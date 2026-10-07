@@ -33,10 +33,26 @@ fi
 info "Backend proxy: $TWINPANEL_BACKEND_URL"
 info "Project: $ROOT"
 
-if [[ ! -x node_modules/.bin/next ]]; then
-  info "Installing dependencies..."
-  npm install --include=optional
+# Keep node_modules synchronized with package.json. This handles dependency
+# additions after git pull even when Next.js was already installed previously.
+DEPS_STAMP="node_modules/.twinpanel-package-hash"
+PACKAGE_HASH="$(sha256sum package.json | awk '{print $1}')"
+INSTALLED_HASH=""
+[[ -f "$DEPS_STAMP" ]] && INSTALLED_HASH="$(cat "$DEPS_STAMP" 2>/dev/null || true)"
+
+if [[ ! -x node_modules/.bin/next || "$INSTALLED_HASH" != "$PACKAGE_HASH" ]]; then
+  info "Synchronizing dependencies..."
+  npm install --include=optional --no-audit --no-fund
+  mkdir -p node_modules
+  printf '%s\n' "$PACKAGE_HASH" > "$DEPS_STAMP"
 fi
+
+# Extra integrity check for the QR dependency used by account delivery.
+node -e 'require.resolve("qrcode.react")' >/dev/null 2>&1 || {
+  info "Repairing missing qrcode.react dependency..."
+  npm install --include=optional --no-audit --no-fund
+  printf '%s\n' "$PACKAGE_HASH" > "$DEPS_STAMP"
+}
 
 CURRENT_REV="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 BUILT_REV=""
