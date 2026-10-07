@@ -1,0 +1,250 @@
+.shell{
+  --sidebar-width:248px;
+  min-height:100vh;
+  display:flex;
+  align-items:flex-start;
+  background:transparent;
+}
+
+.shell.sidebar-collapsed{
+  --sidebar-width:84px;
+}
+
+.sidebar{
+  position:sticky;
+  top:0;
+  flex:0 0 var(--sidebar-width);
+  width:var(--sidebar-width);
+  height:100vh;
+  inset:auto;
+  border-inline-end:1px solid var(--line);
+  border-inline-start:0;
+  background:#080b12f5;
+  backdrop-filter:blur(18px);
+  padding:16px 13px;
+  display:flex;
+  flex-direction:column;
+  z-index:20;
+  overflow:hidden;
+  transition:width .22s ease,flex-basis .22s ease,padding .22s ease;
+}
+
+.sidebar-head{
+  min-height:42px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.sidebar-head .brand{
+  min-width:0;
+  flex:1;
+}
+
+.brand-copy,.profile-copy,.nav-label{
+  min-width:0;
+  white-space:nowrap;
+  overflow:hidden;
+  transition:opacity .16s ease,max-width .22s ease;
+}
+
+.sidebar-collapse,.mobile-menu-close,.mobile-menu-toggle{
+  border:1px solid var(--line);
+  background:#0d121d;
+  color:#a8b0bf;
+  border-radius:10px;
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  flex:0 0 34px;
+}
+
+.mobile-menu-close,.mobile-menu-toggle{
+  display:none;
+}
+
+.shell.sidebar-collapsed .sidebar{
+  padding-inline:12px;
+}
+
+.shell.sidebar-collapsed .brand-copy,
+.shell.sidebar-collapsed .profile-copy,
+.shell.sidebar-collapsed .nav-label{
+  opacity:0;
+  max-width:0;
+  pointer-events:none;
+}
+
+.shell.sidebar-collapsed .sidebar-head .brand{
+  flex:0 0 auto;
+}
+
+.shell.sidebar-collapsed .brand img{
+  width:38px;
+  height:38px;
+}
+
+.shell.sidebar-collapsed .sidebar-head{
+  flex-direction:column;
+  min-height:84px;
+}
+
+.shell.sidebar-collapsed .sidebar-collapse{
+  width:38px;
+  flex-basis:34px;
+}
+
+.sidebar nav{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  margin-top:28px;
+}
+
+.sidebar nav a{
+  min-height:42px;
+  padding:10px 12px;
+  border-radius:11px;
+  color:#909aad;
+  display:flex;
+  gap:10px;
+  align-items:center;
+  border:1px solid transparent;
+  overflow:hidden;
+}
+
+.sidebar nav a i{
+  flex:0 0 20px;
+}
+
+.shell.sidebar-collapsed .sidebar nav a{
+  justify-content:center;
+  padding-inline:8px;
+}
+
+.profile{
+  min-width:0;
+}
+
+.shell.sidebar-collapsed .profile{
+  justify-content:center;
+  padding-inline:0;
+}
+
+.shell main{
+  flex:1 1 auto;
+  width:auto;
+  min-width:0;
+  grid-column:auto;
+  transition:width .22s ease;
+}
+
+.shell main>header{
+  width:100%;
+}
+
+.head-actions{
+  margin-inline-start:auto;
+  margin-right:0;
+}
+
+@media (max-width:1050px){
+  .shell{--sidebar-width:220px}
+  .shell.sidebar-collapsed{--sidebar-width:78px}
+}
+
+@media (max-width:760px){
+  .shell,
+  .shell.sidebar-collapsed{
+    --sidebar-width:100%;
+    display:block;
+  }
+
+  .sidebar,
+  .shell.sidebar-collapsed .sidebar{
+    position:relative;
+    top:auto;
+    width:100%;
+    height:auto;
+    max-height:0;
+    padding:0 13px;
+    border-inline:0;
+    border-bottom:0 solid var(--line);
+    overflow:hidden;
+    opacity:0;
+    pointer-events:none;
+    transition:max-height .24s ease,opacity .18s ease,padding .24s ease,border-width .24s ease;
+  }
+
+  .shell.mobile-menu-open .sidebar,
+  .shell.mobile-menu-open.sidebar-collapsed .sidebar{
+    max-height:720px;
+    padding:14px 13px 16px;
+    border-bottom-width:1px;
+    opacity:1;
+    pointer-events:auto;
+  }
+
+  .shell.sidebar-collapsed .brand-copy,
+  .shell.sidebar-collapsed .profile-copy,
+  .shell.sidebar-collapsed .nav-label{
+    opacity:1;
+    max-width:260px;
+    pointer-events:auto;
+  }
+
+  .shell.sidebar-collapsed .sidebar-head{
+    flex-direction:row;
+    min-height:42px;
+  }
+
+  .shell.sidebar-collapsed .sidebar nav a,
+  .shell.sidebar-collapsed .profile{
+    justify-content:flex-start;
+    padding-inline:12px;
+  }
+
+  .sidebar nav{
+    margin-top:14px;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:7px;
+  }
+
+  .sidebar nav a{
+    background:#0c111b;
+    border-color:#182235;
+  }
+
+  .sidebar .profile{
+    margin-top:14px;
+  }
+
+  .sidebar-collapse{
+    display:none;
+  }
+
+  .mobile-menu-close{
+    display:grid;
+  }
+
+  .mobile-menu-toggle{
+    display:grid;
+  }
+
+  .shell main{
+    width:100%;
+  }
+
+  .shell main>header{
+    position:sticky;
+    top:0;
+  }
+}
+
+@media (max-width:460px){
+  .sidebar nav{
+    grid-template-columns:1fr;
+  }
+}
