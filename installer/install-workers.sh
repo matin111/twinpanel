@@ -68,6 +68,14 @@ else
   warn "app.backup_worker پیدا نشد؛ Backup timer نصب نشد"
 fi
 
+if [[ -f "$RELEASE/quota-agent/agent.py" ]]; then
+  install_unit "$RELEASE/deploy/systemd/twinpanel-quota-agent.service.tpl" twinpanel-quota-agent.service
+else
+  systemctl disable --now twinpanel-quota-agent.service 2>/dev/null || true
+  rm -f /etc/systemd/system/twinpanel-quota-agent.service
+  warn "Quota Agent code در Release موجود نیست؛ سرویس مرکزی Quota نصب نشد"
+fi
+
 systemctl daemon-reload
 
 if [[ -f /etc/systemd/system/twinpanel-transport-manager.service ]]; then
@@ -89,6 +97,37 @@ if [[ -f /etc/systemd/system/twinpanel-bot.service ]]; then
   else
     systemctl disable --now twinpanel-bot.service 2>/dev/null || true
     info "MAIN_BOT_UNIT_READY token_not_configured"
+  fi
+fi
+
+# Quota Agent is optional on the central host. Never copy PKI/config into Git.
+# Start only when the local production configuration references existing mTLS files.
+if [[ -f /etc/systemd/system/twinpanel-quota-agent.service ]]; then
+  QUOTA_READY=0
+  if [[ -s /etc/twinpanel-quota-agent/config.json ]]; then
+    if python3 - <<'PY'
+import json
+from pathlib import Path
+p=Path('/etc/twinpanel-quota-agent/config.json')
+try:
+    cfg=json.loads(p.read_text())
+except Exception:
+    raise SystemExit(1)
+for key in ('client_cert','client_key','ca_cert'):
+    value=str(cfg.get(key) or '').strip()
+    if not value or not Path(value).is_file():
+        raise SystemExit(1)
+raise SystemExit(0)
+PY
+    then QUOTA_READY=1; fi
+  fi
+
+  if (( QUOTA_READY == 1 )); then
+    install -d -m 700 /var/lib/twinpanel-quota-agent
+    systemctl enable --now twinpanel-quota-agent.service
+  else
+    systemctl disable --now twinpanel-quota-agent.service 2>/dev/null || true
+    info "QUOTA_AGENT_UNIT_READY config_or_mtls_not_configured"
   fi
 fi
 
