@@ -4,17 +4,33 @@ import Link from "next/link";
 import {useEffect,useState} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 
-const menu=[
-  ["داشبورد","Dashboard","/admin","⌂"],
-  ["کاربران","Users","/admin/users","♙"],
-  ["اشتراک‌ها","Subscriptions","/admin/subscriptions","▱"],
-  ["پلن‌ها","Plans","/admin/plans","◈"],
-  ["نودها","Nodes","/admin/nodes","▦"],
-  ["تانل‌ها","Tunnels","/admin/tunnels","⤨"],
-  ["پرداخت‌ها","Payments","/admin/payments","◫"],
-  ["پشتیبانی","Support","/admin/support","◌"],
-  ["اعلان‌ها","Notifications","/admin/notifications","◉"],
-  ["تنظیمات","Settings","/admin/settings","⚙"]
+const menuGroups=[
+  {fa:"مدیریت",en:"Management",items:[
+    ["داشبورد","Dashboard","/admin","⌂"],
+    ["کاربران","Users","/admin/users","♙"],
+    ["اشتراک‌ها","Subscriptions","/admin/subscriptions","▱"],
+    ["پلن‌ها","Plans","/admin/plans","◈"]
+  ]},
+  {fa:"زیرساخت",en:"Infrastructure",items:[
+    ["نودها","Nodes","/admin/nodes","▦"],
+    ["تانل‌ها","Tunnels","/admin/tunnels","⤨"]
+  ]},
+  {fa:"مالی و فروش",en:"Sales & Finance",items:[
+    ["پرداخت‌ها","Payments","/admin/payments","◫"],
+    ["کیف پول","Wallet","/admin/wallet","◉"],
+    ["کد تخفیف","Discounts","/admin/discounts","％"],
+    ["نمایندگی‌ها","Resellers","/admin/resellers","♜"],
+    ["تنظیمات فروشگاه","Store Settings","/admin/store-settings","◇"]
+  ]},
+  {fa:"ارتباطات",en:"Communications",items:[
+    ["ربات تلگرام","Telegram Bot","/admin/telegram","✈"],
+    ["پشتیبانی","Support","/admin/support","◌"],
+    ["اعلان‌ها","Notifications","/admin/notifications","◎"]
+  ]},
+  {fa:"سیستم",en:"System",items:[
+    ["بکاپ و بازیابی","Backup & Restore","/admin/backups","⟲"],
+    ["تنظیمات","Settings","/admin/settings","⚙"]
+  ]}
 ] as const;
 
 export function Shell({children,active="/admin"}:{children:React.ReactNode;active?:string}){
@@ -23,9 +39,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
   const [mobileOpen,setMobileOpen]=useState(false);
 
   useEffect(()=>{
-    try{
-      setCollapsed(localStorage.getItem("twinpanel.sidebar.collapsed")==="1");
-    }catch{}
+    try{setCollapsed(localStorage.getItem("twinpanel.sidebar.collapsed")==="1");}catch{}
   },[]);
 
   const toggleCollapsed=()=>{
@@ -47,12 +61,15 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
         <button className="mobile-menu-close" type="button" onClick={()=>setMobileOpen(false)} aria-label={pick("بستن منو","Close menu")}>×</button>
       </div>
 
-      <nav>{menu.map(([fa,en,h,i])=>{
-        const label=pick(fa,en);
-        return <Link key={h} href={h} title={collapsed?label:undefined} className={active===h?"active":""} onClick={()=>setMobileOpen(false)}>
-          <i>{i}</i><span className="nav-label">{label}</span>
-        </Link>;
-      })}</nav>
+      <nav className="sidebar-nav">{menuGroups.map(group=><div className="nav-group" key={group.en}>
+        <div className="nav-group-title">{pick(group.fa,group.en)}</div>
+        {group.items.map(([fa,en,h,i])=>{
+          const label=pick(fa,en);
+          return <Link key={h} href={h} title={collapsed?label:undefined} className={active===h?"active":""} onClick={()=>setMobileOpen(false)}>
+            <i>{i}</i><span className="nav-label">{label}</span>
+          </Link>;
+        })}
+      </div>)}</nav>
 
       <div className="profile">
         <span className="avatar">M</span>
