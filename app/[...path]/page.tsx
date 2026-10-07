@@ -3,6 +3,7 @@ import {TelegramRuntimePage,BackupsRuntimePage,WalletRuntimePage,DiscountsRuntim
 import {ProvisionRuntimePage,SmsReaderRuntimePage,MotherAccessRuntimePage,AccountDeliveryRuntimePage} from "../../components/admin-infra-runtime";
 import {SupportRuntimePage,NotificationsRuntimePage} from "../../components/admin-ops-runtime";
 import {SystemHealthRuntimePage} from "../../components/system-health-runtime";
+import {TunnelTransportRuntimePage} from "../../components/tunnel-transport-runtime";
 import {DomainsRuntimePage} from "../../components/domains-runtime";
 import {BrandingSettingsPage} from "../../components/branding-settings";
 import {L2tpSettingsPage} from "../../components/l2tp-settings";
@@ -30,6 +31,7 @@ const route=(key:string)=>{
   if(key==="admin/plans") return admin(<AdminCollectionRuntime kind="plans"/>);
   if(key==="admin/nodes") return admin(<AdminCollectionRuntime kind="nodes"/>);
   if(key==="admin/tunnels") return admin(<AdminCollectionRuntime kind="tunnels"/>);
+  if(key==="admin/tunnel-transports") return admin(<TunnelTransportRuntimePage/>);
   if(key==="admin/payments") return admin(<AdminCollectionRuntime kind="payments"/>);
   if(key==="admin/settings") return admin(<SettingsPage2027/>);
   if(key==="admin/system-health") return admin(<SystemHealthRuntimePage/>);
