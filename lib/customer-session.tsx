@@ -2,6 +2,7 @@
 
 import {createContext,useContext,useEffect,useMemo,useState} from "react";
 import {clearCustomerToken,customerApi,CustomerUser,getCustomerToken} from "./customer-api";
+import {getResellerProfile} from "./role-router";
 
 type SessionValue={
   ready:boolean;
@@ -28,6 +29,8 @@ export function CustomerSessionProvider({children}:{children:React.ReactNode}){
       const account=await customerApi.me(current);
       if(account.role==="admin"){window.location.replace("/admin");return;}
       if(!account.is_active)throw new Error("حساب کاربری غیرفعال است");
+      const reseller=await getResellerProfile(current);
+      if(reseller){window.location.replace("/reseller");return;}
       setUser(account);setReady(true);
     }catch(reason){
       clearCustomerToken();setToken(null);setUser(null);

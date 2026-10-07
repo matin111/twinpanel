@@ -6,6 +6,7 @@ import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {useBranding} from "../lib/branding";
 import {customerApi,saveCustomerToken} from "../lib/customer-api";
+import {resolvePortal} from "../lib/role-router";
 
 function AuthArt(){
   const {pick}=useI18n();
@@ -31,7 +32,9 @@ export function LoginPage2027(){
   const finish=async(token:string)=>{
     saveCustomerToken(token,remember);
     const user=await customerApi.me(token);
-    window.location.replace(user.role==="admin"?"/admin":"/panel");
+    if(!user.is_active)throw new Error(pick("حساب غیرفعال است","Account is inactive"));
+    const portal=await resolvePortal(token,user.role);
+    window.location.replace(portal==="admin"?"/admin":portal==="reseller"?"/reseller":"/panel");
   };
 
   const submit=async(event:FormEvent)=>{

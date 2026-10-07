@@ -4,6 +4,6 @@
   "private":true,
   "engines":{"node":">=22.13.0"},
   "scripts":{"dev":"next dev","build":"next build","start":"next start -H 127.0.0.1 -p ${PORT:-3000}"},
-  "dependencies":{"next":"16.2.6","react":"19.2.6","react-dom":"19.2.6"},
+  "dependencies":{"next":"16.2.6","qrcode.react":"^4.2.0","react":"19.2.6","react-dom":"19.2.6"},
   "devDependencies":{"@types/node":"22.19.19","@types/react":"19.2.14","@types/react-dom":"19.2.3","typescript":"5.9.3"}
 }
