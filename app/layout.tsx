@@ -2,6 +2,7 @@ import type {Metadata} from "next";
 import {I18nProvider} from "../lib/i18n";
 import "./core.css";
 import "./pages.css";
+import "./i18n.css";
 
 export const metadata:Metadata={
   title:"TwinPanel 2027",
