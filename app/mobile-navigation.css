@@ -1,0 +1,158 @@
+/* TwinPanel mobile navigation drawer — shared by Admin, Customer and Reseller */
+@media (max-width:760px){
+  .shell,
+  .shell.sidebar-collapsed{
+    display:block!important;
+    --sidebar-width:min(86vw,320px)!important;
+  }
+
+  /* Override the legacy core.css mobile rule that hides all <aside> elements. */
+  .shell .sidebar,
+  .shell.sidebar-collapsed .sidebar{
+    display:flex!important;
+    position:fixed!important;
+    top:0!important;
+    right:0!important;
+    bottom:0!important;
+    left:auto!important;
+    width:min(86vw,320px)!important;
+    max-width:320px!important;
+    height:100dvh!important;
+    max-height:none!important;
+    padding:14px 13px 18px!important;
+    border:0!important;
+    border-left:1px solid var(--line)!important;
+    background:color-mix(in srgb,var(--bg) 96%,transparent)!important;
+    backdrop-filter:blur(22px)!important;
+    overflow:hidden!important;
+    opacity:1!important;
+    transform:translateX(105%)!important;
+    pointer-events:none!important;
+    z-index:1000!important;
+    transition:transform .24s ease!important;
+  }
+
+  .shell.mobile-menu-open .sidebar,
+  .shell.mobile-menu-open.sidebar-collapsed .sidebar{
+    transform:translateX(0)!important;
+    pointer-events:auto!important;
+  }
+
+  .shell.mobile-menu-open::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    background:rgba(2,5,12,.56);
+    backdrop-filter:blur(2px);
+    z-index:990;
+    pointer-events:none;
+  }
+
+  .shell .sidebar-head,
+  .shell.sidebar-collapsed .sidebar-head{
+    min-height:44px!important;
+    flex-direction:row!important;
+  }
+
+  .shell .sidebar-head .brand,
+  .shell.sidebar-collapsed .sidebar-head .brand{
+    flex:1 1 auto!important;
+  }
+
+  .shell.sidebar-collapsed .brand-copy,
+  .shell.sidebar-collapsed .profile-copy,
+  .shell.sidebar-collapsed .nav-label{
+    opacity:1!important;
+    max-width:260px!important;
+    pointer-events:auto!important;
+  }
+
+  .shell .sidebar-collapse{
+    display:none!important;
+  }
+
+  .shell .mobile-menu-close{
+    display:grid!important;
+    position:relative!important;
+    z-index:2!important;
+  }
+
+  /* Always reachable even after the user has scrolled deep into a page. */
+  .shell .mobile-menu-toggle{
+    display:grid!important;
+    position:fixed!important;
+    top:12px!important;
+    right:12px!important;
+    width:42px!important;
+    height:42px!important;
+    border-radius:12px!important;
+    z-index:1002!important;
+    box-shadow:0 10px 28px rgba(0,0,0,.18)!important;
+  }
+
+  .shell main>header{
+    min-height:62px!important;
+    height:62px!important;
+    position:sticky!important;
+    top:0!important;
+    z-index:980!important;
+    padding-inline:64px 12px!important;
+  }
+
+  .shell main>header .search{
+    display:none!important;
+  }
+
+  .shell main>header .head-actions{
+    margin-inline-start:auto!important;
+  }
+
+  .shell .sidebar-nav{
+    flex:1 1 auto!important;
+    overflow-y:auto!important;
+    overscroll-behavior:contain;
+    padding-bottom:12px;
+  }
+
+  .shell .sidebar nav,
+  .shell.sidebar-collapsed .sidebar nav{
+    display:flex!important;
+    flex-direction:column!important;
+    grid-template-columns:none!important;
+    margin-top:14px!important;
+    gap:5px!important;
+  }
+
+  .shell .sidebar nav a,
+  .shell.sidebar-collapsed .sidebar nav a{
+    min-height:44px!important;
+    justify-content:flex-start!important;
+    padding:10px 12px!important;
+  }
+
+  .shell .sidebar .profile,
+  .shell.sidebar-collapsed .sidebar .profile{
+    flex:0 0 auto!important;
+    justify-content:flex-start!important;
+    padding:12px 7px!important;
+    margin-top:8px!important;
+  }
+
+  html[data-theme="light"] .shell .sidebar,
+  html[data-theme="light"] .shell.sidebar-collapsed .sidebar{
+    background:rgba(255,255,255,.98)!important;
+    border-left-color:#dfe5ee!important;
+  }
+}
+
+@media (max-width:420px){
+  .shell .sidebar,
+  .shell.sidebar-collapsed .sidebar{
+    width:min(90vw,310px)!important;
+  }
+
+  .shell .mobile-menu-toggle{
+    top:10px!important;
+    right:10px!important;
+  }
+}
