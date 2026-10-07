@@ -41,7 +41,7 @@ export function BrandingProvider({children}:{children:React.ReactNode}){
   },[]);
 
   useEffect(()=>{
-    document.title=`${brand.name} · Control`;
+    document.title=brand.name;
     document.documentElement.style.setProperty("--brand-accent",brand.accent);
   },[brand.name,brand.accent]);
 
@@ -72,6 +72,6 @@ export function BrandMark({compact=false}:{compact?:boolean}){
   const {brand}=useBranding();
   return <div className="brand">
     <img src={brand.logoUrl} alt={brand.name}/>
-    {!compact&&<div className="brand-copy"><b>{brand.name}</b><small>{brand.tagline}</small></div>}
+    {!compact&&<div className="brand-copy"><b>{brand.name}</b></div>}
   </div>;
 }
