@@ -1,4 +1,5 @@
-import {AdminDashboard,AdminListPage,NotificationsPage,SupportPage} from "../../components/admin-screens";
+import {AdminListPage,NotificationsPage,SupportPage} from "../../components/admin-screens";
+import {AdminDashboard2027} from "../../components/admin-dashboard-2027";
 import {BackupsPage,DiscountsPage,ResellersAdminPage,StoreSettingsPage,TelegramPage,WalletPage} from "../../components/admin-extra-screens";
 import {AccountDeliveryPage,BrandingPage,DomainsPage,MotherAccessPage,ProvisionPage,SmsReaderPage,TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
 import {SettingsPage2027} from "../../components/settings-2027";
@@ -11,7 +12,7 @@ const resellerSections=new Set(["customers","subscriptions","sales","wallet","or
 
 const route=(key:string)=>{
   if(key==="login") return <LoginPage2027/>;
-  if(key==="admin") return <AdminDashboard/>;
+  if(key==="admin") return <AdminDashboard2027/>;
   if(key==="admin/settings") return <SettingsPage2027/>;
   if(key==="admin/notifications") return <NotificationsPage/>;
   if(key==="admin/support") return <SupportPage/>;

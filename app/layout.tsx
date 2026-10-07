@@ -9,6 +9,7 @@ import "./modules.css";
 import "./control-plane.css";
 import "./theme.css";
 import "./store-2027.css";
+import "./dashboard-2027.css";
 
 export const metadata:Metadata={
   title:"TwinPanel 2027",
