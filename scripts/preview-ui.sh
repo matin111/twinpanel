@@ -3,6 +3,11 @@ set -euo pipefail
 
 PORT="${PORT:-3010}"
 HOST="${HOST:-127.0.0.1}"
+API_URL="${API_URL:-${TWINPANEL_BACKEND_URL:-}}"
+
+if [ -n "$API_URL" ]; then
+  export TWINPANEL_BACKEND_URL="${API_URL%/}"
+fi
 
 if ! command -v node >/dev/null 2>&1; then
   echo "ERROR: Node.js is not installed. Node >=22.13 is required."
@@ -24,6 +29,12 @@ if [ -f package-lock.json ]; then
   npm ci
 else
   npm install --no-audit --no-fund
+fi
+
+if [ -n "${TWINPANEL_BACKEND_URL:-}" ]; then
+  echo "[TwinPanel] Backend proxy: ${TWINPANEL_BACKEND_URL}"
+else
+  echo "[TwinPanel] Backend proxy: disabled (UI-only preview)"
 fi
 
 echo "[TwinPanel] Building UI..."
