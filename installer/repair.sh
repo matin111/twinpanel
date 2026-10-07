@@ -48,6 +48,9 @@ nginx -t
 systemctl daemon-reload
 systemctl enable twinpanel-api.service twinpanel-web.service nginx.service
 systemctl restart twinpanel-api.service twinpanel-web.service
+
+bash "$CURRENT/installer/install-workers.sh" "$CURRENT"
+install -m 755 "$CURRENT/installer/twinpanelctl" /usr/local/bin/twinpanel
 systemctl reload nginx
 
 if bash "$CURRENT/installer/healthcheck.sh"; then
