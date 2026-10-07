@@ -7,12 +7,16 @@ on:
       - 'feat/backend-runtime-import-*'
     paths:
       - 'backend/**'
+      - 'installer/**'
+      - 'deploy/**'
       - 'scripts/import-legacy-backend-clean.sh'
       - '.github/workflows/backend-static.yml'
   pull_request:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'installer/**'
+      - 'deploy/**'
       - 'scripts/import-legacy-backend-clean.sh'
       - '.github/workflows/backend-static.yml'
 
@@ -45,19 +49,44 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [ -d backend/app ] || exit 0
-          if grep -RInE 'BEGIN ([A-Z0-9 ]+ )?PRIVATE KEY|BEGIN OPENSSH PRIVATE KEY|github_pat_[A-Za-z0-9_]+|ghp_[A-Za-z0-9]+|AKIA[0-9A-Z]{16}' backend/app 2>/dev/null; then
+          if grep -RInE \
+            --exclude='.env.example' \
+            'BEGIN ([A-Z0-9 ]+ )?PRIVATE KEY|BEGIN OPENSSH PRIVATE KEY|github_pat_[A-Za-z0-9_]+|ghp_[A-Za-z0-9]+|AKIA[0-9A-Z]{16}' \
+            backend installer deploy 2>/dev/null; then
             echo 'Potential private material detected.'
             exit 1
           fi
 
-      - name: Compile Python source
+      - name: Compile Python bootstrap
         shell: bash
         run: |
+          set -euo pipefail
+          python -m py_compile backend/create_admin.py
           if [ -d backend/app ]; then python -m compileall -q backend/app; fi
+
+      - name: Validate installer shell syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/import-legacy-backend-clean.sh
+          for file in installer/*.sh installer/twinpanelctl; do
+            [ -f "$file" ] || continue
+            bash -n "$file"
+          done
 
       - name: Validate dependency file
         shell: bash
         run: |
+          set -euo pipefail
           test -s backend/requirements.txt
           python -m pip install --disable-pip-version-check --dry-run -r backend/requirements.txt >/dev/null
+
+      - name: Report runtime migration gate
+        shell: bash
+        run: |
+          if [ -f backend/app/main.py ]; then
+            echo 'BACKEND_RUNTIME_PRESENT=1'
+          else
+            echo 'BACKEND_RUNTIME_PRESENT=0'
+            echo 'Static scaffolding is valid; runtime import/health gates remain intentionally pending.'
+          fi
