@@ -99,7 +99,9 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
 
 export function PageHead({title,sub,action}:{title:string;sub:string;action?:string}){
   const {brand}=useBranding();
-  return <div className="page-head"><div><small>{brand.name.toUpperCase()} · 2027</small><h1>{title}</h1><p>{sub}</p></div>{action&&<button className="primary">＋ {action}</button>}</div>;
+  const safeTitle=title.replaceAll("TwinPanel",brand.name);
+  const safeSub=sub.replaceAll("TwinPanel",brand.name);
+  return <div className="page-head"><div><small>{brand.name.toUpperCase()} · 2027</small><h1>{safeTitle}</h1><p>{safeSub}</p></div>{action&&<button className="primary">＋ {action}</button>}</div>;
 }
 
 export function Card({children,className=""}:{children:React.ReactNode;className?:string}){
