@@ -1,0 +1,78 @@
+/* TwinPanel readability baseline */
+html,body{font-size:14px}
+body{line-height:1.65}
+
+button,input,select,textarea{font-size:13px}
+button,a{line-height:1.45}
+small{font-size:12px}
+
+/* Shared admin / customer / reseller readability */
+.page,.card,.shell,.customer-shell,.reseller-shell{font-size:14px}
+.page h1,.page-head h1{font-size:clamp(25px,2.2vw,34px)}
+.card b,.row b,.activity b,.profile-copy b{font-size:13px}
+.card small,.row small,.activity small,.profile-copy small{font-size:11.5px}
+.badge{font-size:11px;line-height:1.35;padding-block:5px}
+.toolbar input,.toolbar button,.search input{font-size:12.5px}
+.table table{font-size:13px}
+.table th{font-size:12px}
+.table td{font-size:12.5px}
+.stat small{font-size:12px}
+.stat b{font-size:clamp(24px,2vw,34px);font-variant-numeric:tabular-nums}
+
+/* Store readability */
+.store2027{font-size:14px}
+.store-nav nav{font-size:12.5px}
+.store-nav .brand b{font-size:16px}
+.store2027 .primary,.store2027 .ghost,.store2027 button{font-size:12.5px}
+.eyebrow{font-size:11.5px}
+.hero-copy>p{font-size:14px}
+.proof-grid b{font-size:17px;font-variant-numeric:tabular-nums}
+.proof-grid span{font-size:11px}
+.product-preview small,.product-preview span{font-size:11px}
+.product-preview b{font-size:17px}
+.delivery-list b{font-size:12.5px}
+.delivery-list small{font-size:11px}
+.value-strip b{font-size:12.5px}
+.value-strip small{font-size:11px}
+.section-title small{font-size:11px}
+.section-title p{font-size:13px}
+.plan-head>span,.plan-note{font-size:11px}
+.plan-price strong{font-size:38px;font-variant-numeric:tabular-nums}
+.plan-price span{font-size:11px}
+.plan-facts span{font-size:10.5px}
+.plan-facts b{font-size:13px}
+.sales-plan li{font-size:12.5px}
+.purchase-path b{font-size:12.5px}
+.purchase-path small{font-size:11px}
+.sales-protocol p{font-size:12px}
+.protocol-meta button{font-size:11px}
+.guide-selectors>div>small{font-size:11px}
+.guide-tabs button{font-size:12px}
+.guide-result-head small{font-size:10.5px}
+.guide-result-head h3{font-size:18px}
+.guide-steps b{font-size:12.5px}
+.guide-steps p{font-size:11.5px}
+.guide-help b{font-size:12.5px}
+.guide-help p{font-size:11px}
+.conversion-dedicated p,.store-cta p{font-size:12.5px}
+.chips span{font-size:11px}
+.faq-accordion summary{font-size:13px}
+.faq-accordion details p{font-size:12px}
+.store-footer>div:not(.brand){font-size:11.5px}
+.store-footer>div b{font-size:12.5px}
+
+/* Make numeric UI easier to scan */
+.plan-price strong,.stat b,.proof-grid b,.purchase-path span,.delivery-list>div>span,.guide-steps>div>span{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+
+@media(max-width:680px){
+  html,body{font-size:15px}
+  button,input,select,textarea{font-size:14px}
+  small{font-size:12px}
+  .store-nav nav{font-size:13px}
+  .hero-copy>p{font-size:13.5px}
+  .proof-grid span,.value-strip small,.delivery-list small,.purchase-path small{font-size:11.5px}
+  .sales-plan li,.section-title p,.sales-protocol p,.guide-steps p,.faq-accordion details p{font-size:12.5px}
+  .guide-tabs button,.store2027 .primary,.store2027 .ghost,.store2027 button{font-size:13px}
+  .table table{font-size:13px}
+  .table th,.table td{font-size:12.5px}
+}

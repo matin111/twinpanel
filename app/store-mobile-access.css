@@ -1,0 +1,25 @@
+.store-mobile-open,.store-register-quick,.store-mobile-drawer{display:none}
+
+@media(max-width:1180px){
+  .store-mobile-open{display:grid;position:fixed;top:14px;inset-inline-start:14px;z-index:120;width:44px;height:44px;place-items:center;border:1px solid var(--line);border-radius:13px;background:color-mix(in srgb,var(--surface) 92%,transparent);color:var(--text);box-shadow:0 10px 30px rgba(0,0,0,.14);font-size:20px;cursor:pointer;backdrop-filter:blur(18px)}
+  .store-register-quick{display:inline-flex;position:fixed;top:14px;inset-inline-end:14px;z-index:120;min-height:44px;align-items:center;justify-content:center;padding:0 15px;border-radius:12px;background:linear-gradient(135deg,#6d45e8,#8b5cf6);color:#fff!important;font-size:13px;font-weight:800;box-shadow:0 10px 30px rgba(109,69,232,.22)}
+  .store-mobile-drawer{display:block;position:fixed;inset:0;z-index:140;pointer-events:none;visibility:hidden}
+  .store-mobile-drawer.open{pointer-events:auto;visibility:visible}
+  .store-mobile-overlay{position:absolute;inset:0;border:0;background:rgba(5,7,12,.58);opacity:0;transition:.2s;cursor:pointer}
+  .store-mobile-drawer.open .store-mobile-overlay{opacity:1}
+  .store-mobile-drawer aside{position:absolute;top:0;bottom:0;inset-inline-start:0;width:min(86vw,340px);padding:18px;background:var(--surface);border-inline-end:1px solid var(--line);box-shadow:0 0 50px rgba(0,0,0,.28);transform:translateX(-105%);transition:transform .22s ease;display:flex;flex-direction:column;gap:18px;overflow:auto}
+  html[dir="rtl"] .store-mobile-drawer aside{transform:translateX(105%)}
+  .store-mobile-drawer.open aside{transform:translateX(0)!important}
+  .store-mobile-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+  .store-mobile-head b{font-size:15px}
+  .store-mobile-head button{width:38px;height:38px;border:1px solid var(--line);border-radius:10px;background:var(--surface2);color:var(--text);font-size:22px;cursor:pointer}
+  .store-mobile-drawer nav{display:grid;gap:8px}
+  .store-mobile-drawer nav button{min-height:48px;padding:0 14px;text-align:start;border:1px solid var(--line);border-radius:12px;background:var(--surface2);color:var(--text);font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+  .store-mobile-account{margin-top:auto;display:grid;gap:9px;padding-top:15px;border-top:1px solid var(--line)}
+  .store-mobile-account a{min-height:46px;display:flex;align-items:center;justify-content:center;border-radius:12px;font-size:13px;font-weight:800;text-decoration:none}
+}
+
+@media(max-width:460px){
+  .store-mobile-open{top:10px;inset-inline-start:10px;width:42px;height:42px}
+  .store-register-quick{top:10px;inset-inline-end:10px;min-height:42px;padding-inline:12px;font-size:12px}
+}
