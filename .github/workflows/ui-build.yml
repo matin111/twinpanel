@@ -2,7 +2,7 @@ name: TwinPanel UI Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/full-parity-v1]
   pull_request:
     branches: [main]
 
