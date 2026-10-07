@@ -22,7 +22,7 @@ function AuthArt(){
 
 function safeNextForPortal(raw:string|null,portal:"admin"|"reseller"|"customer"){
   if(!raw||!raw.startsWith("/")||raw.startsWith("//"))return null;
-  const allowed=portal==="admin"?raw.startsWith("/admin"):portal==="reseller"?raw.startsWith("/reseller"):raw.startsWith("/panel");
+  const allowed=portal==="admin"?raw.startsWith("/admin"):portal==="reseller"?raw.startsWith("/reseller"):raw.startsWith("/panel")||raw.startsWith("/store");
   return allowed?raw:null;
 }
 
@@ -63,6 +63,9 @@ export function LoginPage2027(){
     finally{setBusy(false);}
   };
 
+  const next=searchParams.get("next");
+  const registerHref=next?`/register?next=${encodeURIComponent(next)}`:"/register";
+
   return <div className="login login2027">
     <AuthArt/>
     <section className="login-form">
@@ -78,7 +81,7 @@ export function LoginPage2027(){
         {error&&<div className="auth-error">{error}</div>}
         <button className="primary full" disabled={busy}>{busy?pick("در حال بررسی...","Please wait..."):twoFactorToken?pick("تأیید و ورود","Verify and sign in"):pick("ورود","Sign in")}</button>
         {twoFactorToken&&<button type="button" className="auth-link-button" onClick={()=>{setTwoFactorToken("");setCode("");setError("");}}>{pick("بازگشت به ورود","Back to sign in")}</button>}
-        {!twoFactorToken&&<small className="signup">{pick("حساب ندارید؟","No account?")} <Link href="/register">{pick("ثبت‌نام کاربر","Create customer account")}</Link></small>}
+        {!twoFactorToken&&<small className="signup">{pick("حساب ندارید؟","No account?")} <Link href={registerHref}>{pick("ثبت‌نام کاربر","Create customer account")}</Link></small>}
       </form>
     </section>
   </div>;
@@ -86,6 +89,7 @@ export function LoginPage2027(){
 
 export function RegisterPage2027(){
   const {pick}=useI18n();
+  const searchParams=useSearchParams();
   const [name,setName]=useState("");
   const [email,setEmail]=useState("");
   const [password,setPassword]=useState("");
@@ -101,10 +105,14 @@ export function RegisterPage2027(){
     try{
       const result=await customerApi.register(email.trim().toLowerCase(),password,name.trim());
       saveCustomerToken(result.access_token,true);
-      window.location.replace("/panel");
+      const requested=safeNextForPortal(searchParams.get("next"),"customer");
+      window.location.replace(requested||"/panel");
     }catch(reason){setError(reason instanceof Error?reason.message:pick("ثبت‌نام ناموفق بود","Registration failed"));}
     finally{setBusy(false);}
   };
+
+  const next=searchParams.get("next");
+  const loginHref=next?`/login?next=${encodeURIComponent(next)}`:"/login";
 
   return <div className="login login2027">
     <AuthArt/>
@@ -119,7 +127,7 @@ export function RegisterPage2027(){
         <div className="customer-only-note">{pick("این فرم فقط حساب کاربر عادی ایجاد می‌کند.","This form creates customer accounts only.")}</div>
         {error&&<div className="auth-error">{error}</div>}
         <button className="primary full" disabled={busy}>{busy?pick("در حال ساخت حساب...","Creating account..."):pick("ثبت‌نام","Create account")}</button>
-        <small className="signup">{pick("حساب دارید؟","Already have an account?")} <Link href="/login">{pick("ورود","Sign in")}</Link></small>
+        <small className="signup">{pick("حساب دارید؟","Already have an account?")} <Link href={loginHref}>{pick("ورود","Sign in")}</Link></small>
       </form>
     </section>
   </div>;
