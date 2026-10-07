@@ -23,7 +23,7 @@ systemctl daemon-reload
 systemctl restart twinpanel-api.service twinpanel-web.service
 systemctl reload nginx
 
-if "$PREVIOUS/installer/healthcheck.sh"; then
+if bash "$PREVIOUS/installer/healthcheck.sh"; then
   echo "ROLLBACK_OK release=$PREVIOUS"
   warn "Rollback فقط کد/Runtime را برگرداند. دیتابیس عمداً Restore نشد."
   exit 0
