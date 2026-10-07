@@ -17,7 +17,7 @@ export function BrandingSettingsPage(){
   const reset=()=>{resetBrand();setSaved(false)};
 
   return <Shell active="/admin/branding"><div className="page">
-    <PageHead title={pick("برندینگ","Branding")} sub={pick("تنها مرجع نام، لوگو و هویت عمومی پنل","The single source of truth for product name, logo and public identity")}/>
+    <PageHead title={pick("برندینگ","Branding")}/>
     <div className="module-grid two">
       <Card>
         <h3>{pick("هویت برند","Brand identity")}</h3>
@@ -34,7 +34,6 @@ export function BrandingSettingsPage(){
         <div className="brand-preview"><img src={draft.logoUrl} alt={draft.name}/><div><b>{draft.name||pick("بدون نام","Unnamed")}</b><small>{draft.tagline}</small></div></div>
         <div className="brand-preview-meta"><span>{pick("نام کوتاه","Short name")}</span><b>{draft.shortName||"—"}</b></div>
         <div className="brand-preview-meta"><span>{pick("لینک پشتیبانی","Support link")}</span><b>{draft.supportLink||"—"}</b></div>
-        <p className="muted">{pick("پس از ذخیره، همین هویت در منوی ادمین، پنل کاربری، نمایندگی، ورود، فروشگاه و عنوان مرورگر استفاده می‌شود.","After saving, this identity is used by Admin, Customer, Reseller, Login, Store and the browser title.")}</p>
       </Card>
     </div>
   </div></Shell>;
