@@ -87,6 +87,11 @@ chmod 644 /etc/systemd/system/twinpanel-api.service /etc/systemd/system/twinpane
 systemctl daemon-reload
 systemctl restart twinpanel-api.service twinpanel-web.service
 
+# Re-render/restart verified worker units so every process points at /opt/twinpanel/current.
+bash "$RELEASE/installer/install-workers.sh" "$RELEASE"
+install -m 755 "$RELEASE/installer/twinpanelctl" /usr/local/bin/twinpanel
+systemctl reload nginx || true
+
 if bash "$RELEASE/installer/healthcheck.sh"; then
   prune_releases 3
   echo "UPDATE_OK release=$RELEASE db_backup=$DB_BACKUP"
@@ -96,8 +101,14 @@ fi
 warn "New release failed healthcheck; switching code back to $CURRENT"
 atomic_activate "$CURRENT"
 record_previous_release "$RELEASE"
+
+export TWINPANEL_DOMAIN TWINPANEL_WEB_PORT TWINPANEL_API_PORT
+render "$CURRENT/deploy/systemd/twinpanel-api.service.tpl" /etc/systemd/system/twinpanel-api.service
+render "$CURRENT/deploy/systemd/twinpanel-web.service.tpl" /etc/systemd/system/twinpanel-web.service
 systemctl daemon-reload
 systemctl restart twinpanel-api.service twinpanel-web.service
+bash "$CURRENT/installer/install-workers.sh" "$CURRENT" || true
+install -m 755 "$CURRENT/installer/twinpanelctl" /usr/local/bin/twinpanel 2>/dev/null || true
 systemctl reload nginx || true
 bash "$CURRENT/installer/healthcheck.sh" || true
 fail "UPDATE_FAILED_ROLLED_BACK_CODE. Database was not auto-restored. Backup: $DB_BACKUP"
