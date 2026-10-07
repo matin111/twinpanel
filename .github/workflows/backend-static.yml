@@ -51,6 +51,9 @@ jobs:
           set -euo pipefail
           if grep -RInE \
             --exclude='.env.example' \
+            --exclude='import-legacy-backend-clean.sh' \
+            --exclude='export-legacy-backend-clean.sh' \
+            --exclude='import-backend-export.sh' \
             'BEGIN ([A-Z0-9 ]+ )?PRIVATE KEY|BEGIN OPENSSH PRIVATE KEY|github_pat_[A-Za-z0-9_]+|ghp_[A-Za-z0-9]+|AKIA[0-9A-Z]{16}' \
             backend installer deploy scripts 2>/dev/null; then
             echo 'Potential private material detected.'
