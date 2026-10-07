@@ -9,6 +9,10 @@ load_install_env
 need curl
 need systemctl
 
+if [[ -f "$TP_CURRENT/installer/twinpanelctl" ]]; then
+  install -m 755 "$TP_CURRENT/installer/twinpanelctl" /usr/local/sbin/twinpanel
+fi
+
 say "TwinPanel healthcheck"
 
 failed=0
