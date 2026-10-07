@@ -228,6 +228,12 @@ systemctl daemon-reload
 systemctl enable twinpanel-api.service twinpanel-web.service
 systemctl restart twinpanel-api.service
 systemctl restart twinpanel-web.service
+
+# Install only the workers proven active/healthy in the legacy audit. The obsolete
+# vpnshop-relay-manager remains disabled; twinpanel-transport-manager is the single writer.
+bash "$RELEASE/installer/install-workers.sh" "$RELEASE"
+
+install -m 755 "$RELEASE/installer/twinpanelctl" /usr/local/bin/twinpanel
 systemctl reload nginx
 
 if ! bash "$RELEASE/installer/healthcheck.sh"; then
