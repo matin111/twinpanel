@@ -4,6 +4,7 @@ import {ThemeProvider} from "../lib/theme";
 import {BrandingProvider} from "../lib/branding";
 import {SupportChatWidget} from "../components/support-chat-widget";
 import {ChatOpenBridge} from "../components/chat-open-bridge";
+import {StoreMobileAccess} from "../components/store-mobile-access";
 import "./core.css";
 import "./pages.css";
 import "./i18n.css";
@@ -21,6 +22,8 @@ import "./support-chat-emoji.css";
 import "./customer-runtime.css";
 import "./customer-dashboard-pro.css";
 import "./domains-runtime.css";
+import "./store-mobile-access.css";
+import "./readability.css";
 
 export const metadata:Metadata={
   title:"VPN Control 2027",
@@ -29,6 +32,6 @@ export const metadata:Metadata={
 
 export default function RootLayout({children}:{children:React.ReactNode}){
   return <html lang="fa" dir="rtl" data-theme="dark" suppressHydrationWarning>
-    <body><ThemeProvider><BrandingProvider><I18nProvider>{children}<SupportChatWidget/><ChatOpenBridge/></I18nProvider></BrandingProvider></ThemeProvider></body>
+    <body><ThemeProvider><BrandingProvider><I18nProvider>{children}<StoreMobileAccess/><SupportChatWidget/><ChatOpenBridge/></I18nProvider></BrandingProvider></ThemeProvider></body>
   </html>;
 }
