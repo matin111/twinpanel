@@ -169,7 +169,6 @@ export const endpoint={
 } as const;
 
 export async function apiFetch<T>(path:string,init?:RequestInit):Promise<T>{
-  if(!API_BASE) throw new Error("NEXT_PUBLIC_API_BASE تنظیم نشده");
   const response=await fetch(`${API_BASE}${path}`,{
     ...init,
     headers:{"Content-Type":"application/json",...(init?.headers||{})},
