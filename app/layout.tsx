@@ -7,6 +7,7 @@ import "./core.css";
 import "./pages.css";
 import "./i18n.css";
 import "./shell.css";
+import "./mobile-navigation.css";
 import "./modules.css";
 import "./control-plane.css";
 import "./theme.css";
