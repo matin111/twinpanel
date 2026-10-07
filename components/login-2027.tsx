@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import {useSearchParams} from "next/navigation";
 import {FormEvent,useState} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
@@ -19,8 +20,15 @@ function AuthArt(){
   </section>;
 }
 
+function safeNextForPortal(raw:string|null,portal:"admin"|"reseller"|"customer"){
+  if(!raw||!raw.startsWith("/")||raw.startsWith("//"))return null;
+  const allowed=portal==="admin"?raw.startsWith("/admin"):portal==="reseller"?raw.startsWith("/reseller"):raw.startsWith("/panel");
+  return allowed?raw:null;
+}
+
 export function LoginPage2027(){
   const {pick}=useI18n();
+  const searchParams=useSearchParams();
   const [email,setEmail]=useState("");
   const [password,setPassword]=useState("");
   const [remember,setRemember]=useState(false);
@@ -34,7 +42,9 @@ export function LoginPage2027(){
     const user=await customerApi.me(token);
     if(!user.is_active)throw new Error(pick("حساب غیرفعال است","Account is inactive"));
     const portal=await resolvePortal(token,user.role);
-    window.location.replace(portal==="admin"?"/admin":portal==="reseller"?"/reseller":"/panel");
+    const fallback=portal==="admin"?"/admin":portal==="reseller"?"/reseller":"/panel";
+    const requested=safeNextForPortal(searchParams.get("next"),portal);
+    window.location.replace(requested||fallback);
   };
 
   const submit=async(event:FormEvent)=>{
