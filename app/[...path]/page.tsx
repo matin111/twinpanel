@@ -1,7 +1,7 @@
-import {NotificationsPage,SupportPage} from "../../components/admin-screens";
 import {TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
 import {TelegramRuntimePage,BackupsRuntimePage,WalletRuntimePage,DiscountsRuntimePage,ResellersRuntimePage,StoreSettingsRuntimePage} from "../../components/admin-parity-runtime";
 import {ProvisionRuntimePage,SmsReaderRuntimePage,MotherAccessRuntimePage,AccountDeliveryRuntimePage} from "../../components/admin-infra-runtime";
+import {SupportRuntimePage,NotificationsRuntimePage} from "../../components/admin-ops-runtime";
 import {DomainsRuntimePage} from "../../components/domains-runtime";
 import {BrandingSettingsPage} from "../../components/branding-settings";
 import {L2tpSettingsPage} from "../../components/l2tp-settings";
@@ -31,8 +31,8 @@ const route=(key:string)=>{
   if(key==="admin/tunnels") return admin(<AdminCollectionRuntime kind="tunnels"/>);
   if(key==="admin/payments") return admin(<AdminCollectionRuntime kind="payments"/>);
   if(key==="admin/settings") return admin(<SettingsPage2027/>);
-  if(key==="admin/notifications") return admin(<NotificationsPage/>);
-  if(key==="admin/support") return admin(<SupportPage/>);
+  if(key==="admin/notifications") return admin(<NotificationsRuntimePage/>);
+  if(key==="admin/support") return admin(<SupportRuntimePage/>);
   if(key==="admin/telegram") return admin(<TelegramRuntimePage/>);
   if(key==="admin/telegram-manager") return admin(<TelegramManagerPage/>);
   if(key==="admin/sms-reader") return admin(<SmsReaderRuntimePage/>);
