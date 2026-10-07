@@ -4,3 +4,10 @@ html[data-theme="light"] .store2027 .guide-steps>div>span{
   border:1px solid #d8ccfa;
   box-shadow:none;
 }
+
+html[data-theme="light"] .store2027 .conversion-dedicated .chips span{
+  background:#ffffff;
+  color:#596579;
+  border-color:#d9e0ea;
+  box-shadow:0 3px 12px rgba(31,42,68,.05);
+}
