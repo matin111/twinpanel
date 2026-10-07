@@ -2,7 +2,7 @@ import {AdminDashboard,AdminListPage,NotificationsPage,SupportPage} from "../../
 import {BackupsPage,DiscountsPage,ResellersAdminPage,StoreSettingsPage,TelegramPage,WalletPage} from "../../components/admin-extra-screens";
 import {AccountDeliveryPage,BrandingPage,DomainsPage,MotherAccessPage,ProvisionPage,SmsReaderPage,TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
 import {SettingsPage2027} from "../../components/settings-2027";
-import {LoginPage} from "../../components/public-screens";
+import {LoginPage2027} from "../../components/login-2027";
 import {CustomerDashboard2027,CustomerSectionPage,ResellerDashboard2027,ResellerSectionPage} from "../../components/portal-pages";
 import {StorePage2027} from "../../components/store-2027";
 
@@ -10,7 +10,7 @@ const customerSections=new Set(["subscription","connection","usage","wallet","pa
 const resellerSections=new Set(["customers","subscriptions","sales","wallet","orders","traffic","bot","notifications","settings"]);
 
 const route=(key:string)=>{
-  if(key==="login") return <LoginPage/>;
+  if(key==="login") return <LoginPage2027/>;
   if(key==="admin") return <AdminDashboard/>;
   if(key==="admin/settings") return <SettingsPage2027/>;
   if(key==="admin/notifications") return <NotificationsPage/>;
