@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {useEffect,useState} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
+import {ThemeSwitch} from "../lib/theme";
 
 const menuGroups=[
   {fa:"مدیریت",en:"Management",items:[
@@ -13,7 +14,10 @@ const menuGroups=[
   ]},
   {fa:"زیرساخت",en:"Infrastructure",items:[
     ["نودها","Nodes","/admin/nodes","▦"],
-    ["تانل‌ها","Tunnels","/admin/tunnels","⤨"]
+    ["تانل‌ها","Tunnels","/admin/tunnels","⤨"],
+    ["راه‌اندازی نود","Provisioning","/admin/provision","⚡"],
+    ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"],
+    ["دسترسی مادر","Mother Access","/admin/mother-access","⌁"]
   ]},
   {fa:"مالی و فروش",en:"Sales & Finance",items:[
     ["پرداخت‌ها","Payments","/admin/payments","◫"],
@@ -24,8 +28,15 @@ const menuGroups=[
   ]},
   {fa:"ارتباطات",en:"Communications",items:[
     ["ربات تلگرام","Telegram Bot","/admin/telegram","✈"],
+    ["مدیریت تلگرام","Telegram Manager","/admin/telegram-manager","◈"],
+    ["SMS Reader","SMS Reader","/admin/sms-reader","▤"],
     ["پشتیبانی","Support","/admin/support","◌"],
     ["اعلان‌ها","Notifications","/admin/notifications","◎"]
+  ]},
+  {fa:"تحویل و سرویس",en:"Delivery & Service",items:[
+    ["تحویل اکانت","Account Delivery","/admin/account-delivery","⇲"],
+    ["تنظیمات VPN","VPN Settings","/admin/vpn-settings","⌁"],
+    ["برندینگ","Branding","/admin/branding","✦"]
   ]},
   {fa:"سیستم",en:"System",items:[
     ["بکاپ و بازیابی","Backup & Restore","/admin/backups","⟲"],
@@ -81,7 +92,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
       <header>
         <button className="mobile-menu-toggle" type="button" onClick={()=>setMobileOpen(v=>!v)} aria-expanded={mobileOpen} aria-label={pick("نمایش منو","Show menu")}>☰</button>
         <div className="search">⌕ <input placeholder={pick("جستجو در پنل...","Search panel...")}/></div>
-        <div className="head-actions"><LanguageSwitch compact/><button type="button">◐</button><button className="notify" type="button">◉</button><span className="avatar">M</span></div>
+        <div className="head-actions"><LanguageSwitch compact/><ThemeSwitch compact/><button className="notify" type="button" title={pick("اعلان‌ها","Notifications")}>◉</button><span className="avatar">M</span></div>
       </header>
       {children}
     </main>
