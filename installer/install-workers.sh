@@ -8,6 +8,7 @@ require_root
 load_install_env
 RELEASE="${1:-$(current_release)}"
 [[ -n "$RELEASE" && -d "$RELEASE/backend/app" ]] || fail "Backend release پیدا نشد"
+[[ -x "$RELEASE/backend/venv/bin/python" ]] || fail "Backend venv پیدا نشد"
 export TWINPANEL_DOMAIN TWINPANEL_WEB_PORT TWINPANEL_API_PORT
 
 install_unit(){
@@ -22,22 +23,39 @@ say "Installing verified TwinPanel workers"
 # V3 transport manager is the single writer. The obsolete relay manager must stay off.
 systemctl disable --now vpnshop-relay-manager.service 2>/dev/null || true
 rm -f /etc/systemd/system/vpnshop-relay-manager.service
+rm -rf /etc/systemd/system/vpnshop-relay-manager.service.d
 
 if [[ -f "$RELEASE/backend/app/tunnel_transport_manager.py" ]]; then
   install_unit "$RELEASE/deploy/systemd/twinpanel-transport-manager.service.tpl" twinpanel-transport-manager.service
 else
+  systemctl disable --now twinpanel-transport-manager.service 2>/dev/null || true
+  rm -f /etc/systemd/system/twinpanel-transport-manager.service
   warn "app.tunnel_transport_manager پیدا نشد؛ Transport Manager نصب نشد"
 fi
 
 if [[ -f "$RELEASE/backend/app/reseller_bot_runtime.py" ]]; then
+  # The legacy runtime expects a Fernet key at this exact path. Generate it locally;
+  # never migrate or commit the old server key.
+  if [[ ! -s /etc/twinpanel-reseller-bot.key ]]; then
+    umask 077
+    "$RELEASE/backend/venv/bin/python" - <<'PY' >/etc/twinpanel-reseller-bot.key
+from cryptography.fernet import Fernet
+print(Fernet.generate_key().decode())
+PY
+    chmod 600 /etc/twinpanel-reseller-bot.key
+  fi
   install_unit "$RELEASE/deploy/systemd/twinpanel-reseller-bots.service.tpl" twinpanel-reseller-bots.service
 else
+  systemctl disable --now twinpanel-reseller-bots.service 2>/dev/null || true
+  rm -f /etc/systemd/system/twinpanel-reseller-bots.service
   warn "app.reseller_bot_runtime پیدا نشد؛ Reseller Bots نصب نشد"
 fi
 
 if [[ -f "$RELEASE/backend/app/telegram_runtime_bot.py" ]]; then
   install_unit "$RELEASE/deploy/systemd/twinpanel-bot.service.tpl" twinpanel-bot.service
 else
+  systemctl disable --now twinpanel-bot.service 2>/dev/null || true
+  rm -f /etc/systemd/system/twinpanel-bot.service
   warn "app.telegram_runtime_bot پیدا نشد؛ Main Bot unit نصب نشد"
 fi
 
@@ -45,6 +63,8 @@ if [[ -f "$RELEASE/backend/app/backup_worker.py" ]]; then
   install_unit "$RELEASE/deploy/systemd/twinpanel-backup.service.tpl" twinpanel-backup.service
   install -m 644 "$RELEASE/deploy/systemd/twinpanel-backup.timer" /etc/systemd/system/twinpanel-backup.timer
 else
+  systemctl disable --now twinpanel-backup.timer 2>/dev/null || true
+  rm -f /etc/systemd/system/twinpanel-backup.service /etc/systemd/system/twinpanel-backup.timer
   warn "app.backup_worker پیدا نشد؛ Backup timer نصب نشد"
 fi
 
@@ -60,14 +80,19 @@ if [[ -f /etc/systemd/system/twinpanel-backup.timer ]]; then
   systemctl enable --now twinpanel-backup.timer
 fi
 
-# Main bot requires its token/secret. Install the unit now, but start it only when configured.
+# Main bot requires its API token/secret. Install the unit now, but start it only
+# after the panel writes /etc/twinpanel-telegram-api.env.
 if [[ -f /etc/systemd/system/twinpanel-bot.service ]]; then
   if [[ -s /etc/twinpanel-telegram-api.env ]]; then
+    chmod 600 /etc/twinpanel-telegram-api.env
     systemctl enable --now twinpanel-bot.service
   else
     systemctl disable --now twinpanel-bot.service 2>/dev/null || true
     info "MAIN_BOT_UNIT_READY token_not_configured"
   fi
 fi
+
+# The removed relay manager must remain disabled after daemon-reload too.
+systemctl disable --now vpnshop-relay-manager.service 2>/dev/null || true
 
 echo "WORKERS_READY"
