@@ -11,6 +11,7 @@ const menuGroups=[
     ["داشبورد","Dashboard","/admin","⌂"],
     ["کاربران","Users","/admin/users","♙"],
     ["اشتراک‌ها","Subscriptions","/admin/subscriptions","▱"],
+    ["ابزار اشتراک","Subscription Tools","/admin/subscription-tools","⌘"],
     ["پلن‌ها","Plans","/admin/plans","◈"]
   ]},
   {fa:"زیرساخت",en:"Infrastructure",items:[
