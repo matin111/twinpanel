@@ -1,4 +1,4 @@
-.theme-switch{display:inline-flex;gap:3px;padding:3px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}.theme-switch button{border:0;background:transparent;color:var(--muted);border-radius:7px;min-width:32px;height:29px}.theme-switch button.active{background:color-mix(in srgb,var(--purple) 28%,transparent);color:var(--text)}.theme-switch.compact button{min-width:29px;height:27px;font-size:11px}
+.theme-switch{display:inline-flex;gap:3px;padding:3px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}.theme-switch button{border:0;background:transparent;color:var(--muted);border-radius:7px;min-width:32px;height:29px}.theme-switch button.active{background:color-mix(in srgb,var(--purple) 28%,transparent);color:var(--text)}.theme-switch.compact button{min-width:29px;height:27px;font-size:11px}.login-tools{position:absolute;top:20px;inset-inline-end:24px;display:flex;align-items:center;gap:7px;z-index:3}.theme-setting-panel{display:flex;align-items:center;gap:16px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--surface2)}.theme-setting-panel p{margin:3px 0 0}
 
 html[data-theme="light"]{--bg:#f5f7fb;--surface:#ffffff;--surface2:#f0f3f9;--line:#dfe5ee;--text:#151922;--muted:#6f7a8d;--purple:#6d43e5;--purple2:#8b6cf6;--green:#159f78;--amber:#c98105;--red:#dc5a70;--shadow:0 18px 50px rgba(31,42,68,.10)}
 html[data-theme="light"] body{background:radial-gradient(circle at 75% -10%,rgba(109,67,229,.09),transparent 30%),var(--bg);color:var(--text)}
@@ -29,5 +29,10 @@ html[data-theme="light"] .badge.ok{background:#e9f8f2;border-color:#bfe8d9;color
 html[data-theme="light"] .badge.warn{background:#fff4de;border-color:#f5d7a3;color:#9a6204}
 html[data-theme="light"] .badge.bad{background:#fff0f3;border-color:#f4c6cf;color:#b63e56}
 html[data-theme="light"] .badge.violet{background:#f0ebff;border-color:#d5c7ff;color:#5e3ac5}
+html[data-theme="light"] .field input,html[data-theme="light"] .field textarea,html[data-theme="light"] .field select,html[data-theme="light"] .secret-field input{background:#fff;border-color:#d7deea;color:var(--text)}
+html[data-theme="light"] .upload-zone{background:#fff;border-color:#cfd7e3}
+html[data-theme="light"] .segments{border-color:#d7deea;background:#fff}
+html[data-theme="light"] .settings-nav button.active{background:#eee9fd;color:#5433bc}
+html[data-theme="light"] .theme-setting-panel{background:#fff}
 
-@media(max-width:760px){html[data-theme="light"] .sidebar,html[data-theme="light"] .shell.sidebar-collapsed .sidebar{background:#fff}}
+@media(max-width:760px){html[data-theme="light"] .sidebar,html[data-theme="light"] .shell.sidebar-collapsed .sidebar{background:#fff}.login-tools{top:13px;inset-inline-end:13px}}
