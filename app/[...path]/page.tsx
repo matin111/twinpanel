@@ -7,7 +7,8 @@ import {BrandingSettingsPage} from "../../components/branding-settings";
 import {L2tpSettingsPage} from "../../components/l2tp-settings";
 import {SettingsPage2027} from "../../components/settings-2027";
 import {LoginPage2027,RegisterPage2027} from "../../components/login-2027";
-import {CustomerDashboardRuntime,CustomerSectionRuntime} from "../../components/customer-runtime";
+import {CustomerSectionRuntime} from "../../components/customer-runtime";
+import {CustomerDashboardPro} from "../../components/customer-dashboard-pro";
 import {ResellerDashboard2027,ResellerSectionPage} from "../../components/portal-pages";
 import {StorePage2027} from "../../components/store-2027";
 
@@ -36,7 +37,7 @@ const route=(key:string)=>{
   if(key==="admin/l2tp") return <L2tpSettingsPage/>;
   if(key==="admin/mother-access") return <MotherAccessPage/>;
   if(key==="admin/branding") return <BrandingSettingsPage/>;
-  if(key==="panel") return <CustomerDashboardRuntime/>;
+  if(key==="panel") return <CustomerDashboardPro/>;
   if(key==="reseller") return <ResellerDashboard2027/>;
   if(key==="store") return <StorePage2027/>;
 

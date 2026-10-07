@@ -14,10 +14,12 @@ import "./control-plane.css";
 import "./theme.css";
 import "./store-2027.css";
 import "./store-light.css";
+import "./store-light-final.css";
 import "./dashboard-2027.css";
 import "./support-chat.css";
 import "./support-chat-emoji.css";
 import "./customer-runtime.css";
+import "./customer-dashboard-pro.css";
 import "./domains-runtime.css";
 
 export const metadata:Metadata={

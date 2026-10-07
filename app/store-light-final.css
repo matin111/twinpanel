@@ -1,0 +1,33 @@
+html[data-theme="light"] .store2027 .conversion-dedicated .chips span,
+html[data-theme="light"] .store2027 .dedicated-card .chips span,
+html[data-theme="light"] .store2027 .guide-steps>div>span,
+html[data-theme="light"] .store2027 .delivery-list>div>span,
+html[data-theme="light"] .store2027 .purchase-path>div>span{
+  background:#f4f0ff !important;
+  color:#5b38bd !important;
+  border-color:#d9cdfb !important;
+  box-shadow:none !important;
+}
+
+html[data-theme="light"] .store2027 .guide-result,
+html[data-theme="light"] .store2027 .guide-shell,
+html[data-theme="light"] .store2027 .dedicated-card,
+html[data-theme="light"] .store2027 .hero-product-card{
+  background:#ffffff !important;
+  border-color:#e2e7ef !important;
+  color:#171a21 !important;
+}
+
+html[data-theme="light"] .store2027 .guide-tabs button,
+html[data-theme="light"] .store2027 .protocol-tabs button{
+  background:#ffffff !important;
+  color:#667085 !important;
+  border-color:#e2e7ef !important;
+}
+
+html[data-theme="light"] .store2027 .guide-tabs button.active,
+html[data-theme="light"] .store2027 .protocol-tabs button.active{
+  background:#f1ecff !important;
+  color:#5634b2 !important;
+  border-color:#d9cdfb !important;
+}
