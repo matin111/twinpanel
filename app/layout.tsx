@@ -11,6 +11,7 @@ import "./modules.css";
 import "./control-plane.css";
 import "./theme.css";
 import "./store-2027.css";
+import "./store-light.css";
 import "./dashboard-2027.css";
 import "./support-chat.css";
 
