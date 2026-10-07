@@ -39,7 +39,18 @@ export const api={
   subscriptions:"/v1/subscriptions",
   nodes:"/v1/nodes",
   tunnels:"/v1/tunnels",
-  provision:"/v1/provision",
+  provision:{
+    base:"/v1/provision",
+    test:"/v1/provision/test",
+    install:"/v1/provision/install",
+    installFabric:"/v1/provision/install-fabric",
+    saveNodeAccess:"/v1/provision/save-node-access",
+    protocolHealth:"/v1/provision/protocol-health",
+    repairProtocols:"/v1/provision/repair-protocols",
+    repairProtocolsSaved:"/v1/provision/repair-protocols-saved",
+    restartProtocol:"/v1/provision/restart-protocol",
+    upgradeAgent:"/v1/provision/upgrade-agent"
+  },
   quotaHealth:"/v1/quota/health",
 
   payments:{
@@ -132,7 +143,7 @@ export const legacyApi={
   subscriptions:api.subscriptions,
   nodes:api.nodes,
   tunnels:api.tunnels,
-  provision:api.provision,
+  provision:api.provision.base,
   quota:api.quotaHealth,
   payments:api.payments.adminIntents,
   support:api.support.admin,
@@ -150,6 +161,9 @@ export const endpoint={
   node:(id:number|string)=>`${api.nodes}/${id}`,
   nodeHealth:(id:number|string)=>`${api.nodes}/${id}/health`,
   nodeProtocols:(id:number|string)=>`${api.nodes}/${id}/protocols`,
+  nodeInstallCommand:(id:number|string)=>`/v1/admin/nodes/${id}/install-command`,
+  provisionNodeAccess:(id:number|string)=>`${api.provision.base}/node-access/${id}`,
+  provisionFabricStatus:(id:number|string)=>`${api.provision.base}/fabric-status/${id}`,
   tunnel:(id:number|string)=>`${api.tunnels}/${id}`,
   tunnelHealth:(id:number|string)=>`${api.tunnels}/${id}/health`,
   subscription:(id:number|string)=>`${api.subscriptions}/${id}`,
@@ -178,7 +192,7 @@ export async function apiFetch<T>(path:string,init?:RequestInit):Promise<T>{
   if(!response.ok){
     let detail="";
     try{detail=JSON.stringify(await response.json());}catch{}
-    throw new Error(`TwinPanel API ${response.status}${detail?`: ${detail}`:""}`);
+    throw new Error(`API ${response.status}${detail?`: ${detail}`:""}`);
   }
   if(response.status===204) return undefined as T;
   return response.json() as Promise<T>;
