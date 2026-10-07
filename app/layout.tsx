@@ -15,6 +15,7 @@ import "./store-2027.css";
 import "./store-light.css";
 import "./dashboard-2027.css";
 import "./support-chat.css";
+import "./support-chat-emoji.css";
 
 export const metadata:Metadata={
   title:"VPN Control 2027",
