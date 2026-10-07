@@ -1,0 +1,63 @@
+name: TwinPanel Backend Static Check
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/backend-runtime-import-*'
+    paths:
+      - 'backend/**'
+      - 'scripts/import-legacy-backend-clean.sh'
+      - '.github/workflows/backend-static.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'scripts/import-legacy-backend-clean.sh'
+      - '.github/workflows/backend-static.yml'
+
+jobs:
+  static-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Reject forbidden backend files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -d backend ]; then exit 0; fi
+          bad="$(find backend -type f \( \
+            -name '.env' -o -name '*.key' -o -name '*.pem' -o -name '*.crt' -o -name '*.cer' -o \
+            -name '*.p12' -o -name '*.pfx' -o -name '*.sql' -o -name '*.dump' -o \
+            -name '*.sqlite' -o -name '*.sqlite3' -o -name '*.bak*' -o -name '*.bad*' -o \
+            -name '*candidate*' -o -name '*zeroed*' -o -name '*before-*' \
+          \) -print)"
+          if [ -n "$bad" ]; then echo "$bad"; exit 1; fi
+
+      - name: Scan obvious private material
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ -d backend/app ] || exit 0
+          if grep -RInE 'BEGIN ([A-Z0-9 ]+ )?PRIVATE KEY|BEGIN OPENSSH PRIVATE KEY|github_pat_[A-Za-z0-9_]+|ghp_[A-Za-z0-9]+|AKIA[0-9A-Z]{16}' backend/app 2>/dev/null; then
+            echo 'Potential private material detected.'
+            exit 1
+          fi
+
+      - name: Compile Python source
+        shell: bash
+        run: |
+          if [ -d backend/app ]; then python -m compileall -q backend/app; fi
+
+      - name: Validate dependency file
+        shell: bash
+        run: |
+          test -s backend/requirements.txt
+          python -m pip install --disable-pip-version-check --dry-run -r backend/requirements.txt >/dev/null
