@@ -2,8 +2,12 @@ import {AdminDashboard,AdminListPage,NotificationsPage,SupportPage} from "../../
 import {BackupsPage,DiscountsPage,ResellersAdminPage,StoreSettingsPage,TelegramPage,WalletPage} from "../../components/admin-extra-screens";
 import {AccountDeliveryPage,BrandingPage,DomainsPage,MotherAccessPage,ProvisionPage,SmsReaderPage,TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
 import {SettingsPage2027} from "../../components/settings-2027";
-import {LoginPage,PanelPage,ResellerPage} from "../../components/public-screens";
+import {LoginPage} from "../../components/public-screens";
+import {CustomerDashboard2027,CustomerSectionPage,ResellerDashboard2027,ResellerSectionPage} from "../../components/portal-pages";
 import {StorePage2027} from "../../components/store-2027";
+
+const customerSections=new Set(["subscription","connection","usage","wallet","payments","support","notifications","profile"]);
+const resellerSections=new Set(["customers","subscriptions","sales","wallet","orders","traffic","bot","notifications","settings"]);
 
 const route=(key:string)=>{
   if(key==="login") return <LoginPage/>;
@@ -25,9 +29,18 @@ const route=(key:string)=>{
   if(key==="admin/vpn-settings") return <VpnSettingsPage/>;
   if(key==="admin/mother-access") return <MotherAccessPage/>;
   if(key==="admin/branding") return <BrandingPage/>;
-  if(key==="panel") return <PanelPage/>;
-  if(key==="reseller") return <ResellerPage/>;
+  if(key==="panel") return <CustomerDashboard2027/>;
+  if(key==="reseller") return <ResellerDashboard2027/>;
   if(key==="store") return <StorePage2027/>;
+
+  if(key.startsWith("panel/")){
+    const section=key.slice("panel/".length);
+    if(customerSections.has(section)) return <CustomerSectionPage section={section}/>;
+  }
+  if(key.startsWith("reseller/")){
+    const section=key.slice("reseller/".length);
+    if(resellerSections.has(section)) return <ResellerSectionPage section={section}/>;
+  }
 
   const map:Record<string,string>={
     "admin/users":"user",
