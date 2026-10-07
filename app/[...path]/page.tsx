@@ -10,7 +10,7 @@ import {LoginPage2027,RegisterPage2027} from "../../components/login-2027";
 import {CustomerSectionRuntime} from "../../components/customer-runtime";
 import {CustomerDashboardPro} from "../../components/customer-dashboard-pro";
 import {ResellerDashboardRuntime,ResellerSectionRuntime} from "../../components/reseller-runtime";
-import {StorePage2027} from "../../components/store-2027";
+import {StoreRuntime2027} from "../../components/store-runtime";
 import {AdminAuthGuard} from "../../components/admin-auth-guard";
 import {AdminDashboardRuntime} from "../../components/admin-dashboard-runtime";
 import {AdminUsersRuntime} from "../../components/admin-users-runtime";
@@ -50,7 +50,7 @@ const route=(key:string)=>{
   if(key==="admin/branding") return admin(<BrandingSettingsPage/>);
   if(key==="panel") return <CustomerDashboardPro/>;
   if(key==="reseller") return <ResellerDashboardRuntime/>;
-  if(key==="store") return <StorePage2027/>;
+  if(key==="store") return <StoreRuntime2027/>;
   if(key.startsWith("panel/")){
     const section=key.slice("panel/".length);
     if(customerSections.has(section)) return <CustomerSectionRuntime section={section}/>;
@@ -59,7 +59,7 @@ const route=(key:string)=>{
     const section=key.slice("reseller/".length);
     if(resellerSections.has(section)) return <ResellerSectionRuntime section={section}/>;
   }
-  return <StorePage2027/>;
+  return <StoreRuntime2027/>;
 };
 
 export default async function Page({params}:{params:Promise<{path:string[]}>}){
