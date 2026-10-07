@@ -4,6 +4,7 @@ import Link from "next/link";
 import {useEffect,useState} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
+import {BrandMark,useBranding} from "../lib/branding";
 
 const menuGroups=[
   {fa:"مدیریت",en:"Management",items:[
@@ -64,10 +65,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
   return <div className={`shell ${collapsed?"sidebar-collapsed":""} ${mobileOpen?"mobile-menu-open":""}`}>
     <aside className="sidebar" aria-label={pick("منوی اصلی","Main navigation")}>
       <div className="sidebar-head">
-        <div className="brand">
-          <img src="/logo.svg" alt="TwinPanel"/>
-          <div className="brand-copy"><b>TwinPanel</b><small>CONTROL 2027</small></div>
-        </div>
+        <BrandMark/>
         <button className="sidebar-collapse" type="button" onClick={toggleCollapsed} aria-label={pick("باز و بسته کردن منو","Toggle sidebar")} title={pick("باز و بسته کردن منو","Toggle sidebar")}>↔</button>
         <button className="mobile-menu-close" type="button" onClick={()=>setMobileOpen(false)} aria-label={pick("بستن منو","Close menu")}>×</button>
       </div>
@@ -100,7 +98,8 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
 }
 
 export function PageHead({title,sub,action}:{title:string;sub:string;action?:string}){
-  return <div className="page-head"><div><small>TWINPANEL 2027</small><h1>{title}</h1><p>{sub}</p></div>{action&&<button className="primary">＋ {action}</button>}</div>;
+  const {brand}=useBranding();
+  return <div className="page-head"><div><small>{brand.name.toUpperCase()} · 2027</small><h1>{title}</h1><p>{sub}</p></div>{action&&<button className="primary">＋ {action}</button>}</div>;
 }
 
 export function Card({children,className=""}:{children:React.ReactNode;className?:string}){
