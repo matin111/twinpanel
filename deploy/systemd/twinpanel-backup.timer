@@ -1,0 +1,12 @@
+[Unit]
+Description=TwinPanel Automatic Backup Scheduler
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+AccuracySec=30s
+Unit=twinpanel-backup.service
+
+[Install]
+WantedBy=timers.target
