@@ -41,6 +41,7 @@ const menuGroups=[
     ["برندینگ","Branding","/admin/branding","✦"]
   ]},
   {fa:"سیستم",en:"System",items:[
+    ["سلامت و امنیت","Health & Security","/admin/system-health","⌾"],
     ["بکاپ و بازیابی","Backup & Restore","/admin/backups","⟲"],
     ["تنظیمات","Settings","/admin/settings","⚙"]
   ]}
