@@ -7,6 +7,7 @@ on:
       - 'feat/backend-runtime-import-*'
     paths:
       - 'backend/**'
+      - 'quota-agent/**'
       - 'installer/**'
       - 'deploy/**'
       - 'scripts/**'
@@ -15,6 +16,7 @@ on:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'quota-agent/**'
       - 'installer/**'
       - 'deploy/**'
       - 'scripts/**'
@@ -32,13 +34,17 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Reject forbidden backend files
+      - name: Reject forbidden runtime files
         shell: bash
         run: |
           set -euo pipefail
-          if [ ! -d backend ]; then exit 0; fi
-          bad="$(find backend -type f \( \
-            -name '.env' -o -name '*.key' -o -name '*.pem' -o -name '*.crt' -o -name '*.cer' -o \
+          roots=()
+          [ -d backend ] && roots+=(backend)
+          [ -d quota-agent ] && roots+=(quota-agent)
+          [ ${#roots[@]} -gt 0 ] || exit 0
+          bad="$(find "${roots[@]}" -type f \( \
+            -name '.env' -o -name '.env.*' -o -name 'config.json' -o \
+            -name '*.key' -o -name '*.pem' -o -name '*.crt' -o -name '*.cer' -o \
             -name '*.p12' -o -name '*.pfx' -o -name '*.sql' -o -name '*.dump' -o \
             -name '*.sqlite' -o -name '*.sqlite3' -o -name '*.bak*' -o -name '*.bad*' -o \
             -name '*candidate*' -o -name '*zeroed*' -o -name '*before-*' \
@@ -55,17 +61,18 @@ jobs:
             --exclude='export-legacy-backend-clean.sh' \
             --exclude='import-backend-export.sh' \
             'BEGIN ([A-Z0-9 ]+ )?PRIVATE KEY|BEGIN OPENSSH PRIVATE KEY|github_pat_[A-Za-z0-9_]+|ghp_[A-Za-z0-9]+|AKIA[0-9A-Z]{16}' \
-            backend installer deploy scripts 2>/dev/null; then
+            backend quota-agent installer deploy scripts 2>/dev/null; then
             echo 'Potential private material detected.'
             exit 1
           fi
 
-      - name: Compile Python bootstrap
+      - name: Compile Python runtime/bootstrap
         shell: bash
         run: |
           set -euo pipefail
           python -m py_compile backend/create_admin.py
           if [ -d backend/app ]; then python -m compileall -q backend/app; fi
+          if [ -d quota-agent ]; then python -m compileall -q quota-agent; fi
 
       - name: Validate shell syntax
         shell: bash
@@ -83,6 +90,7 @@ jobs:
           test -s deploy/systemd/twinpanel-api.service.tpl
           test -s deploy/systemd/twinpanel-web.service.tpl
           test -s deploy/systemd/twinpanel-transport-manager.service.tpl
+          test -s deploy/systemd/twinpanel-quota-agent.service.tpl
           test -s deploy/nginx/twinpanel.conf.tpl
           test ! -e deploy/systemd/vpnshop-relay-manager.service.tpl
 
@@ -97,6 +105,7 @@ jobs:
           grep -q '__DOMAIN__' deploy/nginx/twinpanel.conf.tpl
           grep -q '__WEB_PORT__' deploy/nginx/twinpanel.conf.tpl
           grep -q '__API_PORT__' deploy/nginx/twinpanel.conf.tpl
+          grep -q 'quota-agent/agent.py' deploy/systemd/twinpanel-quota-agent.service.tpl
           grep -q 'vpnshop-relay-manager.service' installer/install-workers.sh
           grep -q 'disable --now vpnshop-relay-manager.service' installer/install-workers.sh
 
@@ -115,4 +124,9 @@ jobs:
           else
             echo 'BACKEND_RUNTIME_PRESENT=0'
             echo 'Static scaffolding is valid; runtime import/health gates remain intentionally pending.'
+          fi
+          if [ -f quota-agent/agent.py ]; then
+            echo 'QUOTA_AGENT_RUNTIME_PRESENT=1'
+          else
+            echo 'QUOTA_AGENT_RUNTIME_PRESENT=0'
           fi
