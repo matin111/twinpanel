@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+CURRENT="/opt/twinpanel/current"
+[[ -d "$CURRENT" ]] || { echo "TwinPanel is not installed" >&2; exit 1; }
+
+cmd="${1:-status}"
+shift || true
+
+case "$cmd" in
+  status)
+    echo "Release: $(readlink -f "$CURRENT" || true)"
+    systemctl --no-pager --full status twinpanel-api.service twinpanel-web.service nginx.service || true
+    ;;
+  health)
+    exec bash "$CURRENT/installer/healthcheck.sh" "$@"
+    ;;
+  repair)
+    exec bash "$CURRENT/installer/repair.sh" "$@"
+    ;;
+  rollback)
+    exec bash "$CURRENT/installer/rollback.sh" "$@"
+    ;;
+  update)
+    source_path="${1:-}"
+    [[ -n "$source_path" ]] || { echo "Usage: twinpanel update /path/to/new/twinpanel-source" >&2; exit 2; }
+    [[ -d "$source_path" ]] || { echo "Source path not found: $source_path" >&2; exit 2; }
+    shift || true
+    export TWINPANEL_SOURCE_ROOT="$(readlink -f "$source_path")"
+    exec bash "$TWINPANEL_SOURCE_ROOT/installer/update.sh" "$@"
+    ;;
+  logs)
+    exec journalctl -u twinpanel-api.service -u twinpanel-web.service -f --no-pager
+    ;;
+  version)
+    cat "$CURRENT/VERSION" 2>/dev/null || basename "$(readlink -f "$CURRENT")"
+    ;;
+  uninstall)
+    exec bash "$CURRENT/installer/uninstall.sh" "$@"
+    ;;
+  *)
+    cat >&2 <<'EOF'
+Usage: twinpanel {status|health|repair|rollback|update PATH|logs|version|uninstall}
+EOF
+    exit 2
+    ;;
+esac
