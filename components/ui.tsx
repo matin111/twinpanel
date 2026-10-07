@@ -4,7 +4,7 @@ import Link from "next/link";
 import {useEffect,useState} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
-import {BrandMark,useBranding} from "../lib/branding";
+import {BrandMark} from "../lib/branding";
 
 const menuGroups=[
   {fa:"مدیریت",en:"Management",items:[
@@ -37,6 +37,7 @@ const menuGroups=[
   {fa:"تحویل و سرویس",en:"Delivery & Service",items:[
     ["تحویل اکانت","Account Delivery","/admin/account-delivery","⇲"],
     ["تنظیمات VPN","VPN Settings","/admin/vpn-settings","⌁"],
+    ["L2TP / IPsec","L2TP / IPsec","/admin/l2tp","◎"],
     ["برندینگ","Branding","/admin/branding","✦"]
   ]},
   {fa:"سیستم",en:"System",items:[
@@ -97,11 +98,8 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
   </div>;
 }
 
-export function PageHead({title,sub,action}:{title:string;sub:string;action?:string}){
-  const {brand}=useBranding();
-  const safeTitle=title.replaceAll("TwinPanel",brand.name);
-  const safeSub=sub.replaceAll("TwinPanel",brand.name);
-  return <div className="page-head"><div><small>{brand.name.toUpperCase()} · 2027</small><h1>{safeTitle}</h1><p>{safeSub}</p></div>{action&&<button className="primary">＋ {action}</button>}</div>;
+export function PageHead({title,sub:_sub,action}:{title:string;sub?:string;action?:string}){
+  return <div className="page-head"><div><h1>{title}</h1></div>{action&&<button className="primary">＋ {action}</button>}</div>;
 }
 
 export function Card({children,className=""}:{children:React.ReactNode;className?:string}){

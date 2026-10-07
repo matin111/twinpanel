@@ -3,6 +3,7 @@ import {AdminDashboard2027} from "../../components/admin-dashboard-2027";
 import {BackupsPage,DiscountsPage,ResellersAdminPage,StoreSettingsPage,TelegramPage,WalletPage} from "../../components/admin-extra-screens";
 import {AccountDeliveryPage,DomainsPage,MotherAccessPage,ProvisionPage,SmsReaderPage,TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
 import {BrandingSettingsPage} from "../../components/branding-settings";
+import {L2tpSettingsPage} from "../../components/l2tp-settings";
 import {SettingsPage2027} from "../../components/settings-2027";
 import {LoginPage2027} from "../../components/login-2027";
 import {CustomerDashboard2027,CustomerSectionPage,ResellerDashboard2027,ResellerSectionPage} from "../../components/portal-pages";
@@ -29,6 +30,7 @@ const route=(key:string)=>{
   if(key==="admin/provision") return <ProvisionPage/>;
   if(key==="admin/account-delivery") return <AccountDeliveryPage/>;
   if(key==="admin/vpn-settings") return <VpnSettingsPage/>;
+  if(key==="admin/l2tp") return <L2tpSettingsPage/>;
   if(key==="admin/mother-access") return <MotherAccessPage/>;
   if(key==="admin/branding") return <BrandingSettingsPage/>;
   if(key==="panel") return <CustomerDashboard2027/>;
