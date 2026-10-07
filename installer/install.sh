@@ -230,7 +230,7 @@ systemctl restart twinpanel-api.service
 systemctl restart twinpanel-web.service
 systemctl reload nginx
 
-if ! "$RELEASE/installer/healthcheck.sh"; then
+if ! bash "$RELEASE/installer/healthcheck.sh"; then
   fail "Healthcheck ناموفق بود؛ journalctl -u twinpanel-api -u twinpanel-web را بررسی کنید"
 fi
 
