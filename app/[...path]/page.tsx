@@ -1,6 +1,6 @@
 import {NotificationsPage,SupportPage} from "../../components/admin-screens";
-import {BackupsPage,DiscountsPage,ResellersAdminPage,StoreSettingsPage,TelegramPage,WalletPage} from "../../components/admin-extra-screens";
 import {AccountDeliveryPage,MotherAccessPage,ProvisionPage,SmsReaderPage,TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
+import {TelegramRuntimePage,BackupsRuntimePage,WalletRuntimePage,DiscountsRuntimePage,ResellersRuntimePage,StoreSettingsRuntimePage} from "../../components/admin-parity-runtime";
 import {DomainsRuntimePage} from "../../components/domains-runtime";
 import {BrandingSettingsPage} from "../../components/branding-settings";
 import {L2tpSettingsPage} from "../../components/l2tp-settings";
@@ -32,14 +32,14 @@ const route=(key:string)=>{
   if(key==="admin/settings") return admin(<SettingsPage2027/>);
   if(key==="admin/notifications") return admin(<NotificationsPage/>);
   if(key==="admin/support") return admin(<SupportPage/>);
-  if(key==="admin/telegram") return admin(<TelegramPage/>);
+  if(key==="admin/telegram") return admin(<TelegramRuntimePage/>);
   if(key==="admin/telegram-manager") return admin(<TelegramManagerPage/>);
   if(key==="admin/sms-reader") return admin(<SmsReaderPage/>);
-  if(key==="admin/backups") return admin(<BackupsPage/>);
-  if(key==="admin/store-settings") return admin(<StoreSettingsPage/>);
-  if(key==="admin/wallet") return admin(<WalletPage/>);
-  if(key==="admin/discounts") return admin(<DiscountsPage/>);
-  if(key==="admin/resellers") return admin(<ResellersAdminPage/>);
+  if(key==="admin/backups") return admin(<BackupsRuntimePage/>);
+  if(key==="admin/store-settings") return admin(<StoreSettingsRuntimePage/>);
+  if(key==="admin/wallet") return admin(<WalletRuntimePage/>);
+  if(key==="admin/discounts") return admin(<DiscountsRuntimePage/>);
+  if(key==="admin/resellers") return admin(<ResellersRuntimePage/>);
   if(key==="admin/domains") return admin(<DomainsRuntimePage/>);
   if(key==="admin/provision") return admin(<ProvisionPage/>);
   if(key==="admin/account-delivery") return admin(<AccountDeliveryPage/>);
