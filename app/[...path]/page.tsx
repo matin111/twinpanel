@@ -6,6 +6,7 @@ import {SupportRuntimePage,NotificationsRuntimePage} from "../../components/admi
 import {SystemHealthRuntimePage} from "../../components/system-health-runtime";
 import {TunnelTransportRuntimePage} from "../../components/tunnel-transport-runtime";
 import {SubscriptionToolsRuntimePage} from "../../components/subscription-tools-runtime";
+import {SubscriptionsFullRuntimePage} from "../../components/subscriptions-full-runtime";
 import {DomainsRuntimePage} from "../../components/domains-runtime";
 import {BrandingSettingsPage} from "../../components/branding-settings";
 import {L2tpSettingsPage} from "../../components/l2tp-settings";
@@ -29,7 +30,7 @@ const route=(key:string)=>{
   if(key==="register") return <RegisterPage2027/>;
   if(key==="admin") return admin(<AdminDashboardRuntime/>);
   if(key==="admin/users") return admin(<AdminUsersRuntime/>);
-  if(key==="admin/subscriptions") return admin(<AdminCollectionRuntime kind="subscriptions"/>);
+  if(key==="admin/subscriptions") return admin(<SubscriptionsFullRuntimePage/>);
   if(key==="admin/subscription-tools") return admin(<SubscriptionToolsRuntimePage/>);
   if(key==="admin/plans") return admin(<AdminCollectionRuntime kind="plans"/>);
   if(key==="admin/nodes") return admin(<AdminCollectionRuntime kind="nodes"/>);
