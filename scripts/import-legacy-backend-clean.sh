@@ -65,6 +65,7 @@ find "$TARGET_APP" -type f \( \
 \) -delete
 
 # Never allow environment files, private material, dumps or archives into backend source.
+# `.env.example` is the only allowed environment-shaped file.
 FORBIDDEN_FILES="$(find "$TARGET_BACKEND" -type f \( \
   -name '.env' -o \
   -name '.env.*' -o \
@@ -83,14 +84,14 @@ FORBIDDEN_FILES="$(find "$TARGET_BACKEND" -type f \( \
   -name '*.tgz' -o \
   -name '*.zip' -o \
   -name '*.rar' \
-\) -print)"
+\) -print | grep -v '/\.env\.example$' || true)"
 
 if [ -n "$FORBIDDEN_FILES" ]; then
   echo "$FORBIDDEN_FILES"
   fail "Forbidden files detected in backend import"
 fi
 
-# Copy dependency lock/source list only; never copy the old project root wholesale.
+# Copy dependency list only; never copy the old project root wholesale.
 if [ -f "$SOURCE_ROOT/requirements.txt" ]; then
   cp -f "$SOURCE_ROOT/requirements.txt" "$TARGET_BACKEND/requirements.txt"
 fi
