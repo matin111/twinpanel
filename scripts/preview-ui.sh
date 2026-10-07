@@ -19,8 +19,12 @@ if ss -ltn "sport = :${PORT}" 2>/dev/null | grep -q LISTEN; then
   exit 1
 fi
 
-echo "[TwinPanel] Installing exact dependencies..."
-npm ci
+echo "[TwinPanel] Installing dependencies..."
+if [ -f package-lock.json ]; then
+  npm ci
+else
+  npm install --no-audit --no-fund
+fi
 
 echo "[TwinPanel] Building UI..."
 npm run build
