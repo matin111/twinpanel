@@ -2,6 +2,7 @@
 
 import {useEffect,useState} from "react";
 import {clearCustomerToken,customerApi,getCustomerToken} from "../lib/customer-api";
+import {getResellerProfile} from "../lib/role-router";
 import {useI18n} from "../lib/i18n";
 
 export function AdminAuthGuard({children}:{children:React.ReactNode}){
@@ -18,8 +19,10 @@ export function AdminAuthGuard({children}:{children:React.ReactNode}){
         if(!alive)return;
         if(!user.is_active){clearCustomerToken();window.location.replace("/login");return;}
         if(user.role!=="admin"){
+          const reseller=await getResellerProfile(token);
+          if(!alive)return;
           setState("denied");
-          window.location.replace(user.role==="reseller"?"/reseller":"/panel");
+          window.location.replace(reseller?"/reseller":"/panel");
           return;
         }
         setState("ok");
