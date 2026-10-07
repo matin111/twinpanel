@@ -9,7 +9,7 @@ import {SettingsPage2027} from "../../components/settings-2027";
 import {LoginPage2027,RegisterPage2027} from "../../components/login-2027";
 import {CustomerSectionRuntime} from "../../components/customer-runtime";
 import {CustomerDashboardPro} from "../../components/customer-dashboard-pro";
-import {ResellerDashboard2027,ResellerSectionPage} from "../../components/portal-pages";
+import {ResellerDashboardRuntime,ResellerSectionRuntime} from "../../components/reseller-runtime";
 import {StorePage2027} from "../../components/store-2027";
 import {AdminAuthGuard} from "../../components/admin-auth-guard";
 import {AdminDashboardRuntime} from "../../components/admin-dashboard-runtime";
@@ -49,7 +49,7 @@ const route=(key:string)=>{
   if(key==="admin/mother-access") return admin(<MotherAccessRuntimePage/>);
   if(key==="admin/branding") return admin(<BrandingSettingsPage/>);
   if(key==="panel") return <CustomerDashboardPro/>;
-  if(key==="reseller") return <ResellerDashboard2027/>;
+  if(key==="reseller") return <ResellerDashboardRuntime/>;
   if(key==="store") return <StorePage2027/>;
   if(key.startsWith("panel/")){
     const section=key.slice("panel/".length);
@@ -57,7 +57,7 @@ const route=(key:string)=>{
   }
   if(key.startsWith("reseller/")){
     const section=key.slice("reseller/".length);
-    if(resellerSections.has(section)) return <ResellerSectionPage section={section}/>;
+    if(resellerSections.has(section)) return <ResellerSectionRuntime section={section}/>;
   }
   return <StorePage2027/>;
 };
