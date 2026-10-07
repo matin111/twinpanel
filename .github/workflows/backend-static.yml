@@ -74,6 +74,30 @@ jobs:
             bash -n "$file"
           done
 
+      - name: Validate clean deployment templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s deploy/systemd/twinpanel-api.service.tpl
+          test -s deploy/systemd/twinpanel-web.service.tpl
+          test -s deploy/systemd/twinpanel-transport-manager.service.tpl
+          test -s deploy/nginx/twinpanel.conf.tpl
+          test ! -e deploy/systemd/vpnshop-relay-manager.service.tpl
+
+          if grep -RInE '/root/vpnshop|/opt/twinpanel-web/current|Requires=vpnshop-api\.service|After=.*vpnshop-api\.service' deploy installer; then
+            echo 'Legacy deployment path/service reference detected.'
+            exit 1
+          fi
+
+          grep -q '__API_PORT__' deploy/systemd/twinpanel-api.service.tpl
+          grep -q '__WEB_PORT__' deploy/systemd/twinpanel-web.service.tpl
+          grep -q '__API_PORT__' deploy/systemd/twinpanel-bot.service.tpl
+          grep -q '__DOMAIN__' deploy/nginx/twinpanel.conf.tpl
+          grep -q '__WEB_PORT__' deploy/nginx/twinpanel.conf.tpl
+          grep -q '__API_PORT__' deploy/nginx/twinpanel.conf.tpl
+          grep -q 'vpnshop-relay-manager.service' installer/install-workers.sh
+          grep -q 'disable --now vpnshop-relay-manager.service' installer/install-workers.sh
+
       - name: Validate dependency file
         shell: bash
         run: |
