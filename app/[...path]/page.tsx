@@ -1,7 +1,8 @@
 import {AdminListPage,NotificationsPage,SupportPage} from "../../components/admin-screens";
 import {AdminDashboard2027} from "../../components/admin-dashboard-2027";
 import {BackupsPage,DiscountsPage,ResellersAdminPage,StoreSettingsPage,TelegramPage,WalletPage} from "../../components/admin-extra-screens";
-import {AccountDeliveryPage,DomainsPage,MotherAccessPage,ProvisionPage,SmsReaderPage,TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
+import {AccountDeliveryPage,MotherAccessPage,ProvisionPage,SmsReaderPage,TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
+import {DomainsRuntimePage} from "../../components/domains-runtime";
 import {BrandingSettingsPage} from "../../components/branding-settings";
 import {L2tpSettingsPage} from "../../components/l2tp-settings";
 import {SettingsPage2027} from "../../components/settings-2027";
@@ -28,7 +29,7 @@ const route=(key:string)=>{
   if(key==="admin/wallet") return <WalletPage/>;
   if(key==="admin/discounts") return <DiscountsPage/>;
   if(key==="admin/resellers") return <ResellersAdminPage/>;
-  if(key==="admin/domains") return <DomainsPage/>;
+  if(key==="admin/domains") return <DomainsRuntimePage/>;
   if(key==="admin/provision") return <ProvisionPage/>;
   if(key==="admin/account-delivery") return <AccountDeliveryPage/>;
   if(key==="admin/vpn-settings") return <VpnSettingsPage/>;
