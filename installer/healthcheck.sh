@@ -45,6 +45,33 @@ elif [[ -n "$CURRENT" && -f "$CURRENT/backend/app/telegram_runtime_bot.py" ]]; t
   info "twinpanel-bot.service = configured unit / waiting for token"
 fi
 
+# Quota Agent is required only when this host has a valid local mTLS config.
+if [[ -n "$CURRENT" && -f "$CURRENT/quota-agent/agent.py" ]]; then
+  QUOTA_READY=0
+  if [[ -s /etc/twinpanel-quota-agent/config.json ]]; then
+    if python3 - <<'PY'
+import json
+from pathlib import Path
+try:
+    cfg=json.loads(Path('/etc/twinpanel-quota-agent/config.json').read_text())
+except Exception:
+    raise SystemExit(1)
+for key in ('client_cert','client_key','ca_cert'):
+    value=str(cfg.get(key) or '').strip()
+    if not value or not Path(value).is_file():
+        raise SystemExit(1)
+raise SystemExit(0)
+PY
+    then QUOTA_READY=1; fi
+  fi
+
+  if (( QUOTA_READY == 1 )); then
+    check_active twinpanel-quota-agent.service
+  else
+    info "twinpanel-quota-agent.service = optional / waiting for config+PKI"
+  fi
+fi
+
 # The obsolete relay manager conflicts with the V3 transport manager single-writer model.
 if systemctl is-active --quiet vpnshop-relay-manager.service 2>/dev/null; then
   warn "vpnshop-relay-manager.service must be inactive"
