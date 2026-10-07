@@ -1,7 +1,8 @@
 import {AdminListPage,NotificationsPage,SupportPage} from "../../components/admin-screens";
 import {AdminDashboard2027} from "../../components/admin-dashboard-2027";
 import {BackupsPage,DiscountsPage,ResellersAdminPage,StoreSettingsPage,TelegramPage,WalletPage} from "../../components/admin-extra-screens";
-import {AccountDeliveryPage,BrandingPage,DomainsPage,MotherAccessPage,ProvisionPage,SmsReaderPage,TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
+import {AccountDeliveryPage,DomainsPage,MotherAccessPage,ProvisionPage,SmsReaderPage,TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
+import {BrandingSettingsPage} from "../../components/branding-settings";
 import {SettingsPage2027} from "../../components/settings-2027";
 import {LoginPage2027} from "../../components/login-2027";
 import {CustomerDashboard2027,CustomerSectionPage,ResellerDashboard2027,ResellerSectionPage} from "../../components/portal-pages";
@@ -29,7 +30,7 @@ const route=(key:string)=>{
   if(key==="admin/account-delivery") return <AccountDeliveryPage/>;
   if(key==="admin/vpn-settings") return <VpnSettingsPage/>;
   if(key==="admin/mother-access") return <MotherAccessPage/>;
-  if(key==="admin/branding") return <BrandingPage/>;
+  if(key==="admin/branding") return <BrandingSettingsPage/>;
   if(key==="panel") return <CustomerDashboard2027/>;
   if(key==="reseller") return <ResellerDashboard2027/>;
   if(key==="store") return <StorePage2027/>;
