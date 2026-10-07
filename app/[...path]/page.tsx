@@ -1,5 +1,4 @@
-import {AdminListPage,NotificationsPage,SupportPage} from "../../components/admin-screens";
-import {AdminDashboard2027} from "../../components/admin-dashboard-2027";
+import {NotificationsPage,SupportPage} from "../../components/admin-screens";
 import {BackupsPage,DiscountsPage,ResellersAdminPage,StoreSettingsPage,TelegramPage,WalletPage} from "../../components/admin-extra-screens";
 import {AccountDeliveryPage,MotherAccessPage,ProvisionPage,SmsReaderPage,TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
 import {DomainsRuntimePage} from "../../components/domains-runtime";
@@ -11,36 +10,46 @@ import {CustomerSectionRuntime} from "../../components/customer-runtime";
 import {CustomerDashboardPro} from "../../components/customer-dashboard-pro";
 import {ResellerDashboard2027,ResellerSectionPage} from "../../components/portal-pages";
 import {StorePage2027} from "../../components/store-2027";
+import {AdminAuthGuard} from "../../components/admin-auth-guard";
+import {AdminDashboardRuntime} from "../../components/admin-dashboard-runtime";
+import {AdminUsersRuntime} from "../../components/admin-users-runtime";
+import {AdminCollectionRuntime} from "../../components/admin-collections-runtime";
 
 const customerSections=new Set(["subscription","connection","usage","orders","wallet","payments","support","notifications","profile"]);
 const resellerSections=new Set(["customers","subscriptions","sales","wallet","orders","traffic","bot","notifications","settings"]);
+const admin=(node:React.ReactNode)=><AdminAuthGuard>{node}</AdminAuthGuard>;
 
 const route=(key:string)=>{
   if(key==="login") return <LoginPage2027/>;
   if(key==="register") return <RegisterPage2027/>;
-  if(key==="admin") return <AdminDashboard2027/>;
-  if(key==="admin/settings") return <SettingsPage2027/>;
-  if(key==="admin/notifications") return <NotificationsPage/>;
-  if(key==="admin/support") return <SupportPage/>;
-  if(key==="admin/telegram") return <TelegramPage/>;
-  if(key==="admin/telegram-manager") return <TelegramManagerPage/>;
-  if(key==="admin/sms-reader") return <SmsReaderPage/>;
-  if(key==="admin/backups") return <BackupsPage/>;
-  if(key==="admin/store-settings") return <StoreSettingsPage/>;
-  if(key==="admin/wallet") return <WalletPage/>;
-  if(key==="admin/discounts") return <DiscountsPage/>;
-  if(key==="admin/resellers") return <ResellersAdminPage/>;
-  if(key==="admin/domains") return <DomainsRuntimePage/>;
-  if(key==="admin/provision") return <ProvisionPage/>;
-  if(key==="admin/account-delivery") return <AccountDeliveryPage/>;
-  if(key==="admin/vpn-settings") return <VpnSettingsPage/>;
-  if(key==="admin/l2tp") return <L2tpSettingsPage/>;
-  if(key==="admin/mother-access") return <MotherAccessPage/>;
-  if(key==="admin/branding") return <BrandingSettingsPage/>;
+  if(key==="admin") return admin(<AdminDashboardRuntime/>);
+  if(key==="admin/users") return admin(<AdminUsersRuntime/>);
+  if(key==="admin/subscriptions") return admin(<AdminCollectionRuntime kind="subscriptions"/>);
+  if(key==="admin/plans") return admin(<AdminCollectionRuntime kind="plans"/>);
+  if(key==="admin/nodes") return admin(<AdminCollectionRuntime kind="nodes"/>);
+  if(key==="admin/tunnels") return admin(<AdminCollectionRuntime kind="tunnels"/>);
+  if(key==="admin/payments") return admin(<AdminCollectionRuntime kind="payments"/>);
+  if(key==="admin/settings") return admin(<SettingsPage2027/>);
+  if(key==="admin/notifications") return admin(<NotificationsPage/>);
+  if(key==="admin/support") return admin(<SupportPage/>);
+  if(key==="admin/telegram") return admin(<TelegramPage/>);
+  if(key==="admin/telegram-manager") return admin(<TelegramManagerPage/>);
+  if(key==="admin/sms-reader") return admin(<SmsReaderPage/>);
+  if(key==="admin/backups") return admin(<BackupsPage/>);
+  if(key==="admin/store-settings") return admin(<StoreSettingsPage/>);
+  if(key==="admin/wallet") return admin(<WalletPage/>);
+  if(key==="admin/discounts") return admin(<DiscountsPage/>);
+  if(key==="admin/resellers") return admin(<ResellersAdminPage/>);
+  if(key==="admin/domains") return admin(<DomainsRuntimePage/>);
+  if(key==="admin/provision") return admin(<ProvisionPage/>);
+  if(key==="admin/account-delivery") return admin(<AccountDeliveryPage/>);
+  if(key==="admin/vpn-settings") return admin(<VpnSettingsPage/>);
+  if(key==="admin/l2tp") return admin(<L2tpSettingsPage/>);
+  if(key==="admin/mother-access") return admin(<MotherAccessPage/>);
+  if(key==="admin/branding") return admin(<BrandingSettingsPage/>);
   if(key==="panel") return <CustomerDashboardPro/>;
   if(key==="reseller") return <ResellerDashboard2027/>;
   if(key==="store") return <StorePage2027/>;
-
   if(key.startsWith("panel/")){
     const section=key.slice("panel/".length);
     if(customerSections.has(section)) return <CustomerSectionRuntime section={section}/>;
@@ -49,18 +58,7 @@ const route=(key:string)=>{
     const section=key.slice("reseller/".length);
     if(resellerSections.has(section)) return <ResellerSectionPage section={section}/>;
   }
-
-  const map:Record<string,string>={
-    "admin/users":"user",
-    "admin/subscriptions":"subscription",
-    "admin/plans":"plan",
-    "admin/nodes":"node",
-    "admin/tunnels":"tunnel",
-    "admin/payments":"payment"
-  };
-
-  const kind=map[key];
-  return kind?<AdminListPage kind={kind}/>:<StorePage2027/>;
+  return <StorePage2027/>;
 };
 
 export default async function Page({params}:{params:Promise<{path:string[]}>}){

@@ -31,7 +31,8 @@ export function LoginPage2027(){
   const finish=async(token:string)=>{
     saveCustomerToken(token,remember);
     const user=await customerApi.me(token);
-    window.location.replace(user.role==="admin"?"/admin":"/panel");
+    const role=String(user.role||"user").toLowerCase();
+    window.location.replace(role==="admin"?"/admin":role==="reseller"?"/reseller":"/panel");
   };
 
   const submit=async(event:FormEvent)=>{
