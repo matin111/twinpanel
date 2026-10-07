@@ -6,6 +6,8 @@ import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {BrandMark} from "../lib/branding";
 import {CustomerSessionProvider,useCustomerSession} from "../lib/customer-session";
+import {clearCustomerToken,customerApi,getCustomerToken} from "../lib/customer-api";
+import {getResellerProfile} from "../lib/role-router";
 
 type MenuItem=readonly [string,string,string,string];
 type PortalShellProps={children:React.ReactNode;active?:string;type:"customer"|"reseller"};
@@ -38,6 +40,35 @@ function CustomerIdentity(){
   </div>;
 }
 
+function ResellerAccessGuard({children}:{children:React.ReactNode}){
+  const {pick}=useI18n();
+  const [ready,setReady]=useState(false);
+  const [error,setError]=useState("");
+  useEffect(()=>{
+    let alive=true;
+    const run=async()=>{
+      const token=getCustomerToken();
+      if(!token){window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);return;}
+      let account;
+      try{account=await customerApi.me(token);}catch{clearCustomerToken();window.location.replace("/login");return;}
+      if(!alive)return;
+      if(!account.is_active){clearCustomerToken();window.location.replace("/login");return;}
+      if(account.role==="admin"){window.location.replace("/admin");return;}
+      try{
+        const reseller=await getResellerProfile(token);
+        if(!alive)return;
+        if(!reseller){window.location.replace("/panel");return;}
+        setReady(true);
+      }catch(reason){if(alive)setError(reason instanceof Error?reason.message:String(reason));}
+    };
+    void run();
+    return()=>{alive=false};
+  },[]);
+  if(error)return <div className="auth-gate"><div className="auth-gate-card"><b>{pick("بررسی دسترسی نمایندگی ناموفق بود","Could not verify reseller access")}</b><small>{error}</small><button className="ghost" onClick={()=>window.location.reload()}>{pick("تلاش دوباره","Retry")}</button></div></div>;
+  if(!ready)return <div className="auth-gate"><div className="auth-gate-card"><span className="spinner"/><b>{pick("در حال بررسی دسترسی نمایندگی...","Checking reseller access...")}</b></div></div>;
+  return <>{children}</>;
+}
+
 function PortalFrame({children,active="",type}:PortalShellProps){
   const {pick}=useI18n();
   const [collapsed,setCollapsed]=useState(false);
@@ -60,5 +91,5 @@ function PortalFrame({children,active="",type}:PortalShellProps){
 
 export function PortalShell(props:PortalShellProps){
   if(props.type==="customer")return <CustomerSessionProvider><PortalFrame {...props}/></CustomerSessionProvider>;
-  return <PortalFrame {...props}/>;
+  return <ResellerAccessGuard><PortalFrame {...props}/></ResellerAccessGuard>;
 }
