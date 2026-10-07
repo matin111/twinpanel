@@ -48,7 +48,7 @@ jobs:
             -name '*.p12' -o -name '*.pfx' -o -name '*.sql' -o -name '*.dump' -o \
             -name '*.sqlite' -o -name '*.sqlite3' -o -name '*.bak*' -o -name '*.bad*' -o \
             -name '*candidate*' -o -name '*zeroed*' -o -name '*before-*' \
-          \) -print)"
+          \) -print | grep -vE '/\.env\.example$' || true)"
           if [ -n "$bad" ]; then echo "$bad"; exit 1; fi
 
       - name: Scan obvious private material
