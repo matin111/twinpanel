@@ -6,6 +6,7 @@ import "./pages.css";
 import "./i18n.css";
 import "./shell.css";
 import "./modules.css";
+import "./control-plane.css";
 import "./theme.css";
 import "./store-2027.css";
 
