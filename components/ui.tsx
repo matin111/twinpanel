@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import {useEffect,useState} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 
 const menu=[
@@ -18,14 +19,50 @@ const menu=[
 
 export function Shell({children,active="/admin"}:{children:React.ReactNode;active?:string}){
   const {pick}=useI18n();
-  return <div className="shell">
-    <aside>
-      <div className="brand"><img src="/logo.svg" alt="TwinPanel"/><div><b>TwinPanel</b><small>CONTROL 2027</small></div></div>
-      <nav>{menu.map(([fa,en,h,i])=><Link key={h} href={h} className={active===h?"active":""}><i>{i}</i>{pick(fa,en)}</Link>)}</nav>
-      <div className="profile"><span className="avatar">M</span><div><b>{pick("مدیر سیستم","System Admin")}</b><small>Administrator</small></div></div>
+  const [collapsed,setCollapsed]=useState(false);
+  const [mobileOpen,setMobileOpen]=useState(false);
+
+  useEffect(()=>{
+    try{
+      setCollapsed(localStorage.getItem("twinpanel.sidebar.collapsed")==="1");
+    }catch{}
+  },[]);
+
+  const toggleCollapsed=()=>{
+    setCollapsed(prev=>{
+      const next=!prev;
+      try{localStorage.setItem("twinpanel.sidebar.collapsed",next?"1":"0");}catch{}
+      return next;
+    });
+  };
+
+  return <div className={`shell ${collapsed?"sidebar-collapsed":""} ${mobileOpen?"mobile-menu-open":""}`}>
+    <aside className="sidebar" aria-label={pick("منوی اصلی","Main navigation")}>
+      <div className="sidebar-head">
+        <div className="brand">
+          <img src="/logo.svg" alt="TwinPanel"/>
+          <div className="brand-copy"><b>TwinPanel</b><small>CONTROL 2027</small></div>
+        </div>
+        <button className="sidebar-collapse" type="button" onClick={toggleCollapsed} aria-label={pick("باز و بسته کردن منو","Toggle sidebar")} title={pick("باز و بسته کردن منو","Toggle sidebar")}>↔</button>
+        <button className="mobile-menu-close" type="button" onClick={()=>setMobileOpen(false)} aria-label={pick("بستن منو","Close menu")}>×</button>
+      </div>
+
+      <nav>{menu.map(([fa,en,h,i])=>{
+        const label=pick(fa,en);
+        return <Link key={h} href={h} title={collapsed?label:undefined} className={active===h?"active":""} onClick={()=>setMobileOpen(false)}>
+          <i>{i}</i><span className="nav-label">{label}</span>
+        </Link>;
+      })}</nav>
+
+      <div className="profile">
+        <span className="avatar">M</span>
+        <div className="profile-copy"><b>{pick("مدیر سیستم","System Admin")}</b><small>Administrator</small></div>
+      </div>
     </aside>
+
     <main>
       <header>
+        <button className="mobile-menu-toggle" type="button" onClick={()=>setMobileOpen(v=>!v)} aria-expanded={mobileOpen} aria-label={pick("نمایش منو","Show menu")}>☰</button>
         <div className="search">⌕ <input placeholder={pick("جستجو در پنل...","Search panel...")}/></div>
         <div className="head-actions"><LanguageSwitch compact/><button type="button">◐</button><button className="notify" type="button">◉</button><span className="avatar">M</span></div>
       </header>
