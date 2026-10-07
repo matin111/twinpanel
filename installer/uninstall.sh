@@ -18,17 +18,34 @@ done
 
 say "TwinPanel uninstall"
 
-systemctl disable --now twinpanel-web.service twinpanel-api.service 2>/dev/null || true
-rm -f /etc/systemd/system/twinpanel-web.service /etc/systemd/system/twinpanel-api.service
+UNITS=(
+  twinpanel-web.service
+  twinpanel-api.service
+  twinpanel-transport-manager.service
+  twinpanel-reseller-bots.service
+  twinpanel-bot.service
+  twinpanel-backup.timer
+  twinpanel-backup.service
+)
+systemctl disable --now "${UNITS[@]}" 2>/dev/null || true
+rm -f \
+  /etc/systemd/system/twinpanel-web.service \
+  /etc/systemd/system/twinpanel-api.service \
+  /etc/systemd/system/twinpanel-transport-manager.service \
+  /etc/systemd/system/twinpanel-reseller-bots.service \
+  /etc/systemd/system/twinpanel-bot.service \
+  /etc/systemd/system/twinpanel-backup.timer \
+  /etc/systemd/system/twinpanel-backup.service
 systemctl daemon-reload
 
+rm -f /usr/local/bin/twinpanel
 rm -f /etc/nginx/sites-enabled/twinpanel.conf /etc/nginx/sites-available/twinpanel.conf
 if command -v nginx >/dev/null 2>&1 && nginx -t >/dev/null 2>&1; then systemctl reload nginx || true; fi
 
 if ((PURGE==0)); then
   rm -f "$TP_CURRENT"
   echo "UNINSTALL_OK"
-  warn "کد Releaseها، دیتابیس، بکاپ‌ها و Secretها عمداً نگه داشته شدند. برای حذف داده‌ها از --purge استفاده کنید."
+  warn "Releaseها، دیتابیس، بکاپ‌ها و Secretها عمداً نگه داشته شدند. برای حذف تنظیمات/Releaseها از --purge استفاده کنید."
   exit 0
 fi
 
@@ -37,6 +54,7 @@ read -r -p "برای حذف Releaseها و تنظیمات عبارت PURGE TWINP
 
 rm -rf --one-file-system "$TP_ROOT"
 rm -rf --one-file-system "$TP_ETC"
+rm -f /etc/twinpanel-reseller-bot.key /etc/twinpanel-telegram-api.env
 
 if ((DROP_DB)); then
   read -r -p "برای حذف کامل دیتابیس عبارت DROP TWINPANEL DATABASE را وارد کنید: " DB_CONFIRM
