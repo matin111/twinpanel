@@ -1,5 +1,6 @@
 import {TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
-import {TelegramRuntimePage,BackupsRuntimePage,WalletRuntimePage,DiscountsRuntimePage,ResellersRuntimePage,StoreSettingsRuntimePage} from "../../components/admin-parity-runtime";
+import {TelegramRuntimePage,WalletRuntimePage,DiscountsRuntimePage,ResellersRuntimePage,StoreSettingsRuntimePage} from "../../components/admin-parity-runtime";
+import {BackupsFullRuntimePage} from "../../components/backups-full-runtime";
 import {ProvisionRuntimePage,SmsReaderRuntimePage,MotherAccessRuntimePage,AccountDeliveryRuntimePage} from "../../components/admin-infra-runtime";
 import {SupportRuntimePage,NotificationsRuntimePage} from "../../components/admin-ops-runtime";
 import {SystemHealthRuntimePage} from "../../components/system-health-runtime";
@@ -42,7 +43,7 @@ const route=(key:string)=>{
   if(key==="admin/telegram") return admin(<TelegramRuntimePage/>);
   if(key==="admin/telegram-manager") return admin(<TelegramManagerPage/>);
   if(key==="admin/sms-reader") return admin(<SmsReaderRuntimePage/>);
-  if(key==="admin/backups") return admin(<BackupsRuntimePage/>);
+  if(key==="admin/backups") return admin(<BackupsFullRuntimePage/>);
   if(key==="admin/store-settings") return admin(<StoreSettingsRuntimePage/>);
   if(key==="admin/wallet") return admin(<WalletRuntimePage/>);
   if(key==="admin/discounts") return admin(<DiscountsRuntimePage/>);
