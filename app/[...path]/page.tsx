@@ -1,7 +1,8 @@
 import {AdminDashboard,AdminListPage,NotificationsPage,SettingsPage,SupportPage} from "../../components/admin-screens";
 import {BackupsPage,DiscountsPage,ResellersAdminPage,StoreSettingsPage,TelegramPage,WalletPage} from "../../components/admin-extra-screens";
 import {AccountDeliveryPage,BrandingPage,DomainsPage,MotherAccessPage,ProvisionPage,SmsReaderPage,TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
-import {LoginPage,PanelPage,ResellerPage,StorePage} from "../../components/public-screens";
+import {LoginPage,PanelPage,ResellerPage} from "../../components/public-screens";
+import {StorePage2027} from "../../components/store-2027";
 
 const route=(key:string)=>{
   if(key==="login") return <LoginPage/>;
@@ -25,7 +26,7 @@ const route=(key:string)=>{
   if(key==="admin/branding") return <BrandingPage/>;
   if(key==="panel") return <PanelPage/>;
   if(key==="reseller") return <ResellerPage/>;
-  if(key==="store") return <StorePage/>;
+  if(key==="store") return <StorePage2027/>;
 
   const map:Record<string,string>={
     "admin/users":"user",
@@ -37,7 +38,7 @@ const route=(key:string)=>{
   };
 
   const kind=map[key];
-  return kind?<AdminListPage kind={kind}/>:<StorePage/>;
+  return kind?<AdminListPage kind={kind}/>:<StorePage2027/>;
 };
 
 export default async function Page({params}:{params:Promise<{path:string[]}>}){
