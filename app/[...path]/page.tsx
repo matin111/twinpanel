@@ -1,4 +1,5 @@
 import {AdminDashboard,AdminListPage,NotificationsPage,SettingsPage,SupportPage} from "../../components/admin-screens";
+import {BackupsPage,DiscountsPage,ResellersAdminPage,StoreSettingsPage,TelegramPage,WalletPage} from "../../components/admin-extra-screens";
 import {LoginPage,PanelPage,ResellerPage,StorePage} from "../../components/public-screens";
 
 const route=(key:string)=>{
@@ -7,6 +8,12 @@ const route=(key:string)=>{
   if(key==="admin/settings") return <SettingsPage/>;
   if(key==="admin/notifications") return <NotificationsPage/>;
   if(key==="admin/support") return <SupportPage/>;
+  if(key==="admin/telegram") return <TelegramPage/>;
+  if(key==="admin/backups") return <BackupsPage/>;
+  if(key==="admin/store-settings") return <StoreSettingsPage/>;
+  if(key==="admin/wallet") return <WalletPage/>;
+  if(key==="admin/discounts") return <DiscountsPage/>;
+  if(key==="admin/resellers") return <ResellersAdminPage/>;
   if(key==="panel") return <PanelPage/>;
   if(key==="reseller") return <ResellerPage/>;
   if(key==="store") return <StorePage/>;

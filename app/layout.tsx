@@ -4,6 +4,7 @@ import "./core.css";
 import "./pages.css";
 import "./i18n.css";
 import "./shell.css";
+import "./modules.css";
 
 export const metadata:Metadata={
   title:"TwinPanel 2027",
