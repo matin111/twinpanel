@@ -1,13 +1,14 @@
-import {AdminDashboard,AdminListPage,NotificationsPage,SettingsPage,SupportPage} from "../../components/admin-screens";
+import {AdminDashboard,AdminListPage,NotificationsPage,SupportPage} from "../../components/admin-screens";
 import {BackupsPage,DiscountsPage,ResellersAdminPage,StoreSettingsPage,TelegramPage,WalletPage} from "../../components/admin-extra-screens";
 import {AccountDeliveryPage,BrandingPage,DomainsPage,MotherAccessPage,ProvisionPage,SmsReaderPage,TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
+import {SettingsPage2027} from "../../components/settings-2027";
 import {LoginPage,PanelPage,ResellerPage} from "../../components/public-screens";
 import {StorePage2027} from "../../components/store-2027";
 
 const route=(key:string)=>{
   if(key==="login") return <LoginPage/>;
   if(key==="admin") return <AdminDashboard/>;
-  if(key==="admin/settings") return <SettingsPage/>;
+  if(key==="admin/settings") return <SettingsPage2027/>;
   if(key==="admin/notifications") return <NotificationsPage/>;
   if(key==="admin/support") return <SupportPage/>;
   if(key==="admin/telegram") return <TelegramPage/>;
