@@ -73,6 +73,36 @@ export type DiscountDraft={
   is_active:boolean;
 };
 
+export type ProvisionProtocolSettings={
+  install_cisco:boolean;
+  cisco_port:number;
+  install_openvpn:boolean;
+  openvpn_port:number;
+  openvpn_transport:"udp"|"tcp";
+  install_wireguard:boolean;
+  wireguard_port:number;
+  install_l2tp:boolean;
+  install_v2ray:boolean;
+  xray_port:number;
+};
+
+export type ProvisionInstallPayload=ProvisionProtocolSettings&{
+  host:string;
+  port:number;
+  username:string;
+  password:string;
+  name:string;
+  node_type:"iran"|"exit";
+  country_code:string;
+  capacity_users:number;
+};
+
+export type MotherAccessSettings={
+  admin_enabled:boolean;
+  reseller_enabled:boolean;
+  reseller_overrides:Record<string,boolean>;
+};
+
 export const parityApi={
   telegramStatus:()=>request<TelegramBotStatus>("/v1/admin/telegram-bot"),
   telegramSaveToken:(token:string)=>request<AnyRow>("/v1/admin/telegram-bot/token",{method:"PUT",body:JSON.stringify({token})}),
@@ -123,5 +153,27 @@ export const parityApi={
   securityOverview:()=>request<AnyRow>("/v1/admin/security/overview"),
   coreProtocols:()=>request<AnyRow>("/v1/admin/core-protocols"),
   restartCoreProtocol:(protocol:string)=>request<AnyRow>(`/v1/admin/core-protocols/${encodeURIComponent(protocol)}/restart`,{method:"POST"}),
-  restartAllCoreProtocols:()=>request<AnyRow>("/v1/admin/core-protocols/restart-all",{method:"POST"})
+  restartAllCoreProtocols:()=>request<AnyRow>("/v1/admin/core-protocols/restart-all",{method:"POST"}),
+
+  provisionTest:(payload:{host:string;port:number;username:string;password:string})=>request<AnyRow>("/v1/provision/test",{method:"POST",body:JSON.stringify(payload)}),
+  provisionInstall:(payload:ProvisionInstallPayload)=>request<AnyRow>("/v1/provision/install",{method:"POST",body:JSON.stringify(payload)}),
+  provisionNodeAccess:(nodeId:number)=>request<AnyRow>(`/v1/provision/node-access/${nodeId}`),
+  provisionSaveNodeAccess:(payload:{node_id:number;host:string;port:number;username:string;password:string})=>request<AnyRow>("/v1/provision/save-node-access",{method:"POST",body:JSON.stringify(payload)}),
+  provisionProtocolHealth:(nodeId:number,protocol?:string)=>request<AnyRow>("/v1/provision/protocol-health",{method:"POST",body:JSON.stringify({node_id:nodeId,...(protocol?{protocol}:{})})}),
+  provisionRestartProtocol:(nodeId:number,protocol?:string)=>request<AnyRow>("/v1/provision/restart-protocol",{method:"POST",body:JSON.stringify({node_id:nodeId,...(protocol?{protocol}:{})})}),
+  provisionRepairSaved:(payload:ProvisionProtocolSettings&{node_id:number})=>request<AnyRow>("/v1/provision/repair-protocols-saved",{method:"POST",body:JSON.stringify(payload)}),
+  provisionUpgradeAgent:(nodeId:number)=>request<AnyRow>("/v1/provision/upgrade-agent",{method:"POST",body:JSON.stringify({node_id:nodeId})}),
+  provisionInstallFabric:(nodeId:number)=>request<AnyRow>("/v1/provision/install-fabric",{method:"POST",body:JSON.stringify({node_id:nodeId})}),
+  provisionFabricStatus:(nodeId:number)=>request<AnyRow>(`/v1/provision/fabric-status/${nodeId}`),
+
+  paymentSettings:()=>request<AnyRow>("/v1/payments/admin/settings"),
+  savePaymentSettings:(payload:AnyRow)=>request<AnyRow>("/v1/payments/admin/settings",{method:"PUT",body:JSON.stringify(payload)}),
+  smsReader:()=>request<AnyRow>("/v1/payments/admin/sms-reader"),
+  smsPairCode:()=>request<AnyRow>("/v1/payments/admin/sms-reader/pair-code",{method:"POST"}),
+  smsAutomagenDevice:(name:string)=>request<AnyRow>("/v1/payments/admin/sms-reader/automagen-device",{method:"POST",body:JSON.stringify({name})}),
+  smsRevokeDevice:(id:number)=>request<AnyRow>(`/v1/payments/admin/sms-reader/devices/${id}/revoke`,{method:"POST"}),
+
+  motherAccess:()=>request<MotherAccessSettings>("/v1/mother-access/admin"),
+  saveMotherAccess:(payload:{admin_enabled:boolean;reseller_enabled:boolean})=>request<AnyRow>("/v1/mother-access/admin",{method:"PUT",body:JSON.stringify(payload)}),
+  setResellerMotherAccess:(resellerId:number,enabled:boolean)=>request<AnyRow>(`/v1/mother-access/admin/resellers/${resellerId}`,{method:"PUT",body:JSON.stringify({enabled})})
 };
