@@ -1,4 +1,7 @@
-export const API_BASE=process.env.NEXT_PUBLIC_API_BASE||"";
+// Browser requests are always same-origin.
+// The real backend target is selected server-side by TWINPANEL_BACKEND_URL,
+// so a stale NEXT_PUBLIC_API_BASE can never break login with CORS/network errors.
+export const API_BASE="";
 
 export const api={
   health:"/health",

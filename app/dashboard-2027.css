@@ -1,7 +1,10 @@
 .dashboard-stats{grid-template-columns:repeat(5,minmax(0,1fr))}
 .online-summary{margin-top:16px;padding:12px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--surface2) 82%,transparent);display:grid;grid-template-columns:auto 1fr;gap:2px 8px;align-items:center}
 .online-summary .dot{grid-row:1/3}.online-summary b{font-size:10px}.online-summary small{color:var(--muted);font-size:8px}
+.admin-runtime-charts{margin-top:13px}.admin-runtime-charts .card{min-width:0}.admin-runtime-charts .chart{margin-top:10px}.admin-runtime-charts .admin-sales-grid{margin-top:2px}.admin-runtime-triple{margin-top:13px}.admin-runtime-protocols-card{margin-top:13px}.admin-runtime-protocols-card .admin-protocol-grid{margin-top:12px}
 html[data-theme="light"] .online-summary{background:#fff}
+html[data-theme="light"] .donut:after{background:#fff}
 @media(max-width:1250px){.dashboard-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:1050px){.admin-runtime-triple{grid-template-columns:1fr 1fr}.admin-runtime-triple>.card:last-child{grid-column:1/-1}}
 @media(max-width:900px){.dashboard-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:760px){.dashboard-stats{grid-template-columns:1fr}}
+@media(max-width:760px){.dashboard-stats{grid-template-columns:1fr}.admin-runtime-triple{grid-template-columns:1fr}.admin-runtime-triple>.card:last-child{grid-column:auto}}

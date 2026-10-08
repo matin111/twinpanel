@@ -5,6 +5,11 @@ import {clearCustomerToken,customerApi,getCustomerToken} from "../lib/customer-a
 import {getResellerProfile} from "../lib/role-router";
 import {useI18n} from "../lib/i18n";
 
+function loginUrlForCurrentPage(){
+  const next=`${window.location.pathname}${window.location.search}`;
+  return `/login?next=${encodeURIComponent(next)}`;
+}
+
 export function AdminAuthGuard({children}:{children:React.ReactNode}){
   const {pick}=useI18n();
   const [state,setState]=useState<"checking"|"ok"|"denied">("checking");
@@ -13,11 +18,15 @@ export function AdminAuthGuard({children}:{children:React.ReactNode}){
     let alive=true;
     const run=async()=>{
       const token=getCustomerToken();
-      if(!token){window.location.replace("/login");return;}
+      if(!token){window.location.replace(loginUrlForCurrentPage());return;}
       try{
         const user=await customerApi.me(token);
         if(!alive)return;
-        if(!user.is_active){clearCustomerToken();window.location.replace("/login");return;}
+        if(!user.is_active){
+          clearCustomerToken();
+          window.location.replace(loginUrlForCurrentPage());
+          return;
+        }
         if(user.role!=="admin"){
           const reseller=await getResellerProfile(token);
           if(!alive)return;
@@ -28,7 +37,7 @@ export function AdminAuthGuard({children}:{children:React.ReactNode}){
         setState("ok");
       }catch{
         clearCustomerToken();
-        if(alive)window.location.replace("/login");
+        if(alive)window.location.replace(loginUrlForCurrentPage());
       }
     };
     void run();
