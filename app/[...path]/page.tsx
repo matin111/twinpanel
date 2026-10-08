@@ -1,14 +1,14 @@
 import {TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
 import {TelegramRuntimePage,WalletRuntimePage,DiscountsRuntimePage,ResellersRuntimePage,StoreSettingsRuntimePage} from "../../components/admin-parity-runtime";
 import {BackupsFullRuntimePage} from "../../components/backups-full-runtime";
-import {ProvisionRuntimePage,SmsReaderRuntimePage,MotherAccessRuntimePage,AccountDeliveryRuntimePage} from "../../components/admin-infra-runtime";
+import {SmsReaderRuntimePage,MotherAccessRuntimePage,AccountDeliveryRuntimePage} from "../../components/admin-infra-runtime";
 import {SupportRuntimePage,NotificationsRuntimePage} from "../../components/admin-ops-runtime";
 import {SystemHealthRuntimePage} from "../../components/system-health-runtime";
 import {TunnelTransportRuntimePage} from "../../components/tunnel-transport-runtime";
 import {SubscriptionToolsRuntimePage} from "../../components/subscription-tools-runtime";
 import {LegacySubscriptionsRuntimePage} from "../../components/legacy-subscriptions-exact";
 import {LegacyUsersRuntimePage} from "../../components/legacy-users-exact";
-import {LegacyNodesRuntimePage} from "../../components/legacy-nodes-exact";
+import {NodesUnifiedRuntimePage} from "../../components/nodes-unified-runtime";
 import {LegacyPlansRuntimePage} from "../../components/legacy-plans-exact";
 import {LegacyTunnelsExactPage} from "../../components/legacy-tunnels-exact";
 import {DomainsRuntimePage} from "../../components/domains-runtime";
@@ -36,7 +36,7 @@ const route=(key:string)=>{
   if(key==="admin/subscriptions") return admin(<LegacySubscriptionsRuntimePage/>);
   if(key==="admin/subscription-tools") return admin(<SubscriptionToolsRuntimePage/>);
   if(key==="admin/plans") return admin(<LegacyPlansRuntimePage/>);
-  if(key==="admin/nodes") return admin(<LegacyNodesRuntimePage/>);
+  if(key==="admin/nodes") return admin(<NodesUnifiedRuntimePage/>);
   if(key==="admin/tunnels") return admin(<LegacyTunnelsExactPage/>);
   if(key==="admin/tunnel-transports") return admin(<TunnelTransportRuntimePage/>);
   if(key==="admin/payments") return admin(<AdminCollectionRuntime kind="payments"/>);
@@ -53,7 +53,7 @@ const route=(key:string)=>{
   if(key==="admin/discounts") return admin(<DiscountsRuntimePage/>);
   if(key==="admin/resellers") return admin(<ResellersRuntimePage/>);
   if(key==="admin/domains") return admin(<DomainsRuntimePage/>);
-  if(key==="admin/provision") return admin(<ProvisionRuntimePage/>);
+  if(key==="admin/provision") return admin(<NodesUnifiedRuntimePage openProvisionInitially/>);
   if(key==="admin/account-delivery") return admin(<AccountDeliveryRuntimePage/>);
   if(key==="admin/vpn-settings") return admin(<VpnSettingsPage/>);
   if(key==="admin/l2tp") return admin(<L2tpSettingsPage/>);
