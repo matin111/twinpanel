@@ -64,7 +64,7 @@ export const adminApi={
   setSubscriptionActive:(id:number,active:boolean)=>request<RuntimeRow>(`/v1/subscriptions/${id}/${active?"activate":"suspend"}`,{method:"POST"}),
   deleteSubscription:(id:number)=>request<RuntimeRow>(`/v1/subscriptions/${id}`,{method:"DELETE"}),
   editSubscription:(id:number,payload:{plan_id:number;traffic_gb:number;node_ids:number[];protocols:string[];account_username?:string;account_password?:string})=>request<RuntimeRow>(`/v1/subscriptions/${id}/admin-edit`,{method:"PATCH",body:JSON.stringify(payload)}),
-  extendSubscription:(id:number,payload:{duration_days?:number;traffic_gb?:number;add_days?:number})=>request<RuntimeRow>(`/v1/subscriptions/${id}/extend`,{method:"PATCH",body:JSON.stringify(payload)}),
+  extendSubscription:(id:number,payload:{duration_days?:number;traffic_gb?:number;add_days?:number;add_traffic_gb?:number})=>request<RuntimeRow>(`/v1/subscriptions/${id}/extend`,{method:"PATCH",body:JSON.stringify({...(payload.add_days!=null?{add_days:payload.add_days}:{}),...(payload.add_traffic_gb!=null?{add_traffic_gb:payload.add_traffic_gb}:payload.traffic_gb!=null?{add_traffic_gb:payload.traffic_gb}:{}),...(payload.duration_days!=null?{add_days:payload.duration_days}:{})})}),
   setSubscriptionManualLimits:(id:number,payload:{traffic_gb:number;duration_days:number})=>request<RuntimeRow>(`/v1/subscriptions/${id}/manual-limits`,{method:"PATCH",body:JSON.stringify(payload)}),
   provisionSubscription:(id:number)=>request<RuntimeRow>(`/v1/subscriptions/${id}/provision-account`,{method:"POST"}),
   refreshSubscriptionPasswords:(id:number)=>request<RuntimeRow>(`/v1/subscriptions/${id}/refresh-simple-passwords`,{method:"POST"}),
