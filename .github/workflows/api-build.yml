@@ -68,6 +68,7 @@ jobs:
         run: |
           sudo install -d -m 700 /etc/twinpanel
           sudo install -d -m 700 /var/lib/twinpanel-backups
+          sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel-backups
 
       - name: Compile backend
         run: python -m compileall -q backend/app
