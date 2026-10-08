@@ -24,6 +24,7 @@ from .routers.store import router as store_router
 from .routers.general_settings import router as general_settings_router
 from .routers.storefront_settings import router as storefront_settings_router
 from .routers.notification_settings import router as notification_settings_router
+from .routers.runtime_endpoints import router as runtime_endpoints_router
 from .admin_notification_service import notification_watch_loop
 # TWINPANEL_REAL_ADMIN_NOTIFICATION_REGISTER_V1
 # TWINPANEL_USERNAME_SETTINGS_REGISTER_V2
@@ -112,6 +113,7 @@ app = FastAPI(
 def health():
     return {"ok": True, "service": settings.app_name, "version": "0.9.7"}
 
+app.include_router(runtime_endpoints_router)
 app.include_router(bootstrap_router_module.router)
 app.include_router(auth.router)
 app.include_router(two_factor_router)
