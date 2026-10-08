@@ -127,7 +127,7 @@ export function RegisterPage2027(){
         <div className="customer-only-note">{pick("این فرم فقط حساب کاربر عادی ایجاد می‌کند.","This form creates customer accounts only.")}</div>
         {error&&<div className="auth-error">{error}</div>}
         <button className="primary full" disabled={busy}>{busy?pick("در حال ساخت حساب...","Creating account..."):pick("ثبت‌نام","Create account")}</button>
-        <small className="signup">{pick("حساب دارید؟","Already have an account?")} <Link href={loginHref}>{pick("ورود","Sign in")}</Link></small>}
+        <small className="signup">{pick("حساب دارید؟","Already have an account?")} <Link href={loginHref}>{pick("ورود","Sign in")}</Link></small>
       </form>
     </section>
   </div>;
