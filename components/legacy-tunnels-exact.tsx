@@ -104,16 +104,31 @@ export function LegacyTunnelsExactPage(){
     const successes:TransportName[]=[];
     const failures:string[]=[];
 
-    for(const name of transportOrder){
-      if(withProgress)setCreateStep(pick(`در حال نصب ${transportLabel(name)}…`,`Installing ${transportLabel(name)}…`));
-      try{
-        await installTransport(tunnelId,name);
-        successes.push(name);
-      }catch(reason){
-        const message=reason instanceof Error?reason.message:String(reason);
-        failures.push(`${transportLabel(name)}: ${message}`);
-      }
+    if(withProgress){
+      setCreateStep(
+        pick(
+          "در حال نصب MTunnel + Backhaul + SSH TUN…",
+          "Installing MTunnel + Backhaul + SSH TUN…",
+        ),
+      );
     }
+
+    const settled=await Promise.allSettled(
+      transportOrder.map(name=>installTransport(tunnelId,name)),
+    );
+
+    settled.forEach((result,index)=>{
+      const name=transportOrder[index];
+
+      if(result.status==="fulfilled"){
+        successes.push(name);
+        return;
+      }
+
+      const reason=result.reason;
+      const message=reason instanceof Error?reason.message:String(reason);
+      failures.push(`${transportLabel(name)}: ${message}`);
+    });
 
     if(successes.length){
       const primary=successes[0];
