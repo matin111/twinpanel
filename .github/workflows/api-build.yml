@@ -49,7 +49,7 @@ jobs:
       REDIS_URL: redis://127.0.0.1:6379/0
       NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
       PUBLIC_API_FALLBACK: http://127.0.0.1:8095
-      TWINPANEL_ADMIN_EMAIL: admin-ci@twinpanel.local
+      TWINPANEL_ADMIN_EMAIL: admin-ci@example.com
       TWINPANEL_ADMIN_PASSWORD: TwinPanel-CI-Admin-2026!
       TWINPANEL_ADMIN_NAME: TwinPanel CI Admin
 
