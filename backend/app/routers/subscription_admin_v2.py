@@ -33,7 +33,7 @@ class AdminSubscriptionCreateV2(BaseModel):
 
     # Missing values inherit the selected plan. This makes the API safe for
     # every UI/client, not only the current admin modal.
-    traffic_gb: float | None = Field(default=None, gt=0, le=100000)
+    traffic_gb: float | None = Field(default=None, ge=0, le=100000)
     duration_days: int | None = Field(default=None, ge=1, le=3650)
     device_limit: int | None = Field(default=None, ge=1, le=1000)
 
@@ -103,11 +103,6 @@ def admin_create_v2(
         else int(plan.device_limit or 1)
     )
 
-    if traffic_gb <= 0:
-        raise HTTPException(
-            status_code=422,
-            detail="حجم پلن یا اشتراک باید بیشتر از صفر باشد",
-        )
     if duration_days <= 0:
         raise HTTPException(
             status_code=422,

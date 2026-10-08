@@ -46,6 +46,7 @@ from .routers.telegram_bot import router as telegram_bot_router
 from .routers.telegram_manager import router as telegram_manager_router
 from .routers.customer_wallet import router as customer_wallet_router, admin_router as customer_wallet_admin_router
 from .routers.customer_subscription_management import router as customer_subscription_management_router
+from .routers.subscription_admin_v2 import router as subscription_admin_v2_router
 
 # Product/self-hosted compatibility must be applied before requests or
 # background workers can invoke migrated tunnel/node helpers.
@@ -197,6 +198,7 @@ app.include_router(customer_subscription_management_router)
 app.include_router(nodes.router)
 app.include_router(node_recovery_router)
 app.include_router(subscriptions.router)
+app.include_router(subscription_admin_v2_router, prefix="/v1")
 app.include_router(tunnels.router)
 app.include_router(tunnel_managed_router)
 app.include_router(admin.router)
