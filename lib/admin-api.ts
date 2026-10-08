@@ -54,7 +54,15 @@ export const adminApi={
   toggleNodeMaintenance:(id:number)=>request<AdminNode>(`/v1/nodes/${id}/maintenance`,{method:"POST"}),
   nodeHealth:(id:number)=>request<RuntimeRow>(`/v1/nodes/${id}/health`),
   nodeProtocols:(id:number)=>request<RuntimeRow>(`/v1/nodes/${id}/protocols`),
-  deleteNode:(id:number)=>request<RuntimeRow>(`/v1/nodes/${id}`,{method:"DELETE"}),
+  deleteNode:async(id:number)=>{
+    try{
+      return await request<RuntimeRow>(`/v1/nodes/${id}`,{method:"DELETE"});
+    }catch(error){
+      const message=error instanceof Error?error.message:String(error);
+      if(!/(پاک.?سازی|runtime|حذف را دوباره|api error 409|api error 500)/i.test(message))throw error;
+      return request<RuntimeRow>(`/v1/nodes/${id}/force-retire`,{method:"POST"});
+    }
+  },
 
   tunnels:()=>request<AdminTunnel[]>("/v1/tunnels"),
   createTunnel:(payload:{iran_node_id:number;exit_node_id:number;transport:string;priority:number;is_active:boolean})=>request<AdminTunnel>("/v1/tunnels",{method:"POST",body:JSON.stringify(payload)}),
