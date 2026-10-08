@@ -6,7 +6,7 @@ from .config import settings
 from .database import SessionLocal
 from .services.public_urls import api_base_url
 from .routers import nodes, provision, tunnels
-from .ssh_tunnel_self_hosted_v2 import provision_ssh_tunnel_self_hosted_v2
+from .ssh_tunnel_self_hosted_v3 import provision_ssh_tunnel_self_hosted_v3
 
 
 _original_install_or_upgrade_agent = provision._install_or_upgrade_agent
@@ -64,11 +64,11 @@ def apply_self_hosted_runtime() -> None:
     # tunnels.py imports this function by name, so patch the module binding.
     tunnels._install_or_upgrade_agent = _self_hosted_install_or_upgrade_agent
 
-    # SSH TUN is controller-owned in the self-hosted product. V2 performs all
-    # node preparation/repair through saved credentials, avoids a blocking
-    # ExecStartPost, tolerates NAT/source-address changes, and returns service
-    # diagnostics through the API instead of requiring manual SSH to nodes.
-    tunnels.provision_ssh_tunnel = provision_ssh_tunnel_self_hosted_v2
+    # SSH TUN is controller-owned in the self-hosted product. V3 keeps all node
+    # changes automatic, uses the V2 self-healing runtime, then performs a real
+    # key-authenticated fallback to the Backhaul private SSH path when public
+    # TCP/22 is reachable but the authenticated SSH session/tunnel is filtered.
+    tunnels.provision_ssh_tunnel = provision_ssh_tunnel_self_hosted_v3
 
     # nodes.py contains migrated cleanup code using Path but the historical
     # source omitted the import. Supply it here until that file is split into
