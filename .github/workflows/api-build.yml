@@ -134,7 +134,7 @@ jobs:
 
       - name: Run managed tunnel orchestration smoke
         working-directory: backend
-        run: python scripts/tunnel_managed_smoke.py
+        run: python -m scripts.tunnel_managed_smoke
 
       - name: Run standalone API core smoke
         working-directory: backend
