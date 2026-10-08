@@ -8,6 +8,7 @@ free(){ ! ss -lnt "sport = :$1" 2>/dev/null | tail -n +2 | grep -q .; }
 [[ $EUID -eq 0 ]] || fail "Installer باید با root اجرا شود"
 command -v ss >/dev/null || fail "ss نصب نیست"
 command -v ip >/dev/null || fail "iproute2 نصب نیست"
+command -v openssl >/dev/null || fail "openssl نصب نیست"
 
 say "TwinPanel Installer"
 echo "دامنه در زمان نصب اجباری نیست. بعد از ورود از بخش دامنه و SSL مدیریت می‌شود."
@@ -30,68 +31,76 @@ API=${API:-8095}
 free "$WEB" || fail "پورت $WEB اشغال است"
 free "$API" || fail "پورت $API اشغال است"
 
-printf '\n===== Admin account =====\n'
-while :; do
-  read -r -p "Admin email: " EMAIL
-  [[ -n "$EMAIL" ]] && break
-  echo "ایمیل نمی‌تواند خالی باشد"
-done
-
-while :; do
-  read -r -s -p "Admin password (typing is hidden): " PASS
-  echo
-  [[ ${#PASS} -ge 10 ]] || { echo "رمز باید حداقل 10 کاراکتر باشد"; continue; }
-
-  read -r -s -p "Confirm password: " PASS2
-  echo
-  [[ "$PASS" == "$PASS2" ]] && break
-  echo "رمزها یکسان نیستند"
-done
+# No admin questions during installation. A unique password is generated per
+# installation. The customer signs in once and changes email/password in panel.
+ADMIN_EMAIL="admin@twinpanel.app"
+ADMIN_NAME="Administrator"
+ADMIN_PASS="$(openssl rand -hex 16)"
 
 read -r -p "License key [leave empty for trial]: " LICENSE
 
 install -d -m 700 /etc/twinpanel
 umask 077
+
 cat >/etc/twinpanel/install.env <<ENV
 TWINPANEL_WEB_PORT=$WEB
 TWINPANEL_API_PORT=$API
 TWINPANEL_BACKEND_URL=http://127.0.0.1:$API
 TWINPANEL_PUBLIC_IP=$PUBLIC_IP
 PUBLIC_API_FALLBACK=http://$PUBLIC_IP
-TWINPANEL_ADMIN_EMAIL=$EMAIL
+TWINPANEL_ADMIN_EMAIL=$ADMIN_EMAIL
 TWINPANEL_LICENSE_KEY=$LICENSE
 ENV
 chmod 600 /etc/twinpanel/install.env
 
-# When the backend runtime already exists (upgrade/reinstall/current development
-# server), create or update the admin immediately. The password is never written
-# to install.env and is removed from the shell environment after bootstrap.
+# Temporary bootstrap secret for the backend installation stage. This file is
+# deleted immediately after a successful admin bootstrap.
+cat >/etc/twinpanel/bootstrap-admin.env <<ENV
+TWINPANEL_ADMIN_EMAIL=$ADMIN_EMAIL
+TWINPANEL_ADMIN_PASSWORD=$ADMIN_PASS
+TWINPANEL_ADMIN_NAME=$ADMIN_NAME
+ENV
+chmod 600 /etc/twinpanel/bootstrap-admin.env
+
+# Keep a root-only copy so credentials can be recovered if the SSH session is
+# lost before the first login. The user should remove it after changing admin
+# credentials from the panel.
+cat >/root/twinpanel-initial-admin.txt <<ENV
+TwinPanel initial admin
+Email: $ADMIN_EMAIL
+Password: $ADMIN_PASS
+ENV
+chmod 600 /root/twinpanel-initial-admin.txt
+
 BACKEND_DIR="/opt/twinpanel/current/backend"
 PYTHON_BIN="/opt/twinpanel/venv/bin/python"
 BOOTSTRAP="$BACKEND_DIR/scripts/bootstrap_admin.py"
 
 if [[ -x "$PYTHON_BIN" && -f "$BOOTSTRAP" && -f /etc/twinpanel/backend.env ]]; then
-  say "Creating admin account"
+  say "Creating default admin"
   set -a
   # shellcheck disable=SC1091
   source /etc/twinpanel/backend.env
+  # shellcheck disable=SC1091
+  source /etc/twinpanel/bootstrap-admin.env
   set +a
 
-  export TWINPANEL_ADMIN_EMAIL="$EMAIL"
-  export TWINPANEL_ADMIN_PASSWORD="$PASS"
-  export TWINPANEL_ADMIN_NAME="Administrator"
-
   (cd "$BACKEND_DIR" && "$PYTHON_BIN" scripts/bootstrap_admin.py)
+  rm -f /etc/twinpanel/bootstrap-admin.env
 
   unset TWINPANEL_ADMIN_PASSWORD TWINPANEL_ADMIN_EMAIL TWINPANEL_ADMIN_NAME
 else
-  echo "Backend runtime is not installed yet; admin bootstrap will run after backend installation."
+  echo "Backend runtime is not installed yet; default admin will be created after backend installation."
 fi
-
-unset PASS PASS2
 
 say "Configuration saved"
 printf 'Frontend internal: 127.0.0.1:%s\nAPI internal: 127.0.0.1:%s\n' "$WEB" "$API"
 printf 'Initial public API: http://%s\n' "$PUBLIC_IP"
-echo "Admin email: $EMAIL"
-echo "Admin password was not stored on disk."
+echo
+echo "===== Initial Admin ====="
+echo "Email: $ADMIN_EMAIL"
+echo "Password: $ADMIN_PASS"
+echo "Saved in: /root/twinpanel-initial-admin.txt"
+echo "After first login, change email/password from the panel and delete that file."
+
+unset ADMIN_PASS
