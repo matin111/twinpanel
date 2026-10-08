@@ -125,11 +125,16 @@ jobs:
           grep -q '"/v1/tunnels"' /tmp/openapi.json
           grep -q '"/v1/subscriptions"' /tmp/openapi.json
           grep -q '"/v1/tunnels/register"' /tmp/openapi.json
+          grep -q '"/v1/tunnels/create-managed"' /tmp/openapi.json
           grep -q '"/v1/tunnels/{tunnel_id}/transports"' /tmp/openapi.json
           grep -q '"/v1/tunnels/{tunnel_id}/transport-mode"' /tmp/openapi.json
           grep -q '"/v1/tunnels/{tunnel_id}/mtunnel/install"' /tmp/openapi.json
           grep -q '"/v1/tunnels/{tunnel_id}/backhaul/install"' /tmp/openapi.json
           grep -q '"/v1/tunnels/{tunnel_id}/ssh/install"' /tmp/openapi.json
+
+      - name: Run managed tunnel orchestration smoke
+        working-directory: backend
+        run: python scripts/tunnel_managed_smoke.py
 
       - name: Run standalone API core smoke
         working-directory: backend
