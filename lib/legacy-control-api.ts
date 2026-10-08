@@ -144,23 +144,55 @@ export const legacyControlApi={
     }
   },
 
-  // Create the logical pair first, then immediately start MTunnel, Backhaul
-  // and SSH TUN at the same time. The UI's existing installAll() consumes
-  // these already-running jobs, so creation no longer blocks on a sequential
-  // managed request and all three transports are provisioned together.
+  // Production create flow:
+  // Registration and installation of all three transports are owned by the API.
+  // The browser only waits for the managed result; it never owns provisioning.
   registerTunnel:async(payload:{iran_node_id:number;exit_node_id:number;transport:string;priority:number;is_active:boolean})=>{
     const body=JSON.stringify({...payload,is_active:true});
+
+    try{
+      const managed=await requestWithTimeout<ManagedTunnelCreateResponse>(
+        "/v1/tunnels/create-managed",
+        {method:"POST",body},
+        360000,
+      );
+
+      const tunnelId=Number(managed?.tunnel?.id||0);
+
+      if(tunnelId){
+        managedInstallCache.set(tunnelId,{
+          installed:Array.isArray(managed.installed)?managed.installed:[],
+          errors:managed.errors||{},
+        });
+      }
+
+      return managed.tunnel;
+    }catch(error){
+      if(!routeMissing(error))throw error;
+    }
+
+    // Compatibility fallback for an older API without create-managed.
     let created:AdminTunnel;
 
     try{
-      created=await requestWithTimeout<AdminTunnel>("/v1/tunnels/register",{method:"POST",body},30000);
+      created=await requestWithTimeout<AdminTunnel>(
+        "/v1/tunnels/register",
+        {method:"POST",body},
+        30000,
+      );
     }catch(error){
       if(!routeMissing(error))throw error;
-      created=await requestWithTimeout<AdminTunnel>("/v1/tunnels",{method:"POST",body},30000);
+
+      created=await requestWithTimeout<AdminTunnel>(
+        "/v1/tunnels",
+        {method:"POST",body},
+        30000,
+      );
     }
 
     const tunnelId=Number(created?.id||0);
     if(tunnelId)startParallelTransportInstalls(tunnelId);
+
     return created;
   },
 

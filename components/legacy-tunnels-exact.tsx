@@ -159,7 +159,7 @@ export function LegacyTunnelsExactPage(){
       return;
     }
 
-    setBusy("create");setError("");setOk("");setCreateStep(pick("در حال ثبت مسیر…","Creating tunnel…"));
+    setBusy("create");setError("");setOk("");setCreateStep(pick("در حال ساخت و نصب MTunnel + Backhaul + SSH TUN…","Creating and installing MTunnel + Backhaul + SSH TUN…"));
 
     try{
       const created=await legacyControlApi.registerTunnel({
