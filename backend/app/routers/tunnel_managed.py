@@ -14,11 +14,21 @@ from . import tunnels as core
 
 router = APIRouter(prefix="/v1/tunnels", tags=["tunnels-managed"])
 
+# Priority order is authoritative for failover/activation.
 _TRANSPORTS = (
     ("mtunnel", 90, core.install_mtunnel_transport),
     ("backhaul", 100, core.install_backhaul_transport),
     ("ssh_tun", 200, core.install_ssh_transport),
 )
+
+# Installation order intentionally keeps Backhaul last. A slow Backhaul setup
+# must not prevent MTunnel + SSH TUN from becoming available first.
+_INSTALL_ORDER = ("mtunnel", "ssh_tun", "backhaul")
+_TRANSPORT_TIMEOUTS = {
+    "mtunnel": 150,
+    "ssh_tun": 150,
+    "backhaul": 75,
+}
 
 
 def _detail_text(exc: Exception) -> str:
@@ -30,17 +40,59 @@ def _detail_text(exc: Exception) -> str:
     return str(exc)
 
 
+def _transport_map():
+    return {
+        name: (priority, installer)
+        for name, priority, installer in _TRANSPORTS
+    }
+
+
+def _mark_transport_failed(
+    db: Session,
+    tunnel_id: int,
+    name: str,
+    message: str,
+) -> None:
+    db.rollback()
+    row = (
+        db.query(TunnelTransport)
+        .filter(
+            TunnelTransport.tunnel_id == tunnel_id,
+            TunnelTransport.transport == name,
+        )
+        .first()
+    )
+    if row is None:
+        return
+
+    row.status = "failed"
+    row.last_error = message[:1800]
+    row.updated_at = datetime.utcnow()
+    db.commit()
+
+
 async def _install_with_retry(
+    name: str,
     installer,
     tunnel_id: int,
     db: Session,
 ):
     last_error: Exception | None = None
+    timeout_seconds = int(_TRANSPORT_TIMEOUTS.get(name, 120))
 
     for attempt in (1, 2):
         try:
-            return await installer(tunnel_id, db)
+            return await asyncio.wait_for(
+                installer(tunnel_id, db),
+                timeout=timeout_seconds,
+            )
+        except TimeoutError as exc:
+            db.rollback()
+            raise RuntimeError(
+                f"{name} install timed out after {timeout_seconds}s"
+            ) from exc
         except Exception as exc:  # installers already persist per-transport failure
+            db.rollback()
             last_error = exc
             if attempt == 1:
                 await asyncio.sleep(2)
@@ -131,10 +183,13 @@ def _activate_best_transport(db: Session, tunnel_id: int) -> str | None:
 
 async def _remove_failed_new_tunnel(db: Session, tunnel_id: int) -> None:
     # First use the normal cleanup path so partially-created remote runtime is
-    # removed whenever SSH is still reachable.
+    # removed whenever SSH is still reachable. Never let cleanup hang forever.
     try:
-        await core.delete_tunnel(tunnel_id, db)
-    except Exception:
+        await asyncio.wait_for(
+            core.delete_tunnel(tunnel_id, db),
+            timeout=45,
+        )
+    except BaseException:
         db.rollback()
 
     if db.get(Tunnel, tunnel_id) is None:
@@ -166,10 +221,9 @@ async def create_managed_tunnel(
 ):
     """Create one Iran->Exit tunnel and install all three transports server-side.
 
-    The old UI flow registered an OFFLINE logical row first and then performed
-    three independent browser requests. Any interrupted/failed request left an
-    OFFLINE tunnel behind. This endpoint owns the full orchestration so the
-    browser receives a usable tunnel or a clear failure.
+    The browser performs one managed request. The API owns transport install,
+    retries, timeouts, final activation and rollback. A failed new tunnel is
+    never left as a permanent OFFLINE placeholder.
     """
 
     existing = (
@@ -188,10 +242,23 @@ async def create_managed_tunnel(
     installed: list[str] = []
     errors: dict[str, str] = {}
     results: dict[str, object] = {}
+    transport_map = _transport_map()
 
-    for name, _, installer in _TRANSPORTS:
+    for name in _INSTALL_ORDER:
+        item = transport_map.get(name)
+        if item is None:
+            errors[name] = "transport installer is not registered"
+            continue
+
+        _, installer = item
+
         try:
-            result = await _install_with_retry(installer, tunnel_id, db)
+            result = await _install_with_retry(
+                name,
+                installer,
+                tunnel_id,
+                db,
+            )
             results[name] = result
 
             row = (
@@ -209,10 +276,17 @@ async def create_managed_tunnel(
                 and str(row.status or "").strip().lower() == "online"
             ):
                 installed.append(name)
+                # Make a usable transport authoritative immediately. If a
+                # secondary transport is slow/fails later, the tunnel stays up.
+                _activate_best_transport(db, tunnel_id)
             else:
-                errors[name] = "installer returned without an online transport"
+                message = "installer returned without an online transport"
+                errors[name] = message
+                _mark_transport_failed(db, tunnel_id, name, message)
         except Exception as exc:
-            errors[name] = _detail_text(exc)[:1800]
+            message = _detail_text(exc)[:1800]
+            errors[name] = message
+            _mark_transport_failed(db, tunnel_id, name, message)
 
     primary = _activate_best_transport(db, tunnel_id)
 
