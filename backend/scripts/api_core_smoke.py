@@ -164,9 +164,11 @@ def main() -> int:
     }
     assert names == {"mtunnel", "backhaul", "ssh_tun"}, transports
 
+    # V2 is the admin-panel contract. Deliberately omit traffic, duration and
+    # device limit so the API itself must apply the selected plan defaults.
     subscription = request(
         "POST",
-        "/v1/subscriptions",
+        "/v1/subscriptions/admin-create-v2",
         token=token,
         payload={
             "user_id": user_id,
@@ -179,8 +181,6 @@ def main() -> int:
                 "l2tp",
                 "v2ray",
             ],
-            "duration_days": 30,
-            "traffic_gb": 20,
         },
     )
     subscription_id = int(subscription["id"])
@@ -193,7 +193,31 @@ def main() -> int:
         "l2tp",
         "v2ray",
     }, subscription
+    assert round(float(subscription["traffic_limit_gb"]), 2) == 20.0, subscription
+    assert int(subscription["activation_duration_days"]) == 30, subscription
+    assert int(subscription["device_limit"]) == 2, subscription
+    assert subscription["device_limit_source"] == "subscription", subscription
+    assert subscription["traffic_unlimited"] is False, subscription
+    assert subscription["duration_unlimited"] is False, subscription
 
+    subscriptions_v2 = request(
+        "GET",
+        "/v1/subscriptions/admin-list-v2",
+        token=token,
+    )
+    listed = next(
+        (
+            item
+            for item in subscriptions_v2
+            if int(item["id"]) == subscription_id
+        ),
+        None,
+    )
+    assert listed is not None, subscriptions_v2
+    assert int(listed["device_limit"]) == 2, listed
+    assert int(listed["activation_duration_days"]) == 30, listed
+
+    # Keep the legacy endpoint available for older customers/upgrades.
     subscriptions = request("GET", "/v1/subscriptions", token=token)
     assert any(int(item["id"]) == subscription_id for item in subscriptions), subscriptions
 
