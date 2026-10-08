@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     redis_url: str = "redis://127.0.0.1:6379/0"
     node_agent_shared_secret: str
 
+    # Public API discovery:
+    # - before an API domain exists, expose this IP/base URL
+    # - after admin configures an active API domain, runtime discovery
+    #   automatically prefers the domain without requiring a frontend rebuild
+    public_api_fallback: str = ""
+
     payment_sms_relay_secret: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
