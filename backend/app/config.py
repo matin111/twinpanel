@@ -16,9 +16,9 @@ class Settings(BaseSettings):
     #   automatically prefers the domain without requiring a frontend rebuild
     public_api_fallback: str = ""
 
-    # Packaged Backhaul binary used by self-hosted tunnel provisioning.
-    # The installer/release must place the licensed binary at this path.
-    backhaul_binary_path: str = "/opt/twinpanel/current/backend/assets/backhaul/backhaul_premium"
+    # Packaged/licensed Backhaul runtime used by self-hosted tunnel provisioning.
+    # Release/installer must place the binary at this path or override it by env.
+    backhaul_binary_path: str = "/opt/twinpanel/runtime/backhaul/backhaul_premium"
 
     payment_sms_relay_secret: str = ""
 
