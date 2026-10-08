@@ -4078,7 +4078,7 @@ async def _backhaul_copy_binary(
     to the selected node.
 
     Controller source:
-      /root/vpnshop/backhaul/backhaul_premium
+      settings.backhaul_binary_path
     """
 
     import os
@@ -4391,9 +4391,9 @@ async def install_backhaul_transport(
             detail="نود خروجی تونل معتبر نیست",
         )
 
-    local_binary = (
-        "/root/vpnshop/backhaul/backhaul_premium"
-    )
+    local_binary = str(
+        settings.backhaul_binary_path
+    ).strip()
 
     if not os.path.isfile(local_binary):
         raise HTTPException(
