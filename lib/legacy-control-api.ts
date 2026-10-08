@@ -67,6 +67,22 @@ export type ManagedTunnelCreateResponse={
   transports?:RuntimeRow[];
 };
 
+type ManagedInstallCache={installed:string[];errors:Record<string,string>};
+const managedInstallCache=new Map<number,ManagedInstallCache>();
+
+async function managedTransportResult(id:number,name:"mtunnel"|"backhaul"|"ssh_tun"){
+  const cached=managedInstallCache.get(id);
+  if(!cached)return null;
+
+  if(name==="ssh_tun")managedInstallCache.delete(id);
+
+  if(cached.installed.includes(name)){
+    return {ok:true,managed:true,transport:name,status:"online"} as RuntimeRow;
+  }
+
+  throw new Error(cached.errors[name]||`${name} نصب نشد`);
+}
+
 export const legacyControlApi={
   dashboard:()=>request<DashboardSummary&RuntimeRow>("/v1/admin/dashboard-summary"),
   systemHealth:()=>request<SystemHealth>("/v1/admin/system-health"),
@@ -89,6 +105,21 @@ export const legacyControlApi={
   },
   registerTunnel:async(payload:{iran_node_id:number;exit_node_id:number;transport:string;priority:number;is_active:boolean})=>{
     const body=JSON.stringify({...payload,is_active:true});
+
+    try{
+      const managed=await request<ManagedTunnelCreateResponse>("/v1/tunnels/create-managed",{method:"POST",body});
+      const tunnelId=Number(managed.tunnel?.id||0);
+      if(tunnelId){
+        managedInstallCache.set(tunnelId,{
+          installed:Array.isArray(managed.installed)?managed.installed:[],
+          errors:managed.errors&&typeof managed.errors==="object"?managed.errors:{},
+        });
+      }
+      return managed.tunnel;
+    }catch(error){
+      if(!routeMissing(error))throw error;
+    }
+
     try{
       return await request<AdminTunnel>("/v1/tunnels/register",{method:"POST",body});
     }catch(error){
@@ -103,10 +134,19 @@ export const legacyControlApi={
   tunnelHealth:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/health`),
   tunnelTransports:(id:number)=>request<TunnelTransportsResponse>(`/v1/tunnels/${id}/transports`),
   setTunnelTransportMode:(id:number,payload:{mode:string;transport?:string|null})=>request<RuntimeRow>(`/v1/tunnels/${id}/transport-mode`,{method:"POST",body:JSON.stringify(payload)}),
-  installSshTunnel:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/ssh/install`,{method:"POST"}),
-  installMtunnel:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/install`,{method:"POST"}),
+  installSshTunnel:async(id:number)=>{
+    const managed=await managedTransportResult(id,"ssh_tun");
+    return managed||request<RuntimeRow>(`/v1/tunnels/${id}/ssh/install`,{method:"POST"});
+  },
+  installMtunnel:async(id:number)=>{
+    const managed=await managedTransportResult(id,"mtunnel");
+    return managed||request<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/install`,{method:"POST"});
+  },
   repairMtunnel:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/repair`,{method:"POST"}),
   mtunnelHealth:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/health`),
-  installBackhaul:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/backhaul/install`,{method:"POST"}),
+  installBackhaul:async(id:number)=>{
+    const managed=await managedTransportResult(id,"backhaul");
+    return managed||request<RuntimeRow>(`/v1/tunnels/${id}/backhaul/install`,{method:"POST"});
+  },
   backhaulStatus:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/backhaul/status`)
 };
