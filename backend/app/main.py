@@ -18,6 +18,7 @@ from . import domain_models
 from . import branding_models  # register reseller tables
 from . import storefront_settings_models  # TWINPANEL_STOREFRONT_CMS_V74
 from . import two_factor_models
+from . import runtime_settings_model
 from .routers import admin, auth, nodes, plans, provision, subscriptions, tunnels, resellers, reseller_portal, domains, branding
 from .routers import bootstrap as bootstrap_router_module
 from .routers.two_factor import router as two_factor_router  # TWINPANEL_REAL_2FA_REGISTER_V1
@@ -58,6 +59,7 @@ _ = telegram_models
 _ = renewal_models
 _ = two_factor_models
 _ = storefront_settings_models
+_ = runtime_settings_model
 
 
 # TWINPANEL_ADMIN_PANEL_NOTIFICATION_REGISTER_V1
