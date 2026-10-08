@@ -25,6 +25,7 @@ from .routers.general_settings import router as general_settings_router
 from .routers.storefront_settings import router as storefront_settings_router
 from .routers.notification_settings import router as notification_settings_router
 from .routers.runtime_endpoints import router as runtime_endpoints_router
+from .routers.node_recovery import router as node_recovery_router
 from .admin_notification_service import notification_watch_loop
 # TWINPANEL_REAL_ADMIN_NOTIFICATION_REGISTER_V1
 # TWINPANEL_USERNAME_SETTINGS_REGISTER_V2
@@ -134,6 +135,7 @@ app.include_router(customer_wallet_router)
 app.include_router(customer_wallet_admin_router)
 app.include_router(customer_subscription_management_router)
 app.include_router(nodes.router)
+app.include_router(node_recovery_router)
 app.include_router(subscriptions.router)
 app.include_router(tunnels.router)
 app.include_router(admin.router)
@@ -185,7 +187,6 @@ app.include_router(reseller_notifications_router)
 # TWINPANEL_ADMIN_BACKUP_ROUTER_V1
 from .routers.backups import router as backups_router
 app.include_router(backups_router)
-
 
 
 
