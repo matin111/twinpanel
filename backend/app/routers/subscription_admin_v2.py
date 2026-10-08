@@ -17,8 +17,7 @@ from .subscriptions import subscription_out
 
 
 # Nested under the already-registered /v1 quota/control router. Keeping this
-# prefix relative avoids touching the production main router just to add the
-# V2 admin flow.
+# prefix relative avoids duplicating the public /v1 prefix.
 router = APIRouter(
     prefix="/subscriptions",
     tags=["subscription-admin-v2"],
@@ -32,15 +31,14 @@ class AdminSubscriptionCreateV2(BaseModel):
     node_ids: list[int] = Field(default_factory=list)
     protocols: list[str] = Field(default_factory=list)
 
-    # Missing traffic/time means unlimited by explicit admin choice.
+    # Missing values inherit the selected plan. This makes the API safe for
+    # every UI/client, not only the current admin modal.
     traffic_gb: float | None = Field(default=None, gt=0, le=100000)
     duration_days: int | None = Field(default=None, ge=1, le=3650)
-
-    # Missing device limit keeps the selected plan default.
     device_limit: int | None = Field(default=None, ge=1, le=1000)
 
     username: str | None = Field(default=None, max_length=120)
-    password: str | None = Field(default=None, max_length=256)
+    password: str | None = Field(default=None, min_length=4, max_length=256)
 
 
 def _enriched_payload(db: Session, sub: Subscription) -> dict:
@@ -50,7 +48,11 @@ def _enriched_payload(db: Session, sub: Subscription) -> dict:
     payload = subscription_out(db, sub).model_dump(mode="json")
     payload.update(
         {
-            "activation_duration_days": sub.activation_duration_days,
+            "activation_duration_days": int(
+                sub.activation_duration_days
+                or (plan.duration_days if plan else 0)
+                or 0
+            ),
             "traffic_unlimited": int(sub.traffic_limit_bytes or 0) <= 0,
             "duration_unlimited": bool(
                 override and override.duration_unlimited
@@ -85,28 +87,52 @@ def admin_create_v2(
     if not plan or not plan.is_active:
         raise HTTPException(status_code=404, detail="پلن پیدا نشد")
 
-    traffic_bytes = 0
-    if payload.traffic_gb is not None:
-        traffic_bytes = int(round(payload.traffic_gb * (1024 ** 3)))
+    traffic_gb = (
+        float(payload.traffic_gb)
+        if payload.traffic_gb is not None
+        else float(plan.traffic_gb or 0)
+    )
+    duration_days = (
+        int(payload.duration_days)
+        if payload.duration_days is not None
+        else int(plan.duration_days or 0)
+    )
+    device_limit = (
+        int(payload.device_limit)
+        if payload.device_limit is not None
+        else int(plan.device_limit or 1)
+    )
+
+    if traffic_gb <= 0:
+        raise HTTPException(
+            status_code=422,
+            detail="حجم پلن یا اشتراک باید بیشتر از صفر باشد",
+        )
+    if duration_days <= 0:
+        raise HTTPException(
+            status_code=422,
+            detail="مدت پلن یا اشتراک باید بیشتر از صفر باشد",
+        )
 
     sub = create_subscription_core(
         db=db,
         user_id=payload.user_id,
         plan_id=payload.plan_id,
-        traffic_bytes=traffic_bytes,
-        # None is intentionally preserved: explicit unlimited time.
-        duration_days=payload.duration_days,
+        traffic_bytes=int(round(traffic_gb * (1024 ** 3))),
+        duration_days=duration_days,
         node_ids=payload.node_ids or [],
         protocols=payload.protocols or [],
         username=(payload.username or "").strip() or None,
         password=(payload.password or "").strip() or None,
     )
 
+    db.flush()
+
     db.add(
         SubscriptionRuntimeOverride(
             subscription_id=sub.id,
-            device_limit=payload.device_limit,
-            duration_unlimited=payload.duration_days is None,
+            device_limit=max(1, device_limit),
+            duration_unlimited=False,
         )
     )
 
