@@ -85,7 +85,11 @@ export type ManagedTunnelCreateResponse={
 type ManagedInstallCache={installed:string[];errors:Record<string,string>};
 const managedInstallCache=new Map<number,ManagedInstallCache>();
 
-async function managedTransportResult(id:number,name:"mtunnel"|"backhaul"|"ssh_tun"){
+type ParallelTransport="mtunnel"|"backhaul"|"ssh_tun";
+type ParallelInstallMap=Map<ParallelTransport,Promise<RuntimeRow>>;
+const parallelInstallCache=new Map<number,ParallelInstallMap>();
+
+async function managedTransportResult(id:number,name:ParallelTransport){
   const cached=managedInstallCache.get(id);
   if(!cached)return null;
 
@@ -96,6 +100,27 @@ async function managedTransportResult(id:number,name:"mtunnel"|"backhaul"|"ssh_t
   }
 
   throw new Error(cached.errors[name]||`${name} نصب نشد`);
+}
+
+function startParallelTransportInstalls(id:number){
+  if(!id||parallelInstallCache.has(id))return;
+
+  const jobs:ParallelInstallMap=new Map();
+  jobs.set("mtunnel",requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/install`,{method:"POST"},150000));
+  jobs.set("backhaul",requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/backhaul/install`,{method:"POST"},75000));
+  jobs.set("ssh_tun",requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/ssh/install`,{method:"POST"},150000));
+  parallelInstallCache.set(id,jobs);
+}
+
+async function parallelTransportResult(id:number,name:ParallelTransport){
+  const jobs=parallelInstallCache.get(id);
+  const job=jobs?.get(name);
+  if(!job)return null;
+
+  jobs!.delete(name);
+  if(jobs!.size===0)parallelInstallCache.delete(id);
+
+  return await job;
 }
 
 export const legacyControlApi={
@@ -118,30 +143,27 @@ export const legacyControlApi={
       return null;
     }
   },
+
+  // Create the logical pair first, then immediately start MTunnel, Backhaul
+  // and SSH TUN at the same time. The UI's existing installAll() consumes
+  // these already-running jobs, so creation no longer blocks on a sequential
+  // managed request and all three transports are provisioned together.
   registerTunnel:async(payload:{iran_node_id:number;exit_node_id:number;transport:string;priority:number;is_active:boolean})=>{
     const body=JSON.stringify({...payload,is_active:true});
+    let created:AdminTunnel;
 
     try{
-      const managed=await requestWithTimeout<ManagedTunnelCreateResponse>("/v1/tunnels/create-managed",{method:"POST",body},360000);
-      const tunnelId=Number(managed.tunnel?.id||0);
-      if(tunnelId){
-        managedInstallCache.set(tunnelId,{
-          installed:Array.isArray(managed.installed)?managed.installed:[],
-          errors:managed.errors&&typeof managed.errors==="object"?managed.errors:{},
-        });
-      }
-      return managed.tunnel;
+      created=await requestWithTimeout<AdminTunnel>("/v1/tunnels/register",{method:"POST",body},30000);
     }catch(error){
       if(!routeMissing(error))throw error;
+      created=await requestWithTimeout<AdminTunnel>("/v1/tunnels",{method:"POST",body},30000);
     }
 
-    try{
-      return await request<AdminTunnel>("/v1/tunnels/register",{method:"POST",body});
-    }catch(error){
-      if(!routeMissing(error))throw error;
-      return request<AdminTunnel>("/v1/tunnels",{method:"POST",body});
-    }
+    const tunnelId=Number(created?.id||0);
+    if(tunnelId)startParallelTransportInstalls(tunnelId);
+    return created;
   },
+
   updateTunnel:(id:number,payload:RuntimeRow)=>request<AdminTunnel>(`/v1/tunnels/${id}`,{method:"PATCH",body:JSON.stringify(payload)}),
   toggleTunnel:(id:number)=>request<AdminTunnel>(`/v1/tunnels/${id}/toggle`,{method:"POST"}),
   deleteTunnel:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}`,{method:"DELETE"}),
@@ -149,19 +171,30 @@ export const legacyControlApi={
   tunnelHealth:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/health`),
   tunnelTransports:(id:number)=>request<TunnelTransportsResponse>(`/v1/tunnels/${id}/transports`),
   setTunnelTransportMode:(id:number,payload:{mode:string;transport?:string|null})=>request<RuntimeRow>(`/v1/tunnels/${id}/transport-mode`,{method:"POST",body:JSON.stringify(payload)}),
+
   installSshTunnel:async(id:number)=>{
+    const parallel=await parallelTransportResult(id,"ssh_tun");
+    if(parallel)return parallel;
     const managed=await managedTransportResult(id,"ssh_tun");
     return managed||requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/ssh/install`,{method:"POST"},150000);
   },
+
   installMtunnel:async(id:number)=>{
+    const parallel=await parallelTransportResult(id,"mtunnel");
+    if(parallel)return parallel;
     const managed=await managedTransportResult(id,"mtunnel");
     return managed||requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/install`,{method:"POST"},150000);
   },
+
   repairMtunnel:(id:number)=>requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/repair`,{method:"POST"},150000),
   mtunnelHealth:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/health`),
+
   installBackhaul:async(id:number)=>{
+    const parallel=await parallelTransportResult(id,"backhaul");
+    if(parallel)return parallel;
     const managed=await managedTransportResult(id,"backhaul");
     return managed||requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/backhaul/install`,{method:"POST"},75000);
   },
+
   backhaulStatus:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/backhaul/status`)
 };
