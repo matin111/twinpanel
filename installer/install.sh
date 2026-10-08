@@ -31,11 +31,12 @@ API=${API:-8095}
 free "$WEB" || fail "پورت $WEB اشغال است"
 free "$API" || fail "پورت $API اشغال است"
 
-# No admin questions during installation. A unique password is generated per
-# installation. The customer signs in once and changes email/password in panel.
+# No admin questions during installation. A unique 12-digit numeric password is
+# generated per installation. The customer changes email/password after login.
 ADMIN_EMAIL="admin@twinpanel.app"
 ADMIN_NAME="Administrator"
-ADMIN_PASS="$(openssl rand -hex 16)"
+RANDOM_HEX="$(openssl rand -hex 6)"
+ADMIN_PASS="$(printf '%012d' "$((16#$RANDOM_HEX % 1000000000000))")"
 
 read -r -p "License key [leave empty for trial]: " LICENSE
 
@@ -103,4 +104,4 @@ echo "Password: $ADMIN_PASS"
 echo "Saved in: /root/twinpanel-initial-admin.txt"
 echo "After first login, change email/password from the panel and delete that file."
 
-unset ADMIN_PASS
+unset ADMIN_PASS RANDOM_HEX
