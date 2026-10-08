@@ -1,19 +1,15 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
-from ..config import settings
 from ..database import get_db
 from ..domain_models import Domain, DomainType, SSLStatus
+from ..services.public_urls import api_base_url
 
 
 router = APIRouter(
     prefix="/v1/runtime",
     tags=["runtime"],
 )
-
-
-def _clean_base(value: str | None) -> str:
-    return str(value or "").strip().rstrip("/")
 
 
 def _active_api_domain(db: Session) -> Domain | None:
@@ -34,42 +30,27 @@ def runtime_endpoints(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """
-    Public runtime endpoint discovery.
+    """Public runtime endpoint discovery.
 
-    Before an API domain is configured, clients use the configured
-    public IP/base URL. As soon as an active API domain exists in the
-    admin domain manager, the public API base automatically switches
-    to that domain. No frontend rebuild is required.
+    Before a dedicated API domain exists, ``api_base`` resolves to the
+    configured public server IP/base URL. As soon as an admin adds a
+    working API domain, the newest active API domain becomes primary.
+    No frontend rebuild or service restart is required for discovery.
     """
 
     item = _active_api_domain(db)
+    base = api_base_url(db, request)
 
-    if item is not None:
-        scheme = (
-            "https"
-            if item.ssl_status == SSLStatus.ACTIVE
-            else "http"
-        )
-
+    if item is not None and base:
         return {
-            "api_base": f"{scheme}://{item.domain}",
+            "api_base": base,
             "source": "domain",
             "api_domain": item.domain,
             "ssl_active": item.ssl_status == SSLStatus.ACTIVE,
         }
 
-    fallback = _clean_base(
-        settings.public_api_fallback
-    )
-
-    if not fallback:
-        fallback = _clean_base(
-            str(request.base_url)
-        )
-
     return {
-        "api_base": fallback,
+        "api_base": base,
         "source": "ip",
         "api_domain": None,
         "ssl_active": False,
