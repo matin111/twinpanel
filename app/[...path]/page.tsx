@@ -5,6 +5,7 @@ import {SmsReaderRuntimePage,MotherAccessRuntimePage,AccountDeliveryRuntimePage}
 import {SupportRuntimePage,NotificationsRuntimePage} from "../../components/admin-ops-runtime";
 import {SystemHealthRuntimePage} from "../../components/system-health-runtime";
 import {TunnelTransportRuntimePage} from "../../components/tunnel-transport-runtime";
+import {ModernTransportCanaryPage} from "../../components/modern-transport-canary";
 import {SubscriptionToolsRuntimePage} from "../../components/subscription-tools-runtime";
 import {LegacySubscriptionsRuntimePage} from "../../components/legacy-subscriptions-exact";
 import {LegacyUsersRuntimePage} from "../../components/legacy-users-exact";
@@ -39,6 +40,7 @@ const route=(key:string)=>{
   if(key==="admin/nodes") return admin(<NodesUnifiedRuntimePage/>);
   if(key==="admin/tunnels") return admin(<LegacyTunnelsExactPage/>);
   if(key==="admin/tunnel-transports") return admin(<TunnelTransportRuntimePage/>);
+  if(key==="admin/tunnel-canary") return admin(<ModernTransportCanaryPage/>);
   if(key==="admin/payments") return admin(<AdminCollectionRuntime kind="payments"/>);
   if(key==="admin/settings") return admin(<SettingsPage2027/>);
   if(key==="admin/system-health") return admin(<SystemHealthRuntimePage/>);
