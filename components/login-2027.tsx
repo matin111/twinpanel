@@ -12,10 +12,9 @@ import {resolvePortal} from "../lib/role-router";
 function AuthArt(){
   const {pick}=useI18n();
   const {brand}=useBranding();
-  const initial=(brand.shortName||brand.name||"P").trim().charAt(0).toUpperCase();
   return <section className="login-art">
     <div className="brand big"><img src={brand.logoUrl} alt={brand.name}/><div><b>{brand.name}</b></div></div>
-    <div className="planet"><span>{initial}</span></div>
+    <div className="planet"/>
     <h2>{pick("اتصال امن، مدیریت ساده","Secure access, simple management")}</h2>
   </section>;
 }
