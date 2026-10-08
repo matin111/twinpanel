@@ -11,6 +11,7 @@ export type AdminTunnel={id:number;iran_node_id:number;exit_node_id:number;trans
 export type RuntimeRow=Record<string,unknown>;
 
 function errorText(payload:unknown,status:number){
+  if(typeof payload==="string"&&payload.trim())return payload.trim();
   if(payload&&typeof payload==="object"){
     const item=payload as {detail?:unknown;message?:unknown};
     if(typeof item.detail==="string")return item.detail;
@@ -27,12 +28,16 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   headers.set("Authorization",`Bearer ${token}`);
   if(init.body&&!headers.has("Content-Type")&&!(init.body instanceof FormData))headers.set("Content-Type","application/json");
   const response=await fetch(`${API_BASE}${path}`,{...init,headers,cache:"no-store"});
-  if(!response.ok){
-    let payload:unknown=null;try{payload=await response.json();}catch{}
-    throw new Error(errorText(payload,response.status));
-  }
   if(response.status===204)return undefined as T;
-  return response.json() as Promise<T>;
+
+  const raw=await response.text();
+  let payload:unknown=null;
+  if(raw){
+    try{payload=JSON.parse(raw);}catch{payload=raw;}
+  }
+
+  if(!response.ok)throw new Error(errorText(payload,response.status));
+  return payload as T;
 }
 
 export const adminApi={
