@@ -6,6 +6,7 @@ from .config import settings
 from .database import SessionLocal
 from .services.public_urls import api_base_url
 from .routers import nodes, provision, tunnels
+from .ssh_tunnel_self_hosted import provision_ssh_tunnel_self_hosted
 
 
 _original_install_or_upgrade_agent = provision._install_or_upgrade_agent
@@ -62,6 +63,12 @@ async def _self_hosted_install_or_upgrade_agent(
 def apply_self_hosted_runtime() -> None:
     # tunnels.py imports this function by name, so patch the module binding.
     tunnels._install_or_upgrade_agent = _self_hosted_install_or_upgrade_agent
+
+    # SSH TUN is also a migrated runtime. Keep the public tunnel router intact,
+    # but replace only its provisioning binding with the self-hosted installer.
+    # The installer performs all node changes remotely from TwinPanel and fixes
+    # the OpenSSH -w lifecycle without requiring manual SSH on customer nodes.
+    tunnels.provision_ssh_tunnel = provision_ssh_tunnel_self_hosted
 
     # nodes.py contains migrated cleanup code using Path but the historical
     # source omitted the import. Supply it here until that file is split into
