@@ -16,7 +16,7 @@ function Modal({title,sub,onClose,children,wide=false}:{title:string;sub?:string
 }
 
 type Draft={iran_node_id:number;exit_node_id:number;transport:string;priority:number;is_active:boolean};
-const emptyDraft:Draft={iran_node_id:0,exit_node_id:0,transport:"backhaul",priority:100,is_active:true};
+const emptyDraft:Draft={iran_node_id:0,exit_node_id:0,transport:"mtunnel",priority:100,is_active:true};
 
 export function LegacyTunnelsExactPage(){
   const {pick}=useI18n();
@@ -34,7 +34,7 @@ export function LegacyTunnelsExactPage(){
   const [health,setHealth]=useState<RuntimeRow|null>(null);
   const [transports,setTransports]=useState<RuntimeRow[]>([]);
   const [mode,setMode]=useState("manual");
-  const [preferred,setPreferred]=useState("backhaul");
+  const [preferred,setPreferred]=useState("mtunnel");
 
   const load=async(silent=false)=>{
     if(!silent)setLoading(true);setError("");
@@ -62,13 +62,43 @@ export function LegacyTunnelsExactPage(){
   };
 
   const openCreate=()=>{
-    setDraft({iran_node_id:iranNodes[0]?.id||0,exit_node_id:exitNodes[0]?.id||0,transport:"backhaul",priority:100,is_active:true});setCreateOpen(true);
+    setError("");setOk("");
+    setDraft({iran_node_id:iranNodes[0]?.id||0,exit_node_id:exitNodes[0]?.id||0,transport:"mtunnel",priority:100,is_active:true});
+    setCreateOpen(true);
   };
 
-  const create=(event:FormEvent)=>{
+  const create=async(event:FormEvent)=>{
     event.preventDefault();
+    if(busy)return;
     if(!draft.iran_node_id||!draft.exit_node_id){setError(pick("نود ایران و خروج را انتخاب کنید","Select Iran and exit nodes"));return;}
-    void act("create",pick("تونل ثبت شد","Tunnel registered"),async()=>{const created=await legacyControlApi.registerTunnel(draft);setCreateOpen(false);setSelected(created);},false);
+
+    setBusy("create");setError("");setOk("");
+
+    try{
+      const created=await legacyControlApi.registerTunnel({...draft,is_active:true});
+      const tunnelId=Number(created.id);
+
+      if(!tunnelId)throw new Error(pick("شناسه تونل بعد از ثبت دریافت نشد.","Tunnel ID was not returned after registration."));
+
+      if(draft.transport==="mtunnel"){
+        await legacyControlApi.installMtunnel(tunnelId);
+      }else if(draft.transport==="backhaul"){
+        await legacyControlApi.installBackhaul(tunnelId);
+      }else{
+        await legacyControlApi.installSshTunnel(tunnelId);
+      }
+
+      setCreateOpen(false);
+      setSelected(created);
+      await load(true);
+      setManageOpen(true);
+      await loadDetail(tunnelId);
+      setOk(pick(`تونل با ${transportLabel(draft.transport)} ساخته و فعال شد.`,`Tunnel created and activated with ${transportLabel(draft.transport)}.`));
+    }catch(reason){
+      setError(reason instanceof Error?reason.message:String(reason));
+    }finally{
+      setBusy("");
+    }
   };
 
   const loadDetail=async(id:number)=>{
@@ -78,7 +108,7 @@ export function LegacyTunnelsExactPage(){
     if(t.status==="fulfilled"){
       setTransports(Array.isArray(t.value.transports)?t.value.transports:[]);
       setMode(s(t.value.mode)||"manual");
-      setPreferred(s(t.value.preferred_transport||t.value.active_transport)||"backhaul");
+      setPreferred(s(t.value.preferred_transport||t.value.active_transport)||"mtunnel");
     }
   };
 
@@ -111,6 +141,8 @@ export function LegacyTunnelsExactPage(){
   const repairMtunnel=()=>{if(!selected)return;if(!window.confirm(pick(`MTunnel تونل #${selected.id} تعمیر شود؟`,`Repair MTunnel for tunnel #${selected.id}?`)))return;void act("repair-mtunnel",pick("تعمیر MTunnel انجام شد","MTunnel repair finished"),()=>legacyControlApi.repairMtunnel(selected.id),true);};
   const prepare=()=>{if(!selected)return;if(!window.confirm(pick(`آماده‌سازی پایه تونل #${selected.id} اجرا شود؟`,`Run base preparation for tunnel #${selected.id}?`)))return;void act("prepare",pick("آماده‌سازی تونل انجام شد","Tunnel preparation finished"),()=>legacyControlApi.prepareTunnel(selected.id),true);};
 
+  const healthTunnel=(health?.tunnel&&typeof health.tunnel==="object"?health.tunnel:{} ) as RuntimeRow;
+
   return <Shell active="/admin/tunnels"><div className="page legacy-control-page">
     <div className="page-head"><div><h1>{pick("تانل‌ها","Tunnels")}</h1><small>{pick("مسیر ایران → خروج، Transport، سلامت و Failover","Iran → exit paths, transports, health and failover")}</small></div><div className="action-row"><button className="ghost" disabled={loading} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button><button className="primary" onClick={openCreate}>＋ {pick("تونل جدید","New tunnel")}</button></div></div>
     {error&&<div className="runtime-error">{error}</div>}{ok&&<div className="runtime-success">{ok}</div>}
@@ -119,19 +151,29 @@ export function LegacyTunnelsExactPage(){
 
     <Card>
       <div className="runtime-toolbar"><label>⌕ <input value={query} onChange={event=>setQuery(event.target.value)} placeholder={pick("نام نود، IP، Transport یا شناسه…","Node, IP, transport or ID…")}/></label></div>
-      <div className="table"><table><thead><tr><th>{pick("مسیر","Path")}</th><th>{pick("Transport","Transport")}</th><th>{pick("Ping","Ping")}</th><th>{pick("اولویت","Priority")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("اجرا","Enabled")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map(item=>{const iran=nodeMap.get(item.iran_node_id);const exit=nodeMap.get(item.exit_node_id);return <tr key={item.id}><td><div className="user-cell"><b>{iran?.name||`#${item.iran_node_id}`} ← {exit?.name||`#${item.exit_node_id}`}</b><small dir="ltr">{iran?.public_ip||"—"} → {exit?.public_ip||"—"}</small></div></td><td><b dir="ltr">{transportLabel(item.transport)}</b></td><td dir="ltr">{item.latency_ms==null?"—":`${item.latency_ms} ms`}</td><td>{n(item.priority).toLocaleString("fa-IR")}</td><td><Badge tone={online(item.status)?"ok":s(item.status).toLowerCase()==="degraded"?"warn":"bad"}>{s(item.status)||"—"}</Badge></td><td><Badge tone={item.is_active?"ok":"warn"}>{item.is_active?pick("فعال","Active"):pick("خاموش","Disabled")}</Badge></td><td><div className="row-actions"><button className="primary-soft" onClick={()=>void openManage(item)}>{pick("مدیریت","Manage")}</button><button disabled={!!busy} onClick={()=>void toggle(item)}>{item.is_active?pick("غیرفعال","Disable"):pick("فعال","Enable")}</button><button className="danger" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button></div></td></tr>;})}</tbody></table>{!filtered.length&&!loading&&<div className="runtime-empty">{pick("تانلی پیدا نشد","No tunnels found")}</div>}</div>
+      <div className="table"><table><thead><tr><th>{pick("مسیر","Path")}</th><th>{pick("Transport","Transport")}</th><th>{pick("Ping","Ping")}</th><th>{pick("اولویت","Priority")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("اجرا","Enabled")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map(item=>{const iran=nodeMap.get(item.iran_node_id);const exit=nodeMap.get(item.exit_node_id);return <tr key={item.id}><td><div className="user-cell"><b>{iran?.name||`#${item.iran_node_id}`} → {exit?.name||`#${item.exit_node_id}`}</b><small dir="ltr">{iran?.public_ip||"—"} → {exit?.public_ip||"—"}</small></div></td><td><b dir="ltr">{transportLabel(item.active_transport||item.transport)}</b></td><td dir="ltr">{item.latency_ms==null?"—":`${item.latency_ms} ms`}</td><td>{n(item.priority).toLocaleString("fa-IR")}</td><td><Badge tone={online(item.status)?"ok":s(item.status).toLowerCase()==="degraded"?"warn":"bad"}>{s(item.status)||"—"}</Badge></td><td><Badge tone={item.is_active?"ok":"warn"}>{item.is_active?pick("فعال","Active"):pick("خاموش","Disabled")}</Badge></td><td><div className="row-actions"><button className="primary-soft" onClick={()=>void openManage(item)}>{pick("مدیریت","Manage")}</button><button disabled={!!busy} onClick={()=>void toggle(item)}>{item.is_active?pick("غیرفعال","Disable"):pick("فعال","Enable")}</button><button className="danger" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button></div></td></tr>;})}</tbody></table>{!filtered.length&&!loading&&<div className="runtime-empty">{pick("تانلی پیدا نشد","No tunnels found")}</div>}</div>
     </Card>
 
-    {createOpen&&<Modal title={pick("ساخت تونل","Create tunnel")} sub={pick("انتخاب جفت ایران و خروج","Select Iran and exit pair")} onClose={()=>!busy&&setCreateOpen(false)}>
-      <form onSubmit={create}><div className="setting-grid"><label className="field"><span>{pick("نود ایران","Iran node")}</span><select value={draft.iran_node_id} onChange={e=>setDraft(d=>({...d,iran_node_id:Number(e.target.value)}))}><option value={0}>{pick("انتخاب","Select")}</option>{iranNodes.map(item=><option key={item.id} value={item.id}>{item.name} · {item.public_ip}</option>)}</select></label><label className="field"><span>{pick("نود خروج","Exit node")}</span><select value={draft.exit_node_id} onChange={e=>setDraft(d=>({...d,exit_node_id:Number(e.target.value)}))}><option value={0}>{pick("انتخاب","Select")}</option>{exitNodes.map(item=><option key={item.id} value={item.id}>{item.name} · {item.public_ip}</option>)}</select></label><label className="field"><span>Transport</span><select value={draft.transport} onChange={e=>setDraft(d=>({...d,transport:e.target.value}))}><option value="backhaul">Backhaul</option><option value="ssh_tun">SSH TUN</option><option value="mtunnel">MTunnel</option></select></label><label className="field"><span>{pick("اولویت","Priority")}</span><input type="number" min={1} value={draft.priority} onChange={e=>setDraft(d=>({...d,priority:Math.max(1,Number(e.target.value)||1)}))}/></label></div><label className="toggle module-toggle compact-toggle"><span>{pick("فعال بعد از ساخت","Enable after creation")}</span><input type="checkbox" checked={draft.is_active} onChange={e=>setDraft(d=>({...d,is_active:e.target.checked}))}/><i/></label><div className="modalActions"><button type="button" className="ghost" onClick={()=>setCreateOpen(false)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy==="create"||!draft.iran_node_id||!draft.exit_node_id}>{busy==="create"?"…":pick("ثبت تونل","Register tunnel")}</button></div></form>
+    {createOpen&&<Modal title={pick("ساخت تونل","Create tunnel")} sub={pick("مسیر ثبت می‌شود و Transport انتخابی همان لحظه نصب و فعال می‌شود","The path is registered and the selected transport is installed immediately")} onClose={()=>!busy&&setCreateOpen(false)}>
+      <form onSubmit={create}>
+        {(!iranNodes.length||!exitNodes.length)&&<div className="runtime-warning">{pick("برای ساخت تونل حداقل یک نود ایران و یک نود خروجی لازم است.","At least one Iran node and one exit node are required.")}</div>}
+        <div className="setting-grid">
+          <label className="field"><span>{pick("نود ایران","Iran node")}</span><select value={draft.iran_node_id} onChange={e=>setDraft(d=>({...d,iran_node_id:Number(e.target.value)}))}><option value={0}>{pick("انتخاب","Select")}</option>{iranNodes.map(item=><option key={item.id} value={item.id}>{item.name} · {item.public_ip}</option>)}</select></label>
+          <label className="field"><span>{pick("نود خروج","Exit node")}</span><select value={draft.exit_node_id} onChange={e=>setDraft(d=>({...d,exit_node_id:Number(e.target.value)}))}><option value={0}>{pick("انتخاب","Select")}</option>{exitNodes.map(item=><option key={item.id} value={item.id}>{item.name} · {item.public_ip}</option>)}</select></label>
+          <label className="field"><span>{pick("Transport اصلی","Primary transport")}</span><select value={draft.transport} onChange={e=>setDraft(d=>({...d,transport:e.target.value}))}><option value="mtunnel">MTunnel</option><option value="backhaul">Backhaul</option><option value="ssh_tun">SSH TUN</option></select></label>
+          <label className="field"><span>{pick("اولویت مسیر","Route priority")}</span><input type="number" min={1} value={draft.priority} onChange={e=>setDraft(d=>({...d,priority:Math.max(1,Number(e.target.value)||1)}))}/></label>
+        </div>
+        <div className="setting-box"><b>{pick("ساخت خودکار","Automatic provisioning")}</b><small>{pick("TwinPanel ابتدا جفت ایران → خروج را ثبت می‌کند، سپس Transport انتخابی را روی هر دو نود نصب، Health Check و فعال می‌کند. Transportهای دیگر بعداً از مدیریت همین تونل قابل نصب هستند.","TwinPanel registers the Iran → exit pair, installs the selected transport on both peers, health-checks it and activates it. Other transports can be installed later from this tunnel's management view.")}</small></div>
+        <div className="modalActions"><button type="button" className="ghost" disabled={!!busy} onClick={()=>setCreateOpen(false)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy==="create"||!draft.iran_node_id||!draft.exit_node_id}>{busy==="create"?pick("در حال ساخت…","Creating…"):pick("ساخت و فعال‌سازی تونل","Create and activate tunnel")}</button></div>
+      </form>
     </Modal>}
 
     {manageOpen&&selected&&<Modal title={pick("مدیریت تونل","Manage tunnel")} sub={`#${selected.id} · ${nodeMap.get(selected.iran_node_id)?.name||selected.iran_node_id} → ${nodeMap.get(selected.exit_node_id)?.name||selected.exit_node_id}`} onClose={()=>!busy&&setManageOpen(false)} wide>
-      <div className="manage-card-section"><div className="manage-section-head"><div><b>{pick("سلامت مسیر","Path health")}</b><small>{pick("داده Health واقعی Backend","Live backend health")}</small></div><button className="ghost" disabled={!!busy} onClick={()=>void act("health",pick("سلامت بروزرسانی شد","Health refreshed"),async()=>setHealth(await legacyControlApi.tunnelHealth(selected.id)))}>{busy==="health"?"…":pick("بررسی سلامت","Check health")}</button></div><div className="legacy-detail-grid"><div><small>{pick("وضعیت","Status")}</small><b>{s(health?.status||selected.status)||"—"}</b></div><div><small>{pick("Ping","Ping")}</small><b dir="ltr">{n(health?.latency_ms||selected.latency_ms)?`${n(health?.latency_ms||selected.latency_ms)} ms`:"—"}</b></div><div><small>{pick("Transport فعال","Active transport")}</small><b dir="ltr">{transportLabel(health?.active_transport||selected.transport)}</b></div><div><small>{pick("Interface","Interface")}</small><b dir="ltr">{s(health?.interface||health?.interface_name)||"—"}</b></div></div></div>
+      <div className="manage-card-section"><div className="manage-section-head"><div><b>{pick("سلامت مسیر","Path health")}</b><small>{pick("داده Health واقعی Backend","Live backend health")}</small></div><button className="ghost" disabled={!!busy} onClick={()=>void act("health",pick("سلامت بروزرسانی شد","Health refreshed"),async()=>setHealth(await legacyControlApi.tunnelHealth(selected.id)))}>{busy==="health"?"…":pick("بررسی سلامت","Check health")}</button></div><div className="legacy-detail-grid"><div><small>{pick("وضعیت","Status")}</small><b>{s(healthTunnel.status||selected.status)||"—"}</b></div><div><small>{pick("Ping","Ping")}</small><b dir="ltr">{n(healthTunnel.latency_ms||selected.latency_ms)?`${n(healthTunnel.latency_ms||selected.latency_ms)} ms`:"—"}</b></div><div><small>{pick("Transport فعال","Active transport")}</small><b dir="ltr">{transportLabel(healthTunnel.active_transport||selected.active_transport||selected.transport)}</b></div><div><small>{pick("Interface","Interface")}</small><b dir="ltr">{s(healthTunnel.interface)||"—"}</b></div></div></div>
 
-      <div className="manage-card-section"><div className="manage-section-head"><div><b>{pick("حالت Transport","Transport mode")}</b><small>{pick("Manual یا Auto Failover","Manual or Auto Failover")}</small></div></div><div className="setting-grid"><label className="field"><span>{pick("حالت","Mode")}</span><select value={mode} onChange={e=>setMode(e.target.value)}><option value="manual">Manual</option><option value="auto">Auto</option></select></label><label className="field"><span>{pick("Transport ترجیحی","Preferred transport")}</span><select value={preferred} disabled={mode!=="manual"} onChange={e=>setPreferred(e.target.value)}>{[...new Set(["backhaul","ssh_tun","mtunnel",...transports.map(item=>s(item.transport)).filter(Boolean)])].map(item=><option key={item} value={item}>{transportLabel(item)}</option>)}</select></label></div><button className="primary-soft" disabled={!!busy} onClick={saveMode}>{busy==="mode"?"…":pick("ذخیره حالت","Save mode")}</button></div>
+      <div className="manage-card-section"><div className="manage-section-head"><div><b>{pick("حالت Transport","Transport mode")}</b><small>{pick("Manual یا Auto Failover","Manual or Auto Failover")}</small></div></div><div className="setting-grid"><label className="field"><span>{pick("حالت","Mode")}</span><select value={mode} onChange={e=>setMode(e.target.value)}><option value="manual">Manual</option><option value="auto">Auto</option></select></label><label className="field"><span>{pick("Transport ترجیحی","Preferred transport")}</span><select value={preferred} disabled={mode!=="manual"} onChange={e=>setPreferred(e.target.value)}>{[...new Set(["mtunnel","backhaul","ssh_tun",...transports.map(item=>s(item.transport)).filter(Boolean)])].map(item=><option key={item} value={item}>{transportLabel(item)}</option>)}</select></label></div><button className="primary-soft" disabled={!!busy} onClick={saveMode}>{busy==="mode"?"…":pick("ذخیره حالت","Save mode")}</button></div>
 
-      <div className="manage-card-section"><div className="manage-section-head"><div><b>{pick("Transportها","Transports")}</b><small>{pick("نصب، تعمیر و وضعیت Transportهای همین تونل","Install, repair and inspect transports for this tunnel")}</small></div></div><div className="legacy-transport-list">{transports.map((item,index)=><div className="setting-box" key={`${s(item.transport)}-${index}`}><div className="card-head"><b>{transportLabel(item.transport)}</b><Badge tone={online(item.status)?"ok":s(item.status)==="degraded"?"warn":"bad"}>{s(item.status)||"—"}</Badge></div><div className="legacy-detail-grid compact"><div><small>{pick("اولویت","Priority")}</small><b>{n(item.priority).toLocaleString("fa-IR")}</b></div><div><small>{pick("Ping","Ping")}</small><b dir="ltr">{item.latency_ms==null?"—":`${n(item.latency_ms)} ms`}</b></div></div>{s(item.last_error)&&<small className="runtime-inline-error">{s(item.last_error)}</small>}</div>)}</div><div className="manage-actions"><button className="ghost" disabled={!!busy} onClick={()=>install("backhaul")}>{busy==="install-backhaul"?"…":pick("نصب Backhaul","Install Backhaul")}</button><button className="ghost" disabled={!!busy} onClick={()=>install("ssh")}>{busy==="install-ssh"?"…":pick("نصب SSH TUN","Install SSH TUN")}</button><button className="ghost" disabled={!!busy} onClick={()=>install("mtunnel")}>{busy==="install-mtunnel"?"…":pick("نصب MTunnel","Install MTunnel")}</button><button className="ghost" disabled={!!busy} onClick={repairMtunnel}>{busy==="repair-mtunnel"?"…":pick("تعمیر MTunnel","Repair MTunnel")}</button><button className="ghost" disabled={!!busy} onClick={prepare}>{busy==="prepare"?"…":pick("آماده‌سازی","Prepare")}</button></div></div>
+      <div className="manage-card-section"><div className="manage-section-head"><div><b>{pick("Transportها","Transports")}</b><small>{pick("نصب، تعمیر و وضعیت Transportهای همین تونل","Install, repair and inspect transports for this tunnel")}</small></div></div><div className="legacy-transport-list">{transports.map((item,index)=><div className="setting-box" key={`${s(item.transport)}-${index}`}><div className="card-head"><b>{transportLabel(item.transport)}</b><Badge tone={online(item.status)?"ok":s(item.status)==="degraded"?"warn":"bad"}>{s(item.status)||"—"}</Badge></div><div className="legacy-detail-grid compact"><div><small>{pick("اولویت","Priority")}</small><b>{n(item.priority).toLocaleString("fa-IR")}</b></div><div><small>{pick("Ping","Ping")}</small><b dir="ltr">{item.latency_ms==null?"—":`${n(item.latency_ms)} ms`}</b></div></div>{s(item.last_error)&&<small className="runtime-inline-error">{s(item.last_error)}</small>}</div>)}</div><div className="manage-actions"><button className="ghost" disabled={!!busy} onClick={()=>install("mtunnel")}>{busy==="install-mtunnel"?"…":pick("نصب MTunnel","Install MTunnel")}</button><button className="ghost" disabled={!!busy} onClick={()=>install("backhaul")}>{busy==="install-backhaul"?"…":pick("نصب Backhaul","Install Backhaul")}</button><button className="ghost" disabled={!!busy} onClick={()=>install("ssh")}>{busy==="install-ssh"?"…":pick("نصب SSH TUN","Install SSH TUN")}</button><button className="ghost" disabled={!!busy} onClick={repairMtunnel}>{busy==="repair-mtunnel"?"…":pick("تعمیر MTunnel","Repair MTunnel")}</button><button className="ghost" disabled={!!busy} onClick={prepare}>{busy==="prepare"?"…":pick("آماده‌سازی","Prepare")}</button></div></div>
 
       <div className="modalActions"><button className="ghost" onClick={()=>setManageOpen(false)}>{pick("بستن","Close")}</button><button disabled={!!busy} onClick={()=>void toggle(selected)}>{selected.is_active?pick("غیرفعال کردن","Disable"):pick("فعال کردن","Enable")}</button><button className="danger" disabled={!!busy} onClick={()=>void remove(selected)}>{pick("حذف تونل","Delete tunnel")}</button></div>
     </Modal>}
