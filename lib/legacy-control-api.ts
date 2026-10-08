@@ -12,7 +12,11 @@ function errorText(payload:unknown,status:number){
     if(typeof item.message==="string")return item.message;
     if(item.detail&&typeof item.detail==="object"){
       const detail=item.detail as {message?:unknown;errors?:unknown};
-      if(typeof detail.message==="string")return detail.message;
+      const message=typeof detail.message==="string"?detail.message:"";
+      const errors=detail.errors&&typeof detail.errors==="object"
+        ?Object.entries(detail.errors as Record<string,unknown>).map(([key,value])=>`${key}: ${String(value)}`).join(" | ")
+        :"";
+      if(message||errors)return [message,errors].filter(Boolean).join(" — ");
     }
     if(Array.isArray(item.detail))return item.detail.map(x=>typeof x==="object"&&x&&"msg" in x?String((x as {msg:unknown}).msg):String(x)).join("، ");
   }
@@ -53,6 +57,15 @@ export type SystemHealth=RuntimeRow&{
 
 export type CoreProtocolsResponse={ok?:boolean;protocols:Record<string,RuntimeRow>};
 export type TunnelTransportsResponse=RuntimeRow&{transports?:RuntimeRow[]};
+export type ManagedTunnelCreateResponse={
+  ok:boolean;
+  complete:boolean;
+  tunnel:AdminTunnel;
+  active_transport:string|null;
+  installed:string[];
+  errors:Record<string,string>;
+  transports?:RuntimeRow[];
+};
 
 export const legacyControlApi={
   dashboard:()=>request<DashboardSummary&RuntimeRow>("/v1/admin/dashboard-summary"),
@@ -65,6 +78,15 @@ export const legacyControlApi={
   nodes:()=>request<AdminNode[]>("/v1/nodes"),
   tunnels:()=>request<AdminTunnel[]>("/v1/tunnels"),
 
+  createManagedTunnel:async(payload:{iran_node_id:number;exit_node_id:number;transport:string;priority:number;is_active:boolean})=>{
+    const body=JSON.stringify({...payload,is_active:true});
+    try{
+      return await request<ManagedTunnelCreateResponse>("/v1/tunnels/create-managed",{method:"POST",body});
+    }catch(error){
+      if(!routeMissing(error))throw error;
+      return null;
+    }
+  },
   registerTunnel:async(payload:{iran_node_id:number;exit_node_id:number;transport:string;priority:number;is_active:boolean})=>{
     const body=JSON.stringify({...payload,is_active:true});
     try{
