@@ -25,6 +25,7 @@ const formatDate=(value:unknown)=>{if(!value)return "—";const date=new Date(St
 const formatBytes=(value:unknown)=>`${(n(value)/GB).toLocaleString("fa-IR",{maximumFractionDigits:1})} GB`;
 const tone=(value:unknown):"ok"|"warn"|"bad"|"violet"=>{const key=s(value).toLowerCase();return key==="active"?"ok":["expired","canceled"].includes(key)?"bad":"warn";};
 const statusLabel=(value:unknown)=>{const key=s(value).toLowerCase();return key==="active"?"فعال":key==="pending"?"در انتظار":key==="expired"?"منقضی":key==="suspended"?"معلق":key==="canceled"?"لغوشده":s(value)||"نامشخص";};
+const optionalPositive=(value:string)=>{const clean=value.trim();if(!clean)return undefined;const out=Number(clean);return Number.isFinite(out)&&out>0?out:undefined;};
 
 function copy(value:string){if(value)void navigator.clipboard.writeText(value);}
 function absoluteLink(value:string){if(!value)return "";if(/^https?:\/\//i.test(value))return value;if(typeof window!=="undefined")return new URL(value,window.location.origin).toString();return value;}
@@ -47,8 +48,9 @@ type ModalKind="create"|"edit"|"extend"|"sublink"|"connect"|null;
 type Draft={
   user_id:number;
   plan_id:number;
-  traffic_gb:number;
-  duration_days:number;
+  traffic_gb:string;
+  duration_days:string;
+  device_limit:string;
   username:string;
   password:string;
   protocols:string[];
@@ -74,13 +76,16 @@ export function LegacySubscriptionsRuntimePage(){
   const [userSearch,setUserSearch]=useState("");
   const [extendDays,setExtendDays]=useState(30);
   const [extendTraffic,setExtendTraffic]=useState(10);
-  const [draft,setDraft]=useState<Draft>({user_id:0,plan_id:0,traffic_gb:100,duration_days:30,username:"",password:"",protocols:[]});
+  const [draft,setDraft]=useState<Draft>({user_id:0,plan_id:0,traffic_gb:"",duration_days:"",device_limit:"1",username:"",password:"",protocols:[]});
 
   const load=async(silent=false)=>{
     if(!silent)setLoading(true);
     setError("");
     try{
-      const [subscriptions,userRows,planRows,nodeRows]=await Promise.all([adminApi.subscriptions(),adminApi.users(),adminApi.plans(),adminApi.nodes()]);
+      let subscriptions:RuntimeRow[];
+      try{subscriptions=await adminApi.subscriptionsV2();}
+      catch{subscriptions=await adminApi.subscriptions();}
+      const [userRows,planRows,nodeRows]=await Promise.all([adminApi.users(),adminApi.plans(),adminApi.nodes()]);
       setRows(subscriptions);
       setUsers(userRows);
       setPlans(planRows);
@@ -124,31 +129,56 @@ export function LegacySubscriptionsRuntimePage(){
   const openCreate=()=>{
     const plan=plans.find(item=>item.is_active!==false)||plans[0];
     const user=users.find(item=>item.role!=="admin"&&item.is_active!==false)||users.find(item=>item.role!=="admin");
-    setDraft({user_id:user?.id||0,plan_id:n(plan?.id),traffic_gb:n(plan?.traffic_gb)||100,duration_days:n(plan?.duration_days)||30,username:"",password:"",protocols:[]});
+    setDraft({
+      user_id:user?.id||0,
+      plan_id:n(plan?.id),
+      traffic_gb:"",
+      duration_days:"",
+      device_limit:String(Math.max(1,n(plan?.device_limit)||1)),
+      username:"",
+      password:"",
+      protocols:[]
+    });
     setUserSearch("");setSelected(null);setConnection(null);setModal("create");
   };
 
   const choosePlan=(id:number)=>{
     const plan=plans.find(item=>n(item.id)===id);
-    setDraft(current=>({...current,plan_id:id,traffic_gb:n(plan?.traffic_gb)||current.traffic_gb,duration_days:n(plan?.duration_days)||current.duration_days}));
+    setDraft(current=>({...current,plan_id:id,device_limit:String(Math.max(1,n(plan?.device_limit)||1))}));
   };
 
   const createSubscription=(event:FormEvent)=>{
     event.preventDefault();
     if(!draft.user_id||!draft.plan_id){setError(pick("کاربر و پلن را انتخاب کنید","Select user and plan"));return;}
+    const traffic=optionalPositive(draft.traffic_gb);
+    const duration=optionalPositive(draft.duration_days);
+    const device=Math.max(1,Math.trunc(optionalPositive(draft.device_limit)||1));
     void act("create",pick("اشتراک ساخته و اکانت صادر شد","Subscription created and account provisioned"),async()=>{
-      const created=await adminApi.createSubscription({user_id:draft.user_id,plan_id:draft.plan_id,node_ids:[],protocols:[],traffic_gb:draft.traffic_gb,duration_days:draft.duration_days,...(draft.username.trim()?{username:draft.username.trim()}:{}),...(draft.password.trim()?{password:draft.password.trim()}:{})});
-      try{await adminApi.provisionSubscription(n(created.id));}catch(reason){setOk(pick("اشتراک ساخته شد؛ صدور اتصال کامل نشد","Subscription created; connection provisioning needs attention"));}
+      const created=await adminApi.createSubscriptionV2({
+        user_id:draft.user_id,
+        plan_id:draft.plan_id,
+        node_ids:[],
+        protocols:[],
+        ...(traffic!==undefined?{traffic_gb:traffic}:{}),
+        ...(duration!==undefined?{duration_days:Math.trunc(duration)}:{}),
+        device_limit:device,
+        ...(draft.username.trim()?{username:draft.username.trim()}:{}),
+        ...(draft.password.trim()?{password:draft.password.trim()}:{})
+      });
+      try{await adminApi.provisionSubscription(n(created.id));}
+      catch{setOk(pick("اشتراک ساخته شد؛ صدور اتصال کامل نشد","Subscription created; connection provisioning needs attention"));}
     },true);
   };
 
   const openEdit=(item:RuntimeRow)=>{
     setSelected(item);setConnection(null);
+    const limit=n(item.traffic_limit_gb)||(n(item.traffic_limit_bytes)/GB);
     setDraft({
       user_id:n(item.user_id),
       plan_id:n(item.plan_id),
-      traffic_gb:n(item.traffic_limit_gb)||(n(item.traffic_limit_bytes)/GB),
-      duration_days:30,
+      traffic_gb:limit>0?String(limit):"",
+      duration_days:n(item.activation_duration_days)>0?String(n(item.activation_duration_days)):"",
+      device_limit:String(Math.max(1,n(item.device_limit)||n(planMap.get(n(item.plan_id))?.device_limit)||1)),
       username:s(item.account_username),
       password:"",
       protocols:strings(item.protocols)
@@ -158,7 +188,8 @@ export function LegacySubscriptionsRuntimePage(){
 
   const saveEdit=(event:FormEvent)=>{
     event.preventDefault();if(!selected)return;
-    void act("edit",pick("اشتراک و اطلاعات اتصال بروزرسانی شد","Subscription and connection info updated"),()=>adminApi.editSubscription(n(selected.id),{plan_id:draft.plan_id,traffic_gb:draft.traffic_gb,node_ids:[],protocols:draft.protocols,account_username:draft.username.trim()||undefined,account_password:draft.password.trim()||undefined}),true);
+    const traffic=optionalPositive(draft.traffic_gb);
+    void act("edit",pick("اشتراک و اطلاعات اتصال بروزرسانی شد","Subscription and connection info updated"),()=>adminApi.editSubscription(n(selected.id),{plan_id:draft.plan_id,traffic_gb:traffic||0,node_ids:[],protocols:draft.protocols,account_username:draft.username.trim()||undefined,account_password:draft.password.trim()||undefined}),true);
   };
 
   const openExtend=(item:RuntimeRow)=>{setSelected(item);setExtendDays(30);setExtendTraffic(10);setModal("extend");};
@@ -189,13 +220,27 @@ export function LegacySubscriptionsRuntimePage(){
   const provision=async()=>{if(!selected)return;setBusy("provision");setError("");try{await adminApi.provisionSubscription(n(selected.id));setConnection(await adminApi.subscriptionConnectionInfo(n(selected.id)));setOk(pick("اطلاعات اتصال ساخته شد","Connection info provisioned"));}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}};
   const refreshPasswords=async()=>{if(!selected)return;setBusy("passwords");setError("");try{await adminApi.refreshSubscriptionPasswords(n(selected.id));setConnection(await adminApi.subscriptionConnectionInfo(n(selected.id)));setOk(pick("رمز Cisco/L2TP بازسازی شد","Cisco/L2TP password refreshed"));}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}};
 
-  const userMatches=users.filter(user=>user.role!=="admin"&&(!userSearch.trim()||`${user.full_name||""} ${user.email||""} ${user.phone||""}`.toLowerCase().includes(userSearch.trim().toLowerCase()))).slice(0,12);
-  const globalNodes=nodes.filter(node=>node.status!=="retired");
+  const userMatches=users.filter(user=>user.role!=="admin"&&(!userSearch.trim()||`${user.full_name||""} ${user.email||""} ${user.phone||""}`.toLowerCase().includes(userSearch.trim().toLowerCase()))).slice(0,30);
   const credentials=connection&&Array.isArray(connection.credentials)?connection.credentials as RuntimeRow[]:[];
   const account=connection&&connection.account&&typeof connection.account==="object"?connection.account as RuntimeRow:null;
   const shareLink=absoluteLink(s(connection?.subscription_link));
   const selectedCredential=credentials.find(item=>s(item.protocol)===activeProtocol)||credentials[0]||null;
   const selectedItems=selectedCredential?list(selectedCredential.items):[];
+
+  const trafficCell=(item:RuntimeRow)=>{
+    const limit=n(item.traffic_limit_bytes);const used=n(item.traffic_used_bytes);
+    if(limit<=0)return <div className="user-cell"><b dir="ltr">{formatBytes(used)} / {pick("نامحدود","Unlimited")}</b><small>∞</small></div>;
+    const percent=Math.min(100,Math.round(used/limit*100));
+    return <div className="user-cell"><b dir="ltr">{formatBytes(used)} / {formatBytes(limit)}</b><small>{percent.toLocaleString("fa-IR")}٪</small></div>;
+  };
+
+  const expiryCell=(item:RuntimeRow)=>{
+    if(item.duration_unlimited===true)return pick("نامحدود","Unlimited");
+    if(item.expires_at)return formatDate(item.expires_at);
+    const days=n(item.activation_duration_days);
+    if(days>0)return pick(`${days.toLocaleString("fa-IR")} روز از اولین اتصال`,`${days} days from first connection`);
+    return "—";
+  };
 
   return <Shell active="/admin/subscriptions"><div className="page legacy-subscriptions-page">
     <div className="page-head"><div><h1>{pick("اشتراک‌ها","Subscriptions")}</h1><small>{pick("مدیریت اشتراک، تمدید، وضعیت، سابلینک و اتصال","Subscriptions, renewals, status, public links and connection delivery")}</small></div><button className="primary" onClick={openCreate}>＋ {pick("اشتراک جدید","New subscription")}</button></div>
@@ -216,35 +261,41 @@ export function LegacySubscriptionsRuntimePage(){
       </div>
 
       {loading&&rows.length===0?<div className="runtime-loading">…</div>:<div className="table"><table><thead><tr><th>{pick("کاربر","User")}</th><th>{pick("پلن","Plan")}</th><th>{pick("نام کاربری","Username")}</th><th>{pick("ترافیک","Traffic")}</th><th>{pick("ساخت","Created")}</th><th>{pick("انقضا","Expires")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map(item=>{
-        const user=userMap.get(n(item.user_id));const plan=planMap.get(n(item.plan_id));const limit=n(item.traffic_limit_bytes);const used=n(item.traffic_used_bytes);const percent=limit>0?Math.min(100,Math.round(used/limit*100)):0;
+        const user=userMap.get(n(item.user_id));const plan=planMap.get(n(item.plan_id));
         return <tr key={n(item.id)}>
           <td><div className="user-cell"><b>{user?.full_name||s(item.customer_name)||`#${item.user_id}`}</b><small dir="ltr">{user?.email||s(item.customer_email)||"—"}</small></div></td>
           <td><div className="user-cell"><b>{s(item.plan_name)||s(plan?.name)||`#${item.plan_id}`}</b><small dir="ltr">MV-{n(item.id)}</small></div></td>
           <td><div className="secret-row"><b dir="ltr">{s(item.account_username)||"—"}</b>{s(item.account_username)&&<button className="mini-btn" onClick={()=>copy(s(item.account_username))}>{pick("کپی","Copy")}</button>}</div></td>
-          <td><div className="user-cell"><b dir="ltr">{formatBytes(used)} / {formatBytes(limit)}</b><small>{percent.toLocaleString("fa-IR")}٪</small></div></td>
-          <td>{formatDate(item.created_at)}</td><td>{formatDate(item.expires_at)}</td>
+          <td>{trafficCell(item)}</td>
+          <td>{formatDate(item.created_at)}</td><td>{expiryCell(item)}</td>
           <td><Badge tone={tone(item.status)}>{statusLabel(item.status)}</Badge></td>
           <td><div className="row-actions"><button className="danger" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button><button disabled={!!busy} onClick={()=>void toggleStatus(item)}>{s(item.status).toLowerCase()==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button><button onClick={()=>openEdit(item)}>{pick("ویرایش","Edit")}</button><button onClick={()=>openExtend(item)}>{pick("تمدید","Renew")}</button><button className="primary-soft" onClick={()=>void loadConnection(item,"sublink")}>{pick("سابلینک","Sub-link")}</button><button className="primary-soft" onClick={()=>void loadConnection(item,"connect")}>{pick("اتصال","Connect")}</button></div></td>
         </tr>;
       })}</tbody></table>{filtered.length===0&&<div className="runtime-empty">{pick("اشتراکی پیدا نشد","No subscriptions found")}</div>}</div>}
     </Card>
 
-    {modal==="create"&&<Modal title={pick("ساخت اشتراک","Create subscription")} sub={pick("ساخت و صدور اکانت در یک مرحله","Create and provision the account in one flow")} onClose={()=>!busy&&setModal(null)} wide>
+    {modal==="create"&&<Modal title={pick("ساخت اشتراک","Create subscription")} sub={pick("ساده، سریع و بدون تنظیمات تکراری سرورها","Simple account creation; infrastructure is assigned automatically")} onClose={()=>!busy&&setModal(null)} wide>
       <form onSubmit={createSubscription}>
-        <div className="manage-section-head"><div><b>{pick("کاربر","User")}</b><small>{pick("نام، ایمیل یا موبایل را جستجو کنید","Search name, email or mobile")}</small></div></div>
-        <label className="field"><span>{pick("جستجوی کاربر","User search")}</span><input value={userSearch} onChange={event=>setUserSearch(event.target.value)} placeholder={pick("جستجو…","Search…")}/></label>
-        <div className="protocol-toggle-grid">{userMatches.map(user=><button type="button" key={user.id} className={`ghost ${draft.user_id===user.id?"active":""}`} onClick={()=>setDraft(current=>({...current,user_id:user.id}))}><b>{user.full_name||user.email||`#${user.id}`}</b><small dir="ltr">{user.phone||user.email||"—"}</small>{draft.user_id===user.id&&<em>✓</em>}</button>)}</div>
-
         <div className="setting-grid">
+          <label className="field"><span>{pick("جستجوی کاربر","User search")}</span><input value={userSearch} onChange={event=>setUserSearch(event.target.value)} placeholder={pick("نام، ایمیل یا موبایل…","Name, email or mobile…")}/></label>
+          <label className="field"><span>{pick("کاربر","User")}</span><select value={draft.user_id} onChange={event=>setDraft(current=>({...current,user_id:Number(event.target.value)}))}><option value={0}>{pick("انتخاب کاربر","Select user")}</option>{userMatches.map(user=><option key={user.id} value={user.id}>{user.full_name||user.email||`#${user.id}`} · {user.phone||user.email||"—"}</option>)}</select></label>
           <label className="field"><span>{pick("پلن","Plan")}</span><select value={draft.plan_id} onChange={event=>choosePlan(Number(event.target.value))}>{plans.filter(plan=>plan.is_active!==false).map(plan=><option key={n(plan.id)} value={n(plan.id)}>{s(plan.name)||`#${plan.id}`}</option>)}</select></label>
-          <label className="field"><span>{pick("حجم GB","Traffic GB")}</span><input type="number" min={1} step="0.1" value={draft.traffic_gb} onChange={event=>setDraft(current=>({...current,traffic_gb:Math.max(1,Number(event.target.value)||1)}))}/></label>
-          <label className="field"><span>{pick("مدت روز","Duration days")}</span><input type="number" min={1} value={draft.duration_days} onChange={event=>setDraft(current=>({...current,duration_days:Math.max(1,Number(event.target.value)||1)}))}/></label>
+        </div>
+
+        <div className="manage-section-head"><div><b>{pick("محدودیت‌ها","Limits")}</b><small>{pick("حجم یا زمان را خالی بگذارید تا نامحدود باشد","Leave traffic or time empty for unlimited")}</small></div></div>
+        <div className="setting-grid">
+          <label className="field"><span>{pick("حجم GB","Traffic GB")}</span><input inputMode="decimal" type="number" min={0.1} step="0.1" value={draft.traffic_gb} onChange={event=>setDraft(current=>({...current,traffic_gb:event.target.value}))} placeholder={pick("خالی = نامحدود","empty = unlimited")}/></label>
+          <label className="field"><span>{pick("مدت روز","Duration days")}</span><input inputMode="numeric" type="number" min={1} step={1} value={draft.duration_days} onChange={event=>setDraft(current=>({...current,duration_days:event.target.value}))} placeholder={pick("خالی = نامحدود","empty = unlimited")}/></label>
+          <label className="field"><span>{pick("محدودیت اتصال همزمان","Concurrent devices")}</span><input inputMode="numeric" type="number" min={1} step={1} value={draft.device_limit} onChange={event=>setDraft(current=>({...current,device_limit:event.target.value}))}/><small>{pick("پیش‌فرض از پلن گرفته می‌شود و برای همین اشتراک قابل تغییر است","Starts from the plan default and can be overridden for this subscription")}</small></label>
+        </div>
+
+        <div className="manage-section-head"><div><b>{pick("اطلاعات اکانت","Account")}</b><small>{pick("در صورت خالی بودن، نام کاربری و رمز خودکار ساخته می‌شود","Username and password are generated automatically when empty")}</small></div></div>
+        <div className="setting-grid">
           <label className="field"><span>{pick("نام کاربری اکانت","Account username")}</span><input dir="ltr" autoComplete="off" value={draft.username} onChange={event=>setDraft(current=>({...current,username:event.target.value}))} placeholder={pick("خالی = خودکار","empty = automatic")}/></label>
           <label className="field"><span>{pick("رمز عبور اکانت","Account password")}</span><input dir="ltr" autoComplete="new-password" value={draft.password} onChange={event=>setDraft(current=>({...current,password:event.target.value}))} placeholder={pick("خالی = خودکار","empty = automatic")}/></label>
         </div>
 
-        <div className="manage-section-head"><div><b>{pick("سرورهای اشتراک","Subscription servers")}</b><small>{pick("تمام نودهای ثبت‌شده سراسری هستند؛ Backend پروتکل‌های مجاز پلن را خودکار انتخاب می‌کند","All registered nodes are global; backend automatically selects plan protocols")}</small></div><Badge tone="violet">{globalNodes.length.toLocaleString("fa-IR")} {pick("سرور","servers")}</Badge></div>
-        <div className="protocol-toggle-grid">{globalNodes.map(node=><div className="setting-box" key={node.id}><b>{node.name}</b><small dir="ltr">{node.public_ip||"—"}</small><Badge tone={node.status==="online"?"ok":"bad"}>{node.status==="online"?pick("آنلاین","Online"):pick("آفلاین","Offline")}</Badge></div>)}</div>
+        <div className="runtime-success" style={{marginTop:14}}>{pick("سرورها به‌صورت سراسری و پروتکل‌ها از پلن انتخاب می‌شوند؛ نیازی به انتخاب دوباره سرور در این فرم نیست.","Servers are global and protocols come from the selected plan; no duplicate server selection is needed here.")}</div>
         <div className="modalActions"><button type="button" className="ghost" onClick={()=>setModal(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy==="create"||!draft.user_id||!draft.plan_id}>{busy==="create"?pick("در حال ساخت…","Creating…"):pick("ساخت و صدور اکانت","Create & provision")}</button></div>
       </form>
     </Modal>}
@@ -253,7 +304,7 @@ export function LegacySubscriptionsRuntimePage(){
       <form onSubmit={saveEdit}>
         <div className="setting-grid">
           <label className="field"><span>{pick("پلن","Plan")}</span><select value={draft.plan_id} onChange={event=>setDraft(current=>({...current,plan_id:Number(event.target.value)}))}>{plans.map(plan=><option key={n(plan.id)} value={n(plan.id)}>{s(plan.name)||`#${plan.id}`}</option>)}</select></label>
-          <label className="field"><span>{pick("حجم کل GB","Total traffic GB")}</span><input type="number" min={1} step="0.1" value={draft.traffic_gb} onChange={event=>setDraft(current=>({...current,traffic_gb:Math.max(1,Number(event.target.value)||1)}))}/></label>
+          <label className="field"><span>{pick("حجم کل GB","Total traffic GB")}</span><input type="number" min={0} step="0.1" value={draft.traffic_gb} onChange={event=>setDraft(current=>({...current,traffic_gb:event.target.value}))} placeholder={pick("خالی = نامحدود","empty = unlimited")}/></label>
           <label className="field"><span>{pick("نام کاربری","Username")}</span><input dir="ltr" value={draft.username} onChange={event=>setDraft(current=>({...current,username:event.target.value}))}/></label>
           <label className="field"><span>{pick("رمز جدید","New password")}</span><input dir="ltr" autoComplete="new-password" value={draft.password} onChange={event=>setDraft(current=>({...current,password:event.target.value}))} placeholder={pick("خالی = بدون تغییر","empty = unchanged")}/></label>
         </div>
@@ -263,7 +314,7 @@ export function LegacySubscriptionsRuntimePage(){
       </form>
     </Modal>}
 
-    {modal==="extend"&&selected&&<Modal title={pick("تمدید اشتراک","Renew subscription")} sub={`MV-${n(selected.id)} · ${formatDate(selected.expires_at)}`} onClose={()=>!busy&&setModal(null)}>
+    {modal==="extend"&&selected&&<Modal title={pick("تمدید اشتراک","Renew subscription")} sub={`MV-${n(selected.id)} · ${expiryCell(selected)}`} onClose={()=>!busy&&setModal(null)}>
       <div className="setting-grid"><label className="field"><span>{pick("روز اضافه","Add days")}</span><input type="number" min={0} value={extendDays} onChange={event=>setExtendDays(Math.max(0,Number(event.target.value)||0))}/></label><label className="field"><span>{pick("حجم اضافه GB","Add traffic GB")}</span><input type="number" min={0} step="0.1" value={extendTraffic} onChange={event=>setExtendTraffic(Math.max(0,Number(event.target.value)||0))}/></label></div>
       <div className="modalActions"><button className="ghost" onClick={()=>setModal(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy==="extend"||(!extendDays&&!extendTraffic)} onClick={saveExtend}>{busy==="extend"?"…":pick("اعمال تمدید","Apply renewal")}</button></div>
     </Modal>}
