@@ -1308,12 +1308,30 @@ async def _install_or_upgrade_agent(
 
     await cmd(conn, "mkdir -p /opt/twinpanel-agent /var/lib/twinpanel-agent")
 
-    # Ensure runtime dependencies exist. This is idempotent.
+    # Ensure runtime dependencies exist.
+    # TWINPANEL_AGENT_APT_LOCK_RETRY_V1
+    #
+    # Tunnel transports can start concurrently. Never let a temporary
+    # unattended-upgrades/apt lock make Node Agent bootstrap fail.
     await cmd(
         conn,
         "export DEBIAN_FRONTEND=noninteractive; "
-        "apt-get update -y >/dev/null && "
-        "apt-get install -y python3 python3-venv python3-pip iproute2 iputils-ping wireguard-tools >/dev/null",
+        "if ! command -v python3 >/dev/null 2>&1 "
+        "|| ! dpkg -s python3-venv python3-pip iproute2 iputils-ping wireguard-tools "
+        ">/dev/null 2>&1; then "
+        "for TRY in $(seq 1 60); do "
+        "apt-get update -y >/dev/null 2>&1 && break; "
+        "[ \"$TRY\" -eq 60 ] && exit 75; "
+        "sleep 2; "
+        "done; "
+        "for TRY in $(seq 1 60); do "
+        "apt-get -o DPkg::Lock::Timeout=300 install -y "
+        "python3 python3-venv python3-pip iproute2 iputils-ping wireguard-tools "
+        ">/dev/null 2>&1 && break; "
+        "[ \"$TRY\" -eq 60 ] && exit 76; "
+        "sleep 2; "
+        "done; "
+        "fi",
         timeout=900,
     )
 
@@ -1321,8 +1339,15 @@ async def _install_or_upgrade_agent(
         conn,
         "if [ ! -x /opt/twinpanel-agent/venv/bin/python ]; then "
         "python3 -m venv /opt/twinpanel-agent/venv; fi && "
+        "if ! /opt/twinpanel-agent/venv/bin/python -c "
+        "\"import httpx,psutil; "
+        "assert httpx.__version__ == '0.28.1'; "
+        "assert psutil.__version__ == '7.0.0'\" "
+        ">/dev/null 2>&1; then "
         "/opt/twinpanel-agent/venv/bin/pip install --upgrade pip >/dev/null && "
-        "/opt/twinpanel-agent/venv/bin/pip install httpx==0.28.1 psutil==7.0.0 >/dev/null",
+        "/opt/twinpanel-agent/venv/bin/pip install "
+        "httpx==0.28.1 psutil==7.0.0 >/dev/null; "
+        "fi",
         timeout=600,
     )
 

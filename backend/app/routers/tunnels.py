@@ -2003,6 +2003,59 @@ async def _ensure_fabric_for_tunnel_node(
         await conn.wait_closed()
 
 
+
+# TWINPANEL_TUNNEL_BOOTSTRAP_COALESCE_V1
+#
+# Three transports may be installed concurrently, but Agent/Fabric bootstrap
+# for the same node must run only once. Other transport jobs wait for the same
+# node bootstrap and then reuse its successful result for a short period.
+_TP_BOOTSTRAP_LOCKS: dict[int, asyncio.Lock] = {}
+_TP_BOOTSTRAP_CACHE: dict[int, tuple[float, dict]] = {}
+_TP_BOOTSTRAP_TTL_SECONDS = 180.0
+
+_ensure_fabric_for_tunnel_node_uncached = _ensure_fabric_for_tunnel_node
+
+
+async def _ensure_fabric_for_tunnel_node(
+    node: Node,
+    db: Session,
+) -> dict:
+    node_id = int(node.id)
+
+    lock = _TP_BOOTSTRAP_LOCKS.setdefault(
+        node_id,
+        asyncio.Lock(),
+    )
+
+    async with lock:
+        loop = asyncio.get_running_loop()
+        now = loop.time()
+
+        cached = _TP_BOOTSTRAP_CACHE.get(node_id)
+
+        if (
+            cached is not None
+            and now - cached[0] <= _TP_BOOTSTRAP_TTL_SECONDS
+        ):
+            return cached[1]
+
+        result = await _ensure_fabric_for_tunnel_node_uncached(
+            node,
+            db,
+        )
+
+        if (
+            isinstance(result, dict)
+            and result.get("ok") is True
+        ):
+            _TP_BOOTSTRAP_CACHE[node_id] = (
+                loop.time(),
+                result,
+            )
+
+        return result
+
+
 async def create_tunnel(
     payload: TunnelCreate,
     db: Session = Depends(get_db),
