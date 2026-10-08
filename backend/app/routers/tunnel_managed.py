@@ -6,7 +6,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..database import get_db
+from ..database import SessionLocal, get_db
 from ..deps import require_admin
 from ..models import Tunnel, TunnelPeerState, TunnelStatus, TunnelTransport
 from ..schemas import TunnelCreate, TunnelOut
@@ -21,9 +21,9 @@ _TRANSPORTS = (
     ("ssh_tun", 200, core.install_ssh_transport),
 )
 
-# Installation order intentionally keeps Backhaul last. A slow Backhaul setup
-# must not prevent MTunnel + SSH TUN from becoming available first.
-_INSTALL_ORDER = ("mtunnel", "ssh_tun", "backhaul")
+# Each transport gets its own bounded installation window. They are launched
+# concurrently with independent SQLAlchemy sessions, so one slow transport
+# never serializes the other two.
 _TRANSPORT_TIMEOUTS = {
     "mtunnel": 150,
     "ssh_tun": 150,
@@ -38,13 +38,6 @@ def _detail_text(exc: Exception) -> str:
             return detail
         return str(detail)
     return str(exc)
-
-
-def _transport_map():
-    return {
-        name: (priority, installer)
-        for name, priority, installer in _TRANSPORTS
-    }
 
 
 def _mark_transport_failed(
@@ -99,6 +92,59 @@ async def _install_with_retry(
 
     assert last_error is not None
     raise last_error
+
+
+async def _run_transport_job(
+    name: str,
+    installer,
+    tunnel_id: int,
+) -> tuple[str, object | None, str | None, bool]:
+    """Run one transport in an isolated DB session.
+
+    FastAPI's request-scoped Session must not be shared by concurrent coroutines.
+    Using one Session per transport keeps the three installs truly parallel and
+    lets each installer commit its own transport state independently.
+    """
+
+    db = SessionLocal()
+    try:
+        try:
+            result = await _install_with_retry(
+                name,
+                installer,
+                tunnel_id,
+                db,
+            )
+
+            db.expire_all()
+            row = (
+                db.query(TunnelTransport)
+                .filter(
+                    TunnelTransport.tunnel_id == tunnel_id,
+                    TunnelTransport.transport == name,
+                )
+                .first()
+            )
+
+            online = bool(
+                row
+                and bool(row.enabled)
+                and str(row.status or "").strip().lower() == "online"
+            )
+
+            if online:
+                return name, result, None, True
+
+            message = "installer returned without an online transport"
+            _mark_transport_failed(db, tunnel_id, name, message)
+            return name, result, message, False
+
+        except Exception as exc:
+            message = _detail_text(exc)[:1800]
+            _mark_transport_failed(db, tunnel_id, name, message)
+            return name, None, message, False
+    finally:
+        db.close()
 
 
 def _transport_snapshot(db: Session, tunnel_id: int) -> list[dict]:
@@ -219,11 +265,11 @@ async def create_managed_tunnel(
     payload: TunnelCreate,
     db: Session = Depends(get_db),
 ):
-    """Create one Iran->Exit tunnel and install all three transports server-side.
+    """Create one Iran->Exit route and install all three transports together.
 
-    The browser performs one managed request. The API owns transport install,
-    retries, timeouts, final activation and rollback. A failed new tunnel is
-    never left as a permanent OFFLINE placeholder.
+    MTunnel, Backhaul and SSH TUN start concurrently. Each uses an independent
+    DB session and timeout. After all jobs settle, the best healthy transport is
+    activated. If all three fail for a newly-created route, it is rolled back.
     """
 
     existing = (
@@ -239,55 +285,26 @@ async def create_managed_tunnel(
     tunnel = core.register_tunnel_pair(payload, db)
     tunnel_id = int(tunnel.id)
 
+    jobs = [
+        _run_transport_job(name, installer, tunnel_id)
+        for name, _, installer in _TRANSPORTS
+    ]
+
+    settled = await asyncio.gather(*jobs)
+
     installed: list[str] = []
     errors: dict[str, str] = {}
     results: dict[str, object] = {}
-    transport_map = _transport_map()
 
-    for name in _INSTALL_ORDER:
-        item = transport_map.get(name)
-        if item is None:
-            errors[name] = "transport installer is not registered"
-            continue
-
-        _, installer = item
-
-        try:
-            result = await _install_with_retry(
-                name,
-                installer,
-                tunnel_id,
-                db,
-            )
+    for name, result, error, online in settled:
+        if result is not None:
             results[name] = result
+        if online:
+            installed.append(name)
+        elif error:
+            errors[name] = error
 
-            row = (
-                db.query(TunnelTransport)
-                .filter(
-                    TunnelTransport.tunnel_id == tunnel_id,
-                    TunnelTransport.transport == name,
-                )
-                .first()
-            )
-
-            if (
-                row
-                and bool(row.enabled)
-                and str(row.status or "").strip().lower() == "online"
-            ):
-                installed.append(name)
-                # Make a usable transport authoritative immediately. If a
-                # secondary transport is slow/fails later, the tunnel stays up.
-                _activate_best_transport(db, tunnel_id)
-            else:
-                message = "installer returned without an online transport"
-                errors[name] = message
-                _mark_transport_failed(db, tunnel_id, name, message)
-        except Exception as exc:
-            message = _detail_text(exc)[:1800]
-            errors[name] = message
-            _mark_transport_failed(db, tunnel_id, name, message)
-
+    db.expire_all()
     primary = _activate_best_transport(db, tunnel_id)
 
     if primary is None:
