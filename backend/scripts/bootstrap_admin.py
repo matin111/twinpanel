@@ -5,6 +5,8 @@ import os
 import sys
 from pathlib import Path
 
+from pydantic import EmailStr, TypeAdapter, ValidationError
+
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
@@ -21,8 +23,15 @@ def need(name: str) -> str:
     return value
 
 
+def valid_email(value: str) -> str:
+    try:
+        return str(TypeAdapter(EmailStr).validate_python(value)).lower()
+    except ValidationError as exc:
+        raise SystemExit(f"TWINPANEL_ADMIN_EMAIL is invalid: {value}") from exc
+
+
 def main() -> int:
-    email = need("TWINPANEL_ADMIN_EMAIL").lower()
+    email = valid_email(need("TWINPANEL_ADMIN_EMAIL"))
     password = need("TWINPANEL_ADMIN_PASSWORD")
     full_name = str(os.getenv("TWINPANEL_ADMIN_NAME", "System Admin") or "System Admin").strip()
 
