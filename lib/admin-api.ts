@@ -65,7 +65,9 @@ export const adminApi={
   deleteTunnel:(id:number)=>request<{ok:boolean}>(`/v1/tunnels/${id}`,{method:"DELETE"}),
 
   subscriptions:()=>request<RuntimeRow[]>("/v1/subscriptions"),
+  subscriptionsV2:()=>request<RuntimeRow[]>("/v1/subscriptions/admin-list-v2"),
   createSubscription:(payload:{user_id:number;plan_id:number;node_ids:number[];protocols:string[];traffic_gb?:number;duration_days?:number;username?:string;password?:string})=>request<RuntimeRow>("/v1/subscriptions",{method:"POST",body:JSON.stringify(payload)}),
+  createSubscriptionV2:(payload:{user_id:number;plan_id:number;node_ids:number[];protocols:string[];traffic_gb?:number;duration_days?:number;device_limit?:number;username?:string;password?:string})=>request<RuntimeRow>("/v1/subscriptions/admin-create-v2",{method:"POST",body:JSON.stringify(payload)}),
   setSubscriptionActive:(id:number,active:boolean)=>request<RuntimeRow>(`/v1/subscriptions/${id}/${active?"activate":"suspend"}`,{method:"POST"}),
   deleteSubscription:(id:number)=>request<RuntimeRow>(`/v1/subscriptions/${id}`,{method:"DELETE"}),
   editSubscription:(id:number,payload:{plan_id:number;traffic_gb:number;node_ids:number[];protocols:string[];account_username?:string;account_password?:string})=>request<RuntimeRow>(`/v1/subscriptions/${id}/admin-edit`,{method:"PATCH",body:JSON.stringify(payload)}),
