@@ -18,9 +18,11 @@ from ..quota_service import (
     pull_commands,
 )
 from ..quota_service_v2 import open_session
+from .subscription_admin_v2 import router as subscription_admin_v2_router
 
 
 router = APIRouter(prefix="/v1", tags=["quota-security"])
+router.include_router(subscription_admin_v2_router)
 
 
 def authenticate_node(
