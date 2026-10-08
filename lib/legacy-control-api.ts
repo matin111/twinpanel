@@ -38,6 +38,21 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   return payload as T;
 }
 
+async function requestWithTimeout<T>(path:string,init:RequestInit={},timeoutMs=120000):Promise<T>{
+  const controller=new AbortController();
+  const timer=window.setTimeout(()=>controller.abort(),timeoutMs);
+  try{
+    return await request<T>(path,{...init,signal:controller.signal});
+  }catch(error){
+    if(controller.signal.aborted){
+      throw new Error(`زمان اجرای عملیات تمام شد (${Math.round(timeoutMs/1000)} ثانیه): ${path}`);
+    }
+    throw error;
+  }finally{
+    window.clearTimeout(timer);
+  }
+}
+
 function routeMissing(error:unknown){
   const message=error instanceof Error?error.message:String(error);
   return /(not found|method not allowed|api error 404|api error 405)/i.test(message);
@@ -97,7 +112,7 @@ export const legacyControlApi={
   createManagedTunnel:async(payload:{iran_node_id:number;exit_node_id:number;transport:string;priority:number;is_active:boolean})=>{
     const body=JSON.stringify({...payload,is_active:true});
     try{
-      return await request<ManagedTunnelCreateResponse>("/v1/tunnels/create-managed",{method:"POST",body});
+      return await requestWithTimeout<ManagedTunnelCreateResponse>("/v1/tunnels/create-managed",{method:"POST",body},360000);
     }catch(error){
       if(!routeMissing(error))throw error;
       return null;
@@ -107,7 +122,7 @@ export const legacyControlApi={
     const body=JSON.stringify({...payload,is_active:true});
 
     try{
-      const managed=await request<ManagedTunnelCreateResponse>("/v1/tunnels/create-managed",{method:"POST",body});
+      const managed=await requestWithTimeout<ManagedTunnelCreateResponse>("/v1/tunnels/create-managed",{method:"POST",body},360000);
       const tunnelId=Number(managed.tunnel?.id||0);
       if(tunnelId){
         managedInstallCache.set(tunnelId,{
@@ -130,23 +145,23 @@ export const legacyControlApi={
   updateTunnel:(id:number,payload:RuntimeRow)=>request<AdminTunnel>(`/v1/tunnels/${id}`,{method:"PATCH",body:JSON.stringify(payload)}),
   toggleTunnel:(id:number)=>request<AdminTunnel>(`/v1/tunnels/${id}/toggle`,{method:"POST"}),
   deleteTunnel:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}`,{method:"DELETE"}),
-  prepareTunnel:(id:number)=>request<AdminTunnel>(`/v1/tunnels/${id}/prepare`,{method:"POST"}),
+  prepareTunnel:(id:number)=>requestWithTimeout<AdminTunnel>(`/v1/tunnels/${id}/prepare`,{method:"POST"},150000),
   tunnelHealth:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/health`),
   tunnelTransports:(id:number)=>request<TunnelTransportsResponse>(`/v1/tunnels/${id}/transports`),
   setTunnelTransportMode:(id:number,payload:{mode:string;transport?:string|null})=>request<RuntimeRow>(`/v1/tunnels/${id}/transport-mode`,{method:"POST",body:JSON.stringify(payload)}),
   installSshTunnel:async(id:number)=>{
     const managed=await managedTransportResult(id,"ssh_tun");
-    return managed||request<RuntimeRow>(`/v1/tunnels/${id}/ssh/install`,{method:"POST"});
+    return managed||requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/ssh/install`,{method:"POST"},150000);
   },
   installMtunnel:async(id:number)=>{
     const managed=await managedTransportResult(id,"mtunnel");
-    return managed||request<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/install`,{method:"POST"});
+    return managed||requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/install`,{method:"POST"},150000);
   },
-  repairMtunnel:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/repair`,{method:"POST"}),
+  repairMtunnel:(id:number)=>requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/repair`,{method:"POST"},150000),
   mtunnelHealth:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/health`),
   installBackhaul:async(id:number)=>{
     const managed=await managedTransportResult(id,"backhaul");
-    return managed||request<RuntimeRow>(`/v1/tunnels/${id}/backhaul/install`,{method:"POST"});
+    return managed||requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/backhaul/install`,{method:"POST"},75000);
   },
   backhaulStatus:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/backhaul/status`)
 };
