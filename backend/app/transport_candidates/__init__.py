@@ -4,7 +4,17 @@ import shlex
 from sqlalchemy.orm import Session
 
 from . import amnezia, gost, gre, netrix
-from .common import SPECS, catalog, close_pair, connect_pair, mark, policy_ids, runtime, tunnel_nodes
+from .common import (
+    SPECS,
+    catalog,
+    close_pair,
+    connect_pair,
+    default_interface,
+    mark,
+    policy_ids,
+    runtime,
+    tunnel_nodes,
+)
 
 INSTALLERS = {
     "kernel_gre": gre.install,
@@ -22,29 +32,170 @@ async def install_transport(name: str, tunnel_id: int, db: Session):
 
 
 async def uninstall_transport(name: str, tunnel_id: int, db: Session):
+    """Remove only runtime owned by one canary transport.
+
+    The canary design deliberately keeps cleanup narrow: services/interfaces,
+    the candidate-only policy route, and exact firewall/NAT rules created by
+    TwinPanel. Existing Backhaul/MTunnel/VPN services are never touched.
+    """
     name = str(name).strip().lower()
     if name not in SPECS:
         raise RuntimeError("unknown_transport")
+
     _, iran, exit_node = tunnel_nodes(db, tunnel_id)
     rt = runtime(name, tunnel_id)
     ci = ce = None
+
     try:
         ci, ce = await connect_pair(iran, exit_node, db)
         table, priority = policy_ids(name, tunnel_id)
-        for conn, service in ((ci, rt["iran_service"]), (ce, rt["exit_service"])):
-            await conn.run(f"""
+
+        for conn, service in (
+            (ci, rt["iran_service"]),
+            (ce, rt["exit_service"]),
+        ):
+            await conn.run(
+                f"""
 set +e
 systemctl disable --now {shlex.quote(service)} >/dev/null 2>&1
 rm -f /etc/systemd/system/{shlex.quote(service)}
 ip link del {shlex.quote(rt['interface'])} >/dev/null 2>&1
 systemctl daemon-reload >/dev/null 2>&1
 true
-""", check=False)
-        await ci.run(f"ip rule del priority {priority} 2>/dev/null || true; ip route flush table {table} 2>/dev/null || true", check=False)
-        mark(db, tunnel_id, name, status="not_installed", enabled=False, error=None, latency_ms=None)
-        return {"ok": True, "transport": name, "removed": True}
+""",
+                check=False,
+            )
+
+        # Remove the isolated source-policy rule used only by canary probes.
+        await ci.run(
+            f"""
+set +e
+ip rule del priority {priority} 2>/dev/null || true
+ip route flush table {table} 2>/dev/null || true
+true
+""",
+            check=False,
+        )
+
+        # Remove the exact egress NAT rule installed for the candidate /30.
+        exit_if = await default_interface(ce)
+        nat_comment = f"TwinPanel-{name}-{int(tunnel_id)}"
+        await ce.run(
+            f"""
+set +e
+if command -v iptables >/dev/null 2>&1; then
+  while iptables -t nat -C POSTROUTING \
+    -s {shlex.quote(rt['network'])} \
+    -o {shlex.quote(exit_if)} \
+    -m comment --comment {shlex.quote(nat_comment)} \
+    -j MASQUERADE 2>/dev/null; do
+    iptables -t nat -D POSTROUTING \
+      -s {shlex.quote(rt['network'])} \
+      -o {shlex.quote(exit_if)} \
+      -m comment --comment {shlex.quote(nat_comment)} \
+      -j MASQUERADE || break
+  done
+fi
+true
+""",
+            check=False,
+        )
+
+        # Remove the exact listener rule created by each transport. GRE's
+        # protocol-47 rule is normally removed by ExecStop, but remove it here
+        # as a second idempotent cleanup pass too.
+        if name == "kernel_gre":
+            await ci.run(
+                f"""
+set +e
+if command -v iptables >/dev/null 2>&1; then
+ while iptables -C INPUT -p 47 -s {shlex.quote(str(exit_node.public_ip))} -m comment --comment TwinPanel-GRE-{int(tunnel_id)}-iran -j ACCEPT 2>/dev/null; do
+  iptables -D INPUT -p 47 -s {shlex.quote(str(exit_node.public_ip))} -m comment --comment TwinPanel-GRE-{int(tunnel_id)}-iran -j ACCEPT || break
+ done
+fi
+true
+""",
+                check=False,
+            )
+            await ce.run(
+                f"""
+set +e
+if command -v iptables >/dev/null 2>&1; then
+ while iptables -C INPUT -p 47 -s {shlex.quote(str(iran.public_ip))} -m comment --comment TwinPanel-GRE-{int(tunnel_id)}-exit -j ACCEPT 2>/dev/null; do
+  iptables -D INPUT -p 47 -s {shlex.quote(str(iran.public_ip))} -m comment --comment TwinPanel-GRE-{int(tunnel_id)}-exit -j ACCEPT || break
+ done
+fi
+true
+""",
+                check=False,
+            )
+
+        elif name == "gost_tun":
+            await ce.run(
+                f"""
+set +e
+if command -v iptables >/dev/null 2>&1; then
+ while iptables -C INPUT -p tcp --dport {int(rt['port'])} -s {shlex.quote(str(iran.public_ip))} -m comment --comment TwinPanel-GOST-{int(tunnel_id)} -j ACCEPT 2>/dev/null; do
+  iptables -D INPUT -p tcp --dport {int(rt['port'])} -s {shlex.quote(str(iran.public_ip))} -m comment --comment TwinPanel-GOST-{int(tunnel_id)} -j ACCEPT || break
+ done
+fi
+true
+""",
+                check=False,
+            )
+
+        elif name == "amneziawg":
+            await ce.run(
+                f"""
+set +e
+if command -v iptables >/dev/null 2>&1; then
+ while iptables -C INPUT -p udp --dport {int(rt['port'])} -s {shlex.quote(str(iran.public_ip))} -m comment --comment TwinPanel-AWG-{int(tunnel_id)} -j ACCEPT 2>/dev/null; do
+  iptables -D INPUT -p udp --dport {int(rt['port'])} -s {shlex.quote(str(iran.public_ip))} -m comment --comment TwinPanel-AWG-{int(tunnel_id)} -j ACCEPT || break
+ done
+fi
+true
+""",
+                check=False,
+            )
+
+        elif name == "netrix":
+            await ci.run(
+                f"""
+set +e
+if command -v iptables >/dev/null 2>&1; then
+ while iptables -C INPUT -p tcp --dport {int(rt['port'])} -s {shlex.quote(str(exit_node.public_ip))} -m comment --comment TwinPanel-Netrix-{int(tunnel_id)} -j ACCEPT 2>/dev/null; do
+  iptables -D INPUT -p tcp --dport {int(rt['port'])} -s {shlex.quote(str(exit_node.public_ip))} -m comment --comment TwinPanel-Netrix-{int(tunnel_id)} -j ACCEPT || break
+ done
+fi
+true
+""",
+                check=False,
+            )
+
+        mark(
+            db,
+            tunnel_id,
+            name,
+            status="not_installed",
+            enabled=False,
+            error=None,
+            latency_ms=None,
+        )
+
+        return {
+            "ok": True,
+            "transport": name,
+            "removed": True,
+        }
+
     finally:
         await close_pair(ci, ce)
 
 
-__all__ = ["SPECS", "catalog", "runtime", "install_transport", "uninstall_transport"]
+__all__ = [
+    "SPECS",
+    "catalog",
+    "runtime",
+    "install_transport",
+    "uninstall_transport",
+]
