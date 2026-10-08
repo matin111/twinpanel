@@ -1,53 +1,154 @@
-/* Subscription link modal: QR first, then link and actions underneath. */
-.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) {
-  grid-template-columns: minmax(0, 1fr) !important;
-  width: min(100%, 430px);
-  margin: 16px auto 0;
-  gap: 12px;
-}
+/* ============================================================
+   TwinPanel — Subscription link modal
+   QR on top, share URL inside a dedicated professional field.
+   ============================================================ */
 
-.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:first-child {
-  order: 1;
-  width: 100%;
-}
-
-.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:last-child {
-  order: 2;
-  width: 100%;
+.subscription-link-stack {
+  width: min(100%, 460px);
+  margin: 14px auto 0;
   display: grid;
-  gap: 10px;
+  gap: 14px;
+}
+
+.subscription-link-stack > .setting-box {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* QR card */
+.subscription-link-stack > .setting-box:first-child {
+  display: grid !important;
+  place-items: center;
+  gap: 10px !important;
+  padding: 14px 16px 16px;
+  border-radius: 16px;
   text-align: center;
 }
 
-.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:last-child code {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 11px 12px;
-  border: 1px solid var(--border, rgba(148, 163, 184, .18));
-  border-radius: 12px;
-  direction: ltr;
-  text-align: left;
-  line-height: 1.7;
-  overflow-wrap: anywhere;
+.subscription-link-stack > .setting-box:first-child > small {
+  font-weight: 800;
+  opacity: .72;
 }
 
-.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:last-child .row-actions {
+.subscription-link-stack > .setting-box:first-child > div {
+  display: grid;
+  place-items: center;
+  max-width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(148, 163, 184, .20);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, .08);
+}
+
+/* Link card */
+.subscription-link-stack > .setting-box:last-child {
+  display: grid;
+  gap: 9px;
+  padding: 14px;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.subscription-link-stack > .setting-box:last-child > small {
+  display: block;
+  font-weight: 800;
+  text-align: right;
+  opacity: .78;
+}
+
+/* The URL itself must stay completely inside its own field. */
+.subscription-link-stack > .setting-box:last-child > code {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(124, 58, 237, .24);
+  border-radius: 12px;
+  background: rgba(124, 58, 237, .055);
+  direction: ltr;
+  unicode-bidi: plaintext;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.75;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  overflow: hidden;
+  user-select: all;
+}
+
+.subscription-link-stack > .setting-box:last-child .row-actions {
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 2px;
 }
 
+.subscription-link-stack > .setting-box:last-child .row-actions > * {
+  min-height: 40px;
+  border-radius: 11px;
+  justify-content: center;
+}
+
+/* Light mode: keep the field visibly separated without dark patches. */
+html:not([data-theme="dark"]) .subscription-link-stack > .setting-box:last-child > code,
+html[data-theme="light"] .subscription-link-stack > .setting-box:last-child > code {
+  color: #172033;
+  background: #f7f5ff;
+  border-color: rgba(124, 58, 237, .22);
+}
+
+/* Dark mode */
+html[data-theme="dark"] .subscription-link-stack > .setting-box:last-child > code {
+  color: #e8ecf6;
+  background: rgba(124, 58, 237, .10);
+  border-color: rgba(167, 139, 250, .26);
+}
+
+/* Compatibility with the older subscription-link markup. */
+.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) {
+  grid-template-columns: minmax(0, 1fr) !important;
+  width: min(100%, 460px);
+  margin: 14px auto 0;
+  gap: 12px;
+}
+
+.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:first-child,
+.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:last-child {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:last-child code {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid rgba(124, 58, 237, .24);
+  border-radius: 12px;
+  direction: ltr;
+  text-align: left;
+  line-height: 1.75;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  overflow: hidden;
+}
+
 @media (max-width: 620px) {
+  .subscription-link-stack,
   .runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) {
     width: 100%;
   }
 
+  .subscription-link-stack > .setting-box:last-child .row-actions > *,
   .runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:last-child .row-actions > * {
     flex: 1 1 120px;
-    justify-content: center;
   }
 }
