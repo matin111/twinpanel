@@ -11,15 +11,12 @@ const menuGroups=[
     ["داشبورد","Dashboard","/admin","⌂"],
     ["کاربران","Users","/admin/users","♙"],
     ["اشتراک‌ها","Subscriptions","/admin/subscriptions","▱"],
-    ["ابزار اشتراک","Subscription Tools","/admin/subscription-tools","⌘"],
     ["پلن‌ها","Plans","/admin/plans","◈"]
   ]},
   {fa:"زیرساخت",en:"Infrastructure",items:[
     ["نودها","Nodes","/admin/nodes","▦"],
     ["تانل‌ها","Tunnels","/admin/tunnels","⤨"],
-    ["Transportها","Transport Manager","/admin/tunnel-transports","⇄"],
-    ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"],
-    ["دسترسی مادر","Mother Access","/admin/mother-access","⌁"]
+    ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"]
   ]},
   {fa:"مالی و فروش",en:"Sales & Finance",items:[
     ["پرداخت‌ها","Payments","/admin/payments","◫"],
@@ -30,19 +27,15 @@ const menuGroups=[
   ]},
   {fa:"ارتباطات",en:"Communications",items:[
     ["ربات تلگرام","Telegram Bot","/admin/telegram","✈"],
-    ["مدیریت تلگرام","Telegram Manager","/admin/telegram-manager","◈"],
     ["SMS Reader","SMS Reader","/admin/sms-reader","▤"],
     ["پشتیبانی","Support","/admin/support","◌"],
     ["اعلان‌ها","Notifications","/admin/notifications","◎"]
   ]},
-  {fa:"تحویل و سرویس",en:"Delivery & Service",items:[
-    ["تحویل اکانت","Account Delivery","/admin/account-delivery","⇲"],
-    ["تنظیمات VPN","VPN Settings","/admin/vpn-settings","⌁"],
+  {fa:"سرویس",en:"Service",items:[
     ["L2TP / IPsec","L2TP / IPsec","/admin/l2tp","◎"],
     ["برندینگ","Branding","/admin/branding","✦"]
   ]},
   {fa:"سیستم",en:"System",items:[
-    ["سلامت و امنیت","Health & Security","/admin/system-health","⌾"],
     ["بکاپ و بازیابی","Backup & Restore","/admin/backups","⟲"],
     ["تنظیمات","Settings","/admin/settings","⚙"]
   ]}
