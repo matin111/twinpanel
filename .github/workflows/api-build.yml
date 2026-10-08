@@ -64,6 +64,11 @@ jobs:
       - name: Install backend dependencies
         run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
 
+      - name: Prepare runtime directories
+        run: |
+          sudo install -d -m 700 /etc/twinpanel
+          sudo install -d -m 700 /var/lib/twinpanel-backups
+
       - name: Compile backend
         run: python -m compileall -q backend/app
 
