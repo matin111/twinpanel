@@ -7,6 +7,9 @@ import {SystemHealthRuntimePage} from "../../components/system-health-runtime";
 import {TunnelTransportRuntimePage} from "../../components/tunnel-transport-runtime";
 import {SubscriptionToolsRuntimePage} from "../../components/subscription-tools-runtime";
 import {SubscriptionsFullRuntimePage} from "../../components/subscriptions-full-runtime";
+import {LegacyUsersRuntimePage} from "../../components/legacy-users-exact";
+import {LegacyNodesRuntimePage} from "../../components/legacy-nodes-exact";
+import {LegacyPlansRuntimePage} from "../../components/legacy-plans-exact";
 import {DomainsRuntimePage} from "../../components/domains-runtime";
 import {BrandingSettingsPage} from "../../components/branding-settings";
 import {L2tpSettingsPage} from "../../components/l2tp-settings";
@@ -18,7 +21,6 @@ import {ResellerDashboardRuntime,ResellerSectionRuntime} from "../../components/
 import {StoreRuntime2027} from "../../components/store-runtime";
 import {AdminAuthGuard} from "../../components/admin-auth-guard";
 import {AdminDashboardRuntime} from "../../components/admin-dashboard-runtime";
-import {AdminUsersRuntime} from "../../components/admin-users-runtime";
 import {AdminCollectionRuntime} from "../../components/admin-collections-runtime";
 
 const customerSections=new Set(["subscription","connection","usage","orders","wallet","payments","support","notifications","profile"]);
@@ -29,11 +31,11 @@ const route=(key:string)=>{
   if(key==="login") return <LoginPage2027/>;
   if(key==="register") return <RegisterPage2027/>;
   if(key==="admin") return admin(<AdminDashboardRuntime/>);
-  if(key==="admin/users") return admin(<AdminUsersRuntime/>);
+  if(key==="admin/users") return admin(<LegacyUsersRuntimePage/>);
   if(key==="admin/subscriptions") return admin(<SubscriptionsFullRuntimePage/>);
   if(key==="admin/subscription-tools") return admin(<SubscriptionToolsRuntimePage/>);
-  if(key==="admin/plans") return admin(<AdminCollectionRuntime kind="plans"/>);
-  if(key==="admin/nodes") return admin(<AdminCollectionRuntime kind="nodes"/>);
+  if(key==="admin/plans") return admin(<LegacyPlansRuntimePage/>);
+  if(key==="admin/nodes") return admin(<LegacyNodesRuntimePage/>);
   if(key==="admin/tunnels") return admin(<AdminCollectionRuntime kind="tunnels"/>);
   if(key==="admin/tunnel-transports") return admin(<TunnelTransportRuntimePage/>);
   if(key==="admin/payments") return admin(<AdminCollectionRuntime kind="payments"/>);
