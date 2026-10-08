@@ -18,7 +18,6 @@ const menuGroups=[
     ["نودها","Nodes","/admin/nodes","▦"],
     ["تانل‌ها","Tunnels","/admin/tunnels","⤨"],
     ["Transportها","Transport Manager","/admin/tunnel-transports","⇄"],
-    ["راه‌اندازی نود","Provisioning","/admin/provision","⚡"],
     ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"],
     ["دسترسی مادر","Mother Access","/admin/mother-access","⌁"]
   ]},
