@@ -1,7 +1,9 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from redis import Redis
+from sqlalchemy import text
 
 from .config import settings
 from .database import Base, engine
@@ -96,7 +98,6 @@ async def lifespan(app: FastAPI):
                 pass
 
 
-
 # TWINPANEL_RESELLER_NOTIFICATION_REGISTER_V1
 from .reseller_notification_models import ResellerNotification
 from .routers.reseller_notifications import (
@@ -110,9 +111,60 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
 @app.get("/health")
 def health():
-    return {"ok": True, "service": settings.app_name, "version": "0.9.7"}
+    return {
+        "ok": True,
+        "service": settings.app_name,
+        "version": "0.9.7",
+    }
+
+
+@app.get("/health/ready")
+def readiness():
+    checks = {
+        "database": False,
+        "redis": False,
+    }
+    errors: dict[str, str] = {}
+
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        checks["database"] = True
+    except Exception as exc:
+        errors["database"] = str(exc)[:300]
+
+    try:
+        client = Redis.from_url(
+            settings.redis_url,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+        )
+        checks["redis"] = bool(client.ping())
+        client.close()
+    except Exception as exc:
+        errors["redis"] = str(exc)[:300]
+
+    payload = {
+        "ok": all(checks.values()),
+        "service": settings.app_name,
+        "version": "0.9.7",
+        "checks": checks,
+    }
+
+    if errors:
+        payload["errors"] = errors
+
+    if not payload["ok"]:
+        raise HTTPException(
+            status_code=503,
+            detail=payload,
+        )
+
+    return payload
+
 
 app.include_router(runtime_endpoints_router)
 app.include_router(bootstrap_router_module.router)
@@ -159,8 +211,6 @@ from .routers.mother_access import router as mother_access_router
 app.include_router(mother_access_router)
 
 
-
-
 # TWINPANEL_RESELLER_BOT_API_V1
 from .routers.reseller_bot import (
     router as reseller_bot_router,
@@ -187,6 +237,3 @@ app.include_router(reseller_notifications_router)
 # TWINPANEL_ADMIN_BACKUP_ROUTER_V1
 from .routers.backups import router as backups_router
 app.include_router(backups_router)
-
-
-
