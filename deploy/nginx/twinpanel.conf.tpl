@@ -1,6 +1,11 @@
 server {
-  listen 80;
-  server_name __DOMAIN__;
+  # TwinPanel runs on a dedicated self-hosted server. Before a domain is
+  # configured, Node Agents must still be able to reach the controller by its
+  # public IPv4 address. Make this block the HTTP default so Host headers which
+  # contain the server IP are routed to TwinPanel instead of another/default
+  # Nginx vhost returning 404.
+  listen 80 default_server;
+  server_name __DOMAIN__ _;
 
   client_max_body_size 50m;
 
