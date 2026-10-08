@@ -24,37 +24,23 @@ def _domain_origin(
 ) -> str | None:
     """Return the newest usable domain for a service role.
 
-    Admin-created domains are the source of truth. The newest active
-    domain wins, so adding/replacing an API domain immediately becomes
-    effective without rebuilding the frontend or changing environment
-    variables. Domains whose nginx setup failed are never advertised.
+    The newest active domain with a working Nginx config wins. This is
+    intentional: when an admin adds/replaces the API domain, the public
+    base switches to that domain immediately. SSL may still be pending;
+    in that short window the resolver advertises http:// and automatically
+    becomes https:// as soon as SSLStatus turns ACTIVE.
     """
 
-    base = (
+    item = (
         db.query(Domain)
         .filter(
             Domain.domain_type == domain_type,
             Domain.is_active.is_(True),
             Domain.nginx_status == "active",
         )
-    )
-
-    # Prefer the newest domain that already has SSL.
-    item = (
-        base
-        .filter(Domain.ssl_status == SSLStatus.ACTIVE)
         .order_by(Domain.id.desc())
         .first()
     )
-
-    # Until SSL issuance finishes, the newest working HTTP domain is
-    # still a valid temporary public origin.
-    if item is None:
-        item = (
-            base
-            .order_by(Domain.id.desc())
-            .first()
-        )
 
     if item is None:
         return None
@@ -113,12 +99,12 @@ def api_base_url(
     db: Session,
     request: Request | None = None,
 ) -> str | None:
-    # 1) As soon as admin adds a working API domain, use it.
+    # 1) Admin domain wins immediately when its Nginx config is active.
     value = _domain_origin(db, DomainType.API)
     if value:
         return value
 
-    # 2) Before a domain exists, use the configured public IP/base.
+    # 2) Before a domain exists, use the configured public IP/base URL.
     value = _clean_base(settings.public_api_fallback)
     if value:
         return value
@@ -128,8 +114,8 @@ def api_base_url(
     if value:
         return value
 
-    # Compatibility fallback for installations that have another
-    # public service domain but no dedicated API domain yet.
+    # Compatibility fallback for installations that already expose
+    # another public service role but have no API domain yet.
     for kind in (
         DomainType.PANEL,
         DomainType.SHOP,
