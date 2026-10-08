@@ -1,4 +1,4 @@
-# TWINPANEL_GENERIC_RELAY_MANAGER_V61
+# TWINPANEL_GENERIC_RELAY_MANAGER_V62
 from __future__ import annotations
 
 import asyncio
@@ -6,6 +6,7 @@ from datetime import datetime
 
 from .database import SessionLocal
 from .models import Node, Tunnel, TunnelStatus, TunnelTransport
+from .mother_relay import provision_mother_ssh_relay
 from .ssh_relay import (
     choose_relay_node,
     provision_ssh_relay,
@@ -57,7 +58,11 @@ async def _primary_health(tunnel, iran, db) -> dict:
     )
     iface = ssh_tunnel_interface(tunnel)
     if not peer_ip or not service:
-        return {"ok": False, "latency_ms": None, "error": "primary_health_meta_missing"}
+        return {
+            "ok": False,
+            "latency_ms": None,
+            "error": "primary_health_meta_missing",
+        }
 
     conn = None
     try:
@@ -77,6 +82,7 @@ LC_ALL=C ping -I {iface} -c 3 -i 0.20 -W 2 -s 900 {peer_ip}
                 "latency_ms": None,
                 "error": (result.stderr or result.stdout or "primary_probe_failed")[-700:],
             }
+
         latency = None
         for line in result.stdout.splitlines():
             if "min/avg/max" in line and "=" in line:
@@ -84,9 +90,18 @@ LC_ALL=C ping -I {iface} -c 3 -i 0.20 -W 2 -s 900 {peer_ip}
                     latency = int(float(line.split("=", 1)[1].strip().split("/")[1]))
                 except Exception:
                     pass
-        return {"ok": True, "latency_ms": latency, "error": None}
+
+        return {
+            "ok": True,
+            "latency_ms": latency,
+            "error": None,
+        }
     except Exception as exc:
-        return {"ok": False, "latency_ms": None, "error": str(exc)[:700]}
+        return {
+            "ok": False,
+            "latency_ms": None,
+            "error": str(exc)[:700],
+        }
     finally:
         if conn:
             conn.close()
@@ -102,7 +117,20 @@ async def _relay_health(tunnel, iran, db) -> dict:
             "error": None,
         }
     except Exception as exc:
-        return {"ok": False, "latency_ms": None, "error": str(exc)[:700]}
+        return {
+            "ok": False,
+            "latency_ms": None,
+            "error": str(exc)[:700],
+        }
+
+
+def _activate_auto_relay_state(db, tunnel) -> None:
+    db.refresh(tunnel)
+    tunnel.mode = "auto"
+    tunnel.preferred_transport = "ssh_tun"
+    if tunnel.active_transport not in {"ssh_tun", "ssh_relay"}:
+        tunnel.active_transport = "ssh_tun"
+    db.commit()
 
 
 async def _ensure_relay(tunnel_id: int):
@@ -124,7 +152,7 @@ async def _ensure_relay(tunnel_id: int):
         if primary.status == "not_installed":
             primary.status = "online" if tunnel.status == TunnelStatus.ONLINE else "offline"
 
-        relay = _ensure_member(db, tunnel.id, "ssh_relay", 200)
+        relay = _ensure_member(db, tunnel.id, "ssh_relay", 300)
         db.commit()
 
         cfg = relay_config(db, tunnel)
@@ -145,12 +173,42 @@ async def _ensure_relay(tunnel_id: int):
                 db.commit()
                 return
 
+        mother_error = None
+        try:
+            print(
+                f"[RelayManager] provision tunnel={tunnel.id} relay=mother_tls target={exit_node.id}",
+                flush=True,
+            )
+            await provision_mother_ssh_relay(
+                tunnel,
+                iran,
+                exit_node,
+                db,
+            )
+            _activate_auto_relay_state(db, tunnel)
+            print(
+                f"[RelayManager] mother relay ready tunnel={tunnel.id}",
+                flush=True,
+            )
+            return
+        except Exception as exc:
+            mother_error = str(exc)[:500]
+            db.rollback()
+            print(
+                f"[RelayManager] mother relay failed tunnel={tunnel.id}: {exc!r}",
+                flush=True,
+            )
+
         relay_node = choose_relay_node(db, tunnel)
         if not relay_node:
             relay = _member(db, tunnel.id, "ssh_relay")
             relay.enabled = False
             relay.status = "not_installed"
-            relay.last_error = "no_online_alternate_exit"
+            relay.last_error = (
+                "mother_relay_failed="
+                + (mother_error or "unknown")
+                + " | no_online_alternate_exit"
+            )[:700]
             relay.updated_at = datetime.utcnow()
             tunnel.mode = "manual"
             tunnel.preferred_transport = "ssh_tun"
@@ -169,13 +227,12 @@ async def _ensure_relay(tunnel_id: int):
             exit_node,
             db,
         )
-        db.refresh(tunnel)
-        tunnel.mode = "auto"
-        tunnel.preferred_transport = "ssh_tun"
-        if tunnel.active_transport not in {"ssh_tun", "ssh_relay"}:
-            tunnel.active_transport = "ssh_tun"
-        db.commit()
-        print(f"[RelayManager] relay ready tunnel={tunnel.id}", flush=True)
+        _activate_auto_relay_state(db, tunnel)
+        print(
+            f"[RelayManager] alternate relay ready tunnel={tunnel.id}",
+            flush=True,
+        )
+
     except Exception as exc:
         print(
             f"[RelayManager] ensure relay failed tunnel={tunnel_id}: {exc!r}",
@@ -200,7 +257,7 @@ async def _manage_one(tunnel_id: int):
             return
 
         primary_row = _ensure_member(db, tunnel.id, "ssh_tun", 100)
-        relay_row = _ensure_member(db, tunnel.id, "ssh_relay", 200)
+        relay_row = _ensure_member(db, tunnel.id, "ssh_relay", 300)
         db.commit()
 
         if not relay_row.enabled or relay_row.status == "not_installed":
@@ -295,6 +352,7 @@ async def _manage_one(tunnel_id: int):
 
         if switched:
             await asyncio.sleep(1)
+
     except Exception as exc:
         print(
             f"[RelayManager] manage failed tunnel={tunnel_id}: {exc!r}",
@@ -328,7 +386,7 @@ async def cycle():
 
 
 async def main():
-    print("TWINPANEL_RELAY_MANAGER_V61_START", flush=True)
+    print("TWINPANEL_RELAY_MANAGER_V62_START", flush=True)
     while True:
         try:
             await cycle()
