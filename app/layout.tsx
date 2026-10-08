@@ -28,6 +28,7 @@ import "./domains-runtime.css";
 import "./store-mobile-access.css";
 import "./readability.css";
 import "./admin-runtime.css";
+import "./modern-canary.css";
 import "./store-enhancements.css";
 import "./store-public-navigation.css";
 import "./customer-delivery-enhancement.css";
