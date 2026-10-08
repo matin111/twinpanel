@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     # Release/installer must place the binary at this path or override it by env.
     backhaul_binary_path: str = "/opt/twinpanel/runtime/backhaul/backhaul_premium"
 
+    # Netrix remains a third-party licensed runtime. TwinPanel never bypasses
+    # its license system; customers who own a valid binary can place it here
+    # (or override the path by env) and TwinPanel will provision it to nodes.
+    netrix_binary_path: str = "/opt/twinpanel/runtime/netrix/netrix"
+
     payment_sms_relay_secret: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
