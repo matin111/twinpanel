@@ -28,6 +28,7 @@ from .routers.storefront_settings import router as storefront_settings_router
 from .routers.notification_settings import router as notification_settings_router
 from .routers.runtime_endpoints import router as runtime_endpoints_router
 from .routers.node_recovery import router as node_recovery_router
+from .self_hosted_runtime import apply_self_hosted_runtime
 from .admin_notification_service import notification_watch_loop
 # TWINPANEL_REAL_ADMIN_NOTIFICATION_REGISTER_V1
 # TWINPANEL_USERNAME_SETTINGS_REGISTER_V2
@@ -43,6 +44,10 @@ from .routers.telegram_bot import router as telegram_bot_router
 from .routers.telegram_manager import router as telegram_manager_router
 from .routers.customer_wallet import router as customer_wallet_router, admin_router as customer_wallet_admin_router
 from .routers.customer_subscription_management import router as customer_subscription_management_router
+
+# Product/self-hosted compatibility must be applied before requests or
+# background workers can invoke migrated tunnel/node helpers.
+apply_self_hosted_runtime()
 
 # TWINPANEL_PAYMENT_TABLE_BOOTSTRAP_V1
 # Payment/store models must be registered before create_all.
