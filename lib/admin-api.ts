@@ -7,7 +7,7 @@ export type AdminUser={id:number;email:string|null;phone?:string|null;full_name:
 export type AdminStats={users:number;active_subscriptions:number;online_nodes:number;active_plans:number};
 export type DashboardSummary={online_users:number;total_users:number;total_accounts:number;sales_today:number;sales_week:number;sales_month:number;online_nodes:number;total_nodes:number;protocols:Record<string,{online:boolean;online_nodes:number}>;generated_at:string};
 export type AdminNode={id:number;name:string;node_type?:string;country_code?:string;public_ip?:string;status?:string;current_users?:number;capacity_users?:number;last_seen_at?:string|null;enable_cisco?:boolean;enable_openvpn?:boolean;enable_wireguard?:boolean;enable_l2tp?:boolean;enable_v2ray?:boolean};
-export type AdminTunnel={id:number;iran_node_id:number;exit_node_id:number;transport?:string;status?:string;latency_ms?:number|null;priority?:number;is_active?:boolean};
+export type AdminTunnel={id:number;iran_node_id:number;exit_node_id:number;transport?:string;active_transport?:string|null;preferred_transport?:string|null;mode?:string|null;status?:string;latency_ms?:number|null;priority?:number;is_active?:boolean};
 export type RuntimeRow=Record<string,unknown>;
 
 function errorText(payload:unknown,status:number){
