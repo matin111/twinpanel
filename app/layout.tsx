@@ -34,6 +34,7 @@ import "./customer-delivery-enhancement.css";
 import "./parity-runtime.css";
 import "./subscriptions-full-runtime.css";
 import "./legacy-parity-batch1.css";
+import "./subscription-link-modal.css";
 
 export const metadata:Metadata={title:"VPN Control 2027",description:"VPN management control panel"};
 
