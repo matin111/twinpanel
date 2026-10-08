@@ -15,9 +15,9 @@ from ..quota_service import (
     acknowledge_command,
     apply_usage_event,
     close_session,
-    open_session,
     pull_commands,
 )
+from ..quota_service_v2 import open_session
 
 
 router = APIRouter(prefix="/v1", tags=["quota-security"])
