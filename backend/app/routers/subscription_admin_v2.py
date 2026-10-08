@@ -16,8 +16,11 @@ from ..subscription_override_models import (
 from .subscriptions import subscription_out
 
 
+# Nested under the already-registered /v1 quota/control router. Keeping this
+# prefix relative avoids touching the production main router just to add the
+# V2 admin flow.
 router = APIRouter(
-    prefix="/v1/subscriptions",
+    prefix="/subscriptions",
     tags=["subscription-admin-v2"],
     dependencies=[Depends(require_admin)],
 )
