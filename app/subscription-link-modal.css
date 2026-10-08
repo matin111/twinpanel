@@ -1,0 +1,53 @@
+/* Subscription link modal: QR first, then link and actions underneath. */
+.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) {
+  grid-template-columns: minmax(0, 1fr) !important;
+  width: min(100%, 430px);
+  margin: 16px auto 0;
+  gap: 12px;
+}
+
+.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:first-child {
+  order: 1;
+  width: 100%;
+}
+
+.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:last-child {
+  order: 2;
+  width: 100%;
+  display: grid;
+  gap: 10px;
+  text-align: center;
+}
+
+.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:last-child code {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  border: 1px solid var(--border, rgba(148, 163, 184, .18));
+  border-radius: 12px;
+  direction: ltr;
+  text-align: left;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:last-child .row-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+@media (max-width: 620px) {
+  .runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) {
+    width: 100%;
+  }
+
+  .runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:last-child .row-actions > * {
+    flex: 1 1 120px;
+    justify-content: center;
+  }
+}
