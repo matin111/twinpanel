@@ -49,6 +49,9 @@ jobs:
       REDIS_URL: redis://127.0.0.1:6379/0
       NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
       PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+      TWINPANEL_ADMIN_EMAIL: admin-ci@twinpanel.local
+      TWINPANEL_ADMIN_PASSWORD: TwinPanel-CI-Admin-2026!
+      TWINPANEL_ADMIN_NAME: TwinPanel CI Admin
 
     steps:
       - name: Checkout
@@ -77,6 +80,10 @@ jobs:
         working-directory: backend
         run: python -c 'from app.main import app; print("API_IMPORT_OK", app.title)'
 
+      - name: Bootstrap admin
+        working-directory: backend
+        run: python scripts/bootstrap_admin.py
+
       - name: Start API
         working-directory: backend
         run: |
@@ -98,6 +105,7 @@ jobs:
         run: |
           curl -fsS http://127.0.0.1:8095/openapi.json > /tmp/openapi.json
           grep -q '"/v1/auth/login"' /tmp/openapi.json
+          grep -q '"/v1/auth/me"' /tmp/openapi.json
           grep -q '"/v1/nodes"' /tmp/openapi.json
           grep -q '"/v1/tunnels"' /tmp/openapi.json
           grep -q '"/v1/subscriptions"' /tmp/openapi.json
@@ -105,6 +113,40 @@ jobs:
           grep -q '"/v1/tunnels/{tunnel_id}/mtunnel/install"' /tmp/openapi.json
           grep -q '"/v1/tunnels/{tunnel_id}/backhaul/install"' /tmp/openapi.json
           grep -q '"/v1/tunnels/{tunnel_id}/ssh/install"' /tmp/openapi.json
+
+      - name: Verify admin login flow
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          base = "http://127.0.0.1:8095"
+          payload = json.dumps({
+              "email": os.environ["TWINPANEL_ADMIN_EMAIL"],
+              "password": os.environ["TWINPANEL_ADMIN_PASSWORD"],
+          }).encode()
+          request = urllib.request.Request(
+              base + "/v1/auth/login",
+              data=payload,
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(request, timeout=10) as response:
+              login = json.load(response)
+          token = login.get("access_token")
+          assert token, login
+
+          request = urllib.request.Request(
+              base + "/v1/auth/me",
+              headers={"Authorization": f"Bearer {token}"},
+          )
+          with urllib.request.urlopen(request, timeout=10) as response:
+              me = json.load(response)
+          assert me.get("email") == os.environ["TWINPANEL_ADMIN_EMAIL"], me
+          assert me.get("role") == "admin", me
+          print("ADMIN_LOGIN_SMOKE_OK", me.get("id"), me.get("email"))
+          PY
 
       - name: Show API log on failure
         if: failure()
