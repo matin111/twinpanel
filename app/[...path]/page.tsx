@@ -6,7 +6,7 @@ import {SupportRuntimePage,NotificationsRuntimePage} from "../../components/admi
 import {SystemHealthRuntimePage} from "../../components/system-health-runtime";
 import {TunnelTransportRuntimePage} from "../../components/tunnel-transport-runtime";
 import {SubscriptionToolsRuntimePage} from "../../components/subscription-tools-runtime";
-import {SubscriptionsFullRuntimePage} from "../../components/subscriptions-full-runtime";
+import {LegacySubscriptionsRuntimePage} from "../../components/legacy-subscriptions-exact";
 import {LegacyUsersRuntimePage} from "../../components/legacy-users-exact";
 import {LegacyNodesRuntimePage} from "../../components/legacy-nodes-exact";
 import {LegacyPlansRuntimePage} from "../../components/legacy-plans-exact";
@@ -32,7 +32,7 @@ const route=(key:string)=>{
   if(key==="register") return <RegisterPage2027/>;
   if(key==="admin") return admin(<AdminDashboardRuntime/>);
   if(key==="admin/users") return admin(<LegacyUsersRuntimePage/>);
-  if(key==="admin/subscriptions") return admin(<SubscriptionsFullRuntimePage/>);
+  if(key==="admin/subscriptions") return admin(<LegacySubscriptionsRuntimePage/>);
   if(key==="admin/subscription-tools") return admin(<SubscriptionToolsRuntimePage/>);
   if(key==="admin/plans") return admin(<LegacyPlansRuntimePage/>);
   if(key==="admin/nodes") return admin(<LegacyNodesRuntimePage/>);
