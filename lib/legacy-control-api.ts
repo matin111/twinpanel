@@ -34,6 +34,11 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   return payload as T;
 }
 
+function routeMissing(error:unknown){
+  const message=error instanceof Error?error.message:String(error);
+  return /(not found|method not allowed|api error 404|api error 405)/i.test(message);
+}
+
 export type SystemHealth=RuntimeRow&{
   hostname?:string;
   state?:string;
@@ -60,7 +65,15 @@ export const legacyControlApi={
   nodes:()=>request<AdminNode[]>("/v1/nodes"),
   tunnels:()=>request<AdminTunnel[]>("/v1/tunnels"),
 
-  registerTunnel:(payload:{iran_node_id:number;exit_node_id:number;transport:string;priority:number;is_active:boolean})=>request<AdminTunnel>("/v1/tunnels/register",{method:"POST",body:JSON.stringify(payload)}),
+  registerTunnel:async(payload:{iran_node_id:number;exit_node_id:number;transport:string;priority:number;is_active:boolean})=>{
+    const body=JSON.stringify({...payload,is_active:true});
+    try{
+      return await request<AdminTunnel>("/v1/tunnels/register",{method:"POST",body});
+    }catch(error){
+      if(!routeMissing(error))throw error;
+      return request<AdminTunnel>("/v1/tunnels",{method:"POST",body});
+    }
+  },
   updateTunnel:(id:number,payload:RuntimeRow)=>request<AdminTunnel>(`/v1/tunnels/${id}`,{method:"PATCH",body:JSON.stringify(payload)}),
   toggleTunnel:(id:number)=>request<AdminTunnel>(`/v1/tunnels/${id}/toggle`,{method:"POST"}),
   deleteTunnel:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}`,{method:"DELETE"}),
