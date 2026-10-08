@@ -29,6 +29,7 @@ from .routers.storefront_settings import router as storefront_settings_router
 from .routers.notification_settings import router as notification_settings_router
 from .routers.runtime_endpoints import router as runtime_endpoints_router
 from .routers.node_recovery import router as node_recovery_router
+from .routers.tunnel_managed import router as tunnel_managed_router
 from .self_hosted_runtime import apply_self_hosted_runtime
 from .admin_notification_service import notification_watch_loop
 # TWINPANEL_REAL_ADMIN_NOTIFICATION_REGISTER_V1
@@ -197,6 +198,7 @@ app.include_router(nodes.router)
 app.include_router(node_recovery_router)
 app.include_router(subscriptions.router)
 app.include_router(tunnels.router)
+app.include_router(tunnel_managed_router)
 app.include_router(admin.router)
 app.include_router(resellers.router)
 app.include_router(reseller_portal.router)
