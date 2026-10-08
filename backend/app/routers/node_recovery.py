@@ -24,7 +24,6 @@ from ..models import (
     SubscriptionNode,
     Tunnel,
     TunnelPeerState,
-    TunnelStatus,
     TunnelTransport,
 )
 
@@ -106,7 +105,7 @@ async def recover_node_agent(
         if exists.exit_status != 0:
             raise HTTPException(
                 status_code=409,
-                detail="Node Agent روی این سرور پیدا نشد؛ از عملیات ارتقای Agent استفاده کنید.",
+                detail="Node Agent روی این سرور پیدا نشد؛ دسترسی/نصب Agent را دوباره انجام دهید.",
             )
 
         python_code = (
@@ -124,9 +123,10 @@ async def recover_node_agent(
         )
         encoded = base64.b64encode(python_code.encode()).decode()
         command = (
-            f"printf '%s' {shlex.quote(encoded)} | base64 -d | python3 && "
-            f"/opt/twinpanel-agent/venv/bin/python -m py_compile {shlex.quote(agent_path)} && "
-            "systemctl daemon-reload && "
+            "set -e; "
+            f"printf '%s' {shlex.quote(encoded)} | base64 -d | python3; "
+            f"/opt/twinpanel-agent/venv/bin/python -m py_compile {shlex.quote(agent_path)}; "
+            "systemctl daemon-reload; "
             "systemctl enable twinpanel-agent.service >/dev/null 2>&1 || true; "
             "systemctl restart twinpanel-agent.service"
         )
@@ -138,7 +138,7 @@ async def recover_node_agent(
                 detail="بازیابی Node Agent ناموفق بود: " + detail[-1200:],
             )
 
-        await asyncio.sleep(3)
+        await asyncio.sleep(4)
         state = await conn.run(
             "systemctl is-active twinpanel-agent.service; "
             "journalctl -u twinpanel-agent.service -n 12 --no-pager",
