@@ -96,6 +96,8 @@ def _interface_name(tunnel_id: int) -> str:
 
 
 from ..ssh_relay import relay_desired_meta
+from ..services.public_urls import api_base_url
+from ..tp2027_transport import TP2027_TRANSPORTS, tp2027_desired_meta, tp2027_interface_name
 from ..lifecycle_cleanup import cleanup_tunnel_runtime
 
 # TWINPANEL_TRANSPORT_CORE_V2
@@ -147,6 +149,12 @@ def _health_interface_name(
         tunnel
     )
 
+    if transport in TP2027_TRANSPORTS:
+        return tp2027_interface_name(
+            transport,
+            int(tunnel.id),
+        )
+
     if transport == "mtunnel":
         return f"mtun{int(tunnel.id)}"[:15]
 
@@ -188,6 +196,12 @@ def _data_interface_name(
     transport = _effective_transport(
         tunnel
     )
+
+    if transport in TP2027_TRANSPORTS:
+        return tp2027_interface_name(
+            transport,
+            int(tunnel.id),
+        )
 
     if transport == "mtunnel":
         return f"mtun{int(tunnel.id)}"[:15]
@@ -587,7 +601,7 @@ async def _prepare_tunnel_node(node: Node, db: Session, wg_port: int):
         # Open both so either role can receive WireGuard packets.
         await ufw_allow(conn, wg_port, "udp")
         await ufw_allow(conn, wg_port + 1, "udp")
-        await _install_or_upgrade_agent(conn, node.id, api_base="https://api.movilineapp.com")
+        await _install_or_upgrade_agent(conn, node.id, api_base=api_base_url(db, None))
         state = (await conn.run("systemctl is-active twinpanel-agent.service", check=False)).stdout.strip()
         if state != "active":
             raise RuntimeError(f"Agent نود {node.name} فعال نیست: {state or 'unknown'}")
@@ -1942,7 +1956,7 @@ async def _ensure_fabric_for_tunnel_node(
         agent = await _install_or_upgrade_agent(
             conn,
             node.id,
-            api_base="https://api.movilineapp.com",
+            api_base=api_base_url(db, None),
         )
 
         if not isinstance(agent, dict):
@@ -3632,7 +3646,63 @@ def desired_tunnels(
         route_health_peer_tunnel_ip = health_peer_tunnel_ip
         route_health_service = health_service
 
-        if active_transport == "ssh_relay":
+        if active_transport in TP2027_TRANSPORTS:
+            overlay_meta = tp2027_desired_meta(
+                db,
+                tunnel,
+                node_id,
+            )
+
+            if overlay_meta:
+                route_interface = (
+                    overlay_meta["interface"]
+                )
+
+                route_network = (
+                    overlay_meta["network"]
+                )
+
+                route_local_address = (
+                    overlay_meta["local_address"]
+                )
+
+                route_peer_tunnel_ip = (
+                    overlay_meta[
+                        "peer_tunnel_ip"
+                    ]
+                )
+
+                route_exit_tunnel_ip = (
+                    overlay_meta[
+                        "exit_tunnel_ip"
+                    ]
+                )
+
+                route_health_interface = (
+                    overlay_meta[
+                        "health_interface"
+                    ]
+                )
+
+                route_health_peer_tunnel_ip = (
+                    overlay_meta[
+                        "health_peer_tunnel_ip"
+                    ]
+                )
+
+                route_health_service = (
+                    overlay_meta[
+                        "health_service"
+                    ]
+                )
+
+            else:
+                # Never advertise a fake WireGuard route
+                # for a manager-owned overlay.
+                candidates = []
+                route_selected = False
+
+        elif active_transport == "ssh_relay":
             relay_meta = relay_desired_meta(
                 db,
                 tunnel,
@@ -3716,11 +3786,14 @@ def desired_tunnels(
 
         # TWINPANEL_SSH_TUNNEL_DESIRED_V47
         # V61: both SSH transports are externally provisioned.
-        if active_transport in {
-            "ssh_tun",
-            "ssh_relay",
-            "backhaul",
-        }:
+        if (
+            active_transport in TP2027_TRANSPORTS
+            or active_transport in {
+                "ssh_tun",
+                "ssh_relay",
+                "backhaul",
+            }
+        ):
             candidates = [active_transport]
         else:
             transport_policy = str(
@@ -4014,10 +4087,19 @@ def report_tunnel_peer(
                     datetime.utcnow()
                 )
 
-                # Runtime and logical DB agree.
-                tunnel.active_transport = (
-                    selected_name
-                )
+                # TWINPANEL_SINGLE_WRITER_V2027
+                #
+                # In AUTO mode Transport Manager is the sole
+                # aggregate writer. Agent reports are telemetry.
+                if (
+                    str(
+                        tunnel.mode or ""
+                    ).strip().lower()
+                    != "auto"
+                ):
+                    tunnel.active_transport = (
+                        selected_name
+                    )
 
     db.commit()
 

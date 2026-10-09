@@ -36,29 +36,26 @@ async def _self_hosted_install_or_upgrade_agent(
     node_id: int,
     api_base: str,
 ):
-    """Keep migrated tunnel code independent from the old controller domain.
+    """
+    Self-hosted TwinPanel always renders Node Agent
+    with this installation's configured API endpoint.
 
-    Some legacy tunnel paths still pass the historical Moviline API URL.
-    Until those large legacy modules are fully refactored, resolve that stale
-    value to the installation's own active API domain/IP before rendering the
-    Node Agent configuration.
+    Domain/API address is resolved centrally from:
+      1. active API domain
+      2. PUBLIC_API_FALLBACK
+
+    Caller-supplied legacy controller URLs are ignored.
     """
 
-    requested = str(api_base or "").strip().rstrip("/")
-
-    if (
-        not requested
-        or requested.lower() == "https://api.movilineapp.com"
-        or requested.lower() == "http://api.movilineapp.com"
-    ):
-        requested = _resolved_public_api_base()
+    requested = (
+        _resolved_public_api_base()
+    )
 
     return await _original_install_or_upgrade_agent(
         conn,
         node_id,
         requested,
     )
-
 
 def apply_self_hosted_runtime() -> None:
     # tunnels.py imports this function by name, so patch the module binding.

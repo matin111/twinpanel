@@ -1147,6 +1147,55 @@ def _reconcile_service_routing_strict(items):
 # API REPORT
 # ============================================================
 
+
+# TWINPANEL_HTTP_RETRY_V2027
+async def http_request_retry(
+    client,
+    method,
+    url,
+    *,
+    attempts=4,
+    **kwargs,
+):
+    last = None
+
+    for attempt in range(
+        1,
+        attempts + 1,
+    ):
+        try:
+
+            response = await client.request(
+                method,
+                url,
+                **kwargs,
+            )
+
+            return response
+
+        except (
+            httpx.ConnectError,
+            httpx.ConnectTimeout,
+            httpx.ReadTimeout,
+            httpx.WriteTimeout,
+            httpx.RemoteProtocolError,
+        ) as exc:
+
+            last = exc
+
+            if attempt >= attempts:
+                raise
+
+            await asyncio.sleep(
+                min(
+                    0.7 * attempt,
+                    2.5,
+                )
+            )
+
+    raise last
+
+
 async def report(
     client,
     tunnel_id,
@@ -1157,7 +1206,9 @@ async def report(
     latency_ms,
     last_error,
 ):
-    r = await client.post(
+    r = await http_request_retry(
+        client,
+        "POST",
         (
             f"{API}/v1/tunnels/"
             f"{tunnel_id}/node/"
@@ -1278,7 +1329,9 @@ def reconcile_tunnel_interfaces(items):
 
 async def reconcile_tunnels(client):
 
-    r = await client.get(
+    r = await http_request_retry(
+        client,
+        "GET",
         (
             f"{API}/v1/tunnels/"
             f"node/{NODE_ID}/desired"
@@ -1343,31 +1396,38 @@ async def reconcile_tunnels(client):
                 or ["wireguard"]
             )
 
-            # TWINPANEL_AGENT_ACTIVE_TRANSPORT_V62
-            if (
-                "ssh_tun" in candidates
-                or "ssh_relay" in candidates
-                or "backhaul" in candidates
+            # TWINPANEL_AGENT_ACTIVE_TRANSPORT_V2027
+            managed_candidates = {
+                "quic_2027",
+                "arq_2027",
+                "kcp_2027",
+                "tcp_2027",
+                "ssh_tun",
+                "ssh_relay",
+                "backhaul",
+            }
+
+            if any(
+                name in managed_candidates
+                for name in candidates
             ):
                 selected = str(
                     item.get("active_transport")
                     or ""
                 ).strip().lower()
 
-                if selected not in {
-                    "ssh_tun",
-                    "ssh_relay",
-                    "backhaul",
-                }:
+                if (
+                    selected
+                    not in managed_candidates
+                    or selected
+                    not in candidates
+                ):
                     selected = next(
                         (
                             name
-                            for name in (
-                                "ssh_relay",
-                                "backhaul",
-                                "ssh_tun",
-                            )
-                            if name in candidates
+                            for name in candidates
+                            if name
+                            in managed_candidates
                         ),
                         "ssh_tun",
                     )
@@ -1528,7 +1588,9 @@ async def heartbeat_loop(client):
 
         try:
 
-            r = await client.post(
+            r = await http_request_retry(
+                client,
+                "POST",
                 (
                     f"{API}/v1/nodes/"
                     f"{NODE_ID}/heartbeat"
@@ -1628,8 +1690,22 @@ async def main():
         exist_ok=True,
     )
 
+    timeout = httpx.Timeout(
+        connect=8.0,
+        read=18.0,
+        write=12.0,
+        pool=8.0,
+    )
+
+    limits = httpx.Limits(
+        max_connections=8,
+        max_keepalive_connections=4,
+        keepalive_expiry=20.0,
+    )
+
     async with httpx.AsyncClient(
-        timeout=15.0,
+        timeout=timeout,
+        limits=limits,
         verify=True,
     ) as client:
 
