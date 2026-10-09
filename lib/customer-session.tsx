@@ -1,6 +1,6 @@
 "use client";
 
-import {createContext,useContext,useEffect,useMemo,useState} from "react";
+import {createContext,useCallback,useContext,useEffect,useMemo,useState} from "react";
 import {clearCustomerToken,customerApi,CustomerUser,getCustomerToken} from "./customer-api";
 import {getResellerProfile} from "./role-router";
 
@@ -21,28 +21,75 @@ export function CustomerSessionProvider({children}:{children:React.ReactNode}){
   const [user,setUser]=useState<CustomerUser|null>(null);
   const [error,setError]=useState("");
 
-  const load=async()=>{
+  const load=useCallback(async()=>{
     const current=getCustomerToken();
-    if(!current){window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);return;}
-    setToken(current);setError("");
+    if(!current){
+      window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
+
+    setError("");
+
+    // Only /auth/me is authoritative for the validity of the login session.
+    // Auxiliary role probes must never erase a valid customer token.
+    let account:CustomerUser;
     try{
-      const account=await customerApi.me(current);
-      if(account.role==="admin"){window.location.replace("/admin");return;}
-      if(!account.is_active)throw new Error("حساب کاربری غیرفعال است");
-      const reseller=await getResellerProfile(current);
-      if(reseller){window.location.replace("/reseller");return;}
-      setUser(account);setReady(true);
+      account=await customerApi.me(current);
     }catch(reason){
-      clearCustomerToken();setToken(null);setUser(null);
+      clearCustomerToken();
+      setToken(null);
+      setUser(null);
+      setReady(false);
       setError(reason instanceof Error?reason.message:"نشست کاربری معتبر نیست");
       window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+      return;
     }
+
+    if(account.role==="admin"){
+      window.location.replace("/admin");
+      return;
+    }
+    if(!account.is_active){
+      clearCustomerToken();
+      setToken(null);
+      setUser(null);
+      setReady(false);
+      window.location.replace("/login");
+      return;
+    }
+
+    // Reseller membership is an optional routing probe. A temporary failure here
+    // must not log a valid customer out or make the portal jump after hydration.
+    try{
+      const reseller=await getResellerProfile(current);
+      if(reseller){
+        window.location.replace("/reseller");
+        return;
+      }
+    }catch{
+      // Keep the authenticated customer session alive. The reseller portal has
+      // its own strict guard and can retry this endpoint independently.
+    }
+
+    setToken(current);
+    setUser(account);
+    setReady(true);
+  },[]);
+
+  useEffect(()=>{void load();},[load]);
+
+  const logout=()=>{
+    clearCustomerToken();
+    setToken(null);
+    setUser(null);
+    setReady(false);
+    window.location.replace("/login");
   };
 
-  useEffect(()=>{void load();},[]);
-
-  const logout=()=>{clearCustomerToken();window.location.replace("/login");};
-  const value=useMemo<SessionValue>(()=>({ready,token,user,error,logout,refresh:load}),[ready,token,user,error]);
+  const value=useMemo<SessionValue>(
+    ()=>({ready,token,user,error,logout,refresh:load}),
+    [ready,token,user,error,load]
+  );
 
   if(!ready)return <div className="customer-session-loading"><span className="customer-loader"/><b>در حال دریافت حساب...</b></div>;
   return <CustomerSessionContext.Provider value={value}>{children}</CustomerSessionContext.Provider>;

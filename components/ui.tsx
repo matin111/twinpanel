@@ -11,11 +11,13 @@ const menuGroups=[
     ["داشبورد","Dashboard","/admin","⌂"],
     ["کاربران","Users","/admin/users","♙"],
     ["اشتراک‌ها","Subscriptions","/admin/subscriptions","▱"],
+    ["ابزار اشتراک","Subscription Tools","/admin/subscription-tools","⌘"],
     ["پلن‌ها","Plans","/admin/plans","◈"]
   ]},
   {fa:"زیرساخت",en:"Infrastructure",items:[
     ["نودها","Nodes","/admin/nodes","▦"],
     ["تانل‌ها","Tunnels","/admin/tunnels","⤨"],
+    ["Transportها","Transport Manager","/admin/tunnel-transports","⇄"],
     ["راه‌اندازی نود","Provisioning","/admin/provision","⚡"],
     ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"],
     ["دسترسی مادر","Mother Access","/admin/mother-access","⌁"]
@@ -41,6 +43,7 @@ const menuGroups=[
     ["برندینگ","Branding","/admin/branding","✦"]
   ]},
   {fa:"سیستم",en:"System",items:[
+    ["سلامت و امنیت","Health & Security","/admin/system-health","⌾"],
     ["بکاپ و بازیابی","Backup & Restore","/admin/backups","⟲"],
     ["تنظیمات","Settings","/admin/settings","⚙"]
   ]}

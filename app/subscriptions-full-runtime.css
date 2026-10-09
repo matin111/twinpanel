@@ -1,0 +1,25 @@
+.subs-full .page-head small{display:block;margin-top:4px;color:var(--muted)}
+.subs-master-detail{display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);gap:14px;align-items:start}
+.subs-sidebar{position:sticky;top:18px;max-height:calc(100vh - 36px);overflow:hidden;display:flex;flex-direction:column}
+.subs-list{display:grid;gap:8px;overflow:auto;padding-inline-end:3px;max-height:68vh}
+.subs-list-item{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:start;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface2);color:var(--text);cursor:pointer;transition:.18s ease}
+.subs-list-item:hover,.subs-list-item.active{border-color:rgba(124,92,252,.55);background:rgba(124,92,252,.08)}
+.subs-list-item>div{min-width:0}.subs-list-item b,.subs-list-item small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.subs-list-item b{font-size:12px}.subs-list-item small{margin-top:4px;color:var(--muted);font-size:10px}
+.subs-detail{display:grid;gap:14px;min-width:0}
+.subs-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.subs-summary-grid>div{min-height:72px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface2)}
+.subs-summary-grid span,.credential-fields span,.credential-config>span,.sub-link-row span{display:block;color:var(--muted);font-size:10px;margin-bottom:5px}
+.subs-summary-grid b{display:block;font-size:12px;overflow-wrap:anywhere}
+.secret-row{display:flex;align-items:center;gap:6px;min-width:0}.secret-row b{flex:1;min-width:0}
+.subs-actions{margin-top:13px;flex-wrap:wrap}.subs-actions .danger{color:#d95b6c}
+.subs-connection{overflow:hidden}.sub-link-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:end;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--surface2);margin-bottom:13px}.sub-link-row>div{min-width:0}.sub-link-row code{display:block;direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+.protocol-sections{display:grid;gap:14px}.protocol-section{display:grid;gap:10px;padding-top:3px}.protocol-section+.protocol-section{padding-top:14px;border-top:1px solid var(--line)}
+.protocol-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.protocol-section-head b,.protocol-section-head small{display:block}.protocol-section-head b{font-size:14px}.protocol-section-head small{margin-top:3px;color:var(--muted);font-size:10px}
+.credential-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.credential-card{min-width:0;padding:13px;border:1px solid var(--line);border-radius:14px;background:var(--surface2)}
+.credential-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.credential-title b,.credential-title small{display:block}.credential-title b{font-size:12px}.credential-title small{margin-top:3px;color:var(--muted);font-size:9px}
+.credential-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.credential-fields>div{position:relative;min-width:0;padding:9px 34px 9px 9px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}.credential-fields code{display:block;direction:ltr;font-size:11px;overflow-wrap:anywhere}.credential-fields button{position:absolute;top:50%;inset-inline-end:7px;transform:translateY(-50%);width:25px;height:25px;border:1px solid var(--line);border-radius:7px;background:var(--surface2);color:var(--text);cursor:pointer}
+.credential-config{margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}.credential-config code{display:block;direction:ltr;overflow-wrap:anywhere;font-size:10px}.credential-config pre{max-height:230px;overflow:auto;white-space:pre-wrap;direction:ltr;text-align:left;font-size:10px;line-height:1.6;margin:7px 0 0}.credential-config .action-row{margin-top:8px}
+html[data-theme="light"] .subs-list-item,html[data-theme="light"] .subs-summary-grid>div,html[data-theme="light"] .sub-link-row,html[data-theme="light"] .credential-card{background:#f8f7fc}
+html[data-theme="light"] .credential-fields>div,html[data-theme="light"] .credential-config{background:#fff}
+@media(max-width:1100px){.subs-master-detail{grid-template-columns:1fr}.subs-sidebar{position:static;max-height:none}.subs-list{max-height:360px}.credential-grid{grid-template-columns:1fr}}
+@media(max-width:720px){.subs-summary-grid,.credential-fields{grid-template-columns:1fr}.sub-link-row{grid-template-columns:1fr}.subs-list{max-height:320px}}

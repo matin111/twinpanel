@@ -76,8 +76,13 @@ function PortalFrame({children,active="",type}:PortalShellProps){
   const menu=type==="customer"?customerMenu:resellerMenu;
   const storageKey=`twinpanel.${type}.sidebar.collapsed`;
 
-  useEffect(()=>{try{setCollapsed(localStorage.getItem(storageKey)==="1");}catch{}},[storageKey]);
-  const toggle=()=>setCollapsed(v=>{const n=!v;try{localStorage.setItem(storageKey,n?"1":"0");}catch{}return n});
+  // Do not restore a stale collapsed value after hydration. That delayed state
+  // change was making the customer layout jump a few seconds after sign-in.
+  const toggle=()=>setCollapsed(v=>{
+    const n=!v;
+    try{localStorage.setItem(storageKey,n?"1":"0");}catch{}
+    return n;
+  });
 
   return <div className={`shell portal-shell ${collapsed?"sidebar-collapsed":""} ${mobileOpen?"mobile-menu-open":""}`}>
     <aside className="sidebar">

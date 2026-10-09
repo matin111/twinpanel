@@ -1,0 +1,149 @@
+name: TwinPanel API Build
+
+on:
+  push:
+    branches:
+      - product/self-hosted-v1
+  pull_request:
+    paths:
+      - "backend/**"
+      - "installer/**"
+      - "deploy/systemd/twinpanel-api.service.tpl"
+      - "deploy/nginx/twinpanel.conf.tpl"
+      - ".github/workflows/api-build.yml"
+
+jobs:
+  api:
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: twinpanel
+          POSTGRES_PASSWORD: twinpanel_test
+          POSTGRES_DB: twinpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U twinpanel -d twinpanel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      APP_NAME: TwinPanel-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+      TWINPANEL_ADMIN_EMAIL: admin-ci@example.com
+      TWINPANEL_ADMIN_PASSWORD: TwinPanel-CI-Admin-2026!
+      TWINPANEL_ADMIN_NAME: TwinPanel CI Admin
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate installer shell
+        run: bash -n installer/install.sh
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Prepare runtime directories
+        run: |
+          sudo install -d -m 700 /etc/twinpanel
+          sudo install -d -m 700 /var/lib/twinpanel-backups
+          sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel-backups
+
+      - name: Compile backend
+        run: python -m compileall -q backend/app backend/scripts
+
+      - name: Import application and create schema
+        working-directory: backend
+        run: python -c 'from app.main import app; print("API_IMPORT_OK", app.title)'
+
+      - name: Verify self-hosted runtime hooks
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from app.main import app
+          from app.routers import nodes, tunnels
+
+          assert tunnels._install_or_upgrade_agent.__module__ == "app.self_hosted_runtime"
+          assert hasattr(nodes, "Path")
+          print("SELF_HOSTED_RUNTIME_OK", app.title)
+          PY
+
+      - name: Bootstrap admin
+        working-directory: backend
+        run: python scripts/bootstrap_admin.py
+
+      - name: Start API
+        working-directory: backend
+        run: |
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8095 > /tmp/twinpanel-api-ci.log 2>&1 &
+          echo $! > /tmp/twinpanel-api-ci.pid
+
+      - name: Wait for readiness
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8095/health/ready; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/twinpanel-api-ci.log
+          exit 1
+
+      - name: Verify required routes
+        run: |
+          curl -fsS http://127.0.0.1:8095/openapi.json > /tmp/openapi.json
+          grep -q '"/v1/runtime/endpoints"' /tmp/openapi.json
+          grep -q '"/v1/auth/login"' /tmp/openapi.json
+          grep -q '"/v1/auth/me"' /tmp/openapi.json
+          grep -q '"/v1/admin/users"' /tmp/openapi.json
+          grep -q '"/v1/plans"' /tmp/openapi.json
+          grep -q '"/v1/nodes"' /tmp/openapi.json
+          grep -q '"/v1/tunnels"' /tmp/openapi.json
+          grep -q '"/v1/subscriptions"' /tmp/openapi.json
+          grep -q '"/v1/tunnels/register"' /tmp/openapi.json
+          grep -q '"/v1/tunnels/create-managed"' /tmp/openapi.json
+          grep -q '"/v1/tunnels/{tunnel_id}/transports"' /tmp/openapi.json
+          grep -q '"/v1/tunnels/{tunnel_id}/transport-mode"' /tmp/openapi.json
+          grep -q '"/v1/tunnels/{tunnel_id}/mtunnel/install"' /tmp/openapi.json
+          grep -q '"/v1/tunnels/{tunnel_id}/backhaul/install"' /tmp/openapi.json
+          grep -q '"/v1/tunnels/{tunnel_id}/ssh/install"' /tmp/openapi.json
+
+      - name: Run managed tunnel orchestration smoke
+        working-directory: backend
+        run: python -m scripts.tunnel_managed_smoke
+
+      - name: Run standalone API core smoke
+        working-directory: backend
+        run: python scripts/api_core_smoke.py
+
+      - name: Show API log on failure
+        if: failure()
+        run: cat /tmp/twinpanel-api-ci.log 2>/dev/null || true
