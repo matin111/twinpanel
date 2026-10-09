@@ -11,7 +11,7 @@ import {LegacySubscriptionsRuntimePage} from "../../components/legacy-subscripti
 import {LegacyUsersRuntimePage} from "../../components/legacy-users-exact";
 import {NodesUnifiedRuntimePage} from "../../components/nodes-unified-runtime";
 import {LegacyPlansRuntimePage} from "../../components/legacy-plans-exact";
-import {LegacyTunnelsExactPage} from "../../components/legacy-tunnels-exact";
+import {ManagedTunnelsRuntimePage} from "../../components/managed-tunnels-runtime";
 import {DomainsRuntimePage} from "../../components/domains-runtime";
 import {BrandingSettingsPage} from "../../components/branding-settings";
 import {L2tpSettingsPage} from "../../components/l2tp-settings";
@@ -38,7 +38,7 @@ const route=(key:string)=>{
   if(key==="admin/subscription-tools") return admin(<SubscriptionToolsRuntimePage/>);
   if(key==="admin/plans") return admin(<LegacyPlansRuntimePage/>);
   if(key==="admin/nodes") return admin(<NodesUnifiedRuntimePage/>);
-  if(key==="admin/tunnels") return admin(<LegacyTunnelsExactPage/>);
+  if(key==="admin/tunnels") return admin(<ManagedTunnelsRuntimePage/>);
   if(key==="admin/tunnel-transports") return admin(<TunnelTransportRuntimePage/>);
   if(key==="admin/tunnel-canary") return admin(<ModernTransportCanaryPage/>);
   if(key==="admin/payments") return admin(<AdminCollectionRuntime kind="payments"/>);

@@ -82,15 +82,36 @@ export type ManagedTunnelCreateResponse={
   installed:string[];
   errors:Record<string,string>;
   transports?:RuntimeRow[];
+  diagnosis?:ManagedTunnelDiagnosis;
+};
+
+export type ManagedTunnelDiagnosis=RuntimeRow&{
+  ok?:boolean;
+  tunnel_id?:number;
+  mode?:string;
+  status?:string;
+  active_transport?:string|null;
+  preferred_transport?:string|null;
+  backhaul_online?:boolean;
+  repair_needed?:string[];
+  healthy?:boolean;
+  transports?:RuntimeRow[];
+};
+
+export type ManagedTunnelRepairResponse=RuntimeRow&{
+  ok?:boolean;
+  tunnel_id?:number;
+  mode?:string;
+  before?:ManagedTunnelDiagnosis;
+  after?:ManagedTunnelDiagnosis;
+  errors?:Record<string,string>;
 };
 
 type ManagedInstallCache={installed:string[];errors:Record<string,string>};
 const managedInstallCache=new Map<number,ManagedInstallCache>();
 
-// A tunnel returned by create-managed is already owned by
-// backend AUTO/V7 selection. The legacy page still performs
-// its compatibility installAll() sequence afterwards; remember
-// these IDs so that sequence cannot force manual/MTunnel mode.
+// Compatibility guard for older page flows. New tunnel UI uses createManagedTunnel
+// directly and never runs browser-owned installAll after managed creation.
 const managedAutoCreateCache=new Set<number>();
 
 type ParallelTransport="mtunnel"|"backhaul"|"ssh_tun";
@@ -100,19 +121,13 @@ const parallelInstallCache=new Map<number,ParallelInstallMap>();
 async function managedTransportResult(id:number,name:ParallelTransport){
   const cached=managedInstallCache.get(id);
   if(!cached)return null;
-
   if(name==="ssh_tun")managedInstallCache.delete(id);
-
-  if(cached.installed.includes(name)){
-    return {ok:true,managed:true,transport:name,status:"online"} as RuntimeRow;
-  }
-
+  if(cached.installed.includes(name))return {ok:true,managed:true,transport:name,status:"online"} as RuntimeRow;
   throw new Error(cached.errors[name]||`${name} نصب نشد`);
 }
 
 function startParallelTransportInstalls(id:number){
   if(!id||parallelInstallCache.has(id))return;
-
   const jobs:ParallelInstallMap=new Map();
   jobs.set("mtunnel",requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/install`,{method:"POST"},150000));
   jobs.set("backhaul",requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/backhaul/install`,{method:"POST"},75000));
@@ -124,10 +139,8 @@ async function parallelTransportResult(id:number,name:ParallelTransport){
   const jobs=parallelInstallCache.get(id);
   const job=jobs?.get(name);
   if(!job)return null;
-
   jobs!.delete(name);
   if(jobs!.size===0)parallelInstallCache.delete(id);
-
   return await job;
 }
 
@@ -144,65 +157,39 @@ export const legacyControlApi={
 
   createManagedTunnel:async(payload:{iran_node_id:number;exit_node_id:number;transport:string;priority:number;is_active:boolean})=>{
     const body=JSON.stringify({...payload,is_active:true});
-    try{
-      return await requestWithTimeout<ManagedTunnelCreateResponse>("/v1/tunnels/create-managed",{method:"POST",body},360000);
-    }catch(error){
-      if(!routeMissing(error))throw error;
-      return null;
-    }
+    return await requestWithTimeout<ManagedTunnelCreateResponse>("/v1/tunnels/create-managed",{method:"POST",body},360000);
   },
 
-  // Production create flow:
-  // Registration and installation of all three transports are owned by the API.
-  // The browser only waits for the managed result; it never owns provisioning.
+  managedDiagnose:(id:number)=>request<ManagedTunnelDiagnosis>(`/v1/tunnels/${id}/managed-diagnose`),
+  managedRepair:(id:number)=>requestWithTimeout<ManagedTunnelRepairResponse>(`/v1/tunnels/${id}/managed-repair`,{method:"POST"},360000),
+
+  // Compatibility fallback for old API deployments. The modern page does not
+  // use this method for new tunnels; production creation is createManagedTunnel.
   registerTunnel:async(payload:{iran_node_id:number;exit_node_id:number;transport:string;priority:number;is_active:boolean})=>{
     const body=JSON.stringify({...payload,is_active:true});
 
     try{
-      const managed=await requestWithTimeout<ManagedTunnelCreateResponse>(
-        "/v1/tunnels/create-managed",
-        {method:"POST",body},
-        360000,
-      );
-
+      const managed=await requestWithTimeout<ManagedTunnelCreateResponse>("/v1/tunnels/create-managed",{method:"POST",body},360000);
       const tunnelId=Number(managed?.tunnel?.id||0);
-
       if(tunnelId){
-        managedInstallCache.set(tunnelId,{
-          installed:Array.isArray(managed.installed)?managed.installed:[],
-          errors:managed.errors||{},
-        });
-
+        managedInstallCache.set(tunnelId,{installed:Array.isArray(managed.installed)?managed.installed:[],errors:managed.errors||{}});
         managedAutoCreateCache.add(tunnelId);
       }
-
       return managed.tunnel;
     }catch(error){
       if(!routeMissing(error))throw error;
     }
 
-    // Compatibility fallback for an older API without create-managed.
     let created:AdminTunnel;
-
     try{
-      created=await requestWithTimeout<AdminTunnel>(
-        "/v1/tunnels/register",
-        {method:"POST",body},
-        30000,
-      );
+      created=await requestWithTimeout<AdminTunnel>("/v1/tunnels/register",{method:"POST",body},30000);
     }catch(error){
       if(!routeMissing(error))throw error;
-
-      created=await requestWithTimeout<AdminTunnel>(
-        "/v1/tunnels",
-        {method:"POST",body},
-        30000,
-      );
+      created=await requestWithTimeout<AdminTunnel>("/v1/tunnels",{method:"POST",body},30000);
     }
 
     const tunnelId=Number(created?.id||0);
     if(tunnelId)startParallelTransportInstalls(tunnelId);
-
     return created;
   },
 
@@ -212,35 +199,14 @@ export const legacyControlApi={
   prepareTunnel:(id:number)=>requestWithTimeout<AdminTunnel>(`/v1/tunnels/${id}/prepare`,{method:"POST"},150000),
   tunnelHealth:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/health`),
   tunnelTransports:(id:number)=>request<TunnelTransportsResponse>(`/v1/tunnels/${id}/transports`),
+
   setTunnelTransportMode:async(id:number,payload:{mode:string;transport?:string|null})=>{
-    if(
-      managedAutoCreateCache.has(id)
-      && payload.mode==="manual"
-      && ["mtunnel","backhaul","ssh_tun"].includes(String(payload.transport||""))
-    ){
+    if(managedAutoCreateCache.has(id)&&payload.mode==="manual"&&["mtunnel","backhaul","ssh_tun"].includes(String(payload.transport||""))){
       managedAutoCreateCache.delete(id);
-
-      return request<RuntimeRow>(
-        `/v1/tunnels/${id}/transport-mode`,
-        {
-          method:"POST",
-          body:JSON.stringify({
-            mode:"auto",
-            transport:null,
-          }),
-        },
-      );
+      return request<RuntimeRow>(`/v1/tunnels/${id}/transport-mode`,{method:"POST",body:JSON.stringify({mode:"auto",transport:null})});
     }
-
     managedAutoCreateCache.delete(id);
-
-    return request<RuntimeRow>(
-      `/v1/tunnels/${id}/transport-mode`,
-      {
-        method:"POST",
-        body:JSON.stringify(payload),
-      },
-    );
+    return request<RuntimeRow>(`/v1/tunnels/${id}/transport-mode`,{method:"POST",body:JSON.stringify(payload)});
   },
 
   installSshTunnel:async(id:number)=>{
