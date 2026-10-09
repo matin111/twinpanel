@@ -75,6 +75,8 @@ export type TunnelTransportsResponse=RuntimeRow&{transports?:RuntimeRow[]};
 export type ManagedTunnelCreateResponse={
   ok:boolean;
   complete:boolean;
+  tp2027_complete?:boolean;
+  full_complete?:boolean;
   tunnel:AdminTunnel;
   active_transport:string|null;
   installed:string[];
@@ -84,6 +86,12 @@ export type ManagedTunnelCreateResponse={
 
 type ManagedInstallCache={installed:string[];errors:Record<string,string>};
 const managedInstallCache=new Map<number,ManagedInstallCache>();
+
+// The legacy tunnel page still performs its old three-install sequence after
+// registerTunnel(). When registerTunnel() was satisfied by create-managed,
+// preserve the backend's new AUTO/V7 selection instead of letting that legacy
+// post-create sequence force MTunnel/manual mode.
+const managedAutoCreateCache=new Set<number>();
 
 async function managedTransportResult(id:number,name:"mtunnel"|"backhaul"|"ssh_tun"){
   const cached=managedInstallCache.get(id);
@@ -129,6 +137,7 @@ export const legacyControlApi={
           installed:Array.isArray(managed.installed)?managed.installed:[],
           errors:managed.errors&&typeof managed.errors==="object"?managed.errors:{},
         });
+        managedAutoCreateCache.add(tunnelId);
       }
       return managed.tunnel;
     }catch(error){
@@ -148,7 +157,22 @@ export const legacyControlApi={
   prepareTunnel:(id:number)=>requestWithTimeout<AdminTunnel>(`/v1/tunnels/${id}/prepare`,{method:"POST"},150000),
   tunnelHealth:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/health`),
   tunnelTransports:(id:number)=>request<TunnelTransportsResponse>(`/v1/tunnels/${id}/transports`),
-  setTunnelTransportMode:(id:number,payload:{mode:string;transport?:string|null})=>request<RuntimeRow>(`/v1/tunnels/${id}/transport-mode`,{method:"POST",body:JSON.stringify(payload)}),
+  setTunnelTransportMode:async(id:number,payload:{mode:string;transport?:string|null})=>{
+    if(
+      managedAutoCreateCache.has(id)
+      && payload.mode==="manual"
+      && ["mtunnel","backhaul","ssh_tun"].includes(String(payload.transport||""))
+    ){
+      managedAutoCreateCache.delete(id);
+      return request<RuntimeRow>(`/v1/tunnels/${id}/transport-mode`,{
+        method:"POST",
+        body:JSON.stringify({mode:"auto",transport:null}),
+      });
+    }
+
+    managedAutoCreateCache.delete(id);
+    return request<RuntimeRow>(`/v1/tunnels/${id}/transport-mode`,{method:"POST",body:JSON.stringify(payload)});
+  },
   installSshTunnel:async(id:number)=>{
     const managed=await managedTransportResult(id,"ssh_tun");
     return managed||requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/ssh/install`,{method:"POST"},150000);
