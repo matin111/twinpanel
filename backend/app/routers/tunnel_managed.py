@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..database import SessionLocal, get_db
 from ..deps import require_admin
-from ..managed_selfheal import (
+from ..managed_ops import (
     diagnose_managed_tunnel,
     install_ssh_transport_managed,
     repair_managed_tunnel,
@@ -24,8 +24,8 @@ from . import tunnels as core
 router = APIRouter(prefix="/v1/tunnels", tags=["tunnels-managed"])
 
 
-# Priority order for independent/base transports. SSH TUN now owns its
-# plain->TLS fallback internally, so create/repair never need a manual server fix.
+# Independent/base transports. The managed SSH installer uses the existing
+# production SSH provisioner with bounded retry; all orchestration stays server-side.
 _TRANSPORTS = (
     ("mtunnel", 90, core.install_mtunnel_transport),
     ("backhaul", 100, core.install_backhaul_transport),
@@ -35,7 +35,7 @@ _TRANSPORTS = (
 
 _TRANSPORT_TIMEOUTS = {
     "mtunnel": 150,
-    "ssh_tun": 260,
+    "ssh_tun": 180,
     "backhaul": 75,
 }
 
@@ -319,11 +319,9 @@ async def create_managed_tunnel(
     """
     One-click managed tunnel creation.
 
-    Phase 1 installs MTunnel, Backhaul and SSH TUN in parallel. SSH TUN
-    automatically falls back to SSH-over-TLS when plain SSH is filtered.
-
-    Phase 2 installs QUIC/ARQ/KCP/TCP 2027 when Backhaul is healthy.
-    Runtime failover stays owned by Transport Manager V7.
+    Phase 1 installs MTunnel, Backhaul and SSH TUN in parallel using official
+    production installers with retry. Phase 2 installs QUIC/ARQ/KCP/TCP 2027
+    when Backhaul is healthy. Runtime failover stays owned by Manager V7.
     """
 
     existing = (
@@ -444,9 +442,9 @@ async def managed_repair(
     """
     Diagnose and repair only unhealthy/missing transports.
 
-    The routine restores AUTO mode, repairs independent base transports,
-    automatically uses TLS for filtered SSH, and only rebuilds TP2027 overlays
-    when Backhaul is healthy. V7 remains the sole runtime failover authority.
+    The routine restores AUTO mode, invokes official base installers as needed,
+    and rebuilds TP2027 overlays only when Backhaul is healthy. V7 remains the
+    sole runtime health/failover authority.
     """
     try:
         return await repair_managed_tunnel(tunnel_id, db)
