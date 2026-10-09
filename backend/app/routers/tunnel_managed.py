@@ -10,6 +10,10 @@ from ..database import SessionLocal, get_db
 from ..deps import require_admin
 from ..models import Tunnel, TunnelPeerState, TunnelStatus, TunnelTransport
 from ..schemas import TunnelCreate, TunnelOut
+from ..tp2027_provision import (
+    TP2027_PRIORITY,
+    install_tp2027_overlays,
+)
 from . import tunnels as core
 
 router = APIRouter(prefix="/v1/tunnels", tags=["tunnels-managed"])
@@ -29,6 +33,18 @@ _TRANSPORT_TIMEOUTS = {
     "ssh_tun": 150,
     "backhaul": 75,
 }
+
+
+_SELECTION_ORDER = (
+    "quic_2027",
+    "arq_2027",
+    "kcp_2027",
+    "tcp_2027",
+    "mtunnel",
+    "backhaul",
+    "ssh_tun",
+    "ssh_relay",
+)
 
 
 def _detail_text(exc: Exception) -> str:
@@ -168,62 +184,97 @@ def _transport_snapshot(db: Session, tunnel_id: int) -> list[dict]:
     ]
 
 
-def _activate_best_transport(db: Session, tunnel_id: int) -> str | None:
-    tunnel = db.get(Tunnel, tunnel_id)
+def _activate_best_transport(
+    db: Session,
+    tunnel_id: int,
+) -> str | None:
+    """
+    Creation-time bootstrap only.
+
+    Transport Manager V7 is the runtime authority
+    after provisioning. Peer health is never
+    fabricated here.
+    """
+
+    tunnel = db.get(
+        Tunnel,
+        tunnel_id,
+    )
+
     if not tunnel:
         return None
 
     rows = {
-        str(row.transport).strip().lower(): row
-        for row in db.query(TunnelTransport)
-        .filter(TunnelTransport.tunnel_id == tunnel_id)
-        .all()
+        str(
+            row.transport
+        ).strip().lower(): row
+        for row in (
+            db.query(TunnelTransport)
+            .filter(
+                TunnelTransport.tunnel_id
+                == tunnel_id
+            )
+            .all()
+        )
     }
 
-    selected: TunnelTransport | None = None
+    selected = None
 
-    for name, _, _ in _TRANSPORTS:
-        row = rows.get(name)
+    for name in _SELECTION_ORDER:
+
+        row = rows.get(
+            name
+        )
+
         if (
             row
             and bool(row.enabled)
-            and str(row.status or "").strip().lower() == "online"
+            and str(
+                row.status
+                or ""
+            ).strip().lower()
+            == "online"
         ):
             selected = row
             break
 
     if selected is None:
+
         tunnel.is_active = False
         tunnel.active_transport = None
-        tunnel.status = TunnelStatus.OFFLINE
+        tunnel.status = (
+            TunnelStatus.OFFLINE
+        )
         tunnel.latency_ms = None
+
         db.commit()
+
         return None
 
     now = datetime.utcnow()
-    selected_name = str(selected.transport)
 
-    tunnel.mode = "manual"
+    selected_name = str(
+        selected.transport
+    )
+
+    tunnel.mode = "auto"
     tunnel.is_active = True
-    tunnel.active_transport = selected_name
-    tunnel.preferred_transport = selected_name
-    tunnel.status = TunnelStatus.ONLINE
-    tunnel.latency_ms = selected.latency_ms
+    tunnel.active_transport = (
+        selected_name
+    )
+    tunnel.preferred_transport = (
+        selected_name
+    )
+    tunnel.status = (
+        TunnelStatus.ONLINE
+    )
+    tunnel.latency_ms = (
+        selected.latency_ms
+    )
     tunnel.last_switch_at = now
 
-    for peer in (
-        db.query(TunnelPeerState)
-        .filter(TunnelPeerState.tunnel_id == tunnel_id)
-        .all()
-    ):
-        peer.selected_transport = selected_name
-        peer.endpoint_reachable = True
-        peer.tunnel_reachable = True
-        peer.latency_ms = selected.latency_ms
-        peer.last_error = None
-        peer.updated_at = now
-
     db.commit()
+
     return selected_name
 
 
@@ -257,81 +308,356 @@ async def _remove_failed_new_tunnel(db: Session, tunnel_id: int) -> None:
     db.commit()
 
 
+
+async def _install_tp2027_phase(
+    db: Session,
+    tunnel_id: int,
+    base_online: set[str],
+) -> tuple[
+    list[str],
+    dict[str, str],
+    dict[str, object],
+]:
+    installed: list[str] = []
+    errors: dict[str, str] = {}
+    results: dict[str, object] = {}
+
+    # TP2027 runs over Backhaul.
+    if "backhaul" not in base_online:
+
+        errors["tp2027"] = (
+            "TP2027 overlays require "
+            "an online Backhaul carrier"
+        )
+
+        return (
+            installed,
+            errors,
+            results,
+        )
+
+    try:
+
+        overlay = await asyncio.wait_for(
+            install_tp2027_overlays(
+                tunnel_id,
+                db,
+            ),
+            timeout=210,
+        )
+
+    except Exception as exc:
+
+        message = _detail_text(
+            exc
+        )[:1800]
+
+        for name in TP2027_PRIORITY:
+            errors[name] = message
+
+        return (
+            installed,
+            errors,
+            results,
+        )
+
+    results["tp2027"] = overlay
+
+    for name, item in (
+        overlay.get(
+            "transports",
+            {},
+        ).items()
+    ):
+
+        if bool(
+            item.get("ok")
+        ):
+
+            installed.append(
+                name
+            )
+
+        else:
+
+            errors[name] = str(
+                item.get(
+                    "error"
+                )
+                or (
+                    "TP2027 overlay "
+                    "install failed"
+                )
+            )[:1800]
+
+    return (
+        installed,
+        errors,
+        results,
+    )
+
+
 @router.post(
     "/create-managed",
-    dependencies=[Depends(require_admin)],
+    dependencies=[
+        Depends(require_admin)
+    ],
 )
 async def create_managed_tunnel(
     payload: TunnelCreate,
     db: Session = Depends(get_db),
 ):
-    """Create one Iran->Exit route and install all three transports together.
+    """
+    One-click managed tunnel creation.
 
-    MTunnel, Backhaul and SSH TUN start concurrently. Each uses an independent
-    DB session and timeout. After all jobs settle, the best healthy transport is
-    activated. If all three fail for a newly-created route, it is rolled back.
+    Phase 1:
+      MTunnel
+      Backhaul
+      SSH TUN
+
+    Phase 2 over healthy Backhaul:
+      QUIC 2027
+      ARQ 2027
+      KCP 2027
+      TCP 2027
+
+    Runtime failover is owned by
+    Transport Manager V7.
     """
 
     existing = (
         db.query(Tunnel)
         .filter(
-            Tunnel.iran_node_id == payload.iran_node_id,
-            Tunnel.exit_node_id == payload.exit_node_id,
+            Tunnel.iran_node_id
+            == payload.iran_node_id,
+
+            Tunnel.exit_node_id
+            == payload.exit_node_id,
         )
         .first()
     )
-    was_existing = existing is not None
 
-    tunnel = core.register_tunnel_pair(payload, db)
-    tunnel_id = int(tunnel.id)
+    was_existing = (
+        existing is not None
+    )
+
+
+    tunnel = (
+        core.register_tunnel_pair(
+            payload,
+            db,
+        )
+    )
+
+    tunnel_id = int(
+        tunnel.id
+    )
+
+
+    # --------------------------------------------------------
+    # Phase 1:
+    # independent carrier/fallback transports
+    # --------------------------------------------------------
 
     jobs = [
-        _run_transport_job(name, installer, tunnel_id)
-        for name, _, installer in _TRANSPORTS
+        _run_transport_job(
+            name,
+            installer,
+            tunnel_id,
+        )
+        for (
+            name,
+            _,
+            installer,
+        ) in _TRANSPORTS
     ]
 
-    settled = await asyncio.gather(*jobs)
+
+    settled = await asyncio.gather(
+        *jobs
+    )
+
 
     installed: list[str] = []
     errors: dict[str, str] = {}
     results: dict[str, object] = {}
 
-    for name, result, error, online in settled:
+    base_online: set[str] = set()
+
+
+    for (
+        name,
+        result,
+        error,
+        online,
+    ) in settled:
+
         if result is not None:
             results[name] = result
+
         if online:
-            installed.append(name)
+
+            installed.append(
+                name
+            )
+
+            base_online.add(
+                name
+            )
+
         elif error:
+
             errors[name] = error
 
+
+    # --------------------------------------------------------
+    # Phase 2:
+    # production-tested TP2027 overlays
+    # --------------------------------------------------------
+
+    (
+        overlay_installed,
+        overlay_errors,
+        overlay_results,
+    ) = await _install_tp2027_phase(
+        db,
+        tunnel_id,
+        base_online,
+    )
+
+
+    installed.extend(
+        overlay_installed
+    )
+
+    errors.update(
+        overlay_errors
+    )
+
+    results.update(
+        overlay_results
+    )
+
+
     db.expire_all()
-    primary = _activate_best_transport(db, tunnel_id)
+
+
+    primary = (
+        _activate_best_transport(
+            db,
+            tunnel_id,
+        )
+    )
+
 
     if primary is None:
+
         if not was_existing:
-            await _remove_failed_new_tunnel(db, tunnel_id)
+
+            await (
+                _remove_failed_new_tunnel(
+                    db,
+                    tunnel_id,
+                )
+            )
 
         raise HTTPException(
             status_code=502,
             detail={
-                "message": "هیچ‌کدام از مسیرهای تانل آنلاین نشدند؛ تانل آفلاین ذخیره نشد.",
-                "errors": errors,
-                "tunnel_id": tunnel_id,
-                "rolled_back": not was_existing,
+                "message": (
+                    "هیچ مسیر سالمی برای "
+                    "تانل ایجاد نشد؛ "
+                    "تانل آفلاین ذخیره نشد."
+                ),
+                "errors":
+                    errors,
+                "tunnel_id":
+                    tunnel_id,
+                "rolled_back":
+                    not was_existing,
             },
         )
 
+
     db.expire_all()
-    live = db.get(Tunnel, tunnel_id)
+
+
+    live = db.get(
+        Tunnel,
+        tunnel_id,
+    )
+
     assert live is not None
 
+
+    base_expected = {
+        name
+        for (
+            name,
+            _,
+            _,
+        ) in _TRANSPORTS
+    }
+
+
+    tp_expected = set(
+        TP2027_PRIORITY
+    )
+
+
+    base_complete = (
+        base_expected
+        <= set(installed)
+    )
+
+    tp2027_complete = (
+        tp_expected
+        <= set(installed)
+    )
+
+
     return {
-        "ok": True,
-        "complete": len(installed) == len(_TRANSPORTS),
-        "tunnel": TunnelOut.model_validate(live).model_dump(mode="json"),
-        "active_transport": primary,
-        "installed": installed,
-        "errors": errors,
-        "transports": _transport_snapshot(db, tunnel_id),
-        "results": results,
+        "ok":
+            True,
+
+        # Backward-compatible meaning used
+        # by existing UI/CI.
+        "complete":
+            base_complete,
+
+        "tp2027_complete":
+            tp2027_complete,
+
+        "full_complete":
+            (
+                base_complete
+                and tp2027_complete
+            ),
+
+        "tunnel":
+            TunnelOut
+            .model_validate(
+                live
+            )
+            .model_dump(
+                mode="json"
+            ),
+
+        "active_transport":
+            primary,
+
+        "installed":
+            installed,
+
+        "errors":
+            errors,
+
+        "transports":
+            _transport_snapshot(
+                db,
+                tunnel_id,
+            ),
+
+        "results":
+            results,
     }
