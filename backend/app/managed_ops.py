@@ -191,6 +191,32 @@ async def _repair_base_job(
         db.close()
 
 
+def _merge_unresolved_errors(after: dict, errors: dict[str, str]) -> dict[str, str]:
+    """Return errors keyed by every transport that is still unhealthy.
+
+    Installer calls can finish successfully and then be rejected by the runtime
+    health manager a moment later. The API result must reflect the final health
+    snapshot rather than only installer exceptions.
+    """
+
+    merged = dict(errors)
+
+    for item in after.get("transports", []):
+        name = str(item.get("transport") or "").strip().lower()
+        issue_code = str(item.get("issue_code") or "").strip().lower()
+
+        if not name or not issue_code:
+            continue
+
+        if name in merged:
+            continue
+
+        last_error = str(item.get("last_error") or "").strip()
+        merged[name] = (last_error or issue_code)[:1800]
+
+    return merged
+
+
 async def repair_managed_tunnel(tunnel_id: int, db: Session) -> dict:
     """Diagnose and repair missing/unhealthy managed runtime automatically.
 
@@ -261,9 +287,16 @@ async def repair_managed_tunnel(tunnel_id: int, db: Session) -> dict:
     await asyncio.sleep(3)
     db.expire_all()
     after = diagnose_managed_tunnel(int(tunnel_id), db)
+    errors = _merge_unresolved_errors(after, errors)
+
+    healthy = bool(after.get("healthy"))
+    attempted = bool(base_targets or overlay_needed)
+    partial = bool(attempted and not healthy)
 
     return {
-        "ok": True,
+        "ok": healthy,
+        "healthy": healthy,
+        "partial": partial,
         "tunnel_id": int(tunnel_id),
         "mode": "auto",
         "before": before,
@@ -271,5 +304,6 @@ async def repair_managed_tunnel(tunnel_id: int, db: Session) -> dict:
         "base_results": base_results,
         "tp2027_result": overlay_result,
         "errors": errors,
+        "remaining": list(after.get("repair_needed") or []),
         "repaired_at": datetime.utcnow().isoformat() + "Z",
     }
