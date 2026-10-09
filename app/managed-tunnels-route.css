@@ -1,0 +1,64 @@
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page{--mtp-card:color-mix(in srgb,var(--surface) 94%,transparent);--mtp-soft:color-mix(in srgb,var(--surface2) 82%,var(--surface));--mtp-line:color-mix(in srgb,var(--line) 88%,transparent);--mtp-purple:color-mix(in srgb,var(--purple) 12%,transparent);--mtp-green:color-mix(in srgb,var(--green) 10%,transparent);--mtp-red:color-mix(in srgb,var(--red) 9%,transparent)}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .page-head{align-items:center;margin-bottom:18px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .page-head h1{font-size:30px;letter-spacing:-.8px;margin:0}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .page-head small{display:block;margin-top:4px;color:var(--muted);font-size:11px;font-weight:500}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .page-head .primary{min-height:42px;padding-inline:17px;border-radius:12px;box-shadow:0 10px 28px color-mix(in srgb,var(--purple) 24%,transparent)}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .stats-grid .stat{min-height:76px;padding:12px 14px;border-radius:15px;background:linear-gradient(180deg,var(--mtp-soft),var(--mtp-card));border:1px solid var(--mtp-line);box-shadow:none}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .stats-grid .stat-icon{width:34px;height:34px;border-radius:10px;font-size:13px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .stats-grid .stat small{font-size:9px;color:var(--muted)}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .stats-grid .stat b{font-size:19px;line-height:1.25;margin-top:2px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page>.card{padding:0;overflow:hidden;border-radius:17px;background:var(--mtp-card);box-shadow:none}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page>.card>.card-head{margin:0;padding:14px 16px;align-items:center;border-bottom:1px solid var(--mtp-line)}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page>.card>.card-head b{font-size:13px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page>.card>.card-head small{font-size:9px;margin-top:2px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page>.card>.card-head .search{width:min(300px,38vw);height:38px;background:var(--surface2)}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .table-wrap{overflow:auto}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page table{min-width:880px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page th{padding:10px 12px;background:color-mix(in srgb,var(--surface2) 84%,transparent);font-size:9px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page td{padding:11px 12px;font-size:10px;vertical-align:middle}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page tbody tr{transition:background .18s ease}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page tbody tr:hover{background:color-mix(in srgb,var(--purple) 5%,transparent)}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page td small{display:block;margin-top:2px;color:var(--muted);font-size:9px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .actions{display:flex;gap:6px;flex-wrap:wrap}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .actions button,body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .modal-actions button{min-height:34px;padding:0 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface2);color:var(--text);font:inherit;font-size:10px;font-weight:700;transition:.18s ease}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .actions button:hover,body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .modal-actions button:hover{border-color:color-mix(in srgb,var(--purple) 48%,var(--line));background:color-mix(in srgb,var(--purple) 10%,var(--surface2))}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .actions button:disabled,body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .modal-actions button:disabled{opacity:.45;cursor:not-allowed}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .alert{margin:10px 0;padding:10px 12px;border:1px solid color-mix(in srgb,var(--purple) 28%,var(--line));border-radius:11px;background:var(--mtp-purple);color:var(--text);font-size:10px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .alert.error{border-color:color-mix(in srgb,var(--red) 35%,var(--line));background:var(--mtp-red);color:color-mix(in srgb,var(--red) 82%,var(--text))}
+body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .alert.success{border-color:color-mix(in srgb,var(--green) 35%,var(--line));background:var(--mtp-green);color:color-mix(in srgb,var(--green) 78%,var(--text))}
+body:has(.sidebar a[href="/admin/tunnels"].active) .runtime-modal{padding:18px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .runtime-modal-bg{background:rgba(2,5,12,.72);backdrop-filter:blur(10px)}
+body:has(.sidebar a[href="/admin/tunnels"].active) .runtime-modal-card{width:min(560px,96vw);max-height:90vh;overflow:auto;padding:0;gap:0;border-radius:20px;background:linear-gradient(180deg,color-mix(in srgb,var(--surface) 97%,transparent),var(--surface));border:1px solid var(--mtp-line);box-shadow:0 28px 100px rgba(0,0,0,.38)}
+body:has(.sidebar a[href="/admin/tunnels"].active) .runtime-modal-card.manage-card{width:min(1080px,96vw);overflow:hidden}
+body:has(.sidebar a[href="/admin/tunnels"].active) .runtime-modal-card>.card-head{position:sticky;top:0;z-index:6;margin:0;padding:14px 16px;background:color-mix(in srgb,var(--surface) 95%,transparent);backdrop-filter:blur(18px);border-bottom:1px solid var(--mtp-line);align-items:center}
+body:has(.sidebar a[href="/admin/tunnels"].active) .runtime-modal-card>.card-head b{font-size:14px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .runtime-modal-card>.card-head small{font-size:9px;margin-top:2px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .runtime-modal-card .icon-button{width:34px;height:34px;border-radius:10px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .runtime-modal-card form{padding:16px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .form-grid{display:grid;gap:12px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .form-grid.two{grid-template-columns:1fr 1fr}
+body:has(.sidebar a[href="/admin/tunnels"].active) .form-grid label{display:grid;gap:6px;color:var(--muted);font-size:10px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .form-grid select{min-height:42px;border:1px solid var(--line);border-radius:11px;background:var(--surface2);color:var(--text);padding:0 11px;font:inherit;outline:0}
+body:has(.sidebar a[href="/admin/tunnels"].active) .form-grid select:focus{border-color:color-mix(in srgb,var(--purple) 58%,var(--line));box-shadow:0 0 0 3px color-mix(in srgb,var(--purple) 10%,transparent)}
+body:has(.sidebar a[href="/admin/tunnels"].active) .form-note{padding:11px 12px;border:1px dashed color-mix(in srgb,var(--purple) 35%,var(--line));border-radius:11px;background:color-mix(in srgb,var(--purple) 7%,transparent);color:var(--muted);font-size:10px;line-height:1.9}
+body:has(.sidebar a[href="/admin/tunnels"].active) .modal-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:12px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .modal-actions .primary{border:0;background:linear-gradient(135deg,var(--purple),color-mix(in srgb,var(--purple) 78%,#4b1aa0));color:#fff}
+body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.stats-grid.compact{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:13px 15px 11px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.stats-grid.compact .stat{min-height:68px;padding:10px 11px;border-radius:13px;background:linear-gradient(180deg,var(--mtp-soft),var(--mtp-card));box-shadow:none}
+body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.stats-grid.compact .stat-icon{width:30px;height:30px;border-radius:9px;font-size:11px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.stats-grid.compact .stat b{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.stats-grid.compact .stat small{font-size:9px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.card-head:not(:first-child){position:static;margin:0;padding:12px 15px;border-top:1px solid var(--mtp-line);border-bottom:1px solid var(--mtp-line);background:color-mix(in srgb,var(--surface2) 50%,transparent)}
+body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.card-head:not(:first-child) .primary{min-height:36px;padding:0 13px;font-size:10px;box-shadow:none}
+body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.table-wrap{max-height:320px;overflow:auto}
+body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.table-wrap table{min-width:820px}
+body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.table-wrap th{position:sticky;top:0;z-index:2;background:var(--surface2)}
+body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.table-wrap td:last-child{max-width:360px;color:var(--muted);font-size:9px;line-height:1.65;word-break:break-word}
+body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.form-grid.two{margin:12px 15px 0}
+body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.modal-actions{margin:0 15px;padding:12px 0 15px;border-top:1px solid var(--mtp-line)}
+body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.modal-actions button:first-child{margin-inline-end:auto;color:color-mix(in srgb,var(--red) 82%,var(--text))}
+html[data-theme="light"] body:has(.sidebar a[href="/admin/tunnels"].active) .runtime-modal-bg{background:rgba(26,34,48,.30)}
+@media(max-width:1100px){body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .stats-grid,body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.stats-grid.compact{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page{padding:15px 12px}body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .page-head{align-items:flex-start}body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .page-head h1{font-size:25px}body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page>.card>.card-head{align-items:stretch;flex-direction:column}body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page>.card>.card-head .search{width:100%;max-width:none}body:has(.sidebar a[href="/admin/tunnels"].active) .runtime-modal{padding:8px}body:has(.sidebar a[href="/admin/tunnels"].active) .runtime-modal-card.manage-card{width:100%;max-height:94vh}body:has(.sidebar a[href="/admin/tunnels"].active) .form-grid.two{grid-template-columns:1fr}body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.card-head:not(:first-child){align-items:stretch;flex-direction:column}body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.card-head:not(:first-child) .primary{width:100%}}
+@media(max-width:480px){body:has(.sidebar a[href="/admin/tunnels"].active) .legacy-control-page .stats-grid,body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.stats-grid.compact{grid-template-columns:1fr}body:has(.sidebar a[href="/admin/tunnels"].active) .modal-actions{flex-wrap:wrap}body:has(.sidebar a[href="/admin/tunnels"].active) .modal-actions button{flex:1}body:has(.sidebar a[href="/admin/tunnels"].active) .manage-card>.modal-actions button:first-child{margin-inline-end:0;flex-basis:100%}}
