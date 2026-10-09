@@ -75,6 +75,8 @@ export type TunnelTransportsResponse=RuntimeRow&{transports?:RuntimeRow[]};
 export type ManagedTunnelCreateResponse={
   ok:boolean;
   complete:boolean;
+  tp2027_complete?:boolean;
+  full_complete?:boolean;
   tunnel:AdminTunnel;
   active_transport:string|null;
   installed:string[];
@@ -84,6 +86,12 @@ export type ManagedTunnelCreateResponse={
 
 type ManagedInstallCache={installed:string[];errors:Record<string,string>};
 const managedInstallCache=new Map<number,ManagedInstallCache>();
+
+// A tunnel returned by create-managed is already owned by
+// backend AUTO/V7 selection. The legacy page still performs
+// its compatibility installAll() sequence afterwards; remember
+// these IDs so that sequence cannot force manual/MTunnel mode.
+const managedAutoCreateCache=new Set<number>();
 
 type ParallelTransport="mtunnel"|"backhaul"|"ssh_tun";
 type ParallelInstallMap=Map<ParallelTransport,Promise<RuntimeRow>>;
@@ -164,6 +172,8 @@ export const legacyControlApi={
           installed:Array.isArray(managed.installed)?managed.installed:[],
           errors:managed.errors||{},
         });
+
+        managedAutoCreateCache.add(tunnelId);
       }
 
       return managed.tunnel;
@@ -202,7 +212,36 @@ export const legacyControlApi={
   prepareTunnel:(id:number)=>requestWithTimeout<AdminTunnel>(`/v1/tunnels/${id}/prepare`,{method:"POST"},150000),
   tunnelHealth:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/health`),
   tunnelTransports:(id:number)=>request<TunnelTransportsResponse>(`/v1/tunnels/${id}/transports`),
-  setTunnelTransportMode:(id:number,payload:{mode:string;transport?:string|null})=>request<RuntimeRow>(`/v1/tunnels/${id}/transport-mode`,{method:"POST",body:JSON.stringify(payload)}),
+  setTunnelTransportMode:async(id:number,payload:{mode:string;transport?:string|null})=>{
+    if(
+      managedAutoCreateCache.has(id)
+      && payload.mode==="manual"
+      && ["mtunnel","backhaul","ssh_tun"].includes(String(payload.transport||""))
+    ){
+      managedAutoCreateCache.delete(id);
+
+      return request<RuntimeRow>(
+        `/v1/tunnels/${id}/transport-mode`,
+        {
+          method:"POST",
+          body:JSON.stringify({
+            mode:"auto",
+            transport:null,
+          }),
+        },
+      );
+    }
+
+    managedAutoCreateCache.delete(id);
+
+    return request<RuntimeRow>(
+      `/v1/tunnels/${id}/transport-mode`,
+      {
+        method:"POST",
+        body:JSON.stringify(payload),
+      },
+    );
+  },
 
   installSshTunnel:async(id:number)=>{
     const parallel=await parallelTransportResult(id,"ssh_tun");
