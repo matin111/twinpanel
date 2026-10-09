@@ -111,6 +111,21 @@ async def main() -> None:
         assert result["tunnel"]["status"] == "online"
         assert result["tunnel"]["is_active"] is True
 
+        diagnosis = result.get("diagnosis")
+        assert isinstance(diagnosis, dict)
+        assert diagnosis.get("backhaul_online") is True
+        diagnosed = diagnosis.get("transports") or []
+        assert len(diagnosed) == 7
+        assert {item.get("transport") for item in diagnosed} == {
+            "quic_2027",
+            "arq_2027",
+            "kcp_2027",
+            "tcp_2027",
+            "mtunnel",
+            "backhaul",
+            "ssh_tun",
+        }
+
         live = db.get(Tunnel, int(result["tunnel"]["id"]))
         assert live is not None
         assert live.active_transport == "mtunnel"
