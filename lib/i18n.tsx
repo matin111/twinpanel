@@ -6,6 +6,7 @@ export type Lang="fa"|"en";
 
 type I18nValue={
   lang:Lang;
+  language:Lang;
   setLang:(lang:Lang)=>void;
   toggle:()=>void;
   pick:(fa:string,en:string)=>string;
@@ -31,6 +32,7 @@ export function I18nProvider({children}:{children:React.ReactNode}){
 
   const value=useMemo<I18nValue>(()=>({
     lang,
+    language:lang,
     setLang:(next)=>setLangState(next),
     toggle:()=>setLangState(v=>v==="fa"?"en":"fa"),
     pick:(fa,en)=>lang==="fa"?fa:en,
