@@ -10,6 +10,7 @@ from ..database import SessionLocal, get_db
 from ..deps import require_admin
 from ..managed_ops import (
     diagnose_managed_tunnel,
+    install_ssh_relay_transport_managed,
     install_ssh_transport_managed,
     repair_managed_tunnel,
 )
@@ -24,8 +25,8 @@ from . import tunnels as core
 router = APIRouter(prefix="/v1/tunnels", tags=["tunnels-managed"])
 
 
-# Independent/base transports. The managed SSH installer uses the existing
-# production SSH provisioner with bounded retry; all orchestration stays server-side.
+# Direct/base transports. SSH Relay is intentionally on-demand: it is only
+# provisioned when every direct base path is unavailable.
 _TRANSPORTS = (
     ("mtunnel", 90, core.install_mtunnel_transport),
     ("backhaul", 100, core.install_backhaul_transport),
@@ -37,6 +38,7 @@ _TRANSPORT_TIMEOUTS = {
     "mtunnel": 150,
     "ssh_tun": 180,
     "backhaul": 75,
+    "ssh_relay": 210,
 }
 
 
@@ -120,7 +122,7 @@ async def _run_transport_job(
     installer,
     tunnel_id: int,
 ) -> tuple[str, object | None, str | None, bool]:
-    """Run one base transport in an isolated SQLAlchemy session."""
+    """Run one direct base transport in an isolated SQLAlchemy session."""
 
     db = SessionLocal()
     try:
@@ -163,6 +165,48 @@ async def _run_transport_job(
         db.close()
 
 
+async def _run_relay_job(
+    tunnel_id: int,
+) -> tuple[str, object | None, str | None, bool]:
+    """Provision the independent SSH Relay fallback in an isolated session."""
+
+    db = SessionLocal()
+    try:
+        try:
+            result = await asyncio.wait_for(
+                install_ssh_relay_transport_managed(tunnel_id, db),
+                timeout=int(_TRANSPORT_TIMEOUTS["ssh_relay"]),
+            )
+            db.expire_all()
+            row = (
+                db.query(TunnelTransport)
+                .filter(
+                    TunnelTransport.tunnel_id == tunnel_id,
+                    TunnelTransport.transport == "ssh_relay",
+                )
+                .first()
+            )
+            online = bool(
+                row
+                and bool(row.enabled)
+                and str(row.status or "").strip().lower() == "online"
+            )
+            if online:
+                return "ssh_relay", result, None, True
+
+            return (
+                "ssh_relay",
+                result,
+                "relay installer returned without an online transport",
+                False,
+            )
+
+        except Exception as exc:
+            return "ssh_relay", None, _detail_text(exc)[:1800], False
+    finally:
+        db.close()
+
+
 def _transport_snapshot(db: Session, tunnel_id: int) -> list[dict]:
     rows = (
         db.query(TunnelTransport)
@@ -188,12 +232,7 @@ def _activate_best_transport(
     db: Session,
     tunnel_id: int,
 ) -> str | None:
-    """
-    Creation-time bootstrap only.
-
-    Transport Manager V7 remains the runtime authority after provisioning.
-    Peer health is never fabricated here.
-    """
+    """Creation-time bootstrap only; V7 owns runtime failover afterwards."""
 
     tunnel = db.get(Tunnel, tunnel_id)
     if not tunnel:
@@ -316,12 +355,12 @@ async def create_managed_tunnel(
     payload: TunnelCreate,
     db: Session = Depends(get_db),
 ):
-    """
-    One-click managed tunnel creation.
+    """One-click managed tunnel creation with automatic relay fallback.
 
-    Phase 1 installs MTunnel, Backhaul and SSH TUN in parallel using official
-    production installers with retry. Phase 2 installs QUIC/ARQ/KCP/TCP 2027
-    when Backhaul is healthy. Runtime failover stays owned by Manager V7.
+    Phase 1 installs the three direct base transports in parallel. If every
+    direct path fails, TwinPanel automatically provisions SSH Relay through an
+    eligible third Exit node. Phase 2 installs TP2027 only when Backhaul itself
+    is healthy. Manager V7 owns runtime failover after provisioning.
     """
 
     existing = (
@@ -358,6 +397,18 @@ async def create_managed_tunnel(
         elif error:
             errors[name] = error
 
+    # Direct path is genuinely unavailable: automatically try the existing
+    # independent SSH Relay transport instead of blindly repeating installers.
+    if not base_online:
+        name, result, error, online = await _run_relay_job(tunnel_id)
+        if result is not None:
+            results[name] = result
+        if online:
+            installed.append(name)
+            base_online.add(name)
+        elif error:
+            errors[name] = error
+
     overlay_installed, overlay_errors, overlay_results = (
         await _install_tp2027_phase(
             db,
@@ -382,7 +433,7 @@ async def create_managed_tunnel(
             detail={
                 "message": (
                     "هیچ مسیر سالمی برای تانل ایجاد نشد؛ "
-                    "تانل آفلاین ذخیره نشد."
+                    "مسیر مستقیم و Relay هر دو ناموفق بودند."
                 ),
                 "errors": errors,
                 "tunnel_id": tunnel_id,
@@ -394,16 +445,18 @@ async def create_managed_tunnel(
     live = db.get(Tunnel, tunnel_id)
     assert live is not None
 
-    base_expected = {name for name, _, _ in _TRANSPORTS}
+    direct_expected = {name for name, _, _ in _TRANSPORTS}
     tp_expected = set(TP2027_PRIORITY)
-    base_complete = base_expected <= set(installed)
+    direct_complete = direct_expected <= set(installed)
     tp2027_complete = tp_expected <= set(installed)
 
     return {
         "ok": True,
-        "complete": base_complete,
+        "operational": True,
+        "complete": direct_complete,
         "tp2027_complete": tp2027_complete,
-        "full_complete": base_complete and tp2027_complete,
+        "full_complete": direct_complete and tp2027_complete,
+        "fallback_active": primary == "ssh_relay",
         "tunnel": TunnelOut.model_validate(live).model_dump(mode="json"),
         "active_transport": primary,
         "installed": installed,
@@ -422,7 +475,7 @@ def managed_diagnose(
     tunnel_id: int,
     db: Session = Depends(get_db),
 ):
-    """Return dependency-aware diagnosis for all seven managed transports."""
+    """Return dependency-aware diagnosis for managed transports and fallback."""
     try:
         return diagnose_managed_tunnel(tunnel_id, db)
     except RuntimeError as exc:
@@ -439,13 +492,7 @@ async def managed_repair(
     tunnel_id: int,
     db: Session = Depends(get_db),
 ):
-    """
-    Diagnose and repair only unhealthy/missing transports.
-
-    The routine restores AUTO mode, invokes official base installers as needed,
-    and rebuilds TP2027 overlays only when Backhaul is healthy. V7 remains the
-    sole runtime health/failover authority.
-    """
+    """Auto-repair direct paths, then provision SSH Relay when needed."""
     try:
         return await repair_managed_tunnel(tunnel_id, db)
     except RuntimeError as exc:
