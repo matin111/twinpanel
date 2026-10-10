@@ -39,7 +39,7 @@ export function ModalAutoCloseOnSuccess(){
     const attemptClose=()=>{
       if(!armedUntil||Date.now()>armedUntil){clearArm();return;}
       const modals=Array.from(document.querySelectorAll<HTMLElement>(MODAL_SELECTOR));
-      const modal=modals.at(-1);
+      const modal=modals.length?modals[modals.length-1]:undefined;
       if(!modal){clearArm();return;}
 
       const candidates=Array.from(modal.querySelectorAll<HTMLButtonElement>(CLOSE_SELECTOR));
