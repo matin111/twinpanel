@@ -10,6 +10,7 @@ const s=(value:unknown)=>String(value??"");
 const n=(value:unknown)=>{const out=Number(value??0);return Number.isFinite(out)?out:0;};
 const lower=(value:unknown)=>s(value).trim().toLowerCase();
 const online=(value:unknown)=>lower(value)==="online";
+const runtimeOnline=(value:unknown)=>["online","degraded"].includes(lower(value));
 
 type TransportName=
   |"quic_2027"
@@ -18,10 +19,11 @@ type TransportName=
   |"tcp_2027"
   |"mtunnel"
   |"backhaul"
-  |"ssh_tun";
+  |"ssh_tun"
+  |"ssh_relay";
 
 const transportOrder:TransportName[]=[
-  "quic_2027","arq_2027","kcp_2027","tcp_2027","mtunnel","backhaul","ssh_tun",
+  "quic_2027","arq_2027","kcp_2027","tcp_2027","mtunnel","backhaul","ssh_tun","ssh_relay",
 ];
 
 const transportPriority:Record<TransportName,number>={
@@ -32,6 +34,7 @@ const transportPriority:Record<TransportName,number>={
   mtunnel:90,
   backhaul:100,
   ssh_tun:200,
+  ssh_relay:300,
 };
 
 const transportLabels:Record<TransportName,string>={
@@ -42,6 +45,7 @@ const transportLabels:Record<TransportName,string>={
   mtunnel:"MTunnel",
   backhaul:"Backhaul",
   ssh_tun:"SSH TUN",
+  ssh_relay:"SSH Relay",
 };
 
 const transportLabel=(value:unknown)=>{
@@ -52,8 +56,8 @@ const transportLabel=(value:unknown)=>{
 const statusTone=(value:unknown):"ok"|"warn"|"bad"|"violet"=>{
   const valueLower=lower(value);
   if(valueLower==="online")return "ok";
-  if(valueLower==="degraded"||valueLower==="installing"||valueLower==="pending")return "warn";
-  if(valueLower==="missing"||valueLower==="not_installed")return "violet";
+  if(["degraded","installing","pending","standby"].includes(valueLower))return "warn";
+  if(["missing","not_installed"].includes(valueLower))return "violet";
   return "bad";
 };
 
@@ -65,6 +69,8 @@ const issueLabel=(value:unknown,fa:boolean)=>{
     not_installed:["نصب نشده","Not installed"],
     disabled:["غیرفعال","Disabled"],
     unhealthy:["ناسالم؛ نیازمند تعمیر","Unhealthy; repair needed"],
+    relay_required:["مسیرهای مستقیم قطع‌اند؛ Relay لازم است","Direct paths unavailable; relay required"],
+    standby:["آماده‌باش؛ فقط هنگام خرابی مسیرهای مستقیم ساخته می‌شود","Standby; provisioned only when direct paths fail"],
   };
   const item=labels[code];
   return item?(fa?item[0]:item[1]):code;
@@ -74,7 +80,10 @@ function Modal({title,sub,onClose,children,wide=false}:{title:string;sub?:string
   return <div className="runtime-modal" role="dialog" aria-modal="true">
     <button className="runtime-modal-bg" aria-label="close" onClick={onClose}/>
     <div className={`runtime-modal-card ${wide?"manage-card":""}`}>
-      <div className="card-head"><div><b>{title}</b>{sub&&<small>{sub}</small>}</div><button type="button" className="icon-button" onClick={onClose}>×</button></div>
+      <div className="card-head">
+        <div><b>{title}</b>{sub&&<small>{sub}</small>}</div>
+        <button type="button" className="icon-button" onClick={onClose}>×</button>
+      </div>
       {children}
     </div>
   </div>;
@@ -191,7 +200,7 @@ export function ManagedTunnelsRuntimePage(){
     }
 
     setBusy("create");setError("");setOk("");
-    setCreateStep(pick("در حال نصب خودکار مسیرهای پایه و TP2027 و انتخاب بهترین مسیر…","Automatically installing base and TP2027 transports and selecting the best path…"));
+    setCreateStep(pick("در حال نصب و تست مسیرهای مستقیم؛ در صورت نیاز Relay خودکار ساخته می‌شود…","Installing and testing direct paths; automatic relay will be provisioned if needed…"));
 
     try{
       const managed=await legacyControlApi.createManagedTunnel({
@@ -205,7 +214,7 @@ export function ManagedTunnelsRuntimePage(){
       const tunnelId=Number(managed.tunnel?.id||0);
       if(!tunnelId)throw new Error(pick("شناسه تونل از Backend دریافت نشد.","Backend did not return a tunnel ID."));
 
-      setCreateStep(pick("در حال عیب‌یابی نهایی و دریافت وضعیت Manager…","Running final diagnosis and reading Manager state…"));
+      setCreateStep(pick("در حال دریافت وضعیت واقعی Manager…","Reading final Manager state…"));
       await load(true);
       const latest=(await legacyControlApi.tunnels()).find(item=>item.id===tunnelId)||managed.tunnel;
       setSelected(latest);
@@ -214,7 +223,9 @@ export function ManagedTunnelsRuntimePage(){
       await loadDetail(tunnelId);
 
       const failed=Object.entries(managed.errors||{});
-      if(failed.length){
+      if(managed.active_transport==="ssh_relay"){
+        setOk(pick("تونل آنلاین شد و به‌دلیل محدودیت مسیر مستقیم، SSH Relay خودکار فعال شد.","Tunnel is online through the automatic SSH Relay fallback."));
+      }else if(failed.length){
         setError(pick(`تونل ساخته شد ولی بعضی مسیرها نیاز به تعمیر دارند: ${failed.map(([key])=>transportLabel(key)).join("، ")}`,`Tunnel was created, but some transports need repair: ${failed.map(([key])=>transportLabel(key)).join(", ")}`));
       }else{
         setOk(pick("تونل به‌صورت کامل و خودکار ساخته شد.","Tunnel was created automatically."));
@@ -238,11 +249,15 @@ export function ManagedTunnelsRuntimePage(){
       const result=await legacyControlApi.managedRepair(selected.id);
       await load(true);
       await loadDetail(selected.id);
-      const errors=result.errors&&typeof result.errors==="object"?Object.entries(result.errors):[];
-      if(errors.length){
-        setError(pick(`تعمیر خودکار اجرا شد؛ موارد باقی‌مانده: ${errors.map(([key])=>transportLabel(key)).join("، ")}`,`Auto repair finished; remaining issues: ${errors.map(([key])=>transportLabel(key)).join(", ")}`));
-      }else{
+      const remaining=Array.isArray(result.remaining)?result.remaining as string[]:[];
+      const active=lower(result.after?.active_transport||"");
+      if(result.ok&&active==="ssh_relay"){
+        setOk(pick(`تونل از مسیر SSH Relay آنلاین شد.${remaining.length?` مسیرهای مستقیم باقی‌مانده: ${remaining.filter(item=>item!=="ssh_relay").map(transportLabel).join("، ")}`:""}`,`Tunnel recovered through SSH Relay.${remaining.length?` Remaining direct issues: ${remaining.filter(item=>item!=="ssh_relay").map(transportLabel).join(", ")}`:""}`));
+      }else if(result.ok){
         setOk(pick("عیب‌یابی و تعمیر خودکار با موفقیت انجام شد.","Automatic diagnosis and repair completed."));
+      }else{
+        const errors=result.errors&&typeof result.errors==="object"?Object.entries(result.errors):[];
+        setError(pick(`هیچ مسیر سالمی بازیابی نشد${errors.length?`: ${errors.map(([key])=>transportLabel(key)).join("، ")}`:""}`,`No healthy path was recovered${errors.length?`: ${errors.map(([key])=>transportLabel(key)).join(", ")}`:""}`));
       }
     }catch(reason){
       setError(reason instanceof Error?reason.message:String(reason));
@@ -281,15 +296,28 @@ export function ManagedTunnelsRuntimePage(){
 
   const normalizedTransports=transportOrder.map(name=>{
     const found=transports.find(item=>lower(item.transport)===name);
-    return found||({transport:name,priority:transportPriority[name],enabled:false,status:"missing",latency_ms:null,last_error:null,issue_code:"not_installed",dependency:name.endsWith("_2027")?"backhaul":null} as RuntimeRow);
+    const relayStandby=name==="ssh_relay"&&!Boolean(diagnosis?.relay_required);
+    return found||({
+      transport:name,
+      priority:transportPriority[name],
+      enabled:false,
+      status:relayStandby?"standby":"missing",
+      latency_ms:null,
+      last_error:null,
+      issue_code:relayStandby?"standby":name==="ssh_relay"?"relay_required":"not_installed",
+      dependency:name.endsWith("_2027")?"backhaul":null,
+    } as RuntimeRow);
   });
 
+  const selectedStatus=lower(diagnosis?.status||selected?.status||"offline");
+  const hasHealthyActive=runtimeOnline(selectedStatus)&&Boolean(diagnosis?.operational??true);
   const activeTransport=lower(diagnosis?.active_transport||selected?.active_transport||selected?.transport||"");
+  const activeDisplay=hasHealthyActive?transportLabel(activeTransport):pick("بدون مسیر سالم","No healthy path");
   const repairNeeded=Array.isArray(diagnosis?.repair_needed)?diagnosis?.repair_needed as string[]:[];
 
-  return <Shell active="/admin/tunnels"><div className="page legacy-control-page">
+  return <Shell active="/admin/tunnels"><div className="page legacy-control-page managed-tunnels-page">
     <div className="page-head">
-      <div><h1>{pick("تانل‌ها","Tunnels")}</h1><small>{pick("ساخت، عیب‌یابی، تعمیر و Failover به‌صورت مدیریت‌شده و خودکار","Managed automatic provisioning, diagnosis, repair and failover")}</small></div>
+      <div><h1>{pick("تانل‌ها","Tunnels")}</h1><small>{pick("ساخت، عیب‌یابی، تعمیر و Failover مدیریت‌شده","Managed provisioning, diagnosis, repair and failover")}</small></div>
       <button className="primary" type="button" onClick={openCreate}>＋ {pick("تونل جدید","New tunnel")}</button>
     </div>
 
@@ -303,20 +331,34 @@ export function ManagedTunnelsRuntimePage(){
     {(error||ok)&&<div className={error?"alert error":"alert success"}>{error||ok}</div>}
 
     <Card>
-      <div className="card-head"><div><b>{pick("مسیرهای ایران → خروج","Iran → Exit paths")}</b><small>{pick("فقط Pairهای آزاد و نودهای آنلاین برای ساخت نمایش داده می‌شوند","Only online nodes and unused pairs are offered for creation")}</small></div><label className="search">⌕ <input value={query} onChange={event=>setQuery(event.target.value)} placeholder={pick("جستجو…","Search…")}/></label></div>
+      <div className="card-head">
+        <div><b>{pick("مسیرهای ایران → خروج","Iran → Exit paths")}</b><small>{pick("ساخت فقط روی Pair آزاد و نود آنلاین انجام می‌شود","Only unused pairs with online nodes can be created")}</small></div>
+        <label className="search">⌕ <input value={query} onChange={event=>setQuery(event.target.value)} placeholder={pick("جستجو…","Search…")}/></label>
+      </div>
       <div className="table-wrap"><table><thead><tr><th>#</th><th>{pick("ایران","Iran")}</th><th>{pick("خروج","Exit")}</th><th>{pick("حالت","Mode")}</th><th>{pick("مسیر فعال","Active")}</th><th>{pick("تاخیر","Latency")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>
         {loading?<tr><td colSpan={8}>{pick("در حال بارگذاری…","Loading…")}</td></tr>:filtered.length===0?<tr><td colSpan={8}>{pick("تونلی پیدا نشد.","No tunnels found.")}</td></tr>:filtered.map(item=>{
-          const iran=nodeMap.get(item.iran_node_id);const exit=nodeMap.get(item.exit_node_id);
-          return <tr key={item.id}><td><b>#{item.id}</b></td><td>{iran?.name||`#${item.iran_node_id}`}<small>{iran?.public_ip||""}</small></td><td>{exit?.name||`#${item.exit_node_id}`}<small>{exit?.public_ip||""}</small></td><td><Badge tone={lower(item.mode)==="auto"?"violet":"warn"}>{s(item.mode||"auto").toUpperCase()}</Badge></td><td>{transportLabel(item.active_transport||item.transport)}</td><td>{item.latency_ms!=null?`${item.latency_ms} ms`:"—"}</td><td><Badge tone={statusTone(item.status)}>{s(item.status||"offline")}</Badge></td><td><div className="actions"><button type="button" onClick={()=>void openManage(item)}>{pick("مدیریت","Manage")}</button><button type="button" onClick={()=>void toggle(item)} disabled={Boolean(busy)}>{item.is_active?pick("غیرفعال","Disable"):pick("فعال","Enable")}</button></div></td></tr>;
+          const iran=nodeMap.get(item.iran_node_id);
+          const exit=nodeMap.get(item.exit_node_id);
+          const live=runtimeOnline(item.status);
+          return <tr key={item.id}>
+            <td><b>#{item.id}</b></td>
+            <td>{iran?.name||`#${item.iran_node_id}`}<small>{iran?.public_ip||""}</small></td>
+            <td>{exit?.name||`#${item.exit_node_id}`}<small>{exit?.public_ip||""}</small></td>
+            <td><Badge tone={lower(item.mode)==="auto"?"violet":"warn"}>{s(item.mode||"auto").toUpperCase()}</Badge></td>
+            <td>{live?transportLabel(item.active_transport||item.transport):pick("بدون مسیر سالم","No healthy path")}</td>
+            <td>{live&&item.latency_ms!=null?`${item.latency_ms} ms`:"—"}</td>
+            <td><Badge tone={statusTone(item.status)}>{s(item.status||"offline")}</Badge></td>
+            <td><div className="actions"><button type="button" onClick={()=>void openManage(item)}>{pick("مدیریت","Manage")}</button><button type="button" onClick={()=>void toggle(item)} disabled={Boolean(busy)}>{item.is_active?pick("غیرفعال","Disable"):pick("فعال","Enable")}</button></div></td>
+          </tr>;
         })}
       </tbody></table></div>
     </Card>
 
-    {createOpen&&<Modal title={pick("ساخت تونل خودکار","Automatic tunnel creation")} sub={pick("Backend تمام مسیرها را نصب و Manager بهترین مسیر را انتخاب می‌کند","Backend installs all paths and Manager selects the best one")} onClose={()=>!busy&&setCreateOpen(false)}>
+    {createOpen&&<Modal title={pick("ساخت تونل خودکار","Automatic tunnel creation")} sub={pick("Backend مسیرهای مستقیم را تست می‌کند و در صورت نیاز Relay مستقل می‌سازد","Backend tests direct paths and provisions an independent relay when needed")} onClose={()=>!busy&&setCreateOpen(false)}>
       <form onSubmit={create} className="form-grid">
         <label>{pick("نود ایران","Iran node")}<select value={draft.iran_node_id} onChange={event=>{const iranId=Number(event.target.value);const exitId=exitNodes.find(item=>!usedPairs.has(`${iranId}:${item.id}`))?.id||0;setDraft(current=>({...current,iran_node_id:iranId,exit_node_id:exitId}));}}>{iranNodes.map(item=><option key={item.id} value={item.id}>{item.name} — {item.public_ip}</option>)}</select></label>
         <label>{pick("نود خروج آزاد","Available exit node")}<select value={draft.exit_node_id} onChange={event=>setDraft(current=>({...current,exit_node_id:Number(event.target.value)}))}><option value={0}>{pick("انتخاب کنید","Select")}</option>{availableExits.map(item=><option key={item.id} value={item.id}>{item.name} — {item.public_ip}</option>)}</select></label>
-        <div className="form-note">{pick("نصب خودکار: MTunnel + Backhaul + SSH TUN، سپس QUIC/ARQ/KCP/TCP 2027 در صورت سالم بودن Carrier. حالت نهایی AUTO است.","Automatic install: MTunnel + Backhaul + SSH TUN, then QUIC/ARQ/KCP/TCP 2027 when the carrier is healthy. Final mode is AUTO.")}</div>
+        <div className="form-note">{pick("خودکار: MTunnel + Backhaul + SSH TUN؛ سپس TP2027 در صورت سلامت Backhaul. اگر همه مسیرهای مستقیم قطع باشند، SSH Relay از یک Exit سالم دیگر ساخته می‌شود.","Automatic: MTunnel + Backhaul + SSH TUN, then TP2027 when Backhaul is healthy. If all direct paths fail, SSH Relay is provisioned through another healthy Exit.")}</div>
         {createStep&&<div className="alert">{createStep}</div>}
         <div className="modal-actions"><button type="button" onClick={()=>setCreateOpen(false)} disabled={Boolean(busy)}>{pick("انصراف","Cancel")}</button><button className="primary" type="submit" disabled={Boolean(busy)||!draft.iran_node_id||!draft.exit_node_id}>{busy==="create"?pick("در حال ساخت…","Creating…"):pick("ساخت و نصب خودکار","Create & auto install")}</button></div>
       </form>
@@ -325,17 +367,28 @@ export function ManagedTunnelsRuntimePage(){
     {manageOpen&&selected&&<Modal wide title={`${pick("مدیریت تونل","Manage tunnel")} #${selected.id}`} sub={`${nodeMap.get(selected.iran_node_id)?.name||selected.iran_node_id} → ${nodeMap.get(selected.exit_node_id)?.name||selected.exit_node_id}`} onClose={()=>!busy&&setManageOpen(false)}>
       <div className="stats-grid compact">
         <Stat label={pick("وضعیت","Status")} value={s(diagnosis?.status||selected.status||"offline")} icon="●"/>
-        <Stat label={pick("مسیر فعال","Active transport")} value={transportLabel(activeTransport)} icon="⇄"/>
+        <Stat label={pick("مسیر فعال","Active transport")} value={activeDisplay} icon="⇄"/>
         <Stat label={pick("حالت","Mode")} value={s(diagnosis?.mode||mode||"auto").toUpperCase()} icon="A"/>
         <Stat label={pick("نیاز به تعمیر","Needs repair")} value={String(repairNeeded.length)} icon="⚙"/>
       </div>
 
-      <div className="card-head"><div><b>{pick("Transportهای مدیریت‌شده","Managed transports")}</b><small>{pick("TP2027 به Backhaul وابسته است؛ خرابی Carrier جداگانه مشخص می‌شود","TP2027 depends on Backhaul; carrier failures are shown separately")}</small></div><button className="primary" type="button" onClick={()=>void autoRepair()} disabled={Boolean(busy)}>{busy==="auto-repair"?pick("در حال عیب‌یابی و تعمیر…","Diagnosing & repairing…"):pick("عیب‌یابی و تعمیر خودکار","Auto diagnose & repair")}</button></div>
+      <div className="card-head">
+        <div><b>{pick("Transportهای مدیریت‌شده","Managed transports")}</b><small>{pick("TP2027 وابسته به Backhaul است؛ SSH Relay فقط هنگام قطع همه مسیرهای مستقیم فعال می‌شود","TP2027 depends on Backhaul; SSH Relay activates only when every direct path is unavailable")}</small></div>
+        <button className="primary" type="button" onClick={()=>void autoRepair()} disabled={Boolean(busy)}>{busy==="auto-repair"?pick("در حال عیب‌یابی و تعمیر…","Diagnosing & repairing…"):pick("عیب‌یابی و تعمیر خودکار","Auto diagnose & repair")}</button>
+      </div>
 
       <div className="table-wrap"><table><thead><tr><th>{pick("اولویت","Priority")}</th><th>Transport</th><th>{pick("وضعیت","Status")}</th><th>{pick("وابستگی","Dependency")}</th><th>{pick("تاخیر","Latency")}</th><th>{pick("تشخیص","Diagnosis")}</th></tr></thead><tbody>
         {normalizedTransports.map(item=>{
           const name=lower(item.transport) as TransportName;
-          return <tr key={name}><td>{n(item.priority)||transportPriority[name]}</td><td><b>{transportLabel(name)}</b>{activeTransport===name&&<small> ✓ {pick("فعال","Active")}</small>}</td><td><Badge tone={statusTone(item.status)}>{s(item.status||"missing")}</Badge></td><td>{name.endsWith("_2027")?"Backhaul":"—"}</td><td>{item.latency_ms!=null?`${n(item.latency_ms)} ms`:"—"}</td><td>{issueLabel(item.issue_code,fa)||s(item.last_error)||"—"}</td></tr>;
+          const isActuallyActive=hasHealthyActive&&activeTransport===name;
+          return <tr key={name}>
+            <td>{n(item.priority)||transportPriority[name]}</td>
+            <td><b>{transportLabel(name)}</b>{isActuallyActive&&<small> ✓ {pick("فعال","Active")}</small>}</td>
+            <td><Badge tone={statusTone(item.status)}>{s(item.status||"missing")}</Badge></td>
+            <td>{name.endsWith("_2027")?"Backhaul":name==="ssh_relay"?pick("Exit واسط","Relay Exit"):"—"}</td>
+            <td>{item.latency_ms!=null?`${n(item.latency_ms)} ms`:"—"}</td>
+            <td>{issueLabel(item.issue_code,fa)||s(item.last_error)||"—"}</td>
+          </tr>;
         })}
       </tbody></table></div>
 
