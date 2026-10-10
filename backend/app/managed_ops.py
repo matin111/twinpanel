@@ -6,7 +6,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
-from .models import Tunnel, TunnelTransport
+from .models import Node, Tunnel, TunnelTransport
 from .tp2027_provision import TP2027_PRIORITY, install_tp2027_overlays
 
 
@@ -18,9 +18,10 @@ EXPECTED_ORDER = (
     "mtunnel",
     "backhaul",
     "ssh_tun",
+    "ssh_relay",
 )
 
-BASE_ORDER = (
+DIRECT_BASE_ORDER = (
     "mtunnel",
     "backhaul",
     "ssh_tun",
@@ -30,7 +31,10 @@ BASE_TIMEOUTS = {
     "mtunnel": 170,
     "backhaul": 90,
     "ssh_tun": 180,
+    "ssh_relay": 210,
 }
+
+RELAY_PRIORITY = 300
 
 
 def _status(value: object) -> str:
@@ -49,12 +53,24 @@ def _rows(db: Session, tunnel_id: int) -> dict[str, TunnelTransport]:
     }
 
 
-def diagnose_managed_tunnel(tunnel_id: int, db: Session) -> dict:
-    """Dependency-aware diagnosis for all managed transports.
+def _row_online(row: TunnelTransport | None) -> bool:
+    return bool(
+        row
+        and bool(row.enabled)
+        and _status(row.status) == "online"
+    )
 
-    This routine is intentionally read-only. It never changes the selected
-    transport, peer health, or runtime state. Transport Manager V7 remains the
+
+def diagnose_managed_tunnel(tunnel_id: int, db: Session) -> dict:
+    """Dependency-aware, read-only diagnosis for managed transports.
+
+    Runtime state is never fabricated here. Transport Manager V7 remains the
     sole runtime health/failover authority.
+
+    ``operational`` means at least one selectable data-plane transport is
+    online. ``complete`` means every normally expected direct transport is
+    healthy as well. SSH Relay is an on-demand fallback and is not considered
+    missing while a direct base transport is healthy.
     """
 
     tunnel = db.get(Tunnel, int(tunnel_id))
@@ -62,12 +78,20 @@ def diagnose_managed_tunnel(tunnel_id: int, db: Session) -> dict:
         raise RuntimeError("tunnel_not_found")
 
     rows = _rows(db, tunnel_id)
-    backhaul = rows.get("backhaul")
-    backhaul_online = bool(
-        backhaul
-        and bool(backhaul.enabled)
-        and _status(backhaul.status) == "online"
+    backhaul_online = _row_online(rows.get("backhaul"))
+    direct_online = any(
+        _row_online(rows.get(name))
+        for name in DIRECT_BASE_ORDER
     )
+    relay_online = _row_online(rows.get("ssh_relay"))
+
+    selectable_online = [
+        name
+        for name, row in rows.items()
+        if name in EXPECTED_ORDER and _row_online(row)
+    ]
+    operational = bool(selectable_online)
+    relay_required = not direct_online
 
     repair_needed: list[str] = []
     transports: list[dict] = []
@@ -80,6 +104,23 @@ def diagnose_managed_tunnel(tunnel_id: int, db: Session) -> dict:
 
         if name in TP2027_PRIORITY and not backhaul_online:
             issue_code = "carrier_down"
+
+        elif name == "ssh_relay":
+            # Relay is deliberately provisioned only when every direct base
+            # carrier is unavailable. An absent relay while direct paths are
+            # healthy is standby, not a fault.
+            if relay_online:
+                issue_code = None
+            elif relay_required:
+                if row is None:
+                    issue_code = "relay_required"
+                elif not enabled:
+                    issue_code = "relay_required"
+                elif status != "online":
+                    issue_code = "relay_required"
+            else:
+                issue_code = "standby"
+
         elif row is None:
             issue_code = "not_installed"
         elif not enabled:
@@ -87,15 +128,20 @@ def diagnose_managed_tunnel(tunnel_id: int, db: Session) -> dict:
         elif status != "online":
             issue_code = "unhealthy"
 
-        if issue_code:
+        # standby is informational and must not trigger repair.
+        if issue_code and issue_code != "standby":
             repair_needed.append(name)
 
         transports.append(
             {
                 "transport": name,
-                "priority": getattr(row, "priority", None),
+                "priority": getattr(row, "priority", None)
+                if row is not None
+                else (RELAY_PRIORITY if name == "ssh_relay" else None),
                 "enabled": enabled,
-                "status": status,
+                "status": "standby"
+                if name == "ssh_relay" and issue_code == "standby"
+                else status,
                 "latency_ms": getattr(row, "latency_ms", None),
                 "last_error": getattr(row, "last_error", None),
                 "issue_code": issue_code,
@@ -111,19 +157,20 @@ def diagnose_managed_tunnel(tunnel_id: int, db: Session) -> dict:
         "active_transport": getattr(tunnel, "active_transport", None),
         "preferred_transport": getattr(tunnel, "preferred_transport", None),
         "backhaul_online": backhaul_online,
+        "direct_online": direct_online,
+        "relay_online": relay_online,
+        "relay_required": relay_required,
+        "selectable_online": selectable_online,
         "repair_needed": repair_needed,
-        "healthy": not repair_needed,
+        "operational": operational,
+        "healthy": operational,
+        "complete": not repair_needed,
         "transports": transports,
     }
 
 
 async def install_ssh_transport_managed(tunnel_id: int, db: Session):
-    """Official SSH installer used by managed create/repair.
-
-    It deliberately delegates to the existing production installer. Automatic
-    repair retries the installer when health is bad; no ad-hoc server mutation
-    or manual DB status override is performed here.
-    """
+    """Official direct SSH installer used by managed create/repair."""
 
     from .routers import tunnels as core
 
@@ -140,6 +187,61 @@ async def install_ssh_transport_managed(tunnel_id: int, db: Session):
 
     assert last_error is not None
     raise last_error
+
+
+async def install_ssh_relay_transport_managed(
+    tunnel_id: int,
+    db: Session,
+):
+    """Provision the existing production SSH Relay as last-resort fallback.
+
+    Relay selection is automatic and constrained to an online, non-retired Exit
+    node with saved root access. The target Exit itself and duplicate target IPs
+    are excluded by ``choose_relay_node``.
+    """
+
+    from .ssh_relay import choose_relay_node, provision_ssh_relay
+
+    tunnel = db.get(Tunnel, int(tunnel_id))
+    if tunnel is None:
+        raise RuntimeError("tunnel_not_found")
+
+    iran = db.get(Node, int(tunnel.iran_node_id))
+    exit_node = db.get(Node, int(tunnel.exit_node_id))
+    if iran is None or exit_node is None:
+        raise RuntimeError("relay_endpoint_node_missing")
+
+    relay = choose_relay_node(db, tunnel)
+    if relay is None:
+        raise RuntimeError("ssh_relay_unavailable: no eligible online relay node")
+
+    result = await provision_ssh_relay(
+        tunnel,
+        iran,
+        relay,
+        exit_node,
+        db,
+    )
+
+    # ssh_relay.py predates V7's final priority table and historically used
+    # 200. Managed mode normalizes it to V7's documented fallback priority 300.
+    row = (
+        db.query(TunnelTransport)
+        .filter(
+            TunnelTransport.tunnel_id == int(tunnel_id),
+            TunnelTransport.transport == "ssh_relay",
+        )
+        .first()
+    )
+    if row is not None:
+        row.priority = RELAY_PRIORITY
+        db.commit()
+
+    return {
+        "relay_node_id": int(relay.id),
+        "relay_public_ip": str(relay.public_ip or ""),
+        "runtime": result,
+    }
 
 
 async def _repair_base_job(
@@ -171,11 +273,7 @@ async def _repair_base_job(
                 )
                 .first()
             )
-            online = bool(
-                row
-                and bool(row.enabled)
-                and _status(row.status) == "online"
-            )
+            online = _row_online(row)
 
             return (
                 name,
@@ -191,23 +289,48 @@ async def _repair_base_job(
         db.close()
 
 
+async def _repair_relay_job(
+    tunnel_id: int,
+) -> tuple[str, bool, str | None, object | None]:
+    db = SessionLocal()
+    try:
+        try:
+            result = await asyncio.wait_for(
+                install_ssh_relay_transport_managed(int(tunnel_id), db),
+                timeout=int(BASE_TIMEOUTS["ssh_relay"]),
+            )
+            db.expire_all()
+            row = (
+                db.query(TunnelTransport)
+                .filter(
+                    TunnelTransport.tunnel_id == int(tunnel_id),
+                    TunnelTransport.transport == "ssh_relay",
+                )
+                .first()
+            )
+            online = _row_online(row)
+            return (
+                "ssh_relay",
+                online,
+                None if online else "relay_installer_finished_but_transport_not_online",
+                result,
+            )
+        except Exception as exc:
+            db.rollback()
+            return "ssh_relay", False, str(exc)[:1800], None
+    finally:
+        db.close()
+
+
 def _merge_unresolved_errors(after: dict, errors: dict[str, str]) -> dict[str, str]:
-    """Return errors keyed by every transport that is still unhealthy.
-
-    Installer calls can finish successfully and then be rejected by the runtime
-    health manager a moment later. The API result must reflect the final health
-    snapshot rather than only installer exceptions.
-    """
-
     merged = dict(errors)
 
     for item in after.get("transports", []):
         name = str(item.get("transport") or "").strip().lower()
         issue_code = str(item.get("issue_code") or "").strip().lower()
 
-        if not name or not issue_code:
+        if not name or not issue_code or issue_code == "standby":
             continue
-
         if name in merged:
             continue
 
@@ -218,17 +341,18 @@ def _merge_unresolved_errors(after: dict, errors: dict[str, str]) -> dict[str, s
 
 
 async def repair_managed_tunnel(tunnel_id: int, db: Session) -> dict:
-    """Diagnose and repair missing/unhealthy managed runtime automatically.
+    """Diagnose and repair managed runtime, including relay fallback.
 
-    Only installers are invoked. Peer reachability, online/offline state and
-    active transport selection are not fabricated here; V7 remains authoritative.
+    Direct base transports are repaired first. If none becomes online, the
+    existing SSH Relay transport is provisioned automatically through another
+    healthy Exit node. TP2027 overlays are rebuilt only when Backhaul is online.
+    Manager V7 remains authoritative for runtime selection and health.
     """
 
     tunnel = db.get(Tunnel, int(tunnel_id))
     if tunnel is None:
         raise RuntimeError("tunnel_not_found")
 
-    # Managed repair returns control to AUTO, but does not select a route.
     tunnel.mode = "auto"
     tunnel.is_active = True
     db.commit()
@@ -236,7 +360,7 @@ async def repair_managed_tunnel(tunnel_id: int, db: Session) -> dict:
     before = diagnose_managed_tunnel(int(tunnel_id), db)
     need = set(before["repair_needed"])
 
-    base_targets = [name for name in BASE_ORDER if name in need]
+    base_targets = [name for name in DIRECT_BASE_ORDER if name in need]
     base_results: dict[str, object] = {}
     errors: dict[str, str] = {}
 
@@ -256,12 +380,24 @@ async def repair_managed_tunnel(tunnel_id: int, db: Session) -> dict:
 
     db.expire_all()
     rows = _rows(db, tunnel_id)
-    backhaul = rows.get("backhaul")
-    backhaul_online = bool(
-        backhaul
-        and bool(backhaul.enabled)
-        and _status(backhaul.status) == "online"
+    direct_online = any(
+        _row_online(rows.get(name))
+        for name in DIRECT_BASE_ORDER
     )
+
+    relay_result = None
+    if not direct_online:
+        name, relay_ok, relay_error, relay_result = await _repair_relay_job(
+            int(tunnel_id)
+        )
+        if relay_result is not None:
+            base_results[name] = relay_result
+        if not relay_ok and relay_error:
+            errors[name] = relay_error
+
+    db.expire_all()
+    rows = _rows(db, tunnel_id)
+    backhaul_online = _row_online(rows.get("backhaul"))
 
     overlay_result = None
     overlay_needed = any(name in need for name in TP2027_PRIORITY)
@@ -282,28 +418,32 @@ async def repair_managed_tunnel(tunnel_id: int, db: Session) -> dict:
         for name in TP2027_PRIORITY:
             errors[name] = "carrier_down: backhaul is not online"
 
-    # V7 consumes the repaired runtime asynchronously. We only provide a fresh
-    # diagnosis snapshot; no active transport/peer health is forced here.
-    await asyncio.sleep(3)
+    # Give V7 enough time for two health cycles without ever writing a fake
+    # active transport or peer state here.
+    await asyncio.sleep(12)
     db.expire_all()
     after = diagnose_managed_tunnel(int(tunnel_id), db)
     errors = _merge_unresolved_errors(after, errors)
 
-    healthy = bool(after.get("healthy"))
-    attempted = bool(base_targets or overlay_needed)
-    partial = bool(attempted and not healthy)
+    operational = bool(after.get("operational"))
+    attempted = bool(base_targets or overlay_needed or not direct_online)
+    partial = bool(operational and after.get("repair_needed"))
 
     return {
-        "ok": healthy,
-        "healthy": healthy,
+        "ok": operational,
+        "healthy": operational,
+        "operational": operational,
+        "complete": bool(after.get("complete")),
         "partial": partial,
         "tunnel_id": int(tunnel_id),
         "mode": "auto",
         "before": before,
         "after": after,
         "base_results": base_results,
+        "ssh_relay_result": relay_result,
         "tp2027_result": overlay_result,
         "errors": errors,
         "remaining": list(after.get("repair_needed") or []),
+        "attempted": attempted,
         "repaired_at": datetime.utcnow().isoformat() + "Z",
     }

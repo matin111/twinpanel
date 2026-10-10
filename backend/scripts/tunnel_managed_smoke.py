@@ -114,8 +114,10 @@ async def main() -> None:
         diagnosis = result.get("diagnosis")
         assert isinstance(diagnosis, dict)
         assert diagnosis.get("backhaul_online") is True
+        assert diagnosis.get("direct_online") is True
+        assert diagnosis.get("relay_required") is False
         diagnosed = diagnosis.get("transports") or []
-        assert len(diagnosed) == 7
+        assert len(diagnosed) == 8
         assert {item.get("transport") for item in diagnosed} == {
             "quic_2027",
             "arq_2027",
@@ -124,7 +126,11 @@ async def main() -> None:
             "mtunnel",
             "backhaul",
             "ssh_tun",
+            "ssh_relay",
         }
+        relay = next(item for item in diagnosed if item.get("transport") == "ssh_relay")
+        assert relay.get("issue_code") == "standby"
+        assert relay.get("status") == "standby"
 
         live = db.get(Tunnel, int(result["tunnel"]["id"]))
         assert live is not None
@@ -164,6 +170,8 @@ async def main() -> None:
             assert exc.status_code == 502
             assert isinstance(exc.detail, dict)
             assert exc.detail.get("rolled_back") is True
+            errors = exc.detail.get("errors") or {}
+            assert "ssh_relay" in errors
         else:
             raise AssertionError("all-failed managed tunnel must fail")
 
