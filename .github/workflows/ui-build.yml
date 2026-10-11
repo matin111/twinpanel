@@ -2,9 +2,13 @@ name: TwinPanel UI Build
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - rebuild/legacy-exact-v1
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - rebuild/legacy-exact-v1
 
 jobs:
   build:
