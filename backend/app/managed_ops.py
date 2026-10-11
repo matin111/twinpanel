@@ -106,9 +106,6 @@ def diagnose_managed_tunnel(tunnel_id: int, db: Session) -> dict:
             issue_code = "carrier_down"
 
         elif name == "ssh_relay":
-            # Relay is deliberately provisioned only when every direct base
-            # carrier is unavailable. An absent relay while direct paths are
-            # healthy is standby, not a fault.
             if relay_online:
                 issue_code = None
             elif relay_required:
@@ -128,7 +125,6 @@ def diagnose_managed_tunnel(tunnel_id: int, db: Session) -> dict:
         elif status != "online":
             issue_code = "unhealthy"
 
-        # standby is informational and must not trigger repair.
         if issue_code and issue_code != "standby":
             repair_needed.append(name)
 
@@ -223,8 +219,6 @@ async def install_ssh_relay_transport_managed(
         db,
     )
 
-    # ssh_relay.py predates V7's final priority table and historically used
-    # 200. Managed mode normalizes it to V7's documented fallback priority 300.
     row = (
         db.query(TunnelTransport)
         .filter(
@@ -347,6 +341,9 @@ async def repair_managed_tunnel(tunnel_id: int, db: Session) -> dict:
     existing SSH Relay transport is provisioned automatically through another
     healthy Exit node. TP2027 overlays are rebuilt only when Backhaul is online.
     Manager V7 remains authoritative for runtime selection and health.
+
+    V15: base installers run deterministically, one at a time. They mutate the
+    same remote systemd/interface/firewall state and must never overlap.
     """
 
     tunnel = db.get(Tunnel, int(tunnel_id))
@@ -364,19 +361,18 @@ async def repair_managed_tunnel(tunnel_id: int, db: Session) -> dict:
     base_results: dict[str, object] = {}
     errors: dict[str, str] = {}
 
-    if base_targets:
-        settled = await asyncio.gather(
-            *(
-                _repair_base_job(name, int(tunnel_id))
-                for name in base_targets
-            )
+    # TWINPANEL_MANAGED_REPAIR_SERIAL_V15
+    # Never run remote-mutating installers concurrently on the same pair.
+    for target in base_targets:
+        name, online, error, result = await _repair_base_job(
+            target,
+            int(tunnel_id),
         )
 
-        for name, online, error, result in settled:
-            if result is not None:
-                base_results[name] = result
-            if not online and error:
-                errors[name] = error
+        if result is not None:
+            base_results[name] = result
+        if not online and error:
+            errors[name] = error
 
     db.expire_all()
     rows = _rows(db, tunnel_id)
@@ -418,8 +414,6 @@ async def repair_managed_tunnel(tunnel_id: int, db: Session) -> dict:
         for name in TP2027_PRIORITY:
             errors[name] = "carrier_down: backhaul is not online"
 
-    # Give V7 enough time for two health cycles without ever writing a fake
-    # active transport or peer state here.
     await asyncio.sleep(12)
     db.expire_all()
     after = diagnose_managed_tunnel(int(tunnel_id), db)
@@ -437,6 +431,7 @@ async def repair_managed_tunnel(tunnel_id: int, db: Session) -> dict:
         "partial": partial,
         "tunnel_id": int(tunnel_id),
         "mode": "auto",
+        "provisioning_mode": "panel_serial_v15",
         "before": before,
         "after": after,
         "base_results": base_results,
