@@ -11,6 +11,7 @@ from fastapi import HTTPException
 from app.database import SessionLocal
 from app.models import Node, NodeStatus, NodeType, Tunnel, TunnelPeerState, TunnelTransport
 from app.routers import tunnel_managed
+from app.runtime_reconciler_v2 import _cleanup_script as cleanup_script_v2
 from app.schemas import TunnelCreate
 
 
@@ -70,7 +71,22 @@ async def _cleanup_without_remote(tunnel_id: int, db):
     return {"ok": True}
 
 
+def _assert_runtime_cleanup_payload_compiles() -> None:
+    script = cleanup_script_v2(9)
+    start_marker = "python3 - \"$TID\" <<'PY2'\n"
+    end_marker = "\nPY2\n"
+
+    assert start_marker in script
+    payload = script.split(start_marker, 1)[1].split(end_marker, 1)[0]
+
+    compile(payload, "<runtime-reconciler-remote-cleanup>", "exec")
+    assert "sep=chr(10)" in payload
+    assert "p.write_text((sep.join(kept) + sep) if kept else '')" in payload
+
+
 async def main() -> None:
+    _assert_runtime_cleanup_payload_compiles()
+
     db = SessionLocal()
     original_transports = tunnel_managed._TRANSPORTS
     original_delete = tunnel_managed.core.delete_tunnel

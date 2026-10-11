@@ -4,7 +4,7 @@ import asyncio
 
 from . import tunnel_transport_manager_v10 as v10
 from .legacy_ingress_reconciler import reconciler_loop as legacy_ingress_loop
-from .runtime_reconciler import reconciler_loop as runtime_reconciler_loop
+from .runtime_reconciler_v2 import reconciler_loop as runtime_reconciler_loop
 
 
 # ============================================================
@@ -16,6 +16,8 @@ from .runtime_reconciler import reconciler_loop as runtime_reconciler_loop
 #   * removal of retired per-tunnel ingress chains which can collide when
 #     one Iran node fans out to several Exit nodes.
 #
+# Runtime reconciliation uses V2's serialization-safe cleanup wrapper while
+# preserving V1's DB ownership and confirmation guards.
 # Neither reconciler writes health truth, active_transport or peer reachability.
 # ============================================================
 
