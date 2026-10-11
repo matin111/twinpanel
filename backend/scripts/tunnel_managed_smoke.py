@@ -71,6 +71,10 @@ async def _cleanup_without_remote(tunnel_id: int, db):
     return {"ok": True}
 
 
+async def _skip_tp2027(db, tunnel_id: int, base_online: set[str]):
+    return [], {}, {}
+
+
 def _assert_runtime_cleanup_payload_compiles() -> None:
     script = cleanup_script_v2(9)
     start_marker = "python3 - \"$TID\" <<'PY2'\n"
@@ -90,8 +94,13 @@ async def main() -> None:
     db = SessionLocal()
     original_transports = tunnel_managed._TRANSPORTS
     original_delete = tunnel_managed.core.delete_tunnel
+    original_tp2027_phase = tunnel_managed._install_tp2027_phase
 
     try:
+        # The orchestration smoke must stay deterministic and must not require
+        # real SSH/TP2027 artifacts. Base transport behavior is mocked below.
+        tunnel_managed._install_tp2027_phase = _skip_tp2027
+
         iran = _node(
             db,
             name="ci-managed-iran",
@@ -153,6 +162,130 @@ async def main() -> None:
         assert live.active_transport == "mtunnel"
         assert live.status.value == "online"
 
+        # ------------------------------------------------------------
+        # Shared Iran -> two different Exit nodes.
+        #
+        # Two create-managed requests are launched concurrently. The per-Iran
+        # provision lock must serialize the complete remote-mutation phase, and
+        # the direct transport phase inside each request must also be serial.
+        # ------------------------------------------------------------
+        exit_two = _node(
+            db,
+            name="ci-managed-exit-two",
+            node_type=NodeType.EXIT,
+            ip="192.0.2.21",
+        )
+        exit_three = _node(
+            db,
+            name="ci-managed-exit-three",
+            node_type=NodeType.EXIT,
+            ip="192.0.2.22",
+        )
+
+        tracker = {
+            "active": 0,
+            "max_active": 0,
+            "trace": [],
+        }
+
+        def tracked_success(name: str, latency: int):
+            async def installer(tunnel_id: int, job_db):
+                tracker["active"] += 1
+                tracker["max_active"] = max(
+                    int(tracker["max_active"]),
+                    int(tracker["active"]),
+                )
+                tracker["trace"].append(
+                    f"start:{tunnel_id}:{name}"
+                )
+
+                try:
+                    # Make accidental overlap observable to the smoke test.
+                    await asyncio.sleep(0.03)
+
+                    row = (
+                        job_db.query(TunnelTransport)
+                        .filter(
+                            TunnelTransport.tunnel_id == tunnel_id,
+                            TunnelTransport.transport == name,
+                        )
+                        .first()
+                    )
+                    assert row is not None
+                    row.enabled = True
+                    row.status = "online"
+                    row.latency_ms = latency
+                    row.last_error = None
+                    job_db.commit()
+
+                    return {
+                        "ok": True,
+                        "transport": name,
+                        "status": "online",
+                    }
+                finally:
+                    tracker["trace"].append(
+                        f"end:{tunnel_id}:{name}"
+                    )
+                    tracker["active"] -= 1
+
+            return installer
+
+        tunnel_managed._TRANSPORTS = (
+            ("mtunnel", 90, tracked_success("mtunnel", 30)),
+            ("backhaul", 100, tracked_success("backhaul", 34)),
+            ("ssh_tun", 200, tracked_success("ssh_tun", 41)),
+        )
+
+        async def create_for_exit(exit_id: int):
+            task_db = SessionLocal()
+            try:
+                return await tunnel_managed.create_managed_tunnel(
+                    TunnelCreate(
+                        iran_node_id=iran.id,
+                        exit_node_id=exit_id,
+                        priority=100,
+                    ),
+                    task_db,
+                )
+            finally:
+                task_db.close()
+
+        second_result, third_result = await asyncio.gather(
+            create_for_exit(exit_two.id),
+            create_for_exit(exit_three.id),
+        )
+
+        assert second_result["ok"] is True
+        assert third_result["ok"] is True
+        assert second_result["active_transport"] == "mtunnel"
+        assert third_result["active_transport"] == "mtunnel"
+        assert int(tracker["max_active"]) == 1, tracker["trace"]
+
+        shared_iran_tunnels = (
+            db.query(Tunnel)
+            .filter(Tunnel.iran_node_id == iran.id)
+            .order_by(Tunnel.id.asc())
+            .all()
+        )
+
+        assert len(shared_iran_tunnels) == 3
+        assert {
+            int(item.exit_node_id)
+            for item in shared_iran_tunnels
+        } == {
+            int(exit_node.id),
+            int(exit_two.id),
+            int(exit_three.id),
+        }
+        assert all(
+            item.status.value == "online"
+            for item in shared_iran_tunnels
+        )
+
+        # ------------------------------------------------------------
+        # All direct paths fail -> rollback the newly-created logical tunnel.
+        # ------------------------------------------------------------
         iran_fail = _node(
             db,
             name="ci-managed-iran-fail",
@@ -206,6 +339,7 @@ async def main() -> None:
     finally:
         tunnel_managed._TRANSPORTS = original_transports
         tunnel_managed.core.delete_tunnel = original_delete
+        tunnel_managed._install_tp2027_phase = original_tp2027_phase
         db.close()
 
 

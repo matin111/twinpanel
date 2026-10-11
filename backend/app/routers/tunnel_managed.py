@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import fcntl
+from contextlib import asynccontextmanager
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -52,6 +55,37 @@ _SELECTION_ORDER = (
     "ssh_tun",
     "ssh_relay",
 )
+
+
+# Provisioning mutates systemd, interfaces, firewall state and managed
+# preflight artifacts on the Iran node. A single Iran node may fan out to many
+# Exit nodes, so two create/repair flows must never mutate that shared node at
+# the same time. flock makes this guard effective across Uvicorn workers, not
+# only inside one Python process. Different Iran nodes still provision in
+# parallel because each node owns a different lock file.
+@asynccontextmanager
+async def _iran_provision_lock(iran_node_id: int):
+    lock_path = Path(
+        f"/tmp/twinpanel-managed-provision-iran-{int(iran_node_id)}.lock"
+    )
+    handle = lock_path.open("a+")
+
+    try:
+        await asyncio.to_thread(
+            fcntl.flock,
+            handle.fileno(),
+            fcntl.LOCK_EX,
+        )
+        yield
+    finally:
+        try:
+            await asyncio.to_thread(
+                fcntl.flock,
+                handle.fileno(),
+                fcntl.LOCK_UN,
+            )
+        finally:
+            handle.close()
 
 
 def _detail_text(exc: Exception) -> str:
@@ -163,6 +197,31 @@ async def _run_transport_job(
             return name, None, message, False
     finally:
         db.close()
+
+
+async def _run_direct_transport_phase(
+    tunnel_id: int,
+) -> list[tuple[str, object | None, str | None, bool]]:
+    """Install base transports deterministically, one at a time.
+
+    All three installers touch the same Iran/Exit hosts and each may run
+    managed preflight, systemd reloads, interface cleanup and firewall work.
+    Running them concurrently creates a remote mutation race which becomes
+    especially visible when one Iran node owns several Exit tunnels.
+    """
+
+    settled: list[tuple[str, object | None, str | None, bool]] = []
+
+    for name, _, installer in _TRANSPORTS:
+        settled.append(
+            await _run_transport_job(
+                name,
+                installer,
+                tunnel_id,
+            )
+        )
+
+    return settled
 
 
 async def _run_relay_job(
@@ -347,22 +406,10 @@ async def _install_tp2027_phase(
     return installed, errors, results
 
 
-@router.post(
-    "/create-managed",
-    dependencies=[Depends(require_admin)],
-)
-async def create_managed_tunnel(
+async def _create_managed_tunnel_locked(
     payload: TunnelCreate,
-    db: Session = Depends(get_db),
+    db: Session,
 ):
-    """One-click managed tunnel creation with automatic relay fallback.
-
-    Phase 1 installs the three direct base transports in parallel. If every
-    direct path fails, TwinPanel automatically provisions SSH Relay through an
-    eligible third Exit node. Phase 2 installs TP2027 only when Backhaul itself
-    is healthy. Manager V7 owns runtime failover after provisioning.
-    """
-
     existing = (
         db.query(Tunnel)
         .filter(
@@ -376,11 +423,8 @@ async def create_managed_tunnel(
     tunnel = core.register_tunnel_pair(payload, db)
     tunnel_id = int(tunnel.id)
 
-    settled = await asyncio.gather(
-        *[
-            _run_transport_job(name, installer, tunnel_id)
-            for name, _, installer in _TRANSPORTS
-        ]
+    settled = await _run_direct_transport_phase(
+        tunnel_id
     )
 
     installed: list[str] = []
@@ -465,6 +509,33 @@ async def create_managed_tunnel(
         "results": results,
         "diagnosis": diagnose_managed_tunnel(tunnel_id, db),
     }
+
+
+@router.post(
+    "/create-managed",
+    dependencies=[Depends(require_admin)],
+)
+async def create_managed_tunnel(
+    payload: TunnelCreate,
+    db: Session = Depends(get_db),
+):
+    """One-click managed tunnel creation with shared-Iran serialization.
+
+    A logical Iran node may fan out to several Exit nodes. Provisioning for the
+    same Iran node is serialized across API workers, and each direct transport
+    is installed deterministically instead of concurrently mutating remote
+    systemd/interface/firewall state. SSH Relay remains an on-demand fallback;
+    TP2027 is installed only after Backhaul is physically online. Manager V7
+    owns runtime failover after provisioning.
+    """
+
+    async with _iran_provision_lock(
+        int(payload.iran_node_id)
+    ):
+        return await _create_managed_tunnel_locked(
+            payload,
+            db,
+        )
 
 
 @router.get(
