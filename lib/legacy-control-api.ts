@@ -114,11 +114,11 @@ const managedInstallCache=new Map<number,ManagedInstallCache>();
 // directly and never runs browser-owned installAll after managed creation.
 const managedAutoCreateCache=new Set<number>();
 
-type ParallelTransport="mtunnel"|"backhaul"|"ssh_tun";
-type ParallelInstallMap=Map<ParallelTransport,Promise<RuntimeRow>>;
-const parallelInstallCache=new Map<number,ParallelInstallMap>();
+type FallbackTransport="mtunnel"|"backhaul"|"ssh_tun";
+type FallbackInstallMap=Map<FallbackTransport,Promise<RuntimeRow>>;
+const fallbackInstallCache=new Map<number,FallbackInstallMap>();
 
-async function managedTransportResult(id:number,name:ParallelTransport){
+async function managedTransportResult(id:number,name:FallbackTransport){
   const cached=managedInstallCache.get(id);
   if(!cached)return null;
   if(name==="ssh_tun")managedInstallCache.delete(id);
@@ -126,22 +126,40 @@ async function managedTransportResult(id:number,name:ParallelTransport){
   throw new Error(cached.errors[name]||`${name} نصب نشد`);
 }
 
-function startParallelTransportInstalls(id:number){
-  if(!id||parallelInstallCache.has(id))return;
-  const jobs:ParallelInstallMap=new Map();
-  jobs.set("mtunnel",requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/install`,{method:"POST"},150000));
-  jobs.set("backhaul",requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/backhaul/install`,{method:"POST"},75000));
-  jobs.set("ssh_tun",requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/ssh/install`,{method:"POST"},150000));
-  parallelInstallCache.set(id,jobs);
+// Old API fallback only. The legacy page may await all three install methods
+// concurrently, but remote provisioning on a shared Iran node must be mutation-
+// safe. Chain the HTTP jobs so MTunnel -> Backhaul -> SSH TUN runs one at a
+// time while preserving the existing Promise-based page contract.
+function startSerializedTransportInstalls(id:number){
+  if(!id||fallbackInstallCache.has(id))return;
+
+  const jobs:FallbackInstallMap=new Map();
+  let queue:Promise<void>=Promise.resolve();
+
+  const enqueue=(name:FallbackTransport,path:string,timeoutMs:number)=>{
+    const job=queue.then(()=>requestWithTimeout<RuntimeRow>(path,{method:"POST"},timeoutMs));
+    jobs.set(name,job);
+    queue=job.then(()=>undefined,()=>undefined);
+  };
+
+  enqueue("mtunnel",`/v1/tunnels/${id}/mtunnel/install`,150000);
+  enqueue("backhaul",`/v1/tunnels/${id}/backhaul/install`,75000);
+  enqueue("ssh_tun",`/v1/tunnels/${id}/ssh/install`,150000);
+
+  fallbackInstallCache.set(id,jobs);
 }
 
-async function parallelTransportResult(id:number,name:ParallelTransport){
-  const jobs=parallelInstallCache.get(id);
+async function serializedTransportResult(id:number,name:FallbackTransport){
+  const jobs=fallbackInstallCache.get(id);
   const job=jobs?.get(name);
   if(!job)return null;
-  jobs!.delete(name);
-  if(jobs!.size===0)parallelInstallCache.delete(id);
-  return await job;
+
+  try{
+    return await job;
+  }finally{
+    jobs!.delete(name);
+    if(jobs!.size===0)fallbackInstallCache.delete(id);
+  }
 }
 
 export const legacyControlApi={
@@ -189,7 +207,7 @@ export const legacyControlApi={
     }
 
     const tunnelId=Number(created?.id||0);
-    if(tunnelId)startParallelTransportInstalls(tunnelId);
+    if(tunnelId)startSerializedTransportInstalls(tunnelId);
     return created;
   },
 
@@ -210,15 +228,15 @@ export const legacyControlApi={
   },
 
   installSshTunnel:async(id:number)=>{
-    const parallel=await parallelTransportResult(id,"ssh_tun");
-    if(parallel)return parallel;
+    const queued=await serializedTransportResult(id,"ssh_tun");
+    if(queued)return queued;
     const managed=await managedTransportResult(id,"ssh_tun");
     return managed||requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/ssh/install`,{method:"POST"},150000);
   },
 
   installMtunnel:async(id:number)=>{
-    const parallel=await parallelTransportResult(id,"mtunnel");
-    if(parallel)return parallel;
+    const queued=await serializedTransportResult(id,"mtunnel");
+    if(queued)return queued;
     const managed=await managedTransportResult(id,"mtunnel");
     return managed||requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/install`,{method:"POST"},150000);
   },
@@ -227,8 +245,8 @@ export const legacyControlApi={
   mtunnelHealth:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/mtunnel/health`),
 
   installBackhaul:async(id:number)=>{
-    const parallel=await parallelTransportResult(id,"backhaul");
-    if(parallel)return parallel;
+    const queued=await serializedTransportResult(id,"backhaul");
+    if(queued)return queued;
     const managed=await managedTransportResult(id,"backhaul");
     return managed||requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/backhaul/install`,{method:"POST"},75000);
   },
