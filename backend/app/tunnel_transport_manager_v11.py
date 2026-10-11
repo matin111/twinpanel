@@ -3,19 +3,20 @@ from __future__ import annotations
 import asyncio
 
 from . import tunnel_transport_manager_v10 as v10
-from .runtime_reconciler import reconciler_loop
+from .legacy_ingress_reconciler import reconciler_loop as legacy_ingress_loop
+from .runtime_reconciler import reconciler_loop as runtime_reconciler_loop
 
 
 # ============================================================
 # TWINPANEL TRANSPORT MANAGER V11
 #
 # V11 keeps V10/V9/V7 as the authoritative health/failover/self-heal stack
-# and adds an independent ownership-safe runtime reconciler.
+# and adds two independent ownership-safe reconcilers:
+#   * orphan runtime cleanup for tunnel ids absent from DB;
+#   * removal of retired per-tunnel ingress chains which can collide when
+#     one Iran node fans out to several Exit nodes.
 #
-# The reconciler only removes TwinPanel runtime ids which are absent from the
-# entire tunnels table and which have been observed as orphaned repeatedly.
-# It never changes health truth, active_transport, peer reachability or any
-# runtime belonging to an existing logical tunnel.
+# Neither reconciler writes health truth, active_transport or peer reachability.
 # ============================================================
 
 
@@ -30,14 +31,20 @@ async def main() -> None:
         name="twinpanel-manager-v10-core",
     )
 
-    reconciler_task = asyncio.create_task(
-        reconciler_loop(),
+    runtime_task = asyncio.create_task(
+        runtime_reconciler_loop(),
         name="twinpanel-runtime-reconciler",
+    )
+
+    legacy_ingress_task = asyncio.create_task(
+        legacy_ingress_loop(),
+        name="twinpanel-legacy-ingress-reconciler",
     )
 
     tasks = {
         manager_task,
-        reconciler_task,
+        runtime_task,
+        legacy_ingress_task,
     }
 
     done, pending = await asyncio.wait(
