@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import fcntl
+from contextlib import asynccontextmanager
 from datetime import datetime
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -35,6 +38,33 @@ BASE_TIMEOUTS = {
 }
 
 RELAY_PRIORITY = 300
+
+
+@asynccontextmanager
+async def _iran_provision_lock(iran_node_id: int):
+    """Share the same cross-worker lock used by create-managed."""
+
+    lock_path = Path(
+        f"/tmp/twinpanel-managed-provision-iran-{int(iran_node_id)}.lock"
+    )
+    handle = lock_path.open("a+")
+
+    try:
+        await asyncio.to_thread(
+            fcntl.flock,
+            handle.fileno(),
+            fcntl.LOCK_EX,
+        )
+        yield
+    finally:
+        try:
+            await asyncio.to_thread(
+                fcntl.flock,
+                handle.fileno(),
+                fcntl.LOCK_UN,
+            )
+        finally:
+            handle.close()
 
 
 def _status(value: object) -> str:
@@ -334,7 +364,7 @@ def _merge_unresolved_errors(after: dict, errors: dict[str, str]) -> dict[str, s
     return merged
 
 
-async def repair_managed_tunnel(tunnel_id: int, db: Session) -> dict:
+async def _repair_managed_tunnel_locked(tunnel_id: int, db: Session) -> dict:
     """Diagnose and repair managed runtime, including relay fallback.
 
     Direct base transports are repaired first. If none becomes online, the
@@ -442,3 +472,19 @@ async def repair_managed_tunnel(tunnel_id: int, db: Session) -> dict:
         "attempted": attempted,
         "repaired_at": datetime.utcnow().isoformat() + "Z",
     }
+
+
+async def repair_managed_tunnel(tunnel_id: int, db: Session) -> dict:
+    """Serialize managed repair against create/repair on the same Iran node."""
+
+    tunnel = db.get(Tunnel, int(tunnel_id))
+    if tunnel is None:
+        raise RuntimeError("tunnel_not_found")
+
+    iran_node_id = int(tunnel.iran_node_id)
+
+    async with _iran_provision_lock(iran_node_id):
+        return await _repair_managed_tunnel_locked(
+            int(tunnel_id),
+            db,
+        )
