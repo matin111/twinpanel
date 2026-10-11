@@ -7,6 +7,7 @@ const SUCCESS_SELECTOR=".runtime-success,.runtime-alert.success,.alert.success";
 const ERROR_SELECTOR=".runtime-error,.runtime-alert.error,.alert.error";
 const ACTION_SELECTOR="button[type='submit'],input[type='submit'],button.primary,button.primary-soft,button.danger,button.danger-btn";
 const CLOSE_SELECTOR="button.icon-button,button.runtime-modal-bg";
+const MUTATING_METHODS=new Set(["POST","PUT","PATCH","DELETE"]);
 
 function mutationTouches(record:MutationRecord,selector:string){
   const target=record.target instanceof Element?record.target:record.target.parentElement;
@@ -18,16 +19,29 @@ function mutationTouches(record:MutationRecord,selector:string){
   return false;
 }
 
+function requestMethod(input:RequestInfo|URL,init?:RequestInit){
+  if(init?.method)return init.method.toUpperCase();
+  if(typeof Request!=="undefined"&&input instanceof Request)return input.method.toUpperCase();
+  return "GET";
+}
+
 export function ModalAutoCloseOnSuccess(){
   useEffect(()=>{
     let armedUntil=0;
+    let completionUntil=0;
     let armTimer:number|undefined;
     let closeTimer:number|undefined;
     let closeStartedAt=0;
+    const nativeFetch=window.fetch.bind(window);
 
     const clearArm=()=>{
       armedUntil=0;
       if(armTimer!==undefined){window.clearTimeout(armTimer);armTimer=undefined;}
+    };
+
+    const clearCompletion=()=>{
+      completionUntil=0;
+      if(closeTimer!==undefined){window.clearTimeout(closeTimer);closeTimer=undefined;}
     };
 
     const arm=()=>{
@@ -37,30 +51,36 @@ export function ModalAutoCloseOnSuccess(){
     };
 
     const attemptClose=()=>{
-      if(!armedUntil||Date.now()>armedUntil){clearArm();return;}
-      const modals=Array.from(document.querySelectorAll<HTMLElement>(MODAL_SELECTOR));
-      const modal=modals.length?modals[modals.length-1]:undefined;
-      if(!modal){clearArm();return;}
+      const now=Date.now();
+      if(!completionUntil||now>completionUntil){clearCompletion();clearArm();return;}
 
-      const candidates=Array.from(modal.querySelectorAll<HTMLButtonElement>(CLOSE_SELECTOR));
-      const close=candidates.find(button=>!button.disabled&&button.offsetParent!==null);
-      if(close){
-        close.click();
-        clearArm();
-        return;
+      const modals=Array.from(document.querySelectorAll<HTMLElement>(MODAL_SELECTOR));
+      const visible=modals.filter(modal=>modal.offsetParent!==null);
+      const modal=visible.length?visible[visible.length-1]:undefined;
+
+      if(modal){
+        const candidates=Array.from(modal.querySelectorAll<HTMLButtonElement>(CLOSE_SELECTOR));
+        const close=candidates.find(button=>!button.disabled&&button.offsetParent!==null);
+        if(close){
+          close.click();
+        }
       }
 
-      if(Date.now()-closeStartedAt<5000){
-        closeTimer=window.setTimeout(attemptClose,100);
+      // Keep watching briefly. Some flows replace the create modal with a detail modal
+      // after the successful request. The UX contract is to return to the page instead.
+      if(Date.now()<completionUntil){
+        closeTimer=window.setTimeout(attemptClose,120);
       }else{
+        clearCompletion();
         clearArm();
       }
     };
 
-    const scheduleClose=()=>{
+    const scheduleClose=(replacementWindowMs=8000)=>{
+      completionUntil=Math.max(completionUntil,Date.now()+replacementWindowMs);
       closeStartedAt=Date.now();
       if(closeTimer!==undefined)window.clearTimeout(closeTimer);
-      closeTimer=window.setTimeout(attemptClose,80);
+      closeTimer=window.setTimeout(attemptClose,40);
     };
 
     const onClick=(event:MouseEvent)=>{
@@ -80,9 +100,17 @@ export function ModalAutoCloseOnSuccess(){
     };
 
     const observer=new MutationObserver(records=>{
-      if(!armedUntil||Date.now()>armedUntil)return;
+      const now=Date.now();
+
+      if(completionUntil&&now<completionUntil&&records.some(record=>mutationTouches(record,MODAL_SELECTOR))){
+        scheduleClose(Math.max(250,completionUntil-now));
+        return;
+      }
+
+      if(!armedUntil||now>armedUntil)return;
 
       if(records.some(record=>mutationTouches(record,ERROR_SELECTOR))){
+        clearCompletion();
         clearArm();
         return;
       }
@@ -92,14 +120,39 @@ export function ModalAutoCloseOnSuccess(){
       }
     });
 
+    window.fetch=async(input:RequestInfo|URL,init?:RequestInit)=>{
+      const method=requestMethod(input,init);
+      try{
+        const response=await nativeFetch(input,init);
+        if(armedUntil&&Date.now()<=armedUntil&&MUTATING_METHODS.has(method)){
+          if(response.ok){
+            // Close on the actual network completion, not on later UI refresh/detail awaits.
+            // This prevents long-running successful jobs from leaving a stale busy modal open.
+            scheduleClose();
+          }else{
+            clearCompletion();
+            clearArm();
+          }
+        }
+        return response;
+      }catch(error){
+        if(armedUntil&&MUTATING_METHODS.has(method)){
+          clearCompletion();
+          clearArm();
+        }
+        throw error;
+      }
+    };
+
     document.addEventListener("click",onClick,true);
     document.addEventListener("submit",onSubmit,true);
-    observer.observe(document.body,{subtree:true,childList:true,characterData:true});
+    observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:["class","disabled"]});
 
     return()=>{
       document.removeEventListener("click",onClick,true);
       document.removeEventListener("submit",onSubmit,true);
       observer.disconnect();
+      window.fetch=nativeFetch;
       if(armTimer!==undefined)window.clearTimeout(armTimer);
       if(closeTimer!==undefined)window.clearTimeout(closeTimer);
     };
