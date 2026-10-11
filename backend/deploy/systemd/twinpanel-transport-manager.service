@@ -1,5 +1,5 @@
 [Unit]
-Description=TwinPanel Transport Manager V7 Overlay-Aware Full Dataplane Failover
+Description=TwinPanel Transport Manager V11 Multi-Tunnel Self-Heal and Runtime Reconciliation
 After=network-online.target twinpanel-api.service
 Wants=network-online.target
 
@@ -11,7 +11,7 @@ EnvironmentFile=/etc/twinpanel/backend.env
 Environment=PYTHONPATH=/opt/twinpanel-product/backend
 Environment=PYTHONDONTWRITEBYTECODE=1
 
-ExecStart=/opt/twinpanel/venv/bin/python -u -m app.tunnel_transport_manager_v7
+ExecStart=/opt/twinpanel/venv/bin/python -u -m app.tunnel_transport_manager_v11
 
 Restart=always
 RestartSec=3
