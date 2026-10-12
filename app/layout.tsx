@@ -2,7 +2,7 @@ import type {Metadata} from "next";
 import {I18nProvider} from "../lib/i18n";
 import {ThemeProvider} from "../lib/theme";
 import {BrandingProvider} from "../lib/branding";
-import {SupportChatWidget} from "../components/support-chat-widget";
+import {SupportChatRuntime} from "../components/support-chat-runtime";
 import {ChatOpenBridge} from "../components/chat-open-bridge";
 import {StoreMobileAccess} from "../components/store-mobile-access";
 import {StoreEnhancements} from "../components/store-enhancements";
@@ -42,6 +42,6 @@ export const metadata:Metadata={title:"VPN Control 2027",description:"VPN manage
 
 export default function RootLayout({children}:{children:React.ReactNode}){
   return <html lang="fa" dir="rtl" data-theme="dark" suppressHydrationWarning>
-    <body><ThemeProvider><BrandingProvider><I18nProvider>{children}<CustomerStoreRedirect/><StoreMobileAccess/><StoreEnhancements/><StorePublicNavigation/><CustomerDeliveryEnhancement/><SupportChatWidget/><ChatOpenBridge/></I18nProvider></BrandingProvider></ThemeProvider></body>
+    <body><ThemeProvider><BrandingProvider><I18nProvider>{children}<CustomerStoreRedirect/><StoreMobileAccess/><StoreEnhancements/><StorePublicNavigation/><CustomerDeliveryEnhancement/><SupportChatRuntime/><ChatOpenBridge/></I18nProvider></BrandingProvider></ThemeProvider></body>
   </html>;
 }
