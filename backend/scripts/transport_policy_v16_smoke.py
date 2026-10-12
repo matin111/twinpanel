@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from app.backhaul_multi_exit_v16 import backhaul_forward_port
 from app.transport_policy_v16 import (
     MANAGED_TRANSPORT_NAMES,
     apply_overlay_loss_policy,
@@ -83,6 +84,15 @@ def main() -> None:
 
     assert policy_priority("backhaul") < policy_priority("mtunnel")
     assert policy_priority("mtunnel") < policy_priority("kcp_2027")
+
+    # Fallback calculation (no matching DB row in CI) is deterministic and
+    # gives different mappings to different tunnel ids instead of hard-coding
+    # 18080 for every Backhaul server process on a shared Iran host.
+    port_a = backhaul_forward_port(9005)
+    port_b = backhaul_forward_port(9009)
+    assert port_a != port_b
+    assert 1024 < port_a <= 65535
+    assert 1024 < port_b <= 65535
 
     print("TRANSPORT_POLICY_V16_SMOKE_OK")
 
