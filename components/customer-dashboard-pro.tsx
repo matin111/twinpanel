@@ -17,6 +17,16 @@ function statusText(value:string,pick:(fa:string,en:string)=>string){
   const row=map[value];return row?pick(row[0],row[1]):value||"—";
 }
 
+function DashboardIcon({type}:{type:"service"|"wallet"|"order"|"bell"|"arrow"|"link"}){
+  const common={width:20,height:20,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:1.8,strokeLinecap:"round" as const,strokeLinejoin:"round" as const,"aria-hidden":true};
+  if(type==="service")return <svg {...common}><rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="M7 9h10M7 13h6"/><circle cx="17" cy="14.5" r="1.5"/></svg>;
+  if(type==="wallet")return <svg {...common}><path d="M4 7.5h14a2 2 0 0 1 2 2v8H6a2 2 0 0 1-2-2z"/><path d="M4 8V6a2 2 0 0 1 2-2h10v3.5"/><path d="M16 11.5h4v3h-4a1.5 1.5 0 0 1 0-3Z"/></svg>;
+  if(type==="order")return <svg {...common}><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>;
+  if(type==="bell")return <svg {...common}><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7"/><path d="M10 20h4"/></svg>;
+  if(type==="link")return <svg {...common}><path d="M10 13a4 4 0 0 0 5.7.1l2.2-2.2a4 4 0 0 0-5.7-5.7L11 6.4"/><path d="M14 11a4 4 0 0 0-5.7-.1L6.1 13a4 4 0 0 0 5.7 5.7l1.2-1.2"/></svg>;
+  return <svg {...common}><path d="m9 18 6-6-6-6"/></svg>;
+}
+
 function CustomerDashboardInner(){
   const {pick}=useI18n();
   const {token,user}=useCustomerSession();
@@ -58,73 +68,79 @@ function CustomerDashboardInner(){
   const latestOrder=orders[0]||null;
   const latestPayment=payments[0]||null;
   const displayName=user?.full_name||user?.email?.split("@")[0]||pick("کاربر","Customer");
-  const ringStyle={"--usage":usedPct} as CSSProperties;
+  const usageStyle={"--usage":`${usedPct}%`} as CSSProperties;
 
-  return <div className="customer-home-2027">
-    <section className="customer-home-head">
-      <div className="customer-home-heading">
-        <span>{pick("مرکز حساب","ACCOUNT CENTER")}</span>
+  return <div className="customer-dash-v27">
+    <section className="customer-dash-v27-head">
+      <div className="customer-dash-v27-title">
+        <span>{pick("مرکز کاربری ۲۰۲۷","CUSTOMER CENTER 2027")}</span>
         <h1>{pick("سلام","Hello")} {displayName}</h1>
-        <p>{pick("اشتراک، پرداخت و حساب شما در یک نگاه","Your service, payments and account at a glance")}</p>
+        <p>{pick("وضعیت سرویس، حساب و پرداخت‌های شما در یک نمای ساده و سریع","Your service, account and payments in one clean view")}</p>
       </div>
-      <div className="customer-home-head-actions">
-        <Link href="/panel/buy" className="primary">＋ {pick("خرید اشتراک","Buy subscription")}</Link>
-        <button type="button" className="ghost" onClick={()=>window.dispatchEvent(new Event("twinpanel:open-chat"))}>✦ {pick("چت آنلاین","Live chat")}</button>
+      <div className="customer-dash-v27-head-actions">
+        <Link href="/panel/buy" className="customer-dash-primary">＋ {pick("خرید اشتراک","Buy subscription")}</Link>
+        <Link href="/panel/subscription" className="customer-dash-secondary"><DashboardIcon type="link"/>{pick("اطلاعات اتصال","Connection details")}</Link>
       </div>
     </section>
 
-    {error&&<div className="customer-home-alert"><span>!</span><div><b>{pick("بخشی از اطلاعات دریافت نشد","Some data could not be loaded")}</b><small>{error}</small></div><button type="button" onClick={()=>void load()}>{pick("تلاش دوباره","Retry")}</button></div>}
+    {error&&<div className="customer-dash-v27-alert"><span>!</span><div><b>{pick("بخشی از اطلاعات دریافت نشد","Some data could not be loaded")}</b><small>{error}</small></div><button type="button" onClick={()=>void load()}>{pick("تلاش دوباره","Retry")}</button></div>}
 
-    <section className="customer-home-overview">
-      <article className="customer-home-service">
-        <div className="customer-home-service-top">
-          <div><small>{pick("سرویس اصلی","PRIMARY SERVICE")}</small><h2>{loading?"…":active?.plan_name||pick("اشتراک فعالی ندارید","No active subscription")}</h2></div>
-          {active&&<span className={`customer-home-status ${active.status}`}>{statusText(active.status,pick)}</span>}
+    <section className="customer-dash-v27-kpis">
+      <Link href="/panel/subscription" className="customer-dash-v27-kpi"><i className="violet"><DashboardIcon type="service"/></i><div><small>{pick("اشتراک فعال","Active subscriptions")}</small><strong>{loading?"…":activeCount.toLocaleString("fa-IR")}</strong><em>{pick("مدیریت سرویس‌ها","Manage services")}</em></div><span><DashboardIcon type="arrow"/></span></Link>
+      <Link href="/panel/wallet" className="customer-dash-v27-kpi"><i className="green"><DashboardIcon type="wallet"/></i><div><small>{pick("موجودی کیف پول","Wallet balance")}</small><strong>{loading?"…":money(wallet?.balance_toman)}</strong><em>{pick("شارژ و تراکنش‌ها","Top-up and history")}</em></div><span><DashboardIcon type="arrow"/></span></Link>
+      <Link href="/panel/orders" className="customer-dash-v27-kpi"><i className="blue"><DashboardIcon type="order"/></i><div><small>{pick("سفارش در جریان","Open orders")}</small><strong>{loading?"…":pendingOrders.toLocaleString("fa-IR")}</strong><em>{orders.length.toLocaleString("fa-IR")} {pick("سفارش کل","total orders")}</em></div><span><DashboardIcon type="arrow"/></span></Link>
+      <Link href="/panel/notifications" className="customer-dash-v27-kpi"><i className="amber"><DashboardIcon type="bell"/></i><div><small>{pick("اعلان خوانده‌نشده","Unread notifications")}</small><strong>{loading?"…":unread.toLocaleString("fa-IR")}</strong><em>{pick("مرکز اعلان‌ها","Notification center")}</em></div><span><DashboardIcon type="arrow"/></span></Link>
+    </section>
+
+    <section className="customer-dash-v27-workspace">
+      <article className="customer-dash-v27-service">
+        <div className="customer-dash-v27-service-head">
+          <div><span>{pick("سرویس اصلی","PRIMARY SERVICE")}</span><h2>{loading?"…":active?.plan_name||pick("اشتراک فعالی ندارید","No active subscription")}</h2></div>
+          {active&&<b className={`customer-dash-v27-status ${active.status}`}>{statusText(active.status,pick)}</b>}
         </div>
-        {active?<div className="customer-home-service-body">
-          <div className="customer-home-ring" style={ringStyle}><div><strong>{usedPct}%</strong><small>{pick("مصرف","used")}</small></div></div>
-          <div className="customer-home-service-info">
-            <div className="customer-home-service-metrics">
-              <span><small>{pick("باقی‌مانده","Remaining")}</small><b>{active.traffic_remaining_gb.toLocaleString("fa-IR")} GB</b></span>
-              <span><small>{pick("روز باقی‌مانده","Days left")}</small><b>{active.days_remaining.toLocaleString("fa-IR")}</b></span>
-              <span><small>{pick("انقضا","Expires")}</small><b>{dateText(active.expires_at)}</b></span>
-              <span><small>{pick("دستگاه","Devices")}</small><b>{active.device_limit.toLocaleString("fa-IR")}</b></span>
-            </div>
-            <div className="customer-home-protocols">{active.protocols.length?active.protocols.map(p=><span key={p}>{protocolName(p)}</span>):<span>{pick("در انتظار ساخت سرویس","Waiting for provisioning")}</span>}</div>
-            <div className="customer-home-service-actions"><Link href="/panel/subscription" className="primary">{pick("مشاهده اطلاعات اتصال","Connection details")}</Link><Link href="/panel/subscription" className="ghost">{pick("مدیریت و تمدید","Manage & renew")}</Link></div>
+
+        {active?<>
+          <div className="customer-dash-v27-usage-row">
+            <div className="customer-dash-v27-usage-copy"><small>{pick("مصرف این دوره","Usage this period")}</small><strong>{active.traffic_used_gb.toLocaleString("fa-IR")} <em>/ {active.traffic_limit_gb.toLocaleString("fa-IR")} GB</em></strong></div>
+            <div className="customer-dash-v27-usage-percent"><strong>{usedPct}%</strong><small>{pick("مصرف شده","used")}</small></div>
           </div>
-        </div>:<div className="customer-home-no-service"><span>◇</span><div><b>{pick("هنوز سرویس فعالی نداری","You do not have an active service yet")}</b><small>{pick("از پلن‌های موجود یک اشتراک انتخاب کن","Choose a subscription from available plans")}</small></div><Link href="/panel/buy" className="primary">{pick("مشاهده پلن‌ها","View plans")}</Link></div>}
+          <div className="customer-dash-v27-progress" style={usageStyle}><span/></div>
+
+          <div className="customer-dash-v27-metrics">
+            <div><small>{pick("حجم باقی‌مانده","Remaining traffic")}</small><b>{active.traffic_remaining_gb.toLocaleString("fa-IR")} GB</b></div>
+            <div><small>{pick("روز باقی‌مانده","Days remaining")}</small><b>{active.days_remaining.toLocaleString("fa-IR")}</b></div>
+            <div><small>{pick("تاریخ انقضا","Expiry date")}</small><b>{dateText(active.expires_at)}</b></div>
+            <div><small>{pick("تعداد دستگاه","Device limit")}</small><b>{active.device_limit.toLocaleString("fa-IR")}</b></div>
+          </div>
+
+          <div className="customer-dash-v27-service-footer">
+            <div className="customer-dash-v27-protocols"><small>{pick("پروتکل‌های فعال","ACTIVE PROTOCOLS")}</small><div>{active.protocols.length?active.protocols.map(p=><span key={p}>{protocolName(p)}</span>):<span>{pick("در انتظار ساخت سرویس","Waiting for provisioning")}</span>}</div></div>
+            <div className="customer-dash-v27-service-actions"><Link href="/panel/subscription" className="customer-dash-primary">{pick("مشاهده اتصال","View connection")}</Link><Link href="/panel/subscription" className="customer-dash-secondary">{pick("تمدید و مدیریت","Renew & manage")}</Link></div>
+          </div>
+        </>:<div className="customer-dash-v27-empty"><i><DashboardIcon type="service"/></i><div><b>{pick("هنوز سرویس فعالی نداری","You do not have an active service yet")}</b><small>{pick("برای شروع یکی از پلن‌های موجود را انتخاب کن","Choose one of the available plans to get started")}</small></div><Link href="/panel/buy" className="customer-dash-primary">{pick("مشاهده پلن‌ها","View plans")}</Link></div>}
       </article>
 
-      <aside className="customer-home-stats">
-        <Link href="/panel/wallet" className="customer-home-stat wallet"><i>◉</i><div><small>{pick("کیف پول","Wallet")}</small><strong>{loading?"…":money(wallet?.balance_toman)}</strong><em>{pick("مدیریت موجودی","Manage balance")} ←</em></div></Link>
-        <Link href="/panel/orders" className="customer-home-stat orders"><i>▤</i><div><small>{pick("سفارش‌های در جریان","Open orders")}</small><strong>{loading?"…":pendingOrders.toLocaleString("fa-IR")}</strong><em>{orders.length.toLocaleString("fa-IR")} {pick("سفارش کل","total orders")}</em></div></Link>
-        <Link href="/panel/notifications" className="customer-home-stat notice"><i>◎</i><div><small>{pick("اعلان جدید","New notifications")}</small><strong>{loading?"…":unread.toLocaleString("fa-IR")}</strong><em>{pick("مرکز اعلان‌ها","Notification center")} ←</em></div></Link>
-        <Link href="/panel/subscription" className="customer-home-stat service"><i>▱</i><div><small>{pick("اشتراک فعال","Active services")}</small><strong>{loading?"…":activeCount.toLocaleString("fa-IR")}</strong><em>{pick("مدیریت سرویس","Manage service")} ←</em></div></Link>
+      <aside className="customer-dash-v27-shortcuts">
+        <div className="customer-dash-v27-card-title"><span>{pick("دسترسی سریع","QUICK ACCESS")}</span><h3>{pick("کارهای پرکاربرد","Common actions")}</h3></div>
+        <Link href="/panel/buy"><i>＋</i><div><b>{pick("خرید اشتراک","Buy subscription")}</b><small>{pick("انتخاب پلن جدید","Choose a new plan")}</small></div><span>‹</span></Link>
+        <Link href="/panel/subscription"><i>⌁</i><div><b>{pick("اشتراک من","My subscription")}</b><small>{pick("اتصال، QR و تمدید","Connection, QR and renewal")}</small></div><span>‹</span></Link>
+        <Link href="/panel/wallet"><i>◉</i><div><b>{pick("کیف پول","Wallet")}</b><small>{pick("شارژ و تاریخچه تراکنش","Top-up and transaction history")}</small></div><span>‹</span></Link>
+        <Link href="/panel/profile"><i>♙</i><div><b>{pick("پروفایل و امنیت","Profile & security")}</b><small>{pick("رمز عبور و احراز هویت","Password and authentication")}</small></div><span>‹</span></Link>
       </aside>
     </section>
 
-    <section className="customer-home-dock">
-      <Link href="/panel/buy"><i>＋</i><span><b>{pick("خرید اشتراک","Buy")}</b><small>{pick("پلن جدید","New plan")}</small></span></Link>
-      <Link href="/panel/subscription"><i>⌁</i><span><b>{pick("اشتراک من","Subscription")}</b><small>{pick("اتصال و تمدید","Connect & renew")}</small></span></Link>
-      <Link href="/panel/orders"><i>▤</i><span><b>{pick("سفارش‌ها","Orders")}</b><small>{pick("پیگیری سفارش","Track orders")}</small></span></Link>
-      <Link href="/panel/wallet"><i>◉</i><span><b>{pick("کیف پول","Wallet")}</b><small>{pick("شارژ و تراکنش","Top-up & history")}</small></span></Link>
-      <Link href="/panel/payments"><i>◫</i><span><b>{pick("پرداخت‌ها","Payments")}</b><small>{pick("پرداخت و رسید","Pay & receipts")}</small></span></Link>
-      <Link href="/panel/profile"><i>♙</i><span><b>{pick("امنیت حساب","Security")}</b><small>{pick("رمز و 2FA","Password & 2FA")}</small></span></Link>
-    </section>
-
-    <section className="customer-home-bottom">
-      <article className="customer-home-activity">
-        <div className="customer-home-card-head"><div><small>{pick("آخرین فعالیت","RECENT ACTIVITY")}</small><h2>{pick("سفارش و پرداخت","Orders & payments")}</h2></div><Link href="/panel/orders">{pick("همه سفارش‌ها","All orders")} ←</Link></div>
-        <div className="customer-home-timeline">
-          <div><span className="violet"/><div><b>{pick("آخرین سفارش","Latest order")}</b><small>{latestOrder?`#${latestOrder.id} · ${dateText(latestOrder.created_at)}`:pick("سفارشی ثبت نشده","No order yet")}</small></div><em>{latestOrder?statusText(latestOrder.status,pick):"—"}</em>{latestOrder&&["pending_payment","payment_submitted","awaiting_review"].includes(latestOrder.status)&&<Link href={`/panel/payments?order=${latestOrder.id}`}>{pick("ادامه پرداخت","Continue")} ←</Link>}</div>
-          <div><span className="green"/><div><b>{pick("آخرین پرداخت","Latest payment")}</b><small>{latestPayment?`#${latestPayment.id} · ${dateText(latestPayment.created_at)}`:pick("پرداختی ثبت نشده","No payment yet")}</small></div><em>{latestPayment?statusText(latestPayment.status,pick):"—"}</em><Link href="/panel/payments">{pick("پرداخت‌ها","Payments")} ←</Link></div>
+    <section className="customer-dash-v27-bottom">
+      <article className="customer-dash-v27-activity">
+        <div className="customer-dash-v27-card-title row"><div><span>{pick("آخرین فعالیت","RECENT ACTIVITY")}</span><h3>{pick("سفارش و پرداخت","Orders & payments")}</h3></div><Link href="/panel/orders">{pick("همه سفارش‌ها","All orders")}</Link></div>
+        <div className="customer-dash-v27-timeline">
+          <div><i className="violet"/><div><b>{pick("آخرین سفارش","Latest order")}</b><small>{latestOrder?`#${latestOrder.id} · ${dateText(latestOrder.created_at)}`:pick("سفارشی ثبت نشده","No order yet")}</small></div><em>{latestOrder?statusText(latestOrder.status,pick):"—"}</em>{latestOrder&&["pending_payment","payment_submitted","awaiting_review"].includes(latestOrder.status)&&<Link href={`/panel/payments?order=${latestOrder.id}`}>{pick("ادامه پرداخت","Continue")}</Link>}</div>
+          <div><i className="green"/><div><b>{pick("آخرین پرداخت","Latest payment")}</b><small>{latestPayment?`#${latestPayment.id} · ${dateText(latestPayment.created_at)}`:pick("پرداختی ثبت نشده","No payment yet")}</small></div><em>{latestPayment?statusText(latestPayment.status,pick):"—"}</em><Link href="/panel/payments">{pick("جزئیات","Details")}</Link></div>
         </div>
       </article>
 
-      <article className="customer-home-notifications">
-        <div className="customer-home-card-head"><div><small>{pick("اعلان‌ها","NOTIFICATIONS")}</small><h2>{pick("آخرین پیام‌ها","Latest messages")}</h2></div><Link href="/panel/notifications">{pick("مشاهده همه","View all")} ←</Link></div>
-        <div className="customer-home-note-list">{notes.length?notes.slice(0,4).map(n=><div key={n.id}><span className={!n.is_read&&!n.read_at?"unread":""}/><div><b>{n.title||pick("اعلان","Notification")}</b><small>{n.message||n.body||"—"}</small></div><time>{dateText(n.created_at)}</time></div>):<div className="customer-home-no-note">{pick("اعلان جدیدی نداری.","You have no notifications.")}</div>}</div>
+      <article className="customer-dash-v27-notes">
+        <div className="customer-dash-v27-card-title row"><div><span>{pick("اعلان‌ها","NOTIFICATIONS")}</span><h3>{pick("آخرین پیام‌ها","Latest messages")}</h3></div><Link href="/panel/notifications">{pick("مشاهده همه","View all")}</Link></div>
+        <div className="customer-dash-v27-note-list">{notes.length?notes.slice(0,4).map(n=><div key={n.id}><i className={!n.is_read&&!n.read_at?"unread":""}/><div><b>{n.title||pick("اعلان","Notification")}</b><small>{n.message||n.body||"—"}</small></div><time>{dateText(n.created_at)}</time></div>):<div className="customer-dash-v27-no-note">{pick("اعلان جدیدی نداری.","You have no notifications.")}</div>}</div>
       </article>
     </section>
   </div>;
