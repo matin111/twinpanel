@@ -24,6 +24,7 @@ import "./customer-runtime.css";
 import "./customer-dashboard-pro.css";
 import "./customer-buy-runtime.css";
 import "./customer-payments-runtime.css";
+import "./customer-subscriptions-runtime.css";
 import "./customer-notification-center.css";
 import "./domains-runtime.css";
 import "./readability.css";
