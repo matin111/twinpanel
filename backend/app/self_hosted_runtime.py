@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .backhaul_multi_exit_v16 import install_backhaul_peer_v16
 from .config import settings
 from .database import SessionLocal
 from .services.public_urls import api_base_url
@@ -57,9 +58,15 @@ async def _self_hosted_install_or_upgrade_agent(
         requested,
     )
 
+
 def apply_self_hosted_runtime() -> None:
     # tunnels.py imports this function by name, so patch the module binding.
     tunnels._install_or_upgrade_agent = _self_hosted_install_or_upgrade_agent
+
+    # V16 removes a shared-Iran collision in Backhaul's historical hard-coded
+    # forwarded mapping. The panel remains the owner of installation/repair;
+    # users do not need to edit node configs manually.
+    tunnels._install_backhaul_peer = install_backhaul_peer_v16
 
     # SSH TUN is controller-owned in the self-hosted product. V3 keeps all node
     # changes automatic, uses the V2 self-healing runtime, then performs a real
