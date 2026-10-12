@@ -35,6 +35,7 @@ import "./parity-runtime.css";
 import "./subscriptions-full-runtime.css";
 import "./legacy-parity-batch1.css";
 import "./subscription-link-modal.css";
+import "./admin-payments-runtime.css";
 import "./customer-shell-final.css";
 import "./admin-shell-final.css";
 
