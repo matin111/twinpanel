@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from app.backhaul_multi_exit_v16 import backhaul_forward_port
+from app.backhaul_multi_exit_v16 import (
+    backhaul_forward_port,
+    install_backhaul_peer_v16,
+)
+from app.manager_runtime_v16 import install_manager_runtime_v16
+from app.routers import tunnels
 from app.transport_policy_v16 import (
     MANAGED_TRANSPORT_NAMES,
     apply_overlay_loss_policy,
@@ -93,6 +98,13 @@ def main() -> None:
     assert port_a != port_b
     assert 1024 < port_a <= 65535
     assert 1024 < port_b <= 65535
+
+    # The standalone Transport Manager does not import app.main, so it must
+    # explicitly install the same self-hosted runtime hooks as the API process.
+    # Otherwise autonomous self-heal could silently fall back to the historical
+    # shared 18080 Backhaul installer.
+    install_manager_runtime_v16()
+    assert tunnels._install_backhaul_peer is install_backhaul_peer_v16
 
     print("TRANSPORT_POLICY_V16_SMOKE_OK")
 
