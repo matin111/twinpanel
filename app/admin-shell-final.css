@@ -1,14 +1,14 @@
 /* Final admin shell isolation. Loaded last to prevent legacy/customer CSS from collapsing admin navigation. */
 @media (min-width:761px){
   .admin-shell{
-    --sidebar-width:258px!important;
+    --sidebar-width:272px!important;
     display:flex!important;
     align-items:flex-start!important;
     grid-template-columns:none!important;
   }
 
   .admin-shell.sidebar-collapsed{
-    --sidebar-width:82px!important;
+    --sidebar-width:86px!important;
   }
 
   .admin-shell>.sidebar{
@@ -22,7 +22,7 @@
     max-width:var(--sidebar-width)!important;
     height:100vh!important;
     min-height:100vh!important;
-    padding:14px 12px!important;
+    padding:15px 13px!important;
     display:flex!important;
     flex-direction:column!important;
     align-items:stretch!important;
@@ -31,13 +31,13 @@
   }
 
   .admin-shell .sidebar-head{
-    flex:0 0 46px!important;
-    min-height:46px!important;
-    height:46px!important;
+    flex:0 0 48px!important;
+    min-height:48px!important;
+    height:48px!important;
     display:flex!important;
     flex-direction:row!important;
     align-items:center!important;
-    gap:8px!important;
+    gap:9px!important;
     margin:0!important;
     padding:0!important;
   }
@@ -52,8 +52,8 @@
     flex:1 1 auto!important;
     min-height:0!important;
     height:auto!important;
-    margin:12px 0 10px!important;
-    padding:0 2px 0 0!important;
+    margin:14px 0 10px!important;
+    padding:0 3px 0 0!important;
     overflow-y:auto!important;
     overflow-x:hidden!important;
     scrollbar-width:thin!important;
@@ -77,9 +77,9 @@
     height:auto!important;
     min-height:0!important;
     max-height:none!important;
-    margin:0 0 9px!important;
+    margin:0 0 11px!important;
     padding:0!important;
-    gap:2px!important;
+    gap:3px!important;
   }
 
   .admin-shell .sidebar-nav>.nav-group>.nav-group-title{
@@ -90,12 +90,12 @@
     min-height:0!important;
     max-height:none!important;
     margin:0!important;
-    padding:7px 11px 5px!important;
-    color:#69758b!important;
-    font-size:8px!important;
+    padding:8px 12px 6px!important;
+    color:#748097!important;
+    font-size:9.5px!important;
     font-weight:900!important;
     line-height:1.35!important;
-    letter-spacing:.02em!important;
+    letter-spacing:.01em!important;
     white-space:nowrap!important;
     overflow:hidden!important;
     text-overflow:ellipsis!important;
@@ -104,7 +104,7 @@
 
   .admin-shell .sidebar-nav>.nav-group>a{
     display:flex!important;
-    flex:0 0 39px!important;
+    flex:0 0 44px!important;
     flex-direction:row!important;
     align-items:center!important;
     justify-content:flex-start!important;
@@ -114,18 +114,18 @@
     width:100%!important;
     min-width:0!important;
     max-width:100%!important;
-    height:39px!important;
-    min-height:39px!important;
-    max-height:39px!important;
+    height:44px!important;
+    min-height:44px!important;
+    max-height:44px!important;
     margin:0!important;
-    padding:0 11px!important;
-    gap:9px!important;
+    padding:0 12px!important;
+    gap:10px!important;
     border:1px solid transparent!important;
-    border-radius:10px!important;
-    color:#98a3b7!important;
+    border-radius:11px!important;
+    color:#9ea8ba!important;
     background:transparent!important;
-    font-size:10px!important;
-    font-weight:650!important;
+    font-size:11.5px!important;
+    font-weight:680!important;
     line-height:1!important;
     direction:rtl!important;
     text-align:right!important;
@@ -136,32 +136,32 @@
   }
 
   .admin-shell .sidebar-nav>.nav-group>a:hover{
-    color:#d9deea!important;
-    background:rgba(255,255,255,.025)!important;
-    border-color:#192235!important;
+    color:#e2e7f2!important;
+    background:rgba(255,255,255,.035)!important;
+    border-color:#1d283c!important;
   }
 
   .admin-shell .sidebar-nav>.nav-group>a.active{
-    color:#e6ddff!important;
-    border-color:rgba(139,92,246,.48)!important;
-    background:linear-gradient(90deg,rgba(124,58,237,.15),rgba(124,58,237,.06))!important;
+    color:#eee8ff!important;
+    border-color:rgba(139,92,246,.52)!important;
+    background:linear-gradient(90deg,rgba(124,58,237,.18),rgba(124,58,237,.07))!important;
     box-shadow:inset -2px 0 0 #8b5cf6!important;
   }
 
   .admin-shell .sidebar-nav>.nav-group>a i{
     display:grid!important;
     place-items:center!important;
-    flex:0 0 20px!important;
-    width:20px!important;
-    min-width:20px!important;
-    max-width:20px!important;
-    height:20px!important;
-    min-height:20px!important;
-    max-height:20px!important;
+    flex:0 0 22px!important;
+    width:22px!important;
+    min-width:22px!important;
+    max-width:22px!important;
+    height:22px!important;
+    min-height:22px!important;
+    max-height:22px!important;
     margin:0!important;
     padding:0!important;
-    color:#8b6ee8!important;
-    font-size:12px!important;
+    color:#9678f1!important;
+    font-size:14px!important;
     line-height:1!important;
     font-style:normal!important;
     writing-mode:horizontal-tb!important;
@@ -178,8 +178,8 @@
     margin:0!important;
     padding:0!important;
     opacity:1!important;
-    font-size:10px!important;
-    line-height:1.25!important;
+    font-size:11.5px!important;
+    line-height:1.3!important;
     white-space:nowrap!important;
     overflow:hidden!important;
     text-overflow:ellipsis!important;
@@ -187,26 +187,26 @@
   }
 
   .admin-shell>.sidebar>.profile{
-    flex:0 0 62px!important;
-    min-height:62px!important;
-    height:62px!important;
+    flex:0 0 64px!important;
+    min-height:64px!important;
+    height:64px!important;
     width:100%!important;
     margin:0!important;
-    padding:10px 4px 0!important;
+    padding:10px 5px 0!important;
     border-top:1px solid var(--line)!important;
     display:flex!important;
     flex-direction:row!important;
     align-items:center!important;
     justify-content:flex-start!important;
-    gap:9px!important;
+    gap:10px!important;
     overflow:hidden!important;
   }
 
   .admin-shell.sidebar-collapsed .sidebar-head{
     flex-direction:column!important;
-    height:86px!important;
-    min-height:86px!important;
-    flex-basis:86px!important;
+    height:88px!important;
+    min-height:88px!important;
+    flex-basis:88px!important;
   }
 
   .admin-shell.sidebar-collapsed .sidebar-head .brand{
@@ -254,8 +254,9 @@
 
 @media (max-width:760px){
   .admin-shell .sidebar-nav>.nav-group>a{
-    min-height:44px!important;
+    min-height:46px!important;
     height:auto!important;
+    font-size:12px!important;
     line-height:1.4!important;
   }
 }
