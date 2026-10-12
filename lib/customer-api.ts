@@ -1,7 +1,5 @@
 "use client";
 
-import {API_BASE} from "./api";
-
 export const CUSTOMER_TOKEN_KEY="twinpanel_customer_token";
 export const CUSTOMER_REMEMBER_KEY="twinpanel_customer_remember_token";
 
@@ -106,7 +104,11 @@ async function request<T>(path:string,options:RequestInit={},token?:string|null)
   const headers=new Headers(options.headers);
   if(options.body&&!headers.has("Content-Type")&&!(options.body instanceof FormData))headers.set("Content-Type","application/json");
   if(token)headers.set("Authorization",`Bearer ${token}`);
-  const response=await fetch(`${API_BASE}${path}`,{...options,headers,cache:"no-store"});
+
+  // Customer-facing code is browser-only and must always use the same-origin
+  // Next.js /v1 proxy. Never let NEXT_PUBLIC_API_BASE point the browser at
+  // 127.0.0.1/localhost on the user's own machine.
+  const response=await fetch(path,{...options,headers,cache:"no-store"});
   if(!response.ok){
     let payload:unknown=null;
     try{payload=await response.json();}catch{}
