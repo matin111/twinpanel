@@ -55,12 +55,8 @@ function CustomerDashboardInner(){
 
   return <div className="customer-pro-dashboard">
     <section className="customer-pro-welcome">
-      <div>
-        <span className="customer-pro-kicker">{pick("حساب کاربری","CUSTOMER ACCOUNT")}</span>
-        <h1>{pick("سلام","Hello")} {displayName}</h1>
-        <p>{pick("اشتراک، مصرف، اتصال، پرداخت و پشتیبانی را از همین‌جا مدیریت کن.","Manage your subscription, usage, connection, payments and support from one place.")}</p>
-      </div>
-      <div className="customer-pro-welcome-actions"><Link href="/store" className="primary">＋ {pick("خرید سرویس","Buy service")}</Link><Link href="/panel/support" className="ghost">{pick("پشتیبانی","Support")}</Link></div>
+      <div><span className="customer-pro-kicker">{pick("حساب کاربری","CUSTOMER ACCOUNT")}</span><h1>{pick("سلام","Hello")} {displayName}</h1></div>
+      <div className="customer-pro-welcome-actions"><Link href="/panel/buy" className="primary">＋ {pick("خرید سرویس","Buy service")}</Link><button type="button" className="ghost" onClick={()=>window.dispatchEvent(new Event("twinpanel:open-chat"))}>{pick("چت آنلاین","Live chat")}</button></div>
     </section>
 
     {error&&<div className="customer-pro-alert"><span>!</span><div><b>{pick("بخشی از اطلاعات دریافت نشد","Some data could not be loaded")}</b><small>{error}</small></div><button onClick={()=>void load()}>{pick("تلاش دوباره","Retry")}</button></div>}
@@ -80,37 +76,25 @@ function CustomerDashboardInner(){
           <div className="customer-pro-traffic"><div><span>{pick("مصرف ترافیک","Traffic usage")}</span><b>{active.traffic_used_gb.toLocaleString("fa-IR")} / {active.traffic_limit_gb.toLocaleString("fa-IR")} GB</b></div><div className="customer-pro-progress"><i style={{width:`${usedPct}%`}}/></div><small>{active.traffic_remaining_gb.toLocaleString("fa-IR")} GB {pick("باقی‌مانده","remaining")}</small></div>
           <div className="customer-pro-protocols">{active.protocols.length?active.protocols.map(p=><span key={p}>{protocolName(p)}</span>):<span>{pick("پروتکل هنوز تخصیص داده نشده","No protocol assigned yet")}</span>}</div>
           <div className="customer-pro-actions"><Link href="/panel/connection" className="primary">{pick("اطلاعات اتصال","Connection details")}</Link><Link href="/panel/subscription" className="ghost">{pick("مدیریت و تمدید","Manage & renew")}</Link></div>
-        </>:<div className="customer-pro-empty"><span>◇</span><b>{pick("هنوز سرویسی نداری","You do not have a service yet")}</b><p>{pick("از فروشگاه یک پلن انتخاب کن؛ بعد از آماده‌شدن، اطلاعات اتصال همین‌جا نمایش داده می‌شود.","Choose a plan from the store. Once ready, the connection details will appear here.")}</p><Link href="/store" className="primary">{pick("مشاهده پلن‌ها","View plans")}</Link></div>}
+        </>:<div className="customer-pro-empty"><span>◇</span><b>{pick("هنوز سرویسی نداری","You do not have a service yet")}</b><Link href="/panel/buy" className="primary">{pick("مشاهده پلن‌ها","View plans")}</Link></div>}
       </article>
 
       <aside className="customer-pro-quick-card">
         <div className="customer-pro-card-head"><div><small>{pick("دسترسی سریع","QUICK ACCESS")}</small><h2>{pick("کارهای پرکاربرد","Common actions")}</h2></div></div>
         <div className="customer-pro-quick-grid">
-          <Link href="/panel/connection"><i>⌁</i><div><b>{pick("اتصال و کانفیگ","Connection")}</b><small>{pick("QR، فایل و مشخصات","QR, files & credentials")}</small></div><span>←</span></Link>
-          <Link href="/panel/usage"><i>◔</i><div><b>{pick("مصرف","Usage")}</b><small>{pick("حجم و باقی‌مانده","Traffic & remaining")}</small></div><span>←</span></Link>
-          <Link href="/panel/wallet"><i>◉</i><div><b>{pick("کیف پول","Wallet")}</b><small>{pick("موجودی و شارژ","Balance & top-up")}</small></div><span>←</span></Link>
-          <Link href="/panel/support"><i>◌</i><div><b>{pick("پشتیبانی","Support")}</b><small>{pick("تیکت و چت آنلاین","Tickets & live chat")}</small></div><span>←</span></Link>
+          <Link href="/panel/connection"><i>⌁</i><div><b>{pick("اتصال و کانفیگ","Connection")}</b></div><span>←</span></Link>
+          <Link href="/panel/usage"><i>◔</i><div><b>{pick("مصرف","Usage")}</b></div><span>←</span></Link>
+          <Link href="/panel/payments"><i>◫</i><div><b>{pick("پرداخت‌ها","Payments")}</b></div><span>←</span></Link>
+          <Link href="/panel/profile"><i>♙</i><div><b>{pick("حساب و امنیت","Account & security")}</b></div><span>←</span></Link>
         </div>
       </aside>
     </section>
 
     <section className="customer-pro-bottom-grid">
-      <article className="customer-pro-activity-card">
-        <div className="customer-pro-card-head"><div><small>{pick("آخرین فعالیت","RECENT ACTIVITY")}</small><h2>{pick("سفارش و پرداخت","Orders & payments")}</h2></div><Link href="/panel/orders">{pick("همه سفارش‌ها","All orders")} ←</Link></div>
-        <div className="customer-pro-activity-list">
-          <div><span className="dot violet"/><div><b>{pick("آخرین سفارش","Latest order")}</b><small>{latestOrder?`#${latestOrder.id} · ${dateText(latestOrder.created_at)}`:pick("سفارشی ثبت نشده","No order yet")}</small></div><em>{latestOrder?statusText(latestOrder.status,pick):"—"}</em></div>
-          <div><span className="dot green"/><div><b>{pick("آخرین پرداخت","Latest payment")}</b><small>{latestPayment?`#${latestPayment.id} · ${dateText(latestPayment.created_at)}`:pick("پرداختی ثبت نشده","No payment yet")}</small></div><em>{latestPayment?statusText(latestPayment.status,pick):"—"}</em></div>
-        </div>
-      </article>
-
-      <article className="customer-pro-notice-card">
-        <div className="customer-pro-card-head"><div><small>{pick("اعلان‌ها","NOTIFICATIONS")}</small><h2>{pick("آخرین پیام‌ها","Latest messages")}</h2></div><Link href="/panel/notifications">{pick("مشاهده همه","View all")} ←</Link></div>
-        <div className="customer-pro-notices">{notes.length?notes.slice(0,3).map(n=><div key={n.id}><span className={!n.is_read&&!n.read_at?"unread":""}/><div><b>{n.title||pick("اعلان","Notification")}</b><small>{n.message||n.body||"—"}</small></div></div>):<div className="customer-pro-no-note">{pick("اعلان جدیدی نداری.","You have no new notifications.")}</div>}</div>
-      </article>
+      <article className="customer-pro-activity-card"><div className="customer-pro-card-head"><div><small>{pick("آخرین فعالیت","RECENT ACTIVITY")}</small><h2>{pick("سفارش و پرداخت","Orders & payments")}</h2></div><Link href="/panel/orders">{pick("همه سفارش‌ها","All orders")} ←</Link></div><div className="customer-pro-activity-list"><div><span className="dot violet"/><div><b>{pick("آخرین سفارش","Latest order")}</b><small>{latestOrder?`#${latestOrder.id} · ${dateText(latestOrder.created_at)}`:pick("سفارشی ثبت نشده","No order yet")}</small></div><em>{latestOrder?statusText(latestOrder.status,pick):"—"}</em></div><div><span className="dot green"/><div><b>{pick("آخرین پرداخت","Latest payment")}</b><small>{latestPayment?`#${latestPayment.id} · ${dateText(latestPayment.created_at)}`:pick("پرداختی ثبت نشده","No payment yet")}</small></div><em>{latestPayment?statusText(latestPayment.status,pick):"—"}</em></div></div></article>
+      <article className="customer-pro-notice-card"><div className="customer-pro-card-head"><div><small>{pick("اعلان‌ها","NOTIFICATIONS")}</small><h2>{pick("آخرین پیام‌ها","Latest messages")}</h2></div><Link href="/panel/notifications">{pick("مشاهده همه","View all")} ←</Link></div><div className="customer-pro-notices">{notes.length?notes.slice(0,3).map(n=><div key={n.id}><span className={!n.is_read&&!n.read_at?"unread":""}/><div><b>{n.title||pick("اعلان","Notification")}</b><small>{n.message||n.body||"—"}</small></div></div>):<div className="customer-pro-no-note">{pick("اعلان جدیدی نداری.","You have no new notifications.")}</div>}</div></article>
     </section>
   </div>;
 }
 
-export function CustomerDashboardPro(){
-  return <PortalShell type="customer" active="/panel"><CustomerDashboardInner/></PortalShell>;
-}
+export function CustomerDashboardPro(){return <PortalShell type="customer" active="/panel"><CustomerDashboardInner/></PortalShell>;}
