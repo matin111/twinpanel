@@ -14,6 +14,7 @@ type PortalShellProps={children:React.ReactNode;active?:string;type:"customer"|"
 
 const customerMenu:MenuItem[]=[
   ["داشبورد","Dashboard","/panel","⌂"],
+  ["خرید اشتراک","Buy Subscription","/panel/buy","◇"],
   ["اشتراک من","My Subscription","/panel/subscription","▱"],
   ["اتصال و کانفیگ","Connection","/panel/connection","⌁"],
   ["مصرف","Usage","/panel/usage","◔"],
@@ -23,7 +24,7 @@ const customerMenu:MenuItem[]=[
   ["پشتیبانی","Support","/panel/support","◌"],
   ["اعلان‌ها","Notifications","/panel/notifications","◎"],
   ["پروفایل و امنیت","Profile & Security","/panel/profile","♙"],
-  ["فروشگاه","Store","/store","◇"]
+  ["فروشگاه عمومی","Public Store","/store","⌂"]
 ];
 
 const resellerMenu:MenuItem[]=[
@@ -76,8 +77,6 @@ function PortalFrame({children,active="",type}:PortalShellProps){
   const menu=type==="customer"?customerMenu:resellerMenu;
   const storageKey=`twinpanel.${type}.sidebar.collapsed`;
 
-  // Do not restore a stale collapsed value after hydration. That delayed state
-  // change was making the customer layout jump a few seconds after sign-in.
   const toggle=()=>setCollapsed(v=>{
     const n=!v;
     try{localStorage.setItem(storageKey,n?"1":"0");}catch{}
