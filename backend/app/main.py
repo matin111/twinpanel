@@ -19,6 +19,7 @@ from . import branding_models  # register reseller tables
 from . import storefront_settings_models  # TWINPANEL_STOREFRONT_CMS_V74
 from . import two_factor_models
 from . import runtime_settings_model
+from . import download_asset_models
 from .routers import admin, auth, nodes, plans, provision, subscriptions, tunnels, resellers, reseller_portal, domains, branding
 from .routers import bootstrap as bootstrap_router_module
 from .routers.two_factor import router as two_factor_router  # TWINPANEL_REAL_2FA_REGISTER_V1
@@ -31,6 +32,8 @@ from .routers.runtime_endpoints import router as runtime_endpoints_router
 from .routers.node_recovery import router as node_recovery_router
 from .routers.tunnel_managed import router as tunnel_managed_router
 from .routers.modern_transports import router as modern_transports_router
+from .routers.download_assets import admin_router as download_assets_admin_router, public_router as download_assets_public_router
+from .routers.public_connection_v3 import router as public_connection_v3_router
 from .self_hosted_runtime import apply_self_hosted_runtime
 from .admin_notification_service import notification_watch_loop
 # TWINPANEL_REAL_ADMIN_NOTIFICATION_REGISTER_V1
@@ -63,6 +66,7 @@ _ = renewal_models
 _ = two_factor_models
 _ = storefront_settings_models
 _ = runtime_settings_model
+_ = download_asset_models
 
 
 # TWINPANEL_ADMIN_PANEL_NOTIFICATION_REGISTER_V1
@@ -196,6 +200,8 @@ app.include_router(telegram_manager_router)
 app.include_router(customer_wallet_router)
 app.include_router(customer_wallet_admin_router)
 app.include_router(customer_subscription_management_router)
+app.include_router(download_assets_admin_router)
+app.include_router(download_assets_public_router)
 app.include_router(nodes.router)
 app.include_router(node_recovery_router)
 app.include_router(subscriptions.router)
@@ -211,6 +217,7 @@ app.include_router(branding.router)
 app.include_router(provision.router)
 app.include_router(quota_security.router)
 app.include_router(account_delivery.router)
+app.include_router(public_connection_v3_router)
 app.include_router(account_delivery.public_router)
 app.include_router(account_delivery.customer_router)
 
