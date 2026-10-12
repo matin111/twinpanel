@@ -67,7 +67,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
     });
   };
 
-  return <div className={`shell ${collapsed?"sidebar-collapsed":""} ${mobileOpen?"mobile-menu-open":""}`}>
+  return <div className={`shell admin-shell ${collapsed?"sidebar-collapsed":""} ${mobileOpen?"mobile-menu-open":""}`}>
     <aside className="sidebar" aria-label={pick("منوی اصلی","Main navigation")}>
       <div className="sidebar-head">
         <BrandMark/>
