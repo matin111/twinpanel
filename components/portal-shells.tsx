@@ -17,12 +17,10 @@ const customerMenu:MenuItem[]=[
   ["داشبورد","Dashboard","/panel","⌂"],
   ["خرید اشتراک","Buy Subscription","/panel/buy","◇"],
   ["اشتراک من","My Subscription","/panel/subscription","▱"],
-  ["اتصال و کانفیگ","Connection","/panel/connection","⌁"],
   ["مصرف","Usage","/panel/usage","◔"],
   ["سفارش‌ها","Orders","/panel/orders","▤"],
   ["کیف پول","Wallet","/panel/wallet","◉"],
   ["پرداخت‌ها","Payments","/panel/payments","◫"],
-  ["پشتیبانی","Support","/panel/support","◌"],
   ["اعلان‌ها","Notifications","/panel/notifications","◎"],
   ["پروفایل و امنیت","Profile & Security","/panel/profile","♙"]
 ];
