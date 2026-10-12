@@ -23,8 +23,7 @@ const customerMenu:MenuItem[]=[
   ["پرداخت‌ها","Payments","/panel/payments","◫"],
   ["پشتیبانی","Support","/panel/support","◌"],
   ["اعلان‌ها","Notifications","/panel/notifications","◎"],
-  ["پروفایل و امنیت","Profile & Security","/panel/profile","♙"],
-  ["فروشگاه عمومی","Public Store","/store","⌂"]
+  ["پروفایل و امنیت","Profile & Security","/panel/profile","♙"]
 ];
 
 const resellerMenu:MenuItem[]=[
