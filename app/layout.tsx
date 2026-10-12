@@ -24,6 +24,7 @@ import "./support-chat.css";
 import "./support-chat-emoji.css";
 import "./customer-runtime.css";
 import "./customer-dashboard-pro.css";
+import "./customer-buy-runtime.css";
 import "./domains-runtime.css";
 import "./store-mobile-access.css";
 import "./readability.css";
