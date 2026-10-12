@@ -21,6 +21,7 @@ import {CustomerPanelEntry} from "../../components/customer-panel-entry";
 import {CustomerBuyRuntime} from "../../components/customer-buy-runtime";
 import {CustomerPaymentsRuntime} from "../../components/customer-payments-runtime";
 import {CustomerSubscriptionsRuntime} from "../../components/customer-subscriptions-runtime";
+import {DownloadAssetsRuntime} from "../../components/download-assets-runtime";
 import {ResellerDashboardRuntime,ResellerSectionRuntime} from "../../components/reseller-runtime";
 import {StoreRuntime2027} from "../../components/store-runtime";
 import {AdminAuthGuard} from "../../components/admin-auth-guard";
@@ -58,6 +59,7 @@ const route=(key:string)=>{
   if(key==="admin/domains") return admin(<DomainsRuntimePage/>);
   if(key==="admin/provision") return admin(<ProvisionRuntimePage/>);
   if(key==="admin/account-delivery") return admin(<AccountDeliveryRuntimePage/>);
+  if(key==="admin/downloads") return admin(<DownloadAssetsRuntime/>);
   if(key==="admin/vpn-settings") return admin(<VpnSettingsPage/>);
   if(key==="admin/l2tp") return admin(<L2tpSettingsPage/>);
   if(key==="admin/mother-access") return admin(<MotherAccessRuntimePage/>);
