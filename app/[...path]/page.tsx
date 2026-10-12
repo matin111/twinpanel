@@ -18,6 +18,7 @@ import {SettingsPage2027} from "../../components/settings-2027";
 import {LoginPage2027,RegisterPage2027} from "../../components/login-2027";
 import {CustomerSectionRuntime} from "../../components/customer-runtime";
 import {CustomerPanelEntry} from "../../components/customer-panel-entry";
+import {CustomerBuyRuntime} from "../../components/customer-buy-runtime";
 import {ResellerDashboardRuntime,ResellerSectionRuntime} from "../../components/reseller-runtime";
 import {StoreRuntime2027} from "../../components/store-runtime";
 import {AdminAuthGuard} from "../../components/admin-auth-guard";
@@ -60,6 +61,7 @@ const route=(key:string)=>{
   if(key==="admin/mother-access") return admin(<MotherAccessRuntimePage/>);
   if(key==="admin/branding") return admin(<BrandingSettingsPage/>);
   if(key==="panel") return <CustomerPanelEntry/>;
+  if(key==="panel/buy") return <CustomerBuyRuntime/>;
   if(key==="reseller") return <ResellerDashboardRuntime/>;
   if(key==="store") return <StoreRuntime2027/>;
   if(key.startsWith("panel/")){
