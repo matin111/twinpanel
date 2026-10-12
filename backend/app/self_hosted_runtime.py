@@ -5,6 +5,7 @@ from pathlib import Path
 from .backhaul_multi_exit_v16 import install_backhaul_peer_v16
 from .config import settings
 from .database import SessionLocal
+from .modern_runtime_v17 import apply_modern_runtime_v17
 from .services.public_urls import api_base_url
 from .routers import nodes, provision, tunnels
 from .ssh_tunnel_self_hosted_v3 import provision_ssh_tunnel_self_hosted_v3
@@ -68,10 +69,13 @@ def apply_self_hosted_runtime() -> None:
     # users do not need to edit node configs manually.
     tunnels._install_backhaul_peer = install_backhaul_peer_v16
 
-    # SSH TUN is controller-owned in the self-hosted product. V3 keeps all node
-    # changes automatic, uses the V2 self-healing runtime, then performs a real
-    # key-authenticated fallback to the Backhaul private SSH path when public
-    # TCP/22 is reachable but the authenticated SSH session/tunnel is filtered.
+    # V17 restores the intended modern-managed architecture. Backhaul stays as
+    # the TP2027 carrier, while KCP/ARQ/QUIC/TCP are the primary transports.
+    # New create/repair flows no longer auto-provision MTunnel/SSH TUN again.
+    apply_modern_runtime_v17()
+
+    # SSH TUN support remains available for explicit legacy/manual use, but it
+    # is no longer automatically added to every managed tunnel by V17.
     tunnels.provision_ssh_tunnel = provision_ssh_tunnel_self_hosted_v3
 
     # nodes.py contains migrated cleanup code using Path but the historical
