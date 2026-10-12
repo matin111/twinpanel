@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import html
-import json
-from datetime import datetime
+import re
 from typing import Any
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
+from ..branding_models import BrandingSettings
 from ..database import get_db
 from ..models import User
 from .account_delivery import (
@@ -27,10 +27,6 @@ def h(value: Any) -> str:
     return html.escape(str(value if value is not None else ""), quote=True)
 
 
-def js(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False)
-
-
 def protocol_title(value: str) -> str:
     return {
         "cisco": "Cisco / OpenConnect",
@@ -42,85 +38,86 @@ def protocol_title(value: str) -> str:
     }.get(str(value or "").lower(), str(value or "Protocol"))
 
 
-def field_row(label: str, value: Any, copyable: bool = True) -> str:
+def safe_color(value: Any, fallback: str) -> str:
+    value = str(value or "").strip()
+    return value if re.fullmatch(r"#[0-9A-Fa-f]{6}", value) else fallback
+
+
+def field_row(label: str, value: Any, *, mono: bool = True) -> str:
     text = str(value or "").strip()
     if not text:
         return ""
-    copy = (
-        f'<button class="copy-btn" type="button" data-copy={h(js(text))}>کپی</button>'
-        if copyable
-        else ""
-    )
+    direction = ' dir="ltr"' if mono else ""
     return (
         '<div class="field-row">'
         f'<span>{h(label)}</span>'
-        f'<code dir="ltr">{h(text)}</code>'
-        f'{copy}'
+        f'<code{direction} title="{h(text)}">{h(text)}</code>'
+        f'<button class="copy-btn" type="button" data-copy="{h(text)}">کپی</button>'
         '</div>'
     )
 
 
-def item_html(protocol: str, item: dict[str, Any], index: int) -> str:
-    rows: list[str] = []
-    labels = {
-        "host": "سرور",
-        "server": "سرور",
-        "port": "پورت",
-        "username": "نام کاربری",
-        "password": "رمز عبور",
-        "psk": "PSK",
-        "uri": "لینک",
-        "endpoint": "Endpoint",
-    }
-    for key, label in labels.items():
-        if item.get(key) not in (None, ""):
-            rows.append(field_row(label, item.get(key)))
-
-    config = str(item.get("config") or "").strip()
+def server_item_html(protocol: str, item: dict[str, Any], index: int) -> str:
+    host = item.get("host") or item.get("server") or item.get("endpoint") or "—"
+    port = item.get("port") or "—"
+    psk = item.get("psk")
     uri = str(item.get("uri") or "").strip()
+    config = str(item.get("config") or "").strip()
     qr = str(item.get("qr") or "").strip()
 
-    config_block = ""
+    compact = (
+        '<div class="server-facts">'
+        f'<div><small>سرور</small><b dir="ltr">{h(host)}</b></div>'
+        f'<div><small>پورت</small><b dir="ltr">{h(port)}</b></div>'
+        + (f'<div><small>PSK</small><b dir="ltr">{h(psk)}</b></div>' if psk else "")
+        + '</div>'
+    )
+
+    actions: list[str] = []
+    if uri:
+        actions.append(f'<button type="button" class="soft copy-btn" data-copy="{h(uri)}">کپی لینک</button>')
+        actions.append(f'<a class="soft" href="{h(uri)}" target="_blank" rel="noopener noreferrer">باز کردن</a>')
+
+    details = ""
     if config:
+        config_id = f"cfg-{h(protocol)}-{index}"
         filename = f"{protocol}-{index + 1}.conf"
         if protocol == "openvpn":
             filename = f"openvpn-{index + 1}.ovpn"
         elif protocol == "wireguard":
             filename = f"wireguard-{index + 1}.conf"
-        config_block = (
-            '<div class="config-box">'
-            f'<textarea readonly dir="ltr">{h(config)}</textarea>'
+        details = (
+            '<details class="config-details">'
+            '<summary>کانفیگ این سرور</summary>'
+            f'<textarea id="{config_id}" readonly dir="ltr">{h(config)}</textarea>'
             '<div class="config-actions">'
-            f'<button type="button" class="copy-btn" data-copy={h(js(config))}>کپی کانفیگ</button>'
-            f'<button type="button" class="download-config" data-filename={h(js(filename))} data-content={h(js(config))}>دانلود کانفیگ</button>'
-            '</div></div>'
+            f'<button type="button" class="soft copy-target" data-target="{config_id}">کپی کانفیگ</button>'
+            f'<button type="button" class="soft download-config" data-target="{config_id}" data-filename="{h(filename)}">دانلود فایل</button>'
+            '</div></details>'
         )
 
-    uri_block = ""
-    if uri:
-        uri_block = (
-            '<div class="uri-actions">'
-            f'<button type="button" class="copy-btn" data-copy={h(js(uri))}>کپی لینک</button>'
-            f'<a href={h(js(uri))} target="_blank" rel="noopener noreferrer">باز کردن</a>'
-            '</div>'
-        )
-
-    qr_block = f'<img class="item-qr" src="{h(qr)}" alt="QR">' if qr else ""
+    qr_html = f'<img class="server-qr" src="{h(qr)}" alt="QR">' if qr else ""
 
     return (
-        '<div class="server-item">'
-        f'<div class="server-head"><b>سرور {index + 1}</b>{qr_block}</div>'
-        f'{"".join(rows)}{uri_block}{config_block}'
-        '</div>'
+        '<article class="server-row">'
+        f'<div class="server-index"><span>{index + 1}</span><b>سرور {index + 1}</b></div>'
+        f'{compact}'
+        f'<div class="server-actions">{"".join(actions)}</div>'
+        f'{qr_html}'
+        f'{details}'
+        '</article>'
     )
 
 
-def credentials_html(payload: dict[str, Any]) -> str:
+def credentials_tabs_html(payload: dict[str, Any]) -> tuple[str, str]:
     credentials = payload.get("credentials") or []
-    if not isinstance(credentials, list) or not credentials:
-        return '<div class="empty">اطلاعات اتصال هنوز آماده نشده است.</div>'
+    if not isinstance(credentials, list):
+        credentials = []
 
-    cards: list[str] = []
+    tabs: list[str] = []
+    panes: list[str] = []
+    pane_index = 0
+
     for cred in credentials:
         if not isinstance(cred, dict):
             continue
@@ -131,22 +128,30 @@ def credentials_html(payload: dict[str, Any]) -> str:
         if not isinstance(items, list):
             items = []
 
-        account_rows = []
-        if cred.get("username"):
-            account_rows.append(field_row("نام کاربری", cred.get("username")))
-        password = cred.get("password") or cred.get("secret")
-        if password:
-            account_rows.append(field_row("رمز عبور", password))
-
-        cards.append(
-            '<section class="protocol-card">'
-            f'<div class="protocol-head"><div><small>PROTOCOL</small><h2>{h(protocol_title(protocol))}</h2></div><span>{len(items)}</span></div>'
-            f'{"".join(account_rows)}'
-            f'<div class="server-list">{"".join(item_html(protocol, item if isinstance(item, dict) else {}, idx) for idx, item in enumerate(items))}</div>'
-            '</section>'
+        pane_id = f"protocol-{pane_index}"
+        active = " active" if pane_index == 0 else ""
+        tabs.append(
+            f'<button class="protocol-tab{active}" type="button" data-pane="{pane_id}">'
+            f'<span>{h(protocol_title(protocol))}</span><small>{len(items)} سرور</small>'
+            '</button>'
         )
 
-    return "".join(cards) or '<div class="empty">اطلاعات اتصال هنوز آماده نشده است.</div>'
+        rows = "".join(
+            server_item_html(protocol, item if isinstance(item, dict) else {}, idx)
+            for idx, item in enumerate(items)
+        ) or '<div class="empty">برای این پروتکل هنوز سروری آماده نشده است.</div>'
+
+        panes.append(
+            f'<section id="{pane_id}" class="protocol-pane{active}">'
+            f'<div class="protocol-pane-head"><div><small>PROTOCOL</small><h2>{h(protocol_title(protocol))}</h2></div><span>{len(items)} سرور</span></div>'
+            f'<div class="server-list">{rows}</div>'
+            '</section>'
+        )
+        pane_index += 1
+
+    if not tabs:
+        return "", '<div class="empty">اطلاعات اتصال هنوز آماده نشده است.</div>'
+    return "".join(tabs), "".join(panes)
 
 
 def downloads_html(downloads: dict[str, list[dict]]) -> str:
@@ -162,10 +167,10 @@ def downloads_html(downloads: dict[str, list[dict]]) -> str:
         items = downloads.get(platform) or []
         if not items:
             continue
-        links = []
+        links: list[str] = []
         for item in items:
             size = int(item.get("file_size") or 0)
-            size_label = f"{size / 1024 / 1024:.1f} MB" if size else ""
+            size_label = f"{size / 1024 / 1024:.1f} MB" if size else "دانلود"
             links.append(
                 '<a class="download-item" href="{}">'
                 '<div><b>{}</b><small>{}</small></div>'
@@ -174,13 +179,13 @@ def downloads_html(downloads: dict[str, list[dict]]) -> str:
                     h(item.get("url") or "#"),
                     h(item.get("name") or "Download"),
                     h(item.get("note") or ""),
-                    h(size_label or "دانلود"),
+                    h(size_label),
                 )
             )
         groups.append(
             f'<section class="download-group"><h3>{h(labels[platform])}</h3><div class="download-list">{"".join(links)}</div></section>'
         )
-    return "".join(groups) or '<div class="empty">فایل دانلودی توسط مدیر اضافه نشده است.</div>'
+    return "".join(groups) or '<div class="empty">هنوز فایل دانلودی توسط مدیر اضافه نشده است.</div>'
 
 
 @router.get("/{token}", response_class=HTMLResponse)
@@ -189,79 +194,99 @@ def public_connection_page_v2(token: str, db: Session = Depends(get_db)):
     payload = _public_payload(db, sub)
     usage = _usage_payload(db, sub)
     user = db.get(User, sub.user_id)
+    branding = db.query(BrandingSettings).first()
+
+    brand_name = str(getattr(branding, "brand_name", None) or "TwinPanel").strip() or "TwinPanel"
+    brand_mark = next((ch.upper() for ch in brand_name if not ch.isspace()), "T")
+    primary = safe_color(getattr(branding, "primary_color", None), "#8B5CF6")
+    secondary = safe_color(getattr(branding, "secondary_color", None), "#6D28D9")
 
     status = str(getattr(sub.status, "value", sub.status)).lower()
     share_url = _share_url(db, sub)
     account = payload.get("account") if isinstance(payload.get("account"), dict) else {}
     username = str((account or {}).get("username") or getattr(sub, "account_username", "") or "")
-    password = str((account or {}).get("password") or getattr(sub, "account_password_encrypted", "") or "")
+    # Never expose the encrypted database value as a password.
+    password = str((account or {}).get("password") or "")
 
     used = float(usage.get("used_gb") or 0)
     total = usage.get("total_gb")
     remaining = usage.get("remaining_gb")
-    percent = float(usage.get("percent") or 0)
+    percent = max(0.0, min(100.0, float(usage.get("percent") or 0)))
     expires = sub.expires_at.strftime("%Y/%m/%d") if sub.expires_at else "—"
     customer_name = (getattr(user, "full_name", None) or getattr(user, "email", None) or "کاربر") if user else "کاربر"
     downloads = public_downloads_by_platform(db)
+    tabs_html, panes_html = credentials_tabs_html(payload)
 
-    if status != "active":
-        state_banner = '<div class="state-banner bad">این اشتراک در حال حاضر فعال نیست.</div>'
-    else:
-        state_banner = '<div class="state-banner ok">اشتراک فعال است</div>'
+    state_banner = (
+        '<div class="state-banner ok"><span></span>اشتراک فعال است</div>'
+        if status == "active"
+        else '<div class="state-banner bad"><span></span>اشتراک در حال حاضر فعال نیست</div>'
+    )
 
     account_box = (
         '<section class="account-card">'
-        '<div class="section-head"><div><small>ACCOUNT</small><h2>اطلاعات حساب</h2></div></div>'
+        '<div class="card-title"><div><small>ACCOUNT</small><h2>اطلاعات حساب</h2></div></div>'
+        '<div class="account-fields">'
         f'{field_row("نام کاربری", username)}'
         f'{field_row("رمز عبور", password)}'
         f'{field_row("لینک اشتراک", share_url)}'
-        '</section>'
+        '</div></section>'
     )
 
+    total_label = "∞" if total is None else f"{float(total or 0):.1f} GB"
+    remaining_label = "∞" if remaining is None else f"{float(remaining or 0):.1f} GB"
+
     page = f'''<!doctype html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="rtl" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="dark light">
-<title>اتصال سرویس #{sub.id}</title>
+<title>{h(brand_name)} · اشتراک #{sub.id}</title>
 <style>
-:root{{--bg:#070b14;--surface:#0d1423;--surface2:#111b2e;--line:#22304a;--text:#f4f7ff;--muted:#8896b3;--purple:#8b5cf6;--purple2:#6d28d9;--green:#22c55e;--red:#ef4444}}
-*{{box-sizing:border-box}}html{{background:var(--bg)}}body{{margin:0;background:radial-gradient(circle at 80% -10%,rgba(124,58,237,.18),transparent 28%),var(--bg);color:var(--text);font-family:Tahoma,Arial,sans-serif;min-height:100vh}}button,a{{font:inherit}}a{{color:inherit;text-decoration:none}}.wrap{{width:min(1120px,94vw);margin:auto;padding:28px 0 60px}}.top{{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px}}.brand{{display:flex;align-items:center;gap:10px;font-weight:900}}.brand-mark{{width:38px;height:38px;border-radius:13px;background:linear-gradient(135deg,var(--purple),var(--purple2));display:grid;place-items:center;box-shadow:0 12px 30px rgba(109,40,217,.3)}}.theme{{width:40px;height:40px;border:1px solid var(--line);background:var(--surface);border-radius:12px;color:var(--text);cursor:pointer}}.hero{{display:grid;grid-template-columns:1fr auto;gap:22px;align-items:center;padding:26px;border:1px solid rgba(139,92,246,.28);border-radius:24px;background:linear-gradient(135deg,rgba(124,58,237,.13),rgba(13,20,35,.96));margin-bottom:18px}}.hero h1{{margin:0 0 8px;font-size:30px}}.hero p{{margin:0;color:var(--muted);font-size:13px}}.hero-stats{{display:grid;grid-template-columns:repeat(3,110px);gap:8px}}.hero-stats span{{padding:13px;border:1px solid var(--line);border-radius:14px;background:rgba(8,13,24,.55);text-align:center}}.hero-stats b{{display:block;font-size:18px}}.hero-stats small{{color:var(--muted);font-size:9px}}.state-banner{{padding:11px 14px;border-radius:12px;margin-bottom:16px;font-size:12px;font-weight:900}}.state-banner.ok{{background:rgba(34,197,94,.09);border:1px solid rgba(34,197,94,.25);color:#86efac}}.state-banner.bad{{background:rgba(239,68,68,.09);border:1px solid rgba(239,68,68,.25);color:#fca5a5}}.grid{{display:grid;grid-template-columns:360px minmax(0,1fr);gap:16px;align-items:start}}.account-card,.protocol-card,.downloads{{border:1px solid var(--line);background:linear-gradient(180deg,var(--surface),rgba(10,16,28,.98));border-radius:20px;padding:18px}}.account-card{{position:sticky;top:16px}}.section-head,.protocol-head{{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}}.section-head small,.protocol-head small{{color:#a78bfa;font-size:9px;font-weight:900;letter-spacing:.12em}}.section-head h2,.protocol-head h2{{margin:4px 0 0;font-size:18px}}.protocol-head>span{{min-width:32px;height:32px;border-radius:10px;background:rgba(124,58,237,.13);display:grid;place-items:center;color:#c4b5fd}}.field-row{{display:grid;grid-template-columns:82px minmax(0,1fr) auto;align-items:center;gap:8px;padding:9px 0;border-bottom:1px dashed var(--line)}}.field-row>span{{color:var(--muted);font-size:10px}}.field-row code{{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-family:ui-monospace,Consolas,monospace;font-size:11px}}.copy-btn,.download-config,.uri-actions a{{height:34px;padding:0 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface2);color:var(--text);cursor:pointer;font-size:10px}}.copy-btn:hover,.download-config:hover,.uri-actions a:hover{{border-color:rgba(139,92,246,.65)}}.protocols{{display:grid;gap:14px}}.server-list{{display:grid;gap:10px}}.server-item{{padding:13px;border:1px solid var(--line);border-radius:14px;background:var(--surface2)}}.server-head{{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px}}.server-head b{{font-size:11px}}.item-qr{{width:72px;height:72px;background:#fff;border-radius:10px;padding:4px}}.config-box{{margin-top:10px}}.config-box textarea{{width:100%;min-height:110px;resize:vertical;padding:10px;border:1px solid var(--line);border-radius:10px;background:#080d17;color:#dbeafe;font:10px/1.7 ui-monospace,Consolas,monospace}}.config-actions,.uri-actions{{display:flex;gap:7px;margin-top:7px}}.uri-actions a{{display:inline-flex;align-items:center}}.downloads{{margin-top:16px}}.downloads-grid{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}}.download-group{{padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface2)}}.download-group h3{{margin:0 0 10px;font-size:13px}}.download-list{{display:grid;gap:7px}}.download-item{{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px;border:1px solid var(--line);border-radius:11px;background:rgba(6,10,18,.45)}}.download-item b{{display:block;font-size:10px}}.download-item small{{display:block;margin-top:3px;color:var(--muted);font-size:8px}}.download-item>span{{color:#c4b5fd;font-size:9px;white-space:nowrap}}.empty{{padding:18px;border:1px dashed var(--line);border-radius:13px;color:var(--muted);text-align:center;font-size:11px}}
-html[data-theme="light"]{{--bg:#f6f8fd;--surface:#fff;--surface2:#f8faff;--line:#dfe7f4;--text:#15203c;--muted:#71809f}}html[data-theme="light"] body{{background:radial-gradient(circle at 80% -10%,rgba(124,58,237,.10),transparent 28%),var(--bg)}}html[data-theme="light"] .config-box textarea{{background:#f7f9fd;color:#15203c}}
-@media(max-width:900px){{.grid{{grid-template-columns:1fr}}.account-card{{position:static}}.hero{{grid-template-columns:1fr}}.hero-stats{{grid-template-columns:repeat(3,1fr)}}}}@media(max-width:620px){{.wrap{{width:min(94vw,540px);padding-top:16px}}.hero{{padding:18px;border-radius:18px}}.hero h1{{font-size:23px}}.hero-stats{{gap:5px}}.hero-stats span{{padding:9px 6px}}.downloads-grid{{grid-template-columns:1fr}}.field-row{{grid-template-columns:1fr auto}}.field-row>span{{grid-column:1/-1}}.field-row code{{white-space:normal;word-break:break-all}}}}
+:root{{--bg:#070b14;--surface:#0d1423;--surface2:#111a2b;--surface3:#151f33;--line:#22304a;--text:#f4f7ff;--muted:#8997b4;--primary:{primary};--secondary:{secondary};--green:#22c55e;--red:#ef4444;--shadow:0 20px 60px rgba(0,0,0,.18)}}
+*{{box-sizing:border-box}}html{{background:var(--bg)}}body{{margin:0;min-height:100vh;background:radial-gradient(circle at 82% -12%,color-mix(in srgb,var(--primary) 18%,transparent),transparent 30%),var(--bg);color:var(--text);font-family:Tahoma,Arial,sans-serif;-webkit-font-smoothing:antialiased}}button,a,input,textarea{{font:inherit}}button{{cursor:pointer}}a{{color:inherit;text-decoration:none}}.wrap{{width:min(1180px,94vw);margin:auto;padding:24px 0 56px}}.topbar{{height:54px;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}}.brand{{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:900}}.brand-mark{{width:36px;height:36px;display:grid;place-items:center;border-radius:12px;background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff;box-shadow:0 10px 26px color-mix(in srgb,var(--primary) 28%,transparent)}}.theme-btn{{width:38px;height:38px;border:1px solid var(--line);border-radius:11px;background:var(--surface);color:var(--text)}}
+.hero{{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:22px;padding:24px;border:1px solid color-mix(in srgb,var(--primary) 28%,var(--line));border-radius:22px;background:linear-gradient(135deg,color-mix(in srgb,var(--primary) 13%,var(--surface)),var(--surface));box-shadow:var(--shadow)}}.hero-copy small{{display:block;color:#b9a5ff;font-size:9px;font-weight:900;letter-spacing:.14em}}.hero-copy h1{{margin:5px 0 6px;font-size:28px}}.hero-copy p{{margin:0;color:var(--muted);font-size:11px}}.hero-stats{{display:grid;grid-template-columns:repeat(3,105px);gap:8px}}.hero-stat{{padding:12px 8px;border:1px solid var(--line);border-radius:13px;background:color-mix(in srgb,var(--surface2) 86%,transparent);text-align:center}}.hero-stat b{{display:block;font-size:16px}}.hero-stat small{{display:block;margin-top:4px;color:var(--muted);font-size:8px}}.usage-track{{height:5px;border-radius:999px;background:var(--surface3);overflow:hidden;margin-top:12px}}.usage-track i{{display:block;height:100%;width:{percent:.1f}%;background:linear-gradient(90deg,var(--primary),#a78bfa);border-radius:inherit}}.state-banner{{display:flex;align-items:center;gap:8px;margin:12px 0;padding:9px 12px;border-radius:11px;font-size:10px;font-weight:900}}.state-banner span{{width:7px;height:7px;border-radius:50%;background:currentColor}}.state-banner.ok{{color:#86efac;background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.20)}}.state-banner.bad{{color:#fca5a5;background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.20)}}
+.account-card,.connection-card,.downloads-card{{border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,var(--surface),color-mix(in srgb,var(--surface) 94%,#000));box-shadow:var(--shadow)}}.account-card{{padding:16px;margin-bottom:12px}}.card-title,.connection-head{{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}}.card-title small,.connection-head small,.protocol-pane-head small{{color:#a78bfa;font-size:8px;font-weight:900;letter-spacing:.14em}}.card-title h2,.connection-head h2,.protocol-pane-head h2{{margin:3px 0 0;font-size:16px}}.account-fields{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}}.field-row{{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px;min-height:46px;padding:7px 9px;border:1px solid var(--line);border-radius:11px;background:var(--surface2)}}.field-row>span{{font-size:8px;color:var(--muted);white-space:nowrap}}.field-row code{{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:10px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--text)}}.copy-btn,.soft{{height:31px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface3);color:var(--text);font-size:9px}}.copy-btn:hover,.soft:hover{{border-color:color-mix(in srgb,var(--primary) 70%,var(--line));background:color-mix(in srgb,var(--primary) 9%,var(--surface3))}}
+.connection-card{{padding:16px}}.protocol-tabs{{display:flex;gap:7px;overflow:auto;padding:2px 0 10px;scrollbar-width:thin}}.protocol-tab{{min-width:max-content;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface2);color:var(--muted);text-align:right}}.protocol-tab span{{display:block;font-size:10px;font-weight:900}}.protocol-tab small{{display:block;margin-top:3px;font-size:7px;color:inherit}}.protocol-tab.active{{border-color:color-mix(in srgb,var(--primary) 62%,var(--line));background:color-mix(in srgb,var(--primary) 12%,var(--surface2));color:var(--text)}}.protocol-pane{{display:none}}.protocol-pane.active{{display:block}}.protocol-pane-head{{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0 11px}}.protocol-pane-head>span{{padding:5px 9px;border-radius:999px;background:color-mix(in srgb,var(--primary) 11%,var(--surface2));color:#c4b5fd;font-size:8px}}.server-list{{display:grid;gap:8px}}.server-row{{position:relative;display:grid;grid-template-columns:100px minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:11px;border:1px solid var(--line);border-radius:12px;background:var(--surface2)}}.server-index{{display:flex;align-items:center;gap:7px}}.server-index span{{width:25px;height:25px;display:grid;place-items:center;border-radius:8px;background:color-mix(in srgb,var(--primary) 13%,var(--surface3));color:#c4b5fd;font-size:9px}}.server-index b{{font-size:9px;white-space:nowrap}}.server-facts{{display:flex;align-items:center;gap:18px;min-width:0}}.server-facts>div{{min-width:95px}}.server-facts small{{display:block;color:var(--muted);font-size:7px}}.server-facts b{{display:block;margin-top:2px;font:10px ui-monospace,SFMono-Regular,Consolas,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}.server-actions{{display:flex;gap:5px}}.server-qr{{width:48px;height:48px;padding:3px;border-radius:8px;background:#fff}}.config-details{{grid-column:1/-1;margin-top:2px;border-top:1px dashed var(--line);padding-top:8px}}.config-details summary{{cursor:pointer;color:#c4b5fd;font-size:9px;font-weight:900}}.config-details textarea{{width:100%;min-height:120px;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:9px;background:#080d17;color:#dbeafe;font:9px/1.65 ui-monospace,Consolas,monospace;resize:vertical}}.config-actions{{display:flex;gap:6px;margin-top:6px}}.empty{{padding:18px;border:1px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center;font-size:10px}}
+.downloads-card{{margin-top:12px;padding:16px}}.downloads-grid{{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}}.download-group{{padding:11px;border:1px solid var(--line);border-radius:12px;background:var(--surface2)}}.download-group h3{{margin:0 0 8px;font-size:11px}}.download-list{{display:grid;gap:6px}}.download-item{{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 9px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}}.download-item b{{display:block;font-size:9px}}.download-item small{{display:block;margin-top:2px;color:var(--muted);font-size:7px}}.download-item>span{{color:#c4b5fd;font-size:8px;white-space:nowrap}}
+.toast{{position:fixed;left:50%;bottom:24px;transform:translate(-50%,15px);padding:9px 14px;border:1px solid var(--line);border-radius:10px;background:#111827;color:#fff;font-size:9px;opacity:0;pointer-events:none;transition:.18s;z-index:20}}.toast.show{{opacity:1;transform:translate(-50%,0)}}
+html[data-theme="light"]{{--bg:#f6f8fd;--surface:#fff;--surface2:#f8faff;--surface3:#eef3fb;--line:#dfe7f4;--text:#15203c;--muted:#71809f}}html[data-theme="light"] body{{background:radial-gradient(circle at 82% -12%,color-mix(in srgb,var(--primary) 10%,transparent),transparent 30%),var(--bg)}}html[data-theme="light"] .config-details textarea{{background:#f7f9fd;color:#15203c}}html[data-theme="light"] .toast{{background:#15203c;color:#fff}}
+@media(max-width:860px){{.hero{{grid-template-columns:1fr}}.hero-stats{{grid-template-columns:repeat(3,1fr)}}.account-fields{{grid-template-columns:1fr}}.server-row{{grid-template-columns:90px minmax(0,1fr) auto}}.server-qr{{grid-column:3;grid-row:1}}.server-actions{{grid-column:1/-1}}.downloads-grid{{grid-template-columns:1fr}}}}@media(max-width:560px){{.wrap{{width:94vw;padding-top:12px}}.hero{{padding:17px;border-radius:17px}}.hero-copy h1{{font-size:22px}}.hero-stats{{gap:5px}}.hero-stat{{padding:9px 4px}}.hero-stat b{{font-size:12px}}.server-row{{grid-template-columns:1fr auto}}.server-index{{grid-column:1}}.server-qr{{grid-column:2;grid-row:1/3}}.server-facts{{grid-column:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}}.server-facts>div{{min-width:0}}.server-actions{{grid-column:1/-1;flex-wrap:wrap}}.server-actions>*{{flex:1;justify-content:center;text-align:center}}}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header class="top"><div class="brand"><span class="brand-mark">T</span><span>TwinPanel</span></div><button id="themeBtn" class="theme" type="button">◐</button></header>
-  <section class="hero"><div><h1>سرویس #{sub.id}</h1><p>{h(customer_name)} · انقضا {h(expires)}</p></div><div class="hero-stats"><span><b>{h(f'{used:.1f} GB')}</b><small>مصرف</small></span><span><b>{h('∞' if total is None else f'{float(total or 0):.1f} GB')}</b><small>حجم کل</small></span><span><b>{h('∞' if remaining is None else f'{float(remaining or 0):.1f} GB')}</b><small>باقی‌مانده</small></span></div></section>
+  <header class="topbar"><div class="brand"><span class="brand-mark">{h(brand_mark)}</span><span>{h(brand_name)}</span></div><button id="themeBtn" class="theme-btn" type="button">◐</button></header>
+  <section class="hero">
+    <div class="hero-copy"><small>SUBSCRIPTION</small><h1>اشتراک #{sub.id}</h1><p>{h(customer_name)} · انقضا {h(expires)}</p><div class="usage-track"><i></i></div></div>
+    <div class="hero-stats"><div class="hero-stat"><b>{h(f'{used:.1f} GB')}</b><small>مصرف</small></div><div class="hero-stat"><b>{h(total_label)}</b><small>حجم کل</small></div><div class="hero-stat"><b>{h(remaining_label)}</b><small>باقی‌مانده</small></div></div>
+  </section>
   {state_banner}
-  <div class="grid">
-    {account_box}
-    <div class="protocols">{credentials_html(payload)}</div>
-  </div>
-  <section class="downloads"><div class="section-head"><div><small>DOWNLOADS</small><h2>دانلود برنامه‌ها</h2></div></div><div class="downloads-grid">{downloads_html(downloads)}</div></section>
+  {account_box}
+  <section class="connection-card"><div class="connection-head"><div><small>CONNECTION</small><h2>اتصال و کانفیگ</h2></div></div><div class="protocol-tabs">{tabs_html}</div><div class="protocol-panes">{panes_html}</div></section>
+  <section class="downloads-card"><div class="card-title"><div><small>DOWNLOADS</small><h2>برنامه‌های اتصال</h2></div></div><div class="downloads-grid">{downloads_html(downloads)}</div></section>
 </div>
+<div id="toast" class="toast">کپی شد</div>
 <script>
 (function(){{
-  var root=document.documentElement;
-  var saved='';try{{saved=localStorage.getItem('twinpanel.connect.theme')||''}}catch(e){{}}
-  if(saved)root.dataset.theme=saved;
+  var root=document.documentElement, toast=document.getElementById('toast');
+  try{{var saved=localStorage.getItem('twinpanel.connect.theme');if(saved)root.dataset.theme=saved}}catch(e){{}}
   document.getElementById('themeBtn').addEventListener('click',function(){{var next=root.dataset.theme==='light'?'dark':'light';root.dataset.theme=next;try{{localStorage.setItem('twinpanel.connect.theme',next)}}catch(e){{}}}});
 
-  function fallbackCopy(text){{
-    var ta=document.createElement('textarea');ta.value=text;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();ta.setSelectionRange(0,ta.value.length);var ok=false;try{{ok=document.execCommand('copy')}}catch(e){{}}document.body.removeChild(ta);return ok;
-  }}
-  async function copyText(text){{
-    if(navigator.clipboard && window.isSecureContext){{try{{await navigator.clipboard.writeText(text);return true}}catch(e){{}}}}
-    return fallbackCopy(text);
-  }}
+  function showToast(text){{toast.textContent=text;toast.classList.add('show');clearTimeout(window.__tpToast);window.__tpToast=setTimeout(function(){{toast.classList.remove('show')}},1200)}}
+  function fallbackCopy(text){{var ta=document.createElement('textarea');ta.value=text;ta.setAttribute('readonly','');ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();ta.setSelectionRange(0,ta.value.length);var ok=false;try{{ok=document.execCommand('copy')}}catch(e){{}}ta.remove();return ok}}
+  async function copyText(text){{if(navigator.clipboard&&window.isSecureContext){{try{{await navigator.clipboard.writeText(text);return true}}catch(e){{}}}}return fallbackCopy(text)}}
+
+  document.querySelectorAll('.protocol-tab').forEach(function(btn){{btn.addEventListener('click',function(){{var id=btn.getAttribute('data-pane');document.querySelectorAll('.protocol-tab').forEach(function(x){{x.classList.remove('active')}});document.querySelectorAll('.protocol-pane').forEach(function(x){{x.classList.remove('active')}});btn.classList.add('active');var pane=document.getElementById(id);if(pane)pane.classList.add('active')}})}});
+
   document.addEventListener('click',async function(ev){{
     var copy=ev.target.closest('[data-copy]');
-    if(copy){{var text='';try{{text=JSON.parse(copy.getAttribute('data-copy'))}}catch(e){{text=copy.getAttribute('data-copy')||''}}var old=copy.textContent;var ok=await copyText(text);copy.textContent=ok?'✓ کپی شد':'کپی نشد';setTimeout(function(){{copy.textContent=old}},1200);return;}}
+    if(copy){{var ok=await copyText(copy.getAttribute('data-copy')||'');showToast(ok?'کپی شد':'کپی نشد');return}}
+    var targetCopy=ev.target.closest('.copy-target');
+    if(targetCopy){{var node=document.getElementById(targetCopy.getAttribute('data-target')||'');var ok2=node?await copyText(node.value||node.textContent||''):false;showToast(ok2?'کپی شد':'کپی نشد');return}}
     var dl=ev.target.closest('.download-config');
-    if(dl){{var content='',filename='config.txt';try{{content=JSON.parse(dl.getAttribute('data-content'));filename=JSON.parse(dl.getAttribute('data-filename'))}}catch(e){{}}var blob=new Blob([content],{{type:'text/plain;charset=utf-8'}});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){{URL.revokeObjectURL(url)}},1000);}}
+    if(dl){{var node2=document.getElementById(dl.getAttribute('data-target')||'');if(!node2)return;var blob=new Blob([node2.value||node2.textContent||''],{{type:'text/plain;charset=utf-8'}});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=dl.getAttribute('data-filename')||'config.txt';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){{URL.revokeObjectURL(url)}},1000)}}
   }});
 }})();
 </script>
