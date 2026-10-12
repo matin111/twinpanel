@@ -5,7 +5,7 @@ from pathlib import Path
 from .backhaul_multi_exit_v16 import install_backhaul_peer_v16
 from .config import settings
 from .database import SessionLocal
-from .modern_runtime_v17 import apply_modern_runtime_v17
+from .modern_runtime_v18 import apply_modern_runtime_v18
 from .services.public_urls import api_base_url
 from .routers import nodes, provision, tunnels
 from .ssh_tunnel_self_hosted_v3 import provision_ssh_tunnel_self_hosted_v3
@@ -49,9 +49,7 @@ async def _self_hosted_install_or_upgrade_agent(
     Caller-supplied legacy controller URLs are ignored.
     """
 
-    requested = (
-        _resolved_public_api_base()
-    )
+    requested = _resolved_public_api_base()
 
     return await _original_install_or_upgrade_agent(
         conn,
@@ -64,18 +62,16 @@ def apply_self_hosted_runtime() -> None:
     # tunnels.py imports this function by name, so patch the module binding.
     tunnels._install_or_upgrade_agent = _self_hosted_install_or_upgrade_agent
 
-    # V16 removes a shared-Iran collision in Backhaul's historical hard-coded
-    # forwarded mapping. The panel remains the owner of installation/repair;
-    # users do not need to edit node configs manually.
+    # Keep the collision-free Backhaul installer available for explicit legacy
+    # use. V18 no longer requires Backhaul as the carrier for modern TP2027.
     tunnels._install_backhaul_peer = install_backhaul_peer_v16
 
-    # V17 restores the intended modern-managed architecture. Backhaul stays as
-    # the TP2027 carrier, while KCP/ARQ/QUIC/TCP are the primary transports.
-    # New create/repair flows no longer auto-provision MTunnel/SSH TUN again.
-    apply_modern_runtime_v17()
+    # V18: KCP/ARQ/QUIC/TCP use independent public underlays. This allows one
+    # Iran node to fan out to several Exit nodes without per-Exit Backhaul
+    # licensing/runtime coupling.
+    apply_modern_runtime_v18()
 
-    # SSH TUN support remains available for explicit legacy/manual use, but it
-    # is no longer automatically added to every managed tunnel by V17.
+    # SSH TUN remains available for explicit legacy/manual use only.
     tunnels.provision_ssh_tunnel = provision_ssh_tunnel_self_hosted_v3
 
     # nodes.py contains migrated cleanup code using Path but the historical

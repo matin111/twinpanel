@@ -3,7 +3,15 @@
 import {API_BASE} from "./api";
 import {getCustomerToken} from "./customer-api";
 
-export type TunnelTransportName="ssh_tun"|"backhaul"|"mtunnel";
+export type TunnelTransportName=
+  |"kcp_2027"
+  |"arq_2027"
+  |"quic_2027"
+  |"tcp_2027"
+  |"backhaul"
+  |"mtunnel"
+  |"ssh_tun"
+  |"ssh_relay";
 export type TunnelTransportMode="auto"|"manual";
 export type TunnelTransportRow={
   id?:number;
@@ -34,6 +42,14 @@ function errorText(payload:unknown,status:number){
     const row=payload as {detail?:unknown;message?:unknown};
     if(typeof row.detail==="string")return row.detail;
     if(typeof row.message==="string")return row.message;
+    if(row.detail&&typeof row.detail==="object"){
+      const detail=row.detail as {message?:unknown;errors?:unknown};
+      const message=typeof detail.message==="string"?detail.message:"";
+      const errors=detail.errors&&typeof detail.errors==="object"
+        ?Object.entries(detail.errors as Record<string,unknown>).map(([key,value])=>`${key}: ${String(value)}`).join(" | ")
+        :"";
+      if(message||errors)return [message,errors].filter(Boolean).join(" — ");
+    }
     if(Array.isArray(row.detail))return row.detail.map(item=>typeof item==="object"&&item&&"msg" in item?String((item as {msg:unknown}).msg):String(item)).join("، ");
   }
   return `API error ${status}`;
@@ -54,6 +70,8 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
 export const tunnelTransportApi={
   transports:(id:number)=>request<TunnelTransportState>(`/v1/tunnels/${id}/transports`),
   setMode:(id:number,payload:{mode:TunnelTransportMode;transport?:TunnelTransportName})=>request<TunnelTransportState>(`/v1/tunnels/${id}/transport-mode`,{method:"POST",body:JSON.stringify(payload)}),
+  managedDiagnose:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/managed-diagnose`),
+  managedRepair:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/managed-repair`,{method:"POST"}),
   installSsh:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/ssh/install`,{method:"POST"}),
   installBackhaul:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/backhaul/install`,{method:"POST"}),
   backhaulStatus:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/backhaul/status`),
