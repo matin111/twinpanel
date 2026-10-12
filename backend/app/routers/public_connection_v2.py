@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..branding_models import BrandingSettings
 from ..database import get_db
-from ..models import User
+from ..models import Node, User
 from .account_delivery import (
     DOWNLOADS,
     _public_payload,
@@ -36,13 +36,13 @@ def safe_color(value: Any, fallback: str) -> str:
 def protocol_meta(protocol: str) -> tuple[str, str, str, str]:
     protocol = str(protocol or "").lower()
     return {
-        "cisco": ("Cisco AnyConnect", "OpenConnect", "C", "#27b7d6"),
-        "openvpn": ("OpenVPN", "فایل و اتصال", "O", "#ff8a24"),
-        "wireguard": ("WireGuard", "فایل + QR", "W", "#ef476f"),
-        "l2tp": ("L2TP / IPsec", "IPsec", "L2TP", "#74d63f"),
-        "v2ray": ("V2Ray / Xray", "لینک + QR", "V", "#7c3aed"),
-        "xray": ("V2Ray / Xray", "لینک + QR", "V", "#7c3aed"),
-    }.get(protocol, (protocol or "Protocol", "اتصال", "•", "#8b5cf6"))
+        "cisco": ("Cisco AnyConnect", "IP + Username + Password", "C", "#27b7d6"),
+        "openvpn": ("OpenVPN", "دانلود کانفیگ", "O", "#ff8a24"),
+        "wireguard": ("WireGuard", "دانلود کانفیگ", "W", "#ef476f"),
+        "l2tp": ("L2TP / IPsec", "IP + Username + Password + PSK", "L2TP", "#74d63f"),
+        "v2ray": ("V2Ray / Xray", "دانلود کانفیگ", "V", "#7c3aed"),
+        "xray": ("V2Ray / Xray", "دانلود کانفیگ", "V", "#7c3aed"),
+    }.get(protocol, (protocol or "Protocol", "کانفیگ", "•", "#8b5cf6"))
 
 
 def platform_meta(platform: str) -> tuple[str, str]:
@@ -74,11 +74,82 @@ def fact_card(label: str, value: Any, *, copy: bool = True) -> str:
     )
 
 
+def live_server_name(
+    item: dict[str, Any],
+    node_names: dict[int, str],
+    index: int,
+) -> str:
+    try:
+        node_id = int(item.get("node_id"))
+    except (TypeError, ValueError):
+        node_id = 0
+
+    return str(
+        node_names.get(node_id)
+        or item.get("node")
+        or item.get("name")
+        or item.get("label")
+        or item.get("country")
+        or item.get("location")
+        or f"Server {index + 1}"
+    ).strip()
+
+
+def download_only_card(
+    protocol: str,
+    index: int,
+    server_name: str,
+    item: dict[str, Any],
+) -> str:
+    config = str(item.get("config") or "").strip()
+    uri = str(item.get("uri") or "").strip()
+    payload = config or uri
+
+    if not payload:
+        return (
+            '<div class="config-only empty-config">'
+            f'<div><small>سرور</small><strong>{h(server_name)}</strong></div>'
+            '<span>کانفیگ این سرور هنوز آماده نشده است.</span>'
+            '</div>'
+        )
+
+    source_id = f"download-source-{protocol}-{index}"
+    filename = str(item.get("filename") or "").strip()
+    if not filename:
+        if protocol == "openvpn":
+            filename = f"openvpn-{index + 1}.ovpn"
+        elif protocol == "wireguard":
+            filename = f"wireguard-{index + 1}.conf"
+        elif protocol in {"v2ray", "xray"}:
+            filename = f"v2ray-{index + 1}.txt"
+        else:
+            filename = f"{protocol}-{index + 1}.conf"
+
+    kind = {
+        "openvpn": "OVPN",
+        "wireguard": "CONF",
+        "v2ray": "V2RAY",
+        "xray": "XRAY",
+    }.get(protocol, "CONFIG")
+
+    return (
+        '<div class="config-only">'
+        '<div class="config-only-copy">'
+        '<span class="config-file-icon">↓</span>'
+        f'<div><small>کانفیگ سرور</small><strong>{h(server_name)}</strong><em>{h(kind)}</em></div>'
+        '</div>'
+        f'<textarea id="{h(source_id)}" class="hidden-config" readonly>{h(payload)}</textarea>'
+        f'<button class="download-main download-config" type="button" data-target="{h(source_id)}" data-filename="{h(filename)}">دانلود کانفیگ</button>'
+        '</div>'
+    )
+
+
 def connection_views(
     protocol: str,
     items: list[dict[str, Any]],
     fallback_username: str,
     fallback_password: str,
+    node_names: dict[int, str],
 ) -> tuple[str, str]:
     tabs: list[str] = []
     views: list[str] = []
@@ -89,74 +160,45 @@ def connection_views(
 
         server_id = f"{protocol}-server-{index}"
         active = " active" if index == 0 else ""
-        name = (
-            item.get("name")
-            or item.get("label")
-            or item.get("country")
-            or item.get("location")
-            or f"سرور {index + 1}"
-        )
+        name = live_server_name(item, node_names, index)
+
         tabs.append(
             f'<button class="server-tab{active}" type="button" data-server="{h(server_id)}">'
-            f'{h(name)}<i></i></button>'
+            f'<span>{h(name)}</span><i></i></button>'
         )
 
-        host = item.get("host") or item.get("server") or item.get("endpoint") or "—"
-        port = item.get("port") or "—"
-        server_port = f"{host}:{port}" if host != "—" and port != "—" else host
+        if protocol not in {"cisco", "l2tp"}:
+            body = download_only_card(protocol, index, name, item)
+            views.append(
+                f'<div id="{h(server_id)}" class="server-view{active}">{body}</div>'
+            )
+            continue
+
+        host = item.get("host") or item.get("server") or item.get("server_ip") or item.get("endpoint") or "—"
+        port = item.get("port")
         username = item.get("username") or fallback_username
         password = item.get("password") or fallback_password
         psk = item.get("psk")
-        uri = str(item.get("uri") or "").strip()
-        config = str(item.get("config") or "").strip()
-        qr = str(item.get("qr") or "").strip()
 
-        facts = [fact_card("Server & Port", server_port)]
-        if protocol in {"cisco", "openvpn", "l2tp"}:
-            facts.extend([
+        if protocol == "cisco":
+            server_value = f"{host}:{port}" if port else str(host)
+            facts = [
+                fact_card("Server & Port", server_value),
                 fact_card("Username", username),
                 fact_card("Password", password),
-            ])
+            ]
         else:
-            if item.get("username"):
-                facts.append(fact_card("Username", item.get("username")))
-            if item.get("password"):
-                facts.append(fact_card("Password", item.get("password")))
-        if psk:
-            facts.append(fact_card("PSK", psk))
-
-        extra_actions: list[str] = []
-        if uri:
-            extra_actions.append(copy_button(uri, "کپی لینک"))
-            extra_actions.append(
-                f'<a class="action-btn" href="{h(uri)}" target="_blank" rel="noopener noreferrer">باز کردن لینک</a>'
-            )
-
-        details = ""
-        if config:
-            config_id = f"config-{protocol}-{index}"
-            filename = f"{protocol}-{index + 1}.conf"
-            if protocol == "openvpn":
-                filename = f"openvpn-{index + 1}.ovpn"
-            elif protocol == "wireguard":
-                filename = f"wireguard-{index + 1}.conf"
-            details = (
-                '<details class="config-drawer">'
-                '<summary><span>کانفیگ این سرور</span><b>نمایش</b></summary>'
-                f'<textarea id="{h(config_id)}" readonly dir="ltr">{h(config)}</textarea>'
-                '<div class="drawer-actions">'
-                f'<button class="action-btn copy-target" type="button" data-target="{h(config_id)}">کپی کانفیگ</button>'
-                f'<button class="action-btn download-config" type="button" data-target="{h(config_id)}" data-filename="{h(filename)}">دانلود فایل</button>'
-                '</div></details>'
-            )
-
-        qr_html = f'<img class="server-qr" src="{h(qr)}" alt="QR">' if qr else ""
+            facts = [
+                fact_card("Server", host),
+                fact_card("Username", username),
+                fact_card("Password", password),
+            ]
+            if psk:
+                facts.append(fact_card("PSK", psk))
 
         views.append(
             f'<div id="{h(server_id)}" class="server-view{active}">'
             f'<div class="facts-grid">{"".join(facts)}</div>'
-            f'<div class="server-footer"><div class="inline-actions">{"".join(extra_actions)}</div>{qr_html}</div>'
-            f'{details}'
             '</div>'
         )
 
@@ -169,6 +211,7 @@ def render_protocols(
     payload: dict[str, Any],
     fallback_username: str,
     fallback_password: str,
+    node_names: dict[int, str],
 ) -> tuple[str, str]:
     credentials = payload.get("credentials") or []
     if not isinstance(credentials, list):
@@ -197,6 +240,7 @@ def render_protocols(
             items,
             str(cred.get("username") or fallback_username or ""),
             str(cred.get("password") or cred.get("secret") or fallback_password or ""),
+            node_names,
         )
 
         selector_cards.append(
@@ -211,7 +255,7 @@ def render_protocols(
         panels.append(
             f'<section id="{pane_id}" class="protocol-panel{active}">'
             '<div class="protocol-panel-head">'
-            f'<div><h2>{h(title)}</h2><small>جزئیات اتصال</small></div>'
+            f'<div><h2>{h(title)}</h2><small>سرور را انتخاب کنید</small></div>'
             f'<div class="server-tabs">{server_tabs}</div>'
             '</div>'
             f'<div class="server-views">{server_views}</div>'
@@ -289,6 +333,12 @@ def public_connection_page_v2(token: str, db: Session = Depends(get_db)):
     user = db.get(User, sub.user_id)
     branding = db.query(BrandingSettings).first()
 
+    node_names = {
+        int(node.id): str(node.name)
+        for node in db.query(Node).all()
+        if getattr(node, "id", None) is not None
+    }
+
     brand_name = str(getattr(branding, "brand_name", None) or "TwinPanel").strip() or "TwinPanel"
     brand_mark = next((ch.upper() for ch in brand_name if not ch.isspace()), "T")
     primary = safe_color(getattr(branding, "primary_color", None), "#8B5CF6")
@@ -323,7 +373,12 @@ def public_connection_page_v2(token: str, db: Session = Depends(get_db)):
     avatar = next((ch.upper() for ch in str(customer_name) if not ch.isspace()), "U")
     service_label = (username or f"SERVICE-{sub.id}").replace("_", "-").upper()
 
-    protocol_cards, protocol_panels = render_protocols(payload, username, password)
+    protocol_cards, protocol_panels = render_protocols(
+        payload,
+        username,
+        password,
+        node_names,
+    )
     downloads = public_downloads_by_platform(db)
     apps_html = program_downloads_html(downloads)
 
@@ -356,14 +411,14 @@ def public_connection_page_v2(token: str, db: Session = Depends(get_db)):
 .topbar{height:72px;border-bottom:1px solid #171c25;background:rgba(4,6,9,.97);display:flex;align-items:center;position:sticky;top:0;z-index:30;backdrop-filter:blur(14px)}.topbar-inner{width:min(1320px,94vw);margin:auto;display:flex;align-items:center;justify-content:space-between;gap:20px}.brand{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:900}.brand-mark{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,var(--primary),var(--secondary));box-shadow:0 10px 28px color-mix(in srgb,var(--primary) 28%,transparent)}.profile{display:flex;align-items:center;gap:11px;direction:rtl}.profile-avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#8d62ff,#6845e5);font-weight:900}.profile-copy{display:grid;gap:2px}.profile-copy strong{font-size:12px}.profile-copy small{font-size:8px;color:var(--muted)}.service-name{font-size:13px;font-weight:900;padding-left:13px;border-left:1px solid #272f3d}.status-pill{height:27px;padding:0 10px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;font-size:8px;font-weight:900}.status-pill i{width:6px;height:6px;border-radius:50%;background:currentColor}.status-pill.online{color:#68e7a7;background:#09281b;border:1px solid #155f3e}.status-pill.offline{color:#ff8fa0;background:#2b1016;border:1px solid #66303a}.theme-btn{width:37px;height:37px;border:1px solid var(--line);border-radius:11px;background:#111722;color:var(--text)}
 .page{width:min(1320px,94vw);margin:0 auto;padding:24px 0 58px}.traffic-card{position:relative;overflow:hidden;display:grid;grid-template-columns:220px minmax(0,1fr);align-items:center;gap:24px;min-height:148px;padding:17px 24px;border:1px solid #252c45;border-radius:19px;background:radial-gradient(circle at 92% 20%,rgba(103,77,210,.19),transparent 30%),linear-gradient(110deg,#0b0f16,#0d1018 64%,#141329);box-shadow:var(--shadow)}.traffic-card:after{content:"";position:absolute;inset:auto 22px 20px 22px;height:3px;border-radius:999px;background:linear-gradient(90deg,rgba(124,58,237,.04),rgba(124,58,237,.22),rgba(41,211,125,.06))}.traffic-visual{display:flex;align-items:center;gap:16px;min-width:0}.donut{--size:110px;flex:0 0 var(--size);width:var(--size);height:var(--size);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--orange) calc(var(--percent)*1%),#303444 0);position:relative;box-shadow:inset 0 0 0 1px rgba(255,255,255,.03)}.donut:before{content:"";position:absolute;inset:12px;border-radius:50%;background:#0d1119;box-shadow:inset 0 0 0 1px #242b38}.donut-center{position:relative;text-align:center;z-index:1}.donut-center b{display:block;font-size:23px}.donut-center small{display:block;color:var(--muted);font-size:7px;margin-top:3px}.traffic-title{min-width:0}.traffic-title h2{margin:0;font-size:17px;white-space:nowrap}.traffic-title small{display:inline-flex;margin-top:6px;padding:4px 7px;border-radius:999px;background:#0b3a29;color:#58dfa0;font-size:7px;font-weight:900}.traffic-stats{display:grid;grid-template-columns:repeat(5,minmax(90px,1fr));align-items:center;height:88px}.traffic-stat{height:60px;padding:0 17px;border-left:1px solid #202632;display:flex;flex-direction:column;justify-content:center}.traffic-stat:last-child{border-left:0}.traffic-stat small{color:var(--muted);font-size:8px}.traffic-stat strong{margin-top:7px;font-size:15px;white-space:nowrap}
 .section-head{display:flex;justify-content:space-between;align-items:end;margin:24px 0 11px}.section-head small{display:block;color:#9a78ff;font-size:8px;font-weight:900;margin-bottom:4px}.section-head h2{margin:0;font-size:19px}.section-head p{margin:4px 0 0;color:var(--muted);font-size:8px}.protocol-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}.protocol-choice{position:relative;min-height:118px;padding:13px;border:1px solid var(--line);border-radius:15px;background:linear-gradient(180deg,#0d1219,#0c1118);color:var(--text);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;transition:.18s ease;box-shadow:0 12px 28px rgba(0,0,0,.11)}.protocol-choice:hover{transform:translateY(-2px);border-color:#3b4557}.protocol-choice.active{border-color:color-mix(in srgb,var(--primary) 78%,#fff 0%);box-shadow:0 0 0 1px color-mix(in srgb,var(--primary) 20%,transparent),0 14px 34px rgba(0,0,0,.2)}.protocol-choice.active:after{content:"✓";position:absolute;top:10px;right:10px;width:21px;height:21px;border-radius:50%;display:grid;place-items:center;background:#2196df;color:#fff;font-size:9px}.protocol-icon{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:var(--protocol-color);color:#fff;font-size:12px;font-weight:900;box-shadow:0 8px 18px color-mix(in srgb,var(--protocol-color) 25%,transparent)}.protocol-choice b{font-size:11px}.protocol-choice small{font-size:8px;color:var(--muted)}.protocol-choice em{font-style:normal;font-size:7px;font-weight:900;color:var(--protocol-color);padding:2px 8px;border-radius:999px;background:color-mix(in srgb,var(--protocol-color) 9%,#0c1118)}
-.protocol-panels{margin-top:11px}.protocol-panel{display:none;border:1px solid var(--line);border-radius:17px;background:#0b1017;overflow:hidden}.protocol-panel.active{display:block}.protocol-panel-head{min-height:70px;padding:14px 16px;border-bottom:1px solid #1c2430;display:flex;align-items:center;justify-content:space-between;gap:18px}.protocol-panel-head h2{margin:0;font-size:15px}.protocol-panel-head small{display:block;margin-top:4px;color:var(--muted);font-size:8px}.server-tabs{display:flex;flex-wrap:wrap;gap:7px;justify-content:flex-start}.server-tab{height:32px;min-width:68px;padding:0 12px;border:1px solid #384259;border-radius:9px;background:#121826;color:#9eabc0;font-size:8px;font-weight:900}.server-tab i{display:inline-block;width:6px;height:6px;margin-right:7px;border-radius:50%;background:#31d685}.server-tab.active{border-color:#7958e9;color:#bcaaff;background:#15112a}.server-views{padding:15px}.server-view{display:none}.server-view.active{display:block}.facts-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.facts-grid:has(.fact-card:nth-child(4)){grid-template-columns:repeat(4,minmax(0,1fr))}.facts-grid:has(.fact-card:only-child){grid-template-columns:minmax(0,420px)}.fact-card{position:relative;min-height:94px;padding:15px 14px 12px;border:1px solid #202a38;border-radius:12px;background:#10151d;text-align:center;overflow:hidden}.fact-card:before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--primary) 48%,transparent),transparent);opacity:.5}.fact-card small{display:block;color:#7e8ba0;font-size:7px}.fact-card strong{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:9px 0 8px;font:700 10px ui-monospace,SFMono-Regular,Consolas,monospace;color:#f7f8fb}.copy-btn,.action-btn{height:28px;padding:0 10px;border:1px solid #3b2f64;border-radius:8px;background:#1b1431;color:#bda6ff;font-size:8px;font-weight:900;display:inline-flex;align-items:center;justify-content:center}.copy-btn:hover,.action-btn:hover{border-color:#7150d5;background:#241943}.server-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px}.inline-actions{display:flex;flex-wrap:wrap;gap:6px}.server-qr{width:72px;height:72px;border-radius:10px;background:white;padding:5px}.config-drawer{margin-top:9px;padding:9px 11px;border:1px solid #202a38;border-radius:11px;background:#0e141d}.config-drawer summary{cursor:pointer;color:#bda6ff;font-size:8px;font-weight:900;display:flex;justify-content:space-between;align-items:center}.config-drawer summary b{font-size:7px;color:var(--muted)}.config-drawer textarea{width:100%;min-height:120px;margin-top:9px;padding:10px;border:1px solid #253044;border-radius:9px;background:#070b10;color:#d8e1ee;font:9px/1.7 ui-monospace,Consolas,monospace;resize:vertical}.drawer-actions{display:flex;gap:7px;margin-top:7px}.empty-state{padding:22px;border:1px dashed var(--line);border-radius:13px;color:var(--muted);text-align:center;font-size:9px}
+.protocol-panels{margin-top:11px}.protocol-panel{display:none;border:1px solid var(--line);border-radius:17px;background:#0b1017;overflow:hidden}.protocol-panel.active{display:block}.protocol-panel-head{min-height:70px;padding:14px 16px;border-bottom:1px solid #1c2430;display:flex;align-items:center;justify-content:space-between;gap:18px}.protocol-panel-head h2{margin:0;font-size:15px}.protocol-panel-head small{display:block;margin-top:4px;color:var(--muted);font-size:8px}.server-tabs{display:flex;flex-wrap:wrap;gap:7px;justify-content:flex-start}.server-tab{height:32px;min-width:68px;max-width:190px;padding:0 12px;border:1px solid #384259;border-radius:9px;background:#121826;color:#9eabc0;font-size:8px;font-weight:900;display:inline-flex;align-items:center;gap:7px}.server-tab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.server-tab i{width:6px;height:6px;flex:0 0 6px;border-radius:50%;background:#31d685}.server-tab.active{border-color:#7958e9;color:#bcaaff;background:#15112a}.server-views{padding:15px}.server-view{display:none}.server-view.active{display:block}.facts-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.facts-grid:has(.fact-card:nth-child(4)){grid-template-columns:repeat(4,minmax(0,1fr))}.fact-card{position:relative;min-height:94px;padding:15px 14px 12px;border:1px solid #202a38;border-radius:12px;background:#10151d;text-align:center;overflow:hidden}.fact-card:before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--primary) 48%,transparent),transparent);opacity:.5}.fact-card small{display:block;color:#7e8ba0;font-size:7px}.fact-card strong{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:9px 0 8px;font:700 10px ui-monospace,SFMono-Regular,Consolas,monospace;color:#f7f8fb}.copy-btn,.action-btn{height:28px;padding:0 10px;border:1px solid #3b2f64;border-radius:8px;background:#1b1431;color:#bda6ff;font-size:8px;font-weight:900;display:inline-flex;align-items:center;justify-content:center}.copy-btn:hover,.action-btn:hover{border-color:#7150d5;background:#241943}.config-only{min-height:92px;padding:14px 15px;border:1px solid #202a38;border-radius:13px;background:linear-gradient(120deg,#10151d,#0c121a);display:flex;align-items:center;justify-content:space-between;gap:16px}.config-only-copy{display:flex;align-items:center;gap:12px;min-width:0}.config-file-icon{width:44px;height:44px;flex:0 0 44px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,#231a45,#17132a);border:1px solid #40336c;color:#bda6ff;font-size:18px}.config-only small{display:block;color:var(--muted);font-size:7px}.config-only strong{display:block;margin-top:4px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:420px}.config-only em{display:inline-block;margin-top:5px;padding:2px 7px;border-radius:999px;background:#151d2a;color:#8090a8;font-style:normal;font-size:6px}.hidden-config{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important}.download-main{height:38px;padding:0 17px;border:1px solid #684dd2;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff;font-size:9px;font-weight:900;box-shadow:0 8px 22px color-mix(in srgb,var(--primary) 18%,transparent)}.empty-config span{color:var(--muted);font-size:8px}
 .subscription-bar{margin-top:11px;min-height:58px;padding:9px 11px;border:1px solid var(--line);border-radius:13px;background:#0b1017;display:flex;align-items:center;justify-content:space-between;gap:14px}.subscription-copy{min-width:0;display:grid;gap:4px}.subscription-copy small{color:var(--muted);font-size:7px}.subscription-copy code{max-width:760px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:9px ui-monospace,SFMono-Regular,Consolas,monospace}.subscription-actions{display:flex;gap:6px;flex:0 0 auto}
 .apps-card{margin-top:20px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,#0b1017,#090d13);overflow:hidden}.apps-head{padding:16px 18px;border-bottom:1px solid #1c2430;display:flex;align-items:center;justify-content:space-between;gap:16px}.apps-head small{display:block;color:#9a78ff;font-size:8px;font-weight:900;margin-bottom:4px}.apps-head h2{margin:0;font-size:17px}.apps-head p{margin:4px 0 0;color:var(--muted);font-size:8px}.device-tools{display:flex;align-items:center;gap:7px}.device-badge{height:30px;padding:0 10px;border:1px solid #315140;border-radius:9px;background:#0b2519;color:#65dfa1;display:flex;align-items:center;font-size:8px;font-weight:900}.show-all-apps{height:30px;padding:0 10px;border:1px solid #3b2f64;border-radius:9px;background:#171225;color:#bda6ff;font-size:8px;font-weight:900}.platform-groups{padding:14px}.platform-group{display:none}.platform-group.device-active{display:block}.platform-group.show-all{display:block;margin-bottom:16px}.platform-group.show-all:last-child{margin-bottom:0}.platform-title{display:flex;align-items:center;gap:9px;margin-bottom:12px}.platform-icon{width:38px;height:38px;border-radius:11px;background:linear-gradient(145deg,#1c2640,#121a2b);border:1px solid #2a3750;display:grid;place-items:center;color:#c9d6ef;font-size:8px;font-weight:900}.platform-title b{display:block;font-size:12px}.platform-title small{display:block;margin-top:3px;color:var(--muted);font-size:7px}.apps-subsection+.apps-subsection{margin-top:14px;padding-top:14px;border-top:1px dashed #222c3a}.apps-subhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.apps-subhead b{font-size:9px}.apps-subhead span{color:var(--muted);font-size:7px}.apps-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.app-card{min-height:72px;padding:10px;border:1px solid #202a38;border-radius:11px;background:#10151d;display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:9px;transition:.16s}.app-card:hover{border-color:#46546d;transform:translateY(-1px)}.app-logo{width:34px;height:34px;border-radius:10px;background:#182237;display:grid;place-items:center;color:#bcaaff;font-weight:900}.app-card b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px}.app-card small{display:block;margin-top:4px;color:var(--muted);font-size:7px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.app-card>em{font-style:normal;color:#bcaaff;font-size:7px;white-space:nowrap}.app-card.uploaded{border-color:#203b30;background:#0d1814}.app-card.uploaded .app-logo{background:#123022;color:#62dca0}.asset-meta{display:grid;gap:3px;text-align:left}.asset-meta i,.asset-meta em{font-style:normal;font-size:6px;white-space:nowrap}.asset-meta i{color:#62dca0}.asset-meta em{color:var(--muted)}
 .toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,14px);padding:9px 14px;border:1px solid #2a3342;border-radius:9px;background:#111723;color:#fff;font-size:9px;opacity:0;pointer-events:none;transition:.18s;z-index:99}.toast.show{opacity:1;transform:translate(-50%,0)}
-html[data-theme="light"]{--bg:#f5f7fb;--header:#fff;--surface:#fff;--surface-2:#f8faff;--surface-3:#eef2f8;--line:#dfe5ef;--line-soft:#edf1f6;--text:#182033;--muted:#738098}html[data-theme="light"] body{background:#f5f7fb}html[data-theme="light"] .topbar{background:rgba(255,255,255,.96);border-color:#e6ebf2}html[data-theme="light"] .traffic-card{background:linear-gradient(110deg,#fff,#faf9ff);border-color:#ddd8f2}html[data-theme="light"] .donut:before{background:#fff}html[data-theme="light"] .protocol-choice,html[data-theme="light"] .protocol-panel,html[data-theme="light"] .fact-card,html[data-theme="light"] .config-drawer,html[data-theme="light"] .subscription-bar,html[data-theme="light"] .apps-card,html[data-theme="light"] .app-card{background:#fff}html[data-theme="light"] .fact-card strong{color:#182033}html[data-theme="light"] .config-drawer textarea{background:#f8faff;color:#182033}html[data-theme="light"] .app-card.uploaded{background:#f4fff8}
+html[data-theme="light"]{--bg:#f5f7fb;--header:#fff;--surface:#fff;--surface-2:#f8faff;--surface-3:#eef2f8;--line:#dfe5ef;--line-soft:#edf1f6;--text:#182033;--muted:#738098}html[data-theme="light"] body{background:#f5f7fb}html[data-theme="light"] .topbar{background:rgba(255,255,255,.96);border-color:#e6ebf2}html[data-theme="light"] .traffic-card{background:linear-gradient(110deg,#fff,#faf9ff);border-color:#ddd8f2}html[data-theme="light"] .donut:before{background:#fff}html[data-theme="light"] .protocol-choice,html[data-theme="light"] .protocol-panel,html[data-theme="light"] .fact-card,html[data-theme="light"] .config-only,html[data-theme="light"] .subscription-bar,html[data-theme="light"] .apps-card,html[data-theme="light"] .app-card{background:#fff}html[data-theme="light"] .fact-card strong{color:#182033}html[data-theme="light"] .app-card.uploaded{background:#f4fff8}
 @media(max-width:1100px){.traffic-card{grid-template-columns:1fr}.traffic-visual{justify-content:center}.traffic-stats{grid-template-columns:repeat(5,1fr);width:100%}.protocol-grid{grid-template-columns:repeat(3,1fr)}.facts-grid,.facts-grid:has(.fact-card:nth-child(4)){grid-template-columns:repeat(2,1fr)}.apps-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:760px){.topbar{height:auto;padding:11px 0}.topbar-inner{align-items:flex-start}.profile{flex-wrap:wrap}.service-name{border-left:0}.page{padding-top:15px}.traffic-card{padding:16px}.traffic-visual{justify-content:flex-start}.traffic-stats{grid-template-columns:repeat(2,1fr);height:auto;gap:6px}.traffic-stat{border:1px solid var(--line);border-radius:10px;height:58px;padding:0 11px}.protocol-grid{grid-template-columns:repeat(2,1fr)}.protocol-panel-head{align-items:flex-start;flex-direction:column}.server-tabs{justify-content:flex-start}.facts-grid,.facts-grid:has(.fact-card:nth-child(4)){grid-template-columns:1fr}.subscription-bar,.apps-head{align-items:flex-start;flex-direction:column}.subscription-copy code{max-width:80vw}.apps-grid{grid-template-columns:1fr}.device-tools{width:100%;justify-content:space-between}}
-@media(max-width:480px){.brand span:last-of-type{display:none}.profile-copy{display:none}.protocol-grid{grid-template-columns:1fr 1fr;gap:8px}.protocol-choice{min-height:103px}.traffic-visual{flex-direction:row}.donut{--size:92px}.traffic-title h2{font-size:15px}.server-footer{align-items:flex-start;flex-direction:column}}
+@media(max-width:760px){.topbar{height:auto;padding:11px 0}.topbar-inner{align-items:flex-start}.profile{flex-wrap:wrap}.service-name{border-left:0}.page{padding-top:15px}.traffic-card{padding:16px}.traffic-visual{justify-content:flex-start}.traffic-stats{grid-template-columns:repeat(2,1fr);height:auto;gap:6px}.traffic-stat{border:1px solid var(--line);border-radius:10px;height:58px;padding:0 11px}.protocol-grid{grid-template-columns:repeat(2,1fr)}.protocol-panel-head{align-items:flex-start;flex-direction:column}.server-tabs{justify-content:flex-start}.facts-grid,.facts-grid:has(.fact-card:nth-child(4)){grid-template-columns:1fr}.config-only{align-items:flex-start;flex-direction:column}.download-main{width:100%}.subscription-bar,.apps-head{align-items:flex-start;flex-direction:column}.subscription-copy code{max-width:80vw}.apps-grid{grid-template-columns:1fr}.device-tools{width:100%;justify-content:space-between}}
+@media(max-width:480px){.brand span:last-of-type{display:none}.profile-copy{display:none}.protocol-grid{grid-template-columns:1fr 1fr;gap:8px}.protocol-choice{min-height:103px}.traffic-visual{flex-direction:row}.donut{--size:92px}.traffic-title h2{font-size:15px}}
 </style>
 </head>
 <body>
@@ -443,10 +498,8 @@ html[data-theme="light"]{--bg:#f5f7fb;--header:#fff;--surface:#fff;--surface-2:#
   document.addEventListener('click',async function(ev){
     var copy=ev.target.closest('[data-copy]');
     if(copy){var ok=await copyText(copy.getAttribute('data-copy')||'');showToast(ok?'کپی شد':'کپی انجام نشد');return}
-    var targetBtn=ev.target.closest('.copy-target');
-    if(targetBtn){var el=document.getElementById(targetBtn.getAttribute('data-target')||'');if(el){var ok2=await copyText(el.value||el.textContent||'');showToast(ok2?'کپی شد':'کپی انجام نشد')}return}
     var dl=ev.target.closest('.download-config');
-    if(dl){var el2=document.getElementById(dl.getAttribute('data-target')||'');if(!el2)return;var blob=new Blob([el2.value||el2.textContent||''],{type:'text/plain;charset=utf-8'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=dl.getAttribute('data-filename')||'config.txt';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},1000);showToast('دانلود آماده شد')}
+    if(dl){var el=document.getElementById(dl.getAttribute('data-target')||'');if(!el)return;var blob=new Blob([el.value||el.textContent||''],{type:'text/plain;charset=utf-8'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=dl.getAttribute('data-filename')||'config.txt';document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},1000);showToast('دانلود آماده شد')}
   });
 })();
 </script>
