@@ -8,6 +8,7 @@ import {BrandMark} from "../lib/branding";
 import {CustomerSessionProvider,useCustomerSession} from "../lib/customer-session";
 import {clearCustomerToken,customerApi,getCustomerToken} from "../lib/customer-api";
 import {getResellerProfile} from "../lib/role-router";
+import {CustomerNotificationCenter} from "./customer-notification-center";
 
 type MenuItem=readonly [string,string,string,string];
 type PortalShellProps={children:React.ReactNode;active?:string;type:"customer"|"reseller"};
@@ -88,7 +89,7 @@ function PortalFrame({children,active="",type}:PortalShellProps){
       <nav className="sidebar-nav"><div className="nav-group"><div className="nav-group-title">{type==="customer"?pick("حساب کاربری","Customer Account"):pick("مرکز نمایندگی","Reseller Center")}</div>{menu.map(([fa,en,href,icon])=><Link key={href} href={href} className={active===href?"active":""} title={collapsed?pick(fa,en):undefined} onClick={()=>setMobileOpen(false)}><i>{icon}</i><span className="nav-label">{pick(fa,en)}</span></Link>)}</div></nav>
       {type==="customer"?<CustomerIdentity/>:<div className="profile"><span className="avatar">R</span><div className="profile-copy"><b>{pick("نماینده فروش","Reseller")}</b><small>Partner</small></div></div>}
     </aside>
-    <main><header><button className="mobile-menu-toggle" type="button" onClick={()=>setMobileOpen(v=>!v)} aria-expanded={mobileOpen}>☰</button><div className="search">⌕ <input placeholder={pick("جستجو...","Search...")}/></div><div className="head-actions"><LanguageSwitch compact/><ThemeSwitch compact/></div></header>{children}</main>
+    <main><header><button className="mobile-menu-toggle" type="button" onClick={()=>setMobileOpen(v=>!v)} aria-expanded={mobileOpen}>☰</button><div className="search">⌕ <input placeholder={pick("جستجو...","Search...")}/></div><div className="head-actions">{type==="customer"&&<CustomerNotificationCenter/>}<LanguageSwitch compact/><ThemeSwitch compact/></div></header>{children}</main>
   </div>;
 }
 
