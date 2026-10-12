@@ -1,7 +1,7 @@
 "use client";
 
 import {useEffect,useMemo,useState} from "react";
-import {Badge,Card,PageHead} from "./ui";
+import {Badge,Card} from "./ui";
 import {PortalShell} from "./portal-shells";
 import {useI18n} from "../lib/i18n";
 import {useCustomerSession} from "../lib/customer-session";
@@ -31,6 +31,10 @@ const protocolName=(value:string)=>({
   l2tp:"L2TP / IPsec",
   v2ray:"V2Ray / Xray"
 } as Record<string,string>)[value]||value;
+
+const protocolIcon=(value:string)=>({
+  cisco:"◉",openvpn:"△",wireguard:"⚡",l2tp:"◎",v2ray:"◇"
+} as Record<string,string>)[value]||"•";
 
 const planProtocols=(plan:StorePlan)=>[
   plan.enable_cisco&&"cisco",
@@ -91,6 +95,7 @@ function BuyBody(){
   const choosePlan=(row:StorePlan)=>{
     setSelectedPlan(row.id);
     setSelectedProtocols(planProtocols(row));
+    setError("");
     setMessage("");
   };
 
@@ -117,35 +122,83 @@ function BuyBody(){
     finally{setBusy(false);}
   };
 
-  return <div className="page customer-runtime">
-    <PageHead title={pick("خرید اشتراک","Buy Subscription")}/>
-    <div className="customer-inline-warning">{pick("پلن، پروتکل و سفارش را بدون خروج از پنل کاربری مدیریت کنید.","Choose the plan and protocols without leaving your account.")}</div>
-    {loading&&<div className="customer-loading"><span className="customer-loader"/>{pick("در حال دریافت پلن‌ها...","Loading plans...")}</div>}
-    {error&&<Card className="customer-empty customer-error"><b>{pick("انجام عملیات ناموفق بود","Operation failed")}</b><p>{error}</p></Card>}
-    {message&&<div className="customer-inline-warning">{message}</div>}
+  return <div className="page customer-runtime customer-buy-page">
+    <section className="customer-buy-hero">
+      <div>
+        <span className="customer-buy-eyebrow">{pick("خرید مستقیم داخل پنل","IN-PANEL PURCHASE")}</span>
+        <h1>{pick("پلن مناسب خودت را انتخاب کن","Choose your subscription")}</h1>
+        <p>{pick("پلن، حجم، مدت و پروتکل‌ها را همین‌جا انتخاب کن؛ سفارش بدون خروج از پنل ساخته می‌شود.","Choose plan, quota, duration and protocols here. Your order is created without leaving the customer panel.")}</p>
+      </div>
+      <div className="customer-buy-hero-stats">
+        <span><b>{plans.length.toLocaleString("fa-IR")}</b><small>{pick("پلن فعال","Active plans")}</small></span>
+        <span><b>{plan?.traffic_gb?.toLocaleString("fa-IR")||"—"}</b><small>GB</small></span>
+        <span><b>{selectedProtocols.length.toLocaleString("fa-IR")}</b><small>{pick("پروتکل","Protocols")}</small></span>
+      </div>
+    </section>
+
+    {loading&&<div className="customer-buy-loading"><span className="customer-loader"/>{pick("در حال دریافت پلن‌ها...","Loading plans...")}</div>}
+    {error&&<div className="customer-buy-alert error"><b>{pick("انجام عملیات ناموفق بود","Operation failed")}</b><span>{error}</span></div>}
+    {message&&<div className="customer-buy-alert success">{message}</div>}
     {!loading&&plans.length===0&&<Card className="customer-empty"><span>◇</span><p>{pick("در حال حاضر پلن فعالی برای فروش وجود ندارد.","No active plans are available.")}</p></Card>}
-    <div className="customer-subscriptions">
-      {plans.map(row=>{
-        const protocols=planProtocols(row);
-        const selected=row.id===selectedPlan;
-        return <Card key={row.id} className={selected?"customer-current-sub":""}>
-          <div className="card-head"><div><b>{row.name}</b><small>{row.description||`#${row.id}`}</small></div>{selected&&<Badge tone="violet">{pick("انتخاب شده","Selected")}</Badge>}</div>
-          <div className="customer-sub-meta">
-            <span>{pick("مدت","Duration")}<b>{row.duration_days.toLocaleString("fa-IR")} {pick("روز","days")}</b></span>
-            <span>{pick("حجم","Traffic")}<b>{row.traffic_gb.toLocaleString("fa-IR")} GB</b></span>
-            <span>{pick("دستگاه","Devices")}<b>{row.device_limit.toLocaleString("fa-IR")}</b></span>
-            <span>{pick("قیمت","Price")}<b>{row.price_toman.toLocaleString("fa-IR")} {pick("تومان","Toman")}</b></span>
+
+    {!loading&&plans.length>0&&<>
+      <div className="customer-buy-section-head">
+        <div><small>{pick("مرحله ۱","STEP 1")}</small><h2>{pick("انتخاب پلن","Select a plan")}</h2></div>
+        <span>{pick("برای تغییر پلن روی کارت کلیک کن","Click a card to switch plan")}</span>
+      </div>
+
+      <div className="customer-buy-grid">
+        {plans.map((row,index)=>{
+          const protocols=planProtocols(row);
+          const selected=row.id===selectedPlan;
+          return <button type="button" key={row.id} className={`customer-buy-plan ${selected?"selected":""}`} onClick={()=>choosePlan(row)}>
+            <div className="customer-buy-plan-top">
+              <div><small>#{row.id}</small><h3>{row.name}</h3></div>
+              {selected?<Badge tone="violet">{pick("انتخاب شده","Selected")}</Badge>:index===Math.floor(plans.length/2)&&plans.length>1?<Badge tone="ok">{pick("پیشنهادی","Popular")}</Badge>:null}
+            </div>
+            {row.description&&<p>{row.description}</p>}
+            <div className="customer-buy-price"><strong>{row.price_toman.toLocaleString("fa-IR")}</strong><span>{pick("تومان","Toman")}</span></div>
+            <div className="customer-buy-facts">
+              <span><i>◷</i><b>{row.duration_days.toLocaleString("fa-IR")}</b><small>{pick("روز","Days")}</small></span>
+              <span><i>◉</i><b>{row.traffic_gb.toLocaleString("fa-IR")}</b><small>GB</small></span>
+              <span><i>⌁</i><b>{row.device_limit.toLocaleString("fa-IR")}</b><small>{pick("دستگاه","Devices")}</small></span>
+            </div>
+            <div className="customer-buy-plan-protocols">{protocols.map(p=><span key={p}>{protocolIcon(p)} {protocolName(p)}</span>)}</div>
+            <div className="customer-buy-select-indicator">{selected?pick("✓ این پلن انتخاب شده","✓ Selected plan"):pick("انتخاب این پلن","Select this plan")}</div>
+          </button>;
+        })}
+      </div>
+
+      {plan&&<section className="customer-buy-checkout">
+        <div className="customer-buy-config">
+          <div className="customer-buy-section-head compact">
+            <div><small>{pick("مرحله ۲","STEP 2")}</small><h2>{pick("پروتکل‌های موردنیاز","Choose protocols")}</h2></div>
+            <span>{pick("هر زمان خواستی می‌توانی انتخاب را تغییر بدهی","You can change this selection anytime")}</span>
           </div>
-          <div className="customer-protocol-chips">{protocols.map(p=><span key={p}>{protocolName(p)}</span>)}</div>
-          <div className="customer-actions"><button className={selected?"primary":"ghost"} onClick={()=>choosePlan(row)}>{selected?pick("انتخاب شده","Selected"):pick("انتخاب پلن","Select plan")}</button></div>
-        </Card>;
-      })}
-    </div>
-    {plan&&<Card>
-      <div className="card-head"><div><b>{pick("پروتکل‌های سفارش","Order protocols")}</b><small>{plan.name}</small></div></div>
-      <div className="customer-protocol-chips">{available.map(p=><button key={p} type="button" className={selectedProtocols.includes(p)?"active":""} onClick={()=>toggleProtocol(p)}>{selectedProtocols.includes(p)?"✓ ":""}{protocolName(p)}</button>)}</div>
-      <div className="customer-actions"><button className="primary" disabled={busy||selectedProtocols.length===0} onClick={()=>void createOrder()}>{busy?pick("در حال ساخت سفارش...","Creating order..."):pick("ساخت سفارش و ادامه پرداخت","Create order & continue")}</button><a className="ghost" href="/panel/orders">{pick("سفارش‌های من","My orders")}</a></div>
-    </Card>}
+          <div className="customer-buy-protocol-grid">
+            {available.map(p=>{
+              const active=selectedProtocols.includes(p);
+              return <button key={p} type="button" className={active?"active":""} onClick={()=>toggleProtocol(p)}>
+                <span className="customer-buy-protocol-icon">{protocolIcon(p)}</span>
+                <span><b>{protocolName(p)}</b><small>{active?pick("فعال در سفارش","Included"):pick("برای افزودن کلیک کن","Click to add")}</small></span>
+                <i>{active?"✓":"+"}</i>
+              </button>;
+            })}
+          </div>
+        </div>
+
+        <aside className="customer-buy-summary">
+          <div className="customer-buy-summary-head"><small>{pick("خلاصه سفارش","ORDER SUMMARY")}</small><h3>{plan.name}</h3></div>
+          <div className="customer-buy-summary-row"><span>{pick("مدت","Duration")}</span><b>{plan.duration_days.toLocaleString("fa-IR")} {pick("روز","days")}</b></div>
+          <div className="customer-buy-summary-row"><span>{pick("حجم","Traffic")}</span><b>{plan.traffic_gb.toLocaleString("fa-IR")} GB</b></div>
+          <div className="customer-buy-summary-row"><span>{pick("دستگاه","Devices")}</span><b>{plan.device_limit.toLocaleString("fa-IR")}</b></div>
+          <div className="customer-buy-summary-row"><span>{pick("پروتکل‌ها","Protocols")}</span><b>{selectedProtocols.length.toLocaleString("fa-IR")}</b></div>
+          <div className="customer-buy-summary-price"><span>{pick("مبلغ سفارش","Order total")}</span><div><strong>{plan.price_toman.toLocaleString("fa-IR")}</strong><small>{pick("تومان","Toman")}</small></div></div>
+          <button className="customer-buy-submit" disabled={busy||selectedProtocols.length===0} onClick={()=>void createOrder()}>{busy?pick("در حال ساخت سفارش...","Creating order..."):pick("ساخت سفارش و ادامه پرداخت","Create order & continue")}</button>
+          <a className="customer-buy-orders-link" href="/panel/orders">{pick("مشاهده سفارش‌های من","View my orders")}</a>
+        </aside>
+      </section>}
+    </>}
   </div>;
 }
 
