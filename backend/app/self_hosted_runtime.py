@@ -6,6 +6,7 @@ from .backhaul_multi_exit_v16 import install_backhaul_peer_v16
 from .config import settings
 from .database import SessionLocal
 from .modern_runtime_v18 import apply_modern_runtime_v18
+from .public_direct_tuning_v19 import apply_public_direct_tuning_v19
 from .services.public_urls import api_base_url
 from .routers import nodes, provision, tunnels
 from .ssh_tunnel_self_hosted_v3 import provision_ssh_tunnel_self_hosted_v3
@@ -70,6 +71,11 @@ def apply_self_hosted_runtime() -> None:
     # Iran node to fan out to several Exit nodes without per-Exit Backhaul
     # licensing/runtime coupling.
     apply_modern_runtime_v18()
+
+    # V19: public-direct TCP/QUIC use one stable lane. Production traces showed
+    # the 8-lane processes carried valid TUN traffic but repeatedly died when a
+    # sibling lane timed out/reset. KCP/ARQ behavior remains unchanged.
+    apply_public_direct_tuning_v19()
 
     # SSH TUN remains available for explicit legacy/manual use only.
     tunnels.provision_ssh_tunnel = provision_ssh_tunnel_self_hosted_v3
