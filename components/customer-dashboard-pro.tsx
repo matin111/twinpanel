@@ -75,14 +75,14 @@ function CustomerDashboardInner(){
           <div className="customer-pro-service-stats"><div><small>{pick("روز باقی‌مانده","Days left")}</small><b>{active.days_remaining.toLocaleString("fa-IR")}</b></div><div><small>{pick("انقضا","Expires")}</small><b>{dateText(active.expires_at)}</b></div><div><small>{pick("دستگاه","Devices")}</small><b>{active.device_limit.toLocaleString("fa-IR")}</b></div></div>
           <div className="customer-pro-traffic"><div><span>{pick("مصرف ترافیک","Traffic usage")}</span><b>{active.traffic_used_gb.toLocaleString("fa-IR")} / {active.traffic_limit_gb.toLocaleString("fa-IR")} GB</b></div><div className="customer-pro-progress"><i style={{width:`${usedPct}%`}}/></div><small>{active.traffic_remaining_gb.toLocaleString("fa-IR")} GB {pick("باقی‌مانده","remaining")}</small></div>
           <div className="customer-pro-protocols">{active.protocols.length?active.protocols.map(p=><span key={p}>{protocolName(p)}</span>):<span>{pick("پروتکل هنوز تخصیص داده نشده","No protocol assigned yet")}</span>}</div>
-          <div className="customer-pro-actions"><Link href="/panel/connection" className="primary">{pick("اطلاعات اتصال","Connection details")}</Link><Link href="/panel/subscription" className="ghost">{pick("مدیریت و تمدید","Manage & renew")}</Link></div>
+          <div className="customer-pro-actions"><Link href="/panel/subscription" className="primary">{pick("اطلاعات اتصال","Connection details")}</Link><Link href="/panel/subscription" className="ghost">{pick("مدیریت و تمدید","Manage & renew")}</Link></div>
         </>:<div className="customer-pro-empty"><span>◇</span><b>{pick("هنوز سرویسی نداری","You do not have a service yet")}</b><Link href="/panel/buy" className="primary">{pick("مشاهده پلن‌ها","View plans")}</Link></div>}
       </article>
 
       <aside className="customer-pro-quick-card">
         <div className="customer-pro-card-head"><div><small>{pick("دسترسی سریع","QUICK ACCESS")}</small><h2>{pick("کارهای پرکاربرد","Common actions")}</h2></div></div>
         <div className="customer-pro-quick-grid">
-          <Link href="/panel/connection"><i>⌁</i><div><b>{pick("اتصال و کانفیگ","Connection")}</b></div><span>←</span></Link>
+          <Link href="/panel/subscription"><i>⌁</i><div><b>{pick("اشتراک و اتصال","Subscription & connection")}</b></div><span>←</span></Link>
           <Link href="/panel/usage"><i>◔</i><div><b>{pick("مصرف","Usage")}</b></div><span>←</span></Link>
           <Link href="/panel/payments"><i>◫</i><div><b>{pick("پرداخت‌ها","Payments")}</b></div><span>←</span></Link>
           <Link href="/panel/profile"><i>♙</i><div><b>{pick("حساب و امنیت","Account & security")}</b></div><span>←</span></Link>
