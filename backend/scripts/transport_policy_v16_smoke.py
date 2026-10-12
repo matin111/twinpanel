@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 from app import managed_ops, tp2027_provision
+from app import tp2027_multi_exit_v18 as tp2027_v18
 from app.backhaul_multi_exit_v16 import (
     backhaul_forward_port,
     install_backhaul_peer_v16,
@@ -117,6 +119,38 @@ def main() -> None:
     install_manager_runtime_v16()
     assert tunnels._install_backhaul_peer is install_backhaul_peer_v16
 
+    # V19 public-direct stability profile: TCP/QUIC use one lane so an idle or
+    # degraded sibling lane cannot terminate the whole process. KCP/ARQ stay
+    # unchanged and the one-Iran-to-many-Exit public-direct model is preserved.
+    tcp_unit = tp2027_v18._public_service_unit(
+        "tcp_2027",
+        9,
+        role="iran",
+        exit_public_ip="198.51.100.20",
+    )
+    quic_unit = tp2027_v18._public_service_unit(
+        "quic_2027",
+        9,
+        role="iran",
+        exit_public_ip="198.51.100.20",
+    )
+    assert "--lanes 1" in tcp_unit
+    assert "--lanes 8" not in tcp_unit
+    assert "--lanes 1" in quic_unit
+    assert "--lanes 8" not in quic_unit
+
+    tcp_config = json.loads(
+        tp2027_v18._config_text_v18(
+            "tcp_2027",
+            9,
+            "198.51.100.20",
+        )
+    )
+    assert tcp_config["carrier"] == "public_direct"
+    assert tcp_config["multi_exit_safe"] is True
+    assert tcp_config["lanes"] == 1
+    assert tcp_config["stability_profile"] == "single_lane_v19"
+
     # New managed tunnels do not auto-create MTunnel/Backhaul/SSH TUN.
     assert tuple(tunnel_managed._TRANSPORTS) == ()
     assert tuple(tunnel_managed._SELECTION_ORDER[:4]) == (
@@ -141,7 +175,7 @@ def main() -> None:
         "tcp_2027",
     )
 
-    print("TRANSPORT_POLICY_V18_MULTI_EXIT_SMOKE_OK")
+    print("TRANSPORT_POLICY_V19_MULTI_EXIT_STABILITY_SMOKE_OK")
 
 
 if __name__ == "__main__":
