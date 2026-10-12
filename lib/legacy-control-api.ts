@@ -74,6 +74,7 @@ export type CoreProtocolsResponse={ok?:boolean;protocols:Record<string,RuntimeRo
 export type TunnelTransportsResponse=RuntimeRow&{transports?:RuntimeRow[]};
 export type ManagedTunnelCreateResponse={
   ok:boolean;
+  operational?:boolean;
   complete:boolean;
   tp2027_complete?:boolean;
   full_complete?:boolean;
@@ -87,10 +88,8 @@ export type ManagedTunnelCreateResponse={
 type ManagedInstallCache={installed:string[];errors:Record<string,string>};
 const managedInstallCache=new Map<number,ManagedInstallCache>();
 
-// The legacy tunnel page still performs its old three-install sequence after
-// registerTunnel(). When registerTunnel() was satisfied by create-managed,
-// preserve the backend's new AUTO/V7 selection instead of letting that legacy
-// post-create sequence force MTunnel/manual mode.
+// Compatibility cache for older tunnel screens. New V18 screens call
+// createManagedTunnel() directly and do not run the legacy three-install flow.
 const managedAutoCreateCache=new Set<number>();
 
 async function managedTransportResult(id:number,name:"mtunnel"|"backhaul"|"ssh_tun"){
