@@ -1,0 +1,189 @@
+/*
+ * Final customer portal shell override.
+ * Loaded after all legacy styles so customer navigation can never become
+ * a stretched grid/card layout on desktop.
+ */
+@media (min-width:761px){
+  .portal-customer{
+    --sidebar-width:248px!important;
+    display:flex!important;
+    align-items:flex-start!important;
+    grid-template-columns:none!important;
+  }
+
+  .portal-customer.sidebar-collapsed{
+    --sidebar-width:84px!important;
+  }
+
+  .portal-customer>.sidebar{
+    position:sticky!important;
+    top:0!important;
+    right:auto!important;
+    bottom:auto!important;
+    left:auto!important;
+    flex:0 0 var(--sidebar-width)!important;
+    width:var(--sidebar-width)!important;
+    min-width:var(--sidebar-width)!important;
+    max-width:var(--sidebar-width)!important;
+    height:100vh!important;
+    min-height:100vh!important;
+    padding:16px 13px!important;
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:stretch!important;
+    overflow:hidden!important;
+  }
+
+  .portal-customer nav.sidebar-nav{
+    display:block!important;
+    flex:1 1 auto!important;
+    min-height:0!important;
+    height:auto!important;
+    margin:18px 0 0!important;
+    padding:0!important;
+    gap:0!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+  }
+
+  .portal-customer .sidebar-nav>.nav-group{
+    display:flex!important;
+    flex-direction:column!important;
+    grid-template-columns:none!important;
+    grid-template-rows:none!important;
+    grid-auto-columns:auto!important;
+    grid-auto-rows:auto!important;
+    grid-auto-flow:row!important;
+    align-items:stretch!important;
+    align-content:flex-start!important;
+    justify-items:stretch!important;
+    justify-content:flex-start!important;
+    gap:4px!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    margin:0!important;
+    padding:0!important;
+  }
+
+  .portal-customer .sidebar-nav>.nav-group>.nav-group-title{
+    display:block!important;
+    flex:0 0 auto!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    margin:0!important;
+    padding:7px 11px 5px!important;
+    color:#667188!important;
+    font-size:8px!important;
+    font-weight:800!important;
+    line-height:1.6!important;
+    white-space:nowrap!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+  }
+
+  .portal-customer .sidebar-nav>.nav-group>a{
+    display:flex!important;
+    flex:0 0 44px!important;
+    flex-direction:row!important;
+    align-items:center!important;
+    justify-content:flex-start!important;
+    align-self:stretch!important;
+    grid-column:auto!important;
+    grid-row:auto!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    height:44px!important;
+    min-height:44px!important;
+    max-height:44px!important;
+    margin:0!important;
+    padding:0 12px!important;
+    gap:10px!important;
+    border-radius:11px!important;
+    overflow:hidden!important;
+    writing-mode:horizontal-tb!important;
+    white-space:nowrap!important;
+  }
+
+  .portal-customer .sidebar-nav>.nav-group>a i{
+    display:grid!important;
+    place-items:center!important;
+    flex:0 0 20px!important;
+    width:20px!important;
+    min-width:20px!important;
+    max-width:20px!important;
+    height:20px!important;
+    min-height:20px!important;
+    margin:0!important;
+    padding:0!important;
+    writing-mode:horizontal-tb!important;
+  }
+
+  .portal-customer .sidebar-nav>.nav-group>a .nav-label{
+    display:block!important;
+    flex:1 1 auto!important;
+    width:auto!important;
+    min-width:0!important;
+    max-width:none!important;
+    height:auto!important;
+    min-height:0!important;
+    margin:0!important;
+    padding:0!important;
+    opacity:1!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+    writing-mode:horizontal-tb!important;
+  }
+
+  .portal-customer .portal-identity{
+    display:block!important;
+    flex:0 0 auto!important;
+    width:100%!important;
+    height:auto!important;
+    min-height:0!important;
+    margin-top:auto!important;
+  }
+
+  .portal-customer .portal-identity .profile{
+    width:100%!important;
+    min-height:56px!important;
+    height:auto!important;
+    display:flex!important;
+    flex-direction:row!important;
+    align-items:center!important;
+  }
+
+  .portal-customer.sidebar-collapsed .sidebar-nav>.nav-group>.nav-group-title{
+    display:none!important;
+  }
+
+  .portal-customer.sidebar-collapsed .sidebar-nav>.nav-group>a{
+    justify-content:center!important;
+    padding:0!important;
+  }
+
+  .portal-customer.sidebar-collapsed .sidebar-nav>.nav-group>a .nav-label{
+    display:none!important;
+    opacity:0!important;
+    width:0!important;
+    max-width:0!important;
+  }
+
+  .portal-customer>main{
+    display:block!important;
+    flex:1 1 auto!important;
+    grid-column:auto!important;
+    width:auto!important;
+    min-width:0!important;
+    max-width:none!important;
+  }
+}
