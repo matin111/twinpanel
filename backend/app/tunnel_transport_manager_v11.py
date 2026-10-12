@@ -5,7 +5,7 @@ import asyncio
 from . import tunnel_transport_manager_v10 as v10
 from .legacy_ingress_reconciler import reconciler_loop as legacy_ingress_loop
 from .runtime_reconciler_v2 import reconciler_loop as runtime_reconciler_loop
-from .transport_policy_v16 import install_transport_policy_v16
+from .manager_runtime_v16 import install_manager_runtime_v16
 
 
 # ============================================================
@@ -17,10 +17,10 @@ from .transport_policy_v16 import install_transport_policy_v16
 #   * removal of retired per-tunnel ingress chains which can collide when
 #     one Iran node fans out to several Exit nodes.
 #
-# Policy V16 is installed before the manager starts. It keeps the proven
-# V10/V9/V8/V7 machinery but changes automatic selection to direct-first,
-# rejects lossy overlay candidates, and includes partially provisioned/direct-
-# only managed tunnels in autonomous self-heal.
+# Manager Runtime V16 is installed before the manager starts. It applies the
+# same self-hosted installer hooks used by the API process, then activates the
+# V16 direct-first transport policy. This keeps autonomous self-heal and API
+# repair behavior identical for shared-Iran/multi-Exit Backhaul provisioning.
 #
 # Runtime reconciliation uses V2's serialization-safe cleanup wrapper while
 # preserving V1's DB ownership and confirmation guards.
@@ -29,7 +29,7 @@ from .transport_policy_v16 import install_transport_policy_v16
 
 
 async def main() -> None:
-    install_transport_policy_v16()
+    install_manager_runtime_v16()
 
     print(
         "TWINPANEL_TRANSPORT_MANAGER_V11_START",
