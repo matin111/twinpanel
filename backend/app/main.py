@@ -39,6 +39,7 @@ from .admin_notification_service import notification_watch_loop
 # TWINPANEL_REAL_ADMIN_NOTIFICATION_REGISTER_V1
 # TWINPANEL_USERNAME_SETTINGS_REGISTER_V2
 from .routers.payments import router as payments_router
+from .routers.payment_receipts_local import router as payment_receipts_local_router
 from .routers.sms_reader import router as sms_reader_router
 from .routers.support import router as support_router, admin_router as support_admin_router
 # TWINPANEL_USER_NOTIFICATION_REGISTER_V1
@@ -189,6 +190,9 @@ app.include_router(storefront_settings_router)
 app.include_router(store_router)
 app.include_router(general_settings_router)
 app.include_router(notification_settings_router)
+# Register local receipt handling before the legacy payments router so the
+# admin receipt path can transparently serve both local and Telegram receipts.
+app.include_router(payment_receipts_local_router)
 app.include_router(payments_router)
 app.include_router(sms_reader_router)
 app.include_router(support_router)
