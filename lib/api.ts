@@ -1,4 +1,13 @@
-export const API_BASE=process.env.NEXT_PUBLIC_API_BASE||"";
+const configuredApiBase=(process.env.NEXT_PUBLIC_API_BASE||"").trim().replace(/\/+$/,"");
+
+// NEXT_PUBLIC_* values run in the browser. A loopback API base such as
+// http://127.0.0.1:8095 would therefore target the user's own computer,
+// not the TwinPanel server. In that case always use the built-in same-origin
+// /v1 proxy route so preview, SSH port-forwarding and production all behave
+// consistently.
+const isLoopbackApiBase=/^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(configuredApiBase);
+
+export const API_BASE=isLoopbackApiBase?"":configuredApiBase;
 
 export const api={
   health:"/health",
