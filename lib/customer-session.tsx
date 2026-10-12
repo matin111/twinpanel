@@ -2,7 +2,6 @@
 
 import {createContext,useCallback,useContext,useEffect,useMemo,useState} from "react";
 import {clearCustomerToken,customerApi,CustomerUser,getCustomerToken} from "./customer-api";
-import {getResellerProfile} from "./role-router";
 
 type SessionValue={
   ready:boolean;
@@ -30,8 +29,10 @@ export function CustomerSessionProvider({children}:{children:React.ReactNode}){
 
     setError("");
 
-    // Only /auth/me is authoritative for the validity of the login session.
-    // Auxiliary role probes must never erase a valid customer token.
+    // /auth/me is the single source of truth for an already authenticated
+    // customer portal session. Portal role resolution belongs to the login
+    // flow; probing /reseller/me again here can create a /panel <-> /reseller
+    // navigation loop when the auxiliary reseller probe is stale or transient.
     let account:CustomerUser;
     try{
       account=await customerApi.me(current);
@@ -49,6 +50,7 @@ export function CustomerSessionProvider({children}:{children:React.ReactNode}){
       window.location.replace("/admin");
       return;
     }
+
     if(!account.is_active){
       clearCustomerToken();
       setToken(null);
@@ -56,19 +58,6 @@ export function CustomerSessionProvider({children}:{children:React.ReactNode}){
       setReady(false);
       window.location.replace("/login");
       return;
-    }
-
-    // Reseller membership is an optional routing probe. A temporary failure here
-    // must not log a valid customer out or make the portal jump after hydration.
-    try{
-      const reseller=await getResellerProfile(current);
-      if(reseller){
-        window.location.replace("/reseller");
-        return;
-      }
-    }catch{
-      // Keep the authenticated customer session alive. The reseller portal has
-      // its own strict guard and can retry this endpoint independently.
     }
 
     setToken(current);
