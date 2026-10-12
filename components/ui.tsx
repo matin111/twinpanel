@@ -38,6 +38,7 @@ const menuGroups=[
   ]},
   {fa:"تحویل و سرویس",en:"Delivery & Service",items:[
     ["تحویل اکانت","Account Delivery","/admin/account-delivery","⇲"],
+    ["فایل‌های دانلود","Download Files","/admin/downloads","⇩"],
     ["تنظیمات VPN","VPN Settings","/admin/vpn-settings","⌁"],
     ["L2TP / IPsec","L2TP / IPsec","/admin/l2tp","◎"],
     ["برندینگ","Branding","/admin/branding","✦"]
