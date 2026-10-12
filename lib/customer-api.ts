@@ -90,6 +90,11 @@ export type WalletTopup={id:number;amount_toman:number;status:string;method?:str
 export type UserNotification={id:number;title?:string|null;message?:string|null;body?:string|null;kind?:string|null;is_read?:boolean;read_at?:string|null;created_at:string;[key:string]:unknown};
 export type SupportTicket={id:number;subject?:string|null;category?:string|null;status:string;created_at:string;updated_at?:string|null;messages?:Array<unknown>;[key:string]:unknown};
 
+type NotificationListResponse={
+  unread_count?:number;
+  items?:UserNotification[];
+};
+
 function errorText(payload:unknown,status:number){
   if(payload&&typeof payload==="object"){
     const value=payload as {detail?:unknown;message?:unknown};
@@ -161,7 +166,11 @@ export const customerApi={
   walletTopups:(token:string)=>request<WalletTopup[]>("/v1/wallet/topups/me",{},token),
   walletMethods:(token:string)=>request<{methods?:Array<Record<string,unknown>>}|Array<Record<string,unknown>>>("/v1/wallet/methods",{},token),
 
-  notifications:(token:string,limit=50)=>request<UserNotification[]>(`/v1/notifications/me?limit=${limit}`,{},token),
+  notifications:async(token:string,limit=50)=>{
+    const payload=await request<NotificationListResponse|UserNotification[]>(`/v1/notifications/me?limit=${limit}`,{},token);
+    if(Array.isArray(payload))return payload;
+    return Array.isArray(payload?.items)?payload.items:[];
+  },
   readNotification:(token:string,id:number)=>request<unknown>(`/v1/notifications/${id}/read`,{method:"POST"},token),
   readAllNotifications:(token:string)=>request<unknown>("/v1/notifications/read-all",{method:"POST"},token),
 
