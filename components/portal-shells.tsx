@@ -80,7 +80,7 @@ function PortalFrame({children,active="",type}:PortalShellProps){
     return n;
   });
 
-  return <div className={`shell portal-shell ${collapsed?"sidebar-collapsed":""} ${mobileOpen?"mobile-menu-open":""}`}>
+  return <div className={`shell portal-shell portal-${type} ${collapsed?"sidebar-collapsed":""} ${mobileOpen?"mobile-menu-open":""}`}>
     <aside className="sidebar">
       <div className="sidebar-head"><BrandMark/><button className="sidebar-collapse" type="button" onClick={toggle}>↔</button><button className="mobile-menu-close" type="button" onClick={()=>setMobileOpen(false)}>×</button></div>
       <nav className="sidebar-nav"><div className="nav-group"><div className="nav-group-title">{type==="customer"?pick("حساب کاربری","Customer Account"):pick("مرکز نمایندگی","Reseller Center")}</div>{menu.map(([fa,en,href,icon])=><Link key={href} href={href} className={active===href?"active":""} title={collapsed?pick(fa,en):undefined} onClick={()=>setMobileOpen(false)}><i>{icon}</i><span className="nav-label">{pick(fa,en)}</span></Link>)}</div></nav>
