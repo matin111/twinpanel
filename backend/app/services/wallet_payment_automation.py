@@ -13,6 +13,7 @@ from ..customer_wallet_models import (
 )
 from ..database import SessionLocal
 from ..payment_models import PaymentIntent, PaymentSettings
+from ..telegram_notify_service import queue_telegram_notification
 from ..user_notification_models import UserNotification
 from .payment_automation import _verify_bep20_transfer, automation_settings
 from .payment_native_crypto import (
@@ -143,7 +144,7 @@ def credit_wallet_topup(
     )
 
     if not exists_notification:
-        db.add(UserNotification(
+        notification = UserNotification(
             batch_id=batch_id,
             user_id=row.user_id,
             title="کیف پول شارژ شد",
@@ -153,7 +154,22 @@ def credit_wallet_topup(
             kind="success",
             telegram_requested=True,
             created_at=datetime.utcnow(),
-        ))
+        )
+        db.add(notification)
+        db.flush()
+
+        queue_telegram_notification(
+            db,
+            user_id=row.user_id,
+            event_key=f"wallet-topup-approved:{row.id}",
+            kind="user_notification",
+            payload={
+                "notification_id": notification.id,
+                "title": notification.title,
+                "message": notification.message,
+                "kind": notification.kind,
+            },
+        )
 
     db.commit()
 
