@@ -10,7 +10,8 @@ from ..deps import require_reseller
 from ..models import Subscription
 from ..models_reseller import Reseller, ResellerSubscription
 from . import reseller_bot_orders as legacy
-from .reseller_subscription_volume_v2 import ExtendIn, extend_subscription_usage_only
+from .reseller_subscription_volume_v2 import ExtendIn
+from .reseller_pool_guard_v3 import extend_subscription_pool_guard
 
 
 router = APIRouter(
@@ -47,12 +48,15 @@ async def approve_order_volume_v2(
     reseller: Reseller = Depends(require_reseller),
     db: Session = Depends(get_db),
 ):
-    """Keep reseller Telegram renewals on the same usage-based pool model.
+    """Keep reseller Telegram renewals on the shared usage pool.
 
-    New-sale orders are delegated to the existing battle-tested approval flow.
-    Renewal orders are routed through the V2 subscription extension core so
-    changing the customer's quota/duration does not reserve reseller traffic.
-    The reseller traffic pool continues to decrease only from real quota usage.
+    Renewal changes the customer's own quota/duration but never reserves or
+    deducts the reseller pool. The reseller pool is charged only by accepted
+    real usage events. Internal-wallet orders may enter here as `paid` and can
+    retry provisioning without being pushed into manual receipt review.
+
+    The shared-pool guard is always used so a renewal cannot reactivate an
+    account while the reseller traffic pool is exhausted.
     """
 
     row = legacy.owned_order(
@@ -71,7 +75,7 @@ async def approve_order_volume_v2(
         row.payment_note
     )
 
-    # Preserve the original provisioning path for ordinary new subscriptions.
+    # Preserve the original provisioning path for ordinary legacy new sales.
     if renewal_subscription_id is None:
         return await legacy.approve_order(
             order_id=order_id,
@@ -82,9 +86,12 @@ async def approve_order_volume_v2(
     if row.status == "fulfilled":
         return legacy.order_out(db, row)
 
+    auto_paid = row.status == "paid"
+
     if row.status not in {
         "awaiting_review",
         "provision_failed",
+        "paid",
     }:
         raise HTTPException(
             status_code=409,
@@ -125,7 +132,7 @@ async def approve_order_volume_v2(
     db.commit()
 
     try:
-        renewal_result = extend_subscription_usage_only(
+        renewal_result = extend_subscription_pool_guard(
             subscription_id=renewal_subscription_id,
             payload=ExtendIn(
                 reset_usage=False,
@@ -152,6 +159,15 @@ async def approve_order_volume_v2(
         row.status = "fulfilled"
         row.fulfilled_at = row.fulfilled_at or datetime.utcnow()
         row.error_text = None
+
+        from ..discount_service import redeem_discount_for_order
+
+        redeem_discount_for_order(
+            db,
+            order_kind="reseller_bot",
+            order_id=int(row.id),
+        )
+
         db.commit()
         db.refresh(row)
 
@@ -171,8 +187,12 @@ async def approve_order_volume_v2(
             isinstance(renewal_result, dict)
             and renewal_result.get("duplicate")
         )
-        result["pricing_model"] = "volume_only"
+        result["pricing_model"] = "usage_pool"
         result["traffic_reserved_from_reseller"] = False
+        result["pool_exhausted"] = bool(
+            isinstance(renewal_result, dict)
+            and renewal_result.get("pool_exhausted")
+        )
         result["expires_at"] = (
             subscription.expires_at.isoformat()
             if subscription and subscription.expires_at
@@ -220,7 +240,7 @@ async def approve_order_volume_v2(
             lock=True,
         )
         if failed:
-            failed.status = "awaiting_review"
+            failed.status = "provision_failed" if auto_paid else "awaiting_review"
             failed.error_text = str(exc.detail)[:2000]
             db.commit()
         raise
@@ -234,7 +254,7 @@ async def approve_order_volume_v2(
             lock=True,
         )
         if failed:
-            failed.status = "awaiting_review"
+            failed.status = "provision_failed" if auto_paid else "awaiting_review"
             failed.error_text = str(exc)[:2000]
             db.commit()
 
