@@ -11,7 +11,7 @@ from ..user_notification_models import UserNotification
 from ..main_receipt_cleanup import cleanup_receipts_once
 
 
-PAYMENT_NOTIFICATION_INTERVAL_SECONDS = 30
+PAYMENT_NOTIFICATION_INTERVAL_SECONDS = 5
 RECEIPT_CLEANUP_INTERVAL_SECONDS = 6 * 60 * 60
 
 
