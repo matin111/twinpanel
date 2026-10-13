@@ -11,7 +11,7 @@ from .public_direct_tuning_v19 import apply_public_direct_tuning_v19
 from .services.public_urls import api_base_url
 from .routers import nodes, provision, tunnels
 from .ssh_tunnel_self_hosted_v3 import provision_ssh_tunnel_self_hosted_v3
-from .xray_modern_runtime import apply_xray_modern_runtime
+from . import xray_modern_runtime
 
 
 _original_install_or_upgrade_agent = provision._install_or_upgrade_agent
@@ -121,20 +121,35 @@ def apply_self_hosted_runtime() -> None:
     apply_managed_relay_recovery_v20()
 
     # ------------------------------------------------------------
-    # Xray Modern Runtime V2
+    # Xray Modern Runtime V2 + collision-free service port plan.
     #
-    # Existing plain VLESS remains available only for old links.
-    # New credentials receive a compatibility portfolio:
-    #   - WebSocket + TLS when an Exit domain/cert is available
-    #   - XHTTP + REALITY
-    #   - HTTPUpgrade + TLS when available
-    #   - gRPC + REALITY fallback
+    # Existing service ranges each reserve a full 1000-port block:
+    #   Cisco      20001..20999
+    #   OpenVPN    21001..21999
+    #   WireGuard  22001..22999
+    #   Xray old   23001..23999
     #
-    # Service routing stays on the logical Iran -> Exit tunnel;
-    # users never select tunnel transports manually.
+    # Keep every modern Xray profile in its own full block as well;
+    # using 23100/23200-style bases would collide as Exit IDs grow.
     # ------------------------------------------------------------
 
-    apply_xray_modern_runtime()
+    xray_modern_runtime.PROFILE_META[
+        xray_modern_runtime.PROFILE_XHTTP
+    ]["public_base"] = 24000
+
+    xray_modern_runtime.PROFILE_META[
+        xray_modern_runtime.PROFILE_GRPC
+    ]["public_base"] = 25000
+
+    xray_modern_runtime.PROFILE_META[
+        xray_modern_runtime.PROFILE_WS
+    ]["public_base"] = 26000
+
+    xray_modern_runtime.PROFILE_META[
+        xray_modern_runtime.PROFILE_HTTPUPGRADE
+    ]["public_base"] = 27000
+
+    xray_modern_runtime.apply_xray_modern_runtime()
 
     # ------------------------------------------------------------
     # SSH TUN
