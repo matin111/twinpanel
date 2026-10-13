@@ -20,6 +20,7 @@ from . import storefront_settings_models  # TWINPANEL_STOREFRONT_CMS_V74
 from . import two_factor_models
 from . import runtime_settings_model
 from . import download_asset_models
+from .payment_crypto_schema import ensure_payment_crypto_schema
 from .routers import admin, auth, nodes, plans, provision, subscriptions, tunnels, resellers, reseller_portal, domains, branding
 from .routers import bootstrap as bootstrap_router_module
 from .routers.two_factor import router as two_factor_router  # TWINPANEL_REAL_2FA_REGISTER_V1
@@ -41,6 +42,7 @@ from .services.payment_market_rates import payment_market_loop
 # TWINPANEL_REAL_ADMIN_NOTIFICATION_REGISTER_V1
 # TWINPANEL_USERNAME_SETTINGS_REGISTER_V2
 from .routers.payments import router as payments_router
+from .routers.payment_native_gateways import router as payment_native_gateways_router
 from .routers.payment_market_rates import router as payment_market_rates_router
 from .routers.payment_automation import router as payment_automation_router
 from .routers.payment_receipts_local import router as payment_receipts_local_router
@@ -87,6 +89,9 @@ from . import reseller_notification_models
 
 
 Base.metadata.create_all(bind=engine)
+# Existing installations need an idempotent ALTER because create_all does not
+# add new columns to payment_intents.
+ensure_payment_crypto_schema()
 
 
 # TWINPANEL_TUNNEL_WATCHDOG_LIFESPAN_V1
@@ -207,12 +212,13 @@ app.include_router(storefront_settings_router)
 app.include_router(store_router)
 app.include_router(general_settings_router)
 app.include_router(notification_settings_router)
+# Exact crypto payment router comes first: it removes USDT-TRC20 and exposes
+# USDT-BEP20 + native TRX + native BNB with immutable live-rate quotes.
+app.include_router(payment_native_gateways_router)
 # Resilient market-rate and automation-status API must precede the older
 # payment automation router because it overrides /admin/live-rate.
 app.include_router(payment_market_rates_router)
-# Payment automation overrides the legacy payment methods/settings/submit
-# routes while delegating all unchanged behavior back to the legacy handlers.
-# It must be registered before the legacy payments router.
+# Payment automation keeps legacy SMS Reader and historical crypto behavior.
 app.include_router(payment_automation_router)
 # Register local receipt handling before the legacy payments router so the
 # admin receipt path can transparently serve both local and Telegram receipts.
