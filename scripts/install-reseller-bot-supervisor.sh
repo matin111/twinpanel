@@ -16,6 +16,11 @@ for cmd in install systemctl grep; do
   }
 done
 
+[[ -d "$SOURCE_DIR/backend" ]] || {
+  echo "source backend directory not found: $SOURCE_DIR/backend" >&2
+  exit 1
+}
+
 [[ -d "$BACKEND_DIR" ]] || {
   echo "backend directory not found: $BACKEND_DIR" >&2
   exit 1
@@ -31,30 +36,59 @@ done
   exit 1
 }
 
-[[ -f "$BACKEND_DIR/requirements.txt" ]] || {
-  echo "requirements not found: $BACKEND_DIR/requirements.txt" >&2
+[[ -f "$SOURCE_DIR/backend/requirements.txt" ]] || {
+  echo "source requirements not found: $SOURCE_DIR/backend/requirements.txt" >&2
   exit 1
 }
-
-for runtime_file in \
-  "$BACKEND_DIR/app/reseller_bot_runtime.py" \
-  "$BACKEND_DIR/app/reseller_bot_runtime_owned.py" \
-  "$BACKEND_DIR/app/reseller_bot_owned_runtime.py"; do
-  [[ -f "$runtime_file" ]] || {
-    echo "reseller bot runtime not found: $runtime_file" >&2
-    exit 1
-  }
-done
 
 [[ -f "$TEMPLATE" ]] || {
   echo "service template not found: $TEMPLATE" >&2
   exit 1
 }
 
-printf '\n[1/6] Installing backend dependencies\n'
+BOT_RUNTIME_FILES=(
+  "app/reseller_bot_runtime.py"
+  "app/reseller_bot_runtime_owned.py"
+  "app/reseller_bot_owned_runtime.py"
+  "app/reseller_bot_review.py"
+  "app/reseller_bot_crypto.py"
+  "app/reseller_bot_order_models.py"
+  "app/reseller_owned_plan_models.py"
+  "app/reseller_owned_plans.py"
+  "app/routers/reseller_bot.py"
+  "app/routers/reseller_bot_orders.py"
+  "app/routers/reseller_bot_orders_volume_v2.py"
+  "app/routers/reseller_bot_orders_owned_v3.py"
+)
+
+for rel in "${BOT_RUNTIME_FILES[@]}"; do
+  [[ -f "$SOURCE_DIR/backend/$rel" ]] || {
+    echo "required reseller bot source missing: $SOURCE_DIR/backend/$rel" >&2
+    exit 1
+  }
+done
+
+printf '\n[1/7] Syncing reseller bot runtime bundle\n'
+install -m 0644 "$SOURCE_DIR/backend/requirements.txt" "$BACKEND_DIR/requirements.txt"
+for rel in "${BOT_RUNTIME_FILES[@]}"; do
+  install -D -m 0644 "$SOURCE_DIR/backend/$rel" "$BACKEND_DIR/$rel"
+done
+printf 'RESELLER_BOT_RUNTIME_SYNC_OK\n'
+
+for runtime_file in \
+  "$BACKEND_DIR/app/reseller_bot_runtime.py" \
+  "$BACKEND_DIR/app/reseller_bot_runtime_owned.py" \
+  "$BACKEND_DIR/app/reseller_bot_owned_runtime.py"; do
+  [[ -f "$runtime_file" ]] || {
+    echo "reseller bot runtime not found after sync: $runtime_file" >&2
+    exit 1
+  }
+done
+
+printf '\n[2/7] Installing backend dependencies\n'
 "$VENV_DIR/bin/pip" install -q -r "$BACKEND_DIR/requirements.txt"
 
-printf '\n[2/6] Ensuring reseller bot encryption key\n'
+printf '\n[3/7] Ensuring reseller bot encryption key\n'
 install -d -m 0755 "$(dirname "$KEY_FILE")"
 KEY_FILE="$KEY_FILE" "$VENV_DIR/bin/python" - <<'PY'
 import os
@@ -91,7 +125,7 @@ else:
     print(f"RESELLER_BOT_KEY_CREATED path={path}")
 PY
 
-printf '\n[3/6] Verifying reseller bot runtime import\n'
+printf '\n[4/7] Verifying reseller bot runtime import\n'
 (
   cd "$BACKEND_DIR"
   PYTHONPATH="$BACKEND_DIR" "$VENV_DIR/bin/python" - <<'PY'
@@ -117,18 +151,18 @@ print("RESELLER_BOT_CRYPTO_ROUNDTRIP_OK")
 PY
 )
 
-printf '\n[4/6] Installing systemd service\n'
+printf '\n[5/7] Installing systemd service\n'
 install -m 0644 "$TEMPLATE" "$TARGET"
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 
-printf '\n[5/6] Starting reseller bot supervisor\n'
+printf '\n[6/7] Starting reseller bot supervisor\n'
 systemctl restart "$SERVICE_NAME"
 sleep 3
 systemctl is-active --quiet "$SERVICE_NAME"
 
-printf '\n[6/6] Final status\n'
-systemctl status "$SERVICE_NAME" --no-pager -l
+printf '\n[7/7] Final status\n'
+SYSTEMD_PAGER=cat systemctl status "$SERVICE_NAME" --no-pager -l
 
 echo
 printf 'RESELLER_BOT_SUPERVISOR_READY\n'
