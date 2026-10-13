@@ -7,6 +7,7 @@ from sqlalchemy import (
     Index,
     Integer,
     JSON,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -23,6 +24,10 @@ class ResellerBotOrder(Base):
         UniqueConstraint(
             "sale_idempotency_key",
             name="uq_reseller_bot_order_sale_key",
+        ),
+        UniqueConstraint(
+            "txid",
+            name="uq_reseller_bot_order_txid",
         ),
         Index(
             "ix_reseller_bot_orders_reseller_status",
@@ -101,9 +106,7 @@ class ResellerBotOrder(Base):
         nullable=False,
     )
 
-
     # TWINPANEL_RESELLER_ORDER_DISCOUNT_SNAPSHOT_V1
-
     # Reseller customer price before discount.
     base_sell_price_toman: Mapped[int] = mapped_column(
         BigInteger,
@@ -128,6 +131,39 @@ class ResellerBotOrder(Base):
     )
 
     discount_applied_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+    )
+
+    # Immutable crypto quote snapshot. The exact amount and market rate are
+    # frozen when the customer chooses a crypto payment method, so a later
+    # market-rate update cannot change an already issued invoice.
+    crypto_asset: Mapped[str | None] = mapped_column(
+        String(16),
+        nullable=True,
+    )
+
+    crypto_network: Mapped[str | None] = mapped_column(
+        String(16),
+        nullable=True,
+    )
+
+    crypto_amount: Mapped[object | None] = mapped_column(
+        Numeric(28, 8),
+        nullable=True,
+    )
+
+    crypto_rate_toman: Mapped[int | None] = mapped_column(
+        BigInteger,
+        nullable=True,
+    )
+
+    txid: Mapped[str | None] = mapped_column(
+        String(220),
+        nullable=True,
+    )
+
+    auto_verified_at: Mapped[datetime | None] = mapped_column(
         DateTime,
         nullable=True,
     )
