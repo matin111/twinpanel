@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-import asyncio
-import subprocess
-from pathlib import Path
-
 from sqlalchemy.orm import Session
 
 from ..models import (
@@ -11,19 +7,7 @@ from ..models import (
     NodeType,
     SubscriptionNode,
 )
-
-
-PROJECT_ROOT = (
-    Path(__file__).resolve().parents[2]
-)
-
-BOOTSTRAP = (
-    PROJECT_ROOT / "quota_bootstrap_v1.py"
-)
-
-PYTHON = (
-    PROJECT_ROOT / "venv" / "bin" / "python"
-)
+from .quota_node_sync import sync_node_config
 
 
 async def sync_subscription_quota_nodes(
@@ -32,11 +16,22 @@ async def sync_subscription_quota_nodes(
     extra_node_ids=None,
 ):
     """
-    Refresh quota-agent config only on Exit nodes
-    related to one subscription.
+    Refresh/validate quota configuration for Exit nodes related
+    to one subscription.
 
-    extra_node_ids is used for removed Exit nodes so
-    stale devices are removed from their config too.
+    The old implementation executed a deployment-local
+    ``quota_bootstrap_v1.py`` using ``backend/venv/bin/python``.
+    Neither path is part of the current production layout, so a
+    successful account provision could incorrectly fail at the
+    quota stage.
+
+    Quota configuration is now generated through the canonical
+    in-process quota service. Exit-node agents consume the same
+    configuration through the quota config API, so provisioning
+    no longer depends on a missing local bootstrap script.
+
+    ``extra_node_ids`` is used by subscription changes/removals
+    so stale Exit-node device lists can also be regenerated.
     """
 
     rows = (
@@ -67,8 +62,14 @@ async def sync_subscription_quota_nodes(
     results = []
 
     for node_id in sorted(node_ids):
-
-        node = db.query(Node).filter(Node.retired_at.is_(None), Node.id == node_id).first()
+        node = (
+            db.query(Node)
+            .filter(
+                Node.retired_at.is_(None),
+                Node.id == node_id,
+            )
+            .first()
+        )
 
         if (
             node is None
@@ -77,38 +78,47 @@ async def sync_subscription_quota_nodes(
             continue
 
         try:
-            proc = await asyncio.to_thread(
-                subprocess.run,
-                [
-                    str(PYTHON),
-                    str(BOOTSTRAP),
-                    str(node_id),
-                ],
-                cwd=str(PROJECT_ROOT),
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                timeout=300,
-                check=False,
+            generated = sync_node_config(
+                db,
+                node_id,
             )
 
-            output = (
-                proc.stdout or ""
-            )[-3000:]
+            ok = bool(
+                isinstance(generated, dict)
+                and generated.get("ok")
+            )
 
-            results.append({
-                "node_id": node_id,
+            item = {
+                "node_id": int(node.id),
                 "node_name": node.name,
-                "ok": proc.returncode == 0,
-                "returncode": proc.returncode,
-                "output": output,
-            })
+                "ok": ok,
+                "mode": "agent-pull",
+            }
+
+            if isinstance(generated, dict):
+                item["devices"] = int(
+                    generated.get("devices") or 0
+                )
+
+                if generated.get("config"):
+                    item["config"] = str(
+                        generated["config"]
+                    )
+
+                if not ok:
+                    item["reason"] = str(
+                        generated.get("reason")
+                        or "quota_config_generation_failed"
+                    )[:500]
+
+            results.append(item)
 
         except Exception as exc:
             results.append({
-                "node_id": node_id,
+                "node_id": int(node.id),
                 "node_name": node.name,
                 "ok": False,
+                "mode": "agent-pull",
                 "error": str(exc)[:500],
             })
 
@@ -117,10 +127,7 @@ async def sync_subscription_quota_nodes(
             item.get("ok")
             for item in results
         ) if results else True,
-
-        "subscription_id":
-            int(subscription_id),
-
-        "nodes":
-            results,
+        "subscription_id": int(subscription_id),
+        "nodes": results,
+        "mode": "agent-pull",
     }
