@@ -85,6 +85,10 @@ jobs:
       - name: Compile backend
         run: python -m compileall -q backend/app backend/scripts
 
+      - name: Run reseller receipt review smoke
+        working-directory: backend
+        run: python scripts/reseller_receipt_review_smoke.py
+
       - name: Import application and create schema
         working-directory: backend
         run: python -c 'from app.main import app; print("API_IMPORT_OK", app.title)'
