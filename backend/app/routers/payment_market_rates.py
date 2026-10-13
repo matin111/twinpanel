@@ -12,6 +12,7 @@ from ..services.payment_market_rates import (
     market_snapshot,
     refresh_market_rates_once,
 )
+from ..services.payment_native_crypto import native_gateway_settings
 
 
 router = APIRouter(
@@ -23,6 +24,7 @@ router = APIRouter(
 def _automation_status(db: Session) -> dict:
     cfg = db.get(PaymentSettings, 1)
     automation = automation_settings(db)
+    native = native_gateway_settings(db)
 
     active_readers = (
         db.query(PaymentSmsReaderDevice.id)
@@ -37,13 +39,15 @@ def _automation_status(db: Session) -> dict:
         cfg.sms_allowed_senders or ""
     ).strip() if cfg else ""
 
+    crypto_auto = bool(
+        automation.get("crypto_auto_verify")
+    )
+
     return {
         "auto_rate_enabled": bool(
             automation.get("auto_rate_enabled")
         ),
-        "crypto_auto_verify": bool(
-            automation.get("crypto_auto_verify")
-        ),
+        "crypto_auto_verify": crypto_auto,
         "sms_reader_enabled": bool(
             cfg.sms_reader_enabled
         ) if cfg else False,
@@ -59,17 +63,21 @@ def _automation_status(db: Session) -> dict:
             and allowed
             and active_readers > 0
         ),
-        "trc20_ready": bool(
-            cfg
-            and cfg.usdt_trc20_enabled
-            and str(cfg.usdt_trc20_address or "").strip()
-            and automation.get("crypto_auto_verify")
-        ),
-        "bep20_ready": bool(
+        "usdt_bep20_ready": bool(
             cfg
             and cfg.usdt_bep20_enabled
             and str(cfg.usdt_bep20_address or "").strip()
-            and automation.get("crypto_auto_verify")
+            and crypto_auto
+        ),
+        "trx_tron_ready": bool(
+            native.get("trx_tron_enabled")
+            and str(native.get("trx_tron_address") or "").strip()
+            and crypto_auto
+        ),
+        "bnb_bsc_ready": bool(
+            native.get("bnb_bsc_enabled")
+            and str(native.get("bnb_bsc_address") or "").strip()
+            and crypto_auto
         ),
     }
 
@@ -120,8 +128,6 @@ def activate_payment_automation(
     }
 
 
-# Compatibility with the current payments UI. Register this router before the
-# older payment_automation router so the UI gets the resilient v2 data.
 @router.get(
     "/admin/live-rate",
     dependencies=[Depends(require_admin)],
