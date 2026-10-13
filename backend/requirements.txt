@@ -16,3 +16,4 @@ asyncssh==2.21.0
 pyotp==2.9.0
 cryptography==50.0.0
 qrcode[pil]==8.2
+aiogram==3.30.0
