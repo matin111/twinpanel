@@ -228,9 +228,8 @@ def create_reseller_subscription(
     )
 
 
-# Pool guard route objects already contain their full /v1/reseller paths.
-# App main registers this owned-plan router before the legacy reseller routers,
-# so extending the route list here preserves the exact path and makes the guard
-# the first FastAPI match without accidentally doubling the router prefix.
+# The guard router is prefix-less by design. Mounting it through this router
+# applies /v1/reseller exactly once and keeps guard routes ahead of the legacy
+# volume/portal routers registered later in app.main.
 from .reseller_pool_guard_v3 import router as reseller_pool_guard_v3_router
-router.routes.extend(reseller_pool_guard_v3_router.routes)
+router.include_router(reseller_pool_guard_v3_router)
