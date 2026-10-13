@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .services.public_urls import shop_base_url
 from .database import SessionLocal
+from .reseller_bot_review import register_reseller_review_handlers
 
 from aiogram import F, Router
 from aiogram.types import (
@@ -58,7 +59,7 @@ GUIDES = {
         "در مرورگر باز کنید.\n"
         "2️⃣ OpenVPN را انتخاب کنید.\n"
         "3️⃣ سرور موردنظر را انتخاب کنید.\n"
-        "4️⃣ فایل .ovpn همان سرور را "
+        "4️⃣ فایل .ovpn همان سرور "
         "دانلود کنید.\n"
         "5️⃣ OpenVPN Connect را باز کنید.\n"
         "6️⃣ Import / Upload File را بزنید.\n"
@@ -552,6 +553,10 @@ def register_learning_handlers(
     *,
     prefix: str,
 ) -> None:
+    register_reseller_review_handlers(
+        router,
+        prefix=prefix,
+    )
 
     @router.message(
         F.text == "📚 آموزش"
