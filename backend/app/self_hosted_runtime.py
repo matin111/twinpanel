@@ -11,6 +11,7 @@ from .public_direct_tuning_v19 import apply_public_direct_tuning_v19
 from .services.public_urls import api_base_url
 from .routers import nodes, provision, tunnels
 from .ssh_tunnel_self_hosted_v3 import provision_ssh_tunnel_self_hosted_v3
+from .xray_modern_runtime import apply_xray_modern_runtime
 
 
 _original_install_or_upgrade_agent = provision._install_or_upgrade_agent
@@ -118,6 +119,22 @@ def apply_self_hosted_runtime() -> None:
     # ------------------------------------------------------------
 
     apply_managed_relay_recovery_v20()
+
+    # ------------------------------------------------------------
+    # Xray Modern Runtime V2
+    #
+    # Existing plain VLESS remains available only for old links.
+    # New credentials receive a compatibility portfolio:
+    #   - WebSocket + TLS when an Exit domain/cert is available
+    #   - XHTTP + REALITY
+    #   - HTTPUpgrade + TLS when available
+    #   - gRPC + REALITY fallback
+    #
+    # Service routing stays on the logical Iran -> Exit tunnel;
+    # users never select tunnel transports manually.
+    # ------------------------------------------------------------
+
+    apply_xray_modern_runtime()
 
     # ------------------------------------------------------------
     # SSH TUN
