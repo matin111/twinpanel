@@ -8,8 +8,14 @@ import {useCustomerSession} from "../lib/customer-session";
 import {customerApi,PaymentIntent,StoreOrder} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
 
-type Method={id:string;title?:string;card_number?:string;card_holder?:string;address?:string;rate_toman?:number};
-type Intent=PaymentIntent&{base_amount_toman?:number;payable_amount_toman?:number;has_receipt?:boolean;receipt_submitted_at?:string|null};
+type Method={
+  id:string;title?:string;card_number?:string;card_holder?:string;address?:string;
+  rate_toman?:number;asset?:string;network?:string;rate_provider?:string|null;rate_updated_at?:string|null;
+};
+type Intent=PaymentIntent&{
+  base_amount_toman?:number;payable_amount_toman?:number;has_receipt?:boolean;receipt_submitted_at?:string|null;
+  crypto_amount_usdt?:string|null;crypto_asset?:string|null;crypto_amount?:string|null;crypto_rate_toman?:number|null;
+};
 
 const MAX_RECEIPT_BYTES=12*1024*1024;
 const RECEIPT_TYPES=new Set(["image/jpeg","image/png","image/webp","image/gif","application/pdf"]);
@@ -52,7 +58,7 @@ function CustomerPaymentsBody(){
     setLoading(true);setError("");
     try{
       const [o,p,m]=await Promise.all([customerApi.orders(token),customerApi.payments(token),customerApi.paymentMethods()]);
-      setOrders(Array.isArray(o)?o:[]);setIntents(Array.isArray(p)?p:[]);setMethods(Array.isArray(m?.methods)?m.methods as Method[]:[]);
+      setOrders(Array.isArray(o)?o:[]);setIntents(Array.isArray(p)?p as Intent[]:[]);setMethods(Array.isArray(m?.methods)?m.methods as Method[]:[]);
       const query=typeof window!=="undefined"?Number(new URLSearchParams(window.location.search).get("order")||0):0;
       const pending=(Array.isArray(o)?o:[]).find(x=>x.id===query)|| (Array.isArray(o)?o:[]).find(x=>["pending_payment","payment_submitted","awaiting_review"].includes(x.status)) || null;
       if(pending)setOrderId(pending.id);
@@ -66,11 +72,14 @@ function CustomerPaymentsBody(){
 
   const order=useMemo(()=>orders.find(x=>x.id===orderId)||null,[orders,orderId]);
   const currentMethod=useMemo(()=>methods.find(x=>x.id===(intent?.method||method))||null,[methods,intent,method]);
+  const isCrypto=Boolean(intent&&intent.method!=="card_to_card");
+  const cryptoAsset=String(intent?.crypto_asset||currentMethod?.asset||(String(intent?.method||"").startsWith("usdt_")?"USDT":"")).toUpperCase();
+  const cryptoAmount=String(intent?.crypto_amount||intent?.crypto_amount_usdt||"");
 
   const createIntent=async()=>{
     if(!token||!orderId||!method)return;
     setBusy(true);setError("");setMessage("");
-    try{const row=await api<Intent>("/v1/payments/intents",{method:"POST",body:JSON.stringify({order_id:orderId,method})},token);setIntent(row);setMethod(row.method||method);setReceiptFile(null);setReceiptKey(v=>v+1);}
+    try{const row=await api<Intent>("/v1/payments/intents",{method:"POST",body:JSON.stringify({order_id:orderId,method})},token);setIntent(row);setMethod(row.method||method);setReceiptFile(null);setReceiptKey(v=>v+1);setTxid("");}
     catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setBusy(false);}
   };
@@ -98,15 +107,14 @@ function CustomerPaymentsBody(){
     event.preventDefault();if(!token||!intent)return;
     setBusy(true);setError("");setMessage("");
     try{
-      const isUsdt=String(intent.method||"").startsWith("usdt_");
       let workingIntent=intent;
-      if(!isUsdt){
+      if(!isCrypto){
         if(!workingIntent.has_receipt&&!receiptFile)throw new Error(pick("برای کارت‌به‌کارت تصویر رسید را انتخاب کنید.","Please select a receipt image for card payment."));
         if(receiptFile)workingIntent=await uploadReceipt(workingIntent);
       }
-      const payload=isUsdt?{txid:txid.trim()}:{tracking_code:tracking.trim()||null,sender_card_last4:last4.trim(),transfer_date:transferDate.trim(),transfer_time:transferTime.trim()};
+      const payload=isCrypto?{txid:txid.trim()}:{tracking_code:tracking.trim()||null,sender_card_last4:last4.trim(),transfer_date:transferDate.trim(),transfer_time:transferTime.trim()};
       const row=await api<Intent>(`/v1/payments/intents/${workingIntent.id}/submit`,{method:"POST",body:JSON.stringify(payload)},token);
-      setIntent(row);setMessage(pick("اطلاعات و رسید پرداخت ثبت شد.","Payment details and receipt submitted."));
+      setIntent(row);setMessage(isCrypto?pick("TXID ثبت شد و تأیید خودکار شبکه در حال بررسی است.","TXID submitted; automatic blockchain verification is checking it."):pick("اطلاعات و رسید پرداخت ثبت شد.","Payment details and receipt submitted."));
       void load();
     }catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setBusy(false);}
@@ -123,7 +131,7 @@ function CustomerPaymentsBody(){
     {order&&!["fulfilled","paid"].includes(order.status)&&<Card className="paymentCheckoutCard">
       <div className="card-head"><div><b>{pick("پرداخت سفارش","Order payment")} #{order.id}</b><small>{money(order.amount_toman)}</small></div><Badge tone="warn">{statusFa(order.status)}</Badge></div>
       {!intent?<>
-        <div className="paymentMethodGrid">{methods.map(row=><button type="button" key={row.id} className={method===row.id?"active":""} onClick={()=>setMethod(row.id)}><b>{row.title||row.id}</b></button>)}</div>
+        <div className="paymentMethodGrid">{methods.map(row=><button type="button" key={row.id} className={method===row.id?"active":""} onClick={()=>setMethod(row.id)}><b>{row.title||row.id}</b>{row.asset&&<small>{row.rate_toman?`${money(row.rate_toman)} / ${row.asset}`:row.network||row.asset}</small>}</button>)}</div>
         <button className="primary paymentMainAction" disabled={!method||busy} onClick={()=>void createIntent()}>{busy?"…":pick("ادامه پرداخت","Continue payment")}</button>
       </>:<form onSubmit={submit} className="paymentIntentBody">
         <div className="paymentDestination">
@@ -133,7 +141,8 @@ function CustomerPaymentsBody(){
             <div><span>{pick("شماره کارت","Card number")}</span><b dir="ltr">{currentMethod?.card_number||"—"}</b>{currentMethod?.card_number&&<button type="button" onClick={()=>void copy("card",currentMethod.card_number!)}>{copied==="card"?"✓":"⧉"}</button>}</div>
             <div><span>{pick("به نام","Card holder")}</span><b>{currentMethod?.card_holder||"—"}</b></div>
           </>:<>
-            <div><span>{pick("مقدار USDT","USDT amount")}</span><b dir="ltr">{intent.crypto_amount_usdt||"—"} USDT</b></div>
+            <div><span>{pick("مقدار دقیق ارز","Exact crypto amount")}</span><b dir="ltr">{cryptoAmount||"—"} {cryptoAsset}</b>{cryptoAmount&&<button type="button" onClick={()=>void copy("amount",cryptoAmount)}>{copied==="amount"?"✓":"⧉"}</button>}</div>
+            <div><span>{pick("نرخ ثبت‌شده برای این سفارش","Frozen quote rate")}</span><b>{intent.crypto_rate_toman?`${money(intent.crypto_rate_toman)} / ${cryptoAsset}`:"—"}</b></div>
             <div><span>{pick("آدرس کیف پول","Wallet address")}</span><b dir="ltr" className="breakAll">{currentMethod?.address||"—"}</b>{currentMethod?.address&&<button type="button" onClick={()=>void copy("addr",currentMethod.address!)}>{copied==="addr"?"✓":"⧉"}</button>}</div>
           </>}
         </div>
@@ -145,11 +154,11 @@ function CustomerPaymentsBody(){
           <label className="wide paymentReceiptField"><span>{pick("رسید پرداخت","Payment receipt")}</span><div className={`paymentReceiptPicker ${receiptFile||intent.has_receipt?"ready":""}`}><input key={receiptKey} type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf" onChange={e=>selectReceipt(e.target.files?.[0]||null)} required={!intent.has_receipt}/><div><b>{receiptFile?receiptFile.name:intent.has_receipt?pick("رسید قبلاً ثبت شده است","Receipt already uploaded"):pick("تصویر رسید را انتخاب کنید","Choose receipt image")}</b><small>{pick("JPG، PNG، WEBP، GIF یا PDF تا ۱۲ مگابایت","JPG, PNG, WEBP, GIF or PDF up to 12 MB")}</small></div><i>{receiptFile||intent.has_receipt?"✓":"↑"}</i></div></label>
         </>:<label className="wide"><span>TXID</span><input dir="ltr" value={txid} onChange={e=>setTxid(e.target.value)} required/></label>}</div>}
         {["pending_payment","payment_submitted"].includes(intent.status)&&<button className="primary paymentMainAction" disabled={busy}>{busy?pick("در حال ثبت...","Submitting..."):pick("ثبت اطلاعات پرداخت","Submit payment")}</button>}
-        {["awaiting_review","approved","auto_verified"].includes(intent.status)&&<div className="paymentStateOk"><b>{statusFa(intent.status)}</b>{intent.has_receipt&&<small>{pick("رسید پرداخت ثبت شده است.","Payment receipt uploaded.")}</small>}</div>}
+        {["awaiting_review","approved","auto_verified"].includes(intent.status)&&<div className="paymentStateOk"><b>{statusFa(intent.status)}</b>{intent.has_receipt&&<small>{pick("رسید پرداخت ثبت شده است.","Payment receipt uploaded.")}</small>}{isCrypto&&intent.status==="awaiting_review"&&<small>{pick("TXID به‌صورت خودکار روی شبکه بررسی می‌شود.","TXID is being verified automatically on-chain.")}</small>}</div>}
       </form>}
     </Card>}
 
-    <section className="paymentHistorySection"><div className="sectionMiniHead"><b>{pick("تاریخچه پرداخت","Payment history")}</b></div>{intents.length===0?<Card><p className="muted">{pick("پرداختی ثبت نشده است.","No payments yet.")}</p></Card>:<div className="customer-list">{intents.map(x=><Card key={x.id} className="customer-list-row"><div><b>#{x.id}</b><small>{x.created_at?new Date(x.created_at).toLocaleString("fa-IR"):"—"}</small></div><div><span>{pick("سفارش","Order")}</span><b>#{x.order_id||"—"}</b></div><div><span>{pick("روش","Method")}</span><b>{x.method||x.payment_method||"—"}</b></div>{x.has_receipt&&<div><span>{pick("رسید","Receipt")}</span><b className="receiptHistoryOk">✓ {pick("ثبت شده","Uploaded")}</b></div>}<Badge tone={["approved","auto_verified"].includes(x.status)?"ok":["rejected"].includes(x.status)?"bad":"warn"}>{statusFa(x.status)}</Badge></Card>)}</div>}</section>
+    <section className="paymentHistorySection"><div className="sectionMiniHead"><b>{pick("تاریخچه پرداخت","Payment history")}</b></div>{intents.length===0?<Card><p className="muted">{pick("پرداختی ثبت نشده است.","No payments yet.")}</p></Card>:<div className="customer-list">{intents.map(x=>{const asset=String(x.crypto_asset||(String(x.method||"").startsWith("usdt_")?"USDT":""));const amount=x.crypto_amount||x.crypto_amount_usdt;return <Card key={x.id} className="customer-list-row"><div><b>#{x.id}</b><small>{x.created_at?new Date(x.created_at).toLocaleString("fa-IR"):"—"}</small></div><div><span>{pick("سفارش","Order")}</span><b>#{x.order_id||"—"}</b></div><div><span>{pick("روش","Method")}</span><b>{x.method||x.payment_method||"—"}</b>{amount&&asset&&<small dir="ltr">{amount} {asset}</small>}</div>{x.has_receipt&&<div><span>{pick("رسید","Receipt")}</span><b className="receiptHistoryOk">✓ {pick("ثبت شده","Uploaded")}</b></div>}<Badge tone={["approved","auto_verified"].includes(x.status)?"ok":["rejected"].includes(x.status)?"bad":"warn"}>{statusFa(x.status)}</Badge></Card>})}</div>}</section>
     <div className="customer-actions"><Link href="/panel/orders" className="ghost">{pick("سفارش‌ها","Orders")}</Link><Link href="/panel/buy" className="primary">{pick("خرید اشتراک","Buy subscription")}</Link></div>
   </div>;
 }
