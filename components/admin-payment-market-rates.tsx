@@ -23,8 +23,9 @@ type AutomationState={
   sms_allowed_senders?:string|null;
   active_reader_count:number;
   card_auto_verify_operational:boolean;
-  trc20_ready:boolean;
-  bep20_ready:boolean;
+  usdt_bep20_ready:boolean;
+  trx_tron_ready:boolean;
+  bnb_bsc_ready:boolean;
 };
 
 type MarketPayload={
@@ -145,12 +146,16 @@ export function AdminPaymentMarketRates(){
     symbol,rate_toman:0,provider:null,updated_at:null,error:null
   });
 
+  const cryptoReady=Boolean(
+    automation?.usdt_bep20_ready||automation?.trx_tron_ready||automation?.bnb_bsc_ready
+  );
+
   return createPortal(
     <div className="paymentMarketV2">
       <div className="paymentMarketHead">
         <div>
           <b>{pick("قیمت لحظه‌ای ارزها","Live market rates")}</b>
-          <small>{pick("بروزرسانی خودکار با چند منبع و نگهداری آخرین نرخ معتبر","Multi-provider refresh with last-known-good fallback")}</small>
+          <small>{pick("نرخ‌های USDT، TRX و BNB برای تبدیل دقیق مبلغ پلن","USDT, TRX and BNB rates for exact plan conversion")}</small>
         </div>
         <button type="button" className="ghost" disabled={busy} onClick={()=>void refresh()}>
           {busy?"…":pick("بروزرسانی نرخ‌ها","Refresh rates")}
@@ -169,13 +174,15 @@ export function AdminPaymentMarketRates(){
       {error&&<div className="paymentMarketError">{error}</div>}
 
       <div className="paymentAutomationState">
-        <div className={automation?.crypto_auto_verify?"ready":"off"}>
-          <span>USDT Auto Verify</span>
+        <div className={automation?.crypto_auto_verify&&cryptoReady?"ready":"waiting"}>
+          <span>{pick("تأیید خودکار ارز دیجیتال","Crypto auto verification")}</span>
           <b>{automation?.crypto_auto_verify?pick("فعال","Active"):pick("غیرفعال","Inactive")}</b>
           <small>
-            TRC20: {automation?.trc20_ready?pick("آماده","Ready"):pick("نیاز به فعال‌سازی و آدرس کیف پول","Needs gateway + wallet")}
+            USDT-BEP20: {automation?.usdt_bep20_ready?pick("آماده","Ready"):pick("نیاز به درگاه و کیف پول","Needs gateway + wallet")}
             {" · "}
-            BEP20: {automation?.bep20_ready?pick("آماده","Ready"):pick("نیاز به فعال‌سازی و آدرس کیف پول","Needs gateway + wallet")}
+            TRX-TRON: {automation?.trx_tron_ready?pick("آماده","Ready"):pick("نیاز به درگاه و کیف پول","Needs gateway + wallet")}
+            {" · "}
+            BNB-BSC: {automation?.bnb_bsc_ready?pick("آماده","Ready"):pick("نیاز به درگاه و کیف پول","Needs gateway + wallet")}
           </small>
         </div>
 
