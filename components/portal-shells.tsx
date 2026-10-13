@@ -32,6 +32,7 @@ const resellerMenu:MenuItem[]=[
   ["فروش","Sales","/reseller/sales","payments"],
   ["کیف پول","Wallet","/reseller/wallet","wallet"],
   ["سفارش‌ها","Orders","/reseller/orders","orders"],
+  ["کدهای تخفیف","Discounts","/reseller/discounts","payments"],
   ["بسته‌های ترافیک","Traffic Packages","/reseller/traffic","cart"],
   ["ربات نمایندگی","Reseller Bot","/reseller/bot","bell"],
   ["اعلان‌ها","Notifications","/reseller/notifications","bell"],
