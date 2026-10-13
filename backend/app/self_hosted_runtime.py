@@ -5,6 +5,7 @@ from pathlib import Path
 from .backhaul_multi_exit_v16 import install_backhaul_peer_v16
 from .config import settings
 from .database import SessionLocal
+from .managed_relay_recovery_v20 import apply_managed_relay_recovery_v20
 from .modern_runtime_v18 import apply_modern_runtime_v18
 from .public_direct_tuning_v19 import apply_public_direct_tuning_v19
 from .services.public_urls import api_base_url
@@ -76,6 +77,11 @@ def apply_self_hosted_runtime() -> None:
     # the 8-lane processes carried valid TUN traffic but repeatedly died when a
     # sibling lane timed out/reset. KCP/ARQ behavior remains unchanged.
     apply_public_direct_tuning_v19()
+
+    # V20: managed repair is V18-aware and uses SSH Relay V2 split-hop recovery
+    # when every direct path is unavailable. This preserves healthy tunnels and
+    # only provisions the relay as an on-demand fallback.
+    apply_managed_relay_recovery_v20()
 
     # SSH TUN remains available for explicit legacy/manual use only.
     tunnels.provision_ssh_tunnel = provision_ssh_tunnel_self_hosted_v3
