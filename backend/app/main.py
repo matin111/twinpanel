@@ -42,6 +42,7 @@ from .services.payment_market_rates import payment_market_loop
 # TWINPANEL_REAL_ADMIN_NOTIFICATION_REGISTER_V1
 # TWINPANEL_USERNAME_SETTINGS_REGISTER_V2
 from .routers.payments import router as payments_router
+from .routers.payment_crypto_discount import router as payment_crypto_discount_router
 from .routers.payment_native_gateways import router as payment_native_gateways_router
 from .routers.payment_market_rates import router as payment_market_rates_router
 from .routers.payment_automation import router as payment_automation_router
@@ -212,8 +213,12 @@ app.include_router(storefront_settings_router)
 app.include_router(store_router)
 app.include_router(general_settings_router)
 app.include_router(notification_settings_router)
-# Exact crypto payment router comes first: it removes USDT-TRC20 and exposes
-# USDT-BEP20 + native TRX + native BNB with immutable live-rate quotes.
+# Crypto purchase discount overrides the exact gateway /methods and /intents
+# routes. It must be first so the discounted immutable quote is the route FastAPI
+# resolves for new crypto plan purchases.
+app.include_router(payment_crypto_discount_router)
+# Exact crypto payment router removes USDT-TRC20 and exposes USDT-BEP20 +
+# native TRX + native BNB with immutable live-rate quotes.
 app.include_router(payment_native_gateways_router)
 # Resilient market-rate and automation-status API must precede the older
 # payment automation router because it overrides /admin/live-rate.
