@@ -25,6 +25,7 @@ import {CustomerSubscriptionsRuntime} from "../../components/customer-subscripti
 import {DownloadAssetsRuntime} from "../../components/download-assets-runtime";
 import {ResellerDashboardRuntime,ResellerSectionRuntime} from "../../components/reseller-runtime";
 import {ResellerBotParityRuntime,ResellerOrdersParityRuntime,ResellerDiscountsParityRuntime} from "../../components/reseller-commerce-parity";
+import {ResellerSubscriptionsParityRuntime} from "../../components/reseller-subscriptions-parity";
 import {StoreRuntime2027} from "../../components/store-runtime";
 import {AdminAuthGuard} from "../../components/admin-auth-guard";
 import {AdminDashboardRuntime} from "../../components/admin-dashboard-runtime";
@@ -37,7 +38,7 @@ import {AdminUsersWalletInline} from "../../components/admin-users-wallet-inline
 import {AdminPaymentsWalletTopups} from "../../components/admin-payments-wallet-topups";
 
 const customerSections=new Set(["orders","notifications","profile"]);
-const resellerSections=new Set(["customers","subscriptions","sales","wallet","traffic","notifications","settings"]);
+const resellerSections=new Set(["customers","sales","wallet","traffic","notifications","settings"]);
 const admin=(node:React.ReactNode)=><AdminAuthGuard>{node}</AdminAuthGuard>;
 const usersWithWallet=()=>admin(<><LegacyUsersRuntimePage/><AdminUsersWalletInline/></>);
 
@@ -81,6 +82,7 @@ const route=(key:string)=>{
   if(key==="panel/payments") return <CustomerPaymentsRuntime/>;
   if(key==="panel/wallet") return <CustomerWalletV2/>;
   if(key==="reseller") return <ResellerDashboardRuntime/>;
+  if(key==="reseller/subscriptions") return <ResellerSubscriptionsParityRuntime/>;
   if(key==="reseller/bot") return <ResellerBotParityRuntime/>;
   if(key==="reseller/orders") return <ResellerOrdersParityRuntime/>;
   if(key==="reseller/discounts") return <ResellerDiscountsParityRuntime/>;
