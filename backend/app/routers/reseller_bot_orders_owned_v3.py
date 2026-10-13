@@ -94,7 +94,9 @@ async def approve_order_owned_v3(
     try:
         if not row.subscription_id:
             # Preserve the immutable order snapshot even if the reseller edits
-            # the plan while a receipt is waiting for review.
+            # the plan while a receipt is waiting for review. Display-only
+            # fields which were not historically stored on the order use the
+            # owned-plan mapping and do not affect quota or pricing.
             requested_protocols = {
                 str(value).strip().lower()
                 for value in (row.protocols or [])
@@ -105,6 +107,11 @@ async def approve_order_owned_v3(
                 id=int(mapping.id),
                 reseller_id=int(mapping.reseller_id),
                 backing_plan_id=int(mapping.backing_plan_id),
+                title=(
+                    str(mapping.title or "").strip()
+                    or f"پلن #{int(mapping.id)}"
+                ),
+                device_limit=int(mapping.device_limit or 1),
                 is_active=True,
                 traffic_gb=int(row.traffic_gb),
                 duration_days=int(row.duration_days),
