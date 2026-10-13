@@ -1,13 +1,16 @@
-name: TwinPanel UI Build
+name: TwinPanel Preview Validation
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - fix/customer-panel-entry-crash-v2
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -17,14 +20,23 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22.13.0'
+          cache: npm
 
-      - name: Install dependencies
+      - name: Install frontend dependencies
         run: |
           if [ -f package-lock.json ]; then
-            npm ci
+            npm ci --include=optional
           else
             npm install --no-audit --no-fund
           fi
 
-      - name: Build
+      - name: Build frontend
         run: npm run build
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile backend Python
+        run: python -m compileall -q backend/app
