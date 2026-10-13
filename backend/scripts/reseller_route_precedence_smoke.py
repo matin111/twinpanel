@@ -18,6 +18,14 @@ def first_endpoint(path: str, method: str) -> str | None:
 
 def main() -> None:
     expected = {
+        # Explicit reseller-owned plan CRUD routes must win over legacy
+        # /v1/reseller/plans compatibility handlers. These checks prevent the
+        # production UI from regressing to HTTP 405 on create/edit/delete.
+        ("/v1/reseller/owned-plans", "GET"): "list_owned_plans",
+        ("/v1/reseller/owned-plans", "POST"): "create_reseller_owned_plan",
+        ("/v1/reseller/owned-plans/{plan_id}", "PATCH"): "update_reseller_owned_plan",
+        ("/v1/reseller/owned-plans/{plan_id}", "DELETE"): "delete_reseller_owned_plan",
+        # Keep legacy list compatibility for existing callers.
         ("/v1/reseller/plans", "GET"): "list_owned_plans",
         ("/v1/reseller/subscriptions/create", "POST"): "create_reseller_subscription",
         ("/v1/reseller/subscriptions/{subscription_id}/extend", "POST"): "extend_subscription_pool_guard",
