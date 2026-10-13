@@ -16,7 +16,6 @@ from ..models_reseller import (
     ResellerWalletTransaction,
 )
 from ..services.reseller_traffic_pool import (
-    effective_reseller_traffic_bytes,
     restore_reseller_pool_subscriptions,
 )
 
@@ -32,6 +31,14 @@ GB = 1024 ** 3
 class BuyTrafficIn(BaseModel):
     package_id: int = Field(gt=0)
     idempotency_key: str = Field(min_length=8, max_length=120)
+
+
+def _effective_pool_bytes(reseller: Reseller) -> int:
+    return max(
+        int(reseller.traffic_balance_bytes or 0)
+        + int(reseller.traffic_credit_bytes or 0),
+        0,
+    )
 
 
 @router.post("/traffic/buy")
@@ -73,7 +80,7 @@ def buy_traffic_and_restore(
     if traffic_bytes <= 0:
         raise HTTPException(status_code=422, detail="حجم بسته معتبر نیست")
 
-    previous_effective = effective_reseller_traffic_bytes(reseller)
+    previous_effective = _effective_pool_bytes(reseller)
     old_traffic = int(reseller.traffic_balance_bytes or 0)
     new_traffic = old_traffic + traffic_bytes
 
@@ -105,12 +112,13 @@ def buy_traffic_and_restore(
         )
     )
 
-    restored = 0
-    if previous_effective <= 0 and effective_reseller_traffic_bytes(reseller) > 0:
-        restored = restore_reseller_pool_subscriptions(
+    restored_count = 0
+    if previous_effective <= 0 and _effective_pool_bytes(reseller) > 0:
+        restore_result = restore_reseller_pool_subscriptions(
             db,
             int(reseller.id),
         )
+        restored_count = int(restore_result.get("restored") or 0)
 
     try:
         db.commit()
@@ -142,6 +150,6 @@ def buy_traffic_and_restore(
         "traffic_balance_bytes": int(new_traffic),
         "traffic_balance_gb": round(new_traffic / GB, 2),
         "wallet_balance": int(new_wallet),
-        "restored_subscriptions": int(restored),
+        "restored_subscriptions": restored_count,
         "pool_mode": "usage_only",
     }
