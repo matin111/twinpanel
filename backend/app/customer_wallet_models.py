@@ -138,7 +138,8 @@ class CustomerWalletTopup(Base):
         index=True,
     )
 
-    # مبلغی که واقعاً وارد کیف پول می‌شود
+    # مبلغی که واقعاً وارد کیف پول می‌شود. Wallet top-ups never receive the
+    # plan-purchase crypto discount: credit and accounting remain 1:1 in Toman.
     amount_toman: Mapped[int] = mapped_column(
         BigInteger,
         nullable=False,
@@ -155,8 +156,25 @@ class CustomerWalletTopup(Base):
         nullable=True,
     )
 
+    # Legacy USDT field kept for historical rows and old bot clients.
     crypto_amount_usdt: Mapped[object | None] = mapped_column(
         Numeric(20, 6),
+        nullable=True,
+    )
+
+    # Immutable quote snapshot for all current crypto top-ups. The quote is
+    # frozen when the request is created so market movement cannot alter the
+    # amount the customer must send later from the panel or Telegram bot.
+    crypto_asset: Mapped[str | None] = mapped_column(
+        String(16),
+        nullable=True,
+    )
+    crypto_amount: Mapped[object | None] = mapped_column(
+        Numeric(28, 8),
+        nullable=True,
+    )
+    crypto_rate_toman: Mapped[int | None] = mapped_column(
+        BigInteger,
         nullable=True,
     )
 
