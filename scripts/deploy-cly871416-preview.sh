@@ -5,6 +5,7 @@ set -Eeuo pipefail
 # Source:  /opt/twinpanel-preview
 # Backend: /opt/twinpanel/current/backend -> twinpanel-api.service :8095
 # Web:     /opt/twinpanel-preview        -> twinpanel-preview.service :3010
+# Bot:     /opt/twinpanel/current/backend -> twinpanel-reseller-bots.service
 
 EXPECTED_HOST="CLY871416"
 REPO_DIR="${REPO_DIR:-/opt/twinpanel-preview}"
@@ -13,6 +14,7 @@ API_DST="${API_DST:-/opt/twinpanel/current/backend}"
 VENV_DIR="${VENV_DIR:-/opt/twinpanel/venv}"
 API_SERVICE="${API_SERVICE:-twinpanel-api.service}"
 WEB_SERVICE="${WEB_SERVICE:-twinpanel-preview.service}"
+BOT_SERVICE="${BOT_SERVICE:-twinpanel-reseller-bots.service}"
 API_URL="${API_URL:-http://127.0.0.1:8095}"
 WEB_URL="${WEB_URL:-http://127.0.0.1:3010}"
 BACKUP_ROOT="${BACKUP_ROOT:-/root/twinpanel-backups}"
@@ -23,6 +25,10 @@ DEPLOY_OK=0
 BACKEND_BACKED_UP=0
 WEB_WAS_ACTIVE=0
 API_WAS_ACTIVE=0
+BOT_SERVICE_PRESENT=0
+BOT_WAS_ACTIVE=0
+BOT_WAS_ENABLED=0
+BOT_SHOULD_RUN=0
 OLD_HEAD=""
 OLD_BRANCH=""
 STASH_REF=""
@@ -87,6 +93,9 @@ rollback() {
   echo " BACKUP: $BACKUP_DIR"
   echo "============================================================"
 
+  if [[ "$BOT_SERVICE_PRESENT" == "1" ]]; then
+    systemctl stop "$BOT_SERVICE" >/dev/null 2>&1 || true
+  fi
   systemctl stop "$API_SERVICE" >/dev/null 2>&1 || true
 
   if [[ "$BACKEND_BACKED_UP" == "1" && -f "$BACKUP_DIR/backend.tar.gz" ]]; then
@@ -111,6 +120,10 @@ rollback() {
     systemctl start "$API_SERVICE" >/dev/null 2>&1 || true
   fi
 
+  if [[ "$BOT_SERVICE_PRESENT" == "1" && "$BOT_WAS_ACTIVE" == "1" ]]; then
+    systemctl start "$BOT_SERVICE" >/dev/null 2>&1 || true
+  fi
+
   if [[ "$WEB_WAS_ACTIVE" == "1" ]]; then
     systemctl start "$WEB_SERVICE" >/dev/null 2>&1 || true
   fi
@@ -120,6 +133,9 @@ rollback() {
   echo "  $BACKUP_DIR"
   echo "  journalctl -u $API_SERVICE -n 150 --no-pager"
   echo "  journalctl -u $WEB_SERVICE -n 150 --no-pager"
+  if [[ "$BOT_SERVICE_PRESENT" == "1" ]]; then
+    echo "  journalctl -u $BOT_SERVICE -n 150 --no-pager"
+  fi
   exit "$exit_code"
 }
 
@@ -143,10 +159,21 @@ fi
 systemctl cat "$API_SERVICE" >/dev/null
 systemctl cat "$WEB_SERVICE" >/dev/null
 
+if systemctl cat "$BOT_SERVICE" >/dev/null 2>&1; then
+  BOT_SERVICE_PRESENT=1
+  if systemctl is-active --quiet "$BOT_SERVICE"; then BOT_WAS_ACTIVE=1; fi
+  if systemctl is-enabled --quiet "$BOT_SERVICE"; then BOT_WAS_ENABLED=1; fi
+  if [[ "$BOT_WAS_ACTIVE" == "1" || "$BOT_WAS_ENABLED" == "1" ]]; then BOT_SHOULD_RUN=1; fi
+fi
+
 mkdir -p "$BACKUP_DIR"
 
 if systemctl is-active --quiet "$API_SERVICE"; then API_WAS_ACTIVE=1; fi
 if systemctl is-active --quiet "$WEB_SERVICE"; then WEB_WAS_ACTIVE=1; fi
+
+printf '%s\n' "$BOT_SERVICE_PRESENT" > "$BACKUP_DIR/bot-service-present.txt"
+printf '%s\n' "$BOT_WAS_ACTIVE" > "$BACKUP_DIR/bot-was-active.txt"
+printf '%s\n' "$BOT_WAS_ENABLED" > "$BACKUP_DIR/bot-was-enabled.txt"
 
 cd "$REPO_DIR"
 OLD_HEAD="$(git rev-parse HEAD)"
@@ -181,6 +208,10 @@ echo "NEW_HEAD=$NEW_HEAD"
 echo "BRANCH=$BRANCH"
 echo "NODE=$(node --version)"
 echo "NPM=$(npm --version)"
+echo "BOT_SERVICE_PRESENT=$BOT_SERVICE_PRESENT"
+echo "BOT_WAS_ACTIVE=$BOT_WAS_ACTIVE"
+echo "BOT_WAS_ENABLED=$BOT_WAS_ENABLED"
+echo "BOT_SHOULD_RUN=$BOT_SHOULD_RUN"
 
 log "VERIFYING REQUIRED SOURCE FILES"
 required_files=(
@@ -195,6 +226,10 @@ required_files=(
   "backend/app/routers/wallet_admin_v2.py"
   "backend/app/routers/wallet_sms_reader.py"
   "backend/app/services/wallet_payment_automation.py"
+  "backend/app/reseller_bot_runtime.py"
+  "backend/app/reseller_bot_runtime_owned.py"
+  "backend/app/reseller_bot_owned_runtime.py"
+  "backend/app/routers/reseller_pool_guard_v3.py"
   "components/admin-wallet-v2.tsx"
   "components/customer-wallet-v2.tsx"
   "components/customer-payments-runtime.tsx"
@@ -205,9 +240,13 @@ for f in "${required_files[@]}"; do
   [[ -f "$REPO_DIR/$f" ]] || fail "required source file missing: $f"
 done
 
-log "SYNCING BACKEND FROM GITHUB SOURCE"
+log "STOPPING BACKEND RUNTIMES FOR CONSISTENT SYNC"
+if [[ "$BOT_SERVICE_PRESENT" == "1" ]]; then
+  systemctl stop "$BOT_SERVICE" || true
+fi
 systemctl stop "$API_SERVICE"
 
+log "SYNCING BACKEND FROM GITHUB SOURCE"
 rsync -a \
   --exclude='.env' \
   --exclude='.env.*' \
@@ -260,6 +299,8 @@ required = {
     "/v1/wallet/topups",
     "/v1/wallet/topups/{topup_id}/submit",
     "/v1/admin/telegram-bot",
+    "/v1/reseller/owned-plans",
+    "/v1/reseller/owned-plans/{plan_id}",
 }
 
 missing = sorted(required - set(paths))
@@ -273,6 +314,18 @@ print("ROUTES_OK")
 for item in sorted(required):
     print("OK", item)
 PY
+
+if [[ "$BOT_SERVICE_PRESENT" == "1" && "$BOT_SHOULD_RUN" == "1" ]]; then
+  log "STARTING RESELLER BOT SUPERVISOR"
+  systemctl start "$BOT_SERVICE"
+  sleep 2
+  if ! systemctl is-active --quiet "$BOT_SERVICE"; then
+    systemctl status "$BOT_SERVICE" --no-pager -l || true
+    journalctl -u "$BOT_SERVICE" -n 150 --no-pager || true
+    fail "reseller bot supervisor failed to start"
+  fi
+  echo "RESELLER_BOT_SUPERVISOR_ACTIVE"
+fi
 
 log "INSTALLING FRONTEND DEPENDENCIES"
 install_frontend_dependencies
@@ -309,6 +362,9 @@ esac
 log "FINAL SERVICE STATUS"
 systemctl is-active "$API_SERVICE"
 systemctl is-active "$WEB_SERVICE"
+if [[ "$BOT_SERVICE_PRESENT" == "1" && "$BOT_SHOULD_RUN" == "1" ]]; then
+  systemctl is-active "$BOT_SERVICE"
+fi
 curl -fsS "$API_URL/health"
 echo
 curl -fsS "$WEB_URL/login" >/dev/null
@@ -324,6 +380,9 @@ echo " BRANCH:     $BRANCH"
 echo " HEAD:       $NEW_HEAD"
 echo " API:        $API_URL/health"
 echo " FRONTEND:   $WEB_URL/login"
+if [[ "$BOT_SERVICE_PRESENT" == "1" ]]; then
+  echo " BOT:        $BOT_SERVICE (should_run=$BOT_SHOULD_RUN)"
+fi
 echo " BACKUP:     $BACKUP_DIR"
 if [[ -n "$STASH_REF" ]]; then
   echo " PREDEPLOY STASH: $STASH_REF"
