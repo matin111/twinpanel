@@ -30,6 +30,7 @@ import {ResellerDashboardV3} from "../../components/reseller-dashboard-v3";
 import {ResellerTrafficRechargeV3} from "../../components/reseller-plans-traffic-v3";
 import {ResellerOwnedPlansRuntime} from "../../components/reseller-owned-plans";
 import {ResellerAccountBuilderRuntime} from "../../components/reseller-account-builder";
+import {ResellerWalletRuntime} from "../../components/reseller-wallet-runtime";
 import {ResellerBotParityRuntime,ResellerOrdersParityRuntime,ResellerDiscountsParityRuntime} from "../../components/reseller-commerce-parity";
 import {StoreRuntime2027} from "../../components/store-runtime";
 import {AdminAuthGuard} from "../../components/admin-auth-guard";
@@ -90,7 +91,8 @@ const route=(key:string)=>{
   if(key==="reseller/customers") return <ResellerAccountBuilderRuntime/>;
   if(key==="reseller/subscriptions") return <ResellerAccountBuilderRuntime/>;
   if(key==="reseller/sales"||key==="reseller/plans") return <ResellerOwnedPlansRuntime/>;
-  if(key==="reseller/traffic"||key==="reseller/wallet") return <ResellerTrafficRechargeV3/>;
+  if(key==="reseller/wallet") return <ResellerWalletRuntime/>;
+  if(key==="reseller/traffic") return <ResellerTrafficRechargeV3/>;
   if(key==="reseller/orders") return <ResellerOrdersParityRuntime/>;
   if(key==="reseller/discounts") return <ResellerDiscountsParityRuntime/>;
   if(key==="reseller/bot") return <ResellerBotParityRuntime/>;

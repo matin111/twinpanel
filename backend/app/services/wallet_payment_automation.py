@@ -12,6 +12,7 @@ from ..customer_wallet_models import (
     CustomerWalletTransaction,
 )
 from ..database import SessionLocal
+from ..models_reseller import Reseller, ResellerWalletTransaction
 from ..payment_models import PaymentIntent, PaymentSettings
 from ..telegram_notify_service import queue_telegram_notification
 from ..user_notification_models import UserNotification
@@ -52,6 +53,23 @@ def _wallet_locked(db: Session, user_id: int) -> CustomerWallet:
     return row
 
 
+def _reseller_locked(db: Session, user_id: int) -> Reseller | None:
+    """Return the reseller owned by this login account and lock it for crediting.
+
+    Reseller owners use the reseller wallet as their operational wallet. Keeping
+    top-up credit in the customer wallet makes traffic-package purchases fail
+    even after a successful payment, so reseller top-ups are routed directly to
+    the reseller ledger.
+    """
+
+    return (
+        db.query(Reseller)
+        .filter(Reseller.owner_user_id == int(user_id))
+        .with_for_update()
+        .first()
+    )
+
+
 def credit_wallet_topup(
     db: Session,
     topup_id: int,
@@ -61,8 +79,12 @@ def credit_wallet_topup(
 ) -> dict:
     """Credit one wallet top-up exactly once.
 
-    The ledger reference is stable, so retries from workers, SMS Reader, panel,
-    Telegram or an admin cannot add the same top-up more than once.
+    Customer accounts are credited to ``customer_wallets``. When the same login
+    owns a reseller account, the payment is instead credited directly to the
+    reseller wallet because reseller purchases debit ``resellers.wallet_balance``.
+
+    Both ledgers use a stable reference derived from the top-up id, so retries
+    from workers, SMS Reader, panel, Telegram or an admin cannot double-credit.
     """
 
     row = (
@@ -75,28 +97,54 @@ def credit_wallet_topup(
     if row is None:
         return {"ok": False, "credited": False, "reason": "topup_not_found"}
 
-    wallet = _wallet_locked(db, row.user_id)
     reference = f"wallet-topup:{row.id}"
+    reseller = _reseller_locked(db, row.user_id)
 
-    existing_tx = (
+    customer_existing_tx = (
         db.query(CustomerWalletTransaction)
         .filter(CustomerWalletTransaction.reference == reference)
         .first()
     )
 
-    if row.status == "approved" or existing_tx is not None:
+    reseller_existing_tx = None
+    if reseller is not None:
+        reseller_existing_tx = (
+            db.query(ResellerWalletTransaction)
+            .filter(ResellerWalletTransaction.idempotency_key == reference)
+            .first()
+        )
+
+    # Old approved rows may have been credited to the customer wallet before
+    # reseller-aware routing existed. Never move or duplicate those funds
+    # automatically: report the legacy target and leave the historical ledger
+    # intact.
+    if row.status == "approved" or customer_existing_tx is not None or reseller_existing_tx is not None:
         if row.status != "approved":
             row.status = "approved"
             row.approved_at = row.approved_at or datetime.utcnow()
             row.rejected_at = None
             db.commit()
 
+        if reseller_existing_tx is not None and reseller is not None:
+            return {
+                "ok": True,
+                "credited": False,
+                "already_approved": True,
+                "topup_id": row.id,
+                "user_id": row.user_id,
+                "wallet_type": "reseller",
+                "reseller_id": int(reseller.id),
+                "balance_toman": int(reseller.wallet_balance or 0),
+            }
+
+        wallet = _wallet_locked(db, row.user_id)
         return {
             "ok": True,
             "credited": False,
             "already_approved": True,
             "topup_id": row.id,
             "user_id": row.user_id,
+            "wallet_type": "customer_legacy" if reseller is not None else "customer",
             "balance_toman": int(wallet.balance_toman or 0),
         }
 
@@ -116,22 +164,51 @@ def credit_wallet_topup(
     if amount <= 0:
         return {"ok": False, "credited": False, "reason": "invalid_amount"}
 
-    wallet.balance_toman = int(wallet.balance_toman or 0) + amount
-    wallet.updated_at = datetime.utcnow()
+    wallet_type = "customer"
+    balance_after = 0
+    reseller_id: int | None = None
 
-    db.add(CustomerWalletTransaction(
-        user_id=row.user_id,
-        amount_toman=amount,
-        kind="topup",
-        description="شارژ کیف پول",
-        reference=reference,
-        created_at=datetime.utcnow(),
-    ))
+    if reseller is not None:
+        reseller.wallet_balance = int(reseller.wallet_balance or 0) + amount
+        reseller.updated_at = datetime.utcnow()
+        balance_after = int(reseller.wallet_balance or 0)
+        reseller_id = int(reseller.id)
+        wallet_type = "reseller"
+
+        db.add(
+            ResellerWalletTransaction(
+                reseller_id=reseller.id,
+                amount=amount,
+                balance_after=balance_after,
+                transaction_type="wallet_topup",
+                reference_type="customer_wallet_topup",
+                reference_id=row.id,
+                description="شارژ کیف پول نمایندگی",
+                idempotency_key=reference,
+                created_at=datetime.utcnow(),
+            )
+        )
+    else:
+        wallet = _wallet_locked(db, row.user_id)
+        wallet.balance_toman = int(wallet.balance_toman or 0) + amount
+        wallet.updated_at = datetime.utcnow()
+        balance_after = int(wallet.balance_toman or 0)
+
+        db.add(
+            CustomerWalletTransaction(
+                user_id=row.user_id,
+                amount_toman=amount,
+                kind="topup",
+                description="شارژ کیف پول",
+                reference=reference,
+                created_at=datetime.utcnow(),
+            )
+        )
 
     row.status = "approved"
     row.approved_at = datetime.utcnow()
     row.rejected_at = None
-    row.review_note = f"auto-credit:{source}"[:1000]
+    row.review_note = f"auto-credit:{source};target={wallet_type}"[:1000]
 
     batch_id = f"wallet-topup-{row.id}"
     exists_notification = (
@@ -144,13 +221,18 @@ def credit_wallet_topup(
     )
 
     if not exists_notification:
+        if wallet_type == "reseller":
+            title = "کیف پول نمایندگی شارژ شد"
+            message = f"مبلغ {amount:,} تومان با موفقیت به کیف پول نمایندگی شما اضافه شد."
+        else:
+            title = "کیف پول شارژ شد"
+            message = f"مبلغ {amount:,} تومان با موفقیت به کیف پول شما اضافه شد."
+
         notification = UserNotification(
             batch_id=batch_id,
             user_id=row.user_id,
-            title="کیف پول شارژ شد",
-            message=(
-                f"مبلغ {amount:,} تومان با موفقیت به کیف پول شما اضافه شد."
-            ),
+            title=title,
+            message=message,
             kind="success",
             telegram_requested=True,
             created_at=datetime.utcnow(),
@@ -173,15 +255,19 @@ def credit_wallet_topup(
 
     db.commit()
 
-    return {
+    result = {
         "ok": True,
         "credited": True,
         "topup_id": row.id,
         "user_id": row.user_id,
         "amount_toman": amount,
-        "balance_toman": int(wallet.balance_toman or 0),
+        "balance_toman": balance_after,
+        "wallet_type": wallet_type,
         "source": source,
     }
+    if reseller_id is not None:
+        result["reseller_id"] = reseller_id
+    return result
 
 
 def _destination_for_topup(db: Session, method: str) -> str:
