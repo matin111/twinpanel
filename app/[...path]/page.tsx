@@ -17,6 +17,7 @@ import {L2tpSettingsPage} from "../../components/l2tp-settings";
 import {SettingsPage2027} from "../../components/settings-2027";
 import {LoginPage2027,RegisterPage2027} from "../../components/login-2027";
 import {CustomerSectionRuntime} from "../../components/customer-runtime";
+import {CustomerWalletV2} from "../../components/customer-wallet-v2";
 import {CustomerPanelEntry} from "../../components/customer-panel-entry";
 import {CustomerBuyRuntime} from "../../components/customer-buy-runtime";
 import {CustomerPaymentsRuntime} from "../../components/customer-payments-runtime";
@@ -32,7 +33,7 @@ import {AdminPaymentMarketRates} from "../../components/admin-payment-market-rat
 import {AdminCryptoDiscountControl} from "../../components/admin-crypto-discount-control";
 import {AdminSmsRelayDownload} from "../../components/admin-sms-relay-download";
 
-const customerSections=new Set(["orders","wallet","notifications","profile"]);
+const customerSections=new Set(["orders","notifications","profile"]);
 const resellerSections=new Set(["customers","subscriptions","sales","wallet","orders","traffic","bot","notifications","settings"]);
 const admin=(node:React.ReactNode)=><AdminAuthGuard>{node}</AdminAuthGuard>;
 
@@ -74,6 +75,7 @@ const route=(key:string)=>{
   if(key==="panel/connection") return <CustomerSubscriptionsRuntime/>;
   if(key==="panel/usage"||key==="panel/support") return <CustomerPanelEntry/>;
   if(key==="panel/payments") return <CustomerPaymentsRuntime/>;
+  if(key==="panel/wallet") return <CustomerWalletV2/>;
   if(key==="reseller") return <ResellerDashboardRuntime/>;
   if(key==="store") return <StoreRuntime2027/>;
   if(key.startsWith("panel/")){
