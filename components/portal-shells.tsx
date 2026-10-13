@@ -29,11 +29,10 @@ const resellerMenu:MenuItem[]=[
   ["داشبورد","Dashboard","/reseller","home"],
   ["مشتریان","Customers","/reseller/customers","profile"],
   ["اشتراک‌ها","Subscriptions","/reseller/subscriptions","subscription"],
-  ["فروش","Sales","/reseller/sales","payments"],
-  ["کیف پول","Wallet","/reseller/wallet","wallet"],
+  ["فروش و قیمت‌ها","Sales & Prices","/reseller/sales","payments"],
+  ["حجم و تراکنش‌ها","Traffic","/reseller/traffic","cart"],
   ["سفارش‌ها","Orders","/reseller/orders","orders"],
   ["کدهای تخفیف","Discounts","/reseller/discounts","payments"],
-  ["بسته‌های ترافیک","Traffic Packages","/reseller/traffic","cart"],
   ["ربات نمایندگی","Reseller Bot","/reseller/bot","bell"],
   ["اعلان‌ها","Notifications","/reseller/notifications","bell"],
   ["تنظیمات","Settings","/reseller/settings","profile"]
@@ -71,46 +70,18 @@ function CustomerAccessGuard({children}:{children:React.ReactNode}){
 
     const run=async()=>{
       const token=getCustomerToken();
-      if(!token){
-        window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);
-        return;
-      }
-
+      if(!token){window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);return;}
       let account;
-      try{
-        account=await customerApi.me(token);
-      }catch{
-        clearCustomerToken();
-        window.location.replace("/login");
-        return;
-      }
-
+      try{account=await customerApi.me(token);}catch{clearCustomerToken();window.location.replace("/login");return;}
       if(!alive)return;
-
-      if(!account.is_active){
-        clearCustomerToken();
-        window.location.replace("/login");
-        return;
-      }
-
-      if(String(account.role||"").toLowerCase()==="admin"){
-        window.location.replace("/admin");
-        return;
-      }
-
+      if(!account.is_active){clearCustomerToken();window.location.replace("/login");return;}
+      if(String(account.role||"").toLowerCase()==="admin"){window.location.replace("/admin");return;}
       try{
         const reseller=await getResellerProfile(token);
         if(!alive)return;
-
-        if(reseller){
-          window.location.replace("/reseller");
-          return;
-        }
-
+        if(reseller){window.location.replace("/reseller");return;}
         setReady(true);
-      }catch(reason){
-        if(alive)setError(reason instanceof Error?reason.message:String(reason));
-      }
+      }catch(reason){if(alive)setError(reason instanceof Error?reason.message:String(reason));}
     };
 
     void run();
@@ -118,9 +89,7 @@ function CustomerAccessGuard({children}:{children:React.ReactNode}){
   },[]);
 
   if(error)return <div className="auth-gate"><div className="auth-gate-card"><b>{pick("بررسی نوع حساب ناموفق بود","Could not verify account type")}</b><small>{error}</small><button className="ghost" onClick={()=>window.location.reload()}>{pick("تلاش دوباره","Retry")}</button></div></div>;
-
   if(!ready)return <div className="auth-gate"><div className="auth-gate-card"><span className="spinner"/><b>{pick("در حال بررسی نوع حساب...","Checking account type...")}</b></div></div>;
-
   return <>{children}</>;
 }
 
@@ -180,6 +149,11 @@ function PortalFrame({children,active="",type}:PortalShellProps){
     return n;
   });
 
+  const resellerLogout=()=>{
+    clearCustomerToken();
+    window.location.replace("/login");
+  };
+
   if(type==="customer")return <div className={`customer-portal-shell ${collapsed?"is-collapsed":""} ${mobileOpen?"is-mobile-open":""}`}>
     <CustomerSidebar active={active} collapsed={collapsed} toggle={toggle} closeMobile={()=>setMobileOpen(false)}/>
     <main className="customer-portal-main"><header className="customer-portal-header"><button className="customer-portal-mobile-toggle" type="button" onClick={()=>setMobileOpen(v=>!v)} aria-expanded={mobileOpen}>☰</button><div className="customer-portal-search"><span>⌕</span><input placeholder={pick("جستجو در حساب...","Search account...")}/></div><div className="customer-portal-header-actions"><CustomerNotificationCenter/><LanguageSwitch compact/><ThemeSwitch compact/></div></header>{children}</main>
@@ -189,7 +163,7 @@ function PortalFrame({children,active="",type}:PortalShellProps){
     <aside className="sidebar">
       <div className="sidebar-head"><BrandMark/><button className="sidebar-collapse" type="button" onClick={toggle}>↔</button><button className="mobile-menu-close" type="button" onClick={()=>setMobileOpen(false)}>×</button></div>
       <nav className="sidebar-nav"><div className="nav-group"><div className="nav-group-title">{pick("مرکز نمایندگی","Reseller Center")}</div>{menu.map(([fa,en,href,icon])=><Link key={href} href={href} className={active===href?"active":""} title={collapsed?pick(fa,en):undefined} onClick={()=>setMobileOpen(false)}><i><PortalIcon name={icon}/></i><span className="nav-label">{pick(fa,en)}</span></Link>)}</div></nav>
-      <div className="profile"><span className="avatar">R</span><div className="profile-copy"><b>{pick("نماینده فروش","Reseller")}</b><small>Partner</small></div></div>
+      <div className="profile"><span className="avatar">R</span><div className="profile-copy"><b>{pick("نماینده فروش","Reseller")}</b><small>Partner</small></div><button className="mini-btn" type="button" onClick={resellerLogout} title={pick("خروج","Sign out")}>↪</button></div>
     </aside>
     <main><header><button className="mobile-menu-toggle" type="button" onClick={()=>setMobileOpen(v=>!v)} aria-expanded={mobileOpen}>☰</button><div className="search">⌕ <input placeholder={pick("جستجو...","Search...")}/></div><div className="head-actions"><LanguageSwitch compact/><ThemeSwitch compact/></div></header>{children}</main>
   </div>;
