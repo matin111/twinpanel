@@ -36,6 +36,7 @@ from .routers.download_assets import admin_router as download_assets_admin_route
 from .routers.public_connection_v3 import router as public_connection_v3_router
 from .self_hosted_runtime import apply_self_hosted_runtime
 from .admin_notification_service import notification_watch_loop
+from .services.customer_maintenance import customer_maintenance_loop
 # TWINPANEL_REAL_ADMIN_NOTIFICATION_REGISTER_V1
 # TWINPANEL_USERNAME_SETTINGS_REGISTER_V2
 from .routers.payments import router as payments_router
@@ -95,6 +96,10 @@ async def lifespan(app: FastAPI):
         notification_watch_loop(),
         name="admin-notification-watch",
     )
+    customer_maintenance_task = asyncio.create_task(
+        customer_maintenance_loop(),
+        name="customer-maintenance",
+    )
 
     try:
         yield
@@ -102,10 +107,12 @@ async def lifespan(app: FastAPI):
     finally:
         watchdog_task.cancel()
         notification_task.cancel()
+        customer_maintenance_task.cancel()
 
         for task in (
             watchdog_task,
             notification_task,
+            customer_maintenance_task,
         ):
             try:
                 await task
