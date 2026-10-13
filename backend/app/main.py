@@ -41,6 +41,7 @@ from .routers.reseller_admin_v2 import router as reseller_admin_v2_router
 from .routers.reseller_traffic_admin_v2 import router as reseller_traffic_admin_v2_router
 from .routers.reseller_sale_v2 import router as reseller_sale_v2_router
 from .routers.reseller_profile_v2 import router as reseller_profile_v2_router
+from .routers.reseller_subscription_volume_v2 import router as reseller_subscription_volume_v2_router
 from .self_hosted_runtime import apply_self_hosted_runtime
 from .admin_notification_service import notification_watch_loop
 from .services.customer_maintenance import customer_maintenance_loop
@@ -284,9 +285,10 @@ app.include_router(admin.router)
 app.include_router(reseller_admin_v2_router)
 app.include_router(reseller_traffic_admin_v2_router)
 app.include_router(resellers.router)
-# Correct reseller sale/profile flows must precede legacy routes with the same paths.
+# Correct reseller sale/profile/edit/renewal flows must precede legacy routes.
 app.include_router(reseller_sale_v2_router)
 app.include_router(reseller_profile_v2_router)
+app.include_router(reseller_subscription_volume_v2_router)
 app.include_router(reseller_portal.router)
 app.include_router(domains.router)
 app.include_router(branding.router)
