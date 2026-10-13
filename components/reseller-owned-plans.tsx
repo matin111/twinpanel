@@ -84,12 +84,31 @@ export function ResellerOwnedPlansRuntime(){
     }finally{setBusy(false);}
   };
 
-  const disable=async(row:ResellerRow)=>{
-    const id=Number(row.id||0);if(!id)return;
-    if(!window.confirm(pick("این پلن غیرفعال شود؟ سفارش‌های قبلی حفظ می‌شوند.","Disable this plan? Existing orders remain intact.")))return;
+  const toggleActive=async(row:ResellerRow)=>{
+    const id=Number(row.id||0);if(!id||busy)return;
+    const isActive=Boolean(row.is_active);
+    const question=isActive?pick("این پلن غیرفعال شود؟ سفارش‌های قبلی حفظ می‌شوند.","Disable this plan? Existing orders remain intact."):pick("این پلن دوباره فعال شود؟","Activate this plan again?");
+    if(!window.confirm(question))return;
     setBusy(true);setError("");setOk("");
-    try{await resellerApi.deletePlan(id);setOk(pick("پلن غیرفعال شد.","Plan disabled."));await load();}
-    catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    try{
+      if(isActive)await resellerApi.disablePlan(id);else await resellerApi.enablePlan(id);
+      setOk(isActive?pick("پلن غیرفعال شد.","Plan disabled."):pick("پلن فعال شد.","Plan activated."));
+      await load();
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setBusy(false);}
+  };
+
+  const remove=async(row:ResellerRow)=>{
+    const id=Number(row.id||0);if(!id||busy)return;
+    const title=str(row,"title")||str(row,"name")||`#${id}`;
+    if(!window.confirm(pick(`پلن «${title}» حذف شود؟ اگر سابقه سفارش یا اشتراک داشته باشد، سیستم برای حفظ تاریخچه اجازه حذف نمی‌دهد.`,`Delete “${title}”? If it has order or subscription history, TwinPanel will protect that history and refuse deletion.`)))return;
+    setBusy(true);setError("");setOk("");
+    try{
+      await resellerApi.deletePlan(id);
+      if(editing===id)closeEditor();
+      setOk(pick("پلن حذف شد.","Plan deleted."));
+      await load();
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy(false);}
   };
 
@@ -107,12 +126,12 @@ export function ResellerOwnedPlansRuntime(){
         <label className="field"><span>{pick("قیمت فروش ربات (تومان)","Bot sale price")}</span><input type="number" min={0} step={1} value={form.sell_price_toman} onChange={e=>setForm(v=>({...v,sell_price_toman:Number(e.target.value)}))}/></label>
         <label className="field"><span>{pick("ترتیب نمایش","Sort order")}</span><input type="number" min={0} value={form.sort_order} onChange={e=>setForm(v=>({...v,sort_order:Number(e.target.value)}))}/></label>
       </div>
-      <div className="card-head"><b>{pick("پروتکل‌ها","Protocols")}</b></div><div className="setting-grid">{protocolRows.map(([key,label])=><label className="field" key={String(key)}><span>{label}</span><input type="checkbox" checked={Boolean(form[key])} onChange={e=>setForm(v=>({...v,[key]:e.target.checked}))}/></label>)}<label className="field"><span>{pick("فعال","Active")}</span><input type="checkbox" checked={form.is_active} onChange={e=>setForm(v=>({...v,is_active:e.target.checked}))}/></label></div>
+      <div className="card-head"><b>{pick("پروتکل‌ها","Protocols")}</b></div><div className="setting-grid owned-plan-protocol-grid">{protocolRows.map(([key,label])=><label className="field" key={String(key)}><span>{label}</span><input type="checkbox" checked={Boolean(form[key])} onChange={e=>setForm(v=>({...v,[key]:e.target.checked}))}/></label>)}<label className="field"><span>{pick("فعال","Active")}</span><input type="checkbox" checked={form.is_active} onChange={e=>setForm(v=>({...v,is_active:e.target.checked}))}/></label></div>
       <div className="action-row"><button type="button" className="ghost" onClick={closeEditor}>{pick("انصراف","Cancel")}</button><button type="submit" className="primary" disabled={busy}>{busy?"…":editing?pick("ذخیره تغییرات","Save changes"):pick("ذخیره پلن","Save plan")}</button></div>
     </form></Card></div>}
 
     <Card><div className="card-head"><div><b>{pick("پلن‌های اختصاصی نمایندگی","Reseller-owned plans")}</b><small>{pick("ربات فقط پلن‌های فعال همین لیست را به مشتری نمایش می‌دهد.","The bot only shows active plans from this list.")}</small></div><Badge tone="violet">{rows.length}</Badge></div>
-      <div className="table"><table><thead><tr><th>{pick("پلن","Plan")}</th><th>{pick("حجم / مدت","Traffic / Duration")}</th><th>{pick("پروتکل‌ها","Protocols")}</th><th>{pick("قیمت","Price")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{rows.map((row,index)=>{const id=Number(row.id||0);const protocols=protocolRows.filter(([key])=>Boolean(row[String(key)])).map(([,label])=>label);return <tr key={id||index}><td><b>{str(row,"title")||str(row,"name")||`#${id}`}</b><small>#{id}</small></td><td>{num(row,"traffic_gb")} GB · {num(row,"duration_days")} {pick("روز","days")}</td><td>{protocols.join(" · ")||"—"}</td><td>{money(num(row,"sell_price_toman"))}</td><td><Badge tone={Boolean(row.is_active)?"ok":"bad"}>{Boolean(row.is_active)?pick("فعال","Active"):pick("غیرفعال","Inactive")}</Badge></td><td><div className="row-actions"><button type="button" className="mini-btn" onClick={()=>startEdit(row)}>{pick("ویرایش","Edit")}</button>{Boolean(row.is_active)&&<button type="button" className="mini-btn danger" disabled={busy} onClick={()=>void disable(row)}>{pick("غیرفعال","Disable")}</button>}</div></td></tr>})}</tbody></table></div>
+      <div className="table"><table><thead><tr><th>{pick("پلن","Plan")}</th><th>{pick("حجم / مدت","Traffic / Duration")}</th><th>{pick("پروتکل‌ها","Protocols")}</th><th>{pick("قیمت","Price")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{rows.map((row,index)=>{const id=Number(row.id||0);const protocols=protocolRows.filter(([key])=>Boolean(row[String(key)])).map(([,label])=>label);return <tr key={id||index}><td><b>{str(row,"title")||str(row,"name")||`#${id}`}</b><small>#{id}</small></td><td>{num(row,"traffic_gb")} GB · {num(row,"duration_days")} {pick("روز","days")}</td><td>{protocols.join(" · ")||"—"}</td><td>{money(num(row,"sell_price_toman"))}</td><td><Badge tone={Boolean(row.is_active)?"ok":"bad"}>{Boolean(row.is_active)?pick("فعال","Active"):pick("غیرفعال","Inactive")}</Badge></td><td><div className="row-actions"><button type="button" className="mini-btn" disabled={busy} onClick={()=>startEdit(row)}>{pick("ویرایش","Edit")}</button><button type="button" className="mini-btn" disabled={busy} onClick={()=>void toggleActive(row)}>{Boolean(row.is_active)?pick("غیرفعال","Disable"):pick("فعال‌سازی","Activate")}</button><button type="button" className="mini-btn danger" disabled={busy} onClick={()=>void remove(row)}>{pick("حذف","Delete")}</button></div></td></tr>})}</tbody></table></div>
       {!rows.length&&<div className="runtime-empty">{pick("هنوز پلنی نساخته‌اید. اولین پلن ربات را ایجاد کنید.","No plans yet. Create your first bot plan.")}</div>}
     </Card>
   </div></PortalShell>;

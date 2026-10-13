@@ -29,11 +29,41 @@ small{font-size:12.5px;line-height:1.6}
   font-size:14px;
 }
 .field input,.field select,.setting-grid input,.setting-grid select{min-height:44px}
+.field input[type="checkbox"],.setting-grid input[type="checkbox"]{
+  width:18px;
+  height:18px;
+  min-width:18px;
+  min-height:18px;
+  margin:6px 0 0;
+  padding:0;
+  accent-color:var(--purple);
+}
 .primary,.ghost{font-size:13.5px;min-height:40px}
 .mini-btn{font-size:12.5px;line-height:1.4;min-height:34px;padding:7px 10px}
 .runtime-error,.runtime-success,.runtime-empty{font-size:13px;line-height:1.7}
 .owned-plan-editor-anchor{scroll-margin-top:90px}
 .owned-plan-editor{border-color:color-mix(in srgb,var(--purple) 32%,var(--line));box-shadow:0 16px 42px color-mix(in srgb,var(--purple) 8%,transparent)}
+
+/* Route access should never blank the whole portal. The shell is rendered
+   immediately and only the changing content area uses lightweight skeletons. */
+.portal-content-skeleton{display:grid;gap:18px;min-height:420px;align-content:start}
+.portal-content-skeleton small{color:var(--muted);font-size:12.5px}
+.portal-skeleton-head{display:grid;gap:10px;max-width:460px}
+.portal-skeleton-head span,.portal-skeleton-stats span,.portal-skeleton-card span{
+  display:block;
+  border-radius:12px;
+  background:linear-gradient(90deg,var(--surface) 25%,color-mix(in srgb,var(--surface) 74%,var(--line)) 50%,var(--surface) 75%);
+  background-size:220% 100%;
+  animation:portal-skeleton-shimmer 1.15s ease-in-out infinite;
+}
+.portal-skeleton-head span:first-child{height:32px;width:min(68%,360px)}
+.portal-skeleton-head span:last-child{height:14px;width:min(92%,520px)}
+.portal-skeleton-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.portal-skeleton-stats span{height:94px}
+.portal-skeleton-card{display:grid;gap:14px;padding:20px;border:1px solid var(--line);border-radius:18px;background:var(--surface)}
+.portal-skeleton-card span{height:42px}
+.portal-skeleton-card span:first-child{height:20px;width:38%}
+@keyframes portal-skeleton-shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
 
 /* Dense legacy dashboard/page labels */
 .chart-labels,.legend,.ticket small,.notification>small,.dates,.usage span,.server small{font-size:12px}
@@ -92,6 +122,7 @@ small{font-size:12.5px;line-height:1.6}
   .page{padding-inline:16px}
   .page h1,.page-head h1{font-size:clamp(25px,8vw,32px)}
   .field,.field>span,.setting-grid label>span{font-size:13.5px}
+  .field input[type="checkbox"],.setting-grid input[type="checkbox"]{width:20px;height:20px;min-width:20px;min-height:20px}
   .table table{font-size:13.5px}
   .table th,.table td{font-size:13px}
   .store-nav nav{font-size:13.5px}
@@ -99,4 +130,5 @@ small{font-size:12.5px;line-height:1.6}
   .proof-grid span,.value-strip small,.delivery-list small,.purchase-path small{font-size:12px}
   .sales-plan li,.section-title p,.sales-protocol p,.guide-steps p,.faq-accordion details p{font-size:13px}
   .guide-tabs button,.store2027 .primary,.store2027 .ghost,.store2027 button{font-size:13.5px}
+  .portal-skeleton-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
 }

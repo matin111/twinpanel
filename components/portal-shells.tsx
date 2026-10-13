@@ -8,6 +8,7 @@ import {BrandMark} from "../lib/branding";
 import {CustomerSessionProvider,useCustomerSession} from "../lib/customer-session";
 import {clearCustomerToken,customerApi,getCustomerToken} from "../lib/customer-api";
 import {getResellerProfile} from "../lib/role-router";
+import {readPortalAccess,writePortalAccess} from "../lib/access-cache";
 import {resellerApi,ResellerRow} from "../lib/reseller-runtime-api";
 import {CustomerNotificationCenter} from "./customer-notification-center";
 import {ResellerNotificationCenter} from "./reseller-notification-center";
@@ -83,9 +84,21 @@ function ResellerIdentity(){
   </div>;
 }
 
+function AccessSkeleton({label}:{label:string}){
+  return <div className="page portal-content-skeleton" aria-busy="true" aria-live="polite">
+    <div className="portal-skeleton-head"><span/><span/></div>
+    <div className="portal-skeleton-stats"><span/><span/><span/><span/></div>
+    <div className="portal-skeleton-card"><span/><span/><span/></div>
+    <small>{label}</small>
+  </div>;
+}
+
 function CustomerAccessGuard({children}:{children:React.ReactNode}){
   const {pick}=useI18n();
-  const [ready,setReady]=useState(false);
+  const [ready,setReady]=useState(()=>{
+    const token=getCustomerToken();
+    return Boolean(token&&readPortalAccess(token)?.portal==="customer");
+  });
   const [error,setError]=useState("");
 
   useEffect(()=>{
@@ -93,30 +106,36 @@ function CustomerAccessGuard({children}:{children:React.ReactNode}){
     const run=async()=>{
       const token=getCustomerToken();
       if(!token){window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);return;}
-      let account;
-      try{account=await customerApi.me(token);}catch{clearCustomerToken();window.location.replace("/login");return;}
-      if(!alive)return;
-      if(!account.is_active){clearCustomerToken();window.location.replace("/login");return;}
-      if(String(account.role||"").toLowerCase()==="admin"){window.location.replace("/admin");return;}
+      const hadCache=readPortalAccess(token)?.portal==="customer";
       try{
-        const reseller=await getResellerProfile(token);
+        const [account,reseller]=await Promise.all([customerApi.me(token),getResellerProfile(token)]);
         if(!alive)return;
-        if(reseller){window.location.replace("/reseller");return;}
-        setReady(true);
-      }catch(reason){if(alive)setError(reason instanceof Error?reason.message:String(reason));}
+        if(!account.is_active){clearCustomerToken();window.location.replace("/login");return;}
+        const portal=String(account.role||"").toLowerCase()==="admin"?"admin":reseller?"reseller":"customer";
+        writePortalAccess(token,portal,account);
+        if(portal!=="customer"){window.location.replace(portal==="admin"?"/admin":"/reseller");return;}
+        setError("");setReady(true);
+      }catch(reason){
+        if(!alive)return;
+        if(hadCache)return;
+        setError(reason instanceof Error?reason.message:String(reason));
+      }
     };
     void run();
     return()=>{alive=false};
   },[]);
 
-  if(error)return <div className="auth-gate"><div className="auth-gate-card"><b>{pick("بررسی نوع حساب ناموفق بود","Could not verify account type")}</b><small>{error}</small><button className="ghost" onClick={()=>window.location.reload()}>{pick("تلاش دوباره","Retry")}</button></div></div>;
-  if(!ready)return <div className="auth-gate"><div className="auth-gate-card"><span className="spinner"/><b>{pick("در حال بررسی نوع حساب...","Checking account type...")}</b></div></div>;
+  if(error)return <div className="page"><div className="auth-gate-card"><b>{pick("بررسی نوع حساب ناموفق بود","Could not verify account type")}</b><small>{error}</small><button className="ghost" onClick={()=>window.location.reload()}>{pick("تلاش دوباره","Retry")}</button></div></div>;
+  if(!ready)return <AccessSkeleton label={pick("در حال آماده‌سازی حساب...","Preparing account...")}/>;
   return <>{children}</>;
 }
 
 function ResellerAccessGuard({children}:{children:React.ReactNode}){
   const {pick}=useI18n();
-  const [ready,setReady]=useState(false);
+  const [ready,setReady]=useState(()=>{
+    const token=getCustomerToken();
+    return Boolean(token&&readPortalAccess(token)?.portal==="reseller");
+  });
   const [error,setError]=useState("");
 
   useEffect(()=>{
@@ -124,24 +143,27 @@ function ResellerAccessGuard({children}:{children:React.ReactNode}){
     const run=async()=>{
       const token=getCustomerToken();
       if(!token){window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);return;}
-      let account;
-      try{account=await customerApi.me(token);}catch{clearCustomerToken();window.location.replace("/login");return;}
-      if(!alive)return;
-      if(!account.is_active){clearCustomerToken();window.location.replace("/login");return;}
-      if(String(account.role||"").toLowerCase()==="admin"){window.location.replace("/admin");return;}
+      const hadCache=readPortalAccess(token)?.portal==="reseller";
       try{
-        const reseller=await getResellerProfile(token);
+        const [account,reseller]=await Promise.all([customerApi.me(token),getResellerProfile(token)]);
         if(!alive)return;
-        if(!reseller){window.location.replace("/panel");return;}
-        setReady(true);
-      }catch(reason){if(alive)setError(reason instanceof Error?reason.message:String(reason));}
+        if(!account.is_active){clearCustomerToken();window.location.replace("/login");return;}
+        const portal=String(account.role||"").toLowerCase()==="admin"?"admin":reseller?"reseller":"customer";
+        writePortalAccess(token,portal,account);
+        if(portal!=="reseller"){window.location.replace(portal==="admin"?"/admin":"/panel");return;}
+        setError("");setReady(true);
+      }catch(reason){
+        if(!alive)return;
+        if(hadCache)return;
+        setError(reason instanceof Error?reason.message:String(reason));
+      }
     };
     void run();
     return()=>{alive=false};
   },[]);
 
-  if(error)return <div className="auth-gate"><div className="auth-gate-card"><b>{pick("بررسی دسترسی نمایندگی ناموفق بود","Could not verify reseller access")}</b><small>{error}</small><button className="ghost" onClick={()=>window.location.reload()}>{pick("تلاش دوباره","Retry")}</button></div></div>;
-  if(!ready)return <div className="auth-gate"><div className="auth-gate-card"><span className="spinner"/><b>{pick("در حال بررسی دسترسی نمایندگی...","Checking reseller access...")}</b></div></div>;
+  if(error)return <div className="page"><div className="auth-gate-card"><b>{pick("بررسی دسترسی نمایندگی ناموفق بود","Could not verify reseller access")}</b><small>{error}</small><button className="ghost" onClick={()=>window.location.reload()}>{pick("تلاش دوباره","Retry")}</button></div></div>;
+  if(!ready)return <AccessSkeleton label={pick("در حال آماده‌سازی نمایندگی...","Preparing reseller panel...")}/>;
   return <>{children}</>;
 }
 
@@ -152,7 +174,7 @@ function PortalSidebar({active,collapsed,toggle,closeMobile,type}:{active:string
     <div className="customer-portal-brand-row"><div className="customer-portal-brand"><BrandMark/></div><button className="customer-portal-collapse" type="button" onClick={toggle} aria-label={pick("جمع کردن منو","Collapse menu")}>‹</button><button className="customer-portal-mobile-close" type="button" onClick={closeMobile} aria-label={pick("بستن منو","Close menu")}>×</button></div>
     <div className="customer-portal-section-label">{type==="customer"?pick("حساب کاربری","Customer account"):pick("مرکز نمایندگی","Reseller center")}</div>
     <nav className="customer-portal-nav" aria-label={type==="customer"?pick("منوی حساب کاربری","Customer navigation"):pick("منوی نمایندگی","Reseller navigation")}>
-      {menu.map(([fa,en,href,icon])=><Link key={href} href={href} className={active===href?"active":""} title={collapsed?pick(fa,en):undefined} onClick={closeMobile}><span className="customer-portal-nav-icon"><PortalIcon name={icon}/></span><span className="customer-portal-nav-label">{pick(fa,en)}</span>{active===href&&<span className="customer-portal-active-dot"/>}</Link>)}
+      {menu.map(([fa,en,href,icon])=><Link prefetch key={href} href={href} className={active===href?"active":""} title={collapsed?pick(fa,en):undefined} onClick={closeMobile}><span className="customer-portal-nav-icon"><PortalIcon name={icon}/></span><span className="customer-portal-nav-label">{pick(fa,en)}</span>{active===href&&<span className="customer-portal-active-dot"/>}</Link>)}
     </nav>
     {type==="customer"?<CustomerIdentity/>:<ResellerIdentity/>}
   </aside>;
@@ -190,6 +212,6 @@ function PortalFrame({children,active="",type}:PortalShellProps){
 }
 
 export function PortalShell(props:PortalShellProps){
-  if(props.type==="customer")return <CustomerSessionProvider><CustomerAccessGuard><PortalFrame {...props}/></CustomerAccessGuard></CustomerSessionProvider>;
-  return <ResellerAccessGuard><PortalFrame {...props}/></ResellerAccessGuard>;
+  if(props.type==="customer")return <CustomerSessionProvider><PortalFrame {...props}><CustomerAccessGuard>{props.children}</CustomerAccessGuard></PortalFrame></CustomerSessionProvider>;
+  return <PortalFrame {...props}><ResellerAccessGuard>{props.children}</ResellerAccessGuard></PortalFrame>;
 }
