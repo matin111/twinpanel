@@ -42,6 +42,7 @@ from .services.customer_maintenance import customer_maintenance_loop
 from .routers.payments import router as payments_router
 from .routers.payment_automation import router as payment_automation_router
 from .routers.payment_receipts_local import router as payment_receipts_local_router
+from .routers.sms_reader_dashboard import router as sms_reader_dashboard_router
 from .routers.sms_reader import router as sms_reader_router
 from .routers.support import router as support_router, admin_router as support_admin_router
 # TWINPANEL_USER_NOTIFICATION_REGISTER_V1
@@ -206,6 +207,9 @@ app.include_router(payment_automation_router)
 # admin receipt path can transparently serve both local and Telegram receipts.
 app.include_router(payment_receipts_local_router)
 app.include_router(payments_router)
+# Restore the proven SMS Reader operational dashboard before the legacy
+# SMS Reader route so /admin/sms-reader includes devices, pair codes and events.
+app.include_router(sms_reader_dashboard_router)
 app.include_router(sms_reader_router)
 app.include_router(support_router)
 app.include_router(support_admin_router)
