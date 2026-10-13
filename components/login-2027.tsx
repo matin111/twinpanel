@@ -40,7 +40,20 @@ export function LoginPage2027(){
     saveCustomerToken(token,remember);
     const user=await customerApi.me(token);
     if(!user.is_active)throw new Error(pick("حساب غیرفعال است","Account is inactive"));
-    const portal=await resolvePortal(token,user.role);
+
+    // /auth/me is authoritative for the authenticated account. Reseller
+    // discovery is auxiliary only and must never turn a valid customer login
+    // into a Failed to fetch error. If that probe is unavailable, continue to
+    // the customer portal; the reseller portal keeps its own strict guard.
+    let portal:"admin"|"reseller"|"customer"=String(user.role||"").toLowerCase()==="admin"?"admin":"customer";
+    if(portal!=="admin"){
+      try{
+        portal=await resolvePortal(token,user.role);
+      }catch{
+        portal="customer";
+      }
+    }
+
     const fallback=portal==="admin"?"/admin":portal==="reseller"?"/reseller":"/panel";
     const requested=safeNextForPortal(searchParams.get("next"),portal);
     window.location.replace(requested||fallback);

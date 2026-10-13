@@ -1,7 +1,5 @@
 "use client";
 
-import {API_BASE} from "./api";
-
 export const CUSTOMER_TOKEN_KEY="twinpanel_customer_token";
 export const CUSTOMER_REMEMBER_KEY="twinpanel_customer_remember_token";
 
@@ -87,10 +85,36 @@ export type PaymentIntent={
 };
 
 export type Wallet={balance_toman:number;updated_at?:string;[key:string]:unknown};
-export type WalletTransaction={id:number;amount_toman?:number;amount?:number;kind?:string;type?:string;description?:string|null;created_at:string;[key:string]:unknown};
-export type WalletTopup={id:number;amount_toman:number;status:string;method?:string|null;tracking_code?:string|null;txid?:string|null;created_at:string;[key:string]:unknown};
+export type WalletTransaction={id:number;amount_toman?:number;amount?:number;kind?:string;type?:string;description?:string|null;reference?:string|null;created_at:string;[key:string]:unknown};
+export type WalletPaymentMethod={id:string;title?:string;card_number?:string;card_holder?:string;address?:string;rate_toman?:number;[key:string]:unknown};
+export type WalletTopup={
+  id:number;
+  amount_toman:number;
+  payable_amount_toman?:number;
+  status:string;
+  method?:string|null;
+  crypto_amount_usdt?:string|null;
+  tracking_code?:string|null;
+  txid?:string|null;
+  sender_card_last4?:string|null;
+  transfer_date?:string|null;
+  transfer_time?:string|null;
+  review_note?:string|null;
+  created_at:string;
+  submitted_at?:string|null;
+  approved_at?:string|null;
+  rejected_at?:string|null;
+  payment_method?:WalletPaymentMethod;
+  [key:string]:unknown;
+};
+export type WalletTopupSubmit={tracking_code?:string|null;txid?:string|null;sender_card_last4?:string|null;transfer_date?:string|null;transfer_time?:string|null};
 export type UserNotification={id:number;title?:string|null;message?:string|null;body?:string|null;kind?:string|null;is_read?:boolean;read_at?:string|null;created_at:string;[key:string]:unknown};
 export type SupportTicket={id:number;subject?:string|null;category?:string|null;status:string;created_at:string;updated_at?:string|null;messages?:Array<unknown>;[key:string]:unknown};
+
+type NotificationListResponse={
+  unread_count?:number;
+  items?:UserNotification[];
+};
 
 function errorText(payload:unknown,status:number){
   if(payload&&typeof payload==="object"){
@@ -106,7 +130,7 @@ async function request<T>(path:string,options:RequestInit={},token?:string|null)
   const headers=new Headers(options.headers);
   if(options.body&&!headers.has("Content-Type")&&!(options.body instanceof FormData))headers.set("Content-Type","application/json");
   if(token)headers.set("Authorization",`Bearer ${token}`);
-  const response=await fetch(`${API_BASE}${path}`,{...options,headers,cache:"no-store"});
+  const response=await fetch(path,{...options,headers,cache:"no-store"});
   if(!response.ok){
     let payload:unknown=null;
     try{payload=await response.json();}catch{}
@@ -157,9 +181,15 @@ export const customerApi={
   wallet:(token:string)=>request<Wallet>("/v1/wallet/me",{},token),
   walletTransactions:(token:string)=>request<WalletTransaction[]>("/v1/wallet/transactions",{},token),
   walletTopups:(token:string)=>request<WalletTopup[]>("/v1/wallet/topups/me",{},token),
-  walletMethods:(token:string)=>request<{methods?:Array<Record<string,unknown>>}|Array<Record<string,unknown>>>("/v1/wallet/methods",{},token),
+  walletMethods:(token:string)=>request<{methods?:WalletPaymentMethod[]}|WalletPaymentMethod[]>("/v1/wallet/methods",{},token),
+  createWalletTopup:(token:string,amountToman:number,method:string)=>request<WalletTopup>("/v1/wallet/topups",{method:"POST",body:JSON.stringify({amount_toman:amountToman,method})},token),
+  submitWalletTopup:(token:string,id:number,payload:WalletTopupSubmit)=>request<WalletTopup>(`/v1/wallet/topups/${id}/submit`,{method:"POST",body:JSON.stringify(payload)},token),
 
-  notifications:(token:string,limit=50)=>request<UserNotification[]>(`/v1/notifications/me?limit=${limit}`,{},token),
+  notifications:async(token:string,limit=50)=>{
+    const payload=await request<NotificationListResponse|UserNotification[]>(`/v1/notifications/me?limit=${limit}`,{},token);
+    if(Array.isArray(payload))return payload;
+    return Array.isArray(payload?.items)?payload.items:[];
+  },
   readNotification:(token:string,id:number)=>request<unknown>(`/v1/notifications/${id}/read`,{method:"POST"},token),
   readAllNotifications:(token:string)=>request<unknown>("/v1/notifications/read-all",{method:"POST"},token),
 

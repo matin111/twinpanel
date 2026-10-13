@@ -24,20 +24,21 @@ const menuGroups=[
   ]},
   {fa:"مالی و فروش",en:"Sales & Finance",items:[
     ["پرداخت‌ها","Payments","/admin/payments","◫"],
-    ["کیف پول","Wallet","/admin/wallet","◉"],
+    ["تأیید خودکار کارت","Card Auto Verify","/admin/sms-reader","▤"],
     ["کد تخفیف","Discounts","/admin/discounts","％"],
     ["نمایندگی‌ها","Resellers","/admin/resellers","♜"],
+    ["پلن‌های شارژ حجم","Traffic Recharge Plans","/admin/reseller-traffic-plans","▣"],
     ["تنظیمات فروشگاه","Store Settings","/admin/store-settings","◇"]
   ]},
   {fa:"ارتباطات",en:"Communications",items:[
     ["ربات تلگرام","Telegram Bot","/admin/telegram","✈"],
     ["مدیریت تلگرام","Telegram Manager","/admin/telegram-manager","◈"],
-    ["SMS Reader","SMS Reader","/admin/sms-reader","▤"],
     ["پشتیبانی","Support","/admin/support","◌"],
     ["اعلان‌ها","Notifications","/admin/notifications","◎"]
   ]},
   {fa:"تحویل و سرویس",en:"Delivery & Service",items:[
     ["تحویل اکانت","Account Delivery","/admin/account-delivery","⇲"],
+    ["فایل‌های دانلود","Download Files","/admin/downloads","⇩"],
     ["تنظیمات VPN","VPN Settings","/admin/vpn-settings","⌁"],
     ["L2TP / IPsec","L2TP / IPsec","/admin/l2tp","◎"],
     ["برندینگ","Branding","/admin/branding","✦"]
@@ -66,7 +67,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
     });
   };
 
-  return <div className={`shell ${collapsed?"sidebar-collapsed":""} ${mobileOpen?"mobile-menu-open":""}`}>
+  return <div className={`shell admin-shell ${collapsed?"sidebar-collapsed":""} ${mobileOpen?"mobile-menu-open":""}`}>
     <aside className="sidebar" aria-label={pick("منوی اصلی","Main navigation")}>
       <div className="sidebar-head">
         <BrandMark/>

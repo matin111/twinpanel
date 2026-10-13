@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {useEffect,useMemo,useState} from "react";
+import {CSSProperties,useEffect,useMemo,useState} from "react";
 import {PortalShell} from "./portal-shells";
 import {useCustomerSession} from "../lib/customer-session";
 import {customerApi,MySubscription,PaymentIntent,StoreOrder,UserNotification,Wallet} from "../lib/customer-api";
@@ -11,10 +11,20 @@ function money(value:unknown){return `${Number(value||0).toLocaleString("fa-IR")
 function clamp(value:number){return Math.min(100,Math.max(0,value));}
 function percent(used:number,limit:number){return limit>0?clamp(Math.round((used/limit)*100)):0;}
 function dateText(value?:string|null){return value?new Date(value).toLocaleDateString("fa-IR",{year:"numeric",month:"short",day:"numeric"}):"—";}
-function protocolName(value:string){return ({cisco:"Cisco / OpenConnect",openvpn:"OpenVPN",wireguard:"WireGuard",l2tp:"L2TP / IPsec",v2ray:"V2Ray / Xray",xray:"V2Ray / Xray"} as Record<string,string>)[value.toLowerCase()]||value;}
+function protocolName(value:string){return ({cisco:"Cisco",openvpn:"OpenVPN",wireguard:"WireGuard",l2tp:"L2TP",v2ray:"V2Ray",xray:"Xray"} as Record<string,string>)[value.toLowerCase()]||value;}
 function statusText(value:string,pick:(fa:string,en:string)=>string){
-  const map:Record<string,[string,string]>={active:["فعال","Active"],pending:["در انتظار","Pending"],suspended:["تعلیق","Suspended"],expired:["منقضی","Expired"],paid:["پرداخت شده","Paid"],fulfilled:["آماده","Ready"],pending_payment:["در انتظار پرداخت","Awaiting payment"],payment_submitted:["پرداخت ثبت شده","Payment submitted"],awaiting_review:["در انتظار تأیید","Awaiting review"],rejected:["رد شده","Rejected"]};
+  const map:Record<string,[string,string]>={active:["فعال","Active"],pending:["در انتظار","Pending"],suspended:["تعلیق","Suspended"],expired:["منقضی","Expired"],paid:["پرداخت شده","Paid"],fulfilled:["آماده","Ready"],pending_payment:["در انتظار پرداخت","Awaiting payment"],payment_submitted:["پرداخت ثبت شده","Payment submitted"],awaiting_review:["در انتظار تأیید","Awaiting review"],approved:["تأیید شده","Approved"],auto_verified:["تأیید خودکار","Auto verified"],rejected:["رد شده","Rejected"],provisioning:["در حال ساخت","Provisioning"]};
   const row=map[value];return row?pick(row[0],row[1]):value||"—";
+}
+
+function DashboardIcon({type}:{type:"service"|"wallet"|"order"|"bell"|"arrow"|"link"}){
+  const common={width:20,height:20,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:1.8,strokeLinecap:"round" as const,strokeLinejoin:"round" as const,"aria-hidden":true};
+  if(type==="service")return <svg {...common}><rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="M7 9h10M7 13h6"/><circle cx="17" cy="14.5" r="1.5"/></svg>;
+  if(type==="wallet")return <svg {...common}><path d="M4 7.5h14a2 2 0 0 1 2 2v8H6a2 2 0 0 1-2-2z"/><path d="M4 8V6a2 2 0 0 1 2-2h10v3.5"/><path d="M16 11.5h4v3h-4a1.5 1.5 0 0 1 0-3Z"/></svg>;
+  if(type==="order")return <svg {...common}><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>;
+  if(type==="bell")return <svg {...common}><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7"/><path d="M10 20h4"/></svg>;
+  if(type==="link")return <svg {...common}><path d="M10 13a4 4 0 0 0 5.7.1l2.2-2.2a4 4 0 0 0-5.7-5.7L11 6.4"/><path d="M14 11a4 4 0 0 0-5.7-.1L6.1 13a4 4 0 0 0 5.7 5.7l1.2-1.2"/></svg>;
+  return <svg {...common}><path d="m9 18 6-6-6-6"/></svg>;
 }
 
 function CustomerDashboardInner(){
@@ -32,7 +42,11 @@ function CustomerDashboardInner(){
     if(!token)return;
     setLoading(true);setError("");
     const result=await Promise.allSettled([
-      customerApi.subscriptions(token),customerApi.wallet(token),customerApi.orders(token),customerApi.payments(token),customerApi.notifications(token,12)
+      customerApi.subscriptions(token),
+      customerApi.wallet(token),
+      customerApi.orders(token),
+      customerApi.payments(token),
+      customerApi.notifications(token,12)
     ]);
     if(result[0].status==="fulfilled")setSubs(result[0].value);
     if(result[1].status==="fulfilled")setWallet(result[1].value);
@@ -47,70 +61,89 @@ function CustomerDashboardInner(){
   useEffect(()=>{void load();},[token]);
 
   const active=useMemo(()=>subs.find(item=>item.status==="active")||subs[0]||null,[subs]);
+  const activeCount=subs.filter(item=>item.status==="active").length;
   const unread=notes.filter(item=>!item.is_read&&!item.read_at).length;
+  const pendingOrders=orders.filter(item=>["pending_payment","payment_submitted","awaiting_review","provisioning"].includes(item.status)).length;
   const usedPct=active?percent(active.traffic_used_gb,active.traffic_limit_gb):0;
   const latestOrder=orders[0]||null;
   const latestPayment=payments[0]||null;
   const displayName=user?.full_name||user?.email?.split("@")[0]||pick("کاربر","Customer");
+  const usageStyle={"--usage":`${usedPct}%`} as CSSProperties;
 
-  return <div className="customer-pro-dashboard">
-    <section className="customer-pro-welcome">
-      <div>
-        <span className="customer-pro-kicker">{pick("حساب کاربری","CUSTOMER ACCOUNT")}</span>
+  return <div className="customer-dash-v27">
+    <section className="customer-dash-v27-head">
+      <div className="customer-dash-v27-title">
+        <span>{pick("مرکز کاربری ۲۰۲۷","CUSTOMER CENTER 2027")}</span>
         <h1>{pick("سلام","Hello")} {displayName}</h1>
-        <p>{pick("اشتراک، مصرف، اتصال، پرداخت و پشتیبانی را از همین‌جا مدیریت کن.","Manage your subscription, usage, connection, payments and support from one place.")}</p>
+        <p>{pick("وضعیت سرویس، حساب و پرداخت‌های شما در یک نمای ساده و سریع","Your service, account and payments in one clean view")}</p>
       </div>
-      <div className="customer-pro-welcome-actions"><Link href="/store" className="primary">＋ {pick("خرید سرویس","Buy service")}</Link><Link href="/panel/support" className="ghost">{pick("پشتیبانی","Support")}</Link></div>
+      <div className="customer-dash-v27-head-actions">
+        <Link href="/panel/buy" className="customer-dash-primary">＋ {pick("خرید اشتراک","Buy subscription")}</Link>
+        <Link href="/panel/subscription" className="customer-dash-secondary"><DashboardIcon type="link"/>{pick("اطلاعات اتصال","Connection details")}</Link>
+      </div>
     </section>
 
-    {error&&<div className="customer-pro-alert"><span>!</span><div><b>{pick("بخشی از اطلاعات دریافت نشد","Some data could not be loaded")}</b><small>{error}</small></div><button onClick={()=>void load()}>{pick("تلاش دوباره","Retry")}</button></div>}
+    {error&&<div className="customer-dash-v27-alert"><span>!</span><div><b>{pick("بخشی از اطلاعات دریافت نشد","Some data could not be loaded")}</b><small>{error}</small></div><button type="button" onClick={()=>void load()}>{pick("تلاش دوباره","Retry")}</button></div>}
 
-    <section className="customer-pro-kpis">
-      <div><span className="customer-pro-kpi-icon violet">▱</span><small>{pick("اشتراک فعال","Active subscription")}</small><strong>{loading?"…":subs.filter(x=>x.status==="active").length.toLocaleString("fa-IR")}</strong><em>{active?.plan_name||pick("بدون اشتراک فعال","No active plan")}</em></div>
-      <div><span className="customer-pro-kpi-icon cyan">◔</span><small>{pick("حجم باقی‌مانده","Traffic remaining")}</small><strong>{loading?"…":active?`${active.traffic_remaining_gb.toLocaleString("fa-IR")} GB`:"—"}</strong><em>{active?`${usedPct}% ${pick("مصرف شده","used")}`:pick("اطلاعاتی نیست","No data")}</em></div>
-      <div><span className="customer-pro-kpi-icon green">◉</span><small>{pick("موجودی کیف پول","Wallet balance")}</small><strong>{loading?"…":money(wallet?.balance_toman)}</strong><em><Link href="/panel/wallet">{pick("مدیریت کیف پول","Manage wallet")} ←</Link></em></div>
-      <div><span className="customer-pro-kpi-icon amber">◎</span><small>{pick("اعلان خوانده‌نشده","Unread notifications")}</small><strong>{loading?"…":unread.toLocaleString("fa-IR")}</strong><em><Link href="/panel/notifications">{pick("مشاهده اعلان‌ها","View notifications")} ←</Link></em></div>
+    <section className="customer-dash-v27-kpis">
+      <Link href="/panel/subscription" className="customer-dash-v27-kpi"><i className="violet"><DashboardIcon type="service"/></i><div><small>{pick("اشتراک فعال","Active subscriptions")}</small><strong>{loading?"…":activeCount.toLocaleString("fa-IR")}</strong><em>{pick("مدیریت سرویس‌ها","Manage services")}</em></div><span><DashboardIcon type="arrow"/></span></Link>
+      <Link href="/panel/wallet" className="customer-dash-v27-kpi"><i className="green"><DashboardIcon type="wallet"/></i><div><small>{pick("موجودی کیف پول","Wallet balance")}</small><strong>{loading?"…":money(wallet?.balance_toman)}</strong><em>{pick("شارژ و تراکنش‌ها","Top-up and history")}</em></div><span><DashboardIcon type="arrow"/></span></Link>
+      <Link href="/panel/orders" className="customer-dash-v27-kpi"><i className="blue"><DashboardIcon type="order"/></i><div><small>{pick("سفارش در جریان","Open orders")}</small><strong>{loading?"…":pendingOrders.toLocaleString("fa-IR")}</strong><em>{orders.length.toLocaleString("fa-IR")} {pick("سفارش کل","total orders")}</em></div><span><DashboardIcon type="arrow"/></span></Link>
+      <Link href="/panel/notifications" className="customer-dash-v27-kpi"><i className="amber"><DashboardIcon type="bell"/></i><div><small>{pick("اعلان خوانده‌نشده","Unread notifications")}</small><strong>{loading?"…":unread.toLocaleString("fa-IR")}</strong><em>{pick("مرکز اعلان‌ها","Notification center")}</em></div><span><DashboardIcon type="arrow"/></span></Link>
     </section>
 
-    <section className="customer-pro-main-grid">
-      <article className="customer-pro-service-card">
-        <div className="customer-pro-card-head"><div><small>{pick("سرویس اصلی","PRIMARY SERVICE")}</small><h2>{active?.plan_name||pick("اشتراک فعالی ندارید","No active subscription")}</h2></div>{active&&<span className={`customer-pro-status ${active.status}`}>{statusText(active.status,pick)}</span>}</div>
+    <section className="customer-dash-v27-workspace">
+      <article className="customer-dash-v27-service">
+        <div className="customer-dash-v27-service-head">
+          <div><span>{pick("سرویس اصلی","PRIMARY SERVICE")}</span><h2>{loading?"…":active?.plan_name||pick("اشتراک فعالی ندارید","No active subscription")}</h2></div>
+          {active&&<b className={`customer-dash-v27-status ${active.status}`}>{statusText(active.status,pick)}</b>}
+        </div>
+
         {active?<>
-          <div className="customer-pro-service-stats"><div><small>{pick("روز باقی‌مانده","Days left")}</small><b>{active.days_remaining.toLocaleString("fa-IR")}</b></div><div><small>{pick("انقضا","Expires")}</small><b>{dateText(active.expires_at)}</b></div><div><small>{pick("دستگاه","Devices")}</small><b>{active.device_limit.toLocaleString("fa-IR")}</b></div></div>
-          <div className="customer-pro-traffic"><div><span>{pick("مصرف ترافیک","Traffic usage")}</span><b>{active.traffic_used_gb.toLocaleString("fa-IR")} / {active.traffic_limit_gb.toLocaleString("fa-IR")} GB</b></div><div className="customer-pro-progress"><i style={{width:`${usedPct}%`}}/></div><small>{active.traffic_remaining_gb.toLocaleString("fa-IR")} GB {pick("باقی‌مانده","remaining")}</small></div>
-          <div className="customer-pro-protocols">{active.protocols.length?active.protocols.map(p=><span key={p}>{protocolName(p)}</span>):<span>{pick("پروتکل هنوز تخصیص داده نشده","No protocol assigned yet")}</span>}</div>
-          <div className="customer-pro-actions"><Link href="/panel/connection" className="primary">{pick("اطلاعات اتصال","Connection details")}</Link><Link href="/panel/subscription" className="ghost">{pick("مدیریت و تمدید","Manage & renew")}</Link></div>
-        </>:<div className="customer-pro-empty"><span>◇</span><b>{pick("هنوز سرویسی نداری","You do not have a service yet")}</b><p>{pick("از فروشگاه یک پلن انتخاب کن؛ بعد از آماده‌شدن، اطلاعات اتصال همین‌جا نمایش داده می‌شود.","Choose a plan from the store. Once ready, the connection details will appear here.")}</p><Link href="/store" className="primary">{pick("مشاهده پلن‌ها","View plans")}</Link></div>}
+          <div className="customer-dash-v27-usage-row">
+            <div className="customer-dash-v27-usage-copy"><small>{pick("مصرف این دوره","Usage this period")}</small><strong>{active.traffic_used_gb.toLocaleString("fa-IR")} <em>/ {active.traffic_limit_gb.toLocaleString("fa-IR")} GB</em></strong></div>
+            <div className="customer-dash-v27-usage-percent"><strong>{usedPct}%</strong><small>{pick("مصرف شده","used")}</small></div>
+          </div>
+          <div className="customer-dash-v27-progress" style={usageStyle}><span/></div>
+
+          <div className="customer-dash-v27-metrics">
+            <div><small>{pick("حجم باقی‌مانده","Remaining traffic")}</small><b>{active.traffic_remaining_gb.toLocaleString("fa-IR")} GB</b></div>
+            <div><small>{pick("روز باقی‌مانده","Days remaining")}</small><b>{active.days_remaining.toLocaleString("fa-IR")}</b></div>
+            <div><small>{pick("تاریخ انقضا","Expiry date")}</small><b>{dateText(active.expires_at)}</b></div>
+            <div><small>{pick("تعداد دستگاه","Device limit")}</small><b>{active.device_limit.toLocaleString("fa-IR")}</b></div>
+          </div>
+
+          <div className="customer-dash-v27-service-footer">
+            <div className="customer-dash-v27-protocols"><small>{pick("پروتکل‌های فعال","ACTIVE PROTOCOLS")}</small><div>{active.protocols.length?active.protocols.map(p=><span key={p}>{protocolName(p)}</span>):<span>{pick("در انتظار ساخت سرویس","Waiting for provisioning")}</span>}</div></div>
+            <div className="customer-dash-v27-service-actions"><Link href="/panel/subscription" className="customer-dash-primary">{pick("مشاهده اتصال","View connection")}</Link><Link href="/panel/subscription" className="customer-dash-secondary">{pick("تمدید و مدیریت","Renew & manage")}</Link></div>
+          </div>
+        </>:<div className="customer-dash-v27-empty"><i><DashboardIcon type="service"/></i><div><b>{pick("هنوز سرویس فعالی نداری","You do not have an active service yet")}</b><small>{pick("برای شروع یکی از پلن‌های موجود را انتخاب کن","Choose one of the available plans to get started")}</small></div><Link href="/panel/buy" className="customer-dash-primary">{pick("مشاهده پلن‌ها","View plans")}</Link></div>}
       </article>
 
-      <aside className="customer-pro-quick-card">
-        <div className="customer-pro-card-head"><div><small>{pick("دسترسی سریع","QUICK ACCESS")}</small><h2>{pick("کارهای پرکاربرد","Common actions")}</h2></div></div>
-        <div className="customer-pro-quick-grid">
-          <Link href="/panel/connection"><i>⌁</i><div><b>{pick("اتصال و کانفیگ","Connection")}</b><small>{pick("QR، فایل و مشخصات","QR, files & credentials")}</small></div><span>←</span></Link>
-          <Link href="/panel/usage"><i>◔</i><div><b>{pick("مصرف","Usage")}</b><small>{pick("حجم و باقی‌مانده","Traffic & remaining")}</small></div><span>←</span></Link>
-          <Link href="/panel/wallet"><i>◉</i><div><b>{pick("کیف پول","Wallet")}</b><small>{pick("موجودی و شارژ","Balance & top-up")}</small></div><span>←</span></Link>
-          <Link href="/panel/support"><i>◌</i><div><b>{pick("پشتیبانی","Support")}</b><small>{pick("تیکت و چت آنلاین","Tickets & live chat")}</small></div><span>←</span></Link>
-        </div>
+      <aside className="customer-dash-v27-shortcuts">
+        <div className="customer-dash-v27-card-title"><span>{pick("دسترسی سریع","QUICK ACCESS")}</span><h3>{pick("کارهای پرکاربرد","Common actions")}</h3></div>
+        <Link href="/panel/buy"><i>＋</i><div><b>{pick("خرید اشتراک","Buy subscription")}</b><small>{pick("انتخاب پلن جدید","Choose a new plan")}</small></div><span>‹</span></Link>
+        <Link href="/panel/subscription"><i>⌁</i><div><b>{pick("اشتراک من","My subscription")}</b><small>{pick("اتصال، QR و تمدید","Connection, QR and renewal")}</small></div><span>‹</span></Link>
+        <Link href="/panel/wallet"><i>◉</i><div><b>{pick("کیف پول","Wallet")}</b><small>{pick("شارژ و تاریخچه تراکنش","Top-up and transaction history")}</small></div><span>‹</span></Link>
+        <Link href="/panel/profile"><i>♙</i><div><b>{pick("پروفایل و امنیت","Profile & security")}</b><small>{pick("رمز عبور و احراز هویت","Password and authentication")}</small></div><span>‹</span></Link>
       </aside>
     </section>
 
-    <section className="customer-pro-bottom-grid">
-      <article className="customer-pro-activity-card">
-        <div className="customer-pro-card-head"><div><small>{pick("آخرین فعالیت","RECENT ACTIVITY")}</small><h2>{pick("سفارش و پرداخت","Orders & payments")}</h2></div><Link href="/panel/orders">{pick("همه سفارش‌ها","All orders")} ←</Link></div>
-        <div className="customer-pro-activity-list">
-          <div><span className="dot violet"/><div><b>{pick("آخرین سفارش","Latest order")}</b><small>{latestOrder?`#${latestOrder.id} · ${dateText(latestOrder.created_at)}`:pick("سفارشی ثبت نشده","No order yet")}</small></div><em>{latestOrder?statusText(latestOrder.status,pick):"—"}</em></div>
-          <div><span className="dot green"/><div><b>{pick("آخرین پرداخت","Latest payment")}</b><small>{latestPayment?`#${latestPayment.id} · ${dateText(latestPayment.created_at)}`:pick("پرداختی ثبت نشده","No payment yet")}</small></div><em>{latestPayment?statusText(latestPayment.status,pick):"—"}</em></div>
+    <section className="customer-dash-v27-bottom">
+      <article className="customer-dash-v27-activity">
+        <div className="customer-dash-v27-card-title row"><div><span>{pick("آخرین فعالیت","RECENT ACTIVITY")}</span><h3>{pick("سفارش و پرداخت","Orders & payments")}</h3></div><Link href="/panel/orders">{pick("همه سفارش‌ها","All orders")}</Link></div>
+        <div className="customer-dash-v27-timeline">
+          <div><i className="violet"/><div><b>{pick("آخرین سفارش","Latest order")}</b><small>{latestOrder?`#${latestOrder.id} · ${dateText(latestOrder.created_at)}`:pick("سفارشی ثبت نشده","No order yet")}</small></div><em>{latestOrder?statusText(latestOrder.status,pick):"—"}</em>{latestOrder&&["pending_payment","payment_submitted","awaiting_review"].includes(latestOrder.status)&&<Link href={`/panel/payments?order=${latestOrder.id}`}>{pick("ادامه پرداخت","Continue")}</Link>}</div>
+          <div><i className="green"/><div><b>{pick("آخرین پرداخت","Latest payment")}</b><small>{latestPayment?`#${latestPayment.id} · ${dateText(latestPayment.created_at)}`:pick("پرداختی ثبت نشده","No payment yet")}</small></div><em>{latestPayment?statusText(latestPayment.status,pick):"—"}</em><Link href="/panel/payments">{pick("جزئیات","Details")}</Link></div>
         </div>
       </article>
 
-      <article className="customer-pro-notice-card">
-        <div className="customer-pro-card-head"><div><small>{pick("اعلان‌ها","NOTIFICATIONS")}</small><h2>{pick("آخرین پیام‌ها","Latest messages")}</h2></div><Link href="/panel/notifications">{pick("مشاهده همه","View all")} ←</Link></div>
-        <div className="customer-pro-notices">{notes.length?notes.slice(0,3).map(n=><div key={n.id}><span className={!n.is_read&&!n.read_at?"unread":""}/><div><b>{n.title||pick("اعلان","Notification")}</b><small>{n.message||n.body||"—"}</small></div></div>):<div className="customer-pro-no-note">{pick("اعلان جدیدی نداری.","You have no new notifications.")}</div>}</div>
+      <article className="customer-dash-v27-notes">
+        <div className="customer-dash-v27-card-title row"><div><span>{pick("اعلان‌ها","NOTIFICATIONS")}</span><h3>{pick("آخرین پیام‌ها","Latest messages")}</h3></div><Link href="/panel/notifications">{pick("مشاهده همه","View all")}</Link></div>
+        <div className="customer-dash-v27-note-list">{notes.length?notes.slice(0,4).map(n=><div key={n.id}><i className={!n.is_read&&!n.read_at?"unread":""}/><div><b>{n.title||pick("اعلان","Notification")}</b><small>{n.message||n.body||"—"}</small></div><time>{dateText(n.created_at)}</time></div>):<div className="customer-dash-v27-no-note">{pick("اعلان جدیدی نداری.","You have no notifications.")}</div>}</div>
       </article>
     </section>
   </div>;
 }
 
-export function CustomerDashboardPro(){
-  return <PortalShell type="customer" active="/panel"><CustomerDashboardInner/></PortalShell>;
-}
+export function CustomerDashboardPro(){return <PortalShell type="customer" active="/panel"><CustomerDashboardInner/></PortalShell>;}

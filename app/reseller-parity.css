@@ -1,0 +1,450 @@
+/* ============================================================
+   TwinPanel 2027 — Reseller parity workspace
+   Scoped to reseller pages only.
+   ============================================================ */
+
+.reseller-parity-page {
+  display: grid;
+  gap: 18px;
+}
+
+.reseller-parity-page .page-head small,
+.reseller-parity-page .card-head small,
+.reseller-parity-page td small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.reseller-parity-page .stats {
+  align-items: stretch;
+}
+
+.reseller-parity-page .runtime-editor,
+.reseller-parity-page .reseller-payment-editor,
+.reseller-parity-page .reseller-discount-editor {
+  display: grid;
+  gap: 16px;
+}
+
+.reseller-parity-page .setting-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.reseller-parity-page .field {
+  min-width: 0;
+}
+
+.reseller-parity-page .field input,
+.reseller-parity-page .field select,
+.reseller-parity-page .field textarea,
+.reseller-order-toolbar input,
+.reseller-order-toolbar select {
+  width: 100%;
+}
+
+.reseller-parity-page .action-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.reseller-parity-page button.danger {
+  border: 1px solid color-mix(in srgb, #ef4444 42%, var(--border));
+  background: color-mix(in srgb, #ef4444 12%, var(--surface));
+  color: #ef4444;
+}
+
+.reseller-parity-page button.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, #ef4444 18%, var(--surface));
+}
+
+.reseller-payment-editor {
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface2) 72%, transparent);
+}
+
+.reseller-payment-table td:nth-child(3),
+.reseller-payment-table th:nth-child(3) {
+  direction: ltr;
+  text-align: right;
+}
+
+.reseller-order-toolbar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(180px, 240px) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.reseller-order-toolbar > label {
+  min-width: 0;
+}
+
+.reseller-order-modal {
+  z-index: 1300;
+}
+
+.reseller-order-detail {
+  width: min(920px, calc(100vw - 28px));
+  max-height: min(88vh, 900px);
+  overflow: auto;
+}
+
+.reseller-order-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.reseller-order-detail-grid > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface2) 74%, transparent);
+}
+
+.reseller-order-detail-grid > div.wide {
+  grid-column: 1 / -1;
+}
+
+.reseller-order-detail-grid span {
+  color: var(--muted);
+  font-size: .82rem;
+}
+
+.reseller-order-detail-grid b {
+  overflow-wrap: anywhere;
+}
+
+.reseller-receipt-preview {
+  display: grid;
+  place-items: center;
+  min-height: 280px;
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--surface2) 76%, transparent);
+}
+
+.reseller-receipt-preview img,
+.reseller-receipt-preview iframe {
+  display: block;
+  width: 100%;
+  max-width: 760px;
+  min-height: 420px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface);
+  object-fit: contain;
+}
+
+.reseller-discount-editor .runtime-choice-section {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.reseller-discount-editor .runtime-choice-section > small {
+  color: var(--muted);
+}
+
+.reseller-discount-editor .protocol-toggle-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* ---------------- Reseller subscription parity ---------------- */
+
+.reseller-subscriptions-parity .reseller-sub-table td {
+  min-width: 120px;
+}
+
+.reseller-subscriptions-parity .reseller-sub-table td:last-child {
+  min-width: 330px;
+}
+
+.reseller-usage-cell {
+  display: grid;
+  gap: 6px;
+  min-width: 150px;
+}
+
+.reseller-usage-cell > span {
+  white-space: nowrap;
+  font-size: .82rem;
+  color: var(--muted);
+}
+
+.reseller-usage-cell .progress {
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface2);
+}
+
+.reseller-usage-cell .progress > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.reseller-sub-modal {
+  width: min(840px, calc(100vw - 28px));
+  max-height: min(90vh, 920px);
+  overflow-y: auto;
+}
+
+.reseller-sub-modal .runtime-choice-section {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.reseller-sub-modal .runtime-choice-section > small {
+  color: var(--muted);
+}
+
+.reseller-plan-preview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.reseller-plan-preview > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface2) 72%, transparent);
+}
+
+.reseller-plan-preview span,
+.reseller-secret-grid span,
+.reseller-credential-item span {
+  color: var(--muted);
+  font-size: .8rem;
+}
+
+.reseller-plan-preview b {
+  overflow-wrap: anywhere;
+}
+
+.reseller-connection-modal {
+  z-index: 1320;
+}
+
+.reseller-connection-card {
+  width: min(980px, calc(100vw - 28px));
+  max-height: min(92vh, 980px);
+  overflow-y: auto;
+}
+
+.reseller-connection-content {
+  display: grid;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.reseller-secret-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.reseller-secret-grid > div {
+  display: grid;
+  grid-template-columns: minmax(90px, auto) minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface2) 72%, transparent);
+}
+
+.reseller-secret-grid > div.wide {
+  grid-column: 1 / -1;
+}
+
+.reseller-secret-grid code,
+.reseller-credential-item code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: ltr;
+  text-align: left;
+}
+
+.reseller-protocol-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.reseller-protocol-list > section {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface2) 65%, transparent);
+}
+
+.reseller-credential-item {
+  display: grid;
+  gap: 8px;
+}
+
+.reseller-credential-item > div {
+  display: grid;
+  grid-template-columns: minmax(78px, auto) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.reseller-credential-item > div:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.reseller-credential-item > div.wide {
+  grid-template-columns: 1fr auto;
+}
+
+.reseller-credential-item > div.wide > span {
+  grid-column: 1 / -1;
+}
+
+.portal-reseller .sidebar-nav {
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.portal-reseller .sidebar-nav .nav-group {
+  padding-bottom: 18px;
+}
+
+.portal-reseller .table td {
+  vertical-align: middle;
+}
+
+.portal-reseller .table td .row-actions {
+  min-width: max-content;
+}
+
+@media (max-width: 1100px) {
+  .reseller-parity-page .module-grid.two {
+    grid-template-columns: 1fr;
+  }
+
+  .reseller-discount-editor .protocol-toggle-grid,
+  .reseller-protocol-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reseller-plan-preview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 780px) {
+  .reseller-parity-page {
+    gap: 14px;
+  }
+
+  .reseller-parity-page .setting-grid,
+  .reseller-order-detail-grid,
+  .reseller-discount-editor .protocol-toggle-grid,
+  .reseller-protocol-list,
+  .reseller-plan-preview,
+  .reseller-secret-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reseller-order-detail-grid > div.wide,
+  .reseller-secret-grid > div.wide {
+    grid-column: auto;
+  }
+
+  .reseller-order-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .reseller-order-toolbar > :last-child {
+    justify-self: start;
+  }
+
+  .reseller-payment-editor {
+    padding: 12px;
+  }
+
+  .reseller-order-detail,
+  .reseller-sub-modal,
+  .reseller-connection-card {
+    width: calc(100vw - 18px);
+    max-height: 92vh;
+  }
+
+  .reseller-receipt-preview img,
+  .reseller-receipt-preview iframe {
+    min-height: 320px;
+  }
+
+  .reseller-secret-grid > div {
+    grid-template-columns: 1fr auto auto;
+  }
+
+  .reseller-secret-grid > div > span {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  .reseller-parity-page .page-head {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .reseller-parity-page .action-row > button {
+    flex: 1 1 auto;
+  }
+
+  .reseller-order-detail-grid > div {
+    padding: 10px 11px;
+  }
+
+  .reseller-secret-grid > div,
+  .reseller-credential-item > div,
+  .reseller-credential-item > div.wide {
+    grid-template-columns: 1fr;
+  }
+
+  .reseller-secret-grid code,
+  .reseller-credential-item code {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}
