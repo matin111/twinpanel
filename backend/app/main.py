@@ -14,6 +14,7 @@ from . import user_notification_models
 from . import telegram_models
 from . import renewal_models
 from . import models_reseller
+from . import reseller_bot_order_models
 from . import reseller_pool_models
 from . import domain_models
 from . import branding_models  # register reseller tables
@@ -77,7 +78,7 @@ from .routers.subscription_admin_v2 import router as subscription_admin_v2_route
 apply_self_hosted_runtime()
 
 # TWINPANEL_PAYMENT_TABLE_BOOTSTRAP_V1
-# Payment/store models must be registered before create_all.
+# Payment/store/reseller-bot models must be registered before create_all.
 _ = store_models
 _ = payment_models
 _ = support_models
@@ -87,6 +88,7 @@ _ = two_factor_models
 _ = storefront_settings_models
 _ = runtime_settings_model
 _ = download_asset_models
+_ = reseller_bot_order_models
 _ = reseller_pool_models
 
 
