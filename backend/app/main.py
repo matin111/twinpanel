@@ -14,6 +14,7 @@ from . import user_notification_models
 from . import telegram_models
 from . import renewal_models
 from . import models_reseller
+from . import reseller_pool_models
 from . import domain_models
 from . import branding_models  # register reseller tables
 from . import storefront_settings_models  # TWINPANEL_STOREFRONT_CMS_V74
@@ -36,6 +37,11 @@ from .routers.tunnel_managed import router as tunnel_managed_router
 from .routers.modern_transports import router as modern_transports_router
 from .routers.download_assets import admin_router as download_assets_admin_router, public_router as download_assets_public_router
 from .routers.public_connection_v3 import router as public_connection_v3_router
+from .routers.reseller_admin_v2 import router as reseller_admin_v2_router
+from .routers.reseller_traffic_admin_v2 import router as reseller_traffic_admin_v2_router
+from .routers.reseller_sale_v2 import router as reseller_sale_v2_router
+from .routers.reseller_profile_v2 import router as reseller_profile_v2_router
+from .routers.reseller_subscription_volume_v2 import router as reseller_subscription_volume_v2_router
 from .self_hosted_runtime import apply_self_hosted_runtime
 from .admin_notification_service import notification_watch_loop
 from .services.customer_maintenance import customer_maintenance_loop
@@ -81,6 +87,7 @@ _ = two_factor_models
 _ = storefront_settings_models
 _ = runtime_settings_model
 _ = download_asset_models
+_ = reseller_pool_models
 
 
 # TWINPANEL_ADMIN_PANEL_NOTIFICATION_REGISTER_V1
@@ -273,7 +280,15 @@ app.include_router(tunnels.router)
 app.include_router(tunnel_managed_router)
 app.include_router(modern_transports_router)
 app.include_router(admin.router)
+# Simplified volume-only reseller admin routes override legacy create/list/stats
+# and traffic adjustment while keeping the older detail/plan endpoints available.
+app.include_router(reseller_admin_v2_router)
+app.include_router(reseller_traffic_admin_v2_router)
 app.include_router(resellers.router)
+# Correct reseller sale/profile/edit/renewal flows must precede legacy routes.
+app.include_router(reseller_sale_v2_router)
+app.include_router(reseller_profile_v2_router)
+app.include_router(reseller_subscription_volume_v2_router)
 app.include_router(reseller_portal.router)
 app.include_router(domains.router)
 app.include_router(branding.router)
