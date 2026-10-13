@@ -1,8 +1,6 @@
-
-
 from ..services.public_urls import api_base_url
 from fastapi import Request
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
@@ -13,11 +11,13 @@ from ..quota_security import public_key_b64, require_node_identity
 from ..services.quota_node_sync import sync_node_config
 from ..quota_service import (
     acknowledge_command,
-    apply_usage_event,
     close_session,
     pull_commands,
 )
-from ..quota_service_v2 import open_session
+from ..services.reseller_traffic_pool import (
+    apply_usage_event,
+    open_session,
+)
 from .subscription_admin_v2 import router as subscription_admin_v2_router
 
 
@@ -45,6 +45,7 @@ def quota_health(db: Session = Depends(get_db)):
         "ledger": "postgresql-append-only",
         "usage_events": event_count,
         "enforcement": "ready-for-node-enrollment",
+        "reseller_pool": "usage-based",
     }
 
 
