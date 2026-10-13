@@ -12,12 +12,13 @@ from ..main_receipt_cleanup import cleanup_receipts_once
 from .payment_automation import (
     activate_existing_sms_auto_verify_once,
     process_pending_crypto_payments_once,
-    refresh_live_rate_once,
+)
+from .payment_native_crypto_exact import (
+    process_pending_native_crypto_exact_once,
 )
 
 
 PAYMENT_NOTIFICATION_INTERVAL_SECONDS = 5
-LIVE_RATE_INTERVAL_SECONDS = 10
 CRYPTO_VERIFY_INTERVAL_SECONDS = 10
 RECEIPT_CLEANUP_INTERVAL_SECONDS = 6 * 60 * 60
 
@@ -145,7 +146,6 @@ async def customer_maintenance_loop() -> None:
     """Customer payment automation and housekeeping loop."""
 
     last_receipt_cleanup = 0.0
-    last_live_rate_refresh = 0.0
     last_crypto_verify = 0.0
     sms_bootstrap_done = False
 
@@ -175,52 +175,29 @@ async def customer_maintenance_loop() -> None:
                 sms_bootstrap_done = True
 
         if (
-            last_live_rate_refresh == 0.0
-            or now - last_live_rate_refresh
-            >= LIVE_RATE_INTERVAL_SECONDS
-        ):
-            try:
-                result = await refresh_live_rate_once()
-
-                if result.get("updated"):
-                    print(
-                        "PAYMENT_LIVE_RATE_UPDATED",
-                        {
-                            "rate_toman": result.get(
-                                "live_rate_toman"
-                            ),
-                            "provider": result.get(
-                                "live_rate_provider"
-                            ),
-                        },
-                        flush=True,
-                    )
-
-            except Exception as exc:
-                print(
-                    "payment live rate refresh failed:",
-                    str(exc),
-                    flush=True,
-                )
-            finally:
-                last_live_rate_refresh = now
-
-        if (
             last_crypto_verify == 0.0
             or now - last_crypto_verify
             >= CRYPTO_VERIFY_INTERVAL_SECONDS
         ):
             try:
-                result = await process_pending_crypto_payments_once()
+                # Legacy worker remains for existing USDT-BEP20 intents.
+                legacy_result = await process_pending_crypto_payments_once()
+                native_result = await process_pending_native_crypto_exact_once()
 
-                if (
-                    result.get("checked")
-                    or result.get("verified")
-                    or result.get("errors")
-                ):
+                checked = int(legacy_result.get("checked") or 0) + int(native_result.get("checked") or 0)
+                verified = int(legacy_result.get("verified") or 0) + int(native_result.get("verified") or 0)
+                errors = int(legacy_result.get("errors") or 0) + int(native_result.get("errors") or 0)
+
+                if checked or verified or errors:
                     print(
                         "PAYMENT_CRYPTO_AUTO_VERIFY",
-                        result,
+                        {
+                            "checked": checked,
+                            "verified": verified,
+                            "errors": errors,
+                            "usdt_bep20": legacy_result,
+                            "native_trx_bnb": native_result,
+                        },
                         flush=True,
                     )
 
