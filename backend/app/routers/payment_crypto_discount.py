@@ -3,16 +3,18 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal, ROUND_UP
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from ..customer_wallet_models import CustomerWalletTopup
 from ..database import get_db
 from ..deps import get_current_user, require_admin
 from ..models import User
 from ..payment_models import PaymentIntent
 from ..runtime_settings_model import RuntimeSetting
 from ..store_models import StoreOrder
+from .payments import ACTIVE_STATUSES, PaymentSubmitIn
 from .payment_native_gateways import (
     CRYPTO_METHODS,
     IntentCreateIn,
@@ -21,6 +23,7 @@ from .payment_native_gateways import (
     intent_out_v2,
     my_payment_intents_v2,
     payment_methods_v2,
+    submit_payment_v2,
 )
 
 
@@ -38,7 +41,6 @@ class CryptoDiscountIn(BaseModel):
         default=Decimal("0"),
         ge=Decimal("0"),
         le=MAX_CRYPTO_DISCOUNT,
-        decimal_places=2,
     )
 
 
@@ -106,10 +108,22 @@ def _decorate_payload(
         original = int(order.amount_toman or 0) if order else 0
 
     paid_base = int(result.get("base_amount_toman") or (row.base_amount_toman if row else 0) or 0)
-    percent = _discount_percent(db)
+    current_percent = _discount_percent(db)
     applied = bool(original > 0 and paid_base > 0 and paid_base < original)
 
-    result["crypto_discount_percent"] = float(percent if applied else Decimal("0"))
+    # Derive the applied percentage from the frozen amounts. This means old
+    # intents remain historically correct even if the admin changes the global
+    # discount later.
+    if applied:
+        applied_percent = (
+            (Decimal(original - paid_base) * Decimal("100"))
+            / Decimal(original)
+        ).quantize(Decimal("0.01"))
+    else:
+        applied_percent = Decimal("0")
+
+    result["crypto_discount_percent"] = float(applied_percent)
+    result["configured_crypto_discount_percent"] = float(current_percent)
     result["original_amount_toman"] = original or paid_base
     result["discount_amount_toman"] = max(0, original - paid_base) if original else 0
     result["discounted_amount_toman"] = paid_base
@@ -180,6 +194,23 @@ async def create_payment_intent_with_crypto_discount(
     db: Session = Depends(get_db),
 ):
     method = str(payload.method or "").strip().lower()
+
+    # Detect an existing active intent before delegating so historical quotes
+    # never change just because the configured discount changed later.
+    existing = None
+    if method in CRYPTO_METHODS:
+        existing = (
+            db.query(PaymentIntent)
+            .filter(
+                PaymentIntent.order_id == payload.order_id,
+                PaymentIntent.user_id == user.id,
+                PaymentIntent.method == method,
+                PaymentIntent.status.in_(ACTIVE_STATUSES),
+            )
+            .order_by(PaymentIntent.id.desc())
+            .first()
+        )
+
     result = await create_payment_intent_v2(payload, user, db)
 
     if method not in CRYPTO_METHODS:
@@ -189,6 +220,9 @@ async def create_payment_intent_with_crypto_discount(
     if row is None:
         return result
 
+    if existing is not None:
+        return _decorate_payload(db, intent_out_v2(row), row)
+
     order = db.get(StoreOrder, row.order_id)
     if order is None:
         return result
@@ -196,8 +230,6 @@ async def create_payment_intent_with_crypto_discount(
     percent = _discount_percent(db)
     original = int(order.amount_toman or 0)
 
-    # Existing active intents are immutable snapshots. Apply the discount only
-    # while the intent still carries the original order total.
     if (
         percent > 0
         and original > 0
@@ -238,6 +270,35 @@ async def create_payment_intent_with_crypto_discount(
         db.refresh(row)
 
     return _decorate_payload(db, intent_out_v2(row), row)
+
+
+@router.post("/intents/{intent_id}/submit")
+async def submit_payment_with_global_txid_guard(
+    intent_id: int,
+    payload: PaymentSubmitIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    row = db.get(PaymentIntent, int(intent_id))
+    if row is None or row.user_id != user.id:
+        raise HTTPException(status_code=404, detail="پرداخت پیدا نشد")
+
+    method = str(row.method or "").lower()
+    if method in CRYPTO_METHODS:
+        txid = str(payload.txid or "").strip()
+        if txid:
+            used = (
+                db.query(CustomerWalletTopup.id)
+                .filter(CustomerWalletTopup.txid == txid)
+                .first()
+            )
+            if used:
+                raise HTTPException(
+                    status_code=409,
+                    detail="این TXID قبلاً برای شارژ کیف پول استفاده شده است",
+                )
+
+    return await submit_payment_v2(intent_id, payload, user, db)
 
 
 @router.get("/intents/me")
