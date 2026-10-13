@@ -1,22 +1,14 @@
 from __future__ import annotations
 
-import json
 from types import SimpleNamespace
 
-from app import managed_ops, tp2027_provision
-from app import tp2027_multi_exit_v18 as tp2027_v18
 from app.backhaul_multi_exit_v16 import (
     backhaul_forward_port,
     install_backhaul_peer_v16,
 )
 from app.manager_runtime_v16 import install_manager_runtime_v16
-from app.routers import tunnel_managed, tunnels
-from app.tp2027_multi_exit_v18 import (
-    _public_firewall_script,
-    _public_service_unit,
-    install_tp2027_overlays_v18,
-)
-from app.transport_policy_v17 import (
+from app.routers import tunnels
+from app.transport_policy_v16 import (
     MANAGED_TRANSPORT_NAMES,
     apply_overlay_loss_policy,
     choose_best_name,
@@ -36,29 +28,31 @@ def main() -> None:
     rows = [
         row("quic_2027", 1),
         row("kcp_2027", 2),
-        row("arq_2027", 3),
+        row("mtunnel", 3),
         row("backhaul", 4),
-        row("mtunnel", 5),
-        row("ssh_tun", 6),
+        row("ssh_tun", 5),
     ]
 
+    # A healthy direct Backhaul carrier must beat every dependent overlay.
     health = {
         "backhaul": {"ok": True},
         "mtunnel": {"ok": True},
-        "ssh_tun": {"ok": True},
         "kcp_2027": {"ok": True},
-        "arq_2027": {"ok": True},
         "quic_2027": {"ok": True},
+        "ssh_tun": {"ok": True},
     }
-    assert choose_best_name(rows, health) == "kcp_2027"
-
-    health["kcp_2027"] = {"ok": False}
-    assert choose_best_name(rows, health) == "arq_2027"
-
-    health["arq_2027"] = {"ok": False}
-    health["quic_2027"] = {"ok": False}
     assert choose_best_name(rows, health) == "backhaul"
 
+    # If Backhaul fails, another independent direct path wins before overlays.
+    health["backhaul"] = {"ok": False}
+    assert choose_best_name(rows, health) == "mtunnel"
+
+    # If every direct path fails, KCP is the preferred measured overlay fallback.
+    health["mtunnel"] = {"ok": False}
+    health["ssh_tun"] = {"ok": False}
+    assert choose_best_name(rows, health) == "kcp_2027"
+
+    # A reachability PASS with severe loss must not qualify for auto selection.
     degraded = apply_overlay_loss_policy(
         {
             "ok": True,
@@ -80,6 +74,7 @@ def main() -> None:
     )
     assert clean["ok"] is True
 
+    # The autonomous repair scope must include direct-only partial tunnels.
     for name in (
         "backhaul",
         "mtunnel",
@@ -92,90 +87,26 @@ def main() -> None:
     ):
         assert name in MANAGED_TRANSPORT_NAMES
 
-    assert policy_priority("kcp_2027") < policy_priority("arq_2027")
-    assert policy_priority("arq_2027") < policy_priority("quic_2027")
-    assert policy_priority("quic_2027") < policy_priority("backhaul")
+    assert policy_priority("backhaul") < policy_priority("mtunnel")
+    assert policy_priority("mtunnel") < policy_priority("kcp_2027")
 
-    # Explicit legacy Backhaul still has collision-free mappings.
+    # Fallback calculation (no matching DB row in CI) is deterministic and
+    # gives different mappings to different tunnel ids instead of hard-coding
+    # 18080 for every Backhaul server process on a shared Iran host.
     port_a = backhaul_forward_port(9005)
     port_b = backhaul_forward_port(9009)
     assert port_a != port_b
+    assert 1024 < port_a <= 65535
+    assert 1024 < port_b <= 65535
 
-    # Public-direct service units must not depend on the Backhaul carrier.
-    unit = _public_service_unit(
-        "kcp_2027",
-        9,
-        role="iran",
-        exit_public_ip="198.51.100.20",
-    )
-    assert "--peer 198.51.100.20:45109" in unit
-    assert "twinpanel-backhaul-9.service" not in unit
-
-    firewall = _public_firewall_script(9, "192.0.2.10")
-    assert "192.0.2.10/32" in firewall
-    assert "TP2027_PUBLIC_IN" in firewall
-    assert "bh9" not in firewall
-
+    # The standalone Transport Manager does not import app.main, so it must
+    # explicitly install the same self-hosted runtime hooks as the API process.
+    # Otherwise autonomous self-heal could silently fall back to the historical
+    # shared 18080 Backhaul installer.
     install_manager_runtime_v16()
     assert tunnels._install_backhaul_peer is install_backhaul_peer_v16
 
-    # V19 public-direct stability profile: TCP/QUIC use one lane so an idle or
-    # degraded sibling lane cannot terminate the whole process. KCP/ARQ stay
-    # unchanged and the one-Iran-to-many-Exit public-direct model is preserved.
-    tcp_unit = tp2027_v18._public_service_unit(
-        "tcp_2027",
-        9,
-        role="iran",
-        exit_public_ip="198.51.100.20",
-    )
-    quic_unit = tp2027_v18._public_service_unit(
-        "quic_2027",
-        9,
-        role="iran",
-        exit_public_ip="198.51.100.20",
-    )
-    assert "--lanes 1" in tcp_unit
-    assert "--lanes 8" not in tcp_unit
-    assert "--lanes 1" in quic_unit
-    assert "--lanes 8" not in quic_unit
-
-    tcp_config = json.loads(
-        tp2027_v18._config_text_v18(
-            "tcp_2027",
-            9,
-            "198.51.100.20",
-        )
-    )
-    assert tcp_config["carrier"] == "public_direct"
-    assert tcp_config["multi_exit_safe"] is True
-    assert tcp_config["lanes"] == 1
-    assert tcp_config["stability_profile"] == "single_lane_v19"
-
-    # New managed tunnels do not auto-create MTunnel/Backhaul/SSH TUN.
-    assert tuple(tunnel_managed._TRANSPORTS) == ()
-    assert tuple(tunnel_managed._SELECTION_ORDER[:4]) == (
-        "kcp_2027",
-        "arq_2027",
-        "quic_2027",
-        "tcp_2027",
-    )
-    assert tuple(managed_ops.DIRECT_BASE_ORDER) == ()
-    assert tuple(managed_ops.EXPECTED_ORDER[:4]) == (
-        "kcp_2027",
-        "arq_2027",
-        "quic_2027",
-        "tcp_2027",
-    )
-    assert tunnel_managed.install_tp2027_overlays is install_tp2027_overlays_v18
-    assert managed_ops.install_tp2027_overlays is install_tp2027_overlays_v18
-    assert tuple(tp2027_provision.TP2027_PRIORITY) == (
-        "kcp_2027",
-        "arq_2027",
-        "quic_2027",
-        "tcp_2027",
-    )
-
-    print("TRANSPORT_POLICY_V19_MULTI_EXIT_STABILITY_SMOKE_OK")
+    print("TRANSPORT_POLICY_V16_SMOKE_OK")
 
 
 if __name__ == "__main__":

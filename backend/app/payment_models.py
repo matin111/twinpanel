@@ -29,6 +29,8 @@ class PaymentSettings(Base):
         String(150), nullable=True
     )
 
+    # Kept only for database/backward compatibility. USDT-TRC20 is no
+    # longer exposed as a payment method in the 2027 payment runtime.
     usdt_trc20_enabled: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )
@@ -127,8 +129,23 @@ class PaymentIntent(Base):
     unique_suffix: Mapped[int | None] = mapped_column(
         Integer, nullable=True
     )
+
+    # Legacy field retained for existing USDT intents.
     crypto_amount_usdt: Mapped[object | None] = mapped_column(
         Numeric(20, 6), nullable=True
+    )
+
+    # Generic immutable crypto quote snapshot. The amount and Toman rate are
+    # frozen when the intent is created, so later market movement cannot
+    # change the amount the customer must transfer.
+    crypto_asset: Mapped[str | None] = mapped_column(
+        String(16), nullable=True
+    )
+    crypto_amount: Mapped[object | None] = mapped_column(
+        Numeric(28, 8), nullable=True
+    )
+    crypto_rate_toman: Mapped[int | None] = mapped_column(
+        BigInteger, nullable=True
     )
 
     tracking_code: Mapped[str | None] = mapped_column(
@@ -257,9 +274,7 @@ class PaymentSmsEvent(Base):
     )
 
 
-
 # TWINPANEL_SMS_READER_PAIRING_V1
-
 class PaymentSmsReaderDevice(Base):
     __tablename__ = "payment_sms_reader_devices"
     __table_args__ = (
