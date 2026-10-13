@@ -40,6 +40,7 @@ from .services.customer_maintenance import customer_maintenance_loop
 # TWINPANEL_REAL_ADMIN_NOTIFICATION_REGISTER_V1
 # TWINPANEL_USERNAME_SETTINGS_REGISTER_V2
 from .routers.payments import router as payments_router
+from .routers.payment_automation import router as payment_automation_router
 from .routers.payment_receipts_local import router as payment_receipts_local_router
 from .routers.sms_reader import router as sms_reader_router
 from .routers.support import router as support_router, admin_router as support_admin_router
@@ -197,6 +198,10 @@ app.include_router(storefront_settings_router)
 app.include_router(store_router)
 app.include_router(general_settings_router)
 app.include_router(notification_settings_router)
+# Payment automation overrides the legacy payment methods/settings/submit
+# routes while delegating all unchanged behavior back to the legacy handlers.
+# It must be registered before the legacy payments router.
+app.include_router(payment_automation_router)
 # Register local receipt handling before the legacy payments router so the
 # admin receipt path can transparently serve both local and Telegram receipts.
 app.include_router(payment_receipts_local_router)
