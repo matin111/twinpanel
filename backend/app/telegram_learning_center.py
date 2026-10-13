@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .services.public_urls import shop_base_url
 from .database import SessionLocal
+from .reseller_bot_review import register_reseller_review_handlers
 
 from aiogram import F, Router
 from aiogram.types import (
@@ -552,6 +553,10 @@ def register_learning_handlers(
     *,
     prefix: str,
 ) -> None:
+    register_reseller_review_handlers(
+        router,
+        prefix=prefix,
+    )
 
     @router.message(
         F.text == "📚 آموزش"
