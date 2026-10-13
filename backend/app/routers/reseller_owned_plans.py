@@ -226,3 +226,9 @@ def create_reseller_subscription(
         password=payload.password,
         sell_price_toman=0,
     )
+
+
+# Pool guard routes are mounted into this high-priority router so activation and
+# renewal can never bypass an exhausted shared reseller traffic pool.
+from .reseller_pool_guard_v3 import router as reseller_pool_guard_v3_router
+router.include_router(reseller_pool_guard_v3_router)
