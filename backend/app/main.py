@@ -322,6 +322,12 @@ app.include_router(reseller_bot_router)
 from .routers.reseller_bot_orders import (
     router as reseller_bot_orders_router,
 )
+from .routers.reseller_bot_orders_volume_v2 import (
+    router as reseller_bot_orders_volume_v2_router,
+)
+# Usage-based renewal approval must win route resolution; the legacy router
+# remains immediately after it for all non-overridden bot-commerce endpoints.
+app.include_router(reseller_bot_orders_volume_v2_router)
 app.include_router(reseller_bot_orders_router)
 
 
