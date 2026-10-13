@@ -61,6 +61,7 @@ from .routers.user_notifications import (
 from .routers.telegram_bot import router as telegram_bot_router
 from .routers.telegram_manager import router as telegram_manager_router
 from .routers.wallet_payment_v2 import router as wallet_payment_v2_router, admin_router as wallet_payment_v2_admin_router
+from .routers.wallet_admin_v2 import router as wallet_admin_v2_router
 from .routers.customer_wallet import router as customer_wallet_router, admin_router as customer_wallet_admin_router
 from .routers.customer_subscription_management import router as customer_subscription_management_router
 from .routers.subscription_admin_v2 import router as subscription_admin_v2_router
@@ -252,10 +253,13 @@ app.include_router(user_notification_router)
 app.include_router(user_notification_admin_router)
 app.include_router(telegram_bot_router)
 app.include_router(telegram_manager_router)
-# Modern wallet payment routes precede the legacy wallet router. Manual admin
-# adjustment/approve/reject endpoints remain provided by the legacy router.
+# Modern customer wallet payment routes come first. Admin V2 then overrides
+# wallet listing, idempotent approval and manual balance adjustment with
+# notifications. The legacy admin router remains after it for reject and other
+# compatibility endpoints that V2 intentionally does not redefine.
 app.include_router(wallet_payment_v2_router)
 app.include_router(wallet_payment_v2_admin_router)
+app.include_router(wallet_admin_v2_router)
 app.include_router(customer_wallet_router)
 app.include_router(customer_wallet_admin_router)
 app.include_router(customer_subscription_management_router)
