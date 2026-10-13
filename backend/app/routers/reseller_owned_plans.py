@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import require_reseller
-from ..models_reseller import Reseller
+from ..models import Plan, Subscription
+from ..models_reseller import Reseller, ResellerSubscription
+from ..reseller_bot_order_models import ResellerBotOrder
 from ..reseller_owned_plan_models import ResellerBotPlan
 from ..reseller_owned_plans import (
     create_owned_plan,
@@ -77,6 +79,37 @@ def _validate_protocols(row: ResellerBotPlan) -> None:
         )
 
 
+def _plan_has_history(db: Session, row: ResellerBotPlan) -> bool:
+    backing_plan_id = int(row.backing_plan_id)
+    order_exists = (
+        db.query(ResellerBotOrder.id)
+        .filter(
+            ResellerBotOrder.reseller_id == int(row.reseller_id),
+            ResellerBotOrder.plan_id == backing_plan_id,
+        )
+        .first()
+        is not None
+    )
+    if order_exists:
+        return True
+
+    subscription_exists = (
+        db.query(ResellerSubscription.id)
+        .join(
+            Subscription,
+            Subscription.id == ResellerSubscription.subscription_id,
+        )
+        .filter(
+            ResellerSubscription.reseller_id == int(row.reseller_id),
+            Subscription.plan_id == backing_plan_id,
+        )
+        .first()
+        is not None
+    )
+    return subscription_exists
+
+
+@router.get("/owned-plans")
 @router.get("/plans")
 def list_owned_plans(
     reseller: Reseller = Depends(require_reseller),
@@ -96,6 +129,7 @@ def list_owned_plans(
     return [plan_out(row) for row in rows]
 
 
+@router.post("/owned-plans")
 @router.post("/plans")
 def create_reseller_owned_plan(
     payload: ResellerOwnedPlanIn,
@@ -123,6 +157,7 @@ def create_reseller_owned_plan(
     return plan_out(row)
 
 
+@router.patch("/owned-plans/{plan_id}")
 @router.patch("/plans/{plan_id}")
 def update_reseller_owned_plan(
     plan_id: int,
@@ -175,6 +210,7 @@ def update_reseller_owned_plan(
     return plan_out(row)
 
 
+# Legacy DELETE keeps its historical soft-disable semantics for compatibility.
 @router.delete("/plans/{plan_id}")
 def disable_reseller_owned_plan(
     plan_id: int,
@@ -195,6 +231,41 @@ def disable_reseller_owned_plan(
     sync_owned_plan_backing(db, row)
     db.commit()
     return {"ok": True, "plan_id": int(row.id), "is_active": False}
+
+
+# The explicit owned-plans endpoint is the reseller UI's real delete action.
+# A plan that already has order/subscription history is intentionally protected;
+# the reseller can still deactivate it without damaging historical records.
+@router.delete("/owned-plans/{plan_id}")
+def delete_reseller_owned_plan(
+    plan_id: int,
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    row = owned_plan(
+        db,
+        int(reseller.id),
+        plan_id,
+        active_only=False,
+        lock=True,
+    )
+    if not row:
+        return {"ok": True, "deleted": False}
+
+    if _plan_has_history(db, row):
+        raise HTTPException(
+            status_code=409,
+            detail="این پلن سابقه سفارش یا اشتراک دارد؛ برای حفظ تاریخچه آن را غیرفعال کنید.",
+        )
+
+    backing = db.get(Plan, int(row.backing_plan_id))
+    if backing is not None:
+        backing.is_active = False
+
+    deleted_id = int(row.id)
+    db.delete(row)
+    db.commit()
+    return {"ok": True, "deleted": True, "plan_id": deleted_id}
 
 
 @router.post("/subscriptions/create")
