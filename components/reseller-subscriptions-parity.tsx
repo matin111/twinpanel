@@ -14,7 +14,6 @@ const gb=(bytes:number)=>Number(bytes||0)/1024/1024/1024;
 const gbText=(bytes:number)=>`${gb(bytes).toLocaleString("fa-IR",{maximumFractionDigits:2})} GB`;
 const dateText=(value:unknown)=>{if(!value)return "—";const d=new Date(String(value));return Number.isNaN(d.getTime())?String(value):d.toLocaleString("fa-IR");};
 const statusTone=(status:string):"ok"|"warn"|"bad"|"violet"=>status==="active"?"ok":["expired","canceled","failed"].includes(status)?"bad":"warn";
-const protocolLabels:Record<string,string>={cisco:"Cisco / OpenConnect",openvpn:"OpenVPN",wireguard:"WireGuard",l2tp:"L2TP / IPsec",v2ray:"V2Ray / Xray",xray:"V2Ray / Xray"};
 const idempotency=(prefix:string)=>`${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
 const enabledProtocols=(plan:ResellerRow)=>Object.entries({cisco:"enable_cisco",openvpn:"enable_openvpn",wireguard:"enable_wireguard",l2tp:"enable_l2tp",v2ray:"enable_v2ray"}).filter(([,field])=>Boolean(plan[field])).map(([name])=>name);
 const absoluteLink=(value:string)=>{if(typeof window==="undefined")return value;try{return new URL(value,window.location.origin).toString();}catch{return value;}};
@@ -43,7 +42,6 @@ function Empty({children}:{children:React.ReactNode}){return <div className="run
 export function ResellerSubscriptionsParityRuntime(){
   const {pick}=useI18n();
   const [subs,setSubs]=useState<ResellerRow[]>([]);
-  const [customers,setCustomers]=useState<ResellerRow[]>([]);
   const [plans,setPlans]=useState<ResellerRow[]>([]);
   const [serverOptions,setServerOptions]=useState<ResellerRow>({});
   const [q,setQ]=useState("");
@@ -60,7 +58,7 @@ export function ResellerSubscriptionsParityRuntime(){
   const [saleKey,setSaleKey]=useState(()=>idempotency("sale"));
   const [extendKey,setExtendKey]=useState(()=>idempotency("extend"));
 
-  const [sell,setSell]=useState({user_id:0,plan_id:0,node_ids:[] as number[],username:"",password:""});
+  const [sell,setSell]=useState({traffic_gb:50,duration_days:30,node_ids:[] as number[],username:"",password:""});
   const [edit,setEdit]=useState({traffic_gb:0,expiry_value:30,expiry_unit:"days" as ExpiryUnit,sell_price_toman:0,account_username:"",account_password:""});
   const [extend,setExtend]=useState({add_traffic_gb:0,add_days:30,charge_toman:0,reset_usage:false});
 
@@ -68,21 +66,19 @@ export function ResellerSubscriptionsParityRuntime(){
     setError("");
     const result=await Promise.allSettled([
       resellerApi.subscriptions(),
-      resellerApi.customers(),
       resellerApi.plans(),
       resellerApi.serverOptions()
     ]);
     if(result[0].status==="fulfilled")setSubs(result[0].value);
-    if(result[1].status==="fulfilled")setCustomers(result[1].value);
-    if(result[2].status==="fulfilled")setPlans(result[2].value);
-    if(result[3].status==="fulfilled")setServerOptions(result[3].value);
+    if(result[1].status==="fulfilled")setPlans(result[1].value);
+    if(result[2].status==="fulfilled")setServerOptions(result[2].value);
     const failed=result.find(x=>x.status==="rejected");
     if(failed&&failed.status==="rejected")setError(failed.reason instanceof Error?failed.reason.message:String(failed.reason));
   };
 
   useEffect(()=>{void load();},[]);
 
-  const selectedPlan=useMemo(()=>plans.find(plan=>Number(plan.plan_id||plan.id)===sell.plan_id)||null,[plans,sell.plan_id]);
+  const backingPlan=useMemo(()=>plans.find(plan=>plan.is_active!==false)||plans[0]||null,[plans]);
   const nodes=rowsOf(serverOptions,"nodes","servers","items");
   const statuses=useMemo(()=>Array.from(new Set(subs.map(row=>str(row,"status")).filter(Boolean))),[subs]);
   const filtered=useMemo(()=>subs.filter(row=>{
@@ -107,33 +103,41 @@ export function ResellerSubscriptionsParityRuntime(){
 
   const openSale=()=>{
     setSaleKey(idempotency("sale"));
-    setSell({user_id:0,plan_id:0,node_ids:[],username:"",password:""});
+    setSell({traffic_gb:50,duration_days:30,node_ids:[],username:"",password:""});
     setSellOpen(true);
   };
 
   const submitSale=(event:FormEvent)=>{
     event.preventDefault();
-    if(!selectedPlan||!sell.user_id)return;
-    const planId=Number(selectedPlan.plan_id||selectedPlan.id||0);
-    const protocols=enabledProtocols(selectedPlan);
+    if(!backingPlan||sell.traffic_gb<=0||sell.duration_days<=0)return;
+    const planId=Number(backingPlan.backing_plan_id||backingPlan.plan_id||backingPlan.id||0);
+    if(!planId){setError(pick("مجوز داخلی ساخت اشتراک آماده نیست.","The internal subscription authorization is not ready."));return;}
+    const protocols=enabledProtocols(backingPlan);
     void act(pick("اشتراک ساخته و روی سرورها فعال شد","Subscription created and provisioned"),async()=>{
       const result=await resellerApi.sellSubscription({
-        user_id:sell.user_id,
+        user_id:null,
         plan_id:planId,
-        traffic_gb:Number(selectedPlan.traffic_gb||0),
-        duration_days:Number(selectedPlan.duration_days||0),
+        traffic_gb:Math.max(1,Number(backingPlan.traffic_gb||1)),
+        duration_days:Math.max(1,Number(backingPlan.duration_days||1)),
         node_ids:sell.node_ids,
         protocols,
-        sell_price_toman:Number(selectedPlan.sell_price_toman||0),
+        sell_price_toman:Number(backingPlan.sell_price_toman||0),
         username:sell.username.trim()||null,
         password:sell.password.trim()||null,
         idempotency_key:saleKey
       });
       const subscriptionId=Number(result.subscription_id||0);
       if(!subscriptionId)throw new Error(pick("شناسه اشتراک ساخته‌شده دریافت نشد.","Created subscription id was not returned."));
+      await resellerApi.extendSubscription(subscriptionId,{
+        add_traffic_gb:Number(sell.traffic_gb),
+        add_days:Number(sell.duration_days),
+        charge_toman:0,
+        reset_usage:true,
+        idempotency_key:idempotency(`manual-${subscriptionId}`)
+      });
       await resellerApi.provisionSubscription(subscriptionId);
       setSellOpen(false);
-      setSell({user_id:0,plan_id:0,node_ids:[],username:"",password:""});
+      setSell({traffic_gb:50,duration_days:30,node_ids:[],username:"",password:""});
       setSaleKey(idempotency("sale"));
     });
   };
@@ -207,7 +211,7 @@ export function ResellerSubscriptionsParityRuntime(){
     <div className="page reseller-parity-page reseller-subscriptions-parity">
       <div className="page-head">
         <div><h1>{pick("اشتراک‌ها","Subscriptions")}</h1><small>{pick("فروش و مدیریت کامل سرویس‌های مشتریان نمایندگی","Sell and fully manage reseller customer services")}</small></div>
-        <div className="action-row"><button className="ghost" onClick={()=>void load()} disabled={busy}>{pick("بروزرسانی","Refresh")}</button><button className="primary" onClick={openSale}>＋ {pick("فروش اشتراک","Sell subscription")}</button></div>
+        <div className="action-row"><button className="ghost" onClick={()=>void load()} disabled={busy}>{pick("بروزرسانی","Refresh")}</button><button className="primary" onClick={openSale}>＋ {pick("ساخت اشتراک","Create subscription")}</button></div>
       </div>
       <Notice error={error} ok={ok}/>
 
@@ -228,7 +232,7 @@ export function ResellerSubscriptionsParityRuntime(){
         {!filtered.length&&<Empty>{pick("اشتراکی با این فیلتر پیدا نشد.","No subscription matches this filter.")}</Empty>}
       </Card>
 
-      {sellOpen&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>!busy&&setSellOpen(false)}/><form className="runtime-modal-card reseller-sub-modal" onSubmit={submitSale}><div className="card-head"><div><b>{pick("فروش اشتراک جدید","Sell new subscription")}</b><small>{pick("حجم، مدت و پروتکل‌ها از پلن مجاز مدیر خوانده می‌شوند و پس از ثبت، سرویس روی سرورها ساخته می‌شود.","Traffic, duration and protocols come from the authorized plan and server provisioning runs after creation.")}</small></div><button className="icon-button" type="button" onClick={()=>setSellOpen(false)}>×</button></div><div className="setting-grid"><label className="field"><span>{pick("مشتری","Customer")}</span><select required value={sell.user_id} onChange={e=>setSell(s=>({...s,user_id:Number(e.target.value)}))}><option value={0}>—</option>{customers.map((row,index)=>{const id=Number(row.id||row.user_id||0);return <option key={id||index} value={id}>{str(row,"full_name","name")||`#${id}`} {str(row,"phone")?`· ${str(row,"phone")}`:""}</option>})}</select></label><label className="field"><span>{pick("پلن مجاز","Authorized plan")}</span><select required value={sell.plan_id} onChange={e=>setSell(s=>({...s,plan_id:Number(e.target.value)}))}><option value={0}>—</option>{plans.map((plan,index)=>{const id=Number(plan.plan_id||plan.id||0);return <option key={id||index} value={id}>{str(plan,"name")||`#${id}`} · {String(plan.traffic_gb||0)}GB · {String(plan.duration_days||0)} {pick("روز","days")} · {money(num(plan,"sell_price_toman"))}</option>})}</select></label><label className="field"><span>{pick("نام کاربری دلخواه (اختیاری)","Custom username (optional)")}</span><input dir="ltr" value={sell.username} onChange={e=>setSell(s=>({...s,username:e.target.value}))}/></label><label className="field"><span>{pick("رمز دلخواه (اختیاری)","Custom password (optional)")}</span><input dir="ltr" value={sell.password} onChange={e=>setSell(s=>({...s,password:e.target.value}))}/></label></div>{selectedPlan&&<div className="reseller-plan-preview"><div><span>{pick("حجم","Traffic")}</span><b>{String(selectedPlan.traffic_gb||0)} GB</b></div><div><span>{pick("مدت","Duration")}</span><b>{String(selectedPlan.duration_days||0)} {pick("روز","days")}</b></div><div><span>{pick("قیمت فروش","Sell price")}</span><b>{money(num(selectedPlan,"sell_price_toman"))}</b></div><div><span>{pick("پروتکل‌ها","Protocols")}</span><b>{enabledProtocols(selectedPlan).map(p=>protocolLabels[p]).join(" · ")||"—"}</b></div></div>}{nodes.length>0&&<div className="runtime-choice-section"><b>{pick("سرور خروجی مقصد","Exit destination")}</b><small>{pick("فقط سرورهای خروجی سالم نمایش داده می‌شوند. اگر انتخاب نشود، بهترین سرور خروجی به‌صورت خودکار انتخاب می‌شود.","Only healthy exit servers are shown. Leave empty to select the best exit automatically.")}</small><div className="protocol-toggle-grid">{nodes.map((node,index)=>{const id=Number(node.id||0),checked=sell.node_ids.includes(id);return <label className="toggle module-toggle" key={id||index}><span>{str(node,"name")||`#${id}`}{Boolean(node.is_mother)?` · ${pick("مادر","Mother")}`:""}</span><input type="checkbox" checked={checked} onChange={e=>setSell(s=>({...s,node_ids:e.target.checked?[...s.node_ids,id]:s.node_ids.filter(x=>x!==id)}))}/><i/></label>})}</div></div>}<div className="runtime-modal-actions"><button className="ghost" type="button" onClick={()=>setSellOpen(false)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy||!sell.user_id||!selectedPlan}>{busy?"…":pick("ساخت و فعال‌سازی","Create & provision")}</button></div></form></div>}
+      {sellOpen&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>!busy&&setSellOpen(false)}/><form className="runtime-modal-card reseller-sub-modal" onSubmit={submitSale}><div className="card-head"><div><b>{pick("ساخت اشتراک جدید","Create new subscription")}</b><small>{pick("برای ساخت دستی مشتری و پلن لازم نیست؛ حجم و مدت را مشخص کنید و سرویس مستقیم ساخته می‌شود.","Manual creation does not require a customer or plan selection; set traffic and duration and the service will be created directly.")}</small></div><button className="icon-button" type="button" onClick={()=>setSellOpen(false)}>×</button></div><div className="setting-grid"><label className="field"><span>{pick("حجم اشتراک GB","Subscription traffic GB")}</span><input type="number" min={0.01} step="0.01" required value={sell.traffic_gb} onChange={e=>setSell(s=>({...s,traffic_gb:Number(e.target.value)}))}/></label><label className="field"><span>{pick("مدت اعتبار (روز)","Validity (days)")}</span><input type="number" min={1} max={3650} step={1} required value={sell.duration_days} onChange={e=>setSell(s=>({...s,duration_days:Number(e.target.value)}))}/></label><label className="field"><span>{pick("نام کاربری دلخواه (اختیاری)","Custom username (optional)")}</span><input dir="ltr" value={sell.username} onChange={e=>setSell(s=>({...s,username:e.target.value}))}/></label><label className="field"><span>{pick("رمز دلخواه (اختیاری)","Custom password (optional)")}</span><input dir="ltr" value={sell.password} onChange={e=>setSell(s=>({...s,password:e.target.value}))}/></label></div>{!backingPlan&&<div className="runtime-error">{pick("برای ساخت اشتراک، حداقل یک مجوز فعال نمایندگی باید وجود داشته باشد.","At least one active reseller authorization is required to create a subscription.")}</div>}<div className="reseller-volume-note"><b>{pick("ساخت دستی نماینده","Manual reseller creation")}</b><small>{pick("تعداد ساخت نامحدود است و هیچ حجمی هنگام ساخت رزرو نمی‌شود؛ فقط مصرف واقعی کاربران از حجم نماینده کم می‌شود.","Creation count is unlimited and no traffic is reserved at creation; only real customer usage drains the reseller pool.")}</small></div>{nodes.length>0&&<div className="runtime-choice-section"><b>{pick("سرور خروجی مقصد","Exit destination")}</b><small>{pick("اگر سروری انتخاب نشود، بهترین سرور خروجی سالم به‌صورت خودکار انتخاب می‌شود.","Leave empty to select the best healthy exit automatically.")}</small><div className="protocol-toggle-grid">{nodes.map((node,index)=>{const id=Number(node.id||0),checked=sell.node_ids.includes(id);return <label className="toggle module-toggle" key={id||index}><span>{str(node,"name")||`#${id}`}{Boolean(node.is_mother)?` · ${pick("مادر","Mother")}`:""}</span><input type="checkbox" checked={checked} onChange={e=>setSell(s=>({...s,node_ids:e.target.checked?[...s.node_ids,id]:s.node_ids.filter(x=>x!==id)}))}/><i/></label>})}</div></div>}<div className="runtime-modal-actions"><button className="ghost" type="button" onClick={()=>setSellOpen(false)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy||!backingPlan||sell.traffic_gb<=0||sell.duration_days<=0}>{busy?"…":pick("ساخت و فعال‌سازی","Create & provision")}</button></div></form></div>}
 
       {editRow&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>!busy&&setEditRow(null)}/><form className="runtime-modal-card reseller-sub-modal" onSubmit={submitEdit}><div className="card-head"><div><b>{pick("ویرایش اشتراک","Edit subscription")} #{str(editRow,"id")}</b><small>{str(editRow,"customer_name")}</small></div><button className="icon-button" type="button" onClick={()=>setEditRow(null)}>×</button></div><div className="setting-grid"><label className="field"><span>{pick("حجم کل GB","Total traffic GB")}</span><input type="number" min={0.01} step="0.01" value={edit.traffic_gb} onChange={e=>setEdit(v=>({...v,traffic_gb:Number(e.target.value)}))}/></label><label className="field"><span>{pick("مدت اعتبار از امروز","Validity from today")}</span><div className="reseller-expiry-duration"><input type="number" min={1} step={1} required value={edit.expiry_value} onChange={e=>setEdit(v=>({...v,expiry_value:Number(e.target.value)}))}/><select value={edit.expiry_unit} onChange={e=>setEdit(v=>({...v,expiry_unit:e.target.value as ExpiryUnit}))}><option value="days">{pick("روز","Days")}</option><option value="months">{pick("ماه","Months")}</option><option value="years">{pick("سال","Years")}</option></select></div></label><label className="field"><span>{pick("قیمت فروش","Sell price")}</span><input type="number" min={0} value={edit.sell_price_toman} onChange={e=>setEdit(v=>({...v,sell_price_toman:Number(e.target.value)}))}/></label><label className="field"><span>{pick("نام کاربری","Username")}</span><input dir="ltr" value={edit.account_username} onChange={e=>setEdit(v=>({...v,account_username:e.target.value}))}/></label><label className="field"><span>{pick("رمز جدید (اختیاری)","New password (optional)")}</span><input dir="ltr" value={edit.account_password} onChange={e=>setEdit(v=>({...v,account_password:e.target.value}))} placeholder={pick("خالی = بدون تغییر","Empty = keep current")}/></label></div><div className="runtime-modal-actions"><button className="ghost" type="button" onClick={()=>setEditRow(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy||edit.expiry_value<1}>{pick("ذخیره تغییرات","Save changes")}</button></div></form></div>}
 
