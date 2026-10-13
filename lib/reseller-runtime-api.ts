@@ -85,6 +85,42 @@ async function requestBlob(path:string):Promise<Blob>{
   return response.blob();
 }
 
+function compactCustomerName(value:unknown,fallback:unknown){
+  const raw=String(value??"").replace(/\s+/g," ").trim();
+  const cleaned=raw
+    .replace(/[^\p{L}\p{N}@_.\-\s]/gu," ")
+    .replace(/\s+/g," ")
+    .trim();
+  const base=cleaned||raw||`#${String(fallback??"")}`;
+  return base.length>18?`${base.slice(0,18)}…`:base;
+}
+
+async function resellerSubscriptions():Promise<ResellerRow[]>{
+  const [subscriptions,ownedPlans]=await Promise.all([
+    request<ResellerRow[]>("/v1/reseller/subscriptions"),
+    request<ResellerRow[]>("/v1/reseller/owned-plans")
+  ]);
+
+  const planTitleByBackingId=new Map<number,string>();
+  for(const plan of ownedPlans){
+    const backingId=Number(plan.backing_plan_id??plan.plan_id??0);
+    const title=String(plan.title??plan.name??"").trim();
+    if(backingId>0&&title)planTitleByBackingId.set(backingId,title);
+  }
+
+  return subscriptions.map(row=>{
+    const rawEmail=String(row.customer_email??"").trim();
+    const backingPlanId=Number(row.plan_id??0);
+    const visiblePlanTitle=planTitleByBackingId.get(backingPlanId);
+    return {
+      ...row,
+      customer_name:compactCustomerName(row.customer_name,row.customer_user_id),
+      customer_email:rawEmail.endsWith("@internal.twinpanel.invalid")?null:row.customer_email,
+      plan_name:visiblePlanTitle||row.plan_name
+    };
+  });
+}
+
 export const resellerApi={
   me:()=>request<ResellerRow>("/v1/reseller/me"),
   dashboard:()=>request<ResellerRow>("/v1/reseller/dashboard"),
@@ -95,7 +131,7 @@ export const resellerApi={
   createCustomer:(payload:{full_name:string;email?:string|null;phone?:string|null;password:string})=>request<ResellerRow>("/v1/reseller/customers",{method:"POST",body:JSON.stringify(payload)}),
   attachCustomer:(userId:number)=>request<ResellerRow>("/v1/reseller/customers/attach",{method:"POST",body:JSON.stringify({user_id:userId})}),
 
-  subscriptions:()=>request<ResellerRow[]>("/v1/reseller/subscriptions"),
+  subscriptions:resellerSubscriptions,
   createSubscription:(payload:{plan_id:number;node_ids:number[];idempotency_key:string;username?:string|null;password?:string|null})=>request<ResellerRow>("/v1/reseller/subscriptions/create",{method:"POST",body:JSON.stringify(payload)}),
   sellSubscription:(payload:{user_id?:number|null;plan_id?:number|null;traffic_gb:number;duration_days:number;node_ids:number[];protocols:string[];sell_price_toman:number;idempotency_key:string;username?:string|null;password?:string|null})=>request<ResellerRow>("/v1/reseller/subscriptions/sell",{method:"POST",body:JSON.stringify(payload)}),
   editSubscription:(id:number,payload:ResellerRow)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/edit`,{method:"PATCH",body:JSON.stringify(payload)}),
