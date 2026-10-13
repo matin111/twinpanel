@@ -1,14 +1,14 @@
 /* Final admin shell isolation. Loaded last to prevent legacy/customer CSS from collapsing admin navigation. */
 @media (min-width:761px){
   .admin-shell{
-    --sidebar-width:280px!important;
+    --sidebar-width:292px!important;
     display:flex!important;
     align-items:flex-start!important;
     grid-template-columns:none!important;
   }
 
   .admin-shell.sidebar-collapsed{
-    --sidebar-width:88px!important;
+    --sidebar-width:90px!important;
   }
 
   .admin-shell>.sidebar{
@@ -31,9 +31,9 @@
   }
 
   .admin-shell .sidebar-head{
-    flex:0 0 50px!important;
-    min-height:50px!important;
-    height:50px!important;
+    flex:0 0 52px!important;
+    min-height:52px!important;
+    height:52px!important;
     display:flex!important;
     flex-direction:row!important;
     align-items:center!important;
@@ -79,7 +79,7 @@
     max-height:none!important;
     margin:0 0 11px!important;
     padding:0!important;
-    gap:3px!important;
+    gap:4px!important;
   }
 
   .admin-shell .sidebar-nav>.nav-group>.nav-group-title{
@@ -92,9 +92,9 @@
     margin:0!important;
     padding:8px 12px 6px!important;
     color:#748097!important;
-    font-size:10px!important;
+    font-size:11.5px!important;
     font-weight:900!important;
-    line-height:1.35!important;
+    line-height:1.4!important;
     letter-spacing:.01em!important;
     white-space:nowrap!important;
     overflow:hidden!important;
@@ -104,7 +104,7 @@
 
   .admin-shell .sidebar-nav>.nav-group>a{
     display:flex!important;
-    flex:0 0 46px!important;
+    flex:0 0 49px!important;
     flex-direction:row!important;
     align-items:center!important;
     justify-content:flex-start!important;
@@ -114,9 +114,9 @@
     width:100%!important;
     min-width:0!important;
     max-width:100%!important;
-    height:46px!important;
-    min-height:46px!important;
-    max-height:46px!important;
+    height:49px!important;
+    min-height:49px!important;
+    max-height:49px!important;
     margin:0!important;
     padding:0 13px!important;
     gap:11px!important;
@@ -124,9 +124,9 @@
     border-radius:12px!important;
     color:#a4aec0!important;
     background:transparent!important;
-    font-size:12.25px!important;
+    font-size:13.5px!important;
     font-weight:700!important;
-    line-height:1!important;
+    line-height:1.35!important;
     direction:rtl!important;
     text-align:right!important;
     white-space:nowrap!important;
@@ -151,17 +151,17 @@
   .admin-shell .sidebar-nav>.nav-group>a i{
     display:grid!important;
     place-items:center!important;
-    flex:0 0 23px!important;
-    width:23px!important;
-    min-width:23px!important;
-    max-width:23px!important;
-    height:23px!important;
-    min-height:23px!important;
-    max-height:23px!important;
+    flex:0 0 24px!important;
+    width:24px!important;
+    min-width:24px!important;
+    max-width:24px!important;
+    height:24px!important;
+    min-height:24px!important;
+    max-height:24px!important;
     margin:0!important;
     padding:0!important;
     color:#9d80f6!important;
-    font-size:15px!important;
+    font-size:16px!important;
     line-height:1!important;
     font-style:normal!important;
     writing-mode:horizontal-tb!important;
@@ -178,8 +178,8 @@
     margin:0!important;
     padding:0!important;
     opacity:1!important;
-    font-size:12.25px!important;
-    line-height:1.3!important;
+    font-size:13.5px!important;
+    line-height:1.4!important;
     white-space:nowrap!important;
     overflow:hidden!important;
     text-overflow:ellipsis!important;
@@ -187,9 +187,9 @@
   }
 
   .admin-shell>.sidebar>.profile{
-    flex:0 0 66px!important;
-    min-height:66px!important;
-    height:66px!important;
+    flex:0 0 70px!important;
+    min-height:70px!important;
+    height:70px!important;
     width:100%!important;
     margin:0!important;
     padding:10px 5px 0!important;
@@ -204,9 +204,9 @@
 
   .admin-shell.sidebar-collapsed .sidebar-head{
     flex-direction:column!important;
-    height:90px!important;
-    min-height:90px!important;
-    flex-basis:90px!important;
+    height:92px!important;
+    min-height:92px!important;
+    flex-basis:92px!important;
   }
 
   .admin-shell.sidebar-collapsed .sidebar-head .brand{
@@ -253,10 +253,17 @@
 }
 
 @media (max-width:760px){
-  .admin-shell .sidebar-nav>.nav-group>a{
-    min-height:47px!important;
-    height:auto!important;
-    font-size:12.5px!important;
+  .admin-shell .sidebar-nav>.nav-group>.nav-group-title{
+    font-size:12px!important;
     line-height:1.4!important;
+  }
+  .admin-shell .sidebar-nav>.nav-group>a{
+    min-height:50px!important;
+    height:auto!important;
+    font-size:14px!important;
+    line-height:1.45!important;
+  }
+  .admin-shell .sidebar-nav>.nav-group>a .nav-label{
+    font-size:14px!important;
   }
 }
