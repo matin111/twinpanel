@@ -105,10 +105,12 @@ export const resellerApi={
   connectionInfo:(id:number)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/connection-info`),
   provisionSubscription:(id:number)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/provision-account`,{method:"POST"}),
 
-  plans:()=>request<ResellerRow[]>("/v1/reseller/plans"),
-  createPlan:(payload:ResellerOwnedPlanPayload)=>request<ResellerRow>("/v1/reseller/plans",{method:"POST",body:JSON.stringify(payload)}),
-  updatePlan:(planId:number,payload:Partial<ResellerOwnedPlanPayload>)=>request<ResellerRow>(`/v1/reseller/plans/${planId}`,{method:"PATCH",body:JSON.stringify(payload)}),
-  deletePlan:(planId:number)=>request<ResellerRow>(`/v1/reseller/plans/${planId}`,{method:"DELETE"}),
+  plans:()=>request<ResellerRow[]>("/v1/reseller/owned-plans"),
+  createPlan:(payload:ResellerOwnedPlanPayload)=>request<ResellerRow>("/v1/reseller/owned-plans",{method:"POST",body:JSON.stringify(payload)}),
+  updatePlan:(planId:number,payload:Partial<ResellerOwnedPlanPayload>)=>request<ResellerRow>(`/v1/reseller/owned-plans/${planId}`,{method:"PATCH",body:JSON.stringify(payload)}),
+  disablePlan:(planId:number)=>request<ResellerRow>(`/v1/reseller/owned-plans/${planId}`,{method:"PATCH",body:JSON.stringify({is_active:false})}),
+  enablePlan:(planId:number)=>request<ResellerRow>(`/v1/reseller/owned-plans/${planId}`,{method:"PATCH",body:JSON.stringify({is_active:true})}),
+  deletePlan:(planId:number)=>request<ResellerRow>(`/v1/reseller/owned-plans/${planId}`,{method:"DELETE"}),
   setPlanPrice:(planId:number,sellPrice:number)=>request<ResellerRow>(`/v1/reseller/plans/${planId}/price`,{method:"PUT",body:JSON.stringify({plan_id:planId,sell_price_toman:sellPrice})}),
 
   serverOptions:()=>request<ResellerRow>("/v1/reseller/server-options"),
