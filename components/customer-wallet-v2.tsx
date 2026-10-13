@@ -175,5 +175,5 @@ function CustomerWalletV2Body(){
 }
 
 export function CustomerWalletV2(){
-  return <PortalShell role="customer"><CustomerWalletV2Body/></PortalShell>;
+  return <PortalShell type="customer" active="/panel/wallet"><CustomerWalletV2Body/></PortalShell>;
 }
