@@ -8,6 +8,8 @@ on:
     paths:
       - "backend/**"
       - "installer/**"
+      - "scripts/deploy-cly871416-preview.sh"
+      - "scripts/smoke-cly871416-runtime.sh"
       - "deploy/systemd/twinpanel-api.service.tpl"
       - "deploy/nginx/twinpanel.conf.tpl"
       - ".github/workflows/api-build.yml"
@@ -58,8 +60,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate installer shell
-        run: bash -n installer/install.sh
+      - name: Validate installer and deployment shell
+        run: |
+          bash -n installer/install.sh
+          bash -n scripts/deploy-cly871416-preview.sh
+          bash -n scripts/smoke-cly871416-runtime.sh
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -135,6 +140,18 @@ jobs:
           grep -q '"/v1/tunnels/{tunnel_id}/mtunnel/install"' /tmp/openapi.json
           grep -q '"/v1/tunnels/{tunnel_id}/backhaul/install"' /tmp/openapi.json
           grep -q '"/v1/tunnels/{tunnel_id}/ssh/install"' /tmp/openapi.json
+          grep -q '"/v1/payments/methods"' /tmp/openapi.json
+          grep -q '"/v1/payments/intents"' /tmp/openapi.json
+          grep -q '"/v1/payments/intents/{intent_id}/receipt-upload"' /tmp/openapi.json
+          grep -q '"/v1/payments/admin/crypto-discount"' /tmp/openapi.json
+          grep -q '"/v1/wallet/methods"' /tmp/openapi.json
+          grep -q '"/v1/wallet/topups"' /tmp/openapi.json
+          grep -q '"/v1/wallet/topups/{topup_id}/submit"' /tmp/openapi.json
+          grep -q '"/v1/admin/wallet/wallets"' /tmp/openapi.json
+          grep -q '"/v1/admin/wallet/topups"' /tmp/openapi.json
+          grep -q '"/v1/admin/wallet/topups/{topup_id}/approve"' /tmp/openapi.json
+          grep -q '"/v1/admin/telegram-bot"' /tmp/openapi.json
+          grep -q '"/v1/admin/telegram-bot/test"' /tmp/openapi.json
 
       - name: Run managed tunnel orchestration smoke
         working-directory: backend
