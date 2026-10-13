@@ -20,17 +20,19 @@ export function ResellerDashboardV3(){
   const [me,setMe]=useState<ResellerRow>({});
   const [dash,setDash]=useState<ResellerRow>({});
   const [subs,setSubs]=useState<ResellerRow[]>([]);
+  const [plans,setPlans]=useState<ResellerRow[]>([]);
   const [tx,setTx]=useState<ResellerRow[]>([]);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
 
   const load=async()=>{
     setLoading(true);setError("");
-    const result=await Promise.allSettled([resellerApi.me(),resellerApi.dashboard(),resellerApi.subscriptions(),resellerApi.trafficTransactions()]);
+    const result=await Promise.allSettled([resellerApi.me(),resellerApi.dashboard(),resellerApi.subscriptions(),resellerApi.plans(),resellerApi.trafficTransactions()]);
     if(result[0].status==="fulfilled")setMe(result[0].value);
     if(result[1].status==="fulfilled")setDash(result[1].value);
     if(result[2].status==="fulfilled")setSubs(result[2].value);
-    if(result[3].status==="fulfilled")setTx(result[3].value);
+    if(result[3].status==="fulfilled")setPlans(result[3].value);
+    if(result[4].status==="fulfilled")setTx(result[4].value);
     const failed=result.find(item=>item.status==="rejected");
     if(failed&&failed.status==="rejected")setError(failed.reason instanceof Error?failed.reason.message:String(failed.reason));
     setLoading(false);
@@ -38,27 +40,29 @@ export function ResellerDashboardV3(){
 
   useEffect(()=>{void load();},[]);
 
-  const remaining=num(dash,"traffic_balance_bytes");
+  const remaining=num(dash,"traffic_balance_bytes")+num(dash,"traffic_credit_bytes");
   const active=num(dash,"active_subscriptions");
-  const customers=num(dash,"customers");
+  const activePlans=plans.filter(row=>Boolean(row.is_active)).length;
   const purchaseCredit=num(me,"wallet_balance");
 
   return <PortalShell type="reseller" active="/reseller"><div className="page reseller-parity-page reseller-dashboard-v2">
     <div className="page-head"><div><h1>{pick("داشبورد نمایندگی","Reseller Dashboard")}</h1><small>{str(me,"brand_name","name")||str(me,"code")}</small></div><button className="ghost" onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button></div>
     {error&&<div className="runtime-error">{error}</div>}{loading&&<div className="runtime-loading">{pick("در حال دریافت اطلاعات...","Loading...")}</div>}
 
+    {remaining<=0&&<div className="runtime-error">{pick("حجم نمایندگی تمام شده است؛ همه اشتراک‌های این نمایندگی تا شارژ مجدد حجم متوقف می‌شوند. ساخت اکانت محدود نمی‌شود.","The reseller traffic pool is exhausted; all reseller subscriptions remain suspended until traffic is recharged. Account creation stays unlimited.")}</div>}
+
     <div className="stats">
-      <Stat label={pick("حجم باقی‌مانده نمایندگی","Remaining reseller traffic")} value={gbBytes(remaining)}/>
+      <Stat label={pick("حجم قابل استفاده نمایندگی","Available reseller traffic")} value={gbBytes(remaining)}/>
       <Stat label={pick("اعتبار خرید حجم","Traffic purchase credit")} value={money(purchaseCredit)}/>
       <Stat label={pick("اشتراک فعال","Active subscriptions")} value={String(active)}/>
-      <Stat label={pick("مشتریان","Customers")} value={String(customers)}/>
+      <Stat label={pick("پلن فعال ربات","Active bot plans")} value={String(activePlans)}/>
     </div>
 
     <div className="module-grid two">
-      <Card><div className="card-head"><div><b>{pick("اشتراک‌های اخیر","Recent subscriptions")}</b><small>{pick("پلن اشتراک مشتری از موجودی حجم نمایندگی جدا مدیریت می‌شود.","Customer subscription plans are managed separately from reseller traffic recharge.")}</small></div><Link className="mini-btn" href="/reseller/subscriptions">{pick("همه","All")}</Link></div>{subs.slice(0,6).map((row,index)=><div className="module-row" key={str(row,"id")||index}><div className="grow"><b>{str(row,"customer_name")||`#${str(row,"customer_user_id")}`} · {str(row,"plan_name")||`#${str(row,"plan_id")}`}</b><small>{str(row,"account_username")||"—"} · {dateText(row.expires_at)}</small></div><Badge tone={tone(str(row,"status"))}>{str(row,"status")||"—"}</Badge></div>)}{!subs.length&&!loading&&<div className="runtime-empty">{pick("اشتراکی ثبت نشده است.","No subscriptions yet.")}</div>}</Card>
-      <Card><div className="card-head"><div><b>{pick("آخرین تراکنش‌های حجم","Recent traffic activity")}</b><small>{pick("خرید پلن شارژ حجم، موجودی حجمی نمایندگی را افزایش می‌دهد.","Buying a traffic recharge package increases the reseller traffic pool.")}</small></div><Link className="mini-btn" href="/reseller/traffic">{pick("خرید حجم","Recharge")}</Link></div>{tx.slice(0,6).map((row,index)=><div className="module-row" key={str(row,"id")||index}><div className="grow"><b className={num(row,"traffic_gb")>=0?"positive":"negative"}>{num(row,"traffic_gb")>=0?"+":""}{num(row,"traffic_gb").toLocaleString("fa-IR",{maximumFractionDigits:2})} GB</b><small>{str(row,"description","type")||"—"} · {dateText(row.created_at)}</small></div><span>{num(row,"balance_after_gb").toLocaleString("fa-IR",{maximumFractionDigits:2})} GB</span></div>)}{!tx.length&&!loading&&<div className="runtime-empty">{pick("تراکنش حجمی ثبت نشده است.","No traffic transactions yet.")}</div>}</Card>
+      <Card><div className="card-head"><div><b>{pick("اشتراک‌های اخیر","Recent subscriptions")}</b><small>{pick("تعداد ساخت نامحدود است؛ فقط مصرف واقعی از حجم مشترک نمایندگی کم می‌شود.","Account creation is unlimited; only real usage drains the shared reseller pool.")}</small></div><Link className="mini-btn" href="/reseller/subscriptions">{pick("ساخت اشتراک","Create")}</Link></div>{subs.slice(0,6).map((row,index)=><div className="module-row" key={str(row,"id")||index}><div className="grow"><b>{str(row,"account_username")||`#${str(row,"id")}`} · {str(row,"plan_name")||`#${str(row,"plan_id")}`}</b><small>{dateText(row.expires_at)}</small></div><Badge tone={tone(str(row,"status"))}>{str(row,"status")||"—"}</Badge></div>)}{!subs.length&&!loading&&<div className="runtime-empty">{pick("اشتراکی ثبت نشده است.","No subscriptions yet.")}</div>}</Card>
+      <Card><div className="card-head"><div><b>{pick("آخرین تراکنش‌های حجم","Recent traffic activity")}</b><small>{pick("مصرف واقعی کاربران Pool را کم می‌کند؛ شارژ حجم سرویس‌های متوقف‌شده را دوباره فعال می‌کند.","Real usage drains the pool; recharging restores subscriptions suspended by pool exhaustion.")}</small></div><Link className="mini-btn" href="/reseller/traffic">{pick("خرید حجم","Recharge")}</Link></div>{tx.slice(0,6).map((row,index)=><div className="module-row" key={str(row,"id")||index}><div className="grow"><b className={num(row,"traffic_gb")>=0?"positive":"negative"}>{num(row,"traffic_gb")>=0?"+":""}{num(row,"traffic_gb").toLocaleString("fa-IR",{maximumFractionDigits:2})} GB</b><small>{str(row,"description","type")||"—"} · {dateText(row.created_at)}</small></div><span>{num(row,"balance_after_gb").toLocaleString("fa-IR",{maximumFractionDigits:2})} GB</span></div>)}{!tx.length&&!loading&&<div className="runtime-empty">{pick("تراکنش حجمی ثبت نشده است.","No traffic transactions yet.")}</div>}</Card>
     </div>
 
-    <Card><div className="card-head"><b>{pick("دسترسی سریع","Quick access")}</b></div><div className="reseller-quick-grid"><Link href="/reseller/customers">{pick("مشتریان","Customers")}</Link><Link href="/reseller/subscriptions">{pick("اشتراک‌ها","Subscriptions")}</Link><Link href="/reseller/sales">{pick("پلن‌های اشتراک و قیمت ربات","Subscription plans & bot prices")}</Link><Link href="/reseller/traffic">{pick("خرید و شارژ حجم","Traffic recharge")}</Link><Link href="/reseller/bot">{pick("ربات فروش","Sales bot")}</Link><Link href="/reseller/orders">{pick("سفارش‌های ربات","Bot orders")}</Link></div></Card>
+    <Card><div className="card-head"><b>{pick("دسترسی سریع","Quick access")}</b></div><div className="reseller-quick-grid"><Link href="/reseller/subscriptions">{pick("ساخت اشتراک","Create subscription")}</Link><Link href="/reseller/sales">{pick("پلن‌های ربات","Bot plans")}</Link><Link href="/reseller/wallet">{pick("کیف پول و شارژ","Wallet & top-up")}</Link><Link href="/reseller/traffic">{pick("خرید و شارژ حجم","Traffic recharge")}</Link><Link href="/reseller/bot">{pick("ربات نمایندگی","Reseller bot")}</Link><Link href="/reseller/orders">{pick("سفارش‌های ربات","Bot orders")}</Link></div></Card>
   </div></PortalShell>;
 }
