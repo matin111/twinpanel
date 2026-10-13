@@ -2,7 +2,7 @@
 
 .reseller-subscriptions-parity .reseller-sub-table table{
   width:100%;
-  min-width:900px;
+  min-width:1100px;
   table-layout:fixed;
 }
 
@@ -28,7 +28,7 @@
 .reseller-subscriptions-parity .reseller-sub-table td:nth-child(7){width:82px}
 .reseller-subscriptions-parity .reseller-sub-table th:last-child,
 .reseller-subscriptions-parity .reseller-sub-table td:last-child{
-  width:205px;
+  width:300px;
 }
 
 .reseller-subscriptions-parity .reseller-sub-table td:nth-child(2) b,
@@ -52,13 +52,16 @@
 
 .reseller-subscriptions-parity .reseller-sub-table .row-actions{
   display:flex;
-  flex-wrap:wrap;
+  flex-wrap:nowrap;
+  align-items:center;
   gap:6px;
-  min-width:0;
-  max-width:205px;
+  min-width:max-content;
+  max-width:none;
+  white-space:nowrap;
 }
 
 .reseller-subscriptions-parity .reseller-sub-table .row-actions .mini-btn{
+  flex:0 0 auto;
   min-height:31px;
   padding:5px 8px;
   white-space:nowrap;
@@ -177,7 +180,7 @@
 }
 
 @media(max-width:780px){
-  .reseller-subscriptions-parity .reseller-sub-table table{min-width:820px}
+  .reseller-subscriptions-parity .reseller-sub-table table{min-width:1040px}
   .reseller-connection-modal .reseller-connection-card{width:calc(100vw - 18px)}
   .reseller-connection-modal .reseller-public-delivery img{
     width:210px;
