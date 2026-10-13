@@ -10,7 +10,9 @@ on:
       - "installer/**"
       - "scripts/deploy-cly871416-preview.sh"
       - "scripts/smoke-cly871416-runtime.sh"
+      - "scripts/install-reseller-bot-supervisor.sh"
       - "deploy/systemd/twinpanel-api.service.tpl"
+      - "deploy/systemd/twinpanel-reseller-bots.service.tpl"
       - "deploy/nginx/twinpanel.conf.tpl"
       - ".github/workflows/api-build.yml"
 
@@ -65,6 +67,7 @@ jobs:
           bash -n installer/install.sh
           bash -n scripts/deploy-cly871416-preview.sh
           bash -n scripts/smoke-cly871416-runtime.sh
+          bash -n scripts/install-reseller-bot-supervisor.sh
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -88,6 +91,24 @@ jobs:
       - name: Run reseller receipt review smoke
         working-directory: backend
         run: python scripts/reseller_receipt_review_smoke.py
+
+      - name: Verify reseller bot runtime import
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from app.reseller_bot_runtime import build_router, supervisor
+          from app.reseller_bot_review import register_reseller_review_handlers
+
+          assert callable(build_router)
+          assert callable(supervisor)
+          assert callable(register_reseller_review_handlers)
+          print("RESELLER_BOT_RUNTIME_IMPORT_OK")
+          PY
+
+      - name: Validate reseller bot systemd template
+        run: |
+          grep -q 'ExecStart=/opt/twinpanel/venv/bin/python -m app.reseller_bot_runtime' deploy/systemd/twinpanel-reseller-bots.service.tpl
+          grep -q 'Restart=always' deploy/systemd/twinpanel-reseller-bots.service.tpl
 
       - name: Import application and create schema
         working-directory: backend
