@@ -21,6 +21,13 @@ type PaymentSettings={
   usdt_rate_toman:number;
   sms_reader_enabled:boolean;sms_auto_verify:boolean;sms_allowed_senders:string;
   unique_amount_max_extra:number;
+  auto_rate_enabled:boolean;crypto_auto_verify:boolean;
+  live_rate_toman?:number;live_rate_provider?:string|null;live_rate_updated_at?:string|null;live_rate_error?:string|null;
+};
+
+type LiveRate={
+  ok:boolean;auto_rate_enabled:boolean;crypto_auto_verify:boolean;
+  rate_toman:number;provider?:string|null;updated_at?:string|null;error?:string|null;
 };
 
 const defaultSettings:PaymentSettings={
@@ -28,7 +35,7 @@ const defaultSettings:PaymentSettings={
   usdt_trc20_enabled:false,usdt_trc20_address:"",
   usdt_bep20_enabled:false,usdt_bep20_address:"",
   usdt_rate_toman:0,sms_reader_enabled:false,sms_auto_verify:false,sms_allowed_senders:"",
-  unique_amount_max_extra:999
+  unique_amount_max_extra:999,auto_rate_enabled:true,crypto_auto_verify:true
 };
 
 const statusLabel:Record<string,string>={
@@ -66,6 +73,7 @@ export function AdminPaymentsRuntime(){
   const [tab,setTab]=useState<"transactions"|"gateways">("transactions");
   const [rows,setRows]=useState<Intent[]>([]);
   const [settings,setSettings]=useState<PaymentSettings>(defaultSettings);
+  const [liveRate,setLiveRate]=useState<LiveRate|null>(null);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
@@ -75,19 +83,32 @@ export function AdminPaymentsRuntime(){
   const [rejecting,setRejecting]=useState<Intent|null>(null);
   const [rejectReason,setRejectReason]=useState("");
 
+  const refreshLiveRate=async()=>{
+    try{
+      const rate=await paymentRequest<LiveRate>("/v1/payments/admin/live-rate");
+      setLiveRate(rate);
+    }catch{/* keep last known live rate */}
+  };
+
   const load=async()=>{
     setLoading(true);setError("");
     try{
-      const [paymentRows,paymentSettings]=await Promise.all([
+      const [paymentRows,paymentSettings,rate]=await Promise.all([
         paymentRequest<Intent[]>(routes.payments.adminIntents),
-        paymentRequest<Partial<PaymentSettings>>(routes.payments.adminSettings)
+        paymentRequest<Partial<PaymentSettings>>(routes.payments.adminSettings),
+        paymentRequest<LiveRate>("/v1/payments/admin/live-rate")
       ]);
       setRows(Array.isArray(paymentRows)?paymentRows:[]);
       setSettings({...defaultSettings,...paymentSettings});
+      setLiveRate(rate);
     }catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setLoading(false);}
   };
   useEffect(()=>{void load();},[]);
+  useEffect(()=>{
+    const timer=window.setInterval(()=>{void refreshLiveRate();},10000);
+    return()=>window.clearInterval(timer);
+  },[]);
 
   const summary=useMemo(()=>({
     total:rows.length,
@@ -119,6 +140,8 @@ export function AdminPaymentsRuntime(){
 
   const saveSettings=(event:FormEvent)=>{event.preventDefault();void run(pick("تنظیمات درگاه‌ها ذخیره شد.","Gateway settings saved."),()=>paymentRequest(routes.payments.adminSettings,{method:"PUT",body:JSON.stringify(settings)}));};
 
+  const forceRateRefresh=()=>void run(pick("نرخ USDT بروزرسانی شد.","USDT rate refreshed."),()=>paymentRequest("/v1/payments/admin/live-rate/refresh",{method:"POST"}));
+
   const openReceipt=async(row:Intent)=>{
     try{
       const token=getCustomerToken();if(!token)throw new Error("AUTH_REQUIRED");
@@ -130,6 +153,7 @@ export function AdminPaymentsRuntime(){
   };
 
   const activeGateways=[settings.card_enabled,settings.usdt_trc20_enabled,settings.usdt_bep20_enabled].filter(Boolean).length;
+  const displayedRate=Number(liveRate?.rate_toman||settings.live_rate_toman||settings.usdt_rate_toman||0);
 
   return <Shell active="/admin/payments"><div className="page adminPayments2027">
     <div className="payPageHead"><div><span>{pick("مالی و فروش","Sales & Finance")}</span><h1>{pick("پرداخت‌ها و درگاه‌ها","Payments & Gateways")}</h1></div><button className="ghost" onClick={()=>void load()} disabled={loading||busy}>{pick("بروزرسانی","Refresh")}</button></div>
@@ -163,7 +187,16 @@ export function AdminPaymentsRuntime(){
 
         <Card className={`gatewayCard ${settings.usdt_bep20_enabled?"enabled":""}`}><div className="gatewayHead"><div className="gatewayIcon">₮</div><div><b>USDT · BEP20</b><small>BNB Smart Chain</small></div><Badge tone={settings.usdt_bep20_enabled?"ok":"bad"}>{settings.usdt_bep20_enabled?pick("فعال","Active"):pick("غیرفعال","Inactive")}</Badge></div><Toggle label={pick("فعال بودن BEP20","Enable BEP20")} checked={settings.usdt_bep20_enabled} onChange={v=>setSettings(s=>({...s,usdt_bep20_enabled:v}))}/><label className="payField"><span>{pick("آدرس کیف پول","Wallet address")}</span><textarea dir="ltr" rows={3} value={settings.usdt_bep20_address||""} onChange={e=>setSettings(s=>({...s,usdt_bep20_address:e.target.value}))}/></label></Card>
 
-        <Card className="gatewayCard gatewayAutomation"><div className="gatewayHead"><div className="gatewayIcon">⌁</div><div><b>{pick("نرخ و تأیید خودکار","Rate & Auto verification")}</b><small>{pick("SMS Reader و نرخ تبدیل USDT","SMS Reader and USDT exchange rate")}</small></div></div><label className="payField"><span>{pick("نرخ هر USDT","USDT rate")}</span><div className="inputSuffix"><input type="number" min={0} value={settings.usdt_rate_toman||0} onChange={e=>setSettings(s=>({...s,usdt_rate_toman:Number(e.target.value)}))}/><em>{pick("تومان","Toman")}</em></div></label><Toggle label="SMS Reader" sub={pick("خواندن پیامک‌های بانکی","Read bank SMS messages")} checked={settings.sms_reader_enabled} onChange={v=>setSettings(s=>({...s,sms_reader_enabled:v}))}/><Toggle label={pick("تأیید خودکار پرداخت","Automatic payment verification")} checked={settings.sms_auto_verify} onChange={v=>setSettings(s=>({...s,sms_auto_verify:v}))}/><label className="payField"><span>{pick("فرستنده‌های مجاز پیامک","Allowed SMS senders")}</span><textarea rows={3} value={settings.sms_allowed_senders||""} onChange={e=>setSettings(s=>({...s,sms_allowed_senders:e.target.value}))} placeholder={pick("هر فرستنده در یک خط","One sender per line")}/></label></Card>
+        <Card className="gatewayCard gatewayAutomation"><div className="gatewayHead"><div className="gatewayIcon">⌁</div><div><b>{pick("نرخ و تأیید خودکار","Rate & Auto verification")}</b><small>{pick("SMS Reader، بلاکچین و نرخ زنده USDT","SMS Reader, blockchain and live USDT rate")}</small></div><Badge tone={settings.auto_rate_enabled?"ok":"warn"}>{settings.auto_rate_enabled?pick("خودکار","Auto"):pick("دستی","Manual")}</Badge></div>
+          <label className="payField"><span>{pick("نرخ لحظه‌ای هر USDT","Live USDT rate")}</span><div className="inputSuffix"><input type="text" readOnly value={displayedRate?displayedRate.toLocaleString("fa-IR"):"—"}/><em>{pick("تومان","Toman")}</em></div><small>{liveRate?.provider?`${liveRate.provider} · ${date(liveRate.updated_at)}`:pick("در انتظار دریافت نرخ...","Waiting for live rate...")}</small>{liveRate?.error&&<small>{liveRate.error}</small>}</label>
+          <Toggle label={pick("دریافت خودکار نرخ USDT","Automatic USDT rate")} sub={pick("بروزرسانی خودکار هر چند ثانیه","Refresh automatically every few seconds")} checked={settings.auto_rate_enabled} onChange={v=>setSettings(s=>({...s,auto_rate_enabled:v}))}/>
+          {!settings.auto_rate_enabled&&<label className="payField"><span>{pick("نرخ دستی هر USDT","Manual USDT rate")}</span><div className="inputSuffix"><input type="number" min={0} value={settings.usdt_rate_toman||0} onChange={e=>setSettings(s=>({...s,usdt_rate_toman:Number(e.target.value)}))}/><em>{pick("تومان","Toman")}</em></div></label>}
+          <button type="button" className="ghost" disabled={busy} onClick={forceRateRefresh}>{pick("دریافت نرخ همین حالا","Refresh rate now")}</button>
+          <Toggle label="SMS Reader" sub={pick("خواندن پیامک‌های بانکی","Read bank SMS messages")} checked={settings.sms_reader_enabled} onChange={v=>setSettings(s=>({...s,sms_reader_enabled:v}))}/>
+          <Toggle label={pick("تأیید خودکار کارت‌به‌کارت","Automatic card payment verification")} sub={pick("تطبیق مبلغ یکتا با پیامک بانکی","Match unique amount with bank SMS")} checked={settings.sms_auto_verify} onChange={v=>setSettings(s=>({...s,sms_auto_verify:v}))}/>
+          <Toggle label={pick("تأیید خودکار ارز دیجیتال","Automatic crypto verification")} sub={pick("بررسی TXID روی TRON و BNB Smart Chain","Verify TXID on TRON and BNB Smart Chain")} checked={settings.crypto_auto_verify} onChange={v=>setSettings(s=>({...s,crypto_auto_verify:v}))}/>
+          <label className="payField"><span>{pick("فرستنده‌های مجاز پیامک","Allowed SMS senders")}</span><textarea rows={3} value={settings.sms_allowed_senders||""} onChange={e=>setSettings(s=>({...s,sms_allowed_senders:e.target.value}))} placeholder={pick("هر فرستنده در یک خط یا با کاما","One sender per line or comma-separated")}/></label>
+        </Card>
       </div>
       <div className="gatewaySaveBar"><div><b>{pick("تنظیمات درگاه‌ها","Gateway settings")}</b><small>{pick("تغییرات پس از ذخیره برای کاربران فعال می‌شود.","Changes become available after saving.")}</small></div><button className="primary" disabled={busy}>{busy?"…":pick("ذخیره تنظیمات","Save settings")}</button></div>
     </form>}
