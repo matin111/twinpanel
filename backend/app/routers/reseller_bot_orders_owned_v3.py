@@ -27,6 +27,14 @@ router = APIRouter(
 )
 
 
+def _failed_status(row) -> str:
+    # Wallet orders are already paid internally and must never be sent back to
+    # manual receipt review just because provisioning needs a retry.
+    if row.subscription_id or str(row.payment_note or "") == "wallet":
+        return "provision_failed"
+    return "awaiting_review"
+
+
 async def approve_order_owned_v3(
     order_id: int,
     reseller: Reseller = Depends(require_reseller),
@@ -45,6 +53,9 @@ async def approve_order_owned_v3(
     # Renewals already have a usage-only V2 path. Keep it as the canonical
     # renewal implementation so changing an account quota never reserves pool.
     if _renewal_subscription_id(row.payment_note) is not None:
+        if row.status == "paid":
+            row.status = "awaiting_review"
+            db.commit()
         return await approve_order_volume_v2(
             order_id=order_id,
             reseller=reseller,
@@ -60,6 +71,9 @@ async def approve_order_owned_v3(
 
     # Historical orders created before reseller-owned plans stay compatible.
     if not mapping:
+        if row.status == "paid":
+            row.status = "awaiting_review"
+            db.commit()
         return await legacy.approve_order(
             order_id=order_id,
             reseller=reseller,
@@ -69,7 +83,7 @@ async def approve_order_owned_v3(
     if row.status == "fulfilled":
         return legacy.order_out(db, row)
 
-    if row.status not in {"awaiting_review", "provision_failed"}:
+    if row.status not in {"awaiting_review", "provision_failed", "paid"}:
         raise HTTPException(
             status_code=409,
             detail="این سفارش آماده تأیید نیست",
@@ -213,11 +227,7 @@ async def approve_order_owned_v3(
             lock=True,
         )
         if failed:
-            failed.status = (
-                "provision_failed"
-                if failed.subscription_id
-                else "awaiting_review"
-            )
+            failed.status = _failed_status(failed)
             db.commit()
         raise
 
@@ -230,11 +240,7 @@ async def approve_order_owned_v3(
             lock=True,
         )
         if failed:
-            failed.status = (
-                "provision_failed"
-                if failed.subscription_id
-                else "awaiting_review"
-            )
+            failed.status = _failed_status(failed)
             failed.error_text = str(exc)[:2000]
             db.commit()
 
