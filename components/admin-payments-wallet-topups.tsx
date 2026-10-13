@@ -23,6 +23,7 @@ type WalletTopup={
   sender_card_last4?:string|null;
   transfer_date?:string|null;
   transfer_time?:string|null;
+  receipt_uploaded?:boolean;
   review_note?:string|null;
   created_at?:string|null;
   submitted_at?:string|null;
@@ -124,8 +125,32 @@ export function AdminPaymentsWalletTopups(){
     finally{setBusy(false);}
   };
 
+  const openReceipt=async(row:WalletTopup)=>{
+    if(busy)return;
+    const token=getCustomerToken();
+    if(!token){setError("AUTH_REQUIRED");return;}
+    setBusy(true);setError("");
+    try{
+      const response=await fetch(`${API_BASE}/v1/admin/wallet/topups/${row.id}/receipt`,{
+        headers:{Authorization:`Bearer ${token}`},
+        cache:"no-store",
+      });
+      if(!response.ok){
+        let detail=pick("رسید قابل دریافت نیست.","Receipt is unavailable.");
+        try{const payload=await response.json();if(payload&&typeof payload.detail==="string")detail=payload.detail;}catch{}
+        throw new Error(detail);
+      }
+      const blob=await response.blob();
+      const url=URL.createObjectURL(blob);
+      const opened=window.open(url,"_blank","noopener,noreferrer");
+      if(!opened)throw new Error(pick("مرورگر اجازه باز کردن رسید را نداد.","The browser blocked the receipt window."));
+      window.setTimeout(()=>URL.revokeObjectURL(url),60_000);
+    }catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{setBusy(false);}
+  };
+
   const approve=(row:WalletTopup)=>void run(
-    pick("شارژ کیف پول تأیید شد و موجودی کاربر افزایش یافت.","Wallet top-up approved and credited."),
+    pick("شارژ کیف پول تأیید شد و موجودی افزایش یافت.","Wallet top-up approved and credited."),
     ()=>request(`/v1/admin/wallet/topups/${row.id}/approve`,{method:"POST"})
   );
 
@@ -184,6 +209,7 @@ export function AdminPaymentsWalletTopups(){
               <div style={{display:"grid",gap:6,justifyItems:"end"}}>
                 <Badge tone="violet">{pick("شارژ کیف پول","Wallet top-up")}</Badge>
                 <Badge tone={row.status==="approved"?"ok":row.status==="rejected"?"bad":"warn"}>{statusFa[row.status]||row.status}</Badge>
+                {row.receipt_uploaded&&<Badge tone="ok">{pick("رسید دارد","Receipt attached")}</Badge>}
               </div>
             </div>
 
@@ -198,9 +224,10 @@ export function AdminPaymentsWalletTopups(){
               {row.review_note&&<span className="wide">{pick("یادداشت","Note")}: <b>{row.review_note}</b></span>}
             </div>
 
-            {reviewing&&<div className="payIntentActions">
-              <button type="button" className="primary" disabled={busy} onClick={()=>approve(row)}>{pick("تأیید و شارژ کیف پول","Approve & credit wallet")}</button>
-              <button type="button" className="danger" disabled={busy} onClick={()=>{setRejecting(row);setReason("");}}>{pick("رد","Reject")}</button>
+            {(reviewing||row.receipt_uploaded)&&<div className="payIntentActions">
+              {row.receipt_uploaded&&<button type="button" className="ghost" disabled={busy} onClick={()=>void openReceipt(row)}>{pick("مشاهده رسید","View receipt")}</button>}
+              {reviewing&&<button type="button" className="primary" disabled={busy} onClick={()=>approve(row)}>{pick("تأیید و شارژ کیف پول","Approve & credit wallet")}</button>}
+              {reviewing&&<button type="button" className="danger" disabled={busy} onClick={()=>{setRejecting(row);setReason("");}}>{pick("رد","Reject")}</button>}
             </div>}
           </Card>;
         })}</div>}
