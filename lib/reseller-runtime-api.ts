@@ -5,6 +5,21 @@ import {getCustomerToken} from "./customer-api";
 
 export type ResellerRow=Record<string,unknown>;
 
+export type ResellerOwnedPlanPayload={
+  title:string;
+  traffic_gb:number;
+  duration_days:number;
+  device_limit:number;
+  sell_price_toman:number;
+  enable_cisco:boolean;
+  enable_openvpn:boolean;
+  enable_wireguard:boolean;
+  enable_l2tp:boolean;
+  enable_v2ray:boolean;
+  sort_order:number;
+  is_active:boolean;
+};
+
 export type ResellerPaymentMethodPayload={
   method_type:string;
   title?:string|null;
@@ -73,10 +88,15 @@ async function requestBlob(path:string):Promise<Blob>{
 export const resellerApi={
   me:()=>request<ResellerRow>("/v1/reseller/me"),
   dashboard:()=>request<ResellerRow>("/v1/reseller/dashboard"),
+
+  // Legacy internal-customer endpoints stay available for bot compatibility.
+  // The reseller-facing UI no longer exposes customer management.
   customers:()=>request<ResellerRow[]>("/v1/reseller/customers"),
   createCustomer:(payload:{full_name:string;email?:string|null;phone?:string|null;password:string})=>request<ResellerRow>("/v1/reseller/customers",{method:"POST",body:JSON.stringify(payload)}),
   attachCustomer:(userId:number)=>request<ResellerRow>("/v1/reseller/customers/attach",{method:"POST",body:JSON.stringify({user_id:userId})}),
+
   subscriptions:()=>request<ResellerRow[]>("/v1/reseller/subscriptions"),
+  createSubscription:(payload:{plan_id:number;node_ids:number[];idempotency_key:string;username?:string|null;password?:string|null})=>request<ResellerRow>("/v1/reseller/subscriptions/create",{method:"POST",body:JSON.stringify(payload)}),
   sellSubscription:(payload:{user_id?:number|null;plan_id?:number|null;traffic_gb:number;duration_days:number;node_ids:number[];protocols:string[];sell_price_toman:number;idempotency_key:string;username?:string|null;password?:string|null})=>request<ResellerRow>("/v1/reseller/subscriptions/sell",{method:"POST",body:JSON.stringify(payload)}),
   editSubscription:(id:number,payload:ResellerRow)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/edit`,{method:"PATCH",body:JSON.stringify(payload)}),
   extendSubscription:(id:number,payload:{add_traffic_gb:number;add_days:number;charge_toman:number;idempotency_key:string;reset_usage?:boolean})=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/extend`,{method:"POST",body:JSON.stringify(payload)}),
@@ -84,8 +104,13 @@ export const resellerApi={
   deleteSubscription:(id:number)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}`,{method:"DELETE"}),
   connectionInfo:(id:number)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/connection-info`),
   provisionSubscription:(id:number)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/provision-account`,{method:"POST"}),
+
   plans:()=>request<ResellerRow[]>("/v1/reseller/plans"),
+  createPlan:(payload:ResellerOwnedPlanPayload)=>request<ResellerRow>("/v1/reseller/plans",{method:"POST",body:JSON.stringify(payload)}),
+  updatePlan:(planId:number,payload:Partial<ResellerOwnedPlanPayload>)=>request<ResellerRow>(`/v1/reseller/plans/${planId}`,{method:"PATCH",body:JSON.stringify(payload)}),
+  deletePlan:(planId:number)=>request<ResellerRow>(`/v1/reseller/plans/${planId}`,{method:"DELETE"}),
   setPlanPrice:(planId:number,sellPrice:number)=>request<ResellerRow>(`/v1/reseller/plans/${planId}/price`,{method:"PUT",body:JSON.stringify({plan_id:planId,sell_price_toman:sellPrice})}),
+
   serverOptions:()=>request<ResellerRow>("/v1/reseller/server-options"),
   traffic:()=>request<ResellerRow>("/v1/reseller/traffic"),
   trafficPackages:()=>request<ResellerRow[]>("/v1/reseller/traffic/packages"),
