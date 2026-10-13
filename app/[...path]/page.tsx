@@ -31,25 +31,27 @@ import {AdminCollectionRuntime} from "../../components/admin-collections-runtime
 import {AdminPaymentsRuntime} from "../../components/admin-payments-runtime";
 import {AdminPaymentMarketRates} from "../../components/admin-payment-market-rates";
 import {AdminCryptoDiscountControl} from "../../components/admin-crypto-discount-control";
-import {AdminWalletV2} from "../../components/admin-wallet-v2";
 import {AdminSmsRelayDownload} from "../../components/admin-sms-relay-download";
+import {AdminUsersWalletInline} from "../../components/admin-users-wallet-inline";
+import {AdminPaymentsWalletTopups} from "../../components/admin-payments-wallet-topups";
 
 const customerSections=new Set(["orders","notifications","profile"]);
 const resellerSections=new Set(["customers","subscriptions","sales","wallet","orders","traffic","bot","notifications","settings"]);
 const admin=(node:React.ReactNode)=><AdminAuthGuard>{node}</AdminAuthGuard>;
+const usersWithWallet=()=>admin(<><LegacyUsersRuntimePage/><AdminUsersWalletInline/></>);
 
 const route=(key:string)=>{
   if(key==="login") return <LoginPage2027/>;
   if(key==="register") return <RegisterPage2027/>;
   if(key==="admin") return admin(<AdminDashboardRuntime/>);
-  if(key==="admin/users") return admin(<LegacyUsersRuntimePage/>);
+  if(key==="admin/users") return usersWithWallet();
   if(key==="admin/subscriptions") return admin(<LegacySubscriptionsRuntimePage/>);
   if(key==="admin/subscription-tools") return admin(<SubscriptionToolsRuntimePage/>);
   if(key==="admin/plans") return admin(<LegacyPlansRuntimePage/>);
   if(key==="admin/nodes") return admin(<LegacyNodesRuntimePage/>);
   if(key==="admin/tunnels") return admin(<LegacyTunnelsExactPage/>);
   if(key==="admin/tunnel-transports") return admin(<TunnelTransportRuntimePage/>);
-  if(key==="admin/payments") return admin(<><AdminPaymentsRuntime/><AdminPaymentMarketRates/><AdminCryptoDiscountControl/></>);
+  if(key==="admin/payments") return admin(<><AdminPaymentsRuntime/><AdminPaymentsWalletTopups/><AdminPaymentMarketRates/><AdminCryptoDiscountControl/></>);
   if(key==="admin/settings") return admin(<SettingsPage2027/>);
   if(key==="admin/system-health") return admin(<SystemHealthRuntimePage/>);
   if(key==="admin/notifications") return admin(<NotificationsRuntimePage/>);
@@ -59,7 +61,7 @@ const route=(key:string)=>{
   if(key==="admin/sms-reader") return admin(<><SmsReaderRuntimePage/><AdminSmsRelayDownload/></>);
   if(key==="admin/backups") return admin(<BackupsFullRuntimePage/>);
   if(key==="admin/store-settings") return admin(<StoreSettingsRuntimePage/>);
-  if(key==="admin/wallet") return admin(<AdminWalletV2/>);
+  if(key==="admin/wallet") return usersWithWallet();
   if(key==="admin/discounts") return admin(<DiscountsRuntimePage/>);
   if(key==="admin/resellers") return admin(<ResellersRuntimePage/>);
   if(key==="admin/domains") return admin(<DomainsRuntimePage/>);
