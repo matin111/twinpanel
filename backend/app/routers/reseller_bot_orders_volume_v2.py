@@ -10,7 +10,8 @@ from ..deps import require_reseller
 from ..models import Subscription
 from ..models_reseller import Reseller, ResellerSubscription
 from . import reseller_bot_orders as legacy
-from .reseller_subscription_volume_v2 import ExtendIn, extend_subscription_usage_only
+from .reseller_subscription_volume_v2 import ExtendIn
+from .reseller_pool_guard_v3 import extend_subscription_pool_guard
 
 
 router = APIRouter(
@@ -53,6 +54,9 @@ async def approve_order_volume_v2(
     deducts the reseller pool. The reseller pool is charged only by accepted
     real usage events. Internal-wallet orders may enter here as `paid` and can
     retry provisioning without being pushed into manual receipt review.
+
+    The shared-pool guard is always used so a renewal cannot reactivate an
+    account while the reseller traffic pool is exhausted.
     """
 
     row = legacy.owned_order(
@@ -128,7 +132,7 @@ async def approve_order_volume_v2(
     db.commit()
 
     try:
-        renewal_result = extend_subscription_usage_only(
+        renewal_result = extend_subscription_pool_guard(
             subscription_id=renewal_subscription_id,
             payload=ExtendIn(
                 reset_usage=False,
@@ -185,6 +189,10 @@ async def approve_order_volume_v2(
         )
         result["pricing_model"] = "usage_pool"
         result["traffic_reserved_from_reseller"] = False
+        result["pool_exhausted"] = bool(
+            isinstance(renewal_result, dict)
+            and renewal_result.get("pool_exhausted")
+        )
         result["expires_at"] = (
             subscription.expires_at.isoformat()
             if subscription and subscription.expires_at
