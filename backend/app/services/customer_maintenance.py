@@ -9,9 +9,16 @@ from ..payment_models import PaymentIntent
 from ..store_models import StoreOrder
 from ..user_notification_models import UserNotification
 from ..main_receipt_cleanup import cleanup_receipts_once
+from .payment_automation import (
+    activate_existing_sms_auto_verify_once,
+    process_pending_crypto_payments_once,
+    refresh_live_rate_once,
+)
 
 
 PAYMENT_NOTIFICATION_INTERVAL_SECONDS = 5
+LIVE_RATE_INTERVAL_SECONDS = 10
+CRYPTO_VERIFY_INTERVAL_SECONDS = 10
 RECEIPT_CLEANUP_INTERVAL_SECONDS = 6 * 60 * 60
 
 
@@ -135,11 +142,97 @@ def sync_payment_notifications_once() -> dict:
 
 
 async def customer_maintenance_loop() -> None:
-    """Keep customer notifications current and purge expired receipts."""
+    """Customer payment automation and housekeeping loop."""
 
     last_receipt_cleanup = 0.0
+    last_live_rate_refresh = 0.0
+    last_crypto_verify = 0.0
+    sms_bootstrap_done = False
 
     while True:
+        now = time.monotonic()
+
+        if not sms_bootstrap_done:
+            try:
+                result = await asyncio.to_thread(
+                    activate_existing_sms_auto_verify_once
+                )
+
+                if result.get("changed"):
+                    print(
+                        "PAYMENT_SMS_AUTO_VERIFY_ACTIVATED",
+                        result,
+                        flush=True,
+                    )
+
+            except Exception as exc:
+                print(
+                    "payment sms auto verify bootstrap failed:",
+                    str(exc),
+                    flush=True,
+                )
+            finally:
+                sms_bootstrap_done = True
+
+        if (
+            last_live_rate_refresh == 0.0
+            or now - last_live_rate_refresh
+            >= LIVE_RATE_INTERVAL_SECONDS
+        ):
+            try:
+                result = await refresh_live_rate_once()
+
+                if result.get("updated"):
+                    print(
+                        "PAYMENT_LIVE_RATE_UPDATED",
+                        {
+                            "rate_toman": result.get(
+                                "live_rate_toman"
+                            ),
+                            "provider": result.get(
+                                "live_rate_provider"
+                            ),
+                        },
+                        flush=True,
+                    )
+
+            except Exception as exc:
+                print(
+                    "payment live rate refresh failed:",
+                    str(exc),
+                    flush=True,
+                )
+            finally:
+                last_live_rate_refresh = now
+
+        if (
+            last_crypto_verify == 0.0
+            or now - last_crypto_verify
+            >= CRYPTO_VERIFY_INTERVAL_SECONDS
+        ):
+            try:
+                result = await process_pending_crypto_payments_once()
+
+                if (
+                    result.get("checked")
+                    or result.get("verified")
+                    or result.get("errors")
+                ):
+                    print(
+                        "PAYMENT_CRYPTO_AUTO_VERIFY",
+                        result,
+                        flush=True,
+                    )
+
+            except Exception as exc:
+                print(
+                    "payment crypto auto verify loop failed:",
+                    str(exc),
+                    flush=True,
+                )
+            finally:
+                last_crypto_verify = now
+
         try:
             result = await asyncio.to_thread(
                 sync_payment_notifications_once
@@ -158,8 +251,6 @@ async def customer_maintenance_loop() -> None:
                 str(exc),
                 flush=True,
             )
-
-        now = time.monotonic()
 
         if (
             last_receipt_cleanup == 0.0
