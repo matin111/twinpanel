@@ -164,6 +164,9 @@ def create_owned_plan(
         f"{secrets.token_hex(8)}"
     )
 
+    # The backing plan is a hidden schema-compatibility record, not a reseller
+    # availability flag. Keep it active so already-paid/pending historical orders
+    # can still be provisioned after the reseller disables the visible plan.
     backing = Plan(
         name=internal_name,
         description="TwinPanel internal reseller-owned plan",
@@ -171,7 +174,7 @@ def create_owned_plan(
         traffic_gb=int(traffic_gb),
         device_limit=int(device_limit),
         price_toman=int(sell_price_toman),
-        is_active=bool(is_active),
+        is_active=True,
         enable_cisco=bool(enable_cisco),
         enable_openvpn=bool(enable_openvpn),
         enable_wireguard=bool(enable_wireguard),
@@ -231,7 +234,7 @@ def sync_owned_plan_backing(
     backing.traffic_gb = int(row.traffic_gb)
     backing.device_limit = int(row.device_limit)
     backing.price_toman = int(row.sell_price_toman)
-    backing.is_active = bool(row.is_active)
+    backing.is_active = True
     backing.enable_cisco = bool(row.enable_cisco)
     backing.enable_openvpn = bool(row.enable_openvpn)
     backing.enable_wireguard = bool(row.enable_wireguard)
