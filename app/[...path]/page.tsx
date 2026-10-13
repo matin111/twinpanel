@@ -24,13 +24,19 @@ import {CustomerBuyRuntime} from "../../components/customer-buy-runtime";
 import {CustomerPaymentsRuntime} from "../../components/customer-payments-runtime";
 import {CustomerSubscriptionsRuntime} from "../../components/customer-subscriptions-runtime";
 import {DownloadAssetsRuntime} from "../../components/download-assets-runtime";
-import {ResellerDashboardRuntime,ResellerSectionRuntime} from "../../components/reseller-runtime";
+import {
+  ResellerDashboardParityV2,
+  ResellerCustomersParityV2,
+  ResellerSalesParityV2,
+  ResellerTrafficParityV2,
+  ResellerNotificationsParityV2,
+  ResellerSettingsParityV2,
+} from "../../components/reseller-portal-parity-v2";
 import {ResellerBotParityRuntime,ResellerOrdersParityRuntime,ResellerDiscountsParityRuntime} from "../../components/reseller-commerce-parity";
 import {ResellerSubscriptionsParityRuntime} from "../../components/reseller-subscriptions-parity";
 import {StoreRuntime2027} from "../../components/store-runtime";
 import {AdminAuthGuard} from "../../components/admin-auth-guard";
 import {AdminDashboardRuntime} from "../../components/admin-dashboard-runtime";
-import {AdminCollectionRuntime} from "../../components/admin-collections-runtime";
 import {AdminPaymentsRuntime} from "../../components/admin-payments-runtime";
 import {AdminPaymentMarketRates} from "../../components/admin-payment-market-rates";
 import {AdminCryptoDiscountControl} from "../../components/admin-crypto-discount-control";
@@ -39,7 +45,6 @@ import {AdminUsersWalletInline} from "../../components/admin-users-wallet-inline
 import {AdminPaymentsWalletTopups} from "../../components/admin-payments-wallet-topups";
 
 const customerSections=new Set(["orders","notifications","profile"]);
-const resellerSections=new Set(["customers","sales","wallet","traffic","notifications","settings"]);
 const admin=(node:React.ReactNode)=><AdminAuthGuard>{node}</AdminAuthGuard>;
 const usersWithWallet=()=>admin(<><LegacyUsersRuntimePage/><AdminUsersWalletInline/></>);
 
@@ -82,19 +87,22 @@ const route=(key:string)=>{
   if(key==="panel/usage"||key==="panel/support") return <CustomerPanelEntry/>;
   if(key==="panel/payments") return <CustomerPaymentsRuntime/>;
   if(key==="panel/wallet") return <CustomerWalletV2/>;
-  if(key==="reseller") return <ResellerDashboardRuntime/>;
+
+  if(key==="reseller") return <ResellerDashboardParityV2/>;
+  if(key==="reseller/customers") return <ResellerCustomersParityV2/>;
   if(key==="reseller/subscriptions") return <ResellerSubscriptionsParityRuntime/>;
-  if(key==="reseller/bot") return <ResellerBotParityRuntime/>;
+  if(key==="reseller/sales") return <ResellerSalesParityV2/>;
+  if(key==="reseller/traffic"||key==="reseller/wallet") return <ResellerTrafficParityV2/>;
   if(key==="reseller/orders") return <ResellerOrdersParityRuntime/>;
   if(key==="reseller/discounts") return <ResellerDiscountsParityRuntime/>;
+  if(key==="reseller/bot") return <ResellerBotParityRuntime/>;
+  if(key==="reseller/notifications") return <ResellerNotificationsParityV2/>;
+  if(key==="reseller/settings") return <ResellerSettingsParityV2/>;
+
   if(key==="store") return <StoreRuntime2027/>;
   if(key.startsWith("panel/")){
     const section=key.slice("panel/".length);
     if(customerSections.has(section)) return <CustomerSectionRuntime section={section}/>;
-  }
-  if(key.startsWith("reseller/")){
-    const section=key.slice("reseller/".length);
-    if(resellerSections.has(section)) return <ResellerSectionRuntime section={section}/>;
   }
   return <StoreRuntime2027/>;
 };
