@@ -31,6 +31,11 @@ admin_router = APIRouter(
 )
 
 ACTIVE_TOPUP_STATUSES = {"pending_payment", "awaiting_review"}
+ACTIVE_PLAN_PAYMENT_STATUSES = {
+    "pending_payment",
+    "payment_submitted",
+    "awaiting_review",
+}
 
 
 def _settings(db: Session) -> PaymentSettings:
@@ -177,12 +182,15 @@ async def create_wallet_topup_v2(
         cfg = _settings(db)
         max_extra = max(10, min(999, int(cfg.unique_amount_max_extra or 900)))
 
-        # Avoid a collision with other active wallet top-ups. Store-order
-        # collisions are handled by the SMS Reader union matcher as ambiguous.
-        for _ in range(30):
+        # SMS Reader identifies a transfer by its exact Toman amount. The same
+        # amount must therefore be unique across BOTH wallet top-ups and active
+        # plan-payment intents, otherwise an incoming bank SMS would be
+        # ambiguous and auto-credit would be intentionally refused.
+        for _ in range(60):
             candidate = secrets.randbelow(max_extra) + 1
             candidate_amount = amount_toman + candidate
-            duplicate = (
+
+            duplicate_wallet = (
                 db.query(CustomerWalletTopup.id)
                 .filter(
                     CustomerWalletTopup.method == "card_to_card",
@@ -191,7 +199,18 @@ async def create_wallet_topup_v2(
                 )
                 .first()
             )
-            if not duplicate:
+
+            duplicate_plan = (
+                db.query(PaymentIntent.id)
+                .filter(
+                    PaymentIntent.method == "card_to_card",
+                    PaymentIntent.payable_amount_toman == candidate_amount,
+                    PaymentIntent.status.in_(ACTIVE_PLAN_PAYMENT_STATUSES),
+                )
+                .first()
+            )
+
+            if not duplicate_wallet and not duplicate_plan:
                 suffix = candidate
                 payable_toman = candidate_amount
                 break
