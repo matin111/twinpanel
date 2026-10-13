@@ -102,7 +102,7 @@ jobs:
           from app.reseller_bot_review import register_reseller_review_handlers
           from app.reseller_owned_plans import create_subscription_from_owned_plan
           from app.routers.reseller_bot_orders_owned_v3 import approve_order_owned_v3
-          from app.services.reseller_traffic_pool import consume_reseller_pool_for_usage, restore_reseller_pool_subscriptions
+          from app.services.reseller_traffic_pool import apply_usage_event, open_session, restore_reseller_pool_subscriptions
 
           for value in (
               supervisor,
@@ -112,7 +112,8 @@ jobs:
               register_reseller_review_handlers,
               create_subscription_from_owned_plan,
               approve_order_owned_v3,
-              consume_reseller_pool_for_usage,
+              apply_usage_event,
+              open_session,
               restore_reseller_pool_subscriptions,
           ):
               assert callable(value)
