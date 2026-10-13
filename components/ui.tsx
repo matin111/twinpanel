@@ -25,7 +25,6 @@ const menuGroups=[
   {fa:"مالی و فروش",en:"Sales & Finance",items:[
     ["پرداخت‌ها","Payments","/admin/payments","◫"],
     ["تأیید خودکار کارت","Card Auto Verify","/admin/sms-reader","▤"],
-    ["کیف پول","Wallet","/admin/wallet","◉"],
     ["کد تخفیف","Discounts","/admin/discounts","％"],
     ["نمایندگی‌ها","Resellers","/admin/resellers","♜"],
     ["تنظیمات فروشگاه","Store Settings","/admin/store-settings","◇"]
@@ -128,5 +127,6 @@ export const names=[
   ["سارا محمدی","Sara Mohammadi"],
   ["محمد کریمی","Mohammad Karimi"],
   ["نگار حسینی","Negar Hosseini"],
+  ["رضا احمدی","Reza Ahmadi"],
   ["رضا احمدی","Reza Ahmadi"]
 ] as const;
