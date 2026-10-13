@@ -300,6 +300,30 @@ class ResellerPaymentMethod(Base):
         nullable=True,
     )
 
+    # Crypto methods share the global live USDT/Toman market feed while each
+    # reseller keeps its own destination wallet and can opt out of automatic
+    # chain verification per method.
+    crypto_asset: Mapped[str | None] = mapped_column(
+        String(16),
+        nullable=True,
+    )
+
+    crypto_network: Mapped[str | None] = mapped_column(
+        String(16),
+        nullable=True,
+    )
+
+    wallet_address: Mapped[str | None] = mapped_column(
+        String(180),
+        nullable=True,
+    )
+
+    auto_verify: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False,
+    )
+
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
@@ -462,7 +486,6 @@ class ResellerSubscription(Base):
     reseller = relationship("Reseller")
     subscription = relationship("Subscription")
     customer = relationship("User")
-
 
 
 class ResellerTrafficTransaction(Base):
