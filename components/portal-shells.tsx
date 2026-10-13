@@ -61,6 +61,69 @@ function CustomerIdentity(){
   </div>;
 }
 
+function CustomerAccessGuard({children}:{children:React.ReactNode}){
+  const {pick}=useI18n();
+  const [ready,setReady]=useState(false);
+  const [error,setError]=useState("");
+
+  useEffect(()=>{
+    let alive=true;
+
+    const run=async()=>{
+      const token=getCustomerToken();
+      if(!token){
+        window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);
+        return;
+      }
+
+      let account;
+      try{
+        account=await customerApi.me(token);
+      }catch{
+        clearCustomerToken();
+        window.location.replace("/login");
+        return;
+      }
+
+      if(!alive)return;
+
+      if(!account.is_active){
+        clearCustomerToken();
+        window.location.replace("/login");
+        return;
+      }
+
+      if(String(account.role||"").toLowerCase()==="admin"){
+        window.location.replace("/admin");
+        return;
+      }
+
+      try{
+        const reseller=await getResellerProfile(token);
+        if(!alive)return;
+
+        if(reseller){
+          window.location.replace("/reseller");
+          return;
+        }
+
+        setReady(true);
+      }catch(reason){
+        if(alive)setError(reason instanceof Error?reason.message:String(reason));
+      }
+    };
+
+    void run();
+    return()=>{alive=false};
+  },[]);
+
+  if(error)return <div className="auth-gate"><div className="auth-gate-card"><b>{pick("بررسی نوع حساب ناموفق بود","Could not verify account type")}</b><small>{error}</small><button className="ghost" onClick={()=>window.location.reload()}>{pick("تلاش دوباره","Retry")}</button></div></div>;
+
+  if(!ready)return <div className="auth-gate"><div className="auth-gate-card"><span className="spinner"/><b>{pick("در حال بررسی نوع حساب...","Checking account type...")}</b></div></div>;
+
+  return <>{children}</>;
+}
+
 function ResellerAccessGuard({children}:{children:React.ReactNode}){
   const {pick}=useI18n();
   const [ready,setReady]=useState(false);
@@ -133,6 +196,6 @@ function PortalFrame({children,active="",type}:PortalShellProps){
 }
 
 export function PortalShell(props:PortalShellProps){
-  if(props.type==="customer")return <CustomerSessionProvider><PortalFrame {...props}/></CustomerSessionProvider>;
+  if(props.type==="customer")return <CustomerSessionProvider><CustomerAccessGuard><PortalFrame {...props}/></CustomerAccessGuard></CustomerSessionProvider>;
   return <ResellerAccessGuard><PortalFrame {...props}/></ResellerAccessGuard>;
 }
