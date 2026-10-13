@@ -18,6 +18,7 @@ const statusTone=(status:string):"ok"|"warn"|"bad"|"violet"=>["approved","paid",
 const statusFa=(status:string)=>({pending_payment:"در انتظار پرداخت",awaiting_review:"در انتظار بررسی",approved:"تأیید و شارژ شده",rejected:"رد شده",paid:"پرداخت شده",failed:"ناموفق"} as Record<string,string>)[status]||status||"—";
 const today=()=>new Date().toISOString().slice(0,10);
 const nowTime=()=>new Date().toTimeString().slice(0,5);
+const canSubmit=(status:string)=>["pending_payment","rejected"].includes(String(status||"").toLowerCase());
 
 function Notice({error,ok}:{error:string;ok:string}){return <>{error&&<div className="runtime-error">{error}</div>}{ok&&<div className="runtime-success">{ok}</div>}</>;}
 function Empty({children}:{children:React.ReactNode}){return <div className="runtime-empty">{children}</div>;}
@@ -65,6 +66,19 @@ export function ResellerWalletRuntime(){
     return methods.find(row=>row.id===id)||null;
   },[activeTopup,methods,method]);
 
+  const openTopup=(row:ResellerWalletTopup)=>{
+    setActiveTopup(row);
+    setMethod(row.method);
+    setProof({
+      tracking_code:String(row.tracking_code||""),
+      sender_card_last4:String(row.sender_card_last4||""),
+      transfer_date:String(row.transfer_date||today()),
+      transfer_time:String(row.transfer_time||nowTime()),
+      txid:String(row.txid||""),
+    });
+    setError("");setOk("");
+  };
+
   const createTopup=async(e:FormEvent)=>{
     e.preventDefault();
     if(busy)return;
@@ -73,8 +87,7 @@ export function ResellerWalletRuntime(){
     setBusy(true);setError("");setOk("");
     try{
       const row=await resellerWalletApi.createTopup(Math.trunc(amount),method);
-      setActiveTopup(row);
-      setProof({tracking_code:"",sender_card_last4:"",transfer_date:today(),transfer_time:nowTime(),txid:""});
+      openTopup(row);
       setOk(pick("درخواست شارژ ساخته شد. مبلغ و مقصد پرداخت را دقیقاً طبق اطلاعات زیر پرداخت کنید.","Top-up created. Pay the exact amount to the destination shown below."));
       await load(false);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
@@ -83,7 +96,7 @@ export function ResellerWalletRuntime(){
 
   const submitProof=async(e:FormEvent)=>{
     e.preventDefault();
-    if(!activeTopup||busy)return;
+    if(!activeTopup||busy||!canSubmit(activeTopup.status))return;
     const type=String(activeTopup.method||"").toLowerCase();
     if(type==="card_to_card"){
       if(!proof.tracking_code.trim()){setError(pick("کد پیگیری را وارد کنید.","Enter the tracking code."));return;}
@@ -109,6 +122,7 @@ export function ResellerWalletRuntime(){
   const walletBalance=Number(summary?.wallet_balance||0);
   const creditLimit=Number(summary?.credit_limit||0);
   const availableCredit=Number(summary?.available_credit??walletBalance+creditLimit);
+  const activeStatus=String(activeTopup?.status||"").toLowerCase();
 
   return <PortalShell type="reseller" active="/reseller/wallet"><div className="page">
     <div className="page-head"><div><h1>{pick("کیف پول نمایندگی","Reseller Wallet")}</h1><small>{pick("شارژهای این صفحه پس از تأیید مستقیماً وارد کیف پول نمایندگی می‌شوند و خرید بسته حجم از همین موجودی انجام می‌شود.","Approved top-ups are credited directly to the reseller wallet and traffic purchases use this balance.")}</small></div><button className="ghost" disabled={busy} onClick={()=>void load(true)}>{pick("بروزرسانی","Refresh")}</button></div>
@@ -124,10 +138,10 @@ export function ResellerWalletRuntime(){
           </form>
         </Card>
 
-        <Card><div className="card-head"><div><b>{pick("وضعیت آخرین شارژ","Latest top-up")}</b><small>{activeTopup?`#${activeTopup.id}`:pick("هنوز درخواست جدیدی در این نشست ساخته نشده است.","No new top-up created in this session.")}</small></div>{activeTopup&&<Badge tone={statusTone(activeTopup.status)}>{pick(statusFa(activeTopup.status),activeTopup.status)}</Badge>}</div>
-          {!activeTopup?<Empty>{pick("برای شروع، مبلغ و روش پرداخت را انتخاب کنید.","Choose an amount and payment method to start.")}</Empty>:<>
+        <Card><div className="card-head"><div><b>{pick("جزئیات شارژ","Top-up details")}</b><small>{activeTopup?`#${activeTopup.id}`:pick("از فرم شارژ یا سوابق پایین یک درخواست را انتخاب کنید.","Create a top-up or select one from history below.")}</small></div>{activeTopup&&<Badge tone={statusTone(activeTopup.status)}>{pick(statusFa(activeTopup.status),activeTopup.status)}</Badge>}</div>
+          {!activeTopup?<Empty>{pick("درخواست فعالی انتخاب نشده است.","No top-up selected.")}</Empty>:<>
             <div className="runtime-info-list"><div><span>{pick("مبلغ شارژ","Wallet credit")}</span><b>{money(activeTopup.amount_toman)}</b></div><div><span>{pick("مبلغ دقیق پرداخت","Exact payable amount")}</span><b>{money(activeTopup.payable_amount_toman??activeTopup.amount_toman)}</b></div><div><span>{pick("روش","Method")}</span><b>{selectedMethod?.title||activeTopup.method}</b></div></div>
-            {activeTopup.status!=="approved"&&<form onSubmit={submitProof}>
+            {canSubmit(activeTopup.status)&&<form onSubmit={submitProof}>
               {activeTopup.method==="card_to_card"?<>
                 <div className="runtime-info-list"><div><span>{pick("شماره کارت مقصد","Destination card")}</span><b dir="ltr">{selectedMethod?.card_number||"—"}</b></div><div><span>{pick("به نام","Card holder")}</span><b>{selectedMethod?.card_holder||"—"}</b></div></div>
                 <div className="setting-grid"><label className="field"><span>{pick("کد پیگیری","Tracking code")}</span><input dir="ltr" value={proof.tracking_code} onChange={e=>setProof(p=>({...p,tracking_code:e.target.value}))}/></label><label className="field"><span>{pick("۴ رقم آخر کارت مبدا","Sender card last 4")}</span><input dir="ltr" inputMode="numeric" maxLength={4} value={proof.sender_card_last4} onChange={e=>setProof(p=>({...p,sender_card_last4:e.target.value.replace(/\D/g,"").slice(0,4)}))}/></label><label className="field"><span>{pick("تاریخ انتقال","Transfer date")}</span><input type="date" dir="ltr" value={proof.transfer_date} onChange={e=>setProof(p=>({...p,transfer_date:e.target.value}))}/></label><label className="field"><span>{pick("ساعت انتقال","Transfer time")}</span><input type="time" dir="ltr" value={proof.transfer_time} onChange={e=>setProof(p=>({...p,transfer_time:e.target.value}))}/></label></div>
@@ -137,13 +151,15 @@ export function ResellerWalletRuntime(){
               </>}
               <button className="primary" type="submit" disabled={busy}>{busy?pick("در حال ثبت...","Submitting..."):pick("ثبت اطلاعات پرداخت","Submit payment proof")}</button>
             </form>}
-            {activeTopup.status==="approved"&&<div className="runtime-success">{pick("این شارژ تأیید شده و مبلغ آن به کیف پول نمایندگی اضافه شده است.","This top-up is approved and has been credited to the reseller wallet.")}</div>}
+            {activeStatus==="awaiting_review"&&<div className="runtime-info">{pick("اطلاعات پرداخت ثبت شده و در انتظار تأیید است. پس از تأیید، موجودی نمایندگی خودکار افزایش می‌یابد.","Payment proof is awaiting approval. The reseller wallet will be credited automatically after approval.")}</div>}
+            {activeStatus==="approved"&&<div className="runtime-success">{pick("این شارژ تأیید شده و مبلغ آن به کیف پول نمایندگی اضافه شده است.","This top-up is approved and has been credited to the reseller wallet.")}</div>}
+            {activeStatus==="rejected"&&activeTopup.review_note&&<div className="runtime-error">{pick("علت رد:","Rejection reason:")} {String(activeTopup.review_note)}</div>}
           </>}
         </Card>
       </div>
 
       <div className="module-grid two">
-        <Card><div className="card-head"><div><b>{pick("درخواست‌های شارژ","Top-up requests")}</b><small>{pick("سوابق پرداخت و وضعیت تأیید","Payment history and approval status")}</small></div><Badge tone="violet">{topups.length}</Badge></div>{!topups.length?<Empty>{pick("هنوز درخواست شارژی ثبت نشده است.","No top-up requests yet.")}</Empty>:topups.slice(0,20).map(row=><div className="module-row" key={row.id}><div className="grow"><b>#{row.id} · {money(row.amount_toman)}</b><small>{dateText(row.created_at)} · {row.method}</small></div><Badge tone={statusTone(row.status)}>{pick(statusFa(row.status),row.status)}</Badge></div>)}</Card>
+        <Card><div className="card-head"><div><b>{pick("درخواست‌های شارژ","Top-up requests")}</b><small>{pick("سوابق پرداخت و وضعیت تأیید","Payment history and approval status")}</small></div><Badge tone="violet">{topups.length}</Badge></div>{!topups.length?<Empty>{pick("هنوز درخواست شارژی ثبت نشده است.","No top-up requests yet.")}</Empty>:topups.slice(0,20).map(row=><div className="module-row" key={row.id}><div className="grow"><b>#{row.id} · {money(row.amount_toman)}</b><small>{dateText(row.created_at)} · {row.method}</small></div><Badge tone={statusTone(row.status)}>{pick(statusFa(row.status),row.status)}</Badge>{["pending_payment","rejected","awaiting_review"].includes(String(row.status||"").toLowerCase())&&<button className="mini-btn" type="button" onClick={()=>openTopup(row)}>{pick("مشاهده","View")}</button>}</div>)}</Card>
         <Card><div className="card-head"><div><b>{pick("تراکنش‌های کیف پول","Wallet transactions")}</b><small>{pick("تمام افزایش و کاهش‌های موجودی نمایندگی","All reseller wallet credits and debits")}</small></div><Badge tone="violet">{transactions.length}</Badge></div>{!transactions.length?<Empty>{pick("تراکنشی ثبت نشده است.","No wallet transactions.")}</Empty>:transactions.slice(0,30).map(row=><div className="module-row" key={row.id}><div className="grow"><b>{row.description||row.type||`#${row.id}`}</b><small>{dateText(row.created_at)} · {pick("مانده","Balance")}: {money(row.balance_after)}</small></div><strong dir="ltr">{row.amount>0?"+":""}{Number(row.amount||0).toLocaleString("fa-IR")}</strong></div>)}</Card>
       </div>
     </>}
