@@ -21,6 +21,7 @@ from . import two_factor_models
 from . import runtime_settings_model
 from . import download_asset_models
 from .payment_crypto_schema import ensure_payment_crypto_schema
+from .wallet_crypto_schema import ensure_wallet_crypto_schema
 from .routers import admin, auth, nodes, plans, provision, subscriptions, tunnels, resellers, reseller_portal, domains, branding
 from .routers import bootstrap as bootstrap_router_module
 from .routers.two_factor import router as two_factor_router  # TWINPANEL_REAL_2FA_REGISTER_V1
@@ -39,6 +40,7 @@ from .self_hosted_runtime import apply_self_hosted_runtime
 from .admin_notification_service import notification_watch_loop
 from .services.customer_maintenance import customer_maintenance_loop
 from .services.payment_market_rates import payment_market_loop
+from .services.wallet_payment_automation import wallet_payment_automation_loop
 # TWINPANEL_REAL_ADMIN_NOTIFICATION_REGISTER_V1
 # TWINPANEL_USERNAME_SETTINGS_REGISTER_V2
 from .routers.payments import router as payments_router
@@ -48,6 +50,7 @@ from .routers.payment_market_rates import router as payment_market_rates_router
 from .routers.payment_automation import router as payment_automation_router
 from .routers.payment_receipts_local import router as payment_receipts_local_router
 from .routers.sms_reader_dashboard import router as sms_reader_dashboard_router
+from .routers.wallet_sms_reader import router as wallet_sms_reader_router
 from .routers.sms_reader import router as sms_reader_router
 from .routers.support import router as support_router, admin_router as support_admin_router
 # TWINPANEL_USER_NOTIFICATION_REGISTER_V1
@@ -57,6 +60,7 @@ from .routers.user_notifications import (
 )
 from .routers.telegram_bot import router as telegram_bot_router
 from .routers.telegram_manager import router as telegram_manager_router
+from .routers.wallet_payment_v2 import router as wallet_payment_v2_router, admin_router as wallet_payment_v2_admin_router
 from .routers.customer_wallet import router as customer_wallet_router, admin_router as customer_wallet_admin_router
 from .routers.customer_subscription_management import router as customer_subscription_management_router
 from .routers.subscription_admin_v2 import router as subscription_admin_v2_router
@@ -90,9 +94,10 @@ from . import reseller_notification_models
 
 
 Base.metadata.create_all(bind=engine)
-# Existing installations need an idempotent ALTER because create_all does not
-# add new columns to payment_intents.
+# Existing installations need idempotent ALTERs because create_all does not add
+# newly introduced columns to existing tables.
 ensure_payment_crypto_schema()
+ensure_wallet_crypto_schema()
 
 
 # TWINPANEL_TUNNEL_WATCHDOG_LIFESPAN_V1
@@ -114,6 +119,10 @@ async def lifespan(app: FastAPI):
         payment_market_loop(),
         name="payment-market-rates",
     )
+    wallet_payment_task = asyncio.create_task(
+        wallet_payment_automation_loop(),
+        name="wallet-payment-automation",
+    )
 
     try:
         yield
@@ -123,12 +132,14 @@ async def lifespan(app: FastAPI):
         notification_task.cancel()
         customer_maintenance_task.cancel()
         payment_market_task.cancel()
+        wallet_payment_task.cancel()
 
         for task in (
             watchdog_task,
             notification_task,
             customer_maintenance_task,
             payment_market_task,
+            wallet_payment_task,
         ):
             try:
                 await task
@@ -229,9 +240,11 @@ app.include_router(payment_automation_router)
 # admin receipt path can transparently serve both local and Telegram receipts.
 app.include_router(payment_receipts_local_router)
 app.include_router(payments_router)
-# Restore the proven SMS Reader operational dashboard before the legacy
-# SMS Reader route so /admin/sms-reader includes devices, pair codes and events.
+# Operational SMS dashboard stays available, while the wallet-aware event
+# endpoints come before the legacy reader so the same bank SMS can safely match
+# either a plan payment or a wallet top-up, never both.
 app.include_router(sms_reader_dashboard_router)
+app.include_router(wallet_sms_reader_router)
 app.include_router(sms_reader_router)
 app.include_router(support_router)
 app.include_router(support_admin_router)
@@ -239,6 +252,10 @@ app.include_router(user_notification_router)
 app.include_router(user_notification_admin_router)
 app.include_router(telegram_bot_router)
 app.include_router(telegram_manager_router)
+# Modern wallet payment routes precede the legacy wallet router. Manual admin
+# adjustment/approve/reject endpoints remain provided by the legacy router.
+app.include_router(wallet_payment_v2_router)
+app.include_router(wallet_payment_v2_admin_router)
 app.include_router(customer_wallet_router)
 app.include_router(customer_wallet_admin_router)
 app.include_router(customer_subscription_management_router)
