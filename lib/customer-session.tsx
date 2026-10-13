@@ -2,6 +2,7 @@
 
 import {createContext,useCallback,useContext,useEffect,useMemo,useState} from "react";
 import {clearCustomerToken,customerApi,CustomerUser,getCustomerToken} from "./customer-api";
+import {readPortalAccess} from "./access-cache";
 
 type SessionValue={
   ready:boolean;
@@ -12,12 +13,24 @@ type SessionValue={
   refresh:()=>Promise<void>;
 };
 
+type CachedSession={token:string;user:CustomerUser}|null;
+
 const CustomerSessionContext=createContext<SessionValue|null>(null);
 
+function cachedSession():CachedSession{
+  const token=getCustomerToken();
+  if(!token)return null;
+  const cached=readPortalAccess(token);
+  const user=cached?.user;
+  if(cached?.portal!=="customer"||!user||!user.is_active||String(user.role||"").toLowerCase()==="admin")return null;
+  return {token,user};
+}
+
 export function CustomerSessionProvider({children}:{children:React.ReactNode}){
-  const [ready,setReady]=useState(false);
-  const [token,setToken]=useState<string|null>(null);
-  const [user,setUser]=useState<CustomerUser|null>(null);
+  const initial=cachedSession();
+  const [ready,setReady]=useState(Boolean(initial));
+  const [token,setToken]=useState<string|null>(initial?.token??null);
+  const [user,setUser]=useState<CustomerUser|null>(initial?.user??null);
   const [error,setError]=useState("");
 
   const load=useCallback(async()=>{
@@ -29,10 +42,9 @@ export function CustomerSessionProvider({children}:{children:React.ReactNode}){
 
     setError("");
 
-    // /auth/me is the single source of truth for an already authenticated
-    // customer portal session. Portal role resolution belongs to the login
-    // flow; probing /reseller/me again here can create a /panel <-> /reseller
-    // navigation loop when the auxiliary reseller probe is stale or transient.
+    // /auth/me remains the source of truth, but a short-lived verified cache
+    // lets route-to-route navigation render immediately while this request
+    // revalidates the account in the background.
     let account:CustomerUser;
     try{
       account=await customerApi.me(current);
