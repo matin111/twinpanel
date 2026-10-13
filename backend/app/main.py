@@ -16,6 +16,7 @@ from . import renewal_models
 from . import models_reseller
 from . import reseller_bot_order_models
 from . import reseller_pool_models
+from . import reseller_owned_plan_models
 from . import domain_models
 from . import branding_models  # register reseller tables
 from . import storefront_settings_models  # TWINPANEL_STOREFRONT_CMS_V74
@@ -40,6 +41,8 @@ from .routers.download_assets import admin_router as download_assets_admin_route
 from .routers.public_connection_v3 import router as public_connection_v3_router
 from .routers.reseller_admin_v2 import router as reseller_admin_v2_router
 from .routers.reseller_traffic_admin_v2 import router as reseller_traffic_admin_v2_router
+from .routers.reseller_traffic_purchase_v3 import router as reseller_traffic_purchase_v3_router
+from .routers.reseller_owned_plans import router as reseller_owned_plans_router
 from .routers.reseller_sale_v2 import router as reseller_sale_v2_router
 from .routers.reseller_profile_v2 import router as reseller_profile_v2_router
 from .routers.reseller_subscription_volume_v2 import router as reseller_subscription_volume_v2_router
@@ -90,6 +93,7 @@ _ = runtime_settings_model
 _ = download_asset_models
 _ = reseller_bot_order_models
 _ = reseller_pool_models
+_ = reseller_owned_plan_models
 
 
 # TWINPANEL_ADMIN_PANEL_NOTIFICATION_REGISTER_V1
@@ -287,7 +291,12 @@ app.include_router(admin.router)
 app.include_router(reseller_admin_v2_router)
 app.include_router(reseller_traffic_admin_v2_router)
 app.include_router(resellers.router)
-# Correct reseller sale/profile/edit/renewal flows must precede legacy routes.
+# Reseller-owned plans and traffic purchase routes must win before legacy portal
+# routes. Sales/account creation are unlimited; the shared pool is charged only
+# from accepted real usage events.
+app.include_router(reseller_owned_plans_router)
+app.include_router(reseller_traffic_purchase_v3_router)
+# Correct reseller profile/edit/renewal flows must precede legacy routes.
 app.include_router(reseller_sale_v2_router)
 app.include_router(reseller_profile_v2_router)
 app.include_router(reseller_subscription_volume_v2_router)
@@ -327,8 +336,12 @@ from .routers.reseller_bot_orders import (
 from .routers.reseller_bot_orders_volume_v2 import (
     router as reseller_bot_orders_volume_v2_router,
 )
-# Usage-based renewal approval must win route resolution; the legacy router
-# remains immediately after it for all non-overridden bot-commerce endpoints.
+from .routers.reseller_bot_orders_owned_v3 import (
+    router as reseller_bot_orders_owned_v3_router,
+)
+# Owned-plan approval wins first, then usage-only renewal compatibility, then
+# legacy endpoints for receipts/payment methods/historical orders.
+app.include_router(reseller_bot_orders_owned_v3_router)
 app.include_router(reseller_bot_orders_volume_v2_router)
 app.include_router(reseller_bot_orders_router)
 
