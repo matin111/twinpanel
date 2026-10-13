@@ -32,6 +32,8 @@ small{font-size:12.5px;line-height:1.6}
 .primary,.ghost{font-size:13.5px;min-height:40px}
 .mini-btn{font-size:12.5px;line-height:1.4;min-height:34px;padding:7px 10px}
 .runtime-error,.runtime-success,.runtime-empty{font-size:13px;line-height:1.7}
+.owned-plan-editor-anchor{scroll-margin-top:90px}
+.owned-plan-editor{border-color:color-mix(in srgb,var(--purple) 32%,var(--line));box-shadow:0 16px 42px color-mix(in srgb,var(--purple) 8%,transparent)}
 
 /* Dense legacy dashboard/page labels */
 .chart-labels,.legend,.ticket small,.notification>small,.dates,.usage span,.server small{font-size:12px}
