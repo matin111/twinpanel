@@ -53,9 +53,6 @@ async def approve_order_owned_v3(
     # Renewals already have a usage-only V2 path. Keep it as the canonical
     # renewal implementation so changing an account quota never reserves pool.
     if _renewal_subscription_id(row.payment_note) is not None:
-        if row.status == "paid":
-            row.status = "awaiting_review"
-            db.commit()
         return await approve_order_volume_v2(
             order_id=order_id,
             reseller=reseller,
