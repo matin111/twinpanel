@@ -38,6 +38,7 @@ import "./subscription-link-modal.css";
 import "./admin-payments-runtime.css";
 import "./reseller-parity.css";
 import "./reseller-parity-v2.css";
+import "./reseller-subscriptions-compact.css";
 import "./admin-resellers-v2.css";
 import "./admin-resellers-volume-v2.css";
 import "./customer-shell-final.css";
