@@ -11,10 +11,13 @@ import {useI18n} from "../lib/i18n";
 type Method={
   id:string;title?:string;card_number?:string;card_holder?:string;address?:string;
   rate_toman?:number;asset?:string;network?:string;rate_provider?:string|null;rate_updated_at?:string|null;
+  crypto_discount_percent?:number;
 };
 type Intent=PaymentIntent&{
   base_amount_toman?:number;payable_amount_toman?:number;has_receipt?:boolean;receipt_submitted_at?:string|null;
   crypto_amount_usdt?:string|null;crypto_asset?:string|null;crypto_amount?:string|null;crypto_rate_toman?:number|null;
+  crypto_discount_percent?:number;configured_crypto_discount_percent?:number;
+  original_amount_toman?:number;discount_amount_toman?:number;discounted_amount_toman?:number;
 };
 
 const MAX_RECEIPT_BYTES=12*1024*1024;
@@ -75,6 +78,10 @@ function CustomerPaymentsBody(){
   const isCrypto=Boolean(intent&&intent.method!=="card_to_card");
   const cryptoAsset=String(intent?.crypto_asset||currentMethod?.asset||(String(intent?.method||"").startsWith("usdt_")?"USDT":"")).toUpperCase();
   const cryptoAmount=String(intent?.crypto_amount||intent?.crypto_amount_usdt||"");
+  const cryptoDiscount=Number(intent?.crypto_discount_percent||0);
+  const cryptoOriginal=Number(intent?.original_amount_toman||order?.amount_toman||0);
+  const cryptoDiscountAmount=Number(intent?.discount_amount_toman||0);
+  const cryptoDiscounted=Number(intent?.discounted_amount_toman||intent?.base_amount_toman||0);
 
   const createIntent=async()=>{
     if(!token||!orderId||!method)return;
@@ -131,7 +138,7 @@ function CustomerPaymentsBody(){
     {order&&!["fulfilled","paid"].includes(order.status)&&<Card className="paymentCheckoutCard">
       <div className="card-head"><div><b>{pick("پرداخت سفارش","Order payment")} #{order.id}</b><small>{money(order.amount_toman)}</small></div><Badge tone="warn">{statusFa(order.status)}</Badge></div>
       {!intent?<>
-        <div className="paymentMethodGrid">{methods.map(row=><button type="button" key={row.id} className={method===row.id?"active":""} onClick={()=>setMethod(row.id)}><b>{row.title||row.id}</b>{row.asset&&<small>{row.rate_toman?`${money(row.rate_toman)} / ${row.asset}`:row.network||row.asset}</small>}</button>)}</div>
+        <div className="paymentMethodGrid">{methods.map(row=><button type="button" key={row.id} className={method===row.id?"active":""} onClick={()=>setMethod(row.id)}><b>{row.title||row.id}</b>{row.asset&&<small>{row.crypto_discount_percent?`${row.crypto_discount_percent}% ${pick("تخفیف", "discount")} · `:""}{row.rate_toman?`${money(row.rate_toman)} / ${row.asset}`:row.network||row.asset}</small>}</button>)}</div>
         <button className="primary paymentMainAction" disabled={!method||busy} onClick={()=>void createIntent()}>{busy?"…":pick("ادامه پرداخت","Continue payment")}</button>
       </>:<form onSubmit={submit} className="paymentIntentBody">
         <div className="paymentDestination">
@@ -141,6 +148,11 @@ function CustomerPaymentsBody(){
             <div><span>{pick("شماره کارت","Card number")}</span><b dir="ltr">{currentMethod?.card_number||"—"}</b>{currentMethod?.card_number&&<button type="button" onClick={()=>void copy("card",currentMethod.card_number!)}>{copied==="card"?"✓":"⧉"}</button>}</div>
             <div><span>{pick("به نام","Card holder")}</span><b>{currentMethod?.card_holder||"—"}</b></div>
           </>:<>
+            {cryptoDiscount>0&&<>
+              <div><span>{pick("قیمت کارت‌به‌کارت","Card price")}</span><b>{money(cryptoOriginal)}</b></div>
+              <div><span>{pick("تخفیف پرداخت کریپتو","Crypto discount")}</span><b>{cryptoDiscount.toLocaleString("fa-IR")}% · -{money(cryptoDiscountAmount)}</b></div>
+              <div><span>{pick("مبلغ بعد از تخفیف","Discounted price")}</span><b>{money(cryptoDiscounted)}</b></div>
+            </>}
             <div><span>{pick("مقدار دقیق ارز","Exact crypto amount")}</span><b dir="ltr">{cryptoAmount||"—"} {cryptoAsset}</b>{cryptoAmount&&<button type="button" onClick={()=>void copy("amount",cryptoAmount)}>{copied==="amount"?"✓":"⧉"}</button>}</div>
             <div><span>{pick("نرخ ثبت‌شده برای این سفارش","Frozen quote rate")}</span><b>{intent.crypto_rate_toman?`${money(intent.crypto_rate_toman)} / ${cryptoAsset}`:"—"}</b></div>
             <div><span>{pick("آدرس کیف پول","Wallet address")}</span><b dir="ltr" className="breakAll">{currentMethod?.address||"—"}</b>{currentMethod?.address&&<button type="button" onClick={()=>void copy("addr",currentMethod.address!)}>{copied==="addr"?"✓":"⧉"}</button>}</div>
@@ -158,7 +170,7 @@ function CustomerPaymentsBody(){
       </form>}
     </Card>}
 
-    <section className="paymentHistorySection"><div className="sectionMiniHead"><b>{pick("تاریخچه پرداخت","Payment history")}</b></div>{intents.length===0?<Card><p className="muted">{pick("پرداختی ثبت نشده است.","No payments yet.")}</p></Card>:<div className="customer-list">{intents.map(x=>{const asset=String(x.crypto_asset||(String(x.method||"").startsWith("usdt_")?"USDT":""));const amount=x.crypto_amount||x.crypto_amount_usdt;return <Card key={x.id} className="customer-list-row"><div><b>#{x.id}</b><small>{x.created_at?new Date(x.created_at).toLocaleString("fa-IR"):"—"}</small></div><div><span>{pick("سفارش","Order")}</span><b>#{x.order_id||"—"}</b></div><div><span>{pick("روش","Method")}</span><b>{x.method||x.payment_method||"—"}</b>{amount&&asset&&<small dir="ltr">{amount} {asset}</small>}</div>{x.has_receipt&&<div><span>{pick("رسید","Receipt")}</span><b className="receiptHistoryOk">✓ {pick("ثبت شده","Uploaded")}</b></div>}<Badge tone={["approved","auto_verified"].includes(x.status)?"ok":["rejected"].includes(x.status)?"bad":"warn"}>{statusFa(x.status)}</Badge></Card>})}</div>}</section>
+    <section className="paymentHistorySection"><div className="sectionMiniHead"><b>{pick("تاریخچه پرداخت","Payment history")}</b></div>{intents.length===0?<Card><p className="muted">{pick("پرداختی ثبت نشده است.","No payments yet.")}</p></Card>:<div className="customer-list">{intents.map(x=>{const asset=String(x.crypto_asset||(String(x.method||"").startsWith("usdt_")?"USDT":""));const amount=x.crypto_amount||x.crypto_amount_usdt;return <Card key={x.id} className="customer-list-row"><div><b>#{x.id}</b><small>{x.created_at?new Date(x.created_at).toLocaleString("fa-IR"):"—"}</small></div><div><span>{pick("سفارش","Order")}</span><b>#{x.order_id||"—"}</b></div><div><span>{pick("روش","Method")}</span><b>{x.method||x.payment_method||"—"}</b>{amount&&asset&&<small dir="ltr">{amount} {asset}</small>}{Number(x.crypto_discount_percent||0)>0&&<small>{Number(x.crypto_discount_percent).toLocaleString("fa-IR")}% {pick("تخفیف کریپتو","crypto discount")} · {money(x.discounted_amount_toman||x.base_amount_toman)}</small>}</div>{x.has_receipt&&<div><span>{pick("رسید","Receipt")}</span><b className="receiptHistoryOk">✓ {pick("ثبت شده","Uploaded")}</b></div>}<Badge tone={["approved","auto_verified"].includes(x.status)?"ok":["rejected"].includes(x.status)?"bad":"warn"}>{statusFa(x.status)}</Badge></Card>})}</div>}</section>
     <div className="customer-actions"><Link href="/panel/orders" className="ghost">{pick("سفارش‌ها","Orders")}</Link><Link href="/panel/buy" className="primary">{pick("خرید اشتراک","Buy subscription")}</Link></div>
   </div>;
 }
