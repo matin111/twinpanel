@@ -49,6 +49,7 @@ export type ResellerWalletTopup={
   sender_card_last4?:string|null;
   transfer_date?:string|null;
   transfer_time?:string|null;
+  receipt_uploaded?:boolean;
   review_note?:string|null;
   created_at:string;
   submitted_at?:string|null;
@@ -64,6 +65,13 @@ export type WalletTopupSubmit={
   sender_card_last4?:string|null;
   transfer_date?:string|null;
   transfer_time?:string|null;
+};
+
+export type WalletReceiptStatus={
+  ok:boolean;
+  topup_id:number;
+  receipt_uploaded:boolean;
+  status:string;
 };
 
 function errorText(payload:unknown,status:number){
@@ -106,6 +114,15 @@ export const resellerWalletApi={
     method:"POST",
     body:JSON.stringify({amount_toman:amountToman,method}),
   }),
+  receiptStatus:(topupId:number)=>request<WalletReceiptStatus>(`/v1/wallet/topups/${topupId}/receipt-status`),
+  uploadReceipt:(topupId:number,file:File)=>{
+    const form=new FormData();
+    form.append("receipt",file);
+    return request<WalletReceiptStatus>(`/v1/wallet/topups/${topupId}/receipt-upload`,{
+      method:"POST",
+      body:form,
+    });
+  },
   submitTopup:(topupId:number,payload:WalletTopupSubmit)=>request<ResellerWalletTopup>(`/v1/wallet/topups/${topupId}/submit`,{
     method:"POST",
     body:JSON.stringify(payload),
