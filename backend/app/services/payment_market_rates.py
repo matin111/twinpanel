@@ -280,21 +280,25 @@ async def _nobitex_rate(symbol: str, host: str) -> tuple[int, str]:
     if str(payload.get("status") or "ok").lower() not in {"ok", "success"}:
         raise RuntimeError(f"Nobitex rejected {market}")
 
-    latest = Decimal(str(payload.get("lastTradePrice") or "0"))
+    latest_rial = Decimal(str(payload.get("lastTradePrice") or "0"))
 
-    if latest <= 0:
+    if latest_rial <= 0:
         asks = payload.get("asks") or []
         bids = payload.get("bids") or []
         ask = Decimal(str(asks[0][0])) if asks else None
         bid = Decimal(str(bids[0][0])) if bids else None
-        latest = _midpoint(ask, bid)
+        latest_rial = _midpoint(ask, bid)
+
+    # Nobitex IRT orderbooks map to RLS in the public API. TwinPanel stores and
+    # displays prices in Toman, therefore every Nobitex quote must be /10.
+    latest_toman = latest_rial / Decimal("10")
 
     value = _validate_rate(
         symbol,
-        int(latest.quantize(Decimal("1"))),
+        int(latest_toman.quantize(Decimal("1"))),
     )
 
-    return value, f"nobitex:{host}:{market}"
+    return value, f"nobitex:{host}:{market}:RLS/TMN"
 
 
 async def _wallex_rate(symbol: str) -> tuple[int, str]:
@@ -323,10 +327,12 @@ async def _wallex_rate(symbol: str) -> tuple[int, str]:
 async def _fetch_symbol(symbol: str) -> tuple[int, str, list[str]]:
     errors: list[str] = []
 
+    # Prefer a Toman-native market first, then fall back to Nobitex where the
+    # public RLS quote is normalized to Toman above.
     providers = (
+        lambda: _wallex_rate(symbol),
         lambda: _nobitex_rate(symbol, "apiv2.nobitex.ir"),
         lambda: _nobitex_rate(symbol, "api.nobitex.ir"),
-        lambda: _wallex_rate(symbol),
     )
 
     for provider in providers:
@@ -359,8 +365,6 @@ def ensure_requested_payment_automation_once() -> dict:
             cfg.sms_auto_verify = True
             changed = True
 
-        # Restore the same sender used by the proven previous setup only when
-        # migration left the field empty. Admin can still edit it afterwards.
         if not str(cfg.sms_allowed_senders or "").strip():
             cfg.sms_allowed_senders = "B.Pasargad"
             changed = True
