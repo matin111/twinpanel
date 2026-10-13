@@ -37,9 +37,11 @@ from .routers.public_connection_v3 import router as public_connection_v3_router
 from .self_hosted_runtime import apply_self_hosted_runtime
 from .admin_notification_service import notification_watch_loop
 from .services.customer_maintenance import customer_maintenance_loop
+from .services.payment_market_rates import payment_market_loop
 # TWINPANEL_REAL_ADMIN_NOTIFICATION_REGISTER_V1
 # TWINPANEL_USERNAME_SETTINGS_REGISTER_V2
 from .routers.payments import router as payments_router
+from .routers.payment_market_rates import router as payment_market_rates_router
 from .routers.payment_automation import router as payment_automation_router
 from .routers.payment_receipts_local import router as payment_receipts_local_router
 from .routers.sms_reader_dashboard import router as sms_reader_dashboard_router
@@ -102,6 +104,10 @@ async def lifespan(app: FastAPI):
         customer_maintenance_loop(),
         name="customer-maintenance",
     )
+    payment_market_task = asyncio.create_task(
+        payment_market_loop(),
+        name="payment-market-rates",
+    )
 
     try:
         yield
@@ -110,11 +116,13 @@ async def lifespan(app: FastAPI):
         watchdog_task.cancel()
         notification_task.cancel()
         customer_maintenance_task.cancel()
+        payment_market_task.cancel()
 
         for task in (
             watchdog_task,
             notification_task,
             customer_maintenance_task,
+            payment_market_task,
         ):
             try:
                 await task
@@ -199,6 +207,9 @@ app.include_router(storefront_settings_router)
 app.include_router(store_router)
 app.include_router(general_settings_router)
 app.include_router(notification_settings_router)
+# Resilient market-rate and automation-status API must precede the older
+# payment automation router because it overrides /admin/live-rate.
+app.include_router(payment_market_rates_router)
 # Payment automation overrides the legacy payment methods/settings/submit
 # routes while delegating all unchanged behavior back to the legacy handlers.
 # It must be registered before the legacy payments router.
