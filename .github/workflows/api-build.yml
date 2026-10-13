@@ -140,6 +140,10 @@ jobs:
         working-directory: backend
         run: python -m scripts.tunnel_managed_smoke
 
+      - name: Run V20 managed relay recovery smoke
+        working-directory: backend
+        run: python -m scripts.managed_relay_recovery_v20_smoke
+
       - name: Run V16 transport policy smoke
         working-directory: backend
         run: python -m scripts.transport_policy_v16_smoke
