@@ -29,6 +29,7 @@ import {AdminDashboardRuntime} from "../../components/admin-dashboard-runtime";
 import {AdminCollectionRuntime} from "../../components/admin-collections-runtime";
 import {AdminPaymentsRuntime} from "../../components/admin-payments-runtime";
 import {AdminPaymentMarketRates} from "../../components/admin-payment-market-rates";
+import {AdminCryptoDiscountControl} from "../../components/admin-crypto-discount-control";
 import {AdminSmsRelayDownload} from "../../components/admin-sms-relay-download";
 
 const customerSections=new Set(["orders","wallet","notifications","profile"]);
@@ -46,7 +47,7 @@ const route=(key:string)=>{
   if(key==="admin/nodes") return admin(<LegacyNodesRuntimePage/>);
   if(key==="admin/tunnels") return admin(<LegacyTunnelsExactPage/>);
   if(key==="admin/tunnel-transports") return admin(<TunnelTransportRuntimePage/>);
-  if(key==="admin/payments") return admin(<><AdminPaymentsRuntime/><AdminPaymentMarketRates/></>);
+  if(key==="admin/payments") return admin(<><AdminPaymentsRuntime/><AdminPaymentMarketRates/><AdminCryptoDiscountControl/></>);
   if(key==="admin/settings") return admin(<SettingsPage2027/>);
   if(key==="admin/system-health") return admin(<SystemHealthRuntimePage/>);
   if(key==="admin/notifications") return admin(<NotificationsRuntimePage/>);
