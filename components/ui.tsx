@@ -27,6 +27,7 @@ const menuGroups=[
     ["تأیید خودکار کارت","Card Auto Verify","/admin/sms-reader","▤"],
     ["کد تخفیف","Discounts","/admin/discounts","％"],
     ["نمایندگی‌ها","Resellers","/admin/resellers","♜"],
+    ["پلن‌های شارژ حجم","Traffic Recharge Plans","/admin/reseller-traffic-plans","▣"],
     ["تنظیمات فروشگاه","Store Settings","/admin/store-settings","◇"]
   ]},
   {fa:"ارتباطات",en:"Communications",items:[
