@@ -127,6 +127,5 @@ export const names=[
   ["سارا محمدی","Sara Mohammadi"],
   ["محمد کریمی","Mohammad Karimi"],
   ["نگار حسینی","Negar Hosseini"],
-  ["رضا احمدی","Reza Ahmadi"],
   ["رضا احمدی","Reza Ahmadi"]
 ] as const;
