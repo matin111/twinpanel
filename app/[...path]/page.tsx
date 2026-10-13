@@ -1,4 +1,4 @@
-import {TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
+import {TelegramManagerPage} from "../../components/admin-control-screens";
 import {TelegramRuntimePage,WalletRuntimePage,DiscountsRuntimePage,ResellersRuntimePage,StoreSettingsRuntimePage} from "../../components/admin-parity-runtime";
 import {BackupsFullRuntimePage} from "../../components/backups-full-runtime";
 import {ProvisionRuntimePage,SmsReaderRuntimePage,MotherAccessRuntimePage,AccountDeliveryRuntimePage} from "../../components/admin-infra-runtime";
@@ -17,6 +17,7 @@ import {SettingsPage2027} from "../../components/settings-2027";
 import {LoginPage2027,RegisterPage2027} from "../../components/login-2027";
 import {CustomerSectionRuntime} from "../../components/customer-runtime";
 import {CustomerConnectionModernPage} from "../../components/customer-connection-modern";
+import {VpnSettingsModernPage} from "../../components/vpn-settings-modern";
 import {CustomerDashboardPro} from "../../components/customer-dashboard-pro";
 import {ResellerDashboardRuntime,ResellerSectionRuntime} from "../../components/reseller-runtime";
 import {StoreRuntime2027} from "../../components/store-runtime";
@@ -55,7 +56,7 @@ const route=(key:string)=>{
   if(key==="admin/domains") return admin(<DomainsRuntimePage/>);
   if(key==="admin/provision") return admin(<ProvisionRuntimePage/>);
   if(key==="admin/account-delivery") return admin(<AccountDeliveryRuntimePage/>);
-  if(key==="admin/vpn-settings") return admin(<VpnSettingsPage/>);
+  if(key==="admin/vpn-settings") return admin(<VpnSettingsModernPage/>);
   if(key==="admin/l2tp") return admin(<L2tpSettingsPage/>);
   if(key==="admin/mother-access") return admin(<MotherAccessRuntimePage/>);
   if(key==="admin/branding") return admin(<BrandingSettingsPage/>);
