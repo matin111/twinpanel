@@ -14,8 +14,9 @@ from ..subscription_enforcement import queue_subscription_enforcement
 from .reseller_subscription_volume_v2 import ExtendIn, extend_subscription_usage_only
 
 
+# Mounted by reseller_owned_plans.router, which already owns the /v1/reseller
+# prefix and is registered before all legacy reseller routes.
 router = APIRouter(
-    prefix="/v1/reseller",
     tags=["reseller-pool-guard-v3"],
 )
 
