@@ -25,11 +25,11 @@ import {CustomerPaymentsRuntime} from "../../components/customer-payments-runtim
 import {CustomerSubscriptionsRuntime} from "../../components/customer-subscriptions-runtime";
 import {DownloadAssetsRuntime} from "../../components/download-assets-runtime";
 import {
-  ResellerDashboardParityV2,
   ResellerCustomersParityV2,
   ResellerNotificationsParityV2,
   ResellerSettingsParityV2,
 } from "../../components/reseller-portal-parity-v2";
+import {ResellerDashboardV3} from "../../components/reseller-dashboard-v3";
 import {ResellerSubscriptionPlansV3,ResellerTrafficRechargeV3} from "../../components/reseller-plans-traffic-v3";
 import {ResellerBotParityRuntime,ResellerOrdersParityRuntime,ResellerDiscountsParityRuntime} from "../../components/reseller-commerce-parity";
 import {ResellerSubscriptionsParityRuntime} from "../../components/reseller-subscriptions-parity";
@@ -87,7 +87,7 @@ const route=(key:string)=>{
   if(key==="panel/payments") return <CustomerPaymentsRuntime/>;
   if(key==="panel/wallet") return <CustomerWalletV2/>;
 
-  if(key==="reseller") return <ResellerDashboardParityV2/>;
+  if(key==="reseller") return <ResellerDashboardV3/>;
   if(key==="reseller/customers") return <ResellerCustomersParityV2/>;
   if(key==="reseller/subscriptions") return <ResellerSubscriptionsParityRuntime/>;
   if(key==="reseller/sales"||key==="reseller/plans") return <ResellerSubscriptionPlansV3/>;
