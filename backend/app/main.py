@@ -37,6 +37,7 @@ from .routers.modern_transports import router as modern_transports_router
 from .routers.download_assets import admin_router as download_assets_admin_router, public_router as download_assets_public_router
 from .routers.public_connection_v3 import router as public_connection_v3_router
 from .routers.reseller_sale_v2 import router as reseller_sale_v2_router
+from .routers.reseller_profile_v2 import router as reseller_profile_v2_router
 from .self_hosted_runtime import apply_self_hosted_runtime
 from .admin_notification_service import notification_watch_loop
 from .services.customer_maintenance import customer_maintenance_loop
@@ -275,8 +276,9 @@ app.include_router(tunnel_managed_router)
 app.include_router(modern_transports_router)
 app.include_router(admin.router)
 app.include_router(resellers.router)
-# Correct reseller sale flow must precede the legacy route with the same path.
+# Correct reseller sale/profile flows must precede legacy routes with the same paths.
 app.include_router(reseller_sale_v2_router)
+app.include_router(reseller_profile_v2_router)
 app.include_router(reseller_portal.router)
 app.include_router(domains.router)
 app.include_router(branding.router)
