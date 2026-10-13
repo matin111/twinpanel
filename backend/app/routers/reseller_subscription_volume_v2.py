@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import re
-import secrets
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -12,6 +11,9 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_reseller
 from ..models import (
+    Node,
+    NodeStatus,
+    NodeType,
     ProtocolCredential,
     Subscription,
     SubscriptionProtocol,
@@ -22,6 +24,7 @@ from ..models_reseller import (
     ResellerSubscription,
     ResellerTrafficTransaction,
 )
+from ..mother_access import reseller_can_use_mother
 from ..services.quota_refresh import sync_subscription_quota_nodes
 from ..subscription_enforcement import queue_subscription_enforcement
 
@@ -75,6 +78,72 @@ def _dt_utc_naive(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value
     return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _usable_exit_nodes(
+    db: Session,
+    reseller: Reseller,
+    *,
+    include_mother: bool,
+) -> list[Node]:
+    rows = (
+        db.query(Node)
+        .filter(
+            Node.retired_at.is_(None),
+            Node.node_type == NodeType.EXIT,
+            Node.status == NodeStatus.ONLINE,
+            Node.show_to_users.is_(True),
+        )
+        .order_by(Node.id.asc())
+        .all()
+    )
+
+    mother_allowed = reseller_can_use_mother(db, int(reseller.id))
+    result: list[Node] = []
+
+    for node in rows:
+        if int(node.current_users or 0) >= int(node.capacity_users or 0):
+            continue
+
+        is_mother = bool(getattr(node, "is_mother", False))
+        if is_mother and (not include_mother or not mother_allowed):
+            continue
+
+        result.append(node)
+
+    return result
+
+
+@router.get("/server-options")
+def reseller_server_options_volume_v2(
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    mother_allowed = reseller_can_use_mother(db, int(reseller.id))
+    rows = _usable_exit_nodes(
+        db,
+        reseller,
+        include_mother=True,
+    )
+
+    return {
+        "can_use_mother": bool(mother_allowed),
+        "nodes": [
+            {
+                "id": int(node.id),
+                "name": node.name,
+                "node_type": NodeType.EXIT.value,
+                "is_mother": bool(getattr(node, "is_mother", False)),
+                "public_ip": node.public_ip,
+                "public_domain": node.public_domain,
+                "status": getattr(node.status, "value", node.status),
+                "current_users": int(node.current_users or 0),
+                "capacity_users": int(node.capacity_users or 0),
+            }
+            for node in rows
+        ],
+        "selection_policy": "exit_only",
+    }
 
 
 @router.post("/subscriptions/{subscription_id}/extend")
@@ -334,3 +403,143 @@ async def edit_subscription_usage_only(
         "quota": quota,
         "message": "اشتراک ویرایش شد؛ حجم نمایندگی فقط با مصرف واقعی کم می‌شود",
     }
+
+
+async def _reseller_delivery_info(
+    db: Session,
+    subscription_id: int,
+):
+    from .account_delivery import _stored_info, provision_account
+
+    sub = db.get(Subscription, subscription_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail="اشتراک پیدا نشد")
+
+    has_config = bool(
+        db.scalar(
+            select(ProtocolCredential.id)
+            .where(
+                ProtocolCredential.subscription_id == sub.id,
+                ProtocolCredential.is_active.is_(True),
+                ProtocolCredential.config_text_encrypted.isnot(None),
+            )
+            .limit(1)
+        )
+    )
+
+    provision_result = None
+    if not has_config and sub.status == SubscriptionStatus.ACTIVE:
+        provision_result = await provision_account(
+            subscription_id=sub.id,
+            db=db,
+        )
+
+    info = _stored_info(db, sub)
+    if provision_result is not None:
+        info["provision"] = {
+            "ok": bool(provision_result.get("ok", True)) if isinstance(provision_result, dict) else True,
+            "errors": list(provision_result.get("errors") or []) if isinstance(provision_result, dict) else [],
+        }
+    return info
+
+
+@router.get("/subscriptions/{subscription_id}/connection-info")
+async def reseller_connection_info_volume_v2(
+    subscription_id: int,
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    _owned_link(db, int(reseller.id), subscription_id)
+    return await _reseller_delivery_info(db, subscription_id)
+
+
+@router.post("/subscriptions/{subscription_id}/provision-account")
+async def reseller_provision_account_volume_v2(
+    subscription_id: int,
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    _owned_link(db, int(reseller.id), subscription_id)
+    from .account_delivery import provision_account
+    return await provision_account(subscription_id=subscription_id, db=db)
+
+
+def _safe_reseller_sale_nodes(
+    db: Session,
+    reseller: Reseller,
+    payload,
+) -> list[Node]:
+    requested_ids = list(
+        dict.fromkeys(
+            int(value)
+            for value in (getattr(payload, "node_ids", []) or [])
+            if int(value) > 0
+        )
+    )
+
+    if requested_ids:
+        nodes = (
+            db.query(Node)
+            .filter(
+                Node.id.in_(requested_ids),
+                Node.retired_at.is_(None),
+                Node.node_type == NodeType.EXIT,
+                Node.show_to_users.is_(True),
+            )
+            .all()
+        )
+
+        if len(nodes) != len(requested_ids):
+            raise HTTPException(
+                status_code=422,
+                detail="فقط سرورهای خروجی فعال برای فروش اشتراک قابل انتخاب‌اند",
+            )
+
+        unavailable = [
+            node.name
+            for node in nodes
+            if (
+                node.status != NodeStatus.ONLINE
+                or int(node.current_users or 0) >= int(node.capacity_users or 0)
+            )
+        ]
+        if unavailable:
+            raise HTTPException(
+                status_code=409,
+                detail="سرور آماده نیست: " + ", ".join(unavailable),
+            )
+
+        if any(bool(getattr(node, "is_mother", False)) for node in nodes) and not reseller_can_use_mother(db, int(reseller.id)):
+            raise HTTPException(
+                status_code=403,
+                detail="دسترسی این نمایندگی به سرور مادر فعال نیست",
+            )
+
+        return nodes
+
+    candidates = _usable_exit_nodes(
+        db,
+        reseller,
+        include_mother=False,
+    )
+    if not candidates:
+        raise HTTPException(
+            status_code=503,
+            detail="هیچ سرور خروجی عادی سالمی برای تخصیص خودکار وجود ندارد",
+        )
+
+    candidates.sort(
+        key=lambda node: (
+            int(node.current_users or 0) / max(int(node.capacity_users or 1), 1),
+            int(node.id),
+        )
+    )
+    return [candidates[0]]
+
+
+# reseller_sale_v2 is imported before this module in app.main.
+# Its sale core resolves this global at request time, so replace the
+# legacy all-node resolver with the production Exit-only policy above.
+from . import reseller_sale_v2 as _reseller_sale_v2
+
+_reseller_sale_v2._resolve_nodes = _safe_reseller_sale_nodes
