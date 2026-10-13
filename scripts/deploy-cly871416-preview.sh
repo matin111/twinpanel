@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# TwinPanel guarded preview deployment for CLY871416.
-# Canonical source: GitHub branch fix/customer-panel-entry-crash-v2
-# Frontend runtime: /opt/twinpanel-preview -> twinpanel-preview.service :3010
-# Backend runtime:  /opt/twinpanel/current/backend -> twinpanel-api.service :8095
+# Guarded TwinPanel preview deployment for CLY871416.
+# Source:  /opt/twinpanel-preview
+# Backend: /opt/twinpanel/current/backend -> twinpanel-api.service :8095
+# Web:     /opt/twinpanel-preview        -> twinpanel-preview.service :3010
 
 EXPECTED_HOST="CLY871416"
 REPO_DIR="${REPO_DIR:-/opt/twinpanel-preview}"
@@ -45,6 +45,7 @@ wait_http_200() {
   local tries="${2:-40}"
   local sleep_s="${3:-1}"
   local i code
+
   for ((i=1; i<=tries; i++)); do
     code="$(curl -sS -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true)"
     if [[ "$code" == "200" ]]; then
@@ -52,7 +53,23 @@ wait_http_200() {
     fi
     sleep "$sleep_s"
   done
+
   return 1
+}
+
+install_frontend_dependencies() {
+  cd "$REPO_DIR"
+
+  # The repository intentionally does not always carry a package-lock.json.
+  # Match CI behavior: use npm ci only when a valid lockfile is present,
+  # otherwise install from package.json without creating a new lockfile.
+  if [[ -f package-lock.json || -f npm-shrinkwrap.json ]]; then
+    echo "FRONTEND_DEPS_MODE=npm-ci"
+    npm ci --include=optional --no-audit --no-fund
+  else
+    echo "FRONTEND_DEPS_MODE=npm-install-no-lock"
+    npm install --include=optional --no-audit --no-fund --package-lock=false
+  fi
 }
 
 rollback() {
@@ -79,19 +96,21 @@ rollback() {
   if [[ -n "$OLD_HEAD" && -d "$REPO_DIR/.git" ]]; then
     cd "$REPO_DIR" || true
     git reset --hard "$OLD_HEAD" || true
+
     if [[ -n "$OLD_BRANCH" ]]; then
       git switch "$OLD_BRANCH" >/dev/null 2>&1 || true
       git reset --hard "$OLD_HEAD" || true
     fi
 
     systemctl stop "$WEB_SERVICE" >/dev/null 2>&1 || true
-    npm ci --include=optional >/dev/null 2>&1 || true
+    install_frontend_dependencies >/dev/null 2>&1 || true
     npm run build >/dev/null 2>&1 || true
   fi
 
   if [[ "$API_WAS_ACTIVE" == "1" ]]; then
     systemctl start "$API_SERVICE" >/dev/null 2>&1 || true
   fi
+
   if [[ "$WEB_WAS_ACTIVE" == "1" ]]; then
     systemctl start "$WEB_SERVICE" >/dev/null 2>&1 || true
   fi
@@ -108,7 +127,7 @@ trap rollback ERR INT TERM
 
 log "PRE-FLIGHT"
 
-for cmd in git rsync tar curl systemctl npm python3; do
+for cmd in git rsync tar curl systemctl npm node python3; do
   require_cmd "$cmd"
 done
 
@@ -120,6 +139,7 @@ fi
 [[ -d "$REPO_DIR/.git" ]] || fail "git repository not found: $REPO_DIR"
 [[ -d "$API_DST" ]] || fail "backend destination not found: $API_DST"
 [[ -x "$VENV_DIR/bin/python" ]] || fail "python venv not found: $VENV_DIR"
+[[ -f "$REPO_DIR/package.json" ]] || fail "frontend package.json not found: $REPO_DIR/package.json"
 systemctl cat "$API_SERVICE" >/dev/null
 systemctl cat "$WEB_SERVICE" >/dev/null
 
@@ -159,6 +179,8 @@ printf '%s\n' "$NEW_HEAD" > "$BACKUP_DIR/new-head.txt"
 echo "OLD_HEAD=$OLD_HEAD"
 echo "NEW_HEAD=$NEW_HEAD"
 echo "BRANCH=$BRANCH"
+echo "NODE=$(node --version)"
+echo "NPM=$(npm --version)"
 
 log "VERIFYING REQUIRED SOURCE FILES"
 required_files=(
@@ -176,7 +198,9 @@ required_files=(
   "components/admin-wallet-v2.tsx"
   "components/customer-wallet-v2.tsx"
   "components/customer-payments-runtime.tsx"
+  "scripts/smoke-cly871416-runtime.sh"
 )
+
 for f in "${required_files[@]}"; do
   [[ -f "$REPO_DIR/$f" ]] || fail "required source file missing: $f"
 done
@@ -222,8 +246,7 @@ curl -fsS "$API_URL/openapi.json" -o "$BACKUP_DIR/openapi.json"
 import json
 import sys
 
-path = sys.argv[1]
-with open(path, "r", encoding="utf-8") as fh:
+with open(sys.argv[1], "r", encoding="utf-8") as fh:
     doc = json.load(fh)
 
 paths = doc.get("paths", {})
@@ -236,23 +259,26 @@ required = {
     "/v1/wallet/methods",
     "/v1/wallet/topups",
     "/v1/wallet/topups/{topup_id}/submit",
+    "/v1/admin/telegram-bot",
 }
+
 missing = sorted(required - set(paths))
 if missing:
     print("MISSING ROUTES:")
     for item in missing:
         print(" -", item)
     raise SystemExit(1)
+
 print("ROUTES_OK")
 for item in sorted(required):
     print("OK", item)
 PY
 
 log "INSTALLING FRONTEND DEPENDENCIES"
-cd "$REPO_DIR"
-npm ci --include=optional
+install_frontend_dependencies
 
 log "BUILDING FRONTEND"
+cd "$REPO_DIR"
 systemctl stop "$WEB_SERVICE"
 npm run build
 systemctl start "$WEB_SERVICE"
@@ -273,10 +299,12 @@ LOGIN_CODE="$(curl -sS \
   || true)"
 
 echo "LOGIN_PROXY_STATUS=$LOGIN_CODE"
-if [[ "$LOGIN_CODE" == "000" || "$LOGIN_CODE" == "502" || "$LOGIN_CODE" == "503" || "$LOGIN_CODE" == "504" ]]; then
-  cat "$BACKUP_DIR/login-proxy-response.txt" 2>/dev/null || true
-  fail "frontend API proxy is unhealthy: HTTP $LOGIN_CODE"
-fi
+case "$LOGIN_CODE" in
+  000|502|503|504)
+    cat "$BACKUP_DIR/login-proxy-response.txt" 2>/dev/null || true
+    fail "frontend API proxy is unhealthy: HTTP $LOGIN_CODE"
+    ;;
+esac
 
 log "FINAL SERVICE STATUS"
 systemctl is-active "$API_SERVICE"
