@@ -35,7 +35,7 @@ BASE_TIMEOUTS = {
     "mtunnel": 170,
     "backhaul": 90,
     "ssh_tun": 180,
-    "ssh_relay": 210,
+    "ssh_relay": 330,
 }
 
 RELAY_PRIORITY = 300

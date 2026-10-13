@@ -19,7 +19,7 @@ from .models import Node, Tunnel, TunnelTransport
 # ============================================================
 
 
-RELAY_ATTEMPT_TIMEOUT_V22 = 270
+RELAY_ATTEMPT_TIMEOUT_V22 = 330
 
 
 async def _try_all_relays_v22(
