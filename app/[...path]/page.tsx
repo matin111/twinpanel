@@ -29,6 +29,7 @@ import {AdminDashboardRuntime} from "../../components/admin-dashboard-runtime";
 import {AdminCollectionRuntime} from "../../components/admin-collections-runtime";
 import {AdminPaymentsRuntime} from "../../components/admin-payments-runtime";
 import {AdminPaymentMarketRates} from "../../components/admin-payment-market-rates";
+import {AdminSmsRelayDownload} from "../../components/admin-sms-relay-download";
 
 const customerSections=new Set(["orders","wallet","notifications","profile"]);
 const resellerSections=new Set(["customers","subscriptions","sales","wallet","orders","traffic","bot","notifications","settings"]);
@@ -52,7 +53,7 @@ const route=(key:string)=>{
   if(key==="admin/support") return admin(<SupportRuntimePage/>);
   if(key==="admin/telegram") return admin(<TelegramRuntimePage/>);
   if(key==="admin/telegram-manager") return admin(<TelegramManagerPage/>);
-  if(key==="admin/sms-reader") return admin(<SmsReaderRuntimePage/>);
+  if(key==="admin/sms-reader") return admin(<><SmsReaderRuntimePage/><AdminSmsRelayDownload/></>);
   if(key==="admin/backups") return admin(<BackupsFullRuntimePage/>);
   if(key==="admin/store-settings") return admin(<StoreSettingsRuntimePage/>);
   if(key==="admin/wallet") return admin(<WalletRuntimePage/>);
