@@ -135,16 +135,15 @@ export function AdminUsersWalletInline(){
       setError(pick("مبلغ تغییر نمی‌تواند صفر باشد.","Adjustment amount cannot be zero."));
       return;
     }
-    if(note.trim().length<2){
-      setError(pick("یک توضیح کوتاه وارد کنید.","Enter a short note."));
-      return;
-    }
 
     setBusy(true);setError("");setOk("");
     try{
       const result=await adminRequest<{balance_toman:number}>(`/v1/admin/wallet/wallets/${userId}/adjust`,{
         method:"POST",
-        body:JSON.stringify({amount_toman:value,note:note.trim()})
+        body:JSON.stringify({
+          amount_toman:value,
+          note:note.trim()||"اصلاح دستی موجودی"
+        })
       });
       setBalances(current=>({...current,[userId]:Number(result.balance_toman||0)}));
       setOk(pick("موجودی کاربر بروزرسانی شد.","User balance updated."));
@@ -199,13 +198,12 @@ export function AdminUsersWalletInline(){
           </label>
 
           <label className="payField">
-            <span>{pick("توضیح","Note")}</span>
+            <span>{pick("توضیح (اختیاری)","Note (optional)")}</span>
             <textarea
               rows={3}
               value={note}
               onChange={e=>setNote(e.target.value)}
-              placeholder={pick("مثلاً شارژ هدیه یا اصلاح حساب","e.g. bonus credit or balance correction")}
-              required
+              placeholder={pick("مثلاً شارژ هدیه یا اصلاح حساب؛ اختیاری","e.g. bonus credit or balance correction; optional")}
             />
           </label>
 
