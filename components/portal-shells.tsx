@@ -27,7 +27,16 @@ const customerMenu:MenuItem[]=[
 ];
 
 const resellerMenu:MenuItem[]=[
-  ["داشبورد","Dashboard","/reseller","⌂"],["مشتریان","Customers","/reseller/customers","♙"],["اشتراک‌ها","Subscriptions","/reseller/subscriptions","▱"],["فروش","Sales","/reseller/sales","◫"],["کیف پول","Wallet","/reseller/wallet","◉"],["سفارش‌ها","Orders","/reseller/orders","▤"],["بسته‌های ترافیک","Traffic Packages","/reseller/traffic","◇"],["ربات نمایندگی","Reseller Bot","/reseller/bot","✈"],["اعلان‌ها","Notifications","/reseller/notifications","◎"],["تنظیمات","Settings","/reseller/settings","⚙"]
+  ["داشبورد","Dashboard","/reseller","⌂"],
+  ["مشتریان","Customers","/reseller/customers","♙"],
+  ["اشتراک‌ها","Subscriptions","/reseller/subscriptions","▱"],
+  ["فروش","Sales","/reseller/sales","◫"],
+  ["کیف پول و شارژ","Wallet & Top-up","/reseller/wallet","◉"],
+  ["بسته‌های ترافیک","Traffic Packages","/reseller/traffic","◇"],
+  ["سفارش‌ها","Orders","/reseller/orders","▤"],
+  ["ربات نمایندگی","Reseller Bot","/reseller/bot","✈"],
+  ["اعلان‌ها","Notifications","/reseller/notifications","◎"],
+  ["تنظیمات","Settings","/reseller/settings","⚙"]
 ];
 
 function CustomerIdentity(){
@@ -76,8 +85,6 @@ function PortalFrame({children,active="",type}:PortalShellProps){
   const menu=type==="customer"?customerMenu:resellerMenu;
   const storageKey=`twinpanel.${type}.sidebar.collapsed`;
 
-  // Do not restore a stale collapsed value after hydration. That delayed state
-  // change was making the customer layout jump a few seconds after sign-in.
   const toggle=()=>setCollapsed(v=>{
     const n=!v;
     try{localStorage.setItem(storageKey,n?"1":"0");}catch{}
