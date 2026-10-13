@@ -27,12 +27,14 @@ assert "register_reseller_review_handlers" in learning
 
 print("RESELLER_RECEIPT_REVIEW_SMOKE_OK")
 
+from scripts.discount_schema_bootstrap_smoke import main as discount_schema_bootstrap_smoke
 from scripts.reseller_bot_payment_callbacks_smoke import main as reseller_bot_payment_callbacks_smoke
 from scripts.reseller_usage_pool_smoke import main as reseller_usage_pool_smoke
 from scripts.reseller_route_precedence_smoke import main as reseller_route_precedence_smoke
 from scripts.reseller_wallet_credit_smoke import main as reseller_wallet_credit_smoke
 from scripts.wallet_receipt_route_smoke import main as wallet_receipt_route_smoke
 
+discount_schema_bootstrap_smoke()
 reseller_bot_payment_callbacks_smoke()
 reseller_usage_pool_smoke()
 reseller_route_precedence_smoke()
