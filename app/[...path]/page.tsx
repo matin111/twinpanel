@@ -1,6 +1,6 @@
 import {TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
 import {TelegramRuntimePage,DiscountsRuntimePage,StoreSettingsRuntimePage} from "../../components/admin-parity-runtime";
-import {AdminResellersVolumeV2} from "../../components/admin-resellers-volume-v2";
+import {AdminResellersLegacyV3} from "../../components/admin-resellers-legacy-v3";
 import {BackupsFullRuntimePage} from "../../components/backups-full-runtime";
 import {ProvisionRuntimePage,SmsReaderRuntimePage,MotherAccessRuntimePage,AccountDeliveryRuntimePage} from "../../components/admin-infra-runtime";
 import {SupportRuntimePage,NotificationsRuntimePage} from "../../components/admin-ops-runtime";
@@ -71,7 +71,7 @@ const route=(key:string)=>{
   if(key==="admin/store-settings") return admin(<StoreSettingsRuntimePage/>);
   if(key==="admin/wallet") return usersWithWallet();
   if(key==="admin/discounts") return admin(<DiscountsRuntimePage/>);
-  if(key==="admin/resellers") return admin(<AdminResellersVolumeV2/>);
+  if(key==="admin/resellers") return admin(<AdminResellersLegacyV3/>);
   if(key==="admin/domains") return admin(<DomainsRuntimePage/>);
   if(key==="admin/provision") return admin(<ProvisionRuntimePage/>);
   if(key==="admin/account-delivery") return admin(<AccountDeliveryRuntimePage/>);
