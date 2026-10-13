@@ -19,16 +19,13 @@ from .payment_receipts_local import (
     _ensure_receipt_root,
     _local_path,
 )
-from .wallet_payment_v2 import _topup_out
 
 
-router = APIRouter(
-    prefix="/v1/wallet",
-    tags=["wallet-receipts"],
-)
-
+# Prefixes are supplied by customer_wallet.router/admin_router when these child
+# routers are mounted. Keeping the child paths prefix-less avoids double-prefix
+# routes such as /v1/wallet/v1/wallet/...
+router = APIRouter(tags=["wallet-receipts"])
 admin_router = APIRouter(
-    prefix="/v1/admin/wallet",
     tags=["admin-wallet-receipts"],
     dependencies=[Depends(require_admin)],
 )
@@ -36,6 +33,15 @@ admin_router = APIRouter(
 
 def _receipt_content_type(filename: str) -> str:
     return mimetypes.guess_type(filename)[0] or "application/octet-stream"
+
+
+def _upload_out(row: CustomerWalletTopup) -> dict:
+    return {
+        "ok": True,
+        "topup_id": int(row.id),
+        "receipt_uploaded": bool(row.receipt_file_marker),
+        "status": str(row.status or ""),
+    }
 
 
 @router.post("/topups/{topup_id}/receipt-upload")
@@ -130,7 +136,26 @@ async def upload_wallet_topup_receipt(
         except OSError:
             pass
 
-    return _topup_out(row)
+    return _upload_out(row)
+
+
+@router.get("/topups/{topup_id}/receipt-status")
+def wallet_topup_receipt_status(
+    topup_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    row = (
+        db.query(CustomerWalletTopup)
+        .filter(
+            CustomerWalletTopup.id == int(topup_id),
+            CustomerWalletTopup.user_id == int(user.id),
+        )
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="درخواست شارژ پیدا نشد")
+    return _upload_out(row)
 
 
 @admin_router.get("/topups/{topup_id}/receipt")
