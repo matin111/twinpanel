@@ -1,0 +1,149 @@
+/* TwinPanel 2027 — compact reseller subscription management */
+
+/* Keep the subscription list readable without an oversized actions column. */
+.reseller-subscriptions-parity .reseller-sub-table table{
+  width:100%;
+  min-width:960px;
+  table-layout:auto;
+}
+
+.reseller-subscriptions-parity .reseller-sub-table th,
+.reseller-subscriptions-parity .reseller-sub-table td{
+  min-width:0;
+}
+
+.reseller-subscriptions-parity .reseller-sub-table th:nth-child(1),
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(1){width:54px}
+.reseller-subscriptions-parity .reseller-sub-table th:nth-child(2),
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(2){min-width:150px}
+.reseller-subscriptions-parity .reseller-sub-table th:nth-child(3),
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(3){min-width:108px}
+.reseller-subscriptions-parity .reseller-sub-table th:nth-child(4),
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(4){min-width:145px}
+.reseller-subscriptions-parity .reseller-sub-table th:nth-child(5),
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(5){min-width:145px}
+.reseller-subscriptions-parity .reseller-sub-table th:nth-child(6),
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(6){min-width:130px}
+.reseller-subscriptions-parity .reseller-sub-table th:nth-child(7),
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(7){min-width:86px}
+.reseller-subscriptions-parity .reseller-sub-table th:last-child,
+.reseller-subscriptions-parity .reseller-sub-table td:last-child{
+  min-width:220px;
+  width:220px;
+}
+
+.reseller-subscriptions-parity .reseller-sub-table .row-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  min-width:0;
+  max-width:220px;
+}
+
+.reseller-subscriptions-parity .reseller-sub-table .row-actions .mini-btn{
+  min-height:32px;
+  padding:6px 9px;
+  white-space:nowrap;
+}
+
+/* Reseller delivery is intentionally simple: subscription link + QR only. */
+.reseller-connection-modal .reseller-connection-card{
+  width:min(720px,calc(100vw - 28px));
+  max-height:min(86vh,760px);
+  overflow:auto;
+}
+
+.reseller-connection-modal .reseller-connection-content{
+  gap:14px;
+  margin-top:14px;
+}
+
+.reseller-connection-modal .reseller-secret-grid{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+}
+
+/* Hide username/password cards in the reseller delivery dialog. */
+.reseller-connection-modal .reseller-secret-grid>div:not(.wide){
+  display:none;
+}
+
+.reseller-connection-modal .reseller-secret-grid>div.wide{
+  grid-column:1;
+  display:grid;
+  grid-template-columns:minmax(120px,auto) minmax(0,1fr) auto auto;
+  gap:8px;
+  align-items:center;
+  padding:14px;
+  border-radius:14px;
+}
+
+.reseller-connection-modal .reseller-secret-grid code{
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* Protocol credentials stay available through the public subscription page,
+   but are not duplicated inside the reseller management modal. */
+.reseller-connection-modal .reseller-protocol-list{
+  display:none;
+}
+
+.reseller-connection-modal .reseller-public-delivery{
+  grid-template-columns:minmax(0,1fr) 154px;
+  gap:20px;
+  margin:0;
+  padding:18px;
+  border-radius:16px;
+}
+
+.reseller-connection-modal .reseller-public-delivery img{
+  width:154px;
+  height:154px;
+  padding:9px;
+  border-radius:14px;
+}
+
+/* Avoid duplicate copy/open buttons: the link row above owns those actions. */
+.reseller-connection-modal .reseller-public-delivery .action-row{
+  display:none;
+}
+
+.reseller-connection-modal .runtime-modal-actions{
+  margin-top:4px;
+}
+
+@media(max-width:780px){
+  .reseller-subscriptions-parity .reseller-sub-table table{min-width:860px}
+  .reseller-connection-modal .reseller-connection-card{width:calc(100vw - 18px)}
+  .reseller-connection-modal .reseller-secret-grid>div.wide{
+    grid-template-columns:1fr auto auto;
+  }
+  .reseller-connection-modal .reseller-secret-grid>div.wide>span{
+    grid-column:1/-1;
+  }
+  .reseller-connection-modal .reseller-public-delivery{
+    grid-template-columns:1fr;
+    text-align:center;
+  }
+  .reseller-connection-modal .reseller-public-delivery img{
+    grid-column:auto;
+    grid-row:auto;
+    margin:auto;
+  }
+}
+
+@media(max-width:520px){
+  .reseller-connection-modal .reseller-secret-grid>div.wide{
+    grid-template-columns:1fr;
+  }
+  .reseller-connection-modal .reseller-secret-grid code{
+    white-space:normal;
+    overflow-wrap:anywhere;
+  }
+  .reseller-connection-modal .reseller-secret-grid .mini-btn{
+    width:100%;
+  }
+}
