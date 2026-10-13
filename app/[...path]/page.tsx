@@ -25,15 +25,12 @@ import {CustomerBuyRuntime} from "../../components/customer-buy-runtime";
 import {CustomerPaymentsRuntime} from "../../components/customer-payments-runtime";
 import {CustomerSubscriptionsRuntime} from "../../components/customer-subscriptions-runtime";
 import {DownloadAssetsRuntime} from "../../components/download-assets-runtime";
-import {
-  ResellerCustomersParityV2,
-  ResellerNotificationsParityV2,
-  ResellerSettingsParityV2,
-} from "../../components/reseller-portal-parity-v2";
+import {ResellerNotificationsParityV2,ResellerSettingsParityV2} from "../../components/reseller-portal-parity-v2";
 import {ResellerDashboardV3} from "../../components/reseller-dashboard-v3";
-import {ResellerSubscriptionPlansV3,ResellerTrafficRechargeV3} from "../../components/reseller-plans-traffic-v3";
+import {ResellerTrafficRechargeV3} from "../../components/reseller-plans-traffic-v3";
+import {ResellerOwnedPlansRuntime} from "../../components/reseller-owned-plans";
+import {ResellerAccountBuilderRuntime} from "../../components/reseller-account-builder";
 import {ResellerBotParityRuntime,ResellerOrdersParityRuntime,ResellerDiscountsParityRuntime} from "../../components/reseller-commerce-parity";
-import {ResellerSubscriptionsParityRuntime} from "../../components/reseller-subscriptions-parity";
 import {StoreRuntime2027} from "../../components/store-runtime";
 import {AdminAuthGuard} from "../../components/admin-auth-guard";
 import {AdminDashboardRuntime} from "../../components/admin-dashboard-runtime";
@@ -90,9 +87,9 @@ const route=(key:string)=>{
   if(key==="panel/wallet") return <CustomerWalletV2/>;
 
   if(key==="reseller") return <ResellerDashboardV3/>;
-  if(key==="reseller/customers") return <ResellerCustomersParityV2/>;
-  if(key==="reseller/subscriptions") return <ResellerSubscriptionsParityRuntime/>;
-  if(key==="reseller/sales"||key==="reseller/plans") return <ResellerSubscriptionPlansV3/>;
+  if(key==="reseller/customers") return <ResellerAccountBuilderRuntime/>;
+  if(key==="reseller/subscriptions") return <ResellerAccountBuilderRuntime/>;
+  if(key==="reseller/sales"||key==="reseller/plans") return <ResellerOwnedPlansRuntime/>;
   if(key==="reseller/traffic"||key==="reseller/wallet") return <ResellerTrafficRechargeV3/>;
   if(key==="reseller/orders") return <ResellerOrdersParityRuntime/>;
   if(key==="reseller/discounts") return <ResellerDiscountsParityRuntime/>;

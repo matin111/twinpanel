@@ -29,9 +29,8 @@ const customerMenu:MenuItem[]=[
 
 const resellerMenu:MenuItem[]=[
   ["داشبورد","Dashboard","/reseller","home"],
-  ["مشتریان","Customers","/reseller/customers","profile"],
-  ["اشتراک‌ها","Subscriptions","/reseller/subscriptions","subscription"],
-  ["پلن‌های اشتراک","Subscription Plans","/reseller/sales","payments"],
+  ["ساخت اشتراک","Create Subscription","/reseller/subscriptions","subscription"],
+  ["پلن‌های ربات","Bot Plans","/reseller/sales","payments"],
   ["خرید و شارژ حجم","Traffic Recharge","/reseller/traffic","cart"],
   ["سفارش‌ها","Orders","/reseller/orders","orders"],
   ["کدهای تخفیف","Discounts","/reseller/discounts","payments"],

@@ -11,7 +11,7 @@ Group=root
 WorkingDirectory=/opt/twinpanel/current/backend
 Environment=PYTHONUNBUFFERED=1
 EnvironmentFile=/etc/twinpanel/backend.env
-ExecStart=/opt/twinpanel/venv/bin/python -m app.reseller_bot_runtime
+ExecStart=/opt/twinpanel/venv/bin/python -m app.reseller_bot_runtime_owned
 Restart=always
 RestartSec=5
 TimeoutStartSec=60
