@@ -29,6 +29,8 @@ class PaymentSettings(Base):
         String(150), nullable=True
     )
 
+    # Kept only for database/backward compatibility. USDT-TRC20 is no
+    # longer exposed as a payment method in the 2027 payment runtime.
     usdt_trc20_enabled: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )
@@ -127,8 +129,23 @@ class PaymentIntent(Base):
     unique_suffix: Mapped[int | None] = mapped_column(
         Integer, nullable=True
     )
+
+    # Legacy field retained for existing USDT intents.
     crypto_amount_usdt: Mapped[object | None] = mapped_column(
         Numeric(20, 6), nullable=True
+    )
+
+    # Generic immutable crypto quote snapshot. The amount and Toman rate are
+    # frozen when the intent is created, so later market movement cannot
+    # change the amount the customer must transfer.
+    crypto_asset: Mapped[str | None] = mapped_column(
+        String(16), nullable=True
+    )
+    crypto_amount: Mapped[object | None] = mapped_column(
+        Numeric(28, 8), nullable=True
+    )
+    crypto_rate_toman: Mapped[int | None] = mapped_column(
+        BigInteger, nullable=True
     )
 
     tracking_code: Mapped[str | None] = mapped_column(
@@ -254,115 +271,4 @@ class PaymentSmsEvent(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
-    )
-
-
-
-# TWINPANEL_SMS_READER_PAIRING_V1
-
-class PaymentSmsReaderDevice(Base):
-    __tablename__ = "payment_sms_reader_devices"
-    __table_args__ = (
-        UniqueConstraint(
-            "token_hash",
-            name="uq_payment_sms_reader_token_hash",
-        ),
-    )
-
-    id: Mapped[int] = mapped_column(
-        BigInteger,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    name: Mapped[str] = mapped_column(
-        String(160),
-        nullable=False,
-    )
-
-    device_uid: Mapped[str] = mapped_column(
-        String(180),
-        nullable=False,
-        unique=True,
-    )
-
-    token_hash: Mapped[str] = mapped_column(
-        String(64),
-        nullable=False,
-    )
-
-    active: Mapped[bool] = mapped_column(
-        Boolean,
-        default=True,
-        nullable=False,
-    )
-
-    app_version: Mapped[str | None] = mapped_column(
-        String(40),
-        nullable=True,
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow,
-        nullable=False,
-    )
-
-    paired_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow,
-        nullable=False,
-    )
-
-    last_seen_at: Mapped[datetime | None] = mapped_column(
-        DateTime,
-        nullable=True,
-    )
-
-    revoked_at: Mapped[datetime | None] = mapped_column(
-        DateTime,
-        nullable=True,
-    )
-
-
-class PaymentSmsReaderPairCode(Base):
-    __tablename__ = "payment_sms_reader_pair_codes"
-    __table_args__ = (
-        UniqueConstraint(
-            "code_hash",
-            name="uq_payment_sms_reader_pair_code",
-        ),
-    )
-
-    id: Mapped[int] = mapped_column(
-        BigInteger,
-        primary_key=True,
-        autoincrement=True,
-    )
-
-    code_hash: Mapped[str] = mapped_column(
-        String(64),
-        nullable=False,
-    )
-
-    expires_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        nullable=False,
-    )
-
-    used_at: Mapped[datetime | None] = mapped_column(
-        DateTime,
-        nullable=True,
-    )
-
-    attempts: Mapped[int] = mapped_column(
-        Integer,
-        default=0,
-        nullable=False,
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.utcnow,
-        nullable=False,
     )
