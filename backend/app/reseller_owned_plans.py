@@ -8,9 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .models import Plan, SubscriptionStatus
+from .models import Plan
 from .models_reseller import (
     Reseller,
+    ResellerPlanPrice,
     ResellerSubscription,
     ResellerTrafficTransaction,
 )
@@ -48,9 +49,12 @@ def enabled_protocols(row: ResellerBotPlan) -> list[str]:
 
 
 def plan_out(row: ResellerBotPlan) -> dict:
+    # `id` is the reseller-owned CRUD identity. `plan_id` intentionally keeps
+    # the hidden backing Plan id for old discount/order code that stores plan ids.
     return {
         "id": int(row.id),
-        "plan_id": int(row.id),
+        "reseller_plan_id": int(row.id),
+        "plan_id": int(row.backing_plan_id),
         "backing_plan_id": int(row.backing_plan_id),
         "name": row.title,
         "title": row.title,
@@ -108,6 +112,19 @@ def owned_plan_by_backing(
     if active_only:
         q = q.where(ResellerBotPlan.is_active.is_(True))
     return db.scalar(q)
+
+
+def _compat_price(
+    db: Session,
+    reseller_id: int,
+    backing_plan_id: int,
+) -> ResellerPlanPrice | None:
+    return db.scalar(
+        select(ResellerPlanPrice).where(
+            ResellerPlanPrice.reseller_id == int(reseller_id),
+            ResellerPlanPrice.plan_id == int(backing_plan_id),
+        )
+    )
 
 
 def create_owned_plan(
@@ -182,6 +199,19 @@ def create_owned_plan(
         is_active=bool(is_active),
     )
     db.add(row)
+
+    # Keep existing bot order/discount/payment code compatible while the hidden
+    # backing Plan remains invisible to central Admin/Store plan catalogs.
+    db.add(
+        ResellerPlanPrice(
+            reseller_id=int(reseller.id),
+            plan_id=int(backing.id),
+            buy_price_toman=0,
+            sell_price_toman=int(sell_price_toman),
+            is_active=bool(is_active),
+        )
+    )
+
     db.flush()
     return row
 
@@ -207,6 +237,25 @@ def sync_owned_plan_backing(
     backing.enable_wireguard = bool(row.enable_wireguard)
     backing.enable_l2tp = bool(row.enable_l2tp)
     backing.enable_v2ray = bool(row.enable_v2ray)
+
+    price = _compat_price(
+        db,
+        int(row.reseller_id),
+        int(row.backing_plan_id),
+    )
+    if not price:
+        price = ResellerPlanPrice(
+            reseller_id=int(row.reseller_id),
+            plan_id=int(row.backing_plan_id),
+            buy_price_toman=0,
+            sell_price_toman=int(row.sell_price_toman),
+            is_active=bool(row.is_active),
+        )
+        db.add(price)
+    else:
+        price.buy_price_toman = 0
+        price.sell_price_toman = int(row.sell_price_toman)
+        price.is_active = bool(row.is_active)
 
 
 def _duplicate_creation(
