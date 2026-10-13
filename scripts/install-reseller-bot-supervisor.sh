@@ -46,6 +46,9 @@ done
   exit 1
 }
 
+# Keep the bot supervisor deploy self-contained. These are the runtime modules
+# imported by the owned-plan bot flow plus the shared-pool guard/enforcement
+# chain used by renewals and account provisioning.
 BOT_RUNTIME_FILES=(
   "app/reseller_bot_runtime.py"
   "app/reseller_bot_runtime_owned.py"
@@ -55,10 +58,20 @@ BOT_RUNTIME_FILES=(
   "app/reseller_bot_order_models.py"
   "app/reseller_owned_plan_models.py"
   "app/reseller_owned_plans.py"
+  "app/reseller_pool_models.py"
+  "app/mother_access.py"
+  "app/subscription_enforcement.py"
+  "app/services/subscription_factory.py"
+  "app/services/reseller_traffic_pool.py"
+  "app/services/quota_refresh.py"
+  "app/services/quota_node_sync.py"
+  "app/services/quota_key_manager.py"
   "app/routers/reseller_bot.py"
   "app/routers/reseller_bot_orders.py"
   "app/routers/reseller_bot_orders_volume_v2.py"
   "app/routers/reseller_bot_orders_owned_v3.py"
+  "app/routers/reseller_subscription_volume_v2.py"
+  "app/routers/reseller_pool_guard_v3.py"
 )
 
 for rel in "${BOT_RUNTIME_FILES[@]}"; do
@@ -68,7 +81,7 @@ for rel in "${BOT_RUNTIME_FILES[@]}"; do
   }
 done
 
-printf '\n[1/7] Syncing reseller bot runtime bundle\n'
+printf '\n[1/8] Syncing reseller bot runtime bundle\n'
 install -m 0644 "$SOURCE_DIR/backend/requirements.txt" "$BACKEND_DIR/requirements.txt"
 for rel in "${BOT_RUNTIME_FILES[@]}"; do
   install -D -m 0644 "$SOURCE_DIR/backend/$rel" "$BACKEND_DIR/$rel"
@@ -78,17 +91,27 @@ printf 'RESELLER_BOT_RUNTIME_SYNC_OK\n'
 for runtime_file in \
   "$BACKEND_DIR/app/reseller_bot_runtime.py" \
   "$BACKEND_DIR/app/reseller_bot_runtime_owned.py" \
-  "$BACKEND_DIR/app/reseller_bot_owned_runtime.py"; do
+  "$BACKEND_DIR/app/reseller_bot_owned_runtime.py" \
+  "$BACKEND_DIR/app/routers/reseller_pool_guard_v3.py" \
+  "$BACKEND_DIR/app/routers/reseller_subscription_volume_v2.py"; do
   [[ -f "$runtime_file" ]] || {
     echo "reseller bot runtime not found after sync: $runtime_file" >&2
     exit 1
   }
 done
 
-printf '\n[2/7] Installing backend dependencies\n'
+printf '\n[2/8] Installing backend dependencies\n'
 "$VENV_DIR/bin/pip" install -q -r "$BACKEND_DIR/requirements.txt"
 
-printf '\n[3/7] Ensuring reseller bot encryption key\n'
+printf '\n[3/8] Compiling synced reseller runtime bundle\n'
+COMPILE_FILES=()
+for rel in "${BOT_RUNTIME_FILES[@]}"; do
+  [[ "$rel" == *.py ]] && COMPILE_FILES+=("$BACKEND_DIR/$rel")
+done
+"$VENV_DIR/bin/python" -m py_compile "${COMPILE_FILES[@]}"
+printf 'RESELLER_BOT_RUNTIME_COMPILE_OK\n'
+
+printf '\n[4/8] Ensuring reseller bot encryption key\n'
 install -d -m 0755 "$(dirname "$KEY_FILE")"
 KEY_FILE="$KEY_FILE" "$VENV_DIR/bin/python" - <<'PY'
 import os
@@ -125,7 +148,7 @@ else:
     print(f"RESELLER_BOT_KEY_CREATED path={path}")
 PY
 
-printf '\n[4/7] Verifying reseller bot runtime import\n'
+printf '\n[5/8] Verifying reseller bot runtime import\n'
 (
   cd "$BACKEND_DIR"
   PYTHONPATH="$BACKEND_DIR" "$VENV_DIR/bin/python" - <<'PY'
@@ -134,6 +157,7 @@ from app.reseller_bot_runtime_owned import build_router, install_runtime_overrid
 from app.reseller_bot_owned_runtime import build_owned_plan_router
 from app.reseller_bot_review import register_reseller_review_handlers
 from app.routers.reseller_bot_orders_owned_v3 import approve_order_owned_v3
+from app.routers.reseller_pool_guard_v3 import extend_subscription_pool_guard
 from app.reseller_bot_crypto import encrypt_bot_token, decrypt_bot_token
 
 assert callable(build_router)
@@ -142,6 +166,7 @@ assert callable(install_runtime_overrides)
 assert callable(supervisor)
 assert callable(register_reseller_review_handlers)
 assert callable(approve_order_owned_v3)
+assert callable(extend_subscription_pool_guard)
 probe = "123456789:test-reseller-bot-key"
 encrypted = encrypt_bot_token(probe)
 assert encrypted != probe
@@ -151,17 +176,17 @@ print("RESELLER_BOT_CRYPTO_ROUNDTRIP_OK")
 PY
 )
 
-printf '\n[5/7] Installing systemd service\n'
+printf '\n[6/8] Installing systemd service\n'
 install -m 0644 "$TEMPLATE" "$TARGET"
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 
-printf '\n[6/7] Starting reseller bot supervisor\n'
+printf '\n[7/8] Starting reseller bot supervisor\n'
 systemctl restart "$SERVICE_NAME"
 sleep 3
 systemctl is-active --quiet "$SERVICE_NAME"
 
-printf '\n[7/7] Final status\n'
+printf '\n[8/8] Final status\n'
 SYSTEMD_PAGER=cat systemctl status "$SERVICE_NAME" --no-pager -l
 
 echo
