@@ -8,7 +8,9 @@ import {BrandMark} from "../lib/branding";
 import {CustomerSessionProvider,useCustomerSession} from "../lib/customer-session";
 import {clearCustomerToken,customerApi,getCustomerToken} from "../lib/customer-api";
 import {getResellerProfile} from "../lib/role-router";
+import {resellerApi,ResellerRow} from "../lib/reseller-runtime-api";
 import {CustomerNotificationCenter} from "./customer-notification-center";
+import {ResellerNotificationCenter} from "./reseller-notification-center";
 
 type IconName="home"|"cart"|"subscription"|"orders"|"wallet"|"payments"|"bell"|"profile";
 type MenuItem=readonly [string,string,string,IconName];
@@ -60,6 +62,27 @@ function CustomerIdentity(){
   </div>;
 }
 
+function ResellerIdentity(){
+  const {pick}=useI18n();
+  const [profile,setProfile]=useState<ResellerRow>({});
+
+  useEffect(()=>{
+    let alive=true;
+    resellerApi.me().then(value=>{if(alive)setProfile(value);}).catch(()=>{});
+    return()=>{alive=false};
+  },[]);
+
+  const name=String(profile.brand_name||profile.name||pick("نماینده فروش","Reseller"));
+  const secondary=String(profile.email||profile.code||"Partner");
+  const initial=name.trim().charAt(0).toUpperCase()||"R";
+  const logout=()=>{clearCustomerToken();window.location.replace("/login");};
+
+  return <div className="customer-portal-identity reseller-portal-identity">
+    <div className="customer-portal-user"><span className="customer-portal-avatar">{initial}</span><div className="customer-portal-user-copy"><b>{name}</b><small dir="ltr">{secondary}</small></div></div>
+    <button type="button" className="customer-portal-logout" onClick={logout} title={pick("خروج از حساب","Sign out")}><span>↪</span><em>{pick("خروج","Sign out")}</em></button>
+  </div>;
+}
+
 function CustomerAccessGuard({children}:{children:React.ReactNode}){
   const {pick}=useI18n();
   const [ready,setReady]=useState(false);
@@ -67,7 +90,6 @@ function CustomerAccessGuard({children}:{children:React.ReactNode}){
 
   useEffect(()=>{
     let alive=true;
-
     const run=async()=>{
       const token=getCustomerToken();
       if(!token){window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);return;}
@@ -83,7 +105,6 @@ function CustomerAccessGuard({children}:{children:React.ReactNode}){
         setReady(true);
       }catch(reason){if(alive)setError(reason instanceof Error?reason.message:String(reason));}
     };
-
     void run();
     return()=>{alive=false};
   },[]);
@@ -97,6 +118,7 @@ function ResellerAccessGuard({children}:{children:React.ReactNode}){
   const {pick}=useI18n();
   const [ready,setReady]=useState(false);
   const [error,setError]=useState("");
+
   useEffect(()=>{
     let alive=true;
     const run=async()=>{
@@ -106,7 +128,7 @@ function ResellerAccessGuard({children}:{children:React.ReactNode}){
       try{account=await customerApi.me(token);}catch{clearCustomerToken();window.location.replace("/login");return;}
       if(!alive)return;
       if(!account.is_active){clearCustomerToken();window.location.replace("/login");return;}
-      if(account.role==="admin"){window.location.replace("/admin");return;}
+      if(String(account.role||"").toLowerCase()==="admin"){window.location.replace("/admin");return;}
       try{
         const reseller=await getResellerProfile(token);
         if(!alive)return;
@@ -117,20 +139,22 @@ function ResellerAccessGuard({children}:{children:React.ReactNode}){
     void run();
     return()=>{alive=false};
   },[]);
+
   if(error)return <div className="auth-gate"><div className="auth-gate-card"><b>{pick("بررسی دسترسی نمایندگی ناموفق بود","Could not verify reseller access")}</b><small>{error}</small><button className="ghost" onClick={()=>window.location.reload()}>{pick("تلاش دوباره","Retry")}</button></div></div>;
   if(!ready)return <div className="auth-gate"><div className="auth-gate-card"><span className="spinner"/><b>{pick("در حال بررسی دسترسی نمایندگی...","Checking reseller access...")}</b></div></div>;
   return <>{children}</>;
 }
 
-function CustomerSidebar({active,collapsed,toggle,closeMobile}:{active:string;collapsed:boolean;toggle:()=>void;closeMobile:()=>void}){
+function PortalSidebar({active,collapsed,toggle,closeMobile,type}:{active:string;collapsed:boolean;toggle:()=>void;closeMobile:()=>void;type:"customer"|"reseller"}){
   const {pick}=useI18n();
-  return <aside className="customer-portal-sidebar">
+  const menu=type==="customer"?customerMenu:resellerMenu;
+  return <aside className={`customer-portal-sidebar ${type==="reseller"?"reseller-portal-sidebar":""}`}>
     <div className="customer-portal-brand-row"><div className="customer-portal-brand"><BrandMark/></div><button className="customer-portal-collapse" type="button" onClick={toggle} aria-label={pick("جمع کردن منو","Collapse menu")}>‹</button><button className="customer-portal-mobile-close" type="button" onClick={closeMobile} aria-label={pick("بستن منو","Close menu")}>×</button></div>
-    <div className="customer-portal-section-label">{pick("حساب کاربری","Customer account")}</div>
-    <nav className="customer-portal-nav" aria-label={pick("منوی حساب کاربری","Customer navigation")}>
-      {customerMenu.map(([fa,en,href,icon])=><Link key={href} href={href} className={active===href?"active":""} title={collapsed?pick(fa,en):undefined} onClick={closeMobile}><span className="customer-portal-nav-icon"><PortalIcon name={icon}/></span><span className="customer-portal-nav-label">{pick(fa,en)}</span>{active===href&&<span className="customer-portal-active-dot"/>}</Link>)}
+    <div className="customer-portal-section-label">{type==="customer"?pick("حساب کاربری","Customer account"):pick("مرکز نمایندگی","Reseller center")}</div>
+    <nav className="customer-portal-nav" aria-label={type==="customer"?pick("منوی حساب کاربری","Customer navigation"):pick("منوی نمایندگی","Reseller navigation")}>
+      {menu.map(([fa,en,href,icon])=><Link key={href} href={href} className={active===href?"active":""} title={collapsed?pick(fa,en):undefined} onClick={closeMobile}><span className="customer-portal-nav-icon"><PortalIcon name={icon}/></span><span className="customer-portal-nav-label">{pick(fa,en)}</span>{active===href&&<span className="customer-portal-active-dot"/>}</Link>)}
     </nav>
-    <CustomerIdentity/>
+    {type==="customer"?<CustomerIdentity/>:<ResellerIdentity/>}
   </aside>;
 }
 
@@ -138,34 +162,30 @@ function PortalFrame({children,active="",type}:PortalShellProps){
   const {pick}=useI18n();
   const [collapsed,setCollapsed]=useState(false);
   const [mobileOpen,setMobileOpen]=useState(false);
-  const menu=type==="customer"?customerMenu:resellerMenu;
   const storageKey=`twinpanel.${type}.sidebar.collapsed`;
 
   useEffect(()=>{try{setCollapsed(localStorage.getItem(storageKey)==="1");}catch{}},[storageKey]);
 
-  const toggle=()=>setCollapsed(v=>{
-    const n=!v;
-    try{localStorage.setItem(storageKey,n?"1":"0");}catch{}
-    return n;
+  const toggle=()=>setCollapsed(value=>{
+    const next=!value;
+    try{localStorage.setItem(storageKey,next?"1":"0");}catch{}
+    return next;
   });
 
-  const resellerLogout=()=>{
-    clearCustomerToken();
-    window.location.replace("/login");
-  };
-
-  if(type==="customer")return <div className={`customer-portal-shell ${collapsed?"is-collapsed":""} ${mobileOpen?"is-mobile-open":""}`}>
-    <CustomerSidebar active={active} collapsed={collapsed} toggle={toggle} closeMobile={()=>setMobileOpen(false)}/>
-    <main className="customer-portal-main"><header className="customer-portal-header"><button className="customer-portal-mobile-toggle" type="button" onClick={()=>setMobileOpen(v=>!v)} aria-expanded={mobileOpen}>☰</button><div className="customer-portal-search"><span>⌕</span><input placeholder={pick("جستجو در حساب...","Search account...")}/></div><div className="customer-portal-header-actions"><CustomerNotificationCenter/><LanguageSwitch compact/><ThemeSwitch compact/></div></header>{children}</main>
-  </div>;
-
-  return <div className={`shell portal-shell portal-${type} ${collapsed?"sidebar-collapsed":""} ${mobileOpen?"mobile-menu-open":""}`}>
-    <aside className="sidebar">
-      <div className="sidebar-head"><BrandMark/><button className="sidebar-collapse" type="button" onClick={toggle}>↔</button><button className="mobile-menu-close" type="button" onClick={()=>setMobileOpen(false)}>×</button></div>
-      <nav className="sidebar-nav"><div className="nav-group"><div className="nav-group-title">{pick("مرکز نمایندگی","Reseller Center")}</div>{menu.map(([fa,en,href,icon])=><Link key={href} href={href} className={active===href?"active":""} title={collapsed?pick(fa,en):undefined} onClick={()=>setMobileOpen(false)}><i><PortalIcon name={icon}/></i><span className="nav-label">{pick(fa,en)}</span></Link>)}</div></nav>
-      <div className="profile"><span className="avatar">R</span><div className="profile-copy"><b>{pick("نماینده فروش","Reseller")}</b><small>Partner</small></div><button className="mini-btn" type="button" onClick={resellerLogout} title={pick("خروج","Sign out")}>↪</button></div>
-    </aside>
-    <main><header><button className="mobile-menu-toggle" type="button" onClick={()=>setMobileOpen(v=>!v)} aria-expanded={mobileOpen}>☰</button><div className="search">⌕ <input placeholder={pick("جستجو...","Search...")}/></div><div className="head-actions"><LanguageSwitch compact/><ThemeSwitch compact/></div></header>{children}</main>
+  return <div className={`customer-portal-shell ${type==="reseller"?"reseller-portal-shell":""} ${collapsed?"is-collapsed":""} ${mobileOpen?"is-mobile-open":""}`}>
+    <PortalSidebar active={active} collapsed={collapsed} toggle={toggle} closeMobile={()=>setMobileOpen(false)} type={type}/>
+    <main className="customer-portal-main">
+      <header className="customer-portal-header">
+        <button className="customer-portal-mobile-toggle" type="button" onClick={()=>setMobileOpen(value=>!value)} aria-expanded={mobileOpen}>☰</button>
+        <div className="customer-portal-search"><span>⌕</span><input placeholder={type==="customer"?pick("جستجو در حساب...","Search account..."):pick("جستجو در نمایندگی...","Search reseller panel...")}/></div>
+        <div className="customer-portal-header-actions">
+          {type==="customer"?<CustomerNotificationCenter/>:<ResellerNotificationCenter/>}
+          <LanguageSwitch compact/>
+          <ThemeSwitch compact/>
+        </div>
+      </header>
+      {children}
+    </main>
   </div>;
 }
 
