@@ -1,6 +1,6 @@
 import {TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
 import {TelegramRuntimePage,DiscountsRuntimePage,StoreSettingsRuntimePage} from "../../components/admin-parity-runtime";
-import {AdminResellersLegacyV3} from "../../components/admin-resellers-legacy-v3";
+import {AdminResellersLegacyV4} from "../../components/admin-resellers-legacy-v4";
 import {BackupsFullRuntimePage} from "../../components/backups-full-runtime";
 import {ProvisionRuntimePage,SmsReaderRuntimePage,MotherAccessRuntimePage,AccountDeliveryRuntimePage} from "../../components/admin-infra-runtime";
 import {SupportRuntimePage,NotificationsRuntimePage} from "../../components/admin-ops-runtime";
@@ -27,11 +27,10 @@ import {DownloadAssetsRuntime} from "../../components/download-assets-runtime";
 import {
   ResellerDashboardParityV2,
   ResellerCustomersParityV2,
-  ResellerSalesParityV2,
-  ResellerTrafficParityV2,
   ResellerNotificationsParityV2,
   ResellerSettingsParityV2,
 } from "../../components/reseller-portal-parity-v2";
+import {ResellerSubscriptionPlansV3,ResellerTrafficRechargeV3} from "../../components/reseller-plans-traffic-v3";
 import {ResellerBotParityRuntime,ResellerOrdersParityRuntime,ResellerDiscountsParityRuntime} from "../../components/reseller-commerce-parity";
 import {ResellerSubscriptionsParityRuntime} from "../../components/reseller-subscriptions-parity";
 import {StoreRuntime2027} from "../../components/store-runtime";
@@ -71,7 +70,7 @@ const route=(key:string)=>{
   if(key==="admin/store-settings") return admin(<StoreSettingsRuntimePage/>);
   if(key==="admin/wallet") return usersWithWallet();
   if(key==="admin/discounts") return admin(<DiscountsRuntimePage/>);
-  if(key==="admin/resellers") return admin(<AdminResellersLegacyV3/>);
+  if(key==="admin/resellers") return admin(<AdminResellersLegacyV4/>);
   if(key==="admin/domains") return admin(<DomainsRuntimePage/>);
   if(key==="admin/provision") return admin(<ProvisionRuntimePage/>);
   if(key==="admin/account-delivery") return admin(<AccountDeliveryRuntimePage/>);
@@ -91,8 +90,8 @@ const route=(key:string)=>{
   if(key==="reseller") return <ResellerDashboardParityV2/>;
   if(key==="reseller/customers") return <ResellerCustomersParityV2/>;
   if(key==="reseller/subscriptions") return <ResellerSubscriptionsParityRuntime/>;
-  if(key==="reseller/sales") return <ResellerSalesParityV2/>;
-  if(key==="reseller/traffic"||key==="reseller/wallet") return <ResellerTrafficParityV2/>;
+  if(key==="reseller/sales"||key==="reseller/plans") return <ResellerSubscriptionPlansV3/>;
+  if(key==="reseller/traffic"||key==="reseller/wallet") return <ResellerTrafficRechargeV3/>;
   if(key==="reseller/orders") return <ResellerOrdersParityRuntime/>;
   if(key==="reseller/discounts") return <ResellerDiscountsParityRuntime/>;
   if(key==="reseller/bot") return <ResellerBotParityRuntime/>;
