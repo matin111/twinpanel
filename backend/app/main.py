@@ -44,6 +44,7 @@ from .routers.reseller_sale_v2 import router as reseller_sale_v2_router
 from .routers.reseller_profile_v2 import router as reseller_profile_v2_router
 from .routers.reseller_subscription_volume_v2 import router as reseller_subscription_volume_v2_router
 from .self_hosted_runtime import apply_self_hosted_runtime
+from .xray_modern_runtime import router as xray_modern_router
 from .admin_notification_service import notification_watch_loop
 from .services.customer_maintenance import customer_maintenance_loop
 from .services.payment_market_rates import payment_market_loop
@@ -296,6 +297,9 @@ app.include_router(domains.router)
 app.include_router(branding.router)
 app.include_router(provision.router)
 app.include_router(quota_security.router)
+# Modern Xray migration/provisioning is isolated behind its own authenticated
+# endpoints; legacy account-delivery routes remain available for compatibility.
+app.include_router(xray_modern_router)
 app.include_router(account_delivery.router)
 # Register the redesigned exact /v1/connect/{token} page before the legacy
 # public router. Legacy sub-routes such as /usage and /qr remain available.
