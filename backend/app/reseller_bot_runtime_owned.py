@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from html import escape
+import logging
 
 from aiogram import Router
 
 from . import reseller_bot_review
 from . import reseller_bot_runtime as legacy_runtime
+from .discount_schema import ensure_discount_schema
 from .models import Plan
 from .reseller_bot_owned_runtime import build_owned_plan_router
 from .reseller_bot_payment_runtime import build_owned_payment_router
@@ -13,6 +15,8 @@ from .reseller_owned_plans import owned_plan_by_backing
 from .routers import reseller_bot_orders as legacy_orders
 from .routers.reseller_bot_orders_owned_v3 import approve_order_owned_v3
 
+
+log = logging.getLogger(__name__)
 
 _original_build_router = legacy_runtime.build_router
 _original_review_caption = reseller_bot_review._review_caption
@@ -72,6 +76,12 @@ def install_runtime_overrides() -> None:
 
 
 def main() -> None:
+    schema = ensure_discount_schema()
+    log.info(
+        "discount schema ready codes=%s redemptions=%s",
+        schema.get("discount_codes"),
+        schema.get("discount_redemptions"),
+    )
     install_runtime_overrides()
     legacy_runtime.main()
 
