@@ -35,10 +35,15 @@ done
   exit 1
 }
 
-[[ -f "$BACKEND_DIR/app/reseller_bot_runtime.py" ]] || {
-  echo "reseller bot runtime not found" >&2
-  exit 1
-}
+for runtime_file in \
+  "$BACKEND_DIR/app/reseller_bot_runtime.py" \
+  "$BACKEND_DIR/app/reseller_bot_runtime_owned.py" \
+  "$BACKEND_DIR/app/reseller_bot_owned_runtime.py"; do
+  [[ -f "$runtime_file" ]] || {
+    echo "reseller bot runtime not found: $runtime_file" >&2
+    exit 1
+  }
+done
 
 [[ -f "$TEMPLATE" ]] || {
   echo "service template not found: $TEMPLATE" >&2
@@ -52,10 +57,19 @@ printf '\n[2/5] Verifying reseller bot runtime import\n'
 (
   cd "$BACKEND_DIR"
   PYTHONPATH="$BACKEND_DIR" "$VENV_DIR/bin/python" - <<'PY'
-from app.reseller_bot_runtime import build_router, supervisor
+from app.reseller_bot_runtime import supervisor
+from app.reseller_bot_runtime_owned import build_router, install_runtime_overrides
+from app.reseller_bot_owned_runtime import build_owned_plan_router
 from app.reseller_bot_review import register_reseller_review_handlers
-print("RESELLER_BOT_RUNTIME_IMPORT_OK")
-print(build_router.__name__, supervisor.__name__, register_reseller_review_handlers.__name__)
+from app.routers.reseller_bot_orders_owned_v3 import approve_order_owned_v3
+
+assert callable(build_router)
+assert callable(build_owned_plan_router)
+assert callable(install_runtime_overrides)
+assert callable(supervisor)
+assert callable(register_reseller_review_handlers)
+assert callable(approve_order_owned_v3)
+print("RESELLER_BOT_OWNED_RUNTIME_IMPORT_OK")
 PY
 )
 
