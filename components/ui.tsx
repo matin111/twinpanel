@@ -24,6 +24,7 @@ const menuGroups=[
   ]},
   {fa:"مالی و فروش",en:"Sales & Finance",items:[
     ["پرداخت‌ها","Payments","/admin/payments","◫"],
+    ["تأیید خودکار کارت","Card Auto Verify","/admin/sms-reader","▤"],
     ["کیف پول","Wallet","/admin/wallet","◉"],
     ["کد تخفیف","Discounts","/admin/discounts","％"],
     ["نمایندگی‌ها","Resellers","/admin/resellers","♜"],
@@ -32,7 +33,6 @@ const menuGroups=[
   {fa:"ارتباطات",en:"Communications",items:[
     ["ربات تلگرام","Telegram Bot","/admin/telegram","✈"],
     ["مدیریت تلگرام","Telegram Manager","/admin/telegram-manager","◈"],
-    ["SMS Reader","SMS Reader","/admin/sms-reader","▤"],
     ["پشتیبانی","Support","/admin/support","◌"],
     ["اعلان‌ها","Notifications","/admin/notifications","◎"]
   ]},
