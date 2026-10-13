@@ -1,5 +1,5 @@
 import {TelegramManagerPage,VpnSettingsPage} from "../../components/admin-control-screens";
-import {TelegramRuntimePage,WalletRuntimePage,DiscountsRuntimePage,ResellersRuntimePage,StoreSettingsRuntimePage} from "../../components/admin-parity-runtime";
+import {TelegramRuntimePage,DiscountsRuntimePage,ResellersRuntimePage,StoreSettingsRuntimePage} from "../../components/admin-parity-runtime";
 import {BackupsFullRuntimePage} from "../../components/backups-full-runtime";
 import {ProvisionRuntimePage,SmsReaderRuntimePage,MotherAccessRuntimePage,AccountDeliveryRuntimePage} from "../../components/admin-infra-runtime";
 import {SupportRuntimePage,NotificationsRuntimePage} from "../../components/admin-ops-runtime";
@@ -31,6 +31,7 @@ import {AdminCollectionRuntime} from "../../components/admin-collections-runtime
 import {AdminPaymentsRuntime} from "../../components/admin-payments-runtime";
 import {AdminPaymentMarketRates} from "../../components/admin-payment-market-rates";
 import {AdminCryptoDiscountControl} from "../../components/admin-crypto-discount-control";
+import {AdminWalletV2} from "../../components/admin-wallet-v2";
 import {AdminSmsRelayDownload} from "../../components/admin-sms-relay-download";
 
 const customerSections=new Set(["orders","notifications","profile"]);
@@ -58,7 +59,7 @@ const route=(key:string)=>{
   if(key==="admin/sms-reader") return admin(<><SmsReaderRuntimePage/><AdminSmsRelayDownload/></>);
   if(key==="admin/backups") return admin(<BackupsFullRuntimePage/>);
   if(key==="admin/store-settings") return admin(<StoreSettingsRuntimePage/>);
-  if(key==="admin/wallet") return admin(<WalletRuntimePage/>);
+  if(key==="admin/wallet") return admin(<AdminWalletV2/>);
   if(key==="admin/discounts") return admin(<DiscountsRuntimePage/>);
   if(key==="admin/resellers") return admin(<ResellersRuntimePage/>);
   if(key==="admin/domains") return admin(<DomainsRuntimePage/>);
