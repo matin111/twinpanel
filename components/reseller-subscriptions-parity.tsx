@@ -41,10 +41,12 @@ export function ResellerSubscriptionsParityRuntime(){
   const [connection,setConnection]=useState<ResellerRow|null>(null);
   const [copied,setCopied]=useState("");
   const [showPassword,setShowPassword]=useState(false);
+  const [saleKey,setSaleKey]=useState(()=>idempotency("sale"));
+  const [extendKey,setExtendKey]=useState(()=>idempotency("extend"));
 
   const [sell,setSell]=useState({user_id:0,plan_id:0,node_ids:[] as number[],username:"",password:""});
   const [edit,setEdit]=useState({traffic_gb:0,expires_at:"",sell_price_toman:0,account_username:"",account_password:""});
-  const [extend,setExtend]=useState({add_traffic_gb:0,add_days:30,charge_toman:0});
+  const [extend,setExtend]=useState({add_traffic_gb:0,add_days:30,charge_toman:0,reset_usage:false});
 
   const load=async()=>{
     setError("");
@@ -78,7 +80,7 @@ export function ResellerSubscriptionsParityRuntime(){
     if(busy)return;
     setBusy(true);setError("");setOk("");
     try{await fn();setOk(label);await load();}
-    catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    catch(reason){setError(reason instanceof Error?reason.message:String(reason));await load();}
     finally{setBusy(false);}
   };
 
@@ -87,14 +89,21 @@ export function ResellerSubscriptionsParityRuntime(){
     catch{setError(pick("کپی انجام نشد.","Copy failed."));}
   };
 
+  const openSale=()=>{
+    setSaleKey(idempotency("sale"));
+    setSell({user_id:0,plan_id:0,node_ids:[],username:"",password:""});
+    setSellOpen(true);
+  };
+
   const submitSale=(event:FormEvent)=>{
     event.preventDefault();
     if(!selectedPlan||!sell.user_id)return;
     const planId=Number(selectedPlan.plan_id||selectedPlan.id||0);
     const protocols=enabledProtocols(selectedPlan);
-    void act(pick("اشتراک با موفقیت ساخته شد","Subscription created"),async()=>{
-      await resellerApi.sellSubscription({
+    void act(pick("اشتراک ساخته و روی سرورها فعال شد","Subscription created and provisioned"),async()=>{
+      const result=await resellerApi.sellSubscription({
         user_id:sell.user_id,
+        plan_id:planId,
         traffic_gb:Number(selectedPlan.traffic_gb||0),
         duration_days:Number(selectedPlan.duration_days||0),
         node_ids:sell.node_ids,
@@ -102,10 +111,14 @@ export function ResellerSubscriptionsParityRuntime(){
         sell_price_toman:Number(selectedPlan.sell_price_toman||0),
         username:sell.username.trim()||null,
         password:sell.password.trim()||null,
-        idempotency_key:idempotency(`sale-${planId}`)
+        idempotency_key:saleKey
       });
+      const subscriptionId=Number(result.subscription_id||0);
+      if(!subscriptionId)throw new Error(pick("شناسه اشتراک ساخته‌شده دریافت نشد.","Created subscription id was not returned."));
+      await resellerApi.provisionSubscription(subscriptionId);
       setSellOpen(false);
       setSell({user_id:0,plan_id:0,node_ids:[],username:"",password:""});
+      setSaleKey(idempotency("sale"));
     });
   };
 
@@ -139,17 +152,24 @@ export function ResellerSubscriptionsParityRuntime(){
 
   const openExtend=(row:ResellerRow)=>{
     setExtendRow(row);
-    setExtend({add_traffic_gb:0,add_days:30,charge_toman:0});
+    setExtend({add_traffic_gb:0,add_days:30,charge_toman:0,reset_usage:false});
+    setExtendKey(idempotency(`extend-${Number(row.id||row.subscription_id||0)}`));
   };
 
   const submitExtend=(event:FormEvent)=>{
     event.preventDefault();
     if(!extendRow)return;
     const id=Number(extendRow.id||extendRow.subscription_id||0);
-    if(!id||(!extend.add_days&&!extend.add_traffic_gb))return;
-    void act(pick("اشتراک تمدید شد","Subscription extended"),async()=>{
-      await resellerApi.extendSubscription(id,{...extend,idempotency_key:idempotency(`extend-${id}`)});
+    if(!id)return;
+    if(extend.reset_usage&&(!extend.add_days||!extend.add_traffic_gb)){
+      setError(pick("برای شروع دوره جدید، حجم و مدت را هر دو وارد کنید.","Enter both traffic and duration for a new billing cycle."));
+      return;
+    }
+    if(!extend.reset_usage&&!extend.add_days&&!extend.add_traffic_gb)return;
+    void act(extend.reset_usage?pick("دوره جدید اشتراک شروع شد","New subscription cycle started"):pick("اشتراک تمدید شد","Subscription extended"),async()=>{
+      await resellerApi.extendSubscription(id,{...extend,idempotency_key:extendKey});
       setExtendRow(null);
+      setExtendKey(idempotency("extend"));
     });
   };
 
@@ -169,7 +189,7 @@ export function ResellerSubscriptionsParityRuntime(){
     <div className="page reseller-parity-page reseller-subscriptions-parity">
       <div className="page-head">
         <div><h1>{pick("اشتراک‌ها","Subscriptions")}</h1><small>{pick("فروش و مدیریت کامل سرویس‌های مشتریان نمایندگی","Sell and fully manage reseller customer services")}</small></div>
-        <div className="action-row"><button className="ghost" onClick={()=>void load()} disabled={busy}>{pick("بروزرسانی","Refresh")}</button><button className="primary" onClick={()=>setSellOpen(true)}>＋ {pick("فروش اشتراک","Sell subscription")}</button></div>
+        <div className="action-row"><button className="ghost" onClick={()=>void load()} disabled={busy}>{pick("بروزرسانی","Refresh")}</button><button className="primary" onClick={openSale}>＋ {pick("فروش اشتراک","Sell subscription")}</button></div>
       </div>
       <Notice error={error} ok={ok}/>
 
@@ -190,13 +210,13 @@ export function ResellerSubscriptionsParityRuntime(){
         {!filtered.length&&<Empty>{pick("اشتراکی با این فیلتر پیدا نشد.","No subscription matches this filter.")}</Empty>}
       </Card>
 
-      {sellOpen&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>!busy&&setSellOpen(false)}/><form className="runtime-modal-card reseller-sub-modal" onSubmit={submitSale}><div className="card-head"><div><b>{pick("فروش اشتراک جدید","Sell new subscription")}</b><small>{pick("حجم، مدت و پروتکل‌ها از پلن مجاز مدیر خوانده می‌شوند.","Traffic, duration and protocols come from the admin-authorized plan.")}</small></div><button className="icon-button" type="button" onClick={()=>setSellOpen(false)}>×</button></div><div className="setting-grid"><label className="field"><span>{pick("مشتری","Customer")}</span><select required value={sell.user_id} onChange={e=>setSell(s=>({...s,user_id:Number(e.target.value)}))}><option value={0}>—</option>{customers.map((row,index)=>{const id=Number(row.id||row.user_id||0);return <option key={id||index} value={id}>{str(row,"full_name","name")||`#${id}`} {str(row,"phone")?`· ${str(row,"phone")}`:""}</option>})}</select></label><label className="field"><span>{pick("پلن مجاز","Authorized plan")}</span><select required value={sell.plan_id} onChange={e=>setSell(s=>({...s,plan_id:Number(e.target.value)}))}><option value={0}>—</option>{plans.map((plan,index)=>{const id=Number(plan.plan_id||plan.id||0);return <option key={id||index} value={id}>{str(plan,"name")||`#${id}`} · {String(plan.traffic_gb||0)}GB · {String(plan.duration_days||0)} {pick("روز","days")} · {money(num(plan,"sell_price_toman"))}</option>})}</select></label><label className="field"><span>{pick("نام کاربری دلخواه (اختیاری)","Custom username (optional)")}</span><input dir="ltr" value={sell.username} onChange={e=>setSell(s=>({...s,username:e.target.value}))}/></label><label className="field"><span>{pick("رمز دلخواه (اختیاری)","Custom password (optional)")}</span><input dir="ltr" value={sell.password} onChange={e=>setSell(s=>({...s,password:e.target.value}))}/></label></div>{selectedPlan&&<div className="reseller-plan-preview"><div><span>{pick("حجم","Traffic")}</span><b>{String(selectedPlan.traffic_gb||0)} GB</b></div><div><span>{pick("مدت","Duration")}</span><b>{String(selectedPlan.duration_days||0)} {pick("روز","days")}</b></div><div><span>{pick("قیمت فروش","Sell price")}</span><b>{money(num(selectedPlan,"sell_price_toman"))}</b></div><div><span>{pick("پروتکل‌ها","Protocols")}</span><b>{enabledProtocols(selectedPlan).map(p=>protocolLabels[p]).join(" · ")||"—"}</b></div></div>}{nodes.length>0&&<div className="runtime-choice-section"><b>{pick("سرور مقصد","Destination server")}</b><small>{pick("اگر انتخاب نشود، تخصیص خودکار انجام می‌شود.","Leave empty for automatic assignment.")}</small><div className="protocol-toggle-grid">{nodes.map((node,index)=>{const id=Number(node.id||0),checked=sell.node_ids.includes(id);return <label className="toggle module-toggle" key={id||index}><span>{str(node,"name")||`#${id}`}{Boolean(node.is_mother)?` · ${pick("مادر","Mother")}`:""}</span><input type="checkbox" checked={checked} onChange={e=>setSell(s=>({...s,node_ids:e.target.checked?[...s.node_ids,id]:s.node_ids.filter(x=>x!==id)}))}/><i/></label>})}</div></div>}<div className="runtime-modal-actions"><button className="ghost" type="button" onClick={()=>setSellOpen(false)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy||!sell.user_id||!selectedPlan}>{busy?"…":pick("ساخت اشتراک","Create subscription")}</button></div></form></div>}
+      {sellOpen&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>!busy&&setSellOpen(false)}/><form className="runtime-modal-card reseller-sub-modal" onSubmit={submitSale}><div className="card-head"><div><b>{pick("فروش اشتراک جدید","Sell new subscription")}</b><small>{pick("حجم، مدت و پروتکل‌ها از پلن مجاز مدیر خوانده می‌شوند و پس از ثبت، سرویس روی سرورها ساخته می‌شود.","Traffic, duration and protocols come from the authorized plan and server provisioning runs after creation.")}</small></div><button className="icon-button" type="button" onClick={()=>setSellOpen(false)}>×</button></div><div className="setting-grid"><label className="field"><span>{pick("مشتری","Customer")}</span><select required value={sell.user_id} onChange={e=>setSell(s=>({...s,user_id:Number(e.target.value)}))}><option value={0}>—</option>{customers.map((row,index)=>{const id=Number(row.id||row.user_id||0);return <option key={id||index} value={id}>{str(row,"full_name","name")||`#${id}`} {str(row,"phone")?`· ${str(row,"phone")}`:""}</option>})}</select></label><label className="field"><span>{pick("پلن مجاز","Authorized plan")}</span><select required value={sell.plan_id} onChange={e=>setSell(s=>({...s,plan_id:Number(e.target.value)}))}><option value={0}>—</option>{plans.map((plan,index)=>{const id=Number(plan.plan_id||plan.id||0);return <option key={id||index} value={id}>{str(plan,"name")||`#${id}`} · {String(plan.traffic_gb||0)}GB · {String(plan.duration_days||0)} {pick("روز","days")} · {money(num(plan,"sell_price_toman"))}</option>})}</select></label><label className="field"><span>{pick("نام کاربری دلخواه (اختیاری)","Custom username (optional)")}</span><input dir="ltr" value={sell.username} onChange={e=>setSell(s=>({...s,username:e.target.value}))}/></label><label className="field"><span>{pick("رمز دلخواه (اختیاری)","Custom password (optional)")}</span><input dir="ltr" value={sell.password} onChange={e=>setSell(s=>({...s,password:e.target.value}))}/></label></div>{selectedPlan&&<div className="reseller-plan-preview"><div><span>{pick("حجم","Traffic")}</span><b>{String(selectedPlan.traffic_gb||0)} GB</b></div><div><span>{pick("مدت","Duration")}</span><b>{String(selectedPlan.duration_days||0)} {pick("روز","days")}</b></div><div><span>{pick("قیمت فروش","Sell price")}</span><b>{money(num(selectedPlan,"sell_price_toman"))}</b></div><div><span>{pick("پروتکل‌ها","Protocols")}</span><b>{enabledProtocols(selectedPlan).map(p=>protocolLabels[p]).join(" · ")||"—"}</b></div></div>}{nodes.length>0&&<div className="runtime-choice-section"><b>{pick("سرور خروجی مقصد","Exit destination")}</b><small>{pick("فقط سرورهای خروجی سالم نمایش داده می‌شوند. اگر انتخاب نشود، بهترین سرور خروجی به‌صورت خودکار انتخاب می‌شود.","Only healthy exit servers are shown. Leave empty to select the best exit automatically.")}</small><div className="protocol-toggle-grid">{nodes.map((node,index)=>{const id=Number(node.id||0),checked=sell.node_ids.includes(id);return <label className="toggle module-toggle" key={id||index}><span>{str(node,"name")||`#${id}`}{Boolean(node.is_mother)?` · ${pick("مادر","Mother")}`:""}</span><input type="checkbox" checked={checked} onChange={e=>setSell(s=>({...s,node_ids:e.target.checked?[...s.node_ids,id]:s.node_ids.filter(x=>x!==id)}))}/><i/></label>})}</div></div>}<div className="runtime-modal-actions"><button className="ghost" type="button" onClick={()=>setSellOpen(false)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy||!sell.user_id||!selectedPlan}>{busy?"…":pick("ساخت و فعال‌سازی","Create & provision")}</button></div></form></div>}
 
       {editRow&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>!busy&&setEditRow(null)}/><form className="runtime-modal-card reseller-sub-modal" onSubmit={submitEdit}><div className="card-head"><div><b>{pick("ویرایش اشتراک","Edit subscription")} #{str(editRow,"id")}</b><small>{str(editRow,"customer_name")}</small></div><button className="icon-button" type="button" onClick={()=>setEditRow(null)}>×</button></div><div className="setting-grid"><label className="field"><span>{pick("حجم کل GB","Total traffic GB")}</span><input type="number" min={0.01} step="0.01" value={edit.traffic_gb} onChange={e=>setEdit(v=>({...v,traffic_gb:Number(e.target.value)}))}/></label><label className="field"><span>{pick("تاریخ انقضا","Expiration")}</span><input type="datetime-local" required value={edit.expires_at} onChange={e=>setEdit(v=>({...v,expires_at:e.target.value}))}/></label><label className="field"><span>{pick("قیمت فروش","Sell price")}</span><input type="number" min={0} value={edit.sell_price_toman} onChange={e=>setEdit(v=>({...v,sell_price_toman:Number(e.target.value)}))}/></label><label className="field"><span>{pick("نام کاربری","Username")}</span><input dir="ltr" value={edit.account_username} onChange={e=>setEdit(v=>({...v,account_username:e.target.value}))}/></label><label className="field"><span>{pick("رمز جدید (اختیاری)","New password (optional)")}</span><input dir="ltr" value={edit.account_password} onChange={e=>setEdit(v=>({...v,account_password:e.target.value}))} placeholder={pick("خالی = بدون تغییر","Empty = keep current")}/></label></div><div className="runtime-modal-actions"><button className="ghost" type="button" onClick={()=>setEditRow(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy}>{pick("ذخیره تغییرات","Save changes")}</button></div></form></div>}
 
-      {extendRow&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>!busy&&setExtendRow(null)}/><form className="runtime-modal-card reseller-sub-modal" onSubmit={submitExtend}><div className="card-head"><div><b>{pick("تمدید اشتراک","Extend subscription")} #{str(extendRow,"id")}</b><small>{pick("فقط مقدار افزایشی را وارد کنید.","Enter only the additional amount.")}</small></div><button className="icon-button" type="button" onClick={()=>setExtendRow(null)}>×</button></div><div className="setting-grid"><label className="field"><span>{pick("حجم اضافه GB","Additional traffic GB")}</span><input type="number" min={0} step="0.01" value={extend.add_traffic_gb} onChange={e=>setExtend(v=>({...v,add_traffic_gb:Number(e.target.value)}))}/></label><label className="field"><span>{pick("روز اضافه","Additional days")}</span><input type="number" min={0} value={extend.add_days} onChange={e=>setExtend(v=>({...v,add_days:Number(e.target.value)}))}/></label><label className="field"><span>{pick("مبلغ ثبت فروش (اختیاری)","Recorded charge (optional)")}</span><input type="number" min={0} value={extend.charge_toman} onChange={e=>setExtend(v=>({...v,charge_toman:Number(e.target.value)}))}/></label></div><div className="runtime-modal-actions"><button className="ghost" type="button" onClick={()=>setExtendRow(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy||(!extend.add_days&&!extend.add_traffic_gb)}>{pick("ثبت تمدید","Apply extension")}</button></div></form></div>}
+      {extendRow&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>!busy&&setExtendRow(null)}/><form className="runtime-modal-card reseller-sub-modal" onSubmit={submitExtend}><div className="card-head"><div><b>{pick("تمدید اشتراک","Extend subscription")} #{str(extendRow,"id")}</b><small>{extend.reset_usage?pick("دوره جدید: مصرف فعلی صفر و سهمیه/تاریخ دوره جایگزین می‌شود.","New cycle: current usage resets and the cycle quota/date are replaced."):pick("تمدید افزایشی: حجم یا روز به اشتراک فعلی اضافه می‌شود.","Additive extension: traffic or days are added to the existing subscription.")}</small></div><button className="icon-button" type="button" onClick={()=>setExtendRow(null)}>×</button></div><label className="toggle module-toggle reseller-cycle-toggle"><span>{pick("شروع دوره جدید و صفر شدن مصرف","Start a new cycle and reset usage")}</span><input type="checkbox" checked={extend.reset_usage} onChange={e=>setExtend(v=>({...v,reset_usage:e.target.checked}))}/><i/></label><div className="setting-grid"><label className="field"><span>{extend.reset_usage?pick("حجم دوره جدید GB","New-cycle traffic GB"):pick("حجم اضافه GB","Additional traffic GB")}</span><input type="number" min={0} step="0.01" value={extend.add_traffic_gb} onChange={e=>setExtend(v=>({...v,add_traffic_gb:Number(e.target.value)}))}/></label><label className="field"><span>{extend.reset_usage?pick("مدت دوره جدید","New-cycle days"):pick("روز اضافه","Additional days")}</span><input type="number" min={0} value={extend.add_days} onChange={e=>setExtend(v=>({...v,add_days:Number(e.target.value)}))}/></label></div><div className="reseller-volume-note"><b>{pick("مدل حجمی نمایندگی","Volume-only reseller model")}</b><small>{pick("ساخت یا تمدید اشتراک از موجودی حجم نماینده رزرو نمی‌کند؛ موجودی فقط با مصرف واقعی کاربران کم می‌شود.","Creating or extending a subscription does not reserve reseller traffic; the pool is reduced only by real customer usage.")}</small></div><div className="runtime-modal-actions"><button className="ghost" type="button" onClick={()=>setExtendRow(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy||(extend.reset_usage?(!extend.add_days||!extend.add_traffic_gb):(!extend.add_days&&!extend.add_traffic_gb))}>{extend.reset_usage?pick("شروع دوره جدید","Start new cycle"):pick("ثبت تمدید","Apply extension")}</button></div></form></div>}
 
-      {connectionRow&&<div className="runtime-modal reseller-connection-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>setConnectionRow(null)}/><div className="runtime-modal-card reseller-connection-card"><div className="card-head"><div><b>{pick("اطلاعات اتصال","Connection information")} #{str(connectionRow,"id")}</b><small>{str(connectionRow,"customer_name")}</small></div><button className="icon-button" type="button" onClick={()=>setConnectionRow(null)}>×</button></div>{!connection?<div className="runtime-loading">{pick("در حال دریافت اطلاعات اتصال...","Loading connection information...")}</div>:<ConnectionDetails info={connection} copied={copied} showPassword={showPassword} setShowPassword={setShowPassword} copy={copy} pick={pick}/>}<div className="runtime-modal-actions"><button className="ghost" type="button" onClick={()=>setConnectionRow(null)}>{pick("بستن","Close")}</button></div></div></div>}
+      {connectionRow&&<div className="runtime-modal reseller-connection-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>setConnectionRow(null)}/><div className="runtime-modal-card reseller-connection-card"><div className="card-head"><div><b>{pick("اطلاعات اتصال","Connection information")} #{str(connectionRow,"id")}</b><small>{str(connectionRow,"customer_name")}</small></div><button className="icon-button" type="button" onClick={()=>setConnectionRow(null)}>×</button></div>{!connection?<div className="runtime-loading">{pick("در حال دریافت و بررسی اطلاعات اتصال...","Loading and checking connection information...")}</div>:<ConnectionDetails info={connection} copied={copied} showPassword={showPassword} setShowPassword={setShowPassword} copy={copy} pick={pick}/>}<div className="runtime-modal-actions"><button className="ghost" type="button" onClick={()=>setConnectionRow(null)}>{pick("بستن","Close")}</button></div></div></div>}
     </div>
   </PortalShell>;
 }
@@ -206,18 +226,23 @@ function ConnectionDetails({info,copied,showPassword,setShowPassword,copy,pick}:
   const username=str(account,"username");
   const password=str(account,"password");
   const link=str(info,"subscription_link");
+  const publicLink=link?absoluteLink(link):"";
+  const qrLink=publicLink?`${publicLink.replace(/\/$/,"")}/qr`:"";
   const credentials=rowsOf(info.credentials);
   return <div className="reseller-connection-content">
     <div className="reseller-secret-grid">
       <div><span>{pick("نام کاربری","Username")}</span><code dir="ltr">{username||"—"}</code>{username&&<button type="button" className="mini-btn" onClick={()=>void copy("username",username)}>{copied==="username"?"✓":pick("کپی","Copy")}</button>}</div>
       <div><span>{pick("رمز عبور","Password")}</span><code dir="ltr">{password?(showPassword?password:"••••••••••"):"—"}</code>{password&&<><button type="button" className="mini-btn" onClick={()=>setShowPassword(!showPassword)}>{showPassword?pick("مخفی","Hide"):pick("نمایش","Show")}</button><button type="button" className="mini-btn" onClick={()=>void copy("password",password)}>{copied==="password"?"✓":pick("کپی","Copy")}</button></>}</div>
-      <div className="wide"><span>{pick("لینک اتصال","Connection link")}</span><code dir="ltr">{link?absoluteLink(link):"—"}</code>{link&&<><button type="button" className="mini-btn" onClick={()=>void copy("link",absoluteLink(link))}>{copied==="link"?"✓":pick("کپی","Copy")}</button><button type="button" className="mini-btn" onClick={()=>window.open(absoluteLink(link),"_blank","noopener,noreferrer")}>{pick("باز کردن","Open")}</button></>}</div>
+      <div className="wide"><span>{pick("لینک عمومی اتصال","Public connection link")}</span><code dir="ltr">{publicLink||"—"}</code>{publicLink&&<><button type="button" className="mini-btn" onClick={()=>void copy("link",publicLink)}>{copied==="link"?"✓":pick("کپی","Copy")}</button><button type="button" className="mini-btn" onClick={()=>window.open(publicLink,"_blank","noopener,noreferrer")}>{pick("باز کردن","Open")}</button></>}</div>
     </div>
-    <div className="reseller-protocol-list">{credentials.map((cred,index)=>{const protocol=str(cred,"protocol");const items=rowsOf(cred.items,"items");return <section key={`${protocol}-${index}`}><div className="card-head"><b>{protocolLabels[protocol]||protocol}</b><Badge tone="violet">{items.length||1}</Badge></div>{items.length?items.map((item,itemIndex)=><CredentialItem key={itemIndex} protocol={protocol} item={item} copied={copied} copy={copy} pick={pick}/>):<small>{pick("اطلاعات این پروتکل از لینک اتصال قابل دریافت است.","Use the connection link for this protocol.")}</small>}</section>})}{!credentials.length&&<Empty>{pick("اطلاعات پروتکل جداگانه‌ای ثبت نشده است؛ از لینک اتصال استفاده کنید.","No separate protocol credentials are stored; use the connection link.")}</Empty>}</div>
+
+    {qrLink&&<div className="reseller-public-delivery"><div><b>{pick("تحویل سریع به مشتری","Quick customer delivery")}</b><small>{pick("این QR صفحه عمومی اتصال همین اشتراک را باز می‌کند.","This QR opens the public connection page for this subscription.")}</small></div><img src={qrLink} alt={pick("QR لینک اتصال","Connection link QR")}/><div className="action-row"><button className="mini-btn" type="button" onClick={()=>void copy("delivery-link",publicLink)}>{copied==="delivery-link"?"✓":pick("کپی لینک","Copy link")}</button><button className="mini-btn primary-lite" type="button" onClick={()=>window.open(publicLink,"_blank","noopener,noreferrer")}>{pick("صفحه اتصال","Connection page")}</button></div></div>}
+
+    <div className="reseller-protocol-list">{credentials.map((cred,index)=>{const protocol=str(cred,"protocol");const items=rowsOf(cred.items,"items");return <section key={`${protocol}-${index}`}><div className="card-head"><b>{protocolLabels[protocol]||protocol}</b><Badge tone="violet">{items.length||1}</Badge></div>{items.length?items.map((item,itemIndex)=><CredentialItem key={itemIndex} protocol={protocol} item={item} publicLink={publicLink} copied={copied} copy={copy} pick={pick}/>):<small>{pick("اطلاعات این پروتکل از لینک اتصال قابل دریافت است.","Use the connection link for this protocol.")}</small>}</section>})}{!credentials.length&&<Empty>{pick("کانفیگ آماده‌ای ثبت نشده است. دوباره صفحه اتصال را باز کنید تا سیستم Provision را بررسی کند.","No ready config is stored. Reopen connection information to retry provisioning.")}</Empty>}</div>
   </div>;
 }
 
-function CredentialItem({protocol,item,copied,copy,pick}:{protocol:string;item:ResellerRow;copied:string;copy:(key:string,value:string)=>Promise<void>;pick:(fa:string,en:string)=>string}){
+function CredentialItem({protocol,item,publicLink,copied,copy,pick}:{protocol:string;item:ResellerRow;publicLink:string;copied:string;copy:(key:string,value:string)=>Promise<void>;pick:(fa:string,en:string)=>string}){
   const pairs=[
     ["host",pick("سرور","Server")],
     ["server",pick("سرور","Server")],
@@ -229,5 +254,8 @@ function CredentialItem({protocol,item,copied,copy,pick}:{protocol:string;item:R
     ["config",pick("کانفیگ","Config")]
   ] as const;
   const shown=pairs.filter(([key])=>item[key]!==undefined&&item[key]!==null&&String(item[key]).trim()!=="");
-  return <div className="reseller-credential-item">{shown.map(([key,label],index)=>{const value=String(item[key]);const copyKey=`${protocol}-${key}-${index}`;return <div key={`${key}-${index}`} className={key==="config"||key==="uri"?"wide":""}><span>{label}</span><code dir="ltr">{key==="config"&&value.length>180?`${value.slice(0,180)}…`:value}</code><button className="mini-btn" type="button" onClick={()=>void copy(copyKey,value)}>{copied===copyKey?"✓":pick("کپی","Copy")}</button></div>})}{!shown.length&&<small>{pick("اطلاعات تکمیلی از لینک اتصال قابل دریافت است.","Additional details are available through the connection link.")}</small>}</div>;
+  const nodeId=Number(item.node_id||0);
+  const downloadable=(protocol==="openvpn"||protocol==="wireguard")&&Boolean(publicLink)&&nodeId>0;
+  const downloadUrl=downloadable?`${publicLink.replace(/\/$/,"")}/file/${protocol}/${nodeId}`:"";
+  return <div className="reseller-credential-item">{shown.map(([key,label],index)=>{const value=String(item[key]);const copyKey=`${protocol}-${key}-${index}`;return <div key={`${key}-${index}`} className={key==="config"||key==="uri"?"wide":""}><span>{label}</span><code dir="ltr">{key==="config"&&value.length>180?`${value.slice(0,180)}…`:value}</code><button className="mini-btn" type="button" onClick={()=>void copy(copyKey,value)}>{copied===copyKey?"✓":pick("کپی","Copy")}</button></div>})}{downloadUrl&&<div className="wide reseller-config-download"><span>{pick("فایل آماده","Ready config")}</span><a className="mini-btn primary-lite" href={downloadUrl} target="_blank" rel="noreferrer">{protocol==="openvpn"?pick("دانلود OpenVPN","Download OpenVPN"):pick("دانلود WireGuard","Download WireGuard")}</a></div>}{!shown.length&&<small>{pick("اطلاعات تکمیلی از لینک اتصال قابل دریافت است.","Additional details are available through the connection link.")}</small>}</div>;
 }
