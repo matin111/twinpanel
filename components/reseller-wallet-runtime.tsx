@@ -3,7 +3,8 @@
 import {FormEvent,useEffect,useMemo,useState} from "react";
 import {Badge,Card,Stat} from "./ui";
 import {PortalShell} from "./portal-shells";
-import {useI18n} from "../lib/i18n";
+import {useI18n,type Lang} from "../lib/i18n";
+import {resellerDate,resellerMoney,resellerNumber,resellerStatus,resellerType} from "../lib/reseller-i18n";
 import {
   resellerWalletApi,
   ResellerWalletSummary,
@@ -12,21 +13,25 @@ import {
   WalletPaymentMethod,
 } from "../lib/reseller-wallet-api";
 
-const money=(value:unknown)=>`${Number(value||0).toLocaleString("fa-IR")} تومان`;
-const dateText=(value:unknown)=>{if(!value)return "—";const d=new Date(String(value));return Number.isNaN(d.getTime())?String(value):d.toLocaleString("fa-IR");};
 const statusTone=(status:string):"ok"|"warn"|"bad"|"violet"=>["approved","paid","completed","success","auto_verified"].includes(status.toLowerCase())?"ok":["rejected","failed","canceled"].includes(status.toLowerCase())?"bad":"warn";
-const statusFa=(status:string)=>({pending_payment:"در انتظار پرداخت",awaiting_review:"در انتظار بررسی",approved:"تأیید و شارژ شده",rejected:"رد شده",paid:"پرداخت شده",failed:"ناموفق"} as Record<string,string>)[status]||status||"—";
 const today=()=>new Date().toISOString().slice(0,10);
 const nowTime=()=>new Date().toTimeString().slice(0,5);
 const canSubmit=(status:string)=>["pending_payment","rejected"].includes(String(status||"").toLowerCase());
 const RECEIPT_MAX=12*1024*1024;
 const RECEIPT_TYPES=new Set(["image/jpeg","image/png","image/webp","image/gif","application/pdf"]);
 
+function paymentMethodLabel(lang:Lang,id:unknown,title?:unknown):string{
+  const key=String(id||"").trim().toLowerCase();
+  if(key==="card_to_card")return lang==="fa"?"کارت به کارت":"Card to card";
+  const raw=String(title||id||"").trim();
+  return raw||"—";
+}
+
 function Notice({error,ok}:{error:string;ok:string}){return <>{error&&<div className="runtime-error">{error}</div>}{ok&&<div className="runtime-success">{ok}</div>}</>;}
 function Empty({children}:{children:React.ReactNode}){return <div className="runtime-empty">{children}</div>;}
 
 export function ResellerWalletRuntime(){
-  const {pick}=useI18n();
+  const {pick,lang}=useI18n();
   const [summary,setSummary]=useState<ResellerWalletSummary|null>(null);
   const [transactions,setTransactions]=useState<ResellerWalletTransaction[]>([]);
   const [topups,setTopups]=useState<ResellerWalletTopup[]>([]);
@@ -42,6 +47,11 @@ export function ResellerWalletRuntime(){
   const [receiptFile,setReceiptFile]=useState<File|null>(null);
   const [receiptUploaded,setReceiptUploaded]=useState(false);
   const [receiptChecking,setReceiptChecking]=useState(false);
+
+  const money=(value:unknown)=>resellerMoney(lang,value);
+  const dateText=(value:unknown)=>resellerDate(lang,value);
+  const statusText=(value:unknown)=>resellerStatus(lang,value);
+  const methodText=(id:unknown,title?:unknown)=>paymentMethodLabel(lang,id,title);
 
   const load=async(showLoading=false)=>{
     if(showLoading)setLoading(true);
@@ -194,19 +204,19 @@ export function ResellerWalletRuntime(){
     <div className="page-head"><div><h1>{pick("کیف پول نمایندگی","Reseller Wallet")}</h1><small>{pick("شارژهای این صفحه پس از تأیید مستقیماً وارد کیف پول نمایندگی می‌شوند و خرید بسته حجم از همین موجودی انجام می‌شود.","Approved top-ups are credited directly to the reseller wallet and traffic purchases use this balance.")}</small></div><button className="ghost" disabled={busy} onClick={()=>void load(true)}>{pick("بروزرسانی","Refresh")}</button></div>
     <Notice error={error} ok={ok}/>
     {loading?<div className="runtime-loading">{pick("در حال دریافت اطلاعات کیف پول...","Loading wallet...")}</div>:<>
-      <div className="stats"><Stat label={pick("موجودی کیف پول","Wallet balance")} value={money(walletBalance)}/><Stat label={pick("سقف اعتبار","Credit limit")} value={money(creditLimit)}/><Stat label={pick("اعتبار قابل استفاده","Available credit")} value={money(availableCredit)}/><Stat label={pick("شارژهای در انتظار","Pending top-ups")} value={String(pendingCount)}/></div>
+      <div className="stats"><Stat label={pick("موجودی کیف پول","Wallet balance")} value={money(walletBalance)}/><Stat label={pick("سقف اعتبار","Credit limit")} value={money(creditLimit)}/><Stat label={pick("اعتبار قابل استفاده","Available credit")} value={money(availableCredit)}/><Stat label={pick("شارژهای در انتظار","Pending top-ups")} value={resellerNumber(lang,pendingCount)}/></div>
 
       <div className="module-grid two">
         <Card className="runtime-editor"><div className="card-head"><div><b>{pick("شارژ کیف پول","Top up wallet")}</b><small>{pick("حداقل شارژ ۱۰ هزار تومان است.","Minimum top-up is 10,000 Toman.")}</small></div></div>
           <form onSubmit={createTopup}>
-            <div className="setting-grid"><label className="field"><span>{pick("مبلغ شارژ (تومان)","Top-up amount (Toman)")}</span><input type="number" min={10000} max={100000000} step={1000} value={amount} onChange={e=>setAmount(Number(e.target.value))}/></label><label className="field"><span>{pick("روش پرداخت","Payment method")}</span><select value={method} onChange={e=>setMethod(e.target.value)} disabled={!methods.length}>{!methods.length&&<option value="">{pick("روش فعالی وجود ندارد","No active method")}</option>}{methods.map(row=><option value={row.id} key={row.id}>{row.title||row.id}</option>)}</select></label></div>
+            <div className="setting-grid"><label className="field"><span>{pick("مبلغ شارژ (تومان)","Top-up amount (Toman)")}</span><input type="number" min={10000} max={100000000} step={1000} value={amount} onChange={e=>setAmount(Number(e.target.value))}/></label><label className="field"><span>{pick("روش پرداخت","Payment method")}</span><select value={method} onChange={e=>setMethod(e.target.value)} disabled={!methods.length}>{!methods.length&&<option value="">{pick("روش فعالی وجود ندارد","No active method")}</option>}{methods.map(row=><option value={row.id} key={row.id}>{methodText(row.id,row.title)}</option>)}</select></label></div>
             <button className="primary" type="submit" disabled={busy||!method}>{busy?pick("در حال ساخت...","Creating..."):pick("ایجاد درخواست شارژ","Create top-up")}</button>
           </form>
         </Card>
 
-        <Card><div className="card-head"><div><b>{pick("جزئیات شارژ","Top-up details")}</b><small>{activeTopup?`#${activeTopup.id}`:pick("از فرم شارژ یا سوابق پایین یک درخواست را انتخاب کنید.","Create a top-up or select one from history below.")}</small></div>{activeTopup&&<Badge tone={statusTone(activeTopup.status)}>{pick(statusFa(activeTopup.status),activeTopup.status)}</Badge>}</div>
+        <Card><div className="card-head"><div><b>{pick("جزئیات شارژ","Top-up details")}</b><small>{activeTopup?`#${activeTopup.id}`:pick("از فرم شارژ یا سوابق پایین یک درخواست را انتخاب کنید.","Create a top-up or select one from history below.")}</small></div>{activeTopup&&<Badge tone={statusTone(activeTopup.status)}>{statusText(activeTopup.status)}</Badge>}</div>
           {!activeTopup?<Empty>{pick("درخواست فعالی انتخاب نشده است.","No top-up selected.")}</Empty>:<>
-            <div className="runtime-info-list"><div><span>{pick("مبلغ شارژ","Wallet credit")}</span><b>{money(activeTopup.amount_toman)}</b></div><div><span>{pick("مبلغ دقیق پرداخت","Exact payable amount")}</span><b>{money(activeTopup.payable_amount_toman??activeTopup.amount_toman)}</b></div><div><span>{pick("روش","Method")}</span><b>{selectedMethod?.title||activeTopup.method}</b></div></div>
+            <div className="runtime-info-list"><div><span>{pick("مبلغ شارژ","Wallet credit")}</span><b>{money(activeTopup.amount_toman)}</b></div><div><span>{pick("مبلغ دقیق پرداخت","Exact payable amount")}</span><b>{money(activeTopup.payable_amount_toman??activeTopup.amount_toman)}</b></div><div><span>{pick("روش","Method")}</span><b>{methodText(activeTopup.method,selectedMethod?.title)}</b></div></div>
 
             {canUploadCardReceipt&&<div className="runtime-editor" style={{marginBlock:"14px"}}>
               <div className="card-head"><div><b>{pick("رسید کارت‌به‌کارت","Card transfer receipt")}</b><small>{pick("JPG، PNG، WEBP، GIF یا PDF تا ۱۲ مگابایت","JPG, PNG, WEBP, GIF or PDF up to 12 MB")}</small></div><Badge tone={receiptUploaded?"ok":"warn"}>{receiptChecking?pick("در حال بررسی","Checking"):receiptUploaded?pick("رسید آپلود شده","Receipt uploaded"):pick("رسید ثبت نشده","No receipt")}</Badge></div>
@@ -232,8 +242,8 @@ export function ResellerWalletRuntime(){
       </div>
 
       <div className="module-grid two">
-        <Card><div className="card-head"><div><b>{pick("درخواست‌های شارژ","Top-up requests")}</b><small>{pick("سوابق پرداخت و وضعیت تأیید","Payment history and approval status")}</small></div><Badge tone="violet">{topups.length}</Badge></div>{!topups.length?<Empty>{pick("هنوز درخواست شارژی ثبت نشده است.","No top-up requests yet.")}</Empty>:topups.slice(0,20).map(row=><div className="module-row" key={row.id}><div className="grow"><b>#{row.id} · {money(row.amount_toman)}</b><small>{dateText(row.created_at)} · {row.method}{row.method==="card_to_card"&&row.receipt_uploaded?` · ${pick("رسید دارد","receipt")}`:""}</small></div><Badge tone={statusTone(row.status)}>{pick(statusFa(row.status),row.status)}</Badge>{["pending_payment","rejected","awaiting_review"].includes(String(row.status||"").toLowerCase())&&<button className="mini-btn" type="button" onClick={()=>openTopup(row)}>{pick("مشاهده","View")}</button>}</div>)}</Card>
-        <Card><div className="card-head"><div><b>{pick("تراکنش‌های کیف پول","Wallet transactions")}</b><small>{pick("تمام افزایش و کاهش‌های موجودی نمایندگی","All reseller wallet credits and debits")}</small></div><Badge tone="violet">{transactions.length}</Badge></div>{!transactions.length?<Empty>{pick("تراکنشی ثبت نشده است.","No wallet transactions.")}</Empty>:transactions.slice(0,30).map(row=><div className="module-row" key={row.id}><div className="grow"><b>{row.description||row.type||`#${row.id}`}</b><small>{dateText(row.created_at)} · {pick("مانده","Balance")}: {money(row.balance_after)}</small></div><strong dir="ltr">{row.amount>0?"+":""}{Number(row.amount||0).toLocaleString("fa-IR")}</strong></div>)}</Card>
+        <Card><div className="card-head"><div><b>{pick("درخواست‌های شارژ","Top-up requests")}</b><small>{pick("سوابق پرداخت و وضعیت تأیید","Payment history and approval status")}</small></div><Badge tone="violet">{resellerNumber(lang,topups.length)}</Badge></div>{!topups.length?<Empty>{pick("هنوز درخواست شارژی ثبت نشده است.","No top-up requests yet.")}</Empty>:topups.slice(0,20).map(row=><div className="module-row" key={row.id}><div className="grow"><b>#{row.id} · {money(row.amount_toman)}</b><small>{dateText(row.created_at)} · {methodText(row.method)}{row.method==="card_to_card"&&row.receipt_uploaded?` · ${pick("رسید دارد","receipt")}`:""}</small></div><Badge tone={statusTone(row.status)}>{statusText(row.status)}</Badge>{["pending_payment","rejected","awaiting_review"].includes(String(row.status||"").toLowerCase())&&<button className="mini-btn" type="button" onClick={()=>openTopup(row)}>{pick("مشاهده","View")}</button>}</div>)}</Card>
+        <Card><div className="card-head"><div><b>{pick("تراکنش‌های کیف پول","Wallet transactions")}</b><small>{pick("تمام افزایش و کاهش‌های موجودی نمایندگی","All reseller wallet credits and debits")}</small></div><Badge tone="violet">{resellerNumber(lang,transactions.length)}</Badge></div>{!transactions.length?<Empty>{pick("تراکنشی ثبت نشده است.","No wallet transactions.")}</Empty>:transactions.slice(0,30).map(row=><div className="module-row" key={row.id}><div className="grow"><b>{row.description||resellerType(lang,row.type)||`#${row.id}`}</b><small>{dateText(row.created_at)} · {pick("مانده","Balance")}: {money(row.balance_after)}</small></div><strong dir="ltr">{row.amount>0?"+":""}{resellerNumber(lang,row.amount)}</strong></div>)}</Card>
       </div>
     </>}
   </div></PortalShell>;
