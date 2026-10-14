@@ -65,32 +65,59 @@ def _owned_topup(
     *,
     lock: bool = False,
 ) -> CustomerWalletTopup:
-    query = (
-        db.query(CustomerWalletTopup)
-        .filter(CustomerWalletTopup.id == int(topup_id))
+    query = db.query(CustomerWalletTopup).filter(
+        CustomerWalletTopup.id == int(topup_id)
     )
     if lock:
         query = query.with_for_update()
     row = query.first()
-    if not row or _method_id(row) is None:
+    method_id = _method_id(row) if row else None
+    if not row or method_id is None:
         raise HTTPException(status_code=404, detail="درخواست شارژ پیدا نشد")
+
     _owned_link(db, reseller_id, int(row.user_id))
+    method = (
+        db.query(ResellerPaymentMethod)
+        .filter(
+            ResellerPaymentMethod.id == int(method_id),
+            ResellerPaymentMethod.reseller_id == int(reseller_id),
+        )
+        .first()
+    )
+    if not method:
+        raise HTTPException(
+            status_code=404,
+            detail="روش پرداخت این درخواست متعلق به نمایندگی نیست",
+        )
     return row
 
 
 def _topup_out(
     db: Session,
+    reseller_id: int,
     row: CustomerWalletTopup,
 ) -> dict:
     link = (
         db.query(ResellerTelegramLink)
-        .filter(ResellerTelegramLink.user_id == int(row.user_id))
+        .filter(
+            ResellerTelegramLink.reseller_id == int(reseller_id),
+            ResellerTelegramLink.user_id == int(row.user_id),
+        )
         .order_by(ResellerTelegramLink.id.desc())
         .first()
     )
     user = db.get(User, int(row.user_id))
     method_id = _method_id(row)
-    method = db.get(ResellerPaymentMethod, method_id) if method_id else None
+    method = None
+    if method_id:
+        method = (
+            db.query(ResellerPaymentMethod)
+            .filter(
+                ResellerPaymentMethod.id == int(method_id),
+                ResellerPaymentMethod.reseller_id == int(reseller_id),
+            )
+            .first()
+        )
     return {
         "id": int(row.id),
         "user_id": int(row.user_id),
@@ -116,17 +143,23 @@ def reseller_bot_wallet_topups(
     reseller: Reseller = Depends(require_reseller),
     db: Session = Depends(get_db),
 ):
-    user_ids = [
-        int(row[0])
-        for row in (
-            db.query(ResellerTelegramLink.user_id)
-            .filter(ResellerTelegramLink.reseller_id == int(reseller.id))
-            .all()
-        )
-    ]
+    links = (
+        db.query(ResellerTelegramLink)
+        .filter(ResellerTelegramLink.reseller_id == int(reseller.id))
+        .all()
+    )
+    user_ids = [int(row.user_id) for row in links]
     if not user_ids:
         return []
 
+    method_ids = {
+        int(row.id)
+        for row in (
+            db.query(ResellerPaymentMethod)
+            .filter(ResellerPaymentMethod.reseller_id == int(reseller.id))
+            .all()
+        )
+    }
     rows = (
         db.query(CustomerWalletTopup)
         .filter(
@@ -137,7 +170,8 @@ def reseller_bot_wallet_topups(
         .limit(500)
         .all()
     )
-    return [_topup_out(db, row) for row in rows]
+    rows = [row for row in rows if (_method_id(row) or 0) in method_ids]
+    return [_topup_out(db, int(reseller.id), row) for row in rows]
 
 
 @router.post("/wallet-topups/{topup_id}/approve")
@@ -160,7 +194,7 @@ def approve_reseller_bot_wallet_topup(
 
     if str(row.status) == "approved":
         return {
-            **_topup_out(db, row),
+            **_topup_out(db, int(reseller.id), row),
             "duplicate": True,
         }
 
@@ -197,7 +231,7 @@ def approve_reseller_bot_wallet_topup(
     db.refresh(row)
 
     return {
-        **_topup_out(db, row),
+        **_topup_out(db, int(reseller.id), row),
         "duplicate": previous is not None,
         "balance_toman": int(wallet.balance_toman or 0),
     }
@@ -221,4 +255,4 @@ def reject_reseller_bot_wallet_topup(
     row.review_note = str(payload.reason or "").strip()[:1000] or "رد توسط نماینده"
     db.commit()
     db.refresh(row)
-    return _topup_out(db, row)
+    return _topup_out(db, int(reseller.id), row)
