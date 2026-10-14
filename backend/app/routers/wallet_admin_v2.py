@@ -9,6 +9,7 @@ from ..customer_wallet_models import CustomerWallet, CustomerWalletTopup
 from ..database import get_db
 from ..deps import require_admin
 from ..models import User
+from ..models_reseller import Reseller, ResellerCustomer
 from ..telegram_notify_service import queue_telegram_notification
 from ..user_notification_models import UserNotification
 from ..services.wallet_payment_automation import credit_wallet_topup
@@ -34,10 +35,40 @@ def _is_reseller_scoped_topup(row: CustomerWalletTopup | None) -> bool:
     )
 
 
+def _is_reseller_scoped_user(db: Session, user_id: int) -> bool:
+    user_id = int(user_id)
+    customer = (
+        db.query(ResellerCustomer.id)
+        .filter(ResellerCustomer.user_id == user_id)
+        .first()
+    )
+    if customer:
+        return True
+
+    owner = (
+        db.query(Reseller.id)
+        .filter(Reseller.owner_user_id == user_id)
+        .first()
+    )
+    return bool(owner)
+
+
 @router.get("/wallets")
 def admin_wallets_v2(db: Session = Depends(get_db)):
+    # Reseller identities are not part of central admin user management. Their
+    # wallets stay private to the reseller flow just like their user profiles.
     rows = (
         db.query(CustomerWallet)
+        .filter(
+            ~CustomerWallet.user_id.in_(
+                db.query(ResellerCustomer.user_id)
+            )
+        )
+        .filter(
+            ~CustomerWallet.user_id.in_(
+                db.query(Reseller.owner_user_id)
+            )
+        )
         .order_by(CustomerWallet.balance_toman.desc())
         .limit(2000)
         .all()
@@ -134,6 +165,11 @@ def adjust_wallet_v2(
     payload: AdminAdjustIn,
     db: Session = Depends(get_db),
 ):
+    if _is_reseller_scoped_user(db, int(user_id)):
+        # Same non-disclosure behavior as central user management: reseller
+        # identities must not be discoverable or mutable by direct user ID.
+        raise HTTPException(status_code=404, detail="کاربر پیدا نشد")
+
     result = adjust_wallet(user_id, payload, db)
     amount = int(payload.amount_toman)
     tx = result.get("transaction") or {}
