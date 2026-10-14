@@ -3,6 +3,10 @@ from __future__ import annotations
 import inspect
 from pathlib import Path
 
+from app.reseller_bot_wallet_menu_runtime import (
+    build_wallet_menu_router,
+    wallet_main_keyboard,
+)
 from app.routers.reseller_bot_orders_owned_v3 import (
     _bot_wallet_reference,
     _owned_bot_link,
@@ -12,6 +16,11 @@ from app.routers.reseller_bot_orders_owned_v3 import (
     reseller_bot_wallets,
     router,
 )
+from app.routers.reseller_bot_wallet_topups import (
+    approve_reseller_bot_wallet_topup,
+    reject_reseller_bot_wallet_topup,
+    router as topup_router,
+)
 
 
 def main() -> None:
@@ -20,11 +29,18 @@ def main() -> None:
     assert "/v1/reseller/bot-commerce/wallets/{user_id}/transactions" in paths
     assert "/v1/reseller/bot-commerce/wallets/{user_id}/adjust" in paths
 
+    topup_paths = {route.path for route in topup_router.routes}
+    assert "/v1/reseller/bot-commerce/wallet-topups" in topup_paths
+    assert "/v1/reseller/bot-commerce/wallet-topups/{topup_id}/approve" in topup_paths
+    assert "/v1/reseller/bot-commerce/wallet-topups/{topup_id}/reject" in topup_paths
+
     scope_source = inspect.getsource(_owned_bot_link)
     ledger_source = inspect.getsource(_owned_wallet_transactions)
     adjust_source = inspect.getsource(adjust_reseller_bot_wallet)
     list_source = inspect.getsource(reseller_bot_wallets)
     tx_source = inspect.getsource(reseller_bot_wallet_transactions)
+    approve_topup_source = inspect.getsource(approve_reseller_bot_wallet_topup)
+    reject_topup_source = inspect.getsource(reject_reseller_bot_wallet_topup)
 
     assert "ResellerTelegramLink.reseller_id" in scope_source
     assert "ResellerTelegramLink.user_id" in scope_source
@@ -39,11 +55,31 @@ def main() -> None:
 
     # Ledger visibility must be reseller-scoped: manual adjustments carry the
     # reseller id and bot wallet purchases are accepted only when their order
-    # belongs to the same reseller and customer.
+    # belongs to the same reseller + customer.
     assert 'adjust_prefix = f"reseller-bot-wallet:{int(reseller_id)}:"' in ledger_source
     assert 'order_prefix = "reseller-bot-wallet-order:"' in ledger_source
     assert "ResellerBotOrder.reseller_id == int(reseller_id)" in ledger_source
     assert "ResellerBotOrder.customer_user_id == int(user_id)" in ledger_source
+
+    # Card-to-card top-up approval is row-locked and idempotent. Only linked
+    # customers of the current reseller can be credited or rejected.
+    assert "lock=True" in approve_topup_source
+    assert 'reference = f"reseller-bot-wallet-topup:' in approve_topup_source
+    assert 'kind="reseller_bot_topup"' in approve_topup_source
+    assert "_owned_topup" in reject_topup_source
+
+    # The Telegram bot must expose wallet as a first-class main-menu feature.
+    keyboard = wallet_main_keyboard()
+    labels = [button.text for row in keyboard.keyboard for button in row]
+    assert "👛 کیف پول من" in labels
+    wallet_router = build_wallet_menu_router(1)
+    assert wallet_router.name == "reseller-wallet-menu-1"
+    wallet_source = inspect.getsource(build_wallet_menu_router)
+    assert 'F.text == "👛 کیف پول من"' in wallet_source
+    assert 'F.data == "rwalletmenu:topup"' in wallet_source
+    assert 'F.data.startswith("rwtm:")' in wallet_source
+    assert 'method=f"reseller_card:' in wallet_source
+    assert 'status = "awaiting_review"' in wallet_source
 
     # Full-repository CI also validates the frontend retry contract. Production
     # backend runtimes intentionally do not contain the Next.js /components
@@ -65,6 +101,7 @@ def main() -> None:
     assert reference == "reseller-bot-wallet:7:wallet-smoke-123456"
     assert len(reference) <= 180
 
+    print("RESELLER_BOT_WALLET_MENU_TOPUP_OK")
     print("RESELLER_BOT_WALLET_SMOKE_OK")
 
 
