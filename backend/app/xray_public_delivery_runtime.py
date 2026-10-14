@@ -9,25 +9,25 @@ from .database import engine
 from .routers import account_delivery, public_connection_v3
 
 
-# TWINPANEL_XRAY_PUBLIC_DELIVERY_RUNTIME_V2
+# TWINPANEL_XRAY_PUBLIC_DELIVERY_RUNTIME_V3
 #
 # The public /v1/connect page is imported before the self-hosted runtime applies
 # Modern Xray. It therefore keeps an early reference to account_delivery's
 # original _public_payload, and its legacy renderer only consumes item.uri.
 #
 # Modern credentials already carry item.profiles[] with a dedicated URI for
-# WebSocket TLS / XHTTP REALITY / HTTPUpgrade TLS / gRPC REALITY. This runtime
-# reconnects the public page to the final account-delivery payload and expands
-# those profile items into the existing server-tab UI without rewriting the
-# public page or changing any credential material.
+# WebSocket TLS / XHTTP REALITY / HTTPUpgrade TLS / gRPC REALITY. V3 keeps one
+# server/country tab per Xray node and renders all profiles for that node inside
+# the same server view. This avoids duplicated country tabs while preserving the
+# existing public page, credential material, QR generation and legacy fallback.
 #
 # Production also calls xray_node_domain_runtime on every API start. Once the
 # xray_domain column already exists, running ALTER TABLE ... IF NOT EXISTS again
 # is unnecessary and can block startup while PostgreSQL waits for an ACCESS
 # EXCLUSIVE lock. A previous guard used SQLAlchemy inspector.get_columns(), but
 # that metadata inspection itself can queue behind an already-waiting ALTER.
-# The V2 guard therefore checks pg_catalog directly without requesting a lock on
-# the nodes relation. Existing installs with xray_domain skip the ALTER entirely.
+# The V2+ guard therefore checks pg_catalog directly without requesting a lock
+# on the nodes relation. Existing installs with xray_domain skip the ALTER.
 
 _runtime_applied = False
 _original_connection_views = public_connection_v3.connection_views
@@ -103,85 +103,111 @@ def _profile_label(profile: dict[str, Any]) -> str:
     return label
 
 
-def _expanded_xray_items(
-    items: list[dict[str, Any]],
+def _server_name(
+    item: dict[str, Any],
     node_names: dict[int, str],
-) -> list[dict[str, Any]]:
-    expanded: list[dict[str, Any]] = []
+    index: int,
+) -> str:
+    try:
+        node_id = int(item.get("node_id") or 0)
+    except (TypeError, ValueError):
+        node_id = 0
 
-    for index, raw_item in enumerate(items):
-        if not isinstance(raw_item, dict):
+    return str(
+        node_names.get(node_id)
+        or item.get("node")
+        or item.get("server")
+        or item.get("server_ip")
+        or f"Server {index + 1}"
+    ).strip()
+
+
+def _profile_delivery_item(
+    item: dict[str, Any],
+    profile: dict[str, Any],
+) -> dict[str, Any] | None:
+    uri = str(profile.get("uri") or "").strip()
+
+    if not uri:
+        return None
+
+    entry = dict(item)
+    entry.pop("profiles", None)
+
+    for key in (
+        "server",
+        "port",
+        "uri",
+        "sni",
+        "security",
+        "transport",
+    ):
+        if profile.get(key) is not None:
+            entry[key] = profile.get(key)
+
+    entry["uri"] = uri
+    entry["profile"] = str(profile.get("id") or "").strip()
+    entry["profile_title"] = _profile_label(profile)
+    entry["recommended"] = bool(profile.get("recommended"))
+
+    qr = str(profile.get("qr") or "").strip()
+    if not qr:
+        qr = account_delivery._qr_data_uri(uri)
+    entry["qr"] = qr
+
+    return entry
+
+
+def _xray_server_body(
+    item: dict[str, Any],
+    server_name: str,
+    server_index: int,
+) -> str:
+    profiles = item.get("profiles")
+
+    if not isinstance(profiles, list) or not profiles:
+        return public_connection_v3.v2ray_card(
+            server_index,
+            server_name,
+            item,
+        )
+
+    cards: list[str] = []
+
+    for profile_index, raw_profile in enumerate(profiles):
+        if not isinstance(raw_profile, dict):
             continue
 
-        item = dict(raw_item)
-        profiles = item.get("profiles")
+        profile = dict(raw_profile)
+        entry = _profile_delivery_item(item, profile)
 
-        if not isinstance(profiles, list) or not profiles:
-            # Legacy VLESS remains visible exactly as before.
-            expanded.append(item)
+        if entry is None:
             continue
 
-        try:
-            node_id = int(item.get("node_id") or 0)
-        except (TypeError, ValueError):
-            node_id = 0
+        cards.append(
+            public_connection_v3.v2ray_card(
+                profile_index,
+                _profile_label(profile),
+                entry,
+            )
+        )
 
-        base_name = str(
-            node_names.get(node_id)
-            or item.get("node")
-            or item.get("server")
-            or item.get("server_ip")
-            or f"Server {index + 1}"
-        ).strip()
+    if not cards:
+        return public_connection_v3.v2ray_card(
+            server_index,
+            server_name,
+            item,
+        )
 
-        added = 0
-
-        for raw_profile in profiles:
-            if not isinstance(raw_profile, dict):
-                continue
-
-            profile = dict(raw_profile)
-            uri = str(profile.get("uri") or "").strip()
-
-            if not uri:
-                continue
-
-            entry = dict(item)
-            entry.pop("profiles", None)
-
-            # Profile-specific delivery values override the compatibility
-            # top-level values on the modern credential item.
-            for key in (
-                "server",
-                "port",
-                "uri",
-                "sni",
-                "security",
-                "transport",
-            ):
-                if profile.get(key) is not None:
-                    entry[key] = profile.get(key)
-
-            entry["uri"] = uri
-            entry["profile"] = str(profile.get("id") or "").strip()
-            entry["profile_title"] = _profile_label(profile)
-            entry["recommended"] = bool(profile.get("recommended"))
-            entry["node"] = f"{base_name} · {_profile_label(profile)}"
-
-            qr = str(profile.get("qr") or "").strip()
-            if not qr:
-                qr = account_delivery._qr_data_uri(uri)
-            entry["qr"] = qr
-
-            expanded.append(entry)
-            added += 1
-
-        # If a malformed modern payload contains no usable profile URI, keep
-        # the stored primary item instead of making Xray disappear entirely.
-        if added == 0:
-            expanded.append(item)
-
-    return expanded
+    # Keep the page's existing delivery-card design. Only layout is added here:
+    # all transports for one country/node are visible together inside one tab.
+    return (
+        '<div style="display:grid;'
+        'grid-template-columns:repeat(auto-fit,minmax(290px,1fr));'
+        'gap:10px">'
+        + "".join(cards)
+        + "</div>"
+    )
 
 
 def _connection_views_modern_xray(
@@ -202,18 +228,43 @@ def _connection_views_modern_xray(
             node_names,
         )
 
-    expanded = _expanded_xray_items(
-        items,
-        node_names,
-    )
+    if not items:
+        return "", '<div class="empty-state">اطلاعات این پروتکل هنوز آماده نشده است.</div>'
 
-    return _original_connection_views(
-        protocol,
-        expanded,
-        fallback_username,
-        fallback_password,
-        node_names,
-    )
+    tabs: list[str] = []
+    views: list[str] = []
+    h = public_connection_v3.h
+
+    for index, raw_item in enumerate(items):
+        if not isinstance(raw_item, dict):
+            continue
+
+        item = dict(raw_item)
+        active = " active" if not tabs else ""
+        server_id = f"{protocol_key}-server-{index}"
+        server_name = _server_name(item, node_names, index)
+
+        tabs.append(
+            f'<button class="server-tab{active}" type="button" '
+            f'data-server="{h(server_id)}">'
+            f'<span>{h(server_name)}</span><i></i></button>'
+        )
+
+        body = _xray_server_body(
+            item,
+            server_name,
+            index,
+        )
+
+        views.append(
+            f'<div id="{h(server_id)}" class="server-view{active}">'
+            f'{body}</div>'
+        )
+
+    if not tabs:
+        return "", '<div class="empty-state">اطلاعات این پروتکل هنوز آماده نشده است.</div>'
+
+    return "".join(tabs), "".join(views)
 
 
 def apply_xray_public_delivery_runtime() -> None:
@@ -231,8 +282,9 @@ def apply_xray_public_delivery_runtime() -> None:
     _runtime_applied = True
 
     print(
-        "TWINPANEL_XRAY_PUBLIC_DELIVERY_RUNTIME_V2_ACTIVE "
-        "profile_tabs=1 dynamic_public_payload=1 legacy_fallback=1 "
+        "TWINPANEL_XRAY_PUBLIC_DELIVERY_RUNTIME_V3_ACTIVE "
+        "server_tabs_grouped=1 profile_cards_together=1 "
+        "dynamic_public_payload=1 legacy_fallback=1 "
         "domain_schema_catalog_guard=1",
         flush=True,
     )
