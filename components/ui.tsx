@@ -14,7 +14,6 @@ const menuGroups=[
     ["داشبورد","Dashboard","/admin","⌂"],
     ["کاربران","Users","/admin/users","♙"],
     ["اشتراک‌ها","Subscriptions","/admin/subscriptions","▱"],
-    ["ابزار اشتراک","Subscription Tools","/admin/subscription-tools","⌘"],
     ["پلن‌ها","Plans","/admin/plans","◈"]
   ]},
   {fa:"زیرساخت",en:"Infrastructure",items:[
@@ -34,7 +33,6 @@ const menuGroups=[
   ]},
   {fa:"ارتباطات",en:"Communications",items:[
     ["ربات تلگرام","Telegram Bot","/admin/telegram","✈"],
-    ["مدیریت تلگرام","Telegram Manager","/admin/telegram-manager","◈"],
     ["پشتیبانی","Support","/admin/support","◌"],
     ["اعلان‌ها","Notifications","/admin/notifications","◎"]
   ]},
