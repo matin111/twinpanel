@@ -76,6 +76,8 @@ export function ResellerBotWalletRuntime(){
       setRows(walletRows);setTransactions(txRows);
       setSelected(walletRows.find(row=>Number(row.user_id||0)===userId)||selected);
     }catch(reason){
+      // Keep adjustKey unchanged on failure. If the server committed but the
+      // response was lost, retrying the same operation cannot double-credit.
       setError(reason instanceof Error?reason.message:String(reason));
     }
     finally{setBusy(false);}
