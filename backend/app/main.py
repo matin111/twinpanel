@@ -339,8 +339,12 @@ from .routers.reseller_bot_orders_volume_v2 import (
 from .routers.reseller_bot_orders_owned_v3 import (
     router as reseller_bot_orders_owned_v3_router,
 )
-# Owned-plan approval wins first, then usage-only renewal compatibility, then
-# legacy endpoints for receipts/payment methods/historical orders.
+from .routers.reseller_bot_wallet_topups import (
+    router as reseller_bot_wallet_topups_router,
+)
+# Wallet top-up review and owned-plan approval win first, then usage-only renewal
+# compatibility, then legacy endpoints for receipts/payment methods/history.
+app.include_router(reseller_bot_wallet_topups_router)
 app.include_router(reseller_bot_orders_owned_v3_router)
 app.include_router(reseller_bot_orders_volume_v2_router)
 app.include_router(reseller_bot_orders_router)
