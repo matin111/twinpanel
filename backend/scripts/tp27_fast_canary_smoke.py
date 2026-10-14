@@ -26,14 +26,17 @@ def _check_helper(mode: str, fou_port: int | None) -> None:
     assert 'ip link del "$IFACE"' in text
     assert 'txqueuelen "$TXQLEN"' in text
     assert "TP27_FAST_READY" in text
+    assert 'ip tunnel add "$IFACE" mode gre' in text
+    assert "encap fou" in text
+    assert "ip fou add port" in text
+
+    expected_mode = f"MODE={mode}"
+    assert expected_mode in text
 
     if mode == "gre-fou":
-        assert "encap fou" in text
-        assert "ip fou add port" in text
-        assert str(fou_port) in text
+        assert f"FOU_PORT={int(fou_port or 0)}" in text
     else:
-        assert 'ip tunnel add "$IFACE" mode gre' in text
-        assert "encap fou" not in text
+        assert "FOU_PORT=0" in text
 
     fd, path = tempfile.mkstemp(prefix="tp27-fast-", suffix=".sh")
     try:
