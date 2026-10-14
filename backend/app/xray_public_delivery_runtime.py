@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from sqlalchemy import inspect
+
+from . import xray_node_domain_runtime
+from .database import engine
 from .routers import account_delivery, public_connection_v3
 
 
@@ -16,9 +20,17 @@ from .routers import account_delivery, public_connection_v3
 # reconnects the public page to the final account-delivery payload and expands
 # those profile items into the existing server-tab UI without rewriting the
 # public page or changing any credential material.
+#
+# Production also calls xray_node_domain_runtime on every API start. Once the
+# xray_domain column already exists, running ALTER TABLE ... IF NOT EXISTS again
+# is unnecessary and can block startup while PostgreSQL waits for an ACCESS
+# EXCLUSIVE lock. Install a narrow guard before self_hosted_runtime applies the
+# node-domain runtime: inspect the existing columns first and only execute the
+# historical migration when the column is actually absent.
 
 _runtime_applied = False
 _original_connection_views = public_connection_v3.connection_views
+_original_domain_schema_ensure = xray_node_domain_runtime._ensure_database_column
 
 _PROFILE_LABELS = {
     "websocket_tls": "WebSocket TLS",
@@ -26,6 +38,32 @@ _PROFILE_LABELS = {
     "httpupgrade_tls": "HTTPUpgrade TLS",
     "grpc_reality": "gRPC Reality",
 }
+
+
+def _ensure_domain_schema_without_redundant_alter() -> None:
+    inspector = inspect(engine)
+
+    if not inspector.has_table("nodes"):
+        return _original_domain_schema_ensure()
+
+    columns = {
+        str(column.get("name") or "").strip()
+        for column in inspector.get_columns("nodes")
+        if isinstance(column, dict)
+    }
+
+    if "xray_domain" in columns:
+        return
+
+    return _original_domain_schema_ensure()
+
+
+# This module is imported by self_hosted_runtime before
+# apply_xray_node_domain_runtime() executes, so the guarded implementation is
+# already active when startup reaches the schema check.
+xray_node_domain_runtime._ensure_database_column = (
+    _ensure_domain_schema_without_redundant_alter
+)
 
 
 def _profile_label(profile: dict[str, Any]) -> str:
@@ -168,6 +206,7 @@ def apply_xray_public_delivery_runtime() -> None:
 
     print(
         "TWINPANEL_XRAY_PUBLIC_DELIVERY_RUNTIME_V1_ACTIVE "
-        "profile_tabs=1 dynamic_public_payload=1 legacy_fallback=1",
+        "profile_tabs=1 dynamic_public_payload=1 legacy_fallback=1 "
+        "domain_schema_lock_guard=1",
         flush=True,
     )
