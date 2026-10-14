@@ -46,6 +46,12 @@ export type ResellerDiscountPayload={
   is_active:boolean;
 };
 
+export type ResellerBotWalletAdjustPayload={
+  amount_toman:number;
+  note:string;
+  idempotency_key:string;
+};
+
 function apiError(payload:unknown,status:number){
   if(payload&&typeof payload==="object"){
     const row=payload as {detail?:unknown;message?:unknown};
@@ -173,6 +179,9 @@ export const resellerApi={
   botOrderReceipt:(id:number)=>requestBlob(`/v1/reseller/bot-commerce/orders/${id}/receipt`),
   botApproveOrder:(id:number)=>request<ResellerRow>(`/v1/reseller/bot-commerce/orders/${id}/approve`,{method:"POST"}),
   botRejectOrder:(id:number,reason:string)=>request<ResellerRow>(`/v1/reseller/bot-commerce/orders/${id}/reject`,{method:"POST",body:JSON.stringify({reason})}),
+  botWallets:()=>request<ResellerRow[]>("/v1/reseller/bot-commerce/wallets"),
+  botWalletTransactions:(userId:number)=>request<ResellerRow[]>(`/v1/reseller/bot-commerce/wallets/${userId}/transactions`),
+  botAdjustWallet:(userId:number,payload:ResellerBotWalletAdjustPayload)=>request<ResellerRow>(`/v1/reseller/bot-commerce/wallets/${userId}/adjust`,{method:"POST",body:JSON.stringify(payload)}),
 
   discounts:()=>request<ResellerRow[]>("/v1/discounts/reseller"),
   createDiscount:(payload:ResellerDiscountPayload)=>request<ResellerRow>("/v1/discounts/reseller",{method:"POST",body:JSON.stringify(payload)}),

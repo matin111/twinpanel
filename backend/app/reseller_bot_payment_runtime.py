@@ -50,10 +50,25 @@ def _pending_order(
         ResellerBotOrder.plan_id == plan_id,
         ResellerBotOrder.status == "pending_payment",
     )
+
+    # Purchase payment channels are deliberately isolated. A wallet preview
+    # must never reuse a card/receipt order, and a manual payment must never
+    # reuse a wallet or renewal order. This keeps proof state, discounts and
+    # wallet idempotency attached to the correct checkout attempt.
     if payment_note == "wallet":
         query = query.filter(
             ResellerBotOrder.payment_method_id.is_(None),
             ResellerBotOrder.payment_note == "wallet",
+        )
+    elif payment_method_id is not None:
+        query = query.filter(
+            ResellerBotOrder.payment_method_id == int(payment_method_id),
+            ResellerBotOrder.payment_note.is_(None),
+        )
+    else:
+        query = query.filter(
+            ResellerBotOrder.payment_method_id.is_(None),
+            ResellerBotOrder.payment_note.is_(None),
         )
 
     order = query.order_by(ResellerBotOrder.id.desc()).first()
@@ -87,8 +102,7 @@ def _pending_order(
         order.base_sell_price_toman = amount_toman
         order.sell_price_toman = amount_toman
         order.protocols = list(protocols)
-        if payment_note is not None:
-            order.payment_note = payment_note
+        order.payment_note = payment_note
 
     return order
 
