@@ -24,6 +24,7 @@ export function ResellerBotWalletRuntime(){
   const [mode,setMode]=useState<"credit"|"debit">("credit");
   const [amount,setAmount]=useState("");
   const [note,setNote]=useState("");
+  const [adjustKey,setAdjustKey]=useState(()=>idempotency());
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
@@ -50,7 +51,7 @@ export function ResellerBotWalletRuntime(){
   const openWallet=async(row:ResellerRow)=>{
     const userId=Number(row.user_id||0);
     if(!userId)return;
-    setSelected(row);setTransactions([]);setAmount("");setNote("");setMode("credit");setError("");setOk("");
+    setSelected(row);setTransactions([]);setAmount("");setNote("");setMode("credit");setAdjustKey(idempotency());setError("");setOk("");
     setBusy(true);
     try{setTransactions(await resellerApi.botWalletTransactions(userId));}
     catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
@@ -67,13 +68,18 @@ export function ResellerBotWalletRuntime(){
     const signed=mode==="credit"?raw:-raw;
     setBusy(true);setError("");setOk("");
     try{
-      await resellerApi.botAdjustWallet(userId,{amount_toman:signed,note:note.trim(),idempotency_key:idempotency()});
-      setOk(mode==="credit"?pick("موجودی کیف پول افزایش یافت.","Wallet credited."):pick("موجودی کیف پول کاهش یافت.","Wallet debited."));
-      setAmount("");setNote("");
+      const result=await resellerApi.botAdjustWallet(userId,{amount_toman:signed,note:note.trim(),idempotency_key:adjustKey});
+      const duplicate=Boolean(result.duplicate);
+      setOk(duplicate?pick("این عملیات قبلاً ثبت شده بود؛ موجودی دوباره تغییر نکرد.","This operation was already recorded; the balance was not changed again."):mode==="credit"?pick("موجودی کیف پول افزایش یافت.","Wallet credited."):pick("موجودی کیف پول کاهش یافت.","Wallet debited."));
+      setAmount("");setNote("");setAdjustKey(idempotency());
       const [walletRows,txRows]=await Promise.all([resellerApi.botWallets(),resellerApi.botWalletTransactions(userId)]);
       setRows(walletRows);setTransactions(txRows);
       setSelected(walletRows.find(row=>Number(row.user_id||0)===userId)||selected);
-    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    }catch(reason){
+      // Keep adjustKey unchanged on failure. If the server committed but the
+      // response was lost, retrying the same operation cannot double-credit.
+      setError(reason instanceof Error?reason.message:String(reason));
+    }
     finally{setBusy(false);}
   };
 
@@ -109,9 +115,9 @@ export function ResellerBotWalletRuntime(){
           <div className="runtime-modal-actions"><button className="ghost" type="button" onClick={()=>setSelected(null)}>{pick("بستن","Close")}</button><button className="primary" disabled={busy||Number(amount)<=0||note.trim().length<2}>{busy?"…":mode==="credit"?pick("افزایش موجودی","Credit wallet"):pick("کاهش موجودی","Debit wallet")}</button></div>
         </form>
 
-        <div className="card-head"><div><b>{pick("آخرین تراکنش‌ها","Recent transactions")}</b><small>{pick("خریدهای کیف پول و تغییرات دستی نماینده در یک دفتر ثبت می‌شوند.","Wallet purchases and reseller adjustments share one ledger.")}</small></div><Badge tone="violet">{transactions.length}</Badge></div>
+        <div className="card-head"><div><b>{pick("آخرین تراکنش‌های همین ربات","This bot's recent transactions")}</b><small>{pick("خریدهای کیف پول این نمایندگی و تغییرات دستی همین نماینده نمایش داده می‌شوند.","Only this reseller bot's wallet purchases and manual adjustments are shown.")}</small></div><Badge tone="violet">{transactions.length}</Badge></div>
         <div className="table"><table><thead><tr><th>ID</th><th>{pick("مبلغ","Amount")}</th><th>{pick("نوع","Type")}</th><th>{pick("توضیح","Description")}</th><th>{pick("زمان","Time")}</th></tr></thead><tbody>{transactions.map((tx,index)=>{const value=num(tx,"amount_toman");return <tr key={Number(tx.id||0)||index}><td>#{str(tx,"id")}</td><td><b dir="ltr">{value>0?"+":""}{money(value)}</b></td><td>{str(tx,"kind")||"—"}</td><td>{str(tx,"description")||"—"}</td><td>{dateText(tx.created_at)}</td></tr>})}</tbody></table></div>
-        {!transactions.length&&!busy&&<Empty>{pick("تراکنشی برای این کیف پول ثبت نشده است.","No transaction has been recorded for this wallet.")}</Empty>}
+        {!transactions.length&&!busy&&<Empty>{pick("تراکنشی برای این ربات ثبت نشده است.","No transaction has been recorded for this bot wallet.")}</Empty>}
       </div></div>}
     </div>
   </PortalShell>;
