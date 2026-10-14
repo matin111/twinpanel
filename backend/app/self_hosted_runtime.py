@@ -15,6 +15,9 @@ from .xray_modern_repair_runtime import (
 from .xray_modern_temp_config_runtime import (
     apply_xray_modern_temp_config_runtime,
 )
+from .tunnel_service_connections_admin_runtime import (
+    apply_tunnel_service_connections_admin_runtime,
+)
 
 
 _original_install_or_upgrade_agent = provision._install_or_upgrade_agent
@@ -101,6 +104,12 @@ def apply_self_hosted_runtime() -> None:
     apply_xray_modern_temp_config_runtime()
     xray_modern_runtime.apply_xray_modern_runtime()
     apply_xray_modern_repair_runtime()
+
+    # Register the admin-only service-routing inventory after Xray Modern has
+    # patched tunnels._service_routes_for_exit. The endpoint therefore reports
+    # legacy and modern Xray routes from the same source that feeds Agent
+    # desired-state, while physical tunnel transports remain a separate model.
+    apply_tunnel_service_connections_admin_runtime()
 
     # SSH TUN is controller-owned in the self-hosted product. V3 keeps all node
     # changes automatic, uses the V2 self-healing runtime, then performs a real

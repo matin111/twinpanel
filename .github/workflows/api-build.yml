@@ -111,9 +111,13 @@ jobs:
           assert "passwordpublickey" in state_script
           assert "if ch.isalnum()" in state_script
 
+          route_paths = {getattr(route, "path", "") for route in app.routes}
+          assert "/v1/tunnels/{tunnel_id}/service-connections" in route_paths
+
           print("SELF_HOSTED_RUNTIME_OK", app.title)
           print("XRAY_MODERN_RUNTIME_HOOKS_OK")
           print("XRAY_REALITY_KEY_PARSER_COMPAT_OK")
+          print("TUNNEL_SERVICE_CONNECTIONS_ROUTE_OK")
           PY
 
       - name: Run Xray Modern auto-repair smoke
@@ -155,6 +159,7 @@ jobs:
           grep -q '"/v1/tunnels/register"' /tmp/openapi.json
           grep -q '"/v1/tunnels/create-managed"' /tmp/openapi.json
           grep -q '"/v1/tunnels/{tunnel_id}/transports"' /tmp/openapi.json
+          grep -q '"/v1/tunnels/{tunnel_id}/service-connections"' /tmp/openapi.json
           grep -q '"/v1/tunnels/{tunnel_id}/transport-mode"' /tmp/openapi.json
           grep -q '"/v1/tunnels/{tunnel_id}/mtunnel/install"' /tmp/openapi.json
           grep -q '"/v1/tunnels/{tunnel_id}/backhaul/install"' /tmp/openapi.json
