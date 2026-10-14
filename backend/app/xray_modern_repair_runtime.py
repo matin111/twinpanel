@@ -1,12 +1,100 @@
 from __future__ import annotations
 
+from . import xray_modern_runtime
 from .models import Node, NodeType
 from .routers import provision
 from .xray_modern_runtime import _ensure_modern_xray
 
 
 _original_provision_protocols = provision.provision_protocols
+_original_state_generator_script = (
+    xray_modern_runtime._state_generator_script
+)
 _runtime_applied = False
+_reality_parser_compat_applied = False
+
+
+def _apply_reality_key_parser_compat() -> None:
+    """
+    Make the remote Xray state generator accept both historical and current
+    `xray x25519` labels.
+
+    Older Xray builds printed labels such as:
+      * Private key
+      * Public key
+
+    Current builds print:
+      * PrivateKey
+      * Password (PublicKey)
+      * Hash32
+
+    The V2 state generator already understands `Password`, but its previous
+    normalization preserved parentheses. That turned `Password (PublicKey)`
+    into `password(publickey)`, so the generated public key was discarded and
+    provisioning failed with `REALITY key generation/derivation failed`.
+
+    We patch the generated remote script rather than modifying secrets or
+    generating keys on the controller. The private/public key material stays on
+    the Exit node exactly as before.
+    """
+
+    global _reality_parser_compat_applied
+
+    if _reality_parser_compat_applied:
+        return
+
+    old_normalizer = (
+        '        key = key.strip().lower().replace(" ", "").replace("_", "")'
+    )
+    new_normalizer = '''        key = "".join(
+            ch
+            for ch in key.strip().lower()
+            if ch.isalnum()
+        )'''
+
+    old_public_labels = (
+        '        elif key in {"password", "publickey", "public"}:'
+    )
+    new_public_labels = '''        elif key in {
+            "password",
+            "passwordpublickey",
+            "publickey",
+            "public",
+        }:'''
+
+    def _state_generator_script_compat(domain: str) -> str:
+        script = _original_state_generator_script(domain)
+
+        if old_normalizer not in script:
+            raise RuntimeError(
+                "Xray REALITY compatibility patch: "
+                "state key normalizer signature changed"
+            )
+
+        if old_public_labels not in script:
+            raise RuntimeError(
+                "Xray REALITY compatibility patch: "
+                "public-key label signature changed"
+            )
+
+        script = script.replace(
+            old_normalizer,
+            new_normalizer,
+            1,
+        )
+        script = script.replace(
+            old_public_labels,
+            new_public_labels,
+            1,
+        )
+
+        return script
+
+    xray_modern_runtime._state_generator_script = (
+        _state_generator_script_compat
+    )
+
+    _reality_parser_compat_applied = True
 
 
 async def _listener_line(
@@ -131,6 +219,8 @@ def apply_xray_modern_repair_runtime() -> None:
     if _runtime_applied:
         return
 
+    _apply_reality_key_parser_compat()
+
     provision.provision_protocols = (
         _provision_protocols_with_xray_reconcile
     )
@@ -138,7 +228,8 @@ def apply_xray_modern_repair_runtime() -> None:
     _runtime_applied = True
 
     print(
-        "TWINPANEL_XRAY_MODERN_REPAIR_RUNTIME_V1_ACTIVE "
-        "legacy_xray_reconcile_before_repair_preflight=1",
+        "TWINPANEL_XRAY_MODERN_REPAIR_RUNTIME_V2_ACTIVE "
+        "legacy_xray_reconcile_before_repair_preflight=1 "
+        "reality_key_parser_compat=1",
         flush=True,
     )
