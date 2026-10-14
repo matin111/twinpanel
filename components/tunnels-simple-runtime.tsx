@@ -26,6 +26,9 @@ import {
 import {
   useI18n,
 } from "../lib/i18n";
+import {
+  TunnelServiceConnectionsPanel,
+} from "./tunnel-service-connections-panel";
 
 
 type Draft = {
@@ -745,10 +748,12 @@ export function TunnelsSimpleRuntimePage() {
               </div>
             </div>
 
+            <TunnelServiceConnectionsPanel tunnelId={selected.id}/>
+
             <div className="runtime-warning">
               {pick(
-                "جزئیات مسیرهای داخلی عمداً مخفی شده‌اند. سیستم سلامت مسیرها را بررسی می‌کند و در صورت نیاز مسیر را تغییر می‌دهد.",
-                "Internal path details are intentionally hidden. The system monitors path health and switches routes when needed.",
+                "جزئیات مسیرهای فیزیکی داخلی توسط سیستم مدیریت می‌شوند. اتصال‌های عبوری سرویس‌ها در بالا از همان Routeهای واقعی Backend نمایش داده می‌شوند.",
+                "Physical internal path details are system-managed. Routed service connections above come from the same live backend routes.",
               )}
             </div>
 
