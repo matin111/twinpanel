@@ -1,12 +1,13 @@
 "use client";
 
-import {useEffect,useState} from "react";
+import {useCallback,useEffect,useRef,useState} from "react";
 import {Badge,Card} from "./ui";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
 
 type Row=Record<string,unknown>;
+type DesktopPermission=NotificationPermission|"unsupported";
 
 const text=(row:Row,key:string)=>String(row?.[key]??"");
 const number=(row:Row,key:string)=>Number(row?.[key]??0)||0;
@@ -35,14 +36,95 @@ export function ResellerBotWalletTopupReview(){
   const [busy,setBusy]=useState<number|null>(null);
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
+  const [desktopPermission,setDesktopPermission]=useState<DesktopPermission>("unsupported");
+  const initialized=useRef(false);
+  const knownReviewIds=useRef<Set<number>>(new Set());
+  const okTimer=useRef<number|null>(null);
 
-  const load=async()=>{
-    setError("");
-    try{setRows(await request<Row[]>("/v1/reseller/bot-commerce/wallet-topups"));}
-    catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+  const flashOk=useCallback((message:string)=>{
+    setOk(message);
+    if(okTimer.current!==null)window.clearTimeout(okTimer.current);
+    okTimer.current=window.setTimeout(()=>setOk(""),6500);
+  },[]);
+
+  const notifyNewReceipt=useCallback((row:Row)=>{
+    if(typeof window==="undefined"||!("Notification" in window)||Notification.permission!=="granted")return;
+    const id=number(row,"id");
+    const customer=text(row,"customer_name")||`#${number(row,"user_id")}`;
+    const amount=money(number(row,"amount_toman"));
+    try{
+      new Notification(pick("رسید شارژ کیف پول جدید","New wallet top-up receipt"),{
+        body:pick(
+          `درخواست #${id} از ${customer} به مبلغ ${amount} برای بررسی ثبت شد.`,
+          `Request #${id} from ${customer} for ${amount} is ready for review.`
+        ),
+        tag:`reseller-wallet-topup-${id}`,
+      });
+    }catch{/* Browser notification is best-effort only. */}
+  },[pick]);
+
+  const load=useCallback(async(silent=false)=>{
+    if(!silent)setError("");
+    try{
+      const next=await request<Row[]>("/v1/reseller/bot-commerce/wallet-topups");
+      const list=Array.isArray(next)?next:[];
+      const reviewRows=list.filter(row=>text(row,"status")==="awaiting_review");
+      const currentIds=new Set(reviewRows.map(row=>number(row,"id")).filter(id=>id>0));
+
+      if(initialized.current){
+        const fresh=reviewRows.filter(row=>{
+          const id=number(row,"id");
+          return id>0&&!knownReviewIds.current.has(id);
+        });
+        if(fresh.length){
+          const newest=fresh[0];
+          flashOk(pick(
+            fresh.length===1?"رسید جدید دریافت شد و لیست خودکار بروزرسانی شد.":`${fresh.length.toLocaleString("fa-IR")} رسید جدید دریافت شد و لیست خودکار بروزرسانی شد.`,
+            fresh.length===1?"A new receipt arrived and the list refreshed automatically.":`${fresh.length} new receipts arrived and the list refreshed automatically.`
+          ));
+          notifyNewReceipt(newest);
+        }
+      }else{
+        initialized.current=true;
+      }
+
+      knownReviewIds.current=currentIds;
+      setRows(list);
+    }catch(reason){
+      if(!silent)setError(reason instanceof Error?reason.message:String(reason));
+    }
+  },[flashOk,notifyNewReceipt,pick]);
+
+  useEffect(()=>{
+    if(typeof window!=="undefined"&&"Notification" in window)setDesktopPermission(Notification.permission);
+    void load(false);
+
+    const poll=window.setInterval(()=>{
+      if(document.visibilityState==="visible")void load(true);
+    },4000);
+    const refresh=()=>{if(document.visibilityState==="visible")void load(true);};
+    window.addEventListener("focus",refresh);
+    document.addEventListener("visibilitychange",refresh);
+
+    return()=>{
+      window.clearInterval(poll);
+      window.removeEventListener("focus",refresh);
+      document.removeEventListener("visibilitychange",refresh);
+      if(okTimer.current!==null)window.clearTimeout(okTimer.current);
+    };
+  },[load]);
+
+  const enableDesktopNotifications=async()=>{
+    if(typeof window==="undefined"||!("Notification" in window)){
+      setDesktopPermission("unsupported");
+      flashOk(pick("مرورگر شما اعلان دسکتاپ را پشتیبانی نمی‌کند.","Desktop notifications are not supported by this browser."));
+      return;
+    }
+    const permission=await Notification.requestPermission();
+    setDesktopPermission(permission);
+    if(permission==="granted")flashOk(pick("اعلان رسیدهای جدید فعال شد.","New receipt notifications are enabled."));
+    else if(permission==="denied")setError(pick("اجازه اعلان مرورگر مسدود شده است.","Browser notification permission is blocked."));
   };
-
-  useEffect(()=>{void load();},[]);
 
   const openReceipt=async(id:number)=>{
     const token=getCustomerToken();
@@ -69,10 +151,10 @@ export function ResellerBotWalletTopupReview(){
     try{
       const result=await request<Row>(`/v1/reseller/bot-commerce/wallet-topups/${id}/approve`,{method:"POST"});
       const notified=result.telegram_notified!==false;
-      setOk(notified
+      flashOk(notified
         ?pick("شارژ تأیید شد، موجودی افزایش یافت و پیام برای کاربر ارسال شد.","Top-up approved, wallet credited, and the user was notified.")
         :pick("شارژ تأیید شد و موجودی افزایش یافت؛ اما پیام تلگرام ارسال نشد.","Top-up approved and wallet credited, but Telegram notification failed."));
-      await load();
+      await load(true);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy(null);}
   };
@@ -84,10 +166,10 @@ export function ResellerBotWalletTopupReview(){
     try{
       const result=await request<Row>(`/v1/reseller/bot-commerce/wallet-topups/${id}/reject`,{method:"POST",body:JSON.stringify({reason:reason.trim()})});
       const notified=result.telegram_notified!==false;
-      setOk(notified
+      flashOk(notified
         ?pick("درخواست رد شد و نتیجه برای کاربر در ربات ارسال شد.","Top-up rejected and the user was notified in Telegram.")
         :pick("درخواست رد شد؛ اما پیام تلگرام برای کاربر ارسال نشد.","Top-up rejected, but Telegram notification failed."));
-      await load();
+      await load(true);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy(null);}
   };
@@ -98,9 +180,17 @@ export function ResellerBotWalletTopupReview(){
     <div className="card-head">
       <div>
         <b>{pick("درخواست‌های شارژ کارت‌به‌کارت ربات","Bot card-to-card wallet top-ups")}</b>
-        <small>{pick("رسید را بررسی کنید؛ نتیجه تأیید یا رد از همان ربات نماینده برای کاربر ارسال می‌شود. درخواست‌های ناقص قدیمی خودکار پاک می‌شوند.","Review the receipt; approval or rejection is sent to the user from the reseller bot. Stale incomplete requests are removed automatically.")}</small>
+        <small>{pick("رسیدهای جدید هر ۴ ثانیه خودکار دریافت می‌شوند؛ نتیجه تأیید یا رد از همان ربات نماینده برای کاربر ارسال می‌شود.","New receipts are fetched automatically every 4 seconds; approval or rejection is sent from the reseller bot.")}</small>
       </div>
-      <div className="action-row"><Badge tone="violet">{pending.length}</Badge><button className="mini-btn" type="button" onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button></div>
+      <div className="action-row">
+        <Badge tone="violet">{pending.length}</Badge>
+        {desktopPermission==="granted"
+          ?<Badge tone="ok">{pick("اعلان فعال","Notifications on")}</Badge>
+          :desktopPermission==="default"
+            ?<button className="mini-btn" type="button" onClick={()=>void enableDesktopNotifications()}>{pick("فعال‌سازی اعلان","Enable notifications")}</button>
+            :null}
+        <button className="mini-btn" type="button" onClick={()=>void load(false)}>{pick("بروزرسانی","Refresh")}</button>
+      </div>
     </div>
 
     {error&&<div className="runtime-error">{error}</div>}

@@ -57,6 +57,7 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
 
 const money=(value:unknown)=>`${Number(value||0).toLocaleString("fa-IR")} تومان`;
 const date=(value?:string|null)=>value?new Date(value).toLocaleString("fa-IR"):"—";
+const isResellerBotTopup=(row:WalletTopup)=>String(row.method||"").toLowerCase().startsWith("reseller_card:");
 const statusFa:Record<string,string>={
   pending_payment:"در انتظار پرداخت",
   awaiting_review:"در انتظار بررسی",
@@ -100,7 +101,8 @@ export function AdminPaymentsWalletTopups(){
     setLoading(true);setError("");
     try{
       const result=await request<WalletTopup[]>("/v1/admin/wallet/topups");
-      setRows(Array.isArray(result)?result:[]);
+      const clean=Array.isArray(result)?result.filter(row=>!isResellerBotTopup(row)):[];
+      setRows(clean);
     }catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setLoading(false);}
   },[]);
@@ -178,7 +180,7 @@ export function AdminPaymentsWalletTopups(){
         <div className="card-head">
           <div>
             <b>{pick("شارژ کیف پول","Wallet top-ups")}</b>
-            <small>{pick("تأیید شارژهای پنل و ربات؛ این موارد خرید اشتراک نیستند.","Review panel and bot wallet top-ups; these are not subscription purchases.")}</small>
+            <small>{pick("فقط شارژهای مستقیم پنل مرکزی در این بخش نمایش داده می‌شوند؛ رسیدهای ربات نماینده فقط در پنل همان نماینده بررسی می‌شوند.","Only direct central-panel wallet top-ups appear here; reseller-bot receipts stay in that reseller's panel.")}</small>
           </div>
           <div className="row-actions">
             {reviewCount>0&&<Badge tone="warn">{reviewCount.toLocaleString("fa-IR")} {pick("نیاز به بررسی","to review")}</Badge>}

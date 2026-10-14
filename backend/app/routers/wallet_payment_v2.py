@@ -36,6 +36,7 @@ ACTIVE_PLAN_PAYMENT_STATUSES = {
     "payment_submitted",
     "awaiting_review",
 }
+RESELLER_TOPUP_METHOD_PATTERN = "reseller_card:%"
 
 
 def _settings(db: Session) -> PaymentSettings:
@@ -349,6 +350,11 @@ async def submit_wallet_topup_v2(
 def admin_wallet_topups_v2(db: Session = Depends(get_db)):
     rows = (
         db.query(CustomerWalletTopup)
+        .filter(
+            ~CustomerWalletTopup.method.like(
+                RESELLER_TOPUP_METHOD_PATTERN
+            )
+        )
         .order_by(CustomerWalletTopup.id.desc())
         .limit(500)
         .all()

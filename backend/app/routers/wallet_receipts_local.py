@@ -31,8 +31,20 @@ admin_router = APIRouter(
 )
 
 
+RESELLER_TOPUP_METHOD_PREFIX = "reseller_card:"
+
+
 def _receipt_content_type(filename: str) -> str:
     return mimetypes.guess_type(filename)[0] or "application/octet-stream"
+
+
+def _is_reseller_scoped_topup(row: CustomerWalletTopup | None) -> bool:
+    return bool(
+        row
+        and str(row.method or "").lower().startswith(
+            RESELLER_TOPUP_METHOD_PREFIX
+        )
+    )
 
 
 def _upload_out(row: CustomerWalletTopup) -> dict:
@@ -164,7 +176,8 @@ def admin_wallet_topup_receipt(
     db: Session = Depends(get_db),
 ):
     row = db.get(CustomerWalletTopup, int(topup_id))
-    if row is None:
+    if row is None or _is_reseller_scoped_topup(row):
+        # Do not expose reseller-owned proofs through the global admin API.
         raise HTTPException(status_code=404, detail="درخواست شارژ پیدا نشد")
 
     local_path = _local_path(str(row.receipt_file_marker or ""))
