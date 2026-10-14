@@ -62,6 +62,7 @@ export const opsApi={
   sendNotification:(payload:NotificationSendPayload)=>request<unknown>("/v1/admin/notifications/send",{method:"POST",body:JSON.stringify(payload)}),
   notificationHistory:(limit=30)=>request<unknown>(`/v1/admin/notifications/history?limit=${limit}`),
   panelNotifications:()=>request<unknown>("/v1/admin/panel-notifications"),
+  panelNotificationRead:(id:string|number)=>request<unknown>(`/v1/admin/panel-notifications/${encodeURIComponent(String(id))}/read`,{method:"POST"}),
   panelNotificationsReadAll:()=>request<unknown>("/v1/admin/panel-notifications/read-all",{method:"POST"}),
 
   storeOrders:()=>request<unknown>("/v1/store/orders/admin"),
