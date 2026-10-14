@@ -13,6 +13,14 @@ import {
   storefrontText,
 } from "../lib/storefront-config";
 import {DEFAULT_STORE_TEMPLATE_ID,resolveStoreTemplateId} from "../lib/store-template-registry";
+import {
+  storeGuideAppImage,
+  storeGuideContent,
+  storeGuidePlatforms,
+  storeGuideScreenshot,
+  type StoreGuidePlatform,
+  type StoreGuideProtocol,
+} from "../lib/store-guide-content";
 
 export type StoreTemplateProps={
   settings:StorefrontSettings;
@@ -25,7 +33,6 @@ export type StoreTemplateProps={
 };
 
 type ProtocolMeta={name:string;short:string;icon:string;fa:string;en:string;tone:string};
-type PlatformMeta={id:string;fa:string;en:string;icon:string;hintFa:string;hintEn:string};
 
 const protocolMeta:Record<string,ProtocolMeta>={
   cisco:{name:"Cisco / OpenConnect",short:"Cisco",icon:"◫",tone:"blue",fa:"مناسب اتصال پایدار با نام کاربری و رمز و سازگاری گسترده.",en:"Stable username/password connectivity with broad compatibility."},
@@ -35,28 +42,22 @@ const protocolMeta:Record<string,ProtocolMeta>={
   v2ray:{name:"V2Ray / Xray",short:"V2Ray",icon:"V",tone:"violet",fa:"انعطاف‌پذیر برای شرایط مختلف شبکه و کاربران حرفه‌ای.",en:"Flexible connectivity for varied network conditions and power users."},
 };
 
-const platforms:PlatformMeta[]=[
-  {id:"android",fa:"اندروید",en:"Android",icon:"◆",hintFa:"آموزش نصب سریع",hintEn:"Quick setup guide"},
-  {id:"ios",fa:"آیفون",en:"iPhone",icon:"●",hintFa:"آموزش نصب",hintEn:"Setup guide"},
-  {id:"windows",fa:"ویندوز",en:"Windows",icon:"⊞",hintFa:"آموزش نصب",hintEn:"Setup guide"},
-  {id:"mac",fa:"macOS",en:"macOS",icon:"⌘",hintFa:"آموزش نصب",hintEn:"Setup guide"},
-  {id:"router",fa:"مودم و روتر",en:"Router",icon:"⌁",hintFa:"راه‌اندازی روی مودم",hintEn:"Router setup"},
-];
+const guideProtocolOrder:StoreGuideProtocol[]=["cisco","openvpn","wireguard","l2tp","v2ray"];
 
 const faqItems=[
   {fa:"بعد از خرید چه اتفاقی می‌افتد؟",en:"What happens after purchase?",faBody:"سفارش داخل حساب شما ثبت می‌شود و وضعیت پرداخت، ساخت سرویس و اطلاعات اتصال را از پنل کاربری پیگیری می‌کنید.",enBody:"Your order is attached to your account so payment, provisioning and connection delivery remain trackable from the customer panel."},
   {fa:"آیا روی چند دستگاه می‌توانم استفاده کنم؟",en:"Can I use it on multiple devices?",faBody:"تعداد دستگاه مجاز برای هر پلن قبل از خرید روی همان کارت پلن نمایش داده می‌شود.",enBody:"The allowed device count is shown on each plan before purchase."},
   {fa:"آیا محدودیت حجمی وجود دارد؟",en:"Is traffic limited?",faBody:"حجم و مدت هر پلن مستقیماً از Backend نمایش داده می‌شود تا قبل از خرید دقیقاً بدانید چه چیزی دریافت می‌کنید.",enBody:"Traffic and duration come directly from the backend so you can see exactly what each plan includes."},
   {fa:"برای اتصال چه پروتکل‌هایی ارائه می‌شود؟",en:"Which protocols are available?",faBody:"پروتکل‌های فعال هر پلن روی همان پلن نمایش داده می‌شوند و می‌توانند شامل Cisco، OpenVPN، WireGuard، L2TP و V2Ray/Xray باشند.",enBody:"Each plan lists its active protocols, which can include Cisco, OpenVPN, WireGuard, L2TP and V2Ray/Xray."},
-  {fa:"اگر در اتصال مشکل داشتم چه کار کنم؟",en:"What if I need help connecting?",faBody:"از آموزش‌های فروشگاه، پشتیبانی آنلاین و لینک پشتیبانی برند برای دریافت راهنمایی استفاده کنید.",enBody:"Use the storefront guides, live chat and your brand support link for help."},
+  {fa:"اگر در اتصال مشکل داشتم چه کار کنم؟",en:"What if I need help connecting?",faBody:"از آموزش‌های واقعی فروشگاه، پشتیبانی آنلاین و لینک پشتیبانی برند برای دریافت راهنمایی استفاده کنید.",enBody:"Use the real storefront guides, live chat and your brand support link for help."},
 ];
 
 function Conversion2027Template({settings,plans,loading,error,message,buying,onBuy}:StoreTemplateProps){
   const {pick,lang}=useI18n();
   const {brand}=useBranding();
   const [mobileNavOpen,setMobileNavOpen]=useState(false);
-  const [guidePlatform,setGuidePlatform]=useState("android");
-  const [guideProtocol,setGuideProtocol]=useState("wireguard");
+  const [guidePlatform,setGuidePlatform]=useState<StoreGuidePlatform>("android");
+  const [guideProtocol,setGuideProtocol]=useState<StoreGuideProtocol>("wireguard");
 
   const locale=lang==="en"?"en-US":"fa-IR";
   const content=(key:string)=>storefrontText(settings,key,lang);
@@ -70,6 +71,15 @@ function Conversion2027Template({settings,plans,loading,error,message,buying,onB
     return ordered.length?ordered:Object.keys(protocolMeta);
   },[plans]);
 
+  const guideProtocolIds=useMemo(()=>{
+    const visible=guideProtocolOrder.filter(protocol=>availableProtocols.includes(protocol));
+    return visible.length?visible:guideProtocolOrder;
+  },[availableProtocols]);
+
+  const activeGuideProtocol:StoreGuideProtocol=guideProtocolIds.includes(guideProtocol)
+    ?guideProtocol
+    :guideProtocolIds[0];
+
   const visibleSections=settings.section_order.filter(section=>isStorefrontSectionVisible(settings,section));
   const navLabels:Partial<Record<StorefrontSectionId,string>>={
     plans:pick("پلن‌ها","Plans"),
@@ -80,8 +90,11 @@ function Conversion2027Template({settings,plans,loading,error,message,buying,onB
     faq:pick("سوالات متداول","FAQ"),
   };
 
-  const selectedPlatform=platforms.find(item=>item.id===guidePlatform)||platforms[0];
-  const selectedProtocol=protocolMeta[guideProtocol]||protocolMeta.wireguard;
+  const selectedPlatform=storeGuidePlatforms.find(item=>item.id===guidePlatform)||storeGuidePlatforms[0];
+  const selectedProtocol=protocolMeta[activeGuideProtocol]||protocolMeta.wireguard;
+  const guide=storeGuideContent[activeGuideProtocol];
+  const guideEntry=guide.systems[guidePlatform];
+  const guideAppImage=storeGuideAppImage(guidePlatform,activeGuideProtocol);
   const featuredPlanIndex=plans.length>2?Math.floor(plans.length/2):0;
 
   const plansSection=<section className="tpStoreSection tpStorePlans" id="plans" key="plans">
@@ -121,14 +134,66 @@ function Conversion2027Template({settings,plans,loading,error,message,buying,onB
 
   const guidesSection=<section className="tpStoreSection" id="guides" key="guides">
     <div className="tpStoreSectionHead">
-      <span className="tpStorePill">{content("guides_tag")}</span>
-      <h2>{content("guides_title")}</h2>
-      <p>{content("guides_description")}</p>
+      <span className="tpStorePill">{pick("آموزش واقعی اتصال","Real setup guides")}</span>
+      <h2>{pick("سیستم و پروتکل را انتخاب کن؛ مرحله‌به‌مرحله جلو برو.","Choose your device and protocol, then follow the real steps.")}</h2>
+      <p>{pick("آموزش‌های پنل قبلی با برنامه معتبر، اطلاعات لازم، مسیر دقیق منوها، تصاویر واقعی مراحل و رفع خطا در همین بخش قرار گرفته‌اند.","The previous panel's real guides are restored here with verified clients, required credentials, exact menus, real step images and troubleshooting.")}</p>
     </div>
-    <div className="tpStoreGuideGrid">{platforms.map(platform=><button key={platform.id} className={`tpStoreGuideCard ${guidePlatform===platform.id?"active":""}`} onClick={()=>setGuidePlatform(platform.id)}><span className="tpStoreGuideIcon">{platform.icon}</span><div><b>{pick(platform.fa,platform.en)}</b><small>{pick(platform.hintFa,platform.hintEn)}</small></div><i>←</i></button>)}</div>
-    <div className="tpStoreGuideDetail">
-      <div className="tpStoreGuideVisual"><span>{selectedPlatform.icon}</span><small>{pick(selectedPlatform.fa,selectedPlatform.en)}</small></div>
-      <div className="tpStoreGuideCopy"><span className="tpStorePill">{pick("راهنمای قدم‌به‌قدم","Step-by-step")}</span><h3>{pick(`راه‌اندازی ${selectedProtocol.name} روی ${selectedPlatform.fa}`,`Set up ${selectedProtocol.name} on ${selectedPlatform.en}`)}</h3><div className="tpStoreProtocolPicker">{availableProtocols.map(id=><button className={guideProtocol===id?"active":""} key={id} onClick={()=>setGuideProtocol(id)}>{protocolMeta[id].short}</button>)}</div><div className="tpStoreSteps"><div><span>1</span><p>{pick("کلاینت سازگار را نصب کنید.","Install a compatible client.")}</p></div><div><span>2</span><p>{pick("اطلاعات اتصال را بعد از خرید از پنل کاربری دریافت کنید.","Get your connection details from the customer panel after purchase.")}</p></div><div><span>3</span><p>{pick("کانفیگ را وارد کنید و متصل شوید.","Import the configuration and connect.")}</p></div></div></div>
+
+    <div className="tpRealGuideShell">
+      <div className="tpRealGuideToolbar">
+        <div className="tpRealGuideTabs">{guideProtocolIds.map(id=><button type="button" className={activeGuideProtocol===id?"active":""} key={id} onClick={()=>setGuideProtocol(id)}>{protocolMeta[id].name}</button>)}</div>
+        <div className="tpRealGuideOsTabs">{storeGuidePlatforms.map(platform=><button type="button" key={platform.id} className={guidePlatform===platform.id?"active":""} onClick={()=>setGuidePlatform(platform.id)}><span>{platform.icon}</span>{pick(platform.fa,platform.en)}</button>)}</div>
+      </div>
+
+      <div className="tpRealGuideIntro">
+        <div className="tpRealGuideIntroMain">
+          <div className="tpRealGuideAppArt">
+            <span>{selectedPlatform.icon}</span>
+            {guideAppImage&&<img src={guideAppImage} alt={`${guideEntry.client} - ${selectedProtocol.name}`} loading="lazy" decoding="async" onError={event=>{event.currentTarget.style.display="none";}}/>}
+          </div>
+          <div>
+            <small>{selectedProtocol.name} · {pick(selectedPlatform.fa,selectedPlatform.en)}</small>
+            <h3>{guideEntry.client}</h3>
+            <p>{guide.summary}</p>
+          </div>
+        </div>
+        {guideEntry.downloadUrl?<a className="tpRealGuideDownload" href={guideEntry.downloadUrl} target="_blank" rel="noopener noreferrer">{guideEntry.downloadLabel}<span>↗</span></a>:<span className="tpRealGuideNoDownload">✓ {guideEntry.downloadLabel}</span>}
+      </div>
+
+      {guideEntry.warning&&<div className="tpRealGuideWarning"><span>⚠</span><div><b>{pick("قبل از شروع بخوان","Read before starting")}</b>{guideEntry.warning}</div></div>}
+
+      <div className="tpRealGuideRequirements">
+        <article><small>{pick("پروتکل","Protocol")}</small><b>{selectedProtocol.name}</b></article>
+        <article><small>{pick("سیستم‌عامل","Operating system")}</small><b>{pick(selectedPlatform.fa,selectedPlatform.en)}</b></article>
+        <article><small>{pick("اطلاعات لازم از حساب","Required account data")}</small><b dir="ltr">{guideEntry.credential}</b></article>
+      </div>
+
+      <div className="tpRealGuideLayout">
+        <div className="tpRealGuideSteps">
+          <header><span><small>{pick("اجرای مرحله‌به‌مرحله","Step by step")}</small><h3>{pick("از نصب تا اتصال موفق","From install to successful connection")}</h3></span><em>{number(guideEntry.steps.length)} {pick("مرحله","steps")}</em></header>
+          {guideEntry.steps.map((step,index)=>{
+            const screenshot=storeGuideScreenshot(guidePlatform,activeGuideProtocol,index);
+            return <article className="tpRealGuideStep" key={`${activeGuideProtocol}-${guidePlatform}-${step.title}`}>
+              <i>{number(index+1)}</i>
+              <div>
+                <b>{step.title}</b>
+                <p>{step.detail}</p>
+                <figure className="tpRealGuideScreenshot">
+                  <img src={screenshot} alt={`${step.title} - ${selectedProtocol.name} - ${pick(selectedPlatform.fa,selectedPlatform.en)}`} loading="lazy" decoding="async" onError={event=>{const figure=event.currentTarget.closest(".tpRealGuideScreenshot");if(figure instanceof HTMLElement)figure.style.display="none";}}/>
+                  <figcaption>{pick("تصویر واقعی مرحله","Real step image")} {number(index+1)} · {selectedProtocol.name} · {pick(selectedPlatform.fa,selectedPlatform.en)}</figcaption>
+                </figure>
+              </div>
+            </article>;
+          })}
+        </div>
+
+        <aside className="tpRealGuideHelp">
+          <header><span className="tpRealGuideHelpIcon">⌁</span><span><small>{pick("اگر وصل نشد","If it does not connect")}</small><h3>{pick("عیب‌یابی همین روش","Troubleshoot this setup")}</h3></span></header>
+          {guideEntry.fixes.map(fix=><p key={fix}><i>✓</i>{fix}</p>)}
+          <div className="tpRealGuideHelpNote"><b>{pick("اطلاعات اتصال را حدس نزن","Never guess connection credentials")}</b><small>{pick("Server، فایل، لینک، رمز و کلید را فقط از پنل کاربری همان اشتراک دریافت کن.","Get the server, file, link, password and keys only from that subscription in your customer panel.")}</small></div>
+          <Link href="/panel" className="tpRealGuidePanelLink">{pick("رفتن به پنل و دریافت اطلاعات","Open panel and get connection details")}</Link>
+        </aside>
+      </div>
     </div>
   </section>;
 
@@ -172,7 +237,7 @@ function Conversion2027Template({settings,plans,loading,error,message,buying,onB
         <button className="tpStoreMenuButton" type="button" onClick={()=>setMobileNavOpen(value=>!value)} aria-label={pick("باز کردن منو","Open menu")}><span/><span/><span/></button>
         <Link href="/store" className="tpStoreBrand"><img src={brand.logoUrl} alt={brand.name}/><b>{brand.name}</b></Link>
         <nav className="tpStoreNavLinks">{visibleSections.map(section=><a key={section} href={`#${section}`}>{navLabels[section]}</a>)}</nav>
-        <div className="tpStoreHeaderActions"><LanguageSwitch compact/><ThemeSwitch compact/><Link href="/login" className="tpStoreLogin">{pick("ورود","Sign in")}</Link>{settings.show_plans&&<a href="#plans" className="tpStoreHeaderBuy">{pick("خرید اشتراک","Buy plan")}</a>}</div>
+        <div className="tpStoreHeaderActions"><LanguageSwitch compact/><ThemeSwitch compact/><Link href="/login" className="tpStoreLogin tpStoreLoginPrimary">{pick("ورود","Sign in")}</Link></div>
       </div>
       {mobileNavOpen&&<div className="tpStoreMobileNav">{visibleSections.map(section=><a key={section} href={`#${section}`} onClick={()=>setMobileNavOpen(false)}>{navLabels[section]}</a>)}<Link href="/login" onClick={()=>setMobileNavOpen(false)}>{pick("ورود به حساب","Sign in")}</Link></div>}
     </header>
