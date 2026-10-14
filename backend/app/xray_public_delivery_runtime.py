@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import inspect
+from sqlalchemy import text
 
 from . import xray_node_domain_runtime
 from .database import engine
 from .routers import account_delivery, public_connection_v3
 
 
-# TWINPANEL_XRAY_PUBLIC_DELIVERY_RUNTIME_V1
+# TWINPANEL_XRAY_PUBLIC_DELIVERY_RUNTIME_V2
 #
 # The public /v1/connect page is imported before the self-hosted runtime applies
 # Modern Xray. It therefore keeps an early reference to account_delivery's
@@ -24,9 +24,10 @@ from .routers import account_delivery, public_connection_v3
 # Production also calls xray_node_domain_runtime on every API start. Once the
 # xray_domain column already exists, running ALTER TABLE ... IF NOT EXISTS again
 # is unnecessary and can block startup while PostgreSQL waits for an ACCESS
-# EXCLUSIVE lock. Install a narrow guard before self_hosted_runtime applies the
-# node-domain runtime: inspect the existing columns first and only execute the
-# historical migration when the column is actually absent.
+# EXCLUSIVE lock. A previous guard used SQLAlchemy inspector.get_columns(), but
+# that metadata inspection itself can queue behind an already-waiting ALTER.
+# The V2 guard therefore checks pg_catalog directly without requesting a lock on
+# the nodes relation. Existing installs with xray_domain skip the ALTER entirely.
 
 _runtime_applied = False
 _original_connection_views = public_connection_v3.connection_views
@@ -40,21 +41,46 @@ _PROFILE_LABELS = {
 }
 
 
+def _nodes_schema_state() -> tuple[bool, bool]:
+    """Return (nodes_exists, xray_domain_exists) without locking nodes."""
+
+    with engine.connect() as connection:
+        row = connection.execute(
+            text(
+                """
+                SELECT
+                    to_regclass('nodes') IS NOT NULL AS nodes_exists,
+                    EXISTS (
+                        SELECT 1
+                        FROM pg_catalog.pg_attribute AS attribute
+                        WHERE attribute.attrelid = to_regclass('nodes')
+                          AND attribute.attname = 'xray_domain'
+                          AND attribute.attnum > 0
+                          AND NOT attribute.attisdropped
+                    ) AS xray_domain_exists
+                """
+            )
+        ).mappings().one()
+
+    return (
+        bool(row["nodes_exists"]),
+        bool(row["xray_domain_exists"]),
+    )
+
+
 def _ensure_domain_schema_without_redundant_alter() -> None:
-    inspector = inspect(engine)
+    nodes_exists, xray_domain_exists = _nodes_schema_state()
 
-    if not inspector.has_table("nodes"):
-        return _original_domain_schema_ensure()
-
-    columns = {
-        str(column.get("name") or "").strip()
-        for column in inspector.get_columns("nodes")
-        if isinstance(column, dict)
-    }
-
-    if "xray_domain" in columns:
+    # Fresh installations are handled by metadata/create_all later in startup.
+    if not nodes_exists:
         return
 
+    if xray_domain_exists:
+        return
+
+    # Older databases that genuinely do not have the column keep the historical
+    # migration path. The important production case is the already-upgraded DB,
+    # which now avoids both ALTER TABLE and relation-locking metadata inspection.
     return _original_domain_schema_ensure()
 
 
@@ -205,8 +231,8 @@ def apply_xray_public_delivery_runtime() -> None:
     _runtime_applied = True
 
     print(
-        "TWINPANEL_XRAY_PUBLIC_DELIVERY_RUNTIME_V1_ACTIVE "
+        "TWINPANEL_XRAY_PUBLIC_DELIVERY_RUNTIME_V2_ACTIVE "
         "profile_tabs=1 dynamic_public_payload=1 legacy_fallback=1 "
-        "domain_schema_lock_guard=1",
+        "domain_schema_catalog_guard=1",
         flush=True,
     )
