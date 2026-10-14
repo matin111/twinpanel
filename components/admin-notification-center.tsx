@@ -44,8 +44,50 @@ function routeFor(item:AdminPanelNotification):string|null{
   return `/admin/${route.replace(/^admin\//,"")}`;
 }
 
+function notificationTitle(item:AdminPanelNotification,lang:"fa"|"en"):string{
+  const raw=String(item.title||"").trim();
+  if(lang==="fa")return raw||"اعلان";
+
+  const source=String(item.source||"").toLowerCase();
+  const category=String(item.category||"").toLowerCase();
+
+  if(source==="tunnel")return "Tunnel status changed";
+  if(source==="node")return "Node status changed";
+  if(source==="payment"||category==="payment")return "Payment awaiting review";
+  if(source==="security"||category==="security")return "Security notification";
+
+  const known:Record<string,string>={
+    "تغییر وضعیت تونل":"Tunnel status changed",
+    "تغییر وضعیت نود":"Node status changed",
+    "پرداخت در انتظار بررسی":"Payment awaiting review",
+    "هشدار امنیتی":"Security alert",
+    "اعلان امنیتی":"Security notification",
+  };
+
+  return known[raw]||raw||"Notification";
+}
+
+function notificationMessage(item:AdminPanelNotification,lang:"fa"|"en"):string{
+  const raw=String(item.message||"").trim();
+  if(!raw)return "—";
+  if(lang==="fa")return raw;
+
+  return raw
+    .replace(/🌐\s*تغییر وضعیت شبکه/g,"🌐 Network status changed")
+    .replace(/🔀\s*تغییر وضعیت تونل/g,"🔀 Tunnel status changed")
+    .replace(/💳\s*پرداخت در انتظار بررسی/g,"💳 Payment awaiting review")
+    .replace(/🔐\s*(هشدار|اعلان) امنیتی/g,"🔐 Security notification")
+    .replace(/شناسه پرداخت:/g,"Payment ID:")
+    .replace(/شناسه سفارش:/g,"Order ID:")
+    .replace(/شناسه کاربر:/g,"User ID:")
+    .replace(/کاربر:/g,"User:")
+    .replace(/مبلغ:/g,"Amount:")
+    .replace(/روش:/g,"Method:")
+    .replace(/تومان/g,"Toman");
+}
+
 export function AdminNotificationCenter(){
-  const {pick}=useI18n();
+  const {pick,lang}=useI18n();
   const router=useRouter();
   const [open,setOpen]=useState(false);
   const [items,setItems]=useState<AdminPanelNotification[]>([]);
@@ -53,6 +95,7 @@ export function AdminNotificationCenter(){
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
   const root=useRef<HTMLDivElement|null>(null);
+  const locale=lang==="fa"?"fa-IR":"en-US";
 
   const load=async()=>{
     setLoading(true);
@@ -143,14 +186,14 @@ export function AdminNotificationCenter(){
       title={pick("اعلان‌ها","Notifications")}
     >
       <span aria-hidden="true">◎</span>
-      {unread>0&&<b>{unread>99?"99+":unread.toLocaleString("fa-IR")}</b>}
+      {unread>0&&<b>{unread>99?"99+":unread.toLocaleString(locale)}</b>}
     </button>
 
     {open&&<div className="customerNotificationPopover adminNotificationPopover" role="dialog" aria-label={pick("اعلان‌های مدیریت","Admin notifications")}>
       <header>
         <div>
           <b>{pick("اعلان‌های مدیریت","Admin notifications")}</b>
-          <small>{unread?`${unread.toLocaleString("fa-IR")} ${pick("خوانده‌نشده","unread")}`:pick("همه خوانده شده‌اند","All caught up")}</small>
+          <small>{unread?`${unread.toLocaleString(locale)} ${pick("خوانده‌نشده","unread")}`:pick("همه خوانده شده‌اند","All caught up")}</small>
         </div>
         {unread>0&&<button type="button" onClick={()=>void markAll()}>{pick("خواندن همه","Mark all read")}</button>}
       </header>
@@ -170,9 +213,9 @@ export function AdminNotificationCenter(){
                 >
                   <i/>
                   <div>
-                    <b>{item.title||pick("اعلان","Notification")}</b>
-                    <p>{item.message||"—"}</p>
-                    <small>{item.created_at?new Date(item.created_at).toLocaleString("fa-IR"):""}</small>
+                    <b>{notificationTitle(item,lang)}</b>
+                    <p>{notificationMessage(item,lang)}</p>
+                    <small>{item.created_at?new Date(item.created_at).toLocaleString(locale):""}</small>
                   </div>
                 </button>)}
       </div>
