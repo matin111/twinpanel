@@ -44,6 +44,7 @@ import "./reseller-subscriptions-compact.css";
 import "./admin-resellers-v2.css";
 import "./admin-resellers-volume-v2.css";
 import "./store-admin.css";
+import "./store-real-guides-v4.css";
 import "./customer-shell-final.css";
 import "./admin-shell-final.css";
 
