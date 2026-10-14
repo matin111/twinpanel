@@ -12,6 +12,9 @@ from .services.public_urls import api_base_url
 from .routers import nodes, provision, tunnels
 from .ssh_tunnel_self_hosted_v3 import provision_ssh_tunnel_self_hosted_v3
 from . import xray_modern_runtime
+from .xray_modern_repair_runtime import (
+    apply_xray_modern_repair_runtime,
+)
 
 
 _original_install_or_upgrade_agent = provision._install_or_upgrade_agent
@@ -150,6 +153,18 @@ def apply_self_hosted_runtime() -> None:
     ]["public_base"] = 27000
 
     xray_modern_runtime.apply_xray_modern_runtime()
+
+    # ------------------------------------------------------------
+    # Xray Modern Repair Runtime V1
+    #
+    # Legacy managed Xray nodes already own their base TCP port. If
+    # modern listeners are missing, generic repair used to fail its
+    # port preflight before the modern reconciler could run. Reconcile
+    # those existing Xray listeners first, then let the normal repair
+    # flow verify and persist protocol status.
+    # ------------------------------------------------------------
+
+    apply_xray_modern_repair_runtime()
 
     # ------------------------------------------------------------
     # SSH TUN
