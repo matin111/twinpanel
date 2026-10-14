@@ -5,11 +5,11 @@ import asyncio
 from . import tunnel_transport_manager_v10 as v10
 from .legacy_ingress_reconciler import reconciler_loop as legacy_ingress_loop
 from .runtime_reconciler_v2 import reconciler_loop as runtime_reconciler_loop
-from .manager_runtime_v16 import install_manager_runtime_v16
+from .manager_runtime_v19 import install_manager_runtime_v19
 
 
 # ============================================================
-# TWINPANEL TRANSPORT MANAGER V11 + POLICY V16
+# TWINPANEL TRANSPORT MANAGER V11 + SMART AUTO V19
 #
 # V11 keeps V10/V9/V7 as the authoritative health/failover/self-heal stack
 # and adds two independent ownership-safe reconcilers:
@@ -17,10 +17,9 @@ from .manager_runtime_v16 import install_manager_runtime_v16
 #   * removal of retired per-tunnel ingress chains which can collide when
 #     one Iran node fans out to several Exit nodes.
 #
-# Manager Runtime V16 is installed before the manager starts. It applies the
-# same self-hosted installer hooks used by the API process, then activates the
-# V16 direct-first transport policy. This keeps autonomous self-heal and API
-# repair behavior identical for shared-Iran/multi-Exit Backhaul provisioning.
+# Manager Runtime V19 keeps the V16 self-hosted/multi-exit Backhaul hooks and
+# installs Smart Auto selection. Manual mode remains authoritative; Auto ranks
+# healthy TP2027 members by live latency/loss/stability with hysteresis.
 #
 # Runtime reconciliation uses V2's serialization-safe cleanup wrapper while
 # preserving V1's DB ownership and confirmation guards.
@@ -29,7 +28,7 @@ from .manager_runtime_v16 import install_manager_runtime_v16
 
 
 async def main() -> None:
-    install_manager_runtime_v16()
+    install_manager_runtime_v19()
 
     print(
         "TWINPANEL_TRANSPORT_MANAGER_V11_START",

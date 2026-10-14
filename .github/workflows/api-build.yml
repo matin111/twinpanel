@@ -186,6 +186,10 @@ jobs:
         working-directory: backend
         run: python -m scripts.transport_policy_v16_smoke
 
+      - name: Run V19 Smart Auto transport policy smoke
+        working-directory: backend
+        run: python -m scripts.transport_policy_v19_smoke
+
       - name: Run standalone API core smoke
         working-directory: backend
         run: python scripts/api_core_smoke.py
