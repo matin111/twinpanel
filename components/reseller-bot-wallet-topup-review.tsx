@@ -5,14 +5,13 @@ import {Badge,Card} from "./ui";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
+import {resellerDate,resellerMoney,resellerNumber,resellerStatus} from "../lib/reseller-i18n";
 
 type Row=Record<string,unknown>;
 type DesktopPermission=NotificationPermission|"unsupported";
 
 const text=(row:Row,key:string)=>String(row?.[key]??"");
 const number=(row:Row,key:string)=>Number(row?.[key]??0)||0;
-const money=(value:number)=>`${Number(value||0).toLocaleString("fa-IR")} تومان`;
-const dateText=(value:unknown)=>{if(!value)return "—";const d=new Date(String(value));return Number.isNaN(d.getTime())?String(value):d.toLocaleString("fa-IR");};
 
 async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   const token=getCustomerToken();
@@ -31,7 +30,7 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
 }
 
 export function ResellerBotWalletTopupReview(){
-  const {pick}=useI18n();
+  const {lang,pick}=useI18n();
   const [rows,setRows]=useState<Row[]>([]);
   const [busy,setBusy]=useState<number|null>(null);
   const [error,setError]=useState("");
@@ -51,7 +50,7 @@ export function ResellerBotWalletTopupReview(){
     if(typeof window==="undefined"||!("Notification" in window)||Notification.permission!=="granted")return;
     const id=number(row,"id");
     const customer=text(row,"customer_name")||`#${number(row,"user_id")}`;
-    const amount=money(number(row,"amount_toman"));
+    const amount=resellerMoney(lang,number(row,"amount_toman"));
     try{
       new Notification(pick("رسید شارژ کیف پول جدید","New wallet top-up receipt"),{
         body:pick(
@@ -60,8 +59,8 @@ export function ResellerBotWalletTopupReview(){
         ),
         tag:`reseller-wallet-topup-${id}`,
       });
-    }catch{/* Browser notification is best-effort only. */}
-  },[pick]);
+    }catch{}
+  },[lang,pick]);
 
   const load=useCallback(async(silent=false)=>{
     if(!silent)setError("");
@@ -79,8 +78,8 @@ export function ResellerBotWalletTopupReview(){
         if(fresh.length){
           const newest=fresh[0];
           flashOk(pick(
-            fresh.length===1?"رسید جدید دریافت شد و لیست خودکار بروزرسانی شد.":`${fresh.length.toLocaleString("fa-IR")} رسید جدید دریافت شد و لیست خودکار بروزرسانی شد.`,
-            fresh.length===1?"A new receipt arrived and the list refreshed automatically.":`${fresh.length} new receipts arrived and the list refreshed automatically.`
+            fresh.length===1?"رسید جدید دریافت شد و لیست خودکار بروزرسانی شد.":`${resellerNumber(lang,fresh.length)} رسید جدید دریافت شد و لیست خودکار بروزرسانی شد.`,
+            fresh.length===1?"A new receipt arrived and the list refreshed automatically.":`${resellerNumber(lang,fresh.length)} new receipts arrived and the list refreshed automatically.`
           ));
           notifyNewReceipt(newest);
         }
@@ -93,7 +92,7 @@ export function ResellerBotWalletTopupReview(){
     }catch(reason){
       if(!silent)setError(reason instanceof Error?reason.message:String(reason));
     }
-  },[flashOk,notifyNewReceipt,pick]);
+  },[flashOk,lang,notifyNewReceipt,pick]);
 
   useEffect(()=>{
     if(typeof window!=="undefined"&&"Notification" in window)setDesktopPermission(Notification.permission);
@@ -128,7 +127,7 @@ export function ResellerBotWalletTopupReview(){
 
   const openReceipt=async(id:number)=>{
     const token=getCustomerToken();
-    if(!token){setError("AUTH_REQUIRED");return;}
+    if(!token){setError(pick("نشست کاربری معتبر نیست.","Authentication is required."));return;}
     setError("");
     try{
       const response=await fetch(`${API_BASE}/v1/reseller/bot-commerce/wallet-topups/${id}/receipt`,{headers:{Authorization:`Bearer ${token}`},cache:"no-store"});
@@ -140,7 +139,7 @@ export function ResellerBotWalletTopupReview(){
       const blob=await response.blob();
       const url=URL.createObjectURL(blob);
       const opened=window.open(url,"_blank","noopener,noreferrer");
-      if(!opened){setError(pick("مرورگر اجازه باز کردن رسید را نداد.","Browser blocked the receipt window."));}
+      if(!opened)setError(pick("مرورگر اجازه باز کردن رسید را نداد.","Browser blocked the receipt window."));
       window.setTimeout(()=>URL.revokeObjectURL(url),60_000);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
   };
@@ -183,7 +182,7 @@ export function ResellerBotWalletTopupReview(){
         <small>{pick("رسیدهای جدید هر ۴ ثانیه خودکار دریافت می‌شوند؛ نتیجه تأیید یا رد از همان ربات نماینده برای کاربر ارسال می‌شود.","New receipts are fetched automatically every 4 seconds; approval or rejection is sent from the reseller bot.")}</small>
       </div>
       <div className="action-row">
-        <Badge tone="violet">{pending.length}</Badge>
+        <Badge tone="violet">{resellerNumber(lang,pending.length)}</Badge>
         {desktopPermission==="granted"
           ?<Badge tone="ok">{pick("اعلان فعال","Notifications on")}</Badge>
           :desktopPermission==="default"
@@ -201,12 +200,12 @@ export function ResellerBotWalletTopupReview(){
       <tbody>{rows.slice(0,100).map((row,index)=>{const id=number(row,"id"),username=text(row,"telegram_username"),status=text(row,"status"),receipt=Boolean(row.receipt_uploaded);return <tr key={id||index}>
         <td>#{id}</td>
         <td><b>{text(row,"customer_name")||`#${number(row,"user_id")}`}</b><small dir="ltr">{username?`@${username.replace(/^@/,"")}`:text(row,"telegram_id")||"—"}</small></td>
-        <td><b>{money(number(row,"amount_toman"))}</b></td>
-        <td>{money(number(row,"payable_amount_toman"))}</td>
+        <td><b>{resellerMoney(lang,number(row,"amount_toman"))}</b></td>
+        <td>{resellerMoney(lang,number(row,"payable_amount_toman"))}</td>
         <td>{receipt?<button className="mini-btn" type="button" onClick={()=>void openReceipt(id)}>{pick("مشاهده رسید","View receipt")}</button>:<Badge tone="bad">{pick("بدون رسید","No receipt")}</Badge>}</td>
         <td><code dir="ltr">{text(row,"tracking_code")||"—"}</code></td>
-        <td><Badge tone={status==="approved"?"ok":status==="rejected"?"bad":"violet"}>{status||"—"}</Badge></td>
-        <td>{dateText(row.submitted_at??row.created_at)}</td>
+        <td><Badge tone={status==="approved"?"ok":status==="rejected"?"bad":"violet"}>{resellerStatus(lang,status)}</Badge></td>
+        <td>{resellerDate(lang,row.submitted_at??row.created_at)}</td>
         <td><div className="action-row">{status==="awaiting_review"&&<><button className="mini-btn" type="button" disabled={busy===id||!receipt} onClick={()=>void approve(id)}>{pick("تأیید","Approve")}</button><button className="mini-btn danger" type="button" disabled={busy===id} onClick={()=>void reject(id)}>{pick("رد","Reject")}</button></>}</div></td>
       </tr>})}</tbody>
     </table></div>
