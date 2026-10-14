@@ -73,6 +73,14 @@ def _status_fa(value: str) -> str:
     }.get(str(value or ""), str(value or "-") or "-")
 
 
+def _topup_method_marker(reseller_id: int, method_id: int) -> str:
+    return f"reseller_card:{int(reseller_id)}:{int(method_id)}"
+
+
+def _topup_method_prefix(reseller_id: int) -> str:
+    return f"reseller_card:{int(reseller_id)}:%"
+
+
 def _wallet_text(db, reseller_id: int, user_id: int) -> str:
     wallet = _wallet(db, user_id)
     db.flush()
@@ -87,7 +95,7 @@ def _wallet_text(db, reseller_id: int, user_id: int) -> str:
         db.query(CustomerWalletTopup)
         .filter(
             CustomerWalletTopup.user_id == user_id,
-            CustomerWalletTopup.method.like("reseller_card:%"),
+            CustomerWalletTopup.method.like(_topup_method_prefix(reseller_id)),
         )
         .order_by(CustomerWalletTopup.id.desc())
         .limit(3)
@@ -123,18 +131,8 @@ def _wallet_text(db, reseller_id: int, user_id: int) -> str:
 def _wallet_inline_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="➕ شارژ کیف پول",
-                    callback_data="rwalletmenu:topup",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text="🔄 بروزرسانی موجودی",
-                    callback_data="rwalletmenu:show",
-                )
-            ],
+            [InlineKeyboardButton(text="➕ شارژ کیف پول", callback_data="rwalletmenu:topup")],
+            [InlineKeyboardButton(text="🔄 بروزرسانی موجودی", callback_data="rwalletmenu:show")],
         ]
     )
 
@@ -202,15 +200,9 @@ def build_wallet_menu_router(reseller_id: int) -> Router:
             await state.clear()
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text=f"💳 {method.title or 'کارت به کارت'}",
-                            callback_data=f"rwtm:{int(method.id)}",
-                        )
-                    ]
+                    [InlineKeyboardButton(text=f"💳 {method.title or 'کارت به کارت'}", callback_data=f"rwtm:{int(method.id)}")]
                     for method in methods
-                ]
-                + [[InlineKeyboardButton(text="⬅️ بازگشت", callback_data="rwalletmenu:show")]]
+                ] + [[InlineKeyboardButton(text="⬅️ بازگشت", callback_data="rwalletmenu:show")]]
             )
             await callback.answer()
             await callback.message.edit_text(
@@ -284,7 +276,7 @@ def build_wallet_menu_router(reseller_id: int) -> Router:
                 db.query(CustomerWalletTopup)
                 .filter(
                     CustomerWalletTopup.user_id == int(user.id),
-                    CustomerWalletTopup.method.like("reseller_card:%"),
+                    CustomerWalletTopup.method.like(_topup_method_prefix(reseller_id)),
                     CustomerWalletTopup.status.in_(["pending_payment", "awaiting_review"]),
                 )
                 .count()
@@ -301,7 +293,7 @@ def build_wallet_menu_router(reseller_id: int) -> Router:
                 amount_toman=amount,
                 payable_amount_toman=payable,
                 unique_suffix=suffix,
-                method=f"reseller_card:{int(method.id)}",
+                method=_topup_method_marker(reseller_id, int(method.id)),
                 status="pending_payment",
             )
             db.add(topup)
@@ -327,10 +319,7 @@ def build_wallet_menu_router(reseller_id: int) -> Router:
                 lines.extend(["شماره شبا:", f"<code>{escape(str(method.iban))}</code>"])
             if method.instructions:
                 lines.extend(["", escape(str(method.instructions))])
-            lines.extend([
-                "",
-                "بعد از واریز، <b>کد پیگیری</b> را همین‌جا ارسال کنید.",
-            ])
+            lines.extend(["", "بعد از واریز، <b>کد پیگیری</b> را همین‌جا ارسال کنید."])
             await message.answer("\n".join(lines))
         finally:
             db.close()
@@ -356,7 +345,7 @@ def build_wallet_menu_router(reseller_id: int) -> Router:
                 .filter(
                     CustomerWalletTopup.id == topup_id,
                     CustomerWalletTopup.user_id == int(user.id),
-                    CustomerWalletTopup.method.like("reseller_card:%"),
+                    CustomerWalletTopup.method.like(_topup_method_prefix(reseller_id)),
                 )
                 .with_for_update()
                 .first()
