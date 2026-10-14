@@ -19,6 +19,7 @@ from app.routers.reseller_bot_orders_owned_v3 import (
 )
 from app.routers.reseller_bot_wallet_topups import (
     _method_parts,
+    _topup_out,
     approve_reseller_bot_wallet_topup,
     reject_reseller_bot_wallet_topup,
     reseller_bot_wallet_topup_receipt,
@@ -45,6 +46,7 @@ def main() -> None:
     list_source = inspect.getsource(reseller_bot_wallets)
     tx_source = inspect.getsource(reseller_bot_wallet_transactions)
     topup_list_source = inspect.getsource(reseller_bot_wallet_topups)
+    topup_out_source = inspect.getsource(_topup_out)
     receipt_source = inspect.getsource(reseller_bot_wallet_topup_receipt)
     approve_topup_source = inspect.getsource(approve_reseller_bot_wallet_topup)
     reject_topup_source = inspect.getsource(reject_reseller_bot_wallet_topup)
@@ -69,7 +71,7 @@ def main() -> None:
     marker_row = type("MarkerRow", (), {"method": "reseller_card:7:11"})()
     assert _method_parts(marker_row) == (7, 11)
     assert 'prefix = f"reseller_card:{int(reseller.id)}:%"' in topup_list_source
-    assert '"receipt_uploaded": bool(row.receipt_file_marker)' in topup_list_source
+    assert '"receipt_uploaded": bool(row.receipt_file_marker)' in topup_out_source
     assert "_owned_topup" in receipt_source
     assert "receipt_file_marker" in receipt_source
     assert "lock=True" in approve_topup_source
