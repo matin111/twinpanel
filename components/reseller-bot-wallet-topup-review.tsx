@@ -89,7 +89,7 @@ export function ResellerBotWalletTopupReview(){
         <td><b>{money(number(row,"amount_toman"))}</b></td>
         <td>{money(number(row,"payable_amount_toman"))}</td>
         <td><code dir="ltr">{text(row,"tracking_code")||"—"}</code></td>
-        <td><Badge tone={status==="approved"?"green":status==="rejected"?"red":"violet"}>{status||"—"}</Badge></td>
+        <td><Badge tone={status==="approved"?"ok":status==="rejected"?"bad":"violet"}>{status||"—"}</Badge></td>
         <td>{dateText(row.submitted_at??row.created_at)}</td>
         <td><div className="action-row">{status==="awaiting_review"&&<><button className="mini-btn" type="button" disabled={busy===id} onClick={()=>void approve(id)}>{pick("تأیید","Approve")}</button><button className="mini-btn danger" type="button" disabled={busy===id} onClick={()=>void reject(id)}>{pick("رد","Reject")}</button></>}</div></td>
       </tr>})}</tbody>
