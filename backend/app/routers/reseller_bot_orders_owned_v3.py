@@ -15,6 +15,7 @@ from ..database import get_db
 from ..deps import require_reseller
 from ..models import Subscription, User
 from ..models_reseller import Reseller
+from ..reseller_bot_order_models import ResellerBotOrder
 from ..reseller_owned_plans import (
     create_subscription_from_owned_plan,
     owned_plan_by_backing,
@@ -96,6 +97,51 @@ def _wallet_transaction_out(row: CustomerWalletTransaction) -> dict:
     }
 
 
+def _owned_wallet_transactions(
+    db: Session,
+    reseller_id: int,
+    user_id: int,
+) -> list[CustomerWalletTransaction]:
+    # The wallet itself is shared by the linked customer account, but a
+    # reseller must not see unrelated customer/admin ledger activity. Expose
+    # only manual adjustments made by this reseller and wallet purchases whose
+    # bot order belongs to this reseller + customer.
+    owned_order_ids = {
+        int(row[0])
+        for row in (
+            db.query(ResellerBotOrder.id)
+            .filter(
+                ResellerBotOrder.reseller_id == int(reseller_id),
+                ResellerBotOrder.customer_user_id == int(user_id),
+            )
+            .all()
+        )
+    }
+    adjust_prefix = f"reseller-bot-wallet:{int(reseller_id)}:"
+    order_prefix = "reseller-bot-wallet-order:"
+    candidates = (
+        db.query(CustomerWalletTransaction)
+        .filter(CustomerWalletTransaction.user_id == int(user_id))
+        .order_by(CustomerWalletTransaction.id.desc())
+        .limit(2000)
+        .all()
+    )
+
+    result: list[CustomerWalletTransaction] = []
+    for row in candidates:
+        reference = str(row.reference or "")
+        owned = reference.startswith(adjust_prefix)
+        if not owned and reference.startswith(order_prefix):
+            raw_order_id = reference[len(order_prefix):]
+            if raw_order_id.isdigit():
+                owned = int(raw_order_id) in owned_order_ids
+        if owned:
+            result.append(row)
+            if len(result) >= 100:
+                break
+    return result
+
+
 @router.get("/wallets")
 def reseller_bot_wallets(
     reseller: Reseller = Depends(require_reseller),
@@ -168,12 +214,10 @@ def reseller_bot_wallet_transactions(
         int(reseller.id),
         int(user_id),
     )
-    rows = (
-        db.query(CustomerWalletTransaction)
-        .filter(CustomerWalletTransaction.user_id == int(user_id))
-        .order_by(CustomerWalletTransaction.id.desc())
-        .limit(100)
-        .all()
+    rows = _owned_wallet_transactions(
+        db,
+        int(reseller.id),
+        int(user_id),
     )
     return [_wallet_transaction_out(row) for row in rows]
 
