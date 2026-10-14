@@ -4,17 +4,25 @@ from datetime import datetime
 from types import SimpleNamespace
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from ..customer_wallet_models import (
+    CustomerWallet,
+    CustomerWalletTransaction,
+)
 from ..database import get_db
 from ..deps import require_reseller
-from ..models import Subscription
+from ..models import Subscription, User
 from ..models_reseller import Reseller
+from ..reseller_bot_order_models import ResellerBotOrder
 from ..reseller_owned_plans import (
     create_subscription_from_owned_plan,
     owned_plan_by_backing,
 )
+from ..reseller_telegram_models import ResellerTelegramLink
 from . import reseller_bot_orders as legacy
+from .customer_wallet import _wallet
 from .reseller_bot_orders_volume_v2 import (
     _renewal_subscription_id,
     approve_order_volume_v2,
@@ -25,6 +33,277 @@ router = APIRouter(
     prefix="/v1/reseller/bot-commerce",
     tags=["reseller-bot-commerce-owned-v3"],
 )
+
+
+class ResellerBotWalletAdjustIn(BaseModel):
+    amount_toman: int = Field(
+        ge=-100_000_000,
+        le=100_000_000,
+    )
+    note: str = Field(
+        min_length=2,
+        max_length=500,
+    )
+    idempotency_key: str = Field(
+        min_length=8,
+        max_length=100,
+    )
+
+
+def _bot_wallet_reference(
+    reseller_id: int,
+    idempotency_key: str,
+) -> str:
+    return (
+        f"reseller-bot-wallet:{int(reseller_id)}:"
+        f"{str(idempotency_key).strip()}"
+    )[:180]
+
+
+def _owned_bot_link(
+    db: Session,
+    reseller_id: int,
+    user_id: int,
+    *,
+    lock: bool = False,
+) -> ResellerTelegramLink:
+    query = (
+        db.query(ResellerTelegramLink)
+        .filter(
+            ResellerTelegramLink.reseller_id == int(reseller_id),
+            ResellerTelegramLink.user_id == int(user_id),
+        )
+    )
+    if lock:
+        query = query.with_for_update()
+    row = query.first()
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="کاربر ربات متعلق به این نمایندگی نیست",
+        )
+    return row
+
+
+def _wallet_transaction_out(row: CustomerWalletTransaction) -> dict:
+    return {
+        "id": int(row.id),
+        "user_id": int(row.user_id),
+        "amount_toman": int(row.amount_toman or 0),
+        "kind": row.kind,
+        "description": row.description,
+        "reference": row.reference,
+        "created_at": row.created_at,
+    }
+
+
+def _owned_wallet_transactions(
+    db: Session,
+    reseller_id: int,
+    user_id: int,
+) -> list[CustomerWalletTransaction]:
+    # The wallet itself is shared by the linked customer account, but a
+    # reseller must not see unrelated customer/admin ledger activity. Expose
+    # only manual adjustments made by this reseller and wallet purchases whose
+    # bot order belongs to this reseller + customer.
+    owned_order_ids = {
+        int(row[0])
+        for row in (
+            db.query(ResellerBotOrder.id)
+            .filter(
+                ResellerBotOrder.reseller_id == int(reseller_id),
+                ResellerBotOrder.customer_user_id == int(user_id),
+            )
+            .all()
+        )
+    }
+    adjust_prefix = f"reseller-bot-wallet:{int(reseller_id)}:"
+    order_prefix = "reseller-bot-wallet-order:"
+    candidates = (
+        db.query(CustomerWalletTransaction)
+        .filter(CustomerWalletTransaction.user_id == int(user_id))
+        .order_by(CustomerWalletTransaction.id.desc())
+        .limit(2000)
+        .all()
+    )
+
+    result: list[CustomerWalletTransaction] = []
+    for row in candidates:
+        reference = str(row.reference or "")
+        owned = reference.startswith(adjust_prefix)
+        if not owned and reference.startswith(order_prefix):
+            raw_order_id = reference[len(order_prefix):]
+            if raw_order_id.isdigit():
+                owned = int(raw_order_id) in owned_order_ids
+        if owned:
+            result.append(row)
+            if len(result) >= 100:
+                break
+    return result
+
+
+@router.get("/wallets")
+def reseller_bot_wallets(
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    links = (
+        db.query(ResellerTelegramLink)
+        .filter(
+            ResellerTelegramLink.reseller_id == int(reseller.id)
+        )
+        .order_by(
+            ResellerTelegramLink.last_seen_at.desc(),
+            ResellerTelegramLink.id.desc(),
+        )
+        .limit(1000)
+        .all()
+    )
+
+    user_ids = [int(row.user_id) for row in links]
+    wallets: dict[int, CustomerWallet] = {}
+    if user_ids:
+        wallets = {
+            int(row.user_id): row
+            for row in (
+                db.query(CustomerWallet)
+                .filter(CustomerWallet.user_id.in_(user_ids))
+                .all()
+            )
+        }
+
+    result = []
+    for link in links:
+        user = db.get(User, int(link.user_id))
+        if not user or not user.is_active:
+            continue
+        wallet = wallets.get(int(link.user_id))
+        email = str(user.email or "").strip()
+        result.append({
+            "user_id": int(user.id),
+            "full_name": user.full_name,
+            "phone": user.phone,
+            "email": (
+                None
+                if email.endswith("@internal.twinpanel.invalid")
+                else user.email
+            ),
+            "telegram_id": int(link.telegram_id),
+            "telegram_username": link.telegram_username,
+            "telegram_first_name": link.telegram_first_name,
+            "last_seen_at": link.last_seen_at,
+            "balance_toman": int(
+                wallet.balance_toman if wallet else 0
+            ),
+            "wallet_updated_at": (
+                wallet.updated_at if wallet else None
+            ),
+        })
+
+    return result
+
+
+@router.get("/wallets/{user_id}/transactions")
+def reseller_bot_wallet_transactions(
+    user_id: int,
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    _owned_bot_link(
+        db,
+        int(reseller.id),
+        int(user_id),
+    )
+    rows = _owned_wallet_transactions(
+        db,
+        int(reseller.id),
+        int(user_id),
+    )
+    return [_wallet_transaction_out(row) for row in rows]
+
+
+@router.post("/wallets/{user_id}/adjust")
+def adjust_reseller_bot_wallet(
+    user_id: int,
+    payload: ResellerBotWalletAdjustIn,
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    amount = int(payload.amount_toman)
+    if amount == 0:
+        raise HTTPException(
+            status_code=422,
+            detail="مبلغ تغییر نمی‌تواند صفر باشد",
+        )
+
+    _owned_bot_link(
+        db,
+        int(reseller.id),
+        int(user_id),
+        lock=True,
+    )
+    user = db.get(User, int(user_id))
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=404,
+            detail="کاربر فعال ربات پیدا نشد",
+        )
+
+    wallet = _wallet(db, int(user_id), lock=True)
+    db.flush()
+
+    reference = _bot_wallet_reference(
+        int(reseller.id),
+        payload.idempotency_key,
+    )
+    previous = (
+        db.query(CustomerWalletTransaction)
+        .filter(
+            CustomerWalletTransaction.user_id == int(user_id),
+            CustomerWalletTransaction.reference == reference,
+        )
+        .first()
+    )
+    if previous:
+        return {
+            "ok": True,
+            "duplicate": True,
+            "user_id": int(user_id),
+            "balance_toman": int(wallet.balance_toman or 0),
+            "transaction": _wallet_transaction_out(previous),
+        }
+
+    current = int(wallet.balance_toman or 0)
+    balance_after = current + amount
+    if balance_after < 0:
+        raise HTTPException(
+            status_code=409,
+            detail="موجودی کیف پول برای این کاهش کافی نیست",
+        )
+
+    wallet.balance_toman = balance_after
+    wallet.updated_at = datetime.utcnow()
+    transaction = CustomerWalletTransaction(
+        user_id=int(user_id),
+        amount_toman=amount,
+        kind="reseller_bot_adjustment",
+        description=(
+            f"تغییر موجودی توسط نماینده #{int(reseller.id)}: "
+            f"{payload.note.strip()}"
+        ),
+        reference=reference,
+    )
+    db.add(transaction)
+    db.commit()
+    db.refresh(transaction)
+
+    return {
+        "ok": True,
+        "duplicate": False,
+        "user_id": int(user_id),
+        "balance_toman": int(wallet.balance_toman or 0),
+        "transaction": _wallet_transaction_out(transaction),
+    }
 
 
 def _failed_status(row) -> str:
@@ -94,7 +373,9 @@ async def approve_order_owned_v3(
     try:
         if not row.subscription_id:
             # Preserve the immutable order snapshot even if the reseller edits
-            # the plan while a receipt is waiting for review.
+            # the plan while a receipt is waiting for review. Display-only
+            # fields which were not historically stored on the order use the
+            # owned-plan mapping and do not affect quota or pricing.
             requested_protocols = {
                 str(value).strip().lower()
                 for value in (row.protocols or [])
@@ -105,6 +386,11 @@ async def approve_order_owned_v3(
                 id=int(mapping.id),
                 reseller_id=int(mapping.reseller_id),
                 backing_plan_id=int(mapping.backing_plan_id),
+                title=(
+                    str(mapping.title or "").strip()
+                    or f"پلن #{int(mapping.id)}"
+                ),
+                device_limit=int(mapping.device_limit or 1),
                 is_active=True,
                 traffic_gb=int(row.traffic_gb),
                 duration_days=int(row.duration_days),

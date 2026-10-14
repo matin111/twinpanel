@@ -215,6 +215,13 @@ class CustomerWalletTopup(Base):
         nullable=True,
     )
 
+    # `local:<filename>` marker for an uploaded card-to-card receipt. The
+    # filename itself is generated server-side and never contains user input.
+    receipt_file_marker: Mapped[str | None] = mapped_column(
+        String(280),
+        nullable=True,
+    )
+
     review_note: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,

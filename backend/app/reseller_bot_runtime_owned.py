@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 from html import escape
+import logging
 
 from aiogram import Router
 
 from . import reseller_bot_review
 from . import reseller_bot_runtime as legacy_runtime
+from .discount_schema import ensure_discount_schema
 from .models import Plan
 from .reseller_bot_owned_runtime import build_owned_plan_router
+from .reseller_bot_payment_runtime import build_owned_payment_router
 from .reseller_owned_plans import owned_plan_by_backing
 from .routers import reseller_bot_orders as legacy_orders
 from .routers.reseller_bot_orders_owned_v3 import approve_order_owned_v3
 
+
+log = logging.getLogger(__name__)
 
 _original_build_router = legacy_runtime.build_router
 _original_review_caption = reseller_bot_review._review_caption
@@ -41,9 +46,15 @@ def _owned_review_caption(db, order):
 
 def build_router(reseller_id: int) -> Router:
     parent = Router(name=f"reseller-bot-root-owned-{reseller_id}")
-    # Owned-plan handlers are intentionally registered first. The existing
-    # router remains behind them for start/dashboard/subscription delivery,
-    # receipt recovery, learning center, discounts and legacy compatibility.
+    # Payment callbacks must be owned by the same runtime that renders the
+    # reseller-owned plan. This prevents rpay/rwallet from falling through to
+    # legacy plan handlers with a different data model.
+    parent.include_router(
+        build_owned_payment_router(reseller_id)
+    )
+    # Owned-plan handlers are intentionally registered before the legacy
+    # compatibility router. The legacy router remains for start/dashboard,
+    # subscription delivery, receipt recovery, learning center and discounts.
     parent.include_router(
         build_owned_plan_router(reseller_id)
     )
@@ -65,6 +76,12 @@ def install_runtime_overrides() -> None:
 
 
 def main() -> None:
+    schema = ensure_discount_schema()
+    log.info(
+        "discount schema ready codes=%s redemptions=%s",
+        schema.get("discount_codes"),
+        schema.get("discount_redemptions"),
+    )
     install_runtime_overrides()
     legacy_runtime.main()
 
