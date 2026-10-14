@@ -1,0 +1,27 @@
+/* Storefront tutorial download button contrast fix */
+html[data-theme="light"] .tpStore .tpRealGuideDownload{
+  background:linear-gradient(135deg,#7c3aed,#6d28d9);
+  border-color:#6d28d9;
+  color:#ffffff!important;
+  box-shadow:0 10px 24px rgba(109,40,217,.18);
+  text-shadow:none;
+  opacity:1;
+}
+html[data-theme="light"] .tpStore .tpRealGuideDownload:hover{
+  background:linear-gradient(135deg,#8b5cf6,#7c3aed);
+  border-color:#7c3aed;
+  color:#ffffff!important;
+  box-shadow:0 13px 30px rgba(109,40,217,.24);
+}
+html[data-theme="light"] .tpStore .tpRealGuideDownload span{
+  color:#ffffff!important;
+  opacity:1;
+}
+
+/* Keep unavailable/native-download state readable too. */
+html[data-theme="light"] .tpStore .tpRealGuideNoDownload{
+  background:#f8fafc;
+  border-color:#cbd5e1;
+  color:#334155!important;
+  opacity:1;
+}
