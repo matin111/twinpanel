@@ -8,6 +8,10 @@ from .database import SessionLocal
 from .services.public_urls import api_base_url
 from .routers import nodes, provision, tunnels
 from .ssh_tunnel_self_hosted_v3 import provision_ssh_tunnel_self_hosted_v3
+from . import xray_modern_runtime
+from .xray_modern_repair_runtime import (
+    apply_xray_modern_repair_runtime,
+)
 
 
 _original_install_or_upgrade_agent = provision._install_or_upgrade_agent
@@ -67,6 +71,29 @@ def apply_self_hosted_runtime() -> None:
     # forwarded mapping. The panel remains the owner of installation/repair;
     # users do not need to edit node configs manually.
     tunnels._install_backhaul_peer = install_backhaul_peer_v16
+
+    # Xray modern is intentionally enabled without enabling the unrelated
+    # V18/V19/V20 tunnel runtimes that are absent from this production baseline.
+    # Modern public service ports use isolated 1000-port blocks so Exit IDs up
+    # to 999 cannot collide with the legacy Xray service range.
+    xray_modern_runtime.PROFILE_META[
+        xray_modern_runtime.PROFILE_XHTTP
+    ]["public_base"] = 24000
+
+    xray_modern_runtime.PROFILE_META[
+        xray_modern_runtime.PROFILE_GRPC
+    ]["public_base"] = 25000
+
+    xray_modern_runtime.PROFILE_META[
+        xray_modern_runtime.PROFILE_WS
+    ]["public_base"] = 26000
+
+    xray_modern_runtime.PROFILE_META[
+        xray_modern_runtime.PROFILE_HTTPUPGRADE
+    ]["public_base"] = 27000
+
+    xray_modern_runtime.apply_xray_modern_runtime()
+    apply_xray_modern_repair_runtime()
 
     # SSH TUN is controller-owned in the self-hosted product. V3 keeps all node
     # changes automatic, uses the V2 self-healing runtime, then performs a real
