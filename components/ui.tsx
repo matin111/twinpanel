@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {BrandMark} from "../lib/branding";
 import {AdminNotificationCenter} from "./admin-notification-center";
+
+const ADMIN_SIDEBAR_SCROLL_KEY="twinpanel.admin.sidebar.scrollTop";
 
 const menuGroups=[
   {fa:"مدیریت",en:"Management",items:[
@@ -54,9 +56,37 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
   const {pick}=useI18n();
   const [collapsed,setCollapsed]=useState(false);
   const [mobileOpen,setMobileOpen]=useState(false);
+  const sidebarNavRef=useRef<HTMLElement|null>(null);
+
+  const rememberSidebarScroll=()=>{
+    const nav=sidebarNavRef.current;
+    if(!nav)return;
+    try{sessionStorage.setItem(ADMIN_SIDEBAR_SCROLL_KEY,String(Math.max(0,Math.round(nav.scrollTop))));}catch{}
+  };
 
   useEffect(()=>{
     try{setCollapsed(localStorage.getItem("twinpanel.sidebar.collapsed")==="1");}catch{}
+
+    let firstFrame=0;
+    let secondFrame=0;
+    try{
+      const saved=Number(sessionStorage.getItem(ADMIN_SIDEBAR_SCROLL_KEY)||0);
+      if(Number.isFinite(saved)&&saved>0){
+        const restore=()=>{
+          if(sidebarNavRef.current)sidebarNavRef.current.scrollTop=saved;
+        };
+        firstFrame=requestAnimationFrame(()=>{
+          restore();
+          secondFrame=requestAnimationFrame(restore);
+        });
+      }
+    }catch{}
+
+    return()=>{
+      if(firstFrame)cancelAnimationFrame(firstFrame);
+      if(secondFrame)cancelAnimationFrame(secondFrame);
+      rememberSidebarScroll();
+    };
   },[]);
 
   const toggleCollapsed=()=>{
@@ -75,11 +105,11 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
         <button className="mobile-menu-close" type="button" onClick={()=>setMobileOpen(false)} aria-label={pick("بستن منو","Close menu")}>×</button>
       </div>
 
-      <nav className="sidebar-nav">{menuGroups.map(group=><div className="nav-group" key={group.en}>
+      <nav ref={sidebarNavRef} className="sidebar-nav" onScroll={rememberSidebarScroll}>{menuGroups.map(group=><div className="nav-group" key={group.en}>
         <div className="nav-group-title">{pick(group.fa,group.en)}</div>
         {group.items.map(([fa,en,h,i])=>{
           const label=pick(fa,en);
-          return <Link key={h} href={h} title={collapsed?label:undefined} className={active===h?"active":""} onClick={()=>setMobileOpen(false)}>
+          return <Link key={h} href={h} title={collapsed?label:undefined} className={active===h?"active":""} onClick={()=>{rememberSidebarScroll();setMobileOpen(false);}}>
             <i>{i}</i><span className="nav-label">{label}</span>
           </Link>;
         })}
