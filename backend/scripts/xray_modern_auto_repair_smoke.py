@@ -3,13 +3,50 @@ from __future__ import annotations
 import asyncio
 
 from app import xray_modern_repair_runtime as runtime
+from app import xray_modern_runtime as modern_runtime
+from app import xray_modern_temp_config_runtime as temp_runtime
 
 
 class DummyNode:
     pass
 
 
+class DummyConn:
+    def __init__(self) -> None:
+        self.command = ""
+
+    async def run(self, command, *args, **kwargs):
+        self.command = str(command)
+        return object()
+
+
 async def main() -> None:
+    temp_runtime.apply_xray_modern_temp_config_runtime()
+
+    # Production regression: Xray 26.x must see a candidate path ending in
+    # `.json`; otherwise it refuses to infer the config format.
+    merged = modern_runtime._merge_clients_script()
+    assert temp_runtime.JSON_TEMP_CONFIG in merged
+    assert temp_runtime.LEGACY_TEMP_CONFIG not in merged
+
+    dummy = DummyConn()
+    proxy = temp_runtime._JsonTempPathConnection(dummy)
+    await proxy.run(
+        "xray run -test -config "
+        + temp_runtime.LEGACY_TEMP_CONFIG
+    )
+    assert temp_runtime.JSON_TEMP_CONFIG in dummy.command
+    assert temp_runtime.LEGACY_TEMP_CONFIG not in dummy.command
+
+    assert (
+        modern_runtime._ensure_modern_xray
+        is temp_runtime._ensure_modern_xray_json_temp
+    )
+    assert (
+        runtime._ensure_modern_xray
+        is temp_runtime._ensure_modern_xray_json_temp
+    )
+
     original_ensure = runtime._ensure_modern_xray
     calls = 0
 
@@ -63,6 +100,7 @@ async def main() -> None:
     assert "reality_private_key\": state.get" not in probe
     assert "reality_password\": state.get" not in probe
 
+    print("XRAY_MODERN_JSON_TEMP_CONFIG_OK")
     print("XRAY_MODERN_AUTO_REPAIR_RETRY_OK")
     print("XRAY_MODERN_HEALTH_PROBE_SAFE_OK")
 
