@@ -1,27 +1,32 @@
 from __future__ import annotations
 
+import re
 from typing import Any
+from urllib.parse import quote
 
 from sqlalchemy import text
 
 from . import xray_node_domain_runtime
 from .database import engine
+from .models import Node
 from .routers import account_delivery, public_connection_v3
 
 
-# TWINPANEL_XRAY_PUBLIC_DELIVERY_RUNTIME_V3
+# TWINPANEL_XRAY_PUBLIC_DELIVERY_RUNTIME_V4
 #
 # The public /v1/connect page is imported before the self-hosted runtime applies
 # Modern Xray. It therefore keeps an early reference to account_delivery's
 # original _public_payload, and its legacy renderer only consumes item.uri.
 #
 # Modern credentials already carry item.profiles[] with a dedicated URI for
-# WebSocket TLS / XHTTP REALITY / HTTPUpgrade TLS / gRPC REALITY. V3 keeps one
+# WebSocket TLS / XHTTP REALITY / HTTPUpgrade TLS / gRPC REALITY. V4 keeps one
 # server/country tab per Xray node and renders the customer-safe profiles for
 # that node inside the same server view. For Iran-facing delivery WebSocket TLS
-# is preferred, XHTTP REALITY is the fallback, and gRPC is intentionally hidden
-# from the customer page. Internal listeners/routes are not removed by this UI
-# runtime, so operational rollback remains possible without reprovisioning.
+# is preferred, XHTTP REALITY is the modern no-domain fallback, and the already
+# preserved legacy VLESS TCP listener is exposed as a simple compatibility
+# fallback. gRPC remains intentionally hidden from the customer page.
+# Internal listeners/routes are not removed by this UI runtime, so operational
+# rollback remains possible without reprovisioning.
 #
 # Production also calls xray_node_domain_runtime on every API start. Once the
 # xray_domain column already exists, running ALTER TABLE ... IF NOT EXISTS again
@@ -36,6 +41,7 @@ _original_domain_schema_ensure = xray_node_domain_runtime._ensure_database_colum
 _PROFILE_LABELS = {
     "websocket_tls": "WebSocket TLS",
     "xhttp_reality": "XHTTP Reality",
+    "tcp_simple": "TCP ساده",
     "httpupgrade_tls": "HTTPUpgrade TLS",
     "grpc_reality": "gRPC Reality",
 }
@@ -43,11 +49,13 @@ _PROFILE_LABELS = {
 # Customer delivery policy for restricted Iranian networks.
 # Keep the list intentionally short and stable:
 #   1. WebSocket TLS when a dedicated Xray domain/certificate is ready.
-#   2. XHTTP REALITY as the no-domain / fallback profile.
+#   2. XHTTP REALITY as the modern no-domain fallback.
+#   3. Legacy VLESS TCP as a simple compatibility fallback.
 # gRPC is deliberately not exposed to end users.
 _PUBLIC_PROFILE_ORDER = (
     "websocket_tls",
     "xhttp_reality",
+    "tcp_simple",
 )
 _PUBLIC_PROFILE_IDS = set(_PUBLIC_PROFILE_ORDER)
 
@@ -126,6 +134,117 @@ def _server_name(
     ).strip()
 
 
+def _existing_uuid(item: dict[str, Any]) -> str:
+    value = str(item.get("uuid") or "").strip()
+
+    if value:
+        return value
+
+    uri = str(item.get("uri") or "").strip()
+    match = re.match(r"^vless://([^@/?#]+)@", uri)
+    return match.group(1) if match else ""
+
+
+def _legacy_tcp_profile(
+    db,
+    item: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Build the already-preserved legacy VLESS TCP profile for one node."""
+
+    try:
+        node_id = int(item.get("node_id") or 0)
+    except (TypeError, ValueError):
+        return None
+
+    if not node_id:
+        return None
+
+    client_id = _existing_uuid(item)
+    if not client_id:
+        return None
+
+    node = db.get(Node, node_id)
+    if not node:
+        return None
+
+    try:
+        host, port = account_delivery._tunnel_access_endpoint(
+            db,
+            node,
+            "v2ray",
+        )
+    except Exception:
+        return None
+
+    name = str(
+        item.get("node")
+        or getattr(node, "name", None)
+        or f"node-{node_id}"
+    ).strip()
+
+    fragment = quote(f"{name}-TCP", safe="")
+    uri = (
+        f"vless://{client_id}@{host}:{int(port)}"
+        f"?encryption=none&type=tcp#{fragment}"
+    )
+
+    return {
+        "id": "tcp_simple",
+        "title": "VLESS TCP ساده",
+        "recommended": False,
+        "security": "none",
+        "transport": "tcp",
+        "server": host,
+        "port": int(port),
+        "uri": uri,
+        "qr": account_delivery._qr_data_uri(uri),
+    }
+
+
+def _public_payload_customer_xray(db, sub) -> dict[str, Any]:
+    """Add a customer-safe TCP fallback without changing stored credentials."""
+
+    payload = account_delivery._public_payload(db, sub)
+
+    credentials = payload.get("credentials")
+    if not isinstance(credentials, list):
+        return payload
+
+    for credential in credentials:
+        if not isinstance(credential, dict):
+            continue
+
+        protocol = str(credential.get("protocol") or "").strip().lower()
+        if protocol not in {"v2ray", "xray"}:
+            continue
+
+        items = credential.get("items")
+        source_items = items if isinstance(items, list) else [items]
+
+        for item in source_items:
+            if not isinstance(item, dict):
+                continue
+
+            profiles = item.get("profiles")
+            if not isinstance(profiles, list):
+                continue
+
+            existing_ids = {
+                str(profile.get("id") or "").strip().lower()
+                for profile in profiles
+                if isinstance(profile, dict)
+            }
+
+            if "tcp_simple" in existing_ids:
+                continue
+
+            tcp_profile = _legacy_tcp_profile(db, item)
+            if tcp_profile is not None:
+                profiles.append(tcp_profile)
+
+    return payload
+
+
 def _profile_delivery_item(
     item: dict[str, Any],
     profile: dict[str, Any],
@@ -200,16 +319,14 @@ def _xray_server_body(
     profiles = _customer_profiles(item)
 
     if not profiles:
-        # A modern credential may currently contain only a hidden transport
-        # (for example gRPC) while TLS/domain is still being prepared. Do not
-        # fall back to exposing that hidden transport. If this is a true legacy
-        # credential with no profiles[] at all, preserve the historical card.
+        # A modern credential may currently contain only hidden transports.
+        # Do not expose those. True legacy credentials without profiles[] keep
+        # their historical single-card behavior.
         raw_profiles = item.get("profiles")
         if isinstance(raw_profiles, list):
             return (
                 '<div class="empty-state">'
-                'WebSocket TLS هنوز برای این سرور آماده نشده است. '
-                'XHTTP نیز در حال حاضر در دسترس نیست.'
+                'پروفایل قابل استفاده Xray برای این سرور آماده نیست.'
                 '</div>'
             )
 
@@ -310,16 +427,16 @@ def apply_xray_public_delivery_runtime() -> None:
     if _runtime_applied:
         return
 
-    public_connection_v3._public_payload = account_delivery._public_payload
+    public_connection_v3._public_payload = _public_payload_customer_xray
     public_connection_v3.connection_views = _connection_views_modern_xray
 
     _runtime_applied = True
 
     print(
-        "TWINPANEL_XRAY_PUBLIC_DELIVERY_RUNTIME_V3_ACTIVE "
+        "TWINPANEL_XRAY_PUBLIC_DELIVERY_RUNTIME_V4_ACTIVE "
         "server_tabs_grouped=1 profile_cards_together=1 "
-        "websocket_first=1 xhttp_fallback=1 grpc_customer_hidden=1 "
-        "dynamic_public_payload=1 legacy_fallback=1 "
-        "domain_schema_catalog_guard=1",
+        "websocket_first=1 xhttp_fallback=1 tcp_simple_fallback=1 "
+        "grpc_customer_hidden=1 dynamic_public_payload=1 "
+        "legacy_fallback=1 domain_schema_catalog_guard=1",
         flush=True,
     )
