@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from .models import Node, NodeType
 from .routers import provision
 from .xray_modern_runtime import _ensure_modern_xray
