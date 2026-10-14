@@ -7,6 +7,11 @@ on:
   pull_request:
     paths:
       - "backend/**"
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "package.json"
+      - "package-lock.json"
       - "installer/**"
       - "deploy/systemd/twinpanel-api.service.tpl"
       - "deploy/nginx/twinpanel.conf.tpl"
@@ -111,6 +116,10 @@ jobs:
           print("XRAY_REALITY_KEY_PARSER_COMPAT_OK")
           PY
 
+      - name: Run Xray Modern auto-repair smoke
+        working-directory: backend
+        run: python -m scripts.xray_modern_auto_repair_smoke
+
       - name: Bootstrap admin
         working-directory: backend
         run: python scripts/bootstrap_admin.py
@@ -175,6 +184,22 @@ jobs:
       - name: Run standalone API core smoke
         working-directory: backend
         run: python scripts/api_core_smoke.py
+
+      - name: Setup Node for admin UI verification
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+
+      - name: Install admin UI dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Build admin UI
+        run: npm run build
 
       - name: Show API log on failure
         if: failure()
