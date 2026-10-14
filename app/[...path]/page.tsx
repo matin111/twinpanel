@@ -3,7 +3,8 @@ import {TelegramRuntimePage,DiscountsRuntimePage,StoreSettingsRuntimePage} from 
 import {AdminResellersLegacyV4} from "../../components/admin-resellers-legacy-v4";
 import {AdminResellerTrafficPlans} from "../../components/admin-reseller-traffic-plans";
 import {BackupsFullRuntimePage} from "../../components/backups-full-runtime";
-import {ProvisionRuntimePage,SmsReaderRuntimePage,MotherAccessRuntimePage,AccountDeliveryRuntimePage} from "../../components/admin-infra-runtime";
+import {SmsReaderRuntimePage,MotherAccessRuntimePage,AccountDeliveryRuntimePage} from "../../components/admin-infra-runtime";
+import {ProvisionRuntimeXrayDomainPage} from "../../components/provision-runtime-xray-domain";
 import {SupportRuntimePage,NotificationsRuntimePage} from "../../components/admin-ops-runtime";
 import {SystemHealthRuntimePage} from "../../components/system-health-runtime";
 import {SubscriptionToolsRuntimePage} from "../../components/subscription-tools-runtime";
@@ -76,7 +77,7 @@ const route=(key:string)=>{
   if(key==="admin/resellers") return admin(<AdminResellersLegacyV4/>);
   if(key==="admin/reseller-traffic-plans") return admin(<AdminResellerTrafficPlans/>);
   if(key==="admin/domains") return admin(<DomainsRuntimePage/>);
-  if(key==="admin/provision") return admin(<ProvisionRuntimePage/>);
+  if(key==="admin/provision") return admin(<ProvisionRuntimeXrayDomainPage/>);
   if(key==="admin/account-delivery") return admin(<AccountDeliveryRuntimePage/>);
   if(key==="admin/downloads") return admin(<DownloadAssetsRuntime/>);
   if(key==="admin/vpn-settings") return admin(<VpnSettingsModernPage/>);
