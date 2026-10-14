@@ -19,6 +19,9 @@ from .xray_modern_temp_config_runtime import (
 from .xray_node_domain_runtime import (
     apply_xray_node_domain_runtime,
 )
+from .xray_public_delivery_runtime import (
+    apply_xray_public_delivery_runtime,
+)
 from .tunnel_service_connections_admin_runtime import (
     apply_tunnel_service_connections_admin_runtime,
 )
@@ -180,6 +183,11 @@ def apply_self_hosted_runtime() -> None:
     # so it composes with the exact production wrappers instead of replacing
     # self-heal or JSON-temp behavior. Legacy public_domain remains a fallback.
     apply_xray_node_domain_runtime()
+
+    # The public share page was imported before Modern Xray patched account
+    # delivery. Rebind it to the final payload and expand nested Modern Xray
+    # profiles into the existing server-tab UI. Legacy VLESS remains available.
+    apply_xray_public_delivery_runtime()
 
     # Some production installations intentionally carry a local main.py drift
     # that removed direct Xray router includes. Restore those routes through an
