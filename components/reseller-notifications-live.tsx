@@ -6,7 +6,7 @@ import {Badge,Card,Stat} from "./ui";
 import {PortalShell} from "./portal-shells";
 import {resellerApi} from "../lib/reseller-runtime-api";
 import {useI18n} from "../lib/i18n";
-
+import {resellerDate,resellerNotificationDisplay,resellerTime} from "../lib/reseller-i18n";
 
 type NotificationRow={
   id:number;
@@ -28,12 +28,6 @@ type NotificationPayload={
 function asPayload(value:unknown):NotificationPayload{
   if(!value||typeof value!=="object")return {};
   return value as NotificationPayload;
-}
-
-function dateText(value?:string|null){
-  if(!value)return "—";
-  const date=new Date(value);
-  return Number.isNaN(date.getTime())?value:date.toLocaleString("fa-IR");
 }
 
 function tone(kind?:string|null):"ok"|"warn"|"bad"|"violet"{
@@ -59,7 +53,7 @@ function routeHref(value?:string|null){
 }
 
 export function ResellerNotificationsLive(){
-  const {pick}=useI18n();
+  const {lang,pick}=useI18n();
   const [items,setItems]=useState<NotificationRow[]>([]);
   const [unread,setUnread]=useState(0);
   const [busy,setBusy]=useState(false);
@@ -79,9 +73,10 @@ export function ResellerNotificationsLive(){
         const incoming=rows.filter(row=>!knownIds.current.has(Number(row.id)));
         if(incoming.length>0&&typeof window!=="undefined"&&"Notification" in window&&Notification.permission==="granted"){
           const newest=incoming[0];
+          const display=resellerNotificationDisplay(lang,newest);
           try{
-            new Notification(newest.title||pick("اعلان جدید نمایندگی","New reseller notification"),{
-              body:newest.message||"",
+            new Notification(display.title||pick("اعلان جدید نمایندگی","New reseller notification"),{
+              body:display.message||"",
               tag:`reseller-notification-${newest.id}`,
             });
           }catch{}
@@ -99,7 +94,7 @@ export function ResellerNotificationsLive(){
     }finally{
       if(!silent)setLoading(false);
     }
-  },[pick]);
+  },[lang,pick]);
 
   useEffect(()=>{
     void load(false);
@@ -164,12 +159,8 @@ export function ResellerNotificationsLive(){
         </div>
         <div className="action-row">
           <Badge tone="ok">{pick("زنده · هر ۴ ثانیه","Live · 4s")}</Badge>
-          <button className="ghost" disabled={loading||busy} onClick={()=>void load(false)}>
-            {pick("بروزرسانی","Refresh")}
-          </button>
-          <button className="primary" disabled={busy||unread===0} onClick={()=>void readAll()}>
-            {pick("خواندن همه","Mark all read")}
-          </button>
+          <button className="ghost" disabled={loading||busy} onClick={()=>void load(false)}>{pick("بروزرسانی","Refresh")}</button>
+          <button className="primary" disabled={busy||unread===0} onClick={()=>void readAll()}>{pick("خواندن همه","Mark all read")}</button>
         </div>
       </div>
 
@@ -186,11 +177,7 @@ export function ResellerNotificationsLive(){
         <div className="card-head">
           <div>
             <b>{pick("مرکز اعلان نمایندگی","Reseller notification center")}</b>
-            <small>
-              {lastUpdate
-                ?`${pick("آخرین بروزرسانی","Last update")}: ${lastUpdate.toLocaleTimeString("fa-IR")}`
-                :pick("در انتظار اولین بروزرسانی","Waiting for first refresh")}
-            </small>
+            <small>{lastUpdate?`${pick("آخرین بروزرسانی","Last update")}: ${resellerTime(lang,lastUpdate)}`:pick("در انتظار اولین بروزرسانی","Waiting for first refresh")}</small>
           </div>
         </div>
 
@@ -199,36 +186,27 @@ export function ResellerNotificationsLive(){
             const href=routeHref(row.route);
             const isRead=Boolean(row.is_read||row.read_at);
             const source=String(row.source||"");
+            const display=resellerNotificationDisplay(lang,row);
 
             return <div className={`module-row reseller-notification-row ${isRead?"is-read":""}`} key={row.id}>
               <div className="grow">
                 <div className="action-row">
-                  <b>{row.title||pick("اعلان","Notification")}</b>
+                  <b>{display.title}</b>
                   <Badge tone={tone(row.kind)}>{sourceTitle(source,pick)}</Badge>
                   {!isRead&&<Badge tone="violet">{pick("جدید","New")}</Badge>}
                 </div>
-                <p>{row.message||"—"}</p>
-                <small>{dateText(row.created_at)}</small>
+                <p>{display.message}</p>
+                <small>{resellerDate(lang,row.created_at)}</small>
               </div>
 
               <div className="action-row">
-                {!isRead&&<button className="mini-btn" disabled={busy} onClick={()=>void readOne(row.id)}>
-                  {pick("خواندم","Mark read")}
-                </button>}
-                {href&&<Link className="mini-btn" href={href}>
-                  {source==="bot_wallet"
-                    ?pick("بررسی شارژ","Review top-up")
-                    :source==="bot_order"
-                      ?pick("بررسی سفارش","Review order")
-                      :pick("باز کردن","Open")}
-                </Link>}
+                {!isRead&&<button className="mini-btn" disabled={busy} onClick={()=>void readOne(row.id)}>{pick("خواندم","Mark read")}</button>}
+                {href&&<Link className="mini-btn" href={href}>{source==="bot_wallet"?pick("بررسی شارژ","Review top-up"):source==="bot_order"?pick("بررسی سفارش","Review order"):pick("باز کردن","Open")}</Link>}
               </div>
             </div>;
           })}
 
-          {!items.length&&!loading&&<div className="runtime-empty">
-            {pick("در حال حاضر اعلانی وجود ندارد.","There are no notifications right now.")}
-          </div>}
+          {!items.length&&!loading&&<div className="runtime-empty">{pick("در حال حاضر اعلانی وجود ندارد.","There are no notifications right now.")}</div>}
         </div>
       </Card>
     </div>
