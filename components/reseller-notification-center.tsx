@@ -38,10 +38,17 @@ export function ResellerNotificationCenter(){
     finally{setLoading(false);}
   };
 
-  useEffect(()=>{void load();},[]);
   useEffect(()=>{
-    const timer=window.setInterval(()=>void load(),30000);
-    return()=>window.clearInterval(timer);
+    void load();
+    const refresh=()=>{if(document.visibilityState==="visible")void load();};
+    const timer=window.setInterval(refresh,5000);
+    window.addEventListener("focus",refresh);
+    document.addEventListener("visibilitychange",refresh);
+    return()=>{
+      window.clearInterval(timer);
+      window.removeEventListener("focus",refresh);
+      document.removeEventListener("visibilitychange",refresh);
+    };
   },[]);
   useEffect(()=>{
     if(!open)return;
@@ -70,11 +77,19 @@ export function ResellerNotificationCenter(){
     }catch{}
   };
 
+  const toggleOpen=()=>{
+    setOpen(value=>{
+      const next=!value;
+      if(next)void load();
+      return next;
+    });
+  };
+
   return <div className="customerNotificationCenter resellerNotificationCenter" ref={root}>
     <button
       type="button"
       className={`customerNotificationBell ${unread?"hasUnread":""}`}
-      onClick={()=>setOpen(value=>!value)}
+      onClick={toggleOpen}
       aria-label={pick("اعلان‌ها","Notifications")}
     >
       <span>◎</span>
