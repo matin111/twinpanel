@@ -67,8 +67,11 @@ export function ResellerBotWalletTopupReview(){
     if(!confirm(pick("این شارژ کیف پول تأیید شود؟","Approve this wallet top-up?")))return;
     setBusy(id);setError("");setOk("");
     try{
-      await request(`/v1/reseller/bot-commerce/wallet-topups/${id}/approve`,{method:"POST"});
-      setOk(pick("شارژ تأیید شد و موجودی کاربر افزایش یافت.","Top-up approved and wallet credited."));
+      const result=await request<Row>(`/v1/reseller/bot-commerce/wallet-topups/${id}/approve`,{method:"POST"});
+      const notified=result.telegram_notified!==false;
+      setOk(notified
+        ?pick("شارژ تأیید شد، موجودی افزایش یافت و پیام برای کاربر ارسال شد.","Top-up approved, wallet credited, and the user was notified.")
+        :pick("شارژ تأیید شد و موجودی افزایش یافت؛ اما پیام تلگرام ارسال نشد.","Top-up approved and wallet credited, but Telegram notification failed."));
       await load();
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy(null);}
@@ -79,8 +82,11 @@ export function ResellerBotWalletTopupReview(){
     if(reason===null)return;
     setBusy(id);setError("");setOk("");
     try{
-      await request(`/v1/reseller/bot-commerce/wallet-topups/${id}/reject`,{method:"POST",body:JSON.stringify({reason:reason.trim()})});
-      setOk(pick("درخواست شارژ رد شد.","Top-up rejected."));
+      const result=await request<Row>(`/v1/reseller/bot-commerce/wallet-topups/${id}/reject`,{method:"POST",body:JSON.stringify({reason:reason.trim()})});
+      const notified=result.telegram_notified!==false;
+      setOk(notified
+        ?pick("درخواست رد شد و نتیجه برای کاربر در ربات ارسال شد.","Top-up rejected and the user was notified in Telegram.")
+        :pick("درخواست رد شد؛ اما پیام تلگرام برای کاربر ارسال نشد.","Top-up rejected, but Telegram notification failed."));
       await load();
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy(null);}
@@ -92,7 +98,7 @@ export function ResellerBotWalletTopupReview(){
     <div className="card-head">
       <div>
         <b>{pick("درخواست‌های شارژ کارت‌به‌کارت ربات","Bot card-to-card wallet top-ups")}</b>
-        <small>{pick("رسید ارسالی کاربر را مشاهده کنید و سپس درخواست را تأیید یا رد کنید؛ تأیید فقط یک‌بار موجودی را افزایش می‌دهد.","Review the customer's receipt before approving or rejecting; approval credits the wallet exactly once.")}</small>
+        <small>{pick("رسید را بررسی کنید؛ نتیجه تأیید یا رد از همان ربات نماینده برای کاربر ارسال می‌شود. درخواست‌های ناقص قدیمی خودکار پاک می‌شوند.","Review the receipt; approval or rejection is sent to the user from the reseller bot. Stale incomplete requests are removed automatically.")}</small>
       </div>
       <div className="action-row"><Badge tone="violet">{pending.length}</Badge><button className="mini-btn" type="button" onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button></div>
     </div>
@@ -114,6 +120,6 @@ export function ResellerBotWalletTopupReview(){
         <td><div className="action-row">{status==="awaiting_review"&&<><button className="mini-btn" type="button" disabled={busy===id||!receipt} onClick={()=>void approve(id)}>{pick("تأیید","Approve")}</button><button className="mini-btn danger" type="button" disabled={busy===id} onClick={()=>void reject(id)}>{pick("رد","Reject")}</button></>}</div></td>
       </tr>})}</tbody>
     </table></div>
-    {!rows.length&&<div className="runtime-empty">{pick("هنوز درخواست شارژ کارت‌به‌کارت ثبت نشده است.","No card-to-card wallet top-up has been submitted yet.")}</div>}
+    {!rows.length&&<div className="runtime-empty">{pick("هنوز درخواست قابل بررسی یا سابقه‌ای ثبت نشده است.","No reviewable top-ups or history yet.")}</div>}
   </Card>;
 }
