@@ -111,6 +111,10 @@ jobs:
           print("XRAY_REALITY_KEY_PARSER_COMPAT_OK")
           PY
 
+      - name: Run Xray Modern auto-repair smoke
+        working-directory: backend
+        run: python scripts/xray_modern_auto_repair_smoke.py
+
       - name: Bootstrap admin
         working-directory: backend
         run: python scripts/bootstrap_admin.py
