@@ -1,0 +1,2 @@
+Legacy learning artwork source: /opt/moviline-web/current/public/learning/{apps,screenshots}
+Migration helper: scripts/migrate-legacy-assets.sh
