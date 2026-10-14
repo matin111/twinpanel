@@ -230,9 +230,9 @@ html[dir="ltr"] .customerNotificationPopover {
   left: 0;
 }
 
-/* The admin bell lives on the left edge of the desktop toolbar. Align the
-   popover from that edge so a wide notification panel never escapes the
-   viewport in RTL layouts. */
+/* Admin notification positioning follows the toolbar edge in each direction.
+   RTL toolbar actions sit at the left edge, while LTR actions sit at the right
+   edge. Anchor inward so the 420px panel always remains inside the viewport. */
 .adminNotificationCenter .adminNotificationPopover {
   right: auto;
   left: 0;
@@ -241,8 +241,8 @@ html[dir="ltr"] .customerNotificationPopover {
 }
 
 html[dir="ltr"] .adminNotificationCenter .adminNotificationPopover {
-  right: auto;
-  left: 0;
+  right: 0;
+  left: auto;
 }
 
 html[data-theme="light"] .customerNotificationPopover,
@@ -269,7 +269,8 @@ html[data-theme="light"] .customerNotificationBell {
     max-height: calc(100dvh - 84px);
   }
 
-  .adminNotificationCenter .adminNotificationPopover {
+  .adminNotificationCenter .adminNotificationPopover,
+  html[dir="ltr"] .adminNotificationCenter .adminNotificationPopover {
     right: 12px;
     left: 12px;
     width: auto;
