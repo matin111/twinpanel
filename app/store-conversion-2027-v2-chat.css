@@ -1,0 +1,2 @@
+body:has(.tpStore) .supportChatLauncher{opacity:0!important;pointer-events:none!important;transform:scale(.72)!important}
+body:has(.tpStore) .supportChatLauncher.active{opacity:0!important;pointer-events:none!important}

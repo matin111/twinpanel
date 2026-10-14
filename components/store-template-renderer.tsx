@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {ComponentType,useMemo,useState} from "react";
-import {Badge,Card} from "./ui";
+import {useMemo,useState,type ReactNode} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {useBranding} from "../lib/branding";
@@ -25,82 +24,232 @@ export type StoreTemplateProps={
   onBuy:(plan:StorePlan)=>void;
 };
 
-const protocolMeta:Record<string,{name:string;icon:string;fa:string;en:string}>={
-  cisco:{name:"Cisco / OpenConnect",icon:"◉",fa:"اتصال ساده با نام کاربری و رمز و سازگاری مناسب برای استفاده روزمره.",en:"Simple username/password access with broad day-to-day compatibility."},
-  openvpn:{name:"OpenVPN",icon:"△",fa:"کانفیگ قابل حمل و پشتیبانی گسترده روی سیستم‌عامل‌های مختلف.",en:"Portable configuration with broad operating-system support."},
-  wireguard:{name:"WireGuard",icon:"⚡",fa:"سبک و سریع با فایل یا QR برای اتصال ساده‌تر.",en:"Fast lightweight connectivity with file or QR delivery."},
-  l2tp:{name:"L2TP / IPsec",icon:"◎",fa:"قابل استفاده از تنظیمات داخلی بسیاری از دستگاه‌ها.",en:"Works through built-in VPN settings on many devices."},
-  v2ray:{name:"V2Ray / Xray",icon:"◇",fa:"گزینه انعطاف‌پذیر برای شرایط متفاوت شبکه.",en:"Flexible connectivity for changing network conditions."},
+type ProtocolMeta={name:string;short:string;icon:string;fa:string;en:string;tone:string};
+type PlatformMeta={id:string;fa:string;en:string;icon:string;hintFa:string;hintEn:string};
+
+const protocolMeta:Record<string,ProtocolMeta>={
+  cisco:{name:"Cisco / OpenConnect",short:"Cisco",icon:"◫",tone:"blue",fa:"مناسب اتصال پایدار با نام کاربری و رمز و سازگاری گسترده.",en:"Stable username/password connectivity with broad compatibility."},
+  openvpn:{name:"OpenVPN",short:"OpenVPN",icon:"◉",tone:"orange",fa:"پایدار، امن و قابل استفاده روی اکثر سیستم‌عامل‌ها.",en:"Stable, secure and widely supported across operating systems."},
+  wireguard:{name:"WireGuard",short:"WireGuard",icon:"⌁",tone:"red",fa:"سبک، سریع و مناسب اتصال مدرن با فایل یا QR.",en:"Fast, lightweight and ideal for modern file or QR setup."},
+  l2tp:{name:"L2TP / IPsec",short:"L2TP",icon:"⌬",tone:"green",fa:"بدون اپ اضافی روی بسیاری از دستگاه‌ها قابل راه‌اندازی است.",en:"Can be configured from built-in VPN settings on many devices."},
+  v2ray:{name:"V2Ray / Xray",short:"V2Ray",icon:"V",tone:"violet",fa:"انعطاف‌پذیر برای شرایط مختلف شبکه و کاربران حرفه‌ای.",en:"Flexible connectivity for varied network conditions and power users."},
 };
 
-const platforms=["Windows","Android","iPhone / iPad","macOS","Linux"];
+const platforms:PlatformMeta[]=[
+  {id:"android",fa:"اندروید",en:"Android",icon:"◆",hintFa:"آموزش نصب سریع",hintEn:"Quick setup guide"},
+  {id:"ios",fa:"آیفون",en:"iPhone",icon:"●",hintFa:"آموزش نصب",hintEn:"Setup guide"},
+  {id:"windows",fa:"ویندوز",en:"Windows",icon:"⊞",hintFa:"آموزش نصب",hintEn:"Setup guide"},
+  {id:"mac",fa:"macOS",en:"macOS",icon:"⌘",hintFa:"آموزش نصب",hintEn:"Setup guide"},
+  {id:"router",fa:"مودم و روتر",en:"Router",icon:"⌁",hintFa:"راه‌اندازی روی مودم",hintEn:"Router setup"},
+];
+
+const faqItems=[
+  {fa:"بعد از خرید چه اتفاقی می‌افتد؟",en:"What happens after purchase?",faBody:"سفارش داخل حساب شما ثبت می‌شود و وضعیت پرداخت، ساخت سرویس و اطلاعات اتصال را از پنل کاربری پیگیری می‌کنید.",enBody:"Your order is attached to your account so payment, provisioning and connection delivery remain trackable from the customer panel."},
+  {fa:"آیا روی چند دستگاه می‌توانم استفاده کنم؟",en:"Can I use it on multiple devices?",faBody:"تعداد دستگاه مجاز برای هر پلن قبل از خرید روی همان کارت پلن نمایش داده می‌شود.",enBody:"The allowed device count is shown on each plan before purchase."},
+  {fa:"آیا محدودیت حجمی وجود دارد؟",en:"Is traffic limited?",faBody:"حجم و مدت هر پلن مستقیماً از Backend نمایش داده می‌شود تا قبل از خرید دقیقاً بدانید چه چیزی دریافت می‌کنید.",enBody:"Traffic and duration come directly from the backend so you can see exactly what each plan includes."},
+  {fa:"برای اتصال چه پروتکل‌هایی ارائه می‌شود؟",en:"Which protocols are available?",faBody:"پروتکل‌های فعال هر پلن روی همان پلن نمایش داده می‌شوند و می‌توانند شامل Cisco، OpenVPN، WireGuard، L2TP و V2Ray/Xray باشند.",enBody:"Each plan lists its active protocols, which can include Cisco, OpenVPN, WireGuard, L2TP and V2Ray/Xray."},
+  {fa:"اگر در اتصال مشکل داشتم چه کار کنم؟",en:"What if I need help connecting?",faBody:"از آموزش‌های فروشگاه، پشتیبانی آنلاین و لینک پشتیبانی برند برای دریافت راهنمایی استفاده کنید.",enBody:"Use the storefront guides, live chat and your brand support link for help."},
+];
 
 function Conversion2027Template({settings,plans,loading,error,message,buying,onBuy}:StoreTemplateProps){
   const {pick,lang}=useI18n();
   const {brand}=useBranding();
+  const [mobileNavOpen,setMobileNavOpen]=useState(false);
+  const [guidePlatform,setGuidePlatform]=useState("android");
   const [guideProtocol,setGuideProtocol]=useState("wireguard");
-  const [guidePlatform,setGuidePlatform]=useState("Windows");
+
   const locale=lang==="en"?"en-US":"fa-IR";
   const content=(key:string)=>storefrontText(settings,key,lang);
   const number=(value:number,options?:Intl.NumberFormatOptions)=>Number(value||0).toLocaleString(locale,options);
+  const openChat=()=>window.dispatchEvent(new Event("twinpanel:open-chat"));
 
   const availableProtocols=useMemo(()=>{
     const set=new Set<string>();
     plans.forEach(plan=>planProtocols(plan).forEach(protocol=>set.add(protocol)));
-    return Object.keys(protocolMeta).filter(protocol=>set.size===0||set.has(protocol));
+    const ordered=Object.keys(protocolMeta).filter(protocol=>set.size===0||set.has(protocol));
+    return ordered.length?ordered:Object.keys(protocolMeta);
   },[plans]);
 
   const visibleSections=settings.section_order.filter(section=>isStorefrontSectionVisible(settings,section));
   const navLabels:Partial<Record<StorefrontSectionId,string>>={
-    plans:pick("پلن‌ها","Plans"),protocols:pick("پروتکل‌ها","Protocols"),services:pick("خدمات","Services"),guides:pick("آموزش اتصال","Setup guides"),account:pick("پنل کاربری","Customer panel"),faq:"FAQ",
+    plans:pick("پلن‌ها","Plans"),
+    protocols:pick("پروتکل‌ها","Protocols"),
+    services:pick("امکانات","Features"),
+    guides:pick("آموزش","Guides"),
+    account:pick("پنل کاربری","Customer panel"),
+    faq:pick("سوالات متداول","FAQ"),
   };
 
-  const plansSection=<section className="store-block plans-section" id="plans" key="plans">
-    <div className="section-title left"><small>{content("plans_tag")}</small><h2>{content("plans_title")}</h2><p>{content("plans_description")}</p></div>
-    {loading?<div className="runtime-loading">{pick("در حال دریافت پلن‌ها...","Loading plans...")}</div>:plans.length===0?<Card><p>{pick("در حال حاضر پلن فعالی برای فروش وجود ندارد.","There are currently no active plans for sale.")}</p></Card>:<div className="pricing pricing-pro conversion-pricing">{plans.map((plan,index)=>{
-      const protocols=planProtocols(plan);const featured=index===Math.floor(plans.length/2)&&plans.length>1;
-      return <Card key={plan.id} className={`${featured?"featured ":""}sales-plan`}>
-        {featured&&<div className="recommend-ribbon">{pick("انتخاب متعادل","Balanced option")}</div>}
-        <div className="plan-head"><Badge tone={featured?"violet":"ok"}>{pick("فعال","Active")}</Badge><span>{number(plan.duration_days)} {pick("روز","days")}</span></div>
-        <h3>{plan.name}</h3>{plan.description&&<p className="muted">{plan.description}</p>}
-        <div className="plan-price"><strong>{number(plan.price_toman)}</strong><span>{pick("تومان","Toman")}</span></div>
-        <div className="plan-facts"><span><b>{number(plan.traffic_gb,{maximumFractionDigits:2})} GB</b>{pick("حجم","Traffic")}</span><span><b>{number(plan.device_limit)}</b>{pick("دستگاه","Devices")}</span></div>
-        <ul>{protocols.map(protocol=><li key={protocol}><i>✓</i>{protocolMeta[protocol]?.name||protocol}</li>)}</ul>
-        <button className={featured?"primary full xl":"ghost full xl"} disabled={buying===plan.id} onClick={()=>onBuy(plan)}>{buying===plan.id?pick("در حال ثبت سفارش...","Creating order..."):pick("انتخاب و ادامه خرید","Choose and continue")}</button>
-        <small className="plan-note">#{plan.id} · {number(protocols.length)} {pick("پروتکل","protocols")}</small>
-      </Card>;
+  const selectedPlatform=platforms.find(item=>item.id===guidePlatform)||platforms[0];
+  const selectedProtocol=protocolMeta[guideProtocol]||protocolMeta.wireguard;
+  const featuredPlanIndex=plans.length>2?Math.floor(plans.length/2):0;
+
+  const plansSection=<section className="tpStoreSection tpStorePlans" id="plans" key="plans">
+    <div className="tpStoreSectionHead">
+      <span className="tpStorePill">{content("plans_tag")}</span>
+      <h2>{content("plans_title")}</h2>
+      <p>{content("plans_description")}</p>
+    </div>
+    {loading?<div className="tpStoreState">{pick("در حال دریافت پلن‌های فعال...","Loading active plans...")}</div>:plans.length===0?<div className="tpStoreState">{pick("در حال حاضر پلن فعالی برای فروش وجود ندارد.","There are currently no active plans for sale.")}</div>:<div className="tpStorePlanGrid">{plans.map((plan,index)=>{
+      const protocols=planProtocols(plan);
+      const featured=index===featuredPlanIndex;
+      return <article className={`tpStorePlanCard ${featured?"featured":""}`} key={plan.id}>
+        {featured&&<span className="tpStorePlanRibbon">{pick("محبوب‌ترین انتخاب","Popular choice")}</span>}
+        <div className="tpStorePlanTop"><div><small>{pick("اشتراک VPN","VPN subscription")}</small><h3>{plan.name}</h3></div><span className="tpStorePlanStatus">{pick("فعال","Active")}</span></div>
+        {plan.description&&<p className="tpStorePlanDesc">{plan.description}</p>}
+        <div className="tpStorePlanPrice"><strong>{number(plan.price_toman)}</strong><span>{pick("تومان","Toman")}</span></div>
+        <div className="tpStorePlanFacts"><div><b>{number(plan.traffic_gb,{maximumFractionDigits:2})} GB</b><small>{pick("حجم","Traffic")}</small></div><div><b>{number(plan.duration_days)}</b><small>{pick("روز","days")}</small></div><div><b>{number(plan.device_limit)}</b><small>{pick("دستگاه","devices")}</small></div></div>
+        <ul className="tpStorePlanList">
+          <li><i>✓</i>{pick("فعال‌سازی سریع بعد از پرداخت","Fast activation after payment")}</li>
+          <li><i>✓</i>{pick("تحویل اطلاعات اتصال داخل پنل","Connection delivery inside your panel")}</li>
+          <li><i>✓</i>{pick("پشتیبانی از پروتکل‌های همین پلن","Support for this plan's protocols")}</li>
+        </ul>
+        <div className="tpStorePlanProtocols">{protocols.slice(0,5).map(protocol=><span key={protocol}>{protocolMeta[protocol]?.short||protocol}</span>)}</div>
+        <button className="tpStoreBuyButton" disabled={buying===plan.id} onClick={()=>onBuy(plan)}>{buying===plan.id?pick("در حال ثبت سفارش...","Creating order..."):pick("خرید اشتراک","Buy subscription")}<span>←</span></button>
+      </article>;
     })}</div>}
   </section>;
 
-  const protocolsSection=<section className="store-block" id="protocols" key="protocols"><div className="section-title"><small>{content("protocols_tag")}</small><h2>{content("protocols_title")}</h2><p>{content("protocols_description")}</p></div><div className="protocol-grid">{availableProtocols.map(id=>{const protocol=protocolMeta[id];return <Card key={id}><span className="protocol-icon">{protocol.icon}</span><h3>{protocol.name}</h3><p>{pick(protocol.fa,protocol.en)}</p><Badge tone="ok">{pick("قابل ارائه","Available")}</Badge></Card>})}</div></section>;
+  const protocolsSection=<section className="tpStoreSection tpStoreSoftSection" id="protocols" key="protocols">
+    <div className="tpStoreSectionHead">
+      <span className="tpStorePill">{content("protocols_tag")}</span>
+      <h2>{content("protocols_title")}</h2>
+      <p>{content("protocols_description")}</p>
+    </div>
+    <div className="tpStoreProtocolGrid">{availableProtocols.map(id=>{const protocol=protocolMeta[id];return <article className={`tpStoreProtocolCard ${protocol.tone}`} key={id}><span className="tpStoreProtocolIcon">{protocol.icon}</span><div><h3>{protocol.name}</h3><p>{pick(protocol.fa,protocol.en)}</p></div><span className="tpStoreAvailable">{pick("قابل ارائه","Available")}</span></article>;})}</div>
+  </section>;
 
-  const servicesSection=<section className="store-block" id="services" key="services"><div className="section-title"><small>{content("services_tag")}</small><h2>{content("services_title")}</h2><p>{content("services_description")}</p></div><div className="module-grid three"><Card><span className="module-icon">◉</span><h3>{pick("تحویل اتصال","Connection delivery")}</h3><p>{pick("فایل، QR، لینک یا اطلاعات ورود متناسب با پروتکل داخل حساب کاربری قرار می‌گیرد.","Files, QR codes, links or credentials are delivered inside the customer account based on protocol.")}</p></Card><Card><span className="module-icon">◫</span><h3>{pick("مدیریت اشتراک","Subscription management")}</h3><p>{pick("حجم، تاریخ انقضا و وضعیت سرویس از پنل کاربری قابل مشاهده و مدیریت است.","Traffic, expiry and service status stay visible and manageable from the customer panel.")}</p></Card><Card><span className="module-icon">◇</span><h3>{pick("خرید و پرداخت","Purchase & payment")}</h3><p>{pick("سفارش و وضعیت پرداخت به حساب شما متصل است تا مسیر خرید قابل پیگیری بماند.","Orders and payment status stay linked to your account for a traceable purchase flow.")}</p></Card></div></section>;
+  const guidesSection=<section className="tpStoreSection" id="guides" key="guides">
+    <div className="tpStoreSectionHead">
+      <span className="tpStorePill">{content("guides_tag")}</span>
+      <h2>{content("guides_title")}</h2>
+      <p>{content("guides_description")}</p>
+    </div>
+    <div className="tpStoreGuideGrid">{platforms.map(platform=><button key={platform.id} className={`tpStoreGuideCard ${guidePlatform===platform.id?"active":""}`} onClick={()=>setGuidePlatform(platform.id)}><span className="tpStoreGuideIcon">{platform.icon}</span><div><b>{pick(platform.fa,platform.en)}</b><small>{pick(platform.hintFa,platform.hintEn)}</small></div><i>←</i></button>)}</div>
+    <div className="tpStoreGuideDetail">
+      <div className="tpStoreGuideVisual"><span>{selectedPlatform.icon}</span><small>{pick(selectedPlatform.fa,selectedPlatform.en)}</small></div>
+      <div className="tpStoreGuideCopy"><span className="tpStorePill">{pick("راهنمای قدم‌به‌قدم","Step-by-step")}</span><h3>{pick(`راه‌اندازی ${selectedProtocol.name} روی ${selectedPlatform.fa}`,`Set up ${selectedProtocol.name} on ${selectedPlatform.en}`)}</h3><div className="tpStoreProtocolPicker">{availableProtocols.map(id=><button className={guideProtocol===id?"active":""} key={id} onClick={()=>setGuideProtocol(id)}>{protocolMeta[id].short}</button>)}</div><div className="tpStoreSteps"><div><span>1</span><p>{pick("کلاینت سازگار را نصب کنید.","Install a compatible client.")}</p></div><div><span>2</span><p>{pick("اطلاعات اتصال را بعد از خرید از پنل کاربری دریافت کنید.","Get your connection details from the customer panel after purchase.")}</p></div><div><span>3</span><p>{pick("کانفیگ را وارد کنید و متصل شوید.","Import the configuration and connect.")}</p></div></div></div>
+    </div>
+  </section>;
 
-  const guidesSection=<section className="store-block guide-studio" id="guides" key="guides"><div className="section-title"><small>{content("guides_tag")}</small><h2>{content("guides_title")}</h2><p>{content("guides_description")}</p></div><div className="guide-pickers"><div>{platforms.map(platform=><button key={platform} className={guidePlatform===platform?"active":""} onClick={()=>setGuidePlatform(platform)}>{platform}</button>)}</div><div>{availableProtocols.map(id=><button key={id} className={guideProtocol===id?"active":""} onClick={()=>setGuideProtocol(id)}>{protocolMeta[id].name}</button>)}</div></div><div className="module-grid three"><Card><span className="module-icon">1</span><h3>{pick("کلاینت مناسب را نصب کن","Install a compatible client")}</h3><p>{guidePlatform}</p></Card><Card><span className="module-icon">2</span><h3>{pick("اطلاعات اتصال را از پنل بگیر","Get connection details from the panel")}</h3><p>{protocolMeta[guideProtocol]?.name}</p></Card><Card><span className="module-icon">3</span><h3>{pick("کانفیگ را اضافه و متصل شو","Import the config and connect")}</h3><p>{pick("فایل، QR، لینک یا اطلاعات ورود بر اساس پروتکل نمایش داده می‌شود.","File, QR, link or credentials are shown based on the protocol.")}</p></Card></div></section>;
+  const servicesSection=<section className="tpStoreSection tpStoreSoftSection" id="services" key="services">
+    <div className="tpStoreSectionHead">
+      <span className="tpStorePill">{content("services_tag")}</span>
+      <h2>{content("services_title")}</h2>
+      <p>{content("services_description")}</p>
+    </div>
+    <div className="tpStoreBenefitsGrid">
+      <article><span>⚡</span><div><b>{pick("سرعت بالا","High speed")}</b><p>{pick("اتصال سریع و مسیر بهینه برای استفاده روزمره.","Fast connectivity with an optimized route for daily use.")}</p></div></article>
+      <article><span>▥</span><div><b>{pick("پایداری بالا","Reliable uptime")}</b><p>{pick("طراحی شده برای اتصال پایدار و تجربه بدون دردسر.","Built for a stable, low-friction connection experience.")}</p></div></article>
+      <article><span>◎</span><div><b>{pick("پروتکل‌های متنوع","Multiple protocols")}</b><p>{pick("چند روش اتصال از یک حساب، متناسب با دستگاه و شبکه شما.","Multiple connection methods from one account for different devices and networks.")}</p></div></article>
+      <article><span>⌁</span><div><b>{pick("پشتیبانی آنلاین","Live support")}</b><p>{pick("اگر سوالی دارید، از چت آنلاین مستقیم کمک بگیرید.","Get help directly from live chat whenever you need it.")}</p></div></article>
+      <article><span>✓</span><div><b>{pick("پرداخت امن","Secure purchase")}</b><p>{pick("وضعیت سفارش و پرداخت در حساب شما قابل پیگیری است.","Orders and payment status remain traceable inside your account.")}</p></div></article>
+      <article><span>↗</span><div><b>{pick("فعال‌سازی سریع","Quick activation")}</b><p>{pick("بعد از تکمیل خرید، اطلاعات سرویس در پنل تحویل می‌شود.","Service details are delivered to your panel after purchase completes.")}</p></div></article>
+    </div>
+  </section>;
 
-  const accountSection=<section className="store-block" id="account" key="account"><div className="section-title"><small>{content("account_tag")}</small><h2>{content("account_title")}</h2><p>{content("account_description")}</p></div><Card className="hero-product-card"><div className="delivery-list"><div><span>01</span><b>{pick("اشتراک‌ها","Subscriptions")}</b><small>{pick("مشاهده و مدیریت سرویس‌ها","View and manage services")}</small></div><div><span>02</span><b>{pick("کیف پول و پرداخت‌ها","Wallet & payments")}</b><small>{pick("سوابق مالی در یک حساب","Financial history in one account")}</small></div><div><span>03</span><b>{pick("اطلاعات اتصال","Connection details")}</b><small>{pick("تحویل امن داخل پنل","Secure in-panel delivery")}</small></div></div><Link className="primary full xl" href="/panel">{pick("ورود به پنل کاربری","Open customer panel")}</Link></Card></section>;
+  const accountSection=<section className="tpStoreSection" id="account" key="account">
+    <div className="tpStoreAccountPanel">
+      <div><span className="tpStorePill">{content("account_tag")}</span><h2>{content("account_title")}</h2><p>{content("account_description")}</p><div className="tpStoreAccountActions"><Link href="/panel" className="tpStorePrimary">{pick("ورود به پنل کاربری","Open customer panel")}</Link><button className="tpStoreSecondary" onClick={openChat}>{pick("پشتیبانی آنلاین","Live support")}</button></div></div>
+      <div className="tpStoreAccountMiniGrid"><div><span>01</span><b>{pick("اشتراک‌ها","Subscriptions")}</b><small>{pick("مدیریت سرویس‌ها","Manage services")}</small></div><div><span>02</span><b>{pick("کیف پول","Wallet")}</b><small>{pick("سوابق مالی","Financial history")}</small></div><div><span>03</span><b>{pick("اطلاعات اتصال","Connection")}</b><small>{pick("تحویل امن","Secure delivery")}</small></div><div><span>04</span><b>{pick("پشتیبانی","Support")}</b><small>{pick("دسترسی مستقیم","Direct access")}</small></div></div>
+    </div>
+  </section>;
 
-  const faqSection=<section className="store-block" id="faq" key="faq"><div className="section-title"><small>{content("faq_tag")}</small><h2>{content("faq_title")}</h2><p>{content("faq_description")}</p></div><div className="faq-grid"><Card><h3>{pick("بعد از خرید چه می‌شود؟","What happens after purchase?")}</h3><p>{pick("سفارش در پنل کاربری ثبت می‌شود و وضعیت پرداخت، ساخت اشتراک و اطلاعات اتصال همان‌جا نمایش داده می‌شود.","The order appears in your customer panel, where payment, provisioning and connection delivery are tracked.")}</p></Card><Card><h3>{pick("قیمت‌ها از کجا می‌آیند؟","Where do prices come from?")}</h3><p>{pick("مستقیم از پلن‌های فعال Backend؛ فروشگاه قیمت نمونه یا آزمایشی ندارد.","Directly from active backend plans; the storefront does not use sample pricing.")}</p></Card><Card><h3>{pick("برای خرید باید حساب داشته باشم؟","Do I need an account to buy?")}</h3><p>{pick("بله. سفارش به حساب کاربری متصل است تا پرداخت و تحویل امن و قابل پیگیری باشد.","Yes. Orders are linked to your account so payment and delivery remain secure and traceable.")}</p></Card></div></section>;
+  const faqSection=<section className="tpStoreSection tpStoreFaq" id="faq" key="faq">
+    <div className="tpStoreSectionHead">
+      <span className="tpStorePill">{content("faq_tag")}</span>
+      <h2>{content("faq_title")}</h2>
+      <p>{content("faq_description")}</p>
+    </div>
+    <div className="tpStoreFaqList">{faqItems.map((item,index)=><details key={item.en} open={index===0}><summary>{pick(item.fa,item.en)}<span>＋</span></summary><p>{pick(item.faBody,item.enBody)}</p></details>)}</div>
+  </section>;
 
-  const sections:Record<StorefrontSectionId,React.ReactNode>={plans:plansSection,protocols:protocolsSection,services:servicesSection,guides:guidesSection,account:accountSection,faq:faqSection};
+  const sections:Record<StorefrontSectionId,ReactNode>={plans:plansSection,protocols:protocolsSection,services:servicesSection,guides:guidesSection,account:accountSection,faq:faqSection};
 
-  return <div className="store store2027 store-conversion" data-store-template="conversion-2027">
-    <header className="store-nav"><div className="brand"><img src={brand.logoUrl} alt={brand.name}/><div><b>{brand.name}</b></div></div><nav>{visibleSections.map(section=><a key={section} href={`#${section}`}>{navLabels[section]}</a>)}<Link href="/reseller">{pick("نمایندگی","Reseller")}</Link></nav><div className="store-actions"><LanguageSwitch compact/><ThemeSwitch compact/><Link className="ghost" href="/login">{pick("ورود","Sign in")}</Link>{settings.show_plans&&<a className="primary" href="#plans">{content("hero_primary_button")}</a>}</div></header>
+  return <div className="tpStore" data-store-template="conversion-2027" dir={lang==="fa"?"rtl":"ltr"}>
+    <header className="tpStoreHeader">
+      <div className="tpStoreHeaderInner">
+        <button className="tpStoreMenuButton" type="button" onClick={()=>setMobileNavOpen(value=>!value)} aria-label={pick("باز کردن منو","Open menu")}><span/><span/><span/></button>
+        <Link href="/store" className="tpStoreBrand"><img src={brand.logoUrl} alt={brand.name}/><b>{brand.name}</b></Link>
+        <nav className="tpStoreNavLinks">{visibleSections.map(section=><a key={section} href={`#${section}`}>{navLabels[section]}</a>)}</nav>
+        <div className="tpStoreHeaderActions"><LanguageSwitch compact/><ThemeSwitch compact/><Link href="/login" className="tpStoreLogin">{pick("ورود","Sign in")}</Link>{settings.show_plans&&<a href="#plans" className="tpStoreHeaderBuy">{pick("خرید اشتراک","Buy plan")}</a>}</div>
+      </div>
+      {mobileNavOpen&&<div className="tpStoreMobileNav">{visibleSections.map(section=><a key={section} href={`#${section}`} onClick={()=>setMobileNavOpen(false)}>{navLabels[section]}</a>)}<Link href="/login" onClick={()=>setMobileNavOpen(false)}>{pick("ورود به حساب","Sign in")}</Link></div>}
+    </header>
+
     <main>
-      <section className="store-hero-pro"><div className="hero-copy"><div className="eyebrow"><span className="live-dot"/>{content("hero_kicker")}</div><h1>{content("hero_title")} <span>{content("hero_highlight")}</span></h1><p>{content("hero_description")}</p><div className="hero-actions">{settings.show_plans&&<a href="#plans" className="primary xl">{content("hero_primary_button")}</a>}<Link href="/panel" className="ghost xl">{content("hero_secondary_button")}</Link></div><div className="proof-grid"><div><b>{plans.length||"—"}</b><span>{pick("پلن فعال","active plans")}</span></div><div><b>{availableProtocols.length||"—"}</b><span>{pick("پروتکل موجود","available protocols")}</span></div><div><b>QR / File</b><span>{pick("تحویل اتصال","connection delivery")}</span></div><div><b>FA / EN</b><span>{pick("رابط دو زبانه","bilingual UI")}</span></div></div></div><Card className="hero-product-card"><div className="hero-card-top"><span>{pick("مسیر خرید","Purchase flow")}</span><Badge tone="violet">Live API</Badge></div><div className="delivery-list"><div><span>01</span><b>{pick("انتخاب پلن","Choose plan")}</b><small>{pick("اطلاعات واقعی Backend","Live backend data")}</small></div><div><span>02</span><b>{pick("ثبت سفارش","Create order")}</b><small>{pick("داخل حساب کاربری","Inside your account")}</small></div><div><span>03</span><b>{pick("پرداخت و تحویل","Pay & receive")}</b><small>{pick("پیگیری در پنل کاربری","Track in customer panel")}</small></div></div><Link className="primary full xl" href="/login?next=%2Fstore">{pick("ورود و شروع خرید","Sign in and start")}</Link></Card></section>
-      {error&&<div className="runtime-error">{error}</div>}{message&&<div className="runtime-success">{message}</div>}
+      <section className="tpStoreHero">
+        <div className="tpStoreHeroGlow"/>
+        <div className="tpStoreHeroCopy">
+          <span className="tpStorePill">{content("hero_kicker")}</span>
+          <h1>{content("hero_title")} <em>{content("hero_highlight")}</em></h1>
+          <p>{content("hero_description")}</p>
+          <div className="tpStoreHeroActions">{settings.show_plans&&<a href="#plans" className="tpStorePrimary">{pick("خرید اشتراک","Buy subscription")}<span>←</span></a>}<a href="#plans" className="tpStoreSecondary">{pick("مشاهده پلن‌ها","View plans")}</a></div>
+          <div className="tpStoreHeroProof"><span><i>●</i>{pick("تحویل داخل پنل","In-panel delivery")}</span><span><i>●</i>{pick("چند پروتکل","Multiple protocols")}</span><span><i>●</i>{pick("پشتیبانی آنلاین","Live support")}</span></div>
+        </div>
+        <div className="tpStoreHeroVisual" aria-hidden="true">
+          <div className="tpStoreOrbit tpStoreOrbitOne"/><div className="tpStoreOrbit tpStoreOrbitTwo"/>
+          <div className="tpStoreGlobe"><span className="tpStoreGlobeLine a"/><span className="tpStoreGlobeLine b"/><span className="tpStoreGlobeLine c"/></div>
+          <div className="tpStorePhone">
+            <div className="tpStorePhoneNotch"/>
+            <div className="tpStorePhoneBrand"><img src={brand.logoUrl} alt=""/><b>{brand.name}</b><small>VPN Connected</small></div>
+            <button className="tpStorePower">⌁</button>
+            <div className="tpStorePhoneApps"><span>▶</span><span>◎</span><span>✦</span><span>G</span><span>N</span></div>
+          </div>
+          <div className="tpStoreOnlineToast"><span>●</span><div><b>{pick("اتصال موفق","Connected")}</b><small>{pick("آی‌پی شما تغییر کرد","Your IP changed")}</small></div></div>
+        </div>
+      </section>
+
+      <section className="tpStoreTrustStrip">
+        <article><span>⚡</span><div><b>{pick("سرعت بالا","High speed")}</b><small>{pick("اتصال پایدار و سریع","Fast stable connection")}</small></div></article>
+        <article><span>▥</span><div><b>99.9%</b><small>{pick("پایداری بالا","reliable uptime")}</small></div></article>
+        <article><span>⌁</span><div><b>{pick("پشتیبانی آنلاین","Live support")}</b><small>{pick("همیشه در دسترس","Always available")}</small></div></article>
+        <article><span>◎</span><div><b>{number(availableProtocols.length)}</b><small>{pick("پروتکل اتصال","connection protocols")}</small></div></article>
+        <article><span>✓</span><div><b>{pick("پرداخت امن","Secure payment")}</b><small>{pick("مسیر خرید قابل پیگیری","Traceable purchase flow")}</small></div></article>
+        <article><span>↗</span><div><b>{pick("فعال‌سازی سریع","Fast activation")}</b><small>{pick("تحویل داخل پنل","Delivered in panel")}</small></div></article>
+      </section>
+
+      {error&&<div className="tpStoreAlert error">{error}</div>}
+      {message&&<div className="tpStoreAlert success">{message}</div>}
+
       {visibleSections.map(section=>sections[section])}
+
+      <section className="tpStoreFinalCta">
+        <div className="tpStoreCtaOrb"/>
+        <div><span className="tpStorePill">{pick("همین حالا شروع کنید","Start now")}</span><h2>{pick("همین حالا به اینترنت آزاد متصل شوید","Connect with confidence today")}</h2><p>{pick("پلن مناسب را انتخاب کنید و مسیر خرید را در چند قدم ساده کامل کنید.","Choose the right plan and complete your purchase in a few simple steps.")}</p></div>
+        <a href="#plans" className="tpStorePrimary">{pick("خرید اشتراک","Buy subscription")}<span>←</span></a>
+      </section>
+
+      <section className="tpStoreContact" id="contact">
+        <div className="tpStoreSectionHead"><span className="tpStorePill">{pick("با ما در ارتباط باشید","Stay connected")}</span><h2>{pick("همیشه و همه‌جا کنار شما","We are always within reach")}</h2><p>{pick("برای پشتیبانی، خبرها و ارتباط سریع از مسیرهای زیر استفاده کنید.","Use these channels for support, updates and quick contact.")}</p></div>
+        <div className="tpStoreSocialGrid">
+          <a href={brand.supportLink||"https://t.me/"} target="_blank" rel="noreferrer" className="telegram"><span>➤</span><div><b>{pick("تلگرام","Telegram")}</b><small>{pick("پشتیبانی و اطلاع‌رسانی","Support & updates")}</small></div></a>
+          <a href="https://instagram.com/" target="_blank" rel="noreferrer" className="instagram"><span>◎</span><div><b>{pick("اینستاگرام","Instagram")}</b><small>{pick("اخبار و محتوای آموزشی","News & learning")}</small></div></a>
+          <a href="https://wa.me/" target="_blank" rel="noreferrer" className="whatsapp"><span>◉</span><div><b>{pick("واتس‌اپ","WhatsApp")}</b><small>{pick("ارتباط سریع","Quick contact")}</small></div></a>
+        </div>
+        <button className="tpStoreChatCard" type="button" onClick={openChat}><span className="tpStoreChatIcon">⌁</span><div><b>{pick("پشتیبانی آنلاین","Live support")}</b><small>{pick("سوال دارید؟ همین حالا با ما چت کنید.","Need help? Start a live chat now.")}</small></div><i>←</i></button>
+      </section>
     </main>
-    <footer className="store-footer"><div className="brand"><img src={brand.logoUrl} alt={brand.name}/><b>{brand.name}</b></div><div><Link href="/login">{pick("ورود","Sign in")}</Link><Link href="/panel">{pick("پنل کاربری","Customer panel")}</Link><Link href="/reseller">{pick("نمایندگی","Reseller")}</Link></div></footer>
+
+    <footer className="tpStoreFooter">
+      <div className="tpStoreFooterBrand"><div className="tpStoreBrand"><img src={brand.logoUrl} alt={brand.name}/><b>{brand.name}</b></div><p>{brand.tagline||pick("اینترنت آزاد، سریع و مطمئن","Fast, reliable connectivity")}</p></div>
+      <div><b>{pick("لینک‌های سریع","Quick links")}</b><a href="#plans">{pick("پلن‌ها","Plans")}</a><a href="#guides">{pick("آموزش اتصال","Setup guides")}</a><Link href="/panel">{pick("پنل کاربری","Customer panel")}</Link></div>
+      <div><b>{pick("خدمات و پشتیبانی","Services & support")}</b><button onClick={openChat}>{pick("چت آنلاین","Live chat")}</button><a href={brand.supportLink||"https://t.me/"} target="_blank" rel="noreferrer">{pick("تلگرام","Telegram")}</a><Link href="/login">{pick("ورود","Sign in")}</Link></div>
+      <div><b>{pick("شبکه‌های اجتماعی","Social")}</b><a href="https://instagram.com/" target="_blank" rel="noreferrer">Instagram</a><a href="https://wa.me/" target="_blank" rel="noreferrer">WhatsApp</a><a href={brand.supportLink||"https://t.me/"} target="_blank" rel="noreferrer">Telegram</a></div>
+      <div className="tpStoreFooterBottom"><span>© {new Date().getFullYear()} {brand.name}</span><span>{pick("تمامی حقوق محفوظ است.","All rights reserved.")}</span></div>
+    </footer>
+
+    <button className="tpStoreFloatingChat" type="button" onClick={openChat} aria-label={pick("باز کردن چت آنلاین","Open live chat")}><span>•••</span></button>
+    {plans.length>0&&<a className="tpStoreMobileBuy" href="#plans"><span>{pick("خرید اشتراک","Buy subscription")}</span><b>{number(plans[0].price_toman)} {pick("تومان","Toman")}</b></a>}
   </div>;
 }
 
-const STORE_TEMPLATE_RENDERERS:Record<string,ComponentType<StoreTemplateProps>>={
-  "conversion-2027":Conversion2027Template,
+const templateRenderers:Record<string,(props:StoreTemplateProps)=>ReactNode>={
+  "conversion-2027":props=><Conversion2027Template {...props}/>,
 };
 
 export function StoreTemplateRenderer(props:StoreTemplateProps){
   const templateId=resolveStoreTemplateId(props.settings.active_template);
-  const Renderer=STORE_TEMPLATE_RENDERERS[templateId]||STORE_TEMPLATE_RENDERERS[DEFAULT_STORE_TEMPLATE_ID];
-  return <Renderer {...props}/>;
+  const renderer=templateRenderers[templateId]||templateRenderers[DEFAULT_STORE_TEMPLATE_ID];
+  return <>{renderer(props)}</>;
 }
