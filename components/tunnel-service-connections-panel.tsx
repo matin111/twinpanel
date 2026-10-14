@@ -92,42 +92,37 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
   const connections = Array.isArray(data?.connections) ? data.connections : [];
 
   return (
-    <div className="manage-card-section">
-      <div className="manage-section-head">
+    <div className="manage-card-section tunnel-service-connections-compact">
+      <div className="tunnel-service-compact-head">
         <div>
-          <b>{pick("اتصال‌های عبوری سرویس‌ها", "Service connections through tunnel")}</b>
+          <b>{pick("اتصال‌های عبوری", "Service connections")}</b>
           <small>
-            {pick(
-              "این‌ها سرویس‌های عبوری هستند و از Transport فیزیکی تانل جدا مدیریت می‌شوند.",
-              "These are routed services and are separate from the tunnel's physical transport.",
-            )}
+            {connections.length.toLocaleString("fa-IR")} {pick("مسیر سرویس", "service routes")}
           </small>
         </div>
 
-        <button
-          type="button"
-          className="ghost"
-          disabled={loading}
-          onClick={() => void load()}
-        >
-          {loading ? "…" : pick("بروزرسانی", "Refresh")}
-        </button>
-      </div>
+        <div className="tunnel-service-compact-actions">
+          {data && (
+            <>
+              <span className="tunnel-service-chip" dir="ltr">
+                {data.active_transport || "—"}
+              </span>
+              <Badge tone={data.route_active ? "ok" : "warn"}>
+                {data.route_active ? pick("مسیریابی فعال", "Routing active") : pick("مسیریابی غیرفعال", "Routing inactive")}
+              </Badge>
+            </>
+          )}
 
-      {data && (
-        <div className="runtime-info-list">
-          <div>
-            <span>{pick("Transport فعلی تانل", "Current tunnel transport")}</span>
-            <b dir="ltr">{data.active_transport || "—"}</b>
-          </div>
-          <div>
-            <span>{pick("مسیریابی سرویس", "Service routing")}</span>
-            <Badge tone={data.route_active ? "ok" : "warn"}>
-              {data.route_active ? pick("فعال", "Active") : pick("غیرفعال", "Inactive")}
-            </Badge>
-          </div>
+          <button
+            type="button"
+            className="ghost tunnel-service-refresh"
+            disabled={loading}
+            onClick={() => void load()}
+          >
+            {loading ? "…" : pick("بروزرسانی", "Refresh")}
+          </button>
         </div>
-      )}
+      </div>
 
       {error && <div className="runtime-error compact">{error}</div>}
 
@@ -138,43 +133,39 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
       )}
 
       {connections.length > 0 && (
-        <div className="setting-grid">
+        <div className="tunnel-service-compact-grid">
           {connections.map((item,index) => {
             const reason = reasonLabel(item.health_reason,pick);
+            const ingress = portText(item.public_port,item.transport);
+            const target = portText(item.target_port,item.transport);
+            const transport = item.transport || "—";
+
             return (
               <div
-                className="setting-box transport-runtime-card"
+                className="tunnel-service-compact-item"
                 key={`${item.protocol}-${item.profile}-${item.public_port ?? "none"}-${index}`}
               >
-                <div className="card-head">
-                  <div>
+                <div className="tunnel-service-compact-item-head">
+                  <div className="tunnel-service-compact-title">
                     <b>{item.title || item.profile || item.protocol}</b>
-                    <small dir="ltr">
-                      {item.profile || item.protocol}
-                    </small>
+                    <small dir="ltr">{item.profile || item.protocol}</small>
                   </div>
+
                   <Badge tone={connectionTone(item)}>
                     {connectionStatus(item,pick)}
                   </Badge>
                 </div>
 
-                <div className="runtime-info-list">
-                  <div>
-                    <span>{pick("پورت ورودی ایران", "Iran ingress port")}</span>
-                    <b dir="ltr">{portText(item.public_port,item.transport)}</b>
-                  </div>
-                  <div>
-                    <span>{pick("پورت سرویس خروجی", "Exit service port")}</span>
-                    <b dir="ltr">{portText(item.target_port,item.transport)}</b>
-                  </div>
-                  <div>
-                    <span>{pick("نوع", "Transport")}</span>
-                    <b dir="ltr">{item.transport || "—"}</b>
-                  </div>
+                <div className="tunnel-service-route-line" dir="ltr">
+                  <strong>{ingress}</strong>
+                  <span>→</span>
+                  <strong>{target}</strong>
+                  <span className="tunnel-service-route-separator">•</span>
+                  <span>{transport}</span>
                 </div>
 
                 {reason && (
-                  <small>{reason}</small>
+                  <small className="tunnel-service-reason">{reason}</small>
                 )}
               </div>
             );
