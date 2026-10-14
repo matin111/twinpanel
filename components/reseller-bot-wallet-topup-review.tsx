@@ -44,6 +44,25 @@ export function ResellerBotWalletTopupReview(){
 
   useEffect(()=>{void load();},[]);
 
+  const openReceipt=async(id:number)=>{
+    const token=getCustomerToken();
+    if(!token){setError("AUTH_REQUIRED");return;}
+    setError("");
+    try{
+      const response=await fetch(`${API_BASE}/v1/reseller/bot-commerce/wallet-topups/${id}/receipt`,{headers:{Authorization:`Bearer ${token}`},cache:"no-store"});
+      if(!response.ok){
+        let detail=`API error ${response.status}`;
+        try{const payload=await response.json();if(payload&&typeof payload==="object"&&"detail" in payload)detail=String((payload as {detail:unknown}).detail);}catch{}
+        throw new Error(detail);
+      }
+      const blob=await response.blob();
+      const url=URL.createObjectURL(blob);
+      const opened=window.open(url,"_blank","noopener,noreferrer");
+      if(!opened){setError(pick("مرورگر اجازه باز کردن رسید را نداد.","Browser blocked the receipt window."));}
+      window.setTimeout(()=>URL.revokeObjectURL(url),60_000);
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+  };
+
   const approve=async(id:number)=>{
     if(!confirm(pick("این شارژ کیف پول تأیید شود؟","Approve this wallet top-up?")))return;
     setBusy(id);setError("");setOk("");
@@ -73,7 +92,7 @@ export function ResellerBotWalletTopupReview(){
     <div className="card-head">
       <div>
         <b>{pick("درخواست‌های شارژ کارت‌به‌کارت ربات","Bot card-to-card wallet top-ups")}</b>
-        <small>{pick("درخواست‌های ثبت‌شده داخل ربات را تأیید یا رد کنید؛ تأیید فقط یک‌بار موجودی را افزایش می‌دهد.","Review top-ups submitted from the bot; approval credits the wallet exactly once.")}</small>
+        <small>{pick("رسید ارسالی کاربر را مشاهده کنید و سپس درخواست را تأیید یا رد کنید؛ تأیید فقط یک‌بار موجودی را افزایش می‌دهد.","Review the customer's receipt before approving or rejecting; approval credits the wallet exactly once.")}</small>
       </div>
       <div className="action-row"><Badge tone="violet">{pending.length}</Badge><button className="mini-btn" type="button" onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button></div>
     </div>
@@ -82,16 +101,17 @@ export function ResellerBotWalletTopupReview(){
     {ok&&<div className="runtime-success">{ok}</div>}
 
     <div className="table"><table>
-      <thead><tr><th>ID</th><th>{pick("کاربر","User")}</th><th>{pick("مبلغ شارژ","Credit")}</th><th>{pick("مبلغ واریز","Paid")}</th><th>{pick("کد پیگیری","Tracking")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("زمان","Time")}</th><th>{pick("عملیات","Actions")}</th></tr></thead>
-      <tbody>{rows.slice(0,100).map((row,index)=>{const id=number(row,"id"),username=text(row,"telegram_username"),status=text(row,"status");return <tr key={id||index}>
+      <thead><tr><th>ID</th><th>{pick("کاربر","User")}</th><th>{pick("مبلغ شارژ","Credit")}</th><th>{pick("مبلغ واریز","Paid")}</th><th>{pick("رسید","Receipt")}</th><th>{pick("کد پیگیری","Tracking")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("زمان","Time")}</th><th>{pick("عملیات","Actions")}</th></tr></thead>
+      <tbody>{rows.slice(0,100).map((row,index)=>{const id=number(row,"id"),username=text(row,"telegram_username"),status=text(row,"status"),receipt=Boolean(row.receipt_uploaded);return <tr key={id||index}>
         <td>#{id}</td>
         <td><b>{text(row,"customer_name")||`#${number(row,"user_id")}`}</b><small dir="ltr">{username?`@${username.replace(/^@/,"")}`:text(row,"telegram_id")||"—"}</small></td>
         <td><b>{money(number(row,"amount_toman"))}</b></td>
         <td>{money(number(row,"payable_amount_toman"))}</td>
+        <td>{receipt?<button className="mini-btn" type="button" onClick={()=>void openReceipt(id)}>{pick("مشاهده رسید","View receipt")}</button>:<Badge tone="bad">{pick("بدون رسید","No receipt")}</Badge>}</td>
         <td><code dir="ltr">{text(row,"tracking_code")||"—"}</code></td>
         <td><Badge tone={status==="approved"?"ok":status==="rejected"?"bad":"violet"}>{status||"—"}</Badge></td>
         <td>{dateText(row.submitted_at??row.created_at)}</td>
-        <td><div className="action-row">{status==="awaiting_review"&&<><button className="mini-btn" type="button" disabled={busy===id} onClick={()=>void approve(id)}>{pick("تأیید","Approve")}</button><button className="mini-btn danger" type="button" disabled={busy===id} onClick={()=>void reject(id)}>{pick("رد","Reject")}</button></>}</div></td>
+        <td><div className="action-row">{status==="awaiting_review"&&<><button className="mini-btn" type="button" disabled={busy===id||!receipt} onClick={()=>void approve(id)}>{pick("تأیید","Approve")}</button><button className="mini-btn danger" type="button" disabled={busy===id} onClick={()=>void reject(id)}>{pick("رد","Reject")}</button></>}</div></td>
       </tr>})}</tbody>
     </table></div>
     {!rows.length&&<div className="runtime-empty">{pick("هنوز درخواست شارژ کارت‌به‌کارت ثبت نشده است.","No card-to-card wallet top-up has been submitted yet.")}</div>}
