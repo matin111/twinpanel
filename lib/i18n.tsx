@@ -15,6 +15,7 @@ type I18nValue={
 };
 
 const I18nContext=createContext<I18nValue|null>(null);
+const parityOriginalText=new Map<Text,string>();
 
 const exactEnglishUi:Record<string,string>={
   "تومان":"Toman",
@@ -141,20 +142,32 @@ function normalizeEnglishUiText(raw:string,parent:HTMLElement,scope:LangScope){
   return value;
 }
 
+function restoreParityText(){
+  for(const [node,original] of parityOriginalText){
+    if(node.isConnected)node.nodeValue=original;
+    parityOriginalText.delete(node);
+  }
+}
+
 function EnglishParityGuard({lang,scope}:{lang:Lang;scope:LangScope}){
   useEffect(()=>{
-    if(lang!=="en"||!(scope==="admin"||scope==="reseller"))return;
+    if(lang!=="en"||!(scope==="admin"||scope==="reseller")){
+      restoreParityText();
+      return;
+    }
 
     const blockedSelector="input,textarea,select,option,code,pre,[data-i18n-preserve='true']";
 
     const normalizeNode=(node:Node)=>{
       if(node.nodeType!==Node.TEXT_NODE)return;
-      const parent=node.parentElement;
-      const raw=node.nodeValue;
+      const textNode=node as Text;
+      const parent=textNode.parentElement;
+      const raw=textNode.nodeValue;
       if(!parent||raw==null||parent.closest(blockedSelector))return;
       if(!/[\u0600-\u06ff۰-۹٠-٩٬٪]/.test(raw))return;
+      parityOriginalText.set(textNode,raw);
       const next=normalizeEnglishUiText(raw,parent,scope);
-      if(next!==raw)node.nodeValue=next;
+      if(next!==raw)textNode.nodeValue=next;
     };
 
     const scan=(root:Node)=>{
@@ -173,7 +186,10 @@ function EnglishParityGuard({lang,scope}:{lang:Lang;scope:LangScope}){
       }
     });
     observer.observe(document.body,{subtree:true,childList:true,characterData:true});
-    return()=>observer.disconnect();
+    return()=>{
+      observer.disconnect();
+      restoreParityText();
+    };
   },[lang,scope]);
 
   return null;
