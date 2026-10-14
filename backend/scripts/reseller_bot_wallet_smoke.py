@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from pathlib import Path
 
 from app.routers.reseller_bot_orders_owned_v3 import (
     _bot_wallet_reference,
@@ -43,6 +44,18 @@ def main() -> None:
     assert 'order_prefix = "reseller-bot-wallet-order:"' in ledger_source
     assert "ResellerBotOrder.reseller_id == int(reseller_id)" in ledger_source
     assert "ResellerBotOrder.customer_user_id == int(user_id)" in ledger_source
+
+    # The UI must reuse the same key for retries. If the server committed and
+    # the HTTP response disappeared, clicking submit again must be a duplicate,
+    # not a second credit/debit.
+    repo_root = Path(__file__).resolve().parents[2]
+    ui_source = (
+        repo_root / "components" / "reseller-bot-wallet-runtime.tsx"
+    ).read_text(encoding="utf-8")
+    assert "const [adjustKey,setAdjustKey]=useState(()=>idempotency())" in ui_source
+    assert "idempotency_key:adjustKey" in ui_source
+    assert "Keep adjustKey unchanged on failure" in ui_source
+    assert "Boolean(result.duplicate)" in ui_source
 
     reference = _bot_wallet_reference(7, "wallet-smoke-123456")
     assert reference == "reseller-bot-wallet:7:wallet-smoke-123456"
