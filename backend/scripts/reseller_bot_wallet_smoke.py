@@ -5,6 +5,7 @@ import inspect
 from app.routers.reseller_bot_orders_owned_v3 import (
     _bot_wallet_reference,
     _owned_bot_link,
+    _owned_wallet_transactions,
     adjust_reseller_bot_wallet,
     reseller_bot_wallet_transactions,
     reseller_bot_wallets,
@@ -19,6 +20,7 @@ def main() -> None:
     assert "/v1/reseller/bot-commerce/wallets/{user_id}/adjust" in paths
 
     scope_source = inspect.getsource(_owned_bot_link)
+    ledger_source = inspect.getsource(_owned_wallet_transactions)
     adjust_source = inspect.getsource(adjust_reseller_bot_wallet)
     list_source = inspect.getsource(reseller_bot_wallets)
     tx_source = inspect.getsource(reseller_bot_wallet_transactions)
@@ -32,6 +34,15 @@ def main() -> None:
     assert 'kind="reseller_bot_adjustment"' in adjust_source
     assert "ResellerTelegramLink.reseller_id" in list_source
     assert "_owned_bot_link" in tx_source
+    assert "_owned_wallet_transactions" in tx_source
+
+    # Ledger visibility must be reseller-scoped: manual adjustments carry the
+    # reseller id and bot wallet purchases are accepted only when their order
+    # belongs to the same reseller and customer.
+    assert 'adjust_prefix = f"reseller-bot-wallet:{int(reseller_id)}:"' in ledger_source
+    assert 'order_prefix = "reseller-bot-wallet-order:"' in ledger_source
+    assert "ResellerBotOrder.reseller_id == int(reseller_id)" in ledger_source
+    assert "ResellerBotOrder.customer_user_id == int(user_id)" in ledger_source
 
     reference = _bot_wallet_reference(7, "wallet-smoke-123456")
     assert reference == "reseller-bot-wallet:7:wallet-smoke-123456"
