@@ -26,7 +26,8 @@ import {CustomerBuyRuntime} from "../../components/customer-buy-runtime";
 import {CustomerPaymentsRuntime} from "../../components/customer-payments-runtime";
 import {CustomerSubscriptionsRuntime} from "../../components/customer-subscriptions-runtime";
 import {DownloadAssetsRuntime} from "../../components/download-assets-runtime";
-import {ResellerNotificationsParityV2,ResellerSettingsParityV2} from "../../components/reseller-portal-parity-v2";
+import {ResellerSettingsParityV2} from "../../components/reseller-portal-parity-v2";
+import {ResellerNotificationsLive} from "../../components/reseller-notifications-live";
 import {ResellerDashboardV3} from "../../components/reseller-dashboard-v3";
 import {ResellerTrafficRechargeV3} from "../../components/reseller-plans-traffic-v3";
 import {ResellerOwnedPlansRuntime} from "../../components/reseller-owned-plans";
@@ -100,7 +101,7 @@ const route=(key:string)=>{
   if(key==="reseller/orders") return <ResellerOrdersParityRuntime/>;
   if(key==="reseller/discounts") return <ResellerDiscountsParityRuntime/>;
   if(key==="reseller/bot") return <ResellerBotParityRuntime/>;
-  if(key==="reseller/notifications") return <ResellerNotificationsParityV2/>;
+  if(key==="reseller/notifications") return <ResellerNotificationsLive/>;
   if(key==="reseller/settings") return <ResellerSettingsParityV2/>;
 
   if(key==="store") return <StoreRuntime2027/>;
