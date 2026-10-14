@@ -1,5 +1,5 @@
 import {TelegramManagerPage} from "../../components/admin-control-screens";
-import {TelegramRuntimePage,DiscountsRuntimePage,StoreSettingsRuntimePage} from "../../components/admin-parity-runtime";
+import {TelegramRuntimePage,DiscountsRuntimePage} from "../../components/admin-parity-runtime";
 import {AdminResellersLegacyV4} from "../../components/admin-resellers-legacy-v4";
 import {AdminResellerTrafficPlans} from "../../components/admin-reseller-traffic-plans";
 import {BackupsFullRuntimePage} from "../../components/backups-full-runtime";
@@ -38,6 +38,7 @@ import {ResellerWalletRuntime} from "../../components/reseller-wallet-runtime";
 import {ResellerBotWalletRuntime} from "../../components/reseller-bot-wallet-runtime";
 import {ResellerBotParityRuntime,ResellerOrdersParityRuntime,ResellerDiscountsParityRuntime} from "../../components/reseller-commerce-parity";
 import {StoreRuntime2027} from "../../components/store-runtime";
+import {StoreSettingsManager} from "../../components/store-settings-manager";
 import {AdminAuthGuard} from "../../components/admin-auth-guard";
 import {AdminDashboardRuntime} from "../../components/admin-dashboard-runtime";
 import {AdminPaymentsRuntime} from "../../components/admin-payments-runtime";
@@ -71,7 +72,7 @@ const route=(key:string)=>{
   if(key==="admin/telegram-manager") return admin(<TelegramManagerPage/>);
   if(key==="admin/sms-reader") return admin(<><SmsReaderRuntimePage/><AdminSmsRelayDownload/></>);
   if(key==="admin/backups") return admin(<BackupsFullRuntimePage/>);
-  if(key==="admin/store-settings") return admin(<StoreSettingsRuntimePage/>);
+  if(key==="admin/store-settings") return admin(<StoreSettingsManager/>);
   if(key==="admin/wallet") return usersWithWallet();
   if(key==="admin/discounts") return admin(<DiscountsRuntimePage/>);
   if(key==="admin/resellers") return admin(<AdminResellersLegacyV4/>);
