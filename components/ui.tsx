@@ -5,6 +5,7 @@ import {useEffect,useState} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {BrandMark} from "../lib/branding";
+import {AdminNotificationCenter} from "./admin-notification-center";
 
 const menuGroups=[
   {fa:"مدیریت",en:"Management",items:[
@@ -94,7 +95,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
       <header>
         <button className="mobile-menu-toggle" type="button" onClick={()=>setMobileOpen(v=>!v)} aria-expanded={mobileOpen} aria-label={pick("نمایش منو","Show menu")}>☰</button>
         <div className="search">⌕ <input placeholder={pick("جستجو در پنل...","Search panel...")}/></div>
-        <div className="head-actions"><LanguageSwitch compact/><ThemeSwitch compact/><button className="notify" type="button" title={pick("اعلان‌ها","Notifications")}>◉</button><span className="avatar">M</span></div>
+        <div className="head-actions"><LanguageSwitch compact/><ThemeSwitch compact/><AdminNotificationCenter/><span className="avatar">M</span></div>
       </header>
       {children}
     </main>
