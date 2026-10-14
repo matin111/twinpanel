@@ -45,17 +45,21 @@ def main() -> None:
     assert "ResellerBotOrder.reseller_id == int(reseller_id)" in ledger_source
     assert "ResellerBotOrder.customer_user_id == int(user_id)" in ledger_source
 
-    # The UI must reuse the same key for retries. If the server committed and
-    # the HTTP response disappeared, clicking submit again must be a duplicate,
-    # not a second credit/debit.
+    # Full-repository CI also validates the frontend retry contract. Production
+    # backend runtimes intentionally do not contain the Next.js /components
+    # tree, so backend-only runtime smoke must not fail just because that UI
+    # source is absent there.
     repo_root = Path(__file__).resolve().parents[2]
-    ui_source = (
-        repo_root / "components" / "reseller-bot-wallet-runtime.tsx"
-    ).read_text(encoding="utf-8")
-    assert "const [adjustKey,setAdjustKey]=useState(()=>idempotency())" in ui_source
-    assert "idempotency_key:adjustKey" in ui_source
-    assert "Keep adjustKey unchanged on failure" in ui_source
-    assert "Boolean(result.duplicate)" in ui_source
+    ui_path = repo_root / "components" / "reseller-bot-wallet-runtime.tsx"
+    if ui_path.is_file():
+        ui_source = ui_path.read_text(encoding="utf-8")
+        assert "const [adjustKey,setAdjustKey]=useState(()=>idempotency())" in ui_source
+        assert "idempotency_key:adjustKey" in ui_source
+        assert "Keep adjustKey unchanged on failure" in ui_source
+        assert "Boolean(result.duplicate)" in ui_source
+        print("RESELLER_BOT_WALLET_UI_CONTRACT_OK")
+    else:
+        print("RESELLER_BOT_WALLET_UI_CONTRACT_SKIPPED_BACKEND_RUNTIME")
 
     reference = _bot_wallet_reference(7, "wallet-smoke-123456")
     assert reference == "reseller-bot-wallet:7:wallet-smoke-123456"
