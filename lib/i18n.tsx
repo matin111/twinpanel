@@ -97,8 +97,9 @@ function preserveWhitespace(original:string,replacement:string){
 }
 
 function trafficHistoryEnglish(parent:HTMLElement,text:string){
-  const row=parent.closest("tr");
-  if(!row)return null;
+  const cell=parent.closest("td");
+  const row=cell?.closest("tr");
+  if(!cell||!row||row.cells.length<5||row.cells[4]!==cell)return null;
   const rowText=row.textContent||"";
   for(const [type,label] of Object.entries(trafficTypeEnglish)){
     if(rowText.includes(type)&&/[\u0600-\u06ff]/.test(text))return label;
@@ -120,8 +121,8 @@ function normalizeEnglishUiText(raw:string,parent:HTMLElement,scope:LangScope){
   // Currency/unit output is UI formatting, not user-entered content. Keep
   // arbitrary Persian names/descriptions untouched while fixing known suffixes.
   value=value
-    .replace(/\b([0-9][0-9,.]*)\s*گیگ\b/g,"$1 GB")
-    .replace(/\b([0-9][0-9,.]*)\s*روز\b/g,"$1 days")
+    .replace(/([0-9][0-9,.]*)\s*گیگ/g,"$1 GB")
+    .replace(/([0-9][0-9,.]*)\s*روز/g,"$1 days")
     .replace(/تومان/g,"Toman")
     .replace(/کارت\s*به\s*کارت/g,"Card to card")
     .replace(/\(قدیمی\)/g,"(Legacy)");
