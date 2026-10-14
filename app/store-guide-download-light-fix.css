@@ -1,0 +1,34 @@
+/* Storefront tutorial download CTA contrast fix */
+html[data-theme="light"] .tpStore .tpRealGuideDownload{
+  background:linear-gradient(135deg,#7c3aed,#6d28d9);
+  border:1px solid #6d28d9;
+  color:#ffffff!important;
+  box-shadow:0 10px 24px rgba(109,40,217,.20);
+  text-shadow:none;
+  opacity:1;
+}
+html[data-theme="light"] .tpStore .tpRealGuideDownload:hover{
+  background:linear-gradient(135deg,#8b5cf6,#7c3aed);
+  border-color:#7c3aed;
+  color:#ffffff!important;
+  box-shadow:0 13px 30px rgba(109,40,217,.26);
+}
+html[data-theme="light"] .tpStore .tpRealGuideDownload:focus-visible{
+  outline:3px solid rgba(124,58,237,.22);
+  outline-offset:3px;
+}
+html[data-theme="light"] .tpStore .tpRealGuideDownload *{
+  color:#ffffff!important;
+  opacity:1!important;
+}
+
+html[data-theme="light"] .tpStore .tpRealGuideNoDownload{
+  background:#f8fafc;
+  border:1px solid #cbd5e1;
+  color:#334155!important;
+  opacity:1;
+}
+html[data-theme="light"] .tpStore .tpRealGuideNoDownload *{
+  color:#334155!important;
+  opacity:1!important;
+}
