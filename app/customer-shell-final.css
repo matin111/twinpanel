@@ -5,7 +5,7 @@
   width:100%;
   display:flex;
   align-items:flex-start;
-  direction:rtl;
+  direction:inherit;
   background:var(--bg);
 }
 
@@ -28,6 +28,7 @@
   z-index:60;
   transition:width .22s ease,min-width .22s ease,flex-basis .22s ease,padding .22s ease;
 }
+html[dir="ltr"] .customer-portal-sidebar{box-shadow:12px 0 42px rgba(0,0,0,.08)}
 
 .customer-portal-brand-row{
   min-height:50px;
@@ -110,6 +111,7 @@
   border-color:var(--line);
   transform:translateX(-1px);
 }
+html[dir="ltr"] .customer-portal-nav>a:hover{transform:translateX(1px)}
 .customer-portal-nav>a.active{
   color:#fff;
   background:linear-gradient(135deg,color-mix(in srgb,var(--purple) 88%,#4f46e5),color-mix(in srgb,var(--purple2) 82%,#7c3aed));
@@ -267,6 +269,7 @@ html[data-theme="light"] .customer-portal-sidebar{
   background:rgba(255,255,255,.94);
   box-shadow:-10px 0 35px rgba(22,34,55,.045);
 }
+html[dir="ltr"][data-theme="light"] .customer-portal-sidebar{box-shadow:10px 0 35px rgba(22,34,55,.045)}
 html[data-theme="light"] .customer-portal-header{background:rgba(247,249,253,.9)}
 html[data-theme="light"] .customer-portal-nav>a.active{box-shadow:0 10px 24px rgba(111,72,215,.18)}
 
@@ -283,7 +286,7 @@ html[data-theme="light"] .customer-portal-nav>a.active{box-shadow:0 10px 24px rg
   .customer-portal-sidebar{
     position:fixed;
     top:0;
-    right:0;
+    inset-inline-start:0;
     z-index:120;
     width:300px;
     min-width:300px;
@@ -294,6 +297,7 @@ html[data-theme="light"] .customer-portal-nav>a.active{box-shadow:0 10px 24px rg
     transition:transform .22s ease,opacity .18s ease;
     box-shadow:-24px 0 70px rgba(0,0,0,.32);
   }
+  html[dir="ltr"] .customer-portal-sidebar{transform:translateX(-105%);box-shadow:24px 0 70px rgba(0,0,0,.32)}
   .customer-portal-shell.is-mobile-open .customer-portal-sidebar{transform:translateX(0);opacity:1;pointer-events:auto}
   .customer-portal-shell.is-collapsed .customer-portal-sidebar{padding:16px 13px 14px}
   .customer-portal-shell.is-collapsed .customer-portal-brand{display:block}
