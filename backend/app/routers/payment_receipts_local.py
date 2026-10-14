@@ -41,6 +41,10 @@ ALLOWED_TYPES = {
 }
 
 
+RESELLER_INTERNAL_EMAIL_SUFFIX = "@internal.twinpanel.invalid"
+RESELLER_INTERNAL_EMAIL_PREFIX = "tg-r"
+
+
 def _ensure_receipt_root() -> None:
     try:
         RECEIPT_ROOT.mkdir(
@@ -75,6 +79,24 @@ def _local_path(marker: str) -> Path | None:
         return None
 
     return candidate
+
+
+def _is_reseller_bot_internal_user(
+    db: Session,
+    user_id: int | None,
+) -> bool:
+    if not user_id:
+        return False
+
+    user = db.get(User, int(user_id))
+    if user is None:
+        return False
+
+    email = str(user.email or "").strip().lower()
+    return bool(
+        email.startswith(RESELLER_INTERNAL_EMAIL_PREFIX)
+        and email.endswith(RESELLER_INTERNAL_EMAIL_SUFFIX)
+    )
 
 
 @router.post("/intents/{intent_id}/receipt-upload")
@@ -169,6 +191,38 @@ async def upload_payment_receipt(
     return intent_out(row)
 
 
+# This router is registered before the legacy payments router. Defining the
+# admin list here gives the global admin UI a source-isolated view while keeping
+# legacy compatibility routes available for ordinary store payments.
+@router.get(
+    "/admin/intents",
+    dependencies=[Depends(require_admin)],
+)
+def admin_payment_intents_isolated(
+    db: Session = Depends(get_db),
+):
+    rows = (
+        db.query(PaymentIntent)
+        .order_by(PaymentIntent.id.desc())
+        .limit(2000)
+        .all()
+    )
+
+    visible = [
+        row
+        for row in rows
+        if not _is_reseller_bot_internal_user(
+            db,
+            int(row.user_id) if row.user_id is not None else None,
+        )
+    ]
+
+    return [
+        intent_out(row)
+        for row in visible[:500]
+    ]
+
+
 @router.get(
     "/admin/intents/{intent_id}/receipt",
     dependencies=[Depends(require_admin)],
@@ -179,7 +233,16 @@ async def admin_payment_receipt_local_first(
 ):
     row = db.get(PaymentIntent, intent_id)
 
-    if not row:
+    if (
+        not row
+        or _is_reseller_bot_internal_user(
+            db,
+            int(row.user_id) if row.user_id is not None else None,
+        )
+    ):
+        # Historical reseller-bot payment intents are treated as reseller-owned
+        # data even if they were created before the dedicated ResellerBotOrder
+        # table existed.
         raise HTTPException(
             status_code=404,
             detail="پرداخت پیدا نشد",
