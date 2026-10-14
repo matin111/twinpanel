@@ -1,5 +1,5 @@
-import {TelegramManagerPage} from "../../components/admin-control-screens";
-import {TelegramRuntimePage,DiscountsRuntimePage} from "../../components/admin-parity-runtime";
+import {DiscountsRuntimePage} from "../../components/admin-parity-runtime";
+import {AdminTelegramLegacyPage} from "../../components/admin-telegram-legacy-parity";
 import {AdminResellersLegacyV4} from "../../components/admin-resellers-legacy-v4";
 import {AdminResellerTrafficPlans} from "../../components/admin-reseller-traffic-plans";
 import {BackupsFullRuntimePage} from "../../components/backups-full-runtime";
@@ -7,7 +7,6 @@ import {SmsReaderRuntimePage,MotherAccessRuntimePage,AccountDeliveryRuntimePage}
 import {ProvisionRuntimeXrayDomainPage} from "../../components/provision-runtime-xray-domain";
 import {SupportRuntimePage,NotificationsRuntimePage} from "../../components/admin-ops-runtime";
 import {SystemHealthRuntimePage} from "../../components/system-health-runtime";
-import {SubscriptionToolsRuntimePage} from "../../components/subscription-tools-runtime";
 import {LegacySubscriptionsRuntimePage} from "../../components/legacy-subscriptions-exact";
 import {LegacyUsersRuntimePage} from "../../components/legacy-users-exact";
 import {LegacyNodesRuntimePage} from "../../components/legacy-nodes-exact";
@@ -58,7 +57,7 @@ const route=(key:string)=>{
   if(key==="admin") return admin(<AdminDashboardRuntime/>);
   if(key==="admin/users") return usersWithWallet();
   if(key==="admin/subscriptions") return admin(<LegacySubscriptionsRuntimePage/>);
-  if(key==="admin/subscription-tools") return admin(<SubscriptionToolsRuntimePage/>);
+  if(key==="admin/subscription-tools") return admin(<LegacySubscriptionsRuntimePage/>);
   if(key==="admin/plans") return admin(<LegacyPlansRuntimePage/>);
   if(key==="admin/nodes") return admin(<LegacyNodesRuntimePage/>);
   if(key==="admin/tunnels") return admin(<TunnelsSimpleRuntimePage/>);
@@ -68,8 +67,7 @@ const route=(key:string)=>{
   if(key==="admin/system-health") return admin(<SystemHealthRuntimePage/>);
   if(key==="admin/notifications") return admin(<NotificationsRuntimePage/>);
   if(key==="admin/support") return admin(<SupportRuntimePage/>);
-  if(key==="admin/telegram") return admin(<TelegramRuntimePage/>);
-  if(key==="admin/telegram-manager") return admin(<TelegramManagerPage/>);
+  if(key==="admin/telegram"||key==="admin/telegram-manager") return admin(<AdminTelegramLegacyPage/>);
   if(key==="admin/sms-reader") return admin(<><SmsReaderRuntimePage/><AdminSmsRelayDownload/></>);
   if(key==="admin/backups") return admin(<BackupsFullRuntimePage/>);
   if(key==="admin/store-settings") return admin(<StoreSettingsManager/>);
