@@ -267,3 +267,31 @@
     font-size:14px!important;
   }
 }
+
+/* Light mode must match the reseller portal contrast. This file is loaded last,
+   so explicit light overrides are required to avoid the desktop dark palette
+   winning over theme.css through !important. */
+html[data-theme="light"] .admin-shell .sidebar-nav>.nav-group>.nav-group-title{
+  color:#8b95a7!important;
+}
+
+html[data-theme="light"] .admin-shell .sidebar-nav>.nav-group>a{
+  color:#667085!important;
+}
+
+html[data-theme="light"] .admin-shell .sidebar-nav>.nav-group>a:hover{
+  color:#34266b!important;
+  background:#f3f0ff!important;
+  border-color:#d8ccfa!important;
+}
+
+html[data-theme="light"] .admin-shell .sidebar-nav>.nav-group>a.active{
+  color:#5030ae!important;
+  border-color:#d8ccfa!important;
+  background:linear-gradient(90deg,rgba(109,67,229,.14),rgba(109,67,229,.04))!important;
+  box-shadow:inset -2px 0 #8b5cf6!important;
+}
+
+html[data-theme="light"] .admin-shell .sidebar-nav>.nav-group>a i{
+  color:#7a5bd8!important;
+}
