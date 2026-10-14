@@ -18,6 +18,7 @@ import "./store-2027.css";
 import "./store-light.css";
 import "./store-light-final.css";
 import "./store-conversion-2027-v2.css";
+import "./store-conversion-2027-v2-chat.css";
 import "./dashboard-2027.css";
 import "./support-chat.css";
 import "./support-chat-emoji.css";
