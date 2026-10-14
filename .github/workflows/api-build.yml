@@ -113,7 +113,7 @@ jobs:
 
       - name: Run Xray Modern auto-repair smoke
         working-directory: backend
-        run: python scripts/xray_modern_auto_repair_smoke.py
+        run: python -m scripts.xray_modern_auto_repair_smoke
 
       - name: Bootstrap admin
         working-directory: backend
