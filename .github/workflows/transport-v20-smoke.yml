@@ -1,0 +1,48 @@
+name: TwinPanel Transport V20 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/transport_policy_v20.py"
+      - "backend/app/manager_runtime_v20.py"
+      - "backend/app/tunnel_transport_manager_v11.py"
+      - "backend/scripts/transport_policy_v20_smoke.py"
+      - ".github/workflows/transport-v20-smoke.yml"
+
+jobs:
+  transport-v20:
+    runs-on: ubuntu-24.04
+
+    env:
+      APP_NAME: TwinPanel-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      DATABASE_URL: sqlite:////tmp/twinpanel-v20-smoke.db
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Compile Performance Auto V20
+        run: |
+          python -m py_compile \
+            backend/app/transport_policy_v20.py \
+            backend/app/manager_runtime_v20.py \
+            backend/app/tunnel_transport_manager_v11.py \
+            backend/scripts/transport_policy_v20_smoke.py
+
+      - name: Run Performance Auto V20 smoke
+        working-directory: backend
+        run: python -m scripts.transport_policy_v20_smoke
