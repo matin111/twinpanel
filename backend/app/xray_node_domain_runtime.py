@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import Column, String, inspect, text
 from sqlalchemy.orm import Session
@@ -170,7 +170,7 @@ def _node_or_404(
 )
 def get_xray_domain(
     node_id: int,
-    db: Session = __import__("fastapi").Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     node = _node_or_404(
         db,
@@ -198,7 +198,7 @@ def get_xray_domain(
 def save_dedicated_xray_domain(
     node_id: int,
     payload: XrayDomainIn,
-    db: Session = __import__("fastapi").Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     node = _node_or_404(
         db,
@@ -232,7 +232,7 @@ def save_dedicated_xray_domain(
 async def prepare_dedicated_xray_domain(
     node_id: int,
     payload: XrayDomainPrepareIn,
-    db: Session = __import__("fastapi").Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     node = _node_or_404(
         db,
