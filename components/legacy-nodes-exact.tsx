@@ -17,8 +17,8 @@ const protocolLabels:Record<(typeof protocolKeys)[number],string>={cisco:"Cisco 
 type NodeRole="mother"|"iran"|"exit";
 type NodeModal="protocols"|"ssh"|"domain"|null;
 type ExtendedNode=AdminNode&{is_mother?:boolean;public_domain?:string|null};
-
-type ProtocolRuntime={protocol?:string;name?:string;installed?:boolean;ok?:boolean;service?:string;listeners?:Record<string,boolean>;port_text?:string;transport?:string};
+type ModernHealth={ok?:boolean;service_active?:boolean;binary_present?:boolean;config_present?:boolean;config_test_ok?:boolean;state_present?:boolean;state_version?:number|string|null;listeners?:Record<string,boolean>;ports?:Record<string,number>;reality_private_key_present?:boolean;reality_public_key_present?:boolean;short_id_xhttp_present?:boolean;short_id_grpc_present?:boolean;tls_enabled?:boolean;tls_domain_configured?:boolean;missing?:string[];error?:string|null};
+type ProtocolRuntime={protocol?:string;name?:string;installed?:boolean;ok?:boolean;service?:string;listeners?:Record<string,boolean>;port_text?:string;transport?:string;error?:string|null;modern_ready?:boolean;modern_reconciled?:boolean;auto_heal_attempted?:boolean;modern_health?:ModernHealth};
 
 function roleOf(node:ExtendedNode):NodeRole{
   if(node.is_mother||node.node_type==="mother"||node.node_type==="core")return "mother";
@@ -167,10 +167,27 @@ export function LegacyNodesRuntimePage(){
 
   const repair=async()=>{
     if(!selected||busy||selectedRole!=="exit"||!ensureAccess())return;
-    if(!window.confirm(pick(`پروتکل‌های نصب‌شده روی «${selected.name}» بررسی و تعمیر شوند؟`,`Check and repair installed protocols on ${selected.name}?`)))return;
-    setBusy("repair");setError("");
-    try{const result=await legacyAdminApi.repairProtocolsSaved(selected.id);flash(s(result.message)||pick("تعمیر سرویس‌ها انجام شد.","Services repaired."));await load(true);}
-    catch(e){fail(e,pick("تعمیر سرویس‌ها ناموفق بود.","Service repair failed."));}
+    if(!window.confirm(pick(`پروتکل‌های نصب‌شده روی «${selected.name}» به‌صورت خودکار بررسی، تعمیر و تایید سلامت شوند؟`,`Automatically check, repair and verify installed protocols on ${selected.name}?`)))return;
+    setBusy("repair");setError("");setWarning("");
+    try{
+      const result=await legacyAdminApi.repairProtocolsSaved(selected.id);
+      const map=result&&typeof result.protocols==="object"&&result.protocols?result.protocols as Record<string,ProtocolRuntime>:{};
+      const failed=Array.isArray(result.failed_protocols)?result.failed_protocols.map(s):[];
+      const xray=map.v2ray;
+      const health=xray?.modern_health;
+      const reason=s(xray?.error||health?.error);
+      await load(true);
+      setRuntime(map);
+      setModal("protocols");
+      if(Boolean(result.ok)){
+        setWarning("");
+        flash(pick("تعمیر خودکار انجام شد و سلامت سرویس‌ها تایید شد.","Automatic repair completed and service health was verified."));
+      }else{
+        const failedText=failed.length?failed.join("، "):pick("نامشخص","unknown");
+        setWarning(reason?`${pick("تعمیر خودکار کامل نشد","Automatic repair did not fully recover the service")}: ${reason}`:`${pick("برخی سرویس‌ها بعد از تعمیر هنوز سالم نیستند","Some services are still unhealthy after repair")}: ${failedText}`);
+      }
+    }
+    catch(e){fail(e,pick("تعمیر خودکار سرویس‌ها ناموفق بود.","Automatic service repair failed."));}
     finally{setBusy("");}
   };
 
@@ -225,7 +242,7 @@ export function LegacyNodesRuntimePage(){
         <div className="node-action-grid">
           {selectedRole!=="iran"&&<button className="primary" disabled={!!busy} onClick={()=>void checkProtocols(true)}>{busy==="health"?"…":pick("بررسی پروتکل‌ها","Check protocols")}</button>}
           {selectedRole!=="iran"&&<button className="ghost" disabled={!!busy} onClick={()=>{if(accessConfigured){setModal("protocols");void checkProtocols(false);}else openSsh();}}>{pick("مدیریت پروتکل‌ها","Manage protocols")}</button>}
-          {selectedRole==="exit"&&<button className="ghost" disabled={!!busy} onClick={()=>void repair()}>{busy==="repair"?"…":pick("تعمیر سرویس‌ها","Repair services")}</button>}
+          {selectedRole==="exit"&&<button className="ghost" disabled={!!busy} onClick={()=>void repair()}>{busy==="repair"?pick("در حال تعمیر و تایید…","Repairing & verifying…"):pick("تعمیر سرویس‌ها","Repair services")}</button>}
           {selectedRole!=="mother"&&<button className="ghost" disabled={!!busy} onClick={()=>void upgradeAgent()}>{busy==="agent"?"…":pick("ارتقای Agent","Upgrade agent")}</button>}
           <button className="ghost" onClick={()=>{setDomainDraft(effectiveDomain);setModal("domain");}}>{pick("دامنه سرور","Server domain")}</button>
           {selectedRole!=="mother"&&<button className="ghost" onClick={openSsh}>{accessConfigured?pick("دسترسی SSH","SSH access"):pick("ثبت دسترسی SSH","Register SSH")}</button>}
@@ -241,6 +258,6 @@ export function LegacyNodesRuntimePage(){
 
     {modal==="domain"&&selected&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" onClick={()=>!busy&&setModal(null)}/><div className="runtime-modal-card"><div className="card-head"><div><b>{pick("دامنه سرور","Server domain")}</b><small>{selected.name}</small></div><button className="icon-button" disabled={!!busy} onClick={()=>setModal(null)}>×</button></div><label className="field"><span>{pick("دامنه عمومی","Public domain")}</span><input dir="ltr" value={domainDraft} onChange={e=>setDomainDraft(e.target.value)} placeholder="de.example.com"/></label><div className="runtime-modal-actions"><button className="ghost" disabled={!!busy} onClick={()=>setModal(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={!!busy} onClick={()=>void saveDomain()}>{busy==="domain"?"…":pick("ذخیره دامنه","Save domain")}</button></div></div></div>}
 
-    {modal==="protocols"&&selected&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" onClick={()=>!busy&&setModal(null)}/><div className="runtime-modal-card wide protocol-manager-modal"><div className="card-head"><div><b>{pick("پروتکل‌های","Protocols of")} {selected.name}</b><small>{accessConfigured?pick("SSH آماده است","SSH ready"):pick("SSH ثبت نشده","SSH not configured")}</small></div><button className="icon-button" disabled={!!busy} onClick={()=>setModal(null)}>×</button></div><div className="protocol-modal-toolbar"><Badge tone={accessConfigured?"ok":"bad"}>{accessConfigured?pick("SSH آماده","SSH ready"):pick("SSH ثبت نشده","SSH missing")}</Badge><button className="ghost" disabled={!!busy} onClick={()=>void checkProtocols(false)}>{busy==="health"?"…":pick("بررسی همه","Check all")}</button></div><div className="protocol-health-grid">{protocolKeys.map(key=>{const live=runtime[key]||{};const enabled=selectedProtocols.includes(key);const listeners=Object.entries(live.listeners||{});return <div className={`protocol-health-card ${enabled?"enabled":"disabled"}`} key={key}><div><b>{protocolLabels[key]}</b><small>{live.service||live.port_text||pick("بررسی نشده","Not checked")}</small><div className="protocol-listeners">{listeners.length?listeners.map(([name,state])=><span key={name} className={state?"live":"dead"}>{name}</span>):<span className="dead">Listener —</span>}</div></div><Badge tone={live.ok?"ok":enabled?"warn":"bad"}>{live.ok?"ONLINE":enabled?"READY":"OFF"}</Badge><button className="mini-btn" disabled={!enabled||!!busy} onClick={()=>void restartProtocol(key)}>{busy===`restart-${key}`?"…":pick("ریستارت","Restart")}</button></div>})}</div><div className="runtime-modal-actions"><button className="ghost" disabled={!!busy} onClick={()=>setModal(null)}>{pick("بستن","Close")}</button><button className="danger" disabled={!!busy||selectedProtocols.length===0} onClick={()=>void restartAll()}>{busy==="restart-all"?"…":pick("ریستارت همه","Restart all")}</button></div></div></div>}
+    {modal==="protocols"&&selected&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" onClick={()=>!busy&&setModal(null)}/><div className="runtime-modal-card wide protocol-manager-modal"><div className="card-head"><div><b>{pick("پروتکل‌های","Protocols of")} {selected.name}</b><small>{accessConfigured?pick("SSH آماده است؛ بررسی و تعمیر از داخل پنل انجام می‌شود","SSH ready; checks and repairs run from the panel"):pick("SSH ثبت نشده","SSH not configured")}</small></div><button className="icon-button" disabled={!!busy} onClick={()=>setModal(null)}>×</button></div><div className="protocol-modal-toolbar"><Badge tone={accessConfigured?"ok":"bad"}>{accessConfigured?pick("مدیریت خودکار آماده","Automatic management ready"):pick("SSH ثبت نشده","SSH missing")}</Badge><button className="ghost" disabled={!!busy} onClick={()=>void checkProtocols(false)}>{busy==="health"?"…":pick("بررسی همه","Check all")}</button></div><div className="protocol-health-grid">{protocolKeys.map(key=>{const live=runtime[key]||{};const enabled=selectedProtocols.includes(key);const modern=key==="v2ray"?live.modern_health:undefined;const listeners=Object.entries(modern?.listeners||live.listeners||{});const failure=s(live.error||modern?.error);const online=Boolean(live.ok)&&(!modern||Boolean(modern.ok));return <div className={`protocol-health-card ${enabled?"enabled":"disabled"}`} key={key}><div><b>{protocolLabels[key]}</b><small>{key==="v2ray"&&modern?modern.ok?pick("Xray Modern تایید سلامت شد","Xray Modern health verified"):pick("Xray Modern نیاز به تعمیر دارد","Xray Modern needs repair"):live.service||live.port_text||pick("بررسی نشده","Not checked")}</small><div className="protocol-listeners">{listeners.length?listeners.map(([name,state])=><span key={name} className={state?"live":"dead"}>{name}</span>):<span className="dead">Listener —</span>}</div>{key==="v2ray"&&live.auto_heal_attempted&&<small>{pick("Self-Heal خودکار اجرا شد.","Automatic Self-Heal was attempted.")}</small>}{failure&&<small title={failure}>{pick("خطا","Error")}: {failure}</small>}</div><Badge tone={online?"ok":enabled?"warn":"bad"}>{online?"ONLINE":enabled?"CHECK":"OFF"}</Badge><button className="mini-btn" disabled={!enabled||!!busy} onClick={()=>void restartProtocol(key)}>{busy===`restart-${key}`?"…":pick("ریستارت","Restart")}</button></div>})}</div><div className="runtime-modal-actions"><button className="ghost" disabled={!!busy} onClick={()=>setModal(null)}>{pick("بستن","Close")}</button><button className="danger" disabled={!!busy||selectedProtocols.length===0} onClick={()=>void restartAll()}>{busy==="restart-all"?"…":pick("ریستارت همه","Restart all")}</button></div></div></div>}
   </div></Shell>;
 }
