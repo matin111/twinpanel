@@ -18,7 +18,9 @@ from app.routers.reseller_bot_orders_owned_v3 import (
     router,
 )
 from app.routers.reseller_bot_wallet_topups import (
+    _cleanup_incomplete_topups,
     _method_parts,
+    _notify_wallet_topup_status,
     _topup_out,
     approve_reseller_bot_wallet_topup,
     reject_reseller_bot_wallet_topup,
@@ -50,6 +52,8 @@ def main() -> None:
     receipt_source = inspect.getsource(reseller_bot_wallet_topup_receipt)
     approve_topup_source = inspect.getsource(approve_reseller_bot_wallet_topup)
     reject_topup_source = inspect.getsource(reject_reseller_bot_wallet_topup)
+    cleanup_source = inspect.getsource(_cleanup_incomplete_topups)
+    notify_source = inspect.getsource(_notify_wallet_topup_status)
 
     assert "ResellerTelegramLink.reseller_id" in scope_source
     assert "ResellerTelegramLink.user_id" in scope_source
@@ -71,6 +75,11 @@ def main() -> None:
     marker_row = type("MarkerRow", (), {"method": "reseller_card:7:11"})()
     assert _method_parts(marker_row) == (7, 11)
     assert 'prefix = f"reseller_card:{int(reseller.id)}:%"' in topup_list_source
+    assert 'CustomerWalletTopup.status != "pending_payment"' in topup_list_source
+    assert "_cleanup_incomplete_topups" in topup_list_source
+    assert 'CustomerWalletTopup.status == "pending_payment"' in cleanup_source
+    assert "PENDING_PAYMENT_TTL" in cleanup_source
+    assert "db.delete(row)" in cleanup_source
     assert '"receipt_uploaded": bool(row.receipt_file_marker)' in topup_out_source
     assert "_owned_topup" in receipt_source
     assert "receipt_file_marker" in receipt_source
@@ -79,7 +88,16 @@ def main() -> None:
     assert "عکس رسید برای این درخواست ثبت نشده است" in approve_topup_source
     assert 'f"reseller-bot-wallet:{int(reseller.id)}:topup:{int(row.id)}"' in approve_topup_source
     assert 'kind="reseller_bot_topup"' in approve_topup_source
+    assert "_notify_wallet_topup_status" in approve_topup_source
+    assert '"telegram_notified": notified' in approve_topup_source
     assert "_owned_topup" in reject_topup_source
+    assert "_notify_wallet_topup_status" in reject_topup_source
+    assert '"telegram_notified": notified' in reject_topup_source
+    assert "ResellerBotSettings" in notify_source
+    assert "decrypt_bot_token" in notify_source
+    assert "/sendMessage" in notify_source
+    assert "شارژ کیف پول تأیید شد" in notify_source
+    assert "درخواست شارژ کیف پول رد شد" in notify_source
 
     keyboard = wallet_main_keyboard()
     labels = [button.text for row in keyboard.keyboard for button in row]
@@ -113,6 +131,8 @@ def main() -> None:
         assert "receipt_uploaded" in review_source
         assert "مشاهده رسید" in review_source
         assert "/receipt`" in review_source
+        assert "telegram_notified" in review_source
+        assert "پیام برای کاربر ارسال شد" in review_source
         print("RESELLER_BOT_WALLET_UI_CONTRACT_OK")
     else:
         print("RESELLER_BOT_WALLET_UI_CONTRACT_SKIPPED_BACKEND_RUNTIME")
@@ -121,6 +141,7 @@ def main() -> None:
     assert reference == "reseller-bot-wallet:7:wallet-smoke-123456"
     assert len(reference) <= 180
 
+    print("RESELLER_BOT_WALLET_NOTIFY_CLEANUP_OK")
     print("RESELLER_BOT_WALLET_RECEIPT_PHOTO_OK")
     print("RESELLER_BOT_WALLET_MENU_TOPUP_OK")
     print("RESELLER_BOT_WALLET_SMOKE_OK")

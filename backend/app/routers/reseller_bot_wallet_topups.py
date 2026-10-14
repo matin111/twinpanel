@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
+import logging
 import mimetypes
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
@@ -15,7 +17,12 @@ from ..customer_wallet_models import (
 from ..database import get_db
 from ..deps import require_reseller
 from ..models import User
-from ..models_reseller import Reseller, ResellerPaymentMethod
+from ..models_reseller import (
+    Reseller,
+    ResellerBotSettings,
+    ResellerPaymentMethod,
+)
+from ..reseller_bot_crypto import decrypt_bot_token
 from ..reseller_telegram_models import ResellerTelegramLink
 from .customer_wallet import _wallet
 from .payment_receipts_local import ALLOWED_TYPES, _local_path
@@ -25,6 +32,9 @@ router = APIRouter(
     prefix="/v1/reseller/bot-commerce",
     tags=["reseller-bot-wallet-topups"],
 )
+
+logger = logging.getLogger(__name__)
+PENDING_PAYMENT_TTL = timedelta(minutes=30)
 
 
 class RejectTopupIn(BaseModel):
@@ -143,6 +153,153 @@ def _topup_out(
     }
 
 
+def _remove_receipt(row: CustomerWalletTopup) -> None:
+    path = _local_path(str(row.receipt_file_marker or ""))
+    if path is None:
+        return
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        logger.warning("failed to remove stale wallet topup receipt: %s", path)
+
+
+def _cleanup_incomplete_topups(
+    db: Session,
+    reseller_id: int,
+    user_ids: list[int],
+) -> int:
+    """Remove abandoned pending_payment rows while preserving one fresh request per user."""
+    if not user_ids:
+        return 0
+
+    cutoff = datetime.utcnow() - PENDING_PAYMENT_TTL
+    prefix = f"reseller_card:{int(reseller_id)}:%"
+    rows = (
+        db.query(CustomerWalletTopup)
+        .filter(
+            CustomerWalletTopup.user_id.in_(user_ids),
+            CustomerWalletTopup.method.like(prefix),
+            CustomerWalletTopup.status == "pending_payment",
+        )
+        .order_by(
+            CustomerWalletTopup.user_id.asc(),
+            CustomerWalletTopup.id.desc(),
+        )
+        .all()
+    )
+
+    newest_by_user: dict[int, int] = {}
+    removed = 0
+    for row in rows:
+        user_id = int(row.user_id)
+        newest_id = newest_by_user.get(user_id)
+        if newest_id is None:
+            newest_by_user[user_id] = int(row.id)
+
+        keep_freshest = (
+            int(row.id) == newest_by_user[user_id]
+            and row.created_at is not None
+            and row.created_at >= cutoff
+        )
+        if keep_freshest:
+            continue
+
+        _remove_receipt(row)
+        db.delete(row)
+        removed += 1
+
+    if removed:
+        db.commit()
+    return removed
+
+
+def _notify_wallet_topup_status(
+    db: Session,
+    *,
+    reseller_id: int,
+    telegram_id: int,
+    topup_id: int,
+    amount_toman: int,
+    approved: bool,
+    balance_toman: int | None = None,
+    reason: str | None = None,
+) -> bool:
+    settings = (
+        db.query(ResellerBotSettings)
+        .filter(
+            ResellerBotSettings.reseller_id == int(reseller_id),
+            ResellerBotSettings.bot_token_encrypted.isnot(None),
+        )
+        .first()
+    )
+    if not settings or not settings.bot_token_encrypted:
+        return False
+
+    try:
+        token = decrypt_bot_token(settings.bot_token_encrypted)
+    except Exception:
+        logger.exception("wallet topup telegram token decrypt failed reseller=%s", reseller_id)
+        return False
+
+    if approved:
+        lines = [
+            "✅ <b>شارژ کیف پول تأیید شد.</b>",
+            "",
+            f"🧾 شماره درخواست: <b>#{int(topup_id)}</b>",
+            f"💰 مبلغ شارژ: <b>{int(amount_toman):,} تومان</b>",
+        ]
+        if balance_toman is not None:
+            lines.append(f"👛 موجودی جدید: <b>{int(balance_toman):,} تومان</b>")
+        lines.extend([
+            "",
+            "اکنون می‌توانید برای خرید یا تمدید اشتراک از کیف پول استفاده کنید.",
+        ])
+    else:
+        lines = [
+            "❌ <b>درخواست شارژ کیف پول رد شد.</b>",
+            "",
+            f"🧾 شماره درخواست: <b>#{int(topup_id)}</b>",
+            f"💰 مبلغ درخواست: <b>{int(amount_toman):,} تومان</b>",
+        ]
+        clean_reason = str(reason or "اطلاعات پرداخت تأیید نشد").strip()
+        if clean_reason:
+            lines.append(f"📝 دلیل: {clean_reason[:500]}")
+        lines.extend([
+            "",
+            "در صورت نیاز می‌توانید از بخش «کیف پول من» درخواست جدید ثبت کنید.",
+        ])
+
+    try:
+        timeout = httpx.Timeout(12.0, connect=5.0)
+        with httpx.Client(timeout=timeout, follow_redirects=False) as client:
+            response = client.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={
+                    "chat_id": int(telegram_id),
+                    "text": "\n".join(lines),
+                    "parse_mode": "HTML",
+                    "disable_web_page_preview": True,
+                },
+            )
+        if response.status_code != 200:
+            logger.warning(
+                "wallet topup telegram notify failed reseller=%s topup=%s status=%s",
+                reseller_id,
+                topup_id,
+                response.status_code,
+            )
+            return False
+        payload = response.json()
+        return bool(isinstance(payload, dict) and payload.get("ok") is True)
+    except Exception:
+        logger.exception(
+            "wallet topup telegram notify exception reseller=%s topup=%s",
+            reseller_id,
+            topup_id,
+        )
+        return False
+
+
 @router.get("/wallet-topups")
 def reseller_bot_wallet_topups(
     reseller: Reseller = Depends(require_reseller),
@@ -159,12 +316,15 @@ def reseller_bot_wallet_topups(
     if not user_ids:
         return []
 
+    _cleanup_incomplete_topups(db, int(reseller.id), user_ids)
+
     prefix = f"reseller_card:{int(reseller.id)}:%"
     rows = (
         db.query(CustomerWalletTopup)
         .filter(
             CustomerWalletTopup.user_id.in_(user_ids),
             CustomerWalletTopup.method.like(prefix),
+            CustomerWalletTopup.status != "pending_payment",
         )
         .order_by(CustomerWalletTopup.id.desc())
         .limit(500)
@@ -215,12 +375,9 @@ def approve_reseller_bot_wallet_topup(
     db: Session = Depends(get_db),
 ):
     row = _owned_topup(db, int(reseller.id), topup_id, lock=True)
+    link = _owned_link(db, int(reseller.id), int(row.user_id))
 
-    # Use the same reseller wallet prefix as manual adjustments so the existing
-    # scoped ledger automatically shows approved card-to-card top-ups.
-    reference = (
-        f"reseller-bot-wallet:{int(reseller.id)}:topup:{int(row.id)}"
-    )
+    reference = f"reseller-bot-wallet:{int(reseller.id)}:topup:{int(row.id)}"
     previous = (
         db.query(CustomerWalletTransaction)
         .filter(
@@ -234,20 +391,15 @@ def approve_reseller_bot_wallet_topup(
         return {
             **_topup_out(db, int(reseller.id), row),
             "duplicate": True,
+            "telegram_notified": None,
         }
 
     if str(row.status) != "awaiting_review":
-        raise HTTPException(
-            status_code=409,
-            detail="این درخواست آماده تأیید نیست",
-        )
+        raise HTTPException(status_code=409, detail="این درخواست آماده تأیید نیست")
 
     receipt_path = _local_path(str(row.receipt_file_marker or ""))
     if receipt_path is None or not receipt_path.is_file():
-        raise HTTPException(
-            status_code=409,
-            detail="عکس رسید برای این درخواست ثبت نشده است",
-        )
+        raise HTTPException(status_code=409, detail="عکس رسید برای این درخواست ثبت نشده است")
 
     wallet = _wallet(db, int(row.user_id), lock=True)
     db.flush()
@@ -275,10 +427,21 @@ def approve_reseller_bot_wallet_topup(
     db.commit()
     db.refresh(row)
 
+    notified = _notify_wallet_topup_status(
+        db,
+        reseller_id=int(reseller.id),
+        telegram_id=int(link.telegram_id),
+        topup_id=int(row.id),
+        amount_toman=int(row.amount_toman or 0),
+        approved=True,
+        balance_toman=int(wallet.balance_toman or 0),
+    )
+
     return {
         **_topup_out(db, int(reseller.id), row),
         "duplicate": previous is not None,
         "balance_toman": int(wallet.balance_toman or 0),
+        "telegram_notified": notified,
     }
 
 
@@ -290,6 +453,7 @@ def reject_reseller_bot_wallet_topup(
     db: Session = Depends(get_db),
 ):
     row = _owned_topup(db, int(reseller.id), topup_id, lock=True)
+    link = _owned_link(db, int(reseller.id), int(row.user_id))
     if str(row.status) == "approved":
         raise HTTPException(status_code=409, detail="درخواست تأییدشده قابل رد نیست")
     if str(row.status) not in {"awaiting_review", "pending_payment"}:
@@ -300,4 +464,18 @@ def reject_reseller_bot_wallet_topup(
     row.review_note = str(payload.reason or "").strip()[:1000] or "رد توسط نماینده"
     db.commit()
     db.refresh(row)
-    return _topup_out(db, int(reseller.id), row)
+
+    notified = _notify_wallet_topup_status(
+        db,
+        reseller_id=int(reseller.id),
+        telegram_id=int(link.telegram_id),
+        topup_id=int(row.id),
+        amount_toman=int(row.amount_toman or 0),
+        approved=False,
+        reason=row.review_note,
+    )
+
+    return {
+        **_topup_out(db, int(reseller.id), row),
+        "telegram_notified": notified,
+    }
