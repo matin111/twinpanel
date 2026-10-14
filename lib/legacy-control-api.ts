@@ -72,6 +72,37 @@ export type SystemHealth=RuntimeRow&{
 
 export type CoreProtocolsResponse={ok?:boolean;protocols:Record<string,RuntimeRow>};
 export type TunnelTransportsResponse=RuntimeRow&{transports?:RuntimeRow[]};
+export type TunnelServiceConnection={
+  protocol:string;
+  profile:string;
+  title:string;
+  public_port?:number|null;
+  target_port?:number|null;
+  transport?:string;
+  available?:boolean;
+  healthy?:boolean|null;
+  health_reason?:string|null;
+};
+export type TunnelServiceConnectionsResponse=RuntimeRow&{
+  tunnel_id:number;
+  iran_node_id:number;
+  exit_node_id:number;
+  exit_node?:string;
+  tunnel_status?:string;
+  tunnel_enabled?:boolean;
+  mode?:string;
+  active_transport?:string;
+  preferred_transport?:string;
+  route_active?:boolean;
+  connections:TunnelServiceConnection[];
+  xray_health?:{
+    ok?:boolean|null;
+    service_active?:boolean|null;
+    tls_enabled?:boolean|null;
+    tls_domain_configured?:boolean|null;
+    error?:string|null;
+  };
+};
 export type ManagedTunnelCreateResponse={
   ok:boolean;
   complete:boolean;
@@ -157,6 +188,7 @@ export const legacyControlApi={
   prepareTunnel:(id:number)=>requestWithTimeout<AdminTunnel>(`/v1/tunnels/${id}/prepare`,{method:"POST"},150000),
   tunnelHealth:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/health`),
   tunnelTransports:(id:number)=>request<TunnelTransportsResponse>(`/v1/tunnels/${id}/transports`),
+  tunnelServiceConnections:(id:number)=>request<TunnelServiceConnectionsResponse>(`/v1/tunnels/${id}/service-connections`),
   setTunnelTransportMode:async(id:number,payload:{mode:string;transport?:string|null})=>{
     if(
       managedAutoCreateCache.has(id)
