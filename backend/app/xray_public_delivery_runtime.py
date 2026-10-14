@@ -17,17 +17,17 @@ from .routers import account_delivery, public_connection_v3
 #
 # Modern credentials already carry item.profiles[] with a dedicated URI for
 # WebSocket TLS / XHTTP REALITY / HTTPUpgrade TLS / gRPC REALITY. V3 keeps one
-# server/country tab per Xray node and renders all profiles for that node inside
-# the same server view. This avoids duplicated country tabs while preserving the
-# existing public page, credential material, QR generation and legacy fallback.
+# server/country tab per Xray node and renders the customer-safe profiles for
+# that node inside the same server view. For Iran-facing delivery WebSocket TLS
+# is preferred, XHTTP REALITY is the fallback, and gRPC is intentionally hidden
+# from the customer page. Internal listeners/routes are not removed by this UI
+# runtime, so operational rollback remains possible without reprovisioning.
 #
 # Production also calls xray_node_domain_runtime on every API start. Once the
 # xray_domain column already exists, running ALTER TABLE ... IF NOT EXISTS again
 # is unnecessary and can block startup while PostgreSQL waits for an ACCESS
-# EXCLUSIVE lock. A previous guard used SQLAlchemy inspector.get_columns(), but
-# that metadata inspection itself can queue behind an already-waiting ALTER.
-# The V2+ guard therefore checks pg_catalog directly without requesting a lock
-# on the nodes relation. Existing installs with xray_domain skip the ALTER.
+# EXCLUSIVE lock. The V2+ guard checks pg_catalog directly without requesting a
+# relation lock. Existing installs with xray_domain skip the ALTER entirely.
 
 _runtime_applied = False
 _original_connection_views = public_connection_v3.connection_views
@@ -39,6 +39,17 @@ _PROFILE_LABELS = {
     "httpupgrade_tls": "HTTPUpgrade TLS",
     "grpc_reality": "gRPC Reality",
 }
+
+# Customer delivery policy for restricted Iranian networks.
+# Keep the list intentionally short and stable:
+#   1. WebSocket TLS when a dedicated Xray domain/certificate is ready.
+#   2. XHTTP REALITY as the no-domain / fallback profile.
+# gRPC is deliberately not exposed to end users.
+_PUBLIC_PROFILE_ORDER = (
+    "websocket_tls",
+    "xhttp_reality",
+)
+_PUBLIC_PROFILE_IDS = set(_PUBLIC_PROFILE_ORDER)
 
 
 def _nodes_schema_state() -> tuple[bool, bool]:
@@ -71,22 +82,15 @@ def _nodes_schema_state() -> tuple[bool, bool]:
 def _ensure_domain_schema_without_redundant_alter() -> None:
     nodes_exists, xray_domain_exists = _nodes_schema_state()
 
-    # Fresh installations are handled by metadata/create_all later in startup.
     if not nodes_exists:
         return
 
     if xray_domain_exists:
         return
 
-    # Older databases that genuinely do not have the column keep the historical
-    # migration path. The important production case is the already-upgraded DB,
-    # which now avoids both ALTER TABLE and relation-locking metadata inspection.
     return _original_domain_schema_ensure()
 
 
-# This module is imported by self_hosted_runtime before
-# apply_xray_node_domain_runtime() executes, so the guarded implementation is
-# already active when startup reaches the schema check.
 xray_node_domain_runtime._ensure_database_column = (
     _ensure_domain_schema_without_redundant_alter
 )
@@ -158,14 +162,57 @@ def _profile_delivery_item(
     return entry
 
 
+def _customer_profiles(item: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_profiles = item.get("profiles")
+
+    if not isinstance(raw_profiles, list):
+        return []
+
+    by_id: dict[str, dict[str, Any]] = {}
+
+    for raw_profile in raw_profiles:
+        if not isinstance(raw_profile, dict):
+            continue
+
+        profile = dict(raw_profile)
+        profile_id = str(profile.get("id") or "").strip().lower()
+
+        if profile_id not in _PUBLIC_PROFILE_IDS:
+            continue
+
+        if not str(profile.get("uri") or "").strip():
+            continue
+
+        by_id[profile_id] = profile
+
+    return [
+        by_id[profile_id]
+        for profile_id in _PUBLIC_PROFILE_ORDER
+        if profile_id in by_id
+    ]
+
+
 def _xray_server_body(
     item: dict[str, Any],
     server_name: str,
     server_index: int,
 ) -> str:
-    profiles = item.get("profiles")
+    profiles = _customer_profiles(item)
 
-    if not isinstance(profiles, list) or not profiles:
+    if not profiles:
+        # A modern credential may currently contain only a hidden transport
+        # (for example gRPC) while TLS/domain is still being prepared. Do not
+        # fall back to exposing that hidden transport. If this is a true legacy
+        # credential with no profiles[] at all, preserve the historical card.
+        raw_profiles = item.get("profiles")
+        if isinstance(raw_profiles, list):
+            return (
+                '<div class="empty-state">'
+                'WebSocket TLS هنوز برای این سرور آماده نشده است. '
+                'XHTTP نیز در حال حاضر در دسترس نیست.'
+                '</div>'
+            )
+
         return public_connection_v3.v2ray_card(
             server_index,
             server_name,
@@ -174,11 +221,7 @@ def _xray_server_body(
 
     cards: list[str] = []
 
-    for profile_index, raw_profile in enumerate(profiles):
-        if not isinstance(raw_profile, dict):
-            continue
-
-        profile = dict(raw_profile)
+    for profile_index, profile in enumerate(profiles):
         entry = _profile_delivery_item(item, profile)
 
         if entry is None:
@@ -193,14 +236,8 @@ def _xray_server_body(
         )
 
     if not cards:
-        return public_connection_v3.v2ray_card(
-            server_index,
-            server_name,
-            item,
-        )
+        return '<div class="empty-state">پروفایل قابل استفاده Xray آماده نیست.</div>'
 
-    # Keep the page's existing delivery-card design. Only layout is added here:
-    # all transports for one country/node are visible together inside one tab.
     return (
         '<div style="display:grid;'
         'grid-template-columns:repeat(auto-fit,minmax(290px,1fr));'
@@ -273,9 +310,6 @@ def apply_xray_public_delivery_runtime() -> None:
     if _runtime_applied:
         return
 
-    # public_connection_v3 imported _public_payload before Modern Xray patched
-    # account_delivery. Rebind it to the final runtime function so nested
-    # profile QR codes and live endpoints are included on public share pages.
     public_connection_v3._public_payload = account_delivery._public_payload
     public_connection_v3.connection_views = _connection_views_modern_xray
 
@@ -284,6 +318,7 @@ def apply_xray_public_delivery_runtime() -> None:
     print(
         "TWINPANEL_XRAY_PUBLIC_DELIVERY_RUNTIME_V3_ACTIVE "
         "server_tabs_grouped=1 profile_cards_together=1 "
+        "websocket_first=1 xhttp_fallback=1 grpc_customer_hidden=1 "
         "dynamic_public_payload=1 legacy_fallback=1 "
         "domain_schema_catalog_guard=1",
         flush=True,
