@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from html import escape
+import os
 import secrets
 
 from aiogram import F, Router
@@ -21,6 +22,12 @@ from .database import SessionLocal
 from .models_reseller import ResellerPaymentMethod
 from .reseller_bot_runtime import linked_user
 from .routers.customer_wallet import _wallet
+from .routers.payment_receipts_local import (
+    MAX_RECEIPT_BYTES,
+    RECEIPT_ROOT,
+    _ensure_receipt_root,
+    _local_path,
+)
 
 
 class ResellerBotWalletTopupState(StatesGroup):
@@ -319,24 +326,69 @@ def build_wallet_menu_router(reseller_id: int) -> Router:
                 lines.extend(["شماره شبا:", f"<code>{escape(str(method.iban))}</code>"])
             if method.instructions:
                 lines.extend(["", escape(str(method.instructions))])
-            lines.extend(["", "بعد از واریز، <b>کد پیگیری</b> را همین‌جا ارسال کنید."])
+            lines.extend([
+                "",
+                "بعد از واریز، <b>عکس رسید پرداخت</b> را همین‌جا ارسال کنید.",
+                "اگر کد پیگیری دارید می‌توانید آن را در کپشن عکس بنویسید.",
+            ])
             await message.answer("\n".join(lines))
         finally:
             db.close()
 
-    @router.message(ResellerBotWalletTopupState.tracking)
-    async def wallet_topup_tracking(message: Message, state: FSMContext):
-        tracking = str(message.text or "").strip()
-        if len(tracking) < 3 or len(tracking) > 180:
-            await message.answer("کد پیگیری معتبر ارسال کنید.")
-            return
-
+    @router.message(ResellerBotWalletTopupState.tracking, F.photo)
+    async def wallet_topup_receipt_photo(message: Message, state: FSMContext):
         data = await state.get_data()
         topup_id = int(data.get("wallet_topup_id") or 0)
+        photo = message.photo[-1] if message.photo else None
+        if not photo or topup_id <= 0:
+            await message.answer("لطفاً عکس رسید پرداخت را ارسال کنید.")
+            return
+
+        if photo.file_size and int(photo.file_size) > MAX_RECEIPT_BYTES:
+            await message.answer("حجم عکس رسید نباید بیشتر از ۱۲ مگابایت باشد.")
+            return
+
         db = SessionLocal()
         try:
             user = linked_user(db, reseller_id, int(message.from_user.id))
             if not user:
+                await state.clear()
+                await message.answer("ابتدا /start را ارسال کنید.")
+                return
+        finally:
+            db.close()
+
+        _ensure_receipt_root()
+        filename = (
+            f"wallet-topup-{topup_id}-tg-"
+            f"{secrets.token_hex(12)}.jpg"
+        )
+        destination = (RECEIPT_ROOT / filename).resolve()
+
+        try:
+            await message.bot.download(photo, destination=destination)
+            if not destination.is_file() or destination.stat().st_size <= 0:
+                raise OSError("empty receipt file")
+            if destination.stat().st_size > MAX_RECEIPT_BYTES:
+                destination.unlink(missing_ok=True)
+                await message.answer("حجم عکس رسید نباید بیشتر از ۱۲ مگابایت باشد.")
+                return
+            os.chmod(destination, 0o640)
+        except Exception:
+            destination.unlink(missing_ok=True)
+            await message.answer("ذخیره عکس رسید ناموفق بود؛ لطفاً دوباره ارسال کنید.")
+            return
+
+        caption = str(message.caption or "").strip()
+        if len(caption) > 180:
+            caption = caption[:180]
+
+        db = SessionLocal()
+        previous = None
+        try:
+            user = linked_user(db, reseller_id, int(message.from_user.id))
+            if not user:
+                destination.unlink(missing_ok=True)
                 await state.clear()
                 await message.answer("ابتدا /start را ارسال کنید.")
                 return
@@ -351,11 +403,15 @@ def build_wallet_menu_router(reseller_id: int) -> Router:
                 .first()
             )
             if not row or str(row.status) != "pending_payment":
+                destination.unlink(missing_ok=True)
                 await state.clear()
                 await message.answer("درخواست شارژ قابل ثبت نیست.")
                 return
 
-            row.tracking_code = tracking
+            previous = _local_path(str(row.receipt_file_marker or ""))
+            row.receipt_file_marker = f"local:{filename}"
+            if caption:
+                row.tracking_code = caption
             row.status = "awaiting_review"
             row.submitted_at = datetime.utcnow()
             row.rejected_at = None
@@ -363,14 +419,27 @@ def build_wallet_menu_router(reseller_id: int) -> Router:
             db.commit()
             await state.clear()
 
+            if previous and previous != destination:
+                try:
+                    previous.unlink(missing_ok=True)
+                except OSError:
+                    pass
+
             await message.answer(
-                "✅ <b>درخواست شارژ ثبت شد.</b>\n\n"
+                "✅ <b>عکس رسید دریافت شد و درخواست شارژ ثبت شد.</b>\n\n"
                 f"شماره درخواست: <b>#{int(row.id)}</b>\n"
                 f"مبلغ شارژ: <b>{int(row.amount_toman or 0):,} تومان</b>\n"
-                "پس از تأیید نماینده، موجودی کیف پول به‌صورت خودکار افزایش می‌یابد.",
+                "پس از بررسی و تأیید نماینده، موجودی کیف پول به‌صورت خودکار افزایش می‌یابد.",
                 reply_markup=wallet_main_keyboard(),
             )
         finally:
             db.close()
+
+    @router.message(ResellerBotWalletTopupState.tracking)
+    async def wallet_topup_receipt_required(message: Message):
+        await message.answer(
+            "📸 برای ثبت شارژ باید <b>عکس رسید پرداخت</b> را ارسال کنید.\n"
+            "کد پیگیری به‌تنهایی کافی نیست."
+        )
 
     return router
