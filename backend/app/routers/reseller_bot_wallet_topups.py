@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+import mimetypes
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -16,6 +18,7 @@ from ..models import User
 from ..models_reseller import Reseller, ResellerPaymentMethod
 from ..reseller_telegram_models import ResellerTelegramLink
 from .customer_wallet import _wallet
+from .payment_receipts_local import ALLOWED_TYPES, _local_path
 
 
 router = APIRouter(
@@ -126,6 +129,7 @@ def _topup_out(
         "payable_amount_toman": int(row.payable_amount_toman or 0),
         "status": str(row.status or ""),
         "tracking_code": row.tracking_code,
+        "receipt_uploaded": bool(row.receipt_file_marker),
         "review_note": row.review_note,
         "created_at": row.created_at,
         "submitted_at": row.submitted_at,
@@ -169,6 +173,41 @@ def reseller_bot_wallet_topups(
     return [_topup_out(db, int(reseller.id), row) for row in rows]
 
 
+@router.get("/wallet-topups/{topup_id}/receipt")
+def reseller_bot_wallet_topup_receipt(
+    topup_id: int,
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    row = _owned_topup(db, int(reseller.id), topup_id)
+    local_path = _local_path(str(row.receipt_file_marker or ""))
+    if local_path is None or not local_path.is_file():
+        raise HTTPException(status_code=404, detail="رسید آپلود نشده است")
+
+    try:
+        content = local_path.read_bytes()
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail="خواندن فایل رسید ناموفق بود") from exc
+
+    if not content:
+        raise HTTPException(status_code=404, detail="فایل رسید خالی است")
+
+    content_type = mimetypes.guess_type(local_path.name)[0] or "application/octet-stream"
+    if content_type not in ALLOWED_TYPES:
+        raise HTTPException(status_code=415, detail="نوع فایل رسید پشتیبانی نمی‌شود")
+
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={
+            "Cache-Control": "private, no-store, max-age=0",
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Disposition": "inline",
+        },
+    )
+
+
 @router.post("/wallet-topups/{topup_id}/approve")
 def approve_reseller_bot_wallet_topup(
     topup_id: int,
@@ -201,6 +240,13 @@ def approve_reseller_bot_wallet_topup(
         raise HTTPException(
             status_code=409,
             detail="این درخواست آماده تأیید نیست",
+        )
+
+    receipt_path = _local_path(str(row.receipt_file_marker or ""))
+    if receipt_path is None or not receipt_path.is_file():
+        raise HTTPException(
+            status_code=409,
+            detail="عکس رسید برای این درخواست ثبت نشده است",
         )
 
     wallet = _wallet(db, int(row.user_id), lock=True)
