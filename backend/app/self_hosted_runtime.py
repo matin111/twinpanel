@@ -12,6 +12,9 @@ from . import xray_modern_runtime
 from .xray_modern_repair_runtime import (
     apply_xray_modern_repair_runtime,
 )
+from .xray_modern_temp_config_runtime import (
+    apply_xray_modern_temp_config_runtime,
+)
 
 
 _original_install_or_upgrade_agent = provision._install_or_upgrade_agent
@@ -92,6 +95,10 @@ def apply_self_hosted_runtime() -> None:
         xray_modern_runtime.PROFILE_HTTPUPGRADE
     ]["public_base"] = 27000
 
+    # Xray 26.x derives config format from the file suffix. Keep the V2 core
+    # untouched and apply the production compatibility shim before Modern and
+    # Repair hooks are activated, so every candidate config ends in `.json`.
+    apply_xray_modern_temp_config_runtime()
     xray_modern_runtime.apply_xray_modern_runtime()
     apply_xray_modern_repair_runtime()
 
