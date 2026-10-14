@@ -47,6 +47,7 @@ import "./store-admin.css";
 import "./store-real-guides-v4.css";
 import "./customer-shell-final.css";
 import "./admin-shell-final.css";
+import "./storefront-polish-v5.css";
 
 export const metadata:Metadata={title:"VPN Control 2027",description:"VPN management control panel"};
 
