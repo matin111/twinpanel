@@ -3,6 +3,7 @@
 import {FormEvent,useEffect,useMemo,useState} from "react";
 import {Badge,Card,Stat} from "./ui";
 import {PortalShell} from "./portal-shells";
+import {ResellerBotWalletTopupReview} from "./reseller-bot-wallet-topup-review";
 import {resellerApi,ResellerRow} from "../lib/reseller-runtime-api";
 import {useI18n} from "../lib/i18n";
 
@@ -96,6 +97,8 @@ export function ResellerBotWalletRuntime(){
         <Stat label={pick("دارای موجودی","Funded wallets")} value={String(funded)}/>
         <Stat label={pick("مجموع موجودی","Total balance")} value={money(totalBalance)}/>
       </div>
+
+      <ResellerBotWalletTopupReview/>
 
       <Card>
         <div className="card-head"><div><b>{pick("کیف پول کاربران ربات","Bot customer wallets")}</b><small>{pick("فقط کاربرانی نمایش داده می‌شوند که با ربات همین نمایندگی /start زده‌اند.","Only users linked to this reseller bot are shown.")}</small></div><Badge tone="violet">{filtered.length}</Badge></div>
