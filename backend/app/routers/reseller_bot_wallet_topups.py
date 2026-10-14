@@ -28,13 +28,13 @@ class RejectTopupIn(BaseModel):
     reason: str = Field(default="", max_length=1000)
 
 
-def _method_id(row: CustomerWalletTopup) -> int | None:
-    value = str(row.method or "")
-    prefix = "reseller_card:"
-    if not value.startswith(prefix):
+def _method_parts(row: CustomerWalletTopup) -> tuple[int, int] | None:
+    parts = str(row.method or "").split(":")
+    if len(parts) != 3 or parts[0] != "reseller_card":
         return None
-    raw = value[len(prefix):]
-    return int(raw) if raw.isdigit() else None
+    if not parts[1].isdigit() or not parts[2].isdigit():
+        return None
+    return int(parts[1]), int(parts[2])
 
 
 def _owned_link(
@@ -71,15 +71,15 @@ def _owned_topup(
     if lock:
         query = query.with_for_update()
     row = query.first()
-    method_id = _method_id(row) if row else None
-    if not row or method_id is None:
+    parts = _method_parts(row) if row else None
+    if not row or not parts or int(parts[0]) != int(reseller_id):
         raise HTTPException(status_code=404, detail="درخواست شارژ پیدا نشد")
 
     _owned_link(db, reseller_id, int(row.user_id))
     method = (
         db.query(ResellerPaymentMethod)
         .filter(
-            ResellerPaymentMethod.id == int(method_id),
+            ResellerPaymentMethod.id == int(parts[1]),
             ResellerPaymentMethod.reseller_id == int(reseller_id),
         )
         .first()
@@ -107,7 +107,8 @@ def _topup_out(
         .first()
     )
     user = db.get(User, int(row.user_id))
-    method_id = _method_id(row)
+    parts = _method_parts(row)
+    method_id = int(parts[1]) if parts and int(parts[0]) == int(reseller_id) else None
     method = None
     if method_id:
         method = (
@@ -143,34 +144,28 @@ def reseller_bot_wallet_topups(
     reseller: Reseller = Depends(require_reseller),
     db: Session = Depends(get_db),
 ):
-    links = (
-        db.query(ResellerTelegramLink)
-        .filter(ResellerTelegramLink.reseller_id == int(reseller.id))
-        .all()
-    )
-    user_ids = [int(row.user_id) for row in links]
+    user_ids = [
+        int(row[0])
+        for row in (
+            db.query(ResellerTelegramLink.user_id)
+            .filter(ResellerTelegramLink.reseller_id == int(reseller.id))
+            .all()
+        )
+    ]
     if not user_ids:
         return []
 
-    method_ids = {
-        int(row.id)
-        for row in (
-            db.query(ResellerPaymentMethod)
-            .filter(ResellerPaymentMethod.reseller_id == int(reseller.id))
-            .all()
-        )
-    }
+    prefix = f"reseller_card:{int(reseller.id)}:%"
     rows = (
         db.query(CustomerWalletTopup)
         .filter(
             CustomerWalletTopup.user_id.in_(user_ids),
-            CustomerWalletTopup.method.like("reseller_card:%"),
+            CustomerWalletTopup.method.like(prefix),
         )
         .order_by(CustomerWalletTopup.id.desc())
         .limit(500)
         .all()
     )
-    rows = [row for row in rows if (_method_id(row) or 0) in method_ids]
     return [_topup_out(db, int(reseller.id), row) for row in rows]
 
 
@@ -182,7 +177,11 @@ def approve_reseller_bot_wallet_topup(
 ):
     row = _owned_topup(db, int(reseller.id), topup_id, lock=True)
 
-    reference = f"reseller-bot-wallet-topup:{int(reseller.id)}:{int(row.id)}"
+    # Use the same reseller wallet prefix as manual adjustments so the existing
+    # scoped ledger automatically shows approved card-to-card top-ups.
+    reference = (
+        f"reseller-bot-wallet:{int(reseller.id)}:topup:{int(row.id)}"
+    )
     previous = (
         db.query(CustomerWalletTransaction)
         .filter(
