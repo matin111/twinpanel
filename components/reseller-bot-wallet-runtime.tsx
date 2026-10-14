@@ -6,18 +6,17 @@ import {PortalShell} from "./portal-shells";
 import {ResellerBotWalletTopupReview} from "./reseller-bot-wallet-topup-review";
 import {resellerApi,ResellerRow} from "../lib/reseller-runtime-api";
 import {useI18n} from "../lib/i18n";
+import {resellerDate,resellerMoney,resellerType} from "../lib/reseller-i18n";
 
 const str=(row:ResellerRow,...keys:string[])=>{for(const key of keys){const value=row?.[key];if(value!==undefined&&value!==null)return String(value);}return "";};
 const num=(row:ResellerRow,...keys:string[])=>{const value=Number(str(row,...keys).replace(/[,٬]/g,"")||0);return Number.isFinite(value)?value:0;};
-const money=(value:number)=>`${Number(value||0).toLocaleString("fa-IR")} تومان`;
-const dateText=(value:unknown)=>{if(!value)return "—";const d=new Date(String(value));return Number.isNaN(d.getTime())?String(value):d.toLocaleString("fa-IR");};
 const idempotency=()=>`bot-wallet-${Date.now()}-${Math.random().toString(36).slice(2,12)}`;
 
 function Notice({error,ok}:{error:string;ok:string}){return <>{error&&<div className="runtime-error">{error}</div>}{ok&&<div className="runtime-success">{ok}</div>}</>;}
 function Empty({children}:{children:React.ReactNode}){return <div className="runtime-empty">{children}</div>;}
 
 export function ResellerBotWalletRuntime(){
-  const {pick}=useI18n();
+  const {lang,pick}=useI18n();
   const [rows,setRows]=useState<ResellerRow[]>([]);
   const [transactions,setTransactions]=useState<ResellerRow[]>([]);
   const [selected,setSelected]=useState<ResellerRow|null>(null);
@@ -95,7 +94,7 @@ export function ResellerBotWalletRuntime(){
       <div className="stats">
         <Stat label={pick("کاربران ربات","Bot users")} value={String(rows.length)}/>
         <Stat label={pick("دارای موجودی","Funded wallets")} value={String(funded)}/>
-        <Stat label={pick("مجموع موجودی","Total balance")} value={money(totalBalance)}/>
+        <Stat label={pick("مجموع موجودی","Total balance")} value={resellerMoney(lang,totalBalance)}/>
       </div>
 
       <ResellerBotWalletTopupReview/>
@@ -103,11 +102,11 @@ export function ResellerBotWalletRuntime(){
       <Card>
         <div className="card-head"><div><b>{pick("کیف پول کاربران ربات","Bot customer wallets")}</b><small>{pick("فقط کاربرانی نمایش داده می‌شوند که با ربات همین نمایندگی /start زده‌اند.","Only users linked to this reseller bot are shown.")}</small></div><Badge tone="violet">{filtered.length}</Badge></div>
         <div className="runtime-toolbar reseller-order-toolbar"><label>⌕ <input value={q} onChange={e=>setQ(e.target.value)} placeholder={pick("جستجو با نام، یوزرنیم تلگرام یا شناسه...","Search name, Telegram username or ID...")}/></label></div>
-        <div className="table"><table><thead><tr><th>{pick("کاربر","User")}</th><th>Telegram</th><th>{pick("موجودی","Balance")}</th><th>{pick("آخرین فعالیت","Last seen")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map((row,index)=>{const userId=Number(row.user_id||0),username=str(row,"telegram_username");return <tr key={userId||index}><td><b>{str(row,"full_name","telegram_first_name")||`#${userId}`}</b><small dir="ltr">{str(row,"phone","email")||`User #${userId}`}</small></td><td><b dir="ltr">{username?`@${username.replace(/^@/,"")}`:"—"}</b><small dir="ltr">{str(row,"telegram_id")?`ID ${str(row,"telegram_id")}`:""}</small></td><td><b>{money(num(row,"balance_toman"))}</b></td><td>{dateText(row.last_seen_at)}</td><td><button className="mini-btn" type="button" onClick={()=>void openWallet(row)}>{pick("مدیریت کیف پول","Manage wallet")}</button></td></tr>})}</tbody></table></div>
+        <div className="table"><table><thead><tr><th>{pick("کاربر","User")}</th><th>Telegram</th><th>{pick("موجودی","Balance")}</th><th>{pick("آخرین فعالیت","Last seen")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map((row,index)=>{const userId=Number(row.user_id||0),username=str(row,"telegram_username");return <tr key={userId||index}><td><b>{str(row,"full_name","telegram_first_name")||`#${userId}`}</b><small dir="ltr">{str(row,"phone","email")||`${pick("کاربر","User")} #${userId}`}</small></td><td><b dir="ltr">{username?`@${username.replace(/^@/,"")}`:"—"}</b><small dir="ltr">{str(row,"telegram_id")?`ID ${str(row,"telegram_id")}`:""}</small></td><td><b>{resellerMoney(lang,num(row,"balance_toman"))}</b></td><td>{resellerDate(lang,row.last_seen_at)}</td><td><button className="mini-btn" type="button" onClick={()=>void openWallet(row)}>{pick("مدیریت کیف پول","Manage wallet")}</button></td></tr>})}</tbody></table></div>
         {!filtered.length&&<Empty>{pick("هنوز کاربری به ربات این نمایندگی متصل نشده است.","No user has linked to this reseller bot yet.")}</Empty>}
       </Card>
 
-      {selected&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>!busy&&setSelected(null)}/><div className="runtime-modal-card reseller-sub-modal"><div className="card-head"><div><b>{pick("مدیریت کیف پول","Manage wallet")}</b><small>{str(selected,"full_name","telegram_first_name")||`#${str(selected,"user_id")}`} · {money(num(selected,"balance_toman"))}</small></div><button className="icon-button" type="button" onClick={()=>setSelected(null)}>×</button></div>
+      {selected&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>!busy&&setSelected(null)}/><div className="runtime-modal-card reseller-sub-modal"><div className="card-head"><div><b>{pick("مدیریت کیف پول","Manage wallet")}</b><small>{str(selected,"full_name","telegram_first_name")||`#${str(selected,"user_id")}`} · {resellerMoney(lang,num(selected,"balance_toman"))}</small></div><button className="icon-button" type="button" onClick={()=>setSelected(null)}>×</button></div>
         <form onSubmit={submit}>
           <div className="setting-grid">
             <label className="field"><span>{pick("نوع عملیات","Operation")}</span><select value={mode} onChange={e=>setMode(e.target.value as "credit"|"debit")}><option value="credit">{pick("افزایش موجودی","Credit")}</option><option value="debit">{pick("کاهش موجودی","Debit")}</option></select></label>
@@ -119,7 +118,7 @@ export function ResellerBotWalletRuntime(){
         </form>
 
         <div className="card-head"><div><b>{pick("آخرین تراکنش‌های همین ربات","This bot's recent transactions")}</b><small>{pick("خریدهای کیف پول این نمایندگی و تغییرات دستی همین نماینده نمایش داده می‌شوند.","Only this reseller bot's wallet purchases and manual adjustments are shown.")}</small></div><Badge tone="violet">{transactions.length}</Badge></div>
-        <div className="table"><table><thead><tr><th>ID</th><th>{pick("مبلغ","Amount")}</th><th>{pick("نوع","Type")}</th><th>{pick("توضیح","Description")}</th><th>{pick("زمان","Time")}</th></tr></thead><tbody>{transactions.map((tx,index)=>{const value=num(tx,"amount_toman");return <tr key={Number(tx.id||0)||index}><td>#{str(tx,"id")}</td><td><b dir="ltr">{value>0?"+":""}{money(value)}</b></td><td>{str(tx,"kind")||"—"}</td><td>{str(tx,"description")||"—"}</td><td>{dateText(tx.created_at)}</td></tr>})}</tbody></table></div>
+        <div className="table"><table><thead><tr><th>ID</th><th>{pick("مبلغ","Amount")}</th><th>{pick("نوع","Type")}</th><th>{pick("توضیح","Description")}</th><th>{pick("زمان","Time")}</th></tr></thead><tbody>{transactions.map((tx,index)=>{const value=num(tx,"amount_toman");return <tr key={Number(tx.id||0)||index}><td>#{str(tx,"id")}</td><td><b>{value>0?"+":""}{resellerMoney(lang,value)}</b></td><td>{resellerType(lang,str(tx,"kind"))}</td><td>{str(tx,"description")||"—"}</td><td>{resellerDate(lang,tx.created_at)}</td></tr>})}</tbody></table></div>
         {!transactions.length&&!busy&&<Empty>{pick("تراکنشی برای این ربات ثبت نشده است.","No transaction has been recorded for this bot wallet.")}</Empty>}
       </div></div>}
     </div>
