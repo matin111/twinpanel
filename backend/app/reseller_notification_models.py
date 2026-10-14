@@ -176,3 +176,9 @@ class ResellerExpiryTelegramDelivery(
         default=_ResellerExpiryDatetime.utcnow,
         nullable=False,
     )
+
+
+# Register receipt listeners only after the notification models above exist.
+# The listener module imports ResellerNotification, so this intentionally lives
+# at the end of this module to avoid a circular import before class creation.
+from . import reseller_receipt_notifications as _reseller_receipt_notifications  # noqa: E402,F401
