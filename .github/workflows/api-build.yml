@@ -93,6 +93,7 @@ jobs:
         run: |
           python - <<'PY'
           from app.main import app
+          from app import xray_modern_runtime
           from app.routers import nodes, provision, tunnels
 
           assert tunnels._install_or_upgrade_agent.__module__ == "app.self_hosted_runtime"
@@ -100,8 +101,14 @@ jobs:
           assert provision.existing_ok.__module__ == "app.xray_modern_runtime"
           assert provision.provision_protocols.__module__ == "app.xray_modern_repair_runtime"
           assert hasattr(nodes, "Path")
+
+          state_script = xray_modern_runtime._state_generator_script("")
+          assert "passwordpublickey" in state_script
+          assert "if ch.isalnum()" in state_script
+
           print("SELF_HOSTED_RUNTIME_OK", app.title)
           print("XRAY_MODERN_RUNTIME_HOOKS_OK")
+          print("XRAY_REALITY_KEY_PARSER_COMPAT_OK")
           PY
 
       - name: Bootstrap admin
