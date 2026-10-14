@@ -33,6 +33,7 @@ const resellerMenu:MenuItem[]=[
   ["ساخت اشتراک","Create Subscription","/reseller/subscriptions","subscription"],
   ["پلن‌های ربات","Bot Plans","/reseller/sales","payments"],
   ["کیف پول و شارژ","Wallet & Top-up","/reseller/wallet","wallet"],
+  ["کیف پول ربات","Bot Wallet","/reseller/bot-wallet","wallet"],
   ["خرید و شارژ حجم","Traffic Recharge","/reseller/traffic","cart"],
   ["سفارش‌ها","Orders","/reseller/orders","orders"],
   ["کدهای تخفیف","Discounts","/reseller/discounts","payments"],
