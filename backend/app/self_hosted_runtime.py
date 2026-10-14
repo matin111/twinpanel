@@ -15,6 +15,9 @@ from .xray_modern_repair_runtime import (
 from .xray_modern_temp_config_runtime import (
     apply_xray_modern_temp_config_runtime,
 )
+from .xray_node_domain_runtime import (
+    apply_xray_node_domain_runtime,
+)
 from .tunnel_service_connections_admin_runtime import (
     apply_tunnel_service_connections_admin_runtime,
 )
@@ -104,6 +107,11 @@ def apply_self_hosted_runtime() -> None:
     apply_xray_modern_temp_config_runtime()
     xray_modern_runtime.apply_xray_modern_runtime()
     apply_xray_modern_repair_runtime()
+
+    # Dedicated Xray domain is applied after every existing Modern/Repair shim
+    # so it composes with the exact production wrappers instead of replacing
+    # self-heal or JSON-temp behavior. Legacy public_domain remains a fallback.
+    apply_xray_node_domain_runtime()
 
     # Register the admin-only service-routing inventory after Xray Modern has
     # patched tunnels._service_routes_for_exit. The endpoint therefore reports
