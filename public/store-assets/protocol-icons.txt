@@ -1,0 +1,1 @@
+Cisco/OpenConnect, OpenVPN, WireGuard and V2Ray storefront cards use the previous-panel artwork hosted at movilineapp.com/learning/apps. L2TP/IPsec uses a local vector shield/lock mark because it has no single official client logo.
