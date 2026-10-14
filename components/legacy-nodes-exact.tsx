@@ -227,7 +227,7 @@ export function LegacyNodesRuntimePage(){
   };
 
   return <Shell active="/admin/nodes"><div className="page legacy-nodes-page">
-    <div className="page-head"><div><h1>{pick("نودها","Nodes")}</h1><small>{pick("مدیریت نود مطابق جریان پنل قدیمی؛ عملیات حساس فقط هنگام درخواست اجرا می‌شوند.","Legacy node workflow; sensitive operations run only on request.")}</small></div><Link href="/admin/provision" className="primary">＋ {pick("افزودن نود","Add node")}</Link></div>
+    <div className="page-head"><div><h1>{pick("نودها","Nodes")}</h1></div><Link href="/admin/provision" className="primary">＋ {pick("افزودن نود","Add node")}</Link></div>
     <Notice error={error} warning={warning} ok={ok}/>
     <div className="stats dashboard-stats"><Stat label={pick("کل نودها","Total nodes")} value={String(nodes.length)}/><Stat label={pick("آنلاین","Online")} value={String(nodes.filter(x=>s(x.status).toLowerCase()==="online").length)}/><Stat label={pick("ایران","Iran")} value={String(nodes.filter(x=>roleOf(x)==="iran").length)}/><Stat label={pick("خروجی","Exit")} value={String(nodes.filter(x=>roleOf(x)==="exit").length)}/></div>
 
