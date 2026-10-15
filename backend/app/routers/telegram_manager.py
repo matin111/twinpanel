@@ -39,12 +39,20 @@ PROJECT_DIR = Path(
     )
 ).resolve()
 
+# Keep the virtualenv path itself instead of resolving its interpreter symlink.
+# Resolving /opt/twinpanel/venv/bin/python3 could turn it into /usr/bin/python3
+# and make the bot lose the packages installed in the TwinPanel environment.
+LIVE_VENV_PYTHON = Path("/opt/twinpanel/venv/bin/python3")
 PYTHON_BIN = Path(
     os.getenv(
         "TWINPANEL_PYTHON_BIN",
-        sys.executable,
+        str(
+            LIVE_VENV_PYTHON
+            if LIVE_VENV_PYTHON.exists()
+            else Path(sys.executable)
+        ),
     )
-).resolve()
+)
 
 API_SERVICE_NAME = os.getenv(
     "TWINPANEL_API_SERVICE",
