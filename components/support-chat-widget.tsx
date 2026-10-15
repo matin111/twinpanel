@@ -4,6 +4,7 @@ import {FormEvent,useEffect,useRef,useState} from "react";
 import {API_BASE} from "../lib/api";
 import {useBranding} from "../lib/branding";
 import {useI18n} from "../lib/i18n";
+import {installSoundUnlock,playAdminAlert} from "../lib/admin-alert-sound";
 
 type ChatMessage={
   id:number;
@@ -34,6 +35,7 @@ type Props={customerToken?:string|null};
 
 const GUEST_STORAGE_KEY="twinpanel_guest_chat_v1";
 const GUEST_SESSION_BACKUP_KEY="twinpanel_guest_chat_session_v1";
+const GUEST_TICKET_CACHE_KEY="twinpanel_guest_chat_ticket_v2";
 const CUSTOMER_TOKEN_KEY="twinpanel_customer_token";
 const ALLOWED_IMAGES=new Set(["image/jpeg","image/png","image/webp","image/gif"]);
 const MAX_IMAGE_BYTES=5*1024*1024;
@@ -76,9 +78,18 @@ function saveGuestSession(value:GuestSession){
   try{window.sessionStorage.setItem(GUEST_SESSION_BACKUP_KEY,raw);}catch{}
 }
 
-function clearGuestSession(){
-  try{window.localStorage.removeItem(GUEST_STORAGE_KEY);}catch{}
-  try{window.sessionStorage.removeItem(GUEST_SESSION_BACKUP_KEY);}catch{}
+function loadCachedGuestTicket(ticketId:number):ChatTicket|null{
+  try{
+    const raw=window.localStorage.getItem(GUEST_TICKET_CACHE_KEY);
+    if(!raw)return null;
+    const parsed=JSON.parse(raw) as ChatTicket;
+    return Number(parsed?.id||0)===ticketId?parsed:null;
+  }catch{return null;}
+}
+
+function saveCachedGuestTicket(value:ChatTicket|null){
+  if(!value?.id)return;
+  try{window.localStorage.setItem(GUEST_TICKET_CACHE_KEY,JSON.stringify(value));}catch{}
 }
 
 async function chatApi<T>(path:string,options:RequestInit={},customerToken?:string|null):Promise<T>{
@@ -123,15 +134,37 @@ export function SupportChatWidget({customerToken}:Props){
   const fileRef=useRef<HTMLInputElement|null>(null);
   const messagesEndRef=useRef<HTMLDivElement|null>(null);
   const refreshBusy=useRef(false);
+  const lastAdminMessageId=useRef(0);
 
   useEffect(()=>{
+    installSoundUnlock();
     const path=window.location.pathname.replace(/\/$/,"")||"/";
     setVisible(path==="/"||path==="/store"||path==="/panel"||path.startsWith("/panel/"));
     const saved=loadGuestSession();
-    if(saved){setGuestSession(saved);setName(saved.name||"");setContact(saved.contact||"");}
+    if(!customerToken&&saved){
+      setGuestSession(saved);
+      setName(saved.name||"");
+      setContact(saved.contact||"");
+      const cached=loadCachedGuestTicket(saved.ticketId);
+      if(cached){setTicket(cached);setInitialized(true);}
+    }
     if(customerToken!==undefined){setResolvedToken(customerToken||null);return;}
     try{setResolvedToken(window.sessionStorage.getItem(CUSTOMER_TOKEN_KEY)||null);}catch{setResolvedToken(null);}
   },[customerToken]);
+
+  useEffect(()=>{
+    if(resolvedToken||!guestSession||!ticket)return;
+    saveGuestSession(guestSession);
+    saveCachedGuestTicket(ticket);
+  },[resolvedToken,guestSession,ticket]);
+
+  useEffect(()=>{
+    const rows=ticket?.messages||[];
+    const latest=rows.filter(item=>String(item.sender_role||"").toLowerCase()==="admin"&&item.id>0).reduce((max,item)=>Math.max(max,item.id),0);
+    if(!latest)return;
+    if(lastAdminMessageId.current===0){lastAdminMessageId.current=latest;return;}
+    if(latest>lastAdminMessageId.current){lastAdminMessageId.current=latest;playAdminAlert("customer_reply");}
+  },[ticket?.messages]);
 
   const scrollBottom=()=>window.setTimeout(()=>messagesEndRef.current?.scrollIntoView({behavior:"smooth",block:"end"}),50);
   const addEmoji=(emoji:string)=>{setDraft(value=>value+emoji);setEmojiOpen(false);};
@@ -139,7 +172,7 @@ export function SupportChatWidget({customerToken}:Props){
   const refresh=async(silent=false)=>{
     if(!visible||refreshBusy.current)return;
     refreshBusy.current=true;
-    if(!silent)setLoading(true);
+    if(!silent&&!ticket)setLoading(true);
     try{
       if(!silent)setError("");
       if(resolvedToken){
@@ -151,17 +184,19 @@ export function SupportChatWidget({customerToken}:Props){
       }
       const saved=guestSession??loadGuestSession();
       if(!saved){setGuestSession(null);setTicket(null);setInitialized(true);return;}
+      saveGuestSession(saved);
       setGuestSession(saved);setName(saved.name||"");setContact(saved.contact||"");
       try{
         const detail=await chatApi<ChatTicket>(`/v1/support/guest/tickets/${saved.ticketId}`,{headers:{"X-Guest-Chat-Token":saved.token}});
         saveGuestSession(saved);
-        setTicket(detail);setInitialized(true);if(!silent)scrollBottom();
+        saveCachedGuestTicket(detail);
+        setTicket(detail);setInitialized(true);setError("");if(!silent)scrollBottom();
       }catch(reason){
-        const status=reason instanceof ChatApiError?reason.status:0;
-        if(status===401||status===403||status===404||status===410){
-          clearGuestSession();setGuestSession(null);setTicket(null);
-        }else if(!silent){
-          setError(reason instanceof Error?reason.message:pick("دریافت گفتگو ناموفق بود","Could not load chat"));
+        const cached=loadCachedGuestTicket(saved.ticketId);
+        if(cached)setTicket(cached);
+        if(!silent){
+          const status=reason instanceof ChatApiError?reason.status:0;
+          setError(status===404||status===410?pick("گفتگوی قبلی ذخیره است و اتصال به سرور در حال بازیابی است.","Your previous chat is saved while the server connection is being restored."):reason instanceof Error?reason.message:pick("دریافت گفتگو ناموفق بود","Could not load chat"));
         }
         setInitialized(true);
       }
@@ -231,7 +266,9 @@ export function SupportChatWidget({customerToken}:Props){
       const session={ticketId:created.id,token:created.guest_token,name:name.trim(),contact:contact.trim()};
       saveGuestSession(session);setGuestSession(session);
       if(image){const next=await sendAttachmentMessage(created.id,session);if(next)created=next;}
-      setTicket({...created,guest_token:undefined});setDraft("");resetImage();scrollBottom();
+      const clean={...created,guest_token:undefined};
+      saveCachedGuestTicket(clean);
+      setTicket(clean);setDraft("");resetImage();setInitialized(true);scrollBottom();
     }catch(reason){setError(reason instanceof Error?reason.message:pick("شروع گفتگو ناموفق بود","Could not start chat"));}
     finally{setSending(false);}
   };
@@ -243,7 +280,11 @@ export function SupportChatWidget({customerToken}:Props){
     const previousDraft=draft;
     if(text&&!image){
       const optimistic:ChatMessage={id:-Date.now(),sender_role:resolvedToken?"user":"guest",message:text,created_at:new Date().toISOString()};
-      setTicket(current=>current?{...current,messages:[...(current.messages||[]),optimistic]}:current);
+      setTicket(current=>{
+        const next=current?{...current,messages:[...(current.messages||[]),optimistic]}:current;
+        if(next&&!resolvedToken)saveCachedGuestTicket(next);
+        return next;
+      });
       setDraft("");scrollBottom();
     }
     try{
@@ -256,6 +297,7 @@ export function SupportChatWidget({customerToken}:Props){
         }
       }
       if(image){const next=await sendAttachmentMessage(ticket.id,session);if(next)updated=next;}
+      if(!resolvedToken)saveCachedGuestTicket(updated);
       setTicket(updated);setDraft("");resetImage();scrollBottom();
     }catch(reason){
       if(text&&!image)setDraft(previousDraft);
@@ -279,8 +321,8 @@ export function SupportChatWidget({customerToken}:Props){
     {open&&<section className="supportChatWindow" aria-label={pick("پشتیبانی آنلاین","Live support")}>
       <header className="supportChatHeader"><div className="supportChatHeaderInfo"><span className="supportChatStatus"/><div><b>{pick("پشتیبانی آنلاین","Live support")}</b><small>{brand.name}</small></div></div><button type="button" className="supportChatClose" onClick={()=>{setOpen(false);setEmojiOpen(false);}}>×</button></header>
       <div className="supportChatBody">
-        {loading&&!initialized&&<div className="supportChatState">{pick("در حال دریافت گفتگو...","Loading chat...")}</div>}
-        {!loading&&initialized&&recoveringGuest&&<div className="supportChatState"><b>{pick("در حال بازیابی گفتگوی قبلی","Restoring your previous chat")}</b>{error&&<p className="supportChatError">{error}</p>}<button type="button" className="supportChatPrimary" onClick={()=>void refresh(false)}>{pick("تلاش دوباره","Retry")}</button></div>}
+        {loading&&!initialized&&!ticket&&<div className="supportChatState">{pick("در حال دریافت گفتگو...","Loading chat...")}</div>}
+        {!loading&&initialized&&recoveringGuest&&<div className="supportChatState"><b>{pick("گفتگوی قبلی شما محفوظ است","Your previous chat is محفوظ")}</b>{error&&<p className="supportChatError">{error}</p>}<button type="button" className="supportChatPrimary" onClick={()=>void refresh(false)}>{pick("تلاش دوباره","Retry")}</button></div>}
         {!loading&&initialized&&!ticket&&!recoveringGuest&&<form className="supportChatStart" onSubmit={startChat}>
           <h3>{pick("چطور می‌توانیم کمک کنیم؟","How can we help?")}</h3>
           {!resolvedToken&&<><label><span>{pick("نام","Name")}</span><input value={name} onChange={e=>setName(e.target.value)} placeholder={pick("نام شما","Your name")} maxLength={120} required/></label><label><span>{pick("ایمیل یا شماره تماس","Email or phone")}</span><input dir="ltr" value={contact} onChange={e=>setContact(e.target.value)} placeholder="email@example.com" maxLength={190} required/></label></>}
