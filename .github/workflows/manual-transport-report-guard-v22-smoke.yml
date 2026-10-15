@@ -13,6 +13,11 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
 
+    env:
+      APP_SECRET_KEY: manual-transport-v22-ci-secret-only
+      DATABASE_URL: sqlite:////tmp/twinpanel-manual-transport-v22.db
+      NODE_AGENT_SHARED_SECRET: manual-transport-v22-ci-node-secret
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
