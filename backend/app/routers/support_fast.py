@@ -6,14 +6,18 @@ from fastapi import Depends, HTTPException, Query, Header
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..deps import require_admin
 from ..models import User
 from ..support_models import SupportMessage, SupportTicket
+from ..telegram_notify_service import queue_telegram_notification
 from .support import (
     CATEGORIES,
     VALID_STATUSES,
+    MessageIn,
     _category,
     _guest_ticket,
     _message_out,
+    _require_content,
     _ticket_or_404,
     admin_router,
     router,
@@ -234,6 +238,67 @@ def admin_fast_ticket_messages(
         "status": row.status,
         "last_message_at": row.last_message_at,
         "messages": [_message_out(message) for message in messages],
+    }
+
+
+@admin_router.post("/fast/tickets/{ticket_id}/reply")
+def admin_fast_reply(
+    ticket_id: int,
+    payload: MessageIn,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    _require_content(payload)
+    row = _ticket_or_404(db, ticket_id)
+
+    if row.status == "closed":
+        raise HTTPException(status_code=409, detail="این تیکت بسته شده است")
+
+    from datetime import datetime
+
+    now = datetime.utcnow()
+    message = SupportMessage(
+        ticket_id=row.id,
+        sender_user_id=admin.id,
+        sender_role="admin",
+        source="admin",
+        message=(payload.message.strip() if payload.message else None),
+        attachment_type=payload.attachment_type,
+        attachment_ref=payload.attachment_ref,
+        created_at=now,
+    )
+
+    db.add(message)
+    row.status = "answered"
+    row.updated_at = now
+    row.last_message_at = now
+    db.flush()
+
+    try:
+        if row.user_id is not None:
+            queue_telegram_notification(
+                db,
+                user_id=row.user_id,
+                event_key=f"support-reply:{row.id}:{message.id}",
+                kind="support_reply",
+                payload={
+                    "ticket_id": row.id,
+                    "message": message.message or "",
+                    "attachment_type": message.attachment_type,
+                    "attachment_ref": message.attachment_ref,
+                },
+            )
+    except Exception as exc:
+        print("support fast telegram notify failed:", str(exc), flush=True)
+
+    db.commit()
+    db.refresh(message)
+
+    return {
+        "ticket_id": row.id,
+        "status": row.status,
+        "last_message_at": row.last_message_at,
+        "message": _message_out(message),
     }
 
 
