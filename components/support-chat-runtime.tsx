@@ -2,14 +2,13 @@
 
 import {useEffect,useState} from "react";
 import {getCustomerToken} from "../lib/customer-api";
-import {SupportChatWidget} from "./support-chat-widget";
+import {SupportChatWidgetV2} from "./support-chat-widget-v2";
 
 export function SupportChatRuntime(){
   const [token,setToken]=useState<string|null|undefined>(undefined);
 
   useEffect(()=>{
     setToken(getCustomerToken());
-
     const sync=()=>setToken(getCustomerToken());
     window.addEventListener("storage",sync);
     window.addEventListener("focus",sync);
@@ -20,5 +19,5 @@ export function SupportChatRuntime(){
   },[]);
 
   if(token===undefined)return null;
-  return <SupportChatWidget customerToken={token}/>;
+  return <SupportChatWidgetV2 customerToken={token}/>;
 }
