@@ -21,24 +21,46 @@ def _check_helper(mode: str, fou_port: int | None) -> None:
         mtu=1400,
     )
 
+    # Safety / ownership guarantees.
     assert "iptables -F" not in text
     assert "net.ipv4.conf.all.rp_filter" not in text
     assert 'ip link del "$IFACE"' in text
     assert 'txqueuelen "$TXQLEN"' in text
-    assert "TP27_FAST_READY" in text
+    assert 'ip addr flush dev "$IFACE" scope global' in text
+
+    # TP27 Core parity: dedicated INPUT/OUTPUT/FORWARD hooks rather than only
+    # an inbound listener rule.
+    assert "ensure_chain_hook INPUT" in text
+    assert "ensure_chain_hook OUTPUT" in text
+    assert "ensure_chain_hook FORWARD" in text
+    assert 'ensure_rule "$CHAIN_IN" -i "$IFACE" -j ACCEPT' in text
+    assert 'ensure_rule "$CHAIN_OUT" -o "$IFACE" -j ACCEPT' in text
+    assert 'ensure_rule "$CHAIN_FWD" -i "$IFACE" -j ACCEPT' in text
+    assert 'ensure_rule "$CHAIN_FWD" -o "$IFACE" -j ACCEPT' in text
+
+    # Same kernel data-plane family as tp27-core.
+    assert "TP27_CORE_READY" in text
     assert 'ip tunnel add "$IFACE" mode gre' in text
     assert "encap fou" in text
     assert "ip fou add port" in text
+
+    # TP27 Core keepalive treats RX progress as health even if ICMP is
+    # transiently filtered.
+    assert "/statistics/rx_bytes" in text
+    assert 'PING_OK=0' in text
+    assert '"$RX_NOW" -gt "$LAST_RX"' in text
 
     expected_mode = f"MODE={mode}"
     assert expected_mode in text
 
     if mode == "gre-fou":
         assert f"FOU_PORT={int(fou_port or 0)}" in text
+        assert '--sport "$FOU_PORT" --dport "$FOU_PORT"' in text
     else:
         assert "FOU_PORT=0" in text
+        assert '-p 47 -s "$REMOTE_PUBLIC/32" -d "$LOCAL_PUBLIC/32"' in text
 
-    fd, path = tempfile.mkstemp(prefix="tp27-fast-", suffix=".sh")
+    fd, path = tempfile.mkstemp(prefix="tp27-core-parity-", suffix=".sh")
     try:
         os.write(fd, text.encode())
         os.close(fd)
@@ -57,6 +79,8 @@ def _check_helper(mode: str, fou_port: int | None) -> None:
 def main() -> None:
     assert gre.DEFAULT_MTU == 1400
     assert gre.TXQUEUELEN == 1000
+    assert gre.KEEPALIVE_INTERVAL == 5
+    assert gre.KEEPALIVE_FAILURES == 4
     assert gre.FOU_PORT_CANDIDATES == (443, 8443, 2053, 2083, 10443)
 
     key1 = gre._gre_key(5, "193.39.9.222", "198.105.115.180")
@@ -67,7 +91,7 @@ def main() -> None:
     _check_helper("gre", None)
     _check_helper("gre-fou", 8443)
 
-    print("TP27_FAST_CANARY_SMOKE_OK")
+    print("TP27_CORE_PARITY_SMOKE_OK")
 
 
 if __name__ == "__main__":
