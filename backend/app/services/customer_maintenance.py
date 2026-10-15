@@ -22,7 +22,7 @@ from .support_maintenance import cleanup_support_once
 PAYMENT_NOTIFICATION_INTERVAL_SECONDS = 5
 CRYPTO_VERIFY_INTERVAL_SECONDS = 10
 RECEIPT_CLEANUP_INTERVAL_SECONDS = 6 * 60 * 60
-SUPPORT_CLEANUP_INTERVAL_SECONDS = 60 * 60
+SUPPORT_CLEANUP_INTERVAL_SECONDS = 15 * 60
 
 
 def _payment_notification_batch_id(intent_id: int) -> str:
