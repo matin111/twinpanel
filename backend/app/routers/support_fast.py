@@ -335,6 +335,38 @@ def guest_send_message_lightweight(
     return _single_message_out(row, message)
 
 
+@router.get("/tickets/me")
+def user_tickets_me_fast(
+    limit: int = Query(
+        default=100,
+        ge=1,
+        le=200,
+    ),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    rows = (
+        db.query(SupportTicket)
+        .filter(
+            SupportTicket.user_id == user.id
+        )
+        .order_by(
+            SupportTicket.last_message_at.desc(),
+            SupportTicket.id.desc(),
+        )
+        .limit(int(limit))
+        .all()
+    )
+
+    return [
+        _ticket_out(
+            row,
+            user,
+        )
+        for row in rows
+    ]
+
+
 @router.get("/tickets/{ticket_id}")
 def user_ticket_detail_fast(
     ticket_id: int,
