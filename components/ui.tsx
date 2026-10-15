@@ -5,8 +5,7 @@ import {useEffect,useState} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {BrandMark} from "../lib/branding";
-import {adminApi} from "../lib/admin-api";
-import {parityApi} from "../lib/admin-parity-api";
+import {PaymentReviewBadge} from "./payment-review-badge";
 
 const menuGroups=[
   {fa:"مدیریت",en:"Management",items:[
@@ -32,7 +31,6 @@ const menuGroups=[
   ]},
   {fa:"ارتباطات",en:"Communications",items:[
     ["ربات تلگرام","Telegram Bot","/admin/telegram","✈"],
-    ["مدیریت تلگرام","Telegram Manager","/admin/telegram-manager","◈"],
     ["SMS Reader","SMS Reader","/admin/sms-reader","▤"],
     ["پشتیبانی","Support","/admin/support","◌"],
     ["اعلان‌ها","Notifications","/admin/notifications","◎"]
@@ -50,42 +48,13 @@ const menuGroups=[
   ]}
 ] as const;
 
-const finalPaymentStatuses=new Set(["approved","auto_verified","paid","rejected","completed","fulfilled"]);
-const reviewPaymentStatuses=new Set(["awaiting_review","payment_submitted","submitted","review","waiting"]);
-
 export function Shell({children,active="/admin"}:{children:React.ReactNode;active?:string}){
   const {pick}=useI18n();
   const [collapsed,setCollapsed]=useState(false);
   const [mobileOpen,setMobileOpen]=useState(false);
-  const [paymentReviewCount,setPaymentReviewCount]=useState(0);
 
   useEffect(()=>{
     try{setCollapsed(localStorage.getItem("twinpanel.sidebar.collapsed")==="1");}catch{}
-  },[]);
-
-  useEffect(()=>{
-    let alive=true;
-    const refresh=async()=>{
-      try{
-        const [payments,topups]=await Promise.all([adminApi.payments(),parityApi.walletTopups()]);
-        if(!alive)return;
-        const purchaseCount=payments.filter(row=>{
-          const status=String(row.status||"").toLowerCase();
-          if(finalPaymentStatuses.has(status))return false;
-          return Boolean(row.has_receipt)||reviewPaymentStatuses.has(status);
-        }).length;
-        const walletCount=topups.filter(row=>{
-          const status=String(row.status||"").toLowerCase();
-          return reviewPaymentStatuses.has(status);
-        }).length;
-        setPaymentReviewCount(purchaseCount+walletCount);
-      }catch{
-        if(alive)setPaymentReviewCount(0);
-      }
-    };
-    void refresh();
-    const timer=window.setInterval(()=>void refresh(),20000);
-    return()=>{alive=false;window.clearInterval(timer);};
   },[]);
 
   const toggleCollapsed=()=>{
@@ -108,9 +77,8 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
         <div className="nav-group-title">{pick(group.fa,group.en)}</div>
         {group.items.map(([fa,en,h,i])=>{
           const label=pick(fa,en);
-          const paymentBadge=h==="/admin/payments"&&paymentReviewCount>0;
           return <Link key={h} href={h} title={collapsed?label:undefined} className={active===h?"active":""} onClick={()=>setMobileOpen(false)}>
-            <i>{i}</i><span className="nav-label">{label}</span>{paymentBadge&&<span className="nav-review-count" title={pick("پرداخت نیازمند بررسی","Payment needs review")}>{paymentReviewCount>99?"99+":paymentReviewCount}</span>}
+            <i>{i}</i><span className="nav-label">{label}</span>{h==="/admin/payments"&&<PaymentReviewBadge/>}
           </Link>;
         })}
       </div>)}</nav>
