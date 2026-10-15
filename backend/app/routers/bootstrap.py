@@ -268,3 +268,15 @@ systemctl --no-pager --full status twinpanel-agent | head -n 15 || true
 """
 
     return PlainTextResponse(dedent(script).lstrip(), media_type="text/x-shellscript")
+
+
+# Register optimized support routes on the bootstrap router. main.py includes
+# this router before the legacy support routers, so identical paths resolve to
+# these bounded/index-friendly handlers without changing existing clients.
+from .support_fast import (  # noqa: E402
+    admin_router as support_fast_admin_router,
+    router as support_fast_router,
+)
+
+router.include_router(support_fast_router)
+router.include_router(support_fast_admin_router)
