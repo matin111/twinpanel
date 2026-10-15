@@ -1,6 +1,6 @@
 import {AdminAuthGuard} from "../../../components/admin-auth-guard";
-import {SupportCenterRuntime} from "../../../components/support-center-runtime";
+import {SupportCenterRuntimeV2} from "../../../components/support-center-runtime-v2";
 
 export default function AdminSupportPage(){
-  return <AdminAuthGuard><SupportCenterRuntime/></AdminAuthGuard>;
+  return <AdminAuthGuard><SupportCenterRuntimeV2/></AdminAuthGuard>;
 }
