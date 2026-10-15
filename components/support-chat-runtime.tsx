@@ -4,7 +4,7 @@ import {usePathname} from "next/navigation";
 import {useEffect,useMemo,useState} from "react";
 import {getCustomerToken} from "../lib/customer-api";
 import {SupportAccountChatWidget} from "./support-account-chat-widget";
-import {SupportChatWidgetV2} from "./support-chat-widget-v2";
+import {SupportGuestChatWidgetV3} from "./support-guest-chat-widget-v3";
 
 export function SupportChatRuntime(){
   const pathname=usePathname();
@@ -29,7 +29,7 @@ export function SupportChatRuntime(){
   },[pathname]);
 
   if(!mode||token===undefined)return null;
-  if(mode==="guest")return <SupportChatWidgetV2 key="store-guest-chat" customerToken={null}/>;
+  if(mode==="guest")return <SupportGuestChatWidgetV3 key="store-guest-chat-v3"/>;
   if(!token)return null;
   return <SupportAccountChatWidget key="customer-account-chat" customerToken={token}/>;
 }
