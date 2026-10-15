@@ -3,14 +3,23 @@ from __future__ import annotations
 import json
 
 from .models import TunnelTransport
+from .kernel_gre_agent_compat_v21 import install_make_agent_hook
 
 
+# TWINPANEL_ROUTABLE_L3_TRANSPORTS_V21
+#
+# Keep the historical public constant because routers/tunnels.py already uses
+# it as the authoritative "externally managed L3 interface" set. Kernel GRE is
+# provisioned by transport_candidates, but once selected it behaves exactly
+# like the existing TP2027 L3 members from Desired State's point of view:
+# interface/address/service are already owned by an external systemd runtime.
 TP2027_TRANSPORTS = frozenset(
     {
         "quic_2027",
         "arq_2027",
         "kcp_2027",
         "tcp_2027",
+        "kernel_gre",
     }
 )
 
@@ -20,6 +29,7 @@ _INTERFACE_PREFIX = {
     "arq_2027": "tp27a",
     "kcp_2027": "tp27k",
     "tcp_2027": "tp27t",
+    "kernel_gre": "tpgr",
 }
 
 
@@ -212,3 +222,10 @@ def tp2027_desired_meta(
             peer_ip,
         "health_service": service,
     }
+
+
+# API startup imports routers.provision before this module from routers.tunnels.
+# Hook the shared renderer once so every future Agent upgrade understands the
+# externally managed kernel_gre transport without duplicating the large Agent
+# template in another source file.
+install_make_agent_hook()
