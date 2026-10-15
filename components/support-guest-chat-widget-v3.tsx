@@ -10,6 +10,8 @@ type ChatMessage={id:number;sender_role:string;message:string|null;attachment_ty
 type ChatTicket={id:number;status:string;subject?:string|null;messages?:ChatMessage[];guest_token?:string};
 type GuestSession={ticketId:number;token:string;name:string;contact:string};
 type UploadResult={attachment_type:string;attachment_ref:string};
+type GuestDelta={ticket_id:number;status:string;last_message_at?:string|null;messages?:ChatMessage[]};
+type GuestFastReply={ticket_id:number;status:string;last_message_at?:string|null;message:ChatMessage};
 
 const SESSION_KEY="twinpanel_guest_chat_v3";
 const SESSION_BACKUP_KEY="twinpanel_guest_chat_session_v3";
@@ -85,6 +87,7 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   return response.json() as Promise<T>;
 }
 function maxAdminMessageId(ticket:ChatTicket|null){return Math.max(0,...(ticket?.messages||[]).filter(x=>String(x.sender_role).toLowerCase()==="admin").map(x=>Number(x.id)||0));}
+function maxMessageId(ticket:ChatTicket|null){return Math.max(0,...(ticket?.messages||[]).filter(x=>Number(x.id)>0).map(x=>Number(x.id)||0));}
 function attachmentUrl(value?:string|null){const ref=String(value||"").trim();if(!ref)return "";if(/^https?:\/\//.test(ref))return ref;return `${API_BASE}${ref.startsWith("/")?ref:`/v1/support/files/${encodeURIComponent(ref)}`}`;}
 
 export function SupportGuestChatWidgetV3(){
@@ -94,6 +97,7 @@ export function SupportGuestChatWidgetV3(){
   const [initialized,setInitialized]=useState(false);
   const [session,setSession]=useState<GuestSession|null>(null);
   const [ticket,setTicket]=useState<ChatTicket|null>(null);
+  const ticketRef=useRef<ChatTicket|null>(null);
   const [name,setName]=useState("");
   const [contact,setContact]=useState("");
   const [draft,setDraft]=useState("");
@@ -107,16 +111,27 @@ export function SupportGuestChatWidgetV3(){
   const fileRef=useRef<HTMLInputElement|null>(null);
   const endRef=useRef<HTMLDivElement|null>(null);
   const refreshBusy=useRef(false);
+  const deltaBusy=useRef(false);
   const lastAdminId=useRef(0);
   const soundReady=useRef(false);
+
+  useEffect(()=>{ticketRef.current=ticket;},[ticket]);
 
   const applyTicket=(next:ChatTicket,play=true)=>{
     const adminId=maxAdminMessageId(next);
     if(play&&lastAdminId.current>0&&adminId>lastAdminId.current&&soundReady.current)void playNotificationSound("message");
     lastAdminId.current=Math.max(lastAdminId.current,adminId);
+    ticketRef.current=next;
     setTicket(next);
     saveTicketCache(next);
     setInitialized(true);
+  };
+
+  const applyFastReply=(sent:GuestFastReply,tempId?:number)=>{
+    const current=ticketRef.current;
+    if(!current||current.id!==sent.ticket_id)return;
+    const cleaned=(current.messages||[]).filter(item=>item.id!==tempId&&item.id!==sent.message.id);
+    applyTicket({...current,status:sent.status,messages:[...cleaned,sent.message]},false);
   };
 
   useEffect(()=>{
@@ -124,7 +139,7 @@ export function SupportGuestChatWidgetV3(){
     if(saved){
       setSession(saved);setName(saved.name);setContact(saved.contact);
       const cached=loadTicketCache(saved);
-      if(cached){setTicket(cached);lastAdminId.current=maxAdminMessageId(cached);}
+      if(cached){ticketRef.current=cached;setTicket(cached);lastAdminId.current=maxAdminMessageId(cached);}
     }
     try{setOpen(localStorage.getItem(OPEN_KEY)==="1");}catch{}
     setInitialized(true);
@@ -146,18 +161,30 @@ export function SupportGuestChatWidgetV3(){
     }catch(reason){if(!silent)setError(friendlyError(reason,"ارتباط با پشتیبانی کند شده است؛ گفتگوی قبلی محفوظ است.","Support connection is slow; your previous chat is preserved.",lang));}
     finally{refreshBusy.current=false;if(!silent)setLoading(false);}
   };
+  const refreshDelta=async()=>{
+    const saved=session??loadSession();const current=ticketRef.current;
+    if(!saved||!current||current.id<=0||deltaBusy.current)return;
+    deltaBusy.current=true;
+    try{
+      const delta=await request<GuestDelta>(`/v1/support/guest/tickets/${saved.ticketId}/messages-after?after_id=${maxMessageId(current)}`,{headers:{"X-Guest-Chat-Token":saved.token}});
+      const latest=ticketRef.current;if(!latest||latest.id!==saved.ticketId)return;
+      const existing=new Set((latest.messages||[]).map(item=>item.id));
+      const incoming=(delta.messages||[]).filter(item=>!existing.has(item.id));
+      if(incoming.length||delta.status!==latest.status){applyTicket({...latest,status:delta.status||latest.status,messages:[...(latest.messages||[]),...incoming]},true);}
+    }catch{}finally{deltaBusy.current=false;}
+  };
 
   useEffect(()=>{if(open&&session)void refresh(false);},[open,session?.ticketId]);
   useEffect(()=>{
     if(!open||!session||!ticket||ticket.id<=0)return;
-    const timer=window.setInterval(()=>{if(document.visibilityState==="visible")void refresh(true);},800);
+    const timer=window.setInterval(()=>{if(document.visibilityState==="visible")void refreshDelta();},500);
     return()=>window.clearInterval(timer);
   },[open,session?.ticketId,ticket?.id]);
   useEffect(()=>{if(open&&ticket?.messages?.length)scrollBottom();},[open,ticket?.messages?.length]);
   useEffect(()=>()=>{if(preview)URL.revokeObjectURL(preview);},[preview]);
 
   const setOpenPersist=(value:boolean)=>{setOpen(value);try{localStorage.setItem(OPEN_KEY,value?"1":"0");}catch{}if(value)void primeNotificationSound();};
-  const resetConversation=()=>{if(!window.confirm(pick("گفتگوی ذخیره‌شده پاک شود و گفتگوی جدید شروع شود؟","Clear the saved conversation and start a new one?")))return;clearSession();setSession(null);setTicket(null);setName("");setContact("");setDraft("");setError("");lastAdminId.current=0;setInitialized(true);};
+  const resetConversation=()=>{if(!window.confirm(pick("گفتگوی ذخیره‌شده پاک شود و گفتگوی جدید شروع شود؟","Clear the saved conversation and start a new one?")))return;clearSession();setSession(null);setTicket(null);ticketRef.current=null;setName("");setContact("");setDraft("");setError("");lastAdminId.current=0;setInitialized(true);};
   const resetImage=()=>{if(preview)URL.revokeObjectURL(preview);setImage(null);setPreview("");if(fileRef.current)fileRef.current.value="";};
   const chooseImage=(file?:File|null)=>{if(!file)return;if(!ALLOWED_IMAGES.has(file.type)){setError(pick("فرمت تصویر باید JPG، PNG، WebP یا GIF باشد","Image must be JPG, PNG, WebP or GIF"));return;}if(file.size>MAX_IMAGE_BYTES){setError(pick("حداکثر حجم تصویر ۵ مگابایت است","Maximum image size is 5 MB"));return;}if(preview)URL.revokeObjectURL(preview);setImage(file);setPreview(URL.createObjectURL(file));setError("");};
   const uploadImage=async(ticketId:number,current:GuestSession)=>{
@@ -168,7 +195,7 @@ export function SupportGuestChatWidgetV3(){
   };
   const sendAttachment=async(ticketId:number,current:GuestSession)=>{
     const uploaded=await uploadImage(ticketId,current);if(!uploaded)return null;
-    return request<ChatTicket>(`/v1/support/guest/tickets/${ticketId}/messages`,{method:"POST",headers:{"X-Guest-Chat-Token":current.token},body:JSON.stringify({message:null,attachment_type:uploaded.attachment_type,attachment_ref:uploaded.attachment_ref,source:"web"})});
+    return request<GuestFastReply>(`/v1/support/guest/tickets/${ticketId}/messages-fast`,{method:"POST",headers:{"X-Guest-Chat-Token":current.token},body:JSON.stringify({message:null,attachment_type:uploaded.attachment_type,attachment_ref:uploaded.attachment_ref,source:"web"})});
   };
 
   const startChat=async(event:FormEvent)=>{
@@ -178,43 +205,44 @@ export function SupportGuestChatWidgetV3(){
     if(name.trim().length<2||contact.trim().length<3){setError(pick("نام و راه ارتباطی را وارد کنید","Enter your name and contact"));return;}
     const first=text||pick("📷 تصویر پیوست شد","📷 Image attached");
     const pending:ChatTicket={id:0,status:"open",messages:[{id:-Date.now(),sender_role:"guest",message:first,created_at:new Date().toISOString(),_pending:true}]};
-    setSending(true);setError("");setTicket(pending);setDraft("");scrollBottom();
+    setSending(true);setError("");ticketRef.current=pending;setTicket(pending);setDraft("");scrollBottom();
     try{
-      let created=await request<ChatTicket>("/v1/support/guest/tickets",{method:"POST",body:JSON.stringify({name:name.trim(),contact:contact.trim(),message:first,source:"web"})});
+      const created=await request<ChatTicket>("/v1/support/guest/tickets",{method:"POST",body:JSON.stringify({name:name.trim(),contact:contact.trim(),message:first,source:"web"})});
       if(!created.id||!created.guest_token)throw new Error("CHAT_CREATE_FAILED");
       const current={ticketId:created.id,token:created.guest_token,name:name.trim(),contact:contact.trim()};
       saveSession(current);setSession(current);
-      if(image){const next=await sendAttachment(created.id,current);if(next)created=next;}
-      const clean={...created,guest_token:undefined};applyTicket(clean,false);resetImage();scrollBottom();
-    }catch(reason){setTicket(null);setDraft(text);setError(friendlyError(reason,"ارسال بیش از حد طول کشید. دوباره تلاش کنید؛ اطلاعات شما حفظ شده است.","Sending took too long. Please retry; your details are preserved.",lang));}
+      const clean={...created,guest_token:undefined};applyTicket(clean,false);
+      if(image){const sent=await sendAttachment(created.id,current);if(sent)applyFastReply(sent);}
+      resetImage();scrollBottom();
+    }catch(reason){ticketRef.current=null;setTicket(null);setDraft(text);setError(friendlyError(reason,"ارسال بیش از حد طول کشید. دوباره تلاش کنید؛ اطلاعات شما حفظ شده است.","Sending took too long. Please retry; your details are preserved.",lang));}
     finally{setSending(false);}
   };
 
   const sendText=async(textValue:string)=>{
-    if(!ticket||ticket.id<=0||sending)return;
+    const currentTicket=ticketRef.current;
+    if(!currentTicket||currentTicket.id<=0||sending)return;
     const text=textValue.trim();if(!text)return;
     const current=session??loadSession();if(!current){setError(pick("گفتگوی قبلی پیدا نشد","Previous chat session was not found"));return;}
     const tempId=-Date.now();
     setSending(true);setError("");setDraft("");
-    setTicket(value=>value?{...value,messages:[...(value.messages||[]),{id:tempId,sender_role:"guest",message:text,created_at:new Date().toISOString(),_pending:true}]}:value);scrollBottom();
+    applyTicket({...currentTicket,messages:[...(currentTicket.messages||[]),{id:tempId,sender_role:"guest",message:text,created_at:new Date().toISOString(),_pending:true}]},false);scrollBottom();
     try{
-      const next=await request<ChatTicket>(`/v1/support/guest/tickets/${ticket.id}/messages`,{method:"POST",headers:{"X-Guest-Chat-Token":current.token},body:JSON.stringify({message:text,source:"web"})});
-      applyTicket(next,false);
-    }catch(reason){setTicket(value=>value?{...value,messages:(value.messages||[]).filter(x=>x.id!==tempId)}:value);setDraft(text);setError(friendlyError(reason,"ارسال پیام دیر پاسخ داد؛ دوباره تلاش کنید.","Message delivery timed out; please retry.",lang));}
+      const sent=await request<GuestFastReply>(`/v1/support/guest/tickets/${currentTicket.id}/messages-fast`,{method:"POST",headers:{"X-Guest-Chat-Token":current.token},body:JSON.stringify({message:text,source:"web"})});
+      applyFastReply(sent,tempId);
+    }catch(reason){const latest=ticketRef.current;if(latest)applyTicket({...latest,messages:(latest.messages||[]).filter(x=>x.id!==tempId)},false);setDraft(text);setError(friendlyError(reason,"ارسال پیام دیر پاسخ داد؛ دوباره تلاش کنید.","Message delivery timed out; please retry.",lang));}
     finally{setSending(false);}
   };
 
   const submitMessage=async(event:FormEvent)=>{
-    event.preventDefault();if(!ticket||ticket.id<=0||sending)return;
+    event.preventDefault();const currentTicket=ticketRef.current;if(!currentTicket||currentTicket.id<=0||sending)return;
     const text=draft.trim();if(!text&&!image)return;
     if(text&&!image){await sendText(text);return;}
     const current=session??loadSession();if(!current){setError(pick("گفتگوی قبلی پیدا نشد","Previous chat session was not found"));return;}
     setSending(true);setError("");
     try{
-      let next=ticket;
-      if(text)next=await request<ChatTicket>(`/v1/support/guest/tickets/${ticket.id}/messages`,{method:"POST",headers:{"X-Guest-Chat-Token":current.token},body:JSON.stringify({message:text,source:"web"})});
-      if(image){const attached=await sendAttachment(ticket.id,current);if(attached)next=attached;}
-      applyTicket(next,false);setDraft("");resetImage();scrollBottom();
+      if(text){const sent=await request<GuestFastReply>(`/v1/support/guest/tickets/${currentTicket.id}/messages-fast`,{method:"POST",headers:{"X-Guest-Chat-Token":current.token},body:JSON.stringify({message:text,source:"web"})});applyFastReply(sent);}
+      if(image){const sent=await sendAttachment(currentTicket.id,current);if(sent)applyFastReply(sent);}
+      setDraft("");resetImage();scrollBottom();
     }catch(reason){setError(friendlyError(reason,"ارسال پیام یا تصویر بیش از حد طول کشید.","Message or image delivery took too long.",lang));}
     finally{setSending(false);}
   };
