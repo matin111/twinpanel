@@ -103,6 +103,7 @@
 }
 
 .sidebar nav a{
+  position:relative;
   min-height:42px;
   padding:10px 12px;
   border-radius:11px;
@@ -116,6 +117,34 @@
 
 .sidebar nav a i{
   flex:0 0 20px;
+}
+
+.nav-review-count{
+  margin-inline-start:auto;
+  min-width:22px;
+  height:22px;
+  padding:0 6px;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+  font-size:11px;
+  font-weight:800;
+  line-height:1;
+  color:#fff;
+  background:#dc2626;
+  box-shadow:0 0 0 2px rgba(220,38,38,.16);
+}
+
+.shell.sidebar-collapsed .nav-review-count{
+  position:absolute;
+  inset-inline-end:5px;
+  top:5px;
+  min-width:17px;
+  height:17px;
+  padding:0 4px;
+  font-size:9px;
 }
 
 .shell.sidebar-collapsed .sidebar nav a{
@@ -222,6 +251,15 @@
     opacity:1;
     max-width:260px;
     pointer-events:auto;
+  }
+
+  .shell.sidebar-collapsed .nav-review-count{
+    position:static;
+    min-width:22px;
+    height:22px;
+    padding:0 6px;
+    font-size:11px;
+    margin-inline-start:auto;
   }
 
   .shell.sidebar-collapsed .sidebar-head{
