@@ -28,6 +28,9 @@ from .tunnel_service_connections_admin_runtime import (
 from .manual_transport_report_guard_v22 import (
     apply_manual_transport_report_guard_v22,
 )
+from .manual_transport_api_v23 import (
+    apply_manual_transport_api_v23,
+)
 
 
 _original_install_or_upgrade_agent = provision._install_or_upgrade_agent
@@ -151,6 +154,10 @@ def apply_self_hosted_runtime() -> None:
     # and must not race a freshly committed Manual selection back to the stale
     # transport from the previous polling cycle.
     apply_manual_transport_report_guard_v22()
+
+    # Manual selection is registry-driven. Any installed, enabled and online
+    # TunnelTransport row can be selected without another hard-coded API list.
+    apply_manual_transport_api_v23()
 
     # tunnels.py imports this function by name, so patch the module binding.
     tunnels._install_or_upgrade_agent = _self_hosted_install_or_upgrade_agent
