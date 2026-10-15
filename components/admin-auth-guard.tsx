@@ -5,32 +5,81 @@ import {clearCustomerToken,customerApi,getCustomerToken} from "../lib/customer-a
 import {getResellerProfile} from "../lib/role-router";
 import {useI18n} from "../lib/i18n";
 
+const ADMIN_AUTH_TTL_MS=2*60*1000;
+let verifiedAdminToken:string|null=null;
+let verifiedAdminUntil=0;
+let verifyPromise:Promise<"admin"|"reseller"|"user"|"inactive">|null=null;
+let verifyPromiseToken:string|null=null;
+
+async function verifyRole(token:string):Promise<"admin"|"reseller"|"user"|"inactive">{
+  if(verifyPromise&&verifyPromiseToken===token)return verifyPromise;
+
+  verifyPromiseToken=token;
+  verifyPromise=(async()=>{
+    const user=await customerApi.me(token);
+    if(!user.is_active)return "inactive";
+    if(user.role==="admin")return "admin";
+    const reseller=await getResellerProfile(token);
+    return reseller?"reseller":"user";
+  })();
+
+  try{
+    return await verifyPromise;
+  }finally{
+    verifyPromise=null;
+    verifyPromiseToken=null;
+  }
+}
+
 export function AdminAuthGuard({children}:{children:React.ReactNode}){
   const {pick}=useI18n();
   const [state,setState]=useState<"checking"|"ok"|"denied">("checking");
 
   useEffect(()=>{
     let alive=true;
+    const token=getCustomerToken();
+
+    if(!token){
+      window.location.replace("/login");
+      return()=>{alive=false;};
+    }
+
+    if(token===verifiedAdminToken&&Date.now()<verifiedAdminUntil){
+      setState("ok");
+      return()=>{alive=false;};
+    }
+
     const run=async()=>{
-      const token=getCustomerToken();
-      if(!token){window.location.replace("/login");return;}
       try{
-        const user=await customerApi.me(token);
+        const role=await verifyRole(token);
         if(!alive)return;
-        if(!user.is_active){clearCustomerToken();window.location.replace("/login");return;}
-        if(user.role!=="admin"){
-          const reseller=await getResellerProfile(token);
-          if(!alive)return;
-          setState("denied");
-          window.location.replace(reseller?"/reseller":"/panel");
+
+        if(role==="admin"){
+          verifiedAdminToken=token;
+          verifiedAdminUntil=Date.now()+ADMIN_AUTH_TTL_MS;
+          setState("ok");
           return;
         }
-        setState("ok");
+
+        verifiedAdminToken=null;
+        verifiedAdminUntil=0;
+
+        if(role==="inactive"){
+          clearCustomerToken();
+          window.location.replace("/login");
+          return;
+        }
+
+        setState("denied");
+        window.location.replace(role==="reseller"?"/reseller":"/panel");
       }catch{
+        verifiedAdminToken=null;
+        verifiedAdminUntil=0;
         clearCustomerToken();
         if(alive)window.location.replace("/login");
       }
     };
+
     void run();
     return()=>{alive=false;};
   },[]);

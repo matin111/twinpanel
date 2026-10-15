@@ -9,6 +9,7 @@ from ..payment_models import PaymentIntent
 from ..store_models import StoreOrder
 from ..user_notification_models import UserNotification
 from ..main_receipt_cleanup import cleanup_receipts_once
+from ..routers.store import _fulfill_paid_order
 from .payment_automation import (
     activate_existing_sms_auto_verify_once,
     process_pending_crypto_payments_once,
@@ -25,6 +26,67 @@ RECEIPT_CLEANUP_INTERVAL_SECONDS = 6 * 60 * 60
 
 def _payment_notification_batch_id(intent_id: int) -> str:
     return f"payment-approved-{int(intent_id)}"
+
+
+async def process_paid_store_orders_once(limit: int = 10) -> dict:
+    """Durable fallback for fast admin approvals.
+
+    Manual approval now returns before SSH/node provisioning finishes. The
+    response schedules an immediate BackgroundTask; this worker also scans paid
+    orders so an API restart between the response and that task cannot strand a
+    successfully approved order.
+    """
+
+    lookup = SessionLocal()
+
+    try:
+        order_ids = [
+            int(row[0])
+            for row in (
+                lookup.query(StoreOrder.id)
+                .filter(StoreOrder.status == "paid")
+                .order_by(StoreOrder.paid_at.asc(), StoreOrder.id.asc())
+                .limit(max(1, int(limit)))
+                .all()
+            )
+        ]
+    finally:
+        lookup.close()
+
+    processed = 0
+    failed = 0
+
+    for order_id in order_ids:
+        db = SessionLocal()
+        try:
+            current = db.get(StoreOrder, order_id)
+            if not current or current.status != "paid":
+                continue
+
+            await _fulfill_paid_order(order_id, db)
+            processed += 1
+
+        except Exception as exc:
+            db.rollback()
+            failed += 1
+            print(
+                "paid store order recovery failed:",
+                {
+                    "order_id": order_id,
+                    "error": str(exc),
+                },
+                flush=True,
+            )
+
+        finally:
+            db.close()
+
+    return {
+        "ok": True,
+        "checked": len(order_ids),
+        "processed": processed,
+        "failed": failed,
+    }
 
 
 def sync_payment_notifications_once() -> dict:
@@ -180,7 +242,6 @@ async def customer_maintenance_loop() -> None:
             >= CRYPTO_VERIFY_INTERVAL_SECONDS
         ):
             try:
-                # Legacy worker remains for existing USDT-BEP20 intents.
                 legacy_result = await process_pending_crypto_payments_once()
                 native_result = await process_pending_native_crypto_exact_once()
 
@@ -209,6 +270,21 @@ async def customer_maintenance_loop() -> None:
                 )
             finally:
                 last_crypto_verify = now
+
+        try:
+            fulfillment = await process_paid_store_orders_once()
+            if fulfillment.get("processed") or fulfillment.get("failed"):
+                print(
+                    "STORE_ORDER_ASYNC_FULFILLMENT",
+                    fulfillment,
+                    flush=True,
+                )
+        except Exception as exc:
+            print(
+                "store order async fulfillment loop failed:",
+                str(exc),
+                flush=True,
+            )
 
         try:
             result = await asyncio.to_thread(

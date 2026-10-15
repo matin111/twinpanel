@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from ..customer_wallet_models import CustomerWallet, CustomerWalletTopup
-from ..database import get_db
+from ..database import SessionLocal, get_db
 from ..deps import require_admin
 from ..models import Subscription, User
 from ..payment_models import PaymentIntent
@@ -51,18 +51,12 @@ def payment_review_summary_v2(
     purchase_review_count = (
         db.query(PaymentIntent.id)
         .filter(
-            ~PaymentIntent.status.in_(
-                FINAL_PAYMENT_STATUSES
-            ),
+            ~PaymentIntent.status.in_(FINAL_PAYMENT_STATUSES),
             or_(
-                PaymentIntent.status.in_(
-                    REVIEW_PAYMENT_STATUSES
-                ),
+                PaymentIntent.status.in_(REVIEW_PAYMENT_STATUSES),
                 and_(
-                    PaymentIntent.receipt_telegram_file_id
-                    .isnot(None),
-                    PaymentIntent.receipt_telegram_file_id
-                    != "",
+                    PaymentIntent.receipt_telegram_file_id.isnot(None),
+                    PaymentIntent.receipt_telegram_file_id != "",
                 ),
             ),
         )
@@ -72,13 +66,9 @@ def payment_review_summary_v2(
     receipt_count = (
         db.query(PaymentIntent.id)
         .filter(
-            ~PaymentIntent.status.in_(
-                FINAL_PAYMENT_STATUSES
-            ),
-            PaymentIntent.receipt_telegram_file_id
-            .isnot(None),
-            PaymentIntent.receipt_telegram_file_id
-            != "",
+            ~PaymentIntent.status.in_(FINAL_PAYMENT_STATUSES),
+            PaymentIntent.receipt_telegram_file_id.isnot(None),
+            PaymentIntent.receipt_telegram_file_id != "",
         )
         .count()
     )
@@ -86,34 +76,91 @@ def payment_review_summary_v2(
     wallet_review_count = (
         db.query(CustomerWalletTopup.id)
         .filter(
-            CustomerWalletTopup.status.in_(
-                REVIEW_PAYMENT_STATUSES
-            )
+            CustomerWalletTopup.status.in_(REVIEW_PAYMENT_STATUSES)
         )
         .count()
     )
 
     return {
-        "needs_review": (
-            int(purchase_review_count)
-            + int(wallet_review_count)
-        ),
-        "purchase_review": int(
-            purchase_review_count
-        ),
+        "needs_review": int(purchase_review_count) + int(wallet_review_count),
+        "purchase_review": int(purchase_review_count),
         "receipt_review": int(receipt_count),
-        "wallet_review": int(
-            wallet_review_count
-        ),
+        "wallet_review": int(wallet_review_count),
         "generated_at": datetime.utcnow(),
     }
 
 
-@router.post(
-    "/payment-intents/{intent_id}/approve-safe"
-)
+async def _fulfill_approved_payment_background(
+    *,
+    intent_id: int,
+    order_id: int,
+    user_id: int,
+    amount_toman: int,
+) -> None:
+    """Provision after the HTTP response has already been sent.
+
+    The order is committed as paid before this task is queued. The existing
+    fulfillment helper is idempotent and records provision_failed on runtime
+    failures, so slow SSH/node provisioning no longer blocks the admin click.
+    """
+
+    db = SessionLocal()
+
+    try:
+        result = await _fulfill_paid_order(int(order_id), db)
+        final_order = db.get(StoreOrder, int(order_id))
+
+        subscription_id = (
+            final_order.subscription_id
+            if final_order
+            else result.get("subscription_id")
+        )
+
+        subscription = (
+            db.get(Subscription, subscription_id)
+            if subscription_id
+            else None
+        )
+
+        queue_telegram_notification(
+            db,
+            user_id=int(user_id),
+            event_key=f"payment-approved:{int(intent_id)}",
+            kind="payment_approved",
+            payload={
+                "payment_id": int(intent_id),
+                "order_id": int(order_id),
+                "subscription_id": subscription_id,
+                "username": (
+                    subscription.account_username
+                    if subscription
+                    else None
+                ),
+                "amount_toman": int(amount_toman or 0),
+            },
+        )
+        db.commit()
+
+    except Exception as exc:
+        db.rollback()
+        print(
+            "payment background fulfillment failed:",
+            {
+                "intent_id": int(intent_id),
+                "order_id": int(order_id),
+                "error": str(exc),
+            },
+            flush=True,
+        )
+
+    finally:
+        db.close()
+
+
+@router.post("/payment-intents/{intent_id}/approve-safe")
 async def approve_payment_intent_safe_v2(
     intent_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     row = (
@@ -131,14 +178,8 @@ async def approve_payment_intent_safe_v2(
 
     if (
         row.method == "card_to_card"
-        and row.status not in {
-            "approved",
-            "auto_verified",
-        }
-        and not str(
-            row.receipt_telegram_file_id
-            or ""
-        ).strip()
+        and row.status not in {"approved", "auto_verified"}
+        and not str(row.receipt_telegram_file_id or "").strip()
     ):
         raise HTTPException(
             status_code=409,
@@ -156,23 +197,16 @@ async def approve_payment_intent_safe_v2(
             detail="سفارش پیدا نشد",
         )
 
-    # Idempotent approval: if SMS automation or another admin already
-    # handled the intent, a stale page should still receive success.
-    if row.status not in {
-        "approved",
-        "auto_verified",
-    }:
+    if row.status not in {"approved", "auto_verified"}:
         row.status = "approved"
         row.verified_at = datetime.utcnow()
 
-    if order.status != "fulfilled":
-        if order.status not in {
-            "paid",
-            "provisioning",
-            "provision_failed",
-        }:
-            order.status = "paid"
+    already_fulfilled = order.status == "fulfilled"
 
+    if not already_fulfilled:
+        order.status = "paid"
+        if order.paid_at is None:
+            order.paid_at = datetime.utcnow()
         order.payment_method = row.method
         order.payment_reference = (
             row.txid
@@ -182,103 +216,59 @@ async def approve_payment_intent_safe_v2(
 
     db.commit()
 
-    if order.status == "fulfilled":
-        result = {
-            "id": int(order.id),
-            "status": order.status,
-            "subscription_id": order.subscription_id,
-            "delivery_ready": True,
-        }
-    else:
-        result = await _fulfill_paid_order(
-            int(row.order_id),
-            db,
-        )
+    amount_toman = int(
+        row.payable_amount_toman
+        or row.base_amount_toman
+        or 0
+    )
 
-    try:
-        final_order = db.get(
-            StoreOrder,
-            row.order_id,
-        )
-        subscription_id = (
-            final_order.subscription_id
-            if final_order
-            else result.get("subscription_id")
-        )
-        subscription = (
-            db.get(
-                Subscription,
-                subscription_id,
-            )
-            if subscription_id
-            else None
-        )
-
-        queue_telegram_notification(
-            db,
-            user_id=row.user_id,
-            event_key=f"payment-approved:{row.id}",
-            kind="payment_approved",
-            payload={
-                "payment_id": row.id,
-                "order_id": row.order_id,
-                "subscription_id": subscription_id,
-                "username": (
-                    subscription.account_username
-                    if subscription
-                    else None
-                ),
-                "amount_toman": int(
-                    row.payable_amount_toman
-                    or row.base_amount_toman
-                    or 0
-                ),
-            },
-        )
-        db.commit()
-    except Exception as exc:
-        db.rollback()
-        print(
-            "payment safe approval notify failed:",
-            str(exc),
-            flush=True,
-        )
-
-    refreshed = db.get(
-        PaymentIntent,
-        int(intent_id),
+    # The response is now independent of slow node/SSH provisioning. Starlette
+    # runs this only after the response body has been sent to the admin.
+    background_tasks.add_task(
+        _fulfill_approved_payment_background,
+        intent_id=int(row.id),
+        order_id=int(row.order_id),
+        user_id=int(row.user_id),
+        amount_toman=amount_toman,
     )
 
     return {
         "ok": True,
         "idempotent": True,
+        "fulfillment_queued": not already_fulfilled,
         "payment": {
-            "id": refreshed.id,
-            "order_id": refreshed.order_id,
-            "user_id": refreshed.user_id,
-            "method": refreshed.method,
-            "status": refreshed.status,
-            "verified_at": refreshed.verified_at,
-            "has_receipt": bool(
-                refreshed.receipt_telegram_file_id
-            ),
+            "id": row.id,
+            "order_id": row.order_id,
+            "user_id": row.user_id,
+            "method": row.method,
+            "status": row.status,
+            "verified_at": row.verified_at,
+            "has_receipt": bool(row.receipt_telegram_file_id),
         },
-        "order": result,
+        "order": {
+            "id": int(order.id),
+            "status": order.status,
+            "subscription_id": order.subscription_id,
+            "delivery_ready": bool(already_fulfilled),
+        },
     }
 
 
 @router.get("/wallets")
 def admin_wallets_v2(db: Session = Depends(get_db)):
+    # One joined query instead of up to 2001 queries (wallet list + one user
+    # lookup per row). This makes the wallet/admin screen much faster on large
+    # installations.
     rows = (
-        db.query(CustomerWallet)
+        db.query(CustomerWallet, User)
+        .outerjoin(User, User.id == CustomerWallet.user_id)
         .order_by(CustomerWallet.balance_toman.desc())
         .limit(2000)
         .all()
     )
 
     result = []
-    for wallet in rows:
-        user = db.get(User, wallet.user_id)
+    for wallet, user in rows:
         result.append({
             "user_id": wallet.user_id,
             "balance_toman": int(wallet.balance_toman or 0),
