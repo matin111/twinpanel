@@ -25,6 +25,9 @@ from .xray_public_delivery_runtime import (
 from .tunnel_service_connections_admin_runtime import (
     apply_tunnel_service_connections_admin_runtime,
 )
+from .manual_transport_report_guard_v22 import (
+    apply_manual_transport_report_guard_v22,
+)
 
 
 _original_install_or_upgrade_agent = provision._install_or_upgrade_agent
@@ -144,6 +147,11 @@ def _register_xray_routes_for_drifted_main() -> int:
 
 
 def apply_self_hosted_runtime() -> None:
+    # Manual transport selection is authoritative. Agent reports are telemetry
+    # and must not race a freshly committed Manual selection back to the stale
+    # transport from the previous polling cycle.
+    apply_manual_transport_report_guard_v22()
+
     # tunnels.py imports this function by name, so patch the module binding.
     tunnels._install_or_upgrade_agent = _self_hosted_install_or_upgrade_agent
 
