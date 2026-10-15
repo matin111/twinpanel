@@ -9,10 +9,11 @@ from .kernel_gre_health_sampling_v26 import (
 )
 from .throughput_auto_v27 import install_throughput_auto_v27
 from .throughput_receiver_v28 import install_throughput_receiver_v28
+from .throughput_meta_v29 import install_throughput_meta_v29
 
 
 # ============================================================
-# TWINPANEL MANAGER RUNTIME V20 + KERNEL GRE ACTIVE V21 + V24 + V26 + V27 + V28
+# TWINPANEL MANAGER RUNTIME V20 + KERNEL GRE ACTIVE V21 + V24 + V26 + V27 + V28 + V29
 #
 # Reuse V19's self-hosted + multi-exit Backhaul hooks, replace only the
 # transport selection policy with Performance Auto V20, then extend that proven
@@ -35,6 +36,11 @@ from .throughput_receiver_v28 import install_throughput_receiver_v28
 # sleep followed by one logfile read, it polls for the receiver's final RX_MBPS
 # marker until a bounded deadline. This removes completion/FIN races without
 # changing throughput caps, schedule, scoring, routes or services.
+#
+# V29 fills benchmark metadata for healthy legacy/self-hosted Backhaul and
+# generic SSH TUN rows whose config_text is empty. It reuses TwinPanel's existing
+# deterministic runtime helpers and changes no provisioning, routes, firewall,
+# services, schema, benchmark caps, or scoring weights.
 # ============================================================
 
 
@@ -46,12 +52,13 @@ def install_manager_runtime_v20() -> None:
     install_kernel_gre_health_sampling_v26()
     install_throughput_auto_v27()
     install_throughput_receiver_v28()
+    install_throughput_meta_v29()
 
     print(
         "TWINPANEL_MANAGER_RUNTIME_V20_ACTIVE "
         "backhaul_multi_exit=1 performance_auto=1 all_transports=1 "
         "kernel_gre_active_v21=1 auto_eligibility_v24=1 "
         "kernel_gre_health_sampling_v26=1 throughput_auto_v27=1 "
-        "throughput_receiver_v28=1",
+        "throughput_receiver_v28=1 throughput_meta_v29=1",
         flush=True,
     )
