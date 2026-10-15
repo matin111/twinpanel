@@ -9,6 +9,7 @@ from ..payment_models import PaymentIntent
 from ..store_models import StoreOrder
 from ..user_notification_models import UserNotification
 from ..main_receipt_cleanup import cleanup_receipts_once
+from ..routers import support_fast as _support_fast  # register bounded support routes
 from .support_maintenance import cleanup_support_once
 from .payment_automation import (
     activate_existing_sms_auto_verify_once,
