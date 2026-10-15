@@ -1,0 +1,47 @@
+name: Kernel GRE Active V21 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/tp2027_transport.py"
+      - "backend/app/kernel_gre_agent_compat_v21.py"
+      - "backend/app/kernel_gre_auto_v21.py"
+      - "backend/app/transport_candidates/gre.py"
+      - "backend/app/manager_runtime_v20.py"
+      - "backend/scripts/kernel_gre_active_v21_smoke.py"
+      - ".github/workflows/kernel-gre-active-v21-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Compile touched modules
+        run: |
+          python -m py_compile \
+            backend/app/tp2027_transport.py \
+            backend/app/kernel_gre_agent_compat_v21.py \
+            backend/app/kernel_gre_auto_v21.py \
+            backend/app/transport_candidates/gre.py \
+            backend/app/manager_runtime_v20.py \
+            backend/scripts/kernel_gre_active_v21_smoke.py
+
+      - name: Kernel GRE active routing smoke
+        env:
+          PYTHONPATH: backend
+        run: |
+          python backend/scripts/kernel_gre_active_v21_smoke.py
