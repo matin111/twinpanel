@@ -129,7 +129,295 @@ export function SupportChatWidgetV2({customerToken}:Props){
 
   const startChat=async(event:FormEvent)=>{event.preventDefault();if(sending)return;const text=draft.trim();if(!text&&!image)return;if(!resolvedToken&&(name.trim().length<2||contact.trim().length<3)){setError(pick("نام و راه ارتباطی را وارد کنید","Enter your name and contact"));return;}setSending(true);setError("");try{const first=text||pick("📷 تصویر پیوست شد","📷 Image attached");if(resolvedToken){let created=await chatApi<ChatTicket>("/v1/support/tickets",{method:"POST",body:JSON.stringify({category:"other",subject:pick("گفتگوی آنلاین","Live chat"),message:first})},resolvedToken);if(image){const next=await sendAttachment(created.id,null);if(next)created=next;}applyTicket(created,false);setDraft("");resetImage();scrollBottom();return;}let created=await chatApi<ChatTicket>("/v1/support/guest/tickets",{method:"POST",body:JSON.stringify({name:name.trim(),contact:contact.trim(),message:first,source:"web"})});if(!created.guest_token||!created.id)throw new Error("CHAT_CREATE_FAILED");const session={ticketId:created.id,token:created.guest_token,name:name.trim(),contact:contact.trim()};saveGuestSession(session);setGuestSession(session);if(image){const next=await sendAttachment(created.id,session);if(next)created=next;}const clean={...created,guest_token:undefined};applyTicket(clean,false);setDraft("");resetImage();scrollBottom();}catch(reason){setError(reason instanceof Error?reason.message:pick("شروع گفتگو ناموفق بود","Could not start chat"));}finally{setSending(false);}};
 
-  const sendText=async(textValue:string)=>{if(!ticket||sending)return;const text=textValue.trim();if(!text)return;setSending(true);setError("");const temp:ChatMessage={id:-Date.now(),sender_role:resolvedToken?"user":"guest",message:text,created_at:new Date().toISOString(),_pending:true};setTicket(current=>current?{...current,messages:[...(current.messages||[]),temp]}:current);setDraft("");scrollBottom();try{const session=guestSession??loadGuestSession();let updated:ChatTicket;if(resolvedToken)updated=await chatApi<ChatTicket>(`/v1/support/tickets/${ticket.id}/messages`,{method:"POST",body:JSON.stringify({message:text,source:"web"})},resolvedToken);else{if(!session)throw new Error("CHAT_SESSION_MISSING");updated=await chatApi<ChatTicket>(`/v1/support/guest/tickets/${ticket.id}/messages`,{method:"POST",headers:{"X-Guest-Chat-Token":session.token},body:JSON.stringify({message:text,source:"web"})});}applyTicket(updated,false);}catch(reason){setTicket(current=>current?{...current,messages:(current.messages||[]).filter(x=>x.id!==temp.id)}:current);setDraft(text);setError(reason instanceof Error?reason.message:pick("ارسال پیام ناموفق بود","Could not send message"));}finally{setSending(false);}};
+  const sendText=async(textValue:string)=>{
+    if(!ticket||sending)return;
+
+    const text=textValue.trim();
+
+    if(!text)return;
+
+    setSending(true);
+    setError("");
+
+    const oldTicket=ticket;
+
+    const temp:ChatMessage={
+      id:-Date.now(),
+      sender_role:resolvedToken
+        ?"user"
+        :"guest",
+      message:text,
+      created_at:new Date().toISOString(),
+      _pending:true,
+    };
+
+    setTicket(current=>
+      current
+        ?{
+            ...current,
+            messages:[
+              ...(current.messages||[]),
+              temp,
+            ],
+          }
+        :current
+    );
+
+    setDraft("");
+    scrollBottom();
+
+    try{
+      const session=
+        guestSession
+        ??loadGuestSession();
+
+      let updated:ChatTicket;
+
+      if(resolvedToken){
+
+        updated=await chatApi<ChatTicket>(
+          `/v1/support/tickets/${oldTicket.id}/messages`,
+          {
+            method:"POST",
+            body:JSON.stringify({
+              message:text,
+              source:"web",
+            }),
+          },
+          resolvedToken,
+        );
+
+      }else{
+
+        if(!session){
+          throw new Error(
+            "CHAT_SESSION_MISSING"
+          );
+        }
+
+        updated=await chatApi<ChatTicket>(
+          `/v1/support/guest/tickets/${oldTicket.id}/messages`,
+          {
+            method:"POST",
+            headers:{
+              "X-Guest-Chat-Token":
+                session.token,
+            },
+            body:JSON.stringify({
+              message:text,
+              source:"web",
+            }),
+          },
+        );
+      }
+
+      applyTicket(
+        updated,
+        false,
+      );
+
+      setError("");
+
+    }catch(reason){
+
+      // SELF_HEAL_DELETED_V2_TICKET
+      if(
+        reason instanceof ChatApiError
+        && reason.status===404
+      ){
+
+        try{
+
+          if(resolvedToken){
+
+            const recreated=
+              await chatApi<ChatTicket>(
+                "/v1/support/tickets",
+                {
+                  method:"POST",
+                  body:JSON.stringify({
+                    category:"other",
+                    subject:pick(
+                      "گفتگوی آنلاین",
+                      "Live chat",
+                    ),
+                    message:text,
+                  }),
+                },
+                resolvedToken,
+              );
+
+            applyTicket(
+              recreated,
+              false,
+            );
+
+            setError("");
+            scrollBottom();
+
+            return;
+          }
+
+          const session=
+            guestSession
+            ??loadGuestSession();
+
+          const rememberedName=
+            String(
+              session?.name
+              ||name
+              ||""
+            ).trim();
+
+          const rememberedContact=
+            String(
+              session?.contact
+              ||contact
+              ||""
+            ).trim();
+
+          if(
+            rememberedName.length<2
+            ||rememberedContact.length<3
+          ){
+            clearGuestSession();
+
+            setGuestSession(null);
+            setTicket(null);
+            setDraft(text);
+
+            setError(
+              pick(
+                "گفتگوی قبلی حذف شده بود؛ نام و راه ارتباطی را وارد و پیام را دوباره ارسال کنید.",
+                "The previous chat was deleted. Enter your name/contact and send again.",
+              )
+            );
+
+            return;
+          }
+
+          const recreated=
+            await chatApi<ChatTicket>(
+              "/v1/support/guest/tickets",
+              {
+                method:"POST",
+                body:JSON.stringify({
+                  name:rememberedName,
+                  contact:rememberedContact,
+                  message:text,
+                  source:"web",
+                }),
+              },
+            );
+
+          if(
+            !recreated.id
+            ||!recreated.guest_token
+          ){
+            throw new Error(
+              "CHAT_RECREATE_FAILED"
+            );
+          }
+
+          const newSession={
+            ticketId:recreated.id,
+            token:recreated.guest_token,
+            name:rememberedName,
+            contact:rememberedContact,
+          };
+
+          saveGuestSession(
+            newSession,
+          );
+
+          setGuestSession(
+            newSession,
+          );
+
+          setName(
+            rememberedName,
+          );
+
+          setContact(
+            rememberedContact,
+          );
+
+          const clean={
+            ...recreated,
+            guest_token:undefined,
+          };
+
+          applyTicket(
+            clean,
+            false,
+          );
+
+          setError("");
+          scrollBottom();
+
+          return;
+
+        }catch(recreateReason){
+
+          setTicket(
+            current=>
+              current
+                ?{
+                    ...current,
+                    messages:(
+                      current.messages||[]
+                    ).filter(
+                      item=>
+                        item.id!==temp.id
+                    ),
+                  }
+                :current
+          );
+
+          setDraft(text);
+
+          setError(
+            recreateReason instanceof Error
+              ?recreateReason.message
+              :pick(
+                  "ساخت گفتگوی جدید ناموفق بود",
+                  "Could not recreate chat",
+                )
+          );
+
+          return;
+        }
+      }
+
+      setTicket(
+        current=>
+          current
+            ?{
+                ...current,
+                messages:(
+                  current.messages||[]
+                ).filter(
+                  item=>item.id!==temp.id
+                ),
+              }
+            :current
+      );
+
+      setDraft(text);
+
+      setError(
+        reason instanceof Error
+          ?reason.message
+          :pick(
+              "ارسال پیام ناموفق بود",
+              "Could not send message",
+            )
+      );
+
+    }finally{
+      setSending(false);
+    }
+  };
   const sendMessage=async(event:FormEvent)=>{event.preventDefault();if(!ticket||sending)return;const text=draft.trim();if(!text&&!image)return;if(text&&!image){await sendText(text);return;}setSending(true);setError("");try{let updated=ticket;const session=guestSession??loadGuestSession();if(text){if(resolvedToken)updated=await chatApi<ChatTicket>(`/v1/support/tickets/${ticket.id}/messages`,{method:"POST",body:JSON.stringify({message:text,source:"web"})},resolvedToken);else{if(!session)throw new Error("CHAT_SESSION_MISSING");updated=await chatApi<ChatTicket>(`/v1/support/guest/tickets/${ticket.id}/messages`,{method:"POST",headers:{"X-Guest-Chat-Token":session.token},body:JSON.stringify({message:text,source:"web"})});}}if(image){const next=await sendAttachment(ticket.id,session);if(next)updated=next;}applyTicket(updated,false);setDraft("");resetImage();}catch(reason){setError(reason instanceof Error?reason.message:pick("ارسال پیام ناموفق بود","Could not send message"));}finally{setSending(false);}};
 
   if(!visible)return null;const messages=ticket?.messages||[];const savedSession=guestSession??loadGuestSession();
