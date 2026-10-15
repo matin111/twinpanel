@@ -1,14 +1,16 @@
-# TWINPANEL_ADMIN_PANEL_NOTIFICATION_API_V2
+# TWINPANEL_ADMIN_PANEL_NOTIFICATION_API_V3
 
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..admin_panel_notification_models import AdminPanelNotification
 from ..database import get_db
 from ..deps import require_admin
+from ..payment_models import PaymentIntent
+from ..support_models import SupportMessage, SupportTicket
 
 
 router = APIRouter(
@@ -30,6 +32,14 @@ RESELLER_RECEIPT_EVENT_PREFIXES = (
     "reseller-bot-order:",
 )
 
+REVIEW_STATUSES = (
+    "awaiting_review",
+    "payment_submitted",
+    "submitted",
+    "review",
+    "waiting",
+)
+
 
 def _out(row: AdminPanelNotification):
     return {
@@ -48,12 +58,6 @@ def _out(row: AdminPanelNotification):
 
 
 def _admin_visible_query(db: Session):
-    """Return only notifications owned by the central-admin scope.
-
-    Reseller-bot wallet/order receipt events are tenant-scoped data. Even if an
-    older runtime accidentally inserted one into the admin notification table,
-    it must not be exposed by the main-admin notification API.
-    """
     query = db.query(AdminPanelNotification).filter(
         ~AdminPanelNotification.source.in_(
             tuple(RESELLER_RECEIPT_SOURCES)
@@ -91,6 +95,60 @@ def list_notifications(
     return {
         "unread_count": unread,
         "items": [_out(row) for row in rows],
+    }
+
+
+@router.get("/pulse")
+def realtime_pulse(db: Session = Depends(get_db)):
+    """Tiny polling endpoint for admin realtime sounds/badges.
+
+    It intentionally returns only scalar IDs/counts so the shell can poll it
+    frequently without downloading payment/support tables on every tick.
+    """
+    latest_support_message_id = int(
+        db.query(func.max(SupportMessage.id))
+        .filter(SupportMessage.sender_role != "admin")
+        .scalar()
+        or 0
+    )
+    open_support_count = int(
+        db.query(func.count(SupportTicket.id))
+        .filter(SupportTicket.status == "open")
+        .scalar()
+        or 0
+    )
+
+    receipt_filter = (
+        PaymentIntent.receipt_telegram_file_id.isnot(None),
+        PaymentIntent.status.in_(REVIEW_STATUSES),
+    )
+    latest_receipt_id = int(
+        db.query(func.max(PaymentIntent.id))
+        .filter(*receipt_filter)
+        .scalar()
+        or 0
+    )
+    pending_receipt_count = int(
+        db.query(func.count(PaymentIntent.id))
+        .filter(*receipt_filter)
+        .scalar()
+        or 0
+    )
+
+    latest_notification_id = int(
+        _admin_visible_query(db)
+        .with_entities(func.max(AdminPanelNotification.id))
+        .scalar()
+        or 0
+    )
+
+    return {
+        "latest_support_message_id": latest_support_message_id,
+        "open_support_count": open_support_count,
+        "latest_receipt_id": latest_receipt_id,
+        "pending_receipt_count": pending_receipt_count,
+        "latest_notification_id": latest_notification_id,
+        "server_time": datetime.utcnow(),
     }
 
 
