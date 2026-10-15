@@ -1,0 +1,46 @@
+name: Manual Transport Report Guard V22 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/manual_transport_report_guard_v22.py"
+      - "backend/app/self_hosted_runtime.py"
+      - "backend/scripts/manual_transport_report_guard_v22_smoke.py"
+      - ".github/workflows/manual-transport-report-guard-v22-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    env:
+      APP_SECRET_KEY: manual-transport-v22-ci-secret-only
+      DATABASE_URL: sqlite:////tmp/twinpanel-manual-transport-v22.db
+      NODE_AGENT_SHARED_SECRET: manual-transport-v22-ci-node-secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Compile touched modules
+        run: |
+          python -m py_compile \
+            backend/app/manual_transport_report_guard_v22.py \
+            backend/app/self_hosted_runtime.py \
+            backend/scripts/manual_transport_report_guard_v22_smoke.py
+
+      - name: Manual transport authority smoke
+        env:
+          PYTHONPATH: backend
+        run: |
+          python backend/scripts/manual_transport_report_guard_v22_smoke.py
