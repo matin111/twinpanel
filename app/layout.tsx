@@ -8,6 +8,7 @@ import {StoreMobileAccess} from "../components/store-mobile-access";
 import {StoreEnhancements} from "../components/store-enhancements";
 import {StorePublicNavigation} from "../components/store-public-navigation";
 import {CustomerDeliveryEnhancement} from "../components/customer-delivery-enhancement";
+import "./design-tokens.css";
 import "./core.css";
 import "./pages.css";
 import "./i18n.css";
