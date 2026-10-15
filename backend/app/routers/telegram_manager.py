@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import subprocess
@@ -9,8 +10,11 @@ import httpx
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
+from ..database import get_db
 from ..deps import require_admin
+from ..telegram_models import TelegramUserLink
 
 
 router = APIRouter(
@@ -72,6 +76,14 @@ class TokenIn(BaseModel):
         min_length=20,
         max_length=300,
     )
+
+
+class BroadcastIn(BaseModel):
+    text: str = Field(
+        min_length=1,
+        max_length=4000,
+    )
+    disable_web_page_preview: bool = True
 
 
 def _runtime_file() -> Path:
@@ -344,6 +356,25 @@ def _service_state() -> str:
     return "inactive"
 
 
+def _broadcast_target_ids(db: Session) -> list[int]:
+    rows = (
+        db.query(TelegramUserLink.telegram_id)
+        .distinct()
+        .order_by(TelegramUserLink.telegram_id.asc())
+        .all()
+    )
+
+    result: list[int] = []
+
+    for row in rows:
+        value = row[0] if row else None
+
+        if value:
+            result.append(int(value))
+
+    return result
+
+
 async def _telegram_get_me(
     bot_token: str,
 ) -> dict:
@@ -595,6 +626,105 @@ def restart_bot():
         )
 
     return _status_payload()
+
+
+@router.get("/broadcast/targets")
+def broadcast_targets(
+    db: Session = Depends(get_db),
+):
+    targets = _broadcast_target_ids(db)
+
+    return {
+        "total": len(targets),
+    }
+
+
+@router.post("/broadcast")
+async def broadcast_message(
+    payload: BroadcastIn,
+    db: Session = Depends(get_db),
+):
+    text = payload.text.strip()
+
+    if not text:
+        raise HTTPException(
+            status_code=422,
+            detail="متن پیام نمی‌تواند خالی باشد",
+        )
+
+    try:
+        token = load_bot_token()
+    except RuntimeError:
+        raise HTTPException(
+            status_code=409,
+            detail="ابتدا توکن ربات را ذخیره کنید",
+        )
+
+    targets = _broadcast_target_ids(db)
+
+    if not targets:
+        return {
+            "ok": True,
+            "total": 0,
+            "sent": 0,
+            "failed": 0,
+            "blocked": 0,
+        }
+
+    url = (
+        "https://api.telegram.org/"
+        f"bot{token}/sendMessage"
+    )
+
+    sent = 0
+    failed = 0
+    blocked = 0
+
+    async with httpx.AsyncClient(
+        timeout=15.0
+    ) as client:
+        for telegram_id in targets:
+            try:
+                response = await client.post(
+                    url,
+                    json={
+                        "chat_id": telegram_id,
+                        "text": text,
+                        "disable_web_page_preview": (
+                            payload.disable_web_page_preview
+                        ),
+                    },
+                )
+
+                try:
+                    data = response.json()
+                except Exception:
+                    data = {}
+
+                if (
+                    response.status_code == 200
+                    and data.get("ok")
+                ):
+                    sent += 1
+                else:
+                    failed += 1
+
+                    if response.status_code == 403:
+                        blocked += 1
+
+            except httpx.HTTPError:
+                failed += 1
+
+            # Keep broadcasts under Telegram's practical global rate limit.
+            await asyncio.sleep(0.045)
+
+    return {
+        "ok": True,
+        "total": len(targets),
+        "sent": sent,
+        "failed": failed,
+        "blocked": blocked,
+    }
 
 
 @router.get("/logs")
