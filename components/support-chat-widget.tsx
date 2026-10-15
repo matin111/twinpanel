@@ -50,7 +50,6 @@ function saveGuestSession(value:GuestSession){try{window.localStorage.setItem(GU
 function clearGuestSession(){try{window.localStorage.removeItem(GUEST_STORAGE_KEY);}catch{}}
 
 async function chatApi<T>(path:string,options:RequestInit={},customerToken?:string|null):Promise<T>{
-  if(!API_BASE)throw new Error("NEXT_PUBLIC_API_BASE تنظیم نشده");
   const headers=new Headers(options.headers);
   if(options.body&&!headers.has("Content-Type")&&!(options.body instanceof FormData)&&!(options.body instanceof Blob))headers.set("Content-Type","application/json");
   if(customerToken)headers.set("Authorization",`Bearer ${customerToken}`);
@@ -154,7 +153,6 @@ export function SupportChatWidget({customerToken}:Props){
       if(!session)throw new Error(pick("شناسه گفتگو پیدا نشد","Chat session not found"));
       headers.set("X-Guest-Chat-Token",session.token);path=`/v1/support/guest/tickets/${ticketId}/upload-image`;
     }
-    if(!API_BASE)throw new Error("NEXT_PUBLIC_API_BASE تنظیم نشده");
     const response=await fetch(`${API_BASE}${path}`,{method:"POST",headers,body:image,cache:"no-store"});
     if(!response.ok){let message=pick("آپلود تصویر ناموفق بود","Image upload failed");try{message=(await response.json()).detail||message;}catch{}throw new Error(message);}
     return response.json() as Promise<UploadResult>;
