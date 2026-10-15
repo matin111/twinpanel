@@ -1,0 +1,46 @@
+name: Auto Eligibility V24 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/auto_eligibility_v24.py"
+      - "backend/app/manager_runtime_v20.py"
+      - "backend/scripts/auto_eligibility_v24_smoke.py"
+      - ".github/workflows/auto-eligibility-v24-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    env:
+      APP_SECRET_KEY: auto-eligibility-v24-ci-secret-only
+      DATABASE_URL: sqlite:////tmp/twinpanel-auto-eligibility-v24.db
+      NODE_AGENT_SHARED_SECRET: auto-eligibility-v24-ci-node-secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Compile touched modules
+        run: |
+          python -m py_compile \
+            backend/app/auto_eligibility_v24.py \
+            backend/app/manager_runtime_v20.py \
+            backend/scripts/auto_eligibility_v24_smoke.py
+
+      - name: Auto eligibility smoke
+        env:
+          PYTHONPATH: backend
+        run: |
+          python backend/scripts/auto_eligibility_v24_smoke.py
