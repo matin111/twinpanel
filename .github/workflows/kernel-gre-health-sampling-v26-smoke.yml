@@ -1,0 +1,46 @@
+name: Kernel GRE Health Sampling V26 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/kernel_gre_health_sampling_v26.py"
+      - "backend/app/manager_runtime_v20.py"
+      - "backend/scripts/kernel_gre_health_sampling_v26_smoke.py"
+      - ".github/workflows/kernel-gre-health-sampling-v26-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    env:
+      APP_SECRET_KEY: kernel-gre-v26-ci-secret-only
+      DATABASE_URL: sqlite:////tmp/twinpanel-kernel-gre-v26.db
+      NODE_AGENT_SHARED_SECRET: kernel-gre-v26-ci-node-secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Compile touched modules
+        run: |
+          python -m py_compile \
+            backend/app/kernel_gre_health_sampling_v26.py \
+            backend/app/manager_runtime_v20.py \
+            backend/scripts/kernel_gre_health_sampling_v26_smoke.py
+
+      - name: Kernel GRE health sampling smoke
+        env:
+          PYTHONPATH: backend
+        run: |
+          python backend/scripts/kernel_gre_health_sampling_v26_smoke.py
