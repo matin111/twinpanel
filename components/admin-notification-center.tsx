@@ -10,6 +10,15 @@ import {playNotificationSound,primeNotificationSound} from "../lib/notification-
 type AdminPanelNotification={id:number;event_key?:string|null;category?:string|null;source?:string|null;title?:string|null;message?:string|null;kind?:string|null;route?:string|null;created_at?:string|null;read_at?:string|null;is_read?:boolean};
 type AdminNotificationPayload={unread_count?:number;items?:unknown};
 
+const SUPPORT_SEEN_KEY="twinpanel.admin.support.lastSeenInboundMessageId";
+const ADMIN_PULSE_EVENT="twinpanel:admin-pulse";
+
+function readSupportSeen():number{
+  try{
+    const value=Number(localStorage.getItem(SUPPORT_SEEN_KEY)||0);
+    return Number.isFinite(value)&&value>=0?Math.floor(value):0;
+  }catch{return 0;}
+}
 function normalize(payload:unknown):{items:AdminPanelNotification[];unread:number}{
   if(!payload||typeof payload!=="object")return {items:[],unread:0};
   const root=payload as AdminNotificationPayload;
@@ -38,7 +47,9 @@ export function AdminNotificationCenter(){
   const pulse=async()=>{
     if(pulseBusy.current)return;pulseBusy.current=true;
     try{
-      const next=await opsApi.adminRealtimePulse();const supportId=Number(next.latest_support_message_id||0);const receiptId=Number(next.latest_receipt_id||0);
+      const next=await opsApi.adminRealtimePulse(readSupportSeen());
+      window.dispatchEvent(new CustomEvent(ADMIN_PULSE_EVENT,{detail:next}));
+      const supportId=Number(next.latest_support_message_id||0);const receiptId=Number(next.latest_receipt_id||0);
       if(!pulseSeeded.current){latestSupportId.current=supportId;latestReceiptId.current=receiptId;pulseSeeded.current=true;return;}
       if(receiptId>latestReceiptId.current){latestReceiptId.current=receiptId;void playNotificationSound("receipt");void load();}
       if(supportId>latestSupportId.current){latestSupportId.current=supportId;void playNotificationSound("message");}
@@ -49,8 +60,8 @@ export function AdminNotificationCenter(){
     const prime=()=>void primeNotificationSound();window.addEventListener("pointerdown",prime,{once:true});window.addEventListener("keydown",prime,{once:true});
     void load();void pulse();
     const refresh=()=>{if(document.visibilityState==="visible"){void load();void pulse();}};
-    const notificationTimer=window.setInterval(()=>{if(document.visibilityState==="visible")void load();},10000);
-    const pulseTimer=window.setInterval(()=>{if(document.visibilityState==="visible")void pulse();},700);
+    const notificationTimer=window.setInterval(()=>{if(document.visibilityState==="visible")void load();},12000);
+    const pulseTimer=window.setInterval(()=>{if(document.visibilityState==="visible")void pulse();},1000);
     window.addEventListener("focus",refresh);document.addEventListener("visibilitychange",refresh);
     return()=>{window.clearInterval(notificationTimer);window.clearInterval(pulseTimer);window.removeEventListener("focus",refresh);document.removeEventListener("visibilitychange",refresh);window.removeEventListener("pointerdown",prime);window.removeEventListener("keydown",prime);};
   },[]);
