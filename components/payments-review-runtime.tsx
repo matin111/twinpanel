@@ -166,26 +166,70 @@ export function PaymentsReviewRuntime(){
   };
 
   const openReceipt=async(row:ReviewRow)=>{
-    const popup=window.open("about:blank","_blank","noopener,noreferrer");
+    setError("");
+
+    // Open the tab synchronously from the click event so browser popup
+    // protection cannot block the authenticated receipt after fetch().
+    // Do not pass `noopener` to window.open here: browsers may return null
+    // for a noopener window, leaving the user with a permanent about:blank
+    // tab. We explicitly sever window.opener immediately instead.
+    const popup=window.open("about:blank","_blank");
+
+    if(!popup){
+      setError(pick("مرورگر اجازه باز کردن رسید را نداد. Pop-up را برای این سایت فعال کنید.","The browser blocked the receipt window. Allow pop-ups for this site."));
+      return;
+    }
+
+    try{
+      popup.opener=null;
+      popup.document.open();
+      popup.document.write(`<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>رسید پرداخت #${row.id}</title><style>html,body{height:100%;margin:0}body{display:grid;place-items:center;background:#0b0f18;color:#e5e7eb;font-family:system-ui,-apple-system,sans-serif}.box{padding:24px;text-align:center}.spinner{width:34px;height:34px;margin:0 auto 14px;border:3px solid #30384a;border-top-color:#8b5cf6;border-radius:50%;animation:s .8s linear infinite}@keyframes s{to{transform:rotate(360deg)}}</style></head><body><div class="box"><div class="spinner"></div><div>در حال دریافت رسید پرداخت...</div></div></body></html>`);
+      popup.document.close();
+    }catch{}
+
     try{
       const token=getCustomerToken();
       if(!token)throw new Error("AUTH_REQUIRED");
+
       const response=await fetch(`${API_BASE}/v1/payments/admin/intents/${row.id}/receipt`,{
         headers:{Authorization:`Bearer ${token}`},
         cache:"no-store",
       });
+
       if(!response.ok){
         let detail=`API error ${response.status}`;
-        try{const payload=await response.json() as {detail?:unknown};if(typeof payload.detail==="string")detail=payload.detail;}catch{}
+        try{
+          const payload=await response.json() as {detail?:unknown};
+          if(typeof payload.detail==="string")detail=payload.detail;
+        }catch{}
         throw new Error(detail);
       }
+
       const blob=await response.blob();
+      if(!blob.size)throw new Error(pick("فایل رسید خالی است.","The receipt file is empty."));
+
       const url=URL.createObjectURL(blob);
-      if(popup)popup.location.href=url;else window.open(url,"_blank","noopener,noreferrer");
-      window.setTimeout(()=>URL.revokeObjectURL(url),60_000);
+
+      if(popup.closed){
+        URL.revokeObjectURL(url);
+        return;
+      }
+
+      popup.location.replace(url);
+      window.setTimeout(()=>URL.revokeObjectURL(url),300_000);
     }catch(e){
-      if(popup)popup.close();
-      setError(e instanceof Error?e.message:String(e));
+      const message=e instanceof Error?e.message:String(e);
+      setError(message);
+
+      try{
+        if(!popup.closed){
+          popup.document.open();
+          popup.document.write(`<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><title>خطای نمایش رسید</title><style>html,body{height:100%;margin:0}body{display:grid;place-items:center;background:#0b0f18;color:#f3f4f6;font-family:system-ui,-apple-system,sans-serif}.box{max-width:620px;padding:28px;text-align:center}.error{color:#fca5a5;font-weight:700;margin-bottom:10px}.hint{color:#9ca3af;font-size:14px}</style></head><body><div class="box"><div class="error">نمایش رسید ناموفق بود</div><div class="hint">به پنل برگردید و دوباره تلاش کنید.</div></div></body></html>`);
+          popup.document.close();
+        }
+      }catch{
+        popup.close();
+      }
     }
   };
 
