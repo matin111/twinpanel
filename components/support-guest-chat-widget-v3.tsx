@@ -74,6 +74,13 @@ function friendlyError(reason:unknown,fa:string,en:string,lang:"fa"|"en"){
   if(error?.name==="TimeoutError"||error?.name==="AbortError"||/signal timed out|timeout|aborted/i.test(raw))return lang==="fa"?fa:en;
   return raw||(lang==="fa"?fa:en);
 }
+
+function isMissingTicket(reason:unknown){
+  const error=reason instanceof Error?reason:null;
+  const raw=String(error?.message||reason||"");
+  return /API 404|گفتگو پیدا نشد|تیکت پیدا نشد|ticket.*not found|conversation.*not found/i.test(raw);
+}
+
 async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   const headers=new Headers(init.headers);
   if(init.body&&!headers.has("Content-Type")&&!(init.body instanceof Blob)&&!(init.body instanceof FormData))headers.set("Content-Type","application/json");
@@ -158,7 +165,19 @@ export function SupportGuestChatWidgetV3(){
     try{
       const next=await request<ChatTicket>(`/v1/support/guest/tickets/${saved.ticketId}`,{headers:{"X-Guest-Chat-Token":saved.token}});
       saveSession(saved);setSession(saved);applyTicket(next,true);setError("");
-    }catch(reason){if(!silent)setError(friendlyError(reason,"ارتباط با پشتیبانی کند شده است؛ گفتگوی قبلی محفوظ است.","Support connection is slow; your previous chat is preserved.",lang));}
+    }catch(reason){
+      if(isMissingTicket(reason)){
+        clearSession();
+        setSession(null);
+        ticketRef.current=null;
+        setTicket(null);
+        lastAdminId.current=0;
+        setError("");
+        setInitialized(true);
+      }else if(!silent){
+        setError(friendlyError(reason,"ارتباط با پشتیبانی کند شده است؛ گفتگوی قبلی محفوظ است.","Support connection is slow; your previous chat is preserved.",lang));
+      }
+    }
     finally{refreshBusy.current=false;if(!silent)setLoading(false);}
   };
   const refreshDelta=async()=>{
@@ -171,7 +190,17 @@ export function SupportGuestChatWidgetV3(){
       const existing=new Set((latest.messages||[]).map(item=>item.id));
       const incoming=(delta.messages||[]).filter(item=>!existing.has(item.id));
       if(incoming.length||delta.status!==latest.status){applyTicket({...latest,status:delta.status||latest.status,messages:[...(latest.messages||[]),...incoming]},true);}
-    }catch{}finally{deltaBusy.current=false;}
+    }catch(reason){
+      if(isMissingTicket(reason)){
+        clearSession();
+        setSession(null);
+        ticketRef.current=null;
+        setTicket(null);
+        lastAdminId.current=0;
+        setError("");
+        setInitialized(true);
+      }
+    }finally{deltaBusy.current=false;}
   };
 
   useEffect(()=>{if(open&&session)void refresh(false);},[open,session?.ticketId]);
@@ -221,16 +250,181 @@ export function SupportGuestChatWidgetV3(){
   const sendText=async(textValue:string)=>{
     const currentTicket=ticketRef.current;
     if(!currentTicket||currentTicket.id<=0||sending)return;
-    const text=textValue.trim();if(!text)return;
-    const current=session??loadSession();if(!current){setError(pick("گفتگوی قبلی پیدا نشد","Previous chat session was not found"));return;}
+
+    const text=textValue.trim();
+    if(!text)return;
+
+    const current=session??loadSession();
+
+    if(!current){
+      setError(pick("گفتگوی قبلی پیدا نشد","Previous chat session was not found"));
+      return;
+    }
+
     const tempId=-Date.now();
-    setSending(true);setError("");setDraft("");
-    applyTicket({...currentTicket,messages:[...(currentTicket.messages||[]),{id:tempId,sender_role:"guest",message:text,created_at:new Date().toISOString(),_pending:true}]},false);scrollBottom();
+
+    setSending(true);
+    setError("");
+    setDraft("");
+
+    applyTicket(
+      {
+        ...currentTicket,
+        messages:[
+          ...(currentTicket.messages||[]),
+          {
+            id:tempId,
+            sender_role:"guest",
+            message:text,
+            created_at:new Date().toISOString(),
+            _pending:true,
+          },
+        ],
+      },
+      false,
+    );
+
+    scrollBottom();
+
     try{
-      const sent=await request<GuestFastReply>(`/v1/support/guest/tickets/${currentTicket.id}/messages-fast`,{method:"POST",headers:{"X-Guest-Chat-Token":current.token},body:JSON.stringify({message:text,source:"web"})});
-      applyFastReply(sent,tempId);
-    }catch(reason){const latest=ticketRef.current;if(latest)applyTicket({...latest,messages:(latest.messages||[]).filter(x=>x.id!==tempId)},false);setDraft(text);setError(friendlyError(reason,"ارسال پیام دیر پاسخ داد؛ دوباره تلاش کنید.","Message delivery timed out; please retry.",lang));}
-    finally{setSending(false);}
+      const sent=await request<GuestFastReply>(
+        `/v1/support/guest/tickets/${currentTicket.id}/messages-fast`,
+        {
+          method:"POST",
+          headers:{
+            "X-Guest-Chat-Token":current.token,
+          },
+          body:JSON.stringify({
+            message:text,
+            source:"web",
+          }),
+        },
+      );
+
+      applyFastReply(
+        sent,
+        tempId,
+      );
+
+    }catch(reason){
+
+      // SELF_HEAL_DELETED_GUEST_TICKET
+      if(isMissingTicket(reason)){
+        try{
+          const recreated=await request<ChatTicket>(
+            "/v1/support/guest/tickets",
+            {
+              method:"POST",
+              body:JSON.stringify({
+                name:(
+                  current.name
+                  || name.trim()
+                  || pick("کاربر","User")
+                ),
+                contact:(
+                  current.contact
+                  || contact.trim()
+                  || "-"
+                ),
+                message:text,
+                source:"web",
+              }),
+            },
+          );
+
+          if(
+            !recreated.id
+            || !recreated.guest_token
+          ){
+            throw new Error(
+              "CHAT_RECREATE_FAILED"
+            );
+          }
+
+          const nextSession={
+            ticketId:recreated.id,
+            token:recreated.guest_token,
+            name:current.name||name.trim(),
+            contact:current.contact||contact.trim(),
+          };
+
+          saveSession(
+            nextSession,
+          );
+
+          setSession(
+            nextSession,
+          );
+
+          const clean={
+            ...recreated,
+            guest_token:undefined,
+          };
+
+          applyTicket(
+            clean,
+            false,
+          );
+
+          setError("");
+          scrollBottom();
+          return;
+
+        }catch(recreateReason){
+          clearSession();
+          setSession(null);
+          ticketRef.current=null;
+          setTicket(null);
+
+          setDraft(
+            text,
+          );
+
+          setError(
+            friendlyError(
+              recreateReason,
+              "گفتگوی قبلی حذف شده بود. پیام شما محفوظ است؛ دوباره ارسال کنید.",
+              "The previous chat was deleted. Your message is preserved; send it again.",
+              lang,
+            ),
+          );
+
+          return;
+        }
+      }
+
+      const latest=ticketRef.current;
+
+      if(latest){
+        applyTicket(
+          {
+            ...latest,
+            messages:(
+              latest.messages||[]
+            ).filter(
+              x=>x.id!==tempId
+            ),
+          },
+          false,
+        );
+      }
+
+      setDraft(
+        text,
+      );
+
+      setError(
+        friendlyError(
+          reason,
+          "ارسال پیام دیر پاسخ داد؛ دوباره تلاش کنید.",
+          "Message delivery timed out; please retry.",
+          lang,
+        ),
+      );
+
+    }finally{
+      setSending(false);
+    }
   };
 
   const submitMessage=async(event:FormEvent)=>{

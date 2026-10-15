@@ -20,6 +20,12 @@ const STICKERS=["👍","❤️","🙏","😊","😂","🎉","✅","🔥","💜",
 const ALLOWED_IMAGES=new Set(["image/jpeg","image/png","image/webp","image/gif"]);
 const MAX_IMAGE_BYTES=5*1024*1024;
 
+function isMissingTicket(reason:unknown){
+  const error=reason instanceof Error?reason:null;
+  const raw=String(error?.message||reason||"");
+  return /API 404|گفتگو پیدا نشد|تیکت پیدا نشد|ticket.*not found|conversation.*not found/i.test(raw);
+}
+
 async function api<T>(path:string,token:string,options:RequestInit={}):Promise<T>{
   const headers=new Headers(options.headers);
   headers.set("Authorization",`Bearer ${token}`);
@@ -51,7 +57,7 @@ export function SupportAccountChatWidget({customerToken}:Props){
 
   const refresh=async(silent=false)=>{if(busy.current)return;busy.current=true;if(!silent)setLoading(true);try{const rows=await api<ChatTicket[]>("/v1/support/tickets/me",customerToken);const current=rows.find(x=>x.status!=="closed")??rows[0]??null;if(!current){ticketRef.current=null;setTicket(null);setInitialized(true);setError("");return;}const detail=await api<ChatTicket>(`/v1/support/tickets/${current.id}`,customerToken);applyTicket(detail,silent);setError("");}catch(reason){if(!silent)setError(reason instanceof Error?reason.message:pick("دریافت گفتگو ناموفق بود","Could not load chat"));setInitialized(true);}finally{busy.current=false;if(!silent)setLoading(false);}};
 
-  const refreshDelta=async()=>{const current=ticketRef.current;if(!current||current.id<=0||deltaBusy.current)return;deltaBusy.current=true;try{const delta=await api<ChatDelta>(`/v1/support/tickets/${current.id}/messages-after?after_id=${maxMessageId(current)}`,customerToken);const latest=ticketRef.current;if(!latest||latest.id!==delta.ticket_id)return;const existing=new Set((latest.messages||[]).map(x=>x.id));const incoming=(delta.messages||[]).filter(x=>!existing.has(x.id));if(incoming.length||delta.status!==latest.status){applyTicket({...latest,status:delta.status||latest.status,messages:[...(latest.messages||[]),...incoming]},true);}}catch{}finally{deltaBusy.current=false;}};
+  const refreshDelta=async()=>{const current=ticketRef.current;if(!current||current.id<=0||deltaBusy.current)return;deltaBusy.current=true;try{const delta=await api<ChatDelta>(`/v1/support/tickets/${current.id}/messages-after?after_id=${maxMessageId(current)}`,customerToken);const latest=ticketRef.current;if(!latest||latest.id!==delta.ticket_id)return;const existing=new Set((latest.messages||[]).map(x=>x.id));const incoming=(delta.messages||[]).filter(x=>!existing.has(x.id));if(incoming.length||delta.status!==latest.status){applyTicket({...latest,status:delta.status||latest.status,messages:[...(latest.messages||[]),...incoming]},true);}}catch(reason){if(isMissingTicket(reason)){ticketRef.current=null;setTicket(null);setInitialized(true);setError("");}}finally{deltaBusy.current=false;}};
 
   useEffect(()=>{if(open)void refresh(false);},[open,customerToken]);
   useEffect(()=>{if(!open||!ticket)return;const timer=window.setInterval(()=>{if(document.visibilityState==="visible")void refreshDelta();},500);return()=>clearInterval(timer);},[open,ticket?.id,customerToken]);
@@ -65,7 +71,145 @@ export function SupportAccountChatWidget({customerToken}:Props){
 
   const createConversation=async(firstMessage:string)=>{return api<ChatTicket>("/v1/support/tickets",customerToken,{method:"POST",body:JSON.stringify({category:"other",subject:pick("پشتیبانی پنل","Panel support"),message:firstMessage})});};
 
-  const sendText=async(textValue:string)=>{const currentTicket=ticketRef.current??ticket;const text=textValue.trim();if(!text||sending)return;setSending(true);setError("");const temp:ChatMessage={id:-Date.now(),sender_role:"user",message:text,created_at:new Date().toISOString(),_pending:true};if(currentTicket){const optimistic={...currentTicket,messages:[...(currentTicket.messages||[]),temp]};ticketRef.current=optimistic;setTicket(optimistic);}setDraft("");scrollBottom();try{if(currentTicket){const sent=await api<ChatFastReply>(`/v1/support/tickets/${currentTicket.id}/messages-fast`,customerToken,{method:"POST",body:JSON.stringify({message:text,source:"web"})});applyFastReply(sent,temp.id);}else{const next=await createConversation(text);applyTicket(next,false);}}catch(reason){const latest=ticketRef.current;if(latest){const restored={...latest,messages:(latest.messages||[]).filter(x=>x.id!==temp.id)};ticketRef.current=restored;setTicket(restored);}setDraft(text);setError(reason instanceof Error?reason.message:pick("ارسال پیام ناموفق بود","Could not send message"));}finally{setSending(false);}};
+  const sendText=async(textValue:string)=>{
+    const currentTicket=ticketRef.current??ticket;
+    const text=textValue.trim();
+
+    if(!text||sending)return;
+
+    setSending(true);
+    setError("");
+
+    const temp:ChatMessage={
+      id:-Date.now(),
+      sender_role:"user",
+      message:text,
+      created_at:new Date().toISOString(),
+      _pending:true,
+    };
+
+    if(currentTicket){
+      const optimistic={
+        ...currentTicket,
+        messages:[
+          ...(currentTicket.messages||[]),
+          temp,
+        ],
+      };
+
+      ticketRef.current=optimistic;
+      setTicket(optimistic);
+    }
+
+    setDraft("");
+    scrollBottom();
+
+    try{
+      if(currentTicket){
+        const sent=await api<ChatFastReply>(
+          `/v1/support/tickets/${currentTicket.id}/messages-fast`,
+          customerToken,
+          {
+            method:"POST",
+            body:JSON.stringify({
+              message:text,
+              source:"web",
+            }),
+          },
+        );
+
+        applyFastReply(
+          sent,
+          temp.id,
+        );
+
+      }else{
+        const next=await createConversation(
+          text,
+        );
+
+        applyTicket(
+          next,
+          false,
+        );
+      }
+
+    }catch(reason){
+
+      // SELF_HEAL_DELETED_ACCOUNT_TICKET
+      if(
+        currentTicket
+        && isMissingTicket(reason)
+      ){
+        try{
+          const replacementTicket=
+            await createConversation(
+              text,
+            );
+
+          applyTicket(
+            replacementTicket,
+            false,
+          );
+
+          setError("");
+          scrollBottom();
+          return;
+
+        }catch(recreateReason){
+          ticketRef.current=null;
+          setTicket(null);
+
+          setDraft(
+            text,
+          );
+
+          setError(
+            recreateReason instanceof Error
+              ? recreateReason.message
+              : pick(
+                  "گفتگوی قبلی حذف شده بود؛ پیام را دوباره ارسال کنید.",
+                  "The previous chat was deleted; send the message again.",
+                ),
+          );
+
+          return;
+        }
+      }
+
+      const latest=ticketRef.current;
+
+      if(latest){
+        const restored={
+          ...latest,
+          messages:(
+            latest.messages||[]
+          ).filter(
+            x=>x.id!==temp.id
+          ),
+        };
+
+        ticketRef.current=restored;
+        setTicket(restored);
+      }
+
+      setDraft(
+        text,
+      );
+
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : pick(
+              "ارسال پیام ناموفق بود",
+              "Could not send message",
+            ),
+      );
+
+    }finally{
+      setSending(false);
+    }
+  };
 
   const submit=async(event:FormEvent)=>{event.preventDefault();if(sending)return;const text=draft.trim();if(!text&&!image)return;if(text&&!image){await sendText(text);return;}setSending(true);setError("");try{let current=ticket;if(!current)current=await createConversation(text||pick("تصویر ارسال شد","Image sent"));else if(text)current=await api<ChatTicket>(`/v1/support/tickets/${current.id}/messages`,customerToken,{method:"POST",body:JSON.stringify({message:text,source:"web"})});if(image&&current){const uploaded=await uploadImage(current.id);if(uploaded)current=await api<ChatTicket>(`/v1/support/tickets/${current.id}/messages`,customerToken,{method:"POST",body:JSON.stringify({message:null,attachment_type:uploaded.attachment_type,attachment_ref:uploaded.attachment_ref,source:"web"})});}if(current)applyTicket(current,false);setDraft("");resetImage();scrollBottom();}catch(reason){setError(reason instanceof Error?reason.message:pick("ارسال پیام ناموفق بود","Could not send message"));}finally{setSending(false);}};
 
