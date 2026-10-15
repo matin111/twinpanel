@@ -68,5 +68,22 @@ html[dir="rtl"] .supportBubbleV1.admin{align-self:flex-start}
 .supportClosedV1{border:1px dashed var(--line);border-radius:11px;padding:12px;text-align:center;color:var(--muted);font-size:12px}
 .supportBlankV1{flex:1;display:grid;place-items:center;align-content:center;text-align:center;padding:35px;color:var(--muted)}
 .supportBlankV1 span{font-size:36px;margin-bottom:9px}.supportBlankV1 b{color:var(--text)}.supportBlankV1 p{max-width:440px;line-height:1.8;font-size:12px}
+
+/* Realtime support v2: fast optimistic delivery, message delete and stickers */
+.supportCenterV2 .supportBubbleV2{position:relative;transition:opacity .16s ease,transform .16s ease}
+.supportCenterV2 .supportBubbleV2.pending{opacity:.62;transform:translateY(1px)}
+.supportCenterV2 .supportPendingV2{color:var(--accent);font-weight:800}
+.supportCenterV2 .supportMessageDeleteV2{width:20px;height:20px;display:grid;place-items:center;border:0;border-radius:7px;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;opacity:.45;transition:.15s ease}
+.supportCenterV2 .supportBubbleV2:hover .supportMessageDeleteV2{opacity:1;background:color-mix(in srgb,#ef4444 9%,transparent);color:#ef4444}
+.supportCenterV2 .supportBubbleV2.sticker{background:transparent!important;border-color:transparent!important;box-shadow:none!important;padding:4px 8px}
+.supportCenterV2 .supportBubbleV2.sticker p{font-size:42px;line-height:1.15;letter-spacing:2px}
+.supportCenterV2 .supportStickerPanelV2{display:grid;grid-template-columns:repeat(8,minmax(36px,1fr));gap:6px;margin:8px 0;padding:9px;border:1px solid var(--line);background:var(--surface-2);border-radius:12px}
+.supportCenterV2 .supportStickerPanelV2 button{height:38px;border:1px solid transparent;border-radius:9px;background:transparent;font-size:22px;cursor:pointer;transition:.14s ease}
+.supportCenterV2 .supportStickerPanelV2 button:hover{background:color-mix(in srgb,var(--accent) 10%,var(--surface));border-color:color-mix(in srgb,var(--accent) 25%,var(--line));transform:translateY(-1px)}
+.supportCenterV2 .supportComposerActionsV2>div{flex-wrap:wrap}
+.supportCenterV2 .supportTicketListV1 .runtime-loading{padding:18px 12px}
+.supportCenterV2 .supportConversationV1{content-visibility:auto;contain-intrinsic-size:650px}
+.supportCenterV2 .supportTicketV1{content-visibility:auto;contain-intrinsic-size:118px}
+
 @media(max-width:1100px){.supportCenterToolbarV1{grid-template-columns:1fr}.supportFilterGroupV1{overflow:auto}.supportCenterGridV1,html[dir="rtl"] .supportCenterGridV1{grid-template-columns:1fr}.supportInboxV1,html[dir="rtl"] .supportInboxV1,.supportConversationV1,html[dir="rtl"] .supportConversationV1{grid-column:1;grid-row:auto}.supportInboxV1{min-height:360px}.supportTicketListV1{height:340px}.supportConversationV1{min-height:600px}}
-@media(max-width:700px){.supportCenterHeadV1,.supportConversationHeadV1{align-items:stretch;flex-direction:column}.supportCenterStatsV1{grid-template-columns:repeat(2,minmax(0,1fr))}.supportConversationActionsV1{justify-content:flex-start}.supportBubbleV1{max-width:92%}.supportMessagesV1{padding:10px}.supportComposerActionsV1{align-items:stretch;flex-direction:column}.supportComposerActionsV1>div{justify-content:space-between}.supportComposerActionsV1>.primary{width:100%}.supportAttachmentV1 img{max-width:100%}}
+@media(max-width:700px){.supportCenterHeadV1,.supportConversationHeadV1{align-items:stretch;flex-direction:column}.supportCenterStatsV1{grid-template-columns:repeat(2,minmax(0,1fr))}.supportConversationActionsV1{justify-content:flex-start}.supportBubbleV1{max-width:92%}.supportMessagesV1{padding:10px}.supportComposerActionsV1{align-items:stretch;flex-direction:column}.supportComposerActionsV1>div{justify-content:space-between}.supportComposerActionsV1>.primary{width:100%}.supportAttachmentV1 img{max-width:100%}.supportCenterV2 .supportStickerPanelV2{grid-template-columns:repeat(4,minmax(40px,1fr))}.supportCenterV2 .supportComposerActionsV2>div{justify-content:flex-start}}
