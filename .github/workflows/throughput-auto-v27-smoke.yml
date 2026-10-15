@@ -1,0 +1,46 @@
+name: Throughput Auto V27 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/throughput_auto_v27.py"
+      - "backend/app/manager_runtime_v20.py"
+      - "backend/scripts/throughput_auto_v27_smoke.py"
+      - ".github/workflows/throughput-auto-v27-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile touched modules
+        working-directory: backend
+        run: |
+          python -m py_compile \
+            app/throughput_auto_v27.py \
+            app/manager_runtime_v20.py \
+            scripts/throughput_auto_v27_smoke.py
+
+      - name: Throughput Auto V27 smoke
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:////tmp/twinpanel-v27-smoke.db
+          APP_SECRET_KEY: v27-smoke-secret
+        run: |
+          PYTHONPATH=. python scripts/throughput_auto_v27_smoke.py
