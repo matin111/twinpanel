@@ -22,6 +22,7 @@ import "./store-light-final.css";
 import "./dashboard-2027.css";
 import "./support-chat.css";
 import "./support-chat-emoji.css";
+import "./support-center.css";
 import "./customer-runtime.css";
 import "./customer-dashboard-pro.css";
 import "./domains-runtime.css";
