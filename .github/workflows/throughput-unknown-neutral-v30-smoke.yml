@@ -1,0 +1,46 @@
+name: Throughput Unknown Neutral V30 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/throughput_auto_v27.py"
+      - "backend/app/throughput_unknown_neutral_v30.py"
+      - "backend/app/manager_runtime_v20.py"
+      - "backend/scripts/throughput_unknown_neutral_v30_smoke.py"
+      - ".github/workflows/throughput-unknown-neutral-v30-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile V30
+        working-directory: backend
+        run: |
+          python -m py_compile \
+            app/throughput_unknown_neutral_v30.py \
+            app/throughput_auto_v27.py \
+            app/manager_runtime_v20.py \
+            scripts/throughput_unknown_neutral_v30_smoke.py
+
+      - name: Run V30 smoke
+        working-directory: backend
+        env:
+          APP_SECRET_KEY: twinpanel-v30-ci-only
+          NODE_AGENT_SHARED_SECRET: twinpanel-v30-ci-node-only
+          DATABASE_URL: sqlite:////tmp/twinpanel-v30-ci.db
+        run: |
+          PYTHONPATH=. python scripts/throughput_unknown_neutral_v30_smoke.py
