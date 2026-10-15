@@ -6,6 +6,7 @@ import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {BrandMark} from "../lib/branding";
 import {AdminNotificationCenter} from "./admin-notification-center";
+import {SupportUnreadBadge} from "./support-unread-badge";
 
 const ADMIN_SIDEBAR_SCROLL_KEY="twinpanel.admin.sidebar.scrollTop";
 
@@ -108,7 +109,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
         {group.items.map(([fa,en,h,i])=>{
           const label=pick(fa,en);
           return <Link key={h} href={h} title={collapsed?label:undefined} className={active===h?"active":""} onClick={()=>{rememberSidebarScroll();setMobileOpen(false);}}>
-            <i>{i}</i><span className="nav-label">{label}</span>
+            <i>{i}</i><span className="nav-label">{label}</span>{h==="/admin/support"&&<SupportUnreadBadge active={active===h}/>} 
           </Link>;
         })}
       </div>)}</nav>
