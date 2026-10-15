@@ -33,6 +33,7 @@ import "./domains-runtime.css";
 import "./readability.css";
 import "./admin-runtime.css";
 import "./admin-telegram-legacy.css";
+import "./admin-telegram-broadcast.css";
 import "./customer-delivery-enhancement.css";
 import "./parity-runtime.css";
 import "./subscriptions-full-runtime.css";
