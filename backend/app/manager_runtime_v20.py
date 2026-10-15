@@ -2,22 +2,27 @@ from __future__ import annotations
 
 from .manager_runtime_v19 import install_manager_runtime_v19
 from .transport_policy_v20 import install_transport_policy_v20
+from .kernel_gre_auto_v21 import install_kernel_gre_active_v21
 
 
 # ============================================================
-# TWINPANEL MANAGER RUNTIME V20
+# TWINPANEL MANAGER RUNTIME V20 + KERNEL GRE ACTIVE V21
 #
-# Reuse V19's self-hosted + multi-exit Backhaul hooks, then replace only the
-# transport selection policy with Performance Auto V20.
+# Reuse V19's self-hosted + multi-exit Backhaul hooks, replace only the
+# transport selection policy with Performance Auto V20, then extend that proven
+# policy with the TP27 Core-parity kernel_gre member. Manual authority and V20
+# anti-flap semantics remain unchanged.
 # ============================================================
 
 
 def install_manager_runtime_v20() -> None:
     install_manager_runtime_v19()
     install_transport_policy_v20()
+    install_kernel_gre_active_v21()
 
     print(
         "TWINPANEL_MANAGER_RUNTIME_V20_ACTIVE "
-        "backhaul_multi_exit=1 performance_auto=1 all_transports=1",
+        "backhaul_multi_exit=1 performance_auto=1 all_transports=1 "
+        "kernel_gre_active_v21=1",
         flush=True,
     )
