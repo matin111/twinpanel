@@ -1,0 +1,51 @@
+name: Throughput Meta V29 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/throughput_meta_v29.py"
+      - "backend/app/throughput_auto_v27.py"
+      - "backend/app/ssh_tunnel.py"
+      - "backend/app/manager_runtime_v20.py"
+      - "backend/scripts/throughput_meta_v29_smoke.py"
+      - ".github/workflows/throughput-meta-v29-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      APP_SECRET_KEY: throughput-v29-ci-secret-only
+      DATABASE_URL: sqlite:////tmp/twinpanel-throughput-v29.db
+      NODE_AGENT_SHARED_SECRET: throughput-v29-ci-node-secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Compile touched modules
+        run: |
+          python -m py_compile \
+            backend/app/throughput_meta_v29.py \
+            backend/app/throughput_auto_v27.py \
+            backend/app/ssh_tunnel.py \
+            backend/app/manager_runtime_v20.py \
+            backend/scripts/throughput_meta_v29_smoke.py
+
+      - name: Throughput Meta V29 smoke
+        env:
+          PYTHONPATH: backend
+        run: |
+          python backend/scripts/throughput_meta_v29_smoke.py
