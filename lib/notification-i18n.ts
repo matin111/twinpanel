@@ -14,23 +14,37 @@ const englishTitleMap:Record<string,string>={
   "تغییر وضعیت نود":"Node status changed",
   "تغییر وضعیت تونل":"Tunnel status changed",
   "پرداخت تأیید شد":"Payment approved",
+  "پرداخت تایید شد":"Payment approved",
   "پرداخت رد شد":"Payment rejected",
   "افزایش موجودی کیف پول":"Wallet balance increased",
   "اصلاح موجودی کیف پول":"Wallet balance adjusted",
   "درخواست شارژ رد شد":"Wallet top-up rejected",
 };
 
-function translateMessageToEnglish(input:string){
+function englishDigits(input:string){
   return String(input||"")
+    .replace(/[۰-۹]/g,d=>String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
+    .replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+    .replace(/٬/g,",")
+    .replace(/٫/g,".");
+}
+
+function translateMessageToEnglish(input:string){
+  const translated=String(input||"")
     .replace(/^🌐 تغییر وضعیت شبکه/gm,"🌐 Network status changed")
     .replace(/^🔀 تغییر وضعیت تونل/gm,"🔀 Tunnel status changed")
     .replace(/پرداخت سفارش (#?\d+) تأیید شد و اشتراک شما آماده استفاده است\.?/g,"Payment for order $1 was approved and your subscription is ready to use.")
+    .replace(/پرداخت سفارش (#?\d+) تایید شد و اشتراک شما آماده استفاده است\.?/g,"Payment for order $1 was approved and your subscription is ready to use.")
     .replace(/پرداخت سفارش (#?\d+) تأیید شد و سرویس شما در حال آماده‌سازی است\.?/g,"Payment for order $1 was approved and your service is being prepared.")
+    .replace(/پرداخت سفارش (#?\d+) تایید شد و سرویس شما در حال آماده‌سازی است\.?/g,"Payment for order $1 was approved and your service is being prepared.")
     .replace(/درخواست شارژ کیف پول #(\d+) رد شد\.?/g,"Wallet top-up #$1 was rejected.")
     .replace(/موجودی کیف پول شما توسط مدیر (.+?) افزایش یافت\./g,"Your wallet balance was increased by $1 by an administrator.")
     .replace(/موجودی کیف پول شما توسط مدیر (.+?) کاهش یافت\./g,"Your wallet balance was decreased by $1 by an administrator.")
     .replace(/توضیح:/g,"Note:")
-    .replace(/دلیل:/g,"Reason:");
+    .replace(/دلیل:/g,"Reason:")
+    .replace(/تومان/g,"Toman");
+
+  return englishDigits(translated);
 }
 
 export function localizeAdminPanelNotification(row:NotificationLike,lang:Lang){
