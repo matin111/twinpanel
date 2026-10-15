@@ -14,7 +14,7 @@ const ProvisionRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m
 const SmsReaderRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.SmsReaderRuntimePage));
 const MotherAccessRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.MotherAccessRuntimePage));
 const AccountDeliveryRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.AccountDeliveryRuntimePage));
-const SupportRuntimePage=dynamic(()=>import("./admin-ops-runtime").then(m=>m.SupportRuntimePage));
+const SupportCenterRuntime=dynamic(()=>import("./support-center-runtime").then(m=>m.SupportCenterRuntime));
 const NotificationsRuntimePage=dynamic(()=>import("./admin-ops-runtime").then(m=>m.NotificationsRuntimePage));
 const SystemHealthRuntimePage=dynamic(()=>import("./system-health-runtime").then(m=>m.SystemHealthRuntimePage));
 const SubscriptionToolsRuntimePage=dynamic(()=>import("./subscription-tools-runtime").then(m=>m.SubscriptionToolsRuntimePage));
@@ -60,7 +60,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="admin/settings") return admin(<SettingsPage2027/>);
   if(key==="admin/system-health") return admin(<SystemHealthRuntimePage/>);
   if(key==="admin/notifications") return admin(<NotificationsRuntimePage/>);
-  if(key==="admin/support") return admin(<SupportRuntimePage/>);
+  if(key==="admin/support") return admin(<SupportCenterRuntime/>);
   if(key==="admin/telegram") return admin(<TelegramRuntimePage/>);
   if(key==="admin/telegram-manager") return admin(<TelegramManagerPage/>);
   if(key==="admin/sms-reader") return admin(<SmsReaderRuntimePage/>);
