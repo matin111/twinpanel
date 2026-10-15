@@ -88,11 +88,7 @@ def delete_local_support_attachment(value: str | None) -> bool:
 
 
 def ensure_support_indexes() -> None:
-    """Create the small indexes used by realtime support queries.
-
-    CREATE INDEX IF NOT EXISTS is idempotent and keeps old installations fast
-    without requiring a destructive migration.
-    """
+    """Create the indexes used by realtime support queries."""
     statements = (
         "CREATE INDEX IF NOT EXISTS ix_support_tickets_last_message_id "
         "ON support_tickets (last_message_at DESC, id DESC)",
@@ -111,46 +107,45 @@ def ensure_support_indexes() -> None:
             connection.execute(text(statement))
 
 
-def _delete_ticket_rows(db, rows: list[SupportTicket]) -> tuple[int, int, list[str]]:
-    tickets_deleted = 0
-    messages_deleted = 0
-    attachment_refs: list[str] = []
+def _purge_tickets_by_ids(db, ticket_ids: list[int]) -> tuple[int, int, list[str]]:
+    if not ticket_ids:
+        return 0, 0, []
 
-    for ticket in rows:
-        messages = (
-            db.query(SupportMessage)
-            .filter(SupportMessage.ticket_id == ticket.id)
-            .all()
+    attachment_rows = (
+        db.query(SupportMessage.attachment_ref)
+        .filter(
+            SupportMessage.ticket_id.in_(ticket_ids),
+            SupportMessage.attachment_ref.isnot(None),
         )
-        attachment_refs.extend(
-            str(item.attachment_ref)
-            for item in messages
-            if local_support_attachment_path(item.attachment_ref) is not None
-        )
-        messages_deleted += len(messages)
+        .all()
+    )
+    attachment_refs = [
+        str(row[0])
+        for row in attachment_rows
+        if local_support_attachment_path(row[0]) is not None
+    ]
 
-        if messages:
-            (
-                db.query(SupportMessage)
-                .filter(SupportMessage.ticket_id == ticket.id)
-                .delete(synchronize_session=False)
-            )
-
-        db.delete(ticket)
-        tickets_deleted += 1
-
+    messages_deleted = int(
+        db.query(SupportMessage)
+        .filter(SupportMessage.ticket_id.in_(ticket_ids))
+        .delete(synchronize_session=False)
+        or 0
+    )
+    tickets_deleted = int(
+        db.query(SupportTicket)
+        .filter(SupportTicket.id.in_(ticket_ids))
+        .delete(synchronize_session=False)
+        or 0
+    )
     return tickets_deleted, messages_deleted, attachment_refs
 
 
 def cleanup_support_once() -> dict:
     """Bound support storage while preserving active conversations.
 
-    - Local chat images are removed after 24 hours by default and their DB
-      attachment references are cleared.
-    - Closed conversations are purged after 30 days by default.
-    - Answered conversations are purged after 90 days by default.
-    - Open conversations are never deleted automatically.
-    - Orphan image files older than the image retention window are removed.
+    Local chat images are removed after 24 hours by default. Closed tickets are
+    purged after 30 days, answered tickets after 90 days, and open tickets are
+    never deleted automatically. All work is bounded to avoid long DB locks.
     """
     ensure_support_indexes()
 
@@ -180,8 +175,7 @@ def cleanup_support_once() -> dict:
         )
 
         for message in old_images:
-            path = local_support_attachment_path(message.attachment_ref)
-            if path is None:
+            if local_support_attachment_path(message.attachment_ref) is None:
                 continue
             if delete_local_support_attachment(message.attachment_ref):
                 attachment_files_deleted += 1
@@ -189,40 +183,46 @@ def cleanup_support_once() -> dict:
             message.attachment_type = None
             attachment_rows_cleared += 1
 
-        closed_rows = (
-            db.query(SupportTicket)
-            .filter(
-                SupportTicket.status == "closed",
-                or_(
-                    SupportTicket.closed_at < closed_cutoff,
-                    (
-                        SupportTicket.closed_at.is_(None)
-                        & (SupportTicket.updated_at < closed_cutoff)
+        closed_ids = [
+            int(row[0])
+            for row in (
+                db.query(SupportTicket.id)
+                .filter(
+                    SupportTicket.status == "closed",
+                    or_(
+                        SupportTicket.closed_at < closed_cutoff,
+                        (
+                            SupportTicket.closed_at.is_(None)
+                            & (SupportTicket.updated_at < closed_cutoff)
+                        ),
                     ),
-                ),
+                )
+                .order_by(SupportTicket.id.asc())
+                .limit(CLEANUP_BATCH)
+                .all()
             )
-            .order_by(SupportTicket.id.asc())
-            .limit(CLEANUP_BATCH)
-            .all()
-        )
+        ]
 
-        answered_rows = (
-            db.query(SupportTicket)
-            .filter(
-                SupportTicket.status == "answered",
-                SupportTicket.updated_at < answered_cutoff,
+        remaining = max(0, CLEANUP_BATCH - len(closed_ids))
+        answered_ids = [
+            int(row[0])
+            for row in (
+                db.query(SupportTicket.id)
+                .filter(
+                    SupportTicket.status == "answered",
+                    SupportTicket.updated_at < answered_cutoff,
+                )
+                .order_by(SupportTicket.id.asc())
+                .limit(remaining)
+                .all()
             )
-            .order_by(SupportTicket.id.asc())
-            .limit(max(0, CLEANUP_BATCH - len(closed_rows)))
-            .all()
-        )
+        ] if remaining else []
 
-        expired = closed_rows + answered_rows
-        if expired:
-            td, md, refs = _delete_ticket_rows(db, expired)
-            tickets_deleted += td
-            messages_deleted += md
-            deferred_attachment_refs.extend(refs)
+        expired_ids = closed_ids + answered_ids
+        td, md, refs = _purge_tickets_by_ids(db, expired_ids)
+        tickets_deleted += td
+        messages_deleted += md
+        deferred_attachment_refs.extend(refs)
 
         db.commit()
 
