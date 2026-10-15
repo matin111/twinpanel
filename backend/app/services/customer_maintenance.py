@@ -28,13 +28,27 @@ def _payment_notification_batch_id(intent_id: int) -> str:
     return f"payment-approved-{int(intent_id)}"
 
 
+def _claim_paid_order(db, order_id: int) -> bool:
+    claimed = (
+        db.query(StoreOrder)
+        .filter(
+            StoreOrder.id == int(order_id),
+            StoreOrder.status == "paid",
+        )
+        .update(
+            {StoreOrder.status: "provisioning"},
+            synchronize_session=False,
+        )
+    )
+    db.commit()
+    return bool(claimed)
+
+
 async def process_paid_store_orders_once(limit: int = 10) -> dict:
     """Durable fallback for fast admin approvals.
 
-    Manual approval now returns before SSH/node provisioning finishes. The
-    response schedules an immediate BackgroundTask; this worker also scans paid
-    orders so an API restart between the response and that task cannot strand a
-    successfully approved order.
+    Orders are atomically claimed before provisioning. This keeps the recovery
+    loop from racing the immediate post-response BackgroundTask.
     """
 
     lookup = SessionLocal()
@@ -59,8 +73,7 @@ async def process_paid_store_orders_once(limit: int = 10) -> dict:
     for order_id in order_ids:
         db = SessionLocal()
         try:
-            current = db.get(StoreOrder, order_id)
-            if not current or current.status != "paid":
+            if not _claim_paid_order(db, order_id):
                 continue
 
             await _fulfill_paid_order(order_id, db)
@@ -69,6 +82,13 @@ async def process_paid_store_orders_once(limit: int = 10) -> dict:
         except Exception as exc:
             db.rollback()
             failed += 1
+
+            failed_order = db.get(StoreOrder, order_id)
+            if failed_order and failed_order.status == "provisioning":
+                failed_order.status = "provision_failed"
+                failed_order.error_text = str(exc)[:2000]
+                db.commit()
+
             print(
                 "paid store order recovery failed:",
                 {
