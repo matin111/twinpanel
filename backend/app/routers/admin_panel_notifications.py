@@ -1,4 +1,4 @@
-# TWINPANEL_ADMIN_PANEL_NOTIFICATION_API_V3
+# TWINPANEL_ADMIN_PANEL_NOTIFICATION_API_V4
 
 from datetime import datetime
 
@@ -99,18 +99,27 @@ def list_notifications(
 
 
 @router.get("/pulse")
-def realtime_pulse(db: Session = Depends(get_db)):
-    """Tiny polling endpoint for admin realtime sounds/badges.
+def realtime_pulse(
+    support_after_id: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """Tiny polling endpoint for admin realtime sounds and badges."""
+    inbound_support = db.query(SupportMessage.id).filter(
+        SupportMessage.sender_role != "admin"
+    )
 
-    It intentionally returns only scalar IDs/counts so the shell can poll it
-    frequently without downloading payment/support tables on every tick.
-    """
     latest_support_message_id = int(
-        db.query(func.max(SupportMessage.id))
-        .filter(SupportMessage.sender_role != "admin")
-        .scalar()
+        inbound_support.with_entities(func.max(SupportMessage.id)).scalar()
         or 0
     )
+
+    support_unread_count = int(
+        inbound_support.filter(
+            SupportMessage.id > int(support_after_id)
+        ).with_entities(func.count(SupportMessage.id)).scalar()
+        or 0
+    )
+
     open_support_count = int(
         db.query(func.count(SupportTicket.id))
         .filter(SupportTicket.status == "open")
@@ -144,6 +153,7 @@ def realtime_pulse(db: Session = Depends(get_db)):
 
     return {
         "latest_support_message_id": latest_support_message_id,
+        "support_unread_count": support_unread_count,
         "open_support_count": open_support_count,
         "latest_receipt_id": latest_receipt_id,
         "pending_receipt_count": pending_receipt_count,
