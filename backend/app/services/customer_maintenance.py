@@ -16,11 +16,13 @@ from .payment_automation import (
 from .payment_native_crypto_exact import (
     process_pending_native_crypto_exact_once,
 )
+from .support_maintenance import cleanup_support_once
 
 
 PAYMENT_NOTIFICATION_INTERVAL_SECONDS = 5
 CRYPTO_VERIFY_INTERVAL_SECONDS = 10
 RECEIPT_CLEANUP_INTERVAL_SECONDS = 6 * 60 * 60
+SUPPORT_CLEANUP_INTERVAL_SECONDS = 60 * 60
 
 
 def _payment_notification_batch_id(intent_id: int) -> str:
@@ -146,6 +148,7 @@ async def customer_maintenance_loop() -> None:
     """Customer payment automation and housekeeping loop."""
 
     last_receipt_cleanup = 0.0
+    last_support_cleanup = 0.0
     last_crypto_verify = 0.0
     sms_bootstrap_done = False
 
@@ -251,6 +254,29 @@ async def customer_maintenance_loop() -> None:
                 )
             finally:
                 last_receipt_cleanup = now
+
+        if (
+            last_support_cleanup == 0.0
+            or now - last_support_cleanup
+            >= SUPPORT_CLEANUP_INTERVAL_SECONDS
+        ):
+            try:
+                result = await asyncio.to_thread(
+                    cleanup_support_once
+                )
+                print(
+                    "SUPPORT_RETENTION_CLEANUP",
+                    result,
+                    flush=True,
+                )
+            except Exception as exc:
+                print(
+                    "support retention cleanup failed:",
+                    str(exc),
+                    flush=True,
+                )
+            finally:
+                last_support_cleanup = now
 
         await asyncio.sleep(
             PAYMENT_NOTIFICATION_INTERVAL_SECONDS
