@@ -1,0 +1,26 @@
+a.supportMenuNeedsReplyV1{position:relative}
+a.supportMenuNeedsReplyV1::after{
+  content:attr(data-support-count);
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:18px;
+  height:18px;
+  padding:0 5px;
+  margin-inline-start:auto;
+  border-radius:999px;
+  background:#ef4444;
+  color:#fff;
+  font-size:10px;
+  font-weight:800;
+  line-height:1;
+  box-shadow:0 0 0 2px rgba(15,23,42,.65);
+}
+.shell.sidebar-collapsed a.supportMenuNeedsReplyV1::after{
+  position:absolute;
+  inset-inline-end:4px;
+  top:4px;
+  min-width:16px;
+  height:16px;
+  padding:0 4px;
+}
