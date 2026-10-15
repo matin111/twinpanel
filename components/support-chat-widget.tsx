@@ -50,9 +50,8 @@ function saveGuestSession(value:GuestSession){try{window.localStorage.setItem(GU
 function clearGuestSession(){try{window.localStorage.removeItem(GUEST_STORAGE_KEY);}catch{}}
 
 async function chatApi<T>(path:string,options:RequestInit={},customerToken?:string|null):Promise<T>{
-  if(!API_BASE)throw new Error("NEXT_PUBLIC_API_BASE تنظیم نشده");
   const headers=new Headers(options.headers);
-  if(options.body&&!headers.has("Content-Type")&&!(options.body instanceof FormData))headers.set("Content-Type","application/json");
+  if(options.body&&!headers.has("Content-Type")&&!(options.body instanceof FormData)&&!(options.body instanceof Blob))headers.set("Content-Type","application/json");
   if(customerToken)headers.set("Authorization",`Bearer ${customerToken}`);
   const response=await fetch(`${API_BASE}${path}`,{...options,headers,cache:"no-store"});
   if(!response.ok){
@@ -147,15 +146,14 @@ export function SupportChatWidget({customerToken}:Props){
 
   const uploadImage=async(ticketId:number,session:GuestSession|null)=>{
     if(!image)return null;
-    const form=new FormData();form.append("file",image);
     const headers=new Headers();let path="";
+    headers.set("Content-Type",image.type||"application/octet-stream");
     if(resolvedToken){headers.set("Authorization",`Bearer ${resolvedToken}`);path=`/v1/support/tickets/${ticketId}/upload-image`;}
     else{
       if(!session)throw new Error(pick("شناسه گفتگو پیدا نشد","Chat session not found"));
       headers.set("X-Guest-Chat-Token",session.token);path=`/v1/support/guest/tickets/${ticketId}/upload-image`;
     }
-    if(!API_BASE)throw new Error("NEXT_PUBLIC_API_BASE تنظیم نشده");
-    const response=await fetch(`${API_BASE}${path}`,{method:"POST",headers,body:form,cache:"no-store"});
+    const response=await fetch(`${API_BASE}${path}`,{method:"POST",headers,body:image,cache:"no-store"});
     if(!response.ok){let message=pick("آپلود تصویر ناموفق بود","Image upload failed");try{message=(await response.json()).detail||message;}catch{}throw new Error(message);}
     return response.json() as Promise<UploadResult>;
   };
@@ -163,7 +161,7 @@ export function SupportChatWidget({customerToken}:Props){
   const sendAttachmentMessage=async(ticketId:number,session:GuestSession|null)=>{
     const uploaded=await uploadImage(ticketId,session);
     if(!uploaded)return null;
-    const payload={message:null,attachment_type:uploaded.attachment_type,attachment_ref:uploaded.attachment_ref};
+    const payload={message:null,attachment_type:uploaded.attachment_type,attachment_ref:uploaded.attachment_ref,source:resolvedToken?"live_chat":"store_guest"};
     if(resolvedToken)return chatApi<ChatTicket>(`/v1/support/tickets/${ticketId}/messages`,{method:"POST",body:JSON.stringify(payload)},resolvedToken);
     if(!session)throw new Error(pick("شناسه گفتگو پیدا نشد","Chat session not found"));
     return chatApi<ChatTicket>(`/v1/support/guest/tickets/${ticketId}/messages`,{method:"POST",headers:{"X-Guest-Chat-Token":session.token},body:JSON.stringify(payload)});
@@ -177,11 +175,11 @@ export function SupportChatWidget({customerToken}:Props){
     try{
       const first=text||pick("📷 تصویر پیوست شد","📷 Image attached");
       if(resolvedToken){
-        let created=await chatApi<ChatTicket>("/v1/support/tickets",{method:"POST",body:JSON.stringify({category:"other",subject:pick("گفتگوی آنلاین","Live chat"),message:first})},resolvedToken);
+        let created=await chatApi<ChatTicket>("/v1/support/tickets",{method:"POST",body:JSON.stringify({category:"other",subject:pick("گفتگوی آنلاین","Live chat"),message:first,source:"live_chat"})},resolvedToken);
         if(image){const next=await sendAttachmentMessage(created.id,null);if(next)created=next;}
         setTicket(created);setDraft("");resetImage();scrollBottom();return;
       }
-      let created=await chatApi<ChatTicket>("/v1/support/guest/tickets",{method:"POST",body:JSON.stringify({name:name.trim(),contact:contact.trim(),message:first})});
+      let created=await chatApi<ChatTicket>("/v1/support/guest/tickets",{method:"POST",body:JSON.stringify({name:name.trim(),contact:contact.trim(),message:first,source:"store_guest"})});
       if(!created.guest_token||!created.id)throw new Error(pick("ایجاد گفتگو ناموفق بود","Could not start chat"));
       const session={ticketId:created.id,token:created.guest_token,name:name.trim(),contact:contact.trim()};
       saveGuestSession(session);setGuestSession(session);
@@ -198,10 +196,11 @@ export function SupportChatWidget({customerToken}:Props){
     try{
       let updated=ticket;const session=guestSession??loadGuestSession();
       if(text){
-        if(resolvedToken)updated=await chatApi<ChatTicket>(`/v1/support/tickets/${ticket.id}/messages`,{method:"POST",body:JSON.stringify({message:text})},resolvedToken);
+        const payload={message:text,source:resolvedToken?"live_chat":"store_guest"};
+        if(resolvedToken)updated=await chatApi<ChatTicket>(`/v1/support/tickets/${ticket.id}/messages`,{method:"POST",body:JSON.stringify(payload)},resolvedToken);
         else{
           if(!session)throw new Error(pick("شناسه گفتگو پیدا نشد","Chat session not found"));
-          updated=await chatApi<ChatTicket>(`/v1/support/guest/tickets/${ticket.id}/messages`,{method:"POST",headers:{"X-Guest-Chat-Token":session.token},body:JSON.stringify({message:text})});
+          updated=await chatApi<ChatTicket>(`/v1/support/guest/tickets/${ticket.id}/messages`,{method:"POST",headers:{"X-Guest-Chat-Token":session.token},body:JSON.stringify(payload)});
         }
       }
       if(image){const next=await sendAttachmentMessage(ticket.id,session);if(next)updated=next;}

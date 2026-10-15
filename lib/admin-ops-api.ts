@@ -20,7 +20,7 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   if(!token)throw new Error("AUTH_REQUIRED");
   const headers=new Headers(init.headers);
   headers.set("Authorization",`Bearer ${token}`);
-  if(init.body&&!headers.has("Content-Type")&&!(init.body instanceof FormData))headers.set("Content-Type","application/json");
+  if(init.body&&!headers.has("Content-Type")&&!(init.body instanceof FormData)&&!(init.body instanceof Blob))headers.set("Content-Type","application/json");
   const response=await fetch(`${API_BASE}${path}`,{...init,headers,cache:"no-store"});
   if(!response.ok){
     let payload:unknown=null;try{payload=await response.json();}catch{}
@@ -30,6 +30,20 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   const type=response.headers.get("content-type")||"";
   if(!type.includes("application/json"))return await response.text() as T;
   return response.json() as Promise<T>;
+}
+
+async function uploadSupportImage(id:string|number,file:File):Promise<unknown>{
+  const token=getCustomerToken();
+  if(!token)throw new Error("AUTH_REQUIRED");
+  const headers=new Headers();
+  headers.set("Authorization",`Bearer ${token}`);
+  headers.set("Content-Type",file.type||"application/octet-stream");
+  const response=await fetch(`${API_BASE}/v1/admin/support/tickets/${encodeURIComponent(String(id))}/upload-image`,{method:"POST",headers,body:file,cache:"no-store"});
+  if(!response.ok){
+    let payload:unknown=null;try{payload=await response.json();}catch{}
+    throw new Error(errorMessage(payload,response.status));
+  }
+  return response.json() as Promise<unknown>;
 }
 
 export type NotificationSettings={
@@ -48,13 +62,23 @@ export type NotificationSendPayload={
   send_telegram:boolean;
 };
 
+export type SupportReplyPayload={
+  message:string|null;
+  attachment_type?:string|null;
+  attachment_ref?:string|null;
+  source?:string|null;
+};
+
 export const opsApi={
   supportTickets:()=>request<unknown>("/v1/admin/support/tickets"),
   supportTicket:(id:string|number)=>request<unknown>(`/v1/admin/support/tickets/${encodeURIComponent(String(id))}`),
   supportReply:(id:string|number,message:string)=>request<unknown>(`/v1/admin/support/tickets/${encodeURIComponent(String(id))}/reply`,{method:"POST",body:JSON.stringify({message})}),
+  supportReplyFull:(id:string|number,payload:SupportReplyPayload)=>request<unknown>(`/v1/admin/support/tickets/${encodeURIComponent(String(id))}/reply`,{method:"POST",body:JSON.stringify(payload)}),
+  supportUploadImage:(id:string|number,file:File)=>uploadSupportImage(id,file),
   supportClose:(id:string|number)=>request<unknown>(`/v1/admin/support/tickets/${encodeURIComponent(String(id))}/close`,{method:"POST"}),
   supportReopen:(id:string|number)=>request<unknown>(`/v1/admin/support/tickets/${encodeURIComponent(String(id))}/reopen`,{method:"POST"}),
   supportDelete:(id:string|number)=>request<unknown>(`/v1/admin/support/tickets/${encodeURIComponent(String(id))}`,{method:"DELETE"}),
+  supportDeleteMessage:(ticketId:string|number,messageId:string|number)=>request<unknown>(`/v1/admin/support/tickets/${encodeURIComponent(String(ticketId))}/messages/${encodeURIComponent(String(messageId))}`,{method:"DELETE"}),
 
   notificationSettings:()=>request<NotificationSettings>("/v1/settings/notifications"),
   saveNotificationSettings:(payload:NotificationSettings)=>request<NotificationSettings>("/v1/settings/notifications",{method:"PUT",body:JSON.stringify(payload)}),
