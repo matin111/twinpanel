@@ -8,10 +8,11 @@ from .kernel_gre_health_sampling_v26 import (
     install_kernel_gre_health_sampling_v26,
 )
 from .throughput_auto_v27 import install_throughput_auto_v27
+from .throughput_receiver_v28 import install_throughput_receiver_v28
 
 
 # ============================================================
-# TWINPANEL MANAGER RUNTIME V20 + KERNEL GRE ACTIVE V21 + V24 + V26 + V27
+# TWINPANEL MANAGER RUNTIME V20 + KERNEL GRE ACTIVE V21 + V24 + V26 + V27 + V28
 #
 # Reuse V19's self-hosted + multi-exit Backhaul hooks, replace only the
 # transport selection policy with Performance Auto V20, then extend that proven
@@ -29,6 +30,11 @@ from .throughput_auto_v27 import install_throughput_auto_v27
 # cached/persisted and influence Auto ranking only after at least two fresh
 # candidates have measurements; health, Manual authority and V20 hysteresis
 # remain authoritative.
+#
+# V28 hardens V27's remote receiver lifecycle. Instead of a fixed 0.5 second
+# sleep followed by one logfile read, it polls for the receiver's final RX_MBPS
+# marker until a bounded deadline. This removes completion/FIN races without
+# changing throughput caps, schedule, scoring, routes or services.
 # ============================================================
 
 
@@ -39,11 +45,13 @@ def install_manager_runtime_v20() -> None:
     install_auto_eligibility_v24()
     install_kernel_gre_health_sampling_v26()
     install_throughput_auto_v27()
+    install_throughput_receiver_v28()
 
     print(
         "TWINPANEL_MANAGER_RUNTIME_V20_ACTIVE "
         "backhaul_multi_exit=1 performance_auto=1 all_transports=1 "
         "kernel_gre_active_v21=1 auto_eligibility_v24=1 "
-        "kernel_gre_health_sampling_v26=1 throughput_auto_v27=1",
+        "kernel_gre_health_sampling_v26=1 throughput_auto_v27=1 "
+        "throughput_receiver_v28=1",
         flush=True,
     )
