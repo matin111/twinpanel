@@ -5,6 +5,9 @@ from app.auto_eligibility_v24 import (
     enabled_rows_v24,
     install_auto_eligibility_v24,
 )
+from app.kernel_gre_auto_v21 import (
+    install_kernel_gre_active_v21,
+)
 from app.models import TunnelTransport
 from app import transport_policy_v20 as v20
 
@@ -25,6 +28,9 @@ def row(
 
 
 def main() -> None:
+    # Match production installation order: V21 first registers kernel_gre as an
+    # Auto-capable member, then V24 applies the per-member eligibility gate.
+    install_kernel_gre_active_v21()
     install_auto_eligibility_v24()
     install_auto_eligibility_v24()
 
