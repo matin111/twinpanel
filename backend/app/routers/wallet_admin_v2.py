@@ -90,6 +90,29 @@ def payment_review_summary_v2(
     }
 
 
+def _claim_paid_order(db: Session, order_id: int) -> bool:
+    """Atomically move one paid order into provisioning.
+
+    Both the immediate BackgroundTask and the recovery worker may notice the
+    same paid order. A conditional UPDATE makes exactly one of them the owner,
+    avoiding duplicate subscription/account provisioning.
+    """
+
+    claimed = (
+        db.query(StoreOrder)
+        .filter(
+            StoreOrder.id == int(order_id),
+            StoreOrder.status == "paid",
+        )
+        .update(
+            {StoreOrder.status: "provisioning"},
+            synchronize_session=False,
+        )
+    )
+    db.commit()
+    return bool(claimed)
+
+
 async def _fulfill_approved_payment_background(
     *,
     intent_id: int,
@@ -97,16 +120,14 @@ async def _fulfill_approved_payment_background(
     user_id: int,
     amount_toman: int,
 ) -> None:
-    """Provision after the HTTP response has already been sent.
-
-    The order is committed as paid before this task is queued. The existing
-    fulfillment helper is idempotent and records provision_failed on runtime
-    failures, so slow SSH/node provisioning no longer blocks the admin click.
-    """
+    """Provision after the HTTP response has already been sent."""
 
     db = SessionLocal()
 
     try:
+        if not _claim_paid_order(db, int(order_id)):
+            return
+
         result = await _fulfill_paid_order(int(order_id), db)
         final_order = db.get(StoreOrder, int(order_id))
 
@@ -143,6 +164,11 @@ async def _fulfill_approved_payment_background(
 
     except Exception as exc:
         db.rollback()
+        failed = db.get(StoreOrder, int(order_id))
+        if failed and failed.status == "provisioning":
+            failed.status = "provision_failed"
+            failed.error_text = str(exc)[:2000]
+            db.commit()
         print(
             "payment background fulfillment failed:",
             {
@@ -222,15 +248,14 @@ async def approve_payment_intent_safe_v2(
         or 0
     )
 
-    # The response is now independent of slow node/SSH provisioning. Starlette
-    # runs this only after the response body has been sent to the admin.
-    background_tasks.add_task(
-        _fulfill_approved_payment_background,
-        intent_id=int(row.id),
-        order_id=int(row.order_id),
-        user_id=int(row.user_id),
-        amount_toman=amount_toman,
-    )
+    if not already_fulfilled:
+        background_tasks.add_task(
+            _fulfill_approved_payment_background,
+            intent_id=int(row.id),
+            order_id=int(row.order_id),
+            user_id=int(row.user_id),
+            amount_toman=amount_toman,
+        )
 
     return {
         "ok": True,
@@ -256,9 +281,6 @@ async def approve_payment_intent_safe_v2(
 
 @router.get("/wallets")
 def admin_wallets_v2(db: Session = Depends(get_db)):
-    # One joined query instead of up to 2001 queries (wallet list + one user
-    # lookup per row). This makes the wallet/admin screen much faster on large
-    # installations.
     rows = (
         db.query(CustomerWallet, User)
         .outerjoin(User, User.id == CustomerWallet.user_id)
