@@ -3,6 +3,7 @@
 import {usePathname} from "next/navigation";
 import {useEffect,useMemo,useState} from "react";
 import {getCustomerToken} from "../lib/customer-api";
+import {SupportAccountChatWidget} from "./support-account-chat-widget";
 import {SupportChatWidgetV2} from "./support-chat-widget-v2";
 
 export function SupportChatRuntime(){
@@ -27,9 +28,8 @@ export function SupportChatRuntime(){
     return null;
   },[pathname]);
 
-  if(!mode)return null;
-  if(token===undefined)return null;
-  if(mode==="account"&&!token)return null;
-
-  return <SupportChatWidgetV2 key={mode} mode={mode} customerToken={mode==="account"?token:null}/>;
+  if(!mode||token===undefined)return null;
+  if(mode==="guest")return <SupportChatWidgetV2 key="store-guest-chat" customerToken={null}/>;
+  if(!token)return null;
+  return <SupportAccountChatWidget key="customer-account-chat" customerToken={token}/>;
 }
