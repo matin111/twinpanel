@@ -83,18 +83,23 @@ export function PaymentsReviewRuntime(){
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
 
-  const load=async()=>{
-    setError("");
+  const load=async(quiet=false)=>{
+    if(!quiet)setError("");
+
+    // User names are secondary metadata. Do not block the payment table on a
+    // potentially large /admin/users response.
+    void adminApi.users().then(setUsers).catch(()=>{});
+
     const result=await Promise.allSettled([
       adminApi.payments(),
       parityApi.walletTopups(),
-      adminApi.users(),
     ]);
+
     if(result[0].status==="fulfilled")setPurchases(result[0].value);
     if(result[1].status==="fulfilled")setWallets(result[1].value);
-    if(result[2].status==="fulfilled")setUsers(result[2].value);
+
     const failed=result.find(item=>item.status==="rejected");
-    if(failed&&failed.status==="rejected")setError(failed.reason instanceof Error?failed.reason.message:String(failed.reason));
+    if(!quiet&&failed&&failed.status==="rejected")setError(failed.reason instanceof Error?failed.reason.message:String(failed.reason));
   };
 
   useEffect(()=>{void load();},[]);
@@ -157,22 +162,34 @@ export function PaymentsReviewRuntime(){
     });
   },[rows,filter,query,userMap]);
 
-  const act=async(key:string,label:string,fn:()=>Promise<unknown>)=>{
+  const markRow=(row:ReviewRow,status:string)=>{
+    const stamp=new Date().toISOString();
+    if(row.kind==="purchase"){
+      setPurchases(prev=>prev.map(item=>n(item.id)===row.id?{...item,status,verified_at:status==="approved"?stamp:item.verified_at,rejected_at:status==="rejected"?stamp:item.rejected_at}:item));
+    }else{
+      setWallets(prev=>prev.map(item=>n(item.id)===row.id?{...item,status,approved_at:status==="approved"?stamp:item.approved_at,rejected_at:status==="rejected"?stamp:item.rejected_at}:item));
+    }
+  };
+
+  const act=async(key:string,label:string,fn:()=>Promise<unknown>,optimistic?:()=>void)=>{
     if(busyKey)return;
     setBusyKey(key);setError("");setOk("");
-    try{await fn();setOk(label);await load();}
-    catch(e){setError(e instanceof Error?e.message:String(e));}
-    finally{setBusyKey("");}
+    try{
+      await fn();
+      optimistic?.();
+      setOk(label);
+      // Refresh in the background. The user gets immediate visual feedback and
+      // the action button is released without waiting for three follow-up APIs.
+      void load(true);
+    }catch(e){
+      setError(e instanceof Error?e.message:String(e));
+    }finally{
+      setBusyKey("");
+    }
   };
 
   const openReceipt=async(row:ReviewRow)=>{
     setError("");
-
-    // Open the tab synchronously from the click event so browser popup
-    // protection cannot block the authenticated receipt after fetch().
-    // Do not pass `noopener` to window.open here: browsers may return null
-    // for a noopener window, leaving the user with a permanent about:blank
-    // tab. We explicitly sever window.opener immediately instead.
     const popup=window.open("about:blank","_blank");
 
     if(!popup){
@@ -209,12 +226,7 @@ export function PaymentsReviewRuntime(){
       if(!blob.size)throw new Error(pick("فایل رسید خالی است.","The receipt file is empty."));
 
       const url=URL.createObjectURL(blob);
-
-      if(popup.closed){
-        URL.revokeObjectURL(url);
-        return;
-      }
-
+      if(popup.closed){URL.revokeObjectURL(url);return;}
       popup.location.replace(url);
       window.setTimeout(()=>URL.revokeObjectURL(url),300_000);
     }catch(e){
@@ -234,15 +246,15 @@ export function PaymentsReviewRuntime(){
   };
 
   const approve=(row:ReviewRow)=>{
-    if(row.kind==="purchase")return act(row.key,pick("پرداخت خرید تأیید شد","Purchase payment approved"),()=>adminApi.approvePayment(row.id));
-    return act(row.key,pick("شارژ کیف پول تأیید شد","Wallet top-up approved"),()=>parityApi.walletApprove(row.id));
+    if(row.kind==="purchase")return act(row.key,pick("پرداخت خرید تأیید شد","Purchase payment approved"),()=>adminApi.approvePayment(row.id),()=>markRow(row,"approved"));
+    return act(row.key,pick("شارژ کیف پول تأیید شد","Wallet top-up approved"),()=>parityApi.walletApprove(row.id),()=>markRow(row,"approved"));
   };
 
   const reject=(row:ReviewRow)=>{
     const reason=window.prompt(pick("دلیل رد پرداخت","Reject reason"),"")||"";
     if(!reason.trim())return;
-    if(row.kind==="purchase")void act(row.key,pick("پرداخت خرید رد شد","Purchase payment rejected"),()=>adminApi.rejectPayment(row.id,reason.trim()));
-    else void act(row.key,pick("شارژ کیف پول رد شد","Wallet top-up rejected"),()=>parityApi.walletReject(row.id,reason.trim()));
+    if(row.kind==="purchase")void act(row.key,pick("پرداخت خرید رد شد","Purchase payment rejected"),()=>adminApi.rejectPayment(row.id,reason.trim()),()=>markRow(row,"rejected"));
+    else void act(row.key,pick("شارژ کیف پول رد شد","Wallet top-up rejected"),()=>parityApi.walletReject(row.id,reason.trim()),()=>markRow(row,"rejected"));
   };
 
   return <Shell active="/admin/payments"><div className="page payment-review-center">
