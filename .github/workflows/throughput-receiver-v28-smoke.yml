@@ -1,0 +1,49 @@
+name: Throughput Receiver V28 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/throughput_receiver_v28.py"
+      - "backend/app/throughput_auto_v27.py"
+      - "backend/app/manager_runtime_v20.py"
+      - "backend/scripts/throughput_receiver_v28_smoke.py"
+      - ".github/workflows/throughput-receiver-v28-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      APP_SECRET_KEY: throughput-v28-ci-secret-only
+      DATABASE_URL: sqlite:////tmp/twinpanel-throughput-v28.db
+      NODE_AGENT_SHARED_SECRET: throughput-v28-ci-node-secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Compile touched modules
+        run: |
+          python -m py_compile \
+            backend/app/throughput_receiver_v28.py \
+            backend/app/throughput_auto_v27.py \
+            backend/app/manager_runtime_v20.py \
+            backend/scripts/throughput_receiver_v28_smoke.py
+
+      - name: Throughput Receiver V28 smoke
+        env:
+          PYTHONPATH: backend
+        run: |
+          python backend/scripts/throughput_receiver_v28_smoke.py
