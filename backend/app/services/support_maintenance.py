@@ -4,7 +4,9 @@ import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from ..database import SessionLocal
+from sqlalchemy import text
+
+from ..database import SessionLocal, engine
 from ..support_models import SupportMessage, SupportTicket
 
 
@@ -27,6 +29,24 @@ CLOSED_RETENTION_DAYS = max(
 
 IMAGE_BATCH_SIZE = 1000
 CLOSED_BATCH_SIZE = 250
+
+
+def ensure_support_indexes_once() -> None:
+    statements = (
+        "CREATE INDEX IF NOT EXISTS ix_support_tickets_last_message "
+        "ON support_tickets (last_message_at DESC, id DESC)",
+        "CREATE INDEX IF NOT EXISTS ix_support_tickets_status_last_message "
+        "ON support_tickets (status, last_message_at DESC, id DESC)",
+        "CREATE INDEX IF NOT EXISTS ix_support_messages_ticket_id_id "
+        "ON support_messages (ticket_id, id)",
+        "CREATE INDEX IF NOT EXISTS ix_support_messages_attachment_created "
+        "ON support_messages (attachment_type, created_at) "
+        "WHERE attachment_ref IS NOT NULL",
+    )
+
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
 
 
 def _attachment_path(ref: str | None) -> Path | None:
@@ -75,9 +95,12 @@ def cleanup_support_once() -> dict:
     - Chat images are removed after 24 hours by default.
     - Attachment-only message rows are removed after the image expires.
     - Closed conversations are purged after 90 days by default.
+    - Query indexes are created idempotently for the bounded inbox paths.
 
-    Both retention values can be overridden with environment variables.
+    Retention values can be overridden with environment variables.
     """
+
+    ensure_support_indexes_once()
 
     db = SessionLocal()
     now = datetime.utcnow()
