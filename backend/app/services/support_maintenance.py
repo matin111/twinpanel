@@ -7,6 +7,7 @@ from pathlib import Path
 from sqlalchemy import text
 
 from ..database import SessionLocal, engine
+from ..routers import support_guest_fast as _support_guest_fast  # register guest fast route
 from ..support_models import SupportMessage, SupportTicket
 
 
