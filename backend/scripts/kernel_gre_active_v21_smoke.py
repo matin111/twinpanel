@@ -8,6 +8,7 @@ from app import transport_policy_v20 as v20
 from app import tunnel_transport_manager_v7 as v7
 from app.kernel_gre_agent_compat_v21 import patch_agent_source
 from app.kernel_gre_auto_v21 import install_kernel_gre_active_v21
+from app.routers import provision
 from app.tp2027_transport import (
     TP2027_TRANSPORTS,
     tp2027_desired_meta,
@@ -95,6 +96,20 @@ def main() -> None:
     assert '"kernel_gre"' in patched
     assert "TWINPANEL_AGENT_KERNEL_GRE_V21" in patched
     assert patch_agent_source(patched) == patched
+
+    # tp2027_transport installs the shared make_agent hook at API import time.
+    # Validate the exact rendered Agent source, not only the helper function.
+    rendered_agent = provision.make_agent(
+        999,
+        "https://example.invalid",
+    )
+    assert '"kernel_gre"' in rendered_agent
+    assert "TWINPANEL_AGENT_KERNEL_GRE_V21" in rendered_agent
+    compile(
+        rendered_agent,
+        "<rendered-twinpanel-agent-v21>",
+        "exec",
+    )
 
     install_kernel_gre_active_v21()
 
