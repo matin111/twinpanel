@@ -31,6 +31,9 @@ from .tunnel_service_connections_admin_runtime import (
 from .service_speed_recovery_v36 import (
     apply_service_speed_recovery_v36,
 )
+from .tp2027_egress_v37 import (
+    apply_tp2027_egress_v37,
+)
 from .manual_transport_report_guard_v22 import (
     apply_manual_transport_report_guard_v22,
 )
@@ -225,6 +228,10 @@ def apply_self_hosted_runtime() -> None:
     # legacy and modern Xray routes from the same source that feeds Agent
     # desired-state, while physical tunnel transports remain a separate model.
     apply_tunnel_service_connections_admin_runtime()
+
+    # V37 repairs the missing Exit egress path for TP2027 overlay networks and
+    # verifies real public egress before a transport can become active.
+    apply_tp2027_egress_v37()
 
     # V36 keeps service forwarding entirely in the existing kernel iptables
     # path. The panel can return a tunnel to AUTO, seed the best healthy member
