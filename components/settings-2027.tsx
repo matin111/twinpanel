@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {FormEvent,useEffect,useMemo,useState} from "react";
 import {Badge,Card,PageHead,Shell} from "./ui";
 import {useI18n} from "../lib/i18n";
@@ -101,53 +100,54 @@ export function SettingsPage2027(){
     try{
       const value=await generalSettingsApi.updateEmail({email:emailDraft.trim(),current_password:emailPassword});
       setProfile(value);setEmailDraft(value.email||"");setEmailPassword("");
-      setOk(pick("ایمیل مدیر بروزرسانی شد","Admin email updated"));
+      setOk(pick("ایمیل مدیر ذخیره شد","Admin email saved"));
     }catch(e){setFailure(e);}finally{finish();}
   };
 
   const savePassword=async(event:FormEvent)=>{
     event.preventDefault();if(!begin("password"))return;
-    if(newPassword!==confirmPassword){setError(pick("تکرار رمز عبور با رمز جدید یکسان نیست.","Password confirmation does not match."));finish();return;}
+    if(newPassword!==confirmPassword){setError(pick("تکرار رمز جدید یکسان نیست.","Password confirmation does not match."));finish();return;}
     try{
       await generalSettingsApi.changePassword({current_password:currentPassword,new_password:newPassword});
       setCurrentPassword("");setNewPassword("");setConfirmPassword("");
-      setOk(pick("رمز عبور مدیر تغییر کرد","Admin password changed"));
+      setOk(pick("رمز عبور تغییر کرد","Password changed"));
     }catch(e){setFailure(e);}finally{finish();}
   };
 
   const setup2fa=async()=>{
     if(!begin("2fa-setup"))return;
-    try{setTwoFactorSetup(await generalSettingsApi.twoFactorSetup());setTwoFactorCode("");setOk(pick("کلید 2FA ساخته شد؛ پس از ثبت در Authenticator کد ۶ رقمی را تأیید کنید.","2FA secret created. Add it to your authenticator, then verify the 6-digit code."));}
+    try{setTwoFactorSetup(await generalSettingsApi.twoFactorSetup());setTwoFactorCode("");}
     catch(e){setFailure(e);}finally{finish();}
   };
 
   const enable2fa=async()=>{
     if(!begin("2fa-enable"))return;
-    try{await generalSettingsApi.twoFactorEnable(twoFactorCode.trim());setTwoFactorEnabled(true);setTwoFactorSetup(null);setTwoFactorCode("");setOk(pick("احراز هویت دومرحله‌ای فعال شد","Two-factor authentication enabled"));}
+    try{await generalSettingsApi.twoFactorEnable(twoFactorCode.trim());setTwoFactorEnabled(true);setTwoFactorSetup(null);setTwoFactorCode("");setOk(pick("ورود دومرحله‌ای فعال شد","Two-factor authentication enabled"));}
     catch(e){setFailure(e);}finally{finish();}
   };
 
   const disable2fa=async()=>{
     if(!begin("2fa-disable"))return;
-    try{await generalSettingsApi.twoFactorDisable({current_password:twoFactorDisablePassword,code:twoFactorDisableCode.trim()});setTwoFactorEnabled(false);setTwoFactorDisablePassword("");setTwoFactorDisableCode("");setOk(pick("احراز هویت دومرحله‌ای غیرفعال شد","Two-factor authentication disabled"));}
+    try{await generalSettingsApi.twoFactorDisable({current_password:twoFactorDisablePassword,code:twoFactorDisableCode.trim()});setTwoFactorEnabled(false);setTwoFactorDisablePassword("");setTwoFactorDisableCode("");setOk(pick("ورود دومرحله‌ای غیرفعال شد","Two-factor authentication disabled"));}
     catch(e){setFailure(e);}finally{finish();}
   };
 
   const generatePsk=async()=>{
     if(!begin("l2tp-generate"))return;
-    try{const value=await generalSettingsApi.generateL2tpPsk();setL2tpDraft(value.psk);setShowPsk(true);setOk(pick("Secret جدید ساخته شد؛ برای اعمال روی سرورها ذخیره را بزنید.","A new secret was generated. Save it to apply it to servers."));}
+    try{const value=await generalSettingsApi.generateL2tpPsk();setL2tpDraft(value.psk);setShowPsk(true);}
     catch(e){setFailure(e);}finally{finish();}
   };
 
   const savePsk=async()=>{
     if(!l2tpDraft.trim()){setError(pick("Secret نمی‌تواند خالی باشد.","Secret cannot be empty."));return;}
-    if(!window.confirm(pick("Secret روی همه Exit Nodeهای فعال L2TP همگام‌سازی شود؟","Sync this secret to all active L2TP exit nodes?")))return;
+    if(!window.confirm(pick("Secret جدید روی تمام سرورهای خروجی فعال L2TP اعمال شود؟","Apply this secret to all active L2TP exit servers?")))return;
     if(!begin("l2tp-save"))return;
     try{
       const result=await generalSettingsApi.saveL2tpPsk(l2tpDraft.trim());
-      const current=await generalSettingsApi.l2tp();setL2tp(current);setL2tpDraft(current.psk||"");
+      const current=await generalSettingsApi.l2tp();
+      setL2tp(current);setL2tpDraft(current.psk||"");
       const count=result.synced_nodes?.length??0;
-      setOk(result.changed?pick(`Secret ذخیره و روی ${count} نود همگام شد.`,`Secret saved and synced to ${count} nodes.`):pick("Secret بدون تغییر بود.","Secret was unchanged."));
+      setOk(result.changed?pick(`Secret ذخیره شد؛ ${count} سرور بروزرسانی شد.`,`Secret saved; ${count} servers updated.`):pick("Secret تغییری نکرد.","Secret was unchanged."));
     }catch(e){setFailure(e);}finally{finish();}
   };
 
@@ -156,7 +156,7 @@ export function SettingsPage2027(){
     try{
       const result=await generalSettingsApi.saveMotherAccess({admin_enabled:mother.admin_enabled,reseller_enabled:mother.reseller_enabled});
       setMother(v=>({...v,admin_enabled:result.admin_enabled,reseller_enabled:result.reseller_enabled}));
-      setOk(pick("تنظیمات دسترسی سرور مادر ذخیره شد","Mother-server access settings saved"));
+      setOk(pick("دسترسی سرور مادر ذخیره شد","Mother-server access saved"));
     }catch(e){setFailure(e);}finally{finish();}
   };
 
@@ -165,54 +165,54 @@ export function SettingsPage2027(){
     try{
       await generalSettingsApi.setResellerMotherAccess(resellerId,enabled);
       setMother(v=>({...v,reseller_overrides:{...v.reseller_overrides,[String(resellerId)]:enabled}}));
-      setOk(pick("دسترسی نماینده بروزرسانی شد","Reseller access updated"));
+      setOk(pick("دسترسی نماینده ذخیره شد","Reseller access saved"));
     }catch(e){setFailure(e);}finally{finish();}
   };
 
   const saveUsername=async(event:FormEvent)=>{
     event.preventDefault();if(!begin("username"))return;
-    try{const result=await generalSettingsApi.saveSubscriptionUsername({prefix:username.prefix,template:username.template});setUsername(result);setOk(pick("تنظیمات نام کاربری ذخیره شد","Username settings saved"));}
+    try{const result=await generalSettingsApi.saveSubscriptionUsername({prefix:username.prefix,template:username.template});setUsername(result);setOk(pick("قالب نام کاربری ذخیره شد","Username format saved"));}
     catch(e){setFailure(e);}finally{finish();}
   };
 
-  const copyText=async(value:string,label:string)=>{
-    try{await navigator.clipboard.writeText(value);setOk(label);setError("");}
-    catch{setError(pick("کپی در مرورگر مجاز نیست.","Clipboard access is not available."));}
+  const copyText=async(value:string)=>{
+    try{await navigator.clipboard.writeText(value);setOk(pick("کپی شد","Copied"));setError("");}
+    catch{setError(pick("کپی در مرورگر مجاز نیست.","Clipboard access is unavailable."));}
   };
 
   const enabledResellerOverrides=useMemo(()=>Object.values(mother.reseller_overrides||{}).filter(Boolean).length,[mother.reseller_overrides]);
 
   return <Shell active="/admin/settings"><div className="page">
-    <PageHead title={pick("تنظیمات سیستم","System Settings")} sub={pick("حساب مدیر، امنیت، L2TP، دسترسی سرور مادر و تنظیمات عملیاتی","Admin account, security, L2TP, mother-server access and operational settings")}/>
+    <PageHead title={pick("تنظیمات سیستم","System Settings")}/>
 
     {error&&<div className="runtime-error">{error}</div>}
     {ok&&<div className="runtime-success">{ok}</div>}
-    {loading&&<div className="runtime-loading">{pick("در حال دریافت تنظیمات واقعی سیستم...","Loading live system settings...")}</div>}
+    {loading&&<div className="runtime-loading">{pick("در حال دریافت تنظیمات...","Loading settings...")}</div>}
 
     <div className="module-grid two settings2027-live">
       <Card>
-        <div className="card-head"><div><b>{pick("حساب مدیر","Admin account")}</b><small>{pick("پروفایل و ایمیل حسابی که اکنون وارد شده است","Profile and email for the currently signed-in account")}</small></div><Badge tone={profile?.is_active?"ok":"warn"}>{profile?.is_active?pick("فعال","Active"):pick("نامشخص","Unknown")}</Badge></div>
+        <div className="card-head"><b>{pick("حساب مدیر","Admin account")}</b><Badge tone={profile?.is_active?"ok":"warn"}>{profile?.is_active?pick("فعال","Active"):pick("نامشخص","Unknown")}</Badge></div>
         <div className="runtime-info-list">
           <div><span>{pick("نام","Name")}</span><b>{profile?.full_name||"—"}</b></div>
           <div><span>{pick("نقش","Role")}</span><b dir="ltr">{profile?.role||"—"}</b></div>
           <div><span>ID</span><b dir="ltr">{profile?.id??"—"}</b></div>
         </div>
         <form onSubmit={saveEmail}>
-          <label className="field"><span>{pick("ایمیل مدیر","Admin email")}</span><input type="email" dir="ltr" value={emailDraft} onChange={e=>setEmailDraft(e.target.value)} required/></label>
-          <label className="field"><span>{pick("رمز فعلی برای تأیید","Current password for confirmation")}</span><input type="password" value={emailPassword} onChange={e=>setEmailPassword(e.target.value)} required autoComplete="current-password"/></label>
-          <div className="action-row"><button className="primary" disabled={Boolean(busy)}>{busy==="email"?pick("در حال ذخیره...","Saving..."):pick("ذخیره ایمیل","Save email")}</button></div>
+          <label className="field"><span>{pick("ایمیل","Email")}</span><input type="email" dir="ltr" value={emailDraft} onChange={e=>setEmailDraft(e.target.value)} required/></label>
+          <label className="field"><span>{pick("رمز فعلی","Current password")}</span><input type="password" value={emailPassword} onChange={e=>setEmailPassword(e.target.value)} required autoComplete="current-password"/></label>
+          <button className="primary" disabled={Boolean(busy)}>{busy==="email"?pick("در حال ذخیره...","Saving..."):pick("ذخیره ایمیل","Save email")}</button>
         </form>
       </Card>
 
       <Card>
-        <div className="card-head"><div><b>{pick("حالت نمایش","Appearance mode")}</b><small>{pick("در مرورگر ذخیره می‌شود و روی تمام صفحات اعمال می‌شود","Saved in the browser and applied across all pages")}</small></div><Badge tone="violet">{mode.toUpperCase()} · {resolved}</Badge></div>
-        <div className="theme-setting-panel"><ThemeSwitch/><div><b>{pick("دارک، لایت یا هماهنگ با سیستم","Dark, light or follow system")}</b><p className="muted">{pick("این تنظیم واقعی است و نیاز به ذخیره جداگانه ندارد.","This preference is applied immediately and needs no separate save.")}</p></div></div>
+        <div className="card-head"><b>{pick("نمایش پنل","Panel appearance")}</b><Badge tone="violet">{mode.toUpperCase()} · {resolved}</Badge></div>
+        <div className="theme-setting-panel"><ThemeSwitch/><b>{pick("حالت روشن، تاریک یا سیستم","Light, dark or system")}</b></div>
       </Card>
     </div>
 
     <div className="module-grid two">
       <Card>
-        <div className="card-head"><div><b>{pick("تغییر رمز عبور","Change password")}</b><small>{pick("رمز فعلی و رمز جدید را وارد کنید","Enter the current and new password")}</small></div></div>
+        <div className="card-head"><b>{pick("تغییر رمز عبور","Change password")}</b></div>
         <form onSubmit={savePassword}>
           <label className="field"><span>{pick("رمز فعلی","Current password")}</span><input type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} required autoComplete="current-password"/></label>
           <label className="field"><span>{pick("رمز جدید","New password")}</span><input type="password" minLength={8} value={newPassword} onChange={e=>setNewPassword(e.target.value)} required autoComplete="new-password"/></label>
@@ -222,73 +222,61 @@ export function SettingsPage2027(){
       </Card>
 
       <Card>
-        <div className="card-head"><div><b>{pick("احراز هویت دومرحله‌ای","Two-factor authentication")}</b><small>{pick("TOTP برای ورود مدیر","TOTP protection for admin login")}</small></div><Badge tone={twoFactorEnabled?"ok":"warn"}>{twoFactorEnabled?pick("فعال","Enabled"):pick("غیرفعال","Disabled")}</Badge></div>
+        <div className="card-head"><b>{pick("ورود دومرحله‌ای","Two-factor authentication")}</b><Badge tone={twoFactorEnabled?"ok":"warn"}>{twoFactorEnabled?pick("فعال","Enabled"):pick("غیرفعال","Disabled")}</Badge></div>
         {!twoFactorEnabled&&<>
-          {!twoFactorSetup&&<button className="primary" disabled={Boolean(busy)} onClick={()=>void setup2fa()}>{busy==="2fa-setup"?"…":pick("راه‌اندازی 2FA","Set up 2FA")}</button>}
-          {twoFactorSetup&&<>
-            <label className="field"><span>{pick("Secret","Secret")}</span><div className="secret-field"><input dir="ltr" readOnly value={twoFactorSetup.secret}/><button type="button" className="mini-btn" onClick={()=>void copyText(twoFactorSetup.secret,pick("Secret کپی شد","Secret copied"))}>{pick("کپی","Copy")}</button></div></label>
-            <label className="field"><span>Authenticator URI</span><div className="secret-field"><input dir="ltr" readOnly value={twoFactorSetup.otpauth_uri}/><button type="button" className="mini-btn" onClick={()=>void copyText(twoFactorSetup.otpauth_uri,pick("URI کپی شد","URI copied"))}>{pick("کپی","Copy")}</button></div></label>
-            <label className="field"><span>{pick("کد ۶ رقمی","6-digit code")}</span><input dir="ltr" inputMode="numeric" maxLength={6} value={twoFactorCode} onChange={e=>setTwoFactorCode(e.target.value.replace(/\D/g,"").slice(0,6))}/></label>
-            <button type="button" className="primary" disabled={Boolean(busy)||twoFactorCode.length!==6} onClick={()=>void enable2fa()}>{busy==="2fa-enable"?"…":pick("تأیید و فعال‌سازی","Verify and enable")}</button>
+          {!twoFactorSetup?<button className="primary" disabled={Boolean(busy)} onClick={()=>void setup2fa()}>{busy==="2fa-setup"?"…":pick("راه‌اندازی 2FA","Set up 2FA")}</button>:<>
+            <label className="field"><span>{pick("کلید Authenticator","Authenticator key")}</span><div className="secret-field"><input dir="ltr" readOnly value={twoFactorSetup.secret}/><button type="button" onClick={()=>void copyText(twoFactorSetup.secret)}>{pick("کپی","Copy")}</button></div></label>
+            <label className="field"><span>{pick("کد ۶ رقمی","6-digit code")}</span><input dir="ltr" inputMode="numeric" maxLength={6} value={twoFactorCode} onChange={e=>setTwoFactorCode(e.target.value.replace(/\D/g,""))}/></label>
+            <button className="primary" disabled={Boolean(busy)||twoFactorCode.length!==6} onClick={()=>void enable2fa()}>{pick("فعال‌سازی","Enable")}</button>
           </>}
         </>}
         {twoFactorEnabled&&<>
-          <label className="field"><span>{pick("رمز فعلی","Current password")}</span><input type="password" value={twoFactorDisablePassword} onChange={e=>setTwoFactorDisablePassword(e.target.value)} autoComplete="current-password"/></label>
-          <label className="field"><span>{pick("کد ۶ رقمی","6-digit code")}</span><input dir="ltr" inputMode="numeric" maxLength={6} value={twoFactorDisableCode} onChange={e=>setTwoFactorDisableCode(e.target.value.replace(/\D/g,"").slice(0,6))}/></label>
-          <button type="button" className="ghost" disabled={Boolean(busy)||!twoFactorDisablePassword||twoFactorDisableCode.length!==6} onClick={()=>void disable2fa()}>{busy==="2fa-disable"?"…":pick("غیرفعال‌سازی 2FA","Disable 2FA")}</button>
+          <label className="field"><span>{pick("رمز فعلی","Current password")}</span><input type="password" value={twoFactorDisablePassword} onChange={e=>setTwoFactorDisablePassword(e.target.value)}/></label>
+          <label className="field"><span>{pick("کد 2FA","2FA code")}</span><input dir="ltr" inputMode="numeric" maxLength={6} value={twoFactorDisableCode} onChange={e=>setTwoFactorDisableCode(e.target.value.replace(/\D/g,""))}/></label>
+          <button className="ghost" disabled={Boolean(busy)||twoFactorDisableCode.length!==6||!twoFactorDisablePassword} onClick={()=>void disable2fa()}>{pick("غیرفعال‌سازی 2FA","Disable 2FA")}</button>
         </>}
       </Card>
     </div>
 
-    <Card className="runtime-editor">
-      <div className="card-head"><div><b>L2TP / IPsec Secret</b><small>{pick("Secret مرکزی؛ هنگام ذخیره روی Exit Nodeهای فعال L2TP همگام می‌شود و در خطا rollback دارد.","Central secret; saving syncs active L2TP exit nodes and rolls back on failure.")}</small></div><Badge tone="violet">{l2tp.exit_count} {pick("نود","nodes")}</Badge></div>
-      <div className="setting-grid">
-        <label className="field"><span>{pick("IPsec Secret مرکزی","Central IPsec secret")}</span><div className="secret-field"><input dir="ltr" type={showPsk?"text":"password"} value={l2tpDraft} maxLength={64} onChange={e=>setL2tpDraft(e.target.value)}/><button type="button" className="mini-btn" onClick={()=>setShowPsk(v=>!v)}>{showPsk?pick("مخفی","Hide"):pick("نمایش","Show")}</button></div></label>
-        <div className="runtime-info-list">
-          <div><span>{pick("طول Secret","Secret length")}</span><b>{l2tpDraft.length}</b></div>
-          <div><span>{pick("Exit Nodeهای L2TP","L2TP exit nodes")}</span><b>{l2tp.exit_nodes.map(x=>x.name).join(" · ")||"—"}</b></div>
-        </div>
-      </div>
+    <Card>
+      <div className="card-head"><b>{pick("Secret مرکزی L2TP / IPsec","Central L2TP / IPsec secret")}</b><Badge tone="violet">{l2tp.exit_count} {pick("سرور خروجی","exit servers")}</Badge></div>
+      <label className="field"><span>IPsec Secret</span><div className="secret-field"><input dir="ltr" type={showPsk?"text":"password"} value={l2tpDraft} onChange={e=>setL2tpDraft(e.target.value)} maxLength={64}/><button type="button" onClick={()=>setShowPsk(v=>!v)}>{showPsk?pick("پنهان","Hide"):pick("نمایش","Show")}</button></div></label>
       <div className="action-row">
-        <button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>void generatePsk()}>{busy==="l2tp-generate"?"…":pick("ساخت Secret","Generate secret")}</button>
-        <button type="button" className="primary" disabled={Boolean(busy)||!l2tpDraft.trim()} onClick={()=>void savePsk()}>{busy==="l2tp-save"?pick("در حال همگام‌سازی...","Syncing..."):pick("ذخیره و همگام‌سازی","Save & sync")}</button>
+        <button className="ghost" disabled={Boolean(busy)} onClick={()=>void generatePsk()}>{busy==="l2tp-generate"?"…":pick("ساخت Secret","Generate secret")}</button>
+        <button className="primary" disabled={Boolean(busy)||!l2tpDraft.trim()} onClick={()=>void savePsk()}>{busy==="l2tp-save"?"…":pick("ذخیره و همگام‌سازی","Save & sync")}</button>
       </div>
-    </Card>
-
-    <Card className="runtime-editor">
-      <div className="card-head"><div><b>{pick("دسترسی سرور مادر","Mother-server access")}</b><small>{pick("دسترسی مدیر و نماینده‌ها را مستقل کنترل کنید","Control admin and reseller access independently")}</small></div><Badge tone="violet">{enabledResellerOverrides} / {resellers.length}</Badge></div>
-      <div className="module-grid two">
-        <label className="toggle module-toggle"><span>{pick("دسترسی مدیر به سرور مادر","Admin mother access")}</span><input type="checkbox" checked={mother.admin_enabled} onChange={e=>setMother(v=>({...v,admin_enabled:e.target.checked}))}/><i/></label>
-        <label className="toggle module-toggle"><span>{pick("فعال‌سازی دسترسی نماینده‌ها","Enable reseller mother access")}</span><input type="checkbox" checked={mother.reseller_enabled} onChange={e=>setMother(v=>({...v,reseller_enabled:e.target.checked}))}/><i/></label>
-      </div>
-      <div className="action-row"><button type="button" className="primary" disabled={Boolean(busy)} onClick={()=>void saveMother()}>{busy==="mother-global"?"…":pick("ذخیره دسترسی سراسری","Save global access")}</button></div>
-
-      <div className="card-head"><div><b>{pick("دسترسی هر نماینده","Per-reseller access")}</b><small>{mother.reseller_enabled?pick("روشن بودن هر نماینده در کنار دسترسی سراسری لازم است.","Each reseller also needs its own switch enabled."):pick("دسترسی سراسری نماینده‌ها خاموش است؛ overrideها فعلاً مؤثر نیستند.","Global reseller access is off, so overrides are not currently effective.")}</small></div></div>
-      {resellers.length?<div>{resellers.map(reseller=>{const enabled=Boolean(mother.reseller_overrides[String(reseller.id)]);const key=`mother-reseller:${reseller.id}`;return <div className="module-row" key={reseller.id}><span className="module-icon">◎</span><div className="grow"><b>{reseller.name}</b><small dir="ltr">{reseller.code||`#${reseller.id}`} · {reseller.email||"—"}</small></div><Badge tone={reseller.is_active===false?"warn":enabled&&mother.reseller_enabled?"ok":"violet"}>{reseller.is_active===false?pick("تعلیق","Suspended"):enabled&&mother.reseller_enabled?pick("مجاز","Allowed"):pick("بسته","Blocked")}</Badge><label className="toggle module-toggle"><input type="checkbox" checked={enabled} disabled={Boolean(busy)} onChange={e=>void toggleResellerMother(reseller.id,e.target.checked)}/><i/></label>{busy===key&&<small>…</small>}</div>})}</div>:<div className="runtime-empty">{pick("نماینده‌ای وجود ندارد.","No resellers found.")}</div>}
-    </Card>
-
-    <Card className="runtime-editor">
-      <div className="card-head"><div><b>{pick("قالب نام کاربری اشتراک","Subscription username format")}</b><small>{pick("مستقیم از تنظیمات عمومی Backend خوانده و ذخیره می‌شود","Read and saved directly through the backend general settings API")}</small></div><button className="ghost" disabled={loading||Boolean(busy)} onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button></div>
-      <form onSubmit={saveUsername}>
-        <div className="setting-grid">
-          <label className="field"><span>{pick("پیشوند","Prefix")}</span><input dir="ltr" value={username.prefix} onChange={e=>setUsername(s=>({...s,prefix:e.target.value}))} placeholder="tp"/></label>
-          <label className="field"><span>{pick("قالب","Template")}</span><input dir="ltr" value={username.template} onChange={e=>setUsername(s=>({...s,template:e.target.value}))} placeholder="{prefix}{user_id}-{subscription_id}"/></label>
-        </div>
-        <div className="runtime-info-list"><div><span>{pick("پیش‌نمایش Backend","Backend preview")}</span><b dir="ltr">{username.preview||"—"}</b></div><div><span>{pick("متغیرهای مجاز","Available variables")}</span><b dir="ltr">{username.variables?.join(" · ")||"—"}</b></div></div>
-        <div className="action-row"><button className="primary" disabled={Boolean(busy)}>{busy==="username"?pick("در حال ذخیره...","Saving..."):pick("ذخیره تنظیمات","Save settings")}</button></div>
-      </form>
     </Card>
 
     <Card>
-      <div className="card-head"><div><b>{pick("ماژول‌های عملیاتی تنظیمات","Operational settings modules")}</b><small>{pick("فقط بخش‌هایی که صفحه عملیاتی مستقل دارند","Only modules with their own operational pages")}</small></div></div>
-      <div className="settings-link-grid">
-        <Link href="/admin/branding"><b>{pick("برندینگ","Branding")}</b><small>{pick("نام، لوگو و هویت عمومی","Name, logo and public identity")}</small></Link>
-        <Link href="/admin/notifications"><b>{pick("اعلان‌ها","Notifications")}</b><small>{pick("کانال‌ها، ارسال و تاریخچه اعلان","Channels, delivery and notification history")}</small></Link>
-        <Link href="/admin/sms-reader"><b>SMS Reader</b><small>{pick("دستگاه، Pair و تطبیق پرداخت","Device pairing and payment matching")}</small></Link>
-        <Link href="/admin/payments"><b>{pick("پرداخت‌ها","Payments")}</b><small>{pick("تنظیمات و عملیات پرداخت","Payment settings and operations")}</small></Link>
-      </div>
+      <div className="card-head"><b>{pick("دسترسی سرور مادر","Mother-server access")}</b><Badge tone="violet">{enabledResellerOverrides}/{resellers.length}</Badge></div>
+      <label className="toggle module-toggle"><span>{pick("دسترسی مدیر","Admin access")}</span><input type="checkbox" checked={mother.admin_enabled} onChange={e=>setMother(v=>({...v,admin_enabled:e.target.checked}))}/><i/></label>
+      <label className="toggle module-toggle"><span>{pick("دسترسی نمایندگان","Reseller access")}</span><input type="checkbox" checked={mother.reseller_enabled} onChange={e=>setMother(v=>({...v,reseller_enabled:e.target.checked}))}/><i/></label>
+      <div className="action-row"><button className="primary" disabled={Boolean(busy)} onClick={()=>void saveMother()}>{busy==="mother-global"?"…":pick("ذخیره دسترسی‌ها","Save access")}</button></div>
+
+      {resellers.length>0&&<div className="runtime-info-list">
+        {resellers.map(reseller=>{
+          const enabled=Boolean(mother.reseller_overrides?.[String(reseller.id)]);
+          return <div key={reseller.id}>
+            <span><b>{reseller.name}</b>{reseller.code?` · ${reseller.code}`:""}</span>
+            <label className="toggle module-toggle"><input type="checkbox" checked={enabled} disabled={!mother.reseller_enabled||Boolean(busy)} onChange={e=>void toggleResellerMother(reseller.id,e.target.checked)}/><i/></label>
+          </div>;
+        })}
+      </div>}
     </Card>
 
-    <Card><div className="card-head"><div><b>{pick("اصل طراحی تنظیمات","Settings policy")}</b></div></div><p className="muted">{pick("در این صفحه فقط تنظیمات واقعی و متصل به Backend نگه داشته می‌شوند. تنظیمات VPN/Xray و سلامت پروتکل‌ها در بخش سرورها و امنیت مدیریت می‌شوند؛ L2TP فقط Secret مرکزی را اینجا نگه می‌دارد.","This page only keeps real backend-connected settings. VPN/Xray and protocol health belong to Servers and Security; only the central L2TP secret is kept here.")}</p></Card>
+    <Card className="runtime-editor">
+      <div className="card-head"><b>{pick("نام کاربری اشتراک","Subscription username")}</b><button className="ghost" disabled={loading||Boolean(busy)} onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button></div>
+      <form onSubmit={saveUsername}>
+        <div className="setting-grid">
+          <label className="field"><span>{pick("پیشوند","Prefix")}</span><input dir="ltr" value={username.prefix} onChange={e=>setUsername(s=>({...s,prefix:e.target.value}))} placeholder="mv"/></label>
+          <label className="field"><span>{pick("قالب","Template")}</span><input dir="ltr" value={username.template} onChange={e=>setUsername(s=>({...s,template:e.target.value}))} placeholder="{prefix}{sub_id}_{user_id}"/></label>
+        </div>
+        <div className="runtime-info-list">
+          <div><span>{pick("پیش‌نمایش","Preview")}</span><b dir="ltr">{username.preview||"—"}</b></div>
+          <div><span>{pick("متغیرها","Variables")}</span><b dir="ltr">{username.variables?.join(" · ")||"—"}</b></div>
+        </div>
+        <button className="primary" disabled={Boolean(busy)}>{busy==="username"?pick("در حال ذخیره...","Saving..."):pick("ذخیره قالب","Save format")}</button>
+      </form>
+    </Card>
   </div></Shell>;
 }
