@@ -159,36 +159,94 @@ def _register_xray_routes_for_drifted_main() -> int:
 
 
 def apply_self_hosted_runtime() -> None:
+    # Manual transport selection is authoritative. Agent reports are telemetry
+    # and must not race a freshly committed Manual selection back to the stale
+    # transport from the previous polling cycle.
     apply_manual_transport_report_guard_v22()
+
+    # Manual selection is registry-driven. Any installed, enabled and online
+    # TunnelTransport row can be selected without another hard-coded API list.
     apply_manual_transport_api_v23()
+
+    # tunnels.py imports this function by name, so patch the module binding.
     tunnels._install_or_upgrade_agent = _self_hosted_install_or_upgrade_agent
+
+    # V16 removes a shared-Iran collision in Backhaul's historical hard-coded
+    # forwarded mapping. The panel remains the owner of installation/repair;
+    # users do not need to edit node configs manually.
     tunnels._install_backhaul_peer = install_backhaul_peer_v16
 
+    # Xray modern is intentionally enabled without enabling the unrelated
+    # V18/V19/V20 tunnel runtimes that are absent from this production baseline.
+    # Modern public service ports use isolated 1000-port blocks so Exit IDs up
+    # to 999 cannot collide with the legacy Xray service range.
     xray_modern_runtime.PROFILE_META[
         xray_modern_runtime.PROFILE_XHTTP
     ]["public_base"] = 24000
+
     xray_modern_runtime.PROFILE_META[
         xray_modern_runtime.PROFILE_GRPC
     ]["public_base"] = 25000
+
     xray_modern_runtime.PROFILE_META[
         xray_modern_runtime.PROFILE_WS
     ]["public_base"] = 26000
+
     xray_modern_runtime.PROFILE_META[
         xray_modern_runtime.PROFILE_HTTPUPGRADE
     ]["public_base"] = 27000
 
+    # Xray 26.x derives config format from the file suffix. Keep the V2 core
+    # untouched and apply the production compatibility shim before Modern and
+    # Repair hooks are activated, so every candidate config ends in `.json`.
     apply_xray_modern_temp_config_runtime()
     xray_modern_runtime.apply_xray_modern_runtime()
     apply_xray_modern_repair_runtime()
+
+    # Dedicated Xray domain is applied after every existing Modern/Repair shim
+    # so it composes with the exact production wrappers instead of replacing
+    # self-heal or JSON-temp behavior. Legacy public_domain remains a fallback.
     apply_xray_node_domain_runtime()
+
+    # V36 upgrades the meaning of "already modern": when an Exit gains a TLS
+    # domain later, existing Reality-only credentials are no longer skipped.
+    # Existing UUIDs are reused, so clients do not receive needless identities.
     apply_xray_profile_reconcile_v36()
+
+    # The public share page was imported before Modern Xray patched account
+    # delivery. Rebind it to the final payload and expand nested Modern Xray
+    # profiles into the existing server-tab UI. Legacy VLESS remains available.
     apply_xray_public_delivery_runtime()
+
+    # Some production installations intentionally carry a local main.py drift
+    # that removed direct Xray router includes. Restore those routes through an
+    # already-included router without editing or overwriting the local main.py.
     _register_xray_routes_for_drifted_main()
+
+    # Register the admin-only service-routing inventory after Xray Modern has
+    # patched tunnels._service_routes_for_exit. The endpoint therefore reports
+    # legacy and modern Xray routes from the same source that feeds Agent
+    # desired-state, while physical tunnel transports remain a separate model.
     apply_tunnel_service_connections_admin_runtime()
+
+    # V37 repairs the missing Exit egress path for TP2027 overlay networks and
+    # verifies real public egress before a transport can become active.
     apply_tp2027_egress_v37()
+
+    # V36 keeps service forwarding entirely in the existing kernel iptables
+    # path. The panel can return a tunnel to AUTO, seed the best healthy member
+    # from fresh throughput/latency telemetry, and reconcile Xray profiles in a
+    # background job without keeping a long browser request open.
     apply_service_speed_recovery_v36()
 
+    # SSH TUN is controller-owned in the self-hosted product. V3 keeps all node
+    # changes automatic, uses the V2 self-healing runtime, then performs a real
+    # key-authenticated fallback to the Backhaul private SSH path when public
+    # TCP/22 is reachable but the authenticated SSH session/tunnel is filtered.
     tunnels.provision_ssh_tunnel = provision_ssh_tunnel_self_hosted_v3
 
+    # nodes.py contains migrated cleanup code using Path but the historical
+    # source omitted the import. Supply it here until that file is split into
+    # smaller lifecycle modules.
     if not hasattr(nodes, "Path"):
         nodes.Path = Path
