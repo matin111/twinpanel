@@ -11,6 +11,7 @@ import {useI18n} from "../lib/i18n";
 
 type SideDiag = {
   ok?: boolean;
+  error?: string;
   service?: {ActiveState?: string; SubState?: string};
   interface?: {exists?: boolean; mtu?: number | null; addr?: string};
   listener?: {required?: boolean; present?: boolean | null};
@@ -33,14 +34,24 @@ type DeepTransport = {
 };
 
 
+type AgentMeta = {
+  available?: boolean;
+  agent_version?: string | null;
+  age_seconds?: number | null;
+};
+
+
 type DeepDiagnosis = {
   ok?: boolean;
   read_only?: boolean;
+  source?: string;
+  partial?: boolean;
   tunnel_id?: number;
   active_transport?: string | null;
   preferred_transport?: string | null;
   unhealthy?: string[];
   transports?: DeepTransport[];
+  agents?: {iran?: AgentMeta; exit?: AgentMeta};
   marker?: string;
 };
 
@@ -52,6 +63,13 @@ type DeepRepairResult = {
   deep_diagnosis?: DeepDiagnosis;
   marker?: string;
   safety?: Record<string, unknown>;
+};
+
+
+type AgentInstallResult = {
+  ok?: boolean;
+  results?: Record<string, {ok?: boolean; service?: string; error?: string; agent_version?: string}>;
+  marker?: string;
 };
 
 
@@ -74,8 +92,16 @@ function statusTone(status: unknown): "ok" | "warn" | "bad" | "violet" {
 function causeTone(code: unknown): "ok" | "warn" | "bad" | "violet" {
   const value = String(code ?? "");
   if (value === "healthy") return "ok";
-  if (["diagnostic_unavailable", "diagnostic_error"].includes(value)) return "warn";
+  if (["diagnostic_unavailable", "diagnostic_error", "agent_unavailable", "agent_diagnostic_error"].includes(value)) return "warn";
   return "bad";
+}
+
+
+function agentText(meta?: AgentMeta) {
+  if (!meta?.available) return "Offline / no fresh report";
+  const version = meta.agent_version || "agent";
+  const age = meta.age_seconds == null ? "" : ` · ${meta.age_seconds}s ago`;
+  return `${version}${age}`;
 }
 
 
@@ -90,8 +116,9 @@ function SideSummary({title, side}: {title: string; side?: SideDiag}) {
     <div className="card">
       <div className="card-head">
         <b>{title}</b>
-        <Badge tone={side?.ok ? "ok" : "bad"}>{side?.ok ? "OK" : "Error"}</Badge>
+        <Badge tone={side?.ok ? "ok" : "warn"}>{side?.ok ? "OK" : "Unavailable"}</Badge>
       </div>
+      {side?.error ? <div className="runtime-warning" dir="ltr">{side.error}</div> : null}
       <div className="runtime-info-list">
         <div><span>Service</span><b>{service}</b></div>
         <div><span>Interface</span><b>{iface ? "OK" : "Missing"}</b></div>
@@ -115,6 +142,7 @@ export function TunnelsDeepDiagnosticsV32() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [diagnosis, setDiagnosis] = useState<DeepDiagnosis | null>(null);
   const [repairResult, setRepairResult] = useState<DeepRepairResult | null>(null);
 
@@ -147,6 +175,7 @@ export function TunnelsDeepDiagnosticsV32() {
     if (!tunnelId || busy) return;
     setBusy("diagnose");
     setError("");
+    setNotice("");
     setRepairResult(null);
     try {
       const result = await tunnelTransportApi.managedDeepDiagnose(tunnelId) as DeepDiagnosis;
@@ -160,15 +189,55 @@ export function TunnelsDeepDiagnosticsV32() {
     }
   };
 
+  const installAgents = async () => {
+    if (!tunnelId || busy) return;
+    if (!window.confirm(pick(
+      `Agent تشخیص روی هر دو نود تانل #${tunnelId} نصب/ارتقا شود؟ SSH ذخیره‌شده فقط برای همین Bootstrap استفاده می‌شود؛ بعد از آن تشخیص بدون SSH انجام می‌شود.`,
+      `Install/upgrade the diagnostics agent on both nodes of tunnel #${tunnelId}? Saved SSH is used only for this bootstrap; routine diagnostics then run without SSH.`,
+    ))) return;
+
+    setBusy("agent");
+    setError("");
+    setNotice("");
+    try {
+      const result = await tunnelTransportApi.installDeepDiagnosticsAgent(tunnelId) as AgentInstallResult;
+      const failures = Object.entries(result.results || {})
+        .filter(([, value]) => value?.ok !== true)
+        .map(([side, value]) => `${side}: ${value?.error || value?.service || "failed"}`);
+
+      if (!result.ok || failures.length) {
+        setError(failures.join(" | ") || pick("نصب Agent کامل نشد.", "Agent installation did not complete."));
+        return;
+      }
+
+      setNotice(pick(
+        "Agent تشخیص روی هر دو سرور فعال شد. حدود ۱۰ تا ۱۵ ثانیه برای اولین گزارش صبر می‌کنیم…",
+        "Diagnostics agents are active on both servers. Waiting about 10–15 seconds for the first report…",
+      ));
+
+      await new Promise(resolve => window.setTimeout(resolve, 12000));
+      const fresh = await tunnelTransportApi.managedDeepDiagnose(tunnelId) as DeepDiagnosis;
+      setDiagnosis(fresh);
+      setNotice(pick("گزارش Agentها دریافت شد.", "Agent reports received."));
+    }
+    catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    }
+    finally {
+      setBusy("");
+    }
+  };
+
   const repair = async () => {
     if (!tunnelId || busy) return;
     if (!window.confirm(pick(
-      `تعمیر عمیق تانل #${tunnelId} اجرا شود؟ مسیرهای سالم دست‌نخورده می‌مانند و نتیجه تشخیص عمیق بعد از تعمیر نمایش داده می‌شود.`,
-      `Run deep repair for tunnel #${tunnelId}? Healthy paths stay untouched and a deep post-repair diagnosis will be shown.`,
+      `تعمیر عمیق تانل #${tunnelId} اجرا شود؟ مسیرهای سالم دست‌نخورده می‌مانند و نتیجه Agentها بعد از تعمیر نمایش داده می‌شود.`,
+      `Run deep repair for tunnel #${tunnelId}? Healthy paths stay untouched and node-agent diagnosis will be shown afterward.`,
     ))) return;
 
     setBusy("repair");
     setError("");
+    setNotice("");
     try {
       const result = await tunnelTransportApi.managedDeepRepair(tunnelId) as DeepRepairResult;
       setRepairResult(result);
@@ -182,6 +251,8 @@ export function TunnelsDeepDiagnosticsV32() {
     }
   };
 
+  const agentsReady = Boolean(diagnosis?.agents?.iran?.available && diagnosis?.agents?.exit?.available);
+
   return (
     <Shell active="/admin/tunnels">
       <div className="page legacy-control-page">
@@ -189,19 +260,20 @@ export function TunnelsDeepDiagnosticsV32() {
           <div>
             <h1>{pick("تشخیص عمیق تانل", "Deep tunnel diagnostics")}</h1>
             <small>{pick(
-              "V32: بررسی Data Plane از خود پنل؛ بدون SSH دستی به سرور ایران یا خارج.",
-              "V32: data-plane diagnostics from the panel, without manual SSH to either node.",
+              "V33: تشخیص روی خود سرور ایران و خارج اجرا می‌شود؛ کنترلر فقط گزارش‌ها را جمع می‌کند. بدون SSH روزمره و بدون پورت ورودی Agent.",
+              "V33: diagnostics run locally on the Iran and Exit nodes; the controller only aggregates reports. No routine SSH and no inbound agent port.",
             )}</small>
           </div>
         </div>
 
         {error ? <div className="runtime-error">{error}</div> : null}
+        {notice ? <div className="runtime-success">{notice}</div> : null}
 
         <Card>
           <div className="card-head">
             <div>
               <b>{pick("انتخاب تانل", "Select tunnel")}</b>
-              <small>{pick("تشخیص عمیق فقط خواندنی است.", "Deep diagnose is read-only.")}</small>
+              <small>{pick("تشخیص عمیق فقط خواندنی است و روی خود Node اجرا می‌شود.", "Deep diagnose is read-only and runs on each node itself.")}</small>
             </div>
           </div>
 
@@ -213,6 +285,8 @@ export function TunnelsDeepDiagnosticsV32() {
                 setTunnelId(Number(event.target.value));
                 setDiagnosis(null);
                 setRepairResult(null);
+                setError("");
+                setNotice("");
               }}
             >
               {tunnels.map(tunnel => {
@@ -225,6 +299,10 @@ export function TunnelsDeepDiagnosticsV32() {
                 );
               })}
             </select>
+
+            <button className="primary-soft" disabled={!tunnelId || Boolean(busy)} onClick={() => void installAgents()}>
+              {busy === "agent" ? "…" : pick("نصب/ارتقای Agent تشخیص", "Install/upgrade diagnostics agents")}
+            </button>
 
             <button className="primary-soft" disabled={!tunnelId || Boolean(busy)} onClick={() => void diagnose()}>
               {busy === "diagnose" ? "…" : pick("تشخیص عمیق", "Deep diagnose")}
@@ -243,10 +321,32 @@ export function TunnelsDeepDiagnosticsV32() {
           ) : null}
         </Card>
 
+        {diagnosis ? (
+          <Card>
+            <div className="card-head">
+              <div>
+                <b>{pick("Agentهای تشخیص", "Diagnostics agents")}</b>
+                <small>{diagnosis.source || "node_agents"}</small>
+              </div>
+              <Badge tone={agentsReady ? "ok" : "warn"}>{agentsReady ? "Ready" : "Partial"}</Badge>
+            </div>
+            <div className="runtime-info-list">
+              <div><span>{pick("سرور ایران", "Iran node")}</span><b dir="ltr">{agentText(diagnosis.agents?.iran)}</b></div>
+              <div><span>{pick("سرور خارج", "Exit node")}</span><b dir="ltr">{agentText(diagnosis.agents?.exit)}</b></div>
+            </div>
+            {!agentsReady ? (
+              <div className="runtime-warning">{pick(
+                "گزارش تازه از هر دو Node موجود نیست. دکمه «نصب/ارتقای Agent تشخیص» را بزن؛ این کار فقط برای Bootstrap از SSH ذخیره‌شده استفاده می‌کند.",
+                "Fresh reports are not available from both nodes. Use Install/upgrade diagnostics agents; saved SSH is used only for bootstrap.",
+              )}</div>
+            ) : null}
+          </Card>
+        ) : null}
+
         {repairResult ? (
           <Card>
             <div className="card-head">
-              <div><b>{pick("نتیجه تعمیر عمیق", "Deep repair result")}</b><small>V32</small></div>
+              <div><b>{pick("نتیجه تعمیر عمیق", "Deep repair result")}</b><small>V33</small></div>
               <Badge tone={repairResult.ok ? "ok" : "warn"}>{repairResult.ok ? "OK" : pick("نیازمند بررسی", "Needs review")}</Badge>
             </div>
             {repairResult.managed_error ? <div className="runtime-error" dir="ltr">{repairResult.managed_error}</div> : null}
@@ -254,8 +354,8 @@ export function TunnelsDeepDiagnosticsV32() {
               <pre className="runtime-log" dir="ltr">{JSON.stringify(repairResult.modern_errors, null, 2)}</pre>
             ) : null}
             <div className="runtime-success">{pick(
-              "V32 هیچ Port/Key/MTU یا وزن Auto را تغییر نمی‌دهد.",
-              "V32 does not rotate ports/keys or change MTU/Auto weights.",
+              "V33 در مرحله تشخیص هیچ Port/Key/MTU، Route یا وزن Auto را تغییر نمی‌دهد.",
+              "V33 diagnosis does not change ports, keys, MTU, routes or Auto weights.",
             )}</div>
           </Card>
         ) : null}
@@ -264,7 +364,7 @@ export function TunnelsDeepDiagnosticsV32() {
           <>
             <Card>
               <div className="card-head">
-                <div><b>{pick("خلاصه تشخیص", "Diagnosis summary")}</b><small>Read-only</small></div>
+                <div><b>{pick("خلاصه تشخیص", "Diagnosis summary")}</b><small>Agent-first · Read-only</small></div>
                 <Badge tone={(diagnosis.unhealthy?.length || 0) ? "warn" : "ok"}>
                   {(diagnosis.unhealthy?.length || 0) ? `${diagnosis.unhealthy?.length} issue` : "Healthy"}
                 </Badge>
