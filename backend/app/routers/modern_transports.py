@@ -1,14 +1,21 @@
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from ..agent_diagnostics_v33 import (
+    build_agent_diagnosis,
+    install_agent_on_connection,
+)
 from ..database import get_db
 from ..deps import require_admin
-from ..managed_deep_diagnostics_v32 import deep_diagnose_managed_tunnel
 from ..managed_ops import repair_managed_tunnel
-from ..models import Tunnel, TunnelTransport
+from ..models import Node, Tunnel, TunnelTransport
+from ..services.public_urls import api_base_url
 from ..transport_candidates import SPECS, catalog, install_transport, runtime, uninstall_transport
+from .provision import ssh_connect_saved
 
 router = APIRouter(
     prefix="/v1/tunnels",
@@ -71,17 +78,117 @@ def list_modern_transports(tunnel_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{tunnel_id}/managed-deep-diagnose")
-async def managed_deep_diagnose(
+def managed_deep_diagnose(
     tunnel_id: int,
     db: Session = Depends(get_db),
 ):
-    """Read-only, panel-driven data-plane diagnosis on both tunnel nodes."""
+    """Read-only V33 diagnosis assembled from node-local diagnostics agents.
+
+    No SSH connection is opened by this endpoint. Missing/stale agent data is
+    returned as an agent_unavailable result with HTTP 200 so one bad node never
+    takes down the whole diagnostics page.
+    """
     try:
-        return await deep_diagnose_managed_tunnel(tunnel_id, db)
+        return build_agent_diagnosis(tunnel_id, db)
     except RuntimeError as exc:
         if str(exc) == "tunnel_not_found":
             raise HTTPException(status_code=404, detail="Tunnel not found") from exc
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Agent diagnostics unavailable: {type(exc).__name__}: {str(exc)[:500]}",
+        ) from exc
+
+
+@router.post("/{tunnel_id}/managed-deep-agent-install")
+async def managed_deep_agent_install(
+    tunnel_id: int,
+    db: Session = Depends(get_db),
+):
+    """One-click install/upgrade of the dedicated diagnostics agent.
+
+    Saved SSH credentials are used only for this installation/recovery step.
+    Normal diagnostics then run locally on each node and push reports back to
+    TwinPanel without inbound agent ports or routine SSH.
+    """
+    tunnel = db.get(Tunnel, int(tunnel_id))
+    if tunnel is None:
+        raise HTTPException(status_code=404, detail="Tunnel not found")
+
+    iran = db.get(Node, int(tunnel.iran_node_id))
+    exit_node = db.get(Node, int(tunnel.exit_node_id))
+    if iran is None or exit_node is None:
+        raise HTTPException(status_code=409, detail="Tunnel nodes are missing")
+
+    api_base = api_base_url(db, None)
+    ci = ce = None
+    results: dict[str, object] = {}
+
+    try:
+        connected = await asyncio.gather(
+            ssh_connect_saved(iran, db),
+            ssh_connect_saved(exit_node, db),
+            return_exceptions=True,
+        )
+
+        ci = connected[0] if not isinstance(connected[0], Exception) else None
+        ce = connected[1] if not isinstance(connected[1], Exception) else None
+
+        if ci is None:
+            results["iran"] = {
+                "ok": False,
+                "node_id": int(iran.id),
+                "error": f"SSH connect failed: {connected[0]}",
+            }
+        if ce is None:
+            results["exit"] = {
+                "ok": False,
+                "node_id": int(exit_node.id),
+                "error": f"SSH connect failed: {connected[1]}",
+            }
+
+        jobs = []
+        labels = []
+        if ci is not None:
+            jobs.append(install_agent_on_connection(ci, int(iran.id), api_base))
+            labels.append("iran")
+        if ce is not None:
+            jobs.append(install_agent_on_connection(ce, int(exit_node.id), api_base))
+            labels.append("exit")
+
+        if jobs:
+            installed = await asyncio.gather(*jobs, return_exceptions=True)
+            for label, value in zip(labels, installed):
+                if isinstance(value, Exception):
+                    results[label] = {
+                        "ok": False,
+                        "error": f"{type(value).__name__}: {str(value)[:1200]}",
+                    }
+                else:
+                    results[label] = value
+
+    finally:
+        for conn in (ci, ce):
+            if conn is not None:
+                conn.close()
+                await conn.wait_closed()
+
+    ok = bool(
+        isinstance(results.get("iran"), dict)
+        and results["iran"].get("ok") is True
+        and isinstance(results.get("exit"), dict)
+        and results["exit"].get("ok") is True
+    )
+
+    return {
+        "ok": ok,
+        "tunnel_id": int(tunnel_id),
+        "results": results,
+        "routine_ssh_required": False,
+        "inbound_agent_port_required": False,
+        "marker": "TWINPANEL_AGENT_DIAGNOSTICS_INSTALL_V33_ACTIVE",
+    }
 
 
 @router.post("/{tunnel_id}/managed-deep-repair")
@@ -89,12 +196,11 @@ async def managed_deep_repair(
     tunnel_id: int,
     db: Session = Depends(get_db),
 ):
-    """Run managed repair, include missed modern paths, then deep-diagnose.
+    """Run existing managed repair, then read node-agent diagnosis.
 
-    V32 deliberately does not rotate ports, keys, MTUs, Auto weights or policy
-    thresholds. It reuses each transport's canonical installer only when that
-    transport is already enabled but unhealthy, and returns the read-only
-    post-repair data-plane diagnosis to the panel.
+    V33 keeps the existing repair implementation for compatibility but removes
+    controller-side SSH from the post-repair diagnostic. Ports, keys, MTUs,
+    Auto weights and hysteresis are not rotated by this wrapper.
     """
     tunnel = db.get(Tunnel, tunnel_id)
     if tunnel is None:
@@ -134,7 +240,7 @@ async def managed_deep_repair(
             modern_errors[name] = f"{type(exc).__name__}: {str(exc)[:1800]}"
 
     db.expire_all()
-    diagnosis = await deep_diagnose_managed_tunnel(tunnel_id, db)
+    diagnosis = build_agent_diagnosis(tunnel_id, db)
 
     return {
         "ok": not bool(managed_error) and not bool(modern_errors),
@@ -144,7 +250,7 @@ async def managed_deep_repair(
         "modern_repair": modern_results,
         "modern_errors": modern_errors,
         "deep_diagnosis": diagnosis,
-        "marker": "TWINPANEL_MANAGED_DEEP_REPAIR_V32_ACTIVE",
+        "marker": "TWINPANEL_MANAGED_DEEP_REPAIR_V33_ACTIVE",
         "safety": {
             "ports_rotated": False,
             "keys_rotated": False,
@@ -201,3 +307,12 @@ async def remove_modern_transport(
                 "error": str(exc)[:4000],
             },
         ) from exc
+
+
+# Register the node-authenticated V33 agent routes on the same exported router
+# without inheriting the admin dependency attached to routes created above.
+# APIRoute objects below were built by an independent router and are appended
+# directly so their X-Node-Secret authentication remains authoritative.
+from .tunnel_diagnostics_agent_v33 import router as _diagnostics_agent_router
+
+router.routes.extend(_diagnostics_agent_router.routes)

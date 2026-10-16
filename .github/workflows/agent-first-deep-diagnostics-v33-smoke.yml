@@ -1,0 +1,115 @@
+name: Agent First Deep Diagnostics V33 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/agent_diagnostics_v33.py"
+      - "backend/app/twinpanel_diag_agent.py.tpl"
+      - "backend/app/routers/tunnel_diagnostics_agent_v33.py"
+      - "backend/app/routers/modern_transports.py"
+      - ".github/workflows/agent-first-deep-diagnostics-v33-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: twinpanel
+          POSTGRES_PASSWORD: twinpanel
+          POSTGRES_DB: twinpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U twinpanel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      APP_SECRET_KEY: ci-v33-secret
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel@127.0.0.1:5432/twinpanel
+      NODE_AGENT_SHARED_SECRET: ci-v33-node-secret
+      REDIS_URL: redis://127.0.0.1:6379/0
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Prepare runtime directories
+        run: |
+          sudo install -d -m 700 /etc/twinpanel
+          sudo install -d -m 700 /var/lib/twinpanel-backups
+          sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel-backups
+
+      - name: Compile V33 runtime
+        run: |
+          python -m py_compile \
+            backend/app/agent_diagnostics_v33.py \
+            backend/app/routers/tunnel_diagnostics_agent_v33.py \
+            backend/app/routers/modern_transports.py
+
+      - name: Verify V33 routes and rendered node agent
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+
+          from app.agent_diagnostics_v33 import render_agent
+          from app.main import app
+
+          paths = {
+              route.path
+              for route in app.routes
+          }
+
+          required = {
+              "/v1/tunnels/{tunnel_id}/managed-deep-diagnose",
+              "/v1/tunnels/{tunnel_id}/managed-deep-agent-install",
+              "/v1/tunnel-diagnostics/node/{node_id}/desired",
+              "/v1/tunnel-diagnostics/tunnel/{tunnel_id}/node/{node_id}/report",
+          }
+
+          missing = required - paths
+          print("V33_REQUIRED_ROUTES=", sorted(required))
+          print("V33_MISSING_ROUTES=", sorted(missing))
+          if missing:
+              raise SystemExit(1)
+
+          source = render_agent(2, "https://api.example.invalid")
+          if "__NODE_ID__" in source or "__SECRET_LITERAL__" in source or "__API_LITERAL__" in source:
+              raise SystemExit("unrendered_agent_placeholder")
+          compile(source, "twinpanel_diag_agent.py", "exec")
+          print("V33_AGENT_RENDER_COMPILE=PASS")
+
+          client = TestClient(app)
+          response = client.get(
+              "/v1/tunnel-diagnostics/node/999999/desired",
+              headers={"X-Node-Secret": "ci-v33-node-secret"},
+          )
+          print("V33_NODE_ROUTE_STATUS=", response.status_code)
+          if response.status_code != 404:
+              raise SystemExit(
+                  "node route must authenticate with X-Node-Secret without admin bearer dependency"
+              )
+
+          print("V33_AGENT_ROUTE_AUTH=PASS")
+          print("V33_AGENT_FIRST_SMOKE=PASS")
+          PY
