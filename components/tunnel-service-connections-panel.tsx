@@ -91,9 +91,9 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
   useEffect(() => {
     void load();
 
-    // Service routes are reconciled by Node Agent. Keep this panel live so an
-    // AUTO failover or a freshly restored Iran DNAT route appears without a
-    // manual page refresh.
+    // Service routes are reconciled by Node Agent. Keep this panel live so a
+    // transport repair or a freshly restored Iran service route appears without
+    // a manual page refresh.
     const timer=window.setInterval(
       ()=>void load(true),
       5000,
@@ -115,21 +115,25 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
     setMessage("");
 
     try {
-      const result=await serviceConnectionsV36Api.highSpeedAuto(tunnelId);
+      const result=await serviceConnectionsV36Api.repairRealEgress(tunnelId);
+      const selected=result.selected;
+      const latency=selected?.latency_ms??result.latency_ms;
+      const loss=selected?.loss_pct;
+
       setMessage(
-        result.route_ready
+        result.ok
           ? pick(
-              `مسیر پرسرعت AUTO روی ${result.active_transport||"Transport سالم"} فعال شد.`,
-              `High-speed AUTO route selected ${result.active_transport||"a healthy transport"}.`,
+              `مسیر واقعی ${result.active_transport||selected?.transport||"سالم"} با خروج اینترنت تایید و فعال شد${latency!=null?`؛ پینگ ${latency.toLocaleString("fa-IR")}ms`:""}${loss!=null?`؛ افت ${loss.toLocaleString("fa-IR")}%`:""}.`,
+              `Verified real Internet egress on ${result.active_transport||selected?.transport||"a healthy transport"}${latency!=null?`; ${latency}ms`:""}${loss!=null?`; ${loss}% loss`:""}.`,
             )
           : pick(
-              "AUTO فعال شد اما هنوز Transport سالمی پیدا نشده است.",
-              "AUTO is enabled, but no healthy transport is available yet.",
+              "قوانین خروج اصلاح شد اما هنوز هیچ مسیر واقعی سالمی تایید نشد.",
+              "Exit routing was repaired, but no real healthy dataplane was verified yet.",
             ),
       );
 
-      // Give the 2s Transport Manager and Node Agent a short reconciliation
-      // window. These are short GETs; no long browser socket is held open.
+      // The repair action is short. Give Node Agent a small window to publish
+      // the service DNAT routes that depend on the newly verified active tunnel.
       for(let i=0;i<8;i+=1){
         await new Promise<void>(resolve=>window.setTimeout(resolve,2000));
         await load(true);
@@ -194,14 +198,14 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
             </>
           )}
 
-          {data && !data.route_active && (
+          {data && (
             <button
               type="button"
               className="primary-soft"
               disabled={Boolean(busy)}
               onClick={()=>void highSpeed()}
             >
-              {busy==="speed"?"…":pick("مسیر پرسرعت", "High-speed route")}
+              {busy==="speed"?"…":pick("تعمیر مسیر واقعی", "Repair real route")}
             </button>
           )}
 
