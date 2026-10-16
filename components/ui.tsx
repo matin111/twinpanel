@@ -19,26 +19,26 @@ const menuGroups=[
     ["پلن‌ها","Plans","/admin/plans","◈"]
   ]},
   {fa:"شبکه و زیرساخت",en:"Network & Infrastructure",items:[
-    ["سرورها و نودها","Servers & Nodes","/admin/nodes","▦"],
+    ["سرورها","Servers","/admin/nodes","▦"],
     ["تونل و Failover","Tunnels & Failover","/admin/tunnels","⤨"],
     ["افزودن سرور","Add Server","/admin/provision","⚡"],
     ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"]
   ]},
   {fa:"فروش و مالی",en:"Sales & Finance",items:[
-    ["پرداخت‌ها و رسیدها","Payments & Receipts","/admin/payments","◫"],
-    ["SMS Reader و تطبیق پرداخت","SMS Reader & Payment Match","/admin/sms-reader","▤"],
-    ["کدهای تخفیف","Discount Codes","/admin/discounts","％"],
-    ["مدیریت نمایندگان","Reseller Management","/admin/resellers","♜"],
-    ["بسته‌های ترافیک نمایندگان","Reseller Traffic Packages","/admin/reseller-traffic-plans","▣"],
-    ["تنظیمات فروشگاه","Store Settings","/admin/store-settings","◇"]
+    ["پرداخت و رسیدها","Payments & Receipts","/admin/payments","◫"],
+    ["تطبیق پرداخت","Payment Matching","/admin/sms-reader","▤"],
+    ["تخفیف‌ها","Discounts","/admin/discounts","％"],
+    ["نمایندگان","Resellers","/admin/resellers","♜"],
+    ["بسته‌های ترافیک","Traffic Packages","/admin/reseller-traffic-plans","▣"],
+    ["فروشگاه","Store","/admin/store-settings","◇"]
   ]},
   {fa:"ارتباطات و پشتیبانی",en:"Communications & Support",items:[
     ["ربات تلگرام","Telegram Bot","/admin/telegram","✈"],
-    ["پشتیبانی و تیکت‌ها","Support & Tickets","/admin/support","◌"],
-    ["اعلان‌ها و اطلاع‌رسانی","Notifications","/admin/notifications","◎"]
+    ["تیکت‌ها","Tickets","/admin/support","◌"],
+    ["اعلان‌ها","Notifications","/admin/notifications","◎"]
   ]},
   {fa:"محتوا و برند",en:"Content & Brand",items:[
-    ["فایل‌ها و لینک‌های دانلود","Download Files & Links","/admin/downloads","⇩"],
+    ["فایل‌های دانلود","Downloads","/admin/downloads","⇩"],
     ["برند و ظاهر","Brand & Appearance","/admin/branding","✦"]
   ]},
   {fa:"سیستم و نگهداری",en:"System & Maintenance",items:[
