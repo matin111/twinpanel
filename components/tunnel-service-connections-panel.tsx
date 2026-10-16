@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect,useState} from "react";
+import {useEffect,useMemo,useState} from "react";
 
 import {Badge} from "./ui";
 import {
@@ -8,6 +8,7 @@ import {
   type TunnelServiceConnection,
   type TunnelServiceConnectionsResponse,
 } from "../lib/legacy-control-api";
+import {serviceConnectionsV36Api} from "../lib/service-connections-v36-api";
 import {useI18n} from "../lib/i18n";
 
 
@@ -68,28 +69,108 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
   const {pick} = useI18n();
   const [data,setData] = useState<TunnelServiceConnectionsResponse|null>(null);
   const [loading,setLoading] = useState(true);
+  const [busy,setBusy] = useState<""|"speed"|"xray">("");
   const [error,setError] = useState("");
+  const [message,setMessage] = useState("");
 
-  const load = async () => {
-    setLoading(true);
-    setError("");
+  const load = async (silent=false) => {
+    if(!silent)setLoading(true);
+    if(!silent)setError("");
     try {
       setData(await legacyControlApi.tunnelServiceConnections(tunnelId));
     }
     catch (reason) {
-      setData(null);
+      if(!silent)setData(null);
       setError(reason instanceof Error ? reason.message : String(reason));
     }
     finally {
-      setLoading(false);
+      if(!silent)setLoading(false);
     }
   };
 
   useEffect(() => {
     void load();
+
+    // Service routes are reconciled by Node Agent. Keep this panel live so an
+    // AUTO failover or a freshly restored Iran DNAT route appears without a
+    // manual page refresh.
+    const timer=window.setInterval(
+      ()=>void load(true),
+      5000,
+    );
+
+    return ()=>window.clearInterval(timer);
   }, [tunnelId]);
 
   const connections = Array.isArray(data?.connections) ? data.connections : [];
+  const hasXray = useMemo(
+    ()=>connections.some(item=>String(item.protocol||"").toLowerCase()==="v2ray"),
+    [connections],
+  );
+
+  const highSpeed = async () => {
+    if(busy)return;
+    setBusy("speed");
+    setError("");
+    setMessage("");
+
+    try {
+      const result=await serviceConnectionsV36Api.highSpeedAuto(tunnelId);
+      setMessage(
+        result.route_ready
+          ? pick(
+              `مسیر پرسرعت AUTO روی ${result.active_transport||"Transport سالم"} فعال شد.`,
+              `High-speed AUTO route selected ${result.active_transport||"a healthy transport"}.`,
+            )
+          : pick(
+              "AUTO فعال شد اما هنوز Transport سالمی پیدا نشده است.",
+              "AUTO is enabled, but no healthy transport is available yet.",
+            ),
+      );
+
+      // Give the 2s Transport Manager and Node Agent a short reconciliation
+      // window. These are short GETs; no long browser socket is held open.
+      for(let i=0;i<8;i+=1){
+        await new Promise<void>(resolve=>window.setTimeout(resolve,2000));
+        await load(true);
+      }
+    }
+    catch(reason){
+      setError(reason instanceof Error?reason.message:String(reason));
+    }
+    finally{
+      setBusy("");
+    }
+  };
+
+  const reconcileXray = async () => {
+    if(busy)return;
+    setBusy("xray");
+    setError("");
+    setMessage("");
+
+    try{
+      const job=await serviceConnectionsV36Api.reconcileXray(tunnelId);
+      const result=job.result;
+      const migrated=Number(result?.migrated??job.migrated??0);
+      const skipped=Number(result?.skipped??job.skipped??0);
+      const errors=Array.isArray(result?.errors)?result?.errors:(Array.isArray(job.errors)?job.errors:[]);
+
+      setMessage(
+        pick(
+          `Xray تکمیل شد: ${migrated.toLocaleString("fa-IR")} اشتراک بروزرسانی، ${skipped.toLocaleString("fa-IR")} بدون تغییر${errors.length?`، ${errors.length.toLocaleString("fa-IR")} خطا`:""}.`,
+          `Xray reconciliation completed: ${migrated} updated, ${skipped} unchanged${errors.length?`, ${errors.length} errors`:""}.`,
+        ),
+      );
+      await load(true);
+    }
+    catch(reason){
+      setError(reason instanceof Error?reason.message:String(reason));
+    }
+    finally{
+      setBusy("");
+    }
+  };
 
   return (
     <div className="manage-card-section tunnel-service-connections-compact">
@@ -113,10 +194,32 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
             </>
           )}
 
+          {data && !data.route_active && (
+            <button
+              type="button"
+              className="primary-soft"
+              disabled={Boolean(busy)}
+              onClick={()=>void highSpeed()}
+            >
+              {busy==="speed"?"…":pick("مسیر پرسرعت", "High-speed route")}
+            </button>
+          )}
+
+          {hasXray && (
+            <button
+              type="button"
+              className="primary-soft"
+              disabled={Boolean(busy)}
+              onClick={()=>void reconcileXray()}
+            >
+              {busy==="xray"?"…":pick("تکمیل Xray", "Complete Xray")}
+            </button>
+          )}
+
           <button
             type="button"
             className="ghost tunnel-service-refresh"
-            disabled={loading}
+            disabled={loading||Boolean(busy)}
             onClick={() => void load()}
           >
             {loading ? "…" : pick("بروزرسانی", "Refresh")}
@@ -125,6 +228,7 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
       </div>
 
       {error && <div className="runtime-error compact">{error}</div>}
+      {message && <div className="runtime-success compact">{message}</div>}
 
       {!error && !loading && connections.length === 0 && (
         <div className="runtime-empty">
