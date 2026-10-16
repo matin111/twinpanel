@@ -73,6 +73,12 @@ type AgentInstallResult = {
 };
 
 
+type DeepDiagnosticsProps = {
+  initialTunnelId?: number;
+  onBack?: () => void;
+};
+
+
 const labels: Record<string, string> = {
   kcp_2027: "KCP 2027",
   mtunnel: "MTunnel",
@@ -134,7 +140,10 @@ function SideSummary({title, side}: {title: string; side?: SideDiag}) {
 }
 
 
-export function TunnelsDeepDiagnosticsV32() {
+export function TunnelsDeepDiagnosticsV32({
+  initialTunnelId = 0,
+  onBack,
+}: DeepDiagnosticsProps = {}) {
   const {pick} = useI18n();
   const [tunnels, setTunnels] = useState<AdminTunnel[]>([]);
   const [nodes, setNodes] = useState<AdminNode[]>([]);
@@ -158,7 +167,13 @@ export function TunnelsDeepDiagnosticsV32() {
         ]);
         setTunnels(tunnelRows);
         setNodes(nodeRows);
-        setTunnelId(current => current || tunnelRows[0]?.id || 0);
+        setTunnelId(current => {
+          const requested = Number(initialTunnelId || 0);
+          if (requested > 0 && tunnelRows.some(row => row.id === requested)) {
+            return requested;
+          }
+          return current || tunnelRows[0]?.id || 0;
+        });
       }
       catch (reason) {
         setError(reason instanceof Error ? reason.message : String(reason));
@@ -167,7 +182,7 @@ export function TunnelsDeepDiagnosticsV32() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [initialTunnelId]);
 
   const selected = tunnels.find(row => row.id === tunnelId) || null;
 
@@ -260,10 +275,17 @@ export function TunnelsDeepDiagnosticsV32() {
           <div>
             <h1>{pick("تشخیص عمیق تانل", "Deep tunnel diagnostics")}</h1>
             <small>{pick(
-              "V33: تشخیص روی خود سرور ایران و خارج اجرا می‌شود؛ کنترلر فقط گزارش‌ها را جمع می‌کند. بدون SSH روزمره و بدون پورت ورودی Agent.",
-              "V33: diagnostics run locally on the Iran and Exit nodes; the controller only aggregates reports. No routine SSH and no inbound agent port.",
+              "تشخیص برای همان مسیر ایران ↔ خارج انتخاب‌شده اجرا می‌شود؛ کنترلر فقط گزارش Agentها را جمع می‌کند.",
+              "Diagnostics run for the selected Iran ↔ Exit tunnel pair; the controller only aggregates agent reports.",
             )}</small>
           </div>
+          {onBack ? (
+            <div className="action-row">
+              <button type="button" className="ghost" disabled={Boolean(busy)} onClick={onBack}>
+                {pick("بازگشت به تانل‌ها", "Back to tunnels")}
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {error ? <div className="runtime-error">{error}</div> : null}
@@ -272,8 +294,8 @@ export function TunnelsDeepDiagnosticsV32() {
         <Card>
           <div className="card-head">
             <div>
-              <b>{pick("انتخاب تانل", "Select tunnel")}</b>
-              <small>{pick("تشخیص عمیق فقط خواندنی است و روی خود Node اجرا می‌شود.", "Deep diagnose is read-only and runs on each node itself.")}</small>
+              <b>{pick("سرورهای این تانل", "Tunnel servers")}</b>
+              <small>{pick("تشخیص عمیق روی خود نود ایران و خارج اجرا می‌شود.", "Deep diagnostics run locally on the Iran and Exit nodes.")}</small>
             </div>
           </div>
 
@@ -282,11 +304,13 @@ export function TunnelsDeepDiagnosticsV32() {
               value={tunnelId}
               disabled={loading || Boolean(busy)}
               onChange={event => {
-                setTunnelId(Number(event.target.value));
+                const nextId = Number(event.target.value);
+                setTunnelId(nextId);
                 setDiagnosis(null);
                 setRepairResult(null);
                 setError("");
                 setNotice("");
+                if (nextId > 0) window.location.hash = `deep-diagnostics=${nextId}`;
               }}
             >
               {tunnels.map(tunnel => {
@@ -316,6 +340,8 @@ export function TunnelsDeepDiagnosticsV32() {
           {selected ? (
             <div className="runtime-info-list">
               <div><span>{pick("تانل", "Tunnel")}</span><b>#{selected.id}</b></div>
+              <div><span>{pick("ایران", "Iran")}</span><b>{nodeMap.get(selected.iran_node_id)?.name || `#${selected.iran_node_id}`}</b></div>
+              <div><span>{pick("خارج", "Exit")}</span><b>{nodeMap.get(selected.exit_node_id)?.name || `#${selected.exit_node_id}`}</b></div>
               <div><span>{pick("وضعیت", "Status")}</span><Badge tone={statusTone(selected.status)}>{String(selected.status || "—")}</Badge></div>
             </div>
           ) : null}
@@ -346,7 +372,7 @@ export function TunnelsDeepDiagnosticsV32() {
         {repairResult ? (
           <Card>
             <div className="card-head">
-              <div><b>{pick("نتیجه تعمیر عمیق", "Deep repair result")}</b><small>V33</small></div>
+              <div><b>{pick("نتیجه تعمیر عمیق", "Deep repair result")}</b><small>V34</small></div>
               <Badge tone={repairResult.ok ? "ok" : "warn"}>{repairResult.ok ? "OK" : pick("نیازمند بررسی", "Needs review")}</Badge>
             </div>
             {repairResult.managed_error ? <div className="runtime-error" dir="ltr">{repairResult.managed_error}</div> : null}
@@ -354,8 +380,8 @@ export function TunnelsDeepDiagnosticsV32() {
               <pre className="runtime-log" dir="ltr">{JSON.stringify(repairResult.modern_errors, null, 2)}</pre>
             ) : null}
             <div className="runtime-success">{pick(
-              "V33 در مرحله تشخیص هیچ Port/Key/MTU، Route یا وزن Auto را تغییر نمی‌دهد.",
-              "V33 diagnosis does not change ports, keys, MTU, routes or Auto weights.",
+              "تشخیص عمیق Port/Key/MTU، Route یا وزن Auto را تغییر نمی‌دهد؛ Repair به‌صورت Job اجرا می‌شود.",
+              "Deep diagnostics do not change ports, keys, MTU, routes or Auto weights; repair runs as a job.",
             )}</div>
           </Card>
         ) : null}
