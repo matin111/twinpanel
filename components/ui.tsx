@@ -18,34 +18,33 @@ const menuGroups=[
     ["اشتراک‌ها","Subscriptions","/admin/subscriptions","▱"],
     ["پلن‌ها","Plans","/admin/plans","◈"]
   ]},
-  {fa:"زیرساخت",en:"Infrastructure",items:[
-    ["نودها","Nodes","/admin/nodes","▦"],
-    ["تانل‌ها","Tunnels","/admin/tunnels","⤨"],
-    ["راه‌اندازی نود","Provisioning","/admin/provision","⚡"],
-    ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"],
-    ["دسترسی مادر","Mother Access","/admin/mother-access","⌁"]
+  {fa:"شبکه و زیرساخت",en:"Network & Infrastructure",items:[
+    ["سرورها و نودها","Servers & Nodes","/admin/nodes","▦"],
+    ["تونل و Failover","Tunnels & Failover","/admin/tunnels","⤨"],
+    ["افزودن سرور","Add Server","/admin/provision","⚡"],
+    ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"]
   ]},
-  {fa:"مالی و فروش",en:"Sales & Finance",items:[
-    ["پرداخت‌ها","Payments","/admin/payments","◫"],
-    ["تأیید خودکار کارت","Card Auto Verify","/admin/sms-reader","▤"],
-    ["کد تخفیف","Discounts","/admin/discounts","％"],
-    ["نمایندگی‌ها","Resellers","/admin/resellers","♜"],
-    ["پلن‌های شارژ حجم","Traffic Recharge Plans","/admin/reseller-traffic-plans","▣"],
+  {fa:"فروش و مالی",en:"Sales & Finance",items:[
+    ["پرداخت‌ها و رسیدها","Payments & Receipts","/admin/payments","◫"],
+    ["SMS Reader و تطبیق پرداخت","SMS Reader & Payment Match","/admin/sms-reader","▤"],
+    ["کدهای تخفیف","Discount Codes","/admin/discounts","％"],
+    ["مدیریت نمایندگان","Reseller Management","/admin/resellers","♜"],
+    ["بسته‌های ترافیک نمایندگان","Reseller Traffic Packages","/admin/reseller-traffic-plans","▣"],
     ["تنظیمات فروشگاه","Store Settings","/admin/store-settings","◇"]
   ]},
-  {fa:"ارتباطات",en:"Communications",items:[
+  {fa:"ارتباطات و پشتیبانی",en:"Communications & Support",items:[
     ["ربات تلگرام","Telegram Bot","/admin/telegram","✈"],
-    ["پشتیبانی","Support","/admin/support","◌"],
-    ["اعلان‌ها","Notifications","/admin/notifications","◎"]
+    ["پشتیبانی و تیکت‌ها","Support & Tickets","/admin/support","◌"],
+    ["اعلان‌ها و اطلاع‌رسانی","Notifications","/admin/notifications","◎"]
   ]},
-  {fa:"تحویل و سرویس",en:"Delivery & Service",items:[
-    ["فایل‌های دانلود","Download Files","/admin/downloads","⇩"],
-    ["برندینگ","Branding","/admin/branding","✦"]
+  {fa:"محتوا و برند",en:"Content & Brand",items:[
+    ["فایل‌ها و لینک‌های دانلود","Download Files & Links","/admin/downloads","⇩"],
+    ["برند و ظاهر","Brand & Appearance","/admin/branding","✦"]
   ]},
-  {fa:"سیستم",en:"System",items:[
-    ["امنیت","Security","/admin/system-health","⌾"],
+  {fa:"سیستم و نگهداری",en:"System & Maintenance",items:[
+    ["امنیت و ریسک","Security & Risk","/admin/system-health","⌾"],
     ["بکاپ و بازیابی","Backup & Restore","/admin/backups","⟲"],
-    ["تنظیمات","Settings","/admin/settings","⚙"]
+    ["تنظیمات سیستم","System Settings","/admin/settings","⚙"]
   ]}
 ] as const;
 
