@@ -55,6 +55,11 @@ type ManagedDiagnosis = {
 };
 
 
+type TunnelsPanelRuntimeV31Props = {
+  onDeepDiagnostics?: (tunnelId: number) => void;
+};
+
+
 const emptyDraft: Draft = {
   iran_node_id: 0,
   exit_node_id: 0,
@@ -151,7 +156,9 @@ function Modal({
 }
 
 
-export function TunnelsPanelRuntimeV31() {
+export function TunnelsPanelRuntimeV31({
+  onDeepDiagnostics,
+}: TunnelsPanelRuntimeV31Props = {}) {
   const {pick} = useI18n();
 
   const [tunnels, setTunnels] = useState<AdminTunnel[]>([]);
@@ -574,9 +581,21 @@ export function TunnelsPanelRuntimeV31() {
                       <td><Badge tone={tone(tunnel.status)}>{String(tunnel.status || "—")}</Badge></td>
                       <td><Badge tone={tunnel.is_active ? "ok" : "warn"}>{tunnel.is_active ? pick("فعال", "Active") : pick("خاموش", "Disabled")}</Badge></td>
                       <td>
-                        <button className="primary-soft" disabled={Boolean(busy)} onClick={() => openManage(tunnel)}>
-                          {pick("مدیریت کامل", "Full control")}
-                        </button>
+                        <div className="action-row">
+                          <button className="primary-soft" disabled={Boolean(busy)} onClick={() => openManage(tunnel)}>
+                            {pick("مدیریت کامل", "Full control")}
+                          </button>
+                          {onDeepDiagnostics ? (
+                            <button
+                              type="button"
+                              className="ghost"
+                              disabled={Boolean(busy)}
+                              onClick={() => onDeepDiagnostics(tunnel.id)}
+                            >
+                              {pick("تشخیص عمیق", "Deep diagnostics")}
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   );
