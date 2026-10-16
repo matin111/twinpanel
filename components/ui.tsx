@@ -40,7 +40,6 @@ const menuGroups=[
   ]},
   {fa:"تحویل و سرویس",en:"Delivery & Service",items:[
     ["فایل‌های دانلود","Download Files","/admin/downloads","⇩"],
-    ["تنظیمات VPN","VPN Settings","/admin/vpn-settings","⌁"],
     ["برندینگ","Branding","/admin/branding","✦"]
   ]},
   {fa:"سیستم",en:"System",items:[
