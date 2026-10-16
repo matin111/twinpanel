@@ -53,6 +53,12 @@ jobs:
       - name: Install backend dependencies
         run: pip install -r backend/requirements.txt
 
+      - name: Prepare runtime directories
+        run: |
+          sudo install -d -m 700 /etc/twinpanel
+          sudo install -d -m 700 /var/lib/twinpanel-backups
+          sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel-backups
+
       - name: Compile V33 runtime
         run: |
           python -m py_compile \
@@ -64,9 +70,6 @@ jobs:
         working-directory: backend
         run: |
           python - <<'PY'
-          import pathlib
-          import tempfile
-
           from fastapi.testclient import TestClient
 
           from app.agent_diagnostics_v33 import render_agent
