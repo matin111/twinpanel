@@ -25,6 +25,9 @@ from .xray_profile_reconcile_v36 import (
 from .xray_public_delivery_runtime import (
     apply_xray_public_delivery_runtime,
 )
+from .xray_public_profile_policy_v38 import (
+    apply_xray_public_profile_policy_v38,
+)
 from .tunnel_service_connections_admin_runtime import (
     apply_tunnel_service_connections_admin_runtime,
 )
@@ -217,6 +220,11 @@ def apply_self_hosted_runtime() -> None:
     # delivery. Rebind it to the final payload and expand nested Modern Xray
     # profiles into the existing server-tab UI. Legacy VLESS remains available.
     apply_xray_public_delivery_runtime()
+
+    # V38 customer policy: keep the proven WebSocket TLS profile first, hide
+    # XHTTP Reality from customers, and expose HTTPUpgrade TLS as the secure
+    # domain-backed fallback. Internal XHTTP runtime remains intact for rollback.
+    apply_xray_public_profile_policy_v38()
 
     # Some production installations intentionally carry a local main.py drift
     # that removed direct Xray router includes. Restore those routes through an
