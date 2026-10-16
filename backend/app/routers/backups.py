@@ -2,7 +2,6 @@ from __future__ import annotations
 
 # TWINPANEL_ADMIN_BACKUP_ROUTER_V1
 
-import json
 import tempfile
 from pathlib import Path
 from typing import Literal
@@ -84,7 +83,7 @@ class BackupSettingsIn(BaseModel):
         max_length=80,
     )
 
-    send_telegram: bool = True
+    send_telegram: bool = False
 
     telegram_chat_id: str = Field(
         default="",
@@ -96,7 +95,6 @@ class BackupSettingsIn(BaseModel):
         ge=1,
         le=100,
     )
-
 
 
 class TelegramVerifyIn(BaseModel):
@@ -114,12 +112,30 @@ class RestoreIn(BaseModel):
 @router.get("")
 def backup_home():
 
+    current_settings = load_settings()
+
+    chat_id = str(
+        current_settings.get(
+            "telegram_chat_id"
+        ) or ""
+    ).strip()
+
+    # Old installations could contain the inconsistent state
+    # send_telegram=true with an empty Chat ID. Present that state
+    # as disabled so the admin can save schedule settings normally.
+    if not chat_id:
+        current_settings = {
+            **current_settings,
+            "send_telegram": False,
+            "telegram_chat_id": "",
+        }
+
     return {
         "ok": True,
         "backups":
             list_backups(),
         "settings":
-            load_settings(),
+            current_settings,
         "key_fingerprint":
             recovery_key_fingerprint(),
         "included_tables":
@@ -130,35 +146,35 @@ def backup_home():
 
 
 @router.put("/settings")
-
 def update_backup_settings(
     payload: BackupSettingsIn,
 ):
 
-    data = (
-        payload.model_dump()
-    )
+    data = payload.model_dump()
+
+    chat_id = str(
+        data.get(
+            "telegram_chat_id"
+        ) or ""
+    ).strip()
+
+    data[
+        "telegram_chat_id"
+    ] = chat_id
+
+    # Telegram delivery is optional and must never block saving
+    # the independent automatic-backup schedule. If no Chat ID
+    # exists, normalize delivery to disabled.
+    if not chat_id:
+        data[
+            "send_telegram"
+        ] = False
 
     telegram_verification = None
 
     if data.get(
         "send_telegram"
     ):
-
-        chat_id = str(
-            data.get(
-                "telegram_chat_id"
-            ) or ""
-        ).strip()
-
-        if not chat_id:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "برای ارسال خودکار تلگرام، "
-                    "Chat ID را وارد کنید."
-                ),
-            )
 
         try:
             telegram_verification = (
@@ -185,30 +201,6 @@ def update_backup_settings(
             telegram_verification,
     }
 
-def manual_backup(
-    payload: BackupCreateIn,
-):
-
-    try:
-        result = create_backup(
-            kind="manual",
-            send_telegram=(
-                payload.send_telegram
-            ),
-        )
-
-    except Exception as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=str(exc),
-        ) from exc
-
-    return {
-        "ok": True,
-        "backup": result,
-    }
-
-
 
 # TWINPANEL_BACKUP_TELEGRAM_VERIFY_ROUTE_V3
 @router.post("/verify-telegram")
@@ -234,9 +226,7 @@ def backup_verify_telegram(
         ) from exc
 
 
-
 # TWINPANEL_MANUAL_BACKUP_CREATE_ROUTE_V146
-
 @router.post("/create")
 def manual_backup(
     payload: BackupCreateIn,
