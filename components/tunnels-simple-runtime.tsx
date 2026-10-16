@@ -3,12 +3,13 @@
 import {useEffect, useState} from "react";
 
 import {TunnelsPanelRuntimeV31} from "./tunnels-panel-runtime-v31";
+import {TunnelsDeepDiagnosticsV32} from "./tunnels-deep-diagnostics-v32";
 import {
   TunnelsSimpleRuntimePage as TunnelsServiceConnectionsRuntime,
 } from "./tunnels-service-connections-runtime";
 
 
-type TunnelPanelView = "control" | "service-connections";
+type TunnelPanelView = "control" | "deep-diagnostics" | "service-connections";
 
 
 export function TunnelsSimpleRuntimePage() {
@@ -16,11 +17,15 @@ export function TunnelsSimpleRuntimePage() {
 
   useEffect(() => {
     const syncFromHash = () => {
-      setView(
-        window.location.hash === "#service-connections"
-          ? "service-connections"
-          : "control",
-      );
+      if (window.location.hash === "#service-connections") {
+        setView("service-connections");
+      }
+      else if (window.location.hash === "#deep-diagnostics") {
+        setView("deep-diagnostics");
+      }
+      else {
+        setView("control");
+      }
     };
 
     syncFromHash();
@@ -34,6 +39,9 @@ export function TunnelsSimpleRuntimePage() {
   const choose = (next: TunnelPanelView) => {
     if (next === "service-connections") {
       window.location.hash = "service-connections";
+    }
+    else if (next === "deep-diagnostics") {
+      window.location.hash = "deep-diagnostics";
     }
     else {
       window.history.replaceState(
@@ -66,6 +74,14 @@ export function TunnelsSimpleRuntimePage() {
 
         <button
           type="button"
+          className={view === "deep-diagnostics" ? "primary-soft" : "ghost"}
+          onClick={() => choose("deep-diagnostics")}
+        >
+          تشخیص عمیق
+        </button>
+
+        <button
+          type="button"
           className={view === "service-connections" ? "primary-soft" : "ghost"}
           onClick={() => choose("service-connections")}
         >
@@ -75,7 +91,9 @@ export function TunnelsSimpleRuntimePage() {
 
       {view === "service-connections"
         ? <TunnelsServiceConnectionsRuntime />
-        : <TunnelsPanelRuntimeV31 />}
+        : view === "deep-diagnostics"
+          ? <TunnelsDeepDiagnosticsV32 />
+          : <TunnelsPanelRuntimeV31 />}
     </>
   );
 }
