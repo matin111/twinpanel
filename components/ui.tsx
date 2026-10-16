@@ -5,6 +5,7 @@ import {useEffect,useRef,useState} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {BrandMark} from "../lib/branding";
+import {PaymentReviewBadge} from "./payment-review-badge";
 import {AdminNotificationCenter} from "./admin-notification-center";
 import {SupportUnreadBadge} from "./support-unread-badge";
 
@@ -38,10 +39,8 @@ const menuGroups=[
     ["اعلان‌ها","Notifications","/admin/notifications","◎"]
   ]},
   {fa:"تحویل و سرویس",en:"Delivery & Service",items:[
-    ["تحویل اکانت","Account Delivery","/admin/account-delivery","⇲"],
     ["فایل‌های دانلود","Download Files","/admin/downloads","⇩"],
     ["تنظیمات VPN","VPN Settings","/admin/vpn-settings","⌁"],
-    ["L2TP / IPsec","L2TP / IPsec","/admin/l2tp","◎"],
     ["برندینگ","Branding","/admin/branding","✦"]
   ]},
   {fa:"سیستم",en:"System",items:[
@@ -109,7 +108,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
         {group.items.map(([fa,en,h,i])=>{
           const label=pick(fa,en);
           return <Link key={h} href={h} title={collapsed?label:undefined} className={active===h?"active":""} onClick={()=>{rememberSidebarScroll();setMobileOpen(false);}}>
-            <i>{i}</i><span className="nav-label">{label}</span>{h==="/admin/support"&&<SupportUnreadBadge active={active===h}/>} 
+            <i>{i}</i><span className="nav-label">{label}</span>{h==="/admin/support"&&<SupportUnreadBadge active={active===h}/>}{h==="/admin/payments"&&<PaymentReviewBadge/>}
           </Link>;
         })}
       </div>)}</nav>
