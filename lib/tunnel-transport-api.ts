@@ -8,6 +8,19 @@ export type TunnelTransportMode="auto"|"manual";
 export type TunnelTransportRow={id?:number;tunnel_id?:number;transport?:string;priority?:number;enabled?:boolean;status?:string;latency_ms?:number|null;last_error?:string|null;last_healthy_at?:string|null;[key:string]:unknown};
 export type TunnelTransportState={tunnel_id:number;iran_node_id?:number;exit_node_id?:number;mode?:string;preferred_transport?:string|null;active_transport?:string|null;last_switch_at?:string|null;transports?:TunnelTransportRow[];[key:string]:unknown};
 
+type DeepRepairJob={
+  ok?:boolean;
+  accepted?:boolean;
+  reused?:boolean;
+  job_id?:string;
+  tunnel_id?:number;
+  status?:"queued"|"running"|"succeeded"|"failed"|string;
+  stage?:string|null;
+  result?:Record<string,unknown>|null;
+  error?:string|null;
+  marker?:string;
+};
+
 function errorText(payload:unknown,status:number){
   if(typeof payload==="string"&&payload.trim())return payload.trim();
   if(payload&&typeof payload==="object"){
@@ -52,13 +65,48 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   return payload as T;
 }
 
+function sleep(ms:number){
+  return new Promise<void>(resolve=>window.setTimeout(resolve,ms));
+}
+
+async function managedDeepRepairJob(id:number):Promise<Record<string,unknown>>{
+  const started=await request<DeepRepairJob>(`/v1/tunnels/${id}/managed-deep-repair-job`,{method:"POST"});
+  const jobId=String(started.job_id||"").trim();
+  if(!jobId)throw new Error("Deep repair job was not created.");
+
+  if(started.status==="succeeded"&&started.result)return started.result;
+  if(started.status==="failed")throw new Error(started.error||"Deep repair job failed.");
+
+  // V34: each poll is a short request. The browser/Next/FastAPI socket is no
+  // longer held open while MTunnel/TP2027/SSH installers run for minutes.
+  const deadline=Date.now()+15*60*1000;
+  let lastStage=String(started.stage||started.status||"queued");
+
+  while(Date.now()<deadline){
+    await sleep(2000);
+    const job=await request<DeepRepairJob>(`/v1/tunnels/${id}/managed-deep-repair-job/${encodeURIComponent(jobId)}`);
+    lastStage=String(job.stage||job.status||lastStage);
+
+    if(job.status==="succeeded"){
+      if(!job.result)throw new Error("Deep repair completed without a result.");
+      return job.result;
+    }
+
+    if(job.status==="failed"){
+      throw new Error(job.error||`Deep repair failed at ${lastStage}.`);
+    }
+  }
+
+  throw new Error(`Deep repair is still running (${lastStage}). Refresh later and run diagnosis again.`);
+}
+
 export const tunnelTransportApi={
   transports:(id:number)=>request<TunnelTransportState>(`/v1/tunnels/${id}/transports`),
   setMode:(id:number,payload:{mode:TunnelTransportMode;transport?:TunnelTransportName})=>request<TunnelTransportState>(`/v1/tunnels/${id}/transport-mode`,{method:"POST",body:JSON.stringify(payload)}),
   managedDiagnose:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/managed-diagnose`),
   managedRepair:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/managed-repair`,{method:"POST"}),
   managedDeepDiagnose:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/managed-deep-diagnose`),
-  managedDeepRepair:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/managed-deep-repair`,{method:"POST"}),
+  managedDeepRepair:(id:number)=>managedDeepRepairJob(id),
   installDeepDiagnosticsAgent:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/managed-deep-agent-install`,{method:"POST"}),
   installSsh:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/ssh/install`,{method:"POST"}),
   installBackhaul:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/backhaul/install`,{method:"POST"}),
