@@ -1,0 +1,35 @@
+name: Managed Deep Diagnostics V32 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/managed_deep_diagnostics_v32.py"
+      - "backend/app/routers/modern_transports.py"
+      - "backend/scripts/managed_deep_diagnostics_v32_smoke.py"
+      - ".github/workflows/managed-deep-diagnostics-v32-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Compile V32 modules
+        run: |
+          python -m py_compile \
+            backend/app/managed_deep_diagnostics_v32.py \
+            backend/app/routers/modern_transports.py \
+            backend/scripts/managed_deep_diagnostics_v32_smoke.py
+      - name: Run V32 smoke
+        working-directory: backend
+        env:
+          APP_SECRET_KEY: ci-v32-deep-diagnostics-secret
+          NODE_AGENT_SHARED_SECRET: ci-v32-node-agent-shared-secret
+          DATABASE_URL: sqlite:///./v32-smoke.db
+          REDIS_URL: redis://127.0.0.1:6379/0
+        run: python scripts/managed_deep_diagnostics_v32_smoke.py
