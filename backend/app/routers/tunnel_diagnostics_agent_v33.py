@@ -9,12 +9,20 @@ from sqlalchemy.orm import Session
 from ..agent_diagnostics_v33 import desired_targets_for_node, save_agent_report
 from ..config import settings
 from ..database import get_db
+from ..deep_repair_jobs_v34 import get_deep_repair_job, start_deep_repair_job
+from ..deps import require_admin
 from ..models import Node, Tunnel
 
 
 router = APIRouter(
     prefix="/v1/tunnel-diagnostics",
     tags=["tunnel-diagnostics-agent-v33"],
+)
+
+repair_router = APIRouter(
+    prefix="/v1/tunnels",
+    tags=["tunnel-deep-repair-v34"],
+    dependencies=[Depends(require_admin)],
 )
 
 
@@ -90,3 +98,49 @@ def diagnostics_report(
         "accepted": sorted(diagnostics),
         "marker": "TWINPANEL_AGENT_DIAGNOSTICS_REPORT_V33_ACTIVE",
     }
+
+
+@repair_router.post(
+    "/{tunnel_id}/managed-deep-repair-job",
+    status_code=202,
+)
+async def start_managed_deep_repair_job(
+    tunnel_id: int,
+    db: Session = Depends(get_db),
+):
+    """Queue a deep repair and return immediately.
+
+    The long-running managed/modern installers execute in an API background
+    task with their own database session. Browser/Next proxy connections are
+    therefore never held open for the full repair duration.
+    """
+    tunnel = db.get(Tunnel, int(tunnel_id))
+    if tunnel is None:
+        raise HTTPException(status_code=404, detail="Tunnel not found")
+
+    return await start_deep_repair_job(int(tunnel_id))
+
+
+@repair_router.get(
+    "/{tunnel_id}/managed-deep-repair-job/{job_id}",
+)
+async def managed_deep_repair_job_status(
+    tunnel_id: int,
+    job_id: str,
+    db: Session = Depends(get_db),
+):
+    tunnel = db.get(Tunnel, int(tunnel_id))
+    if tunnel is None:
+        raise HTTPException(status_code=404, detail="Tunnel not found")
+
+    job = await get_deep_repair_job(int(tunnel_id), str(job_id))
+    if job is None:
+        raise HTTPException(status_code=404, detail="Deep repair job not found")
+
+    return job
+
+
+# Register V34 admin repair-job routes alongside the node-authenticated routes.
+# modern_transports.py appends this router's APIRoute objects directly, so the
+# absolute /v1/tunnels paths above retain their own admin dependency.
+router.routes.extend(repair_router.routes)
