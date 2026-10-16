@@ -21,6 +21,33 @@ export type HighSpeedRouteResult={
   }>;
 };
 
+export type RealEgressRepairResult={
+  ok?:boolean;
+  tunnel_id?:number;
+  mode?:string;
+  active_transport?:string;
+  status?:string;
+  latency_ms?:number|null;
+  exit_interface?:string|null;
+  message?:string;
+  selected?:{
+    transport?:string;
+    ok?:boolean;
+    loss_pct?:number|null;
+    latency_ms?:number|null;
+    public_ip?:string|null;
+    error?:string|null;
+  }|null;
+  verification?:Array<{
+    transport?:string;
+    ok?:boolean;
+    loss_pct?:number|null;
+    latency_ms?:number|null;
+    public_ip?:string|null;
+    error?:string|null;
+  }>;
+};
+
 export type XrayReconcileJob={
   job_id?:string;
   exit_node_id?:number;
@@ -120,6 +147,10 @@ async function reconcileXray(tunnelId:number):Promise<XrayReconcileJob>{
 export const serviceConnectionsV36Api={
   highSpeedAuto:(tunnelId:number)=>request<HighSpeedRouteResult>(
     `/v1/tunnels/${tunnelId}/service-connections/high-speed-auto`,
+    {method:"POST"},
+  ),
+  repairRealEgress:(tunnelId:number)=>request<RealEgressRepairResult>(
+    `/v1/tunnels/${tunnelId}/service-connections/repair-real-egress`,
     {method:"POST"},
   ),
   reconcileXray:(tunnelId:number)=>reconcileXray(tunnelId),
