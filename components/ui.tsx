@@ -19,32 +19,32 @@ const menuGroups=[
     ["پلن‌ها","Plans","/admin/plans","◈"]
   ]},
   {fa:"شبکه و زیرساخت",en:"Network & Infrastructure",items:[
-    ["سرورها","Servers","/admin/nodes","▦"],
-    ["تونل و Failover","Tunnels & Failover","/admin/tunnels","⤨"],
-    ["افزودن سرور","Add Server","/admin/provision","⚡"],
+    ["نودها","Nodes","/admin/nodes","▦"],
+    ["تانل‌ها","Tunnels","/admin/tunnels","⤨"],
+    ["راه‌اندازی نود","Provision Node","/admin/provision","⚡"],
     ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"]
   ]},
   {fa:"فروش و مالی",en:"Sales & Finance",items:[
-    ["پرداخت و رسیدها","Payments & Receipts","/admin/payments","◫"],
-    ["تطبیق پرداخت","Payment Matching","/admin/sms-reader","▤"],
-    ["تخفیف‌ها","Discounts","/admin/discounts","％"],
-    ["نمایندگان","Resellers","/admin/resellers","♜"],
-    ["بسته‌های ترافیک","Traffic Packages","/admin/reseller-traffic-plans","▣"],
-    ["فروشگاه","Store","/admin/store-settings","◇"]
+    ["پرداخت‌ها","Payments","/admin/payments","◫"],
+    ["تأیید خودکار کارت","Auto Payment Verification","/admin/sms-reader","▤"],
+    ["کدهای تخفیف","Discount Codes","/admin/discounts","％"],
+    ["نمایندگی‌ها","Resellers","/admin/resellers","♜"],
+    ["پلن‌های شارژ حجم","Traffic Recharge Plans","/admin/reseller-traffic-plans","▣"],
+    ["تنظیمات فروشگاه","Store Settings","/admin/store-settings","◇"]
   ]},
   {fa:"ارتباطات و پشتیبانی",en:"Communications & Support",items:[
     ["ربات تلگرام","Telegram Bot","/admin/telegram","✈"],
-    ["تیکت‌ها","Tickets","/admin/support","◌"],
+    ["پشتیبانی","Support","/admin/support","◌"],
     ["اعلان‌ها","Notifications","/admin/notifications","◎"]
   ]},
   {fa:"محتوا و برند",en:"Content & Brand",items:[
     ["فایل‌های دانلود","Downloads","/admin/downloads","⇩"],
-    ["برند و ظاهر","Brand & Appearance","/admin/branding","✦"]
+    ["برندینگ","Branding","/admin/branding","✦"]
   ]},
   {fa:"سیستم و نگهداری",en:"System & Maintenance",items:[
-    ["امنیت و ریسک","Security & Risk","/admin/system-health","⌾"],
+    ["امنیت","Security","/admin/system-health","⌾"],
     ["بکاپ و بازیابی","Backup & Restore","/admin/backups","⟲"],
-    ["تنظیمات سیستم","System Settings","/admin/settings","⚙"]
+    ["تنظیمات","Settings","/admin/settings","⚙"]
   ]}
 ] as const;
 

@@ -2,12 +2,14 @@
 
 import dynamic from "next/dynamic";
 import {AdminAuthGuard} from "./admin-auth-guard";
+import {Card,Shell} from "./ui";
 
 const TelegramManagerPage=dynamic(()=>import("./admin-control-screens").then(m=>m.TelegramManagerPage));
 const TelegramRuntimePage=dynamic(()=>import("./admin-parity-runtime").then(m=>m.TelegramRuntimePage));
 const WalletRuntimePage=dynamic(()=>import("./admin-parity-runtime").then(m=>m.WalletRuntimePage));
 const DiscountsRuntimePage=dynamic(()=>import("./admin-parity-runtime").then(m=>m.DiscountsRuntimePage));
 const ResellersRuntimePage=dynamic(()=>import("./admin-parity-runtime").then(m=>m.ResellersRuntimePage));
+const AdminResellerTrafficPlans=dynamic(()=>import("./admin-reseller-traffic-plans").then(m=>m.AdminResellerTrafficPlans));
 const StoreSettingsRuntimePage=dynamic(()=>import("./admin-parity-runtime").then(m=>m.StoreSettingsRuntimePage));
 const BackupsFullRuntimePage=dynamic(()=>import("./backups-full-runtime").then(m=>m.BackupsFullRuntimePage));
 const ProvisionRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.ProvisionRuntimePage));
@@ -43,6 +45,24 @@ const customerSections=new Set(["subscription","connection","usage","orders","wa
 const resellerSections=new Set(["customers","subscriptions","sales","wallet","orders","traffic","bot","notifications","settings"]);
 const admin=(node:React.ReactNode)=><AdminAuthGuard>{node}</AdminAuthGuard>;
 
+function AdminUnknownRoute(){
+  return (
+    <Shell active="">
+      <div className="page">
+        <div className="page-head">
+          <div>
+            <h1>صفحه پیدا نشد</h1>
+          </div>
+        </div>
+        <Card>
+          <b>این مسیر در پنل مدیریت وجود ندارد.</b>
+        </Card>
+      </div>
+    </Shell>
+  );
+}
+
+
 const DownloadAssetsRuntime=dynamic(()=>import("./download-assets-runtime").then(m=>m.DownloadAssetsRuntime));
 
 export function RoutedPageClient({routeKey}:{routeKey:string}){
@@ -56,6 +76,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="admin/subscription-tools") return admin(<SubscriptionToolsRuntimePage/>);
   if(key==="admin/plans") return admin(<LegacyPlansRuntimePage/>);
   if(key==="admin/nodes") return admin(<LegacyNodesRuntimePage/>);
+  if(key==="admin/network") return admin(<LegacyNodesRuntimePage/>);
   if(key==="admin/tunnels") return admin(<TunnelsSimpleRuntimePage/>);
   if(key==="admin/tunnel-transports") return admin(<TunnelsSimpleRuntimePage/>);
   if(key==="admin/payments") return admin(<PaymentsReviewRuntime/>);
@@ -71,10 +92,11 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="admin/wallet") return admin(<WalletRuntimePage/>);
   if(key==="admin/discounts") return admin(<DiscountsRuntimePage/>);
   if(key==="admin/resellers") return admin(<ResellersRuntimePage/>);
+  if(key==="admin/reseller-traffic-plans") return admin(<AdminResellerTrafficPlans/>);
   if(key==="admin/domains") return admin(<DomainsRuntimePage/>);
   if(key==="admin/provision") return admin(<ProvisionRuntimePage/>);
   if(key==="admin/account-delivery") return admin(<AccountDeliveryRuntimePage/>);
-  if(key==="admin/downloads") return <DownloadAssetsRuntime/>;
+  if(key==="admin/downloads") return admin(<DownloadAssetsRuntime/>);
   if(key==="admin/vpn-settings") return admin(<VpnSettingsModernPage/>);
   if(key==="admin/l2tp") return admin(<L2tpSettingsPage/>);
   if(key==="admin/mother-access") return admin(<MotherAccessRuntimePage/>);
@@ -94,5 +116,6 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
     if(resellerSections.has(section)) return <ResellerSectionRuntime section={section}/>;
   }
 
+  if(key.startsWith("admin/")) return admin(<AdminUnknownRoute/>);
   return <StoreRuntime2027/>;
 }
