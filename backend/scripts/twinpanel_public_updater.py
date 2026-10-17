@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import shutil
 import subprocess
 import sys
-import tarfile
 import tempfile
 import time
 import urllib.request
@@ -21,6 +19,7 @@ CURRENT = Path('/opt/twinpanel/current')
 RELEASES = Path('/opt/twinpanel/releases')
 VENV = Path('/opt/twinpanel/venv/bin/python3')
 DEFAULT_MANIFEST = 'https://raw.githubusercontent.com/matin111/twinpanel/main/releases/stable.json'
+DEFAULT_REPOSITORY = 'https://github.com/matin111/twinpanel.git'
 
 
 def now() -> str:
@@ -57,7 +56,7 @@ def runtime_env() -> dict[str, str]:
 
 
 def get_json(url: str) -> dict:
-    req = urllib.request.Request(url, headers={'User-Agent': 'TwinPanel-Public-Updater/1'})
+    req = urllib.request.Request(url, headers={'User-Agent': 'TwinPanel-Public-Updater/2'})
     with urllib.request.urlopen(req, timeout=25) as res:
         obj = json.loads(res.read().decode('utf-8'))
     if not isinstance(obj, dict):
@@ -65,40 +64,10 @@ def get_json(url: str) -> dict:
     return obj
 
 
-def download(url: str, target: Path) -> None:
-    req = urllib.request.Request(url, headers={'User-Agent': 'TwinPanel-Public-Updater/1'})
-    with urllib.request.urlopen(req, timeout=120) as res, target.open('wb') as fh:
-        shutil.copyfileobj(res, fh, length=1024 * 1024)
-
-
-def digest(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open('rb') as fh:
-        for chunk in iter(lambda: fh.read(1024 * 1024), b''):
-            h.update(chunk)
-    return h.hexdigest()
-
-
 def run(args: list[str], cwd: Path | None = None, env: dict[str, str] | None = None, timeout: int = 1200) -> None:
     cp = subprocess.run(args, cwd=str(cwd) if cwd else None, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
     if cp.returncode != 0:
         raise RuntimeError(f"COMMAND_FAILED:{' '.join(args)}\n{(cp.stdout or '')[-5000:]}")
-
-
-def safe_extract(archive: Path, dest: Path) -> Path:
-    dest = dest.resolve()
-    with tarfile.open(archive, 'r:gz') as tf:
-        for member in tf.getmembers():
-            target = (dest / member.name).resolve()
-            if target != dest and dest not in target.parents:
-                raise RuntimeError('UNSAFE_ARCHIVE')
-        tf.extractall(dest)
-    if (dest / 'backend').is_dir():
-        return dest
-    children = [p for p in dest.iterdir() if p.is_dir()]
-    if len(children) == 1 and (children[0] / 'backend').is_dir():
-        return children[0]
-    raise RuntimeError('INVALID_RELEASE_LAYOUT')
 
 
 def backup(env: dict[str, str]) -> None:
@@ -150,6 +119,17 @@ def rollback(previous: Path | None) -> None:
     restart()
 
 
+def clone_release(repository: str, source_sha: str, target: Path) -> None:
+    run(['git', 'init', '-q', str(target)], timeout=60)
+    run(['git', '-C', str(target), 'remote', 'add', 'origin', repository], timeout=60)
+    run(['git', '-C', str(target), '-c', 'advice.detachedHead=false', 'fetch', '-q', '--depth', '1', 'origin', source_sha], timeout=300)
+    run(['git', '-C', str(target), 'checkout', '-q', '--detach', 'FETCH_HEAD'], timeout=60)
+    cp = subprocess.run(['git', '-C', str(target), 'rev-parse', 'HEAD'], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+    actual = (cp.stdout or '').strip()
+    if cp.returncode != 0 or actual != source_sha:
+        raise RuntimeError('SOURCE_COMMIT_VERIFICATION_FAILED')
+
+
 def main() -> int:
     env = runtime_env()
     manifest_url = env.get('TWINPANEL_RELEASE_MANIFEST_URL') or DEFAULT_MANIFEST
@@ -158,10 +138,12 @@ def main() -> int:
         raise RuntimeError('RELEASE_NOT_INSTALLABLE')
 
     version = str(manifest.get('version') or '').strip()
-    url = str(manifest.get('package_url') or '').strip()
-    expected = str(manifest.get('sha256') or '').strip().lower()
-    if not version or not url or len(expected) != 64:
+    repository = str(manifest.get('repository_url') or DEFAULT_REPOSITORY).strip()
+    source_sha = str(manifest.get('source_sha') or '').strip().lower()
+    if not version or not repository.startswith('https://github.com/matin111/twinpanel'):
         raise RuntimeError('RELEASE_METADATA_INCOMPLETE')
+    if len(source_sha) != 40 or any(ch not in '0123456789abcdef' for ch in source_sha):
+        raise RuntimeError('RELEASE_SOURCE_SHA_INVALID')
 
     requested = {}
     try:
@@ -179,26 +161,21 @@ def main() -> int:
 
     RELEASES.mkdir(parents=True, exist_ok=True)
     final = RELEASES / version
-    save(state='downloading', current_version=current_version, target_version=version)
+    save(state='fetching', current_version=current_version, target_version=version, source_sha=source_sha)
 
     with tempfile.TemporaryDirectory(prefix='twinpanel-public-update-') as name:
         tmp = Path(name)
-        archive = tmp / 'release.tar.gz'
-        extracted = tmp / 'release'
-        extracted.mkdir()
-        download(url, archive)
-        if digest(archive) != expected:
-            raise RuntimeError('RELEASE_SHA256_MISMATCH')
+        source = tmp / 'source'
+        clone_release(repository, source_sha, source)
+        if (source / 'VERSION').read_text(encoding='utf-8').strip() != version:
+            raise RuntimeError('RELEASE_VERSION_MISMATCH')
 
         save(state='backup', target_version=version)
         backup(env)
-        save(state='extracting', target_version=version)
-        root = safe_extract(archive, extracted)
-        if (root / 'VERSION').read_text(encoding='utf-8').strip() != version:
-            raise RuntimeError('RELEASE_VERSION_MISMATCH')
+
         if final.exists():
             shutil.rmtree(final)
-        shutil.copytree(root, final, symlinks=True)
+        shutil.copytree(source, final, symlinks=True, ignore=shutil.ignore_patterns('.git'))
 
     save(state='building', target_version=version)
     python = VENV if VENV.is_file() else Path(sys.executable)
@@ -220,7 +197,7 @@ def main() -> int:
         rollback(previous)
         raise RuntimeError('POST_UPDATE_HEALTH_FAILED')
 
-    save(state='completed', target_version=version, previous_version=current_version, completed_at=now())
+    save(state='completed', target_version=version, previous_version=current_version, source_sha=source_sha, completed_at=now())
     try:
         REQUEST.unlink()
     except FileNotFoundError:
