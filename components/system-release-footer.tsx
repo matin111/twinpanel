@@ -1,9 +1,11 @@
 "use client";
 
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
+
+const UPDATE_RELOAD_KEY="twinpanel-update-reload-pending-v1";
 
 type LicenseState={
   status?:string;
@@ -63,6 +65,9 @@ export function SystemReleaseFooter(){
   const [error,setError]=useState("");
   const [licenseOpen,setLicenseOpen]=useState(false);
   const [licenseKey,setLicenseKey]=useState("");
+  const [reloading,setReloading]=useState(false);
+  const initialVersionRef=useRef("");
+  const reloadTimerRef=useRef<number|null>(null);
 
   const updateState=String(data?.update?.state||"");
   const updateBusy=useMemo(()=>[
@@ -82,6 +87,7 @@ export function SystemReleaseFooter(){
   const load=async(check=false)=>{
     try{
       const result=await request<ReleaseStatus>(check?"/v1/admin/system/release/check":"/v1/admin/system/release/status",check?{method:"POST"}:{});
+      if(!initialVersionRef.current)initialVersionRef.current=String(result.current_version||"").trim();
       setData(result);setError("");
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
   };
@@ -120,6 +126,34 @@ export function SystemReleaseFooter(){
     return()=>window.clearInterval(timer);
   },[updateBusy]);
 
+  useEffect(()=>{
+    if(!data)return;
+
+    if(updateState==="failed"){
+      try{window.sessionStorage.removeItem(UPDATE_RELOAD_KEY);}catch{}
+      return;
+    }
+
+    const current=String(data.current_version||"").trim();
+    const target=String(data.update?.target_version||"").trim();
+    const completed=updateState==="completed"&&Boolean(target)&&current===target;
+    if(!completed||reloading)return;
+
+    let startedHere=false;
+    try{startedHere=window.sessionStorage.getItem(UPDATE_RELOAD_KEY)==="1";}catch{}
+    const versionChanged=Boolean(initialVersionRef.current&&initialVersionRef.current!==current);
+    if(!startedHere&&!versionChanged)return;
+
+    try{window.sessionStorage.removeItem(UPDATE_RELOAD_KEY);}catch{}
+    setReloading(true);
+    if(reloadTimerRef.current!==null)window.clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current=window.setTimeout(()=>window.location.reload(),700);
+  },[data,reloading,updateState]);
+
+  useEffect(()=>()=>{
+    if(reloadTimerRef.current!==null)window.clearTimeout(reloadTimerRef.current);
+  },[]);
+
   const licenseStatus=String(data?.license?.status||"");
   const remaining=remainingText(data?.license?.seconds_remaining,lang==="fa");
   const needsLicense=["trial_expired","license_expired","revoked","suspended"].includes(licenseStatus);
@@ -143,14 +177,18 @@ export function SystemReleaseFooter(){
   },[lang,updateState,pick]);
 
   const startUpdate=async()=>{
-    if(busy||updateBusy)return;
+    if(busy||updateBusy||reloading)return;
     if(!window.confirm(pick("بروزرسانی پنل شروع شود؟ قبل از تغییر نسخه، بکاپ خودکار ساخته می‌شود.","Start the panel update? A backup is created before the release is changed.")))return;
     setBusy("update");setError("");
     try{
+      try{window.sessionStorage.setItem(UPDATE_RELOAD_KEY,"1");}catch{}
       await request("/v1/admin/system/update",{method:"POST"});
       await load(false);
       window.setTimeout(()=>void load(false),1500);
-    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    }catch(reason){
+      try{window.sessionStorage.removeItem(UPDATE_RELOAD_KEY);}catch{}
+      setError(reason instanceof Error?reason.message:String(reason));
+    }
     finally{setBusy("");}
   };
 
@@ -179,11 +217,12 @@ export function SystemReleaseFooter(){
         <button type="button" onClick={()=>setLicenseOpen(true)}>{pick("لایسنس","License")}</button>
       </div>
 
-      {data.update_available&&<button className="system-update-button" type="button" disabled={busy==="update"||updateBusy} onClick={()=>void startUpdate()}>
+      {reloading&&<button className="system-update-button" type="button" disabled>{pick("بروزرسانی کامل شد؛ در حال تازه‌سازی…","Update complete; refreshing…")}</button>}
+      {!reloading&&data.update_available&&<button className="system-update-button" type="button" disabled={busy==="update"||updateBusy} onClick={()=>void startUpdate()}>
         {updateBusy?updateProgress:pick(`بروزرسانی به ${data.latest_version}`,`Update to ${data.latest_version}`)}
       </button>}
 
-      {!data.update_available&&<button className="system-check-button" type="button" disabled={Boolean(busy)} onClick={()=>void load(true)}>{pick("بررسی بروزرسانی","Check update")}</button>}
+      {!reloading&&!data.update_available&&<button className="system-check-button" type="button" disabled={Boolean(busy)} onClick={()=>void load(true)}>{pick("بررسی بروزرسانی","Check update")}</button>}
       {error&&<small className="system-release-error">{error}</small>}
     </div>
 
