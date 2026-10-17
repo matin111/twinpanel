@@ -27,7 +27,7 @@ const protocolLabels:Record<(typeof protocolKeys)[number],string>={
 };
 
 type NodeRole="iran"|"exit"|"mother";
-type NodeModal="ssh"|"domain"|"xray-domain"|"protocols"|null;
+type NodeModal="manage"|"ssh"|"domain"|"xray-domain"|"protocols"|null;
 type ExtendedNode=AdminNode&{is_mother?:boolean;public_domain?:string|null};
 type ProtocolRuntime={
   protocol?:string;
@@ -159,13 +159,19 @@ export function LegacyNodesRuntimePage(){
     return false;
   };
 
+  const openManage=(node:ExtendedNode)=>{
+    setSelectedId(node.id);
+    setError("");setWarning("");setSuccess("");
+    setModal("manage");
+  };
+
   const saveAccess=async()=>{
     if(!selected||busy)return;
     if(!accessDraft.password){setError(pick("رمز SSH را وارد کنید.","Enter the SSH password."));return;}
     setBusy("ssh");setError("");setWarning("");
     try{
       await legacyAdminApi.saveNodeAccess({node_id:selected.id,host:selected.public_ip||effectiveDomain,port:accessDraft.port,username:accessDraft.username,password:accessDraft.password});
-      setAccessConfigured(true);setModal(null);setAccessDraft(current=>({...current,password:""}));
+      setAccessConfigured(true);setModal("manage");setAccessDraft(current=>({...current,password:""}));
       setSuccess(pick("دسترسی SSH ذخیره شد.","SSH access saved."));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy("");}
@@ -181,7 +187,7 @@ export function LegacyNodesRuntimePage(){
       setDomains(current=>current.some(row=>n(row.id||row.node_id)===selected.id)
         ?current.map(row=>n(row.id||row.node_id)===selected.id?{...row,...next}:row)
         :[...current,next]);
-      setModal(null);setSuccess(pick("دامنه ذخیره شد.","Domain saved."));
+      setModal("manage");setSuccess(pick("دامنه ذخیره شد.","Domain saved."));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy("");}
   };
@@ -198,7 +204,7 @@ export function LegacyNodesRuntimePage(){
       const prepared=await legacyAdminApi.prepareXrayDomain(selected.id,false);
       setXrayDomainInfo(current=>({...current,...prepared,xray_domain:domain,effective_xray_domain:domain}));
       setXrayDomainDraft(domain);
-      setModal(null);
+      setModal("manage");
       setSuccess(Boolean(prepared.tls_enabled)
         ?pick("دامنه Xray ذخیره و TLS/Xray اعمال شد.","Xray domain saved and TLS/Xray applied.")
         :pick("دامنه Xray ذخیره شد؛ گواهی TLS معتبر روی نود خروجی پیدا نشد.","Xray domain saved; no valid TLS certificate was found on the Exit node."));
@@ -247,6 +253,7 @@ export function LegacyNodesRuntimePage(){
     setBusy("delete");setError("");
     try{
       await adminApi.deleteNode(selected.id);
+      setModal(null);
       setSuccess(pick("نود حذف شد.","Node deleted."));
       await load(true);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
@@ -284,13 +291,16 @@ export function LegacyNodesRuntimePage(){
         <div className="table"><table><thead><tr><th>{pick("نود","Node")}</th><th>{pick("نوع","Type")}</th><th>IP</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead>
           <tbody>{filtered.map(node=><tr key={node.id} className={node.id===selectedId?"is-selected":""}>
             <td><b>{node.name}</b></td><td>{roleOf(node)}</td><td dir="ltr">{node.public_ip||"—"}</td><td><Badge tone={tone(node.status)}>{node.status||"—"}</Badge></td>
-            <td><button type="button" className={node.id===selectedId?"primary-soft":"ghost"} onClick={()=>setSelectedId(node.id)}>{pick("مدیریت","Manage")}</button></td>
+            <td><button type="button" className={node.id===selectedId?"primary-soft":"ghost"} onClick={()=>openManage(node)}>{pick("مدیریت","Manage")}</button></td>
           </tr>)}</tbody>
         </table></div>
       </Card>
 
-      {selected&&<Card>
+      {modal==="manage"&&selected?<Modal title={pick(`مدیریت نود ${selected.name}`,`Manage node ${selected.name}`)} onClose={()=>setModal(null)}>
         <div className="card-head"><div><b>{selected.name}</b><small dir="ltr">{selected.public_ip||"—"}</small></div><Badge tone={tone(selected.status)}>{selected.status||"—"}</Badge></div>
+        {error&&<div className="runtime-error">{error}</div>}
+        {warning&&<div className="runtime-warning">{warning}</div>}
+        {success&&<div className="runtime-success">{success}</div>}
         <div className="runtime-info-list">
           <div><span>{pick("نقش","Role")}</span><b>{selectedRole}</b></div>
           <div><span>{pick("دسترسی SSH","SSH access")}</span><Badge tone={accessConfigured?"ok":"warn"}>{accessConfigured?pick("ثبت شده","Saved"):pick("ثبت نشده","Missing")}</Badge></div>
@@ -306,9 +316,11 @@ export function LegacyNodesRuntimePage(){
           {selectedRole!=="mother"?<button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>void toggleMaintenance()}>{selected.status==="maintenance"?pick("خروج از نگهداری","Leave maintenance"):pick("حالت نگهداری","Maintenance")}</button>:null}
           <button type="button" className="danger" disabled={Boolean(busy)} onClick={()=>void deleteNode()}>{pick("حذف نود","Delete node")}</button>
         </div>
-      </Card>}
+      </Modal>:null}
 
-      {modal==="ssh"&&selected?<Modal title={pick("دسترسی SSH","SSH access")} onClose={()=>setModal(null)}>
+      {modal==="ssh"&&selected?<Modal title={pick("دسترسی SSH","SSH access")} onClose={()=>setModal("manage")}>
+        {error&&<div className="runtime-error">{error}</div>}
+        {warning&&<div className="runtime-warning">{warning}</div>}
         <div className="runtime-form">
           <label>{pick("پورت","Port")}<input type="number" value={accessDraft.port} onChange={event=>setAccessDraft(current=>({...current,port:Number(event.target.value)||22}))}/></label>
           <label>{pick("نام کاربری","Username")}<input value={accessDraft.username} onChange={event=>setAccessDraft(current=>({...current,username:event.target.value}))}/></label>
@@ -317,11 +329,14 @@ export function LegacyNodesRuntimePage(){
         </div>
       </Modal>:null}
 
-      {modal==="domain"&&selected?<Modal title={pick("دامنه عمومی نود","Public node domain")} onClose={()=>setModal(null)}>
+      {modal==="domain"&&selected?<Modal title={pick("دامنه عمومی نود","Public node domain")} onClose={()=>setModal("manage")}>
+        {error&&<div className="runtime-error">{error}</div>}
         <div className="runtime-form"><label>{pick("دامنه عمومی","Public domain")}<input dir="ltr" value={domainDraft} onChange={event=>setDomainDraft(event.target.value)} placeholder="node.example.com"/></label><button type="button" className="primary" disabled={Boolean(busy)} onClick={()=>void saveDomain()}>{busy==="domain"?"…":pick("ذخیره","Save")}</button></div>
       </Modal>:null}
 
-      {modal==="xray-domain"&&selected?<Modal title={pick("دامنه Xray / V2Ray","Xray / V2Ray domain")} onClose={()=>setModal(null)}>
+      {modal==="xray-domain"&&selected?<Modal title={pick("دامنه Xray / V2Ray","Xray / V2Ray domain")} onClose={()=>setModal("manage")}>
+        {error&&<div className="runtime-error">{error}</div>}
+        {warning&&<div className="runtime-warning">{warning}</div>}
         <div className="runtime-form">
           <label>{pick("دامنه Xray","Xray domain")}<input dir="ltr" value={xrayDomainDraft} onChange={event=>setXrayDomainDraft(event.target.value)} placeholder="vtray.example.com"/></label>
           <small>{pick("این دامنه مخصوص TLS/SNI پروفایل‌های Xray است. صدور SSL خودکار اجرا نمی‌شود؛ گواهی موجود روی نود خروجی استفاده می‌شود.","This domain is dedicated to Xray TLS/SNI. Automatic certificate issuance is not run; the existing Exit certificate is used.")}</small>
@@ -329,7 +344,9 @@ export function LegacyNodesRuntimePage(){
         </div>
       </Modal>:null}
 
-      {modal==="protocols"&&selected?<Modal title={pick("سلامت پروتکل‌ها","Protocol health")} onClose={()=>setModal(null)}>
+      {modal==="protocols"&&selected?<Modal title={pick("سلامت پروتکل‌ها","Protocol health")} onClose={()=>setModal("manage")}>
+        {error&&<div className="runtime-error">{error}</div>}
+        {success&&<div className="runtime-success">{success}</div>}
         <div className="tunnel-service-compact-grid">{selectedProtocols.map(key=>{const row=runtime[key]||{};const ok=Boolean(row.ok);return <div className="tunnel-service-compact-item" key={key}>
           <div className="tunnel-service-compact-item-head"><b>{protocolLabels[key]}</b><Badge tone={ok?"ok":"warn"}>{ok?"ONLINE":"CHECK"}</Badge></div>
           {row.error?<small dir="ltr">{row.error}</small>:null}
