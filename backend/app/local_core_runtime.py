@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from urllib.parse import urlparse
@@ -87,7 +88,7 @@ def detect_local_public_ipv4() -> str:
             return host
 
     try:
-        process = __import__("subprocess").run(
+        process = subprocess.run(
             ["ip", "-4", "route", "get", "1.1.1.1"],
             capture_output=True,
             text=True,
@@ -181,10 +182,10 @@ def managed_protocol_nodes(db: Session) -> list[Node]:
     return [local, *remote]
 
 
-def connection_for_node(node: Node, db: Session):
+async def connection_for_node(node: Node, db: Session):
     if getattr(node, "is_mother", False) or str(getattr(node, "agent_url", "") or "") == LOCAL_AGENT_URL:
         return LocalShellConnection()
 
     from .routers.provision import ssh_connect_saved
 
-    return ssh_connect_saved(node, db)
+    return await ssh_connect_saved(node, db)
