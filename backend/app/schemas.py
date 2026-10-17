@@ -207,7 +207,7 @@ class SubscriptionCreate(BaseModel):
 class SubscriptionOut(BaseModel):
     id: int
     user_id: int
-    plan_id: int
+    plan_id: int | None
     status: SubscriptionStatus
     traffic_limit_bytes: int
     traffic_used_bytes: int

@@ -49,7 +49,6 @@ def generate_share_code(username: str | None):
 
 
 
-
 def generate_account_username(user_id: int):
     import secrets
     return f"mv{user_id}{secrets.token_hex(3)}"
@@ -79,7 +78,7 @@ def create_subscription_core(
 
     db: Session,
     user_id: int,
-    plan_id: int,
+    plan_id: int | None,
     traffic_bytes: int,
     duration_days: int,
     node_ids: list[int],
@@ -96,9 +95,9 @@ def create_subscription_core(
             detail="کاربر فعال پیدا نشد",
         )
 
-    plan = db.get(Plan, plan_id)
+    plan = db.get(Plan, plan_id) if plan_id is not None else None
 
-    if not plan or not plan.is_active:
+    if plan_id is not None and (not plan or not plan.is_active):
         raise HTTPException(
             status_code=404,
             detail="پلن پیدا نشد",
@@ -139,13 +138,19 @@ def create_subscription_core(
     )
 
 
-    if not requested_protocols:
+    if not requested_protocols and plan is not None:
 
         requested_protocols = [
             p
             for p, field in PROTOCOL_FIELDS.items()
             if getattr(plan, field, False)
         ]
+
+    if not requested_protocols:
+        raise HTTPException(
+            status_code=422,
+            detail="حداقل یک پروتکل برای اشتراک انتخاب کنید",
+        )
 
 
     iran_node = next(
@@ -190,7 +195,7 @@ def create_subscription_core(
 
     sub = Subscription(
         user_id=user_id,
-        plan_id=plan_id,
+        plan_id=(plan.id if plan is not None else None),
 
         status=SubscriptionStatus.ACTIVE,
 

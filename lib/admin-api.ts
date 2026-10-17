@@ -102,12 +102,15 @@ export const adminApi={
   subscriptions:()=>request<RuntimeRow[]>("/v1/subscriptions"),
   subscriptionsV2:()=>request<RuntimeRow[]>("/v1/subscriptions/admin-list-v2"),
   createSubscription:(payload:{user_id:number;plan_id:number;node_ids:number[];protocols:string[];traffic_gb?:number;duration_days?:number;username?:string;password?:string})=>request<RuntimeRow>("/v1/subscriptions",{method:"POST",body:JSON.stringify(payload)}),
-  createSubscriptionV2:async(payload:{user_id:number;plan_id:number;node_ids:number[];protocols:string[];traffic_gb?:number;duration_days?:number;device_limit?:number;username?:string;password?:string})=>{
+  createSubscriptionV2:async(payload:{user_id:number;plan_id?:number|null;node_ids:number[];protocols:string[];traffic_gb?:number;duration_days?:number;device_limit?:number;username?:string;password?:string})=>{
     try{
       return await request<RuntimeRow>("/v1/subscriptions/admin-create-v2",{method:"POST",body:JSON.stringify(payload)});
     }catch(error){
       const message=error instanceof Error?error.message:String(error);
       if(!/(not found|method not allowed|api error 404|api error 405)/i.test(message))throw error;
+      if(payload.plan_id==null){
+        throw new Error("ساخت اشتراک دستی به API جدید نیاز دارد؛ پنل را بروزرسانی کنید");
+      }
       const {device_limit:_deviceLimit,...legacyPayload}=payload;
       return request<RuntimeRow>("/v1/subscriptions",{method:"POST",body:JSON.stringify(legacyPayload)});
     }
