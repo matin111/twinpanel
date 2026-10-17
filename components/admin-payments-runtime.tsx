@@ -5,6 +5,7 @@ import {Badge,Card,Shell} from "./ui";
 import {API_BASE,api as routes} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
+import {AdminPaymentMarketRates} from "./admin-payment-market-rates";
 
 type Intent={
   id:number;order_id?:number|null;user_id?:number|null;method?:string;status?:string;
@@ -213,6 +214,8 @@ export function AdminPaymentsRuntime(){
       </div>
       <div className="gatewaySaveBar"><div><b>{pick("تنظیمات درگاه‌ها","Gateway settings")}</b><small>{pick("مبلغ ارز هر سفارش هنگام ساخت پرداخت با نرخ زنده محاسبه و ثابت می‌شود.","Each order's crypto amount is calculated from the live rate and frozen when payment is created.")}</small></div><button className="primary" disabled={busy}>{busy?"…":pick("ذخیره تنظیمات","Save settings")}</button></div>
     </form>}
+
+    <AdminPaymentMarketRates/>
 
     {rejecting&&<div className="runtime-modal"><button className="runtime-modal-bg" onClick={()=>setRejecting(null)} aria-label="close"/><form className="runtime-modal-card" onSubmit={reject}><div className="card-head"><div><b>{pick("رد پرداخت","Reject payment")} #{rejecting.id}</b><small>{rejecting.crypto_amount&&rejecting.crypto_asset?`${rejecting.crypto_amount} ${rejecting.crypto_asset}`:money(rejecting.payable_amount_toman??rejecting.base_amount_toman)}</small></div><button type="button" className="icon-button" onClick={()=>setRejecting(null)}>×</button></div><label><span>{pick("دلیل رد","Rejection reason")}</span><textarea autoFocus rows={4} value={rejectReason} onChange={e=>setRejectReason(e.target.value)} required/></label><div className="runtime-modal-actions"><button type="button" className="ghost" onClick={()=>setRejecting(null)}>{pick("انصراف","Cancel")}</button><button className="danger" disabled={busy}>{pick("رد پرداخت","Reject payment")}</button></div></form></div>}
   </div></Shell>;
