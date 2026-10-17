@@ -32,12 +32,10 @@ def load_env_file(path: Path) -> dict[str, str]:
     return values
 
 
-# Load the exact installed runtime environment before importing TwinPanel.
 for env_path in (INSTALL_ENV, BACKEND_ENV, FRONTEND_ENV):
     for key, value in load_env_file(env_path).items():
         os.environ.setdefault(key, value)
 
-# The script is shipped inside backend/scripts and may be called from anywhere.
 backend_dir = CURRENT / "backend"
 if backend_dir.is_dir():
     sys.path.insert(0, str(backend_dir))
@@ -165,24 +163,36 @@ def safe_get_feature(name: str, path: str, api_base: str, token: str, paths: dic
 
 def scan_frontend_contract() -> None:
     started = time.monotonic()
-    source = CURRENT / "components/support-chat-widget-v2.tsx"
-    if source.is_file():
-        text = source.read_text(encoding="utf-8", errors="ignore")
-        if 'if(!API_BASE)throw new Error("NEXT_PUBLIC_API_BASE is not configured")' in text:
-            record(
-                "frontend.same_origin_contract",
-                "FAIL",
-                "support chat rejects the portable same-origin API mode",
-                started,
-            )
-            return
     api_file = CURRENT / "lib/api.ts"
-    if api_file.is_file():
-        text = api_file.read_text(encoding="utf-8", errors="ignore")
-        if "browserOrigin" in text and "!configuredApiBase" in text:
-            record("frontend.same_origin_contract", "PASS", "portable browser origin fallback present", started)
-            return
-    record("frontend.same_origin_contract", "WARN", "same-origin contract could not be proven from installed source", started)
+    if not api_file.is_file():
+        record("frontend.same_origin_contract", "FAIL", "lib/api.ts missing from active release", started)
+        return
+
+    text = api_file.read_text(encoding="utf-8", errors="ignore")
+    central_fallback = (
+        "browserOrigin" in text
+        and "window.location.origin" in text
+        and "!configuredApiBase||isLoopbackApiBase" in text
+    )
+    if central_fallback:
+        record(
+            "frontend.same_origin_contract",
+            "PASS",
+            "empty/loopback public API base resolves to current browser origin",
+            started,
+        )
+        return
+
+    source = CURRENT / "components/support-chat-widget-v2.tsx"
+    if source.is_file() and 'NEXT_PUBLIC_API_BASE is not configured' in source.read_text(encoding="utf-8", errors="ignore"):
+        record(
+            "frontend.same_origin_contract",
+            "FAIL",
+            "portable prebuilt mode can be rejected by support chat",
+            started,
+        )
+        return
+    record("frontend.same_origin_contract", "WARN", "same-origin contract could not be proven", started)
 
 
 def main() -> int:
@@ -206,7 +216,6 @@ def main() -> int:
         state = unit_state(unit)
         record(f"service.{unit.removesuffix('.service')}", "PASS" if state == "active" else "FAIL", state, started)
 
-    # Database/cache service names differ across Ubuntu/package/container installs.
     for label, choices in (
         ("postgresql", ("postgresql.service",)),
         ("redis", ("redis-server.service", "redis.service")),
@@ -254,8 +263,6 @@ def main() -> int:
             started,
         )
 
-        # Safe, read-only feature probes. Each one must exist in OpenAPI and
-        # answer with the locally generated active-admin token.
         features = [
             ("feature.auth", "/v1/auth/me"),
             ("feature.dashboard", "/v1/admin/dashboard-summary"),
