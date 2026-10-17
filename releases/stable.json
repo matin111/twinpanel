@@ -2,16 +2,16 @@
   "schema": 2,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.10",
+  "version": "1.1.0-rc.11",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T19:36:00Z",
+  "released_at": "2026-10-17T19:47:00Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "ce1ab4c49a8b2047c0fbc81865520f7cd287d8f0",
+  "source_sha": "d8e574017fcbbc6ce982912fd563457c5393c468",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "notes": {
-    "fa": "نسخه 1.1.0-rc.10 تشخیص بروزرسانی در پنل مدیریت را خودکار می‌کند: هنگام باز شدن پنل، بازگشت فوکوس و به‌صورت دوره‌ای Manifest زنده بررسی می‌شود؛ در صورت وجود نسخه جدید، دکمه بروزرسانی و وضعیت قرمز/چشمک‌زن گروه سیستم بدون نیاز به کلیک دستی روی بررسی بروزرسانی نمایش داده می‌شوند.",
-    "en": "TwinPanel 1.1.0-rc.10 automatically detects available updates in the admin UI. The live release manifest is checked on page load, when focus returns, and periodically, so the update action and red/blinking System attention state appear without requiring a manual Check update click."
+    "fa": "نسخه 1.1.0-rc.11 خطای رقابتی بروزرسانی را برطرف می‌کند: اگر Stable بین ثبت درخواست و شروع Worker به نسخه جدیدتری برسد، Updater دیگر با REQUESTED_RELEASE_CHANGED متوقف نمی‌شود و به نسخه Stable جدیدتر Retarget می‌شود؛ در عین حال کنترل installable/published، محدودیت Repository، تطبیق دقیق Source SHA و VERSION حفظ می‌شوند.",
+    "en": "TwinPanel 1.1.0-rc.11 fixes the updater release race. If stable advances between queuing an update and the worker starting, the updater no longer fails with REQUESTED_RELEASE_CHANGED and can safely retarget to the newer stable release while preserving installable/published gating, repository allowlisting, exact source SHA verification, and VERSION verification."
   }
 }
