@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.19",
-  "source_sha": "9b01d3912fa851152d6bccbcfb5d69eabe517115",
+  "version": "1.1.0-rc.20",
+  "source_sha": "326d086cf737d177c7853ed58d9d36727d4a8a67",
   "notes": {
-    "fa": "نسخه 1.1.0-rc.19 سه اصلاح Runtime را یک‌جا منتشر می‌کند: خطاهای موقت 502/503/504 هنگام ری‌استارت بروزرسانی دیگر به‌عنوان خطای قرمز نمایش داده نمی‌شوند و Marker بازیابی تا تأیید نسخه جدید حفظ می‌شود؛ منوی بالای مدیریت با کلیک روی محتوای صفحه خودکار بسته می‌شود؛ و چت آنلاین پشتیبانی ادمین دوباره زنده است، چون Endpoint واقعی دریافت پیام‌های جدید پس از after_id به Backend اضافه شده و Contract آن در CI نصب واقعی محافظت می‌شود.",
-    "en": "TwinPanel 1.1.0-rc.19 ships three runtime fixes together: transient 502/503/504 errors during update restarts are no longer shown as false red failures and the recovery marker remains until the new version is confirmed; admin top-navigation dropdowns close automatically when page content is clicked; and admin live support chat is live again through a real backend messages-after delta endpoint guarded by the installed-runtime CI contract."
+    "fa": "نسخه 1.1.0-rc.20 فیکس Runtime بروزرسانی را پس از تست واقعی rc.19 تکمیل می‌کند: خطاهای موقت 502/503/504 و قطع کوتاه اتصال در پنجره Restart دیگر به‌عنوان خطای قرمز نمایش داده نمی‌شوند؛ آخرین وضعیت سالم مستقل از closure قدیمی Timer حفظ می‌شود؛ Marker بروزرسانی تا Reload واقعی و تأیید state=completed همراه با current_version=target_version در صفحه جدید باقی می‌ماند؛ خطای Gateway خارج از Update فقط پس از پایداری ۳۰ ثانیه نمایش داده می‌شود؛ بررسی Stable از ۵ دقیقه به ۱ دقیقه کاهش یافته؛ و Contract نصب واقعی مسیر Live Chat ادمین، کاربر و مهمان به‌همراه Notification sound را محافظت می‌کند.",
+    "en": "TwinPanel 1.1.0-rc.20 completes the in-place updater runtime fix after real rc.19 verification: transient 502/503/504 and short connection resets during restart no longer surface as false red failures; the last healthy status is preserved independently of stale timer closures; the recovery marker survives the actual browser reload and is cleared only when a new page confirms state=completed with current_version=target_version; non-update gateway failures surface only after a persistent 30-second outage; stable discovery is reduced from five minutes to one minute; and installed-runtime contracts protect admin, customer and guest live-chat polling plus notification sound behavior."
   }
 }
