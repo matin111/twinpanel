@@ -1,0 +1,75 @@
+name: TwinPanel Service Connections V28 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/tunnel_service_connections_admin_runtime.py'
+      - 'backend/app/xray_profile_reconcile_v36.py'
+      - 'backend/app/tp2027_egress_v28.py'
+      - 'backend/app/service_connections_jobs_v28.py'
+      - 'backend/app/self_hosted_runtime.py'
+      - 'components/tunnel-service-connections-panel.tsx'
+      - '.github/workflows/service-connections-v28-smoke.yml'
+  push:
+    branches:
+      - fix/service-connections-runtime-v28
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Python syntax
+        run: |
+          python -m py_compile \
+            backend/app/tunnel_service_connections_admin_runtime.py \
+            backend/app/xray_profile_reconcile_v36.py \
+            backend/app/tp2027_egress_v28.py \
+            backend/app/service_connections_jobs_v28.py \
+            backend/app/self_hosted_runtime.py
+
+      - name: Route and safety contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          runtime=Path('backend/app/self_hosted_runtime.py').read_text()
+          inventory=Path('backend/app/tunnel_service_connections_admin_runtime.py').read_text()
+          egress=Path('backend/app/tp2027_egress_v28.py').read_text()
+          jobs=Path('backend/app/service_connections_jobs_v28.py').read_text()
+          ui=Path('components/tunnel-service-connections-panel.tsx').read_text()
+
+          for marker in (
+              'apply_xray_profile_reconcile_v36()',
+              'apply_tunnel_service_connections_admin_runtime()',
+              'apply_tp2027_egress_v28()',
+              'apply_service_connections_jobs_v28()',
+          ):
+              assert marker in runtime, marker
+
+          assert '/{tunnel_id}/service-connections' in inventory
+          assert '"capabilities": _capabilities' in inventory
+          assert 'repair_real_egress' in inventory
+          assert 'xray_reconcile' in inventory
+
+          assert '/{tunnel_id}/service-connections/repair-real-egress' in egress
+          assert 'fallback_preserved' in egress
+          assert 'original["active_transport"]' in egress
+          assert 'ports_rotated": False' in egress
+          assert 'mtu_changed": False' in egress
+
+          assert '/{tunnel_id}/service-connections/xray-reconcile-job' in jobs
+          assert '/{tunnel_id}/service-connections/xray-reconcile-job/{job_id}' in jobs
+
+          assert 'canRepairRealEgress' in ui
+          assert 'canReconcileXray' in ui
+          assert 'data && canRepairRealEgress' in ui
+          print('SERVICE_CONNECTIONS_V28_CONTRACT_OK')
+          PY
