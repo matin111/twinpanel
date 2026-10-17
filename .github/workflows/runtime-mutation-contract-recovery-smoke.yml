@@ -1,0 +1,134 @@
+name: TwinPanel Runtime Mutation Contract Recovery Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/scripts/twinpanel_runtime_unit_reconcile.py'
+      - 'backend/scripts/twinpanel_public_updater.py'
+      - 'deploy/systemd/twinpanel-api.service.tpl'
+      - 'deploy/systemd/twinpanel-web.service.tpl'
+      - 'lib/admin-parity-api.ts'
+      - 'lib/admin-api.ts'
+      - 'lib/legacy-control-api.ts'
+      - 'components/provision-runtime-xray-domain.tsx'
+      - 'components/legacy-subscriptions-exact.tsx'
+      - 'components/legacy-tunnels-exact.tsx'
+      - 'app/v1/subscriptions/admin-create-v2/route.ts'
+      - 'backend/app/main.py'
+      - 'backend/app/routers/provision.py'
+      - 'backend/app/routers/subscription_admin_v2.py'
+      - 'backend/app/routers/tunnel_managed.py'
+      - '.github/workflows/runtime-mutation-contract-recovery-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  runtime-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify API unit convergence bridge
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import os
+          import tempfile
+          from pathlib import Path
+
+          path=Path('backend/scripts/twinpanel_runtime_unit_reconcile.py')
+          spec=importlib.util.spec_from_file_location('runtime_reconcile',path)
+          module=importlib.util.module_from_spec(spec)
+          assert spec and spec.loader
+          spec.loader.exec_module(module)
+
+          repo=Path('.').resolve()
+          rendered=module.render_api_unit(repo,18095)
+          assert 'WorkingDirectory=/opt/twinpanel/current/backend' in rendered
+          assert '--port 18095 --workers 1' in rendered
+          assert '__API_PORT__' not in rendered
+
+          with tempfile.TemporaryDirectory() as tmp:
+              root=Path(tmp)
+              unit=root/'twinpanel-api.service'
+              backup=root/'twinpanel-api.service.backup'
+              unit.write_text('[Service]\nWorkingDirectory=/legacy/backend\n',encoding='utf-8')
+
+              first=module.reconcile_api_unit(
+                  release_root=repo,
+                  api_port=18095,
+                  unit_path=unit,
+                  backup_path=backup,
+                  restart=False,
+                  verify=False,
+                  systemctl='/bin/true',
+              )
+              assert first['unit_changed'] is True
+              assert backup.is_file()
+              assert '/legacy/backend' in backup.read_text(encoding='utf-8')
+              assert unit.read_text(encoding='utf-8') == rendered
+
+              second=module.reconcile_api_unit(
+                  release_root=repo,
+                  api_port=18095,
+                  unit_path=unit,
+                  backup_path=backup,
+                  restart=False,
+                  verify=False,
+                  systemctl='/bin/true',
+              )
+              assert second['unit_changed'] is False
+
+          os.environ['TWINPANEL_API_PORT']='19095'
+          assert module.detect_api_port() == 19095
+
+          web=Path('deploy/systemd/twinpanel-web.service.tpl').read_text(encoding='utf-8')
+          assert 'User=www-data' in web
+          assert 'NoNewPrivileges=true' in web
+          assert 'ExecStartPre=+/opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_runtime_unit_reconcile.py --restart --verify' in web
+
+          updater=Path('backend/scripts/twinpanel_public_updater.py').read_text(encoding='utf-8')
+          install_pos=updater.index('install_web_unit(final, web_port)')
+          switch_pos=updater.index('previous = atomic_switch(final)')
+          assert install_pos < switch_pos
+
+          print('RUNTIME_API_UNIT_CONVERGENCE_OK')
+          PY
+
+      - name: Verify admin mutation route contracts
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          parity=Path('lib/admin-parity-api.ts').read_text(encoding='utf-8')
+          provision_ui=Path('components/provision-runtime-xray-domain.tsx').read_text(encoding='utf-8')
+          provision_api=Path('backend/app/routers/provision.py').read_text(encoding='utf-8')
+          assert '"/v1/provision/install"' in parity
+          assert 'parityApi.provisionInstall(installPayload)' in provision_ui
+          assert '@router.post("/install")' in provision_api
+
+          subscription_proxy=Path('app/v1/subscriptions/admin-create-v2/route.ts').read_text(encoding='utf-8')
+          subscription_api=Path('backend/app/routers/subscription_admin_v2.py').read_text(encoding='utf-8')
+          subscriptions_ui=Path('components/legacy-subscriptions-exact.tsx').read_text(encoding='utf-8')
+          assert '/v1/subscriptions/admin-create-v2' in subscription_proxy
+          assert '@router.post("/admin-create-v2")' in subscription_api
+          assert 'createSubscription' in subscriptions_ui
+
+          tunnel_client=Path('lib/legacy-control-api.ts').read_text(encoding='utf-8')
+          tunnel_ui=Path('components/legacy-tunnels-exact.tsx').read_text(encoding='utf-8')
+          tunnel_api=Path('backend/app/routers/tunnel_managed.py').read_text(encoding='utf-8')
+          assert '/v1/tunnels/create-managed' in tunnel_client
+          assert 'createManagedTunnel' in tunnel_ui
+          assert '"/create-managed"' in tunnel_api
+
+          main=Path('backend/app/main.py').read_text(encoding='utf-8')
+          assert 'app.include_router(subscription_admin_v2_router, prefix="/v1")' in main
+          assert 'app.include_router(tunnel_managed_router)' in main
+          assert 'app.include_router(provision.router)' in main
+
+          print('ADMIN_MUTATION_ROUTE_CONTRACTS_OK')
+          PY
+
+      - name: Validate recovery helper syntax
+        run: |
+          python3 -m py_compile backend/scripts/twinpanel_runtime_unit_reconcile.py
+          bash -n installer/install.sh
