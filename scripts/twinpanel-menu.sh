@@ -47,6 +47,7 @@ run_backend(){
     source "$BACKEND_ENV"
     set +a
     cd "$BACKEND"
+    export PYTHONPATH="$BACKEND${PYTHONPATH:+:$PYTHONPATH}"
     "$PY" "$@"
   )
 }
