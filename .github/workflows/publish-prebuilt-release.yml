@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - releases/candidate.json
+      - .github/workflows/publish-prebuilt-release.yml
   workflow_dispatch:
 
 permissions:
@@ -65,12 +66,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22.13.0"
-          cache: npm
-          cache-dependency-path: source/package-lock.json
 
       - name: Install frontend dependencies
         working-directory: source
-        run: npm ci --include=optional --no-audit --no-fund
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ -f package-lock.json ]]; then
+            npm ci --include=optional --no-audit --no-fund
+          else
+            npm install --include=optional --no-audit --no-fund
+          fi
 
       - name: Build production standalone frontend
         working-directory: source
@@ -104,7 +110,6 @@ jobs:
 
           python3 - "$VERSION" "$SOURCE_SHA" <<'PY'
           import json
-          import platform
           import sys
           from datetime import datetime, timezone
           from pathlib import Path
