@@ -1,0 +1,43 @@
+name: TwinPanel SSH Management Menu Smoke
+
+on:
+  pull_request:
+    paths:
+      - "installer/**"
+      - "scripts/twinpanel-menu.sh"
+      - "backend/scripts/twinpanel_admin_cli.py"
+      - "backend/scripts/twinpanel_protocol_cli.py"
+      - ".github/workflows/ssh-management-menu-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate shell syntax
+        run: |
+          bash -n installer/install.sh
+          bash -n scripts/twinpanel-menu.sh
+
+      - name: Validate Python syntax
+        run: |
+          python3 -m py_compile backend/scripts/twinpanel_admin_cli.py
+          python3 -m py_compile backend/scripts/twinpanel_protocol_cli.py
+
+      - name: Verify installer wires SSH menu
+        run: |
+          grep -q 'exec bash /opt/twinpanel/current/scripts/twinpanel-menu.sh' installer/install.sh
+          grep -q 'SSH management: twinpanel' installer/install.sh
+          grep -q 'TwinPanel initial admin — first login only' installer/install.sh
+          grep -q 'Existing administrator preserved' installer/install.sh
+
+      - name: Verify protocol actions are explicit
+        run: |
+          grep -q 'Status / وضعیت' backend/scripts/twinpanel_protocol_cli.py
+          grep -q 'Install / نصب' backend/scripts/twinpanel_protocol_cli.py
+          grep -q 'Repair / تعمیر' backend/scripts/twinpanel_protocol_cli.py
+          grep -q 'Restart / ریستارت' backend/scripts/twinpanel_protocol_cli.py
+          grep -q 'Remove / حذف' backend/scripts/twinpanel_protocol_cli.py
