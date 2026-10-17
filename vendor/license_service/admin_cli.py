@@ -16,7 +16,6 @@ from app import (
     Base,
     KEY_PEPPER,
     License,
-    LicenseEvent,
     RELEASE_ROOT,
     SessionLocal,
     Trial,
@@ -84,17 +83,10 @@ def license_action(args: argparse.Namespace) -> None:
         row = db.scalar(select(License).where(License.key_hash == key_hash))
         if row is None:
             raise SystemExit("LICENSE_NOT_FOUND")
+        # Keep activation rows bound while suspended/revoked so an installation
+        # cannot fall back to an older Trial. state_for() will authoritatively
+        # return suspended/revoked until the vendor changes the license state.
         row.status = args.action
-        if args.action in {"revoked", "suspended"}:
-            for activation in db.scalars(
-                select(Activation).where(
-                    Activation.license_id == row.id,
-                    Activation.active.is_(True),
-                )
-            ).all():
-                if args.action == "revoked":
-                    activation.active = False
-                    activation.deactivated_at = utcnow()
         event(db, f"license_{args.action}", license_id=row.id)
         db.commit()
         print(f"LICENSE_{args.action.upper()}=OK")
