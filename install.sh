@@ -57,43 +57,24 @@ setup_local_protocols(){
   fi
 
   if [[ -z "$raw" ]]; then
-    if [[ -r /dev/tty && -w /dev/tty ]]; then
-      say "VPN protocol setup"
-      cat >/dev/tty <<'MENU'
-Install VPN protocols on Local / This server now?
-
-  1) Cisco / OpenConnect
-  2) OpenVPN
-  3) WireGuard
-  4) L2TP / IPsec
-  5) V2Ray / Xray
-  6) Install all protocols
-  0) Skip for now
-
-You can enter one or more numbers separated by spaces, for example: 1 2 3
-MENU
-      printf 'Protocols [0]: ' >/dev/tty
-      read -r raw </dev/tty || raw="0"
-      raw="${raw:-0}"
-    else
-      raw="0"
-    fi
+    raw="all"
+    info "Fresh installation detected; all VPN protocols will be installed automatically."
   fi
 
   local selected
   if ! selected="$(normalize_protocol_selection "$raw")"; then
-    warn "Invalid VPN protocol selection '$raw'. Protocol setup was skipped."
+    warn "Invalid TWINPANEL_INSTALL_PROTOCOLS value '$raw'. Protocol setup was skipped."
     PROTOCOL_SETUP_STATUS="invalid-selection"
     return 0
   fi
 
   if [[ -z "$selected" ]]; then
     PROTOCOL_SETUP_STATUS="skipped"
-    info "VPN protocol installation skipped. You can install protocols later with: twinpanel"
+    info "VPN protocol installation was explicitly skipped."
     return 0
   fi
 
-  say "Installing selected VPN protocols"
+  say "Installing VPN protocols automatically"
   info "Target: Local / This server"
   info "Protocols: $selected"
 
@@ -108,10 +89,10 @@ MENU
     /opt/twinpanel/venv/bin/python3 scripts/twinpanel_installer_protocols.py --protocols "$selected"
   ); then
     PROTOCOL_SETUP_STATUS="completed:$selected"
-    info "Selected VPN protocols are installed and healthy."
+    info "VPN protocols are installed and healthy."
   else
     PROTOCOL_SETUP_STATUS="partial-or-failed:$selected"
-    warn "TwinPanel itself is installed, but one or more selected VPN protocols need attention."
+    warn "TwinPanel itself is installed, but one or more VPN protocols need attention."
     warn "Open 'twinpanel' -> Protocol management and use Status/Repair for the failed protocol."
   fi
 }
