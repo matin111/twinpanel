@@ -33,13 +33,16 @@ type AttentionState={
   updateAvailable:boolean;
 };
 
-async function request<T>(path:string):Promise<T>{
+async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
+  const headers=new Headers(init.headers);
+  headers.set("Authorization",`Bearer ${token}`);
   const response=await fetch(`${API_BASE}${path}`,{
-    headers:{Authorization:`Bearer ${token}`},
+    ...init,
+    headers,
     cache:"no-store",
-    signal:AbortSignal.timeout(5000),
+    signal:init.signal??AbortSignal.timeout(5000),
   });
   if(!response.ok)throw new Error(`API ${response.status}`);
   return response.json() as Promise<T>;
@@ -121,7 +124,7 @@ export function useAdminNavAttention(active:string){
 
     const refreshRelease=async()=>{
       try{
-        const release=await request<ReleaseStatus>("/v1/admin/system/release/status");
+        const release=await request<ReleaseStatus>("/v1/admin/system/release/check",{method:"POST"});
         if(!alive)return;
         setState(current=>({...current,updateAvailable:Boolean(release.update_available)}));
       }catch{}
@@ -142,7 +145,7 @@ export function useAdminNavAttention(active:string){
       void refreshPayments();
       void refreshNotifications();
     },10000);
-    const releaseTimer=window.setInterval(()=>{if(document.visibilityState==="visible")void refreshRelease();},60000);
+    const releaseTimer=window.setInterval(()=>{if(document.visibilityState==="visible")void refreshRelease();},300000);
     window.addEventListener("focus",refreshVisible);
     document.addEventListener("visibilitychange",refreshVisible);
 
