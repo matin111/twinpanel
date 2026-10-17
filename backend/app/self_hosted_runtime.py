@@ -34,6 +34,9 @@ from .tunnel_service_connections_admin_runtime import (
 from .service_speed_recovery_v36 import (
     apply_service_speed_recovery_v36,
 )
+from .service_client_egress_v46 import (
+    apply_service_client_egress_v46,
+)
 from .tp2027_egress_v37 import (
     apply_tp2027_egress_v37,
 )
@@ -236,6 +239,11 @@ def apply_self_hosted_runtime() -> None:
     # legacy and modern Xray routes from the same source that feeds Agent
     # desired-state, while physical tunnel transports remain a separate model.
     apply_tunnel_service_connections_admin_runtime()
+
+    # V46 extends the existing panel-owned V37 repair path with persistent
+    # Exit-side forwarding/MASQUERADE for VPN client address pools. Apply the
+    # renderer hook before V37 binds the final TP2027 firewall renderer.
+    apply_service_client_egress_v46()
 
     # V37 repairs the missing Exit egress path for TP2027 overlay networks and
     # verifies real public egress before a transport can become active.
