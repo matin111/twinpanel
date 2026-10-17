@@ -8,9 +8,9 @@ import sys
 from app.database import SessionLocal
 
 try:
-    from .twinpanel_protocol_cli import PROTOCOL_NAMES, PROTOCOL_ORDER, _exit_nodes, _run
+    from .twinpanel_protocol_cli import PROTOCOL_NAMES, PROTOCOL_ORDER, _managed_nodes, _run
 except ImportError:
-    from twinpanel_protocol_cli import PROTOCOL_NAMES, PROTOCOL_ORDER, _exit_nodes, _run
+    from twinpanel_protocol_cli import PROTOCOL_NAMES, PROTOCOL_ORDER, _managed_nodes, _run
 
 
 def _ascii(value: object) -> str:
@@ -25,15 +25,15 @@ def _select_protocol() -> str:
 
 
 def _select_node(db):
-    nodes = _exit_nodes(db)
-    if not nodes:
-        return None
+    nodes = _managed_nodes(db)
 
-    print("\nExit nodes")
+    print("\nTargets")
     for row in nodes:
-        print(f"  {row.id}) {_ascii(row.name)}  [{row.public_ip}]")
+        name = "Local / This server" if getattr(row, "is_mother", False) else _ascii(row.name)
+        mode = "local" if getattr(row, "is_mother", False) else "SSH"
+        print(f"  {row.id}) {name}  [{row.public_ip}]  ({mode})")
 
-    raw = input("Node ID: ").strip()
+    raw = input("Target ID: ").strip()
     if not raw.isdigit():
         raise RuntimeError("INVALID_NODE_ID")
 
@@ -67,8 +67,8 @@ def _friendly_error(exc: Exception) -> str:
     value = str(exc)
     mapping = {
         "INVALID_PROTOCOL": "Invalid protocol selection.",
-        "INVALID_NODE_ID": "Invalid Exit node ID.",
-        "NODE_NOT_FOUND": "Exit node not found.",
+        "INVALID_NODE_ID": "Invalid target ID.",
+        "NODE_NOT_FOUND": "Protocol target not found.",
         "INVALID_ACTION": "Invalid action selection.",
     }
     return mapping.get(value, f"ERROR={_ascii(exc)}")
@@ -79,11 +79,6 @@ def main() -> int:
     try:
         protocol = _select_protocol()
         node = _select_node(db)
-        if node is None:
-            print("\nNo Exit nodes are configured yet.")
-            print("Add an Exit node in the TwinPanel web panel, save its SSH access, then run this menu again.")
-            return 2
-
         action = _select_action()
 
         if action == "remove":
@@ -93,7 +88,8 @@ def main() -> int:
                 print("Cancelled")
                 return 0
 
-        print(f"\nNode: {_ascii(node.name)} ({node.public_ip})")
+        target = "Local / This server" if getattr(node, "is_mother", False) else _ascii(node.name)
+        print(f"\nTarget: {target} ({node.public_ip})")
         print(f"Protocol: {PROTOCOL_NAMES[protocol]}")
         print(f"Action: {action}\n")
 
