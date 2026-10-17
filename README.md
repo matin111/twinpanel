@@ -34,9 +34,28 @@ Persian installation guide:
 
 ---
 
+## SSH management
+
+After installation, open the TwinPanel SSH management menu with:
+
+```bash
+twinpanel
+```
+
+The short alias is also available:
+
+```bash
+tp
+```
+
+Use this menu for routine server-side TwinPanel management, including panel/service status, administrator management, protocol management, updates, backups, logs/diagnostics, domain/SSL operations, and version information.
+
+---
+
 ## Table of contents
 
 - [Quick install](#quick-install)
+- [SSH management](#ssh-management)
 - [Overview](#overview)
 - [Core capabilities](#core-capabilities)
 - [Users and subscriptions](#users-and-subscriptions)
@@ -55,7 +74,6 @@ Persian installation guide:
 - [Trial and licensing](#trial-and-licensing)
 - [User interface](#user-interface)
 - [Architecture](#architecture)
-- [SSH management](#ssh-management)
 - [Requirements](#requirements)
 - [Important paths](#important-paths)
 - [Security rules](#security-rules)
@@ -520,24 +538,6 @@ FastAPI
 ```
 
 Frontend and API services run locally, while Nginx publishes the public HTTP/HTTPS endpoint.
-
----
-
-## SSH management
-
-After installation, open the TwinPanel SSH management menu with:
-
-```bash
-twinpanel
-```
-
-The short alias is also available:
-
-```bash
-tp
-```
-
-Use this menu for routine server-side TwinPanel management, including panel/service status, administrator management, protocol management, updates, backups, logs/diagnostics, domain/SSL operations, and version information.
 
 ---
 
