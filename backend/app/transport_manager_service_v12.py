@@ -39,14 +39,22 @@ WantedBy=multi-user.target
 
 
 def _run(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        list(args),
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=False,
-        timeout=20,
-    )
+    argv = list(args)
+    try:
+        return subprocess.run(
+            argv,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+            timeout=20,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return subprocess.CompletedProcess(
+            argv,
+            124,
+            stdout=f"{type(exc).__name__}:{exc}",
+        )
 
 
 def ensure_transport_manager_service_v12() -> dict:
@@ -63,6 +71,9 @@ def ensure_transport_manager_service_v12() -> dict:
     The initial installer imports app.main before it creates twinpanel-api.service.
     We deliberately defer activation in that phase; the first real API service
     start then reconciles the manager. CI/containers without systemd also no-op.
+
+    This function is deliberately non-fatal: transport-manager activation must
+    never prevent the API from starting. Failures are returned as state only.
     """
 
     result = {
@@ -102,16 +113,20 @@ def ensure_transport_manager_service_v12() -> dict:
                 BACKUP_PATH.write_text(current, encoding="utf-8")
                 os.chmod(BACKUP_PATH, 0o644)
             except OSError:
-                # Backup failure must not break API startup. The updater already
-                # provides a full application rollback; this copy is an extra
-                # unit-level rollback convenience.
+                # The full application updater still owns the primary rollback.
+                # This backup is only an extra unit-level convenience.
                 pass
 
-        tmp = UNIT_PATH.with_suffix(".service.tmp")
-        tmp.write_text(UNIT_CONTENT, encoding="utf-8")
-        os.chmod(tmp, 0o644)
-        tmp.replace(UNIT_PATH)
-        result["changed"] = True
+        try:
+            tmp = UNIT_PATH.with_suffix(".service.tmp")
+            tmp.write_text(UNIT_CONTENT, encoding="utf-8")
+            os.chmod(tmp, 0o644)
+            tmp.replace(UNIT_PATH)
+            result["changed"] = True
+        except OSError as exc:
+            result["ok"] = False
+            result["reason"] = f"unit_write_failed:{type(exc).__name__}"
+            return result
 
         reload_cp = _run(systemctl, "daemon-reload")
         if reload_cp.returncode != 0:
