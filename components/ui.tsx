@@ -51,13 +51,16 @@ const menuGroups=[
 export function Shell({children,active="/admin"}:{children:React.ReactNode;active?:string}){
   const {pick}=useI18n();
   const [mobileOpen,setMobileOpen]=useState(false);
+  const navCenterStyle:React.CSSProperties=mobileOpen
+    ? {position:"static",maxWidth:"none"}
+    : {position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",maxWidth:"calc(100% - 320px)"};
 
   return <div className={`shell admin-shell admin-top-shell ${mobileOpen?"mobile-menu-open":""}`}>
     <div className="admin-topbar">
       <div className="admin-topbar-inner">
         <div className="admin-topbar-brand"><BrandMark/></div>
 
-        <div style={{position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",maxWidth:"calc(100% - 320px)"}}>
+        <div style={navCenterStyle}>
           <nav className="admin-topnav" aria-label={pick("منوی اصلی","Main navigation")}>{menuGroups.map(group=>{
             const groupActive=group.items.some(([, ,href])=>active===href);
             return <details className={`topnav-group ${groupActive?"active":""}`} key={group.en}>
