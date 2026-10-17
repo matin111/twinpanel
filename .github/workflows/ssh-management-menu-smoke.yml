@@ -41,23 +41,39 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          for path in (
-              Path("scripts/twinpanel-menu.sh"),
-              Path("backend/scripts/twinpanel_protocol_cli_en.py"),
-          ):
+          menu_path = Path("scripts/twinpanel-menu.sh")
+          protocol_path = Path("backend/scripts/twinpanel_protocol_cli_en.py")
+
+          for path in (menu_path, protocol_path):
               text = path.read_text(encoding="utf-8")
               non_ascii = [(i, ch) for i, ch in enumerate(text) if ord(ch) > 127]
               assert not non_ascii, f"non-ASCII characters found in {path}: {non_ascii[:5]}"
 
-          menu = Path("scripts/twinpanel-menu.sh").read_text(encoding="utf-8")
+          menu = menu_path.read_text(encoding="utf-8")
           assert "Language" not in menu
           assert "Panel status" in menu
           assert "Service management" in menu
           assert "Administrator management" in menu
           assert "Protocol management" in menu
+          assert "Available protocols:" in menu
+          assert "Cisco / OpenConnect" in menu
+          assert "OpenVPN" in menu
+          assert "WireGuard" in menu
+          assert "L2TP / IPsec" in menu
+          assert "V2Ray / Xray" in menu
           assert "scripts/twinpanel_protocol_cli_en.py" in menu
           assert 'export PYTHONPATH="$BACKEND${PYTHONPATH:+:$PYTHONPATH}"' in menu
-          print("SSH_MENU_ENGLISH_ASCII_OK")
+          assert "unit_exists" in menu
+          assert "not-installed" in menu
+          assert "restart_unit twinpanel-api.service || true" in menu
+          assert "restart_nginx || true" in menu
+
+          protocol = protocol_path.read_text(encoding="utf-8")
+          main_start = protocol.index("def main()")
+          main_body = protocol[main_start:]
+          assert main_body.index("_select_protocol()") < main_body.index("_select_node(db)")
+          assert "No Exit nodes are configured yet." in protocol
+          print("SSH_MENU_ENGLISH_RUNTIME_GUARDS_OK")
           PY
 
       - name: Setup Python
