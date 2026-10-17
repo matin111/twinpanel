@@ -27,14 +27,16 @@ case "${VERSION_ID:-}" in
   *) fail "Unsupported Ubuntu version: ${VERSION_ID:-unknown}" ;;
 esac
 
-export DEBIAN_FRONTEND=noninteractive
-for cmd in curl python3 git; do
-  if ! command -v "$cmd" >/dev/null 2>&1; then
-    apt-get update -y
-    apt-get install -y ca-certificates curl git python3
-    break
-  fi
+for cmd in curl python3 awk; do
+  command -v "$cmd" >/dev/null 2>&1 || fail "Missing command: $cmd"
 done
+
+if ! command -v git >/dev/null 2>&1; then
+  say "Installing Git"
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -y
+  apt-get install -y git ca-certificates
+fi
 
 say "$PRODUCT public installer"
 echo "فارسی: نصب مستقیم TwinPanel از Release عمومی رسمی"
@@ -51,19 +53,18 @@ curl -fsSL --connect-timeout 10 --max-time 30 "$MANIFEST_URL" -o "$MANIFEST_FILE
 mapfile -t RELEASE < <(python3 - "$MANIFEST_FILE" <<'PY'
 import json,sys
 obj=json.load(open(sys.argv[1],encoding='utf-8'))
-installable=obj.get('installable') is True
+if obj.get('installable') is not True:
+    raise SystemExit('release is not installable')
 version=str(obj.get('version') or '').strip()
 repo=str(obj.get('repository_url') or '').strip()
 sha=str(obj.get('source_sha') or '').strip().lower()
 channel=str(obj.get('channel') or 'stable').strip()
-if not installable:
-    raise SystemExit('release is not installable')
 if not version:
     raise SystemExit('release version missing')
-if not repo.startswith('https://github.com/matin111/twinpanel'):
-    raise SystemExit('unexpected release repository')
+if not repo.startswith('https://github.com/') or not repo.endswith('.git'):
+    raise SystemExit('release repository_url invalid')
 if len(sha) != 40 or any(ch not in '0123456789abcdef' for ch in sha):
-    raise SystemExit('source_sha invalid')
+    raise SystemExit('release source_sha invalid')
 print(version)
 print(repo)
 print(sha)
@@ -80,29 +81,29 @@ info "Version: $VERSION"
 info "Channel: $CHANNEL"
 info "Source: $SOURCE_SHA"
 
-say "Downloading verified source"
+say "Fetching verified TwinPanel source"
 git init -q "$SOURCE_DIR"
 git -C "$SOURCE_DIR" remote add origin "$REPOSITORY_URL"
-git -C "$SOURCE_DIR" -c advice.detachedHead=false fetch -q --depth 1 origin "$SOURCE_SHA"
+git -C "$SOURCE_DIR" -c advice.detachedHead=false fetch --depth 1 origin "$SOURCE_SHA"
 git -C "$SOURCE_DIR" checkout -q --detach FETCH_HEAD
 
-ACTUAL_SHA="$(git -C "$SOURCE_DIR" rev-parse HEAD)"
-[[ "$ACTUAL_SHA" == "$SOURCE_SHA" ]] || fail "Source commit verification failed"
+ACTUAL_SHA="$(git -C "$SOURCE_DIR" rev-parse HEAD | tr '[:upper:]' '[:lower:]')"
+[[ "$ACTUAL_SHA" == "$SOURCE_SHA" ]] || fail "Release source SHA mismatch"
+info "Git commit verified: $ACTUAL_SHA"
 
 PACKAGE_VERSION="$(tr -d '[:space:]' < "$SOURCE_DIR/VERSION" 2>/dev/null || true)"
 [[ "$PACKAGE_VERSION" == "$VERSION" ]] || fail "Release VERSION mismatch"
+[[ -x "$SOURCE_DIR/installer/install.sh" || -f "$SOURCE_DIR/installer/install.sh" ]] || fail "installer/install.sh missing"
 
-ENTRY="$SOURCE_DIR/installer/install.sh"
-[[ -f "$ENTRY" ]] || fail "installer/install.sh missing from release source"
-chmod +x "$ENTRY"
-
+chmod +x "$SOURCE_DIR/installer/install.sh"
 export TWINPANEL_RELEASE_CHANNEL="$CHANNEL"
 export TWINPANEL_RELEASE_MANIFEST_URL="$MANIFEST_URL"
 
 say "Installing TwinPanel $VERSION"
-bash "$ENTRY"
+bash "$SOURCE_DIR/installer/install.sh"
 
-# Canonicalize release settings so the panel and updater follow this repository.
+# Canonicalize runtime release settings. Older release installers may still
+# carry a historical public-manifest default.
 if [[ -f /etc/twinpanel/backend.env ]]; then
   python3 - "$MANIFEST_URL" "$CHANNEL" <<'PY'
 from pathlib import Path
@@ -133,9 +134,34 @@ install -d -m 700 /etc/twinpanel
 cat >/etc/twinpanel/install.env <<ENV
 TWINPANEL_RELEASE_CHANNEL=$CHANNEL
 TWINPANEL_RELEASE_MANIFEST_URL=$MANIFEST_URL
-TWINPANEL_RELEASE_SOURCE_SHA=$SOURCE_SHA
 ENV
 chmod 600 /etc/twinpanel/install.env
+
+# Fresh public installs use the public-release updater. The licensed updater
+# remains in source for future vendor-license deployments.
+cat >/etc/systemd/system/twinpanel-updater.service <<'UNIT'
+[Unit]
+Description=TwinPanel Public Release Updater
+After=network-online.target twinpanel-api.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/twinpanel/current/backend
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/etc/twinpanel/backend.env
+EnvironmentFile=-/etc/twinpanel/install.env
+ExecStart=/opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_public_updater.py
+TimeoutStartSec=3600
+Nice=5
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+
+[Install]
+WantedBy=multi-user.target
+UNIT
 
 systemctl daemon-reload
 systemctl restart twinpanel-api.service twinpanel-web.service 2>/dev/null || true
