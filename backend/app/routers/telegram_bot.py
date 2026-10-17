@@ -59,17 +59,12 @@ class TelegramTouchIn(BaseModel):
     )
 
 
-
 class TelegramEnsureIn(BaseModel):
-    telegram_id: int = Field(
-        gt=0,
-    )
-
+    telegram_id: int = Field(gt=0)
     telegram_username: str | None = Field(
         default=None,
         max_length=100,
     )
-
     telegram_first_name: str | None = Field(
         default=None,
         max_length=150,
@@ -84,16 +79,10 @@ def _require_bot_secret(
         "",
     ).strip()
 
-    # TWINPANEL_DYNAMIC_BOT_SECRET_V2
-    # Secret may be generated later from the admin panel.
     if not expected:
         try:
-            secret_file = (
-                "/etc/twinpanel-telegram-api.env"
-            )
-
             with open(
-                secret_file,
+                "/etc/twinpanel-telegram-api.env",
                 "r",
                 encoding="utf-8",
             ) as handle:
@@ -149,6 +138,73 @@ def _role_value(user: User) -> str:
             user.role,
         )
     ).lower()
+
+
+def _telegram_user_id(
+    telegram_id: int,
+) -> str:
+    return str(int(telegram_id))
+
+
+def _legacy_telegram_emails(
+    telegram_id: int,
+) -> tuple[str, ...]:
+    value = int(telegram_id)
+
+    return (
+        f"tg_{value}@telegram.twinpanel.local",
+        f"tg_{value}@telegram.local",
+    )
+
+
+def _normalize_telegram_identity(
+    db: Session,
+    user: User,
+    telegram_id: int,
+) -> None:
+    """
+    Bot-created accounts use the Telegram numeric ID directly in the
+    legacy `users.email` identity column. This keeps the admin user list
+    short and readable while preserving the existing schema.
+
+    Old generated identities are migrated lazily the next time the user
+    talks to the bot.
+    """
+    desired = _telegram_user_id(
+        telegram_id
+    )
+
+    if user.email == desired:
+        return
+
+    legacy_values = set(
+        _legacy_telegram_emails(
+            telegram_id
+        )
+    )
+
+    if str(user.email or "") not in legacy_values:
+        return
+
+    collision = (
+        db.query(User)
+        .filter(
+            User.email == desired,
+            User.id != user.id,
+        )
+        .first()
+    )
+
+    if collision:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "شناسه تلگرام با یک کاربر موجود "
+                "تداخل دارد"
+            ),
+        )
+
+    user.email = desired
 
 
 def _link_out(
@@ -210,6 +266,13 @@ def telegram_status(
             "telegram_id": telegram_id,
         }
 
+    _normalize_telegram_identity(
+        db,
+        user,
+        telegram_id,
+    )
+    db.commit()
+
     return _link_out(
         db,
         link,
@@ -262,7 +325,6 @@ def link_account(
             detail="حساب مدیریت به ربات کاربری متصل نمی‌شود",
         )
 
-    # One Telegram account <-> one Twin Panel account.
     by_telegram = db.get(
         TelegramUserLink,
         payload.telegram_id,
@@ -296,9 +358,7 @@ def link_account(
             payload.telegram_first_name
         )
         by_telegram.last_seen_at = now
-
         link = by_telegram
-
     else:
         link = TelegramUserLink(
             telegram_id=payload.telegram_id,
@@ -312,7 +372,6 @@ def link_account(
             created_at=now,
             last_seen_at=now,
         )
-
         db.add(link)
 
     db.commit()
@@ -359,8 +418,6 @@ def touch_link(
     }
 
 
-
-# TWINPANEL_TELEGRAM_AUTO_REGISTER_V1
 @router.post(
     "/ensure",
     dependencies=[Depends(bot_guard)],
@@ -372,12 +429,8 @@ def ensure_telegram_account(
     telegram_id = int(
         payload.telegram_id
     )
-
     now = datetime.utcnow()
 
-    # ---------------------------------
-    # Existing Telegram link
-    # ---------------------------------
     link = db.get(
         TelegramUserLink,
         telegram_id,
@@ -389,13 +442,10 @@ def ensure_telegram_account(
             link.user_id,
         )
 
-        # Broken legacy link:
-        # remove it and recreate below.
         if not user:
             db.delete(link)
             db.flush()
             link = None
-
         else:
             if not user.is_active:
                 raise HTTPException(
@@ -412,14 +462,18 @@ def ensure_telegram_account(
                     detail="نوع حساب کاربری معتبر نیست",
                 )
 
+            _normalize_telegram_identity(
+                db,
+                user,
+                telegram_id,
+            )
+
             link.telegram_username = (
                 payload.telegram_username
             )
-
             link.telegram_first_name = (
                 payload.telegram_first_name
             )
-
             link.last_seen_at = now
 
             db.commit()
@@ -428,36 +482,43 @@ def ensure_telegram_account(
                 "ok": True,
                 "created": False,
                 "linked": True,
-                "telegram_id":
-                    telegram_id,
-                "access_token":
+                "telegram_id": telegram_id,
+                "access_token": (
                     create_access_token(
                         str(user.id)
-                    ),
-                "token_type":
-                    "bearer",
+                    )
+                ),
+                "token_type": "bearer",
                 "user": {
                     "id": user.id,
                     "email": user.email,
                     "phone": user.phone,
-                    "full_name":
-                        user.full_name,
+                    "full_name": user.full_name,
                 },
             }
 
-    # ---------------------------------
-    # Create/recover internal user
-    # ---------------------------------
-    internal_email = (
-        f"tg_{telegram_id}"
-        "@telegram.twinpanel.local"
+    desired_identity = (
+        _telegram_user_id(
+            telegram_id
+        )
+    )
+
+    candidate_identities = (
+        desired_identity,
+        *_legacy_telegram_emails(
+            telegram_id
+        ),
     )
 
     user = (
         db.query(User)
         .filter(
-            User.email
-            == internal_email
+            User.email.in_(
+                candidate_identities
+            )
+        )
+        .order_by(
+            User.id.asc()
         )
         .first()
     )
@@ -480,6 +541,12 @@ def ensure_telegram_account(
                 detail="نوع حساب کاربری معتبر نیست",
             )
 
+        _normalize_telegram_identity(
+            db,
+            user,
+            telegram_id,
+        )
+
         existing_user_link = (
             db.query(TelegramUserLink)
             .filter(
@@ -501,7 +568,6 @@ def ensure_telegram_account(
                     "تلگرام دیگری متصل است"
                 ),
             )
-
     else:
         first_name = str(
             payload.telegram_first_name
@@ -522,14 +588,12 @@ def ensure_telegram_account(
             )
         )
 
-        # Random password is never shown,
-        # stored, or sent to Telegram.
         random_password = (
             secrets.token_urlsafe(32)
         )
 
         user = User(
-            email=internal_email,
+            email=desired_identity,
             full_name=display_name,
             password_hash=hash_password(
                 random_password
@@ -540,12 +604,8 @@ def ensure_telegram_account(
 
         db.add(user)
         db.flush()
-
         created = True
 
-    # ---------------------------------
-    # Telegram link
-    # ---------------------------------
     link = TelegramUserLink(
         telegram_id=telegram_id,
         user_id=user.id,
@@ -560,7 +620,6 @@ def ensure_telegram_account(
     )
 
     db.add(link)
-
     db.commit()
     db.refresh(user)
     db.refresh(link)
@@ -569,20 +628,18 @@ def ensure_telegram_account(
         "ok": True,
         "created": created,
         "linked": True,
-        "telegram_id":
-            telegram_id,
-        "access_token":
+        "telegram_id": telegram_id,
+        "access_token": (
             create_access_token(
                 str(user.id)
-            ),
-        "token_type":
-            "bearer",
+            )
+        ),
+        "token_type": "bearer",
         "user": {
             "id": user.id,
             "email": user.email,
             "phone": user.phone,
-            "full_name":
-                user.full_name,
+            "full_name": user.full_name,
         },
     }
 
@@ -623,14 +680,21 @@ def telegram_session(
             detail="حساب کاربری معتبر نیست",
         )
 
+    _normalize_telegram_identity(
+        db,
+        user,
+        telegram_id,
+    )
+
     link.last_seen_at = datetime.utcnow()
     db.commit()
 
     return {
-        "access_token":
+        "access_token": (
             create_access_token(
                 str(user.id)
-            ),
+            )
+        ),
         "token_type": "bearer",
         "user": {
             "id": user.id,

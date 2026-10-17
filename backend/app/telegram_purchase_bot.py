@@ -1,5 +1,4 @@
 import time
-from datetime import datetime
 from html import escape
 
 from aiogram import F, Router
@@ -14,12 +13,8 @@ from aiogram.types import (
 
 
 class PurchasePaymentState(StatesGroup):
-    # TWINPANEL_MAIN_DISCOUNT_BOT_V2
     discount = State()
     proof = State()
-    card_last4 = State()
-    transfer_date = State()
-    transfer_time = State()
     receipt = State()
 
 
@@ -92,17 +87,10 @@ def plans_keyboard(plans):
 
     for plan in plans[:30]:
         plan_id = int(plan["id"])
-
         name = str(
             plan.get("name")
             or f"پلن #{plan_id}"
         )
-
-        traffic = int(
-            plan.get("traffic_gb")
-            or 0
-        )
-
         days = int(
             plan.get("duration_days")
             or 0
@@ -112,7 +100,6 @@ def plans_keyboard(plans):
             InlineKeyboardButton(
                 text=(
                     f"🛒 {name} | "
-                    # TWINPANEL_PLAN_BUTTON_SIMPLE_V2
                     f"{days} روز"
                 )[:60],
                 callback_data=(
@@ -147,7 +134,6 @@ def plan_confirm_keyboard(plan_id):
     )
 
 
-# TWINPANEL_MAIN_DISCOUNT_KEYBOARD_V2
 def discount_choice_keyboard(
     order_id: int,
 ):
@@ -249,11 +235,16 @@ def proof_keyboard(
     intent_id,
     method_id,
 ):
+    if method_id == "card_to_card":
+        action_text = "📷 ارسال رسید پرداخت"
+    else:
+        action_text = "✅ ثبت TXID پرداخت"
+
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="✅ ثبت اطلاعات پرداخت",
+                    text=action_text,
                     callback_data=(
                         f"shop:proof:"
                         f"{intent_id}:"
@@ -274,19 +265,14 @@ def proof_keyboard(
 def plan_text(plan):
     return (
         f"🛒 <b>{escape(str(plan.get('name') or 'اشتراک'))}</b>\n\n"
-
         f"📦 حجم: "
         f"<b>{int(plan.get('traffic_gb') or 0)} گیگابایت</b>\n"
-
         f"📅 اعتبار: "
         f"<b>{int(plan.get('duration_days') or 0)} روز</b>\n"
-
         f"📱 تعداد دستگاه: "
         f"<b>{int(plan.get('device_limit') or 0)}</b>\n"
-
         f"💰 قیمت: "
         f"<b>{money(plan.get('price_toman'))} تومان</b>\n\n"
-
         f"🌐 پروتکل‌ها:\n"
         f"<b>{escape(protocol_text(plan))}</b>"
     )
@@ -318,10 +304,9 @@ def create_purchase_router(
         )
 
         return active_plans(
-            rows if isinstance(
-                rows,
-                list,
-            ) else []
+            rows
+            if isinstance(rows, list)
+            else []
         )
 
     async def find_plan(plan_id):
@@ -344,6 +329,28 @@ def create_purchase_router(
 
         return plan
 
+    async def load_payment_methods():
+        method_data = await request_fn(
+            "GET",
+            "/v1/payments/methods",
+        )
+
+        methods = (
+            method_data.get("methods")
+            if isinstance(
+                method_data,
+                dict,
+            )
+            else []
+        ) or []
+
+        if not methods:
+            raise RuntimeError(
+                "روش پرداخت فعالی وجود ندارد"
+            )
+
+        return methods
+
     @router.message(
         F.text == "🛒 خرید اشتراک"
     )
@@ -354,14 +361,10 @@ def create_purchase_router(
         await state.clear()
 
         try:
-            # Also verifies that Telegram
-            # account is linked.
             await user_token(
                 message.from_user.id
             )
-
             plans = await load_plans()
-
         except Exception as exc:
             await message.answer(
                 "❌ " + escape(str(exc))
@@ -396,9 +399,7 @@ def create_purchase_router(
             await user_token(
                 callback.from_user.id
             )
-
             plans = await load_plans()
-
         except Exception as exc:
             await callback.answer(
                 str(exc),
@@ -435,11 +436,9 @@ def create_purchase_router(
             plan_id = int(
                 callback.data.split(":")[2]
             )
-
             plan = await find_plan(
                 plan_id
             )
-
         except Exception as exc:
             await callback.answer(
                 str(exc),
@@ -470,15 +469,12 @@ def create_purchase_router(
             plan_id = int(
                 callback.data.split(":")[2]
             )
-
             token = await user_token(
                 callback.from_user.id
             )
-
             plan = await find_plan(
                 plan_id
             )
-
             protocols = plan_protocols(
                 plan
             )
@@ -499,26 +495,9 @@ def create_purchase_router(
                 },
             )
 
-            method_data = (
-                await request_fn(
-                    "GET",
-                    "/v1/payments/methods",
-                )
-            )
-
             methods = (
-                method_data.get(
-                    "methods"
-                )
-                or []
+                await load_payment_methods()
             )
-
-            if not methods:
-                raise RuntimeError(
-                    "روش پرداخت فعالی "
-                    "وجود ندارد"
-                )
-
         except Exception as exc:
             await callback.answer(
                 str(exc),
@@ -532,13 +511,10 @@ def create_purchase_router(
             "✅ <b>سفارش ساخته شد</b>\n\n"
             f"شماره سفارش: "
             f"<b>#{order.get('id')}</b>\n"
-
             f"پلن: "
             f"<b>{escape(str(plan.get('name') or '-'))}</b>\n"
-
             f"مبلغ: "
             f"<b>{money(order.get('amount_toman'))} تومان</b>\n\n"
-
             "کد تخفیف دارید؟",
             reply_markup=(
                 discount_choice_keyboard(
@@ -547,7 +523,6 @@ def create_purchase_router(
             ),
         )
 
-    # TWINPANEL_MAIN_DISCOUNT_HANDLERS_V2
     @router.callback_query(
         F.data.startswith(
             "shop:discount:"
@@ -571,11 +546,9 @@ def create_purchase_router(
         await state.set_state(
             PurchasePaymentState.discount
         )
-
         await state.update_data(
             discount_order_id=order_id
         )
-
         await callback.answer()
 
         await callback.message.edit_text(
@@ -587,7 +560,6 @@ def create_purchase_router(
                 )
             ),
         )
-
 
     @router.callback_query(
         F.data.startswith(
@@ -602,24 +574,9 @@ def create_purchase_router(
             order_id = int(
                 callback.data.split(":")[2]
             )
-
-            method_data = (
-                await request_fn(
-                    "GET",
-                    "/v1/payments/methods",
-                )
-            )
-
             methods = (
-                method_data.get("methods")
-                or []
+                await load_payment_methods()
             )
-
-            if not methods:
-                raise RuntimeError(
-                    "روش پرداخت فعالی وجود ندارد"
-                )
-
         except Exception as exc:
             await callback.answer(
                 str(exc),
@@ -641,7 +598,6 @@ def create_purchase_router(
             ),
         )
 
-
     @router.message(
         PurchasePaymentState.discount
     )
@@ -650,14 +606,12 @@ def create_purchase_router(
         state: FSMContext,
     ):
         data = await state.get_data()
-
         order_id = int(
             data.get(
                 "discount_order_id"
             )
             or 0
         )
-
         code = str(
             message.text
             or ""
@@ -665,12 +619,10 @@ def create_purchase_router(
 
         if not order_id:
             await state.clear()
-
             await message.answer(
                 "سفارش پیدا نشد؛ "
                 "خرید را دوباره شروع کنید."
             )
-
             return
 
         if not code:
@@ -688,7 +640,6 @@ def create_purchase_router(
             token = await user_token(
                 message.from_user.id
             )
-
             result = await request_fn(
                 "POST",
                 (
@@ -700,24 +651,9 @@ def create_purchase_router(
                     "code": code,
                 },
             )
-
-            method_data = (
-                await request_fn(
-                    "GET",
-                    "/v1/payments/methods",
-                )
-            )
-
             methods = (
-                method_data.get("methods")
-                or []
+                await load_payment_methods()
             )
-
-            if not methods:
-                raise RuntimeError(
-                    "روش پرداخت فعالی وجود ندارد"
-                )
-
         except Exception as exc:
             await message.answer(
                 "❌ کد تخفیف اعمال نشد.\n\n"
@@ -738,21 +674,18 @@ def create_purchase_router(
             )
             or 0
         )
-
         discount_amount = int(
             result.get(
                 "discount_amount_toman"
             )
             or 0
         )
-
         final_amount = int(
             result.get(
                 "final_amount_toman"
             )
             or 0
         )
-
         applied_code = str(
             result.get("code")
             or code
@@ -777,7 +710,6 @@ def create_purchase_router(
             ),
         )
 
-
     @router.callback_query(
         F.data.startswith(
             "shop:pay:"
@@ -791,13 +723,8 @@ def create_purchase_router(
                 ":",
                 3,
             )
-
-            order_id = int(
-                parts[2]
-            )
-
+            order_id = int(parts[2])
             method_id = parts[3]
-
             token = await user_token(
                 callback.from_user.id
             )
@@ -812,20 +739,9 @@ def create_purchase_router(
                 },
             )
 
-            method_data = (
-                await request_fn(
-                    "GET",
-                    "/v1/payments/methods",
-                )
-            )
-
             methods = (
-                method_data.get(
-                    "methods"
-                )
-                or []
+                await load_payment_methods()
             )
-
             method = next(
                 (
                     row
@@ -835,7 +751,6 @@ def create_purchase_router(
                 ),
                 {},
             )
-
         except Exception as exc:
             await callback.answer(
                 str(exc),
@@ -864,8 +779,8 @@ def create_purchase_router(
                 f"<code>{escape(str(method.get('card_number') or '-'))}</code>\n"
                 f"👤 به نام: "
                 f"<b>{escape(str(method.get('card_holder') or '-'))}</b>\n"
+                "\nپس از واریز، فقط رسید پرداخت را ارسال کنید."
             )
-
         else:
             text += (
                 "\n💰 آدرس کیف پول:\n"
@@ -880,9 +795,9 @@ def create_purchase_router(
                     f"<b>{escape(str(intent.get('crypto_amount_usdt')))} USDT</b>\n"
                 )
 
-        text += (
-            "\nپس از پرداخت، دکمه زیر را بزنید."
-        )
+            text += (
+                "\nپس از پرداخت، TXID تراکنش را ثبت کنید."
+            )
 
         await callback.message.edit_text(
             text,
@@ -908,13 +823,8 @@ def create_purchase_router(
                 ":",
                 3,
             )
-
-            intent_id = int(
-                parts[2]
-            )
-
+            intent_id = int(parts[2])
             method_id = parts[3]
-
         except Exception:
             await callback.answer(
                 "اطلاعات پرداخت نامعتبر است",
@@ -923,28 +833,33 @@ def create_purchase_router(
             return
 
         await state.clear()
-
         await state.update_data(
             intent_id=intent_id,
             payment_method=method_id,
         )
+        await callback.answer()
+
+        if method_id == "card_to_card":
+            await state.set_state(
+                PurchasePaymentState.receipt
+            )
+
+            await callback.message.answer(
+                "📷 <b>رسید پرداخت را ارسال کنید.</b>\n\n"
+                "نیازی به کد پیگیری، شماره کارت مبدا، "
+                "تاریخ یا ساعت واریز نیست.\n\n"
+                "عکس، فایل تصویری یا PDF قابل قبول است."
+            )
+            return
 
         await state.set_state(
             PurchasePaymentState.proof
         )
 
-        await callback.answer()
-
-        if method_id == "card_to_card":
-            await callback.message.answer(
-                "🧾 کد پیگیری کارت‌به‌کارت "
-                "را ارسال کنید."
-            )
-        else:
-            await callback.message.answer(
-                "🔗 TXID تراکنش USDT "
-                "را ارسال کنید."
-            )
+        await callback.message.answer(
+            "🔗 TXID تراکنش USDT "
+            "را ارسال کنید."
+        )
 
     @router.message(
         PurchasePaymentState.proof
@@ -960,39 +875,28 @@ def create_purchase_router(
 
         if len(value) < 3:
             await message.answer(
-                "❌ اطلاعات تراکنش معتبر نیست."
+                "❌ TXID معتبر نیست."
             )
             return
 
         data = await state.get_data()
 
-        # کارت‌به‌کارت دو مرحله دارد:
-        # ابتدا کد پیگیری، سپس 4 رقم آخر کارت مبدا.
         if (
             data.get("payment_method")
             == "card_to_card"
         ):
-            await state.update_data(
-                tracking_code=value
-            )
-
             await state.set_state(
-                PurchasePaymentState.card_last4
+                PurchasePaymentState.receipt
             )
-
             await message.answer(
-                "💳 لطفاً <b>۴ رقم آخر کارت مبدا</b> "
-                "که با آن پرداخت کرده‌اید را ارسال کنید.\n\n"
-                "مثال: <code>1234</code>"
+                "📷 لطفاً فقط رسید پرداخت را ارسال کنید."
             )
             return
 
-        # USDT
         try:
             token = await user_token(
                 message.from_user.id
             )
-
             result = await request_fn(
                 "POST",
                 (
@@ -1004,7 +908,6 @@ def create_purchase_router(
                     "txid": value,
                 },
             )
-
         except Exception as exc:
             await message.answer(
                 "❌ " + escape(str(exc))
@@ -1027,256 +930,6 @@ def create_purchase_router(
             "به‌صورت خودکار ساخته می‌شود."
         )
 
-
-    @router.message(
-        PurchasePaymentState.card_last4
-    )
-    async def shop_card_last4_submit(
-        message: Message,
-        state: FSMContext,
-    ):
-        raw = str(
-            message.text
-            or ""
-        ).strip()
-
-        digits = raw.translate(
-            str.maketrans(
-                "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩",
-                "01234567890123456789",
-            )
-        )
-
-        digits = "".join(
-            ch
-            for ch in digits
-            if ch.isdigit()
-        )
-
-        if len(digits) != 4:
-            await message.answer(
-                "❌ فقط <b>۴ رقم آخر کارت مبدا</b> "
-                "را ارسال کنید.\n\n"
-                "مثال: <code>1234</code>"
-            )
-            return
-
-        await state.update_data(
-            sender_card_last4=digits
-        )
-
-        await state.set_state(
-            PurchasePaymentState.transfer_date
-        )
-
-        await message.answer(
-            "📅 <b>تاریخ پرداخت</b> را "
-            "به میلادی ارسال کنید.\n\n"
-            "فرمت:\n"
-            "<code>YYYY-MM-DD</code>\n\n"
-            "مثال:\n"
-            "<code>2026-08-31</code>"
-        )
-
-
-    @router.message(
-        PurchasePaymentState.transfer_date
-    )
-    async def shop_transfer_date(
-        message: Message,
-        state: FSMContext,
-    ):
-        raw = str(
-            message.text
-            or ""
-        ).strip()
-
-        raw = raw.translate(
-            str.maketrans(
-                "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩",
-                "01234567890123456789",
-            )
-        )
-
-        # 2026/08/31 را هم قبول می‌کنیم.
-        value = raw.replace(
-            "/",
-            "-",
-        )
-
-        try:
-            parsed = datetime.strptime(
-                value,
-                "%Y-%m-%d",
-            )
-
-            value = parsed.strftime(
-                "%Y-%m-%d"
-            )
-
-        except ValueError:
-            await message.answer(
-                "❌ تاریخ معتبر نیست.\n\n"
-                "به این شکل ارسال کنید:\n"
-                "<code>2026-08-31</code>"
-            )
-            return
-
-        await state.update_data(
-            transfer_date=value
-        )
-
-        await state.set_state(
-            PurchasePaymentState.transfer_time
-        )
-
-        await message.answer(
-            "🕐 <b>ساعت پرداخت</b> را ارسال کنید.\n\n"
-            "فرمت ۲۴ ساعته:\n"
-            "<code>HH:MM</code>\n\n"
-            "مثال:\n"
-            "<code>00:38</code>"
-        )
-
-
-    @router.message(
-        PurchasePaymentState.transfer_time
-    )
-    async def shop_transfer_time(
-        message: Message,
-        state: FSMContext,
-    ):
-        raw = str(
-            message.text
-            or ""
-        ).strip()
-
-        raw = raw.translate(
-            str.maketrans(
-                "۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩",
-                "01234567890123456789",
-            )
-        )
-
-        value = (
-            raw
-            .replace(".", ":")
-            .replace("٫", ":")
-        )
-
-        try:
-            parsed = datetime.strptime(
-                value,
-                "%H:%M",
-            )
-
-            value = parsed.strftime(
-                "%H:%M"
-            )
-
-        except ValueError:
-            await message.answer(
-                "❌ ساعت معتبر نیست.\n\n"
-                "مثال:\n"
-                "<code>00:38</code>\n"
-                "یا\n"
-                "<code>14:25</code>"
-            )
-            return
-
-        data = await state.get_data()
-
-        tracking_code = str(
-            data.get("tracking_code")
-            or ""
-        ).strip()
-
-        last4 = str(
-            data.get("sender_card_last4")
-            or ""
-        ).strip()
-
-        transfer_date = str(
-            data.get("transfer_date")
-            or ""
-        ).strip()
-
-        if (
-            not tracking_code
-            or len(last4) != 4
-            or not transfer_date
-        ):
-            await state.clear()
-
-            await message.answer(
-                "❌ اطلاعات پرداخت ناقص شده است.\n"
-                "لطفاً دوباره از بخش خرید "
-                "فرآیند پرداخت را شروع کنید."
-            )
-            return
-
-        try:
-            token = await user_token(
-                message.from_user.id
-            )
-
-            result = await request_fn(
-                "POST",
-                (
-                    "/v1/payments/intents/"
-                    f"{data['intent_id']}/submit"
-                ),
-                token=token,
-                payload={
-                    "tracking_code":
-                        tracking_code,
-
-                    "sender_card_last4":
-                        last4,
-
-                    "transfer_date":
-                        transfer_date,
-
-                    "transfer_time":
-                        value,
-                },
-            )
-
-        except Exception as exc:
-            # اطلاعات داخل FSM نگه داشته می‌شود
-            # تا کاربر مجبور نباشد دوباره
-            # کد پیگیری و کارت را وارد کند.
-            await message.answer(
-                "❌ ثبت پرداخت ناموفق بود:\n"
-                + escape(str(exc))
-            )
-            return
-
-        await state.update_data(
-            transfer_time=value
-        )
-
-        await state.set_state(
-            PurchasePaymentState.receipt
-        )
-
-        await message.answer(
-            "✅ <b>اطلاعات پرداخت ثبت شد</b>\n\n"
-            f"🧾 کد پیگیری: "
-            f"<code>{escape(tracking_code)}</code>\n"
-            f"💳 کارت مبدا: "
-            f"<code>**** {escape(last4)}</code>\n"
-            f"📅 تاریخ: "
-            f"<b>{escape(transfer_date)}</b>\n"
-            f"🕐 ساعت: "
-            f"<b>{escape(value)}</b>\n\n"
-            "📷 حالا <b>عکس رسید پرداخت</b> "
-            "را ارسال کنید.\n\n"
-            "عکس، فایل تصویری یا PDF قابل قبول است."
-        )
-
-
-    # TWINPANEL_MAIN_RECEIPT_BOT_V1
     @router.message(
         PurchasePaymentState.receipt
     )
@@ -1290,13 +943,11 @@ def create_purchase_router(
             file_id = (
                 message.photo[-1].file_id
             )
-
         elif message.document:
             mime = str(
                 message.document.mime_type
                 or ""
             ).lower()
-
             filename = str(
                 message.document.file_name
                 or ""
@@ -1331,14 +982,12 @@ def create_purchase_router(
             return
 
         data = await state.get_data()
-
         intent_id = data.get(
             "intent_id"
         )
 
         if not intent_id:
             await state.clear()
-
             await message.answer(
                 "❌ اطلاعات پرداخت پیدا نشد.\n"
                 "لطفاً فرآیند خرید را "
@@ -1350,8 +999,7 @@ def create_purchase_router(
             token = await user_token(
                 message.from_user.id
             )
-
-            result = await request_fn(
+            await request_fn(
                 "POST",
                 (
                     "/v1/payments/intents/"
@@ -1359,11 +1007,9 @@ def create_purchase_router(
                 ),
                 token=token,
                 payload={
-                    "telegram_file_id":
-                        file_id,
+                    "telegram_file_id": file_id,
                 },
             )
-
         except Exception as exc:
             await message.answer(
                 "❌ ثبت رسید ناموفق بود:\n"
@@ -1377,13 +1023,10 @@ def create_purchase_router(
 
         await message.answer(
             "✅ <b>رسید پرداخت ثبت شد</b>\n\n"
-            "وضعیت: "
-            "<b>در انتظار بررسی</b>\n\n"
+            "وضعیت: <b>در انتظار بررسی</b>\n\n"
             "پس از تأیید مدیر، اکانت "
             "به‌صورت خودکار ساخته می‌شود و "
-            "اطلاعات اتصال برای شما "
-            "ارسال خواهد شد."
+            "اطلاعات اتصال برای شما ارسال خواهد شد."
         )
-
 
     return router

@@ -9,7 +9,8 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
-from .models import Node, Tunnel, TunnelTransport
+from .managed_relay_recovery_v20 import install_managed_relay_v20
+from .models import Tunnel, TunnelTransport
 from .tp2027_provision import TP2027_PRIORITY, install_tp2027_overlays
 
 
@@ -34,7 +35,7 @@ BASE_TIMEOUTS = {
     "mtunnel": 170,
     "backhaul": 90,
     "ssh_tun": 180,
-    "ssh_relay": 210,
+    "ssh_relay": 330,
 }
 
 RELAY_PRIORITY = 300
@@ -91,16 +92,27 @@ def _row_online(row: TunnelTransport | None) -> bool:
     )
 
 
+def _direct_online(rows: dict[str, TunnelTransport]) -> bool:
+    """Return true for any healthy non-relay data plane.
+
+    V18+ TP2027 transports are public-direct and therefore count as direct
+    paths even when Backhaul is down.
+    """
+
+    names = tuple(TP2027_PRIORITY) + DIRECT_BASE_ORDER
+    return any(_row_online(rows.get(name)) for name in names)
+
+
 def diagnose_managed_tunnel(tunnel_id: int, db: Session) -> dict:
     """Dependency-aware, read-only diagnosis for managed transports.
 
     Runtime state is never fabricated here. Transport Manager V7 remains the
     sole runtime health/failover authority.
 
-    ``operational`` means at least one selectable data-plane transport is
-    online. ``complete`` means every normally expected direct transport is
-    healthy as well. SSH Relay is an on-demand fallback and is not considered
-    missing while a direct base transport is healthy.
+    V20 is V18-aware: TP2027 members have independent public underlays and do
+    not depend on Backhaul. ``operational`` means at least one selectable
+    data-plane transport is online. SSH Relay is an on-demand fallback and is
+    required only when every direct path is unavailable.
     """
 
     tunnel = db.get(Tunnel, int(tunnel_id))
@@ -109,10 +121,7 @@ def diagnose_managed_tunnel(tunnel_id: int, db: Session) -> dict:
 
     rows = _rows(db, tunnel_id)
     backhaul_online = _row_online(rows.get("backhaul"))
-    direct_online = any(
-        _row_online(rows.get(name))
-        for name in DIRECT_BASE_ORDER
-    )
+    direct_online = _direct_online(rows)
     relay_online = _row_online(rows.get("ssh_relay"))
 
     selectable_online = [
@@ -132,19 +141,11 @@ def diagnose_managed_tunnel(tunnel_id: int, db: Session) -> dict:
         status = _status(row.status) if row else "missing"
         issue_code: str | None = None
 
-        if name in TP2027_PRIORITY and not backhaul_online:
-            issue_code = "carrier_down"
-
-        elif name == "ssh_relay":
+        if name == "ssh_relay":
             if relay_online:
                 issue_code = None
             elif relay_required:
-                if row is None:
-                    issue_code = "relay_required"
-                elif not enabled:
-                    issue_code = "relay_required"
-                elif status != "online":
-                    issue_code = "relay_required"
+                issue_code = "relay_required"
             else:
                 issue_code = "standby"
 
@@ -171,7 +172,7 @@ def diagnose_managed_tunnel(tunnel_id: int, db: Session) -> dict:
                 "latency_ms": getattr(row, "latency_ms", None),
                 "last_error": getattr(row, "last_error", None),
                 "issue_code": issue_code,
-                "dependency": "backhaul" if name in TP2027_PRIORITY else None,
+                "dependency": None,
             }
         )
 
@@ -219,53 +220,12 @@ async def install_ssh_relay_transport_managed(
     tunnel_id: int,
     db: Session,
 ):
-    """Provision the existing production SSH Relay as last-resort fallback.
+    """Provision V20 relay recovery as the managed last-resort fallback."""
 
-    Relay selection is automatic and constrained to an online, non-retired Exit
-    node with saved root access. The target Exit itself and duplicate target IPs
-    are excluded by ``choose_relay_node``.
-    """
-
-    from .ssh_relay import choose_relay_node, provision_ssh_relay
-
-    tunnel = db.get(Tunnel, int(tunnel_id))
-    if tunnel is None:
-        raise RuntimeError("tunnel_not_found")
-
-    iran = db.get(Node, int(tunnel.iran_node_id))
-    exit_node = db.get(Node, int(tunnel.exit_node_id))
-    if iran is None or exit_node is None:
-        raise RuntimeError("relay_endpoint_node_missing")
-
-    relay = choose_relay_node(db, tunnel)
-    if relay is None:
-        raise RuntimeError("ssh_relay_unavailable: no eligible online relay node")
-
-    result = await provision_ssh_relay(
-        tunnel,
-        iran,
-        relay,
-        exit_node,
+    return await install_managed_relay_v20(
+        int(tunnel_id),
         db,
     )
-
-    row = (
-        db.query(TunnelTransport)
-        .filter(
-            TunnelTransport.tunnel_id == int(tunnel_id),
-            TunnelTransport.transport == "ssh_relay",
-        )
-        .first()
-    )
-    if row is not None:
-        row.priority = RELAY_PRIORITY
-        db.commit()
-
-    return {
-        "relay_node_id": int(relay.id),
-        "relay_public_ip": str(relay.public_ip or ""),
-        "runtime": result,
-    }
 
 
 async def _repair_base_job(
@@ -365,15 +325,14 @@ def _merge_unresolved_errors(after: dict, errors: dict[str, str]) -> dict[str, s
 
 
 async def _repair_managed_tunnel_locked(tunnel_id: int, db: Session) -> dict:
-    """Diagnose and repair managed runtime, including relay fallback.
+    """Diagnose and repair managed runtime, including V20 relay fallback.
 
-    Direct base transports are repaired first. If none becomes online, the
-    existing SSH Relay transport is provisioned automatically through another
-    healthy Exit node. TP2027 overlays are rebuilt only when Backhaul is online.
+    V20 repairs modern TP2027 overlays independently of Backhaul because V18
+    moved them to public-direct underlays. Legacy direct base transports are
+    still repaired serially. After all direct candidates have had a repair
+    opportunity, SSH Relay V2 is provisioned only if no direct path is online.
+
     Manager V7 remains authoritative for runtime selection and health.
-
-    V15: base installers run deterministically, one at a time. They mutate the
-    same remote systemd/interface/firewall state and must never overlap.
     """
 
     tunnel = db.get(Tunnel, int(tunnel_id))
@@ -391,8 +350,8 @@ async def _repair_managed_tunnel_locked(tunnel_id: int, db: Session) -> dict:
     base_results: dict[str, object] = {}
     errors: dict[str, str] = {}
 
-    # TWINPANEL_MANAGED_REPAIR_SERIAL_V15
-    # Never run remote-mutating installers concurrently on the same pair.
+    # TWINPANEL_MANAGED_REPAIR_SERIAL_V20
+    # Never run remote-mutating legacy installers concurrently on one Iran node.
     for target in base_targets:
         name, online, error, result = await _repair_base_job(
             target,
@@ -404,31 +363,11 @@ async def _repair_managed_tunnel_locked(tunnel_id: int, db: Session) -> dict:
         if not online and error:
             errors[name] = error
 
-    db.expire_all()
-    rows = _rows(db, tunnel_id)
-    direct_online = any(
-        _row_online(rows.get(name))
-        for name in DIRECT_BASE_ORDER
-    )
-
-    relay_result = None
-    if not direct_online:
-        name, relay_ok, relay_error, relay_result = await _repair_relay_job(
-            int(tunnel_id)
-        )
-        if relay_result is not None:
-            base_results[name] = relay_result
-        if not relay_ok and relay_error:
-            errors[name] = relay_error
-
-    db.expire_all()
-    rows = _rows(db, tunnel_id)
-    backhaul_online = _row_online(rows.get("backhaul"))
-
+    # V18/V19 modern members no longer have a Backhaul carrier dependency.
     overlay_result = None
     overlay_needed = any(name in need for name in TP2027_PRIORITY)
 
-    if overlay_needed and backhaul_online:
+    if overlay_needed:
         try:
             overlay_result = await asyncio.wait_for(
                 install_tp2027_overlays(int(tunnel_id), db),
@@ -440,9 +379,20 @@ async def _repair_managed_tunnel_locked(tunnel_id: int, db: Session) -> dict:
             for name in TP2027_PRIORITY:
                 errors[name] = message
 
-    elif overlay_needed and not backhaul_online:
-        for name in TP2027_PRIORITY:
-            errors[name] = "carrier_down: backhaul is not online"
+    # Re-read direct path truth only after both legacy and modern repair passes.
+    db.expire_all()
+    rows = _rows(db, tunnel_id)
+    direct_online = _direct_online(rows)
+
+    relay_result = None
+    if not direct_online:
+        name, relay_ok, relay_error, relay_result = await _repair_relay_job(
+            int(tunnel_id)
+        )
+        if relay_result is not None:
+            base_results[name] = relay_result
+        if not relay_ok and relay_error:
+            errors[name] = relay_error
 
     await asyncio.sleep(12)
     db.expire_all()
@@ -461,7 +411,7 @@ async def _repair_managed_tunnel_locked(tunnel_id: int, db: Session) -> dict:
         "partial": partial,
         "tunnel_id": int(tunnel_id),
         "mode": "auto",
-        "provisioning_mode": "panel_serial_v15",
+        "provisioning_mode": "panel_serial_v20",
         "before": before,
         "after": after,
         "base_results": base_results,
