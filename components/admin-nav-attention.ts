@@ -4,8 +4,6 @@ import {useEffect,useMemo,useState} from "react";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 
-const SUPPORT_SEEN_KEY="twinpanel.admin.support.lastSeenInboundMessageId";
-
 type NotificationItem={
   route?:string|null;
   read_at?:string|null;
@@ -17,9 +15,9 @@ type NotificationPayload={
   items?:unknown;
 };
 
-type PulsePayload={
-  latest_support_message_id?:number;
-  support_unread_count?:number;
+type SupportTicket={
+  id?:number;
+  status?:string|null;
 };
 
 type PaymentReviewSummary={needs_review?:number};
@@ -27,7 +25,7 @@ type ReleaseStatus={update_available?:boolean};
 
 type AttentionState={
   paymentReviewCount:number;
-  supportUnreadCount:number;
+  supportNeedsReplyCount:number;
   notificationUnreadCount:number;
   unreadRoutes:string[];
   updateAvailable:boolean;
@@ -55,23 +53,10 @@ function normalizeRoute(raw:unknown):string|null{
   return `/admin/${value.replace(/^admin\//,"")}`;
 }
 
-function readSupportSeen():number|null{
-  try{
-    const raw=localStorage.getItem(SUPPORT_SEEN_KEY);
-    if(raw===null)return null;
-    const value=Number(raw);
-    return Number.isFinite(value)&&value>=0?value:null;
-  }catch{return null;}
-}
-
-function writeSupportSeen(value:number){
-  try{localStorage.setItem(SUPPORT_SEEN_KEY,String(Math.max(0,Math.floor(value))));}catch{}
-}
-
-export function useAdminNavAttention(active:string){
+export function useAdminNavAttention(_active:string){
   const [state,setState]=useState<AttentionState>({
     paymentReviewCount:0,
-    supportUnreadCount:0,
+    supportNeedsReplyCount:0,
     notificationUnreadCount:0,
     unreadRoutes:[],
     updateAvailable:false,
@@ -80,25 +65,14 @@ export function useAdminNavAttention(active:string){
   useEffect(()=>{
     let alive=true;
 
-    const refreshPulse=async()=>{
+    const refreshSupport=async()=>{
       try{
-        const seen=readSupportSeen();
-        const after=Math.max(0,seen??0);
-        const pulse=await request<PulsePayload>(`/v1/admin/panel-notifications/pulse?support_after_id=${after}`);
+        const rows=await request<SupportTicket[]>("/v1/admin/support/tickets?status=open");
         if(!alive)return;
-        const latest=Math.max(0,Number(pulse.latest_support_message_id)||0);
-        if(seen===null){
-          writeSupportSeen(latest);
-          setState(current=>({...current,supportUnreadCount:0}));
-          return;
-        }
-        if(active==="/admin/support"){
-          if(latest>seen)writeSupportSeen(latest);
-          setState(current=>({...current,supportUnreadCount:0}));
-          return;
-        }
-        const count=Math.max(0,Number(pulse.support_unread_count)||0);
-        setState(current=>({...current,supportUnreadCount:count||(latest>seen?1:0)}));
+        const count=Array.isArray(rows)
+          ?rows.filter(row=>String(row?.status||"").toLowerCase()==="open").length
+          :0;
+        setState(current=>({...current,supportNeedsReplyCount:count}));
       }catch{}
     };
 
@@ -114,10 +88,18 @@ export function useAdminNavAttention(active:string){
       try{
         const payload=await request<NotificationPayload>("/v1/admin/panel-notifications");
         if(!alive)return;
-        const rows=Array.isArray(payload.items)?payload.items.filter((row):row is NotificationItem=>Boolean(row&&typeof row==="object")):[];
+        const rows=Array.isArray(payload.items)
+          ?payload.items.filter((row):row is NotificationItem=>Boolean(row&&typeof row==="object"))
+          :[];
         const unreadRows=rows.filter(row=>!row.is_read&&!row.read_at);
-        const routes=Array.from(new Set(unreadRows.map(row=>normalizeRoute(row.route)).filter((route):route is string=>Boolean(route))));
-        const unread=Number.isFinite(Number(payload.unread_count))?Math.max(0,Number(payload.unread_count)||0):unreadRows.length;
+        const routes=Array.from(new Set(
+          unreadRows
+            .map(row=>normalizeRoute(row.route))
+            .filter((route):route is string=>Boolean(route))
+        ));
+        const unread=Number.isFinite(Number(payload.unread_count))
+          ?Math.max(0,Number(payload.unread_count)||0)
+          :unreadRows.length;
         setState(current=>({...current,notificationUnreadCount:unread,unreadRoutes:routes}));
       }catch{}
     };
@@ -132,46 +114,55 @@ export function useAdminNavAttention(active:string){
 
     const refreshVisible=()=>{
       if(document.visibilityState!=="visible")return;
-      void refreshPulse();
+      void refreshSupport();
       void refreshPayments();
       void refreshNotifications();
       void refreshRelease();
     };
 
     refreshVisible();
-    const pulseTimer=window.setInterval(()=>{if(document.visibilityState==="visible")void refreshPulse();},2000);
+
+    const fastTimer=window.setInterval(()=>{
+      if(document.visibilityState!=="visible")return;
+      void refreshSupport();
+    },2500);
+
     const workTimer=window.setInterval(()=>{
       if(document.visibilityState!=="visible")return;
       void refreshPayments();
       void refreshNotifications();
     },10000);
-    const releaseTimer=window.setInterval(()=>{if(document.visibilityState==="visible")void refreshRelease();},300000);
+
+    const releaseTimer=window.setInterval(()=>{
+      if(document.visibilityState==="visible")void refreshRelease();
+    },300000);
+
     window.addEventListener("focus",refreshVisible);
     document.addEventListener("visibilitychange",refreshVisible);
 
     return()=>{
       alive=false;
-      window.clearInterval(pulseTimer);
+      window.clearInterval(fastTimer);
       window.clearInterval(workTimer);
       window.clearInterval(releaseTimer);
       window.removeEventListener("focus",refreshVisible);
       document.removeEventListener("visibilitychange",refreshVisible);
     };
-  },[active]);
+  },[]);
 
   const routeSet=useMemo(()=>new Set(state.unreadRoutes),[state.unreadRoutes]);
 
   const hasPathAttention=(href:string)=>{
     if(routeSet.has(href))return true;
     if(href==="/admin/payments"&&state.paymentReviewCount>0)return true;
-    if(href==="/admin/support"&&state.supportUnreadCount>0)return true;
+    if(href==="/admin/support"&&state.supportNeedsReplyCount>0)return true;
     if(href==="/admin/notifications"&&state.notificationUnreadCount>0)return true;
     return false;
   };
 
   const countForPath=(href:string)=>{
     if(href==="/admin/payments")return state.paymentReviewCount;
-    if(href==="/admin/support")return state.supportUnreadCount;
+    if(href==="/admin/support")return state.supportNeedsReplyCount;
     if(href==="/admin/notifications")return state.notificationUnreadCount;
     return 0;
   };

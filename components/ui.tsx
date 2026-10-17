@@ -50,10 +50,16 @@ const menuGroups=[
 export function Shell({children,active="/admin"}:{children:React.ReactNode;active?:string}){
   const {pick}=useI18n();
   const [mobileOpen,setMobileOpen]=useState(false);
+  const [openGroup,setOpenGroup]=useState<string|null>(null);
   const attention=useAdminNavAttention(active);
   const navCenterStyle:React.CSSProperties=mobileOpen
     ? {position:"static",maxWidth:"none"}
     : {position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",maxWidth:"calc(100% - 320px)"};
+
+  const closeMenus=()=>{
+    setOpenGroup(null);
+    setMobileOpen(false);
+  };
 
   return <div className={`shell admin-shell admin-top-shell ${mobileOpen?"mobile-menu-open":""}`}>
     <div className="admin-topbar">
@@ -64,8 +70,16 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
           <nav className="admin-topnav" aria-label={pick("منوی اصلی","Main navigation")}>{menuGroups.map(group=>{
             const groupActive=group.items.some(([, ,href])=>active===href);
             const groupAttention=attention.groupHasAttention(group.en,group.items.map(([, ,href])=>href));
-            return <details className={`topnav-group ${groupActive?"active":""} ${groupAttention?"has-attention":""}`} key={group.en}>
-              <summary className="topnav-group-trigger">
+            const groupOpen=openGroup===group.en;
+            return <details className={`topnav-group ${groupActive?"active":""} ${groupAttention?"has-attention":""}`} key={group.en} open={groupOpen}>
+              <summary
+                className="topnav-group-trigger"
+                aria-expanded={groupOpen}
+                onClick={event=>{
+                  event.preventDefault();
+                  setOpenGroup(current=>current===group.en?null:group.en);
+                }}
+              >
                 <span>{pick(group.fa,group.en)}</span>
                 {groupAttention&&<span className="nav-attention-dot" aria-hidden="true"/>}
                 <span className="topnav-chevron" aria-hidden="true">⌄</span>
@@ -77,7 +91,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
                     const label=pick(fa,en);
                     const itemAttention=attention.hasPathAttention(h);
                     const itemCount=attention.countForPath(h);
-                    return <Link key={h} href={h} className={`${active===h?"active":""} ${itemAttention?"has-attention":""}`.trim()} onClick={()=>setMobileOpen(false)}>
+                    return <Link key={h} href={h} className={`${active===h?"active":""} ${itemAttention?"has-attention":""}`.trim()} onClick={closeMenus}>
                       <i>{i}</i><span className="nav-label">{label}</span>
                       {itemAttention&&<span className="nav-attention-dot" aria-hidden="true"/>}
                       {itemCount>0&&<span className="nav-attention-count" aria-label={`${itemCount} ${pick("مورد نیازمند بررسی","items need review")}`}>{itemCount>99?"99+":itemCount}</span>}
