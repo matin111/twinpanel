@@ -89,6 +89,15 @@ def admin_create_v2(
     payload: AdminSubscriptionCreateV2,
     db: Session = Depends(get_db),
 ):
+    manual = payload.plan_id is None
+
+    # Existing installations before manual-mode support have plan_id NOT NULL.
+    # This must run before the request Session performs any query: PostgreSQL
+    # ALTER TABLE needs an exclusive lock, so opening the Session transaction
+    # first could make the migration wait on the same request's own lock.
+    if manual:
+        ensure_subscription_plan_schema()
+
     plan = (
         db.get(Plan, payload.plan_id)
         if payload.plan_id is not None
@@ -96,8 +105,6 @@ def admin_create_v2(
     )
     if payload.plan_id is not None and (not plan or not plan.is_active):
         raise HTTPException(status_code=404, detail="پلن پیدا نشد")
-
-    manual = plan is None
 
     if manual:
         if payload.traffic_gb is None:
@@ -147,12 +154,6 @@ def admin_create_v2(
                 else "مدت پلن یا اشتراک باید بیشتر از صفر باشد"
             ),
         )
-
-    # Existing installations before manual-mode support have plan_id NOT NULL.
-    # Converge that single column immediately before the first manual insert;
-    # the helper is idempotent and keeps the existing plan foreign key.
-    if manual:
-        ensure_subscription_plan_schema()
 
     sub = create_subscription_core(
         db=db,
