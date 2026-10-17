@@ -219,7 +219,10 @@ export function LegacyNodesRuntimePage(){
     <div className="page legacy-control-page">
       <div className="page-head">
         <div><h1>{pick("نودها","Nodes")}</h1><small>{pick("فقط کنترل‌های عملیاتی و قابل استفاده نمایش داده می‌شوند.","Only functional operational controls are shown.")}</small></div>
-        <button type="button" className="ghost" disabled={loading} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button>
+        <div className="action-row">
+          <a href="/admin/provision" className="primary">＋ {pick("افزودن نود","Add node")}</a>
+          <button type="button" className="ghost" disabled={loading} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button>
+        </div>
       </div>
 
       {error&&<div className="runtime-error">{error}</div>}
