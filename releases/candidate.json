@@ -1,0 +1,8 @@
+{
+  "version": "1.1.0-rc.13",
+  "source_sha": "76c492ac002e9e1619a5e117de15ed6cd296ac0c",
+  "notes": {
+    "fa": "نسخه 1.1.0-rc.13 معماری بروزرسانی TwinPanel را به Release آماده و از پیش Build‌شده منتقل می‌کند. Build فرانت‌اند و نصب وابستگی‌های Node در GitHub Actions انجام می‌شود و سرور مشتری فقط فایل امضاشده با SHA256 را دانلود، بررسی، بکاپ، استخراج، فعال و Health-check می‌کند. همچنین موفقیت کاذب بروزرسانی با بررسی مسیر فعال، VERSION و نسخه گزارش‌شده توسط Health API/Web مسدود شده است.",
+    "en": "TwinPanel 1.1.0-rc.13 moves production updates to verified prebuilt releases. Frontend build and Node dependency installation happen in GitHub Actions; customer servers only download the SHA256-verified artifact, back up, extract, atomically activate, restart and health-check it. False completed states are also blocked by active-path, VERSION and API/Web version verification."
+  }
+}
