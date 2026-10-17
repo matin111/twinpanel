@@ -3,6 +3,7 @@ import {I18nProvider} from "../lib/i18n";
 import {ThemeProvider} from "../lib/theme";
 import {BrandingProvider} from "../lib/branding";
 import {SupportChatRuntime} from "../components/support-chat-runtime";
+import {SupportMenuBadgeRuntime} from "../components/support-menu-badge-runtime";
 import {ChatOpenBridge} from "../components/chat-open-bridge";
 import {CustomerDeliveryEnhancement} from "../components/customer-delivery-enhancement";
 import {CustomerStoreRedirect} from "../components/customer-store-redirect";
@@ -23,6 +24,7 @@ import "./dashboard-2027.css";
 import "./support-chat.css";
 import "./support-chat-emoji.css";
 import "./support-center.css";
+import "./support-menu-badge.css";
 import "./customer-runtime.css";
 import "./customer-dashboard-pro.css";
 import "./customer-buy-runtime.css";
@@ -59,6 +61,6 @@ export const metadata:Metadata={title:"VPN Control 2027",description:"VPN manage
 
 export default function RootLayout({children}:{children:React.ReactNode}){
   return <html lang="fa" dir="rtl" data-theme="dark" suppressHydrationWarning>
-    <body><ThemeProvider><BrandingProvider><I18nProvider>{children}<CustomerStoreRedirect/><CustomerDeliveryEnhancement/><SupportChatRuntime/><ChatOpenBridge/></I18nProvider></BrandingProvider></ThemeProvider></body>
+    <body><ThemeProvider><BrandingProvider><I18nProvider>{children}<CustomerStoreRedirect/><CustomerDeliveryEnhancement/><SupportMenuBadgeRuntime/><SupportChatRuntime/><ChatOpenBridge/></I18nProvider></BrandingProvider></ThemeProvider></body>
   </html>;
 }
