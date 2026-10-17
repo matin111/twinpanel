@@ -6,7 +6,11 @@ import json
 import sys
 
 from app.database import SessionLocal
-from twinpanel_protocol_cli import PROTOCOL_NAMES, PROTOCOL_ORDER, _exit_nodes, _run
+
+try:
+    from .twinpanel_protocol_cli import PROTOCOL_NAMES, PROTOCOL_ORDER, _exit_nodes, _run
+except ImportError:
+    from twinpanel_protocol_cli import PROTOCOL_NAMES, PROTOCOL_ORDER, _exit_nodes, _run
 
 
 def _ascii(value: object) -> str:
