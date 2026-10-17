@@ -7,6 +7,7 @@ on:
       - 'backend/app/tp2027_transport.py'
       - 'backend/app/tunnel_transport_manager_v12.py'
       - 'backend/app/candidate_lifecycle_v21.py'
+      - 'backend/app/runtime_reconciler_v3.py'
       - 'backend/app/self_hosted_runtime.py'
       - 'backend/app/routers/modern_transports.py'
       - 'backend/app/transport_candidates/__init__.py'
@@ -20,6 +21,7 @@ on:
       - 'backend/app/tp2027_transport.py'
       - 'backend/app/tunnel_transport_manager_v12.py'
       - 'backend/app/candidate_lifecycle_v21.py'
+      - 'backend/app/runtime_reconciler_v3.py'
       - 'backend/app/self_hosted_runtime.py'
       - 'backend/app/routers/modern_transports.py'
       - 'backend/app/transport_candidates/__init__.py'
@@ -48,6 +50,7 @@ jobs:
             backend/app/tp2027_transport.py \
             backend/app/tunnel_transport_manager_v12.py \
             backend/app/candidate_lifecycle_v21.py \
+            backend/app/runtime_reconciler_v3.py \
             backend/app/self_hosted_runtime.py \
             backend/app/routers/modern_transports.py \
             backend/app/transport_candidates/__init__.py
@@ -61,6 +64,7 @@ jobs:
           route = Path('backend/app/tp2027_transport.py').read_text()
           manager = Path('backend/app/tunnel_transport_manager_v12.py').read_text()
           lifecycle = Path('backend/app/candidate_lifecycle_v21.py').read_text()
+          reconciler = Path('backend/app/runtime_reconciler_v3.py').read_text()
           runtime = Path('backend/app/self_hosted_runtime.py').read_text()
           api = Path('backend/app/routers/modern_transports.py').read_text()
           cleanup = Path('backend/app/transport_candidates/__init__.py').read_text()
@@ -72,12 +76,14 @@ jobs:
               assert name in route, f'{name} missing from route metadata'
               assert name in api, f'{name} missing from API surface'
               assert name in cleanup, f'{name} missing from cleanup surface'
+              assert name in reconciler, f'{name} missing from orphan reconciler'
 
           assert 'download_weight=0.70' in smart
           assert 'upload_weight=0.30' in smart
           assert 'known_bad_quic_0.6.1_frag_dataplane_idle_timeout' in smart
           assert 'CANDIDATE_STABLE_SECONDS = 60.0' in smart
           assert 'install_smart_transport_auto_v21()' in manager
+          assert 'runtime_reconciler_v3' in manager
           assert 'cleanup_tunnel_runtime_v21' in lifecycle
           assert 'cleanup_tunnel_runtime_v21' in runtime
           assert 'tunnel_transport_manager_v12' in unit
