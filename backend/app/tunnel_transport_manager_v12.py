@@ -4,7 +4,7 @@ import asyncio
 
 from . import tunnel_transport_manager_v10 as v10
 from .legacy_ingress_reconciler import reconciler_loop as legacy_ingress_loop
-from .runtime_reconciler_v2 import reconciler_loop as runtime_reconciler_loop
+from .runtime_reconciler_v3 import reconciler_loop as runtime_reconciler_loop
 from .manager_runtime_v16 import install_manager_runtime_v16
 from .smart_transport_auto_v21 import install_smart_transport_auto_v21
 
@@ -14,6 +14,8 @@ from .smart_transport_auto_v21 import install_smart_transport_auto_v21
 #
 # V12 preserves the proven V10/V9/V7 repair + relay core and the V11
 # reconciliation workers, then layers Smart Auto V21 on top of Runtime V16.
+# Runtime Reconciler V3 extends orphan cleanup to every Smart Auto candidate
+# while retaining the existing DB-authority and two-pass deletion guard.
 #
 # Smart Auto owns only transport qualification/selection:
 #   * installs isolated modern L3 candidates (GRE, GOST TUN/WSS,
@@ -43,6 +45,7 @@ async def main() -> None:
     print(
         "TWINPANEL_TRANSPORT_MANAGER_V12_START "
         "policy=smart-speed-health "
+        "reconciler=v3 "
         "candidates=kernel_gre,gost_tun,amneziawg,netrix",
         flush=True,
     )
@@ -54,7 +57,7 @@ async def main() -> None:
 
     runtime_task = asyncio.create_task(
         runtime_reconciler_loop(),
-        name="twinpanel-runtime-reconciler",
+        name="twinpanel-runtime-reconciler-v3",
     )
 
     legacy_ingress_task = asyncio.create_task(
