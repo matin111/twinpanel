@@ -1,13 +1,14 @@
 const configuredApiBase=(process.env.NEXT_PUBLIC_API_BASE||"").trim().replace(/\/+$/,"");
 
-// NEXT_PUBLIC_* values run in the browser. A loopback API base such as
-// http://127.0.0.1:8095 would otherwise target the user's own computer.
-// For browser-side modules, resolve loopback configuration to the current
-// TwinPanel origin so every request passes through the built-in /v1 proxy.
+// Public prebuilt releases are intentionally compiled without a customer-
+// specific API URL. In the browser, an empty or loopback API base must resolve
+// to the current TwinPanel origin so requests use the built-in /v1 proxy.
+// This keeps one portable artifact working on IP installs and custom domains.
 const isLoopbackApiBase=/^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(configuredApiBase);
+const browserOrigin=typeof window!=="undefined"?window.location.origin:"";
 
-export const API_BASE=isLoopbackApiBase
-  ?(typeof window!=="undefined"?window.location.origin:"")
+export const API_BASE=(!configuredApiBase||isLoopbackApiBase)
+  ?browserOrigin
   :configuredApiBase;
 
 export const api={
