@@ -5,6 +5,9 @@ from .xray_tcp_tls_v39 import (
     PROFILE_TCP_TLS,
     apply_xray_tcp_tls_v39,
 )
+from .xray_tcp_tls_admin_v39 import (
+    apply_xray_tcp_tls_admin_v39,
+)
 
 
 # TWINPANEL_XRAY_PUBLIC_PROFILE_POLICY_V39
@@ -41,6 +44,7 @@ def apply_xray_public_profile_policy_v38() -> None:
     # Keep the existing self_hosted_runtime hook name stable while upgrading the
     # actual customer profile policy to V39.
     apply_xray_tcp_tls_v39()
+    apply_xray_tcp_tls_admin_v39()
 
     xray_public_delivery_runtime._PUBLIC_PROFILE_ORDER = (
         _PUBLIC_PROFILE_ORDER_V39
