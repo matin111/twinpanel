@@ -86,7 +86,7 @@ TwinPanel برای سناریوهایی طراحی شده که اپراتور م
 | برندینگ | نام، ظاهر و تنظیمات برند قابل تغییر |
 | Backup | بکاپ و بازیابی با فرآیند مدیریتی |
 | Release | نمایش نسخه، Update کنترل‌شده، Health Check و Rollback |
-| License | Trial هفت‌روزه و فعال‌سازی License بدون نصب مجدد |
+| License | زیرساخت Trial هفت‌روزه و فعال‌سازی License بدون نصب مجدد |
 
 ---
 
@@ -387,31 +387,34 @@ Clientهای معرفی‌شده در Runtime شامل ابزارهایی مثل
 
 ## بروزرسانی و Rollback
 
-TwinPanel برای Update دستی فایل‌ها طراحی نشده است. مسیر استاندارد بروزرسانی شامل این مراحل است:
+TwinPanel برای Update دستی فایل‌ها طراحی نشده است. مسیر عمومی بروزرسانی شامل این مراحل است:
 
 1. شناسایی نسخه نصب‌شده
-2. بررسی Release مجاز برای License
+2. دریافت Manifest نسخه Stable منتشرشده
 3. Backup قبل از بروزرسانی
-4. دانلود Package
-5. بررسی SHA256 / صحت Package
+4. دریافت دقیق Commit عمومی معرفی‌شده در Manifest
+5. بررسی SHA واقعی Git و فایل `VERSION`
 6. نصب یا Build نسخه جدید
-7. Restart سرویس‌ها
-8. Health Check
-9. Rollback خودکار در صورت Fail شدن Health
+7. تعویض اتمیک `/opt/twinpanel/current`
+8. Restart سرویس‌ها
+9. Health Check
+10. Rollback خودکار در صورت Fail شدن Health
 
-نسخه نصب‌شده در پنل قابل نمایش است و Release Channel باید از Source رسمی استفاده کند.
+نسخه نصب‌شده در پنل قابل نمایش است و بروزرسانی مشتری فقط از Manifest رسمی Stable انجام می‌شود.
 
 ---
 
 ## Trial و License
 
-- Trial برای نصب جدید: **۷ روز**
-- Trial به Installation Identity متصل می‌شود
-- حذف فایل‌های محلی یا نصب مجدد نباید Trial جدید بسازد
-- License پولی روی همان Installation فعال می‌شود
-- فعال‌سازی License نیاز به حذف کاربران یا دیتابیس ندارد
-- در اختلال موقت License Server، طراحی محصول نباید ترافیک موجود کاربران را ناگهانی قطع کند و Grace محدود برای خطای ارتباط در نظر گرفته شده است
-- پس از پایان Trial، مسیرهای لازم مثل Login مدیریت، فعال‌سازی License، Backup/Export و Diagnostics بر اساس Policy محصول قابل نگهداری هستند
+TwinPanel زیرساخت Trial هفت‌روزه و License پولی را نگه می‌دارد. نسخه عمومی فعلی `1.1.0-rc.1` بدون اجبار License Server قابل نصب است (`license_required: false`) تا نصب عمومی مستقل از سرویس Vendor قابل آزمایش و استفاده باشد.
+
+معماری License برای مراحل بعدی این قابلیت‌ها را در نظر گرفته است:
+
+- اتصال Trial به Installation Identity
+- فعال‌سازی License پولی بدون حذف کاربران، اشتراک‌ها، نودها، تانل‌ها یا دیتابیس
+- Signed Entitlement
+- Grace محدود در قطعی موقت License Server
+- بازماندن مسیرهایی مثل Login مدیریت، Activation، Backup/Export و Diagnostics طبق Policy محصول
 
 جزئیات بیشتر:
 
@@ -472,11 +475,13 @@ Frontend و API به‌صورت محلی اجرا می‌شوند و Nginx Endpo
 
 ## نصب سریع
 
-نصب مشتری باید فقط از Bootstrap عمومی رسمی انجام شود:
+مشتری فقط همین یک دستور را اجرا می‌کند:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/matin111/tp27-core/main/twinpanel/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/matin111/twinpanel/main/install.sh | sudo bash
 ```
+
+برای نصب نیازی به GitHub Account، SSH Key، Deploy Key، Token، Clone دستی یا انتخاب Branch/Commit نیست. Installer فایل `releases/stable.json` را می‌خواند و دقیقاً Commit عمومی تأییدشده داخل Manifest را نصب می‌کند.
 
 راهنمای کامل نصب فارسی:
 
@@ -502,21 +507,22 @@ curl -fsSL https://raw.githubusercontent.com/matin111/tp27-core/main/twinpanel/i
 
 ## فرآیند نصب
 
-Bootstrap رسمی به‌صورت خلاصه این مراحل را انجام می‌دهد:
+Installer عمومی به‌صورت خلاصه این مراحل را انجام می‌دهد:
 
-1. بررسی سیستم‌عامل و منابع
-2. ساخت Installation ID و Machine Fingerprint
-3. فعال‌سازی License یا Trial
-4. Resolve آخرین Release مجاز
-5. بررسی SHA256 Package
+1. بررسی Ubuntu و دسترسی root
+2. دریافت Manifest رسمی Stable
+3. خواندن Version و Commit دقیق نسخه
+4. دریافت همان Commit با HTTPS
+5. بررسی SHA واقعی Git و فایل `VERSION`
 6. نصب Dependencyها و Runtimeها
 7. نصب Backend و Frontend
 8. ساخت Secretهای محلی
 9. Initialize دیتابیس
 10. ساخت Admin اولیه
-11. نصب systemd services
-12. تنظیم Nginx
-13. اجرای Health Check نهایی
+11. نصب systemd serviceها
+12. نصب منوی SSH با دستور `twinpanel` و `tp`
+13. تنظیم Nginx
+14. اجرای Health Check نهایی
 
 Password اولیه Admin در فایل root-only زیر نگهداری می‌شود:
 
@@ -524,7 +530,7 @@ Password اولیه Admin در فایل root-only زیر نگهداری می‌�
 /root/twinpanel-initial-admin.txt
 ```
 
-پس از اولین ورود بهتر است رمز تغییر کند و فایل حذف شود.
+پس از اولین ورود، مدیر Email و Password خودش را تغییر می‌دهد و می‌تواند فایل را حذف کند. Reinstall یا Update نیز Admin موجود را بدون اجازه تغییر نمی‌دهد.
 
 ---
 
@@ -533,11 +539,15 @@ Password اولیه Admin در فایل root-only زیر نگهداری می‌�
 ```text
 /opt/twinpanel/current                 نسخه فعال
 /opt/twinpanel/releases                Releaseهای نصب‌شده
+/opt/twinpanel/venv                    محیط Python
 /etc/twinpanel/backend.env             Environment بک‌اند
 /etc/twinpanel/frontend.env            Environment فرانت‌اند
+/etc/twinpanel/install.env             تنظیمات Install/Release
 /var/lib/twinpanel-backups             Backupها
-/var/lib/twinpanel-license             وضعیت محلی License
+/var/lib/twinpanel-license             وضعیت Release/License/Update
 /root/twinpanel-initial-admin.txt      اطلاعات Admin اولیه
+/usr/local/bin/twinpanel               دستور مدیریت SSH
+/usr/local/bin/tp                      نام کوتاه دستور مدیریت
 ```
 
 ---
@@ -550,7 +560,7 @@ Branch اصلی مخزن و صفحه پیش‌فرض پروژه:
 main
 ```
 
-Releaseهای قابل نصب مشتری باید از جریان رسمی و اعتبارسنجی‌شده منتشر شوند. Branchهای آزمایشی مثل `feat/*`، `fix/*`، `preview/*` یا Branchهای Local Production منبع مستقیم نصب مشتری نیستند.
+Release قابل نصب مشتری از فایل [`releases/stable.json`](releases/stable.json) انتخاب می‌شود و به یک Commit دقیق و اعتبارسنجی‌شده قفل است. Branchهای آزمایشی مثل `feat/*`، `fix/*`، `preview/*` یا Branchهای Local Production منبع مستقیم نصب مشتری نیستند.
 
 نسخه محصول در فایل زیر نگهداری می‌شود:
 
