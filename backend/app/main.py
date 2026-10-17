@@ -69,6 +69,7 @@ from .routers.sms_reader_dashboard import router as sms_reader_dashboard_router
 from .routers.wallet_sms_reader import router as wallet_sms_reader_router
 from .routers.sms_reader import router as sms_reader_router
 from .routers.support import router as support_router, admin_router as support_admin_router
+from .routers.support_live_delta import router as support_live_delta_router
 # TWINPANEL_USER_NOTIFICATION_REGISTER_V1
 from .routers.user_notifications import (
     router as user_notification_router,
@@ -272,6 +273,7 @@ app.include_router(sms_reader_dashboard_router)
 app.include_router(wallet_sms_reader_router)
 app.include_router(sms_reader_router)
 app.include_router(support_router)
+app.include_router(support_live_delta_router)
 app.include_router(support_admin_router)
 app.include_router(user_notification_router)
 app.include_router(user_notification_admin_router)
