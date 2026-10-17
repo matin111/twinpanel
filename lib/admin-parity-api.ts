@@ -106,6 +106,7 @@ export type MotherAccessSettings={
 export const parityApi={
   telegramStatus:()=>request<TelegramBotStatus>("/v1/admin/telegram-bot"),
   telegramSaveToken:(token:string)=>request<AnyRow>("/v1/admin/telegram-bot/token",{method:"PUT",body:JSON.stringify({token})}),
+  telegramDeleteToken:()=>request<TelegramBotStatus>("/v1/admin/telegram-bot/token",{method:"DELETE"}),
   telegramTest:()=>request<AnyRow>("/v1/admin/telegram-bot/test",{method:"POST"}),
   telegramInstall:()=>request<AnyRow>("/v1/admin/telegram-bot/install",{method:"POST"}),
   telegramStart:()=>request<AnyRow>("/v1/admin/telegram-bot/start",{method:"POST"}),
