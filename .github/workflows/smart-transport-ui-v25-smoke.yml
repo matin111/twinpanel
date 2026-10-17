@@ -64,3 +64,47 @@ jobs:
           assert 'release.release_manifest = release_manifest_v25' in router
           print('SMART_TRANSPORT_UI_V25_CONTRACT_OK')
           PY
+      - name: Release manifest fallback contract
+        env:
+          PYTHONPATH: backend
+        run: |
+          python - <<'PY'
+          import base64
+          import json
+          from unittest.mock import patch
+
+          import httpx
+          from app import release_manifest_v25 as resolver
+
+          manifest={
+              'schema':3,
+              'product':'TwinPanel',
+              'channel':'stable',
+              'version':'9.9.9-rc.25',
+              'installable':True,
+              'published':True,
+          }
+
+          class FakeResponse:
+              def __init__(self,payload): self.payload=payload
+              def raise_for_status(self): return None
+              def json(self): return self.payload
+
+          api_payload={
+              'encoding':'base64',
+              'content':base64.b64encode(json.dumps(manifest).encode()).decode(),
+          }
+
+          def fake_get(url,*args,**kwargs):
+              if 'api.github.com' in url:
+                  return FakeResponse(api_payload)
+              raise httpx.ConnectError('blocked raw provider')
+
+          with patch('app.release_manifest_v25.httpx.get',side_effect=fake_get):
+              result=resolver.release_manifest_v25()
+
+          assert result['version']=='9.9.9-rc.25',result
+          assert result['manifest_source']==resolver.GITHUB_API_MANIFEST_URL,result
+          assert 'error' not in result,result
+          print('RELEASE_MANIFEST_V25_API_FALLBACK_OK')
+          PY
