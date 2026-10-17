@@ -17,6 +17,18 @@ from . import xray_modern_runtime
 from .xray_modern_repair_runtime import (
     apply_xray_modern_repair_runtime,
 )
+from .xray_profile_reconcile_v36 import (
+    apply_xray_profile_reconcile_v36,
+)
+from .tunnel_service_connections_admin_runtime import (
+    apply_tunnel_service_connections_admin_runtime,
+)
+from .tp2027_egress_v28 import (
+    apply_tp2027_egress_v28,
+)
+from .service_connections_jobs_v28 import (
+    apply_service_connections_jobs_v28,
+)
 
 
 _original_install_or_upgrade_agent = provision._install_or_upgrade_agent
@@ -78,11 +90,6 @@ async def _self_hosted_install_or_upgrade_agent(
 def apply_self_hosted_runtime() -> None:
     # ------------------------------------------------------------
     # Smart Auto V12 production activation
-    #
-    # Older self-hosted installs may have no transport-manager unit or may
-    # still point at the historical /opt/twinpanel-product checkout. API runs
-    # as root, so every release startup can idempotently reconcile the exact
-    # product-owned unit. CI/containers without systemd are a safe no-op.
     # ------------------------------------------------------------
 
     ensure_transport_manager_service_v12()
@@ -97,10 +104,6 @@ def apply_self_hosted_runtime() -> None:
 
     # ------------------------------------------------------------
     # Logical tunnel lifecycle V21
-    #
-    # Modern candidate runtimes are now first-class members of one logical
-    # tunnel. Remove their exact owned services/interfaces/rules before the
-    # logical tunnel row is deleted so no GRE/GOST/AWG/Netrix orphan remains.
     # ------------------------------------------------------------
 
     tunnels.cleanup_tunnel_runtime = (
@@ -109,9 +112,6 @@ def apply_self_hosted_runtime() -> None:
 
     # ------------------------------------------------------------
     # Backhaul V16
-    #
-    # Keep the collision-free Backhaul installer available for
-    # explicit legacy/manual use.
     # ------------------------------------------------------------
 
     tunnels._install_backhaul_peer = (
@@ -120,45 +120,24 @@ def apply_self_hosted_runtime() -> None:
 
     # ------------------------------------------------------------
     # Modern TP2027 V18
-    #
-    # KCP / ARQ / QUIC / TCP have independent public underlays.
-    # One Iran node can therefore fan out to multiple Exit nodes.
     # ------------------------------------------------------------
 
     apply_modern_runtime_v18()
 
     # ------------------------------------------------------------
     # Public-direct stability V19
-    #
-    # TCP and QUIC use the production-proven stable single-lane
-    # profile. KCP and ARQ behavior remains unchanged.
     # ------------------------------------------------------------
 
     apply_public_direct_tuning_v19()
 
     # ------------------------------------------------------------
     # Managed Relay Recovery V20
-    #
-    # Managed repair understands that V18 modern transports are
-    # public-direct and independent from Backhaul.
-    #
-    # SSH Relay V2 / split-hop is used only after every direct
-    # data-plane candidate remains unavailable.
     # ------------------------------------------------------------
 
     apply_managed_relay_recovery_v20()
 
     # ------------------------------------------------------------
     # Xray Modern Runtime V2 + collision-free service port plan.
-    #
-    # Existing service ranges each reserve a full 1000-port block:
-    #   Cisco      20001..20999
-    #   OpenVPN    21001..21999
-    #   WireGuard  22001..22999
-    #   Xray old   23001..23999
-    #
-    # Keep every modern Xray profile in its own full block as well;
-    # using 23100/23200-style bases would collide as Exit IDs grow.
     # ------------------------------------------------------------
 
     xray_modern_runtime.PROFILE_META[
@@ -181,20 +160,26 @@ def apply_self_hosted_runtime() -> None:
 
     # ------------------------------------------------------------
     # Xray Modern Repair Runtime V1
-    #
-    # Legacy managed Xray nodes already own their base TCP port. If
-    # modern listeners are missing, generic repair used to fail its
-    # port preflight before the modern reconciler could run. Reconcile
-    # those existing Xray listeners first, then let the normal repair
-    # flow verify and persist protocol status.
     # ------------------------------------------------------------
 
     apply_xray_modern_repair_runtime()
 
     # ------------------------------------------------------------
-    # SSH TUN
+    # Service Connections V28
     #
-    # Keep the controller-owned self-hosted V3 implementation.
+    # These runtimes were previously merged and later lost from the public
+    # release lineage while their UI remained. Register them after Xray Modern
+    # has patched the service-route generator so UI and Agent desired-state read
+    # the same live route source.
+    # ------------------------------------------------------------
+
+    apply_xray_profile_reconcile_v36()
+    apply_tunnel_service_connections_admin_runtime()
+    apply_tp2027_egress_v28()
+    apply_service_connections_jobs_v28()
+
+    # ------------------------------------------------------------
+    # SSH TUN
     # ------------------------------------------------------------
 
     tunnels.provision_ssh_tunnel = (
