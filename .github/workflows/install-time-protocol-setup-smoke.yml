@@ -32,14 +32,23 @@ jobs:
       - name: Validate protocol helper syntax
         run: python3 -m py_compile backend/scripts/twinpanel_installer_protocols.py
 
-      - name: Verify install-time protocol UI wiring
+      - name: Verify automatic fresh-install protocol wiring
         run: |
-          grep -q 'VPN protocol setup' install.sh
-          grep -q 'Install all protocols' install.sh
+          grep -q 'Fresh installation detected; all VPN protocols will be installed automatically.' install.sh
+          grep -q 'raw="all"' install.sh
+          grep -q 'Installing VPN protocols automatically' install.sh
           grep -q 'TWINPANEL_INSTALL_PROTOCOLS' install.sh
           grep -q 'scripts/twinpanel_installer_protocols.py --protocols' install.sh
           grep -q 'Local / This server' install.sh
           grep -q 'Existing installation detected; protocol runtime was preserved.' install.sh
+          if grep -q '/dev/tty' install.sh; then
+            echo 'Fresh install must not prompt for protocol selection'
+            exit 1
+          fi
+          if grep -q 'Protocols \[0\]:' install.sh; then
+            echo 'Interactive protocol prompt is still present'
+            exit 1
+          fi
 
       - name: Setup Python
         uses: actions/setup-python@v5
