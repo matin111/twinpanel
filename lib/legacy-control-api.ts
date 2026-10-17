@@ -105,14 +105,18 @@ export type TunnelServiceConnectionsResponse=RuntimeRow&{
 };
 export type ManagedTunnelCreateResponse={
   ok:boolean;
+  operational?:boolean;
   complete:boolean;
   tp2027_complete?:boolean;
   full_complete?:boolean;
+  fallback_active?:boolean;
   tunnel:AdminTunnel;
   active_transport:string|null;
   installed:string[];
   errors:Record<string,string>;
   transports?:RuntimeRow[];
+  results?:Record<string,unknown>;
+  diagnosis?:RuntimeRow;
 };
 
 type ManagedInstallCache={installed:string[];errors:Record<string,string>};
@@ -219,5 +223,18 @@ export const legacyControlApi={
     const managed=await managedTransportResult(id,"backhaul");
     return managed||requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/backhaul/install`,{method:"POST"},75000);
   },
-  backhaulStatus:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/backhaul/status`)
+  backhaulStatus:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/backhaul/status`),
+
+  getDomains:()=>request<RuntimeRow[]>("/v1/domains"),
+  setDomain:(id:number,domain:string)=>request<RuntimeRow>(`/v1/nodes/${id}/domain`,{method:"PATCH",body:JSON.stringify({domain})}),
+
+  provision:(id:number,protocol:string)=>requestWithTimeout<RuntimeRow>(`/v1/nodes/${id}/provision/${protocol}`,{method:"POST"},150000),
+  repairNode:(id:number)=>requestWithTimeout<RuntimeRow>(`/v1/nodes/${id}/repair`,{method:"POST"},150000),
+  installAgent:(id:number)=>requestWithTimeout<RuntimeRow>(`/v1/nodes/${id}/agent/install`,{method:"POST"},150000),
+  upgradeAgent:(id:number)=>requestWithTimeout<RuntimeRow>(`/v1/nodes/${id}/agent/upgrade`,{method:"POST"},150000),
+  repairProtocolsSaved:(id:number)=>requestWithTimeout<RuntimeRow>(`/v1/nodes/${id}/protocols/repair-saved`,{method:"POST"},150000),
+  installTunnelFabric:(id:number)=>requestWithTimeout<RuntimeRow>(`/v1/nodes/${id}/tunnel-fabric/install`,{method:"POST"},150000),
+
+  protocolHealth:(id:number)=>request<Record<string,RuntimeRow>>(`/v1/nodes/${id}/protocols/health`),
+  restartProtocol:(id:number,protocol:string)=>requestWithTimeout<RuntimeRow>(`/v1/nodes/${id}/protocols/${encodeURIComponent(protocol)}/restart`,{method:"POST"},120000),
 };
