@@ -5,6 +5,7 @@ on:
     paths:
       - "installer/**"
       - "scripts/twinpanel-menu.sh"
+      - "backend/app/local_core_runtime.py"
       - "backend/scripts/twinpanel_admin_cli.py"
       - "backend/scripts/twinpanel_protocol_cli.py"
       - "backend/scripts/twinpanel_protocol_cli_en.py"
@@ -21,6 +22,7 @@ jobs:
       DATABASE_URL: sqlite:////tmp/twinpanel-cli-ci.db
       REDIS_URL: redis://127.0.0.1:6379/15
       NODE_AGENT_SHARED_SECRET: cli-ci-node-secret-cli-ci-node-secret
+      PUBLIC_API_FALLBACK: http://203.0.113.10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +34,7 @@ jobs:
 
       - name: Validate Python syntax
         run: |
+          python3 -m py_compile backend/app/local_core_runtime.py
           python3 -m py_compile backend/scripts/twinpanel_admin_cli.py
           python3 -m py_compile backend/scripts/twinpanel_protocol_cli.py
           python3 -m py_compile backend/scripts/twinpanel_protocol_cli_en.py
@@ -43,8 +46,9 @@ jobs:
 
           menu_path = Path("scripts/twinpanel-menu.sh")
           protocol_path = Path("backend/scripts/twinpanel_protocol_cli_en.py")
+          local_path = Path("backend/app/local_core_runtime.py")
 
-          for path in (menu_path, protocol_path):
+          for path in (menu_path, protocol_path, local_path):
               text = path.read_text(encoding="utf-8")
               non_ascii = [(i, ch) for i, ch in enumerate(text) if ord(ch) > 127]
               assert not non_ascii, f"non-ASCII characters found in {path}: {non_ascii[:5]}"
@@ -73,7 +77,15 @@ jobs:
           main_start = protocol.index("def main()")
           main_body = protocol[main_start:]
           assert main_body.index("_select_protocol()") < main_body.index("_select_node(db)")
-          assert "No Exit nodes are configured yet." in protocol
+          assert "Local / This server" in protocol
+          assert "No Exit nodes are configured yet." not in protocol
+          assert "_managed_nodes" in protocol
+
+          local_runtime = local_path.read_text(encoding="utf-8")
+          assert 'LOCAL_AGENT_URL = "local://core"' in local_runtime
+          assert "LocalShellConnection" in local_runtime
+          assert "ensure_local_core_node" in local_runtime
+          assert "managed_protocol_nodes" in local_runtime
           print("SSH_MENU_ENGLISH_RUNTIME_GUARDS_OK")
           PY
 
@@ -91,11 +103,55 @@ jobs:
         working-directory: backend
         run: |
           python - <<'PY'
+          from app import local_core_runtime
           from scripts import twinpanel_admin_cli, twinpanel_protocol_cli, twinpanel_protocol_cli_en
+          assert callable(local_core_runtime.ensure_local_core_node)
           assert callable(twinpanel_admin_cli.main)
           assert callable(twinpanel_protocol_cli.main)
           assert callable(twinpanel_protocol_cli_en.main)
           print("SSH_MANAGEMENT_IMPORT_OK")
+          PY
+
+      - name: Verify local core target and command runtime
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          import asyncio
+
+          from app.database import Base, SessionLocal, engine
+          from app.local_core_runtime import (
+              LOCAL_AGENT_URL,
+              LocalShellConnection,
+              ensure_local_core_node,
+              managed_protocol_nodes,
+          )
+
+          Base.metadata.create_all(bind=engine)
+          db = SessionLocal()
+          try:
+              first = ensure_local_core_node(db)
+              second = ensure_local_core_node(db)
+              assert first.id == second.id
+              assert first.agent_url == LOCAL_AGENT_URL
+              assert first.is_mother is True
+              assert first.public_ip == "203.0.113.10"
+              targets = managed_protocol_nodes(db)
+              assert targets
+              assert targets[0].id == first.id
+              assert targets[0].is_mother is True
+          finally:
+              db.close()
+
+          async def smoke():
+              conn = LocalShellConnection()
+              result = await conn.run("printf LOCAL_CORE_OK", check=True)
+              assert result.exit_status == 0
+              assert result.stdout == "LOCAL_CORE_OK"
+              conn.close()
+              await conn.wait_closed()
+
+          asyncio.run(smoke())
+          print("LOCAL_CORE_PROTOCOL_RUNTIME_OK")
           PY
 
       - name: Verify direct CLI execution can import backend app

@@ -285,8 +285,8 @@ protocol_menu(){
   echo "  4) L2TP / IPsec"
   echo "  5) V2Ray / Xray"
   echo
-  echo "The selected protocol is managed on an Exit node."
-  echo "Remove creates a remote backup before changing protocol files."
+  echo "The selected protocol can be managed on this server or a remote Exit node."
+  echo "Remove creates a backup on the selected target before changing protocol files."
   echo
   run_backend scripts/twinpanel_protocol_cli_en.py || true
   pause

@@ -7,7 +7,8 @@ import sys
 from datetime import datetime
 
 from app.database import SessionLocal
-from app.models import Node, NodeProtocolConfig, NodeType
+from app.local_core_runtime import connection_for_node, managed_protocol_nodes
+from app.models import Node, NodeProtocolConfig
 from app.routers.provision import (
     PROTOCOL_NAMES,
     ProtocolSettings,
@@ -17,7 +18,6 @@ from app.routers.provision import (
     _save_live_health,
     cmd,
     provision_protocols,
-    ssh_connect_saved,
 )
 
 PROTOCOL_ORDER = ["cisco", "openvpn", "wireguard", "l2tp", "v2ray"]
@@ -30,29 +30,17 @@ ENABLE_FIELD = {
 }
 
 
-def _exit_nodes(db):
-    rows = (
-        db.query(Node)
-        .filter(Node.retired_at.is_(None), Node.node_type == NodeType.EXIT)
-        .order_by(Node.id.asc())
-        .all()
-    )
-    return [
-        row
-        for row in rows
-        if not getattr(row, "is_mother", False)
-        and str(getattr(row, "agent_url", "") or "") != "local://core"
-    ]
+def _managed_nodes(db):
+    return managed_protocol_nodes(db)
 
 
 def _select_node(db):
-    nodes = _exit_nodes(db)
-    if not nodes:
-        raise RuntimeError("NO_EXIT_NODE")
-    print("\nExit nodes / سرورهای خروجی")
+    nodes = _managed_nodes(db)
+    print("\nManaged protocol targets")
     for row in nodes:
-        print(f"  {row.id}) {row.name}  [{row.public_ip}]")
-    raw = input("Node ID / شناسه سرور: ").strip()
+        target = "Local / This server" if getattr(row, "is_mother", False) else row.name
+        print(f"  {row.id}) {target}  [{row.public_ip}]")
+    raw = input("Node ID: ").strip()
     if not raw.isdigit():
         raise RuntimeError("INVALID_NODE_ID")
     node_id = int(raw)
@@ -63,10 +51,10 @@ def _select_node(db):
 
 
 def _select_protocol() -> str:
-    print("\nProtocols / پروتکل‌ها")
+    print("\nProtocols")
     for index, name in enumerate(PROTOCOL_ORDER, start=1):
         print(f"  {index}) {PROTOCOL_NAMES[name]}")
-    raw = input("Protocol / پروتکل: ").strip()
+    raw = input("Protocol: ").strip()
     if not raw.isdigit() or not 1 <= int(raw) <= len(PROTOCOL_ORDER):
         raise RuntimeError("INVALID_PROTOCOL")
     return PROTOCOL_ORDER[int(raw) - 1]
@@ -74,16 +62,16 @@ def _select_protocol() -> str:
 
 def _select_action() -> str:
     actions = [
-        ("status", "Status / وضعیت"),
-        ("install", "Install / نصب"),
-        ("repair", "Repair / تعمیر"),
-        ("restart", "Restart / ریستارت"),
-        ("remove", "Remove / حذف"),
+        ("status", "Status"),
+        ("install", "Install"),
+        ("repair", "Repair"),
+        ("restart", "Restart"),
+        ("remove", "Remove"),
     ]
-    print("\nActions / عملیات")
+    print("\nActions")
     for index, (_, title) in enumerate(actions, start=1):
         print(f"  {index}) {title}")
-    raw = input("Action / عملیات: ").strip()
+    raw = input("Action: ").strip()
     if not raw.isdigit() or not 1 <= int(raw) <= len(actions):
         raise RuntimeError("INVALID_ACTION")
     return actions[int(raw) - 1][0]
@@ -189,13 +177,13 @@ async def _remove_runtime(conn, protocol: str, item: NodeProtocolConfig | None) 
 async def _run(db, node: Node, protocol: str, action: str) -> dict:
     stored = _protocol_settings_from_db(db, node.id)
     item = stored.get(protocol)
-    conn = await ssh_connect_saved(node, db)
+    conn = await connection_for_node(node, db)
     try:
         if action == "status":
             result = await _protocol_live_health(conn, protocol, item)
             _save_live_health(db, node, protocol, result)
             db.commit()
-            return {"ok": bool(result.get("ok")), "action": action, "protocol": protocol, "result": result}
+            return {"ok": bool(result.get("ok")), "action": action, "protocol": protocol, "target": "local" if node.is_mother else "remote", "result": result}
 
         if action == "restart":
             service = await _restart_protocol_service(conn, protocol, item)
@@ -203,13 +191,13 @@ async def _run(db, node: Node, protocol: str, action: str) -> dict:
             result = await _protocol_live_health(conn, protocol, item)
             _save_live_health(db, node, protocol, result)
             db.commit()
-            return {"ok": bool(result.get("ok")), "action": action, "protocol": protocol, "service": service, "result": result}
+            return {"ok": bool(result.get("ok")), "action": action, "protocol": protocol, "target": "local" if node.is_mother else "remote", "service": service, "result": result}
 
         if action in {"install", "repair"}:
             if action == "install":
                 current = await _protocol_live_health(conn, protocol, item)
                 if current.get("ok"):
-                    return {"ok": True, "action": action, "protocol": protocol, "skipped": True, "reason": "already_healthy", "result": current}
+                    return {"ok": True, "action": action, "protocol": protocol, "target": "local" if node.is_mother else "remote", "skipped": True, "reason": "already_healthy", "result": current}
             settings = _settings_for(protocol, item)
             results, failed, secrets_out = await provision_protocols(
                 conn,
@@ -226,6 +214,7 @@ async def _run(db, node: Node, protocol: str, action: str) -> dict:
                 "ok": bool(health.get("ok")) and protocol not in failed,
                 "action": action,
                 "protocol": protocol,
+                "target": "local" if node.is_mother else "remote",
                 "provision": results.get(protocol),
                 "health": health,
                 "one_time_secrets": secrets_out,
@@ -241,7 +230,7 @@ async def _run(db, node: Node, protocol: str, action: str) -> dict:
             item.last_error = None
             item.checked_at = datetime.utcnow()
             db.commit()
-            return {"ok": True, "action": action, "protocol": protocol, "backup": backup}
+            return {"ok": True, "action": action, "protocol": protocol, "target": "local" if node.is_mother else "remote", "backup": backup}
 
         raise RuntimeError("INVALID_ACTION")
     finally:
@@ -252,23 +241,24 @@ async def _run(db, node: Node, protocol: str, action: str) -> dict:
 def main() -> int:
     db = SessionLocal()
     try:
-        node = _select_node(db)
         protocol = _select_protocol()
+        node = _select_node(db)
         action = _select_action()
         if action == "remove":
             expected = f"REMOVE {protocol}"
-            typed = input(f"Type '{expected}' to confirm / برای تایید وارد کنید: ").strip()
+            typed = input(f"Type '{expected}' to confirm: ").strip()
             if typed != expected:
-                print("Cancelled / لغو شد")
+                print("Cancelled")
                 return 0
-        print(f"\nNode: {node.name} ({node.public_ip})")
+        target = "Local / This server" if node.is_mother else node.name
+        print(f"\nTarget: {target} ({node.public_ip})")
         print(f"Protocol: {PROTOCOL_NAMES[protocol]}")
         print(f"Action: {action}\n")
         result = asyncio.run(_run(db, node, protocol, action))
-        print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+        print(json.dumps(result, ensure_ascii=True, indent=2, default=str))
         return 0 if result.get("ok") else 1
     except KeyboardInterrupt:
-        print("\nCancelled / لغو شد")
+        print("\nCancelled")
         return 130
     except Exception as exc:
         print(f"ERROR={exc}", file=sys.stderr)
