@@ -14,6 +14,7 @@ const StoreSettingsRuntimePage=dynamic(()=>import("./admin-parity-runtime").then
 const BackupsFullRuntimePage=dynamic(()=>import("./backups-full-runtime").then(m=>m.BackupsFullRuntimePage));
 const ProvisionRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.ProvisionRuntimePage));
 const SmsReaderRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.SmsReaderRuntimePage));
+const AdminSmsRelayDownload=dynamic(()=>import("./admin-sms-relay-download").then(m=>m.AdminSmsRelayDownload));
 const MotherAccessRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.MotherAccessRuntimePage));
 const AccountDeliveryRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.AccountDeliveryRuntimePage));
 const SupportRuntimePage=dynamic(()=>import("./admin-ops-runtime").then(m=>m.SupportRuntimePage));
@@ -88,7 +89,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="admin/support") return admin(<SupportRuntimePage/>);
   if(key==="admin/telegram") return admin(<TelegramRuntimePage/>);
   if(key==="admin/telegram-manager") return admin(<TelegramManagerPage/>);
-  if(key==="admin/sms-reader") return admin(<SmsReaderRuntimePage/>);
+  if(key==="admin/sms-reader") return admin(<><SmsReaderRuntimePage/><AdminSmsRelayDownload/></>);
   if(key==="admin/backups") return admin(<BackupsFullRuntimePage/>);
   if(key==="admin/store-settings") return admin(<StoreSettingsRuntimePage/>);
   if(key==="admin/wallet") return admin(<WalletRuntimePage/>);
