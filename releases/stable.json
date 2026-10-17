@@ -2,16 +2,16 @@
   "schema": 2,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.8",
+  "version": "1.1.0-rc.9",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T19:17:00Z",
+  "released_at": "2026-10-17T19:28:00Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e789ac73b08b395dbafeeb56b4996a903d424941",
+  "source_sha": "855d8a8a5135a28be9f619532a3cdecc4dda8711",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "notes": {
-    "fa": "نسخه 1.1.0-rc.8 رابط پنل مدیریت را بازطراحی می‌کند: منوی کناری حذف شده و ناوبری گروه‌بندی‌شده به بالای صفحه منتقل شده است. مسیرها، دسترسی‌ها و Backend بدون تغییر باقی مانده‌اند؛ RTL فارسی، English، Dark/Light، وضعیت مسیر فعال، اعلان‌ها و نسخه موبایل نیز حفظ شده‌اند.",
-    "en": "TwinPanel 1.1.0-rc.8 redesigns the admin shell by replacing the sidebar with grouped top navigation. Routes, permissions and backend behavior remain unchanged, while Persian RTL, English, dark/light themes, active-route state, notifications and responsive mobile navigation are preserved."
+    "fa": "نسخه 1.1.0-rc.9 منوی بالای مدیریت را دقیقاً در مرکز صفحه قرار می‌دهد و سیستم Attention اضافه می‌کند: رسیدهای در انتظار بررسی، پیام‌های خوانده‌نشده پشتیبانی، اعلان‌های خوانده‌نشده Route‌دار و بروزرسانی پنل، آیتم مرتبط و گروه والد را با وضعیت قرمز و نقطه چشمک‌زن مشخص می‌کنند. تعداد موارد پرداخت، پشتیبانی و اعلان‌ها نیز داخل Dropdown نمایش داده می‌شود.",
+    "en": "TwinPanel 1.1.0-rc.9 centers the admin top navigation across the viewport and adds unified attention indicators. Pending payment reviews, unread support messages, unread routed notifications, and available panel updates mark the affected item and parent group with a red state and blinking dot, with compact queue counts inside dropdowns."
   }
 }
