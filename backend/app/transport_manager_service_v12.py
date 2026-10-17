@@ -8,6 +8,7 @@ from pathlib import Path
 
 UNIT_NAME = "twinpanel-transport-manager.service"
 UNIT_PATH = Path("/etc/systemd/system") / UNIT_NAME
+API_UNIT_PATH = Path("/etc/systemd/system/twinpanel-api.service")
 BACKUP_PATH = Path("/etc/systemd/system/twinpanel-transport-manager.service.pre-smart-v12")
 
 UNIT_CONTENT = """[Unit]
@@ -25,6 +26,7 @@ Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PYTHONUNBUFFERED=1
 EnvironmentFile=/etc/twinpanel/backend.env
 EnvironmentFile=-/etc/twinpanel/install.env
+ExecStartPre=/bin/sleep 2
 ExecStart=/opt/twinpanel/venv/bin/python3 -u -m app.tunnel_transport_manager_v12
 Restart=always
 RestartSec=3
@@ -54,11 +56,13 @@ def ensure_transport_manager_service_v12() -> dict:
     restarts the API. Existing installations created before Smart Auto V21 may
     not have had a transport-manager unit installed at all, or may still carry
     the old /opt/twinpanel-product working directory. Because twinpanel-api runs
-    as root, API startup is the safest compatibility bridge: install the exact
+    as root, API startup is the compatibility bridge: install the exact
     product-owned unit, preserve one rollback copy of an old unit, reload
     systemd, enable the service and start it asynchronously.
 
-    CI/containers without systemd intentionally no-op.
+    The initial installer imports app.main before it creates twinpanel-api.service.
+    We deliberately defer activation in that phase; the first real API service
+    start then reconciles the manager. CI/containers without systemd also no-op.
     """
 
     result = {
@@ -76,6 +80,10 @@ def ensure_transport_manager_service_v12() -> dict:
     systemctl = shutil.which("systemctl")
     if not systemctl or not Path("/run/systemd/system").is_dir():
         result["reason"] = "systemd_unavailable"
+        return result
+
+    if not API_UNIT_PATH.is_file():
+        result["reason"] = "api_unit_missing_deferred"
         return result
 
     result["managed"] = True
