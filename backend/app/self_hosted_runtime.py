@@ -12,6 +12,7 @@ from .public_direct_tuning_v19 import apply_public_direct_tuning_v19
 from .services.public_urls import api_base_url
 from .routers import nodes, provision, tunnels
 from .ssh_tunnel_self_hosted_v3 import provision_ssh_tunnel_self_hosted_v3
+from .transport_manager_service_v12 import ensure_transport_manager_service_v12
 from . import xray_modern_runtime
 from .xray_modern_repair_runtime import (
     apply_xray_modern_repair_runtime,
@@ -75,6 +76,17 @@ async def _self_hosted_install_or_upgrade_agent(
 
 
 def apply_self_hosted_runtime() -> None:
+    # ------------------------------------------------------------
+    # Smart Auto V12 production activation
+    #
+    # Older self-hosted installs may have no transport-manager unit or may
+    # still point at the historical /opt/twinpanel-product checkout. API runs
+    # as root, so every release startup can idempotently reconcile the exact
+    # product-owned unit. CI/containers without systemd are a safe no-op.
+    # ------------------------------------------------------------
+
+    ensure_transport_manager_service_v12()
+
     # ------------------------------------------------------------
     # Node Agent
     # ------------------------------------------------------------
