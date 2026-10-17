@@ -1,0 +1,87 @@
+.nav-attention-dot{
+  width:8px;
+  height:8px;
+  flex:0 0 8px;
+  border-radius:999px;
+  background:#ef4444;
+  box-shadow:0 0 0 0 rgba(239,68,68,.58);
+  animation:twinpanel-nav-attention-pulse 1.15s ease-out infinite;
+}
+
+.nav-attention-count{
+  min-width:20px;
+  height:20px;
+  padding:0 6px;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+  color:#fff;
+  background:#dc2626;
+  border:1px solid rgba(255,255,255,.1);
+  box-shadow:0 0 0 2px rgba(220,38,38,.12);
+  font-size:10px;
+  font-weight:900;
+  line-height:1;
+}
+
+.topnav-group.has-attention>.topnav-group-trigger{
+  color:#ff9aa4!important;
+  border-color:rgba(239,68,68,.48)!important;
+  background:linear-gradient(180deg,rgba(239,68,68,.115),rgba(239,68,68,.035))!important;
+}
+
+.topnav-group.has-attention>.topnav-group-trigger:hover,
+.topnav-group.has-attention[open]>.topnav-group-trigger{
+  color:#ffd7db!important;
+  border-color:rgba(248,113,113,.62)!important;
+  background:rgba(239,68,68,.12)!important;
+}
+
+.topnav-menu-grid>a.has-attention{
+  color:#ff9aa4!important;
+  border-color:rgba(239,68,68,.23)!important;
+  background:rgba(239,68,68,.045)!important;
+}
+
+.topnav-menu-grid>a.has-attention:hover{
+  color:#ffe1e4!important;
+  border-color:rgba(248,113,113,.48)!important;
+  background:rgba(239,68,68,.09)!important;
+}
+
+.topnav-menu-grid>a.has-attention i{
+  color:#fb7185!important;
+}
+
+.topnav-release.has-attention .system-release-footer{
+  border-color:rgba(239,68,68,.45)!important;
+  box-shadow:0 0 0 1px rgba(239,68,68,.08) inset!important;
+}
+
+@keyframes twinpanel-nav-attention-pulse{
+  0%{box-shadow:0 0 0 0 rgba(239,68,68,.62);opacity:1}
+  55%{box-shadow:0 0 0 7px rgba(239,68,68,0);opacity:.76}
+  100%{box-shadow:0 0 0 0 rgba(239,68,68,0);opacity:1}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .nav-attention-dot{animation:none}
+}
+
+html[data-theme="light"] .topnav-group.has-attention>.topnav-group-trigger{
+  color:#c6283d!important;
+  border-color:#fecdd3!important;
+  background:#fff1f2!important;
+}
+
+html[data-theme="light"] .topnav-menu-grid>a.has-attention{
+  color:#b42336!important;
+  border-color:#fecdd3!important;
+  background:#fff5f6!important;
+}
+
+html[data-theme="light"] .topnav-menu-grid>a.has-attention i{
+  color:#e11d48!important;
+}
