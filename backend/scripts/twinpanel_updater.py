@@ -24,6 +24,8 @@ INSTALLATION_ID_FILE = Path("/etc/twinpanel/installation-id")
 CURRENT = Path("/opt/twinpanel/current")
 RELEASES = Path("/opt/twinpanel/releases")
 VENV_PYTHON = Path("/opt/twinpanel/venv/bin/python3")
+MANAGEMENT_CLI = Path("/usr/local/bin/twinpanel")
+MANAGEMENT_ALIAS = Path("/usr/local/bin/tp")
 
 
 def now_iso() -> str:
@@ -218,6 +220,29 @@ def rollback(previous: Path) -> None:
     restart_runtime()
 
 
+def install_management_cli(release: Path) -> None:
+    menu = release / "scripts" / "twinpanel-menu.sh"
+    if not menu.is_file():
+        return
+
+    MANAGEMENT_CLI.parent.mkdir(parents=True, exist_ok=True)
+    wrapper = (
+        "#!/usr/bin/env bash\n"
+        "exec bash /opt/twinpanel/current/scripts/twinpanel-menu.sh \"$@\"\n"
+    )
+    tmp = MANAGEMENT_CLI.with_name(MANAGEMENT_CLI.name + ".tmp")
+    tmp.write_text(wrapper, encoding="utf-8")
+    os.chmod(tmp, 0o755)
+    tmp.replace(MANAGEMENT_CLI)
+
+    try:
+        if MANAGEMENT_ALIAS.exists() or MANAGEMENT_ALIAS.is_symlink():
+            MANAGEMENT_ALIAS.unlink()
+        MANAGEMENT_ALIAS.symlink_to(MANAGEMENT_CLI)
+    except OSError:
+        pass
+
+
 def prune_releases(active: Path, keep: int = 3) -> None:
     entries = [p for p in RELEASES.iterdir() if p.is_dir()]
     entries.sort(key=lambda p: p.stat().st_mtime, reverse=True)
@@ -319,6 +344,10 @@ def main() -> int:
             rollback(previous)
             raise RuntimeError("POST_UPDATE_HEALTH_FAILED")
 
+        # Install the stable command wrapper only after the new release passes
+        # health checks. A failed upgrade therefore cannot leave a command that
+        # points at files absent from the rolled-back release.
+        install_management_cli(final_dir)
         prune_releases(final_dir)
         write_state(
             state="completed",
