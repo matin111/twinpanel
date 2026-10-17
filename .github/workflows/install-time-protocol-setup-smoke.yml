@@ -1,0 +1,78 @@
+name: TwinPanel Install-time Protocol Setup Smoke
+
+on:
+  pull_request:
+    paths:
+      - "install.sh"
+      - "VERSION"
+      - "backend/scripts/twinpanel_installer_protocols.py"
+      - "backend/scripts/twinpanel_protocol_cli.py"
+      - ".github/workflows/install-time-protocol-setup-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    env:
+      APP_NAME: TwinPanel-Installer-CI
+      APP_ENV: test
+      APP_SECRET_KEY: installer-ci-secret-key-installer-ci-secret-key
+      DATABASE_URL: sqlite:////tmp/twinpanel-installer-protocol-ci.db
+      REDIS_URL: redis://127.0.0.1:6379/15
+      NODE_AGENT_SHARED_SECRET: installer-ci-node-secret-installer-ci-node-secret
+      PUBLIC_API_FALLBACK: http://203.0.113.10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate installer shell
+        run: bash -n install.sh
+
+      - name: Validate protocol helper syntax
+        run: python3 -m py_compile backend/scripts/twinpanel_installer_protocols.py
+
+      - name: Verify install-time protocol UI wiring
+        run: |
+          grep -q 'VPN protocol setup' install.sh
+          grep -q 'Install all protocols' install.sh
+          grep -q 'TWINPANEL_INSTALL_PROTOCOLS' install.sh
+          grep -q 'scripts/twinpanel_installer_protocols.py --protocols' install.sh
+          grep -q 'Local / This server' install.sh
+          grep -q 'Existing installation detected; protocol runtime was preserved.' install.sh
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Verify protocol parser and local target
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from app.database import Base, SessionLocal, engine
+          from app.local_core_runtime import LOCAL_AGENT_URL
+          from scripts.twinpanel_installer_protocols import parse_protocols
+          from app.local_core_runtime import ensure_local_core_node
+
+          assert parse_protocols("all") == ["cisco", "openvpn", "wireguard", "l2tp", "v2ray"]
+          assert parse_protocols("cisco,openvpn,wg") == ["cisco", "openvpn", "wireguard"]
+          assert parse_protocols("openconnect ipsec xray") == ["cisco", "l2tp", "v2ray"]
+
+          Base.metadata.create_all(bind=engine)
+          db = SessionLocal()
+          try:
+              node = ensure_local_core_node(db)
+              assert node.agent_url == LOCAL_AGENT_URL
+              assert node.is_mother is True
+              assert node.public_ip == "203.0.113.10"
+          finally:
+              db.close()
+
+          print("INSTALL_TIME_PROTOCOL_SETUP_OK")
+          PY
