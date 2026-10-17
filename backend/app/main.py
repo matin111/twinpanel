@@ -47,11 +47,14 @@ from .routers.reseller_sale_v2 import router as reseller_sale_v2_router
 from .routers.reseller_profile_v2 import router as reseller_profile_v2_router
 from .routers.reseller_subscription_volume_v2 import router as reseller_subscription_volume_v2_router
 from .routers.admin_user_isolation import router as admin_user_isolation_router
+from .routers.system_release import router as system_release_router
 from .self_hosted_runtime import apply_self_hosted_runtime
 from .admin_notification_service import notification_watch_loop
 from .services.customer_maintenance import customer_maintenance_loop
 from .services.payment_market_rates import payment_market_loop
 from .services.wallet_payment_automation import wallet_payment_automation_loop
+from .license_guard import LicenseMutationGuardMiddleware
+from .system_release import current_version, license_validation_loop
 # TWINPANEL_REAL_ADMIN_NOTIFICATION_REGISTER_V1
 # TWINPANEL_USERNAME_SETTINGS_REGISTER_V2
 from .routers.payments import router as payments_router
@@ -96,17 +99,14 @@ _ = reseller_bot_order_models
 _ = reseller_pool_models
 _ = reseller_owned_plan_models
 
-
 # TWINPANEL_ADMIN_PANEL_NOTIFICATION_REGISTER_V1
 from .admin_panel_notification_models import AdminPanelNotification
 from .routers.admin_panel_notifications import (
     router as admin_panel_notifications_router,
 )
 
-
 # TWINPANEL_RESELLER_NOTIFICATION_MODEL_BEFORE_CREATE_ALL_V1
 from . import reseller_notification_models
-
 
 Base.metadata.create_all(bind=engine)
 # Existing installations need idempotent ALTERs because create_all does not add
@@ -138,6 +138,10 @@ async def lifespan(app: FastAPI):
         wallet_payment_automation_loop(),
         name="wallet-payment-automation",
     )
+    license_validation_task = asyncio.create_task(
+        license_validation_loop(),
+        name="license-validation",
+    )
 
     try:
         yield
@@ -148,6 +152,7 @@ async def lifespan(app: FastAPI):
         customer_maintenance_task.cancel()
         payment_market_task.cancel()
         wallet_payment_task.cancel()
+        license_validation_task.cancel()
 
         for task in (
             watchdog_task,
@@ -155,6 +160,7 @@ async def lifespan(app: FastAPI):
             customer_maintenance_task,
             payment_market_task,
             wallet_payment_task,
+            license_validation_task,
         ):
             try:
                 await task
@@ -168,12 +174,14 @@ from .routers.reseller_notifications import (
     router as reseller_notifications_router,
 )
 
+APP_VERSION = current_version()
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.9.7",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
+app.add_middleware(LicenseMutationGuardMiddleware)
 
 
 @app.get("/health")
@@ -181,7 +189,7 @@ def health():
     return {
         "ok": True,
         "service": settings.app_name,
-        "version": "0.9.7",
+        "version": APP_VERSION,
     }
 
 
@@ -214,7 +222,7 @@ def readiness():
     payload = {
         "ok": all(checks.values()),
         "service": settings.app_name,
-        "version": "0.9.7",
+        "version": APP_VERSION,
         "checks": checks,
     }
 
@@ -320,18 +328,15 @@ app.include_router(account_delivery.customer_router)
 from .routers.vpn_settings import router as vpn_settings_router
 app.include_router(vpn_settings_router)
 
-
 # Mother server access policy
 from .routers.mother_access import router as mother_access_router
 app.include_router(mother_access_router)
-
 
 # TWINPANEL_RESELLER_BOT_API_V1
 from .routers.reseller_bot import (
     router as reseller_bot_router,
 )
 app.include_router(reseller_bot_router)
-
 
 # TWINPANEL_RESELLER_BOT_COMMERCE_V1
 from .routers.reseller_bot_orders import (
@@ -353,15 +358,13 @@ app.include_router(reseller_bot_orders_owned_v3_router)
 app.include_router(reseller_bot_orders_volume_v2_router)
 app.include_router(reseller_bot_orders_router)
 
-
 # TWINPANEL_DISCOUNT_CORE_V1
 from .routers.discounts import router as discounts_router
 app.include_router(discounts_router)
 
 app.include_router(admin_panel_notifications_router)
-
 app.include_router(reseller_notifications_router)
-
+app.include_router(system_release_router)
 
 # TWINPANEL_ADMIN_BACKUP_ROUTER_V1
 from .routers.backups import router as backups_router

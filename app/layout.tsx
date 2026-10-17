@@ -50,6 +50,7 @@ import "./store-admin.css";
 import "./store-real-guides-v4.css";
 import "./customer-shell-final.css";
 import "./admin-shell-final.css";
+import "./system-release.css";
 import "./storefront-polish-v5.css";
 import "./storefront-mobile-hero-v6.css";
 import "./storefront-mobile-hero-v8.css";
