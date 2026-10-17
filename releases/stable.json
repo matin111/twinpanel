@@ -1,17 +1,24 @@
 {
-  "schema": 2,
+  "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.12",
+  "version": "1.1.0-rc.13",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T20:15:00Z",
+  "released_at": "2026-10-17T20:42:12Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e8063bc9692e5959e801db6d45a5d4458a2d3fac",
+  "source_sha": "76c492ac002e9e1619a5e117de15ed6cd296ac0c",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
+  "artifact": {
+    "format": "twinpanel-prebuilt-v1",
+    "arch": "x86_64",
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.13/twinpanel-1.1.0-rc.13-linux-x86_64.tar.gz",
+    "sha256": "f3e760e1964ed7d653f335082f7975eab146a249fc9f1bf0e8ffecb9ac30cd37",
+    "size_bytes": 12455734
+  },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.12 پایداری ربات تلگرام و سرعت بروزرسانی را بهبود می‌دهد: سرویس ربات اکنون محیط اصلی Backend را دریافت می‌کند، امکان حذف امن توکن اضافه شده، سرویس ربات هنگام فعال‌سازی نسخه جدید Restart می‌شود و Updater از Fast Path محافظه‌کارانه برای reuse کردن dependencyها و buildهای سازگار استفاده می‌کند؛ در صورت هرگونه تغییر یا ابهام، Full Build قبلی به‌صورت خودکار اجرا می‌شود و Backup، بررسی SHA، Atomic Switch، Health Check و Rollback حفظ شده‌اند.",
-    "en": "TwinPanel 1.1.0-rc.12 hardens the Telegram bot runtime and speeds up panel updates. The bot service now receives the main backend environment, safe token removal is available, the bot service is restarted after release activation, and the updater uses a conservative fast path to reuse compatible dependencies and frontend builds. Any changed or uncertain state automatically falls back to the previous full build path while preserving backup, exact SHA verification, atomic switching, health checks, and rollback."
+    "fa": "نسخه 1.1.0-rc.13 معماری بروزرسانی TwinPanel را به Release آماده و از پیش Build‌شده منتقل می‌کند. Build فرانت‌اند و نصب وابستگی‌های Node در GitHub Actions انجام می‌شود و سرور مشتری فقط فایل امضاشده با SHA256 را دانلود، بررسی، بکاپ، استخراج، فعال و Health-check می‌کند. همچنین موفقیت کاذب بروزرسانی با بررسی مسیر فعال، VERSION و نسخه گزارش‌شده توسط Health API/Web مسدود شده است.",
+    "en": "TwinPanel 1.1.0-rc.13 moves production updates to verified prebuilt releases. Frontend build and Node dependency installation happen in GitHub Actions; customer servers only download the SHA256-verified artifact, back up, extract, atomically activate, restart and health-check it. False completed states are also blocked by active-path, VERSION and API/Web version verification."
   }
 }
