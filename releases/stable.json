@@ -5,7 +5,7 @@
   "version": "1.1.0-rc.14",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T20:58:01Z",
+  "released_at": "2026-10-17T21:04:36Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
   "source_sha": "2486e68de63ee0ed45fbb9e386b5905970a66f1e",
   "github_url": "https://github.com/matin111/twinpanel",
@@ -14,8 +14,8 @@
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
     "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.14/twinpanel-1.1.0-rc.14-linux-x86_64.tar.gz",
-    "sha256": "e69399c5766dc1839a38d5750240643f40724c749c4e40e7c3e955f110471915",
-    "size_bytes": 12456847
+    "sha256": "a603e65ffe751fc851354d57309112f02e4bfb4c1c18a489f8c4fa24966cdbad",
+    "size_bytes": 12456920
   },
   "notes": {
     "fa": "نسخه 1.1.0-rc.14 پس از تکمیل موفق بروزرسانی، صفحه مدیریت را به‌صورت خودکار تازه‌سازی می‌کند. Refresh فقط زمانی انجام می‌شود که وضعیت بروزرسانی completed باشد و نسخه فعال دقیقاً با target_version یکسان باشد؛ در خطا یا Rollback رفرش موفقیت جعلی انجام نمی‌شود.",
