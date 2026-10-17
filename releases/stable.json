@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.26",
+  "version": "1.1.0-rc.27",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T23:47:44Z",
+  "released_at": "2026-10-17T23:55:43Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "f3f21f6eb46ee5a16c94f9c67397a6688ef9b60a",
+  "source_sha": "5e3b70be56b2299e7f5cc321e63e76826dcb7113",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.26/twinpanel-1.1.0-rc.26-linux-x86_64.tar.gz",
-    "sha256": "49240f76395e52d00acd9232f1fc7a5dac176c24c07033228dccba494f216be8",
-    "size_bytes": 12510122
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.27/twinpanel-1.1.0-rc.27-linux-x86_64.tar.gz",
+    "sha256": "6247bd9a0b9ad565a1090d8002a875616146571c6b0cae774f7ab93e8c4ef664",
+    "size_bytes": 12522788
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.26 کنترل‌های مسیر هوشمند را به پنل مدیریت برمی‌گرداند و کشف بروزرسانی را مقاوم‌تر می‌کند. در بخش شبکه و زیرساخت، صفحه «مسیرهای هوشمند» برای GRE، GOST TUN/WSS، AmneziaWG و Netrix فعال است و وضعیت نصب، سلامت و Qualification، پایداری ۶۰ ثانیه‌ای، Ping، سرعت دانلود/آپلود/امتیاز وزنی، قرنطینه و خطا را نمایش می‌دهد؛ نصب/بازسازی/حذف هر Candidate، Smart Auto و انتخاب دستی فقط برای مسیر تأییدشده نیز در همان صفحه قابل مدیریت است. مسیرهای قدیمی برای Rollback حفظ می‌شوند. بررسی نسخه جدید نیز علاوه بر مانیفست اصلی، bridge قدیمی و GitHub Contents API را به‌عنوان fallback بررسی می‌کند تا خطای یک منبع باعث مخفی‌شدن بروزرسانی نشود. در صفحه اشتراک‌ها نیز دکمه‌های «اشتراک جدید» و «اشتراک دستی» دوباره در یک گروه عملیاتی کنار هم قرار گرفته‌اند؛ رفتار قبلی ساخت با پلن حفظ شده و حالت دستی واقعی بدون پلن نیز بدون تغییر در منطق بک‌اند باقی مانده است.",
-    "en": "TwinPanel 1.1.0-rc.26 restores the Smart Transports administration surface and hardens update discovery. Network & Infrastructure now exposes GRE, GOST TUN/WSS, AmneziaWG and Netrix with install state, health/qualification, 60-second stability, latency, download/upload/weighted throughput, quarantine and error telemetry; scoped install/rebuild/remove, Smart Auto and qualified manual selection are managed from the same page while legacy transports remain available for rollback. Release discovery now falls back across the primary manifest, legacy bridge and GitHub Contents API so a single provider failure no longer hides an available update. On the subscriptions page, New Subscription and Manual Subscription are grouped together again in one action cluster; the existing plan-backed flow is preserved and true no-plan manual creation remains unchanged at the backend."
+    "fa": "نسخه 1.1.0-rc.27 صفحه اشتراک‌ها را به جریان حرفه‌ای و قبلی برمی‌گرداند: فقط یک دکمه اصلی «اشتراک جدید» در بالای صفحه وجود دارد و همان پنجره ساخت قبلی برای انتخاب کاربر، پلن، حجم، مدت، تعداد اتصال و صدور اکانت استفاده می‌شود. لانچر جداگانه «اشتراک دستی» از مسیر فعال پنل حذف شده تا دو جریان موازی و ظاهر پراکنده ایجاد نشود. قابلیت‌های بک‌اند مربوط به plan_id nullable و ساخت بدون پلن و migration امن PostgreSQL حفظ شده‌اند و تست‌های رگرسیون همچنان ساخت با پلن و بدون پلن را بررسی می‌کنند. اصلاحات Smart Transports و کشف مقاوم بروزرسانی نسخه rc.26 نیز بدون تغییر حفظ شده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.27 restores the subscriptions page to the previous professional single-entry workflow: only one primary New Subscription action is shown and the existing create dialog remains the active surface for user, plan, traffic, duration, device limit and provisioning. The separate Manual Subscription launcher is removed from the active route to avoid duplicate competing flows and fragmented layout. Backend nullable plan_id support, true no-plan compatibility and the safe PostgreSQL migration remain intact and regression-tested. The Smart Transports and resilient update-discovery improvements from rc.26 are preserved."
   }
 }
