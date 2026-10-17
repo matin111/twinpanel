@@ -226,10 +226,12 @@ PY
 export TWINPANEL_ADMIN_EMAIL="$ADMIN_EMAIL"
 export TWINPANEL_ADMIN_PASSWORD="$ADMIN_PASS"
 export TWINPANEL_ADMIN_NAME="$ADMIN_NAME"
-ADMIN_RESULT="$((
-  cd "$RELEASE_ROOT/backend"
-  /opt/twinpanel/venv/bin/python3 scripts/bootstrap_admin.py
-) 2>&1)"
+ADMIN_RESULT="$(
+  (
+    cd "$RELEASE_ROOT/backend"
+    /opt/twinpanel/venv/bin/python3 scripts/bootstrap_admin.py
+  ) 2>&1
+)"
 printf '%s\n' "$ADMIN_RESULT"
 ADMIN_CREATED=0
 if grep -q 'action=created' <<<"$ADMIN_RESULT"; then
