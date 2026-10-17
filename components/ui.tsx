@@ -5,9 +5,8 @@ import {useState} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {BrandMark} from "../lib/branding";
-import {PaymentReviewBadge} from "./payment-review-badge";
 import {AdminNotificationCenter} from "./admin-notification-center";
-import {SupportUnreadBadge} from "./support-unread-badge";
+import {useAdminNavAttention} from "./admin-nav-attention";
 import {SystemReleaseFooter} from "./system-release-footer";
 
 const menuGroups=[
@@ -51,33 +50,45 @@ const menuGroups=[
 export function Shell({children,active="/admin"}:{children:React.ReactNode;active?:string}){
   const {pick}=useI18n();
   const [mobileOpen,setMobileOpen]=useState(false);
+  const attention=useAdminNavAttention(active);
+  const navCenterStyle:React.CSSProperties=mobileOpen
+    ? {position:"static",maxWidth:"none"}
+    : {position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",maxWidth:"calc(100% - 320px)"};
 
   return <div className={`shell admin-shell admin-top-shell ${mobileOpen?"mobile-menu-open":""}`}>
     <div className="admin-topbar">
       <div className="admin-topbar-inner">
         <div className="admin-topbar-brand"><BrandMark/></div>
 
-        <nav className="admin-topnav" aria-label={pick("منوی اصلی","Main navigation")}>{menuGroups.map(group=>{
-          const groupActive=group.items.some(([, ,href])=>active===href);
-          return <details className={`topnav-group ${groupActive?"active":""}`} key={group.en}>
-            <summary className="topnav-group-trigger">
-              <span>{pick(group.fa,group.en)}</span>
-              <span className="topnav-chevron" aria-hidden="true">⌄</span>
-            </summary>
-            <div className="topnav-menu">
-              <div className="topnav-menu-head">{pick(group.fa,group.en)}</div>
-              <div className="topnav-menu-grid">
-                {group.items.map(([fa,en,h,i])=>{
-                  const label=pick(fa,en);
-                  return <Link key={h} href={h} className={active===h?"active":""} onClick={()=>setMobileOpen(false)}>
-                    <i>{i}</i><span className="nav-label">{label}</span>{h==="/admin/support"&&<SupportUnreadBadge active={active===h}/>}{h==="/admin/payments"&&<PaymentReviewBadge/>}
-                  </Link>;
-                })}
+        <div style={navCenterStyle}>
+          <nav className="admin-topnav" aria-label={pick("منوی اصلی","Main navigation")}>{menuGroups.map(group=>{
+            const groupActive=group.items.some(([, ,href])=>active===href);
+            const groupAttention=attention.groupHasAttention(group.en,group.items.map(([, ,href])=>href));
+            return <details className={`topnav-group ${groupActive?"active":""} ${groupAttention?"has-attention":""}`} key={group.en}>
+              <summary className="topnav-group-trigger">
+                <span>{pick(group.fa,group.en)}</span>
+                {groupAttention&&<span className="nav-attention-dot" aria-hidden="true"/>}
+                <span className="topnav-chevron" aria-hidden="true">⌄</span>
+              </summary>
+              <div className="topnav-menu">
+                <div className="topnav-menu-head">{pick(group.fa,group.en)}</div>
+                <div className="topnav-menu-grid">
+                  {group.items.map(([fa,en,h,i])=>{
+                    const label=pick(fa,en);
+                    const itemAttention=attention.hasPathAttention(h);
+                    const itemCount=attention.countForPath(h);
+                    return <Link key={h} href={h} className={`${active===h?"active":""} ${itemAttention?"has-attention":""}`.trim()} onClick={()=>setMobileOpen(false)}>
+                      <i>{i}</i><span className="nav-label">{label}</span>
+                      {itemAttention&&<span className="nav-attention-dot" aria-hidden="true"/>}
+                      {itemCount>0&&<span className="nav-attention-count" aria-label={`${itemCount} ${pick("مورد نیازمند بررسی","items need review")}`}>{itemCount>99?"99+":itemCount}</span>}
+                    </Link>;
+                  })}
+                </div>
+                {group.en==="System & Maintenance"&&<div className={`topnav-release ${attention.updateAvailable?"has-attention":""}`}><SystemReleaseFooter/></div>}
               </div>
-              {group.en==="System & Maintenance"&&<div className="topnav-release"><SystemReleaseFooter/></div>}
-            </div>
-          </details>;
-        })}</nav>
+            </details>;
+          })}</nav>
+        </div>
 
         <button className="admin-mobile-menu-toggle" type="button" onClick={()=>setMobileOpen(v=>!v)} aria-expanded={mobileOpen} aria-label={pick("نمایش منو","Show menu")}>☰</button>
       </div>
