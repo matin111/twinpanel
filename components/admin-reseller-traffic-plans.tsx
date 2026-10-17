@@ -113,6 +113,48 @@ export function AdminResellerTrafficPlans(){
     finally{setBusy(false);}
   };
 
+  const remove=async(id:number,title:string)=>{
+    if(!id||busy)return;
+
+    const confirmed=window.confirm(
+      pick(
+        `پلن «${title}» برای همیشه حذف شود؟`,
+        `Permanently delete “${title}”?`
+      )
+    );
+
+    if(!confirmed)return;
+
+    setBusy(true);setError("");setOk("");
+
+    try{
+      await api(
+        `/v1/admin/resellers/traffic-packages/${id}/hard`,
+        {method:"DELETE"}
+      );
+
+      setOk(
+        pick(
+          "پلن شارژ حجم حذف شد.",
+          "Traffic recharge plan deleted."
+        )
+      );
+
+      if(draft.id===id)setDraft(emptyDraft);
+
+      await load();
+    }catch(reason){
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : String(reason)
+      );
+    }finally{
+      setBusy(false);
+    }
+  };
+
+
   return <Shell active="/admin/reseller-traffic-plans"><div className="page reseller-admin-v2">
     <div className="page-head"><h1>{pick("پلن‌های شارژ حجم نمایندگی","Reseller traffic recharge plans")}</h1></div>
 
@@ -141,7 +183,7 @@ export function AdminResellerTrafficPlans(){
 
     <Card>
       <div className="runtime-toolbar"><label>⌕ <input value={query} onChange={event=>setQuery(event.target.value)} placeholder={pick("جستجوی پلن...","Search plans...")}/></label><Badge tone="violet">{filtered.length}</Badge></div>
-      <div className="table reseller-admin-table"><table><thead><tr><th>ID</th><th>{pick("عنوان","Title")}</th><th>{pick("حجم","Traffic")}</th><th>{pick("قیمت","Price")}</th><th>{pick("ترتیب","Order")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map(row=>{const id=Number(row.id||0),active=Boolean(row.is_active);return <tr key={id}><td>#{id}</td><td><b>{text(row,"title")}</b></td><td><b>{traffic(num(row,"traffic_gb"))}</b></td><td><b>{money(num(row,"price_toman"))}</b></td><td>{num(row,"sort_order")}</td><td><Badge tone={active?"ok":"warn"}>{active?pick("فعال","Active"):pick("غیرفعال","Disabled")}</Badge></td><td><div className="row-actions"><button className="mini-btn" type="button" onClick={()=>edit(row)}>{pick("ویرایش","Edit")}</button>{active&&<button className="mini-btn danger" type="button" disabled={busy} onClick={()=>void disable(id)}>{pick("غیرفعال","Disable")}</button>}</div></td></tr>})}</tbody></table></div>
+      <div className="table reseller-admin-table"><table><thead><tr><th>ID</th><th>{pick("عنوان","Title")}</th><th>{pick("حجم","Traffic")}</th><th>{pick("قیمت","Price")}</th><th>{pick("ترتیب","Order")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map(row=>{const id=Number(row.id||0),active=Boolean(row.is_active);return <tr key={id}><td>#{id}</td><td><b>{text(row,"title")}</b></td><td><b>{traffic(num(row,"traffic_gb"))}</b></td><td><b>{money(num(row,"price_toman"))}</b></td><td>{num(row,"sort_order")}</td><td><Badge tone={active?"ok":"warn"}>{active?pick("فعال","Active"):pick("غیرفعال","Disabled")}</Badge></td><td><div className="row-actions"><button className="mini-btn" type="button" onClick={()=>edit(row)}>{pick("ویرایش","Edit")}</button>{active&&<button className="mini-btn" type="button" disabled={busy} onClick={()=>void disable(id)}>{pick("غیرفعال","Disable")}</button>}<button className="mini-btn danger" type="button" disabled={busy} onClick={()=>void remove(id,text(row,"title"))}>{pick("حذف","Delete")}</button></div></td></tr>})}</tbody></table></div>
       {!filtered.length&&<div className="runtime-empty">{pick("هنوز پلن شارژ حجمی تعریف نشده است.","No traffic recharge plan has been defined yet.")}</div>}
     </Card>
   </div></Shell>;

@@ -1053,6 +1053,70 @@ def admin_update_traffic_package(
     return {"ok":True}
 
 
+
+@router.delete("/traffic-packages/{package_id}/hard")
+def admin_hard_delete_traffic_package(
+    package_id:int,
+    db:Session=Depends(get_db),
+):
+    row=db.get(
+        ResellerTrafficPackage,
+        package_id,
+    )
+
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="بسته حجم پیدا نشد",
+        )
+
+    traffic_usage=(
+        db.query(ResellerTrafficTransaction)
+        .filter(
+            ResellerTrafficTransaction.reference_type
+            == "traffic_package",
+            ResellerTrafficTransaction.reference_id
+            == package_id,
+        )
+        .count()
+    )
+
+    wallet_usage=(
+        db.query(ResellerWalletTransaction)
+        .filter(
+            ResellerWalletTransaction.reference_type
+            == "traffic_package",
+            ResellerWalletTransaction.reference_id
+            == package_id,
+        )
+        .count()
+    )
+
+    usage_count=max(
+        int(traffic_usage or 0),
+        int(wallet_usage or 0),
+    )
+
+    if usage_count:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "این پلن سابقه خرید دارد و برای حفظ "
+                "سوابق مالی قابل حذف کامل نیست؛ "
+                "آن را غیرفعال کنید."
+            ),
+        )
+
+    db.delete(row)
+    db.commit()
+
+    return {
+        "ok":True,
+        "deleted":True,
+        "id":package_id,
+    }
+
+
 @router.delete("/traffic-packages/{package_id}")
 def admin_delete_traffic_package(
     package_id:int,
