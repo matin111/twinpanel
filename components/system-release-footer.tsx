@@ -69,9 +69,29 @@ export function SystemReleaseFooter(){
   };
 
   useEffect(()=>{
-    void load(false);
-    const timer=window.setInterval(()=>void load(false),300000);
-    return()=>window.clearInterval(timer);
+    let alive=true;
+    const checkNow=()=>{
+      if(!alive||document.visibilityState!=="visible")return;
+      void load(true);
+    };
+    const refreshStatus=()=>{
+      if(!alive||document.visibilityState!=="visible")return;
+      void load(false);
+    };
+
+    checkNow();
+    const statusTimer=window.setInterval(refreshStatus,15000);
+    const checkTimer=window.setInterval(checkNow,300000);
+    window.addEventListener("focus",checkNow);
+    document.addEventListener("visibilitychange",checkNow);
+
+    return()=>{
+      alive=false;
+      window.clearInterval(statusTimer);
+      window.clearInterval(checkTimer);
+      window.removeEventListener("focus",checkNow);
+      document.removeEventListener("visibilitychange",checkNow);
+    };
   },[]);
 
   const updateBusy=useMemo(()=>["queued","resolving","downloading","backup","extracting","building","restarting","rollback"].includes(String(data?.update?.state||"")),[data?.update?.state]);
@@ -107,7 +127,7 @@ export function SystemReleaseFooter(){
     <div className={`system-release-footer ${data.update_available?"has-update":""}`}>
       <div className="system-release-version">
         <span>{pick("TwinPanel","TwinPanel")}</span>
-        <a href={data.github_url||"https://github.com/matin111/tp27-core"} target="_blank" rel="noreferrer">v{data.current_version}</a>
+        <a href={data.github_url||"https://github.com/matin111/twinpanel"} target="_blank" rel="noreferrer">v{data.current_version}</a>
       </div>
 
       <div className="system-release-license">
