@@ -1,0 +1,46 @@
+name: TwinPanel Telegram Runtime Hardening Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/telegram_manager.py'
+      - 'components/admin-telegram-legacy-parity.tsx'
+      - 'lib/admin-parity-api.ts'
+      - '.github/workflows/telegram-runtime-hardening-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Telegram service environment and token reset contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          manager = Path('backend/app/routers/telegram_manager.py').read_text(encoding='utf-8')
+          ui = Path('components/admin-telegram-legacy-parity.tsx').read_text(encoding='utf-8')
+          api = Path('lib/admin-parity-api.ts').read_text(encoding='utf-8')
+
+          required_manager = (
+              'EnvironmentFile=/etc/twinpanel/backend.env',
+              'EnvironmentFile=/etc/twinpanel-telegram-api.env',
+              '@router.delete("/token")',
+              'TOKEN_FILE.unlink(missing_ok=True)',
+              'META_FILE.unlink(missing_ok=True)',
+              'KEY_FILE.unlink(missing_ok=True)',
+              '_repair_existing_service_env()',
+          )
+          for marker in required_manager:
+              assert marker in manager, marker
+
+          assert 'حذف توکن' in ui
+          assert 'Remove token' in ui
+          assert 'telegramDeleteToken' in ui
+          assert 'telegramDeleteToken' in api
+          assert 'method:"DELETE"' in api.replace(' ', '')
+
+          print('TELEGRAM_HARDENING_SMOKE_OK')
+          PY
