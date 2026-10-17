@@ -56,6 +56,7 @@ jobs:
           assert "Administrator management" in menu
           assert "Protocol management" in menu
           assert "scripts/twinpanel_protocol_cli_en.py" in menu
+          assert 'export PYTHONPATH="$BACKEND${PYTHONPATH:+:$PYTHONPATH}"' in menu
           print("SSH_MENU_ENGLISH_ASCII_OK")
           PY
 
@@ -79,6 +80,17 @@ jobs:
           assert callable(twinpanel_protocol_cli_en.main)
           print("SSH_MANAGEMENT_IMPORT_OK")
           PY
+
+      - name: Verify direct CLI execution can import backend app
+        run: |
+          set +e
+          output="$(cd backend && PYTHONPATH="$PWD" python scripts/twinpanel_protocol_cli_en.py </dev/null 2>&1)"
+          set -e
+          echo "$output"
+          if grep -q 'ModuleNotFoundError' <<<"$output"; then
+            echo "Direct protocol CLI import path is broken"
+            exit 1
+          fi
 
       - name: Verify installer wires SSH menu
         run: |
