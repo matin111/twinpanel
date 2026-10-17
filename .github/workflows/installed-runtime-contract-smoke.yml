@@ -10,6 +10,7 @@ on:
       - 'components/ui.tsx'
       - 'app/v1/**'
       - 'backend/app/routers/__init__.py'
+      - 'backend/app/routers/support.py'
       - 'backend/app/routers/support_live_delta.py'
       - 'backend/scripts/twinpanel_feature_audit.py'
       - '.github/workflows/installed-runtime-contract-smoke.yml'
@@ -43,12 +44,26 @@ jobs:
 
           support_ui = Path('components/support-center-runtime-v3.tsx').read_text(encoding='utf-8')
           support_delta = Path('backend/app/routers/support_live_delta.py').read_text(encoding='utf-8')
+          support_backend = Path('backend/app/routers/support.py').read_text(encoding='utf-8')
+          support_widget = Path('components/support-chat-widget-v2.tsx').read_text(encoding='utf-8')
           routers_init = Path('backend/app/routers/__init__.py').read_text(encoding='utf-8')
+
           delta_path = '/tickets/{ticket_id}/messages-after'
           assert '/messages-after?after_id=${after}' in support_ui
           assert delta_path in support_delta
           assert 'SupportMessage.id > after_id' in support_delta
+          assert '.order_by(SupportMessage.id.asc())' in support_delta
           assert 'support_live_delta' in routers_init
+
+          # Customer and guest chat must continue receiving admin replies without
+          # a manual refresh. These routes are intentionally full-detail today;
+          # the contract ensures the polled frontend paths actually exist.
+          assert '`/v1/support/tickets/${current.id}`' in support_widget
+          assert '`/v1/support/guest/tickets/${saved.ticketId}`' in support_widget
+          assert 'window.setInterval(()=>{if(document.visibilityState==="visible")void refresh(true);},500)' in support_widget
+          assert 'playNotificationSound("message")' in support_widget
+          assert '@router.get("/tickets/{ticket_id}")' in support_backend
+          assert '@router.get("/guest/tickets/{ticket_id}")' in support_backend
 
           shell = Path('components/ui.tsx').read_text(encoding='utf-8')
           assert '<main onPointerDown={closeMenus}>' in shell
