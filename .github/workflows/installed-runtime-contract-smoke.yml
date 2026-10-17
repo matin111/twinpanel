@@ -6,6 +6,7 @@ on:
       - 'lib/api.ts'
       - 'components/support-chat-widget-v2.tsx'
       - 'components/support-center-runtime-v3.tsx'
+      - 'components/system-release-footer.tsx'
       - 'components/ui.tsx'
       - 'app/v1/**'
       - 'backend/app/routers/__init__.py'
@@ -51,6 +52,15 @@ jobs:
 
           shell = Path('components/ui.tsx').read_text(encoding='utf-8')
           assert '<main onPointerDown={closeMenus}>' in shell
+
+          release_ui = Path('components/system-release-footer.tsx').read_text(encoding='utf-8')
+          assert 'lastHealthyRef=useRef<ReleaseStatus|null>(null)' in release_ui
+          assert 'transientSinceRef=useRef<number|null>(null)' in release_ui
+          assert 'TRANSIENT_API_GRACE_MS=30*1000' in release_ui
+          assert 'marker.reload_from!==pageInstanceRef.current' in release_ui
+          assert 'markRecoveryReloadRequested(pageInstanceRef.current)' in release_ui
+          assert 'if(marker)return;' in release_ui
+          assert '[502,503,504].includes(reason.status)' in release_ui
 
           print('PORTABLE_RUNTIME_CONTRACT_OK')
           PY
