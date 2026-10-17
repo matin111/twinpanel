@@ -19,6 +19,7 @@ const menuGroups=[
   {fa:"شبکه و زیرساخت",en:"Network & Infrastructure",items:[
     ["نودها","Nodes","/admin/nodes","▦"],
     ["تانل‌ها","Tunnels","/admin/tunnels","⤨"],
+    ["مسیرهای هوشمند","Smart Transports","/admin/tunnel-transports","⇄"],
     ["راه‌اندازی نود","Provision Node","/admin/provision","⚡"],
     ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"]
   ]},

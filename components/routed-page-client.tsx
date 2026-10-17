@@ -28,6 +28,7 @@ const AdminUsersRuntime=dynamic(()=>import("./admin-users-runtime").then(m=>m.Ad
 const LegacyNodesRuntimePage=dynamic(()=>import("./legacy-nodes-exact").then(m=>m.LegacyNodesRuntimePage));
 const LegacyPlansRuntimePage=dynamic(()=>import("./legacy-plans-exact").then(m=>m.LegacyPlansRuntimePage));
 const TunnelsSimpleRuntimePage=dynamic(()=>import("./tunnels-simple-runtime").then(m=>m.TunnelsSimpleRuntimePage));
+const SmartTransportsRuntimeV25=dynamic(()=>import("./smart-transports-runtime-v25").then(m=>m.SmartTransportsRuntimeV25));
 const DomainsRuntimePage=dynamic(()=>import("./domains-runtime").then(m=>m.DomainsRuntimePage));
 const BrandingSettingsPage=dynamic(()=>import("./branding-settings").then(m=>m.BrandingSettingsPage));
 const L2tpSettingsPage=dynamic(()=>import("./l2tp-settings").then(m=>m.L2tpSettingsPage));
@@ -76,7 +77,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="admin/nodes") return admin(<LegacyNodesRuntimePage/>);
   if(key==="admin/network") return admin(<LegacyNodesRuntimePage/>);
   if(key==="admin/tunnels") return admin(<TunnelsSimpleRuntimePage/>);
-  if(key==="admin/tunnel-transports") return admin(<TunnelsSimpleRuntimePage/>);
+  if(key==="admin/tunnel-transports") return admin(<SmartTransportsRuntimeV25/>);
   if(key==="admin/payments") return admin(<PaymentsReviewRuntime/>);
   if(key==="admin/payment-settings") return admin(<AdminPaymentsRuntime/>);
   if(key==="admin/settings") return admin(<SettingsPage2027/>);
