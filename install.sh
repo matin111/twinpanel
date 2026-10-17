@@ -5,12 +5,116 @@ PRODUCT="TwinPanel"
 DEFAULT_MANIFEST_URL="https://raw.githubusercontent.com/matin111/twinpanel/main/releases/stable.json"
 MANIFEST_URL="${TWINPANEL_RELEASE_MANIFEST_URL:-$DEFAULT_MANIFEST_URL}"
 WORKDIR=""
+EXISTING_INSTALL=0
+PROTOCOL_SETUP_STATUS="skipped"
+[[ -f /etc/twinpanel/backend.env ]] && EXISTING_INSTALL=1
 
 say(){ printf '\n\033[1;35m%s\033[0m\n' "$*"; }
 info(){ printf '\033[1;34m%s\033[0m\n' "$*"; }
+warn(){ printf '\033[1;33mWARNING: %s\033[0m\n' "$*" >&2; }
 fail(){ printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 cleanup(){ [[ -n "${WORKDIR:-}" && -d "$WORKDIR" ]] && rm -rf "$WORKDIR" || true; }
 trap cleanup EXIT
+
+normalize_protocol_selection(){
+  local raw="${1:-}" token
+  raw="${raw//,/ }"
+
+  case "${raw,,}" in
+    0|skip|none|no) printf '%s' ""; return 0 ;;
+    6|all|'*') printf '%s' "all"; return 0 ;;
+  esac
+
+  local selected=()
+  for token in $raw; do
+    case "${token,,}" in
+      1|cisco|openconnect) selected+=("cisco") ;;
+      2|openvpn) selected+=("openvpn") ;;
+      3|wireguard|wg) selected+=("wireguard") ;;
+      4|l2tp|ipsec) selected+=("l2tp") ;;
+      5|v2ray|xray) selected+=("v2ray") ;;
+      *) return 2 ;;
+    esac
+  done
+
+  local joined="" item
+  for item in "${selected[@]}"; do
+    if [[ ",$joined," == *",$item,"* ]]; then
+      continue
+    fi
+    joined="${joined:+$joined,}$item"
+  done
+  printf '%s' "$joined"
+}
+
+setup_local_protocols(){
+  local raw="${TWINPANEL_INSTALL_PROTOCOLS:-}"
+
+  if (( EXISTING_INSTALL )) && [[ -z "$raw" ]]; then
+    PROTOCOL_SETUP_STATUS="preserved-existing-install"
+    info "Existing installation detected; protocol runtime was preserved."
+    return 0
+  fi
+
+  if [[ -z "$raw" ]]; then
+    if [[ -r /dev/tty && -w /dev/tty ]]; then
+      say "VPN protocol setup"
+      cat >/dev/tty <<'MENU'
+Install VPN protocols on Local / This server now?
+
+  1) Cisco / OpenConnect
+  2) OpenVPN
+  3) WireGuard
+  4) L2TP / IPsec
+  5) V2Ray / Xray
+  6) Install all protocols
+  0) Skip for now
+
+You can enter one or more numbers separated by spaces, for example: 1 2 3
+MENU
+      printf 'Protocols [0]: ' >/dev/tty
+      read -r raw </dev/tty || raw="0"
+      raw="${raw:-0}"
+    else
+      raw="0"
+    fi
+  fi
+
+  local selected
+  if ! selected="$(normalize_protocol_selection "$raw")"; then
+    warn "Invalid VPN protocol selection '$raw'. Protocol setup was skipped."
+    PROTOCOL_SETUP_STATUS="invalid-selection"
+    return 0
+  fi
+
+  if [[ -z "$selected" ]]; then
+    PROTOCOL_SETUP_STATUS="skipped"
+    info "VPN protocol installation skipped. You can install protocols later with: twinpanel"
+    return 0
+  fi
+
+  say "Installing selected VPN protocols"
+  info "Target: Local / This server"
+  info "Protocols: $selected"
+
+  set -a
+  # shellcheck disable=SC1091
+  source /etc/twinpanel/backend.env
+  set +a
+
+  if (
+    cd /opt/twinpanel/current/backend
+    export PYTHONPATH="/opt/twinpanel/current/backend${PYTHONPATH:+:$PYTHONPATH}"
+    /opt/twinpanel/venv/bin/python3 scripts/twinpanel_installer_protocols.py --protocols "$selected"
+  ); then
+    PROTOCOL_SETUP_STATUS="completed:$selected"
+    info "Selected VPN protocols are installed and healthy."
+  else
+    PROTOCOL_SETUP_STATUS="partial-or-failed:$selected"
+    warn "TwinPanel itself is installed, but one or more selected VPN protocols need attention."
+    warn "Open 'twinpanel' -> Protocol management and use Status/Repair for the failed protocol."
+  fi
+}
 
 [[ ${EUID:-$(id -u)} -eq 0 ]] || fail "Run as root / با دسترسی root اجرا کنید"
 
@@ -167,6 +271,8 @@ systemctl daemon-reload
 systemctl restart twinpanel-api.service twinpanel-web.service 2>/dev/null || true
 systemctl restart nginx 2>/dev/null || true
 
+setup_local_protocols
+
 say "Final health check"
 for i in $(seq 1 60); do
   if curl -fsS --max-time 4 http://127.0.0.1/health >/dev/null 2>&1; then
@@ -183,6 +289,7 @@ echo "Version: $VERSION"
 echo "Source SHA: $SOURCE_SHA"
 echo "Panel: http://${PUBLIC_IP:-SERVER_IP}"
 echo "SSH management: twinpanel  (or: tp)"
+echo "VPN protocols: $PROTOCOL_SETUP_STATUS"
 echo "Initial admin: /root/twinpanel-initial-admin.txt"
 echo "Release manifest: $MANIFEST_URL"
 echo "نسخه: $VERSION"
