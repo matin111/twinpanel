@@ -5,9 +5,9 @@
   "version": "1.1.0-rc.1",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T16:05:00Z",
+  "released_at": "2026-10-17T16:05:08Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "4e5e2be75825e62bf631c542f1b26e6d058666bd",
+  "source_sha": "3d472f014ab5598bbc530e07548e8300dee6d8bf",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "notes": {
