@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.22",
-  "source_sha": "679f9d039a623b4924ef8639f6c05c311a094f22",
+  "version": "1.1.0-rc.23",
+  "source_sha": "01ebf421800c8e66a395a3fc9dcadbb570f9f19e",
   "notes": {
-    "fa": "نسخه 1.1.0-rc.22 لایه پاپ‌آپ‌های پنل مدیریت را یکدست می‌کند: همه Modalها بالاتر از هدر و زیرمنوهای Sticky نمایش داده می‌شوند، اندازه‌های normal/wide/manage استاندارد شده‌اند، پنجره ساخت و ویرایش اشتراک جمع‌وجورتر و دارای اسکرول داخلی کنترل‌شده است، و رفتار موبایل/نمایشگرهای کوتاه بدون خروج پاپ‌آپ از Viewport اصلاح شده است.",
-    "en": "TwinPanel 1.1.0-rc.22 standardizes the admin modal layer: all dialogs render above sticky headers and navigation menus, normal/wide/manage sizes are normalized, subscription create/edit dialogs are more compact with controlled internal scrolling, and short-screen/mobile viewport behavior is corrected."
+    "fa": "نسخه 1.1.0-rc.23 بازخورد عملیات‌های طولانی پنل را اصلاح می‌کند: هنگام نصب و راه‌اندازی نود، ساخت تانل مدیریت‌شده و ساخت اشتراک، بلافاصله وضعیت واضح «در حال اجرا» با زمان سپری‌شده نمایش داده می‌شود و پس از پایان، موفقیت یا خطا مشخص می‌شود. همچنین همگرایی ایمن سرویس API برای نصب‌های قدیمی/مهاجرت‌شده اضافه شده تا Backend فعال با Release جاری هماهنگ بماند.",
+    "en": "TwinPanel 1.1.0-rc.23 fixes feedback for long-running admin operations: node provisioning, managed tunnel creation and subscription creation now show an immediate running state with elapsed time, followed by a clear success or error result. It also adds defensive API service convergence for legacy/migrated installations so the active backend stays aligned with the current release."
   }
 }
