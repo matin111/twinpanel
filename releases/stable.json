@@ -2,16 +2,16 @@
   "schema": 2,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.2",
+  "version": "1.1.0-rc.3",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T16:47:00Z",
+  "released_at": "2026-10-17T17:38:00Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "39b630f0532c9c7cc2bee84ade557144da67aeaa",
+  "source_sha": "ee56f7c4c9963c2ea9a84480750c1f1a8e13180a",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "notes": {
-    "fa": "نسخه 1.1.0-rc.2 منوی مدیریت SSH را کامل بازبینی می‌کند: رابط SSH انگلیسی و ASCII-safe شده، اجرای CLI پروتکل‌ها و PYTHONPATH اصلاح شده، لیست پروتکل‌ها قبل از انتخاب Exit Node نمایش داده می‌شود و مدیریت سرویس‌ها، لاگ‌ها، بکاپ و بروزرسانی مقاوم‌تر شده‌اند.",
-    "en": "TwinPanel 1.1.0-rc.2 repairs and hardens SSH management: English/ASCII-safe terminal UI, fixed Backend CLI/PYTHONPATH handling, protocol-first selection, clear no-Exit-node handling, and safer service, logs, backup and update operations."
+    "fa": "نسخه 1.1.0-rc.3 نمایش تکراری لیست پروتکل‌ها در منوی مدیریت SSH را حذف می‌کند. انتخاب پروتکل فقط یک‌بار نمایش داده می‌شود و جریان انتخاب Exit Node و عملیات پروتکل بدون تغییر باقی می‌ماند.",
+    "en": "TwinPanel 1.1.0-rc.3 removes the duplicated protocol list in SSH management. Protocol choices are shown once while Exit-node selection and protocol actions remain unchanged."
   }
 }
