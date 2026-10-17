@@ -1,0 +1,44 @@
+name: TwinPanel Public Updater Release Race Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/scripts/twinpanel_public_updater.py'
+      - 'VERSION'
+      - '.github/workflows/public-updater-release-race-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify updater release selection
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          path = Path('backend/scripts/twinpanel_public_updater.py')
+          spec = importlib.util.spec_from_file_location('tp_updater', path)
+          module = importlib.util.module_from_spec(spec)
+          assert spec.loader is not None
+          spec.loader.exec_module(module)
+
+          assert module.resolve_requested_release('1.1.0-rc.10', '1.1.0-rc.10') == ('1.1.0-rc.10', False)
+          assert module.resolve_requested_release('1.1.0-rc.9', '1.1.0-rc.10') == ('1.1.0-rc.10', True)
+          assert module.resolve_requested_release('', '1.1.0-rc.10') == ('1.1.0-rc.10', False)
+
+          try:
+              module.resolve_requested_release('1.1.0-rc.10', '1.1.0-rc.9')
+          except RuntimeError as exc:
+              assert str(exc) == 'REQUESTED_RELEASE_CHANGED'
+          else:
+              raise AssertionError('downgrade/older manifest must remain blocked')
+
+          print('UPDATER_RELEASE_RACE_SMOKE_OK')
+          PY
+
+      - name: Compile updater
+        run: python3 -m py_compile backend/scripts/twinpanel_public_updater.py
