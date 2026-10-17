@@ -16,6 +16,9 @@ type UpdateState={
   state?:string;
   target_version?:string;
   error?:string;
+  delivery?:string;
+  elapsed_seconds?:number;
+  download_bytes?:number;
 };
 
 type ReleaseStatus={
@@ -61,6 +64,21 @@ export function SystemReleaseFooter(){
   const [licenseOpen,setLicenseOpen]=useState(false);
   const [licenseKey,setLicenseKey]=useState("");
 
+  const updateState=String(data?.update?.state||"");
+  const updateBusy=useMemo(()=>[
+    "queued",
+    "resolving",
+    "fetching",
+    "downloading",
+    "verifying",
+    "backup",
+    "extracting",
+    "building",
+    "python-dependencies",
+    "restarting",
+    "rollback",
+  ].includes(updateState),[updateState]);
+
   const load=async(check=false)=>{
     try{
       const result=await request<ReleaseStatus>(check?"/v1/admin/system/release/check":"/v1/admin/system/release/status",check?{method:"POST"}:{});
@@ -80,7 +98,7 @@ export function SystemReleaseFooter(){
     };
 
     checkNow();
-    const statusTimer=window.setInterval(refreshStatus,15000);
+    const statusTimer=window.setInterval(refreshStatus,5000);
     const checkTimer=window.setInterval(checkNow,300000);
     window.addEventListener("focus",checkNow);
     document.addEventListener("visibilitychange",checkNow);
@@ -94,10 +112,35 @@ export function SystemReleaseFooter(){
     };
   },[]);
 
-  const updateBusy=useMemo(()=>["queued","resolving","downloading","backup","extracting","building","restarting","rollback"].includes(String(data?.update?.state||"")),[data?.update?.state]);
+  useEffect(()=>{
+    if(!updateBusy)return;
+    const timer=window.setInterval(()=>{
+      if(document.visibilityState==="visible")void load(false);
+    },2000);
+    return()=>window.clearInterval(timer);
+  },[updateBusy]);
+
   const licenseStatus=String(data?.license?.status||"");
   const remaining=remainingText(data?.license?.seconds_remaining,lang==="fa");
   const needsLicense=["trial_expired","license_expired","revoked","suspended"].includes(licenseStatus);
+
+  const updateProgress=useMemo(()=>{
+    const fa=lang==="fa";
+    const labels:Record<string,string>={
+      queued:fa?"در صف بروزرسانی…":"Queued…",
+      resolving:fa?"در حال آماده‌سازی…":"Preparing…",
+      fetching:fa?"در حال دریافت نسخه…":"Fetching release…",
+      downloading:fa?"در حال دانلود نسخه…":"Downloading…",
+      verifying:fa?"در حال بررسی نسخه…":"Verifying…",
+      backup:fa?"در حال ساخت بکاپ…":"Creating backup…",
+      extracting:fa?"در حال آماده‌سازی فایل‌ها…":"Preparing files…",
+      building:fa?"در حال آماده‌سازی اجرا…":"Preparing runtime…",
+      "python-dependencies":fa?"در حال بروزرسانی وابستگی‌ها…":"Updating dependencies…",
+      restarting:fa?"در حال فعال‌سازی نسخه…":"Activating release…",
+      rollback:fa?"در حال بازگردانی نسخه قبلی…":"Rolling back…",
+    };
+    return labels[updateState]||pick("در حال بروزرسانی…","Updating…");
+  },[lang,updateState,pick]);
 
   const startUpdate=async()=>{
     if(busy||updateBusy)return;
@@ -106,7 +149,7 @@ export function SystemReleaseFooter(){
     try{
       await request("/v1/admin/system/update",{method:"POST"});
       await load(false);
-      window.setTimeout(()=>void load(false),5000);
+      window.setTimeout(()=>void load(false),1500);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy("");}
   };
@@ -137,7 +180,7 @@ export function SystemReleaseFooter(){
       </div>
 
       {data.update_available&&<button className="system-update-button" type="button" disabled={busy==="update"||updateBusy} onClick={()=>void startUpdate()}>
-        {updateBusy?pick("در حال بروزرسانی…","Updating…"):pick(`بروزرسانی به ${data.latest_version}`,`Update to ${data.latest_version}`)}
+        {updateBusy?updateProgress:pick(`بروزرسانی به ${data.latest_version}`,`Update to ${data.latest_version}`)}
       </button>}
 
       {!data.update_available&&<button className="system-check-button" type="button" disabled={Boolean(busy)} onClick={()=>void load(true)}>{pick("بررسی بروزرسانی","Check update")}</button>}

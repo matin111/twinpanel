@@ -1,60 +1,93 @@
-name: TwinPanel Public Updater Fast Path Smoke
+name: TwinPanel Public Updater Prebuilt Smoke
 
 on:
   pull_request:
     paths:
       - 'backend/scripts/twinpanel_public_updater.py'
+      - 'next.config.ts'
+      - 'package.json'
+      - 'scripts/prepare-standalone.mjs'
+      - 'deploy/systemd/twinpanel-web.service.tpl'
       - '.github/workflows/public-updater-fast-path-smoke.yml'
+      - '.github/workflows/publish-prebuilt-release.yml'
   workflow_dispatch:
 
 jobs:
   smoke:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - ubuntu-24.04
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify updater fast-path helpers
+      - name: Show runtime versions
+        run: |
+          python3 --version
+          tar --version | head -1
+
+      - name: Verify prebuilt updater contract
         run: |
           python3 - <<'PY'
           import importlib.util
-          import os
+          import json
+          import tarfile
           import tempfile
           from pathlib import Path
 
-          path = Path('backend/scripts/twinpanel_public_updater.py')
-          spec = importlib.util.spec_from_file_location('tp_updater', path)
-          mod = importlib.util.module_from_spec(spec)
+          path=Path('backend/scripts/twinpanel_public_updater.py')
+          spec=importlib.util.spec_from_file_location('tp_updater',path)
+          mod=importlib.util.module_from_spec(spec)
           assert spec and spec.loader
           spec.loader.exec_module(mod)
 
+          version='1.2.3-rc.4'
+          source_sha='a'*40
           with tempfile.TemporaryDirectory() as tmp:
-              root = Path(tmp)
-              left = root / 'left.txt'
-              right = root / 'right.txt'
-              left.write_text('same\n', encoding='utf-8')
-              right.write_text('same\n', encoding='utf-8')
-              assert mod.same_file(left, right) is True
-              right.write_text('changed\n', encoding='utf-8')
-              assert mod.same_file(left, right) is False
+              root=Path(tmp)
+              package=root/'payload'/'twinpanel'
+              (package/'.next/standalone').mkdir(parents=True)
+              (package/'backend/app').mkdir(parents=True)
+              (package/'VERSION').write_text(version,encoding='utf-8')
+              (package/'.next/standalone/server.js').write_text('console.log("ok")\n',encoding='utf-8')
+              (package/'backend/app/main.py').write_text('app=None\n',encoding='utf-8')
+              (package/'.twinpanel-release.json').write_text(json.dumps({
+                  'format':mod.ARTIFACT_FORMAT,
+                  'version':version,
+                  'source_sha':source_sha,
+                  'arch':'x86_64',
+              }),encoding='utf-8')
+              archive=root/'release.tar.gz'
+              with tarfile.open(archive,'w:gz') as bundle:
+                  bundle.add(package,arcname='twinpanel')
+              extracted=mod.extract_prebuilt(archive,root/'out',version,source_sha)
+              assert (extracted/'.next/standalone/server.js').is_file()
 
-              source = root / 'source'
-              target = root / 'target'
-              source.mkdir()
-              (source / 'a.txt').write_text('cached\n', encoding='utf-8')
-              assert mod.hardlink_tree(source, target) is True
-              assert (target / 'a.txt').read_text(encoding='utf-8') == 'cached\n'
-              assert os.stat(source / 'a.txt').st_ino == os.stat(target / 'a.txt').st_ino
-
-          text = path.read_text(encoding='utf-8')
+          text=path.read_text(encoding='utf-8')
           for marker in (
-              'requirements_reused',
-              'node_dependencies_reused',
-              'frontend_build_reused',
-              '--prefer-offline',
-              'FRONTEND_ARTIFACTS_MISSING',
-              'twinpanel-bot.service',
+              'twinpanel-prebuilt-v1',
+              'download_verified_artifact',
+              'RELEASE_ARTIFACT_SHA256_MISMATCH',
+              'verify_activation',
+              'ACTIVATION_VERSION_MISMATCH',
+              'healthy_version',
+              "delivery='prebuilt' if prebuilt else 'source-build-fallback'",
           ):
-              assert marker in text, marker
+              assert marker in text,marker
 
-          print('FAST_PATH_SMOKE_OK')
+          service=Path('deploy/systemd/twinpanel-web.service.tpl').read_text(encoding='utf-8')
+          assert '.next/standalone/server.js' in service
+          assert 'node_modules/next/dist/bin/next' in service
+
+          config=Path('next.config.ts').read_text(encoding='utf-8')
+          assert 'output:"standalone"' in config.replace(' ','')
+          print('PREBUILT_UPDATER_SMOKE_OK')
           PY
+
+      - name: Validate shell and Python syntax
+        run: |
+          bash -n installer/install.sh
+          python3 -m py_compile backend/scripts/twinpanel_public_updater.py

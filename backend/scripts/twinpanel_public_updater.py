@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import urllib.request
@@ -21,35 +24,34 @@ RELEASES = Path('/opt/twinpanel/releases')
 VENV = Path('/opt/twinpanel/venv/bin/python3')
 DEFAULT_MANIFEST = 'https://raw.githubusercontent.com/matin111/twinpanel/main/releases/stable.json'
 DEFAULT_REPOSITORY = 'https://github.com/matin111/twinpanel.git'
-
-FRONTEND_PATHS = (
-    'app',
-    'components',
-    'lib',
-    'public',
-    'styles',
-    'package.json',
-    'package-lock.json',
-    'tsconfig.json',
-    'next-env.d.ts',
-    'next.config.js',
-    'next.config.mjs',
-    'next.config.ts',
-    'postcss.config.js',
-    'postcss.config.mjs',
-    'tailwind.config.js',
-    'tailwind.config.ts',
-)
+ARTIFACT_FORMAT = 'twinpanel-prebuilt-v1'
+ALLOWED_ARTIFACT_PREFIX = 'https://github.com/matin111/twinpanel/releases/download/'
+STARTED_MONOTONIC = time.monotonic()
 
 
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def elapsed_seconds() -> float:
+    return round(max(0.0, time.monotonic() - STARTED_MONOTONIC), 3)
+
+
 def save(**payload):
     ROOT.mkdir(parents=True, exist_ok=True)
     tmp = STATE.with_suffix('.tmp')
-    tmp.write_text(json.dumps({'updated_at': now(), **payload}, ensure_ascii=False, indent=2), encoding='utf-8')
+    tmp.write_text(
+        json.dumps(
+            {
+                'updated_at': now(),
+                'elapsed_seconds': elapsed_seconds(),
+                **payload,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding='utf-8',
+    )
     os.chmod(tmp, 0o600)
     tmp.replace(STATE)
 
@@ -80,6 +82,7 @@ def runtime_env() -> dict[str, str]:
     out = dict(os.environ)
     out.update(env_file('/etc/twinpanel/install.env'))
     out.update(env_file('/etc/twinpanel/backend.env'))
+    out.update(env_file('/etc/twinpanel/frontend.env'))
     out.setdefault('NEXT_TELEMETRY_DISABLED', '1')
     out.setdefault('npm_config_audit', 'false')
     out.setdefault('npm_config_fund', 'false')
@@ -87,7 +90,10 @@ def runtime_env() -> dict[str, str]:
 
 
 def get_json(url: str) -> dict:
-    req = urllib.request.Request(url, headers={'User-Agent': 'TwinPanel-Public-Updater/4'})
+    req = urllib.request.Request(
+        url,
+        headers={'User-Agent': 'TwinPanel-Public-Updater/5'},
+    )
     with urllib.request.urlopen(req, timeout=25) as res:
         obj = json.loads(res.read().decode('utf-8'))
     if not isinstance(obj, dict):
@@ -117,13 +123,6 @@ def _version_key(value: str) -> tuple[int, int, int, int, int]:
 
 
 def resolve_requested_release(requested_version: str, live_version: str) -> tuple[str, bool]:
-    """Resolve a queued update against the current stable manifest.
-
-    A newer stable release appearing after the request was queued is safe to
-    adopt because the worker still validates installable metadata, repository,
-    exact source SHA and the VERSION file before activation. Downgrades or
-    unrelated/older manifest changes remain blocked.
-    """
     wanted = str(requested_version or '').strip()
     live = str(live_version or '').strip()
     if not wanted or wanted == live:
@@ -133,10 +132,25 @@ def resolve_requested_release(requested_version: str, live_version: str) -> tupl
     raise RuntimeError('REQUESTED_RELEASE_CHANGED')
 
 
-def run(args: list[str], cwd: Path | None = None, env: dict[str, str] | None = None, timeout: int = 1200) -> None:
-    cp = subprocess.run(args, cwd=str(cwd) if cwd else None, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
+def run(
+    args: list[str],
+    cwd: Path | None = None,
+    env: dict[str, str] | None = None,
+    timeout: int = 1200,
+) -> None:
+    cp = subprocess.run(
+        args,
+        cwd=str(cwd) if cwd else None,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=timeout,
+    )
     if cp.returncode != 0:
-        raise RuntimeError(f"COMMAND_FAILED:{' '.join(args)}\n{(cp.stdout or '')[-5000:]}")
+        raise RuntimeError(
+            f"COMMAND_FAILED:{' '.join(args)}\n{(cp.stdout or '')[-5000:]}"
+        )
 
 
 def same_file(left: Path, right: Path) -> bool:
@@ -150,47 +164,57 @@ def same_file(left: Path, right: Path) -> bool:
         return False
 
 
-def hardlink_tree(source: Path, target: Path) -> bool:
-    if not source.is_dir():
-        return False
-    try:
-        if target.exists() or target.is_symlink():
-            if target.is_dir() and not target.is_symlink():
-                shutil.rmtree(target)
-            else:
-                target.unlink()
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(source, target, symlinks=True, copy_function=os.link)
-        return True
-    except Exception:
-        if target.exists() and target.is_dir() and not target.is_symlink():
-            shutil.rmtree(target, ignore_errors=True)
-        return False
-
-
 def backup(env: dict[str, str]) -> None:
     python = VENV if VENV.is_file() else Path(sys.executable)
-    code = "from app.backup_service import create_backup; print(create_backup(kind='pre_update', send_telegram=False).get('filename',''))"
-    run([str(python), '-c', code], cwd=CURRENT / 'backend', env=env, timeout=300)
+    code = (
+        "from app.backup_service import create_backup; "
+        "print(create_backup(kind='pre_update', send_telegram=False).get('filename',''))"
+    )
+    run(
+        [str(python), '-c', code],
+        cwd=CURRENT / 'backend',
+        env=env,
+        timeout=300,
+    )
 
 
-def restart() -> None:
+def restart_services() -> None:
     subprocess.run(['systemctl', 'daemon-reload'], check=False)
-    for unit in ('twinpanel-api.service', 'twinpanel-web.service', 'twinpanel-reseller-bots.service', 'twinpanel-bot.service'):
-        if subprocess.run(['systemctl', 'cat', unit], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+    for unit in (
+        'twinpanel-api.service',
+        'twinpanel-web.service',
+        'twinpanel-reseller-bots.service',
+        'twinpanel-bot.service',
+    ):
+        if subprocess.run(
+            ['systemctl', 'cat', unit],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode == 0:
             subprocess.run(['systemctl', 'restart', unit], check=False)
 
 
-def healthy(url: str, seconds: int = 90) -> bool:
+def healthy_version(url: str, expected_version: str, seconds: int = 75) -> bool:
     end = time.time() + seconds
     while time.time() < end:
         try:
-            with urllib.request.urlopen(url, timeout=4) as res:
-                if 200 <= res.status < 300:
+            req = urllib.request.Request(
+                url,
+                headers={'User-Agent': 'TwinPanel-Update-Health/2'},
+            )
+            with urllib.request.urlopen(req, timeout=4) as res:
+                if not (200 <= res.status < 300):
+                    raise RuntimeError('HTTP_NOT_OK')
+                payload = json.loads(res.read().decode('utf-8'))
+                if (
+                    isinstance(payload, dict)
+                    and payload.get('ok') is True
+                    and str(payload.get('version') or '').strip() == expected_version
+                ):
                     return True
         except Exception:
             pass
-        time.sleep(2)
+        time.sleep(1)
     return False
 
 
@@ -214,52 +238,205 @@ def rollback(previous: Path | None) -> None:
         tmp.unlink()
     tmp.symlink_to(previous)
     tmp.replace(CURRENT)
-    restart()
+    restart_services()
 
 
 def clone_release(repository: str, source_sha: str, target: Path) -> None:
     run(['git', 'init', '-q', str(target)], timeout=60)
     run(['git', '-C', str(target), 'remote', 'add', 'origin', repository], timeout=60)
-    run(['git', '-C', str(target), '-c', 'advice.detachedHead=false', 'fetch', '-q', '--depth', '1', 'origin', source_sha], timeout=300)
-    run(['git', '-C', str(target), 'checkout', '-q', '--detach', 'FETCH_HEAD'], timeout=60)
-    cp = subprocess.run(['git', '-C', str(target), 'rev-parse', 'HEAD'], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
-    actual = (cp.stdout or '').strip()
+    run(
+        [
+            'git', '-C', str(target), '-c', 'advice.detachedHead=false',
+            'fetch', '-q', '--depth', '1', 'origin', source_sha,
+        ],
+        timeout=300,
+    )
+    run(
+        ['git', '-C', str(target), 'checkout', '-q', '--detach', 'FETCH_HEAD'],
+        timeout=60,
+    )
+    cp = subprocess.run(
+        ['git', '-C', str(target), 'rev-parse', 'HEAD'],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    actual = (cp.stdout or '').strip().lower()
     if cp.returncode != 0 or actual != source_sha:
         raise RuntimeError('SOURCE_COMMIT_VERIFICATION_FAILED')
 
 
-def frontend_changed(repo: Path, previous_sha: str, target_sha: str) -> bool:
-    previous = str(previous_sha or '').strip().lower()
-    if not previous or previous == target_sha:
-        return not bool(previous)
-    if len(previous) != 40 or any(ch not in '0123456789abcdef' for ch in previous):
-        return True
+def artifact_metadata(manifest: dict) -> dict:
+    value = manifest.get('artifact')
+    return value if isinstance(value, dict) else {}
+
+
+def validate_artifact_metadata(artifact: dict) -> tuple[str, str, int | None]:
+    if str(artifact.get('format') or '').strip() != ARTIFACT_FORMAT:
+        raise RuntimeError('RELEASE_ARTIFACT_FORMAT_INVALID')
+
+    arch = str(artifact.get('arch') or 'x86_64').strip().lower()
+    machine = platform.machine().strip().lower()
+    aliases = {'amd64': 'x86_64', 'x86_64': 'x86_64'}
+    if aliases.get(machine, machine) != aliases.get(arch, arch):
+        raise RuntimeError('RELEASE_ARTIFACT_ARCH_MISMATCH')
+
+    url = str(artifact.get('url') or '').strip()
+    digest = str(artifact.get('sha256') or '').strip().lower()
+    if not url.startswith(ALLOWED_ARTIFACT_PREFIX):
+        raise RuntimeError('RELEASE_ARTIFACT_URL_INVALID')
+    if len(digest) != 64 or any(ch not in '0123456789abcdef' for ch in digest):
+        raise RuntimeError('RELEASE_ARTIFACT_SHA256_INVALID')
+
+    size = artifact.get('size_bytes')
     try:
-        run(['git', '-C', str(repo), 'fetch', '-q', '--depth', '1', 'origin', previous], timeout=300)
-        cp = subprocess.run(
-            ['git', '-C', str(repo), 'diff', '--quiet', previous, target_sha, '--', *FRONTEND_PATHS],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            check=False,
-        )
-        if cp.returncode == 0:
-            return False
-        if cp.returncode == 1:
-            return True
+        size_value = int(size) if size is not None else None
     except Exception:
-        pass
-    return True
+        size_value = None
+    if size_value is not None and size_value <= 0:
+        size_value = None
+    return url, digest, size_value
+
+
+def download_verified_artifact(
+    url: str,
+    expected_sha256: str,
+    destination: Path,
+    expected_size: int | None = None,
+) -> int:
+    req = urllib.request.Request(
+        url,
+        headers={'User-Agent': 'TwinPanel-Public-Updater/5'},
+    )
+    digest = hashlib.sha256()
+    total = 0
+    with urllib.request.urlopen(req, timeout=90) as response, destination.open('wb') as out:
+        while True:
+            chunk = response.read(1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > 1024 * 1024 * 1024:
+                raise RuntimeError('RELEASE_ARTIFACT_TOO_LARGE')
+            digest.update(chunk)
+            out.write(chunk)
+    if digest.hexdigest().lower() != expected_sha256:
+        raise RuntimeError('RELEASE_ARTIFACT_SHA256_MISMATCH')
+    if expected_size is not None and total != expected_size:
+        raise RuntimeError('RELEASE_ARTIFACT_SIZE_MISMATCH')
+    return total
+
+
+def extract_prebuilt(
+    archive: Path,
+    destination: Path,
+    version: str,
+    source_sha: str,
+) -> Path:
+    destination.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(archive, mode='r:gz') as bundle:
+        bundle.extractall(destination, filter='data')
+
+    root = destination / 'twinpanel'
+    if not root.is_dir():
+        raise RuntimeError('RELEASE_ARTIFACT_ROOT_MISSING')
+
+    package_version = (root / 'VERSION').read_text(encoding='utf-8').strip()
+    if package_version != version:
+        raise RuntimeError('RELEASE_ARTIFACT_VERSION_MISMATCH')
+
+    meta = read_json(root / '.twinpanel-release.json')
+    if str(meta.get('format') or '') != ARTIFACT_FORMAT:
+        raise RuntimeError('RELEASE_ARTIFACT_METADATA_INVALID')
+    if str(meta.get('version') or '').strip() != version:
+        raise RuntimeError('RELEASE_ARTIFACT_METADATA_VERSION_MISMATCH')
+    if str(meta.get('source_sha') or '').strip().lower() != source_sha:
+        raise RuntimeError('RELEASE_ARTIFACT_SOURCE_SHA_MISMATCH')
+
+    if not (root / '.next/standalone/server.js').is_file():
+        raise RuntimeError('RELEASE_STANDALONE_FRONTEND_MISSING')
+    if not (root / 'backend/app/main.py').is_file():
+        raise RuntimeError('RELEASE_BACKEND_MISSING')
+    return root
+
+
+def prepare_source_fallback(
+    repository: str,
+    source_sha: str,
+    version: str,
+    destination: Path,
+    env: dict[str, str],
+) -> Path:
+    source = destination / 'source'
+    clone_release(repository, source_sha, source)
+    if (source / 'VERSION').read_text(encoding='utf-8').strip() != version:
+        raise RuntimeError('RELEASE_VERSION_MISMATCH')
+
+    if (source / 'package-lock.json').is_file():
+        run(
+            ['npm', 'ci', '--include=optional', '--prefer-offline', '--no-audit', '--no-fund'],
+            cwd=source,
+            env=env,
+            timeout=1200,
+        )
+    else:
+        run(
+            ['npm', 'install', '--prefer-offline', '--no-audit', '--no-fund'],
+            cwd=source,
+            env=env,
+            timeout=1200,
+        )
+    run(['npm', 'run', 'build'], cwd=source, env=env, timeout=1500)
+    if not (source / '.next/standalone/server.js').is_file():
+        raise RuntimeError('FRONTEND_STANDALONE_BUILD_FAILED')
+    return source
+
+
+def install_web_unit(release: Path, web_port: int) -> None:
+    template = release / 'deploy/systemd/twinpanel-web.service.tpl'
+    if not template.is_file():
+        raise RuntimeError('WEB_SERVICE_TEMPLATE_MISSING')
+    content = template.read_text(encoding='utf-8').replace('__WEB_PORT__', str(web_port))
+    path = Path('/etc/systemd/system/twinpanel-web.service')
+    tmp = path.with_suffix('.service.tmp')
+    tmp.write_text(content, encoding='utf-8')
+    os.chmod(tmp, 0o644)
+    tmp.replace(path)
 
 
 def normalize_web_permissions(target: Path) -> None:
-    for path in (target / '.next', target / 'node_modules'):
-        if path.exists():
-            subprocess.run(['chown', '-R', 'www-data:www-data', str(path)], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    standalone = target / '.next/standalone'
+    if standalone.exists():
+        subprocess.run(
+            ['chown', '-R', 'www-data:www-data', str(standalone)],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        subprocess.run(
+            ['chmod', '-R', 'a+rX', str(standalone)],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+
+def verify_activation(final: Path, version: str) -> None:
+    try:
+        active = CURRENT.resolve(strict=True)
+        target = final.resolve(strict=True)
+    except Exception as exc:
+        raise RuntimeError('ACTIVATION_PATH_UNRESOLVED') from exc
+    if active != target:
+        raise RuntimeError('ACTIVATION_PATH_MISMATCH')
+    active_version = (CURRENT / 'VERSION').read_text(encoding='utf-8').strip()
+    if active_version != version:
+        raise RuntimeError('ACTIVATION_VERSION_MISMATCH')
 
 
 def main() -> int:
     env = runtime_env()
-    previous_state = read_json(STATE)
     manifest_url = env.get('TWINPANEL_RELEASE_MANIFEST_URL') or DEFAULT_MANIFEST
     manifest = get_json(manifest_url)
     if manifest.get('installable') is not True or manifest.get('published') is not True:
@@ -279,18 +456,22 @@ def main() -> int:
 
     current_version = (CURRENT / 'VERSION').read_text(encoding='utf-8').strip()
     if current_version == version:
-        save(state='completed', target_version=version, previous_version=current_version, reason='already_latest', source_sha=source_sha)
+        save(
+            state='completed',
+            target_version=version,
+            previous_version=current_version,
+            reason='already_latest',
+            source_sha=source_sha,
+        )
         return 0
-
-    previous_source_sha = ''
-    if str(previous_state.get('target_version') or '').strip() == current_version:
-        candidate = str(previous_state.get('source_sha') or '').strip().lower()
-        if len(candidate) == 40 and all(ch in '0123456789abcdef' for ch in candidate):
-            previous_source_sha = candidate
 
     current_release = CURRENT.resolve()
     RELEASES.mkdir(parents=True, exist_ok=True)
     final = RELEASES / version
+    artifact = artifact_metadata(manifest)
+    prebuilt = bool(artifact)
+    download_bytes = 0
+
     save(
         state='fetching',
         current_version=current_version,
@@ -298,90 +479,115 @@ def main() -> int:
         requested_version=wanted or version,
         retargeted=retargeted,
         source_sha=source_sha,
+        delivery='prebuilt' if prebuilt else 'source-build-fallback',
     )
 
-    frontend_needs_build = True
     with tempfile.TemporaryDirectory(prefix='twinpanel-public-update-') as name:
         tmp = Path(name)
-        source = tmp / 'source'
-        clone_release(repository, source_sha, source)
-        if (source / 'VERSION').read_text(encoding='utf-8').strip() != version:
-            raise RuntimeError('RELEASE_VERSION_MISMATCH')
+        if prebuilt:
+            url, sha256, size_bytes = validate_artifact_metadata(artifact)
+            archive = tmp / 'release.tar.gz'
+            download_bytes = download_verified_artifact(
+                url,
+                sha256,
+                archive,
+                expected_size=size_bytes,
+            )
+            prepared = extract_prebuilt(
+                archive,
+                tmp / 'extracted',
+                version,
+                source_sha,
+            )
+        else:
+            prepared = prepare_source_fallback(
+                repository,
+                source_sha,
+                version,
+                tmp,
+                env,
+            )
 
-        frontend_needs_build = frontend_changed(source, previous_source_sha, source_sha)
-
-        save(state='backup', target_version=version, requested_version=wanted or version, retargeted=retargeted)
+        save(
+            state='backup',
+            target_version=version,
+            requested_version=wanted or version,
+            retargeted=retargeted,
+            delivery='prebuilt' if prebuilt else 'source-build-fallback',
+            download_bytes=download_bytes,
+        )
         backup(env)
 
         if final.exists():
             shutil.rmtree(final)
-        shutil.copytree(source, final, symlinks=True, ignore=shutil.ignore_patterns('.git'))
-
-    save(
-        state='building',
-        target_version=version,
-        requested_version=wanted or version,
-        retargeted=retargeted,
-        fast_path=True,
-        frontend_changed=frontend_needs_build,
-    )
+        shutil.copytree(
+            prepared,
+            final,
+            symlinks=True,
+            ignore=shutil.ignore_patterns('.git', '.env', '.env.local'),
+        )
 
     python = VENV if VENV.is_file() else Path(sys.executable)
-    requirements_reused = same_file(current_release / 'backend/requirements.txt', final / 'backend/requirements.txt')
+    requirements_reused = same_file(
+        current_release / 'backend/requirements.txt',
+        final / 'backend/requirements.txt',
+    )
     if not requirements_reused:
-        run([str(python), '-m', 'pip', 'install', '-r', 'backend/requirements.txt'], cwd=final, env=env, timeout=900)
+        save(
+            state='python-dependencies',
+            target_version=version,
+            delivery='prebuilt' if prebuilt else 'source-build-fallback',
+        )
+        run(
+            [str(python), '-m', 'pip', 'install', '-r', 'backend/requirements.txt'],
+            cwd=final,
+            env=env,
+            timeout=900,
+        )
 
-    node_dependencies_reused = False
-    frontend_build_reused = False
-    lock_unchanged = same_file(current_release / 'package-lock.json', final / 'package-lock.json')
-
-    if not frontend_needs_build and (current_release / '.next').is_dir() and (current_release / 'node_modules').is_dir():
-        node_dependencies_reused = hardlink_tree(current_release / 'node_modules', final / 'node_modules')
-        frontend_build_reused = node_dependencies_reused and hardlink_tree(current_release / '.next', final / '.next')
-        if not frontend_build_reused:
-            if (final / '.next').exists():
-                shutil.rmtree(final / '.next', ignore_errors=True)
-            frontend_needs_build = True
-
-    if frontend_needs_build:
-        if lock_unchanged and (current_release / 'node_modules').is_dir():
-            node_dependencies_reused = hardlink_tree(current_release / 'node_modules', final / 'node_modules')
-
-        if not node_dependencies_reused:
-            if (final / 'package-lock.json').is_file():
-                run(['npm', 'ci', '--include=optional', '--prefer-offline', '--no-audit', '--no-fund'], cwd=final, env=env, timeout=1200)
-            else:
-                run(['npm', 'install', '--prefer-offline', '--no-audit', '--no-fund'], cwd=final, env=env, timeout=1200)
-
-        current_cache = current_release / '.next/cache'
-        if current_cache.is_dir() and not (final / '.next/cache').exists():
-            hardlink_tree(current_cache, final / '.next/cache')
-
-        run(['npm', 'run', 'build'], cwd=final, env=env, timeout=1500)
-
-    if not (final / '.next').is_dir() or not (final / 'node_modules').is_dir():
+    if not (final / '.next/standalone/server.js').is_file():
         raise RuntimeError('FRONTEND_ARTIFACTS_MISSING')
 
     normalize_web_permissions(final)
+    web_port = int(env.get('TWINPANEL_WEB_PORT', '3000') or 3000)
+    api_port = int(env.get('TWINPANEL_API_PORT', '8095') or 8095)
+    install_web_unit(final, web_port)
 
     previous = atomic_switch(final)
-    save(
-        state='restarting',
-        target_version=version,
-        requested_version=wanted or version,
-        retargeted=retargeted,
-        requirements_reused=requirements_reused,
-        node_dependencies_reused=node_dependencies_reused,
-        frontend_build_reused=frontend_build_reused,
-    )
-    restart()
+    try:
+        verify_activation(final, version)
+        save(
+            state='restarting',
+            target_version=version,
+            requested_version=wanted or version,
+            retargeted=retargeted,
+            delivery='prebuilt' if prebuilt else 'source-build-fallback',
+            download_bytes=download_bytes,
+            requirements_reused=requirements_reused,
+        )
+        restart_services()
 
-    api_port = int(env.get('TWINPANEL_API_PORT', '8095') or 8095)
-    web_port = int(env.get('TWINPANEL_WEB_PORT', '3000') or 3000)
-    if not healthy(f'http://127.0.0.1:{api_port}/health') or not healthy(f'http://127.0.0.1:{web_port}/health'):
-        save(state='rollback', target_version=version, error='POST_UPDATE_HEALTH_FAILED')
+        verify_activation(final, version)
+        api_ok = healthy_version(
+            f'http://127.0.0.1:{api_port}/health',
+            version,
+        )
+        web_ok = healthy_version(
+            f'http://127.0.0.1:{web_port}/health',
+            version,
+        )
+        verify_activation(final, version)
+        if not api_ok or not web_ok:
+            raise RuntimeError('POST_UPDATE_HEALTH_VERSION_FAILED')
+    except Exception:
+        save(
+            state='rollback',
+            target_version=version,
+            previous_version=current_version,
+            error='ACTIVATION_OR_HEALTH_FAILED',
+        )
         rollback(previous)
-        raise RuntimeError('POST_UPDATE_HEALTH_FAILED')
+        raise
 
     save(
         state='completed',
@@ -390,9 +596,11 @@ def main() -> int:
         requested_version=wanted or version,
         retargeted=retargeted,
         source_sha=source_sha,
+        delivery='prebuilt' if prebuilt else 'source-build-fallback',
+        download_bytes=download_bytes,
         requirements_reused=requirements_reused,
-        node_dependencies_reused=node_dependencies_reused,
-        frontend_build_reused=frontend_build_reused,
+        active_path=str(CURRENT.resolve()),
+        active_version=(CURRENT / 'VERSION').read_text(encoding='utf-8').strip(),
         completed_at=now(),
     )
     try:

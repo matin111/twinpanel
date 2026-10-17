@@ -1,0 +1,221 @@
+name: TwinPanel Publish Prebuilt Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - releases/candidate.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: twinpanel-publish-stable-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout publisher branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read release candidate
+        id: candidate
+        shell: bash
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          import re
+          from pathlib import Path
+
+          path=Path('releases/candidate.json')
+          if not path.is_file():
+              raise SystemExit('releases/candidate.json is missing')
+          obj=json.loads(path.read_text(encoding='utf-8'))
+          version=str(obj.get('version') or '').strip()
+          source_sha=str(obj.get('source_sha') or '').strip().lower()
+          if not re.fullmatch(r'\d+\.\d+\.\d+(?:-[A-Za-z0-9._-]+)?',version):
+              raise SystemExit('candidate version is invalid')
+          if not re.fullmatch(r'[0-9a-f]{40}',source_sha):
+              raise SystemExit('candidate source_sha is invalid')
+          print(f'version={version}')
+          print(f'source_sha={source_sha}')
+          print(f'tag=v{version}')
+          print(f'asset=twinpanel-{version}-linux-x86_64.tar.gz')
+          PY
+
+      - name: Checkout exact release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.candidate.outputs.source_sha }}
+          fetch-depth: 1
+          path: source
+
+      - name: Verify candidate source version
+        shell: bash
+        run: |
+          test "$(tr -d '[:space:]' < source/VERSION)" = "${{ steps.candidate.outputs.version }}"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+          cache: npm
+          cache-dependency-path: source/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: source
+        run: npm ci --include=optional --no-audit --no-fund
+
+      - name: Build production standalone frontend
+        working-directory: source
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_API_BASE: ""
+        run: npm run build
+
+      - name: Build verified production package
+        id: package
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          VERSION="${{ steps.candidate.outputs.version }}"
+          SOURCE_SHA="${{ steps.candidate.outputs.source_sha }}"
+          ASSET="${{ steps.candidate.outputs.asset }}"
+
+          test -f source/.next/standalone/server.js
+          rm -rf stage "$ASSET"
+          mkdir -p stage/twinpanel/.next
+
+          rsync -a \
+            --exclude='.git' \
+            --exclude='.next' \
+            --exclude='node_modules' \
+            --exclude='.env' \
+            --exclude='.env.local' \
+            source/ stage/twinpanel/
+
+          cp -a source/.next/standalone stage/twinpanel/.next/standalone
+
+          python3 - "$VERSION" "$SOURCE_SHA" <<'PY'
+          import json
+          import platform
+          import sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          version,source_sha=sys.argv[1:]
+          payload={
+              'format':'twinpanel-prebuilt-v1',
+              'version':version,
+              'source_sha':source_sha,
+              'arch':'x86_64',
+              'built_at':datetime.now(timezone.utc).isoformat(),
+              'builder':'github-actions',
+          }
+          Path('stage/twinpanel/.twinpanel-release.json').write_text(
+              json.dumps(payload,ensure_ascii=False,indent=2)+'\n',
+              encoding='utf-8',
+          )
+          PY
+
+          tar -C stage -czf "$ASSET" twinpanel
+          SHA256="$(sha256sum "$ASSET" | awk '{print $1}')"
+          SIZE="$(stat -c '%s' "$ASSET")"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+          echo "size_bytes=$SIZE" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          TAG="${{ steps.candidate.outputs.tag }}"
+          ASSET="${{ steps.candidate.outputs.asset }}"
+          SOURCE_SHA="${{ steps.candidate.outputs.source_sha }}"
+          VERSION="${{ steps.candidate.outputs.version }}"
+
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$SOURCE_SHA" \
+              --title "TwinPanel $VERSION" \
+              --notes "Verified prebuilt TwinPanel production release $VERSION."
+          fi
+
+          gh release upload "$TAG" "$ASSET" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
+      - name: Publish stable manifest only after artifact exists
+        env:
+          VERSION: ${{ steps.candidate.outputs.version }}
+          SOURCE_SHA: ${{ steps.candidate.outputs.source_sha }}
+          TAG: ${{ steps.candidate.outputs.tag }}
+          ASSET: ${{ steps.candidate.outputs.asset }}
+          ASSET_SHA256: ${{ steps.package.outputs.sha256 }}
+          ASSET_SIZE: ${{ steps.package.outputs.size_bytes }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+
+          python3 - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          candidate_path=Path('releases/candidate.json')
+          candidate=json.loads(candidate_path.read_text(encoding='utf-8'))
+          version=os.environ['VERSION']
+          source_sha=os.environ['SOURCE_SHA'].lower()
+          if str(candidate.get('version') or '').strip()!=version:
+              raise SystemExit('candidate changed while release was building')
+          if str(candidate.get('source_sha') or '').strip().lower()!=source_sha:
+              raise SystemExit('candidate source changed while release was building')
+
+          notes=candidate.get('notes') or {}
+          manifest={
+              'schema':3,
+              'product':'TwinPanel',
+              'channel':'stable',
+              'version':version,
+              'installable':True,
+              'published':True,
+              'released_at':datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z'),
+              'repository_url':'https://github.com/matin111/twinpanel.git',
+              'source_sha':source_sha,
+              'github_url':'https://github.com/matin111/twinpanel',
+              'license_required':False,
+              'artifact':{
+                  'format':'twinpanel-prebuilt-v1',
+                  'arch':'x86_64',
+                  'url':f"https://github.com/matin111/twinpanel/releases/download/{os.environ['TAG']}/{os.environ['ASSET']}",
+                  'sha256':os.environ['ASSET_SHA256'].lower(),
+                  'size_bytes':int(os.environ['ASSET_SIZE']),
+              },
+              'notes':notes,
+          }
+          Path('releases/stable.json').write_text(
+              json.dumps(manifest,ensure_ascii=False,indent=2)+'\n',
+              encoding='utf-8',
+          )
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add releases/stable.json
+          if git diff --cached --quiet; then
+            echo "Stable manifest already matches the published artifact."
+            exit 0
+          fi
+          git commit -m "Publish TwinPanel ${VERSION} prebuilt release"
+          git push origin HEAD:main
