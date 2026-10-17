@@ -18,10 +18,6 @@ def _ascii(value: object) -> str:
 
 
 def _select_protocol() -> str:
-    print("\nAvailable protocols")
-    for index, name in enumerate(PROTOCOL_ORDER, start=1):
-        print(f"  {index}) {PROTOCOL_NAMES[name]}")
-
     raw = input("Protocol: ").strip()
     if not raw.isdigit() or not 1 <= int(raw) <= len(PROTOCOL_ORDER):
         raise RuntimeError("INVALID_PROTOCOL")
