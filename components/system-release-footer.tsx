@@ -58,6 +58,14 @@ function remainingText(seconds:number|undefined|null,fa:boolean){
   return fa?`${hours.toLocaleString("fa-IR")} ساعت`:`${hours}h`;
 }
 
+function updatePendingInSession(){
+  try{
+    return typeof window!=="undefined"&&window.sessionStorage.getItem(UPDATE_RELOAD_KEY)==="1";
+  }catch{
+    return false;
+  }
+}
+
 export function SystemReleaseFooter(){
   const {pick,lang}=useI18n();
   const [data,setData]=useState<ReleaseStatus|null>(null);
@@ -89,7 +97,14 @@ export function SystemReleaseFooter(){
       const result=await request<ReleaseStatus>(check?"/v1/admin/system/release/check":"/v1/admin/system/release/status",check?{method:"POST"}:{});
       if(!initialVersionRef.current)initialVersionRef.current=String(result.current_version||"").trim();
       setData(result);setError("");
-    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    }catch(reason){
+      // During an in-place update the API is intentionally restarted. Nginx may
+      // briefly return 502/connection errors while the new release activates.
+      // Keep the last known progress on screen instead of presenting that
+      // expected restart window as a failed update.
+      if(updatePendingInSession())return;
+      setError(reason instanceof Error?reason.message:String(reason));
+    }
   };
 
   useEffect(()=>{
@@ -131,6 +146,8 @@ export function SystemReleaseFooter(){
 
     if(updateState==="failed"){
       try{window.sessionStorage.removeItem(UPDATE_RELOAD_KEY);}catch{}
+      const detail=String(data.update?.error||"").trim();
+      if(detail)setError(detail);
       return;
     }
 
