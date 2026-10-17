@@ -87,7 +87,7 @@ The product includes:
 | Branding | Configurable product/brand presentation |
 | Backup | Backup/restore integration and pre-update backup workflow |
 | Release | Version display, guarded update, health verification, rollback |
-| Licensing | Seven-day trial and paid activation without reinstalling the product |
+| Licensing | Seven-day trial and paid activation integration without reinstalling the product |
 
 ---
 
@@ -416,31 +416,34 @@ TwinPanel exposes operational health checks for both the service and its depende
 
 TwinPanel is designed around guarded releases instead of manually replacing production files.
 
-A normal update path includes:
+A normal public update path includes:
 
 1. Detect the currently installed version
-2. Resolve the newest release allowed for the installation/license
+2. Resolve the published Stable manifest
 3. Create a pre-upgrade backup
-4. Download the release package
-5. Verify package checksum/integrity
+4. Fetch the exact public Git commit declared by the manifest
+5. Verify the checked-out commit and release `VERSION`
 6. Install/build the new release
-7. Restart services
-8. Run health verification
-9. Automatically roll back if the new release fails health verification
+7. Atomically switch `/opt/twinpanel/current`
+8. Restart services
+9. Run health verification
+10. Automatically roll back if the new release fails health verification
 
-The installed version can be surfaced inside the panel and installable releases should come from the validated release channel.
+The installed version is surfaced inside the panel and customer updates come only from the validated public Stable manifest.
 
 ---
 
 ## Trial and licensing
 
-- New installation trial: **7 days**
-- Trial state is bound to the installation identity
-- Removing local files or reinstalling should not create a fresh trial
-- A paid license upgrades the same installation
-- Paid activation does not require deleting users, subscriptions, nodes, tunnels, or the database
-- A temporary license-service connectivity problem should not abruptly terminate existing VPN user traffic; a bounded offline grace model is used for connectivity failures
-- After trial expiration, essential paths such as admin login, license activation, backup/export, and diagnostics can remain available according to the product policy
+TwinPanel retains integration for seven-day trials and paid licenses. The current public `1.1.0-rc.1` manifest is installable without mandatory license enforcement (`license_required: false`) so clean public installation can be validated independently of a future vendor license service.
+
+The licensing architecture is designed so it can later support:
+
+- Trial state bound to installation identity
+- Paid activation without deleting users, subscriptions, nodes, tunnels, or the database
+- Signed entitlement validation
+- Bounded offline grace for temporary license-service connectivity failures
+- Keeping admin login, activation, backup/export, and diagnostics accessible according to license policy
 
 More details:
 
@@ -501,11 +504,13 @@ Frontend and API services run locally, while Nginx publishes the public HTTP/HTT
 
 ## Quick install
 
-Customer installations must use the official public bootstrap:
+Customer installations use the public installer in this repository:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/matin111/tp27-core/main/twinpanel/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/matin111/twinpanel/main/install.sh | sudo bash
 ```
+
+No GitHub account, SSH key, Deploy Key, Personal Access Token, manual clone, branch selection, or commit selection is required from the customer. The installer resolves `releases/stable.json` and fetches the exact validated public Git commit declared by that manifest.
 
 Full English installation guide:
 
@@ -535,21 +540,22 @@ The installer prepares the required runtime stack, including PostgreSQL, Redis, 
 
 ## Installation flow
 
-The official bootstrap performs the installation as a guarded sequence:
+The official public installer performs the installation as a guarded sequence:
 
-1. Validate OS, resources, and ports
-2. Generate Installation ID and machine fingerprint
-3. Activate a paid license or request a trial
-4. Resolve the newest entitled release
-5. Verify package SHA256
+1. Validate Ubuntu and root access
+2. Resolve the published Stable manifest
+3. Read the release version and exact public source commit
+4. Fetch that commit over HTTPS
+5. Verify the checked-out Git SHA and `VERSION`
 6. Install dependencies and runtime services
 7. Install Backend and Frontend
 8. Generate local secrets
 9. Initialize the database
 10. Bootstrap the first administrator
 11. Install systemd services
-12. Configure/enable Nginx
-13. Run final health checks
+12. Install the `twinpanel` / `tp` SSH management command
+13. Configure/enable Nginx
+14. Run final health checks
 
 The generated initial administrator password is stored in the root-only file:
 
@@ -557,7 +563,7 @@ The generated initial administrator password is stored in the root-only file:
 /root/twinpanel-initial-admin.txt
 ```
 
-After first login, change the administrator credentials and remove the file.
+After first login, change the administrator credentials and remove the file. Reinstall/update preserves an existing administrator instead of silently changing its credentials.
 
 ---
 
@@ -566,11 +572,15 @@ After first login, change the administrator credentials and remove the file.
 ```text
 /opt/twinpanel/current                 active release
 /opt/twinpanel/releases                installed releases
+/opt/twinpanel/venv                    Python virtual environment
 /etc/twinpanel/backend.env             Backend runtime environment
 /etc/twinpanel/frontend.env            Frontend runtime environment
+/etc/twinpanel/install.env             install/release settings
 /var/lib/twinpanel-backups             backups
-/var/lib/twinpanel-license             local license state
+/var/lib/twinpanel-license             release/license/update state
 /root/twinpanel-initial-admin.txt      initial admin credentials
+/usr/local/bin/twinpanel               SSH management command
+/usr/local/bin/tp                      short SSH management alias
 ```
 
 ---
@@ -583,7 +593,7 @@ The repository default and canonical project branch is:
 main
 ```
 
-Customer-installable releases must be promoted through the validated official release workflow. Experimental branches such as `feat/*`, `fix/*`, `preview/*`, or local production branches are not direct customer installation sources.
+Customer-installable releases are selected through [`releases/stable.json`](releases/stable.json), which pins the public installation to an exact validated source commit. Experimental branches such as `feat/*`, `fix/*`, `preview/*`, or local production branches are not direct customer installation sources.
 
 The product version is stored in:
 

@@ -1,6 +1,6 @@
 # TwinPanel Installation Guide
 
-This guide covers the official self-hosted installation. Customer installations must come only from the official release channel, never from experimental feature/fix branches.
+This guide covers the official self-hosted installation. Customer installations come from the public `matin111/twinpanel` repository and its validated Stable manifest, never from experimental feature/fix branches.
 
 ## Requirements
 
@@ -8,33 +8,43 @@ This guide covers the official self-hosted installation. Customer installations 
 - root access
 - 2GB RAM and 2 vCPU recommended
 - At least 20GB free disk space
-- Outbound Internet access for install/update downloads
+- Outbound Internet access for installation/update downloads
 - Ports 80 and 443 for the public web endpoint
 
 ## Quick install
 
-The public bootstrap command is hosted in `matin111/tp27-core`. The public bootstrap contains no private TwinPanel source or vendor signing secrets; it resolves the entitled release through the license/distribution service.
+Run one command as root or through sudo:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/matin111/tp27-core/main/twinpanel/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/matin111/twinpanel/main/install.sh | sudo bash
 ```
 
-If no paid License Key is entered, the installer requests a seven-day trial for the installation. The trial starts on the first successful activation and must not reset when local files are removed or TwinPanel is reinstalled.
+No GitHub account, SSH key, Deploy Key, Personal Access Token, manual clone, branch selection, or commit selection is required from the customer.
+
+The bootstrap reads the public Stable manifest at:
+
+```text
+https://raw.githubusercontent.com/matin111/twinpanel/main/releases/stable.json
+```
+
+The manifest points to one validated public Git commit. The installer fetches that exact commit over HTTPS and verifies the checked-out commit before installation. Customer installations therefore do not float with every new commit pushed to `main`.
 
 ## Installation flow
 
-1. Validate OS, resources, and ports
-2. Generate an Installation ID and machine fingerprint
-3. Activate a paid license or seven-day trial
-4. Resolve the newest entitled release for the installation
-5. Verify package SHA256
-6. Install PostgreSQL, Redis, Python runtime, Node.js, Nginx, and dependencies
-7. Install Backend and Frontend
-8. Generate local secrets with restricted permissions
-9. Initialize the database and bootstrap the initial admin
-10. Install systemd services
-11. Enable Nginx
-12. Run final Web/API/DB/Redis health checks
+1. Validate the supported Ubuntu release and root access
+2. Resolve the published Stable release manifest
+3. Read the exact release version and source commit
+4. Fetch the public TwinPanel repository over HTTPS
+5. Verify the checked-out Git commit against the manifest
+6. Verify the source `VERSION`
+7. Install PostgreSQL, Redis, Python runtime, Node.js, Nginx, and dependencies
+8. Install Backend and Frontend
+9. Generate local secrets with restricted permissions
+10. Initialize the database and bootstrap the initial admin
+11. Install systemd services
+12. Install the `twinpanel` / `tp` SSH management menu
+13. Enable Nginx and services
+14. Run final Web/API health checks
 
 ## Initial admin credentials
 
@@ -44,44 +54,66 @@ The installer generates a random initial administrator password and stores it on
 /root/twinpanel-initial-admin.txt
 ```
 
-After the first login, change the email/password and delete the file.
+This account is for the first login. After signing in, change the administrator email/password and remove the initial credentials file.
+
+Reinstalling or updating TwinPanel preserves an existing administrator instead of silently replacing the admin password.
+
+## SSH management
+
+After installation run:
+
+```bash
+twinpanel
+```
+
+or:
+
+```bash
+tp
+```
+
+The SSH menu provides panel/service status, admin management, protocol management, updates, backup, logs/diagnostics, version information and related operational controls.
 
 ## Domain and SSL
 
-A domain is not required during the first installation. TwinPanel can start on the server public IP. Domains and TLS are managed later from the Domains & SSL section.
+A domain is not required during the first installation. TwinPanel can start on the server public IP. Domains and TLS can be configured later from the product controls.
 
 ## Updates
 
-The admin panel displays the installed version and update state. When a newer Stable release is available, an update notification appears. Pressing Update runs a guarded process:
+The panel reads the same public Stable manifest used for installation. When a newer validated release is published, the update process uses the exact source commit declared by the manifest.
 
-- pre-upgrade backup
-- entitled release download
-- checksum verification
-- build/install the new release
+The guarded update path includes:
+
+- pre-update backup
+- exact release commit fetch over HTTPS
+- Git commit verification
+- version verification
+- dependency install/build
+- atomic `/opt/twinpanel/current` switch
 - service restart
-- health verification
-- automatic rollback on failure
+- Web/API health verification
+- automatic rollback to the previous release when health verification fails
 
-## Trial and license
+## Licensing
 
-- Trial duration: exactly 7 days from the first successful activation
-- 3 days remaining: visible warning
-- 24 hours remaining: persistent warning
-- Trial expired: admin login, license activation, backup/export and diagnostics remain accessible; new management mutations are restricted according to license policy
-- A temporary license-server outage must not abruptly terminate existing VPN user traffic; a bounded offline grace window is used for connectivity failures
+The current public `1.1.0-rc.1` manifest is installable without a mandatory license service (`license_required: false`). The product retains its license/trial integration so a vendor license service can be enabled later without changing the customer-facing one-line installation command.
 
 ## Important paths
 
 ```text
 /opt/twinpanel/current                 active release
 /opt/twinpanel/releases                installed releases
+/opt/twinpanel/venv                    Python virtual environment
 /etc/twinpanel/backend.env             backend runtime environment
 /etc/twinpanel/frontend.env            frontend runtime environment
+/etc/twinpanel/install.env             release/install settings
 /var/lib/twinpanel-backups             backups
-/var/lib/twinpanel-license             local license state
+/var/lib/twinpanel-license             release/license/update state
 /root/twinpanel-initial-admin.txt      initial admin credentials
+/usr/local/bin/twinpanel               SSH management command
+/usr/local/bin/tp                      short SSH management alias
 ```
 
 ## Security rule
 
-Never commit tokens, vendor license signing keys, SSH private keys, Telegram tokens, production environment files, certificates/private keys, or database dumps to GitHub.
+Never commit production secrets, vendor signing private keys, SSH private keys, Telegram tokens, production environment files, certificate private keys, database dumps, or confidential customer data to GitHub.
