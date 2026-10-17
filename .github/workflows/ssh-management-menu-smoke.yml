@@ -7,6 +7,7 @@ on:
       - "scripts/twinpanel-menu.sh"
       - "backend/scripts/twinpanel_admin_cli.py"
       - "backend/scripts/twinpanel_protocol_cli.py"
+      - "backend/scripts/twinpanel_protocol_cli_en.py"
       - ".github/workflows/ssh-management-menu-smoke.yml"
   workflow_dispatch:
 
@@ -33,6 +34,30 @@ jobs:
         run: |
           python3 -m py_compile backend/scripts/twinpanel_admin_cli.py
           python3 -m py_compile backend/scripts/twinpanel_protocol_cli.py
+          python3 -m py_compile backend/scripts/twinpanel_protocol_cli_en.py
+
+      - name: Verify SSH menu is English-only and ASCII-safe
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          for path in (
+              Path("scripts/twinpanel-menu.sh"),
+              Path("backend/scripts/twinpanel_protocol_cli_en.py"),
+          ):
+              text = path.read_text(encoding="utf-8")
+              non_ascii = [(i, ch) for i, ch in enumerate(text) if ord(ch) > 127]
+              assert not non_ascii, f"non-ASCII characters found in {path}: {non_ascii[:5]}"
+
+          menu = Path("scripts/twinpanel-menu.sh").read_text(encoding="utf-8")
+          assert "Language" not in menu
+          assert "Panel status" in menu
+          assert "Service management" in menu
+          assert "Administrator management" in menu
+          assert "Protocol management" in menu
+          assert "scripts/twinpanel_protocol_cli_en.py" in menu
+          print("SSH_MENU_ENGLISH_ASCII_OK")
+          PY
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -48,9 +73,10 @@ jobs:
         working-directory: backend
         run: |
           python - <<'PY'
-          from scripts import twinpanel_admin_cli, twinpanel_protocol_cli
+          from scripts import twinpanel_admin_cli, twinpanel_protocol_cli, twinpanel_protocol_cli_en
           assert callable(twinpanel_admin_cli.main)
           assert callable(twinpanel_protocol_cli.main)
+          assert callable(twinpanel_protocol_cli_en.main)
           print("SSH_MANAGEMENT_IMPORT_OK")
           PY
 
@@ -61,10 +87,10 @@ jobs:
           grep -q 'TwinPanel initial admin — first login only' installer/install.sh
           grep -q 'Existing administrator preserved' installer/install.sh
 
-      - name: Verify protocol actions are explicit
+      - name: Verify English protocol actions are explicit
         run: |
-          grep -q 'Status / وضعیت' backend/scripts/twinpanel_protocol_cli.py
-          grep -q 'Install / نصب' backend/scripts/twinpanel_protocol_cli.py
-          grep -q 'Repair / تعمیر' backend/scripts/twinpanel_protocol_cli.py
-          grep -q 'Restart / ریستارت' backend/scripts/twinpanel_protocol_cli.py
-          grep -q 'Remove / حذف' backend/scripts/twinpanel_protocol_cli.py
+          grep -q '("status", "Status")' backend/scripts/twinpanel_protocol_cli_en.py
+          grep -q '("install", "Install")' backend/scripts/twinpanel_protocol_cli_en.py
+          grep -q '("repair", "Repair")' backend/scripts/twinpanel_protocol_cli_en.py
+          grep -q '("restart", "Restart")' backend/scripts/twinpanel_protocol_cli_en.py
+          grep -q '("remove", "Remove")' backend/scripts/twinpanel_protocol_cli_en.py
