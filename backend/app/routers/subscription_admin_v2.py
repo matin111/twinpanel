@@ -51,6 +51,7 @@ def _enriched_payload(db: Session, sub: Subscription) -> dict:
     payload.update(
         {
             "creation_mode": "plan" if sub.plan_id is not None else "manual",
+            "plan_name": plan.name if plan is not None else "دستی",
             "activation_duration_days": int(
                 sub.activation_duration_days
                 or (plan.duration_days if plan else 0)
