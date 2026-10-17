@@ -192,6 +192,18 @@ export function LegacyNodesRuntimePage(){
     finally{setBusy("");}
   };
 
+  const upgradeAgent=async()=>{
+    if(!selected||busy||selectedRole==="mother"||!ensureAccess())return;
+    setBusy("agent");setError("");setWarning("");setSuccess("");
+    try{
+      const result=await legacyAdminApi.upgradeAgent(selected.id);
+      const message=s(result.message);
+      setSuccess(message||pick("Node Agent به‌روزرسانی شد؛ مسیرهای سرویس به‌صورت خودکار هماهنگ می‌شوند.","Node Agent updated; service routes will reconcile automatically."));
+      await load(true);
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setBusy("");}
+  };
+
   const toggleMaintenance=async()=>{
     if(!selected||busy||selectedRole==="mother")return;
     setBusy("maintenance");setError("");
@@ -261,6 +273,7 @@ export function LegacyNodesRuntimePage(){
         </div>
         <div className="action-row">
           <button type="button" className="primary-soft" onClick={()=>{setError("");setAccessDraft(current=>({...current,password:""}));setModal("ssh");}}>{pick("دسترسی SSH","SSH access")}</button>
+          {selectedRole!=="mother"?<button type="button" className="primary-soft" disabled={Boolean(busy)} onClick={()=>void upgradeAgent()}>{busy==="agent"?"…":pick("به‌روزرسانی Agent","Update Agent")}</button>:null}
           <button type="button" className="primary-soft" onClick={()=>{setDomainDraft(effectiveDomain);setModal("domain");}}>{pick("دامنه","Domain")}</button>
           {selectedRole==="exit"?<button type="button" className="primary" disabled={Boolean(busy)} onClick={()=>void checkProtocols()}>{busy==="health"?"…":pick("بررسی پروتکل‌ها","Check protocols")}</button>:null}
           {selectedRole!=="mother"?<button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>void toggleMaintenance()}>{selected.status==="maintenance"?pick("خروج از نگهداری","Leave maintenance"):pick("حالت نگهداری","Maintenance")}</button>:null}
