@@ -44,7 +44,8 @@ jobs:
           assert 'WorkingDirectory=/opt/twinpanel/current/backend' in manager
           assert 'PYTHONPATH=/opt/twinpanel/current/backend' in manager
           assert '/opt/twinpanel/venv/bin/python3 -u -m app.tunnel_transport_manager_v12' in manager
-          assert '/opt/twinpanel-product' not in manager
+          assert 'WorkingDirectory=/opt/twinpanel-product' not in manager
+          assert 'PYTHONPATH=/opt/twinpanel-product' not in manager
           assert 'API_UNIT_PATH' in manager
           assert 'api_unit_missing_deferred' in manager
           assert 'ExecStartPre=/bin/sleep 2' in manager
