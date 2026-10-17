@@ -8,7 +8,7 @@ const TelegramManagerPage=dynamic(()=>import("./admin-control-screens").then(m=>
 const TelegramRuntimePage=dynamic(()=>import("./admin-parity-runtime").then(m=>m.TelegramRuntimePage));
 const WalletRuntimePage=dynamic(()=>import("./admin-parity-runtime").then(m=>m.WalletRuntimePage));
 const DiscountsRuntimePage=dynamic(()=>import("./admin-parity-runtime").then(m=>m.DiscountsRuntimePage));
-const ResellersRuntimePage=dynamic(()=>import("./admin-parity-runtime").then(m=>m.ResellersRuntimePage));
+const AdminResellersManagementRuntime=dynamic(()=>import("./admin-resellers-management-runtime").then(m=>m.AdminResellersManagementRuntime));
 const AdminResellerTrafficPlans=dynamic(()=>import("./admin-reseller-traffic-plans").then(m=>m.AdminResellerTrafficPlans));
 const StoreSettingsRuntimePage=dynamic(()=>import("./admin-parity-runtime").then(m=>m.StoreSettingsRuntimePage));
 const BackupsFullRuntimePage=dynamic(()=>import("./backups-full-runtime").then(m=>m.BackupsFullRuntimePage));
@@ -94,7 +94,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="admin/store-settings") return admin(<StoreSettingsRuntimePage/>);
   if(key==="admin/wallet") return admin(<WalletRuntimePage/>);
   if(key==="admin/discounts") return admin(<DiscountsRuntimePage/>);
-  if(key==="admin/resellers") return admin(<ResellersRuntimePage/>);
+  if(key==="admin/resellers") return admin(<AdminResellersManagementRuntime/>);
   if(key==="admin/reseller-traffic-plans") return admin(<AdminResellerTrafficPlans/>);
   if(key==="admin/domains") return admin(<DomainsRuntimePage/>);
   if(key==="admin/provision") return admin(<ProvisionRuntimePage/>);
