@@ -129,6 +129,7 @@ jobs:
           )
           PY
 
+          chmod -R a+rX stage/twinpanel
           tar -C stage -czf "$ASSET" twinpanel
           SHA256="$(sha256sum "$ASSET" | awk '{print $1}')"
           SIZE="$(stat -c '%s' "$ASSET")"

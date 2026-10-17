@@ -27,6 +27,7 @@ DEFAULT_REPOSITORY = 'https://github.com/matin111/twinpanel.git'
 ARTIFACT_FORMAT = 'twinpanel-prebuilt-v1'
 ALLOWED_ARTIFACT_PREFIX = 'https://github.com/matin111/twinpanel/releases/download/'
 STARTED_MONOTONIC = time.monotonic()
+STAGE_SECONDS: dict[str, float] = {}
 
 
 def now() -> str:
@@ -37,7 +38,15 @@ def elapsed_seconds() -> float:
     return round(max(0.0, time.monotonic() - STARTED_MONOTONIC), 3)
 
 
-def save(**payload):
+def stage_begin() -> float:
+    return time.monotonic()
+
+
+def stage_end(name: str, started: float) -> None:
+    STAGE_SECONDS[name] = round(max(0.0, time.monotonic() - started), 3)
+
+
+def save(**payload) -> None:
     ROOT.mkdir(parents=True, exist_ok=True)
     tmp = STATE.with_suffix('.tmp')
     tmp.write_text(
@@ -45,6 +54,7 @@ def save(**payload):
             {
                 'updated_at': now(),
                 'elapsed_seconds': elapsed_seconds(),
+                'stage_seconds': dict(STAGE_SECONDS),
                 **payload,
             },
             ensure_ascii=False,
@@ -90,11 +100,8 @@ def runtime_env() -> dict[str, str]:
 
 
 def get_json(url: str) -> dict:
-    req = urllib.request.Request(
-        url,
-        headers={'User-Agent': 'TwinPanel-Public-Updater/5'},
-    )
-    with urllib.request.urlopen(req, timeout=25) as res:
+    req = urllib.request.Request(url, headers={'User-Agent': 'TwinPanel-Public-Updater/6'})
+    with urllib.request.urlopen(req, timeout=20) as res:
         obj = json.loads(res.read().decode('utf-8'))
     if not isinstance(obj, dict):
         raise RuntimeError('INVALID_MANIFEST')
@@ -157,9 +164,7 @@ def same_file(left: Path, right: Path) -> bool:
     if not left.is_file() or not right.is_file():
         return False
     try:
-        if left.stat().st_size != right.stat().st_size:
-            return False
-        return left.read_bytes() == right.read_bytes()
+        return left.stat().st_size == right.stat().st_size and left.read_bytes() == right.read_bytes()
     except OSError:
         return False
 
@@ -178,8 +183,8 @@ def backup(env: dict[str, str]) -> None:
     )
 
 
-def restart_services() -> None:
-    subprocess.run(['systemctl', 'daemon-reload'], check=False)
+def existing_units() -> list[str]:
+    units: list[str] = []
     for unit in (
         'twinpanel-api.service',
         'twinpanel-web.service',
@@ -190,32 +195,66 @@ def restart_services() -> None:
             ['systemctl', 'cat', unit],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            timeout=5,
         ).returncode == 0:
-            subprocess.run(['systemctl', 'restart', unit], check=False)
+            units.append(unit)
+    return units
 
 
-def healthy_version(url: str, expected_version: str, seconds: int = 75) -> bool:
+def restart_services() -> None:
+    subprocess.run(
+        ['systemctl', 'daemon-reload'],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        timeout=15,
+    )
+    units = existing_units()
+    if units:
+        subprocess.run(
+            ['systemctl', '--no-block', 'restart', *units],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=15,
+        )
+
+
+def health_ok(url: str, expected_version: str) -> bool:
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'TwinPanel-Update-Health/3'})
+        with urllib.request.urlopen(req, timeout=2) as res:
+            if not (200 <= res.status < 300):
+                return False
+            payload = json.loads(res.read().decode('utf-8'))
+        return (
+            isinstance(payload, dict)
+            and payload.get('ok') is True
+            and str(payload.get('version') or '').strip() == expected_version
+        )
+    except Exception:
+        return False
+
+
+def wait_for_healthy(
+    urls: dict[str, str],
+    expected_version: str,
+    seconds: int = 45,
+) -> tuple[bool, list[str]]:
+    pending = set(urls)
     end = time.time() + seconds
-    while time.time() < end:
-        try:
-            req = urllib.request.Request(
-                url,
-                headers={'User-Agent': 'TwinPanel-Update-Health/2'},
-            )
-            with urllib.request.urlopen(req, timeout=4) as res:
-                if not (200 <= res.status < 300):
-                    raise RuntimeError('HTTP_NOT_OK')
-                payload = json.loads(res.read().decode('utf-8'))
-                if (
-                    isinstance(payload, dict)
-                    and payload.get('ok') is True
-                    and str(payload.get('version') or '').strip() == expected_version
-                ):
-                    return True
-        except Exception:
-            pass
-        time.sleep(1)
-    return False
+    while pending and time.time() < end:
+        for name in tuple(pending):
+            if health_ok(urls[name], expected_version):
+                pending.remove(name)
+        if pending:
+            time.sleep(0.5)
+    return not pending, sorted(pending)
+
+
+def healthy_version(url: str, expected_version: str, seconds: int = 45) -> bool:
+    ok, _ = wait_for_healthy({'service': url}, expected_version, seconds=seconds)
+    return ok
 
 
 def atomic_switch(target: Path) -> Path | None:
@@ -251,16 +290,14 @@ def clone_release(repository: str, source_sha: str, target: Path) -> None:
         ],
         timeout=300,
     )
-    run(
-        ['git', '-C', str(target), 'checkout', '-q', '--detach', 'FETCH_HEAD'],
-        timeout=60,
-    )
+    run(['git', '-C', str(target), 'checkout', '-q', '--detach', 'FETCH_HEAD'], timeout=60)
     cp = subprocess.run(
         ['git', '-C', str(target), 'rev-parse', 'HEAD'],
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=False,
+        timeout=15,
     )
     actual = (cp.stdout or '').strip().lower()
     if cp.returncode != 0 or actual != source_sha:
@@ -275,20 +312,17 @@ def artifact_metadata(manifest: dict) -> dict:
 def validate_artifact_metadata(artifact: dict) -> tuple[str, str, int | None]:
     if str(artifact.get('format') or '').strip() != ARTIFACT_FORMAT:
         raise RuntimeError('RELEASE_ARTIFACT_FORMAT_INVALID')
-
     arch = str(artifact.get('arch') or 'x86_64').strip().lower()
     machine = platform.machine().strip().lower()
     aliases = {'amd64': 'x86_64', 'x86_64': 'x86_64'}
     if aliases.get(machine, machine) != aliases.get(arch, arch):
         raise RuntimeError('RELEASE_ARTIFACT_ARCH_MISMATCH')
-
     url = str(artifact.get('url') or '').strip()
     digest = str(artifact.get('sha256') or '').strip().lower()
     if not url.startswith(ALLOWED_ARTIFACT_PREFIX):
         raise RuntimeError('RELEASE_ARTIFACT_URL_INVALID')
     if len(digest) != 64 or any(ch not in '0123456789abcdef' for ch in digest):
         raise RuntimeError('RELEASE_ARTIFACT_SHA256_INVALID')
-
     size = artifact.get('size_bytes')
     try:
         size_value = int(size) if size is not None else None
@@ -305,15 +339,12 @@ def download_verified_artifact(
     destination: Path,
     expected_size: int | None = None,
 ) -> int:
-    req = urllib.request.Request(
-        url,
-        headers={'User-Agent': 'TwinPanel-Public-Updater/5'},
-    )
+    req = urllib.request.Request(url, headers={'User-Agent': 'TwinPanel-Public-Updater/6'})
     digest = hashlib.sha256()
     total = 0
-    with urllib.request.urlopen(req, timeout=90) as response, destination.open('wb') as out:
+    with urllib.request.urlopen(req, timeout=60) as response, destination.open('wb') as out:
         while True:
-            chunk = response.read(1024 * 1024)
+            chunk = response.read(2 * 1024 * 1024)
             if not chunk:
                 break
             total += len(chunk)
@@ -337,15 +368,11 @@ def extract_prebuilt(
     destination.mkdir(parents=True, exist_ok=True)
     with tarfile.open(archive, mode='r:gz') as bundle:
         bundle.extractall(destination, filter='data')
-
     root = destination / 'twinpanel'
     if not root.is_dir():
         raise RuntimeError('RELEASE_ARTIFACT_ROOT_MISSING')
-
-    package_version = (root / 'VERSION').read_text(encoding='utf-8').strip()
-    if package_version != version:
+    if (root / 'VERSION').read_text(encoding='utf-8').strip() != version:
         raise RuntimeError('RELEASE_ARTIFACT_VERSION_MISMATCH')
-
     meta = read_json(root / '.twinpanel-release.json')
     if str(meta.get('format') or '') != ARTIFACT_FORMAT:
         raise RuntimeError('RELEASE_ARTIFACT_METADATA_INVALID')
@@ -353,7 +380,6 @@ def extract_prebuilt(
         raise RuntimeError('RELEASE_ARTIFACT_METADATA_VERSION_MISMATCH')
     if str(meta.get('source_sha') or '').strip().lower() != source_sha:
         raise RuntimeError('RELEASE_ARTIFACT_SOURCE_SHA_MISMATCH')
-
     if not (root / '.next/standalone/server.js').is_file():
         raise RuntimeError('RELEASE_STANDALONE_FRONTEND_MISSING')
     if not (root / 'backend/app/main.py').is_file():
@@ -372,7 +398,6 @@ def prepare_source_fallback(
     clone_release(repository, source_sha, source)
     if (source / 'VERSION').read_text(encoding='utf-8').strip() != version:
         raise RuntimeError('RELEASE_VERSION_MISMATCH')
-
     if (source / 'package-lock.json').is_file():
         run(
             ['npm', 'ci', '--include=optional', '--prefer-offline', '--no-audit', '--no-fund'],
@@ -390,6 +415,9 @@ def prepare_source_fallback(
     run(['npm', 'run', 'build'], cwd=source, env=env, timeout=1500)
     if not (source / '.next/standalone/server.js').is_file():
         raise RuntimeError('FRONTEND_STANDALONE_BUILD_FAILED')
+    git_dir = source / '.git'
+    if git_dir.exists():
+        shutil.rmtree(git_dir)
     return source
 
 
@@ -405,21 +433,23 @@ def install_web_unit(release: Path, web_port: int) -> None:
     tmp.replace(path)
 
 
-def normalize_web_permissions(target: Path) -> None:
-    standalone = target / '.next/standalone'
-    if standalone.exists():
-        subprocess.run(
-            ['chown', '-R', 'www-data:www-data', str(standalone)],
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        subprocess.run(
-            ['chmod', '-R', 'a+rX', str(standalone)],
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+def ensure_web_entry_access(target: Path) -> None:
+    paths = (target, target / '.next', target / '.next/standalone')
+    for path in paths:
+        mode = path.stat().st_mode & 0o777
+        os.chmod(path, mode | 0o055)
+    server = target / '.next/standalone/server.js'
+    mode = server.stat().st_mode & 0o777
+    os.chmod(server, mode | 0o044)
+    check = subprocess.run(
+        ['runuser', '-u', 'www-data', '--', 'test', '-r', str(server)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+        timeout=5,
+    )
+    if check.returncode != 0:
+        raise RuntimeError('FRONTEND_ARTIFACT_PERMISSION_INVALID')
 
 
 def verify_activation(final: Path, version: str) -> None:
@@ -430,15 +460,17 @@ def verify_activation(final: Path, version: str) -> None:
         raise RuntimeError('ACTIVATION_PATH_UNRESOLVED') from exc
     if active != target:
         raise RuntimeError('ACTIVATION_PATH_MISMATCH')
-    active_version = (CURRENT / 'VERSION').read_text(encoding='utf-8').strip()
-    if active_version != version:
+    if (CURRENT / 'VERSION').read_text(encoding='utf-8').strip() != version:
         raise RuntimeError('ACTIVATION_VERSION_MISMATCH')
 
 
 def main() -> int:
     env = runtime_env()
+
+    started = stage_begin()
     manifest_url = env.get('TWINPANEL_RELEASE_MANIFEST_URL') or DEFAULT_MANIFEST
     manifest = get_json(manifest_url)
+    stage_end('manifest', started)
     if manifest.get('installable') is not True or manifest.get('published') is not True:
         raise RuntimeError('RELEASE_NOT_INSTALLABLE')
 
@@ -453,7 +485,6 @@ def main() -> int:
     requested = read_json(REQUEST)
     wanted = str(requested.get('requested_version') or '').strip()
     version, retargeted = resolve_requested_release(wanted, version)
-
     current_version = (CURRENT / 'VERSION').read_text(encoding='utf-8').strip()
     if current_version == version:
         save(
@@ -482,31 +513,50 @@ def main() -> int:
         delivery='prebuilt' if prebuilt else 'source-build-fallback',
     )
 
-    with tempfile.TemporaryDirectory(prefix='twinpanel-public-update-') as name:
-        tmp = Path(name)
+    with tempfile.TemporaryDirectory(prefix='.twinpanel-update-', dir=RELEASES) as name:
+        work = Path(name)
         if prebuilt:
             url, sha256, size_bytes = validate_artifact_metadata(artifact)
-            archive = tmp / 'release.tar.gz'
+            archive = work / 'release.tar.gz'
+
+            save(
+                state='downloading',
+                target_version=version,
+                delivery='prebuilt',
+            )
+            started = stage_begin()
             download_bytes = download_verified_artifact(
                 url,
                 sha256,
                 archive,
                 expected_size=size_bytes,
             )
+            stage_end('download', started)
+
+            save(
+                state='extracting',
+                target_version=version,
+                delivery='prebuilt',
+                download_bytes=download_bytes,
+            )
+            started = stage_begin()
             prepared = extract_prebuilt(
                 archive,
-                tmp / 'extracted',
+                work / 'stage',
                 version,
                 source_sha,
             )
+            stage_end('extract', started)
         else:
+            started = stage_begin()
             prepared = prepare_source_fallback(
                 repository,
                 source_sha,
                 version,
-                tmp,
+                work,
                 env,
             )
+            stage_end('source_build_fallback', started)
 
         save(
             state='backup',
@@ -516,16 +566,15 @@ def main() -> int:
             delivery='prebuilt' if prebuilt else 'source-build-fallback',
             download_bytes=download_bytes,
         )
+        started = stage_begin()
         backup(env)
+        stage_end('backup', started)
 
+        started = stage_begin()
         if final.exists():
             shutil.rmtree(final)
-        shutil.copytree(
-            prepared,
-            final,
-            symlinks=True,
-            ignore=shutil.ignore_patterns('.git', '.env', '.env.local'),
-        )
+        prepared.replace(final)
+        stage_end('activate_files', started)
 
     python = VENV if VENV.is_file() else Path(sys.executable)
     requirements_reused = same_file(
@@ -538,20 +587,24 @@ def main() -> int:
             target_version=version,
             delivery='prebuilt' if prebuilt else 'source-build-fallback',
         )
+        started = stage_begin()
         run(
             [str(python), '-m', 'pip', 'install', '-r', 'backend/requirements.txt'],
             cwd=final,
             env=env,
             timeout=900,
         )
+        stage_end('python_dependencies', started)
 
     if not (final / '.next/standalone/server.js').is_file():
         raise RuntimeError('FRONTEND_ARTIFACTS_MISSING')
 
-    normalize_web_permissions(final)
+    started = stage_begin()
+    ensure_web_entry_access(final)
     web_port = int(env.get('TWINPANEL_WEB_PORT', '3000') or 3000)
     api_port = int(env.get('TWINPANEL_API_PORT', '8095') or 8095)
     install_web_unit(final, web_port)
+    stage_end('runtime_prepare', started)
 
     previous = atomic_switch(final)
     try:
@@ -565,20 +618,25 @@ def main() -> int:
             download_bytes=download_bytes,
             requirements_reused=requirements_reused,
         )
+
+        started = stage_begin()
         restart_services()
+        stage_end('restart_dispatch', started)
 
         verify_activation(final, version)
-        api_ok = healthy_version(
-            f'http://127.0.0.1:{api_port}/health',
+        started = stage_begin()
+        health_ok_all, pending = wait_for_healthy(
+            {
+                'api': f'http://127.0.0.1:{api_port}/health',
+                'web': f'http://127.0.0.1:{web_port}/health',
+            },
             version,
+            seconds=45,
         )
-        web_ok = healthy_version(
-            f'http://127.0.0.1:{web_port}/health',
-            version,
-        )
+        stage_end('health', started)
         verify_activation(final, version)
-        if not api_ok or not web_ok:
-            raise RuntimeError('POST_UPDATE_HEALTH_VERSION_FAILED')
+        if not health_ok_all:
+            raise RuntimeError('POST_UPDATE_HEALTH_VERSION_FAILED:' + ','.join(pending))
     except Exception:
         save(
             state='rollback',
