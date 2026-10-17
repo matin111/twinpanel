@@ -2,16 +2,16 @@
   "schema": 2,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.7",
+  "version": "1.1.0-rc.8",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T18:50:00Z",
+  "released_at": "2026-10-17T19:17:00Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b53308e1bbf9b034dd167b3be21e956d030e136e",
+  "source_sha": "e789ac73b08b395dbafeeb56b4996a903d424941",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "notes": {
-    "fa": "نسخه 1.1.0-rc.7 نصب تازه TwinPanel را کاملاً خودکار می‌کند: بعد از نصب پنل، Cisco/OpenConnect، OpenVPN، WireGuard، L2TP/IPsec و V2Ray/Xray بدون سؤال و بدون مرحله دستی روی Local / This server نصب و Health-check می‌شوند. نصب و بروزرسانی موجود به‌صورت پیش‌فرض پروتکل‌های فعال را دست نمی‌زند.",
-    "en": "TwinPanel 1.1.0-rc.7 makes fresh installation fully automatic: after the panel is installed, Cisco/OpenConnect, OpenVPN, WireGuard, L2TP/IPsec and V2Ray/Xray are provisioned and health-checked automatically on Local / This server with no interactive protocol prompt. Existing installations and updates preserve the current protocol runtime by default."
+    "fa": "نسخه 1.1.0-rc.8 رابط پنل مدیریت را بازطراحی می‌کند: منوی کناری حذف شده و ناوبری گروه‌بندی‌شده به بالای صفحه منتقل شده است. مسیرها، دسترسی‌ها و Backend بدون تغییر باقی مانده‌اند؛ RTL فارسی، English، Dark/Light، وضعیت مسیر فعال، اعلان‌ها و نسخه موبایل نیز حفظ شده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.8 redesigns the admin shell by replacing the sidebar with grouped top navigation. Routes, permissions and backend behavior remain unchanged, while Persian RTL, English, dark/light themes, active-route state, notifications and responsive mobile navigation are preserved."
   }
 }
