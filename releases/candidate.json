@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.14",
-  "source_sha": "2486e68de63ee0ed45fbb9e386b5905970a66f1e",
+  "version": "1.1.0-rc.15",
+  "source_sha": "ff141e858a53606db85453e0cff724a0cd8b6be5",
   "notes": {
-    "fa": "نسخه 1.1.0-rc.14 پس از تکمیل موفق بروزرسانی، صفحه مدیریت را به‌صورت خودکار تازه‌سازی می‌کند. Refresh فقط زمانی انجام می‌شود که وضعیت بروزرسانی completed باشد و نسخه فعال دقیقاً با target_version یکسان باشد؛ در خطا یا Rollback رفرش موفقیت جعلی انجام نمی‌شود.",
-    "en": "TwinPanel 1.1.0-rc.14 automatically refreshes the current admin page after a successful update. Reload only occurs when update state is completed and the active current_version exactly matches target_version, so failed or rolled-back updates never trigger a false-success refresh."
+    "fa": "نسخه 1.1.0-rc.15 مسیر بروزرسانی Prebuilt را روی سرور مشتری Zero-copy می‌کند: فایل Release روی همان فایل‌سیستم مقصد استخراج و با Rename اتمیک فعال می‌شود، کپی کامل دوم و chown/chmod بازگشتی از VPS حذف شده، Restart سرویس‌ها همزمان dispatch می‌شود و API/Web با یک deadline مشترک Health-check می‌شوند. زمان هر مرحله نیز در stage_seconds ثبت می‌شود تا گلوگاه واقعی قابل اندازه‌گیری باشد. Refresh خودکار پنل پس از موفقیت کامل بروزرسانی نیز حفظ شده است.",
+    "en": "TwinPanel 1.1.0-rc.15 makes the customer-side prebuilt update path zero-copy: the verified release is extracted on the destination filesystem and atomically renamed into place, the second full copy and recursive chown/chmod are removed from the VPS, service restarts are dispatched concurrently, and API/Web share one health deadline. Per-stage timings are recorded in stage_seconds for real bottleneck measurement, while automatic admin refresh after a verified successful update remains enabled."
   }
 }
