@@ -108,7 +108,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
       </div>
     </div>
 
-    <main>
+    <main onPointerDown={closeMenus}>
       <header className="admin-commandbar">
         <div className="search">⌕ <input placeholder={pick("جستجو در پنل...","Search panel...")}/></div>
         <div className="head-actions"><LanguageSwitch compact/><ThemeSwitch compact/><AdminNotificationCenter/><span className="avatar">M</span></div>
