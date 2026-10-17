@@ -12,6 +12,11 @@ import {serviceConnectionsV36Api} from "../lib/service-connections-v36-api";
 import {useI18n} from "../lib/i18n";
 
 
+type ServiceCapabilities={
+  repair_real_egress?:boolean;
+  xray_reconcile?:boolean;
+};
+
 function reasonLabel(value: string | null | undefined, pick: (fa:string,en:string)=>string) {
   switch (String(value || "")) {
     case "tls_domain_unavailable":
@@ -28,34 +33,19 @@ function reasonLabel(value: string | null | undefined, pick: (fa:string,en:strin
   }
 }
 
-
 function connectionTone(item: TunnelServiceConnection): "ok" | "warn" | "bad" {
-  if (item.available === false) {
-    return "warn";
-  }
-  if (item.healthy === true) {
-    return "ok";
-  }
-  if (item.healthy === false) {
-    return "bad";
-  }
+  if (item.available === false) return "warn";
+  if (item.healthy === true) return "ok";
+  if (item.healthy === false) return "bad";
   return "warn";
 }
 
-
 function connectionStatus(item: TunnelServiceConnection, pick: (fa:string,en:string)=>string) {
-  if (item.available === false) {
-    return pick("غیرفعال", "Unavailable");
-  }
-  if (item.healthy === true) {
-    return "ONLINE";
-  }
-  if (item.healthy === false) {
-    return "CHECK";
-  }
+  if (item.available === false) return pick("غیرفعال", "Unavailable");
+  if (item.healthy === true) return "ONLINE";
+  if (item.healthy === false) return "CHECK";
   return pick("نامشخص", "Unknown");
 }
-
 
 function portText(value: number | null | undefined, transport?: string) {
   if (value == null) {
@@ -63,7 +53,6 @@ function portText(value: number | null | undefined, transport?: string) {
   }
   return String(value);
 }
-
 
 export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
   const {pick} = useI18n();
@@ -90,15 +79,7 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
 
   useEffect(() => {
     void load();
-
-    // Service routes are reconciled by Node Agent. Keep this panel live so a
-    // transport repair or a freshly restored Iran service route appears without
-    // a manual page refresh.
-    const timer=window.setInterval(
-      ()=>void load(true),
-      5000,
-    );
-
+    const timer=window.setInterval(()=>void load(true),5000);
     return ()=>window.clearInterval(timer);
   }, [tunnelId]);
 
@@ -107,6 +88,11 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
     ()=>connections.some(item=>String(item.protocol||"").toLowerCase()==="v2ray"),
     [connections],
   );
+  const capabilities=(
+    data as (TunnelServiceConnectionsResponse&{capabilities?:ServiceCapabilities})|null
+  )?.capabilities;
+  const canRepairRealEgress=Boolean(capabilities?.repair_real_egress);
+  const canReconcileXray=Boolean(capabilities?.xray_reconcile&&hasXray);
 
   const highSpeed = async () => {
     if(busy)return;
@@ -127,13 +113,11 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
               `Verified real Internet egress on ${result.active_transport||selected?.transport||"a healthy transport"}${latency!=null?`; ${latency}ms`:""}${loss!=null?`; ${loss}% loss`:""}.`,
             )
           : pick(
-              "قوانین خروج اصلاح شد اما هنوز هیچ مسیر واقعی سالمی تایید نشد.",
-              "Exit routing was repaired, but no real healthy dataplane was verified yet.",
+              "هیچ TP2027 سالمی تایید نشد؛ مسیر سالم قبلی بدون تغییر حفظ شد.",
+              "No healthy TP2027 path was verified; the existing healthy fallback was preserved.",
             ),
       );
 
-      // The repair action is short. Give Node Agent a small window to publish
-      // the service DNAT routes that depend on the newly verified active tunnel.
       for(let i=0;i<8;i+=1){
         await new Promise<void>(resolve=>window.setTimeout(resolve,2000));
         await load(true);
@@ -198,7 +182,7 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
             </>
           )}
 
-          {data && (
+          {data && canRepairRealEgress && (
             <button
               type="button"
               className="primary-soft"
@@ -209,7 +193,7 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
             </button>
           )}
 
-          {hasXray && (
+          {canReconcileXray && (
             <button
               type="button"
               className="primary-soft"
