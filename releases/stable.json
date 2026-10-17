@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.18",
+  "version": "1.1.0-rc.19",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T21:59:38Z",
+  "released_at": "2026-10-17T22:22:05Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "c56ec6493be0cdc1f97d7cacde520ef87cbf6907",
+  "source_sha": "9b01d3912fa851152d6bccbcfb5d69eabe517115",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.18/twinpanel-1.1.0-rc.18-linux-x86_64.tar.gz",
-    "sha256": "4941e37a48a8d55848a6078988292ebfb1694c76704804008b9e6832bd696fb3",
-    "size_bytes": 12463447
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.19/twinpanel-1.1.0-rc.19-linux-x86_64.tar.gz",
+    "sha256": "02434809a2477519845fb77f8089cff13a33c366b500eafb4fe2be9c16e25050",
+    "size_bytes": 12465065
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.18 رفتار منوی مدیریت را اصلاح می‌کند. اگر پشتیبانی گفتگوی نیازمند پاسخ، پرداخت/رسید نیازمند بررسی، اعلان خوانده‌نشده یا بروزرسانی جدید داشته باشد، گروه مربوطه با رنگ قرمز و نقطه چشمک‌زن مشخص می‌شود و هشدار پشتیبانی صرفاً با باز کردن صفحه پاک نمی‌شود؛ تا زمان پاسخ یا بستن گفتگو باقی می‌ماند. همچنین منوی بالایی به Accordion واقعی تبدیل شده تا با باز کردن هر گروه، گروه قبلی خودکار بسته شود و پس از انتخاب یک آیتم نیز Dropdown بسته شود.",
-    "en": "TwinPanel 1.1.0-rc.18 fixes admin navigation attention and menu behavior. Support conversations needing a reply, payments/receipts needing review, unread notifications, and available updates keep their related navigation group red with a blinking attention dot until the work is actually resolved. Opening the Support page no longer clears pending-reply attention. The top navigation is now an exclusive accordion, so opening one group automatically closes the previous group, and selecting an item closes the dropdown."
+    "fa": "نسخه 1.1.0-rc.19 سه اصلاح Runtime را یک‌جا منتشر می‌کند: خطاهای موقت 502/503/504 هنگام ری‌استارت بروزرسانی دیگر به‌عنوان خطای قرمز نمایش داده نمی‌شوند و Marker بازیابی تا تأیید نسخه جدید حفظ می‌شود؛ منوی بالای مدیریت با کلیک روی محتوای صفحه خودکار بسته می‌شود؛ و چت آنلاین پشتیبانی ادمین دوباره زنده است، چون Endpoint واقعی دریافت پیام‌های جدید پس از after_id به Backend اضافه شده و Contract آن در CI نصب واقعی محافظت می‌شود.",
+    "en": "TwinPanel 1.1.0-rc.19 ships three runtime fixes together: transient 502/503/504 errors during update restarts are no longer shown as false red failures and the recovery marker remains until the new version is confirmed; admin top-navigation dropdowns close automatically when page content is clicked; and admin live support chat is live again through a real backend messages-after delta endpoint guarded by the installed-runtime CI contract."
   }
 }
