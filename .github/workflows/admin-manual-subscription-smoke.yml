@@ -1,0 +1,222 @@
+name: TwinPanel Admin Manual Subscription Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/subscription_plan_schema.py'
+      - 'backend/app/routers/subscription_admin_v2.py'
+      - 'backend/app/services/subscription_factory.py'
+      - 'backend/app/schemas.py'
+      - 'components/admin-manual-subscription-create.tsx'
+      - 'components/routed-page-client.tsx'
+      - 'lib/admin-api.ts'
+      - '.github/workflows/admin-manual-subscription-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  manual-subscription:
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: twinpanel
+          POSTGRES_PASSWORD: twinpanel_test
+          POSTGRES_DB: twinpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U twinpanel -d twinpanel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      APP_NAME: TwinPanel-Manual-Subscription-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+      TWINPANEL_ADMIN_EMAIL: admin-ci@example.com
+      TWINPANEL_ADMIN_PASSWORD: TwinPanel-CI-Admin-2026!
+      TWINPANEL_ADMIN_NAME: TwinPanel CI Admin
+      NEXT_TELEMETRY_DISABLED: '1'
+      NEXT_PUBLIC_API_BASE: ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Prepare runtime directories
+        run: |
+          sudo install -d -m 700 /etc/twinpanel
+          sudo install -d -m 700 /var/lib/twinpanel-backups
+          sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel-backups
+
+      - name: Verify manual and plan-backed creation contracts
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from sqlalchemy import inspect, text
+
+          from app.main import app
+          from app.database import SessionLocal, engine
+          from app.models import Plan, Subscription, SubscriptionProtocol, User
+          from app.routers.subscription_admin_v2 import AdminSubscriptionCreateV2, admin_create_v2
+          from app.security import hash_password
+
+          assert app.title
+
+          # Fresh metadata must already describe plan_id as nullable because the
+          # compatibility module is imported before Base.metadata.create_all.
+          assert Subscription.__table__.c.plan_id.nullable is True
+          assert inspect(engine).get_columns('subscriptions')
+
+          db = SessionLocal()
+          try:
+              user = User(
+                  email='manual-sub-ci@example.com',
+                  password_hash=hash_password('TwinPanel-CI-Manual-2026!'),
+                  full_name='Manual Subscription CI',
+                  is_active=True,
+              )
+              plan = Plan(
+                  name='CI Plan Backed',
+                  duration_days=30,
+                  traffic_gb=50,
+                  device_limit=2,
+                  price_toman=1000,
+                  is_active=True,
+                  enable_cisco=True,
+                  enable_openvpn=True,
+                  enable_wireguard=True,
+                  enable_l2tp=True,
+                  enable_v2ray=True,
+              )
+              db.add_all([user, plan]); db.commit(); db.refresh(user); db.refresh(plan)
+              user_id=user.id; plan_id=plan.id
+          finally:
+              db.close()
+
+          # Recreate the legacy production shape, then prove the first manual
+          # request converges it before opening its own ORM transaction.
+          with engine.begin() as connection:
+              connection.execute(text('ALTER TABLE subscriptions ALTER COLUMN plan_id SET NOT NULL'))
+          legacy_plan_column={c['name']:c for c in inspect(engine).get_columns('subscriptions')}['plan_id']
+          assert legacy_plan_column['nullable'] is False
+
+          db = SessionLocal()
+          try:
+              manual = admin_create_v2(
+                  AdminSubscriptionCreateV2(
+                      user_id=user_id,
+                      plan_id=None,
+                      traffic_gb=25,
+                      duration_days=45,
+                      device_limit=3,
+                      protocols=['cisco','wireguard'],
+                  ),
+                  db,
+              )
+              assert manual['plan_id'] is None
+              assert manual['creation_mode'] == 'manual'
+              assert manual['plan_name'] == 'دستی'
+              assert manual['activation_duration_days'] == 45
+              assert manual['device_limit'] == 3
+              manual_id=int(manual['id'])
+          finally:
+              db.close()
+
+          migrated_plan_column={c['name']:c for c in inspect(engine).get_columns('subscriptions')}['plan_id']
+          assert migrated_plan_column['nullable'] is True
+
+          db = SessionLocal()
+          try:
+              stored=db.get(Subscription, manual_id)
+              assert stored is not None and stored.plan_id is None
+              assert stored.traffic_limit_bytes == 25 * 1024**3
+              protocols=[row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==manual_id).order_by(SubscriptionProtocol.protocol).all()]
+              assert protocols == ['cisco','wireguard']
+
+              plan_backed = admin_create_v2(
+                  AdminSubscriptionCreateV2(
+                      user_id=user_id,
+                      plan_id=plan_id,
+                      protocols=[],
+                  ),
+                  db,
+              )
+              assert plan_backed['plan_id'] == plan_id
+              assert plan_backed['creation_mode'] == 'plan'
+              assert plan_backed['activation_duration_days'] == 30
+              assert plan_backed['device_limit'] == 2
+          finally:
+              db.close()
+
+          print('ADMIN_MANUAL_SUBSCRIPTION_RUNTIME_OK')
+          PY
+
+      - name: Verify frontend manual-mode contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          api=Path('lib/admin-api.ts').read_text(encoding='utf-8')
+          routed=Path('components/routed-page-client.tsx').read_text(encoding='utf-8')
+          manual=Path('components/admin-manual-subscription-create.tsx').read_text(encoding='utf-8')
+          backend=Path('backend/app/routers/subscription_admin_v2.py').read_text(encoding='utf-8')
+          schema=Path('backend/app/subscription_plan_schema.py').read_text(encoding='utf-8')
+
+          assert 'plan_id?:number|null' in api
+          assert 'AdminManualSubscriptionCreate' in routed
+          assert '<AdminManualSubscriptionCreate/><LegacySubscriptionsRuntimePage/>' in routed
+          assert 'plan_id:null' in manual
+          assert 'اشتراک دستی' in manual
+          assert 'traffic_gb:trafficValue' in manual
+          assert 'duration_days:durationValue' in manual
+          assert 'protocols.length===0' in manual
+          assert 'window.location.reload()' in manual
+          assert 'plan_id: int | None = None' in backend
+          assert 'ensure_subscription_plan_schema()' in backend
+          assert 'ALTER COLUMN plan_id DROP NOT NULL' in schema
+          assert 'Subscription.__table__.c.plan_id.nullable = True' in schema
+
+          print('ADMIN_MANUAL_SUBSCRIPTION_FRONTEND_CONTRACT_OK')
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Build frontend
+        run: npm run build
