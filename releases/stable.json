@@ -2,16 +2,16 @@
   "schema": 2,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.3",
+  "version": "1.1.0-rc.4",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T17:38:00Z",
+  "released_at": "2026-10-17T18:00:00Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "ee56f7c4c9963c2ea9a84480750c1f1a8e13180a",
+  "source_sha": "10edbfd6ed243817efc8db8e84a8841476e15fa9",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "notes": {
-    "fa": "نسخه 1.1.0-rc.3 نمایش تکراری لیست پروتکل‌ها در منوی مدیریت SSH را حذف می‌کند. انتخاب پروتکل فقط یک‌بار نمایش داده می‌شود و جریان انتخاب Exit Node و عملیات پروتکل بدون تغییر باقی می‌ماند.",
-    "en": "TwinPanel 1.1.0-rc.3 removes the duplicated protocol list in SSH management. Protocol choices are shown once while Exit-node selection and protocol actions remain unchanged."
+    "fa": "نسخه 1.1.0-rc.4 سرور اصلی TwinPanel را به‌عنوان Local / This server به مدیریت پروتکل‌ها اضافه می‌کند. Status، Install، Repair، Restart و Remove روی سرور اصلی بدون SSH به خودش اجرا می‌شوند و Exit Nodeهای ریموت همچنان با دسترسی SSH ذخیره‌شده مدیریت می‌شوند. Remove قبل از تغییر فایل‌ها روی مقصد انتخاب‌شده بکاپ می‌گیرد.",
+    "en": "TwinPanel 1.1.0-rc.4 adds the main TwinPanel server as a Local / This server protocol target. Status, Install, Repair, Restart and Remove run locally without SSH-to-self, while remote Exit nodes continue to use saved SSH access. Remove backs up the selected target before changing protocol files."
   }
 }
