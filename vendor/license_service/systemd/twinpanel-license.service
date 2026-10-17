@@ -1,0 +1,25 @@
+[Unit]
+Description=TwinPanel Vendor License and Distribution API
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=twinlicense
+Group=twinlicense
+WorkingDirectory=/opt/twinpanel-license-service
+EnvironmentFile=/etc/twinpanel-license-server/license.env
+ExecStart=/opt/twinpanel-license-service/venv/bin/uvicorn app:app --host 127.0.0.1 --port 8110 --workers 2
+Restart=always
+RestartSec=3
+TimeoutStartSec=60
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/twinpanel-license-server /srv/twinpanel-releases
+ReadOnlyPaths=/etc/twinpanel-license-server
+
+[Install]
+WantedBy=multi-user.target
