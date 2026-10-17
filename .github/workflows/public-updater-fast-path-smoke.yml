@@ -73,10 +73,21 @@ jobs:
               'RELEASE_ARTIFACT_SHA256_MISMATCH',
               'verify_activation',
               'ACTIVATION_VERSION_MISMATCH',
-              'healthy_version',
+              'wait_for_healthy',
               "delivery='prebuilt' if prebuilt else 'source-build-fallback'",
+              "TemporaryDirectory(prefix='.twinpanel-update-', dir=RELEASES)",
+              "['systemctl', '--no-block', 'restart', *units]",
+              "'stage_seconds': dict(STAGE_SECONDS)",
+              "prepared.replace(final)",
           ):
               assert marker in text,marker
+
+          assert "shutil.copytree(" not in text
+          assert "['chown', '-R'" not in text
+          assert "['chmod', '-R'" not in text
+
+          publisher=Path('.github/workflows/publish-prebuilt-release.yml').read_text(encoding='utf-8')
+          assert 'chmod -R a+rX stage/twinpanel' in publisher
 
           service=Path('deploy/systemd/twinpanel-web.service.tpl').read_text(encoding='utf-8')
           assert '.next/standalone/server.js' in service
@@ -84,7 +95,7 @@ jobs:
 
           config=Path('next.config.ts').read_text(encoding='utf-8')
           assert 'output:"standalone"' in config.replace(' ','')
-          print('PREBUILT_UPDATER_SMOKE_OK')
+          print('PREBUILT_UPDATER_ZERO_COPY_SMOKE_OK')
           PY
 
       - name: Validate shell and Python syntax
