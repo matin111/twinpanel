@@ -26,6 +26,7 @@ export function AdminManualSubscriptionCreate(){
   const {pick}=useI18n();
   const [mounted,setMounted]=useState(false);
   const [actionHost,setActionHost]=useState<HTMLElement|null>(null);
+  const [primaryAction,setPrimaryAction]=useState<HTMLButtonElement|null>(null);
   const [open,setOpen]=useState(false);
   const [users,setUsers]=useState<AdminUser[]>([]);
   const [loadingUsers,setLoadingUsers]=useState(false);
@@ -44,13 +45,37 @@ export function AdminManualSubscriptionCreate(){
   useEffect(()=>{
     setMounted(true);
     let frame=0;
+    let host:HTMLDivElement|null=null;
+    let original:HTMLButtonElement|null=null;
+    let originalDisplay="";
+
     const locate=()=>{
-      const host=document.querySelector<HTMLElement>(".legacy-subscriptions-page .page-head");
-      if(host){setActionHost(host);return;}
-      frame=window.requestAnimationFrame(locate);
+      const pageHead=document.querySelector<HTMLElement>(".legacy-subscriptions-page .page-head");
+      if(!pageHead){frame=window.requestAnimationFrame(locate);return;}
+
+      original=pageHead.querySelector<HTMLButtonElement>(":scope > button.primary");
+      if(!original){frame=window.requestAnimationFrame(locate);return;}
+
+      host=document.createElement("div");
+      host.className="row-actions subscription-create-action-group";
+      host.setAttribute("data-subscription-create-actions","true");
+      pageHead.insertBefore(host,original);
+
+      originalDisplay=original.style.display;
+      original.style.display="none";
+
+      setPrimaryAction(original);
+      setActionHost(host);
     };
+
     frame=window.requestAnimationFrame(locate);
-    return()=>window.cancelAnimationFrame(frame);
+    return()=>{
+      window.cancelAnimationFrame(frame);
+      setActionHost(null);
+      setPrimaryAction(null);
+      if(original)original.style.display=originalDisplay;
+      host?.remove();
+    };
   },[]);
 
   const filteredUsers=useMemo(()=>{
@@ -131,9 +156,14 @@ export function AdminManualSubscriptionCreate(){
   if(!mounted)return null;
 
   const action=actionHost?createPortal(
-    <button type="button" className="primary-soft" onClick={openManual}>
-      ＋ {pick("اشتراک دستی","Manual subscription")}
-    </button>,
+    <>
+      <button type="button" className="primary" onClick={()=>primaryAction?.click()}>
+        ＋ {pick("اشتراک جدید","New subscription")}
+      </button>
+      <button type="button" className="primary-soft" onClick={openManual}>
+        ＋ {pick("اشتراک دستی","Manual subscription")}
+      </button>
+    </>,
     actionHost,
   ):null;
 
