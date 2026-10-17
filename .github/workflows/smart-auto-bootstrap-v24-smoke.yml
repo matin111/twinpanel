@@ -1,0 +1,185 @@
+name: Smart Auto Bootstrap V24 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/smart_auto_bootstrap_v24.py'
+      - 'backend/app/tunnel_transport_manager_v12.py'
+      - '.github/workflows/smart-auto-bootstrap-v24-smoke.yml'
+  push:
+    branches:
+      - feat/smart-auto-bootstrap-v24
+    paths:
+      - 'backend/app/smart_auto_bootstrap_v24.py'
+      - 'backend/app/tunnel_transport_manager_v12.py'
+      - '.github/workflows/smart-auto-bootstrap-v24-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap-postgres:
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: twinpanel
+          POSTGRES_PASSWORD: twinpanel
+          POSTGRES_DB: twinpanel_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U twinpanel -d twinpanel_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
+    env:
+      APP_SECRET_KEY: bootstrap-v24-test-secret
+      NODE_AGENT_SHARED_SECRET: bootstrap-v24-node-secret
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel@127.0.0.1:5432/twinpanel_test
+      REDIS_URL: redis://127.0.0.1:6379/0
+      PYTHONPATH: ${{ github.workspace }}/backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Compile bootstrap runtime
+        run: |
+          python -m py_compile \
+            backend/app/smart_auto_bootstrap_v24.py \
+            backend/app/tunnel_transport_manager_v12.py
+
+      - name: Run bootstrap database contract
+        run: |
+          python - <<'PY'
+          from app.database import Base, SessionLocal, engine
+          from app.models import (
+              Node,
+              NodeAccess,
+              NodeStatus,
+              NodeType,
+              Tunnel,
+              TunnelPeerState,
+              TunnelTransport,
+          )
+          from app.smart_auto_bootstrap_v24 import reconcile_once
+
+          Base.metadata.drop_all(bind=engine)
+          Base.metadata.create_all(bind=engine)
+
+          db = SessionLocal()
+          try:
+              iran = Node(
+                  name='iran-test',
+                  node_type=NodeType.IRAN,
+                  country_code='IR',
+                  public_ip='193.0.2.10',
+                  agent_url='http://193.0.2.10:8787',
+                  status=NodeStatus.ONLINE,
+              )
+              exit1 = Node(
+                  name='exit-test-1',
+                  node_type=NodeType.EXIT,
+                  country_code='DE',
+                  public_ip='198.51.100.20',
+                  agent_url='local://core',
+                  status=NodeStatus.ONLINE,
+              )
+              exit2 = Node(
+                  name='exit-test-2',
+                  node_type=NodeType.EXIT,
+                  country_code='NL',
+                  public_ip='198.51.100.21',
+                  agent_url='http://198.51.100.21:8787',
+                  status=NodeStatus.ONLINE,
+              )
+              db.add_all([iran, exit1, exit2])
+              db.flush()
+              for node in (iran, exit1, exit2):
+                  db.add(NodeAccess(
+                      node_id=node.id,
+                      ssh_port=22,
+                      ssh_username='root',
+                      private_key_path=f'/tmp/node-{node.id}.key',
+                  ))
+              db.commit()
+              iran_id = int(iran.id)
+              exit1_id = int(exit1.id)
+              exit2_id = int(exit2.id)
+          finally:
+              db.close()
+
+          # Ambiguous topology: must be a strict no-op.
+          result = reconcile_once()
+          assert result['created_tunnel_id'] is None, result
+
+          db = SessionLocal()
+          try:
+              assert db.query(Tunnel).count() == 0
+              db.query(NodeAccess).filter(NodeAccess.node_id == exit2_id).delete()
+              db.query(Node).filter(Node.id == exit2_id).delete()
+              db.commit()
+          finally:
+              db.close()
+
+          # Exactly one eligible pair: create one logical AUTO tunnel only.
+          result = reconcile_once()
+          tunnel_id = result['created_tunnel_id']
+          assert tunnel_id is not None, result
+
+          db = SessionLocal()
+          try:
+              tunnels = db.query(Tunnel).all()
+              assert len(tunnels) == 1
+              tunnel = tunnels[0]
+              assert int(tunnel.iran_node_id) == iran_id
+              assert int(tunnel.exit_node_id) == exit1_id
+              assert tunnel.mode == 'auto'
+              assert tunnel.is_active is True
+              assert tunnel.active_transport is None
+              assert getattr(tunnel.status, 'value', tunnel.status) == 'offline'
+
+              peers = db.query(TunnelPeerState).filter(
+                  TunnelPeerState.tunnel_id == tunnel_id
+              ).all()
+              assert len(peers) == 2
+              assert all(peer.tunnel_reachable is False for peer in peers)
+
+              seeds = db.query(TunnelTransport).filter(
+                  TunnelTransport.tunnel_id == tunnel_id,
+                  TunnelTransport.transport == 'tcp_2027',
+              ).all()
+              assert len(seeds) == 1
+              assert seeds[0].enabled is False
+              assert seeds[0].status == 'not_installed'
+          finally:
+              db.close()
+
+          # Idempotent second pass: never duplicate the logical pair or seed.
+          second = reconcile_once()
+          assert second['created_tunnel_id'] is None, second
+
+          db = SessionLocal()
+          try:
+              assert db.query(Tunnel).count() == 1
+              assert db.query(TunnelTransport).filter(
+                  TunnelTransport.tunnel_id == tunnel_id,
+                  TunnelTransport.transport == 'tcp_2027',
+              ).count() == 1
+          finally:
+              db.close()
+
+          print('SMART_AUTO_BOOTSTRAP_V24_POSTGRES_OK')
+          PY
