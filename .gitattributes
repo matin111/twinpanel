@@ -1,0 +1,11 @@
+/vendor export-ignore
+/.github export-ignore
+/.gitignore export-ignore
+/.gitattributes export-ignore
+/FEATURE_PARITY.md export-ignore
+/LEGACY_EXACT_FEATURE_MATRIX.md export-ignore
+/MIGRATION_MANIFEST.md export-ignore
+/PREVIEW.md export-ignore
+/PRODUCT_DISTRIBUTION.md export-ignore
+/RELEASE_WORKFLOW.md export-ignore
+/LICENSE_TRIAL_SPEC.md export-ignore
