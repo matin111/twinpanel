@@ -55,9 +55,6 @@ jobs:
           assert '.order_by(SupportMessage.id.asc())' in support_delta
           assert 'support_live_delta' in routers_init
 
-          # Customer and guest chat must continue receiving admin replies without
-          # a manual refresh. These routes are intentionally full-detail today;
-          # the contract ensures the polled frontend paths actually exist.
           assert '`/v1/support/tickets/${current.id}`' in support_widget
           assert '`/v1/support/guest/tickets/${saved.ticketId}`' in support_widget
           assert 'window.setInterval(()=>{if(document.visibilityState==="visible")void refresh(true);},500)' in support_widget
@@ -76,6 +73,7 @@ jobs:
           assert 'markRecoveryReloadRequested(pageInstanceRef.current)' in release_ui
           assert 'if(marker)return;' in release_ui
           assert '[502,503,504].includes(reason.status)' in release_ui
+          assert 'window.setInterval(checkNow,60000)' in release_ui
 
           print('PORTABLE_RUNTIME_CONTRACT_OK')
           PY
