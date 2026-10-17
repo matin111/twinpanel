@@ -172,7 +172,7 @@ protocol_menu(){
   echo "Select the Exit node, protocol and action."
   echo "Protocol removal creates a backup on that node before changing files."
   echo
-  run_backend scripts/twinpanel_protocol_cli.py || true
+  run_backend scripts/twinpanel_protocol_cli_en.py || true
   pause
 }
 
