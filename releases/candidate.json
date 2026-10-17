@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.16",
-  "source_sha": "411af6aabc8ce6e6b4f7343e671bef0f193552b6",
+  "version": "1.1.0-rc.17",
+  "source_sha": "eb2733af9a046a897049d7bc05563ff466aa9689",
   "notes": {
-    "fa": "نسخه 1.1.0-rc.16 برای Benchmark واقعی موتور بروزرسانی Zero-copy منتشر می‌شود. این نسخه زمان کل و زمان هر مرحله بروزرسانی را ثبت می‌کند تا Download، Extract، Backup، Restart و Health جداگانه قابل اندازه‌گیری باشند. همچنین خطاهای موقت 502 یا قطع کوتاه API هنگام Restart طبیعی سرویس‌ها دیگر در UI به‌عنوان خطای بروزرسانی نمایش داده نمی‌شوند؛ اگر Update واقعاً fail شود، خطای واقعی پس از بازگشت API نمایش داده خواهد شد.",
-    "en": "TwinPanel 1.1.0-rc.16 is a real-world benchmark release for the zero-copy updater. It records total and per-stage update timings so download, extract, backup, restart and health can be measured independently. Expected transient 502/network errors during the normal API restart window are no longer shown as update failures in the UI; genuine updater failures are surfaced after the API returns."
+    "fa": "نسخه 1.1.0-rc.17 شکاف بین تست‌های CI و نصب واقعی مشتری را می‌بندد. در Prebuilt عمومی، اگر NEXT_PUBLIC_API_BASE خالی یا loopback باشد، مرورگر به‌صورت امن از origin فعلی پنل و proxy داخلی /v1 استفاده می‌کند؛ بنابراین قابلیت‌هایی مثل پشتیبانی آنلاین دیگر به‌دلیل ثابت نبودن دامنه/IP از API جدا نمی‌شوند. همچنین یک Installed Feature Audit فقط‌خواندنی اضافه شده که سرویس‌ها، Health، same-origin proxy، احراز هویت ادمین محلی و Endpointهای واقعی داشبورد، کاربران، پلن‌ها، اشتراک‌ها، نودها، تونل‌ها، پروتکل‌ها، امنیت، پرداخت، کیف پول، فروشگاه، تخفیف، پشتیبانی، اعلان‌ها، بکاپ، دامنه، تنظیمات، تلگرام، نمایندگی، Quota و سیستم بروزرسانی را PASS/WARN/FAIL گزارش می‌کند.",
+    "en": "TwinPanel 1.1.0-rc.17 closes the gap between source CI and real customer installations. Public prebuilt builds now resolve an empty or loopback NEXT_PUBLIC_API_BASE to the current browser origin and the built-in /v1 proxy, keeping browser features connected on IP and custom-domain installs. It also adds a read-only Installed Feature Audit covering services, health, same-origin proxying, local admin auth, and live feature endpoints for dashboard, users, plans, subscriptions, nodes, tunnels, protocols, security, payments, wallet, store, discounts, support, notifications, backups, domains, settings, Telegram, resellers, quota, and the updater."
   }
 }
