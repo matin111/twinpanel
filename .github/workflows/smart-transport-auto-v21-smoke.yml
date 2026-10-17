@@ -9,6 +9,7 @@ on:
       - 'backend/app/candidate_lifecycle_v21.py'
       - 'backend/app/self_hosted_runtime.py'
       - 'backend/app/routers/modern_transports.py'
+      - 'backend/app/transport_candidates/__init__.py'
       - 'backend/deploy/systemd/twinpanel-transport-manager.service'
       - '.github/workflows/smart-transport-auto-v21-smoke.yml'
   push:
@@ -21,6 +22,7 @@ on:
       - 'backend/app/candidate_lifecycle_v21.py'
       - 'backend/app/self_hosted_runtime.py'
       - 'backend/app/routers/modern_transports.py'
+      - 'backend/app/transport_candidates/__init__.py'
       - 'backend/deploy/systemd/twinpanel-transport-manager.service'
       - '.github/workflows/smart-transport-auto-v21-smoke.yml'
 
@@ -47,7 +49,8 @@ jobs:
             backend/app/tunnel_transport_manager_v12.py \
             backend/app/candidate_lifecycle_v21.py \
             backend/app/self_hosted_runtime.py \
-            backend/app/routers/modern_transports.py
+            backend/app/routers/modern_transports.py \
+            backend/app/transport_candidates/__init__.py
 
       - name: Smart transport static contracts
         run: |
@@ -60,6 +63,7 @@ jobs:
           lifecycle = Path('backend/app/candidate_lifecycle_v21.py').read_text()
           runtime = Path('backend/app/self_hosted_runtime.py').read_text()
           api = Path('backend/app/routers/modern_transports.py').read_text()
+          cleanup = Path('backend/app/transport_candidates/__init__.py').read_text()
           unit = Path('backend/deploy/systemd/twinpanel-transport-manager.service').read_text()
 
           required_candidates = ('kernel_gre', 'gost_tun', 'amneziawg', 'netrix')
@@ -67,6 +71,7 @@ jobs:
               assert name in smart, f'{name} missing from Smart Auto'
               assert name in route, f'{name} missing from route metadata'
               assert name in api, f'{name} missing from API surface'
+              assert name in cleanup, f'{name} missing from cleanup surface'
 
           assert 'download_weight=0.70' in smart
           assert 'upload_weight=0.30' in smart
@@ -79,5 +84,6 @@ jobs:
           assert '"selectable": qualified' in api
           assert 'selectable": False' not in api
           assert 'CANDIDATE_L3_TRANSPORTS' in route
+          assert 'Shared binaries/toolchains are intentionally preserved' in cleanup
           print('SMART_TRANSPORT_AUTO_V21_CONTRACT_OK')
           PY
