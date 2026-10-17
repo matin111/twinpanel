@@ -5,7 +5,8 @@ import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
 
-const UPDATE_RELOAD_KEY="twinpanel-update-reload-pending-v1";
+const UPDATE_RELOAD_KEY="twinpanel-update-reload-pending-v2";
+const UPDATE_RECOVERY_MS=5*60*1000;
 
 type LicenseState={
   status?:string;
@@ -32,6 +33,20 @@ type ReleaseStatus={
   update:UpdateState;
 };
 
+type RecoveryMarker={
+  expires_at:number;
+  target_version?:string;
+};
+
+class ReleaseRequestError extends Error{
+  status:number;
+  constructor(message:string,status:number){
+    super(message);
+    this.name="ReleaseRequestError";
+    this.status=status;
+  }
+}
+
 async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
@@ -44,7 +59,7 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   if(raw){try{payload=JSON.parse(raw);}catch{payload=raw;}}
   if(!response.ok){
     const detail=payload&&typeof payload==="object"&&"detail" in payload?String((payload as {detail:unknown}).detail):`API error ${response.status}`;
-    throw new Error(detail);
+    throw new ReleaseRequestError(detail,response.status);
   }
   return payload as T;
 }
@@ -58,12 +73,44 @@ function remainingText(seconds:number|undefined|null,fa:boolean){
   return fa?`${hours.toLocaleString("fa-IR")} ساعت`:`${hours}h`;
 }
 
-function updatePendingInSession(){
+function readRecoveryMarker():RecoveryMarker|null{
   try{
-    return typeof window!=="undefined"&&window.sessionStorage.getItem(UPDATE_RELOAD_KEY)==="1";
+    if(typeof window==="undefined")return null;
+    const raw=window.sessionStorage.getItem(UPDATE_RELOAD_KEY);
+    if(!raw)return null;
+    const parsed=JSON.parse(raw) as Partial<RecoveryMarker>;
+    const expires=Number(parsed.expires_at)||0;
+    if(expires<=Date.now()){
+      window.sessionStorage.removeItem(UPDATE_RELOAD_KEY);
+      return null;
+    }
+    return {
+      expires_at:expires,
+      target_version:String(parsed.target_version||"").trim()||undefined,
+    };
   }catch{
-    return false;
+    return null;
   }
+}
+
+function setRecoveryMarker(targetVersion?:string){
+  try{
+    const marker:RecoveryMarker={
+      expires_at:Date.now()+UPDATE_RECOVERY_MS,
+      target_version:String(targetVersion||"").trim()||undefined,
+    };
+    window.sessionStorage.setItem(UPDATE_RELOAD_KEY,JSON.stringify(marker));
+  }catch{}
+}
+
+function clearRecoveryMarker(){
+  try{window.sessionStorage.removeItem(UPDATE_RELOAD_KEY);}catch{}
+}
+
+function isTransientReleaseError(reason:unknown){
+  if(reason instanceof ReleaseRequestError)return [502,503,504].includes(reason.status);
+  const text=reason instanceof Error?reason.message:String(reason||"");
+  return /failed to fetch|networkerror|network request failed|load failed|connection|fetch failed/i.test(text);
 }
 
 export function SystemReleaseFooter(){
@@ -96,13 +143,23 @@ export function SystemReleaseFooter(){
     try{
       const result=await request<ReleaseStatus>(check?"/v1/admin/system/release/check":"/v1/admin/system/release/status",check?{method:"POST"}:{});
       if(!initialVersionRef.current)initialVersionRef.current=String(result.current_version||"").trim();
-      setData(result);setError("");
+      setData(result);
+      setError("");
+
+      // Keep the recovery marker across the actual browser reload. Clear it
+      // only after the new page has successfully reached the release API and
+      // the active version is confirmed as the completed target.
+      const marker=readRecoveryMarker();
+      const current=String(result.current_version||"").trim();
+      const target=String(result.update?.target_version||marker?.target_version||"").trim();
+      const completed=String(result.update?.state||"")==="completed"&&Boolean(target)&&current===target;
+      if(marker&&completed)clearRecoveryMarker();
     }catch(reason){
-      // During an in-place update the API is intentionally restarted. Nginx may
-      // briefly return 502/connection errors while the new release activates.
-      // Keep the last known progress on screen instead of presenting that
-      // expected restart window as a failed update.
-      if(updatePendingInSession())return;
+      // A short 502/503/504 or connection loss is expected while API/Web are
+      // being restarted during an in-place release. Never surface raw gateway
+      // errors to the admin when we have a recovery marker or a last-known
+      // healthy release state. Polling will recover automatically.
+      if(isTransientReleaseError(reason)&&(readRecoveryMarker()||data))return;
       setError(reason instanceof Error?reason.message:String(reason));
     }
   };
@@ -145,7 +202,7 @@ export function SystemReleaseFooter(){
     if(!data)return;
 
     if(updateState==="failed"){
-      try{window.sessionStorage.removeItem(UPDATE_RELOAD_KEY);}catch{}
+      clearRecoveryMarker();
       const detail=String(data.update?.error||"").trim();
       if(detail)setError(detail);
       return;
@@ -156,12 +213,14 @@ export function SystemReleaseFooter(){
     const completed=updateState==="completed"&&Boolean(target)&&current===target;
     if(!completed||reloading)return;
 
-    let startedHere=false;
-    try{startedHere=window.sessionStorage.getItem(UPDATE_RELOAD_KEY)==="1";}catch{}
+    const marker=readRecoveryMarker();
+    const startedHere=Boolean(marker);
     const versionChanged=Boolean(initialVersionRef.current&&initialVersionRef.current!==current);
     if(!startedHere&&!versionChanged)return;
 
-    try{window.sessionStorage.removeItem(UPDATE_RELOAD_KEY);}catch{}
+    // Do not clear the marker here. The browser may reload before the new API
+    // is fully ready. The next page clears it only after its first successful
+    // completed-version status response.
     setReloading(true);
     if(reloadTimerRef.current!==null)window.clearTimeout(reloadTimerRef.current);
     reloadTimerRef.current=window.setTimeout(()=>window.location.reload(),700);
@@ -197,14 +256,22 @@ export function SystemReleaseFooter(){
     if(busy||updateBusy||reloading)return;
     if(!window.confirm(pick("بروزرسانی پنل شروع شود؟ قبل از تغییر نسخه، بکاپ خودکار ساخته می‌شود.","Start the panel update? A backup is created before the release is changed.")))return;
     setBusy("update");setError("");
+    const expectedTarget=String(data?.latest_version||"").trim();
+    setRecoveryMarker(expectedTarget);
     try{
-      try{window.sessionStorage.setItem(UPDATE_RELOAD_KEY,"1");}catch{}
       await request("/v1/admin/system/update",{method:"POST"});
       await load(false);
       window.setTimeout(()=>void load(false),1500);
     }catch(reason){
-      try{window.sessionStorage.removeItem(UPDATE_RELOAD_KEY);}catch{}
-      setError(reason instanceof Error?reason.message:String(reason));
+      if(isTransientReleaseError(reason)){
+        // The update request may already have reached the API immediately
+        // before its restart. Keep the recovery marker and let status polling
+        // determine the authoritative outcome instead of showing a false 502.
+        window.setTimeout(()=>void load(false),1200);
+      }else{
+        clearRecoveryMarker();
+        setError(reason instanceof Error?reason.message:String(reason));
+      }
     }
     finally{setBusy("");}
   };
