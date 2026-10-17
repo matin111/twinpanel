@@ -57,27 +57,29 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
       <div className="admin-topbar-inner">
         <div className="admin-topbar-brand"><BrandMark/></div>
 
-        <nav className="admin-topnav" aria-label={pick("منوی اصلی","Main navigation")}>{menuGroups.map(group=>{
-          const groupActive=group.items.some(([, ,href])=>active===href);
-          return <details className={`topnav-group ${groupActive?"active":""}`} key={group.en}>
-            <summary className="topnav-group-trigger">
-              <span>{pick(group.fa,group.en)}</span>
-              <span className="topnav-chevron" aria-hidden="true">⌄</span>
-            </summary>
-            <div className="topnav-menu">
-              <div className="topnav-menu-head">{pick(group.fa,group.en)}</div>
-              <div className="topnav-menu-grid">
-                {group.items.map(([fa,en,h,i])=>{
-                  const label=pick(fa,en);
-                  return <Link key={h} href={h} className={active===h?"active":""} onClick={()=>setMobileOpen(false)}>
-                    <i>{i}</i><span className="nav-label">{label}</span>{h==="/admin/support"&&<SupportUnreadBadge active={active===h}/>}{h==="/admin/payments"&&<PaymentReviewBadge/>}
-                  </Link>;
-                })}
+        <div style={{position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",maxWidth:"calc(100% - 320px)"}}>
+          <nav className="admin-topnav" aria-label={pick("منوی اصلی","Main navigation")}>{menuGroups.map(group=>{
+            const groupActive=group.items.some(([, ,href])=>active===href);
+            return <details className={`topnav-group ${groupActive?"active":""}`} key={group.en}>
+              <summary className="topnav-group-trigger">
+                <span>{pick(group.fa,group.en)}</span>
+                <span className="topnav-chevron" aria-hidden="true">⌄</span>
+              </summary>
+              <div className="topnav-menu">
+                <div className="topnav-menu-head">{pick(group.fa,group.en)}</div>
+                <div className="topnav-menu-grid">
+                  {group.items.map(([fa,en,h,i])=>{
+                    const label=pick(fa,en);
+                    return <Link key={h} href={h} className={active===h?"active":""} onClick={()=>setMobileOpen(false)}>
+                      <i>{i}</i><span className="nav-label">{label}</span>{h==="/admin/support"&&<SupportUnreadBadge active={active===h}/>}{h==="/admin/payments"&&<PaymentReviewBadge/>}
+                    </Link>;
+                  })}
+                </div>
+                {group.en==="System & Maintenance"&&<div className="topnav-release"><SystemReleaseFooter/></div>}
               </div>
-              {group.en==="System & Maintenance"&&<div className="topnav-release"><SystemReleaseFooter/></div>}
-            </div>
-          </details>;
-        })}</nav>
+            </details>;
+          })}</nav>
+        </div>
 
         <button className="admin-mobile-menu-toggle" type="button" onClick={()=>setMobileOpen(v=>!v)} aria-expanded={mobileOpen} aria-label={pick("نمایش منو","Show menu")}>☰</button>
       </div>
