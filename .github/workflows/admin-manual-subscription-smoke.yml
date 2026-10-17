@@ -198,6 +198,9 @@ jobs:
           assert 'duration_days:durationValue' in manual
           assert 'protocols.length===0' in manual
           assert 'window.location.reload()' in manual
+          assert 'subscription-create-action-group' in manual
+          assert 'original.style.display="none"' in manual
+          assert 'primaryAction?.click()' in manual
           assert 'plan_id: int | None = None' in backend
           assert 'ensure_subscription_plan_schema()' in backend
           assert 'ALTER COLUMN plan_id DROP NOT NULL' in schema
