@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -56,12 +57,50 @@ def runtime_env() -> dict[str, str]:
 
 
 def get_json(url: str) -> dict:
-    req = urllib.request.Request(url, headers={'User-Agent': 'TwinPanel-Public-Updater/2'})
+    req = urllib.request.Request(url, headers={'User-Agent': 'TwinPanel-Public-Updater/3'})
     with urllib.request.urlopen(req, timeout=25) as res:
         obj = json.loads(res.read().decode('utf-8'))
     if not isinstance(obj, dict):
         raise RuntimeError('INVALID_MANIFEST')
     return obj
+
+
+def _version_key(value: str) -> tuple[int, int, int, int, int]:
+    raw = str(value or '').strip().lower().lstrip('v')
+    match = re.match(r'^(\d+)\.(\d+)\.(\d+)(?:[-.]?([a-z]+)[.-]?(\d*)?)?', raw)
+    if not match:
+        return (0, 0, 0, -1, 0)
+    major, minor, patch = [int(match.group(i) or 0) for i in (1, 2, 3)]
+    label = match.group(4) or ''
+    number = int(match.group(5) or 0)
+    rank = {
+        '': 4,
+        'stable': 4,
+        'release': 4,
+        'rc': 3,
+        'beta': 2,
+        'preview': 1,
+        'alpha': 1,
+        'dev': 0,
+    }.get(label, 0)
+    return (major, minor, patch, rank, number)
+
+
+def resolve_requested_release(requested_version: str, live_version: str) -> tuple[str, bool]:
+    """Resolve a queued update against the current stable manifest.
+
+    A newer stable release appearing after the request was queued is safe to
+    adopt because the worker still validates installable metadata, repository,
+    exact source SHA and the VERSION file before activation. Downgrades or
+    unrelated/older manifest changes remain blocked.
+    """
+    wanted = str(requested_version or '').strip()
+    live = str(live_version or '').strip()
+    if not wanted or wanted == live:
+        return live, False
+    if _version_key(live) > _version_key(wanted):
+        return live, True
+    raise RuntimeError('REQUESTED_RELEASE_CHANGED')
 
 
 def run(args: list[str], cwd: Path | None = None, env: dict[str, str] | None = None, timeout: int = 1200) -> None:
@@ -134,7 +173,7 @@ def main() -> int:
     env = runtime_env()
     manifest_url = env.get('TWINPANEL_RELEASE_MANIFEST_URL') or DEFAULT_MANIFEST
     manifest = get_json(manifest_url)
-    if manifest.get('installable') is not True:
+    if manifest.get('installable') is not True or manifest.get('published') is not True:
         raise RuntimeError('RELEASE_NOT_INSTALLABLE')
 
     version = str(manifest.get('version') or '').strip()
@@ -151,8 +190,7 @@ def main() -> int:
     except Exception:
         requested = {}
     wanted = str(requested.get('requested_version') or '').strip()
-    if wanted and wanted != version:
-        raise RuntimeError('REQUESTED_RELEASE_CHANGED')
+    version, retargeted = resolve_requested_release(wanted, version)
 
     current_version = (CURRENT / 'VERSION').read_text(encoding='utf-8').strip()
     if current_version == version:
@@ -161,7 +199,14 @@ def main() -> int:
 
     RELEASES.mkdir(parents=True, exist_ok=True)
     final = RELEASES / version
-    save(state='fetching', current_version=current_version, target_version=version, source_sha=source_sha)
+    save(
+        state='fetching',
+        current_version=current_version,
+        target_version=version,
+        requested_version=wanted or version,
+        retargeted=retargeted,
+        source_sha=source_sha,
+    )
 
     with tempfile.TemporaryDirectory(prefix='twinpanel-public-update-') as name:
         tmp = Path(name)
@@ -170,14 +215,14 @@ def main() -> int:
         if (source / 'VERSION').read_text(encoding='utf-8').strip() != version:
             raise RuntimeError('RELEASE_VERSION_MISMATCH')
 
-        save(state='backup', target_version=version)
+        save(state='backup', target_version=version, requested_version=wanted or version, retargeted=retargeted)
         backup(env)
 
         if final.exists():
             shutil.rmtree(final)
         shutil.copytree(source, final, symlinks=True, ignore=shutil.ignore_patterns('.git'))
 
-    save(state='building', target_version=version)
+    save(state='building', target_version=version, requested_version=wanted or version, retargeted=retargeted)
     python = VENV if VENV.is_file() else Path(sys.executable)
     run([str(python), '-m', 'pip', 'install', '-r', 'backend/requirements.txt'], cwd=final, env=env, timeout=900)
     if (final / 'package-lock.json').is_file():
@@ -187,7 +232,7 @@ def main() -> int:
     run(['npm', 'run', 'build'], cwd=final, env=env, timeout=1500)
 
     previous = atomic_switch(final)
-    save(state='restarting', target_version=version)
+    save(state='restarting', target_version=version, requested_version=wanted or version, retargeted=retargeted)
     restart()
 
     api_port = int(env.get('TWINPANEL_API_PORT', '8095') or 8095)
@@ -197,7 +242,15 @@ def main() -> int:
         rollback(previous)
         raise RuntimeError('POST_UPDATE_HEALTH_FAILED')
 
-    save(state='completed', target_version=version, previous_version=current_version, source_sha=source_sha, completed_at=now())
+    save(
+        state='completed',
+        target_version=version,
+        previous_version=current_version,
+        requested_version=wanted or version,
+        retargeted=retargeted,
+        source_sha=source_sha,
+        completed_at=now(),
+    )
     try:
         REQUEST.unlink()
     except FileNotFoundError:
