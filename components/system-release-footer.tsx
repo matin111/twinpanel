@@ -171,9 +171,6 @@ export function SystemReleaseFooter(){
       const target=String(result.update?.target_version||marker?.target_version||"").trim();
       const completed=String(result.update?.state||"")==="completed"&&Boolean(target)&&current===target;
 
-      // The marker must survive the old page's final successful status call.
-      // It is cleared only by a different page instance after the browser has
-      // reloaded and that new page has confirmed the completed target version.
       if(
         marker
         &&completed
@@ -189,12 +186,7 @@ export function SystemReleaseFooter(){
         const started=transientSinceRef.current??Date.now();
         transientSinceRef.current=started;
 
-        // During an update/reload recovery window, 502/503/504 and connection
-        // resets are expected and must never become a false red failure.
         if(marker)return;
-
-        // Outside updates, preserve the last known healthy release status for
-        // a short outage. Only a persistent API failure is surfaced.
         if(hasHealthy&&Date.now()-started<TRANSIENT_API_GRACE_MS)return;
       }
 
@@ -215,7 +207,7 @@ export function SystemReleaseFooter(){
 
     checkNow();
     const statusTimer=window.setInterval(refreshStatus,5000);
-    const checkTimer=window.setInterval(checkNow,300000);
+    const checkTimer=window.setInterval(checkNow,60000);
     window.addEventListener("focus",checkNow);
     document.addEventListener("visibilitychange",checkNow);
 
@@ -256,8 +248,6 @@ export function SystemReleaseFooter(){
     const versionChanged=Boolean(initialVersionRef.current&&initialVersionRef.current!==current);
     if(!startedHere&&!versionChanged)return;
 
-    // Mark which page instance requested the reload. A successful status call
-    // on this old page cannot clear the marker; the next page instance can.
     if(marker)markRecoveryReloadRequested(pageInstanceRef.current);
 
     setReloading(true);
