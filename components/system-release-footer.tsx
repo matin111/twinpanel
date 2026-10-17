@@ -5,8 +5,9 @@ import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
 
-const UPDATE_RELOAD_KEY="twinpanel-update-reload-pending-v2";
+const UPDATE_RELOAD_KEY="twinpanel-update-reload-pending-v3";
 const UPDATE_RECOVERY_MS=5*60*1000;
+const TRANSIENT_API_GRACE_MS=30*1000;
 
 type LicenseState={
   status?:string;
@@ -36,6 +37,7 @@ type ReleaseStatus={
 type RecoveryMarker={
   expires_at:number;
   target_version?:string;
+  reload_from?:string;
 };
 
 class ReleaseRequestError extends Error{
@@ -87,20 +89,28 @@ function readRecoveryMarker():RecoveryMarker|null{
     return {
       expires_at:expires,
       target_version:String(parsed.target_version||"").trim()||undefined,
+      reload_from:String(parsed.reload_from||"").trim()||undefined,
     };
   }catch{
     return null;
   }
 }
 
+function writeRecoveryMarker(marker:RecoveryMarker){
+  try{window.sessionStorage.setItem(UPDATE_RELOAD_KEY,JSON.stringify(marker));}catch{}
+}
+
 function setRecoveryMarker(targetVersion?:string){
-  try{
-    const marker:RecoveryMarker={
-      expires_at:Date.now()+UPDATE_RECOVERY_MS,
-      target_version:String(targetVersion||"").trim()||undefined,
-    };
-    window.sessionStorage.setItem(UPDATE_RELOAD_KEY,JSON.stringify(marker));
-  }catch{}
+  writeRecoveryMarker({
+    expires_at:Date.now()+UPDATE_RECOVERY_MS,
+    target_version:String(targetVersion||"").trim()||undefined,
+  });
+}
+
+function markRecoveryReloadRequested(pageInstance:string){
+  const marker=readRecoveryMarker();
+  if(!marker)return;
+  writeRecoveryMarker({...marker,reload_from:pageInstance});
 }
 
 function clearRecoveryMarker(){
@@ -123,6 +133,13 @@ export function SystemReleaseFooter(){
   const [reloading,setReloading]=useState(false);
   const initialVersionRef=useRef("");
   const reloadTimerRef=useRef<number|null>(null);
+  const lastHealthyRef=useRef<ReleaseStatus|null>(null);
+  const transientSinceRef=useRef<number|null>(null);
+  const pageInstanceRef=useRef("");
+
+  if(!pageInstanceRef.current){
+    pageInstanceRef.current=`release-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
 
   const updateState=String(data?.update?.state||"");
   const updateBusy=useMemo(()=>[
@@ -143,23 +160,44 @@ export function SystemReleaseFooter(){
     try{
       const result=await request<ReleaseStatus>(check?"/v1/admin/system/release/check":"/v1/admin/system/release/status",check?{method:"POST"}:{});
       if(!initialVersionRef.current)initialVersionRef.current=String(result.current_version||"").trim();
+
+      lastHealthyRef.current=result;
+      transientSinceRef.current=null;
       setData(result);
       setError("");
 
-      // Keep the recovery marker across the actual browser reload. Clear it
-      // only after the new page has successfully reached the release API and
-      // the active version is confirmed as the completed target.
       const marker=readRecoveryMarker();
       const current=String(result.current_version||"").trim();
       const target=String(result.update?.target_version||marker?.target_version||"").trim();
       const completed=String(result.update?.state||"")==="completed"&&Boolean(target)&&current===target;
-      if(marker&&completed)clearRecoveryMarker();
+
+      // The marker must survive the old page's final successful status call.
+      // It is cleared only by a different page instance after the browser has
+      // reloaded and that new page has confirmed the completed target version.
+      if(
+        marker
+        &&completed
+        &&marker.reload_from
+        &&marker.reload_from!==pageInstanceRef.current
+      ){
+        clearRecoveryMarker();
+      }
     }catch(reason){
-      // A short 502/503/504 or connection loss is expected while API/Web are
-      // being restarted during an in-place release. Never surface raw gateway
-      // errors to the admin when we have a recovery marker or a last-known
-      // healthy release state. Polling will recover automatically.
-      if(isTransientReleaseError(reason)&&(readRecoveryMarker()||data))return;
+      if(isTransientReleaseError(reason)){
+        const marker=readRecoveryMarker();
+        const hasHealthy=Boolean(lastHealthyRef.current);
+        const started=transientSinceRef.current??Date.now();
+        transientSinceRef.current=started;
+
+        // During an update/reload recovery window, 502/503/504 and connection
+        // resets are expected and must never become a false red failure.
+        if(marker)return;
+
+        // Outside updates, preserve the last known healthy release status for
+        // a short outage. Only a persistent API failure is surfaced.
+        if(hasHealthy&&Date.now()-started<TRANSIENT_API_GRACE_MS)return;
+      }
+
       setError(reason instanceof Error?reason.message:String(reason));
     }
   };
@@ -218,9 +256,10 @@ export function SystemReleaseFooter(){
     const versionChanged=Boolean(initialVersionRef.current&&initialVersionRef.current!==current);
     if(!startedHere&&!versionChanged)return;
 
-    // Do not clear the marker here. The browser may reload before the new API
-    // is fully ready. The next page clears it only after its first successful
-    // completed-version status response.
+    // Mark which page instance requested the reload. A successful status call
+    // on this old page cannot clear the marker; the next page instance can.
+    if(marker)markRecoveryReloadRequested(pageInstanceRef.current);
+
     setReloading(true);
     if(reloadTimerRef.current!==null)window.clearTimeout(reloadTimerRef.current);
     reloadTimerRef.current=window.setTimeout(()=>window.location.reload(),700);
@@ -264,9 +303,6 @@ export function SystemReleaseFooter(){
       window.setTimeout(()=>void load(false),1500);
     }catch(reason){
       if(isTransientReleaseError(reason)){
-        // The update request may already have reached the API immediately
-        // before its restart. Keep the recovery marker and let status polling
-        // determine the authoritative outcome instead of showing a false 502.
         window.setTimeout(()=>void load(false),1200);
       }else{
         clearRecoveryMarker();
