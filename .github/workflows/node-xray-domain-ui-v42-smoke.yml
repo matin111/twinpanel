@@ -1,0 +1,23 @@
+name: Node Xray Domain UI V42 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/legacy-nodes-exact.tsx'
+      - 'lib/legacy-admin-api.ts'
+      - '.github/workflows/node-xray-domain-ui-v42-smoke.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify dedicated Xray domain controls
+        run: |
+          set -euo pipefail
+          grep -q 'xrayDomain:' lib/legacy-admin-api.ts
+          grep -q 'updateXrayDomain:' lib/legacy-admin-api.ts
+          grep -q 'prepareXrayDomain:' lib/legacy-admin-api.ts
+          grep -q 'دامنه Xray' components/legacy-nodes-exact.tsx
+          grep -q 'saveAndPrepareXrayDomain' components/legacy-nodes-exact.tsx
+          grep -q 'issueCertificate=false' lib/legacy-admin-api.ts
