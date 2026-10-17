@@ -1,0 +1,95 @@
+name: Smart Transport Auto V21 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/smart_transport_auto_v21.py'
+      - 'backend/app/tp2027_transport.py'
+      - 'backend/app/tunnel_transport_manager_v12.py'
+      - 'backend/app/candidate_lifecycle_v21.py'
+      - 'backend/app/runtime_reconciler_v3.py'
+      - 'backend/app/self_hosted_runtime.py'
+      - 'backend/app/routers/modern_transports.py'
+      - 'backend/app/transport_candidates/__init__.py'
+      - 'backend/deploy/systemd/twinpanel-transport-manager.service'
+      - '.github/workflows/smart-transport-auto-v21-smoke.yml'
+  push:
+    branches:
+      - feat/smart-iran-tunnel-auto-v21
+    paths:
+      - 'backend/app/smart_transport_auto_v21.py'
+      - 'backend/app/tp2027_transport.py'
+      - 'backend/app/tunnel_transport_manager_v12.py'
+      - 'backend/app/candidate_lifecycle_v21.py'
+      - 'backend/app/runtime_reconciler_v3.py'
+      - 'backend/app/self_hosted_runtime.py'
+      - 'backend/app/routers/modern_transports.py'
+      - 'backend/app/transport_candidates/__init__.py'
+      - 'backend/deploy/systemd/twinpanel-transport-manager.service'
+      - '.github/workflows/smart-transport-auto-v21-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  syntax-and-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Python syntax compile
+        run: |
+          python -m py_compile \
+            backend/app/smart_transport_auto_v21.py \
+            backend/app/tp2027_transport.py \
+            backend/app/tunnel_transport_manager_v12.py \
+            backend/app/candidate_lifecycle_v21.py \
+            backend/app/runtime_reconciler_v3.py \
+            backend/app/self_hosted_runtime.py \
+            backend/app/routers/modern_transports.py \
+            backend/app/transport_candidates/__init__.py
+
+      - name: Smart transport static contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          smart = Path('backend/app/smart_transport_auto_v21.py').read_text()
+          route = Path('backend/app/tp2027_transport.py').read_text()
+          manager = Path('backend/app/tunnel_transport_manager_v12.py').read_text()
+          lifecycle = Path('backend/app/candidate_lifecycle_v21.py').read_text()
+          reconciler = Path('backend/app/runtime_reconciler_v3.py').read_text()
+          runtime = Path('backend/app/self_hosted_runtime.py').read_text()
+          api = Path('backend/app/routers/modern_transports.py').read_text()
+          cleanup = Path('backend/app/transport_candidates/__init__.py').read_text()
+          unit = Path('backend/deploy/systemd/twinpanel-transport-manager.service').read_text()
+
+          required_candidates = ('kernel_gre', 'gost_tun', 'amneziawg', 'netrix')
+          for name in required_candidates:
+              assert name in smart, f'{name} missing from Smart Auto'
+              assert name in route, f'{name} missing from route metadata'
+              assert name in api, f'{name} missing from API surface'
+              assert name in cleanup, f'{name} missing from cleanup surface'
+              assert name in reconciler, f'{name} missing from orphan reconciler'
+
+          assert 'download_weight=0.70' in smart
+          assert 'upload_weight=0.30' in smart
+          assert 'known_bad_quic_0.6.1_frag_dataplane_idle_timeout' in smart
+          assert 'CANDIDATE_STABLE_SECONDS = 60.0' in smart
+          assert 'install_smart_transport_auto_v21()' in manager
+          assert 'runtime_reconciler_v3' in manager
+          assert 'cleanup_tunnel_runtime_v21' in lifecycle
+          assert 'cleanup_tunnel_runtime_v21' in runtime
+          assert 'tunnel_transport_manager_v12' in unit
+          assert '"selectable": qualified' in api
+          assert 'selectable": False' not in api
+          assert 'CANDIDATE_L3_TRANSPORTS' in route
+          assert 'Shared binaries/toolchains are intentionally preserved' in cleanup
+          print('SMART_TRANSPORT_AUTO_V21_CONTRACT_OK')
+          PY

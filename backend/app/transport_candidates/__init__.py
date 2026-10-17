@@ -34,9 +34,10 @@ async def install_transport(name: str, tunnel_id: int, db: Session):
 async def uninstall_transport(name: str, tunnel_id: int, db: Session):
     """Remove only runtime owned by one canary transport.
 
-    The canary design deliberately keeps cleanup narrow: services/interfaces,
-    the candidate-only policy route, and exact firewall/NAT rules created by
-    TwinPanel. Existing Backhaul/MTunnel/VPN services are never touched.
+    Cleanup stays tunnel-id scoped: services/interfaces, candidate-only policy
+    routing, exact ownership-tagged firewall/NAT rules, and per-tunnel config
+    files. Shared binaries/toolchains are intentionally preserved because other
+    logical tunnels on the same Iran/Exit node may still use them.
     """
     name = str(name).strip().lower()
     if name not in SPECS:
@@ -63,6 +64,48 @@ ip link del {shlex.quote(rt['interface'])} >/dev/null 2>&1
 systemctl daemon-reload >/dev/null 2>&1
 true
 """,
+                check=False,
+            )
+
+        # Remove tunnel-specific files only. Never remove a shared candidate
+        # binary or source tree because another tunnel may still depend on it.
+        if name == "kernel_gre":
+            await ci.run(
+                f"rm -f /usr/local/sbin/tp-gre-{int(tunnel_id)}-iran; true",
+                check=False,
+            )
+            await ce.run(
+                f"rm -f /usr/local/sbin/tp-gre-{int(tunnel_id)}-exit; true",
+                check=False,
+            )
+
+        elif name == "amneziawg":
+            await ci.run(
+                f"""
+rm -f \
+  /etc/twinpanel/amneziawg/tunnel-{int(tunnel_id)}.key \
+  /etc/twinpanel/amneziawg/tunnel-{int(tunnel_id)}-iran.conf
+true
+""",
+                check=False,
+            )
+            await ce.run(
+                f"""
+rm -f \
+  /etc/twinpanel/amneziawg/tunnel-{int(tunnel_id)}.key \
+  /etc/twinpanel/amneziawg/tunnel-{int(tunnel_id)}-exit.conf
+true
+""",
+                check=False,
+            )
+
+        elif name == "netrix":
+            await ci.run(
+                f"rm -f /etc/twinpanel/netrix/tunnel-{int(tunnel_id)}-iran.yaml; true",
+                check=False,
+            )
+            await ce.run(
+                f"rm -f /etc/twinpanel/netrix/tunnel-{int(tunnel_id)}-exit.yaml; true",
                 check=False,
             )
 

@@ -1,5 +1,5 @@
 [Unit]
-Description=TwinPanel Transport Manager V11 Multi-Tunnel Self-Heal and Runtime Reconciliation
+Description=TwinPanel Transport Manager V12 Smart Iran Path + Multi-Tunnel Self-Heal
 After=network-online.target twinpanel-api.service
 Wants=network-online.target
 
@@ -11,7 +11,7 @@ EnvironmentFile=/etc/twinpanel/backend.env
 Environment=PYTHONPATH=/opt/twinpanel-product/backend
 Environment=PYTHONDONTWRITEBYTECODE=1
 
-ExecStart=/opt/twinpanel/venv/bin/python -u -m app.tunnel_transport_manager_v11
+ExecStart=/opt/twinpanel/venv/bin/python -u -m app.tunnel_transport_manager_v12
 
 Restart=always
 RestartSec=3

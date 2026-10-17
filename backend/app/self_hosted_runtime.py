@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .backhaul_multi_exit_v16 import install_backhaul_peer_v16
+from .candidate_lifecycle_v21 import cleanup_tunnel_runtime_v21
 from .config import settings
 from .database import SessionLocal
 from .managed_relay_recovery_v20 import apply_managed_relay_recovery_v20
@@ -80,6 +81,18 @@ def apply_self_hosted_runtime() -> None:
 
     tunnels._install_or_upgrade_agent = (
         _self_hosted_install_or_upgrade_agent
+    )
+
+    # ------------------------------------------------------------
+    # Logical tunnel lifecycle V21
+    #
+    # Modern candidate runtimes are now first-class members of one logical
+    # tunnel. Remove their exact owned services/interfaces/rules before the
+    # logical tunnel row is deleted so no GRE/GOST/AWG/Netrix orphan remains.
+    # ------------------------------------------------------------
+
+    tunnels.cleanup_tunnel_runtime = (
+        cleanup_tunnel_runtime_v21
     )
 
     # ------------------------------------------------------------
