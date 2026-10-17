@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.15",
+  "version": "1.1.0-rc.16",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T21:05:42Z",
+  "released_at": "2026-10-17T21:22:54Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "ff141e858a53606db85453e0cff724a0cd8b6be5",
+  "source_sha": "411af6aabc8ce6e6b4f7343e671bef0f193552b6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.15/twinpanel-1.1.0-rc.15-linux-x86_64.tar.gz",
-    "sha256": "45a55cf92d6950e42fe3727ff01a90624e961c19d3dd73ceb90d2cc90d747b05",
-    "size_bytes": 12459648
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.16/twinpanel-1.1.0-rc.16-linux-x86_64.tar.gz",
+    "sha256": "427f966ec895963617f29bf93cf28a2dd76c83794013edde0a218d7279d98a96",
+    "size_bytes": 12460459
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.15 مسیر بروزرسانی Prebuilt را روی سرور مشتری Zero-copy می‌کند: فایل Release روی همان فایل‌سیستم مقصد استخراج و با Rename اتمیک فعال می‌شود، کپی کامل دوم و chown/chmod بازگشتی از VPS حذف شده، Restart سرویس‌ها همزمان dispatch می‌شود و API/Web با یک deadline مشترک Health-check می‌شوند. زمان هر مرحله نیز در stage_seconds ثبت می‌شود تا گلوگاه واقعی قابل اندازه‌گیری باشد. Refresh خودکار پنل پس از موفقیت کامل بروزرسانی نیز حفظ شده است.",
-    "en": "TwinPanel 1.1.0-rc.15 makes the customer-side prebuilt update path zero-copy: the verified release is extracted on the destination filesystem and atomically renamed into place, the second full copy and recursive chown/chmod are removed from the VPS, service restarts are dispatched concurrently, and API/Web share one health deadline. Per-stage timings are recorded in stage_seconds for real bottleneck measurement, while automatic admin refresh after a verified successful update remains enabled."
+    "fa": "نسخه 1.1.0-rc.16 برای Benchmark واقعی موتور بروزرسانی Zero-copy منتشر می‌شود. این نسخه زمان کل و زمان هر مرحله بروزرسانی را ثبت می‌کند تا Download، Extract، Backup، Restart و Health جداگانه قابل اندازه‌گیری باشند. همچنین خطاهای موقت 502 یا قطع کوتاه API هنگام Restart طبیعی سرویس‌ها دیگر در UI به‌عنوان خطای بروزرسانی نمایش داده نمی‌شوند؛ اگر Update واقعاً fail شود، خطای واقعی پس از بازگشت API نمایش داده خواهد شد.",
+    "en": "TwinPanel 1.1.0-rc.16 is a real-world benchmark release for the zero-copy updater. It records total and per-stage update timings so download, extract, backup, restart and health can be measured independently. Expected transient 502/network errors during the normal API restart window are no longer shown as update failures in the UI; genuine updater failures are surfaced after the API returns."
   }
 }
