@@ -27,7 +27,7 @@ const protocolLabels:Record<(typeof protocolKeys)[number],string>={
 };
 
 type NodeRole="iran"|"exit"|"mother";
-type NodeModal="ssh"|"domain"|"protocols"|null;
+type NodeModal="ssh"|"domain"|"xray-domain"|"protocols"|null;
 type ExtendedNode=AdminNode&{is_mother?:boolean;public_domain?:string|null};
 type ProtocolRuntime={
   protocol?:string;
@@ -77,6 +77,8 @@ export function LegacyNodesRuntimePage(){
   const [accessConfigured,setAccessConfigured]=useState(false);
   const [accessDraft,setAccessDraft]=useState({port:22,username:"root",password:""});
   const [domainDraft,setDomainDraft]=useState("");
+  const [xrayDomainDraft,setXrayDomainDraft]=useState("");
+  const [xrayDomainInfo,setXrayDomainInfo]=useState<RuntimeRow|null>(null);
   const [runtime,setRuntime]=useState<Record<string,ProtocolRuntime>>({});
 
   const load=async(silent=false)=>{
@@ -102,6 +104,8 @@ export function LegacyNodesRuntimePage(){
   const selectedRole=selected?roleOf(selected):null;
   const selectedDomain=selected?domains.find(row=>n(row.id||row.node_id)===selected.id):null;
   const effectiveDomain=s(selected?.public_domain||selectedDomain?.public_domain||selectedDomain?.domain);
+  const effectiveXrayDomain=s(xrayDomainInfo?.effective_xray_domain||xrayDomainInfo?.xray_domain||effectiveDomain);
+  const storedXrayDomain=s(xrayDomainInfo?.xray_domain);
   const selectedProtocols=selected?enabledProtocols(selected):[];
 
   const filtered=useMemo(()=>{
@@ -119,7 +123,7 @@ export function LegacyNodesRuntimePage(){
   const exitCount=nodes.filter(node=>roleOf(node)==="exit").length;
 
   useEffect(()=>{
-    if(!selected){setAccessConfigured(false);setRuntime({});return;}
+    if(!selected){setAccessConfigured(false);setRuntime({});setXrayDomainInfo(null);setXrayDomainDraft("");return;}
     let active=true;
     legacyAdminApi.nodeAccess(selected.id).then(result=>{
       if(!active)return;
@@ -128,6 +132,20 @@ export function LegacyNodesRuntimePage(){
     }).catch(()=>{
       if(active){setAccessConfigured(false);setAccessDraft({port:22,username:"root",password:""});}
     });
+    if(roleOf(selected)==="exit"){
+      legacyAdminApi.xrayDomain(selected.id).then(result=>{
+        if(!active)return;
+        setXrayDomainInfo(result);
+        setXrayDomainDraft(s(result.xray_domain||result.effective_xray_domain||effectiveDomain));
+      }).catch(()=>{
+        if(!active)return;
+        setXrayDomainInfo(null);
+        setXrayDomainDraft(effectiveDomain);
+      });
+    }else{
+      setXrayDomainInfo(null);
+      setXrayDomainDraft("");
+    }
     setDomainDraft(effectiveDomain);
     setRuntime({});
     setError("");setWarning("");setSuccess("");
@@ -164,6 +182,26 @@ export function LegacyNodesRuntimePage(){
         ?current.map(row=>n(row.id||row.node_id)===selected.id?{...row,...next}:row)
         :[...current,next]);
       setModal(null);setSuccess(pick("دامنه ذخیره شد.","Domain saved."));
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setBusy("");}
+  };
+
+  const saveAndPrepareXrayDomain=async()=>{
+    if(!selected||busy||selectedRole!=="exit")return;
+    if(!ensureAccess())return;
+    const domain=xrayDomainDraft.trim();
+    if(!domain){setError(pick("دامنه Xray را وارد کنید.","Enter the Xray domain."));return;}
+    setBusy("xray-domain");setError("");setWarning("");setSuccess("");
+    try{
+      const saved=await legacyAdminApi.updateXrayDomain(selected.id,domain);
+      setXrayDomainInfo(saved);
+      const prepared=await legacyAdminApi.prepareXrayDomain(selected.id,false);
+      setXrayDomainInfo(current=>({...current,...prepared,xray_domain:domain,effective_xray_domain:domain}));
+      setXrayDomainDraft(domain);
+      setModal(null);
+      setSuccess(Boolean(prepared.tls_enabled)
+        ?pick("دامنه Xray ذخیره و TLS/Xray اعمال شد.","Xray domain saved and TLS/Xray applied.")
+        :pick("دامنه Xray ذخیره شد؛ گواهی TLS معتبر روی نود خروجی پیدا نشد.","Xray domain saved; no valid TLS certificate was found on the Exit node."));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy("");}
   };
@@ -256,12 +294,14 @@ export function LegacyNodesRuntimePage(){
         <div className="runtime-info-list">
           <div><span>{pick("نقش","Role")}</span><b>{selectedRole}</b></div>
           <div><span>{pick("دسترسی SSH","SSH access")}</span><Badge tone={accessConfigured?"ok":"warn"}>{accessConfigured?pick("ثبت شده","Saved"):pick("ثبت نشده","Missing")}</Badge></div>
-          <div><span>{pick("دامنه","Domain")}</span><b dir="ltr">{effectiveDomain||"—"}</b></div>
+          <div><span>{pick("دامنه عمومی","Public domain")}</span><b dir="ltr">{effectiveDomain||"—"}</b></div>
+          {selectedRole==="exit"?<div><span>{pick("دامنه Xray","Xray domain")}</span><b dir="ltr">{effectiveXrayDomain||"—"}{!storedXrayDomain&&effectiveXrayDomain?<small> ({pick("fallback","fallback")})</small>:null}</b></div>:null}
           <div><span>{pick("پروتکل‌های فعال","Enabled protocols")}</span><b>{selectedProtocols.length.toLocaleString("fa-IR")}</b></div>
         </div>
         <div className="action-row">
           <button type="button" className="primary-soft" onClick={()=>{setError("");setAccessDraft(current=>({...current,password:""}));setModal("ssh");}}>{pick("دسترسی SSH","SSH access")}</button>
-          <button type="button" className="primary-soft" onClick={()=>{setDomainDraft(effectiveDomain);setModal("domain");}}>{pick("دامنه","Domain")}</button>
+          <button type="button" className="primary-soft" onClick={()=>{setDomainDraft(effectiveDomain);setModal("domain");}}>{pick("دامنه عمومی","Public domain")}</button>
+          {selectedRole==="exit"?<button type="button" className="primary-soft" onClick={()=>{setXrayDomainDraft(storedXrayDomain||effectiveXrayDomain);setModal("xray-domain");}}>{pick("دامنه Xray","Xray domain")}</button>:null}
           {selectedRole==="exit"?<button type="button" className="primary" disabled={Boolean(busy)} onClick={()=>void checkProtocols()}>{busy==="health"?"…":pick("بررسی پروتکل‌ها","Check protocols")}</button>:null}
           {selectedRole!=="mother"?<button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>void toggleMaintenance()}>{selected.status==="maintenance"?pick("خروج از نگهداری","Leave maintenance"):pick("حالت نگهداری","Maintenance")}</button>:null}
           <button type="button" className="danger" disabled={Boolean(busy)} onClick={()=>void deleteNode()}>{pick("حذف نود","Delete node")}</button>
@@ -277,8 +317,16 @@ export function LegacyNodesRuntimePage(){
         </div>
       </Modal>:null}
 
-      {modal==="domain"&&selected?<Modal title={pick("دامنه نود","Node domain")} onClose={()=>setModal(null)}>
-        <div className="runtime-form"><label>{pick("دامنه","Domain")}<input dir="ltr" value={domainDraft} onChange={event=>setDomainDraft(event.target.value)} placeholder="node.example.com"/></label><button type="button" className="primary" disabled={Boolean(busy)} onClick={()=>void saveDomain()}>{busy==="domain"?"…":pick("ذخیره","Save")}</button></div>
+      {modal==="domain"&&selected?<Modal title={pick("دامنه عمومی نود","Public node domain")} onClose={()=>setModal(null)}>
+        <div className="runtime-form"><label>{pick("دامنه عمومی","Public domain")}<input dir="ltr" value={domainDraft} onChange={event=>setDomainDraft(event.target.value)} placeholder="node.example.com"/></label><button type="button" className="primary" disabled={Boolean(busy)} onClick={()=>void saveDomain()}>{busy==="domain"?"…":pick("ذخیره","Save")}</button></div>
+      </Modal>:null}
+
+      {modal==="xray-domain"&&selected?<Modal title={pick("دامنه Xray / V2Ray","Xray / V2Ray domain")} onClose={()=>setModal(null)}>
+        <div className="runtime-form">
+          <label>{pick("دامنه Xray","Xray domain")}<input dir="ltr" value={xrayDomainDraft} onChange={event=>setXrayDomainDraft(event.target.value)} placeholder="vtray.example.com"/></label>
+          <small>{pick("این دامنه مخصوص TLS/SNI پروفایل‌های Xray است. صدور SSL خودکار اجرا نمی‌شود؛ گواهی موجود روی نود خروجی استفاده می‌شود.","This domain is dedicated to Xray TLS/SNI. Automatic certificate issuance is not run; the existing Exit certificate is used.")}</small>
+          <button type="button" className="primary" disabled={Boolean(busy)} onClick={()=>void saveAndPrepareXrayDomain()}>{busy==="xray-domain"?"…":pick("ذخیره و اعمال Xray","Save and apply Xray")}</button>
+        </div>
       </Modal>:null}
 
       {modal==="protocols"&&selected?<Modal title={pick("سلامت پروتکل‌ها","Protocol health")} onClose={()=>setModal(null)}>
