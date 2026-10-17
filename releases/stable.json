@@ -2,16 +2,16 @@
   "schema": 2,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.5",
+  "version": "1.1.0-rc.6",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T18:20:00Z",
+  "released_at": "2026-10-17T18:35:00Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7507eb60f70c670fc2c1bf7b47455987b4635139",
+  "source_sha": "5dcc0400c23056ddaed99fde46238c0e2df0f6ae",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "notes": {
-    "fa": "نسخه 1.1.0-rc.5 چرخه تراکنش دیتابیس در مدیریت پروتکل‌ها را اصلاح می‌کند. Queryهای کوتاه قبل از اجرای طولانی apt/systemd/SSH آزاد می‌شوند، Sessionهای خطادار rollback می‌شوند و نصب/تعمیر پروتکل روی Local و Exit Node دیگر تراکنش باز و بلااستفاده نگه نمی‌دارد. این نسخه خطای Can't reconnect until invalid transaction is rolled back را در نصب Cisco/OpenConnect روی Local / This server هدف قرار می‌دهد.",
-    "en": "TwinPanel 1.1.0-rc.5 fixes database transaction lifecycle in protocol management. Short DB reads are released before long apt/systemd/SSH operations, failed sessions are rolled back, and Local/Exit protocol install or repair no longer keeps an idle transaction checked out. This release specifically addresses the Cisco/OpenConnect Local / This server PendingRollback failure."
+    "fa": "نسخه 1.1.0-rc.6 مرحله انتخاب و نصب پروتکل‌های VPN را به نصب عمومی تازه TwinPanel اضافه می‌کند. در نصب جدید می‌توان Cisco/OpenConnect، OpenVPN، WireGuard، L2TP/IPsec و V2Ray/Xray را تکی، چندتایی یا همگی روی Local / This server نصب کرد. نصب موجود به‌صورت پیش‌فرض دست‌نخورده می‌ماند و نصب non-interactive بدون انتخاب صریح پروتکل‌ها را Skip می‌کند.",
+    "en": "TwinPanel 1.1.0-rc.6 adds VPN protocol selection and provisioning to fresh public installation. New installs can choose Cisco/OpenConnect, OpenVPN, WireGuard, L2TP/IPsec and V2Ray/Xray individually, in groups, or all at once on Local / This server. Existing installs preserve protocol runtime by default, and non-interactive installs skip protocol provisioning unless explicitly requested."
   }
 }
