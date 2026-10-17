@@ -428,6 +428,20 @@ def release_manifest() -> dict[str, Any]:
         }
 
 
+def _manifest_installable(manifest: dict[str, Any]) -> bool:
+    if "installable" in manifest:
+        value = manifest.get("installable")
+    elif "published" in manifest:
+        value = manifest.get("published")
+    else:
+        # Backward-compatible default for older manifests.
+        return True
+
+    if isinstance(value, bool):
+        return value
+    return _truthy(str(value) if value is not None else "")
+
+
 def load_update_state() -> dict[str, Any]:
     state = _read_json(UPDATE_STATE_FILE)
     return state or {"state": "idle"}
@@ -437,6 +451,7 @@ def release_status(refresh_license_state: bool = False) -> dict[str, Any]:
     installed = current_version()
     manifest = release_manifest()
     latest = str(manifest.get("version") or installed).strip()
+    installable = _manifest_installable(manifest)
 
     license_state = validate_license() if refresh_license_state else load_license_state()
     remaining = _seconds_until_expiry(license_state)
@@ -449,7 +464,8 @@ def release_status(refresh_license_state: bool = False) -> dict[str, Any]:
         "current_version": installed,
         "latest_version": latest,
         "channel": manifest.get("channel") or DEFAULT_RELEASE_CHANNEL,
-        "update_available": is_newer_version(latest, installed),
+        "release_installable": installable,
+        "update_available": installable and is_newer_version(latest, installed),
         "released_at": manifest.get("released_at"),
         "release_notes": manifest.get("notes") or {},
         "github_url": manifest.get("github_url") or DEFAULT_GITHUB_URL,
