@@ -2,16 +2,16 @@
   "schema": 2,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.11",
+  "version": "1.1.0-rc.12",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T19:47:00Z",
+  "released_at": "2026-10-17T20:15:00Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d8e574017fcbbc6ce982912fd563457c5393c468",
+  "source_sha": "e8063bc9692e5959e801db6d45a5d4458a2d3fac",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "notes": {
-    "fa": "نسخه 1.1.0-rc.11 خطای رقابتی بروزرسانی را برطرف می‌کند: اگر Stable بین ثبت درخواست و شروع Worker به نسخه جدیدتری برسد، Updater دیگر با REQUESTED_RELEASE_CHANGED متوقف نمی‌شود و به نسخه Stable جدیدتر Retarget می‌شود؛ در عین حال کنترل installable/published، محدودیت Repository، تطبیق دقیق Source SHA و VERSION حفظ می‌شوند.",
-    "en": "TwinPanel 1.1.0-rc.11 fixes the updater release race. If stable advances between queuing an update and the worker starting, the updater no longer fails with REQUESTED_RELEASE_CHANGED and can safely retarget to the newer stable release while preserving installable/published gating, repository allowlisting, exact source SHA verification, and VERSION verification."
+    "fa": "نسخه 1.1.0-rc.12 پایداری ربات تلگرام و سرعت بروزرسانی را بهبود می‌دهد: سرویس ربات اکنون محیط اصلی Backend را دریافت می‌کند، امکان حذف امن توکن اضافه شده، سرویس ربات هنگام فعال‌سازی نسخه جدید Restart می‌شود و Updater از Fast Path محافظه‌کارانه برای reuse کردن dependencyها و buildهای سازگار استفاده می‌کند؛ در صورت هرگونه تغییر یا ابهام، Full Build قبلی به‌صورت خودکار اجرا می‌شود و Backup، بررسی SHA، Atomic Switch، Health Check و Rollback حفظ شده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.12 hardens the Telegram bot runtime and speeds up panel updates. The bot service now receives the main backend environment, safe token removal is available, the bot service is restarted after release activation, and the updater uses a conservative fast path to reuse compatible dependencies and frontend builds. Any changed or uncertain state automatically falls back to the previous full build path while preserving backup, exact SHA verification, atomic switching, health checks, and rollback."
   }
 }
