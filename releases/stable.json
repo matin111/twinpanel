@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.21",
+  "version": "1.1.0-rc.22",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T22:47:26Z",
+  "released_at": "2026-10-17T22:50:38Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7e498d3391bf8cf633a5ee10d94742bea1079b16",
+  "source_sha": "679f9d039a623b4924ef8639f6c05c311a094f22",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.21/twinpanel-1.1.0-rc.21-linux-x86_64.tar.gz",
-    "sha256": "83a76523974abbcbeaf7fcac1aac30d3c06433f8b3689ca38b8476996fe7487f",
-    "size_bytes": 12486642
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.22/twinpanel-1.1.0-rc.22-linux-x86_64.tar.gz",
+    "sha256": "120949e15d237163ebc71fd5bb5cc213552016aaa1a023ad125613eb3f0e72ec",
+    "size_bytes": 12484636
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.21 فعال‌سازی Production برای Smart Auto V21 را کامل می‌کند: نصب‌های قدیمی که Transport Manager ندارند یا هنوز به مسیر تاریخی /opt/twinpanel-product اشاره می‌کنند، هنگام شروع واقعی API به‌صورت idempotent به Manager V12 روی /opt/twinpanel/current مهاجرت می‌کنند؛ unit قبلی برای rollback نگه داشته می‌شود؛ نصب اولیه قبل از ایجاد unit API به‌طور ایمن defer می‌شود؛ سرویس بدون مسدود کردن startup فعال می‌شود؛ و خطاهای systemd یا نوشتن unit هرگز مانع بالا آمدن API نمی‌شوند. این نسخه شامل انتخاب خودکار سلامت+سرعت بین kernel GRE، GOST TUN/WSS، AmneziaWG و Netrix مجاز نیز هست.",
-    "en": "TwinPanel 1.1.0-rc.21 completes production activation for Smart Auto V21. Older installations that have no Transport Manager unit, or still reference the historical /opt/twinpanel-product checkout, now idempotently reconcile to Manager V12 on /opt/twinpanel/current during a real API service start. The previous unit is preserved for rollback, initial-install imports defer safely until the API unit exists, manager startup is non-blocking, and systemd/unit-write failures can never prevent the API from starting. The release also includes health-and-throughput automatic selection across kernel GRE, GOST TUN/WSS, AmneziaWG and licensed Netrix candidates."
+    "fa": "نسخه 1.1.0-rc.22 لایه پاپ‌آپ‌های پنل مدیریت را یکدست می‌کند: همه Modalها بالاتر از هدر و زیرمنوهای Sticky نمایش داده می‌شوند، اندازه‌های normal/wide/manage استاندارد شده‌اند، پنجره ساخت و ویرایش اشتراک جمع‌وجورتر و دارای اسکرول داخلی کنترل‌شده است، و رفتار موبایل/نمایشگرهای کوتاه بدون خروج پاپ‌آپ از Viewport اصلاح شده است.",
+    "en": "TwinPanel 1.1.0-rc.22 standardizes the admin modal layer: all dialogs render above sticky headers and navigation menus, normal/wide/manage sizes are normalized, subscription create/edit dialogs are more compact with controlled internal scrolling, and short-screen/mobile viewport behavior is corrected."
   }
 }
