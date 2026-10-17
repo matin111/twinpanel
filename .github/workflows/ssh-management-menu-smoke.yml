@@ -7,6 +7,7 @@ on:
       - "scripts/twinpanel-menu.sh"
       - "backend/scripts/twinpanel_admin_cli.py"
       - "backend/scripts/twinpanel_protocol_cli.py"
+      - "backend/scripts/twinpanel_protocol_cli_en.py"
       - ".github/workflows/ssh-management-menu-smoke.yml"
   workflow_dispatch:
 
@@ -33,6 +34,47 @@ jobs:
         run: |
           python3 -m py_compile backend/scripts/twinpanel_admin_cli.py
           python3 -m py_compile backend/scripts/twinpanel_protocol_cli.py
+          python3 -m py_compile backend/scripts/twinpanel_protocol_cli_en.py
+
+      - name: Verify SSH menu is English-only and ASCII-safe
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          menu_path = Path("scripts/twinpanel-menu.sh")
+          protocol_path = Path("backend/scripts/twinpanel_protocol_cli_en.py")
+
+          for path in (menu_path, protocol_path):
+              text = path.read_text(encoding="utf-8")
+              non_ascii = [(i, ch) for i, ch in enumerate(text) if ord(ch) > 127]
+              assert not non_ascii, f"non-ASCII characters found in {path}: {non_ascii[:5]}"
+
+          menu = menu_path.read_text(encoding="utf-8")
+          assert "Language" not in menu
+          assert "Panel status" in menu
+          assert "Service management" in menu
+          assert "Administrator management" in menu
+          assert "Protocol management" in menu
+          assert "Available protocols:" in menu
+          assert "Cisco / OpenConnect" in menu
+          assert "OpenVPN" in menu
+          assert "WireGuard" in menu
+          assert "L2TP / IPsec" in menu
+          assert "V2Ray / Xray" in menu
+          assert "scripts/twinpanel_protocol_cli_en.py" in menu
+          assert 'export PYTHONPATH="$BACKEND${PYTHONPATH:+:$PYTHONPATH}"' in menu
+          assert "unit_exists" in menu
+          assert "not-installed" in menu
+          assert "restart_unit twinpanel-api.service || true" in menu
+          assert "restart_nginx || true" in menu
+
+          protocol = protocol_path.read_text(encoding="utf-8")
+          main_start = protocol.index("def main()")
+          main_body = protocol[main_start:]
+          assert main_body.index("_select_protocol()") < main_body.index("_select_node(db)")
+          assert "No Exit nodes are configured yet." in protocol
+          print("SSH_MENU_ENGLISH_RUNTIME_GUARDS_OK")
+          PY
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -48,11 +90,23 @@ jobs:
         working-directory: backend
         run: |
           python - <<'PY'
-          from scripts import twinpanel_admin_cli, twinpanel_protocol_cli
+          from scripts import twinpanel_admin_cli, twinpanel_protocol_cli, twinpanel_protocol_cli_en
           assert callable(twinpanel_admin_cli.main)
           assert callable(twinpanel_protocol_cli.main)
+          assert callable(twinpanel_protocol_cli_en.main)
           print("SSH_MANAGEMENT_IMPORT_OK")
           PY
+
+      - name: Verify direct CLI execution can import backend app
+        run: |
+          set +e
+          output="$(cd backend && PYTHONPATH="$PWD" python scripts/twinpanel_protocol_cli_en.py </dev/null 2>&1)"
+          set -e
+          echo "$output"
+          if grep -q 'ModuleNotFoundError' <<<"$output"; then
+            echo "Direct protocol CLI import path is broken"
+            exit 1
+          fi
 
       - name: Verify installer wires SSH menu
         run: |
@@ -61,10 +115,10 @@ jobs:
           grep -q 'TwinPanel initial admin — first login only' installer/install.sh
           grep -q 'Existing administrator preserved' installer/install.sh
 
-      - name: Verify protocol actions are explicit
+      - name: Verify English protocol actions are explicit
         run: |
-          grep -q 'Status / وضعیت' backend/scripts/twinpanel_protocol_cli.py
-          grep -q 'Install / نصب' backend/scripts/twinpanel_protocol_cli.py
-          grep -q 'Repair / تعمیر' backend/scripts/twinpanel_protocol_cli.py
-          grep -q 'Restart / ریستارت' backend/scripts/twinpanel_protocol_cli.py
-          grep -q 'Remove / حذف' backend/scripts/twinpanel_protocol_cli.py
+          grep -q '("status", "Status")' backend/scripts/twinpanel_protocol_cli_en.py
+          grep -q '("install", "Install")' backend/scripts/twinpanel_protocol_cli_en.py
+          grep -q '("repair", "Repair")' backend/scripts/twinpanel_protocol_cli_en.py
+          grep -q '("restart", "Restart")' backend/scripts/twinpanel_protocol_cli_en.py
+          grep -q '("remove", "Remove")' backend/scripts/twinpanel_protocol_cli_en.py
