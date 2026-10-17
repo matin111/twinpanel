@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.24",
-  "source_sha": "c4744fbfaf6e69b339d334f1df4850665f97a753",
+  "version": "1.1.0-rc.25",
+  "source_sha": "224a3d7b0fd1c0e411db3f14cdb6b9c8293d1b90",
   "notes": {
-    "fa": "نسخه 1.1.0-rc.24 قابلیت Smart Auto Bootstrap V24 را اضافه می‌کند: اگر پنل هیچ Logical Tunnel نداشته باشد و دقیقاً یک نود ایران Online و یک نود خروجی Online با دسترسی SSH ذخیره‌شده وجود داشته باشد، Manager به‌صورت امن یک Pair خودکار می‌سازد و آن را وارد مسیر نصب و ارزیابی Candidateهای GRE، GOST TUN/WSS، AmneziaWG و Netrix می‌کند. topology مبهم بدون تغییر باقی می‌ماند و هیچ مسیر قدیمی به‌صورت اجباری نصب نمی‌شود.",
-    "en": "TwinPanel 1.1.0-rc.24 adds Smart Auto Bootstrap V24: when no logical tunnel exists and exactly one online Iran node plus one online Exit node have saved SSH access, the manager safely creates one automatic logical pair and hands it to the existing GRE, GOST TUN/WSS, AmneziaWG and optional Netrix qualification pipeline. Ambiguous topologies remain untouched and no legacy data plane is force-installed."
+    "fa": "نسخه 1.1.0-rc.25 ساخت اشتراک را دوحالته می‌کند: حالت معمول با انتخاب پلن بدون تغییر باقی مانده و حالت «اشتراک دستی» امکان ساخت واقعی بدون پلن را با تعیین مستقیم حجم، مدت، تعداد اتصال همزمان و پروتکل‌ها فراهم می‌کند. برای نصب‌های قبلی، ستون plan_id به‌صورت idempotent و امن nullable می‌شود و اشتراک دستی با plan_id=NULL واقعی ذخیره می‌شود؛ ساخت با پلن نیز با تست رگرسیون حفظ شده است.",
+    "en": "TwinPanel 1.1.0-rc.25 adds two subscription creation modes: the existing plan-backed flow remains unchanged, while a true Manual Subscription flow can be created without selecting a plan by directly setting traffic, duration, concurrent devices and protocols. Existing installations safely migrate plan_id to nullable, manual subscriptions are stored with a real NULL plan_id, and plan-backed creation remains regression-tested."
   }
 }
