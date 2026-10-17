@@ -1,0 +1,116 @@
+/* TwinPanel admin modal layer contract.
+ * Loaded after the legacy/runtime modal styles so dialogs always stay above
+ * the sticky admin navigation and keep a predictable desktop/mobile size.
+ */
+
+.admin-shell .runtime-modal{
+  position:fixed!important;
+  inset:0!important;
+  z-index:5000!important;
+  display:grid!important;
+  place-items:center!important;
+  box-sizing:border-box!important;
+  padding:clamp(12px,2vw,24px)!important;
+  overflow:auto!important;
+  overscroll-behavior:contain!important;
+}
+
+.admin-shell .runtime-modal-bg{
+  position:absolute!important;
+  inset:0!important;
+  z-index:0!important;
+}
+
+.admin-shell .runtime-modal-card{
+  position:relative!important;
+  z-index:1!important;
+  box-sizing:border-box!important;
+  max-width:calc(100vw - 32px)!important;
+  max-height:calc(100dvh - 48px)!important;
+  margin:auto!important;
+  overflow:auto!important;
+  overscroll-behavior:contain!important;
+}
+
+/* Standard modal widths. */
+.admin-shell .runtime-modal-card.wide{
+  width:min(900px,calc(100vw - 40px))!important;
+  max-height:min(86dvh,840px)!important;
+}
+
+.admin-shell .runtime-modal-card.manage-card{
+  width:min(980px,calc(100vw - 40px))!important;
+  max-height:min(86dvh,840px)!important;
+}
+
+/* Subscription create/edit is intentionally compact. */
+.admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card{
+  width:min(760px,calc(100vw - 32px))!important;
+  max-height:min(78dvh,700px)!important;
+}
+
+.admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card>.card-head{
+  position:sticky!important;
+  top:-15px!important;
+  z-index:5!important;
+  margin:-15px -15px 4px!important;
+  padding:13px 15px 11px!important;
+  border-bottom:1px solid var(--line)!important;
+  background:var(--surface)!important;
+}
+
+.admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card .modalActions{
+  position:sticky!important;
+  bottom:-15px!important;
+  z-index:4!important;
+  margin:4px -15px -15px!important;
+  padding:11px 15px!important;
+  border-top:1px solid var(--line)!important;
+  background:var(--surface)!important;
+}
+
+/* Infrastructure/tunnel management needs more horizontal room, but should
+ * still never become a near-full-screen desktop dialog. */
+.admin-shell .legacy-control-page .runtime-modal-card.manage-card{
+  width:min(900px,calc(100vw - 40px))!important;
+  max-height:min(84dvh,800px)!important;
+}
+
+/* Older user-management dialogs had their own lower z-index. Keep every
+ * runtime modal in the same top layer. */
+.admin-shell .user-manage-modal{
+  z-index:5000!important;
+}
+
+@media(max-width:900px){
+  .admin-shell .runtime-modal{
+    padding:10px!important;
+  }
+
+  .admin-shell .runtime-modal-card,
+  .admin-shell .runtime-modal-card.wide,
+  .admin-shell .runtime-modal-card.manage-card,
+  .admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card,
+  .admin-shell .legacy-control-page .runtime-modal-card.manage-card{
+    width:calc(100vw - 20px)!important;
+    max-width:calc(100vw - 20px)!important;
+    max-height:calc(100dvh - 20px)!important;
+  }
+}
+
+@media(max-width:560px){
+  .admin-shell .runtime-modal{
+    padding:6px!important;
+  }
+
+  .admin-shell .runtime-modal-card,
+  .admin-shell .runtime-modal-card.wide,
+  .admin-shell .runtime-modal-card.manage-card,
+  .admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card,
+  .admin-shell .legacy-control-page .runtime-modal-card.manage-card{
+    width:calc(100vw - 12px)!important;
+    max-width:calc(100vw - 12px)!important;
+    max-height:calc(100dvh - 12px)!important;
+    border-radius:14px!important;
+  }
+}
