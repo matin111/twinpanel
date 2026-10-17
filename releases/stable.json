@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.17",
+  "version": "1.1.0-rc.18",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T21:46:32Z",
+  "released_at": "2026-10-17T21:59:38Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "eb2733af9a046a897049d7bc05563ff466aa9689",
+  "source_sha": "c56ec6493be0cdc1f97d7cacde520ef87cbf6907",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.17/twinpanel-1.1.0-rc.17-linux-x86_64.tar.gz",
-    "sha256": "4ecd5b16230bf29c1e595d197d9135d19bfef9b1860298788e96ca5460090fab",
-    "size_bytes": 12464464
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.18/twinpanel-1.1.0-rc.18-linux-x86_64.tar.gz",
+    "sha256": "4941e37a48a8d55848a6078988292ebfb1694c76704804008b9e6832bd696fb3",
+    "size_bytes": 12463447
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.17 شکاف بین تست‌های CI و نصب واقعی مشتری را می‌بندد. در Prebuilt عمومی، اگر NEXT_PUBLIC_API_BASE خالی یا loopback باشد، مرورگر به‌صورت امن از origin فعلی پنل و proxy داخلی /v1 استفاده می‌کند؛ بنابراین قابلیت‌هایی مثل پشتیبانی آنلاین دیگر به‌دلیل ثابت نبودن دامنه/IP از API جدا نمی‌شوند. همچنین یک Installed Feature Audit فقط‌خواندنی اضافه شده که سرویس‌ها، Health، same-origin proxy، احراز هویت ادمین محلی و Endpointهای واقعی داشبورد، کاربران، پلن‌ها، اشتراک‌ها، نودها، تونل‌ها، پروتکل‌ها، امنیت، پرداخت، کیف پول، فروشگاه، تخفیف، پشتیبانی، اعلان‌ها، بکاپ، دامنه، تنظیمات، تلگرام، نمایندگی، Quota و سیستم بروزرسانی را PASS/WARN/FAIL گزارش می‌کند.",
-    "en": "TwinPanel 1.1.0-rc.17 closes the gap between source CI and real customer installations. Public prebuilt builds now resolve an empty or loopback NEXT_PUBLIC_API_BASE to the current browser origin and the built-in /v1 proxy, keeping browser features connected on IP and custom-domain installs. It also adds a read-only Installed Feature Audit covering services, health, same-origin proxying, local admin auth, and live feature endpoints for dashboard, users, plans, subscriptions, nodes, tunnels, protocols, security, payments, wallet, store, discounts, support, notifications, backups, domains, settings, Telegram, resellers, quota, and the updater."
+    "fa": "نسخه 1.1.0-rc.18 رفتار منوی مدیریت را اصلاح می‌کند. اگر پشتیبانی گفتگوی نیازمند پاسخ، پرداخت/رسید نیازمند بررسی، اعلان خوانده‌نشده یا بروزرسانی جدید داشته باشد، گروه مربوطه با رنگ قرمز و نقطه چشمک‌زن مشخص می‌شود و هشدار پشتیبانی صرفاً با باز کردن صفحه پاک نمی‌شود؛ تا زمان پاسخ یا بستن گفتگو باقی می‌ماند. همچنین منوی بالایی به Accordion واقعی تبدیل شده تا با باز کردن هر گروه، گروه قبلی خودکار بسته شود و پس از انتخاب یک آیتم نیز Dropdown بسته شود.",
+    "en": "TwinPanel 1.1.0-rc.18 fixes admin navigation attention and menu behavior. Support conversations needing a reply, payments/receipts needing review, unread notifications, and available updates keep their related navigation group red with a blinking attention dot until the work is actually resolved. Opening the Support page no longer clears pending-reply attention. The top navigation is now an exclusive accordion, so opening one group automatically closes the previous group, and selecting an item closes the dropdown."
   }
 }
