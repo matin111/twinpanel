@@ -2,77 +2,73 @@
 
 ## Source of truth
 
-All installable TwinPanel application code lives in GitHub and is released from a validated product branch/tag. Production servers must never become the source of truth.
+All customer-installable TwinPanel application code lives in GitHub and is released from one validated canonical branch. Production servers must never become the source of truth.
 
-Current product integration branch:
+Canonical customer release branch:
 
-`product/self-hosted-v1`
+`release/stable-v1`
 
-This branch contains both:
-
-- Next.js frontend
-- FastAPI backend
-- installer/deployment files
-- node-agent/bootstrap code
+Temporary `feat/*`, `fix/*`, `deploy/*`, `preview/*`, preserve/backup branches are development or audit branches only and must not be used by customer installers.
 
 ## Repositories
 
-### 1. `matin111/twinpanel`
+### 1. `matin111/twinpanel` — private product source
 
-Customer-installable product source and release pipeline.
+Contains the customer product and release pipeline:
 
-Required release contents:
-
-- `/app`, `/components`, `/lib`, `/public` — web application
-- `/backend` — FastAPI API and all runtime services
-- `/installer` — one-command installer/updater/repair/uninstaller
+- `/app`, `/components`, `/lib`, `/public` — Next.js web application
+- `/backend` — FastAPI API and runtime services
+- `/installer` — release installation logic
 - `/deploy/systemd` — service definitions
 - `/deploy/nginx` — reverse proxy templates
-- `/deploy` — PostgreSQL/Redis/runtime deployment templates
-- node-agent/bootstrap logic
+- `/deploy` — runtime templates/examples
 - database bootstrap/migrations
-- health/diagnostic scripts
+- health/diagnostic/update logic
 
-No customer secret, license signing secret, Telegram bot token, SSH private key, certificate private key, production `.env`, or database dump may be committed.
+No customer secret, vendor license signing private key, Telegram bot token, SSH private key, certificate private key, production `.env`, database dump, or customer backup may be committed.
 
-### 2. License platform repository (private)
+### 2. `matin111/tp27-core` — public bootstrap and release metadata
 
-License server source must be stored in a separate private GitHub repository and deployed only on the vendor license server. It is not shipped inside customer installations.
+Contains only public installation/bootstrap material, public license verification key, documentation links, and release-channel metadata. It does not contain the private TwinPanel product archive or vendor secrets.
 
-Responsibilities:
+The customer-facing one-line installer is:
 
-- issue/revoke/suspend/extend licenses
-- bind a license to an installation/server fingerprint according to policy
+```bash
+curl -fsSL https://raw.githubusercontent.com/matin111/tp27-core/main/twinpanel/install.sh | sudo bash
+```
+
+### 3. Vendor license platform — separate private service/repository
+
+The authoritative license service is not shipped to customer servers. Responsibilities:
+
+- issue/revoke/suspend/extend paid licenses
+- create/recover one 7-day trial per eligible installation fingerprint
+- bind entitlement to installation/server identity
 - activation and periodic validation API
-- installation entitlement and release-channel response
+- signed entitlement issuance
+- permitted release channel/version
+- time-limited private release download URLs
 - license audit/events
-- admin authentication
-- Telegram admin bot
-- customer/license lookup
-- create license
-- extend license
-- suspend/revoke license
-- activation reset / server move
+- admin authentication and vendor Telegram bot
+- activation reset/server move policy
 - expiry notifications
-- optional sales/order notifications
 
-The license server keeps all signing secrets and Telegram bot tokens outside GitHub in deployment secrets/environment variables.
+All signing private keys and vendor bot secrets stay only in deployment secrets/environment variables on the vendor service.
 
 ## Customer install flow
 
-1. Customer receives a license key.
-2. Customer runs the official TwinPanel bootstrap installer.
-3. Installer checks OS/resources/ports and creates a machine installation ID.
-4. Installer activates the key against the vendor license API.
-5. License API returns entitlement/release metadata.
-6. Installer obtains the validated TwinPanel release artifact produced from GitHub Actions.
-7. Installer installs PostgreSQL + Redis, Backend, Frontend, systemd and Nginx.
-8. Database schema is initialized.
-9. Admin account is created through a one-time local bootstrap flow.
-10. Installer starts services and runs health checks.
-11. Installation succeeds only when Web, API, DB and Redis health checks pass.
+1. Customer runs the public bootstrap installer.
+2. Installer validates Ubuntu/resources/ports and generates a stable Installation ID.
+3. Installer computes a privacy-conscious machine fingerprint locally.
+4. With no paid key, the vendor API starts/recovers the 7-day trial. With a paid key, it activates the paid entitlement.
+5. Vendor API returns a signed entitlement plus the permitted release metadata.
+6. Installer obtains a short-lived download URL for the validated TwinPanel artifact.
+7. Installer verifies SHA256 before extraction.
+8. Installer sets up PostgreSQL, Redis, Backend, Frontend, systemd and Nginx.
+9. Database schema and the one-time initial admin are created.
+10. Installation succeeds only after Web/API/DB/Redis health checks pass.
 
-## Runtime architecture on every customer server
+## Runtime architecture
 
 ```text
 Internet
@@ -89,36 +85,51 @@ Internet
               PostgreSQL :5432      Redis :6379
 ```
 
-Browser requests remain same-origin. Next.js/API runtime targets must point to the API installed on the same TwinPanel deployment by default; no hard-coded dependency on an old Moviline/TwinPanel server is allowed.
+Browser requests remain same-origin. No hard-coded dependency on an old production panel/API is allowed.
 
 ## License architecture
 
-Customer panel must contain only the public license client configuration and installation token/state. It must never contain the vendor signing key.
+Customer servers contain only:
 
-Recommended API contract:
+- installation ID/fingerprint hash
+- vendor API endpoint
+- vendor public verification key
+- signed entitlement/cache
+- license/update UI and client logic
 
+The customer server never receives the vendor signing private key.
+
+Primary vendor API contract:
+
+- `POST /v1/license/trial`
 - `POST /v1/license/activate`
 - `POST /v1/license/validate`
-- `POST /v1/license/deactivate`
-- `GET /v1/license/status`
-- vendor admin endpoints under `/v1/admin/licenses/*`
+- `POST /v1/license/release`
 
-Validation response should include at minimum:
+Signed validation payloads include status, installation ID, expiry, edition/features, and release channel. A bounded offline grace period handles temporary vendor API outages.
 
-- license status
-- installation id
-- product edition/features
-- expiration time
-- permitted release channel/version
-- signed response or server-verifiable token
+After authoritative trial/license expiry, protected new management mutations are blocked, while admin login, license activation, backup/export and diagnostics remain available. Existing VPN data-plane traffic is not abruptly terminated by a temporary licensing outage.
 
-A temporary license-server outage should use a bounded grace period rather than instantly stopping customer traffic.
+## In-panel updates
+
+Every customer panel displays its installed version and public GitHub/bootstrap link. The panel checks the public stable release manifest. When a newer entitled release exists, the administrator sees an update indicator and can press Update.
+
+The root-owned updater service must:
+
+1. validate entitlement
+2. create an encrypted pre-update backup
+3. request a time-limited entitled package URL
+4. download and verify SHA256
+5. install/build in `/opt/twinpanel/releases/<version>`
+6. atomically switch `/opt/twinpanel/current`
+7. restart services
+8. verify Web/API health
+9. roll back automatically on failure
+10. keep only a small number of previous releases
 
 ## Telegram license bot
 
-The Telegram bot runs only on the vendor license server and uses the license platform's internal API/database. It is not the sales bot installed for each TwinPanel customer.
-
-Minimum admin actions:
+The vendor Telegram bot runs only on the vendor license server and is separate from customer sales bots. Minimum restricted/audited actions:
 
 - `/newlicense`
 - `/license <key>`
@@ -126,26 +137,31 @@ Minimum admin actions:
 - `/suspend <key>`
 - `/revoke <key>`
 - `/resetactivation <key>`
+- `/trial <installation_id>`
+- `/trialinfo <installation_id>`
+- `/resettrial <installation_id>`
 - `/expiring`
 - `/stats`
 
-All destructive actions must be restricted to configured Telegram admin IDs and audited.
-
 ## Release gates
 
-A commercial release cannot be published unless CI verifies:
+A customer release cannot be promoted unless CI verifies:
 
 1. frontend build
-2. backend Python compile/import
+2. backend compile/import
 3. clean database bootstrap
 4. login/bootstrap flow
-5. API health
+5. API health/readiness
 6. frontend-to-API proxy
-7. installer shellcheck/syntax
-8. install on a clean supported Ubuntu image/VM
+7. installer/updater syntax
+8. install on clean supported Ubuntu
 9. upgrade from previous release
-10. rollback/backup path
+10. pre-update backup, rollback and health paths
+
+## Repository hygiene
+
+After a validated release is promoted and deployed, temporary branches fully contained by the canonical release should be removed. Keep only active work, release branches, necessary audit/preserve references, and unresolved incident branches. Do not delete historical branches until clean-install and upgrade tests prove the canonical release contains the required changes.
 
 ## Non-negotiable rule
 
-Do not patch a customer's production backend as a substitute for updating GitHub source. Every production fix must first exist in the product source/release and then be deployed through the update mechanism.
+Do not patch a customer production backend as a substitute for updating GitHub source. Every production fix must first exist in the canonical product source/release and then be deployed through the update mechanism.

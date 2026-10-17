@@ -1,0 +1,11 @@
+[Unit]
+Description=Run TwinPanel automatic backup scheduler every 5 minutes
+
+[Timer]
+OnCalendar=*-*-* *:00/5:00
+Persistent=true
+AccuracySec=15s
+Unit=twinpanel-backup.service
+
+[Install]
+WantedBy=timers.target

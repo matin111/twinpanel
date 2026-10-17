@@ -8,6 +8,7 @@ import {BrandMark} from "../lib/branding";
 import {PaymentReviewBadge} from "./payment-review-badge";
 import {AdminNotificationCenter} from "./admin-notification-center";
 import {SupportUnreadBadge} from "./support-unread-badge";
+import {SystemReleaseFooter} from "./system-release-footer";
 
 const ADMIN_SIDEBAR_SCROLL_KEY="twinpanel.admin.sidebar.scrollTop";
 
@@ -116,6 +117,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
         <span className="avatar">M</span>
         <div className="profile-copy"><b>{pick("مدیر سیستم","System Admin")}</b><small>Administrator</small></div>
       </div>
+      <SystemReleaseFooter/>
     </aside>
 
     <main>

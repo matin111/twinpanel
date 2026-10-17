@@ -30,16 +30,42 @@ def valid_email(value: str) -> str:
         raise SystemExit(f"TWINPANEL_ADMIN_EMAIL is invalid: {value}") from exc
 
 
+def truthy(name: str) -> bool:
+    return str(os.getenv(name, "") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def main() -> int:
     email = valid_email(need("TWINPANEL_ADMIN_EMAIL"))
     password = need("TWINPANEL_ADMIN_PASSWORD")
     full_name = str(os.getenv("TWINPANEL_ADMIN_NAME", "System Admin") or "System Admin").strip()
+    force_update = truthy("TWINPANEL_ADMIN_FORCE_UPDATE")
 
     if len(password) < 10:
         raise SystemExit("TWINPANEL_ADMIN_PASSWORD must be at least 10 characters")
 
     db = SessionLocal()
     try:
+        existing_admin = (
+            db.query(User)
+            .filter(User.role == UserRole.ADMIN)
+            .order_by(User.id.asc())
+            .first()
+        )
+
+        # Installer/bootstrap is idempotent by default. A reinstall or upgrade
+        # must never rotate an existing administrator password unexpectedly.
+        if existing_admin is not None and not force_update:
+            print(
+                "ADMIN_BOOTSTRAP_OK "
+                f"action=preserved id={existing_admin.id} email={existing_admin.email}"
+            )
+            return 0
+
         user = db.query(User).filter(User.email == email).first()
 
         if user is None:

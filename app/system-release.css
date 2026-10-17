@@ -1,0 +1,40 @@
+.system-release-footer{
+  margin:10px 14px 12px;
+  padding:10px 11px;
+  border:1px solid var(--border,#202a3b);
+  border-radius:14px;
+  background:rgba(124,58,237,.055);
+  display:grid;
+  gap:7px;
+  font-size:11px;
+}
+.system-release-footer.has-update{border-color:rgba(139,92,246,.6);box-shadow:0 0 0 1px rgba(139,92,246,.08) inset}
+.system-release-version,.system-release-license{display:flex;align-items:center;gap:7px;min-width:0}
+.system-release-version{justify-content:space-between}
+.system-release-version span,.system-release-license>span:not(.license-dot){opacity:.72;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.system-release-version a{color:inherit;text-decoration:none;font-weight:800;direction:ltr}
+.system-release-version a:hover{text-decoration:underline}
+.system-release-license button,.system-check-button,.system-update-button{border:0;cursor:pointer;font:inherit}
+.system-release-license button{margin-inline-start:auto;background:transparent;color:inherit;opacity:.76;padding:2px 4px}
+.license-dot{width:7px;height:7px;border-radius:999px;flex:0 0 auto;background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.08)}
+.license-dot.warn{background:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.08)}
+.license-dot.bad{background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.08)}
+.system-update-button,.system-check-button{min-height:30px;border-radius:9px;padding:0 9px;font-weight:800}
+.system-update-button{background:linear-gradient(135deg,#7c3aed,#9333ea);color:#fff}
+.system-check-button{background:rgba(148,163,184,.08);color:inherit;border:1px solid var(--border,#202a3b)}
+.system-update-button:disabled,.system-check-button:disabled{opacity:.55;cursor:wait}
+.system-release-error{color:#f87171;line-height:1.55;word-break:break-word}
+.system-license-modal{position:fixed;inset:0;z-index:10050;display:grid;place-items:center;padding:18px}
+.system-license-backdrop{position:absolute;inset:0;border:0;background:rgba(2,6,23,.74);backdrop-filter:blur(7px)}
+.system-license-card{position:relative;width:min(430px,100%);border:1px solid var(--border,#263247);border-radius:18px;background:var(--panel,#0d1422);padding:16px;display:grid;gap:14px;box-shadow:0 30px 90px rgba(0,0,0,.45)}
+.system-license-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.system-license-head>div{display:grid;gap:5px}
+.system-license-head small{opacity:.68;line-height:1.7}
+.system-license-head>button{width:34px;height:34px;border-radius:10px;border:1px solid var(--border,#263247);background:transparent;color:inherit;cursor:pointer}
+.system-license-card input{height:44px;border:1px solid var(--border,#263247);border-radius:11px;background:rgba(2,6,23,.26);color:inherit;padding:0 12px;outline:none}
+.system-license-card input:focus{border-color:#8b5cf6;box-shadow:0 0 0 3px rgba(139,92,246,.1)}
+.system-license-actions{display:flex;justify-content:flex-end;gap:8px}
+.system-license-actions button{min-height:38px;border-radius:10px;padding:0 14px}
+.sidebar-collapsed .system-release-footer{margin-inline:8px;padding:8px;place-items:center}
+.sidebar-collapsed .system-release-footer .system-release-version span,.sidebar-collapsed .system-release-license>span:not(.license-dot),.sidebar-collapsed .system-release-license button,.sidebar-collapsed .system-check-button,.sidebar-collapsed .system-update-button{display:none}
+@media(max-width:760px){.system-release-footer{margin:8px 10px 10px}.system-license-modal{padding:10px}.system-license-card{border-radius:16px}.system-license-actions{display:grid;grid-template-columns:1fr 1fr}}
