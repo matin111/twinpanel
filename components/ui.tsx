@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {useEffect,useRef,useState} from "react";
+import {useState} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {BrandMark} from "../lib/branding";
@@ -9,8 +9,6 @@ import {PaymentReviewBadge} from "./payment-review-badge";
 import {AdminNotificationCenter} from "./admin-notification-center";
 import {SupportUnreadBadge} from "./support-unread-badge";
 import {SystemReleaseFooter} from "./system-release-footer";
-
-const ADMIN_SIDEBAR_SCROLL_KEY="twinpanel.admin.sidebar.scrollTop";
 
 const menuGroups=[
   {fa:"مدیریت",en:"Management",items:[
@@ -52,77 +50,41 @@ const menuGroups=[
 
 export function Shell({children,active="/admin"}:{children:React.ReactNode;active?:string}){
   const {pick}=useI18n();
-  const [collapsed,setCollapsed]=useState(false);
   const [mobileOpen,setMobileOpen]=useState(false);
-  const sidebarNavRef=useRef<HTMLElement|null>(null);
 
-  const rememberSidebarScroll=()=>{
-    const nav=sidebarNavRef.current;
-    if(!nav)return;
-    try{sessionStorage.setItem(ADMIN_SIDEBAR_SCROLL_KEY,String(Math.max(0,Math.round(nav.scrollTop))));}catch{}
-  };
+  return <div className={`shell admin-shell admin-top-shell ${mobileOpen?"mobile-menu-open":""}`}>
+    <div className="admin-topbar">
+      <div className="admin-topbar-inner">
+        <div className="admin-topbar-brand"><BrandMark/></div>
 
-  useEffect(()=>{
-    try{setCollapsed(localStorage.getItem("twinpanel.sidebar.collapsed")==="1");}catch{}
+        <nav className="admin-topnav" aria-label={pick("منوی اصلی","Main navigation")}>{menuGroups.map(group=>{
+          const groupActive=group.items.some(([, ,href])=>active===href);
+          return <details className={`topnav-group ${groupActive?"active":""}`} key={group.en}>
+            <summary className="topnav-group-trigger">
+              <span>{pick(group.fa,group.en)}</span>
+              <span className="topnav-chevron" aria-hidden="true">⌄</span>
+            </summary>
+            <div className="topnav-menu">
+              <div className="topnav-menu-head">{pick(group.fa,group.en)}</div>
+              <div className="topnav-menu-grid">
+                {group.items.map(([fa,en,h,i])=>{
+                  const label=pick(fa,en);
+                  return <Link key={h} href={h} className={active===h?"active":""} onClick={()=>setMobileOpen(false)}>
+                    <i>{i}</i><span className="nav-label">{label}</span>{h==="/admin/support"&&<SupportUnreadBadge active={active===h}/>}{h==="/admin/payments"&&<PaymentReviewBadge/>}
+                  </Link>;
+                })}
+              </div>
+              {group.en==="System & Maintenance"&&<div className="topnav-release"><SystemReleaseFooter/></div>}
+            </div>
+          </details>;
+        })}</nav>
 
-    let firstFrame=0;
-    let secondFrame=0;
-    try{
-      const saved=Number(sessionStorage.getItem(ADMIN_SIDEBAR_SCROLL_KEY)||0);
-      if(Number.isFinite(saved)&&saved>0){
-        const restore=()=>{
-          if(sidebarNavRef.current)sidebarNavRef.current.scrollTop=saved;
-        };
-        firstFrame=requestAnimationFrame(()=>{
-          restore();
-          secondFrame=requestAnimationFrame(restore);
-        });
-      }
-    }catch{}
-
-    return()=>{
-      if(firstFrame)cancelAnimationFrame(firstFrame);
-      if(secondFrame)cancelAnimationFrame(secondFrame);
-      rememberSidebarScroll();
-    };
-  },[]);
-
-  const toggleCollapsed=()=>{
-    setCollapsed(prev=>{
-      const next=!prev;
-      try{localStorage.setItem("twinpanel.sidebar.collapsed",next?"1":"0");}catch{}
-      return next;
-    });
-  };
-
-  return <div className={`shell admin-shell ${collapsed?"sidebar-collapsed":""} ${mobileOpen?"mobile-menu-open":""}`}>
-    <aside className="sidebar" aria-label={pick("منوی اصلی","Main navigation")}>
-      <div className="sidebar-head">
-        <BrandMark/>
-        <button className="sidebar-collapse" type="button" onClick={toggleCollapsed} aria-label={pick("باز و بسته کردن منو","Toggle sidebar")} title={pick("باز و بسته کردن منو","Toggle sidebar")}>↔</button>
-        <button className="mobile-menu-close" type="button" onClick={()=>setMobileOpen(false)} aria-label={pick("بستن منو","Close menu")}>×</button>
+        <button className="admin-mobile-menu-toggle" type="button" onClick={()=>setMobileOpen(v=>!v)} aria-expanded={mobileOpen} aria-label={pick("نمایش منو","Show menu")}>☰</button>
       </div>
-
-      <nav ref={sidebarNavRef} className="sidebar-nav" onScroll={rememberSidebarScroll}>{menuGroups.map(group=><div className="nav-group" key={group.en}>
-        <div className="nav-group-title">{pick(group.fa,group.en)}</div>
-        {group.items.map(([fa,en,h,i])=>{
-          const label=pick(fa,en);
-          return <Link key={h} href={h} title={collapsed?label:undefined} className={active===h?"active":""} onClick={()=>{rememberSidebarScroll();setMobileOpen(false);}}>
-            <i>{i}</i><span className="nav-label">{label}</span>{h==="/admin/support"&&<SupportUnreadBadge active={active===h}/>}{h==="/admin/payments"&&<PaymentReviewBadge/>}
-          </Link>;
-        })}
-      </div>)}</nav>
-
-      <div className="profile">
-        <span className="avatar">M</span>
-        <div className="profile-copy"><b>{pick("مدیر سیستم","System Admin")}</b><small>Administrator</small></div>
-      </div>
-      <SystemReleaseFooter/>
-    </aside>
+    </div>
 
     <main>
-      <header>
-        <button className="mobile-menu-toggle" type="button" onClick={()=>setMobileOpen(v=>!v)} aria-expanded={mobileOpen} aria-label={pick("نمایش منو","Show menu")}>☰</button>
+      <header className="admin-commandbar">
         <div className="search">⌕ <input placeholder={pick("جستجو در پنل...","Search panel...")}/></div>
         <div className="head-actions"><LanguageSwitch compact/><ThemeSwitch compact/><AdminNotificationCenter/><span className="avatar">M</span></div>
       </header>
