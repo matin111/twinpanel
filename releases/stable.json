@@ -2,16 +2,16 @@
   "schema": 2,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.4",
+  "version": "1.1.0-rc.5",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T18:00:00Z",
+  "released_at": "2026-10-17T18:20:00Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "10edbfd6ed243817efc8db8e84a8841476e15fa9",
+  "source_sha": "7507eb60f70c670fc2c1bf7b47455987b4635139",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "notes": {
-    "fa": "نسخه 1.1.0-rc.4 سرور اصلی TwinPanel را به‌عنوان Local / This server به مدیریت پروتکل‌ها اضافه می‌کند. Status، Install، Repair، Restart و Remove روی سرور اصلی بدون SSH به خودش اجرا می‌شوند و Exit Nodeهای ریموت همچنان با دسترسی SSH ذخیره‌شده مدیریت می‌شوند. Remove قبل از تغییر فایل‌ها روی مقصد انتخاب‌شده بکاپ می‌گیرد.",
-    "en": "TwinPanel 1.1.0-rc.4 adds the main TwinPanel server as a Local / This server protocol target. Status, Install, Repair, Restart and Remove run locally without SSH-to-self, while remote Exit nodes continue to use saved SSH access. Remove backs up the selected target before changing protocol files."
+    "fa": "نسخه 1.1.0-rc.5 چرخه تراکنش دیتابیس در مدیریت پروتکل‌ها را اصلاح می‌کند. Queryهای کوتاه قبل از اجرای طولانی apt/systemd/SSH آزاد می‌شوند، Sessionهای خطادار rollback می‌شوند و نصب/تعمیر پروتکل روی Local و Exit Node دیگر تراکنش باز و بلااستفاده نگه نمی‌دارد. این نسخه خطای Can't reconnect until invalid transaction is rolled back را در نصب Cisco/OpenConnect روی Local / This server هدف قرار می‌دهد.",
+    "en": "TwinPanel 1.1.0-rc.5 fixes database transaction lifecycle in protocol management. Short DB reads are released before long apt/systemd/SSH operations, failed sessions are rolled back, and Local/Exit protocol install or repair no longer keeps an idle transaction checked out. This release specifically addresses the Cisco/OpenConnect Local / This server PendingRollback failure."
   }
 }
