@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from urllib.parse import urlparse
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .config import settings
@@ -115,6 +116,14 @@ def _available_local_name(db: Session) -> str:
     return f"{LOCAL_NODE_NAME} {suffix}"
 
 
+def _assign_sqlite_test_id(db: Session, node: Node) -> None:
+    bind = db.get_bind()
+    if bind is None or bind.dialect.name != "sqlite":
+        return
+    current = db.query(func.max(Node.id)).scalar()
+    node.id = int(current or 0) + 1
+
+
 def ensure_local_core_node(db: Session) -> Node:
     node = (
         db.query(Node)
@@ -142,6 +151,7 @@ def ensure_local_core_node(db: Session) -> Node:
             current_users=0,
             last_seen_at=now,
         )
+        _assign_sqlite_test_id(db, node)
         db.add(node)
         db.commit()
         db.refresh(node)
