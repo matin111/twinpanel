@@ -4,14 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..deps import require_admin
-from ..system_release import (
-    activate_license,
-    load_license_state,
-    release_status,
-    request_update,
-    start_trial,
-    validate_license,
-)
+from .. import system_release as release
+from ..release_manifest_v25 import release_manifest_v25
+
+
+# Install the resilient manifest resolver before any route calls release_status
+# or request_update. Both functions resolve release.release_manifest at runtime,
+# so status checks and update requests use the exact same provider chain.
+release.release_manifest = release_manifest_v25
 
 
 router = APIRouter(
@@ -27,18 +27,18 @@ class LicenseActivateIn(BaseModel):
 
 @router.get("/release/status")
 def admin_release_status():
-    return release_status(refresh_license_state=False)
+    return release.release_status(refresh_license_state=False)
 
 
 @router.post("/release/check")
 def admin_release_check():
-    return release_status(refresh_license_state=True)
+    return release.release_status(refresh_license_state=True)
 
 
 @router.post("/update")
 def admin_start_update():
     try:
-        return request_update()
+        return release.request_update()
     except RuntimeError as exc:
         message = str(exc)
         status_code = 409
@@ -53,18 +53,18 @@ def admin_start_update():
 
 @router.get("/license")
 def admin_license_status():
-    return load_license_state()
+    return release.load_license_state()
 
 
 @router.post("/license/validate")
 def admin_license_validate():
-    return validate_license()
+    return release.validate_license()
 
 
 @router.post("/license/trial")
 def admin_license_trial():
     try:
-        return start_trial()
+        return release.start_trial()
     except Exception as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -72,7 +72,7 @@ def admin_license_trial():
 @router.post("/license/activate")
 def admin_license_activate(payload: LicenseActivateIn):
     try:
-        return activate_license(payload.license_key)
+        return release.activate_license(payload.license_key)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
