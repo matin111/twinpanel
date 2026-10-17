@@ -14,8 +14,44 @@ TwinPanel یک پلتفرم Self‑Hosted برای مدیریت کامل سرو�
 
 ---
 
+## نصب سریع
+
+مشتری فقط همین یک دستور را اجرا می‌کند:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/matin111/twinpanel/main/install.sh | sudo bash
+```
+
+برای نصب نیازی به GitHub Account، SSH Key، Deploy Key، Token، Clone دستی یا انتخاب Branch/Commit نیست. Installer فایل `releases/stable.json` را می‌خواند و دقیقاً Commit عمومی تأییدشده داخل Manifest را نصب می‌کند.
+
+راهنمای کامل نصب فارسی:
+
+[`docs/INSTALL_FA.md`](docs/INSTALL_FA.md)
+
+---
+
+## مدیریت SSH
+
+بعد از پایان نصب، برای باز کردن منوی مدیریت TwinPanel داخل SSH فقط این دستور را اجرا کنید:
+
+```bash
+twinpanel
+```
+
+نام کوتاه همان منو نیز قابل استفاده است:
+
+```bash
+tp
+```
+
+از این منو می‌توان وضعیت پنل و سرویس‌ها، ادمین، پروتکل‌ها، بروزرسانی، بکاپ، لاگ و Diagnostics، دامنه/SSL و اطلاعات نسخه را مدیریت کرد.
+
+---
+
 ## فهرست مطالب
 
+- [نصب سریع](#نصب-سریع)
+- [مدیریت SSH](#مدیریت-ssh)
 - [نمای کلی](#نمای-کلی)
 - [امکانات اصلی](#امکانات-اصلی)
 - [مدیریت کاربران و اشتراک‌ها](#مدیریت-کاربران-و-اشتراکها)
@@ -34,8 +70,6 @@ TwinPanel یک پلتفرم Self‑Hosted برای مدیریت کامل سرو�
 - [Trial و License](#trial-و-license)
 - [رابط کاربری](#رابط-کاربری)
 - [معماری](#معماری)
-- [نصب سریع](#نصب-سریع)
-- [مدیریت SSH](#مدیریت-ssh)
 - [نیازمندی‌ها](#نیازمندیها)
 - [مسیرهای مهم](#مسیرهای-مهم)
 - [قوانین امنیتی](#قوانین-امنیتی)
@@ -471,40 +505,6 @@ FastAPI
 ```
 
 Frontend و API به‌صورت محلی اجرا می‌شوند و Nginx Endpoint عمومی را Publish می‌کند.
-
----
-
-## نصب سریع
-
-مشتری فقط همین یک دستور را اجرا می‌کند:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/matin111/twinpanel/main/install.sh | sudo bash
-```
-
-برای نصب نیازی به GitHub Account، SSH Key، Deploy Key، Token، Clone دستی یا انتخاب Branch/Commit نیست. Installer فایل `releases/stable.json` را می‌خواند و دقیقاً Commit عمومی تأییدشده داخل Manifest را نصب می‌کند.
-
-راهنمای کامل نصب فارسی:
-
-[`docs/INSTALL_FA.md`](docs/INSTALL_FA.md)
-
----
-
-## مدیریت SSH
-
-بعد از پایان نصب، برای باز کردن منوی مدیریت TwinPanel داخل SSH فقط این دستور را اجرا کنید:
-
-```bash
-twinpanel
-```
-
-نام کوتاه همان منو نیز قابل استفاده است:
-
-```bash
-tp
-```
-
-از این منو می‌توان وضعیت پنل و سرویس‌ها، ادمین، پروتکل‌ها، بروزرسانی، بکاپ، لاگ و Diagnostics، دامنه/SSL و اطلاعات نسخه را مدیریت کرد.
 
 ---
 
