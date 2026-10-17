@@ -186,6 +186,7 @@ Type=simple
 WorkingDirectory={project}
 Environment=PYTHONUNBUFFERED=1
 Environment=TWINPANEL_API_BASE=http://127.0.0.1:8095
+EnvironmentFile=/etc/twinpanel/backend.env
 EnvironmentFile=/etc/twinpanel-telegram-api.env
 ExecStart={python} -m app.telegram_runtime_bot
 Restart=always
@@ -457,6 +458,34 @@ async def update_token(
         "username": bot.get("username"),
         "first_name": bot.get("first_name"),
     })
+
+    return _status_payload()
+
+
+@router.delete("/token")
+def delete_token():
+    if SERVICE_FILE.exists():
+        try:
+            _run([
+                "systemctl",
+                "stop",
+                "twinpanel-bot.service",
+            ])
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=f"توقف ربات پیش از حذف توکن ناموفق بود: {exc}",
+            )
+
+    try:
+        TOKEN_FILE.unlink(missing_ok=True)
+        META_FILE.unlink(missing_ok=True)
+        KEY_FILE.unlink(missing_ok=True)
+    except OSError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"حذف توکن ربات ناموفق بود: {exc}",
+        ) from exc
 
     return _status_payload()
 
