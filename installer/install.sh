@@ -218,25 +218,42 @@ ADMIN_EMAIL="admin@twinpanel.app"
 ADMIN_NAME="Administrator"
 ADMIN_PASS="$(python3 - <<'PY'
 import secrets
-print(''.join(secrets.choice('0123456789') for _ in range(12)))
+import string
+alphabet=string.ascii_letters+string.digits+'-_.@'
+print(''.join(secrets.choice(alphabet) for _ in range(20)))
 PY
 )"
 export TWINPANEL_ADMIN_EMAIL="$ADMIN_EMAIL"
 export TWINPANEL_ADMIN_PASSWORD="$ADMIN_PASS"
 export TWINPANEL_ADMIN_NAME="$ADMIN_NAME"
-(
+ADMIN_RESULT="$((
   cd "$RELEASE_ROOT/backend"
   /opt/twinpanel/venv/bin/python3 scripts/bootstrap_admin.py
-)
-unset TWINPANEL_ADMIN_PASSWORD TWINPANEL_ADMIN_EMAIL TWINPANEL_ADMIN_NAME
-cat >/root/twinpanel-initial-admin.txt <<ENV
-TwinPanel initial admin
+) 2>&1)"
+printf '%s\n' "$ADMIN_RESULT"
+ADMIN_CREATED=0
+if grep -q 'action=created' <<<"$ADMIN_RESULT"; then
+  ADMIN_CREATED=1
+  cat >/root/twinpanel-initial-admin.txt <<ENV
+TwinPanel initial admin — first login only
 Email: $ADMIN_EMAIL
 Password: $ADMIN_PASS
 Panel: http://$PUBLIC_IP
 Version: $VERSION
+
+Change the email/password after first login, then delete this file.
 ENV
-chmod 600 /root/twinpanel-initial-admin.txt
+  chmod 600 /root/twinpanel-initial-admin.txt
+fi
+unset TWINPANEL_ADMIN_PASSWORD TWINPANEL_ADMIN_EMAIL TWINPANEL_ADMIN_NAME
+
+say "Installing SSH management menu"
+cat >/usr/local/bin/twinpanel <<'SH'
+#!/usr/bin/env bash
+exec bash /opt/twinpanel/current/scripts/twinpanel-menu.sh "$@"
+SH
+chmod 755 /usr/local/bin/twinpanel
+ln -sfn /usr/local/bin/twinpanel /usr/local/bin/tp
 
 say "Installing systemd units"
 sed "s/__API_PORT__/$API_PORT/g" "$RELEASE_ROOT/deploy/systemd/twinpanel-api.service.tpl" >/etc/systemd/system/twinpanel-api.service
@@ -304,10 +321,20 @@ curl -fsS --max-time 5 http://127.0.0.1/health >/dev/null || fail "Nginx/API pub
 say "TwinPanel installation complete"
 echo "Version: $VERSION"
 echo "Panel: http://$PUBLIC_IP"
-echo "Admin email: $ADMIN_EMAIL"
-echo "Admin password: $ADMIN_PASS"
-echo "Credentials file: /root/twinpanel-initial-admin.txt"
-echo "Change the admin credentials after first login and delete the credentials file."
+echo "SSH management: twinpanel  (or: tp)"
+if (( ADMIN_CREATED )); then
+  echo "Admin email: $ADMIN_EMAIL"
+  echo "Admin password: $ADMIN_PASS"
+  echo "Credentials file: /root/twinpanel-initial-admin.txt"
+  echo "This account is for first login only. Change the admin email/password after login and delete the credentials file."
+else
+  echo "Existing administrator preserved; no admin credentials were changed."
+fi
 echo "نسخه: $VERSION"
 echo "آدرس پنل: http://$PUBLIC_IP"
-echo "بعد از اولین ورود، ایمیل و رمز مدیر را تغییر دهید."
+echo "منوی مدیریت SSH: twinpanel"
+if (( ADMIN_CREATED )); then
+  echo "این اطلاعات فقط برای ورود اولیه است؛ بعد از ورود ایمیل و رمز مدیر را تغییر دهید."
+else
+  echo "ادمین قبلی بدون تغییر حفظ شد."
+fi
