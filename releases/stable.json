@@ -2,16 +2,16 @@
   "schema": 2,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.9",
+  "version": "1.1.0-rc.10",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-17T19:28:00Z",
+  "released_at": "2026-10-17T19:36:00Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "855d8a8a5135a28be9f619532a3cdecc4dda8711",
+  "source_sha": "ce1ab4c49a8b2047c0fbc81865520f7cd287d8f0",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "notes": {
-    "fa": "نسخه 1.1.0-rc.9 منوی بالای مدیریت را دقیقاً در مرکز صفحه قرار می‌دهد و سیستم Attention اضافه می‌کند: رسیدهای در انتظار بررسی، پیام‌های خوانده‌نشده پشتیبانی، اعلان‌های خوانده‌نشده Route‌دار و بروزرسانی پنل، آیتم مرتبط و گروه والد را با وضعیت قرمز و نقطه چشمک‌زن مشخص می‌کنند. تعداد موارد پرداخت، پشتیبانی و اعلان‌ها نیز داخل Dropdown نمایش داده می‌شود.",
-    "en": "TwinPanel 1.1.0-rc.9 centers the admin top navigation across the viewport and adds unified attention indicators. Pending payment reviews, unread support messages, unread routed notifications, and available panel updates mark the affected item and parent group with a red state and blinking dot, with compact queue counts inside dropdowns."
+    "fa": "نسخه 1.1.0-rc.10 تشخیص بروزرسانی در پنل مدیریت را خودکار می‌کند: هنگام باز شدن پنل، بازگشت فوکوس و به‌صورت دوره‌ای Manifest زنده بررسی می‌شود؛ در صورت وجود نسخه جدید، دکمه بروزرسانی و وضعیت قرمز/چشمک‌زن گروه سیستم بدون نیاز به کلیک دستی روی بررسی بروزرسانی نمایش داده می‌شوند.",
+    "en": "TwinPanel 1.1.0-rc.10 automatically detects available updates in the admin UI. The live release manifest is checked on page load, when focus returns, and periodically, so the update action and red/blinking System attention state appear without requiring a manual Check update click."
   }
 }
