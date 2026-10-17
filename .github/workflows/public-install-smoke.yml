@@ -43,9 +43,9 @@ jobs:
           assert data.get('channel') == 'stable'
           assert isinstance(data.get('version'), str) and data['version']
           assert data.get('installable') is True
-          assert str(data.get('package_url') or '').startswith('https://github.com/matin111/twinpanel/')
-          sha=str(data.get('sha256') or '')
-          assert len(sha)==64 and all(c in '0123456789abcdef' for c in sha.lower())
+          assert data.get('repository_url') == 'https://github.com/matin111/twinpanel.git'
+          sha=str(data.get('source_sha') or '').lower()
+          assert len(sha)==40 and all(c in '0123456789abcdef' for c in sha)
           assert data.get('github_url') == 'https://github.com/matin111/twinpanel'
           PY
           fi
