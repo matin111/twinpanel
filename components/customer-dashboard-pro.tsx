@@ -120,13 +120,10 @@ function CustomerDashboardInner(){
         </>:<div className="customer-dash-v27-empty"><i><DashboardIcon type="service"/></i><div><b>{pick("هنوز سرویس فعالی نداری","You do not have an active service yet")}</b><small>{pick("برای شروع یکی از پلن‌های موجود را انتخاب کن","Choose one of the available plans to get started")}</small></div><Link href="/panel/buy" className="customer-dash-primary">{pick("مشاهده پلن‌ها","View plans")}</Link></div>}
       </article>
 
-      <aside className="customer-dash-v27-shortcuts">
-        <div className="customer-dash-v27-card-title"><span>{pick("دسترسی سریع","QUICK ACCESS")}</span><h3>{pick("کارهای پرکاربرد","Common actions")}</h3></div>
-        <Link href="/panel/buy"><i>＋</i><div><b>{pick("خرید اشتراک","Buy subscription")}</b><small>{pick("انتخاب پلن جدید","Choose a new plan")}</small></div><span>‹</span></Link>
-        <Link href="/panel/subscription"><i>⌁</i><div><b>{pick("اشتراک من","My subscription")}</b><small>{pick("اتصال، QR و تمدید","Connection, QR and renewal")}</small></div><span>‹</span></Link>
-        <Link href="/panel/wallet"><i>◉</i><div><b>{pick("کیف پول","Wallet")}</b><small>{pick("شارژ و تاریخچه تراکنش","Top-up and transaction history")}</small></div><span>‹</span></Link>
-        <Link href="/panel/profile"><i>♙</i><div><b>{pick("پروفایل و امنیت","Profile & security")}</b><small>{pick("رمز عبور و احراز هویت","Password and authentication")}</small></div><span>‹</span></Link>
-      </aside>
+      {/* CUSTOMER_SINGLE_NAV_V1:
+          Quick Access removed because the primary PortalShell
+          already provides the same customer navigation. */}
+
     </section>
 
     <section className="customer-dash-v27-bottom">

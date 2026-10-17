@@ -5,7 +5,9 @@ import {useEffect,useRef,useState} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {BrandMark} from "../lib/branding";
+import {PaymentReviewBadge} from "./payment-review-badge";
 import {AdminNotificationCenter} from "./admin-notification-center";
+import {SupportUnreadBadge} from "./support-unread-badge";
 
 const ADMIN_SIDEBAR_SCROLL_KEY="twinpanel.admin.sidebar.scrollTop";
 
@@ -16,37 +18,33 @@ const menuGroups=[
     ["اشتراک‌ها","Subscriptions","/admin/subscriptions","▱"],
     ["پلن‌ها","Plans","/admin/plans","◈"]
   ]},
-  {fa:"زیرساخت",en:"Infrastructure",items:[
-    ["نودها","Nodes","/admin/nodes","▦"],
-    ["تانل‌ها","Tunnels","/admin/tunnels","⤨"],
-    ["راه‌اندازی نود","Provisioning","/admin/provision","⚡"],
-    ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"],
-    ["دسترسی مادر","Mother Access","/admin/mother-access","⌁"]
+  {fa:"شبکه و زیرساخت",en:"Network & Infrastructure",items:[
+    ["سرورها","Servers","/admin/nodes","▦"],
+    ["تونل و Failover","Tunnels & Failover","/admin/tunnels","⤨"],
+    ["افزودن سرور","Add Server","/admin/provision","⚡"],
+    ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"]
   ]},
-  {fa:"مالی و فروش",en:"Sales & Finance",items:[
-    ["پرداخت‌ها","Payments","/admin/payments","◫"],
-    ["تأیید خودکار کارت","Card Auto Verify","/admin/sms-reader","▤"],
-    ["کد تخفیف","Discounts","/admin/discounts","％"],
-    ["نمایندگی‌ها","Resellers","/admin/resellers","♜"],
-    ["پلن‌های شارژ حجم","Traffic Recharge Plans","/admin/reseller-traffic-plans","▣"],
-    ["تنظیمات فروشگاه","Store Settings","/admin/store-settings","◇"]
+  {fa:"فروش و مالی",en:"Sales & Finance",items:[
+    ["پرداخت و رسیدها","Payments & Receipts","/admin/payments","◫"],
+    ["تطبیق پرداخت","Payment Matching","/admin/sms-reader","▤"],
+    ["تخفیف‌ها","Discounts","/admin/discounts","％"],
+    ["نمایندگان","Resellers","/admin/resellers","♜"],
+    ["بسته‌های ترافیک","Traffic Packages","/admin/reseller-traffic-plans","▣"],
+    ["فروشگاه","Store","/admin/store-settings","◇"]
   ]},
-  {fa:"ارتباطات",en:"Communications",items:[
+  {fa:"ارتباطات و پشتیبانی",en:"Communications & Support",items:[
     ["ربات تلگرام","Telegram Bot","/admin/telegram","✈"],
-    ["پشتیبانی","Support","/admin/support","◌"],
+    ["تیکت‌ها","Tickets","/admin/support","◌"],
     ["اعلان‌ها","Notifications","/admin/notifications","◎"]
   ]},
-  {fa:"تحویل و سرویس",en:"Delivery & Service",items:[
-    ["تحویل اکانت","Account Delivery","/admin/account-delivery","⇲"],
-    ["فایل‌های دانلود","Download Files","/admin/downloads","⇩"],
-    ["تنظیمات VPN","VPN Settings","/admin/vpn-settings","⌁"],
-    ["L2TP / IPsec","L2TP / IPsec","/admin/l2tp","◎"],
-    ["برندینگ","Branding","/admin/branding","✦"]
+  {fa:"محتوا و برند",en:"Content & Brand",items:[
+    ["فایل‌های دانلود","Downloads","/admin/downloads","⇩"],
+    ["برند و ظاهر","Brand & Appearance","/admin/branding","✦"]
   ]},
-  {fa:"سیستم",en:"System",items:[
-    ["سلامت و امنیت","Health & Security","/admin/system-health","⌾"],
+  {fa:"سیستم و نگهداری",en:"System & Maintenance",items:[
+    ["امنیت و ریسک","Security & Risk","/admin/system-health","⌾"],
     ["بکاپ و بازیابی","Backup & Restore","/admin/backups","⟲"],
-    ["تنظیمات","Settings","/admin/settings","⚙"]
+    ["تنظیمات سیستم","System Settings","/admin/settings","⚙"]
   ]}
 ] as const;
 
@@ -108,7 +106,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
         {group.items.map(([fa,en,h,i])=>{
           const label=pick(fa,en);
           return <Link key={h} href={h} title={collapsed?label:undefined} className={active===h?"active":""} onClick={()=>{rememberSidebarScroll();setMobileOpen(false);}}>
-            <i>{i}</i><span className="nav-label">{label}</span>
+            <i>{i}</i><span className="nav-label">{label}</span>{h==="/admin/support"&&<SupportUnreadBadge active={active===h}/>}{h==="/admin/payments"&&<PaymentReviewBadge/>}
           </Link>;
         })}
       </div>)}</nav>

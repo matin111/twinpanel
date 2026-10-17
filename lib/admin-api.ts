@@ -9,6 +9,10 @@ export type DashboardSummary={online_users:number;total_users:number;total_accou
 export type AdminNode={id:number;name:string;node_type?:string;country_code?:string;public_ip?:string;status?:string;current_users?:number;capacity_users?:number;last_seen_at?:string|null;enable_cisco?:boolean;enable_openvpn?:boolean;enable_wireguard?:boolean;enable_l2tp?:boolean;enable_v2ray?:boolean};
 export type AdminTunnel={id:number;iran_node_id:number;exit_node_id:number;transport?:string;active_transport?:string|null;preferred_transport?:string|null;mode?:string|null;status?:string;latency_ms?:number|null;priority?:number;is_active?:boolean};
 export type RuntimeRow=Record<string,unknown>;
+export type PaymentReviewSummary={needs_review:number;purchase_review:number;receipt_review:number;wallet_review:number;generated_at?:string};
+
+const READ_CACHE_TTL_MS=4000;
+const readCache=new Map<string,{expires:number;promise:Promise<unknown>}>();
 
 function errorText(payload:unknown,status:number){
   if(typeof payload==="string"&&payload.trim())return payload.trim();
@@ -21,7 +25,7 @@ function errorText(payload:unknown,status:number){
   return `API error ${status}`;
 }
 
-async function request<T>(path:string,init:RequestInit={}):Promise<T>{
+async function performRequest<T>(path:string,init:RequestInit={}):Promise<T>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
   const headers=new Headers(init.headers);
@@ -38,6 +42,29 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
 
   if(!response.ok)throw new Error(errorText(payload,response.status));
   return payload as T;
+}
+
+async function request<T>(path:string,init:RequestInit={}):Promise<T>{
+  const method=String(init.method||"GET").toUpperCase();
+
+  if(method!=="GET"){
+    readCache.clear();
+    return performRequest<T>(path,init);
+  }
+
+  const now=Date.now();
+  const cached=readCache.get(path);
+  if(cached&&cached.expires>now)return cached.promise as Promise<T>;
+
+  const promise=performRequest<T>(path,init);
+  readCache.set(path,{expires:now+READ_CACHE_TTL_MS,promise:promise as Promise<unknown>});
+
+  try{
+    return await promise;
+  }catch(error){
+    if(readCache.get(path)?.promise===promise)readCache.delete(path);
+    throw error;
+  }
 }
 
 export const adminApi={
@@ -100,6 +127,7 @@ export const adminApi={
   deletePlan:(id:number)=>request<RuntimeRow>(`/v1/plans/${id}`,{method:"DELETE"}),
 
   payments:()=>request<RuntimeRow[]>("/v1/payments/admin/intents"),
-  approvePayment:(id:number)=>request<RuntimeRow>(`/v1/payments/admin/intents/${id}/approve`,{method:"POST"}),
+  paymentReviewSummary:()=>request<PaymentReviewSummary>("/v1/admin/wallet/payment-review-summary"),
+  approvePayment:(id:number)=>request<RuntimeRow>(`/v1/admin/wallet/payment-intents/${id}/approve-safe`,{method:"POST"}),
   rejectPayment:(id:number,reason:string)=>request<RuntimeRow>(`/v1/payments/admin/intents/${id}/reject`,{method:"POST",body:JSON.stringify({reason})})
 };
