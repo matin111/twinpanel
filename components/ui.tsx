@@ -1,48 +1,50 @@
 "use client";
 
 import Link from "next/link";
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {BrandMark} from "../lib/branding";
 import {PaymentReviewBadge} from "./payment-review-badge";
+import {AdminNotificationCenter} from "./admin-notification-center";
+import {SupportUnreadBadge} from "./support-unread-badge";
+import {SystemReleaseFooter} from "./system-release-footer";
+
+const ADMIN_SIDEBAR_SCROLL_KEY="twinpanel.admin.sidebar.scrollTop";
 
 const menuGroups=[
   {fa:"مدیریت",en:"Management",items:[
     ["داشبورد","Dashboard","/admin","⌂"],
     ["کاربران","Users","/admin/users","♙"],
     ["اشتراک‌ها","Subscriptions","/admin/subscriptions","▱"],
-    ["ابزار اشتراک","Subscription Tools","/admin/subscription-tools","⌘"],
     ["پلن‌ها","Plans","/admin/plans","◈"]
   ]},
-  {fa:"زیرساخت",en:"Infrastructure",items:[
+  {fa:"شبکه و زیرساخت",en:"Network & Infrastructure",items:[
     ["نودها","Nodes","/admin/nodes","▦"],
     ["تانل‌ها","Tunnels","/admin/tunnels","⤨"],
-    ["راه‌اندازی نود","Provisioning","/admin/provision","⚡"],
-    ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"],
-    ["دسترسی مادر","Mother Access","/admin/mother-access","⌁"]
+    ["راه‌اندازی نود","Provision Node","/admin/provision","⚡"],
+    ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"]
   ]},
-  {fa:"مالی و فروش",en:"Sales & Finance",items:[
+  {fa:"فروش و مالی",en:"Sales & Finance",items:[
     ["پرداخت‌ها","Payments","/admin/payments","◫"],
-    ["کیف پول","Wallet","/admin/wallet","◉"],
-    ["کد تخفیف","Discounts","/admin/discounts","％"],
+    ["تنظیمات پرداخت","Payment Settings","/admin/payment-settings","⌁"],
+    ["تأیید خودکار کارت","Auto Payment Verification","/admin/sms-reader","▤"],
+    ["کدهای تخفیف","Discount Codes","/admin/discounts","％"],
     ["نمایندگی‌ها","Resellers","/admin/resellers","♜"],
+    ["پلن‌های شارژ حجم","Traffic Recharge Plans","/admin/reseller-traffic-plans","▣"],
     ["تنظیمات فروشگاه","Store Settings","/admin/store-settings","◇"]
   ]},
-  {fa:"ارتباطات",en:"Communications",items:[
+  {fa:"ارتباطات و پشتیبانی",en:"Communications & Support",items:[
     ["ربات تلگرام","Telegram Bot","/admin/telegram","✈"],
-    ["SMS Reader","SMS Reader","/admin/sms-reader","▤"],
     ["پشتیبانی","Support","/admin/support","◌"],
     ["اعلان‌ها","Notifications","/admin/notifications","◎"]
   ]},
-  {fa:"تحویل و سرویس",en:"Delivery & Service",items:[
-    ["تحویل اکانت","Account Delivery","/admin/account-delivery","⇲"],
-    ["تنظیمات VPN","VPN Settings","/admin/vpn-settings","⌁"],
-    ["L2TP / IPsec","L2TP / IPsec","/admin/l2tp","◎"],
+  {fa:"محتوا و برند",en:"Content & Brand",items:[
+    ["فایل‌های دانلود","Downloads","/admin/downloads","⇩"],
     ["برندینگ","Branding","/admin/branding","✦"]
   ]},
-  {fa:"سیستم",en:"System",items:[
-    ["سلامت و امنیت","Health & Security","/admin/system-health","⌾"],
+  {fa:"سیستم و نگهداری",en:"System & Maintenance",items:[
+    ["امنیت","Security","/admin/system-health","⌾"],
     ["بکاپ و بازیابی","Backup & Restore","/admin/backups","⟲"],
     ["تنظیمات","Settings","/admin/settings","⚙"]
   ]}
@@ -52,9 +54,37 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
   const {pick}=useI18n();
   const [collapsed,setCollapsed]=useState(false);
   const [mobileOpen,setMobileOpen]=useState(false);
+  const sidebarNavRef=useRef<HTMLElement|null>(null);
+
+  const rememberSidebarScroll=()=>{
+    const nav=sidebarNavRef.current;
+    if(!nav)return;
+    try{sessionStorage.setItem(ADMIN_SIDEBAR_SCROLL_KEY,String(Math.max(0,Math.round(nav.scrollTop))));}catch{}
+  };
 
   useEffect(()=>{
     try{setCollapsed(localStorage.getItem("twinpanel.sidebar.collapsed")==="1");}catch{}
+
+    let firstFrame=0;
+    let secondFrame=0;
+    try{
+      const saved=Number(sessionStorage.getItem(ADMIN_SIDEBAR_SCROLL_KEY)||0);
+      if(Number.isFinite(saved)&&saved>0){
+        const restore=()=>{
+          if(sidebarNavRef.current)sidebarNavRef.current.scrollTop=saved;
+        };
+        firstFrame=requestAnimationFrame(()=>{
+          restore();
+          secondFrame=requestAnimationFrame(restore);
+        });
+      }
+    }catch{}
+
+    return()=>{
+      if(firstFrame)cancelAnimationFrame(firstFrame);
+      if(secondFrame)cancelAnimationFrame(secondFrame);
+      rememberSidebarScroll();
+    };
   },[]);
 
   const toggleCollapsed=()=>{
@@ -65,7 +95,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
     });
   };
 
-  return <div className={`shell ${collapsed?"sidebar-collapsed":""} ${mobileOpen?"mobile-menu-open":""}`}>
+  return <div className={`shell admin-shell ${collapsed?"sidebar-collapsed":""} ${mobileOpen?"mobile-menu-open":""}`}>
     <aside className="sidebar" aria-label={pick("منوی اصلی","Main navigation")}>
       <div className="sidebar-head">
         <BrandMark/>
@@ -73,12 +103,12 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
         <button className="mobile-menu-close" type="button" onClick={()=>setMobileOpen(false)} aria-label={pick("بستن منو","Close menu")}>×</button>
       </div>
 
-      <nav className="sidebar-nav">{menuGroups.map(group=><div className="nav-group" key={group.en}>
+      <nav ref={sidebarNavRef} className="sidebar-nav" onScroll={rememberSidebarScroll}>{menuGroups.map(group=><div className="nav-group" key={group.en}>
         <div className="nav-group-title">{pick(group.fa,group.en)}</div>
         {group.items.map(([fa,en,h,i])=>{
           const label=pick(fa,en);
-          return <Link key={h} href={h} title={collapsed?label:undefined} className={active===h?"active":""} onClick={()=>setMobileOpen(false)}>
-            <i>{i}</i><span className="nav-label">{label}</span>{h==="/admin/payments"&&<PaymentReviewBadge/>}
+          return <Link key={h} href={h} title={collapsed?label:undefined} className={active===h?"active":""} onClick={()=>{rememberSidebarScroll();setMobileOpen(false);}}>
+            <i>{i}</i><span className="nav-label">{label}</span>{h==="/admin/support"&&<SupportUnreadBadge active={active===h}/>}{h==="/admin/payments"&&<PaymentReviewBadge/>}
           </Link>;
         })}
       </div>)}</nav>
@@ -87,13 +117,14 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
         <span className="avatar">M</span>
         <div className="profile-copy"><b>{pick("مدیر سیستم","System Admin")}</b><small>Administrator</small></div>
       </div>
+      <SystemReleaseFooter/>
     </aside>
 
     <main>
       <header>
         <button className="mobile-menu-toggle" type="button" onClick={()=>setMobileOpen(v=>!v)} aria-expanded={mobileOpen} aria-label={pick("نمایش منو","Show menu")}>☰</button>
         <div className="search">⌕ <input placeholder={pick("جستجو در پنل...","Search panel...")}/></div>
-        <div className="head-actions"><LanguageSwitch compact/><ThemeSwitch compact/><button className="notify" type="button" title={pick("اعلان‌ها","Notifications")}>◉</button><span className="avatar">M</span></div>
+        <div className="head-actions"><LanguageSwitch compact/><ThemeSwitch compact/><AdminNotificationCenter/><span className="avatar">M</span></div>
       </header>
       {children}
     </main>

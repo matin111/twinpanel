@@ -1,0 +1,52 @@
+/* Storefront protocol artwork V9
+   Local-only assets: no dependency on legacy /learning files or remote CDNs. */
+
+.tpStore .tpStoreProtocolIcon{
+  width:58px;
+  height:58px;
+  flex:0 0 58px;
+  border-radius:17px;
+  background-color:#fff!important;
+  background-repeat:no-repeat!important;
+  background-position:center!important;
+  background-size:100% 100%!important;
+  border:1px solid rgba(148,163,184,.20)!important;
+  box-shadow:0 10px 26px rgba(15,23,42,.10)!important;
+}
+
+.tpStore .tpStoreProtocolCard.blue .tpStoreProtocolIcon{
+  background-image:url('/store-assets/protocols/cisco-openconnect.svg')!important;
+}
+.tpStore .tpStoreProtocolCard.orange .tpStoreProtocolIcon{
+  background-image:url('/store-assets/protocols/openvpn.svg')!important;
+}
+.tpStore .tpStoreProtocolCard.red .tpStoreProtocolIcon{
+  background-image:url('/store-assets/protocols/wireguard.svg')!important;
+}
+.tpStore .tpStoreProtocolCard.green .tpStoreProtocolIcon{
+  background-image:url('/store-assets/protocols/l2tp-ipsec.svg')!important;
+}
+.tpStore .tpStoreProtocolCard.violet .tpStoreProtocolIcon{
+  background-image:url('/store-assets/protocols/v2ray-xray.svg')!important;
+}
+
+html[data-theme='dark'] .tpStore .tpStoreProtocolIcon{
+  background-color:#f8fafc!important;
+  border-color:rgba(255,255,255,.10)!important;
+  box-shadow:0 12px 30px rgba(0,0,0,.24)!important;
+}
+
+html[data-theme='light'] .tpStore .tpStoreProtocolIcon{
+  background-color:#fff!important;
+  border-color:#dce2ec!important;
+  box-shadow:0 10px 26px rgba(15,23,42,.08)!important;
+}
+
+@media(max-width:820px){
+  .tpStore .tpStoreProtocolIcon{
+    width:54px;
+    height:54px;
+    flex-basis:54px;
+    border-radius:16px;
+  }
+}

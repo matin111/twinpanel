@@ -36,6 +36,7 @@ ACTIVE_PLAN_PAYMENT_STATUSES = {
     "payment_submitted",
     "awaiting_review",
 }
+RESELLER_TOPUP_METHOD_PATTERN = "reseller_card:%"
 
 
 def _settings(db: Session) -> PaymentSettings:
@@ -120,6 +121,7 @@ def _topup_out(row: CustomerWalletTopup) -> dict:
         "sender_card_last4": row.sender_card_last4,
         "transfer_date": row.transfer_date,
         "transfer_time": row.transfer_time,
+        "receipt_uploaded": bool(row.receipt_file_marker),
         "review_note": row.review_note,
         "created_at": row.created_at,
         "submitted_at": row.submitted_at,
@@ -348,6 +350,11 @@ async def submit_wallet_topup_v2(
 def admin_wallet_topups_v2(db: Session = Depends(get_db)):
     rows = (
         db.query(CustomerWalletTopup)
+        .filter(
+            ~CustomerWalletTopup.method.like(
+                RESELLER_TOPUP_METHOD_PATTERN
+            )
+        )
         .order_by(CustomerWalletTopup.id.desc())
         .limit(500)
         .all()
@@ -365,3 +372,14 @@ def admin_wallet_topups_v2(db: Session = Depends(get_db)):
         result.append(item)
 
     return result
+
+
+# Local receipt upload/view routes use this router's existing prefixes so they
+# are registered before legacy wallet compatibility endpoints in app.main.
+from .wallet_receipts_local import (
+    router as wallet_receipts_router,
+    admin_router as wallet_receipts_admin_router,
+)
+
+router.include_router(wallet_receipts_router)
+admin_router.include_router(wallet_receipts_admin_router)

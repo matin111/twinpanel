@@ -95,22 +95,75 @@
   flex-basis:34px;
 }
 
+/*
+ * Portal navigation hardening.
+ * The menu links live inside .nav-group. Older shared styles can turn that
+ * wrapper into a stretching grid. Keep the desktop portal navigation a true
+ * vertical list regardless of legacy CSS loaded before/after this file.
+ */
+.sidebar-nav{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+}
+
 .sidebar nav{
   display:flex;
   flex-direction:column;
   gap:4px;
   margin-top:28px;
+  min-height:0;
 }
 
-.sidebar nav a{
-  position:relative;
-  min-height:42px;
-  padding:10px 12px;
+.sidebar-nav .nav-group{
+  display:flex!important;
+  flex-direction:column!important;
+  grid-template-columns:none!important;
+  grid-auto-rows:auto!important;
+  align-content:flex-start!important;
+  align-items:stretch!important;
+  justify-content:flex-start!important;
+  gap:4px!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:0!important;
+}
+
+.sidebar-nav .nav-group-title{
+  display:block!important;
+  flex:0 0 auto!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:0!important;
+  padding:7px 11px 5px;
+  color:#667188;
+  font-size:8px;
+  font-weight:800;
+  letter-spacing:.02em;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.sidebar nav a,
+.sidebar-nav .nav-group>a{
+  flex:0 0 auto!important;
+  width:100%!important;
+  height:auto!important;
+  min-height:42px!important;
+  max-height:none!important;
+  padding:10px 12px!important;
   border-radius:11px;
   color:#909aad;
-  display:flex;
+  display:flex!important;
+  flex-direction:row!important;
+  justify-content:flex-start!important;
   gap:10px;
-  align-items:center;
+  align-items:center!important;
+  align-self:stretch!important;
   border:1px solid transparent;
   overflow:hidden;
 }
@@ -119,41 +172,26 @@
   flex:0 0 20px;
 }
 
-.nav-review-count{
-  margin-inline-start:auto;
-  min-width:22px;
-  height:22px;
-  padding:0 6px;
-  border-radius:999px;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  flex:0 0 auto;
-  font-size:11px;
-  font-weight:800;
-  line-height:1;
-  color:#fff;
-  background:#dc2626;
-  box-shadow:0 0 0 2px rgba(220,38,38,.16);
+.shell.sidebar-collapsed .sidebar nav a,
+.shell.sidebar-collapsed .sidebar-nav .nav-group>a{
+  justify-content:center!important;
+  padding-inline:8px!important;
 }
 
-.shell.sidebar-collapsed .nav-review-count{
-  position:absolute;
-  inset-inline-end:5px;
-  top:5px;
-  min-width:17px;
-  height:17px;
-  padding:0 4px;
-  font-size:9px;
-}
-
-.shell.sidebar-collapsed .sidebar nav a{
-  justify-content:center;
-  padding-inline:8px;
+.shell.sidebar-collapsed .sidebar-nav .nav-group-title{
+  opacity:0;
+  height:0!important;
+  padding:0!important;
+  pointer-events:none;
 }
 
 .profile{
   min-width:0;
+}
+
+.portal-identity{
+  flex:0 0 auto;
+  margin-top:auto;
 }
 
 .shell.sidebar-collapsed .profile{
@@ -253,15 +291,6 @@
     pointer-events:auto;
   }
 
-  .shell.sidebar-collapsed .nav-review-count{
-    position:static;
-    min-width:22px;
-    height:22px;
-    padding:0 6px;
-    font-size:11px;
-    margin-inline-start:auto;
-  }
-
   .shell.sidebar-collapsed .sidebar-head{
     flex-direction:row;
     min-height:42px;
@@ -269,14 +298,22 @@
 
   .shell.sidebar-collapsed .sidebar nav a,
   .shell.sidebar-collapsed .profile{
-    justify-content:flex-start;
-    padding-inline:12px;
+    justify-content:flex-start!important;
+    padding-inline:12px!important;
+  }
+
+  .shell.sidebar-collapsed .sidebar-nav .nav-group-title{
+    opacity:1;
+    height:auto!important;
+    padding:7px 11px 5px!important;
+    pointer-events:auto;
   }
 
   .sidebar nav{
     margin-top:14px;
-    display:grid;
-    grid-template-columns:repeat(2,minmax(0,1fr));
+    display:flex!important;
+    flex-direction:column!important;
+    grid-template-columns:none!important;
     gap:7px;
   }
 

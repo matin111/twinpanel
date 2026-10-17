@@ -21,7 +21,7 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   const headers=new Headers(init.headers);
   headers.set("Authorization",`Bearer ${token}`);
   if(init.body&&!headers.has("Content-Type")&&!(init.body instanceof FormData)&&!(init.body instanceof Blob))headers.set("Content-Type","application/json");
-  const response=await fetch(`${API_BASE}${path}`,{...init,headers,cache:"no-store"});
+  const response=await fetch(`${API_BASE}${path}`,{...init,headers,cache:"no-store",signal:init.signal??AbortSignal.timeout(5000)});
   if(!response.ok){
     let payload:unknown=null;try{payload=await response.json();}catch{}
     throw new Error(errorMessage(payload,response.status));
@@ -38,7 +38,7 @@ async function uploadSupportImage(id:string|number,file:File):Promise<unknown>{
   const headers=new Headers();
   headers.set("Authorization",`Bearer ${token}`);
   headers.set("Content-Type",file.type||"application/octet-stream");
-  const response=await fetch(`${API_BASE}/v1/admin/support/tickets/${encodeURIComponent(String(id))}/upload-image`,{method:"POST",headers,body:file,cache:"no-store"});
+  const response=await fetch(`${API_BASE}/v1/admin/support/tickets/${encodeURIComponent(String(id))}/upload-image`,{method:"POST",headers,body:file,cache:"no-store",signal:AbortSignal.timeout(10000)});
   if(!response.ok){
     let payload:unknown=null;try{payload=await response.json();}catch{}
     throw new Error(errorMessage(payload,response.status));
@@ -46,28 +46,10 @@ async function uploadSupportImage(id:string|number,file:File):Promise<unknown>{
   return response.json() as Promise<unknown>;
 }
 
-export type NotificationSettings={
-  telegram_enabled:boolean;
-  telegram_chat_id:string;
-  payment_enabled:boolean;
-  network_enabled:boolean;
-  security_enabled:boolean;
-};
-
-export type NotificationSendPayload={
-  title:string;
-  message:string;
-  kind:"info"|"success"|"warning"|"error";
-  user_email:string|null;
-  send_telegram:boolean;
-};
-
-export type SupportReplyPayload={
-  message:string|null;
-  attachment_type?:string|null;
-  attachment_ref?:string|null;
-  source?:string|null;
-};
+export type NotificationSettings={telegram_enabled:boolean;telegram_chat_id:string;payment_enabled:boolean;network_enabled:boolean;security_enabled:boolean};
+export type NotificationSendPayload={title:string;message:string;kind:"info"|"success"|"warning"|"error";user_email:string|null;send_telegram:boolean};
+export type SupportReplyPayload={message:string|null;attachment_type?:string|null;attachment_ref?:string|null;source?:string|null};
+export type AdminRealtimePulse={latest_support_message_id:number;open_support_count:number;latest_receipt_id:number;pending_receipt_count:number;latest_notification_id:number;server_time:string};
 
 export const opsApi={
   supportTickets:()=>request<unknown>("/v1/admin/support/tickets"),
@@ -86,6 +68,8 @@ export const opsApi={
   sendNotification:(payload:NotificationSendPayload)=>request<unknown>("/v1/admin/notifications/send",{method:"POST",body:JSON.stringify(payload)}),
   notificationHistory:(limit=30)=>request<unknown>(`/v1/admin/notifications/history?limit=${limit}`),
   panelNotifications:()=>request<unknown>("/v1/admin/panel-notifications"),
+  adminRealtimePulse:()=>request<AdminRealtimePulse>("/v1/admin/panel-notifications/pulse"),
+  panelNotificationRead:(id:string|number)=>request<unknown>(`/v1/admin/panel-notifications/${encodeURIComponent(String(id))}/read`,{method:"POST"}),
   panelNotificationsReadAll:()=>request<unknown>("/v1/admin/panel-notifications/read-all",{method:"POST"}),
 
   storeOrders:()=>request<unknown>("/v1/store/orders/admin"),

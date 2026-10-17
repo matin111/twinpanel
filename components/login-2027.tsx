@@ -8,6 +8,7 @@ import {ThemeSwitch} from "../lib/theme";
 import {useBranding} from "../lib/branding";
 import {customerApi,saveCustomerToken} from "../lib/customer-api";
 import {resolvePortal} from "../lib/role-router";
+import {writePortalAccess} from "../lib/access-cache";
 
 function AuthArt(){
   const {pick}=useI18n();
@@ -40,7 +41,21 @@ export function LoginPage2027(){
     saveCustomerToken(token,remember);
     const user=await customerApi.me(token);
     if(!user.is_active)throw new Error(pick("حساب غیرفعال است","Account is inactive"));
-    const portal=await resolvePortal(token,user.role);
+
+    // /auth/me is authoritative for the authenticated account. Reseller
+    // discovery is auxiliary only and must never turn a valid customer login
+    // into a Failed to fetch error. If that probe is unavailable, continue to
+    // the customer portal; the reseller portal keeps its own strict guard.
+    let portal:"admin"|"reseller"|"customer"=String(user.role||"").toLowerCase()==="admin"?"admin":"customer";
+    if(portal!=="admin"){
+      try{
+        portal=await resolvePortal(token,user.role);
+      }catch{
+        portal="customer";
+      }
+    }
+
+    writePortalAccess(token,portal,user);
     const fallback=portal==="admin"?"/admin":portal==="reseller"?"/reseller":"/panel";
     const requested=safeNextForPortal(searchParams.get("next"),portal);
     window.location.replace(requested||fallback);
@@ -104,6 +119,8 @@ export function RegisterPage2027(){
     try{
       const result=await customerApi.register(email.trim().toLowerCase(),password,name.trim());
       saveCustomerToken(result.access_token,true);
+      const user=await customerApi.me(result.access_token);
+      writePortalAccess(result.access_token,"customer",user);
       const requested=safeNextForPortal(searchParams.get("next"),"customer");
       window.location.replace(requested||"/panel");
     }catch(reason){setError(reason instanceof Error?reason.message:pick("ثبت‌نام ناموفق بود","Registration failed"));}

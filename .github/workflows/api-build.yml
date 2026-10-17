@@ -7,8 +7,17 @@ on:
   pull_request:
     paths:
       - "backend/**"
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "package.json"
+      - "package-lock.json"
       - "installer/**"
+      - "scripts/deploy-cly871416-preview.sh"
+      - "scripts/smoke-cly871416-runtime.sh"
+      - "scripts/install-reseller-bot-supervisor.sh"
       - "deploy/systemd/twinpanel-api.service.tpl"
+      - "deploy/systemd/twinpanel-reseller-bots.service.tpl"
       - "deploy/nginx/twinpanel.conf.tpl"
       - ".github/workflows/api-build.yml"
 
@@ -58,8 +67,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate installer shell
-        run: bash -n installer/install.sh
+      - name: Validate installer and deployment shell
+        run: |
+          bash -n installer/install.sh
+          bash -n scripts/deploy-cly871416-preview.sh
+          bash -n scripts/smoke-cly871416-runtime.sh
+          bash -n scripts/install-reseller-bot-supervisor.sh
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -84,9 +97,77 @@ jobs:
         working-directory: backend
         run: python scripts/reseller_receipt_review_smoke.py
 
+      - name: Verify reseller owned-plan runtime import
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from app.reseller_bot_runtime import supervisor
+          from app.reseller_bot_runtime_owned import build_router, install_runtime_overrides
+          from app.reseller_bot_owned_runtime import build_owned_plan_router
+          from app.reseller_bot_review import register_reseller_review_handlers
+          from app.reseller_owned_plans import create_subscription_from_owned_plan
+          from app.routers.reseller_bot_orders_owned_v3 import approve_order_owned_v3
+          from app.services.reseller_traffic_pool import apply_usage_event, open_session, restore_reseller_pool_subscriptions
+
+          for value in (
+              supervisor,
+              build_router,
+              install_runtime_overrides,
+              build_owned_plan_router,
+              register_reseller_review_handlers,
+              create_subscription_from_owned_plan,
+              approve_order_owned_v3,
+              apply_usage_event,
+              open_session,
+              restore_reseller_pool_subscriptions,
+          ):
+              assert callable(value)
+          print("RESELLER_OWNED_USAGE_POOL_IMPORT_OK")
+          PY
+
+      - name: Validate reseller bot systemd template
+        run: |
+          grep -q 'ExecStart=/opt/twinpanel/venv/bin/python -m app.reseller_bot_runtime_owned' deploy/systemd/twinpanel-reseller-bots.service.tpl
+          grep -q 'Restart=always' deploy/systemd/twinpanel-reseller-bots.service.tpl
+
       - name: Import application and create schema
         working-directory: backend
         run: python -c 'from app.main import app; print("API_IMPORT_OK", app.title)'
+
+      - name: Verify reseller owned plan schema and routes
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from app.database import SessionLocal
+          from app.models import User
+          from app.models_reseller import Reseller, ResellerPlanPrice
+          from app.reseller_owned_plan_models import ResellerBotPlan
+          from app.reseller_owned_plans import INTERNAL_PLAN_PREFIX, create_owned_plan, plan_out
+          from app.security import hash_password
+
+          db = SessionLocal()
+          try:
+              user = User(email="reseller-owned-ci@example.com", password_hash=hash_password("TwinPanel-CI-Reseller-2026!"), full_name="CI Reseller", is_active=True)
+              db.add(user); db.flush()
+              reseller = Reseller(owner_user_id=user.id, code="ci-owned-plan", name="CI Owned Plans", traffic_balance_bytes=10 * 1024**3, traffic_credit_bytes=0, is_active=True)
+              db.add(reseller); db.flush()
+              before = int(reseller.traffic_balance_bytes or 0)
+              row = create_owned_plan(db, reseller=reseller, title="50 GB / 30 Days", traffic_gb=50, duration_days=30, device_limit=2, sell_price_toman=100000, enable_cisco=True, enable_openvpn=True, enable_wireguard=True, enable_l2tp=True, enable_v2ray=True, sort_order=10, is_active=True)
+              db.flush()
+              out = plan_out(row)
+              assert out["reseller_plan_id"] == row.id
+              assert out["plan_id"] == row.backing_plan_id
+              assert out["traffic_reserved_on_sale"] is False
+              assert int(reseller.traffic_balance_bytes or 0) == before
+              price = db.query(ResellerPlanPrice).filter(ResellerPlanPrice.reseller_id == reseller.id, ResellerPlanPrice.plan_id == row.backing_plan_id).one()
+              assert price.buy_price_toman == 0 and price.sell_price_toman == 100000
+              assert row.backing_plan_id > 0
+              assert INTERNAL_PLAN_PREFIX.startswith("__tp_")
+              assert db.query(ResellerBotPlan).filter(ResellerBotPlan.reseller_id == reseller.id).count() == 1
+              print("RESELLER_OWNED_PLAN_SCHEMA_OK")
+          finally:
+              db.rollback(); db.close()
+          PY
 
       - name: Verify self-hosted runtime hooks
         working-directory: backend
@@ -132,6 +213,10 @@ jobs:
           grep -q '"/v1/nodes"' /tmp/openapi.json
           grep -q '"/v1/tunnels"' /tmp/openapi.json
           grep -q '"/v1/subscriptions"' /tmp/openapi.json
+          grep -q '"/v1/reseller/plans"' /tmp/openapi.json
+          grep -q '"/v1/reseller/subscriptions/create"' /tmp/openapi.json
+          grep -q '"/v1/reseller/traffic/buy"' /tmp/openapi.json
+          grep -q '"/v1/reseller/bot-commerce/orders/{order_id}/approve"' /tmp/openapi.json
           grep -q '"/v1/tunnels/register"' /tmp/openapi.json
           grep -q '"/v1/tunnels/create-managed"' /tmp/openapi.json
           grep -q '"/v1/tunnels/{tunnel_id}/transports"' /tmp/openapi.json
@@ -139,6 +224,20 @@ jobs:
           grep -q '"/v1/tunnels/{tunnel_id}/mtunnel/install"' /tmp/openapi.json
           grep -q '"/v1/tunnels/{tunnel_id}/backhaul/install"' /tmp/openapi.json
           grep -q '"/v1/tunnels/{tunnel_id}/ssh/install"' /tmp/openapi.json
+          grep -q '"/v1/payments/methods"' /tmp/openapi.json
+          grep -q '"/v1/payments/intents"' /tmp/openapi.json
+          grep -q '"/v1/payments/intents/{intent_id}/receipt-upload"' /tmp/openapi.json
+          grep -q '"/v1/payments/admin/crypto-discount"' /tmp/openapi.json
+          grep -q '"/v1/wallet/methods"' /tmp/openapi.json
+          grep -q '"/v1/wallet/topups"' /tmp/openapi.json
+          grep -q '"/v1/wallet/topups/{topup_id}/submit"' /tmp/openapi.json
+          grep -q '"/v1/admin/wallet/wallets"' /tmp/openapi.json
+          grep -q '"/v1/admin/wallet/topups"' /tmp/openapi.json
+          grep -q '"/v1/admin/wallet/topups/{topup_id}/approve"' /tmp/openapi.json
+          grep -q '"/v1/admin/telegram-bot"' /tmp/openapi.json
+          grep -q '"/v1/admin/telegram-bot/test"' /tmp/openapi.json
+          grep -q '"/v1/xray-modern' /tmp/openapi.json
+          grep -q '"/v1/xray-modern-admin' /tmp/openapi.json
 
       - name: Run managed tunnel orchestration smoke
         working-directory: backend
@@ -148,6 +247,10 @@ jobs:
         working-directory: backend
         run: python -m scripts.managed_relay_recovery_v20_smoke
 
+      - name: Run V19 public direct tuning smoke
+        working-directory: backend
+        run: python -m scripts.public_direct_tuning_v19_smoke
+
       - name: Run V16 transport policy smoke
         working-directory: backend
         run: python -m scripts.transport_policy_v16_smoke
@@ -155,6 +258,22 @@ jobs:
       - name: Run standalone API core smoke
         working-directory: backend
         run: python scripts/api_core_smoke.py
+
+      - name: Setup Node for admin UI verification
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+
+      - name: Install admin UI dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Build admin UI
+        run: npm run build
 
       - name: Show API log on failure
         if: failure()

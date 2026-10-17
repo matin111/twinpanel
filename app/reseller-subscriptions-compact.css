@@ -1,0 +1,213 @@
+/* TwinPanel 2027 — compact reseller subscription management */
+
+.reseller-subscriptions-parity .reseller-sub-table table{
+  width:100%;
+  min-width:1100px;
+  table-layout:fixed;
+}
+
+.reseller-subscriptions-parity .reseller-sub-table th,
+.reseller-subscriptions-parity .reseller-sub-table td{
+  min-width:0;
+  vertical-align:middle;
+}
+
+.reseller-subscriptions-parity .reseller-sub-table th:nth-child(1),
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(1){width:48px}
+.reseller-subscriptions-parity .reseller-sub-table th:nth-child(2),
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(2){width:150px}
+.reseller-subscriptions-parity .reseller-sub-table th:nth-child(3),
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(3){width:110px}
+.reseller-subscriptions-parity .reseller-sub-table th:nth-child(4),
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(4){width:145px}
+.reseller-subscriptions-parity .reseller-sub-table th:nth-child(5),
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(5){width:145px}
+.reseller-subscriptions-parity .reseller-sub-table th:nth-child(6),
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(6){width:125px}
+.reseller-subscriptions-parity .reseller-sub-table th:nth-child(7),
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(7){width:82px}
+.reseller-subscriptions-parity .reseller-sub-table th:last-child,
+.reseller-subscriptions-parity .reseller-sub-table td:last-child{
+  width:300px;
+}
+
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(2) b,
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(4) b,
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(2) small,
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(4) small{
+  display:block;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.reseller-subscriptions-parity .reseller-sub-table td:nth-child(3) code{
+  display:block;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.reseller-subscriptions-parity .reseller-sub-table .row-actions{
+  display:flex;
+  flex-wrap:nowrap;
+  align-items:center;
+  gap:6px;
+  min-width:max-content;
+  max-width:none;
+  white-space:nowrap;
+}
+
+.reseller-subscriptions-parity .reseller-sub-table .row-actions .mini-btn{
+  flex:0 0 auto;
+  min-height:31px;
+  padding:5px 8px;
+  white-space:nowrap;
+}
+
+/* Clean reseller delivery modal: QR first, subscription link below. */
+.reseller-connection-modal .reseller-connection-card{
+  width:min(680px,calc(100vw - 28px));
+  max-height:min(88vh,780px);
+  overflow:auto;
+}
+
+.reseller-connection-modal .reseller-connection-content{
+  display:flex;
+  flex-direction:column;
+  gap:18px;
+  margin-top:16px;
+}
+
+.reseller-connection-modal .reseller-public-delivery{
+  order:1;
+  display:grid;
+  grid-template-columns:1fr;
+  place-items:center;
+  gap:10px;
+  margin:0;
+  padding:20px 18px 22px;
+  border-radius:18px;
+  text-align:center;
+  background:color-mix(in srgb,var(--accent) 5%,var(--surface2));
+}
+
+.reseller-connection-modal .reseller-public-delivery>div:first-child{
+  display:grid;
+  gap:5px;
+  justify-items:center;
+}
+
+.reseller-connection-modal .reseller-public-delivery>div:first-child b{
+  font-size:1rem;
+}
+
+.reseller-connection-modal .reseller-public-delivery>div:first-child small{
+  max-width:420px;
+  line-height:1.75;
+}
+
+.reseller-connection-modal .reseller-public-delivery img{
+  grid-column:1;
+  grid-row:auto;
+  width:232px;
+  height:232px;
+  margin:8px auto 0;
+  padding:12px;
+  border-radius:20px;
+  background:#fff;
+  object-fit:contain;
+  box-shadow:0 14px 34px rgba(0,0,0,.24);
+}
+
+.reseller-connection-modal .reseller-public-delivery .action-row{
+  display:none;
+}
+
+.reseller-connection-modal .reseller-secret-grid{
+  order:2;
+  display:grid;
+  grid-template-columns:1fr;
+  gap:10px;
+}
+
+.reseller-connection-modal .reseller-secret-grid>div:not(.wide){
+  display:none;
+}
+
+.reseller-connection-modal .reseller-secret-grid>div.wide{
+  grid-column:1;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto auto;
+  gap:8px;
+  align-items:center;
+  padding:14px;
+  border-radius:15px;
+  background:var(--surface2);
+}
+
+.reseller-connection-modal .reseller-secret-grid>div.wide>span{
+  grid-column:1/-1;
+  font-size:.82rem;
+  color:var(--muted);
+}
+
+.reseller-connection-modal .reseller-secret-grid code{
+  min-width:0;
+  max-width:100%;
+  padding:8px 10px;
+  border-radius:10px;
+  background:color-mix(in srgb,var(--surface) 78%,transparent);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.reseller-connection-modal .reseller-protocol-list{
+  display:none;
+}
+
+.reseller-connection-modal .runtime-modal-actions{
+  margin-top:6px;
+}
+
+.reseller-expiry-duration{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 150px;
+  gap:10px;
+}
+
+@media(max-width:780px){
+  .reseller-subscriptions-parity .reseller-sub-table table{min-width:1040px}
+  .reseller-connection-modal .reseller-connection-card{width:calc(100vw - 18px)}
+  .reseller-connection-modal .reseller-public-delivery img{
+    width:210px;
+    height:210px;
+  }
+}
+
+@media(max-width:520px){
+  .reseller-expiry-duration{
+    grid-template-columns:1fr;
+  }
+  .reseller-connection-modal .reseller-public-delivery{
+    padding:16px 12px 18px;
+  }
+  .reseller-connection-modal .reseller-public-delivery img{
+    width:190px;
+    height:190px;
+  }
+  .reseller-connection-modal .reseller-secret-grid>div.wide{
+    grid-template-columns:1fr 1fr;
+  }
+  .reseller-connection-modal .reseller-secret-grid code{
+    grid-column:1/-1;
+    white-space:normal;
+    overflow-wrap:anywhere;
+  }
+  .reseller-connection-modal .reseller-secret-grid .mini-btn{
+    width:100%;
+  }
+}

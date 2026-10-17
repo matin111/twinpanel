@@ -6,7 +6,7 @@ import {BackupHome,BackupSettings,parityApi} from "../lib/admin-parity-api";
 import {downloadBackupFile,downloadRecoveryKey,uploadBackup} from "../lib/backup-runtime-api";
 import {useI18n} from "../lib/i18n";
 
-const defaults:BackupSettings={enabled:false,frequency:"daily",hour:3,minute:0,weekday:0,timezone:"Asia/Tehran",send_telegram:true,telegram_chat_id:"",retention:14};
+const defaults:BackupSettings={enabled:false,frequency:"daily",hour:3,minute:0,weekday:0,timezone:"Asia/Tehran",send_telegram:false,telegram_chat_id:"",retention:14};
 const str=(row:Record<string,unknown>,...keys:string[])=>{for(const key of keys){const v=row[key];if(v!==undefined&&v!==null)return String(v);}return "";};
 const num=(row:Record<string,unknown>,...keys:string[])=>{for(const key of keys){const v=Number(row[key]);if(Number.isFinite(v))return v;}return 0;};
 const fileName=(row:Record<string,unknown>)=>str(row,"filename","name","file")||"—";
@@ -25,9 +25,24 @@ export function BackupsFullRuntimePage(){
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
 
+  const normalizeSettings=(value:BackupSettings):BackupSettings=>{
+    const telegram_chat_id=String(value.telegram_chat_id||"").trim();
+    return {
+      ...defaults,
+      ...value,
+      telegram_chat_id,
+      send_telegram:Boolean(value.send_telegram&&telegram_chat_id),
+    };
+  };
+
   const load=async()=>{
     setLoading(true);setError("");
-    try{const data=await parityApi.backups();setHome(data);setSettings({...defaults,...data.settings});}
+    try{
+      const data=await parityApi.backups();
+      const normalized=normalizeSettings({...defaults,...data.settings});
+      setHome({...data,settings:normalized});
+      setSettings(normalized);
+    }
     catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setLoading(false);}
   };
@@ -45,8 +60,12 @@ export function BackupsFullRuntimePage(){
     finally{setBusy("");}
   };
 
-  const create=()=>void run("create",pick("بکاپ جدید ساخته شد","Backup created"),()=>parityApi.backupCreate(settings.send_telegram));
-  const saveSettings=()=>void run("settings",pick("تنظیمات بکاپ ذخیره شد","Backup settings saved"),()=>parityApi.backupSettings(settings));
+  const create=()=>void run("create",pick("بکاپ جدید ساخته شد","Backup created"),()=>parityApi.backupCreate(Boolean(settings.send_telegram&&settings.telegram_chat_id.trim())));
+  const saveSettings=()=>{
+    const normalized=normalizeSettings(settings);
+    setSettings(normalized);
+    void run("settings",pick("تنظیمات بکاپ ذخیره شد","Backup settings saved"),()=>parityApi.backupSettings(normalized));
+  };
   const upload=async(event:ChangeEvent<HTMLInputElement>)=>{
     const file=event.target.files?.[0];event.target.value="";if(!file)return;
     if(!file.name.toLowerCase().endsWith(".tpbak")){setError(pick("فقط فایل .tpbak قابل آپلود است.","Only .tpbak files are accepted."));return;}
@@ -76,7 +95,7 @@ export function BackupsFullRuntimePage(){
     <div className="module-grid two">
       <Card><div className="card-head"><div><b>{pick("کلید بازیابی","Recovery Key")}</b><small>{pick("بدون این کلید، بکاپ رمزگذاری‌شده روی سرور دیگر قابل Restore نیست.","Encrypted backups cannot be restored on another server without this key.")}</small></div><Badge tone="violet">{home.key_fingerprint?pick("فعال","Ready"):pick("نامشخص","Unknown")}</Badge></div><div className="runtime-info-list"><div><span>{pick("Fingerprint","Fingerprint")}</span><b dir="ltr">{home.key_fingerprint||"—"}</b></div><div><span>{pick("جداول داخل بکاپ","Included tables")}</span><b>{home.included_tables?.length??0}</b></div><div><span>{pick("جداول Runtime حذف‌شده","Excluded runtime tables")}</span><b>{home.excluded_runtime_tables?.length??0}</b></div></div><button className="ghost full" disabled={Boolean(busy)} onClick={()=>void recovery()}>{busy==="recovery"?"…":pick("دانلود کلید بازیابی","Download recovery key")}</button></Card>
 
-      <Card><div className="card-head"><div><b>{pick("Telegram Backup","Telegram Backup")}</b><small>{pick("Chat ID همان تنظیمات Backup است؛ توکن از Telegram Runtime استفاده می‌شود.","Chat ID belongs to backup settings; the bot token is managed by Telegram Runtime.")}</small></div></div><label className="field"><span>Telegram Chat ID</span><input dir="ltr" value={settings.telegram_chat_id} onChange={e=>setSettings(v=>({...v,telegram_chat_id:e.target.value}))}/></label><label className="toggle module-toggle"><span>{pick("ارسال بکاپ‌های جدید به Telegram","Send new backups to Telegram")}</span><input type="checkbox" checked={settings.send_telegram} onChange={e=>setSettings(v=>({...v,send_telegram:e.target.checked}))}/><i/></label><div className="action-row"><button className="ghost" disabled={Boolean(busy)} onClick={()=>void run("test-telegram",pick("Telegram Backup تست شد","Backup Telegram tested"),parityApi.backupTestTelegram,false)}>{busy==="test-telegram"?"…":pick("تست Telegram","Test Telegram")}</button><button className="primary" disabled={Boolean(busy)} onClick={saveSettings}>{busy==="settings"?"…":pick("ذخیره","Save")}</button></div></Card>
+      <Card><div className="card-head"><div><b>{pick("Telegram Backup","Telegram Backup")}</b><small>{pick("اگر Chat ID خالی باشد، ارسال خودکار Telegram خاموش نگه داشته می‌شود.","Automatic Telegram delivery stays off while Chat ID is empty.")}</small></div></div><label className="field"><span>Telegram Chat ID</span><input dir="ltr" value={settings.telegram_chat_id} onChange={e=>setSettings(v=>({...v,telegram_chat_id:e.target.value}))}/></label><label className="toggle module-toggle"><span>{pick("ارسال بکاپ‌های جدید به Telegram","Send new backups to Telegram")}</span><input type="checkbox" checked={settings.send_telegram} onChange={e=>setSettings(v=>({...v,send_telegram:e.target.checked}))}/><i/></label><div className="action-row"><button className="ghost" disabled={Boolean(busy)} onClick={()=>void run("test-telegram",pick("Telegram Backup تست شد","Backup Telegram tested"),parityApi.backupTestTelegram,false)}>{busy==="test-telegram"?"…":pick("تست Telegram","Test Telegram")}</button><button className="primary" disabled={Boolean(busy)} onClick={saveSettings}>{busy==="settings"?"…":pick("ذخیره","Save")}</button></div></Card>
     </div>
 
     <Card className="runtime-editor"><div className="card-head"><div><b>{pick("بکاپ خودکار","Automatic Backup")}</b><small>{pick("تنظیمات مستقیم در Backend ذخیره می‌شود","Saved directly in the backend")}</small></div><label className="toggle module-toggle"><span>{settings.enabled?pick("فعال","Enabled"):pick("غیرفعال","Disabled")}</span><input type="checkbox" checked={settings.enabled} onChange={e=>setSettings(v=>({...v,enabled:e.target.checked}))}/><i/></label></div><div className="setting-grid"><label className="field"><span>{pick("تکرار","Frequency")}</span><select value={settings.frequency} onChange={e=>setSettings(v=>({...v,frequency:e.target.value as BackupSettings["frequency"]}))}><option value="hourly">Hourly</option><option value="daily">Daily</option><option value="weekly">Weekly</option></select></label><label className="field"><span>{pick("ساعت","Hour")}</span><input type="number" min={0} max={23} value={settings.hour} onChange={e=>setSettings(v=>({...v,hour:Number(e.target.value)}))}/></label><label className="field"><span>{pick("دقیقه","Minute")}</span><input type="number" min={0} max={59} value={settings.minute} onChange={e=>setSettings(v=>({...v,minute:Number(e.target.value)}))}/></label><label className="field"><span>{pick("روز هفته ۰ تا ۶","Weekday 0-6")}</span><input type="number" min={0} max={6} value={settings.weekday} onChange={e=>setSettings(v=>({...v,weekday:Number(e.target.value)}))}/></label><label className="field"><span>{pick("Timezone","Timezone")}</span><input dir="ltr" value={settings.timezone} onChange={e=>setSettings(v=>({...v,timezone:e.target.value}))}/></label><label className="field"><span>{pick("تعداد نگهداری","Retention")}</span><input type="number" min={1} max={100} value={settings.retention} onChange={e=>setSettings(v=>({...v,retention:Number(e.target.value)}))}/></label></div><button className="primary" disabled={Boolean(busy)} onClick={saveSettings}>{busy==="settings"?"…":pick("ذخیره زمان‌بندی","Save schedule")}</button></Card>

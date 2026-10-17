@@ -72,24 +72,60 @@ export type SystemHealth=RuntimeRow&{
 
 export type CoreProtocolsResponse={ok?:boolean;protocols:Record<string,RuntimeRow>};
 export type TunnelTransportsResponse=RuntimeRow&{transports?:RuntimeRow[]};
+export type TunnelServiceConnection={
+  protocol:string;
+  profile:string;
+  title:string;
+  public_port?:number|null;
+  target_port?:number|null;
+  transport?:string;
+  available?:boolean;
+  healthy?:boolean|null;
+  health_reason?:string|null;
+};
+export type TunnelServiceConnectionsResponse=RuntimeRow&{
+  tunnel_id:number;
+  iran_node_id:number;
+  exit_node_id:number;
+  exit_node?:string;
+  tunnel_status?:string;
+  tunnel_enabled?:boolean;
+  mode?:string;
+  active_transport?:string;
+  preferred_transport?:string;
+  route_active?:boolean;
+  connections:TunnelServiceConnection[];
+  xray_health?:{
+    ok?:boolean|null;
+    service_active?:boolean|null;
+    tls_enabled?:boolean|null;
+    tls_domain_configured?:boolean|null;
+    error?:string|null;
+  };
+};
 export type ManagedTunnelCreateResponse={
   ok:boolean;
   operational?:boolean;
   complete:boolean;
   tp2027_complete?:boolean;
   full_complete?:boolean;
+  fallback_active?:boolean;
   tunnel:AdminTunnel;
   active_transport:string|null;
   installed:string[];
   errors:Record<string,string>;
   transports?:RuntimeRow[];
+  results?:Record<string,unknown>;
+  diagnosis?:RuntimeRow;
 };
 
 type ManagedInstallCache={installed:string[];errors:Record<string,string>};
 const managedInstallCache=new Map<number,ManagedInstallCache>();
 
-// Compatibility cache for older tunnel screens. New V18 screens call
-// createManagedTunnel() directly and do not run the legacy three-install flow.
+// The legacy tunnel page still performs its old three-install sequence after
+// registerTunnel(). When registerTunnel() was satisfied by create-managed,
+// preserve the backend's new AUTO/V7 selection instead of letting that legacy
+// post-create sequence force MTunnel/manual mode.
 const managedAutoCreateCache=new Set<number>();
 
 async function managedTransportResult(id:number,name:"mtunnel"|"backhaul"|"ssh_tun"){
@@ -156,6 +192,7 @@ export const legacyControlApi={
   prepareTunnel:(id:number)=>requestWithTimeout<AdminTunnel>(`/v1/tunnels/${id}/prepare`,{method:"POST"},150000),
   tunnelHealth:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/health`),
   tunnelTransports:(id:number)=>request<TunnelTransportsResponse>(`/v1/tunnels/${id}/transports`),
+  tunnelServiceConnections:(id:number)=>request<TunnelServiceConnectionsResponse>(`/v1/tunnels/${id}/service-connections`),
   setTunnelTransportMode:async(id:number,payload:{mode:string;transport?:string|null})=>{
     if(
       managedAutoCreateCache.has(id)
@@ -186,5 +223,18 @@ export const legacyControlApi={
     const managed=await managedTransportResult(id,"backhaul");
     return managed||requestWithTimeout<RuntimeRow>(`/v1/tunnels/${id}/backhaul/install`,{method:"POST"},75000);
   },
-  backhaulStatus:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/backhaul/status`)
+  backhaulStatus:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/backhaul/status`),
+
+  getDomains:()=>request<RuntimeRow[]>("/v1/domains"),
+  setDomain:(id:number,domain:string)=>request<RuntimeRow>(`/v1/nodes/${id}/domain`,{method:"PATCH",body:JSON.stringify({domain})}),
+
+  provision:(id:number,protocol:string)=>requestWithTimeout<RuntimeRow>(`/v1/nodes/${id}/provision/${protocol}`,{method:"POST"},150000),
+  repairNode:(id:number)=>requestWithTimeout<RuntimeRow>(`/v1/nodes/${id}/repair`,{method:"POST"},150000),
+  installAgent:(id:number)=>requestWithTimeout<RuntimeRow>(`/v1/nodes/${id}/agent/install`,{method:"POST"},150000),
+  upgradeAgent:(id:number)=>requestWithTimeout<RuntimeRow>(`/v1/nodes/${id}/agent/upgrade`,{method:"POST"},150000),
+  repairProtocolsSaved:(id:number)=>requestWithTimeout<RuntimeRow>(`/v1/nodes/${id}/protocols/repair-saved`,{method:"POST"},150000),
+  installTunnelFabric:(id:number)=>requestWithTimeout<RuntimeRow>(`/v1/nodes/${id}/tunnel-fabric/install`,{method:"POST"},150000),
+
+  protocolHealth:(id:number)=>request<Record<string,RuntimeRow>>(`/v1/nodes/${id}/protocols/health`),
+  restartProtocol:(id:number,protocol:string)=>requestWithTimeout<RuntimeRow>(`/v1/nodes/${id}/protocols/${encodeURIComponent(protocol)}/restart`,{method:"POST"},120000),
 };

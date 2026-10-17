@@ -5,6 +5,53 @@ import {getCustomerToken} from "./customer-api";
 
 export type ResellerRow=Record<string,unknown>;
 
+export type ResellerOwnedPlanPayload={
+  title:string;
+  traffic_gb:number;
+  duration_days:number;
+  device_limit:number;
+  sell_price_toman:number;
+  enable_cisco:boolean;
+  enable_openvpn:boolean;
+  enable_wireguard:boolean;
+  enable_l2tp:boolean;
+  enable_v2ray:boolean;
+  sort_order:number;
+  is_active:boolean;
+};
+
+export type ResellerPaymentMethodPayload={
+  method_type:string;
+  title?:string|null;
+  card_number?:string|null;
+  iban?:string|null;
+  account_holder?:string|null;
+  instructions?:string|null;
+  is_active:boolean;
+};
+
+export type ResellerDiscountPayload={
+  code:string;
+  title?:string|null;
+  discount_type:"percent"|"fixed";
+  discount_value:number;
+  max_discount_toman?:number|null;
+  min_order_toman:number;
+  applies_to:"purchase"|"renewal"|"both";
+  plan_ids:number[];
+  usage_limit_total?:number|null;
+  usage_limit_per_user?:number|null;
+  starts_at?:string|null;
+  ends_at?:string|null;
+  is_active:boolean;
+};
+
+export type ResellerBotWalletAdjustPayload={
+  amount_toman:number;
+  note:string;
+  idempotency_key:string;
+};
+
 function apiError(payload:unknown,status:number){
   if(payload&&typeof payload==="object"){
     const row=payload as {detail?:unknown;message?:unknown};
@@ -29,20 +76,85 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   return response.json() as Promise<T>;
 }
 
+async function requestBlob(path:string):Promise<Blob>{
+  const token=getCustomerToken();
+  if(!token)throw new Error("AUTH_REQUIRED");
+  const response=await fetch(`${API_BASE}${path}`,{
+    headers:{Authorization:`Bearer ${token}`},
+    cache:"no-store"
+  });
+  if(!response.ok){
+    let payload:unknown=null;
+    try{payload=await response.json();}catch{}
+    throw new Error(apiError(payload,response.status));
+  }
+  return response.blob();
+}
+
+function compactCustomerName(value:unknown,fallback:unknown){
+  const raw=String(value??"").replace(/\s+/g," ").trim();
+  const cleaned=raw
+    .replace(/[^\p{L}\p{N}@_.\-\s]/gu," ")
+    .replace(/\s+/g," ")
+    .trim();
+  const base=cleaned||raw||`#${String(fallback??"")}`;
+  return base.length>18?`${base.slice(0,18)}…`:base;
+}
+
+async function resellerSubscriptions():Promise<ResellerRow[]>{
+  const [subscriptions,ownedPlans]=await Promise.all([
+    request<ResellerRow[]>("/v1/reseller/subscriptions"),
+    request<ResellerRow[]>("/v1/reseller/owned-plans")
+  ]);
+
+  const planTitleByBackingId=new Map<number,string>();
+  for(const plan of ownedPlans){
+    const backingId=Number(plan.backing_plan_id??plan.plan_id??0);
+    const title=String(plan.title??plan.name??"").trim();
+    if(backingId>0&&title)planTitleByBackingId.set(backingId,title);
+  }
+
+  return subscriptions.map(row=>{
+    const rawEmail=String(row.customer_email??"").trim();
+    const backingPlanId=Number(row.plan_id??0);
+    const visiblePlanTitle=planTitleByBackingId.get(backingPlanId);
+    return {
+      ...row,
+      customer_name:compactCustomerName(row.customer_name,row.customer_user_id),
+      customer_email:rawEmail.endsWith("@internal.twinpanel.invalid")?null:row.customer_email,
+      plan_name:visiblePlanTitle||row.plan_name
+    };
+  });
+}
+
 export const resellerApi={
   me:()=>request<ResellerRow>("/v1/reseller/me"),
   dashboard:()=>request<ResellerRow>("/v1/reseller/dashboard"),
+
+  // Legacy internal-customer endpoints stay available for bot compatibility.
+  // The reseller-facing UI no longer exposes customer management.
   customers:()=>request<ResellerRow[]>("/v1/reseller/customers"),
   createCustomer:(payload:{full_name:string;email?:string|null;phone?:string|null;password:string})=>request<ResellerRow>("/v1/reseller/customers",{method:"POST",body:JSON.stringify(payload)}),
-  subscriptions:()=>request<ResellerRow[]>("/v1/reseller/subscriptions"),
-  sellSubscription:(payload:{user_id?:number|null;traffic_gb:number;duration_days:number;node_ids:number[];protocols:string[];sell_price_toman:number;idempotency_key:string})=>request<ResellerRow>("/v1/reseller/subscriptions/sell",{method:"POST",body:JSON.stringify(payload)}),
+  attachCustomer:(userId:number)=>request<ResellerRow>("/v1/reseller/customers/attach",{method:"POST",body:JSON.stringify({user_id:userId})}),
+
+  subscriptions:resellerSubscriptions,
+  createSubscription:(payload:{plan_id:number;node_ids:number[];idempotency_key:string;username?:string|null;password?:string|null})=>request<ResellerRow>("/v1/reseller/subscriptions/create",{method:"POST",body:JSON.stringify(payload)}),
+  sellSubscription:(payload:{user_id?:number|null;plan_id?:number|null;traffic_gb:number;duration_days:number;node_ids:number[];protocols:string[];sell_price_toman:number;idempotency_key:string;username?:string|null;password?:string|null})=>request<ResellerRow>("/v1/reseller/subscriptions/sell",{method:"POST",body:JSON.stringify(payload)}),
   editSubscription:(id:number,payload:ResellerRow)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/edit`,{method:"PATCH",body:JSON.stringify(payload)}),
-  extendSubscription:(id:number,payload:{add_traffic_gb:number;add_days:number;charge_toman:number;idempotency_key:string})=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/extend`,{method:"POST",body:JSON.stringify(payload)}),
+  extendSubscription:(id:number,payload:{add_traffic_gb:number;add_days:number;charge_toman:number;idempotency_key:string;reset_usage?:boolean})=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/extend`,{method:"POST",body:JSON.stringify(payload)}),
   toggleSubscription:(id:number)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/toggle-active`,{method:"POST"}),
   deleteSubscription:(id:number)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}`,{method:"DELETE"}),
   connectionInfo:(id:number)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/connection-info`),
-  plans:()=>request<ResellerRow[]>("/v1/reseller/plans"),
+  provisionSubscription:(id:number)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/provision-account`,{method:"POST"}),
+
+  plans:()=>request<ResellerRow[]>("/v1/reseller/owned-plans"),
+  createPlan:(payload:ResellerOwnedPlanPayload)=>request<ResellerRow>("/v1/reseller/owned-plans",{method:"POST",body:JSON.stringify(payload)}),
+  updatePlan:(planId:number,payload:Partial<ResellerOwnedPlanPayload>)=>request<ResellerRow>(`/v1/reseller/owned-plans/${planId}`,{method:"PATCH",body:JSON.stringify(payload)}),
+  disablePlan:(planId:number)=>request<ResellerRow>(`/v1/reseller/owned-plans/${planId}`,{method:"PATCH",body:JSON.stringify({is_active:false})}),
+  enablePlan:(planId:number)=>request<ResellerRow>(`/v1/reseller/owned-plans/${planId}`,{method:"PATCH",body:JSON.stringify({is_active:true})}),
+  deletePlan:(planId:number)=>request<ResellerRow>(`/v1/reseller/owned-plans/${planId}`,{method:"DELETE"}),
   setPlanPrice:(planId:number,sellPrice:number)=>request<ResellerRow>(`/v1/reseller/plans/${planId}/price`,{method:"PUT",body:JSON.stringify({plan_id:planId,sell_price_toman:sellPrice})}),
+
   serverOptions:()=>request<ResellerRow>("/v1/reseller/server-options"),
   traffic:()=>request<ResellerRow>("/v1/reseller/traffic"),
   trafficPackages:()=>request<ResellerRow[]>("/v1/reseller/traffic/packages"),
@@ -51,15 +163,31 @@ export const resellerApi={
   walletTransactions:()=>request<ResellerRow[]>("/v1/reseller/wallet/transactions"),
   updateProfile:(payload:ResellerRow)=>request<ResellerRow>("/v1/reseller/profile",{method:"PATCH",body:JSON.stringify(payload)}),
   changePassword:(currentPassword:string,newPassword:string)=>request<ResellerRow>("/v1/auth/change-password",{method:"POST",body:JSON.stringify({current_password:currentPassword,new_password:newPassword})}),
+
   botStatus:()=>request<ResellerRow>("/v1/reseller/bot"),
   botSaveToken:(token:string)=>request<ResellerRow>("/v1/reseller/bot/token",{method:"PUT",body:JSON.stringify({token})}),
   botUpdateSettings:(payload:ResellerRow)=>request<ResellerRow>("/v1/reseller/bot/settings",{method:"PATCH",body:JSON.stringify(payload)}),
   botTest:()=>request<ResellerRow>("/v1/reseller/bot/test",{method:"POST"}),
   botActivate:()=>request<ResellerRow>("/v1/reseller/bot/activate",{method:"POST"}),
   botDeactivate:()=>request<ResellerRow>("/v1/reseller/bot/deactivate",{method:"POST"}),
+
+  botPaymentMethods:()=>request<ResellerRow[]>("/v1/reseller/bot-commerce/payment-methods"),
+  botCreatePaymentMethod:(payload:ResellerPaymentMethodPayload)=>request<ResellerRow>("/v1/reseller/bot-commerce/payment-methods",{method:"POST",body:JSON.stringify(payload)}),
+  botUpdatePaymentMethod:(id:number,payload:ResellerPaymentMethodPayload)=>request<ResellerRow>(`/v1/reseller/bot-commerce/payment-methods/${id}`,{method:"PUT",body:JSON.stringify(payload)}),
+  botDeletePaymentMethod:(id:number)=>request<ResellerRow>(`/v1/reseller/bot-commerce/payment-methods/${id}`,{method:"DELETE"}),
   botOrders:()=>request<ResellerRow[]>("/v1/reseller/bot-commerce/orders"),
+  botOrderReceipt:(id:number)=>requestBlob(`/v1/reseller/bot-commerce/orders/${id}/receipt`),
   botApproveOrder:(id:number)=>request<ResellerRow>(`/v1/reseller/bot-commerce/orders/${id}/approve`,{method:"POST"}),
   botRejectOrder:(id:number,reason:string)=>request<ResellerRow>(`/v1/reseller/bot-commerce/orders/${id}/reject`,{method:"POST",body:JSON.stringify({reason})}),
+  botWallets:()=>request<ResellerRow[]>("/v1/reseller/bot-commerce/wallets"),
+  botWalletTransactions:(userId:number)=>request<ResellerRow[]>(`/v1/reseller/bot-commerce/wallets/${userId}/transactions`),
+  botAdjustWallet:(userId:number,payload:ResellerBotWalletAdjustPayload)=>request<ResellerRow>(`/v1/reseller/bot-commerce/wallets/${userId}/adjust`,{method:"POST",body:JSON.stringify(payload)}),
+
+  discounts:()=>request<ResellerRow[]>("/v1/discounts/reseller"),
+  createDiscount:(payload:ResellerDiscountPayload)=>request<ResellerRow>("/v1/discounts/reseller",{method:"POST",body:JSON.stringify(payload)}),
+  updateDiscount:(id:number,payload:ResellerDiscountPayload)=>request<ResellerRow>(`/v1/discounts/reseller/${id}`,{method:"PUT",body:JSON.stringify(payload)}),
+  disableDiscount:(id:number)=>request<ResellerRow>(`/v1/discounts/reseller/${id}`,{method:"DELETE"}),
+
   notifications:()=>request<unknown>("/v1/reseller/notifications"),
   notificationMarkRead:(id:number)=>request<unknown>(`/v1/reseller/notifications/${id}/read`,{method:"POST"}),
   notificationReadAll:()=>request<unknown>("/v1/reseller/notifications/read-all",{method:"POST"})

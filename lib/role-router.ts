@@ -1,7 +1,5 @@
 "use client";
 
-import {API_BASE} from "./api";
-
 export type ResellerProfile={
   id:number;
   code?:string|null;
@@ -20,7 +18,7 @@ async function errorText(response:Response){
 }
 
 export async function getResellerProfile(token:string):Promise<ResellerProfile|null>{
-  const response=await fetch(`${API_BASE}/v1/reseller/me`,{
+  const response=await fetch("/v1/reseller/me",{
     headers:{Authorization:`Bearer ${token}`},
     cache:"no-store"
   });

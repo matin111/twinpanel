@@ -1,0 +1,297 @@
+/* Final admin shell isolation. Loaded last to prevent legacy/customer CSS from collapsing admin navigation. */
+@media (min-width:761px){
+  .admin-shell{
+    --sidebar-width:292px!important;
+    display:flex!important;
+    align-items:flex-start!important;
+    grid-template-columns:none!important;
+  }
+
+  .admin-shell.sidebar-collapsed{
+    --sidebar-width:90px!important;
+  }
+
+  .admin-shell>.sidebar{
+    position:sticky!important;
+    top:0!important;
+    right:auto!important;
+    left:auto!important;
+    flex:0 0 var(--sidebar-width)!important;
+    width:var(--sidebar-width)!important;
+    min-width:var(--sidebar-width)!important;
+    max-width:var(--sidebar-width)!important;
+    height:100vh!important;
+    min-height:100vh!important;
+    padding:15px 13px!important;
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:stretch!important;
+    overflow:hidden!important;
+    box-sizing:border-box!important;
+  }
+
+  .admin-shell .sidebar-head{
+    flex:0 0 52px!important;
+    min-height:52px!important;
+    height:52px!important;
+    display:flex!important;
+    flex-direction:row!important;
+    align-items:center!important;
+    gap:10px!important;
+    margin:0!important;
+    padding:0!important;
+  }
+
+  .admin-shell .sidebar-head .brand{
+    flex:1 1 auto!important;
+    min-width:0!important;
+  }
+
+  .admin-shell nav.sidebar-nav{
+    display:block!important;
+    flex:1 1 auto!important;
+    min-height:0!important;
+    height:auto!important;
+    margin:14px 0 10px!important;
+    padding:0 3px 0 0!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    scrollbar-width:thin!important;
+    overscroll-behavior:contain!important;
+  }
+
+  .admin-shell .sidebar-nav>.nav-group{
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:stretch!important;
+    align-content:flex-start!important;
+    justify-content:flex-start!important;
+    grid-template-columns:none!important;
+    grid-template-rows:none!important;
+    grid-auto-columns:auto!important;
+    grid-auto-rows:auto!important;
+    grid-auto-flow:row!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    margin:0 0 11px!important;
+    padding:0!important;
+    gap:4px!important;
+  }
+
+  .admin-shell .sidebar-nav>.nav-group>.nav-group-title{
+    display:block!important;
+    flex:0 0 auto!important;
+    width:100%!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    margin:0!important;
+    padding:8px 12px 6px!important;
+    color:#748097!important;
+    font-size:11.5px!important;
+    font-weight:900!important;
+    line-height:1.4!important;
+    letter-spacing:.01em!important;
+    white-space:nowrap!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    writing-mode:horizontal-tb!important;
+  }
+
+  .admin-shell .sidebar-nav>.nav-group>a{
+    display:flex!important;
+    flex:0 0 49px!important;
+    flex-direction:row!important;
+    align-items:center!important;
+    justify-content:flex-start!important;
+    align-self:stretch!important;
+    grid-column:auto!important;
+    grid-row:auto!important;
+    width:100%!important;
+    min-width:0!important;
+    max-width:100%!important;
+    height:49px!important;
+    min-height:49px!important;
+    max-height:49px!important;
+    margin:0!important;
+    padding:0 13px!important;
+    gap:11px!important;
+    border:1px solid transparent!important;
+    border-radius:12px!important;
+    color:#a4aec0!important;
+    background:transparent!important;
+    font-size:13.5px!important;
+    font-weight:700!important;
+    line-height:1.35!important;
+    direction:rtl!important;
+    text-align:right!important;
+    white-space:nowrap!important;
+    overflow:hidden!important;
+    writing-mode:horizontal-tb!important;
+    box-sizing:border-box!important;
+  }
+
+  .admin-shell .sidebar-nav>.nav-group>a:hover{
+    color:#e7ebf4!important;
+    background:rgba(255,255,255,.04)!important;
+    border-color:#202c42!important;
+  }
+
+  .admin-shell .sidebar-nav>.nav-group>a.active{
+    color:#f1ecff!important;
+    border-color:rgba(139,92,246,.56)!important;
+    background:linear-gradient(90deg,rgba(124,58,237,.2),rgba(124,58,237,.08))!important;
+    box-shadow:inset -2px 0 0 #8b5cf6!important;
+  }
+
+  .admin-shell .sidebar-nav>.nav-group>a i{
+    display:grid!important;
+    place-items:center!important;
+    flex:0 0 24px!important;
+    width:24px!important;
+    min-width:24px!important;
+    max-width:24px!important;
+    height:24px!important;
+    min-height:24px!important;
+    max-height:24px!important;
+    margin:0!important;
+    padding:0!important;
+    color:#9d80f6!important;
+    font-size:16px!important;
+    line-height:1!important;
+    font-style:normal!important;
+    writing-mode:horizontal-tb!important;
+  }
+
+  .admin-shell .sidebar-nav>.nav-group>a .nav-label{
+    display:block!important;
+    flex:1 1 auto!important;
+    min-width:0!important;
+    width:auto!important;
+    max-width:none!important;
+    height:auto!important;
+    min-height:0!important;
+    margin:0!important;
+    padding:0!important;
+    opacity:1!important;
+    font-size:13.5px!important;
+    line-height:1.4!important;
+    white-space:nowrap!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    writing-mode:horizontal-tb!important;
+  }
+
+  .admin-shell>.sidebar>.profile{
+    flex:0 0 70px!important;
+    min-height:70px!important;
+    height:70px!important;
+    width:100%!important;
+    margin:0!important;
+    padding:10px 5px 0!important;
+    border-top:1px solid var(--line)!important;
+    display:flex!important;
+    flex-direction:row!important;
+    align-items:center!important;
+    justify-content:flex-start!important;
+    gap:10px!important;
+    overflow:hidden!important;
+  }
+
+  .admin-shell.sidebar-collapsed .sidebar-head{
+    flex-direction:column!important;
+    height:92px!important;
+    min-height:92px!important;
+    flex-basis:92px!important;
+  }
+
+  .admin-shell.sidebar-collapsed .sidebar-head .brand{
+    flex:0 0 auto!important;
+  }
+
+  .admin-shell.sidebar-collapsed .sidebar-nav>.nav-group{
+    margin-bottom:4px!important;
+  }
+
+  .admin-shell.sidebar-collapsed .sidebar-nav>.nav-group>.nav-group-title{
+    display:none!important;
+  }
+
+  .admin-shell.sidebar-collapsed .sidebar-nav>.nav-group>a{
+    justify-content:center!important;
+    padding:0!important;
+  }
+
+  .admin-shell.sidebar-collapsed .sidebar-nav>.nav-group>a .nav-label{
+    display:none!important;
+    opacity:0!important;
+    width:0!important;
+    max-width:0!important;
+  }
+
+  .admin-shell.sidebar-collapsed>.sidebar>.profile{
+    justify-content:center!important;
+    padding-inline:0!important;
+  }
+
+  .admin-shell.sidebar-collapsed>.sidebar>.profile .profile-copy{
+    display:none!important;
+  }
+
+  .admin-shell>main{
+    display:block!important;
+    flex:1 1 auto!important;
+    width:auto!important;
+    min-width:0!important;
+    max-width:none!important;
+    grid-column:auto!important;
+  }
+}
+
+@media (max-width:760px){
+  .admin-shell .sidebar-nav>.nav-group>.nav-group-title{
+    font-size:12px!important;
+    line-height:1.4!important;
+  }
+  .admin-shell .sidebar-nav>.nav-group>a{
+    min-height:50px!important;
+    height:auto!important;
+    font-size:14px!important;
+    line-height:1.45!important;
+  }
+  .admin-shell .sidebar-nav>.nav-group>a .nav-label{
+    font-size:14px!important;
+  }
+}
+
+/* Light mode must match the reseller portal contrast. This file is loaded last,
+   so explicit light overrides are required to avoid the desktop dark palette
+   winning over theme.css through !important. */
+html[data-theme="light"] .admin-shell .sidebar-nav>.nav-group>.nav-group-title{
+  color:#8b95a7!important;
+}
+
+html[data-theme="light"] .admin-shell .sidebar-nav>.nav-group>a{
+  color:#667085!important;
+}
+
+html[data-theme="light"] .admin-shell .sidebar-nav>.nav-group>a:hover{
+  color:#34266b!important;
+  background:#f3f0ff!important;
+  border-color:#d8ccfa!important;
+}
+
+html[data-theme="light"] .admin-shell .sidebar-nav>.nav-group>a.active{
+  color:#5030ae!important;
+  border-color:#d8ccfa!important;
+  background:linear-gradient(90deg,rgba(109,67,229,.14),rgba(109,67,229,.04))!important;
+  box-shadow:inset -2px 0 #8b5cf6!important;
+}
+
+html[data-theme="light"] .admin-shell .sidebar-nav>.nav-group>a i{
+  color:#7a5bd8!important;
+}

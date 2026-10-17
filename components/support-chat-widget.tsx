@@ -33,31 +33,64 @@ type UploadResult={attachment_type:string;attachment_ref:string};
 type Props={customerToken?:string|null};
 
 const GUEST_STORAGE_KEY="twinpanel_guest_chat_v1";
+const GUEST_SESSION_BACKUP_KEY="twinpanel_guest_chat_session_v1";
 const CUSTOMER_TOKEN_KEY="twinpanel_customer_token";
 const ALLOWED_IMAGES=new Set(["image/jpeg","image/png","image/webp","image/gif"]);
 const MAX_IMAGE_BYTES=5*1024*1024;
 const CHAT_EMOJIS=["😀","😁","😂","😍","🥰","😊","😉","😎","🤩","🥳","👍","👌","🙏","👏","💜","❤️","🔥","✨","✅","💯","🎉","🚀","📌","🤝"];
 
-function loadGuestSession():GuestSession|null{
+class ChatApiError extends Error{
+  status:number;
+  constructor(message:string,status:number){super(message);this.name="ChatApiError";this.status=status;}
+}
+
+function parseGuestSession(raw:string|null):GuestSession|null{
+  if(!raw)return null;
   try{
-    const raw=window.localStorage.getItem(GUEST_STORAGE_KEY);
-    if(!raw)return null;
-    const parsed=JSON.parse(raw) as GuestSession;
-    return parsed.ticketId&&parsed.token?parsed:null;
+    const parsed=JSON.parse(raw) as Partial<GuestSession>;
+    const ticketId=Number(parsed.ticketId||0);
+    const token=String(parsed.token||"").trim();
+    if(!ticketId||!token)return null;
+    return {ticketId,token,name:String(parsed.name||""),contact:String(parsed.contact||"")};
   }catch{return null;}
 }
-function saveGuestSession(value:GuestSession){try{window.localStorage.setItem(GUEST_STORAGE_KEY,JSON.stringify(value));}catch{}}
-function clearGuestSession(){try{window.localStorage.removeItem(GUEST_STORAGE_KEY);}catch{}}
+
+function loadGuestSession():GuestSession|null{
+  try{
+    const local=parseGuestSession(window.localStorage.getItem(GUEST_STORAGE_KEY));
+    if(local)return local;
+  }catch{}
+  try{
+    const session=parseGuestSession(window.sessionStorage.getItem(GUEST_SESSION_BACKUP_KEY));
+    if(session){
+      try{window.localStorage.setItem(GUEST_STORAGE_KEY,JSON.stringify(session));}catch{}
+      return session;
+    }
+  }catch{}
+  return null;
+}
+
+function saveGuestSession(value:GuestSession){
+  const raw=JSON.stringify(value);
+  try{window.localStorage.setItem(GUEST_STORAGE_KEY,raw);}catch{}
+  try{window.sessionStorage.setItem(GUEST_SESSION_BACKUP_KEY,raw);}catch{}
+}
+
+function clearGuestSession(){
+  try{window.localStorage.removeItem(GUEST_STORAGE_KEY);}catch{}
+  try{window.sessionStorage.removeItem(GUEST_SESSION_BACKUP_KEY);}catch{}
+}
 
 async function chatApi<T>(path:string,options:RequestInit={},customerToken?:string|null):Promise<T>{
+  if(!API_BASE)throw new Error("NEXT_PUBLIC_API_BASE تنظیم نشده");
   const headers=new Headers(options.headers);
   if(options.body&&!headers.has("Content-Type")&&!(options.body instanceof FormData)&&!(options.body instanceof Blob))headers.set("Content-Type","application/json");
   if(customerToken)headers.set("Authorization",`Bearer ${customerToken}`);
-  const response=await fetch(`${API_BASE}${path}`,{...options,headers,cache:"no-store"});
+  const response=await fetch(`${API_BASE}${path}`,{...options,headers,cache:"no-store",signal:options.signal??AbortSignal.timeout(8000)});
   if(!response.ok){
     let message="ارتباط با پشتیبانی ناموفق بود";
     try{const payload=await response.json() as {detail?:string;message?:string};message=payload.detail??payload.message??message;}catch{}
-    throw new Error(message);
+    throw new ChatApiError(message,response.status);
   }
   if(response.status===204)return undefined as T;
   return response.json() as Promise<T>;
@@ -89,10 +122,13 @@ export function SupportChatWidget({customerToken}:Props){
   const [preview,setPreview]=useState("");
   const fileRef=useRef<HTMLInputElement|null>(null);
   const messagesEndRef=useRef<HTMLDivElement|null>(null);
+  const refreshBusy=useRef(false);
 
   useEffect(()=>{
     const path=window.location.pathname.replace(/\/$/,"")||"/";
     setVisible(path==="/"||path==="/store"||path==="/panel"||path.startsWith("/panel/"));
+    const saved=loadGuestSession();
+    if(saved){setGuestSession(saved);setName(saved.name||"");setContact(saved.contact||"");}
     if(customerToken!==undefined){setResolvedToken(customerToken||null);return;}
     try{setResolvedToken(window.sessionStorage.getItem(CUSTOMER_TOKEN_KEY)||null);}catch{setResolvedToken(null);}
   },[customerToken]);
@@ -101,7 +137,8 @@ export function SupportChatWidget({customerToken}:Props){
   const addEmoji=(emoji:string)=>{setDraft(value=>value+emoji);setEmojiOpen(false);};
 
   const refresh=async(silent=false)=>{
-    if(!visible)return;
+    if(!visible||refreshBusy.current)return;
+    refreshBusy.current=true;
     if(!silent)setLoading(true);
     try{
       if(!silent)setError("");
@@ -112,21 +149,30 @@ export function SupportChatWidget({customerToken}:Props){
         const detail=await chatApi<ChatTicket>(`/v1/support/tickets/${current.id}`,{},resolvedToken);
         setTicket(detail);setInitialized(true);if(!silent)scrollBottom();return;
       }
-      const saved=loadGuestSession();
+      const saved=guestSession??loadGuestSession();
       if(!saved){setGuestSession(null);setTicket(null);setInitialized(true);return;}
       setGuestSession(saved);setName(saved.name||"");setContact(saved.contact||"");
       try{
         const detail=await chatApi<ChatTicket>(`/v1/support/guest/tickets/${saved.ticketId}`,{headers:{"X-Guest-Chat-Token":saved.token}});
+        saveGuestSession(saved);
         setTicket(detail);setInitialized(true);if(!silent)scrollBottom();
-      }catch{clearGuestSession();setGuestSession(null);setTicket(null);setInitialized(true);}
+      }catch(reason){
+        const status=reason instanceof ChatApiError?reason.status:0;
+        if(status===401||status===403||status===404||status===410){
+          clearGuestSession();setGuestSession(null);setTicket(null);
+        }else if(!silent){
+          setError(reason instanceof Error?reason.message:pick("دریافت گفتگو ناموفق بود","Could not load chat"));
+        }
+        setInitialized(true);
+      }
     }catch(reason){if(!silent)setError(reason instanceof Error?reason.message:pick("دریافت گفتگو ناموفق بود","Could not load chat"));}
-    finally{if(!silent)setLoading(false);}
+    finally{refreshBusy.current=false;if(!silent)setLoading(false);}
   };
 
   useEffect(()=>{if(open&&visible)void refresh();},[open,visible,resolvedToken]);
   useEffect(()=>{
     if(!open||!visible||!ticket)return;
-    const timer=window.setInterval(()=>void refresh(true),3000);
+    const timer=window.setInterval(()=>void refresh(true),1500);
     return()=>window.clearInterval(timer);
   },[open,visible,ticket?.id,resolvedToken,guestSession?.token]);
   useEffect(()=>{if(open&&ticket?.messages?.length)scrollBottom();},[open,ticket?.messages?.length]);
@@ -153,7 +199,8 @@ export function SupportChatWidget({customerToken}:Props){
       if(!session)throw new Error(pick("شناسه گفتگو پیدا نشد","Chat session not found"));
       headers.set("X-Guest-Chat-Token",session.token);path=`/v1/support/guest/tickets/${ticketId}/upload-image`;
     }
-    const response=await fetch(`${API_BASE}${path}`,{method:"POST",headers,body:image,cache:"no-store"});
+    if(!API_BASE)throw new Error("NEXT_PUBLIC_API_BASE تنظیم نشده");
+    const response=await fetch(`${API_BASE}${path}`,{method:"POST",headers,body:image,cache:"no-store",signal:AbortSignal.timeout(15000)});
     if(!response.ok){let message=pick("آپلود تصویر ناموفق بود","Image upload failed");try{message=(await response.json()).detail||message;}catch{}throw new Error(message);}
     return response.json() as Promise<UploadResult>;
   };
@@ -161,7 +208,7 @@ export function SupportChatWidget({customerToken}:Props){
   const sendAttachmentMessage=async(ticketId:number,session:GuestSession|null)=>{
     const uploaded=await uploadImage(ticketId,session);
     if(!uploaded)return null;
-    const payload={message:null,attachment_type:uploaded.attachment_type,attachment_ref:uploaded.attachment_ref,source:resolvedToken?"live_chat":"store_guest"};
+    const payload={message:null,attachment_type:uploaded.attachment_type,attachment_ref:uploaded.attachment_ref};
     if(resolvedToken)return chatApi<ChatTicket>(`/v1/support/tickets/${ticketId}/messages`,{method:"POST",body:JSON.stringify(payload)},resolvedToken);
     if(!session)throw new Error(pick("شناسه گفتگو پیدا نشد","Chat session not found"));
     return chatApi<ChatTicket>(`/v1/support/guest/tickets/${ticketId}/messages`,{method:"POST",headers:{"X-Guest-Chat-Token":session.token},body:JSON.stringify(payload)});
@@ -175,11 +222,11 @@ export function SupportChatWidget({customerToken}:Props){
     try{
       const first=text||pick("📷 تصویر پیوست شد","📷 Image attached");
       if(resolvedToken){
-        let created=await chatApi<ChatTicket>("/v1/support/tickets",{method:"POST",body:JSON.stringify({category:"other",subject:pick("گفتگوی آنلاین","Live chat"),message:first,source:"live_chat"})},resolvedToken);
+        let created=await chatApi<ChatTicket>("/v1/support/tickets",{method:"POST",body:JSON.stringify({category:"other",subject:pick("گفتگوی آنلاین","Live chat"),message:first})},resolvedToken);
         if(image){const next=await sendAttachmentMessage(created.id,null);if(next)created=next;}
         setTicket(created);setDraft("");resetImage();scrollBottom();return;
       }
-      let created=await chatApi<ChatTicket>("/v1/support/guest/tickets",{method:"POST",body:JSON.stringify({name:name.trim(),contact:contact.trim(),message:first,source:"store_guest"})});
+      let created=await chatApi<ChatTicket>("/v1/support/guest/tickets",{method:"POST",body:JSON.stringify({name:name.trim(),contact:contact.trim(),message:first})});
       if(!created.guest_token||!created.id)throw new Error(pick("ایجاد گفتگو ناموفق بود","Could not start chat"));
       const session={ticketId:created.id,token:created.guest_token,name:name.trim(),contact:contact.trim()};
       saveGuestSession(session);setGuestSession(session);
@@ -193,19 +240,28 @@ export function SupportChatWidget({customerToken}:Props){
     event.preventDefault();if(sending||!ticket)return;
     const text=draft.trim();if(!text&&!image)return;
     setSending(true);setError("");setEmojiOpen(false);
+    const previousDraft=draft;
+    if(text&&!image){
+      const optimistic:ChatMessage={id:-Date.now(),sender_role:resolvedToken?"user":"guest",message:text,created_at:new Date().toISOString()};
+      setTicket(current=>current?{...current,messages:[...(current.messages||[]),optimistic]}:current);
+      setDraft("");scrollBottom();
+    }
     try{
       let updated=ticket;const session=guestSession??loadGuestSession();
       if(text){
-        const payload={message:text,source:resolvedToken?"live_chat":"store_guest"};
-        if(resolvedToken)updated=await chatApi<ChatTicket>(`/v1/support/tickets/${ticket.id}/messages`,{method:"POST",body:JSON.stringify(payload)},resolvedToken);
+        if(resolvedToken)updated=await chatApi<ChatTicket>(`/v1/support/tickets/${ticket.id}/messages`,{method:"POST",body:JSON.stringify({message:text})},resolvedToken);
         else{
           if(!session)throw new Error(pick("شناسه گفتگو پیدا نشد","Chat session not found"));
-          updated=await chatApi<ChatTicket>(`/v1/support/guest/tickets/${ticket.id}/messages`,{method:"POST",headers:{"X-Guest-Chat-Token":session.token},body:JSON.stringify(payload)});
+          updated=await chatApi<ChatTicket>(`/v1/support/guest/tickets/${ticket.id}/messages`,{method:"POST",headers:{"X-Guest-Chat-Token":session.token},body:JSON.stringify({message:text})});
         }
       }
       if(image){const next=await sendAttachmentMessage(ticket.id,session);if(next)updated=next;}
       setTicket(updated);setDraft("");resetImage();scrollBottom();
-    }catch(reason){setError(reason instanceof Error?reason.message:pick("ارسال پیام ناموفق بود","Could not send message"));}
+    }catch(reason){
+      if(text&&!image)setDraft(previousDraft);
+      setError(reason instanceof Error?reason.message:pick("ارسال پیام ناموفق بود","Could not send message"));
+      void refresh(true);
+    }
     finally{setSending(false);}
   };
 
@@ -216,6 +272,7 @@ export function SupportChatWidget({customerToken}:Props){
 
   if(!visible)return null;
   const messages=ticket?.messages??[];
+  const recoveringGuest=!resolvedToken&&guestSession&&!ticket;
 
   return <div className="supportChatRoot">
     <input ref={fileRef} type="file" hidden accept="image/jpeg,image/png,image/webp,image/gif" onChange={e=>pickImage(e.target.files?.[0])}/>
@@ -223,7 +280,8 @@ export function SupportChatWidget({customerToken}:Props){
       <header className="supportChatHeader"><div className="supportChatHeaderInfo"><span className="supportChatStatus"/><div><b>{pick("پشتیبانی آنلاین","Live support")}</b><small>{brand.name}</small></div></div><button type="button" className="supportChatClose" onClick={()=>{setOpen(false);setEmojiOpen(false);}}>×</button></header>
       <div className="supportChatBody">
         {loading&&!initialized&&<div className="supportChatState">{pick("در حال دریافت گفتگو...","Loading chat...")}</div>}
-        {!loading&&initialized&&!ticket&&<form className="supportChatStart" onSubmit={startChat}>
+        {!loading&&initialized&&recoveringGuest&&<div className="supportChatState"><b>{pick("در حال بازیابی گفتگوی قبلی","Restoring your previous chat")}</b>{error&&<p className="supportChatError">{error}</p>}<button type="button" className="supportChatPrimary" onClick={()=>void refresh(false)}>{pick("تلاش دوباره","Retry")}</button></div>}
+        {!loading&&initialized&&!ticket&&!recoveringGuest&&<form className="supportChatStart" onSubmit={startChat}>
           <h3>{pick("چطور می‌توانیم کمک کنیم؟","How can we help?")}</h3>
           {!resolvedToken&&<><label><span>{pick("نام","Name")}</span><input value={name} onChange={e=>setName(e.target.value)} placeholder={pick("نام شما","Your name")} maxLength={120} required/></label><label><span>{pick("ایمیل یا شماره تماس","Email or phone")}</span><input dir="ltr" value={contact} onChange={e=>setContact(e.target.value)} placeholder="email@example.com" maxLength={190} required/></label></>}
           <label><span>{pick("پیام","Message")}</span><textarea value={draft} onChange={e=>setDraft(e.target.value)} placeholder={pick("پیام خود را بنویسید...","Write your message...")} rows={4} maxLength={10000}/></label>

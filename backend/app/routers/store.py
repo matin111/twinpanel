@@ -18,6 +18,7 @@ from ..models import (
     Plan,
     User,
 )
+from ..reseller_owned_plans import is_internal_reseller_plan
 from ..schemas import SubscriptionCreate
 from ..store_models import StoreOrder
 from .subscriptions import create_subscription
@@ -121,6 +122,7 @@ def create_store_order(
     if (
         plan is None
         or not plan.is_active
+        or is_internal_reseller_plan(plan)
     ):
         raise HTTPException(
             status_code=404,
@@ -225,7 +227,6 @@ def create_store_order(
         amount_toman=int(
             plan.price_toman or 0
         ),
-        # TWINPANEL_STORE_BASE_AMOUNT_SNAPSHOT_V1
         base_amount_toman=int(
             plan.price_toman or 0
         ),
@@ -300,10 +301,6 @@ async def _fulfill_paid_order(
         order.error_text = None
         db.commit()
 
-        # TWINPANEL_SAFE_RENEWAL_HOOK_V2
-        # Renewal orders keep the existing
-        # subscription instead of provisioning
-        # a new account.
         from ..renewal_service import (
             fulfill_renewal_order,
         )
@@ -320,6 +317,13 @@ async def _fulfill_paid_order(
             return _order_out(order)
 
         if not order.subscription_id:
+            plan = db.get(Plan, int(order.plan_id))
+            if not plan or is_internal_reseller_plan(plan):
+                raise HTTPException(
+                    status_code=404,
+                    detail="پلن فروشگاه پیدا نشد",
+                )
+
             payload = SubscriptionCreate(
                 user_id=order.user_id,
                 plan_id=order.plan_id,

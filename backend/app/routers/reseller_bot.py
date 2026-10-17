@@ -1,4 +1,5 @@
 from datetime import datetime
+import hmac
 
 import httpx
 
@@ -20,6 +21,7 @@ from ..reseller_bot_crypto import (
     encrypt_bot_token,
 )
 from .reseller_portal import require_reseller
+from .telegram_manager import load_bot_token
 
 
 router = APIRouter(
@@ -135,6 +137,67 @@ def _out(
     }
 
 
+# TWINPANEL_TELEGRAM_TOKEN_OWNERSHIP_GUARD_V1
+def _assert_token_available(
+    db: Session,
+    reseller_id: int,
+    token: str,
+) -> None:
+    """Reject one BotFather token being owned by multiple runtimes."""
+
+    try:
+        main_token = load_bot_token()
+    except RuntimeError:
+        main_token = ""
+
+    if (
+        main_token
+        and hmac.compare_digest(
+            token,
+            main_token,
+        )
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "این توکن در ربات اصلی پنل استفاده می‌شود. "
+                "برای ربات نمایندگی یک Bot Token جداگانه وارد کنید."
+            ),
+        )
+
+    rows = (
+        db.query(ResellerBotSettings)
+        .filter(
+            ResellerBotSettings.reseller_id
+            != int(reseller_id),
+            ResellerBotSettings.bot_token_encrypted.isnot(
+                None
+            ),
+        )
+        .all()
+    )
+
+    for other in rows:
+        try:
+            other_token = decrypt_bot_token(
+                other.bot_token_encrypted
+            )
+        except Exception:
+            continue
+
+        if hmac.compare_digest(
+            token,
+            other_token,
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "این توکن قبلاً برای نمایندگی دیگری ثبت شده است. "
+                    "هر ربات تلگرام باید Bot Token اختصاصی داشته باشد."
+                ),
+            )
+
+
 async def _telegram_get_me(
     token: str,
 ) -> dict:
@@ -226,6 +289,12 @@ async def save_reseller_bot_token(
     db: Session = Depends(get_db),
 ):
     token = payload.token.strip()
+
+    _assert_token_available(
+        db,
+        int(reseller.id),
+        token,
+    )
 
     info = await _telegram_get_me(
         token
@@ -351,6 +420,12 @@ async def test_reseller_bot(
             detail="خواندن امن توکن ربات ناموفق بود",
         )
 
+    _assert_token_available(
+        db,
+        int(reseller.id),
+        token,
+    )
+
     info = await _telegram_get_me(
         token
     )
@@ -407,6 +482,12 @@ async def activate_reseller_bot(
             status_code=500,
             detail="خواندن امن توکن ربات ناموفق بود",
         )
+
+    _assert_token_available(
+        db,
+        int(reseller.id),
+        token,
+    )
 
     info = await _telegram_get_me(
         token

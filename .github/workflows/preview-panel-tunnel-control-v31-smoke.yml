@@ -1,0 +1,36 @@
+name: Preview Panel Tunnel Control V31 Smoke
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
+      - name: Verify unified V39 tunnel and node controls
+        run: |
+          grep -q 'TunnelsUnifiedRuntimeV39' components/tunnels-simple-runtime.tsx
+          grep -q 'TunnelServiceConnectionsPanel' components/tunnels-unified-runtime-v39.tsx
+          grep -q 'managedDeepDiagnose' components/tunnels-unified-runtime-v39.tsx
+          grep -q 'managedDeepRepair' components/tunnels-unified-runtime-v39.tsx
+          grep -q 'setMode' components/tunnels-unified-runtime-v39.tsx
+          grep -q 'installDeepDiagnosticsAgent' components/tunnels-unified-runtime-v39.tsx
+          ! grep -q 'repairProtocolsSaved' components/legacy-nodes-exact.tsx
+          ! grep -q 'upgradeAgent' components/legacy-nodes-exact.tsx
+          ! grep -q 'installTunnelFabric' components/legacy-nodes-exact.tsx
+          grep -q 'protocolHealth' components/legacy-nodes-exact.tsx
+          grep -q 'restartProtocol' components/legacy-nodes-exact.tsx
+      - name: Build UI
+        run: npm run build

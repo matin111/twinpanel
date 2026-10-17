@@ -1,0 +1,8 @@
+/* Storefront uses the same SupportChatWidget launcher/window as the customer panel.
+   Do not hide or replace the global launcher here. */
+body:has(.tpStore) .supportChatLauncher,
+body:has(.tpStore) .supportChatLauncher.active{
+  opacity:1!important;
+  pointer-events:auto!important;
+  transform:none!important;
+}

@@ -1,15 +1,20 @@
+import asyncio
 import json
 import os
 import subprocess
 import secrets
+import sys
 from pathlib import Path
 
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
+from ..database import get_db
 from ..deps import require_admin
+from ..telegram_models import TelegramUserLink
 
 
 router = APIRouter(
@@ -27,8 +32,36 @@ SERVICE_FILE = Path(
     "/etc/systemd/system/twinpanel-bot.service"
 )
 
-PROJECT_DIR = Path("/root/vpnshop/vpnshop")
-PYTHON_BIN = PROJECT_DIR / "venv/bin/python"
+# The old implementation was pinned to /root/vpnshop/vpnshop even though
+# production TwinPanel now runs from /opt/twinpanel-product/backend (or the
+# /opt/twinpanel/current/backend symlink). Resolve the backend that actually
+# loaded this router so status/install/repair always target the live runtime.
+PROJECT_DIR = Path(
+    os.getenv(
+        "TWINPANEL_BACKEND_DIR",
+        str(Path(__file__).resolve().parents[2]),
+    )
+).resolve()
+
+# Keep the virtualenv path itself instead of resolving its interpreter symlink.
+# Resolving /opt/twinpanel/venv/bin/python3 could turn it into /usr/bin/python3
+# and make the bot lose the packages installed in the TwinPanel environment.
+LIVE_VENV_PYTHON = Path("/opt/twinpanel/venv/bin/python3")
+PYTHON_BIN = Path(
+    os.getenv(
+        "TWINPANEL_PYTHON_BIN",
+        str(
+            LIVE_VENV_PYTHON
+            if LIVE_VENV_PYTHON.exists()
+            else Path(sys.executable)
+        ),
+    )
+)
+
+API_SERVICE_NAME = os.getenv(
+    "TWINPANEL_API_SERVICE",
+    "twinpanel-api.service",
+).strip() or "twinpanel-api.service"
 
 SECRET_ENV_FILE = Path(
     "/etc/twinpanel-telegram-api.env"
@@ -38,12 +71,23 @@ SECRET_ENV_NAME = (
 )
 
 
-
 class TokenIn(BaseModel):
     token: str = Field(
         min_length=20,
         max_length=300,
     )
+
+
+class BroadcastIn(BaseModel):
+    text: str = Field(
+        min_length=1,
+        max_length=4000,
+    )
+    disable_web_page_preview: bool = True
+
+
+def _runtime_file() -> Path:
+    return PROJECT_DIR / "app/telegram_runtime_bot.py"
 
 
 def _ensure_dir():
@@ -52,7 +96,6 @@ def _ensure_dir():
         exist_ok=True,
     )
     os.chmod(CONF_DIR, 0o700)
-
 
 
 # TWINPANEL_PANEL_MANAGED_BOT_SECRET_V2
@@ -128,66 +171,63 @@ def _ensure_internal_secret() -> None:
     )
 
 
+def _service_text() -> str:
+    project = str(PROJECT_DIR)
+    python = str(PYTHON_BIN)
+
+    return f"""[Unit]
+Description=TwinPanel Telegram Bot
+After=network-online.target {API_SERVICE_NAME}
+Wants=network-online.target
+Requires={API_SERVICE_NAME}
+
+[Service]
+Type=simple
+WorkingDirectory={project}
+Environment=PYTHONUNBUFFERED=1
+Environment=TWINPANEL_API_BASE=http://127.0.0.1:8095
+EnvironmentFile=/etc/twinpanel-telegram-api.env
+ExecStart={python} -m app.telegram_runtime_bot
+Restart=always
+RestartSec=4
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+
+def _write_service_file() -> None:
+    SERVICE_FILE.write_text(
+        _service_text(),
+        encoding="utf-8",
+    )
+    os.chmod(SERVICE_FILE, 0o644)
+
+
 def _repair_existing_service_env() -> None:
     if not SERVICE_FILE.exists():
         return
 
-    text = SERVICE_FILE.read_text(
+    expected = _service_text()
+    current = SERVICE_FILE.read_text(
         encoding="utf-8"
     )
 
-    optional = (
-        "EnvironmentFile="
-        "-/etc/twinpanel-telegram-api.env"
+    if current == expected:
+        return
+
+    # Repair old installs as well as the old /root/vpnshop/vpnshop unit.
+    _write_service_file()
+
+    subprocess.run(
+        [
+            "systemctl",
+            "daemon-reload",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
     )
-
-    required = (
-        "EnvironmentFile="
-        "/etc/twinpanel-telegram-api.env"
-    )
-
-    changed = False
-
-    if optional in text:
-        text = text.replace(
-            optional,
-            required,
-        )
-        changed = True
-
-    elif required not in text:
-        anchor = (
-            "Environment=PYTHONUNBUFFERED=1\n"
-        )
-
-        if anchor in text:
-            text = text.replace(
-                anchor,
-                anchor + required + "\n",
-                1,
-            )
-            changed = True
-
-    if changed:
-        SERVICE_FILE.write_text(
-            text,
-            encoding="utf-8",
-        )
-
-        os.chmod(
-            SERVICE_FILE,
-            0o644,
-        )
-
-        subprocess.run(
-            [
-                "systemctl",
-                "daemon-reload",
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
 
 
 def _fernet() -> Fernet:
@@ -316,6 +356,25 @@ def _service_state() -> str:
     return "inactive"
 
 
+def _broadcast_target_ids(db: Session) -> list[int]:
+    rows = (
+        db.query(TelegramUserLink.telegram_id)
+        .distinct()
+        .order_by(TelegramUserLink.telegram_id.asc())
+        .all()
+    )
+
+    result: list[int] = []
+
+    for row in rows:
+        value = row[0] if row else None
+
+        if value:
+            result.append(int(value))
+
+    return result
+
+
 async def _telegram_get_me(
     bot_token: str,
 ) -> dict:
@@ -363,10 +422,8 @@ def _status_payload() -> dict:
         "installed":
             SERVICE_FILE.exists(),
         "runtime_ready":
-            (
-                PROJECT_DIR
-                / "app/telegram_runtime_bot.py"
-            ).exists(),
+            _runtime_file().exists()
+            and PYTHON_BIN.exists(),
         "service_state":
             _service_state(),
         "bot": {
@@ -442,15 +499,20 @@ def install_bot():
 
     _ensure_internal_secret()
 
-    runtime = (
-        PROJECT_DIR
-        / "app/telegram_runtime_bot.py"
-    )
+    runtime = _runtime_file()
 
     if not runtime.exists():
         raise HTTPException(
             status_code=409,
-            detail="Runtime ربات نصب نشده است",
+            detail=(
+                "فایل اجرای ربات در Backend فعلی پیدا نشد"
+            ),
+        )
+
+    if not PYTHON_BIN.exists():
+        raise HTTPException(
+            status_code=409,
+            detail="Python محیط TwinPanel پیدا نشد",
         )
 
     try:
@@ -465,28 +527,8 @@ def install_bot():
             timeout=180,
         )
 
-        SERVICE_FILE.write_text(
-            """[Unit]
-Description=Twin Panel Telegram Bot
-After=network-online.target vpnshop-api.service
-Wants=network-online.target
-Requires=vpnshop-api.service
-
-[Service]
-Type=simple
-WorkingDirectory=/root/vpnshop/vpnshop
-Environment=PYTHONUNBUFFERED=1
-Environment=TWINPANEL_API_BASE=http://127.0.0.1:8095
-EnvironmentFile=/etc/twinpanel-telegram-api.env
-ExecStart=/root/vpnshop/vpnshop/venv/bin/python -m app.telegram_runtime_bot
-Restart=always
-RestartSec=4
-
-[Install]
-WantedBy=multi-user.target
-""",
-            encoding="utf-8",
-        )
+        # Install and repair both use the current live backend/python paths.
+        _write_service_file()
 
         _run(
             ["systemctl", "daemon-reload"]
@@ -584,6 +626,105 @@ def restart_bot():
         )
 
     return _status_payload()
+
+
+@router.get("/broadcast/targets")
+def broadcast_targets(
+    db: Session = Depends(get_db),
+):
+    targets = _broadcast_target_ids(db)
+
+    return {
+        "total": len(targets),
+    }
+
+
+@router.post("/broadcast")
+async def broadcast_message(
+    payload: BroadcastIn,
+    db: Session = Depends(get_db),
+):
+    text = payload.text.strip()
+
+    if not text:
+        raise HTTPException(
+            status_code=422,
+            detail="متن پیام نمی‌تواند خالی باشد",
+        )
+
+    try:
+        token = load_bot_token()
+    except RuntimeError:
+        raise HTTPException(
+            status_code=409,
+            detail="ابتدا توکن ربات را ذخیره کنید",
+        )
+
+    targets = _broadcast_target_ids(db)
+
+    if not targets:
+        return {
+            "ok": True,
+            "total": 0,
+            "sent": 0,
+            "failed": 0,
+            "blocked": 0,
+        }
+
+    url = (
+        "https://api.telegram.org/"
+        f"bot{token}/sendMessage"
+    )
+
+    sent = 0
+    failed = 0
+    blocked = 0
+
+    async with httpx.AsyncClient(
+        timeout=15.0
+    ) as client:
+        for telegram_id in targets:
+            try:
+                response = await client.post(
+                    url,
+                    json={
+                        "chat_id": telegram_id,
+                        "text": text,
+                        "disable_web_page_preview": (
+                            payload.disable_web_page_preview
+                        ),
+                    },
+                )
+
+                try:
+                    data = response.json()
+                except Exception:
+                    data = {}
+
+                if (
+                    response.status_code == 200
+                    and data.get("ok")
+                ):
+                    sent += 1
+                else:
+                    failed += 1
+
+                    if response.status_code == 403:
+                        blocked += 1
+
+            except httpx.HTTPError:
+                failed += 1
+
+            # Keep broadcasts under Telegram's practical global rate limit.
+            await asyncio.sleep(0.045)
+
+    return {
+        "ok": True,
+        "total": len(targets),
+        "sent": sent,
+        "failed": failed,
+        "blocked": blocked,
+    }
 
 
 @router.get("/logs")

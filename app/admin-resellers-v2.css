@@ -1,0 +1,32 @@
+.reseller-admin-v2 .page-head small{display:block;margin-top:6px;color:var(--muted);line-height:1.8}.reseller-create-simple{overflow:visible}.reseller-create-simple form{display:grid;gap:18px}.reseller-simple-grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(240px,.8fr);gap:14px;align-items:start}.reseller-user-picker{position:relative;z-index:8;grid-column:1/-1}.reseller-user-results{position:absolute;top:calc(100% + 8px);right:0;left:0;z-index:30;display:grid;gap:6px;max-height:280px;overflow:auto;padding:8px;border:1px solid var(--border);border-radius:14px;background:var(--surface);box-shadow:0 18px 48px rgba(0,0,0,.28)}.reseller-user-results button{display:grid;gap:4px;width:100%;padding:11px 12px;border:1px solid transparent;border-radius:11px;background:transparent;color:inherit;text-align:right;cursor:pointer}.reseller-user-results button:hover{border-color:var(--border);background:var(--surface2)}.reseller-user-results b{direction:ltr;text-align:left}.reseller-user-results span{color:var(--muted);font-size:.82rem}.reseller-selected-user{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid color-mix(in srgb,var(--accent) 45%,var(--border));border-radius:14px;background:color-mix(in srgb,var(--accent) 8%,var(--surface2))}.reseller-selected-user>span{display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}.reseller-selected-user div{display:grid;gap:3px;min-width:0}.reseller-selected-user small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);text-align:right}.input-with-unit{display:grid;grid-template-columns:1fr auto;align-items:center;border:1px solid var(--border);border-radius:12px;background:var(--surface2);overflow:hidden}.input-with-unit input{border:0!important;border-radius:0!important;background:transparent!important}.input-with-unit>span{padding-inline:12px;color:var(--muted);font-size:.85rem}.reseller-list-toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}.reseller-list-toolbar label{display:flex;align-items:center;gap:8px;flex:1;max-width:520px}.reseller-list-toolbar input{width:100%}.reseller-traffic-modal{width:min(520px,calc(100vw - 24px))}.reseller-traffic-modal form{display:grid;gap:14px}.reseller-admin-v2 .table td small{display:block;margin-top:4px;color:var(--muted)}.reseller-admin-v2 .table td:nth-child(3) code{white-space:nowrap}.reseller-admin-v2 .row-actions{min-width:max-content}@media(max-width:760px){.reseller-simple-grid{grid-template-columns:1fr}.reseller-selected-user{grid-template-columns:auto 1fr}.reseller-selected-user button{grid-column:1/-1}.reseller-list-toolbar{align-items:stretch;flex-direction:column}.reseller-list-toolbar label{max-width:none}.reseller-user-results{position:static;margin-top:8px;box-shadow:none}}
+
+/* ============================================================
+   RESELLER MANAGEMENT MODAL V1
+   The management workspace stays mounted in the page, but when
+   reseller-admin-tabs exist it becomes a real responsive modal.
+   ============================================================ */
+html:has(.page>.runtime-editor .reseller-admin-tabs),
+body:has(.page>.runtime-editor .reseller-admin-tabs){overflow:hidden}
+body:has(.page>.runtime-editor .reseller-admin-tabs)::before{content:"";position:fixed;inset:0;z-index:9998;background:rgba(2,6,15,.74);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.page>.runtime-editor:has(.reseller-admin-tabs){position:fixed;top:50%;left:50%;z-index:9999;transform:translate(-50%,-50%);width:min(1180px,calc(100vw - 48px));max-height:calc(100dvh - 48px);margin:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border));border-radius:22px;background:var(--surface);box-shadow:0 28px 90px rgba(0,0,0,.52)}
+.page>.runtime-editor:has(.reseller-admin-tabs)>.card-head{position:sticky;top:0;z-index:12;margin:-1px -1px 16px;padding:16px 18px;border-bottom:1px solid var(--border);border-radius:22px 22px 0 0;background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.page>.runtime-editor:has(.reseller-admin-tabs)>.card-head .action-row{flex-wrap:nowrap}
+.page>.runtime-editor:has(.reseller-admin-tabs) .reseller-admin-tabs{display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;padding:8px 2px 10px;scrollbar-width:thin}
+.page>.runtime-editor:has(.reseller-admin-tabs) .reseller-admin-tabs>button{flex:0 0 auto;white-space:nowrap}
+.page>.runtime-editor:has(.reseller-admin-tabs) .dashboard-stats{grid-template-columns:repeat(4,minmax(150px,1fr))}
+.page>.runtime-editor:has(.reseller-admin-tabs) .setting-grid{align-items:start}
+.page>.runtime-editor:has(.reseller-admin-tabs) .table{max-width:100%;overflow:auto}
+
+@media(max-width:760px){
+  .page>.runtime-editor:has(.reseller-admin-tabs){width:calc(100vw - 12px);max-height:calc(100dvh - 12px);border-radius:16px;padding:12px}
+  .page>.runtime-editor:has(.reseller-admin-tabs)>.card-head{margin:-12px -12px 12px;padding:12px;border-radius:16px 16px 0 0;gap:10px;align-items:center}
+  .page>.runtime-editor:has(.reseller-admin-tabs)>.card-head>div:first-child{min-width:0}
+  .page>.runtime-editor:has(.reseller-admin-tabs)>.card-head b,.page>.runtime-editor:has(.reseller-admin-tabs)>.card-head small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .page>.runtime-editor:has(.reseller-admin-tabs)>.card-head .ghost{display:none}
+  .page>.runtime-editor:has(.reseller-admin-tabs) .dashboard-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .page>.runtime-editor:has(.reseller-admin-tabs) .reseller-admin-tabs{margin-inline:-2px;padding-bottom:8px}
+  .page>.runtime-editor:has(.reseller-admin-tabs) .setting-grid{grid-template-columns:1fr}
+  .page>.runtime-editor:has(.reseller-admin-tabs) .module-grid.two{grid-template-columns:1fr}
+  .page>.runtime-editor:has(.reseller-admin-tabs) .field input,.page>.runtime-editor:has(.reseller-admin-tabs) .field textarea{width:100%;min-width:0}
+  .page>.runtime-editor:has(.reseller-admin-tabs) .row-actions{max-width:100%;overflow-x:auto;flex-wrap:nowrap}
+}

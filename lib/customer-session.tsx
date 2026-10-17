@@ -2,7 +2,7 @@
 
 import {createContext,useCallback,useContext,useEffect,useMemo,useState} from "react";
 import {clearCustomerToken,customerApi,CustomerUser,getCustomerToken} from "./customer-api";
-import {getResellerProfile} from "./role-router";
+import {readPortalAccess} from "./access-cache";
 
 type SessionValue={
   ready:boolean;
@@ -13,12 +13,24 @@ type SessionValue={
   refresh:()=>Promise<void>;
 };
 
+type CachedSession={token:string;user:CustomerUser}|null;
+
 const CustomerSessionContext=createContext<SessionValue|null>(null);
 
+function cachedSession():CachedSession{
+  const token=getCustomerToken();
+  if(!token)return null;
+  const cached=readPortalAccess(token);
+  const user=cached?.user;
+  if(cached?.portal!=="customer"||!user||!user.is_active||String(user.role||"").toLowerCase()==="admin")return null;
+  return {token,user};
+}
+
 export function CustomerSessionProvider({children}:{children:React.ReactNode}){
-  const [ready,setReady]=useState(false);
-  const [token,setToken]=useState<string|null>(null);
-  const [user,setUser]=useState<CustomerUser|null>(null);
+  const initial=cachedSession();
+  const [ready,setReady]=useState(Boolean(initial));
+  const [token,setToken]=useState<string|null>(initial?.token??null);
+  const [user,setUser]=useState<CustomerUser|null>(initial?.user??null);
   const [error,setError]=useState("");
 
   const load=useCallback(async()=>{
@@ -30,8 +42,9 @@ export function CustomerSessionProvider({children}:{children:React.ReactNode}){
 
     setError("");
 
-    // Only /auth/me is authoritative for the validity of the login session.
-    // Auxiliary role probes must never erase a valid customer token.
+    // /auth/me remains the source of truth, but a short-lived verified cache
+    // lets route-to-route navigation render immediately while this request
+    // revalidates the account in the background.
     let account:CustomerUser;
     try{
       account=await customerApi.me(current);
@@ -49,6 +62,7 @@ export function CustomerSessionProvider({children}:{children:React.ReactNode}){
       window.location.replace("/admin");
       return;
     }
+
     if(!account.is_active){
       clearCustomerToken();
       setToken(null);
@@ -56,19 +70,6 @@ export function CustomerSessionProvider({children}:{children:React.ReactNode}){
       setReady(false);
       window.location.replace("/login");
       return;
-    }
-
-    // Reseller membership is an optional routing probe. A temporary failure here
-    // must not log a valid customer out or make the portal jump after hydration.
-    try{
-      const reseller=await getResellerProfile(current);
-      if(reseller){
-        window.location.replace("/reseller");
-        return;
-      }
-    }catch{
-      // Keep the authenticated customer session alive. The reseller portal has
-      // its own strict guard and can retry this endpoint independently.
     }
 
     setToken(current);
