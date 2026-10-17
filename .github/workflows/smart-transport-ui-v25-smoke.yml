@@ -1,0 +1,66 @@
+name: Smart Transport UI V25 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/smart-transports-runtime-v25.tsx'
+      - 'components/routed-page-client.tsx'
+      - 'components/ui.tsx'
+      - 'lib/modern-transport-api.ts'
+      - 'backend/app/release_manifest_v25.py'
+      - 'backend/app/routers/system_release.py'
+      - '.github/workflows/smart-transport-ui-v25-smoke.yml'
+  push:
+    branches:
+      - fix/restore-smart-transport-ui-update-check
+    paths:
+      - 'components/smart-transports-runtime-v25.tsx'
+      - 'components/routed-page-client.tsx'
+      - 'components/ui.tsx'
+      - 'lib/modern-transport-api.ts'
+      - 'backend/app/release_manifest_v25.py'
+      - 'backend/app/routers/system_release.py'
+      - '.github/workflows/smart-transport-ui-v25-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python syntax
+        run: |
+          python -m py_compile \
+            backend/app/release_manifest_v25.py \
+            backend/app/routers/system_release.py
+      - name: Static contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          route=Path('components/routed-page-client.tsx').read_text()
+          nav=Path('components/ui.tsx').read_text()
+          page=Path('components/smart-transports-runtime-v25.tsx').read_text()
+          api=Path('lib/modern-transport-api.ts').read_text()
+          resolver=Path('backend/app/release_manifest_v25.py').read_text()
+          router=Path('backend/app/routers/system_release.py').read_text()
+
+          assert 'admin/tunnel-transports") return admin(<SmartTransportsRuntimeV25/>)' in route
+          assert '["مسیرهای هوشمند","Smart Transports","/admin/tunnel-transports"' in nav
+          for name in ('kernel_gre','gost_tun','amneziawg','netrix'):
+              assert name in page
+              assert name in api
+          for field in ('stable_seconds','qualified','benchmark','weighted_mbps'):
+              assert field in page
+          assert '/modern-transports' in api
+          assert 'PRIMARY_MANIFEST_URL' in resolver
+          assert 'LEGACY_MANIFEST_URL' in resolver
+          assert 'GITHUB_API_MANIFEST_URL' in resolver
+          assert 'release.release_manifest = release_manifest_v25' in router
+          print('SMART_TRANSPORT_UI_V25_CONTRACT_OK')
+          PY
