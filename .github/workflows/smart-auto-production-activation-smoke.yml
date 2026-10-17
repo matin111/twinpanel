@@ -1,0 +1,58 @@
+name: Smart Auto Production Activation Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/transport_manager_service_v12.py'
+      - 'backend/app/self_hosted_runtime.py'
+      - '.github/workflows/smart-auto-production-activation-smoke.yml'
+  push:
+    branches:
+      - fix/smart-auto-production-activation
+    paths:
+      - 'backend/app/transport_manager_service_v12.py'
+      - 'backend/app/self_hosted_runtime.py'
+      - '.github/workflows/smart-auto-production-activation-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  activation-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile activation runtime
+        run: |
+          python -m py_compile \
+            backend/app/transport_manager_service_v12.py \
+            backend/app/self_hosted_runtime.py
+
+      - name: Verify production activation contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          manager = Path('backend/app/transport_manager_service_v12.py').read_text()
+          runtime = Path('backend/app/self_hosted_runtime.py').read_text()
+
+          assert 'WorkingDirectory=/opt/twinpanel/current/backend' in manager
+          assert 'PYTHONPATH=/opt/twinpanel/current/backend' in manager
+          assert '/opt/twinpanel/venv/bin/python3 -u -m app.tunnel_transport_manager_v12' in manager
+          assert 'WorkingDirectory=/opt/twinpanel-product' not in manager
+          assert 'PYTHONPATH=/opt/twinpanel-product' not in manager
+          assert 'API_UNIT_PATH' in manager
+          assert 'api_unit_missing_deferred' in manager
+          assert 'ExecStartPre=/bin/sleep 2' in manager
+          assert 'BACKUP_PATH' in manager
+          assert 'systemctl, "start", "--no-block"' in manager
+          assert 'ensure_transport_manager_service_v12' in runtime
+          assert 'ensure_transport_manager_service_v12()' in runtime
+
+          print('SMART_AUTO_PRODUCTION_ACTIVATION_OK')
+          PY
