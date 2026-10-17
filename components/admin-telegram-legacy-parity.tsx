@@ -84,6 +84,26 @@ export function AdminTelegramLegacyPage(){
     }
   };
 
+  const deleteToken=async()=>{
+    if(busy||!status?.token_configured)return;
+    const confirmed=window.confirm(
+      pick(
+        "توکن ذخیره‌شده حذف و سرویس ربات متوقف شود؟ نصب ربات و تنظیمات پنل حذف نمی‌شوند و بعداً می‌توانید توکن جدید ثبت کنید.",
+        "Remove the saved token and stop the bot service? The bot installation and panel settings will stay in place so you can save a new token later.",
+      ),
+    );
+    if(!confirmed)return;
+
+    await act(
+      "delete-token",
+      pick("توکن ربات حذف شد","Bot token removed"),
+      async()=>{
+        await parityApi.telegramDeleteToken();
+        setToken("");
+      },
+    );
+  };
+
   const sendBroadcast=async()=>{
     if(busy||!broadcastText.trim())return;
     const total=broadcastTargets??0;
@@ -172,6 +192,7 @@ export function AdminTelegramLegacyPage(){
             <div className="tg-action-row">
               <button className="primary" disabled={Boolean(busy)||!token.trim()} onClick={()=>void act("token",pick("توکن ذخیره شد","Token saved"),async()=>{await parityApi.telegramSaveToken(token.trim());setToken("");})}>{busy==="token"?pick("در حال بررسی...","Checking..."):pick("ذخیره توکن","Save token")}</button>
               <button className="ghost" disabled={Boolean(busy)||!tokenReady} onClick={()=>void act("test",pick("اتصال ربات تأیید شد","Bot connection verified"),parityApi.telegramTest)}>{busy==="test"?pick("در حال تست...","Testing..."):pick("تست اتصال","Test connection")}</button>
+              <button className="ghost danger" disabled={Boolean(busy)||!tokenReady} onClick={()=>void deleteToken()}>{busy==="delete-token"?pick("در حال حذف...","Removing..."):pick("حذف توکن","Remove token")}</button>
             </div>
           </div>
 
