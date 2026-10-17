@@ -1,0 +1,51 @@
+name: TwinPanel Public Install Smoke
+
+on:
+  pull_request:
+    paths:
+      - "install.sh"
+      - "releases/**"
+      - "backend/scripts/twinpanel_public_updater.py"
+      - "deploy/systemd/twinpanel-updater.service.tpl"
+      - ".github/workflows/public-install-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  validate-public-install:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate shell syntax
+        run: |
+          bash -n install.sh
+          bash -n installer/install.sh
+          bash -n scripts/twinpanel-menu.sh
+
+      - name: Validate updater Python
+        run: |
+          python3 -m py_compile backend/scripts/twinpanel_public_updater.py
+
+      - name: Validate canonical public source
+        run: |
+          grep -q 'matin111/twinpanel/main/releases/stable.json' install.sh
+          grep -q 'matin111/twinpanel/main/releases/stable.json' backend/scripts/twinpanel_public_updater.py
+          grep -q 'twinpanel_public_updater.py' deploy/systemd/twinpanel-updater.service.tpl
+
+      - name: Validate release manifest when present
+        run: |
+          if [ -f releases/stable.json ]; then
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('releases/stable.json').read_text())
+          assert data.get('channel') == 'stable'
+          assert isinstance(data.get('version'), str) and data['version']
+          assert data.get('installable') is True
+          assert str(data.get('package_url') or '').startswith('https://github.com/matin111/twinpanel/')
+          sha=str(data.get('sha256') or '')
+          assert len(sha)==64 and all(c in '0123456789abcdef' for c in sha.lower())
+          assert data.get('github_url') == 'https://github.com/matin111/twinpanel'
+          PY
+          fi
