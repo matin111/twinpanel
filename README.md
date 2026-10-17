@@ -35,6 +35,7 @@ The platform is designed so the core operational stack runs on infrastructure yo
 - [User interface](#user-interface)
 - [Architecture](#architecture)
 - [Quick install](#quick-install)
+- [SSH management](#ssh-management)
 - [Requirements](#requirements)
 - [Important paths](#important-paths)
 - [Security rules](#security-rules)
@@ -519,6 +520,24 @@ Full English installation guide:
 Persian installation guide:
 
 [`docs/INSTALL_FA.md`](docs/INSTALL_FA.md)
+
+---
+
+## SSH management
+
+After installation, open the TwinPanel SSH management menu with:
+
+```bash
+twinpanel
+```
+
+The short alias is also available:
+
+```bash
+tp
+```
+
+Use this menu for routine server-side TwinPanel management, including panel/service status, administrator management, protocol management, updates, backups, logs/diagnostics, domain/SSL operations, and version information.
 
 ---
 
