@@ -19,13 +19,18 @@ jobs:
           else
             npm install --no-audit --no-fund
           fi
-      - name: Verify preview-safe V31 integration
+      - name: Verify unified V39 tunnel and node controls
         run: |
-          grep -q 'TunnelsPanelRuntimeV31' components/tunnels-simple-runtime.tsx
-          grep -q 'TunnelsServiceConnectionsRuntime' components/tunnels-simple-runtime.tsx
-          grep -q 'managedDiagnose' components/tunnels-panel-runtime-v31.tsx
-          grep -q 'managedRepair' components/tunnels-panel-runtime-v31.tsx
-          grep -q 'setMode' components/tunnels-panel-runtime-v31.tsx
-          grep -q 'TunnelServiceConnectionsPanel' components/tunnels-service-connections-runtime.tsx
+          grep -q 'TunnelsUnifiedRuntimeV39' components/tunnels-simple-runtime.tsx
+          grep -q 'TunnelServiceConnectionsPanel' components/tunnels-unified-runtime-v39.tsx
+          grep -q 'managedDeepDiagnose' components/tunnels-unified-runtime-v39.tsx
+          grep -q 'managedDeepRepair' components/tunnels-unified-runtime-v39.tsx
+          grep -q 'setMode' components/tunnels-unified-runtime-v39.tsx
+          grep -q 'installDeepDiagnosticsAgent' components/tunnels-unified-runtime-v39.tsx
+          ! grep -q 'repairProtocolsSaved' components/legacy-nodes-exact.tsx
+          ! grep -q 'upgradeAgent' components/legacy-nodes-exact.tsx
+          ! grep -q 'installTunnelFabric' components/legacy-nodes-exact.tsx
+          grep -q 'protocolHealth' components/legacy-nodes-exact.tsx
+          grep -q 'restartProtocol' components/legacy-nodes-exact.tsx
       - name: Build UI
         run: npm run build
