@@ -14,8 +14,29 @@ The platform is designed so the core operational stack runs on infrastructure yo
 
 ---
 
+## Quick install
+
+Customer installations use the public installer in this repository:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/matin111/twinpanel/main/install.sh | sudo bash
+```
+
+No GitHub account, SSH key, Deploy Key, Personal Access Token, manual clone, branch selection, or commit selection is required from the customer. The installer resolves `releases/stable.json` and fetches the exact validated public Git commit declared by that manifest.
+
+Full English installation guide:
+
+[`docs/INSTALL_EN.md`](docs/INSTALL_EN.md)
+
+Persian installation guide:
+
+[`docs/INSTALL_FA.md`](docs/INSTALL_FA.md)
+
+---
+
 ## Table of contents
 
+- [Quick install](#quick-install)
 - [Overview](#overview)
 - [Core capabilities](#core-capabilities)
 - [Users and subscriptions](#users-and-subscriptions)
@@ -34,7 +55,6 @@ The platform is designed so the core operational stack runs on infrastructure yo
 - [Trial and licensing](#trial-and-licensing)
 - [User interface](#user-interface)
 - [Architecture](#architecture)
-- [Quick install](#quick-install)
 - [SSH management](#ssh-management)
 - [Requirements](#requirements)
 - [Important paths](#important-paths)
@@ -500,26 +520,6 @@ FastAPI
 ```
 
 Frontend and API services run locally, while Nginx publishes the public HTTP/HTTPS endpoint.
-
----
-
-## Quick install
-
-Customer installations use the public installer in this repository:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/matin111/twinpanel/main/install.sh | sudo bash
-```
-
-No GitHub account, SSH key, Deploy Key, Personal Access Token, manual clone, branch selection, or commit selection is required from the customer. The installer resolves `releases/stable.json` and fetches the exact validated public Git commit declared by that manifest.
-
-Full English installation guide:
-
-[`docs/INSTALL_EN.md`](docs/INSTALL_EN.md)
-
-Persian installation guide:
-
-[`docs/INSTALL_FA.md`](docs/INSTALL_FA.md)
 
 ---
 
