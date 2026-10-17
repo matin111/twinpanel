@@ -10,7 +10,7 @@ const WalletRuntimePage=dynamic(()=>import("./admin-parity-runtime").then(m=>m.W
 const DiscountsRuntimePage=dynamic(()=>import("./admin-parity-runtime").then(m=>m.DiscountsRuntimePage));
 const AdminResellersManagementRuntime=dynamic(()=>import("./admin-resellers-management-runtime").then(m=>m.AdminResellersManagementRuntime));
 const AdminResellerTrafficPlans=dynamic(()=>import("./admin-reseller-traffic-plans").then(m=>m.AdminResellerTrafficPlans));
-const StoreSettingsRuntimePage=dynamic(()=>import("./admin-parity-runtime").then(m=>m.StoreSettingsRuntimePage));
+const StoreSettingsManager=dynamic(()=>import("./store-settings-manager").then(m=>m.StoreSettingsManager));
 const BackupsFullRuntimePage=dynamic(()=>import("./backups-full-runtime").then(m=>m.BackupsFullRuntimePage));
 const ProvisionRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.ProvisionRuntimePage));
 const SmsReaderRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.SmsReaderRuntimePage));
@@ -21,8 +21,8 @@ const SupportRuntimePage=dynamic(()=>import("./admin-ops-runtime").then(m=>m.Sup
 const NotificationsRuntimePage=dynamic(()=>import("./admin-ops-runtime").then(m=>m.NotificationsRuntimePage));
 const SystemHealthRuntimePage=dynamic(()=>import("./system-health-runtime").then(m=>m.SystemHealthRuntimePage));
 const SubscriptionToolsRuntimePage=dynamic(()=>import("./subscription-tools-runtime").then(m=>m.SubscriptionToolsRuntimePage));
-const LegacySubscriptionsRuntimePage=dynamic(()=>import("./legacy-subscriptions-exact").then(m=>m.LegacySubscriptionsRuntimePage));
-const LegacyUsersRuntimePage=dynamic(()=>import("./legacy-users-exact").then(m=>m.LegacyUsersRuntimePage));
+const SubscriptionsFullRuntimePage=dynamic(()=>import("./subscriptions-full-runtime").then(m=>m.SubscriptionsFullRuntimePage));
+const AdminUsersRuntime=dynamic(()=>import("./admin-users-runtime").then(m=>m.AdminUsersRuntime));
 const LegacyNodesRuntimePage=dynamic(()=>import("./legacy-nodes-exact").then(m=>m.LegacyNodesRuntimePage));
 const LegacyPlansRuntimePage=dynamic(()=>import("./legacy-plans-exact").then(m=>m.LegacyPlansRuntimePage));
 const TunnelsSimpleRuntimePage=dynamic(()=>import("./tunnels-simple-runtime").then(m=>m.TunnelsSimpleRuntimePage));
@@ -42,6 +42,7 @@ const StoreRuntime2027=dynamic(()=>import("./store-runtime").then(m=>m.StoreRunt
 const AdminDashboardRuntime=dynamic(()=>import("./admin-dashboard-runtime").then(m=>m.AdminDashboardRuntime));
 const PaymentsReviewRuntime=dynamic(()=>import("./payments-review-runtime").then(m=>m.PaymentsReviewRuntime));
 const AdminPaymentsRuntime=dynamic(()=>import("./admin-payments-runtime").then(m=>m.AdminPaymentsRuntime));
+const DownloadAssetsRuntime=dynamic(()=>import("./download-assets-runtime").then(m=>m.DownloadAssetsRuntime));
 
 const customerSections=new Set(["subscription","connection","usage","orders","wallet","payments","support","notifications","profile"]);
 const resellerSections=new Set(["customers","subscriptions","sales","wallet","orders","traffic","bot","notifications","settings"]);
@@ -52,20 +53,13 @@ function AdminUnknownRoute(){
     <Shell active="">
       <div className="page">
         <div className="page-head">
-          <div>
-            <h1>صفحه پیدا نشد</h1>
-          </div>
+          <div><h1>صفحه پیدا نشد</h1></div>
         </div>
-        <Card>
-          <b>این مسیر در پنل مدیریت وجود ندارد.</b>
-        </Card>
+        <Card><b>این مسیر در پنل مدیریت وجود ندارد.</b></Card>
       </div>
     </Shell>
   );
 }
-
-
-const DownloadAssetsRuntime=dynamic(()=>import("./download-assets-runtime").then(m=>m.DownloadAssetsRuntime));
 
 export function RoutedPageClient({routeKey}:{routeKey:string}){
   const key=routeKey;
@@ -73,8 +67,8 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="login") return <LoginPage2027/>;
   if(key==="register") return <RegisterPage2027/>;
   if(key==="admin") return admin(<AdminDashboardRuntime/>);
-  if(key==="admin/users") return admin(<LegacyUsersRuntimePage/>);
-  if(key==="admin/subscriptions") return admin(<LegacySubscriptionsRuntimePage/>);
+  if(key==="admin/users") return admin(<AdminUsersRuntime/>);
+  if(key==="admin/subscriptions") return admin(<SubscriptionsFullRuntimePage/>);
   if(key==="admin/subscription-tools") return admin(<SubscriptionToolsRuntimePage/>);
   if(key==="admin/plans") return admin(<LegacyPlansRuntimePage/>);
   if(key==="admin/nodes") return admin(<LegacyNodesRuntimePage/>);
@@ -91,7 +85,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="admin/telegram-manager") return admin(<TelegramManagerPage/>);
   if(key==="admin/sms-reader") return admin(<><SmsReaderRuntimePage/><AdminSmsRelayDownload/></>);
   if(key==="admin/backups") return admin(<BackupsFullRuntimePage/>);
-  if(key==="admin/store-settings") return admin(<StoreSettingsRuntimePage/>);
+  if(key==="admin/store-settings") return admin(<StoreSettingsManager/>);
   if(key==="admin/wallet") return admin(<WalletRuntimePage/>);
   if(key==="admin/discounts") return admin(<DiscountsRuntimePage/>);
   if(key==="admin/resellers") return admin(<AdminResellersManagementRuntime/>);
