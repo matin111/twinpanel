@@ -46,6 +46,9 @@ export const legacyAdminApi={
   upgradeAgent:(nodeId:number)=>request<RuntimeRow>(`/v1/nodes/${nodeId}/recover-agent`,{method:"POST"}),
   nodeDomains:()=>request<{ok?:boolean;nodes:RuntimeRow[]}>("/v1/subscriptions/node-domains"),
   updateNodeDomain:(id:number,domain:string)=>request<RuntimeRow>(`/v1/subscriptions/node-domains/${id}`,{method:"PUT",body:JSON.stringify({domain})}),
+  xrayDomain:(id:number)=>request<RuntimeRow>(`/v1/xray-modern-admin/nodes/${id}/xray-domain`),
+  updateXrayDomain:(id:number,domain:string)=>request<RuntimeRow>(`/v1/xray-modern-admin/nodes/${id}/xray-domain`,{method:"PUT",body:JSON.stringify({domain})}),
+  prepareXrayDomain:(id:number,issueCertificate=false)=>request<RuntimeRow>(`/v1/xray-modern-admin/nodes/${id}/xray-domain/prepare`,{method:"POST",body:JSON.stringify({issue_certificate:issueCertificate})}),
   installTunnelFabric:(nodeId:number)=>request<RuntimeRow>("/v1/provision/install-fabric",{method:"POST",body:JSON.stringify({node_id:nodeId})}),
   tunnelFabricStatus:(nodeId:number)=>request<RuntimeRow>(`/v1/provision/fabric-status/${nodeId}`)
 };
