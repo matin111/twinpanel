@@ -12,6 +12,23 @@ import {serviceConnectionsV36Api} from "../lib/service-connections-v36-api";
 import {useI18n} from "../lib/i18n";
 
 
+const HIDDEN_XRAY_SERVICE_PROFILES = new Set([
+  "xhttp_reality",
+  "legacy",
+]);
+
+
+function visibleServiceConnection(item: TunnelServiceConnection) {
+  if (String(item.protocol || "").toLowerCase() !== "v2ray") {
+    return true;
+  }
+
+  return !HIDDEN_XRAY_SERVICE_PROFILES.has(
+    String(item.profile || "").toLowerCase(),
+  );
+}
+
+
 function reasonLabel(value: string | null | undefined, pick: (fa:string,en:string)=>string) {
   switch (String(value || "")) {
     case "tls_domain_unavailable":
@@ -102,7 +119,11 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
     return ()=>window.clearInterval(timer);
   }, [tunnelId]);
 
-  const connections = Array.isArray(data?.connections) ? data.connections : [];
+  const rawConnections = Array.isArray(data?.connections) ? data.connections : [];
+  const connections = useMemo(
+    ()=>rawConnections.filter(visibleServiceConnection),
+    [rawConnections],
+  );
   const hasXray = useMemo(
     ()=>connections.some(item=>String(item.protocol||"").toLowerCase()==="v2ray"),
     [connections],
