@@ -14,9 +14,20 @@ on:
 
 jobs:
   smoke:
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - ubuntu-24.04
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Show runtime versions
+        run: |
+          python3 --version
+          tar --version | head -1
 
       - name: Verify prebuilt updater contract
         run: |
@@ -69,14 +80,14 @@ jobs:
 
           service=Path('deploy/systemd/twinpanel-web.service.tpl').read_text(encoding='utf-8')
           assert '.next/standalone/server.js' in service
-          assert 'node_modules/next/dist/bin/next' in service  # rollback compatibility
+          assert 'node_modules/next/dist/bin/next' in service
 
           config=Path('next.config.ts').read_text(encoding='utf-8')
           assert 'output:"standalone"' in config.replace(' ','')
           print('PREBUILT_UPDATER_SMOKE_OK')
           PY
 
-      - name: Validate shell and workflow syntax basics
+      - name: Validate shell and Python syntax
         run: |
           bash -n installer/install.sh
           python3 -m py_compile backend/scripts/twinpanel_public_updater.py
