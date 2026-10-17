@@ -1,6 +1,6 @@
 # راهنمای نصب TwinPanel
 
-این راهنما برای نصب نسخه رسمی Self-Hosted پنل است. منبع نصب فقط شاخه/ریلیز رسمی TwinPanel است و نباید از Branchهای آزمایشی نصب انجام شود.
+این راهنما برای نصب رسمی Self-Hosted پنل است. نصب مشتری مستقیماً از مخزن عمومی `matin111/twinpanel` و Manifest نسخه Stable تأییدشده انجام می‌شود و Branchهای آزمایشی `feat/*`، `fix/*` و مشابه آن منبع نصب مشتری نیستند.
 
 ## پیش‌نیازها
 
@@ -8,80 +8,112 @@
 - دسترسی root
 - حداقل 2GB RAM و 2 vCPU پیشنهاد می‌شود
 - حداقل 20GB فضای آزاد
-- دسترسی خروجی اینترنت برای دریافت بسته نصب و بروزرسانی
+- دسترسی خروجی اینترنت برای دریافت سورس و بروزرسانی
 - پورت‌های 80 و 443 برای وب عمومی
 
 ## نصب سریع
 
-دستور رسمی نصب عمومی از مخزن `matin111/tp27-core` اجرا می‌شود. این Bootstrap هیچ سورس خصوصی یا Secret را داخل مخزن عمومی نگه نمی‌دارد و بسته نصب را فقط از سرویس انتشار/لایسنس دریافت می‌کند.
+مشتری فقط همین یک دستور را اجرا می‌کند:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/matin111/tp27-core/main/twinpanel/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/matin111/twinpanel/main/install.sh | sudo bash
 ```
 
-در صورت وارد نکردن License Key، یک Trial هفت‌روزه برای همان Installation درخواست می‌شود. Trial از اولین Activation موفق شروع می‌شود و با حذف فایل‌های محلی یا نصب مجدد نباید ریست شود.
+برای نصب نیازی به GitHub Account، SSH Key، Deploy Key، Personal Access Token، Clone دستی، انتخاب Branch یا واردکردن Commit نیست.
+
+Installer ابتدا Manifest رسمی Stable را از مسیر زیر می‌خواند:
+
+```text
+https://raw.githubusercontent.com/matin111/twinpanel/main/releases/stable.json
+```
+
+Manifest به یک Commit عمومی و تأییدشده قفل است. Installer همان Commit را با HTTPS دریافت می‌کند و SHA واقعی Git را قبل از نصب بررسی می‌کند؛ بنابراین نصب مشتری با هر Commit جدید `main` به‌صورت ناخواسته تغییر نمی‌کند.
 
 ## روند نصب
 
-1. بررسی سیستم‌عامل، منابع و پورت‌ها
-2. ساخت Installation ID و Fingerprint
-3. فعال‌سازی License یا Trial هفت‌روزه
-4. دریافت آخرین Release مجاز برای همان Installation
-5. بررسی SHA256 بسته
-6. نصب PostgreSQL، Redis، Python runtime، Node.js، Nginx و وابستگی‌ها
-7. نصب Backend و Frontend
-8. ساخت Secretهای محلی با Permission محدود
-9. ساخت دیتابیس و Admin اولیه
-10. نصب systemd serviceها
-11. فعال‌سازی Nginx
-12. Health Check نهایی Web/API/DB/Redis
+1. بررسی Ubuntu پشتیبانی‌شده و دسترسی root
+2. دریافت Manifest نسخه Stable منتشرشده
+3. خواندن Version و Commit دقیق نسخه
+4. دریافت مخزن عمومی TwinPanel با HTTPS
+5. بررسی SHA واقعی Commit با مقدار Manifest
+6. بررسی فایل `VERSION`
+7. نصب PostgreSQL، Redis، Python runtime، Node.js، Nginx و وابستگی‌ها
+8. نصب Backend و Frontend
+9. ساخت Secretهای محلی با Permission محدود
+10. ساخت دیتابیس و Admin اولیه
+11. نصب سرویس‌های systemd
+12. نصب منوی SSH با دستورهای `twinpanel` و `tp`
+13. فعال‌سازی Nginx و سرویس‌ها
+14. Health Check نهایی Web و API
 
 ## اطلاعات ورود اولیه
 
-Installer یک رمز تصادفی برای Admin اولیه می‌سازد و آن را فقط در فایل زیر با Permission `0600` نگه می‌دارد:
+Installer برای اولین ورود یک رمز تصادفی Admin می‌سازد و آن را فقط در فایل زیر با Permission `0600` ذخیره می‌کند:
 
 ```text
 /root/twinpanel-initial-admin.txt
 ```
 
-بعد از اولین ورود، Email و Password را تغییر دهید و فایل فوق را حذف کنید.
+این حساب فقط برای ورود اولیه است. بعد از ورود، مدیر Email و Password خودش را تغییر می‌دهد و می‌تواند فایل اطلاعات اولیه را حذف کند.
+
+در Reinstall یا Update، اگر Admin از قبل وجود داشته باشد، رمز آن بدون اجازه تغییر نمی‌کند.
+
+## مدیریت از SSH
+
+بعد از نصب کافی است اجرا شود:
+
+```bash
+twinpanel
+```
+
+یا:
+
+```bash
+tp
+```
+
+منوی SSH شامل وضعیت پنل و سرویس‌ها، مدیریت Admin، مدیریت جداگانه پروتکل‌ها، بروزرسانی، بکاپ، لاگ و Diagnostics، اطلاعات Version و ابزارهای عملیاتی مرتبط است.
 
 ## دامنه و SSL
 
-دامنه در زمان نصب اجباری نیست. پنل ابتدا با IP عمومی سرور قابل استفاده است. سپس از بخش «دامنه و SSL» دامنه‌های API/Web مدیریت می‌شوند.
+دامنه در نصب اولیه اجباری نیست. پنل ابتدا با IP عمومی سرور قابل استفاده است و دامنه/TLS را می‌توان بعداً از تنظیمات محصول مدیریت کرد.
 
 ## بروزرسانی
 
-ادمین داخل پنل وضعیت نسخه را می‌بیند. وقتی نسخه جدید Stable منتشر شود، اعلان بروزرسانی نمایش داده می‌شود و دکمه «بروزرسانی» فرآیند زیر را آغاز می‌کند:
+پنل همان Manifest رسمی Stable را بررسی می‌کند. وقتی نسخه جدید تأیید و منتشر شود، Updater دقیقاً Commit معرفی‌شده در Manifest را دریافت می‌کند.
 
-- Backup قبل از Upgrade
-- دریافت Release مجاز از سرویس انتشار
-- بررسی Hash
-- Build/Install نسخه جدید
+فرآیند بروزرسانی شامل موارد زیر است:
+
+- Backup قبل از Update
+- دریافت Commit دقیق نسخه با HTTPS
+- بررسی SHA واقعی Git
+- بررسی Version
+- نصب وابستگی‌ها و Build
+- تعویض اتمیک `/opt/twinpanel/current`
 - Restart سرویس‌ها
-- Health Check
-- Rollback خودکار در صورت شکست
+- Health Check وب و API
+- Rollback خودکار به نسخه قبلی در صورت شکست Health Check
 
-## Trial و License
+## لایسنس
 
-- Trial: دقیقاً 7 روز از اولین Activation موفق
-- 3 روز مانده: هشدار واضح
-- 24 ساعت مانده: هشدار ثابت
-- پایان Trial: ورود Admin، License Activation، Backup/Export و Diagnostics باز می‌ماند؛ عملیات مدیریتی جدید طبق Policy لایسنس محدود می‌شود
-- قطع موقت License Server نباید ترافیک VPN موجود را ناگهانی قطع کند؛ برای قطعی موقت Grace محدود در نظر گرفته می‌شود
+نسخه عمومی فعلی `1.1.0-rc.1` بدون اجبار به License Server قابل نصب است (`license_required: false`). زیرساخت Trial/License داخل محصول باقی می‌ماند تا بعداً بتوان سرویس مرکزی لایسنس را بدون تغییر دستور نصب یک‌خطی مشتری فعال کرد.
 
 ## مسیرهای مهم
 
 ```text
 /opt/twinpanel/current                 نسخه فعال
 /opt/twinpanel/releases                نسخه‌های نصب‌شده
+/opt/twinpanel/venv                    محیط Python
 /etc/twinpanel/backend.env             تنظیمات Backend
 /etc/twinpanel/frontend.env            تنظیمات Frontend
+/etc/twinpanel/install.env             تنظیمات Install/Release
 /var/lib/twinpanel-backups             بکاپ‌ها
-/var/lib/twinpanel-license             وضعیت محلی License
+/var/lib/twinpanel-license             وضعیت Release/License/Update
 /root/twinpanel-initial-admin.txt      اطلاعات Admin اولیه
+/usr/local/bin/twinpanel               دستور مدیریت SSH
+/usr/local/bin/tp                      نام کوتاه دستور مدیریت
 ```
 
 ## نکته امنیتی
 
-هیچ Token، License signing key، SSH private key، Telegram token، Database dump یا Production `.env` نباید داخل GitHub Commit شود.
+هیچ Production Secret، کلید خصوصی امضای License، SSH Private Key، Telegram Token، فایل `.env` واقعی، کلید خصوصی Certificate، Database Dump یا اطلاعات محرمانه مشتری نباید داخل GitHub Commit شود.
