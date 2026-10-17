@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.22",
-  "source_sha": "679f9d039a623b4924ef8639f6c05c311a094f22",
+  "version": "1.1.0-rc.24",
+  "source_sha": "c4744fbfaf6e69b339d334f1df4850665f97a753",
   "notes": {
-    "fa": "نسخه 1.1.0-rc.22 لایه پاپ‌آپ‌های پنل مدیریت را یکدست می‌کند: همه Modalها بالاتر از هدر و زیرمنوهای Sticky نمایش داده می‌شوند، اندازه‌های normal/wide/manage استاندارد شده‌اند، پنجره ساخت و ویرایش اشتراک جمع‌وجورتر و دارای اسکرول داخلی کنترل‌شده است، و رفتار موبایل/نمایشگرهای کوتاه بدون خروج پاپ‌آپ از Viewport اصلاح شده است.",
-    "en": "TwinPanel 1.1.0-rc.22 standardizes the admin modal layer: all dialogs render above sticky headers and navigation menus, normal/wide/manage sizes are normalized, subscription create/edit dialogs are more compact with controlled internal scrolling, and short-screen/mobile viewport behavior is corrected."
+    "fa": "نسخه 1.1.0-rc.24 قابلیت Smart Auto Bootstrap V24 را اضافه می‌کند: اگر پنل هیچ Logical Tunnel نداشته باشد و دقیقاً یک نود ایران Online و یک نود خروجی Online با دسترسی SSH ذخیره‌شده وجود داشته باشد، Manager به‌صورت امن یک Pair خودکار می‌سازد و آن را وارد مسیر نصب و ارزیابی Candidateهای GRE، GOST TUN/WSS، AmneziaWG و Netrix می‌کند. topology مبهم بدون تغییر باقی می‌ماند و هیچ مسیر قدیمی به‌صورت اجباری نصب نمی‌شود.",
+    "en": "TwinPanel 1.1.0-rc.24 adds Smart Auto Bootstrap V24: when no logical tunnel exists and exactly one online Iran node plus one online Exit node have saved SSH access, the manager safely creates one automatic logical pair and hands it to the existing GRE, GOST TUN/WSS, AmneziaWG and optional Netrix qualification pipeline. Ambiguous topologies remain untouched and no legacy data plane is force-installed."
   }
 }
