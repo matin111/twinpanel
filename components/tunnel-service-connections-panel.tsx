@@ -3,6 +3,7 @@
 import {useEffect,useMemo,useState} from "react";
 
 import {Badge} from "./ui";
+import {TunnelManageModalPolishV45} from "./tunnel-manage-modal-polish-v45";
 import {
   legacyControlApi,
   type TunnelServiceConnection,
@@ -187,7 +188,13 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
           `Xray reconciliation completed: ${migrated} updated, ${skipped} unchanged${errors.length?`, ${errors.length} errors`:""}.`,
         ),
       );
-      await load(true);
+
+      // Give the Exit listener and the Iran service route a short window to
+      // publish their final health after reconcile, then refresh the cards.
+      for(let i=0;i<6;i+=1){
+        await load(true);
+        await new Promise<void>(resolve=>window.setTimeout(resolve,1500));
+      }
     }
     catch(reason){
       setError(reason instanceof Error?reason.message:String(reason));
@@ -199,6 +206,8 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
 
   return (
     <div className="manage-card-section tunnel-service-connections-compact">
+      <TunnelManageModalPolishV45/>
+
       <div className="tunnel-service-compact-head">
         <div>
           <b>{pick("اتصال‌های عبوری", "Service connections")}</b>
