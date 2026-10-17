@@ -81,7 +81,7 @@ function Toggle({label,sub,checked,onChange}:{label:string;sub?:string;checked:b
 
 export function AdminPaymentsRuntime(){
   const {pick}=useI18n();
-  const [tab,setTab]=useState<"transactions"|"gateways">("transactions");
+  const [tab,setTab]=useState<"transactions"|"gateways">("gateways");
   const [rows,setRows]=useState<Intent[]>([]);
   const [settings,setSettings]=useState<PaymentSettings>(defaultSettings);
   const [liveRate,setLiveRate]=useState<LiveRate|null>(null);
@@ -166,8 +166,8 @@ export function AdminPaymentsRuntime(){
   const activeGateways=[settings.card_enabled,settings.usdt_bep20_enabled,settings.trx_tron_enabled,settings.bnb_bsc_enabled].filter(Boolean).length;
   const displayedRate=Number(liveRate?.rate_toman||settings.live_rate_toman||settings.usdt_rate_toman||0);
 
-  return <Shell active="/admin/payments"><div className="page adminPayments2027">
-    <div className="payPageHead"><div><span>{pick("مالی و فروش","Sales & Finance")}</span><h1>{pick("پرداخت‌ها و درگاه‌ها","Payments & Gateways")}</h1></div><button className="ghost" onClick={()=>void load()} disabled={loading||busy}>{pick("بروزرسانی","Refresh")}</button></div>
+  return <Shell active="/admin/payment-settings"><div className="page adminPayments2027">
+    <div className="payPageHead"><div><span>{pick("مالی و فروش","Sales & Finance")}</span><h1>{pick("تنظیمات پرداخت‌ها","Payment Settings")}</h1></div><button className="ghost" onClick={()=>void load()} disabled={loading||busy}>{pick("بروزرسانی","Refresh")}</button></div>
 
     {error&&<div className="runtime-error">{error}</div>}{ok&&<div className="runtime-success">{ok}</div>}
 

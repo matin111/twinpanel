@@ -40,6 +40,7 @@ const ResellerSectionRuntime=dynamic(()=>import("./reseller-runtime").then(m=>m.
 const StoreRuntime2027=dynamic(()=>import("./store-runtime").then(m=>m.StoreRuntime2027));
 const AdminDashboardRuntime=dynamic(()=>import("./admin-dashboard-runtime").then(m=>m.AdminDashboardRuntime));
 const PaymentsReviewRuntime=dynamic(()=>import("./payments-review-runtime").then(m=>m.PaymentsReviewRuntime));
+const AdminPaymentsRuntime=dynamic(()=>import("./admin-payments-runtime").then(m=>m.AdminPaymentsRuntime));
 
 const customerSections=new Set(["subscription","connection","usage","orders","wallet","payments","support","notifications","profile"]);
 const resellerSections=new Set(["customers","subscriptions","sales","wallet","orders","traffic","bot","notifications","settings"]);
@@ -80,6 +81,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="admin/tunnels") return admin(<TunnelsSimpleRuntimePage/>);
   if(key==="admin/tunnel-transports") return admin(<TunnelsSimpleRuntimePage/>);
   if(key==="admin/payments") return admin(<PaymentsReviewRuntime/>);
+  if(key==="admin/payment-settings") return admin(<AdminPaymentsRuntime/>);
   if(key==="admin/settings") return admin(<SettingsPage2027/>);
   if(key==="admin/system-health") return admin(<SystemHealthRuntimePage/>);
   if(key==="admin/notifications") return admin(<NotificationsRuntimePage/>);

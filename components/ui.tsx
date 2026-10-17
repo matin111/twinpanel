@@ -26,6 +26,7 @@ const menuGroups=[
   ]},
   {fa:"فروش و مالی",en:"Sales & Finance",items:[
     ["پرداخت‌ها","Payments","/admin/payments","◫"],
+    ["تنظیمات پرداخت","Payment Settings","/admin/payment-settings","⌁"],
     ["تأیید خودکار کارت","Auto Payment Verification","/admin/sms-reader","▤"],
     ["کدهای تخفیف","Discount Codes","/admin/discounts","％"],
     ["نمایندگی‌ها","Resellers","/admin/resellers","♜"],
