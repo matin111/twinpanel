@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import {AdminAuthGuard} from "./admin-auth-guard";
 import {AdminOperationFeedback} from "./admin-operation-feedback";
-import {AdminManualSubscriptionCreate} from "./admin-manual-subscription-create";
 import {Card,Shell} from "./ui";
 
 const TelegramManagerPage=dynamic(()=>import("./admin-control-screens").then(m=>m.TelegramManagerPage));
@@ -71,7 +70,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="register") return <RegisterPage2027/>;
   if(key==="admin") return admin(<AdminDashboardRuntime/>);
   if(key==="admin/users") return admin(<AdminUsersRuntime/>);
-  if(key==="admin/subscriptions") return admin(<><AdminManualSubscriptionCreate/><LegacySubscriptionsRuntimePage/></>);
+  if(key==="admin/subscriptions") return admin(<LegacySubscriptionsRuntimePage/>);
   if(key==="admin/subscription-tools") return admin(<SubscriptionToolsRuntimePage/>);
   if(key==="admin/plans") return admin(<LegacyPlansRuntimePage/>);
   if(key==="admin/nodes") return admin(<LegacyNodesRuntimePage/>);
