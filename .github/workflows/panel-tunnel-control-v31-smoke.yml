@@ -1,0 +1,46 @@
+name: Panel Tunnel Control V31 Smoke
+
+on:
+  pull_request:
+    branches:
+      - deploy/throughput-unknown-neutral-v30
+    paths:
+      - 'components/tunnels-simple-runtime.tsx'
+      - 'components/tunnels-panel-runtime-v31.tsx'
+      - 'lib/tunnel-transport-api.ts'
+      - '.github/workflows/panel-tunnel-control-v31-smoke.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Verify V31 panel runtime
+        run: |
+          grep -q 'TunnelsPanelRuntimeV31' components/tunnels-panel-runtime-v31.tsx
+          grep -q 'managedDiagnose' components/tunnels-panel-runtime-v31.tsx
+          grep -q 'managedRepair' components/tunnels-panel-runtime-v31.tsx
+          grep -q 'setMode' components/tunnels-panel-runtime-v31.tsx
+          grep -q 'installBackhaul' components/tunnels-panel-runtime-v31.tsx
+          grep -q 'installMtunnel' components/tunnels-panel-runtime-v31.tsx
+          grep -q 'installSsh' components/tunnels-panel-runtime-v31.tsx
+          grep -q 'TunnelsPanelRuntimeV31 as TunnelsSimpleRuntimePage' components/tunnels-simple-runtime.tsx
+
+      - name: Build UI
+        run: npm run build

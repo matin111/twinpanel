@@ -19,11 +19,23 @@ from .xray_modern_temp_config_runtime import (
 from .xray_node_domain_runtime import (
     apply_xray_node_domain_runtime,
 )
+from .xray_profile_reconcile_v36 import (
+    apply_xray_profile_reconcile_v36,
+)
 from .xray_public_delivery_runtime import (
     apply_xray_public_delivery_runtime,
 )
+from .xray_public_profile_policy_v38 import (
+    apply_xray_public_profile_policy_v38,
+)
 from .tunnel_service_connections_admin_runtime import (
     apply_tunnel_service_connections_admin_runtime,
+)
+from .service_speed_recovery_v36 import (
+    apply_service_speed_recovery_v36,
+)
+from .tp2027_egress_v37 import (
+    apply_tp2027_egress_v37,
 )
 from .manual_transport_report_guard_v22 import (
     apply_manual_transport_report_guard_v22,
@@ -199,10 +211,20 @@ def apply_self_hosted_runtime() -> None:
     # self-heal or JSON-temp behavior. Legacy public_domain remains a fallback.
     apply_xray_node_domain_runtime()
 
+    # V36 upgrades the meaning of "already modern": when an Exit gains a TLS
+    # domain later, existing Reality-only credentials are no longer skipped.
+    # Existing UUIDs are reused, so clients do not receive needless identities.
+    apply_xray_profile_reconcile_v36()
+
     # The public share page was imported before Modern Xray patched account
     # delivery. Rebind it to the final payload and expand nested Modern Xray
     # profiles into the existing server-tab UI. Legacy VLESS remains available.
     apply_xray_public_delivery_runtime()
+
+    # V38 customer policy: keep the proven WebSocket TLS profile first, hide
+    # XHTTP Reality from customers, and expose HTTPUpgrade TLS as the secure
+    # domain-backed fallback. Internal XHTTP runtime remains intact for rollback.
+    apply_xray_public_profile_policy_v38()
 
     # Some production installations intentionally carry a local main.py drift
     # that removed direct Xray router includes. Restore those routes through an
@@ -214,6 +236,16 @@ def apply_self_hosted_runtime() -> None:
     # legacy and modern Xray routes from the same source that feeds Agent
     # desired-state, while physical tunnel transports remain a separate model.
     apply_tunnel_service_connections_admin_runtime()
+
+    # V37 repairs the missing Exit egress path for TP2027 overlay networks and
+    # verifies real public egress before a transport can become active.
+    apply_tp2027_egress_v37()
+
+    # V36 keeps service forwarding entirely in the existing kernel iptables
+    # path. The panel can return a tunnel to AUTO, seed the best healthy member
+    # from fresh throughput/latency telemetry, and reconcile Xray profiles in a
+    # background job without keeping a long browser request open.
+    apply_service_speed_recovery_v36()
 
     # SSH TUN is controller-owned in the self-hosted product. V3 keeps all node
     # changes automatic, uses the V2 self-healing runtime, then performs a real
