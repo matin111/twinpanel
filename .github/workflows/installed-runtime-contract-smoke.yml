@@ -1,0 +1,63 @@
+name: TwinPanel Installed Runtime Contract Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'lib/api.ts'
+      - 'components/support-chat-widget-v2.tsx'
+      - 'app/v1/**'
+      - 'backend/scripts/twinpanel_feature_audit.py'
+      - '.github/workflows/installed-runtime-contract-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  portable-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify portable same-origin API contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          api = Path('lib/api.ts').read_text(encoding='utf-8')
+          assert 'browserOrigin' in api
+          assert '!configuredApiBase||isLoopbackApiBase' in api
+          assert 'window.location.origin' in api
+
+          proxy = Path('app/v1/[...path]/route.ts').read_text(encoding='utf-8')
+          assert 'TWINPANEL_BACKEND_URL' in proxy
+          assert 'http://127.0.0.1:8095' in proxy
+
+          audit = Path('backend/scripts/twinpanel_feature_audit.py').read_text(encoding='utf-8')
+          assert 'installed-read-only' in audit
+          assert 'feature.support' in audit
+          assert 'feature.telegram' in audit
+          assert 'feature.update_system' in audit
+          print('PORTABLE_RUNTIME_CONTRACT_OK')
+          PY
+
+      - name: Compile installed feature audit
+        run: python3 -m py_compile backend/scripts/twinpanel_feature_audit.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Build exact portable frontend mode
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_API_BASE: ''
+        run: npm run build
+
+      - name: Verify standalone frontend exists
+        run: test -f .next/standalone/server.js
