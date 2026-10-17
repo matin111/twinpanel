@@ -5,7 +5,11 @@ on:
     paths:
       - 'lib/api.ts'
       - 'components/support-chat-widget-v2.tsx'
+      - 'components/support-center-runtime-v3.tsx'
+      - 'components/ui.tsx'
       - 'app/v1/**'
+      - 'backend/app/routers/__init__.py'
+      - 'backend/app/routers/support_live_delta.py'
       - 'backend/scripts/twinpanel_feature_audit.py'
       - '.github/workflows/installed-runtime-contract-smoke.yml'
   workflow_dispatch:
@@ -35,11 +39,26 @@ jobs:
           assert 'feature.support' in audit
           assert 'feature.telegram' in audit
           assert 'feature.update_system' in audit
+
+          support_ui = Path('components/support-center-runtime-v3.tsx').read_text(encoding='utf-8')
+          support_delta = Path('backend/app/routers/support_live_delta.py').read_text(encoding='utf-8')
+          routers_init = Path('backend/app/routers/__init__.py').read_text(encoding='utf-8')
+          delta_path = '/tickets/{ticket_id}/messages-after'
+          assert '/messages-after?after_id=${after}' in support_ui
+          assert delta_path in support_delta
+          assert 'SupportMessage.id > after_id' in support_delta
+          assert 'support_live_delta' in routers_init
+
+          shell = Path('components/ui.tsx').read_text(encoding='utf-8')
+          assert '<main onPointerDown={closeMenus}>' in shell
+
           print('PORTABLE_RUNTIME_CONTRACT_OK')
           PY
 
-      - name: Compile installed feature audit
-        run: python3 -m py_compile backend/scripts/twinpanel_feature_audit.py
+      - name: Compile installed feature audit and support delta
+        run: |
+          python3 -m py_compile backend/scripts/twinpanel_feature_audit.py
+          python3 -m py_compile backend/app/routers/support_live_delta.py
 
       - uses: actions/setup-node@v4
         with:
