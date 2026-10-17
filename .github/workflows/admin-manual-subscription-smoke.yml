@@ -7,7 +7,7 @@ on:
       - 'backend/app/routers/subscription_admin_v2.py'
       - 'backend/app/services/subscription_factory.py'
       - 'backend/app/schemas.py'
-      - 'components/admin-manual-subscription-create.tsx'
+      - 'components/legacy-subscriptions-exact.tsx'
       - 'components/routed-page-client.tsx'
       - 'lib/admin-api.ts'
       - '.github/workflows/admin-manual-subscription-smoke.yml'
@@ -178,35 +178,30 @@ jobs:
           print('ADMIN_MANUAL_SUBSCRIPTION_RUNTIME_OK')
           PY
 
-      - name: Verify frontend manual-mode contract
+      - name: Verify single admin create entry contract
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
           api=Path('lib/admin-api.ts').read_text(encoding='utf-8')
           routed=Path('components/routed-page-client.tsx').read_text(encoding='utf-8')
-          manual=Path('components/admin-manual-subscription-create.tsx').read_text(encoding='utf-8')
+          subscriptions=Path('components/legacy-subscriptions-exact.tsx').read_text(encoding='utf-8')
           backend=Path('backend/app/routers/subscription_admin_v2.py').read_text(encoding='utf-8')
           schema=Path('backend/app/subscription_plan_schema.py').read_text(encoding='utf-8')
 
           assert 'plan_id?:number|null' in api
-          assert 'AdminManualSubscriptionCreate' in routed
-          assert '<AdminManualSubscriptionCreate/><LegacySubscriptionsRuntimePage/>' in routed
-          assert 'plan_id:null' in manual
-          assert 'اشتراک دستی' in manual
-          assert 'traffic_gb:trafficValue' in manual
-          assert 'duration_days:durationValue' in manual
-          assert 'protocols.length===0' in manual
-          assert 'window.location.reload()' in manual
-          assert 'subscription-create-action-group' in manual
-          assert 'original.style.display="none"' in manual
-          assert 'primaryAction?.click()' in manual
+          assert 'AdminManualSubscriptionCreate' not in routed
+          assert 'if(key==="admin/subscriptions") return admin(<LegacySubscriptionsRuntimePage/>);' in routed
+          assert 'onClick={openCreate}' in subscriptions
+          assert 'اشتراک جدید' in subscriptions
+          assert 'adminApi.createSubscriptionV2' in subscriptions
+          assert 'user_id:draft.user_id,plan_id:draft.plan_id' in subscriptions
           assert 'plan_id: int | None = None' in backend
           assert 'ensure_subscription_plan_schema()' in backend
           assert 'ALTER COLUMN plan_id DROP NOT NULL' in schema
           assert 'Subscription.__table__.c.plan_id.nullable = True' in schema
 
-          print('ADMIN_MANUAL_SUBSCRIPTION_FRONTEND_CONTRACT_OK')
+          print('ADMIN_SINGLE_SUBSCRIPTION_CREATE_ENTRY_OK')
           PY
 
       - uses: actions/setup-node@v4
