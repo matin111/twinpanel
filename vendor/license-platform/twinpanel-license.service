@@ -1,0 +1,20 @@
+[Unit]
+Description=TwinPanel Vendor License Platform
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/twinpanel-license/current
+EnvironmentFile=/etc/twinpanel-license/license.env
+ExecStart=/opt/twinpanel-license/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8181 --workers 1
+Restart=always
+RestartSec=4
+TimeoutStartSec=90
+TimeoutStopSec=30
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
