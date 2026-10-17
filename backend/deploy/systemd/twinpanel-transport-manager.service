@@ -5,18 +5,20 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/twinpanel-product/backend
-
-EnvironmentFile=/etc/twinpanel/backend.env
-Environment=PYTHONPATH=/opt/twinpanel-product/backend
+User=root
+Group=root
+WorkingDirectory=/opt/twinpanel/current/backend
+Environment=PYTHONPATH=/opt/twinpanel/current/backend
 Environment=PYTHONDONTWRITEBYTECODE=1
-
-ExecStart=/opt/twinpanel/venv/bin/python -u -m app.tunnel_transport_manager_v12
-
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=/etc/twinpanel/backend.env
+EnvironmentFile=-/etc/twinpanel/install.env
+ExecStartPre=/bin/sleep 2
+ExecStart=/opt/twinpanel/venv/bin/python3 -u -m app.tunnel_transport_manager_v12
 Restart=always
 RestartSec=3
 TimeoutStopSec=20
-
+LimitNOFILE=65535
 StandardOutput=journal
 StandardError=journal
 
