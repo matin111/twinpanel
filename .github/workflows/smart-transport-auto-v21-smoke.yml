@@ -6,6 +6,8 @@ on:
       - 'backend/app/smart_transport_auto_v21.py'
       - 'backend/app/tp2027_transport.py'
       - 'backend/app/tunnel_transport_manager_v12.py'
+      - 'backend/app/candidate_lifecycle_v21.py'
+      - 'backend/app/self_hosted_runtime.py'
       - 'backend/app/routers/modern_transports.py'
       - 'backend/deploy/systemd/twinpanel-transport-manager.service'
       - '.github/workflows/smart-transport-auto-v21-smoke.yml'
@@ -16,6 +18,8 @@ on:
       - 'backend/app/smart_transport_auto_v21.py'
       - 'backend/app/tp2027_transport.py'
       - 'backend/app/tunnel_transport_manager_v12.py'
+      - 'backend/app/candidate_lifecycle_v21.py'
+      - 'backend/app/self_hosted_runtime.py'
       - 'backend/app/routers/modern_transports.py'
       - 'backend/deploy/systemd/twinpanel-transport-manager.service'
       - '.github/workflows/smart-transport-auto-v21-smoke.yml'
@@ -41,6 +45,8 @@ jobs:
             backend/app/smart_transport_auto_v21.py \
             backend/app/tp2027_transport.py \
             backend/app/tunnel_transport_manager_v12.py \
+            backend/app/candidate_lifecycle_v21.py \
+            backend/app/self_hosted_runtime.py \
             backend/app/routers/modern_transports.py
 
       - name: Smart transport static contracts
@@ -51,6 +57,8 @@ jobs:
           smart = Path('backend/app/smart_transport_auto_v21.py').read_text()
           route = Path('backend/app/tp2027_transport.py').read_text()
           manager = Path('backend/app/tunnel_transport_manager_v12.py').read_text()
+          lifecycle = Path('backend/app/candidate_lifecycle_v21.py').read_text()
+          runtime = Path('backend/app/self_hosted_runtime.py').read_text()
           api = Path('backend/app/routers/modern_transports.py').read_text()
           unit = Path('backend/deploy/systemd/twinpanel-transport-manager.service').read_text()
 
@@ -65,6 +73,8 @@ jobs:
           assert 'known_bad_quic_0.6.1_frag_dataplane_idle_timeout' in smart
           assert 'CANDIDATE_STABLE_SECONDS = 60.0' in smart
           assert 'install_smart_transport_auto_v21()' in manager
+          assert 'cleanup_tunnel_runtime_v21' in lifecycle
+          assert 'cleanup_tunnel_runtime_v21' in runtime
           assert 'tunnel_transport_manager_v12' in unit
           assert '"selectable": qualified' in api
           assert 'selectable": False' not in api
