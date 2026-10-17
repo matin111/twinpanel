@@ -6,9 +6,11 @@ on:
       - 'lib/api.ts'
       - 'components/support-chat-widget-v2.tsx'
       - 'components/support-center-runtime-v3.tsx'
+      - 'components/system-release-footer.tsx'
       - 'components/ui.tsx'
       - 'app/v1/**'
       - 'backend/app/routers/__init__.py'
+      - 'backend/app/routers/support.py'
       - 'backend/app/routers/support_live_delta.py'
       - 'backend/scripts/twinpanel_feature_audit.py'
       - '.github/workflows/installed-runtime-contract-smoke.yml'
@@ -42,15 +44,36 @@ jobs:
 
           support_ui = Path('components/support-center-runtime-v3.tsx').read_text(encoding='utf-8')
           support_delta = Path('backend/app/routers/support_live_delta.py').read_text(encoding='utf-8')
+          support_backend = Path('backend/app/routers/support.py').read_text(encoding='utf-8')
+          support_widget = Path('components/support-chat-widget-v2.tsx').read_text(encoding='utf-8')
           routers_init = Path('backend/app/routers/__init__.py').read_text(encoding='utf-8')
+
           delta_path = '/tickets/{ticket_id}/messages-after'
           assert '/messages-after?after_id=${after}' in support_ui
           assert delta_path in support_delta
           assert 'SupportMessage.id > after_id' in support_delta
+          assert '.order_by(SupportMessage.id.asc())' in support_delta
           assert 'support_live_delta' in routers_init
+
+          assert '`/v1/support/tickets/${current.id}`' in support_widget
+          assert '`/v1/support/guest/tickets/${saved.ticketId}`' in support_widget
+          assert 'window.setInterval(()=>{if(document.visibilityState==="visible")void refresh(true);},500)' in support_widget
+          assert 'playNotificationSound("message")' in support_widget
+          assert '@router.get("/tickets/{ticket_id}")' in support_backend
+          assert '@router.get("/guest/tickets/{ticket_id}")' in support_backend
 
           shell = Path('components/ui.tsx').read_text(encoding='utf-8')
           assert '<main onPointerDown={closeMenus}>' in shell
+
+          release_ui = Path('components/system-release-footer.tsx').read_text(encoding='utf-8')
+          assert 'lastHealthyRef=useRef<ReleaseStatus|null>(null)' in release_ui
+          assert 'transientSinceRef=useRef<number|null>(null)' in release_ui
+          assert 'TRANSIENT_API_GRACE_MS=30*1000' in release_ui
+          assert 'marker.reload_from!==pageInstanceRef.current' in release_ui
+          assert 'markRecoveryReloadRequested(pageInstanceRef.current)' in release_ui
+          assert 'if(marker)return;' in release_ui
+          assert '[502,503,504].includes(reason.status)' in release_ui
+          assert 'window.setInterval(checkNow,60000)' in release_ui
 
           print('PORTABLE_RUNTIME_CONTRACT_OK')
           PY
