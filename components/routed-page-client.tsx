@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import {AdminAuthGuard} from "./admin-auth-guard";
+import {AdminOperationFeedback} from "./admin-operation-feedback";
 import {Card,Shell} from "./ui";
 
 const TelegramManagerPage=dynamic(()=>import("./admin-control-screens").then(m=>m.TelegramManagerPage));
@@ -46,7 +47,7 @@ const DownloadAssetsRuntime=dynamic(()=>import("./download-assets-runtime").then
 
 const customerSections=new Set(["subscription","connection","usage","orders","wallet","payments","support","notifications","profile"]);
 const resellerSections=new Set(["customers","subscriptions","sales","wallet","orders","traffic","bot","notifications","settings"]);
-const admin=(node:React.ReactNode)=><AdminAuthGuard>{node}</AdminAuthGuard>;
+const admin=(node:React.ReactNode)=><AdminAuthGuard><AdminOperationFeedback/>{node}</AdminAuthGuard>;
 
 function AdminUnknownRoute(){
   return (
