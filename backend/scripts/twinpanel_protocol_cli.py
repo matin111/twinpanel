@@ -115,6 +115,27 @@ def _settings_for(protocol: str, item: NodeProtocolConfig | None) -> ProtocolSet
     return ProtocolSettings(**kwargs)
 
 
+def _release_db_transaction(db) -> None:
+    """Release checked-out DB connection before slow local/SSH I/O.
+
+    SessionLocal uses expire_on_commit=False, so already-loaded Node and
+    NodeProtocolConfig values remain usable after this commit. This prevents an
+    idle transaction from being held while apt/systemd/network commands run.
+    """
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def _rollback_db(db) -> None:
+    try:
+        db.rollback()
+    except Exception:
+        pass
+
+
 async def _backup_protocol(conn, protocol: str) -> str:
     stamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
     base = f"/var/lib/twinpanel-protocol-backups/{stamp}-{protocol}"
@@ -177,8 +198,21 @@ async def _remove_runtime(conn, protocol: str, item: NodeProtocolConfig | None) 
 async def _run(db, node: Node, protocol: str, action: str) -> dict:
     stored = _protocol_settings_from_db(db, node.id)
     item = stored.get(protocol)
-    conn = await connection_for_node(node, db)
+
+    # The settings query above starts a SQLAlchemy transaction. Never keep that
+    # transaction checked out while apt/systemd/SSH commands can run for
+    # minutes. SessionLocal is expire_on_commit=False, so item/node remain safe
+    # to read after releasing the connection back to the pool.
+    _release_db_transaction(db)
+
+    conn = None
     try:
+        conn = await connection_for_node(node, db)
+
+        # Remote targets read NodeAccess before connecting. Release that short
+        # lookup transaction before protocol commands begin as well.
+        _release_db_transaction(db)
+
         if action == "status":
             result = await _protocol_live_health(conn, protocol, item)
             _save_live_health(db, node, protocol, result)
@@ -198,15 +232,25 @@ async def _run(db, node: Node, protocol: str, action: str) -> dict:
                 current = await _protocol_live_health(conn, protocol, item)
                 if current.get("ok"):
                     return {"ok": True, "action": action, "protocol": protocol, "target": "local" if node.is_mother else "remote", "skipped": True, "reason": "already_healthy", "result": current}
+
             settings = _settings_for(protocol, item)
-            results, failed, secrets_out = await provision_protocols(
-                conn,
-                settings,
-                db,
-                node,
-                repair=(action == "repair"),
-            )
+            try:
+                results, failed, secrets_out = await provision_protocols(
+                    conn,
+                    settings,
+                    db,
+                    node,
+                    repair=(action == "repair"),
+                )
+            except Exception:
+                # A failed flush/commit leaves a SQLAlchemy Session unusable
+                # until rollback. Clean it here before returning control to the
+                # menu instead of leaking PendingRollbackError.
+                _rollback_db(db)
+                raise
+
             fresh_item = _protocol_settings_from_db(db, node.id).get(protocol)
+            _release_db_transaction(db)
             health = await _protocol_live_health(conn, protocol, fresh_item)
             _save_live_health(db, node, protocol, health)
             db.commit()
@@ -233,9 +277,13 @@ async def _run(db, node: Node, protocol: str, action: str) -> dict:
             return {"ok": True, "action": action, "protocol": protocol, "target": "local" if node.is_mother else "remote", "backup": backup}
 
         raise RuntimeError("INVALID_ACTION")
+    except Exception:
+        _rollback_db(db)
+        raise
     finally:
-        conn.close()
-        await conn.wait_closed()
+        if conn is not None:
+            conn.close()
+            await conn.wait_closed()
 
 
 def main() -> int:
@@ -258,9 +306,11 @@ def main() -> int:
         print(json.dumps(result, ensure_ascii=True, indent=2, default=str))
         return 0 if result.get("ok") else 1
     except KeyboardInterrupt:
+        _rollback_db(db)
         print("\nCancelled")
         return 130
     except Exception as exc:
+        _rollback_db(db)
         print(f"ERROR={exc}", file=sys.stderr)
         return 1
     finally:

@@ -1,0 +1,52 @@
+name: TwinPanel Protocol DB Transaction Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/scripts/twinpanel_protocol_cli.py"
+      - "backend/scripts/twinpanel_protocol_cli_en.py"
+      - ".github/workflows/protocol-db-transaction-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile protocol CLIs
+        run: |
+          python3 -m py_compile backend/scripts/twinpanel_protocol_cli.py
+          python3 -m py_compile backend/scripts/twinpanel_protocol_cli_en.py
+
+      - name: Verify transaction boundaries
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          core = Path("backend/scripts/twinpanel_protocol_cli.py").read_text(encoding="utf-8")
+          english = Path("backend/scripts/twinpanel_protocol_cli_en.py").read_text(encoding="utf-8")
+
+          assert "def _release_db_transaction(db)" in core
+          assert "def _rollback_db(db)" in core
+
+          run_start = core.index("async def _run(")
+          run_body = core[run_start:]
+
+          settings_read = run_body.index("_protocol_settings_from_db(db, node.id)")
+          first_release = run_body.index("_release_db_transaction(db)", settings_read)
+          connect = run_body.index("connection_for_node(node, db)")
+          second_release = run_body.index("_release_db_transaction(db)", connect)
+          provision = run_body.index("await provision_protocols(")
+          fresh_read = run_body.index("fresh_item = _protocol_settings_from_db", provision)
+          fresh_release = run_body.index("_release_db_transaction(db)", fresh_read)
+          health = run_body.index("health = await _protocol_live_health", fresh_read)
+
+          assert settings_read < first_release < connect < second_release < provision
+          assert fresh_read < fresh_release < health
+          assert run_body.count("_rollback_db(db)") >= 2
+
+          assert "Database transaction was interrupted and rolled back. Retry the action." in english
+          print("PROTOCOL_DB_TRANSACTION_GUARDS_OK")
+          PY

@@ -71,7 +71,14 @@ def _friendly_error(exc: Exception) -> str:
         "NODE_NOT_FOUND": "Protocol target not found.",
         "INVALID_ACTION": "Invalid action selection.",
     }
-    return mapping.get(value, f"ERROR={_ascii(exc)}")
+    if value in mapping:
+        return mapping[value]
+
+    lowered = value.lower()
+    if "invalid transaction" in lowered or "rollback()" in lowered or "pendingrollback" in lowered:
+        return "Database transaction was interrupted and rolled back. Retry the action."
+
+    return f"ERROR={_ascii(exc)}"
 
 
 def main() -> int:
