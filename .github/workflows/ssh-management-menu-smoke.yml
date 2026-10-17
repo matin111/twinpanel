@@ -69,6 +69,7 @@ jobs:
           assert "restart_nginx || true" in menu
 
           protocol = protocol_path.read_text(encoding="utf-8")
+          assert 'print("\\nAvailable protocols")' not in protocol
           main_start = protocol.index("def main()")
           main_body = protocol[main_start:]
           assert main_body.index("_select_protocol()") < main_body.index("_select_node(db)")
