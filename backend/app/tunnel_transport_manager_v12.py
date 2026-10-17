@@ -7,6 +7,7 @@ from .legacy_ingress_reconciler import reconciler_loop as legacy_ingress_loop
 from .runtime_reconciler_v3 import reconciler_loop as runtime_reconciler_loop
 from .manager_runtime_v16 import install_manager_runtime_v16
 from .smart_transport_auto_v21 import install_smart_transport_auto_v21
+from .smart_auto_bootstrap_v24 import reconciler_loop as smart_bootstrap_loop
 
 
 # ============================================================
@@ -17,7 +18,13 @@ from .smart_transport_auto_v21 import install_smart_transport_auto_v21
 # Runtime Reconciler V3 extends orphan cleanup to every Smart Auto candidate
 # while retaining the existing DB-authority and two-pass deletion guard.
 #
-# Smart Auto owns only transport qualification/selection:
+# Smart Auto Bootstrap V24 handles the empty-topology first-run case safely:
+# when no logical tunnel exists and exactly one ONLINE Iran + one ONLINE Exit
+# both have saved SSH access, it creates one AUTO logical pair and a disabled
+# seed row. It never guesses across multiple nodes and never installs a legacy
+# data plane itself.
+#
+# Smart Auto owns transport qualification/selection:
 #   * installs isolated modern L3 candidates (GRE, GOST TUN/WSS,
 #     AmneziaWG and licensed Netrix when available);
 #   * validates peer + TCP egress + UDP egress;
@@ -35,19 +42,21 @@ from .smart_transport_auto_v21 import install_smart_transport_auto_v21
 
 
 async def main() -> None:
-    # Keep all V16 self-hosted installer and shared-Iran safety hooks.
     install_manager_runtime_v16()
-
-    # Smart Auto must be installed AFTER V16 so its selector/probe wrappers are
-    # the final authoritative manager policy while retaining V16 plumbing.
     install_smart_transport_auto_v21()
 
     print(
         "TWINPANEL_TRANSPORT_MANAGER_V12_START "
         "policy=smart-speed-health "
+        "bootstrap=v24 "
         "reconciler=v3 "
         "candidates=kernel_gre,gost_tun,amneziawg,netrix",
         flush=True,
+    )
+
+    bootstrap_task = asyncio.create_task(
+        smart_bootstrap_loop(),
+        name="twinpanel-smart-auto-bootstrap-v24",
     )
 
     manager_task = asyncio.create_task(
@@ -66,6 +75,7 @@ async def main() -> None:
     )
 
     tasks = {
+        bootstrap_task,
         manager_task,
         runtime_task,
         legacy_ingress_task,
