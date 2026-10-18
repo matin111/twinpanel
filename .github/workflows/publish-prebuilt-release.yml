@@ -163,6 +163,7 @@ jobs:
             --clobber
 
       - name: Publish stable manifest only after artifact exists
+        working-directory: publisher
         env:
           VERSION: ${{ steps.candidate.outputs.version }}
           SOURCE_SHA: ${{ steps.candidate.outputs.source_sha }}
