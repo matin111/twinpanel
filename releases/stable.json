@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.35",
+  "version": "1.1.0-rc.36",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-18T10:44:47Z",
+  "released_at": "2026-10-18T10:49:21Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "330a9d66d4bf789433751f012070662a4cd21739",
+  "source_sha": "10459c52c94b5546956f47cde15c3ce019330dd6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.35/twinpanel-1.1.0-rc.35-linux-x86_64.tar.gz",
-    "sha256": "7d729e9b439fbb827b521c55126f7695777e589dfe9c4535ea33facf40584a55",
-    "size_bytes": 12616822
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.36/twinpanel-1.1.0-rc.36-linux-x86_64.tar.gz",
+    "sha256": "71a639f8c8364377fa32c88c7bb11451814fb663173347c5f643375812156787",
+    "size_bytes": 12615925
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.35 خطای مرحله دوم ساخت سرویس پس از فعال‌سازی سفارش را برطرف می‌کند. در نسخه قبل ممکن بود اکانت و کانفیگ‌های قابل استفاده واقعاً ساخته شوند اما وجود یک هشدار غیرمسدودکننده مثل خطای یک نود فرعی یا همگام‌سازی Quota باعث شود کل سفارش provision_failed اعلام شود و پیام «پرداخت ثبت شد اما ساخت اکانت کامل نشد» نمایش داده شود. این نسخه آمادگی تحویل را بر اساس کانفیگ‌های واقعی و قابل استفاده کاربر می‌سنجد: اگر برای تمام پروتکل‌های درخواست‌شده حداقل یک کانفیگ سالم وجود داشته باشد سفارش تکمیل می‌شود و هشدارهای جانبی مانع تحویل نمی‌شوند. همچنین قبل از تکرار Provision، کانفیگ‌های موجود بررسی می‌شوند تا سفارش‌های قبلاً نیمه‌موفق بدون اجرای دوباره عملیات روی سرورها بازیابی شوند؛ این موضوع به‌ویژه از ساخت Peer اضافه WireGuard جلوگیری می‌کند. اگر حتی یکی از پروتکل‌های درخواست‌شده هیچ کانفیگ قابل استفاده‌ای نداشته باشد، خطا همچنان واقعی و مسدودکننده باقی می‌ماند. اصلاحات rc.34 برای سفارش رایگان و همه قابلیت‌های پرداخت، رسید، Xray و Update بدون تغییر حفظ شده‌اند.",
-    "en": "TwinPanel 1.1.0-rc.35 fixes the second-stage provisioning false failure after checkout activation. A previous attempt could successfully create usable customer credentials yet still fail the whole order because `provision_account` reported a non-blocking warning such as one secondary node failure or quota refresh warning. Delivery readiness is now determined from the actual filtered customer-facing credentials: when every requested protocol has at least one usable credential, the order is fulfilled and side warnings no longer block delivery. Before replaying remote provisioning, TwinPanel also inspects existing delivery credentials and safely recovers previously failed orders, preventing unnecessary re-provisioning and especially duplicate WireGuard peers. A genuinely missing requested protocol still fails the order. All rc.34 free-order checkout behavior plus existing payment, receipt, Xray and updater protections are retained."
+    "fa": "نسخه 1.1.0-rc.36 دامنه اختصاصی V2Ray/Xray را مستقیماً داخل همان پنجره مدیریت نود خروجی قرار می‌دهد. دامنه عمومی نود و دامنه Xray اکنون کاملاً جدا و با عنوان‌های واضح نمایش داده می‌شوند؛ برای Exitهایی که V2Ray فعال دارند، ردیف و دکمه «دامنه Xray» در خود پنجره مدیریت وجود دارد و می‌توان دامنه را مستقل ذخیره کرد یا با «ذخیره و آماده‌سازی TLS» گواهی و پروفایل‌های Xray را Reconcile کرد. دامنه موثر Xray، وضعیت TLS و fallback دامنه عمومی نیز همان‌جا قابل مشاهده است و کارت جداگانه قدیمی از صفحه نودها حذف شده تا دو محل موازی برای یک تنظیم وجود نداشته باشد. تمام اصلاحات rc.35 برای بازیابی امن Provision، جلوگیری از ساخت کانفیگ یا Peer تکراری، اصلاحات پرداخت/سفارش و سازگاری Xray 26.3.x بدون تغییر حفظ شده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.36 moves the dedicated V2Ray/Xray domain directly into the existing Exit-node management dialog. The Node public domain and Xray domain are now clearly separated; Exit nodes with V2Ray enabled expose an Xray-domain row and action in the same dialog, with independent save and Save & prepare TLS flows that reconcile the Xray certificate and profiles. The effective Xray domain, TLS readiness and legacy public-domain fallback are visible in place, and the redundant standalone Xray-domain card has been removed so there is only one operational control surface. All rc.35 safe provisioning recovery, duplicate credential/peer prevention, payment/order fixes and Xray 26.3.x compatibility changes are retained unchanged."
   }
 }
