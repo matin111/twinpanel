@@ -127,6 +127,26 @@ async function resellerSubscriptions():Promise<ResellerRow[]>{
   });
 }
 
+async function setOwnedPlanPrice(planId:number,sellPrice:number):Promise<ResellerRow>{
+  const value=Number(sellPrice);
+  if(!Number.isFinite(value)||value<0)throw new Error("INVALID_SELL_PRICE");
+
+  const ownedPlans=await request<ResellerRow[]>("/v1/reseller/owned-plans");
+  const target=ownedPlans.find(row=>{
+    const ownedId=Number(row.reseller_plan_id??row.id??0);
+    const backingId=Number(row.backing_plan_id??row.plan_id??0);
+    return ownedId===Number(planId)||backingId===Number(planId);
+  });
+
+  const ownedId=Number(target?.reseller_plan_id??target?.id??0);
+  if(!ownedId)throw new Error("RESELLER_PLAN_NOT_FOUND");
+
+  return request<ResellerRow>(`/v1/reseller/owned-plans/${ownedId}`,{
+    method:"PATCH",
+    body:JSON.stringify({sell_price_toman:Math.trunc(value)})
+  });
+}
+
 export const resellerApi={
   me:()=>request<ResellerRow>("/v1/reseller/me"),
   dashboard:()=>request<ResellerRow>("/v1/reseller/dashboard"),
@@ -153,7 +173,7 @@ export const resellerApi={
   disablePlan:(planId:number)=>request<ResellerRow>(`/v1/reseller/owned-plans/${planId}`,{method:"PATCH",body:JSON.stringify({is_active:false})}),
   enablePlan:(planId:number)=>request<ResellerRow>(`/v1/reseller/owned-plans/${planId}`,{method:"PATCH",body:JSON.stringify({is_active:true})}),
   deletePlan:(planId:number)=>request<ResellerRow>(`/v1/reseller/owned-plans/${planId}`,{method:"DELETE"}),
-  setPlanPrice:(planId:number,sellPrice:number)=>request<ResellerRow>(`/v1/reseller/plans/${planId}/price`,{method:"PUT",body:JSON.stringify({plan_id:planId,sell_price_toman:sellPrice})}),
+  setPlanPrice:setOwnedPlanPrice,
 
   serverOptions:()=>request<ResellerRow>("/v1/reseller/server-options"),
   traffic:()=>request<ResellerRow>("/v1/reseller/traffic"),
