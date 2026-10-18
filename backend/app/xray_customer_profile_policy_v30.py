@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from fastapi import Depends
+from sqlalchemy.orm import Session
+
 from . import (
     tunnel_service_connections_admin_runtime,
     xray_modern_admin,
@@ -10,8 +13,13 @@ from . import (
     xray_profile_reconcile_v36,
     xray_public_delivery_runtime,
 )
+from .database import get_db
 from .routers import provision
-from .xray_tcp_tls_v39 import PROFILE_TCP_TLS, _tcp_tls_target_port
+from .xray_tcp_tls_v39 import (
+    PROFILE_TCP_TLS,
+    _tcp_tls_public_port,
+    _tcp_tls_target_port,
+)
 
 
 # ============================================================
@@ -88,7 +96,7 @@ def _admin_profile_rows_v30(node, base_port: int) -> list[dict[str, Any]]:
         "recommended": False,
         "requires_tls_domain": True,
         "target_port": _tcp_tls_target_port(int(base_port)),
-        "tunnel_public_port": 28000 + int(node.id),
+        "tunnel_public_port": _tcp_tls_public_port(int(node.id)),
     }
 
     # The admin profile catalog should mirror the customer-safe policy. Hidden
@@ -129,7 +137,10 @@ async def _admin_status_remote_v30(conn, base_port: int) -> dict[str, Any]:
     return state
 
 
-async def _service_connections_v30(tunnel_id: int, db):
+async def _service_connections_v30(
+    tunnel_id: int,
+    db: Session = Depends(get_db),
+):
     assert _original_service_connections is not None
 
     payload = dict(
