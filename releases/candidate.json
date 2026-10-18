@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.31",
-  "source_sha": "02a7ce77f8a2a9f6c55738965c27856269c92a2b",
+  "version": "1.1.0-rc.32",
+  "source_sha": "9f54d25cab68fd669a69a88a5a256e73927964f6",
   "notes": {
-    "fa": "نسخه 1.1.0-rc.31 سیاست نهایی Xray را برمی‌گرداند: WebSocket TLS، HTTPUpgrade TLS و VLESS TCP TLS پروفایل‌های قابل‌تحویل به کاربر هستند. gRPC Reality، XHTTP Reality و VLESS Legacy/plain فقط برای Rollback و Diagnostic داخلی حفظ می‌شوند و دیگر در کارت‌های عادی اتصال یا تحویل اکانت ظاهر نمی‌شوند. Runtime اختصاصی دامنه Xray، موتور TCP TLS V39، سازگاری V44 برای Xray 26.3.x و preflight مربوط به listener دوباره روی lineage فعلی فعال شده‌اند. UUIDهای موجود، listenerهای قدیمی، کلیدها و تنظیمات سالم حذف یا بازتولید نمی‌شوند. این نسخه همچنین اصلاحات تاییدشده rc.30 و routing پنل کاربری را حفظ می‌کند.",
-    "en": "TwinPanel 1.1.0-rc.31 restores the final Xray customer policy: WebSocket TLS, HTTPUpgrade TLS and VLESS TCP TLS are the customer-deliverable profiles. gRPC Reality, XHTTP Reality and legacy/plain VLESS remain internal-only for rollback and diagnostics and are no longer exposed in normal connection cards or account delivery. The dedicated Xray-domain runtime, V39 TCP TLS engine, V44 Xray 26.3.x compatibility and listener preflight are restored on the current lineage. Existing UUIDs, legacy listeners, keys and healthy settings are preserved. The verified rc.30 and customer-portal routing fixes are retained."
+    "fa": "نسخه 1.1.0-rc.32 نمایش خام خطاهای 502/503/504 Nginx را هنگام Restart موقت API برطرف می‌کند. کلاینت مدیریت دیگر HTML خطای Gateway را به کاربر نشان نمی‌دهد؛ درخواست‌های امن GET در قطعی کوتاه با Backoff محدود دوباره امتحان می‌شوند، اما POST/PUT/PATCH/DELETE هرگز خودکار تکرار نمی‌شوند تا عملیات مدیریتی دوبار اجرا نشود. منطق بازیابی بروزرسانی و سیاست تاییدشده Xray نسخه rc.31 بدون تغییر حفظ شده‌اند: WebSocket TLS، HTTPUpgrade TLS و VLESS TCP TLS برای کاربر و gRPC Reality/XHTTP Reality/VLESS Legacy فقط داخلی هستند.",
+    "en": "TwinPanel 1.1.0-rc.32 prevents raw Nginx 502/503/504 gateway HTML from leaking into the admin UI during short API restarts. Safe GET requests use bounded transient retry/backoff, while POST/PUT/PATCH/DELETE are never replayed automatically, avoiding duplicate administrative mutations after ambiguous gateway failures. Existing updater recovery behavior and the validated rc.31 Xray policy remain unchanged: WebSocket TLS, HTTPUpgrade TLS and VLESS TCP TLS are customer-facing while gRPC Reality, XHTTP Reality and VLESS Legacy remain internal-only."
   }
 }
