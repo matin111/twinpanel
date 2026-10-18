@@ -22,14 +22,16 @@ _PROTOCOL_TO_QUOTA = {
 def _quota_device_for_credential(
     db: Session,
     credential: ProtocolCredential,
-) -> QuotaDevice:
+) -> QuotaDevice | None:
     """Return the canonical quota device for one protocol credential.
 
-    QuotaSession.device_id is a foreign key to quota_devices.id.  Older node
+    QuotaSession.device_id is a foreign key to quota_devices.id. Older node
     config generation accidentally exported ProtocolCredential.id instead,
-    causing every real session-open/usage event to be rejected as
-    device_not_allowed.  Existing installations may also predate automatic
-    QuotaDevice creation, so this function performs an idempotent lazy backfill.
+    causing real session-open/usage events to fail device validation.
+
+    Existing installations may predate automatic QuotaDevice creation, so a
+    missing device is backfilled. An existing revoked/inactive device is never
+    reactivated here; that remains an enforcement decision.
     """
 
     source_protocol = str(credential.protocol or "").strip().lower()
@@ -39,13 +41,14 @@ def _quota_device_for_credential(
         .filter(
             QuotaDevice.subscription_id == int(credential.subscription_id),
             QuotaDevice.protocol == source_protocol,
-            QuotaDevice.status == "active",
         )
         .order_by(QuotaDevice.id.asc())
         .first()
     )
 
     if device is not None:
+        if str(device.status or "").strip().lower() != "active":
+            return None
         return device
 
     device = QuotaDevice(
@@ -95,6 +98,8 @@ def build_node_devices(db: Session, node_id: int):
         seen.add(dedupe_key)
 
         device = _quota_device_for_credential(db, credential)
+        if device is None:
+            continue
 
         result.append(
             {
