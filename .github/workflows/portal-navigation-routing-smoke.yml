@@ -1,0 +1,120 @@
+name: TwinPanel Portal Navigation Routing Smoke
+
+on:
+  pull_request:
+    paths:
+      - "components/routed-page-client.tsx"
+      - "components/portal-shells.tsx"
+      - "app/portal-topnav-2027.css"
+      - "app/layout.tsx"
+      - ".github/workflows/portal-navigation-routing-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "components/routed-page-client.tsx"
+      - "components/portal-shells.tsx"
+      - "app/portal-topnav-2027.css"
+      - "app/layout.tsx"
+      - ".github/workflows/portal-navigation-routing-smoke.yml"
+
+jobs:
+  portal-navigation-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify every reseller menu route has a dedicated runtime
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          routes = Path("components/routed-page-client.tsx").read_text(encoding="utf-8")
+          expected = {
+              "reseller": "ResellerDashboardV3",
+              "reseller/subscriptions": "ResellerSubscriptionsParityRuntime",
+              "reseller/sales": "ResellerSubscriptionPlansV3",
+              "reseller/wallet": "ResellerWalletRuntime",
+              "reseller/bot-wallet": "ResellerBotWalletRuntime",
+              "reseller/traffic": "ResellerTrafficRechargeV3",
+              "reseller/orders": "ResellerOrdersParityRuntime",
+              "reseller/discounts": "ResellerDiscountsParityRuntime",
+              "reseller/bot": "ResellerBotParityRuntime",
+              "reseller/notifications": "ResellerNotificationsLive",
+              "reseller/settings": "ResellerSettingsParityV2",
+          }
+          missing = []
+          for key, component in expected.items():
+              needle = f'if(key==="{key}") return <{component}/>'
+              if needle not in routes:
+                  missing.append(needle)
+          if missing:
+              raise SystemExit("missing dedicated reseller routes: " + repr(missing))
+
+          shell = Path("components/portal-shells.tsx").read_text(encoding="utf-8")
+          menu_routes = [
+              "/reseller",
+              "/reseller/subscriptions",
+              "/reseller/sales",
+              "/reseller/wallet",
+              "/reseller/bot-wallet",
+              "/reseller/traffic",
+              "/reseller/orders",
+              "/reseller/discounts",
+              "/reseller/bot",
+              "/reseller/notifications",
+              "/reseller/settings",
+          ]
+          for href in menu_routes:
+              if f'"{href}"' not in shell:
+                  raise SystemExit(f"reseller menu link missing: {href}")
+          print("reseller menu routing contract OK")
+          PY
+
+      - name: Verify customer and reseller menus use centered top navigation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          shell = Path("components/portal-shells.tsx").read_text(encoding="utf-8")
+          css = Path("app/portal-topnav-2027.css").read_text(encoding="utf-8")
+          layout = Path("app/layout.tsx").read_text(encoding="utf-8")
+          required_shell = [
+              "function PortalTopNav",
+              "customerGroups",
+              "resellerGroups",
+              'className="customer-portal-topnav"',
+              'className="customer-portal-primarybar"',
+              'className="customer-portal-utilitybar"',
+              "PortalMobileDrawer",
+          ]
+          required_css = [
+              ".customer-portal-topnav{",
+              "left:50%;",
+              "transform:translate(-50%,-50%);",
+              ".customer-portal-topnav-group",
+              "@media(max-width:900px)",
+              ".customer-portal-mobile-backdrop",
+          ]
+          missing = [x for x in required_shell if x not in shell]
+          missing += [x for x in required_css if x not in css]
+          if 'import "./portal-topnav-2027.css";' not in layout:
+              missing.append("portal topnav stylesheet import")
+          if missing:
+              raise SystemExit("portal topnav contract missing: " + repr(missing))
+          print("portal centered top navigation contract OK")
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional
+          else
+            npm install --include=optional --no-audit --no-fund
+          fi
+
+      - name: Build frontend
+        run: npm run build
