@@ -156,13 +156,13 @@ def public_connection_page_live_v4(token: str, db: Session = Depends(get_db)):
     )
     source = re.sub(
         r'<div class="donut" style="--pct:([^"]*)">',
-        r'<div id="trafficDonut" class="donut" style="--pct:\1">',
+        lambda match: f'<div id="trafficDonut" class="donut" style="--pct:{match.group(1)}">',
         source,
         count=1,
     )
     source = re.sub(
         r'(<div id="trafficDonut"[^>]*><div><b)(>)([^<]*)(</b>)',
-        r'\1 id="livePercent"\2\3\4',
+        lambda match: f'{match.group(1)} id="livePercent"{match.group(2)}{match.group(3)}{match.group(4)}',
         source,
         count=1,
     )
@@ -179,7 +179,7 @@ def public_connection_page_live_v4(token: str, db: Session = Depends(get_db)):
 
     source = re.sub(
         r'<span class="status (on|off)">',
-        r'<span id="liveStatus" class="status \1">',
+        lambda match: f'<span id="liveStatus" class="status {match.group(1)}">',
         source,
         count=1,
     )
@@ -187,14 +187,14 @@ def public_connection_page_live_v4(token: str, db: Session = Depends(get_db)):
     if getattr(sub, "starts_at", None) is None:
         source = re.sub(
             r'(<strong id="liveStart">)[^<]*(</strong>)',
-            r'\1—\2',
+            lambda match: f'{match.group(1)}—{match.group(2)}',
             source,
             count=1,
         )
     if getattr(sub, "expires_at", None) is None:
         source = re.sub(
             r'(<strong id="liveExpire">)[^<]*(</strong>)',
-            r'\1—\2',
+            lambda match: f'{match.group(1)}—{match.group(2)}',
             source,
             count=1,
         )
