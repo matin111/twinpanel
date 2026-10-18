@@ -1,0 +1,72 @@
+name: TwinPanel Customer Portal Routing Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/routed-page-client.tsx'
+      - 'components/customer-buy-runtime.tsx'
+      - 'components/customer-subscriptions-runtime.tsx'
+      - 'components/customer-payments-runtime.tsx'
+      - 'components/customer-runtime.tsx'
+      - 'components/portal-shells.tsx'
+      - '.github/workflows/customer-portal-routing-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  customer-routing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify customer portal route contracts
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          routed=Path('components/routed-page-client.tsx').read_text(encoding='utf-8')
+          generic=Path('components/customer-runtime.tsx').read_text(encoding='utf-8')
+          buy=Path('components/customer-buy-runtime.tsx').read_text(encoding='utf-8')
+          subscriptions=Path('components/customer-subscriptions-runtime.tsx').read_text(encoding='utf-8')
+          payments=Path('components/customer-payments-runtime.tsx').read_text(encoding='utf-8')
+          shell=Path('components/portal-shells.tsx').read_text(encoding='utf-8')
+
+          assert 'const CustomerBuyRuntime=dynamic(()=>import("./customer-buy-runtime").then(m=>m.CustomerBuyRuntime));' in routed
+          assert 'const CustomerSubscriptionsRuntime=dynamic(()=>import("./customer-subscriptions-runtime").then(m=>m.CustomerSubscriptionsRuntime));' in routed
+          assert 'const CustomerPaymentsRuntime=dynamic(()=>import("./customer-payments-runtime").then(m=>m.CustomerPaymentsRuntime));' in routed
+          assert 'if(key==="panel/buy") return <CustomerBuyRuntime/>;' in routed
+          assert 'if(key==="panel/subscription") return <CustomerSubscriptionsRuntime/>;' in routed
+          assert 'if(key==="panel/payments") return <CustomerPaymentsRuntime/>;' in routed
+          assert 'const customerSections=new Set(["orders","wallet","notifications","profile"]);' in routed
+
+          assert 'export function CustomerBuyRuntime()' in buy
+          assert 'active="/panel/buy"' in buy
+          assert 'export function CustomerSubscriptionsRuntime()' in subscriptions
+          assert 'active="/panel/subscription"' in subscriptions
+          assert 'export function CustomerPaymentsRuntime()' in payments
+          assert 'active="/panel/payments"' in payments
+
+          assert '["خرید اشتراک","Buy Subscription","/panel/buy","cart"]' in shell
+          assert '["اشتراک من","My Subscription","/panel/subscription","subscription"]' in shell
+          assert '["پرداخت‌ها","Payments","/panel/payments","payments"]' in shell
+
+          assert "['orders','wallet','notifications','profile'].includes(section)" in generic
+          print('CUSTOMER_PORTAL_ROUTING_CONTRACT_OK')
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Build frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_API_BASE: ''
+        run: npm run build
