@@ -6,3 +6,4 @@
     "en": "TwinPanel 1.1.0-rc.41 fixes stale client UI remaining in already-open tabs after an in-panel update. The exact TwinPanel version is now embedded in the frontend bundle and every admin, customer, reseller and storefront page compares its client build against the healthy server version. When a tab is still executing an older release, the mismatch is confirmed twice and the current page is replaced with a version cache-buster so fresh HTML and client chunks are loaded. Background and BFCache tabs are checked when the user returns, while temporary restart/health outages remain silent. The release publisher now also requires complete standalone static assets. The rc.40 true planless reseller subscription flow with plan_id=NULL, direct traffic/duration/protocol selection and normal provisioning, plus portal click-away menus, remains unchanged."
   }
 }
+
