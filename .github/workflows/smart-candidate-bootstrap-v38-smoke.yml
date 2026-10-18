@@ -1,0 +1,60 @@
+name: Smart Candidate Bootstrap V38 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/smart_candidate_bootstrap_v38.py'
+      - 'backend/app/tunnel_transport_manager_v12.py'
+      - '.github/workflows/smart-candidate-bootstrap-v38-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/smart_candidate_bootstrap_v38.py'
+      - 'backend/app/tunnel_transport_manager_v12.py'
+      - '.github/workflows/smart-candidate-bootstrap-v38-smoke.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile bootstrap and manager
+        run: |
+          python3 -m py_compile \
+            backend/app/smart_candidate_bootstrap_v38.py \
+            backend/app/tunnel_transport_manager_v12.py
+
+      - name: Verify zero-row bootstrap contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          bootstrap = Path('backend/app/smart_candidate_bootstrap_v38.py').read_text()
+          manager = Path('backend/app/tunnel_transport_manager_v12.py').read_text()
+
+          required_bootstrap = [
+              'Tunnel.is_active.is_(True)',
+              'Tunnel.mode == "auto"',
+              'smart._maybe_schedule_install(int(tunnel_id))',
+              'TWINPANEL_SMART_CANDIDATE_BOOTSTRAP_V38_ACTIVE',
+              'LOOP_SECONDS = 5.0',
+          ]
+          for token in required_bootstrap:
+              assert token in bootstrap, token
+
+          # V38 must reuse V21 lifecycle ownership rather than bypassing its
+          # install limiter/cooldown/Netrix guard with direct installer calls.
+          assert 'install_transport(' not in bootstrap
+
+          required_manager = [
+              'from .smart_candidate_bootstrap_v38 import reconciler_loop as candidate_bootstrap_loop',
+              'candidate_bootstrap=v38',
+              'candidate_bootstrap_task = asyncio.create_task(',
+              'candidate_bootstrap_task,',
+          ]
+          for token in required_manager:
+              assert token in manager, token
+
+          print('SMART_CANDIDATE_BOOTSTRAP_V38_CONTRACT=PASS')
+          PY
