@@ -1,0 +1,89 @@
+name: TwinPanel Navigation and Reseller Pricing Smoke
+
+on:
+  pull_request:
+    paths:
+      - "components/portal-topnav-behavior.tsx"
+      - "components/reseller-plans-traffic-v3.tsx"
+      - "lib/reseller-runtime-api.ts"
+      - ".github/workflows/navigation-reseller-pricing-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "components/portal-topnav-behavior.tsx"
+      - "components/reseller-plans-traffic-v3.tsx"
+      - "lib/reseller-runtime-api.ts"
+      - ".github/workflows/navigation-reseller-pricing-smoke.yml"
+
+jobs:
+  navigation-pricing-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify reliable panel navigation contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path("components/portal-topnav-behavior.tsx").read_text(encoding="utf-8")
+          required = [
+              '.admin-topnav a[href]',
+              '.customer-portal-topnav a[href]',
+              '.customer-portal-nav a[href]',
+              'event.stopImmediatePropagation()',
+              'window.location.assign(navAnchor.href)',
+          ]
+          missing = [item for item in required if item not in source]
+          if missing:
+              raise SystemExit(f"reliable panel navigation contract missing: {missing!r}")
+          print("reliable panel navigation contract OK")
+          PY
+
+      - name: Verify unrestricted reseller selling-price contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          ui = Path("components/reseller-plans-traffic-v3.tsx").read_text(encoding="utf-8")
+          api = Path("lib/reseller-runtime-api.ts").read_text(encoding="utf-8")
+
+          required_ui = [
+              'const ownedPlanId=',
+              'value<0',
+              'min={0}',
+              'await resellerApi.setPlanPrice(planId,value)',
+          ]
+          required_api = [
+              'async function setOwnedPlanPrice',
+              '/v1/reseller/owned-plans',
+              'method:"PATCH"',
+              'sell_price_toman:Math.trunc(value)',
+              'setPlanPrice:setOwnedPlanPrice',
+          ]
+          missing = [item for item in required_ui if item not in ui]
+          missing += [item for item in required_api if item not in api]
+          if missing:
+              raise SystemExit(f"reseller pricing contract missing: {missing!r}")
+          if 'value<=0' in ui:
+              raise SystemExit("reseller selling-price UI still rejects zero")
+          if '/v1/reseller/plans/${planId}/price' in api:
+              raise SystemExit("reseller pricing still writes through legacy price-only endpoint")
+          print("unrestricted reseller selling-price contract OK")
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional
+          else
+            npm install --include=optional --no-audit --no-fund
+          fi
+
+      - name: Build frontend
+        run: npm run build
