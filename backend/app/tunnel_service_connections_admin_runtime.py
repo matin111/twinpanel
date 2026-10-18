@@ -9,7 +9,7 @@ from .database import get_db
 from .deps import require_admin
 from .models import Node, NodeProtocolConfig, Tunnel, TunnelTransport
 from .routers import provision, tunnels
-from .xray_modern_repair_runtime import _modern_health_snapshot
+from .xray_modern_admin import _status_remote as _current_xray_status_remote
 
 
 _runtime_applied = False
@@ -109,6 +109,31 @@ def _capabilities(
     }
 
 
+async def _current_xray_health(conn, base_port: int) -> dict[str, Any]:
+    """Normalize the current rc.27 Xray runtime health to the admin contract.
+
+    The old service-connections runtime used a helper removed from the current
+    release line. Reuse the current Xray admin probe instead of reviving stale
+    implementation details. The base legacy VLESS listener is probed explicitly
+    because the modern admin status reports only the additional modern profiles.
+    """
+    runtime = await _current_xray_status_remote(conn, int(base_port))
+    profiles = runtime.get("profiles")
+    listeners = dict(profiles) if isinstance(profiles, dict) else {}
+    listeners["legacy"] = bool(
+        await provision.listener(conn, int(base_port), "tcp")
+    )
+
+    service_active = bool(runtime.get("service_active"))
+    return {
+        "ok": bool(service_active and any(bool(value) for value in listeners.values())),
+        "service_active": service_active,
+        "tls_enabled": bool(runtime.get("tls_enabled")),
+        "tls_domain_configured": bool(str(runtime.get("tls_domain") or "").strip()),
+        "listeners": listeners,
+    }
+
+
 async def tunnel_service_connections_admin(
     tunnel_id: int,
     db: Session = Depends(get_db),
@@ -173,7 +198,7 @@ async def tunnel_service_connections_admin(
             conn = None
             try:
                 conn = await provision.ssh_connect_saved(exit_node, db)
-                xray_health = await _modern_health_snapshot(conn, base_port)
+                xray_health = await _current_xray_health(conn, base_port)
             except Exception as exc:
                 xray_probe_error = str(exc)[:500]
             finally:
@@ -266,11 +291,7 @@ async def tunnel_service_connections_admin(
                 if xray_health
                 else None
             ),
-            "error": (
-                str(xray_health.get("error") or "")[:500] or None
-                if xray_health
-                else xray_probe_error
-            ),
+            "error": xray_probe_error,
         },
     }
 
