@@ -1,0 +1,96 @@
+name: Xray TCP TLS Customer Policy V30 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/xray_node_domain_runtime.py'
+      - 'backend/app/xray_public_delivery_runtime.py'
+      - 'backend/app/xray_tcp_tls_v39.py'
+      - 'backend/app/xray_tcp_tls_compat_v44.py'
+      - 'backend/app/xray_reconcile_infra_v41.py'
+      - 'backend/app/xray_customer_profile_policy_v30.py'
+      - 'backend/app/self_hosted_runtime.py'
+      - '.github/workflows/xray-tcp-tls-policy-v30-smoke.yml'
+  push:
+    branches:
+      - fix/restore-xray-tcp-tls-v30
+
+permissions:
+  contents: read
+
+jobs:
+  policy-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile restored Xray runtimes
+        run: |
+          python -m py_compile \
+            backend/app/xray_node_domain_runtime.py \
+            backend/app/xray_public_delivery_runtime.py \
+            backend/app/xray_tcp_tls_v39.py \
+            backend/app/xray_tcp_tls_compat_v44.py \
+            backend/app/xray_reconcile_infra_v41.py \
+            backend/app/xray_customer_profile_policy_v30.py \
+            backend/app/self_hosted_runtime.py
+
+      - name: Enforce final customer profile contract
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          policy_path=Path('backend/app/xray_customer_profile_policy_v30.py')
+          policy_text=policy_path.read_text(encoding='utf-8')
+          tree=ast.parse(policy_text)
+
+          public_order=None
+          hidden=None
+          for node in tree.body:
+              if isinstance(node, ast.Assign):
+                  for target in node.targets:
+                      if isinstance(target, ast.Name) and target.id=='PUBLIC_PROFILE_ORDER':
+                          # PROFILE_TCP_TLS is deliberately a symbolic third item.
+                          items=[]
+                          for item in node.value.elts:
+                              if isinstance(item, ast.Constant):
+                                  items.append(item.value)
+                              elif isinstance(item, ast.Name):
+                                  items.append(item.id)
+                          public_order=tuple(items)
+                      if isinstance(target, ast.Name) and target.id=='HIDDEN_ROUTED_PROFILES':
+                          call=node.value
+                          values=[]
+                          if isinstance(call, ast.Call) and call.args:
+                              arg=call.args[0]
+                              if isinstance(arg, (ast.Set, ast.List, ast.Tuple)):
+                                  values=[elt.value for elt in arg.elts if isinstance(elt,ast.Constant)]
+                          hidden=set(values)
+
+          assert public_order == ('websocket_tls','httpupgrade_tls','PROFILE_TCP_TLS'), public_order
+          assert hidden is not None
+          assert {'legacy','xhttp_reality','grpc_reality','tcp_simple'} <= hidden
+          assert 'VLESS TCP TLS' in policy_text
+          assert 'grpc_reality=internal_only' in policy_text
+
+          tcp=Path('backend/app/xray_tcp_tls_v39.py').read_text(encoding='utf-8')
+          compat=Path('backend/app/xray_tcp_tls_compat_v44.py').read_text(encoding='utf-8')
+          runtime=Path('backend/app/self_hosted_runtime.py').read_text(encoding='utf-8')
+
+          assert 'PROFILE_TCP_TLS = "tcp_tls"' in tcp
+          assert 'TCP_TLS_OFFSET = 5' in tcp
+          assert 'TCP_TLS_PUBLIC_BASE = 28000' in tcp
+          assert 'config.tcp-tls-v44.json' in compat
+          assert 'apply_xray_tcp_tls_v39()' in runtime
+          assert 'apply_xray_tcp_tls_compat_v44()' in runtime
+          assert 'apply_xray_customer_profile_policy_v30()' in runtime
+          assert runtime.index('apply_xray_tcp_tls_v39()') < runtime.index('apply_xray_tcp_tls_compat_v44()')
+          assert runtime.index('apply_xray_tcp_tls_compat_v44()') < runtime.index('apply_xray_customer_profile_policy_v30()')
+
+          print('XRAY_TCP_TLS_CUSTOMER_POLICY_V30_OK')
+          PY
