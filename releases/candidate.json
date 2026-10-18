@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.42",
-  "source_sha": "f0e644657cf6e518dee6ac58a15604aeffd6e5cb",
+  "version": "1.1.0-rc.43",
+  "source_sha": "e6b68fb30f99b1e45aa0767a6744c518113ebc3c",
   "notes": {
-    "fa": "نسخه 1.1.0-rc.42 رابط تحویل اتصال را در ادمین و نمایندگی جمع‌وجورتر و حرفه‌ای‌تر می‌کند و توضیحات فرعی غیرضروری را از سربرگ‌ها و بخش‌های پنل حذف می‌کند. صفحه عمومی اتصال اکنون هر ۳ ثانیه وضعیت واقعی اشتراک را تازه می‌کند؛ بعد از اولین اتصال VPN، تاریخ شروع و انقضا بدون رفرش صفحه ظاهر می‌شوند، وضعیت «متصل» نمایش داده می‌شود و مصرف ترافیک با دقت KB/MB/GB به‌صورت زنده به‌روزرسانی می‌شود. قبل از اولین اتصال نیز تاریخ شروع به‌اشتباه تاریخ ساخت اشتراک را نشان نمی‌دهد.",
-    "en": "TwinPanel 1.1.0-rc.42 makes admin/reseller connection-delivery dialogs smaller and more polished and removes unnecessary secondary explanatory copy across panel headings and helper sections. The public connection page now refreshes real subscription state every 3 seconds: after the first accepted VPN session, start/expiry dates appear without reloading, connected state is shown, and traffic usage updates live with KB/MB/GB precision. Before first use, the start date no longer falls back to the subscription creation date."
+    "fa": "نسخه 1.1.0-rc.43 خطای کاذب API 502/503/504 هنگام Restart طبیعی سرویس API در بروزرسانی داخل پنل را برطرف می‌کند. در پنجره Warm-up، وضعیت سالم قبلی حفظ می‌شود و خطای Gateway قرمز نمایش داده نمی‌شود؛ درخواست‌های همزمان status/check نیز Deduplicate شده‌اند، Focus و Visibility فقط وضعیت را می‌خوانند و بررسی خودکار نسخه جدید با فاصله ۵ دقیقه کنترل می‌شود. خطاهای واقعی بروزرسانی همچنان نمایش داده می‌شوند. این نسخه همچنین اصلاح ادغام‌شده دیتاپلین خروجی VPN و هم‌ترازی ایمن OpenVPN PKI را در بر دارد.",
+    "en": "TwinPanel 1.1.0-rc.43 removes false API 502/503/504 errors during the normal API service restart window of an in-panel update. Healthy release state is preserved through warm-up, transient gateway failures are not rendered as red update errors, concurrent status/check calls are deduplicated, focus/visibility events use read-only status refreshes, and background release discovery is throttled to a controlled 5-minute cadence. Real updater failures still surface normally. This release also includes the already-merged VPN access dataplane and safe OpenVPN PKI alignment fix."
   }
 }
