@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.30",
-  "source_sha": "9e4412262b3642c8603064126427509baa4d9887",
+  "version": "1.1.0-rc.31",
+  "source_sha": "02a7ce77f8a2a9f6c55738965c27856269c92a2b",
   "notes": {
-    "fa": "نسخه 1.1.0-rc.30 رابط مدیریت را جمع‌وجورتر و حرفه‌ای‌تر می‌کند. پنجره ساخت اشتراک دستی در دسکتاپ ارتفاع و عرض کنترل‌شده‌تری دارد، فرم و پروتکل‌ها متراکم‌تر چیده می‌شوند و اسکرول داخلی با Header و Actionهای sticky حفظ شده است. در صفحه نودها نیز کارت بلند مدیریت از پایین جدول حذف شده و دکمه «مدیریت» اکنون یک پاپ‌آپ جمع‌وجور باز می‌کند که وضعیت، SSH، دامنه، تعداد پروتکل‌ها و تمام عملیات قبلی را بدون تغییر API/Backend در دسترس نگه می‌دارد. زیرپنجره‌های SSH، دامنه و سلامت پروتکل نیز پس از بستن به پنجره مدیریت نود برمی‌گردند.",
-    "en": "TwinPanel 1.1.0-rc.30 refines the admin UI with denser, more professional dialogs. The manual-subscription dialog now uses tighter desktop width/height, denser fields and protocol controls, while preserving internal scrolling with sticky header/actions. On the Nodes page, the long inline management card is removed; Manage now opens a compact popup containing status, SSH state, domain, enabled protocol count and all existing actions without changing backend/API behavior. SSH, domain and protocol-health subdialogs return to the node-management popup when closed."
+    "fa": "نسخه 1.1.0-rc.31 سیاست نهایی Xray را برمی‌گرداند: WebSocket TLS، HTTPUpgrade TLS و VLESS TCP TLS پروفایل‌های قابل‌تحویل به کاربر هستند. gRPC Reality، XHTTP Reality و VLESS Legacy/plain فقط برای Rollback و Diagnostic داخلی حفظ می‌شوند و دیگر در کارت‌های عادی اتصال یا تحویل اکانت ظاهر نمی‌شوند. Runtime اختصاصی دامنه Xray، موتور TCP TLS V39، سازگاری V44 برای Xray 26.3.x و preflight مربوط به listener دوباره روی lineage فعلی فعال شده‌اند. UUIDهای موجود، listenerهای قدیمی، کلیدها و تنظیمات سالم حذف یا بازتولید نمی‌شوند. این نسخه همچنین اصلاحات تاییدشده rc.30 و routing پنل کاربری را حفظ می‌کند.",
+    "en": "TwinPanel 1.1.0-rc.31 restores the final Xray customer policy: WebSocket TLS, HTTPUpgrade TLS and VLESS TCP TLS are the customer-deliverable profiles. gRPC Reality, XHTTP Reality and legacy/plain VLESS remain internal-only for rollback and diagnostics and are no longer exposed in normal connection cards or account delivery. The dedicated Xray-domain runtime, V39 TCP TLS engine, V44 Xray 26.3.x compatibility and listener preflight are restored on the current lineage. Existing UUIDs, legacy listeners, keys and healthy settings are preserved. The verified rc.30 and customer-portal routing fixes are retained."
   }
 }
