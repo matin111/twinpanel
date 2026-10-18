@@ -1,0 +1,48 @@
+name: Admin API Transient Gateway V4 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'lib/admin-api.ts'
+      - '.github/workflows/admin-api-transient-gateway-v4-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify safe transient gateway handling
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('lib/admin-api.ts').read_text(encoding='utf-8')
+
+          required = [
+              'const TRANSIENT_GET_STATUSES=new Set([502,503,504]);',
+              'const TRANSIENT_GET_RETRY_MS=[350,900,1800] as const;',
+              'function isHtmlErrorBody',
+              'function isTransientNetworkError',
+              'method==="GET"',
+              'TRANSIENT_GET_STATUSES.has(response.status)',
+              'await response.body?.cancel()',
+              'if(isHtmlErrorBody(text))return `خطای ارتباط با سرویس پنل (${status})`;',
+              'readCache.clear();',
+          ]
+          missing = [item for item in required if item not in source]
+          if missing:
+              raise SystemExit(f'missing transient gateway contract: {missing}')
+
+          if 'if(typeof payload==="string"&&payload.trim())return payload.trim();' in source:
+              raise SystemExit('raw textual gateway payload can still leak into the admin UI')
+
+          # Mutation safety: retries are gated strictly to GET. POST/PUT/PATCH/DELETE
+          # must never be replayed automatically after an ambiguous gateway failure.
+          if source.count('method==="GET"') < 3:
+              raise SystemExit('GET-only retry guard is incomplete')
+
+          print('ADMIN_API_TRANSIENT_GATEWAY_V4_OK')
+          PY
