@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.36",
+  "version": "1.1.0-rc.37",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-18T10:49:21Z",
+  "released_at": "2026-10-18T11:16:22Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "10459c52c94b5546956f47cde15c3ce019330dd6",
+  "source_sha": "a22de4e6507090d14545f1d44836a648c1de218e",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.36/twinpanel-1.1.0-rc.36-linux-x86_64.tar.gz",
-    "sha256": "71a639f8c8364377fa32c88c7bb11451814fb663173347c5f643375812156787",
-    "size_bytes": 12615925
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.37/twinpanel-1.1.0-rc.37-linux-x86_64.tar.gz",
+    "sha256": "baff106adc6edac7ab49e81b397aa16c1ee9d9895cfe7534e05f523a5b831f2b",
+    "size_bytes": 12614729
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.36 دامنه اختصاصی V2Ray/Xray را مستقیماً داخل همان پنجره مدیریت نود خروجی قرار می‌دهد. دامنه عمومی نود و دامنه Xray اکنون کاملاً جدا و با عنوان‌های واضح نمایش داده می‌شوند؛ برای Exitهایی که V2Ray فعال دارند، ردیف و دکمه «دامنه Xray» در خود پنجره مدیریت وجود دارد و می‌توان دامنه را مستقل ذخیره کرد یا با «ذخیره و آماده‌سازی TLS» گواهی و پروفایل‌های Xray را Reconcile کرد. دامنه موثر Xray، وضعیت TLS و fallback دامنه عمومی نیز همان‌جا قابل مشاهده است و کارت جداگانه قدیمی از صفحه نودها حذف شده تا دو محل موازی برای یک تنظیم وجود نداشته باشد. تمام اصلاحات rc.35 برای بازیابی امن Provision، جلوگیری از ساخت کانفیگ یا Peer تکراری، اصلاحات پرداخت/سفارش و سازگاری Xray 26.3.x بدون تغییر حفظ شده‌اند.",
-    "en": "TwinPanel 1.1.0-rc.36 moves the dedicated V2Ray/Xray domain directly into the existing Exit-node management dialog. The Node public domain and Xray domain are now clearly separated; Exit nodes with V2Ray enabled expose an Xray-domain row and action in the same dialog, with independent save and Save & prepare TLS flows that reconcile the Xray certificate and profiles. The effective Xray domain, TLS readiness and legacy public-domain fallback are visible in place, and the redundant standalone Xray-domain card has been removed so there is only one operational control surface. All rc.35 safe provisioning recovery, duplicate credential/peer prevention, payment/order fixes and Xray 26.3.x compatibility changes are retained unchanged."
+    "fa": "نسخه 1.1.0-rc.37 مشکل خالی‌بودن کانفیگ‌های V2Ray/Xray در لینک اشتراک‌های قدیمی را پس از تنظیم دامنه اختصاصی و TLS برطرف می‌کند. علت این بود که Runtime نود آماده می‌شد اما Credentialهای قدیمی اشتراک‌ها همچنان فقط پروفایل‌های داخلی/قدیمی را نگه می‌داشتند و سیاست جدید پنل آن پروفایل‌ها را از دید کاربر مخفی می‌کرد. از این نسخه، بعد از «ذخیره و آماده‌سازی TLS» و تایید TLS روی نود خروجی، فرآیند Reconcile موجود V36/V41 به‌صورت پس‌زمینه برای همان Exit شروع می‌شود؛ UUIDهای فعلی حفظ می‌شوند، فقط Credentialهای ناقص بازسازی می‌شوند و زیرساخت VLESS TCP TLS نیز قبل از مهاجرت بررسی/ترمیم می‌شود. درخواست مدیریتی منتظر همگام‌سازی تمام اشتراک‌ها نمی‌ماند تا دوباره 502/504 ایجاد نشود. مسیر عمومی /v1/connect همچنان فقط خواندنی است. پروفایل‌های قابل تحویل کاربر WebSocket TLS، HTTPUpgrade TLS و VLESS TCP TLS باقی می‌مانند و XHTTP Reality، gRPC Reality و Legacy/Plain مخفی هستند. تمام اصلاحات rc.36 و نسخه‌های قبل حفظ شده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.37 fixes empty V2Ray/Xray configurations in historical public subscription links after a dedicated Xray domain and TLS are prepared. The node runtime could be healthy while old encrypted subscription credentials still contained only retired/internal profiles that the current customer policy correctly hides. After a successful TLS-enabled Save & prepare TLS operation, TwinPanel now schedules the existing V36/V41 reconciliation pipeline in the background for that Exit. Existing UUIDs are preserved, only incomplete credentials are rebuilt, and VLESS TCP TLS infrastructure is preflighted/repaired before migration. The admin mutation does not wait for every subscription, preventing a new 502/504 timeout class. Public /v1/connect remains read-only. Customer delivery remains WebSocket TLS, HTTPUpgrade TLS and VLESS TCP TLS; XHTTP Reality, gRPC Reality and legacy/plain stay hidden. All rc.36 and earlier fixes are preserved."
   }
 }
