@@ -7,7 +7,7 @@ on:
       - 'components/routed-page-client.tsx'
       - 'components/admin-infra-runtime.tsx'
       - 'components/provision-runtime-xray-domain.tsx'
-      - 'components/node-xray-domain-runtime-v33.tsx'
+      - 'components/legacy-nodes-exact.tsx'
       - 'components/tunnels-simple-runtime.tsx'
       - 'components/tunnels-unified-runtime-v39.tsx'
       - 'components/legacy-subscriptions-exact.tsx'
@@ -31,7 +31,7 @@ jobs:
           routed=Path('components/routed-page-client.tsx').read_text(encoding='utf-8')
           feedback=Path('components/admin-operation-feedback.tsx').read_text(encoding='utf-8')
           provision=Path('components/provision-runtime-xray-domain.tsx').read_text(encoding='utf-8')
-          node_xray=Path('components/node-xray-domain-runtime-v33.tsx').read_text(encoding='utf-8')
+          nodes=Path('components/legacy-nodes-exact.tsx').read_text(encoding='utf-8')
           tunnel_entry=Path('components/tunnels-simple-runtime.tsx').read_text(encoding='utf-8')
           tunnels=Path('components/tunnels-unified-runtime-v39.tsx').read_text(encoding='utf-8')
           subscriptions=Path('components/legacy-subscriptions-exact.tsx').read_text(encoding='utf-8')
@@ -39,7 +39,9 @@ jobs:
           assert 'AdminOperationFeedback' in routed
           assert '<AdminAuthGuard><AdminOperationFeedback/>{node}</AdminAuthGuard>' in routed
           assert 'if(key==="admin/provision") return admin(<ProvisionRuntimeXrayDomainPage/>);' in routed
-          assert 'NodeXrayDomainRuntimeV33' in routed
+          assert 'if(key==="admin/nodes") return admin(<LegacyNodesRuntimePage/>);' in routed
+          assert 'if(key==="admin/network") return admin(<LegacyNodesRuntimePage/>);' in routed
+          assert 'NodeXrayDomainRuntimeV33' not in routed
           assert 'if(key==="admin/tunnels") return admin(<TunnelsSimpleRuntimePage/>);' in routed
           assert 'if(key==="admin/subscriptions") return admin(<><LegacySubscriptionsRuntimePage/><AdminManualSubscriptionCreate/></>);' in routed
           assert 'AdminManualSubscriptionCreate' in routed
@@ -47,7 +49,9 @@ jobs:
           assert 'parityApi.provisionInstall(installPayload)' in provision
           assert 'saveXrayDomain(nodeId,domain)' in provision
           assert 'prepareXrayDomain(nodeId)' in provision
-          assert 'adminApi.prepareXrayDomain' in node_xray
+          assert 'adminApi.xrayDomain(selected.id)' in nodes
+          assert 'adminApi.saveXrayDomain(selected.id,xrayDomainDraft.trim())' in nodes
+          assert 'adminApi.prepareXrayDomain(selected.id,true)' in nodes
           assert 'TunnelsUnifiedRuntimeV39' in tunnel_entry
           assert 'legacyControlApi.createManagedTunnel' in tunnels
           assert 'adminApi.createSubscriptionV2' in subscriptions

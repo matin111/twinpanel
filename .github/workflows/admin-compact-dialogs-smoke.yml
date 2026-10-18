@@ -24,11 +24,14 @@ jobs:
           manual=Path('components/admin-manual-subscription-create.tsx').read_text(encoding='utf-8')
           css=Path('app/admin-modal-layer-final.css').read_text(encoding='utf-8')
 
-          assert 'type NodeModal="manage"|"ssh"|"domain"|"protocols"|null;' in nodes
+          assert 'type NodeModal="manage"|"ssh"|"domain"|"xray-domain"|"protocols"|null;' in nodes
           assert 'setSelectedId(current=>current&&ns.some(row=>row.id===current)?current:0);' in nodes
           assert 'setModal("manage")' in nodes
           assert 'className="manage-card node-manage-modal-card"' in nodes
           assert 'node-manage-actions' in nodes
+          assert 'setModal("xray-domain")' in nodes
+          assert 'دامنه عمومی' in nodes
+          assert 'دامنه Xray' in nodes
           assert '{selected&&<Card>' not in nodes
           assert 'plan_id:null' in manual
           assert 'manual-subscription-modal' in manual

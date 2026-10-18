@@ -1,10 +1,10 @@
-name: Xray Dedicated Domain UI V33 Smoke
+name: Xray Dedicated Domain UI V34 Smoke
 
 on:
   pull_request:
     paths:
       - "components/routed-page-client.tsx"
-      - "components/node-xray-domain-runtime-v33.tsx"
+      - "components/legacy-nodes-exact.tsx"
       - "components/provision-runtime-xray-domain.tsx"
       - "lib/admin-api.ts"
       - "backend/app/xray_node_domain_runtime.py"
@@ -15,7 +15,7 @@ on:
     branches: [main]
     paths:
       - "components/routed-page-client.tsx"
-      - "components/node-xray-domain-runtime-v33.tsx"
+      - "components/legacy-nodes-exact.tsx"
       - "components/provision-runtime-xray-domain.tsx"
       - "lib/admin-api.ts"
       - "backend/app/xray_node_domain_runtime.py"
@@ -52,16 +52,21 @@ jobs:
           grep -F 'if(key==="admin/provision") return admin(<ProvisionRuntimeXrayDomainPage/>)' components/routed-page-client.tsx
           ! grep -F 'if(key==="admin/provision") return admin(<ProvisionRuntimePage/>)' components/routed-page-client.tsx
 
-      - name: Verify nodes page exposes dedicated Xray domain
+      - name: Verify node management modal exposes dedicated Xray domain
         run: |
           set -euo pipefail
-          grep -F 'NodeXrayDomainRuntimeV33' components/routed-page-client.tsx
-          grep -F 'adminApi.xrayDomain' components/node-xray-domain-runtime-v33.tsx
-          grep -F 'adminApi.saveXrayDomain' components/node-xray-domain-runtime-v33.tsx
-          grep -F 'adminApi.prepareXrayDomain' components/node-xray-domain-runtime-v33.tsx
-          grep -F 'دامنه اختصاصی V2Ray / Xray' components/node-xray-domain-runtime-v33.tsx
-          grep -F 'VLESS TCP TLS' components/node-xray-domain-runtime-v33.tsx
-          grep -F 'ذخیره این مقدار دامنه عمومی نود را تغییر نمی‌دهد' components/node-xray-domain-runtime-v33.tsx
+          grep -F 'type NodeModal="manage"|"ssh"|"domain"|"xray-domain"|"protocols"|null;' components/legacy-nodes-exact.tsx
+          grep -F 'hasDedicatedXrayDomain' components/legacy-nodes-exact.tsx
+          grep -F 'adminApi.xrayDomain(selected.id)' components/legacy-nodes-exact.tsx
+          grep -F 'adminApi.saveXrayDomain(selected.id,xrayDomainDraft.trim())' components/legacy-nodes-exact.tsx
+          grep -F 'adminApi.prepareXrayDomain(selected.id,true)' components/legacy-nodes-exact.tsx
+          grep -F 'دامنه عمومی' components/legacy-nodes-exact.tsx
+          grep -F 'دامنه Xray' components/legacy-nodes-exact.tsx
+          grep -F 'دامنه اختصاصی V2Ray / Xray' components/legacy-nodes-exact.tsx
+          grep -F 'ذخیره و آماده‌سازی TLS' components/legacy-nodes-exact.tsx
+          grep -F 'if(key==="admin/nodes") return admin(<LegacyNodesRuntimePage/>)' components/routed-page-client.tsx
+          grep -F 'if(key==="admin/network") return admin(<LegacyNodesRuntimePage/>)' components/routed-page-client.tsx
+          ! grep -F 'NodeXrayDomainRuntimeV33' components/routed-page-client.tsx
 
       - name: Verify hardened shared API endpoints
         run: |
@@ -71,14 +76,14 @@ jobs:
           grep -F 'prepareXrayDomain:(id:number,issueCertificate=true)=>request<XrayDomainState>' lib/admin-api.ts
           grep -F '/v1/xray-modern-admin/nodes/${id}/xray-domain' lib/admin-api.ts
 
-      - name: Verify historical provisioning UI is still complete
+      - name: Verify provisioning UI is still complete
         run: |
           set -euo pipefail
           grep -F 'دامنه V2Ray / Xray' components/provision-runtime-xray-domain.tsx
           grep -F 'دامنه اختصاصی Xray' components/provision-runtime-xray-domain.tsx
           grep -F '/xray-domain/prepare' components/provision-runtime-xray-domain.tsx
 
-      - name: Compile new backend compatibility runtime
+      - name: Compile backend compatibility runtime
         run: |
           python3 -m py_compile \
             backend/app/xray_modern_config_compat_v45.py \
