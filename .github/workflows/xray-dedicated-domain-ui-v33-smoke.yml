@@ -1,4 +1,4 @@
-name: Xray Dedicated Domain UI V34 Smoke
+name: Xray TLS Subscription Reconcile V37 Smoke
 
 on:
   pull_request:
@@ -8,6 +8,10 @@ on:
       - "components/provision-runtime-xray-domain.tsx"
       - "lib/admin-api.ts"
       - "backend/app/xray_node_domain_runtime.py"
+      - "backend/app/xray_profile_reconcile_v36.py"
+      - "backend/app/xray_reconcile_infra_v41.py"
+      - "backend/app/xray_customer_profile_policy_v30.py"
+      - "backend/app/xray_public_delivery_runtime.py"
       - "backend/app/xray_modern_config_compat_v45.py"
       - "backend/app/self_hosted_runtime.py"
       - ".github/workflows/xray-dedicated-domain-ui-v33-smoke.yml"
@@ -19,6 +23,10 @@ on:
       - "components/provision-runtime-xray-domain.tsx"
       - "lib/admin-api.ts"
       - "backend/app/xray_node_domain_runtime.py"
+      - "backend/app/xray_profile_reconcile_v36.py"
+      - "backend/app/xray_reconcile_infra_v41.py"
+      - "backend/app/xray_customer_profile_policy_v30.py"
+      - "backend/app/xray_public_delivery_runtime.py"
       - "backend/app/xray_modern_config_compat_v45.py"
       - "backend/app/self_hosted_runtime.py"
 
@@ -31,10 +39,37 @@ jobs:
       - name: Verify dedicated domain backend contract
         run: |
           set -euo pipefail
+          grep -F 'TWINPANEL_XRAY_NODE_DOMAIN_RUNTIME_V2' backend/app/xray_node_domain_runtime.py
           grep -F 'ADD COLUMN IF NOT EXISTS xray_domain' backend/app/xray_node_domain_runtime.py
           grep -F '"/nodes/{node_id}/xray-domain"' backend/app/xray_node_domain_runtime.py
           grep -F '"/nodes/{node_id}/xray-domain/prepare"' backend/app/xray_node_domain_runtime.py
           grep -F '_effective_xray_domain' backend/app/xray_node_domain_runtime.py
+
+      - name: Verify TLS prepare schedules historical subscription reconciliation
+        run: |
+          set -euo pipefail
+          grep -F 'async def _schedule_subscription_reconcile' backend/app/xray_node_domain_runtime.py
+          grep -F 'xray_profile_reconcile_v36.start_xray_reconcile_job' backend/app/xray_node_domain_runtime.py
+          grep -F 'if tls_enabled:' backend/app/xray_node_domain_runtime.py
+          grep -F '"reconcile_job": reconcile_job' backend/app/xray_node_domain_runtime.py
+          grep -F '"reconcile_error": reconcile_error' backend/app/xray_node_domain_runtime.py
+          grep -F 'همگام‌سازی اشتراک‌های موجود در پس‌زمینه شروع شد' backend/app/xray_node_domain_runtime.py
+          grep -F 'uuid_preserved=1' backend/app/xray_node_domain_runtime.py
+          grep -F 'async def start_xray_reconcile_job' backend/app/xray_profile_reconcile_v36.py
+          grep -F 'client_id = xray_modern_runtime._existing_uuid(previous) or str(uuid.uuid4())' backend/app/xray_profile_reconcile_v36.py
+          grep -F 'tcp_tls_listener_preflight=1' backend/app/xray_reconcile_infra_v41.py
+
+      - name: Verify public Xray policy remains TLS-only
+        run: |
+          set -euo pipefail
+          grep -F 'PUBLIC_PROFILE_ORDER = (' backend/app/xray_customer_profile_policy_v30.py
+          grep -F '"websocket_tls"' backend/app/xray_customer_profile_policy_v30.py
+          grep -F '"httpupgrade_tls"' backend/app/xray_customer_profile_policy_v30.py
+          grep -F 'PROFILE_TCP_TLS' backend/app/xray_customer_profile_policy_v30.py
+          grep -F '"xhttp_reality"' backend/app/xray_customer_profile_policy_v30.py
+          grep -F '"grpc_reality"' backend/app/xray_customer_profile_policy_v30.py
+          grep -F '"tcp_simple"' backend/app/xray_customer_profile_policy_v30.py
+          ! grep -F 'start_xray_reconcile_job' backend/app/xray_public_delivery_runtime.py
 
       - name: Verify Xray 26.3 modern candidate compatibility
         run: |
@@ -86,5 +121,10 @@ jobs:
       - name: Compile backend compatibility runtime
         run: |
           python3 -m py_compile \
+            backend/app/xray_node_domain_runtime.py \
+            backend/app/xray_profile_reconcile_v36.py \
+            backend/app/xray_reconcile_infra_v41.py \
+            backend/app/xray_customer_profile_policy_v30.py \
+            backend/app/xray_public_delivery_runtime.py \
             backend/app/xray_modern_config_compat_v45.py \
             backend/app/self_hosted_runtime.py
