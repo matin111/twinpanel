@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.40",
+  "version": "1.1.0-rc.41",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-18T19:47:03Z",
+  "released_at": "2026-10-18T20:29:55Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "8def9a194f07f18c0433b650f32eb532c1953dc4",
+  "source_sha": "69766766b260be4c3ce5443ba875aefba2e31d53",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.40/twinpanel-1.1.0-rc.40-linux-x86_64.tar.gz",
-    "sha256": "2f9696dd87e56c367f04f3127d82870b810c697e096328cadabf449142011692",
-    "size_bytes": 12742945
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.41/twinpanel-1.1.0-rc.41-linux-x86_64.tar.gz",
+    "sha256": "ce34c98ece697448191a8c598833938575e07aab790c3d5b73a3f3c3a97d12ed",
+    "size_bytes": 12748364
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.40 دو ایراد Runtime پنل نمایندگی را برطرف می‌کند. ساخت اشتراک نماینده اکنون واقعاً بدون نیاز به پلن انجام می‌شود: نماینده حجم، مدت، پروتکل‌ها و در صورت نیاز نام کاربری/رمز و سرور مقصد را مشخص می‌کند و اشتراک با plan_id=NULL واقعی ساخته و سپس Provision می‌شود. مدل حجمی نمایندگی حفظ شده است؛ هنگام ساخت حجمی رزرو نمی‌شود و فقط مصرف واقعی کاربران از موجودی نماینده کم می‌شود. برای نصب‌های قدیمی PostgreSQL نیز nullable شدن plan_id قبل از باز شدن تراکنش‌های درخواست به‌صورت idempotent انجام می‌شود تا قفل درخواست ایجاد نشود. همچنین منوی بالای پنل کاربر و نماینده مثل پنل ادمین رفتار می‌کند: با باز شدن یک گروه، گروه‌های دیگر بسته می‌شوند؛ با کلیک روی صفحه بیرون منو، انتخاب لینک یا زدن Escape منو بسته می‌شود. ساخت با پلن، فروش ربات، سفارش‌ها، پرداخت، احراز هویت و عملیات ویرایش/تمدید/حذف اشتراک بدون تغییر حفظ شده‌اند. تمام اصلاحات rc.39 و نسخه‌های قبل نیز حفظ شده‌اند.",
-    "en": "TwinPanel 1.1.0-rc.40 fixes two reseller runtime issues. Reseller subscription creation is now truly planless: the reseller directly selects traffic, duration, protocols, optional credentials and optional exit servers, and TwinPanel creates a real subscription with plan_id=NULL before provisioning it. The reseller usage-pool model is preserved: no traffic is reserved at creation and only real customer usage drains the reseller balance. Existing PostgreSQL installations normalize plan_id to nullable idempotently before request transactions are opened, avoiding request-time schema lock waits. Customer and reseller top navigation now also behaves like the admin shell: opening one group closes the others, and clicking outside, choosing a link, or pressing Escape closes the menu. Plan-backed flows, reseller bot sales/orders, payments, authentication, and existing subscription edit/extend/delete actions remain unchanged. All rc.39 and earlier fixes are preserved."
+    "fa": "نسخه 1.1.0-rc.41 مشکل باقی‌ماندن رابط قدیمی در تب‌های باز بعد از بروزرسانی را برطرف می‌کند. نسخه دقیق TwinPanel اکنون داخل Bundle فرانت‌اند ثبت می‌شود و تمام صفحات ادمین، کاربر، نماینده و فروشگاه نسخه Client را با نسخه سالم سرور مقایسه می‌کنند. اگر یک تب پس از بروزرسانی هنوز کد نسخه قبلی را اجرا کند، اختلاف نسخه دو بار تأیید و سپس همان صفحه با Cache-Buster نسخه جدید باز می‌شود؛ تب‌های پس‌زمینه و BFCache نیز هنگام بازگشت کاربر بررسی می‌شوند. زمان Restart و قطعی موقت Health هیچ خطایی ایجاد نمی‌کند. Publisher نیز از این پس وجود فایل‌های Static کامل در Standalone Artifact را اجباری می‌کند. اصلاح rc.40 برای ساخت واقعی اشتراک نماینده بدون پلن با plan_id=NULL، انتخاب حجم/مدت/پروتکل‌ها و Provision عادی، و همچنین بسته‌شدن منو با کلیک بیرون بدون تغییر حفظ شده است.",
+    "en": "TwinPanel 1.1.0-rc.41 fixes stale client UI remaining in already-open tabs after an in-panel update. The exact TwinPanel version is now embedded in the frontend bundle and every admin, customer, reseller and storefront page compares its client build against the healthy server version. When a tab is still executing an older release, the mismatch is confirmed twice and the current page is replaced with a version cache-buster so fresh HTML and client chunks are loaded. Background and BFCache tabs are checked when the user returns, while temporary restart/health outages remain silent. The release publisher now also requires complete standalone static assets. The rc.40 true planless reseller subscription flow with plan_id=NULL, direct traffic/duration/protocol selection and normal provisioning, plus portal click-away menus, remains unchanged."
   }
 }
