@@ -32,6 +32,8 @@ jobs:
           assert 'value<0' in pricing
           assert 'value<=0' not in pricing
           assert 'min={1} value={drafts[id]' not in pricing
+          assert 'Number(row.id||row.reseller_plan_id||0)' in pricing
+          assert 'Number(row.plan_id||row.id||0)' not in pricing
           assert 'resellerApi.updatePlan(planId,{sell_price_toman:value})' in pricing
           assert 'updatePlan:' in api
           assert 'method:"PATCH"' in api
