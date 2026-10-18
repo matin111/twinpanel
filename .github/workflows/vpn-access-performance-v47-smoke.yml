@@ -1,0 +1,84 @@
+name: VPN Access Performance V47 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/vpn_access_performance_v47.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/vpn-access-performance-v47-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/vpn_access_performance_v47.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/vpn-access-performance-v47-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile runtime
+        run: |
+          python -m py_compile \
+            backend/app/vpn_access_performance_v47.py \
+            backend/app/tunnel_transport_manager_v12.py
+
+      - name: Verify V47 contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          perf = Path("backend/app/vpn_access_performance_v47.py").read_text()
+          manager = Path("backend/app/tunnel_transport_manager_v12.py").read_text()
+
+          required = [
+              "ACCESS_MTU = 1200",
+              "ACCESS_TCP_MSS = 1160",
+              '"cisco": "10.91.0.0/24"',
+              '"openvpn": "10.92.0.0/24"',
+              '"wireguard": "10.93.0.0/24"',
+              "TP_ACCESS_PERF",
+              "--set-mss",
+              "-s \"$SUBNET\" -o \"$WAN\"",
+              "-d \"$SUBNET\" -i \"$WAN\"",
+              "/etc/ocserv/ocserv.conf",
+              "/etc/openvpn/server/twinpanel.conf",
+              "/etc/wireguard/wg-access0.conf",
+              "ip link set dev \"$IFACE\" mtu \"$ACCESS_MTU\"",
+              "systemctl kill -s HUP ocserv.service",
+              "v2ray=untouched",
+          ]
+
+          for token in required:
+              assert token in perf, token
+
+          forbidden = [
+              "iptables -F",
+              "iptables -t nat -F",
+              "iptables -t filter -F",
+              "netfilter-persistent save",
+              "systemctl restart ocserv",
+              "systemctl restart openvpn",
+              "systemctl restart wg-quick",
+          ]
+
+          for token in forbidden:
+              assert token not in perf, token
+
+          assert "vpn_access_performance_v47" in manager
+          assert "vpn_access_performance_loop()" in manager
+          assert "twinpanel-vpn-access-performance-v47" in manager
+          assert "vpn_access_performance_task" in manager
+
+          print("VPN_ACCESS_PERFORMANCE_V47_SMOKE_OK")
+          PY
