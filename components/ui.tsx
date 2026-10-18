@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {useState} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
@@ -92,11 +91,11 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
                     const label=pick(fa,en);
                     const itemAttention=attention.hasPathAttention(h);
                     const itemCount=attention.countForPath(h);
-                    return <Link key={h} href={h} className={`${active===h?"active":""} ${itemAttention?"has-attention":""}`.trim()} onClick={closeMenus}>
+                    return <a key={h} href={h} className={`${active===h?"active":""} ${itemAttention?"has-attention":""}`.trim()} onClick={closeMenus}>
                       <i>{i}</i><span className="nav-label">{label}</span>
                       {itemAttention&&<span className="nav-attention-dot" aria-hidden="true"/>}
                       {itemCount>0&&<span className="nav-attention-count" aria-label={`${itemCount} ${pick("مورد نیازمند بررسی","items need review")}`}>{itemCount>99?"99+":itemCount}</span>}
-                    </Link>;
+                    </a>;
                   })}
                 </div>
                 {group.en==="System & Maintenance"&&<div className={`topnav-release ${attention.updateAvailable?"has-attention":""}`}><SystemReleaseFooter/></div>}
