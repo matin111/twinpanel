@@ -1,0 +1,332 @@
+/* TwinPanel 2027 customer/reseller top navigation.
+   Loaded after customer-shell-final.css so legacy sidebar rules remain only as a mobile drawer. */
+
+.customer-portal-shell{
+  display:block;
+  min-height:100vh;
+  width:100%;
+  background:var(--bg);
+}
+
+.customer-portal-main{
+  width:100%;
+  min-width:0;
+  min-height:100vh;
+}
+
+.customer-portal-header{
+  position:sticky;
+  top:0;
+  z-index:85;
+  min-height:0;
+  padding:0;
+  display:block;
+  border-bottom:1px solid var(--line);
+  background:color-mix(in srgb,var(--bg) 91%,transparent);
+  backdrop-filter:blur(20px);
+}
+
+.customer-portal-primarybar{
+  position:relative;
+  width:100%;
+  height:68px;
+  display:flex;
+  align-items:center;
+  padding-inline:22px;
+  border-bottom:1px solid color-mix(in srgb,var(--line) 72%,transparent);
+}
+
+.customer-portal-header-brand{
+  position:absolute;
+  inset-inline-start:22px;
+  top:50%;
+  transform:translateY(-50%);
+  max-width:190px;
+  display:flex;
+  align-items:center;
+  z-index:2;
+}
+.customer-portal-header-brand .brand{min-width:0}
+
+.customer-portal-topnav{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  z-index:5;
+  width:max-content;
+  max-width:calc(100% - 440px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  white-space:nowrap;
+}
+
+.customer-portal-topnav-group{
+  position:relative;
+  flex:0 0 auto;
+}
+.customer-portal-topnav-group>summary{
+  list-style:none;
+  min-height:39px;
+  padding:0 13px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  border:1px solid transparent;
+  border-radius:11px;
+  color:var(--muted);
+  background:transparent;
+  font-size:13px;
+  font-weight:850;
+  line-height:1;
+  cursor:pointer;
+  user-select:none;
+  transition:background .16s ease,border-color .16s ease,color .16s ease,box-shadow .16s ease;
+}
+.customer-portal-topnav-group>summary::-webkit-details-marker{display:none}
+.customer-portal-topnav-group>summary span{font-size:11px;opacity:.75;transition:transform .16s ease}
+.customer-portal-topnav-group[open]>summary span{transform:rotate(180deg)}
+.customer-portal-topnav-group:hover>summary,
+.customer-portal-topnav-group[open]>summary{
+  color:var(--text);
+  border-color:var(--line);
+  background:var(--surface2);
+}
+.customer-portal-topnav-group.active>summary{
+  color:#fff;
+  border-color:color-mix(in srgb,var(--purple2) 55%,transparent);
+  background:linear-gradient(135deg,color-mix(in srgb,var(--purple) 88%,#4f46e5),color-mix(in srgb,var(--purple2) 82%,#7c3aed));
+  box-shadow:0 8px 22px color-mix(in srgb,var(--purple) 16%,transparent);
+}
+
+.customer-portal-topnav-menu{
+  position:absolute;
+  top:calc(100% + 9px);
+  inset-inline-start:50%;
+  transform:translateX(50%);
+  width:245px;
+  padding:8px;
+  display:grid;
+  gap:5px;
+  border:1px solid var(--line);
+  border-radius:15px;
+  background:color-mix(in srgb,var(--surface) 97%,transparent);
+  box-shadow:0 20px 55px rgba(0,0,0,.24);
+  backdrop-filter:blur(20px);
+  z-index:300;
+}
+html[dir="ltr"] .customer-portal-topnav-menu{transform:translateX(-50%)}
+
+.customer-portal-topnav-menu>a{
+  min-height:44px;
+  padding:6px 9px;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  border:1px solid transparent;
+  border-radius:11px;
+  color:var(--muted);
+  text-decoration:none;
+  transition:.16s ease;
+}
+.customer-portal-topnav-menu>a:hover{
+  color:var(--text);
+  border-color:var(--line);
+  background:var(--surface2);
+}
+.customer-portal-topnav-menu>a.active{
+  color:var(--purple2);
+  border-color:color-mix(in srgb,var(--purple) 28%,var(--line));
+  background:color-mix(in srgb,var(--purple) 10%,var(--surface2));
+}
+.customer-portal-topnav-menu .customer-portal-nav-icon{
+  flex:0 0 31px;
+  width:31px;
+  height:31px;
+}
+.customer-portal-topnav-menu .customer-portal-nav-label{font-size:12.5px}
+.customer-portal-topnav-menu .customer-portal-active-dot{background:var(--purple2);box-shadow:none}
+
+.customer-portal-header-actions{
+  position:absolute;
+  inset-inline-end:22px;
+  top:50%;
+  transform:translateY(-50%);
+  margin:0;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  z-index:6;
+}
+
+.customer-portal-utilitybar{
+  min-height:58px;
+  padding:8px 22px;
+  display:flex;
+  align-items:center;
+  gap:14px;
+}
+.customer-portal-utilitybar .customer-portal-search{
+  width:min(430px,42vw);
+  min-width:230px;
+  height:40px;
+  margin:0;
+}
+
+.customer-portal-top-identity{
+  margin-inline-start:auto;
+  min-width:210px;
+  max-width:300px;
+}
+.customer-portal-top-identity .customer-portal-identity{
+  margin:0;
+  padding:0;
+  border:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 38px;
+  gap:7px;
+}
+.customer-portal-top-identity .customer-portal-user{
+  min-height:40px;
+  padding:4px 7px;
+  background:transparent;
+  border:1px solid transparent;
+}
+.customer-portal-top-identity .customer-portal-avatar{
+  width:31px;
+  height:31px;
+  flex-basis:31px;
+  border-radius:9px;
+}
+.customer-portal-top-identity .customer-portal-user-copy b{font-size:12px}
+.customer-portal-top-identity .customer-portal-user-copy small{font-size:10.5px}
+
+.customer-portal-sidebar,
+.customer-portal-mobile-backdrop{
+  display:none;
+}
+.customer-portal-mobile-toggle{display:none}
+
+html[data-theme="light"] .customer-portal-header{
+  background:rgba(247,249,253,.94);
+}
+html[data-theme="light"] .customer-portal-topnav-menu{
+  background:rgba(255,255,255,.98);
+  box-shadow:0 18px 45px rgba(22,34,55,.12);
+}
+
+@media(max-width:1100px) and (min-width:901px){
+  .customer-portal-topnav{max-width:calc(100% - 330px);gap:4px}
+  .customer-portal-topnav-group>summary{padding-inline:9px;font-size:12px}
+  .customer-portal-header-brand{max-width:135px}
+  .customer-portal-primarybar,.customer-portal-utilitybar{padding-inline:14px}
+  .customer-portal-header-brand{inset-inline-start:14px}
+  .customer-portal-header-actions{inset-inline-end:14px}
+}
+
+@media(max-width:900px){
+  .customer-portal-header{z-index:100}
+  .customer-portal-primarybar{
+    height:62px;
+    padding:8px 12px;
+    justify-content:space-between;
+  }
+  .customer-portal-header-brand{
+    position:static;
+    transform:none;
+    max-width:180px;
+  }
+  .customer-portal-topnav{display:none}
+  .customer-portal-header-actions{
+    position:static;
+    transform:none;
+    margin-inline-start:auto;
+  }
+  .customer-portal-mobile-toggle{display:grid}
+  .customer-portal-utilitybar{display:none}
+  .customer-portal-top-identity{display:none}
+
+  .customer-portal-mobile-backdrop{
+    position:fixed;
+    inset:0;
+    z-index:118;
+    display:block;
+    border:0;
+    padding:0;
+    background:rgba(0,0,0,.48);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .18s ease;
+  }
+  .customer-portal-mobile-backdrop.open{
+    opacity:1;
+    pointer-events:auto;
+  }
+
+  .customer-portal-sidebar,
+  .customer-portal-shell.is-collapsed .customer-portal-sidebar{
+    position:fixed;
+    top:0;
+    inset-inline-start:0;
+    z-index:120;
+    width:min(320px,88vw);
+    min-width:min(320px,88vw);
+    height:100dvh;
+    padding:16px 13px 14px;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    border-inline-start:1px solid var(--line);
+    background:color-mix(in srgb,var(--surface) 98%,transparent);
+    box-shadow:-24px 0 70px rgba(0,0,0,.34);
+    transform:translateX(108%);
+    opacity:0;
+    pointer-events:none;
+    transition:transform .22s ease,opacity .18s ease;
+  }
+  html[dir="ltr"] .customer-portal-sidebar{transform:translateX(-108%);box-shadow:24px 0 70px rgba(0,0,0,.34)}
+  .customer-portal-sidebar.open,
+  html[dir="ltr"] .customer-portal-sidebar.open{
+    transform:translateX(0);
+    opacity:1;
+    pointer-events:auto;
+  }
+  .customer-portal-sidebar .customer-portal-brand{display:block}
+  .customer-portal-sidebar .customer-portal-mobile-close{display:grid}
+  .customer-portal-sidebar .customer-portal-section-label{
+    height:auto;
+    margin:18px 8px 8px;
+    opacity:1;
+  }
+  .customer-portal-sidebar .customer-portal-nav{
+    display:flex;
+    flex:1 1 auto;
+    flex-direction:column;
+    min-height:0;
+    overflow-y:auto;
+    gap:5px;
+  }
+  .customer-portal-sidebar .customer-portal-nav>a{
+    min-height:48px;
+    height:48px;
+    max-height:48px;
+    padding:0 10px;
+    justify-content:flex-start;
+  }
+  .customer-portal-sidebar .customer-portal-nav-label,
+  .customer-portal-sidebar .customer-portal-active-dot{display:block}
+  .customer-portal-sidebar .customer-portal-identity{
+    margin-top:12px;
+    padding-top:10px;
+    display:grid;
+  }
+}
+
+@media(max-width:520px){
+  .customer-portal-primarybar{padding-inline:10px}
+  .customer-portal-header-brand{max-width:145px}
+  .customer-portal-header-actions{gap:5px}
+}
