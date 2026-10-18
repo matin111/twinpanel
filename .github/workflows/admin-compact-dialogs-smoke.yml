@@ -1,0 +1,62 @@
+name: TwinPanel Admin Compact Dialogs Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/legacy-nodes-exact.tsx'
+      - 'components/admin-manual-subscription-create.tsx'
+      - 'app/admin-modal-layer-final.css'
+      - '.github/workflows/admin-compact-dialogs-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  compact-dialogs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify compact modal and node management contracts
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          nodes=Path('components/legacy-nodes-exact.tsx').read_text(encoding='utf-8')
+          manual=Path('components/admin-manual-subscription-create.tsx').read_text(encoding='utf-8')
+          css=Path('app/admin-modal-layer-final.css').read_text(encoding='utf-8')
+
+          assert 'type NodeModal="manage"|"ssh"|"domain"|"protocols"|null;' in nodes
+          assert 'setSelectedId(current=>current&&ns.some(row=>row.id===current)?current:0);' in nodes
+          assert 'setModal("manage")' in nodes
+          assert 'className="manage-card node-manage-modal-card"' in nodes
+          assert 'node-manage-actions' in nodes
+          assert '{selected&&<Card>' not in nodes
+          assert 'plan_id:null' in manual
+          assert 'manual-subscription-modal' in manual
+
+          assert 'max-height:min(70dvh,620px)!important;' in css
+          assert 'width:min(700px,calc(100vw - 28px))!important;' in css
+          assert 'grid-template-columns:repeat(3,minmax(0,1fr))!important;' in css
+          assert 'node-manage-modal-card' in css
+          assert 'width:min(680px,calc(100vw - 28px))!important;' in css
+          assert 'max-height:min(70dvh,600px)!important;' in css
+
+          print('ADMIN_COMPACT_DIALOGS_CONTRACT_OK')
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Build frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_API_BASE: ''
+        run: npm run build
