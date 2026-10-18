@@ -11,7 +11,7 @@ body > .runtime-modal{
   display:grid!important;
   place-items:center!important;
   box-sizing:border-box!important;
-  padding:clamp(10px,1.6vw,20px)!important;
+  padding:clamp(12px,2vw,24px)!important;
   overflow:auto!important;
   overscroll-behavior:contain!important;
 }
@@ -30,8 +30,8 @@ body > .runtime-modal > .runtime-modal-card{
   box-sizing:border-box!important;
   height:auto!important;
   min-height:0!important;
-  max-width:calc(100vw - 28px)!important;
-  max-height:calc(100dvh - 40px)!important;
+  max-width:calc(100vw - 32px)!important;
+  max-height:calc(100dvh - 48px)!important;
   margin:auto!important;
   overflow:auto!important;
   overscroll-behavior:contain!important;
@@ -40,14 +40,14 @@ body > .runtime-modal > .runtime-modal-card{
 /* Standard modal widths. */
 .admin-shell .runtime-modal-card.wide,
 body > .runtime-modal > .runtime-modal-card.wide{
-  width:min(860px,calc(100vw - 36px))!important;
-  max-height:min(82dvh,760px)!important;
+  width:min(900px,calc(100vw - 40px))!important;
+  max-height:min(86dvh,840px)!important;
 }
 
 .admin-shell .runtime-modal-card.manage-card,
 body > .runtime-modal > .runtime-modal-card.manage-card{
-  width:min(900px,calc(100vw - 36px))!important;
-  max-height:min(82dvh,760px)!important;
+  width:min(980px,calc(100vw - 40px))!important;
+  max-height:min(86dvh,840px)!important;
 }
 
 /* Subscription create/edit stays deliberately compact and content-driven. */
@@ -132,11 +132,10 @@ body > .runtime-modal.manual-subscription-modal .module-toggle{
   border-radius:10px!important;
 }
 
-/* Infrastructure/tunnel dialogs get enough horizontal room without becoming
- * near-full-screen desktop sheets. */
+/* Infrastructure/tunnel management keeps its existing production width. */
 .admin-shell .legacy-control-page .runtime-modal-card.manage-card{
-  width:min(860px,calc(100vw - 36px))!important;
-  max-height:min(80dvh,720px)!important;
+  width:min(900px,calc(100vw - 40px))!important;
+  max-height:min(84dvh,800px)!important;
 }
 
 /* Node management is a compact command dialog instead of a full-width inline card. */
@@ -235,7 +234,7 @@ body > .runtime-modal.manual-subscription-modal .module-toggle{
 @media(max-width:900px){
   .admin-shell .runtime-modal,
   body > .runtime-modal{
-    padding:9px!important;
+    padding:10px!important;
   }
 
   .admin-shell .runtime-modal-card,
@@ -248,9 +247,9 @@ body > .runtime-modal.manual-subscription-modal .module-toggle{
   body > .runtime-modal > .runtime-modal-card.wide,
   body > .runtime-modal > .runtime-modal-card.manage-card,
   body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manage-card{
-    width:calc(100vw - 18px)!important;
-    max-width:calc(100vw - 18px)!important;
-    max-height:calc(100dvh - 18px)!important;
+    width:calc(100vw - 20px)!important;
+    max-width:calc(100vw - 20px)!important;
+    max-height:calc(100dvh - 20px)!important;
   }
 }
 
@@ -264,7 +263,7 @@ body > .runtime-modal.manual-subscription-modal .module-toggle{
 @media(max-width:560px){
   .admin-shell .runtime-modal,
   body > .runtime-modal{
-    padding:5px!important;
+    padding:6px!important;
   }
 
   .admin-shell .runtime-modal-card,
@@ -277,9 +276,9 @@ body > .runtime-modal.manual-subscription-modal .module-toggle{
   body > .runtime-modal > .runtime-modal-card.wide,
   body > .runtime-modal > .runtime-modal-card.manage-card,
   body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manage-card{
-    width:calc(100vw - 10px)!important;
-    max-width:calc(100vw - 10px)!important;
-    max-height:calc(100dvh - 10px)!important;
+    width:calc(100vw - 12px)!important;
+    max-width:calc(100vw - 12px)!important;
+    max-height:calc(100dvh - 12px)!important;
     border-radius:14px!important;
   }
 
