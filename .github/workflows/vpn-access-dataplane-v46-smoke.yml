@@ -1,0 +1,85 @@
+name: VPN Access Dataplane V46 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/vpn_access_dataplane_v46.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/vpn-access-dataplane-v46-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/vpn_access_dataplane_v46.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/vpn-access-dataplane-v46-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile runtime
+        run: |
+          python -m py_compile \
+            backend/app/vpn_access_dataplane_v46.py \
+            backend/app/tunnel_transport_manager_v12.py
+
+      - name: Verify access dataplane contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          access = Path("backend/app/vpn_access_dataplane_v46.py").read_text()
+          manager = Path("backend/app/tunnel_transport_manager_v12.py").read_text()
+
+          required = [
+              '"cisco": "10.91.0.0/24"',
+              '"openvpn": "10.92.0.0/24"',
+              '"wireguard": "10.93.0.0/24"',
+              '"l2tp": "10.94.0.0/24"',
+              "TP_ACCESS_EGRESS",
+              "TP_ACCESS_FWD",
+              "TP_ACCESS_MSS",
+              "MASQUERADE",
+              "ESTABLISHED,RELATED",
+              "--clamp-mss-to-pmtu",
+              "net.ipv4.ip_forward=1",
+              "/etc/openvpn/twinpanel-central/ca.crt",
+              "/etc/openvpn/twinpanel-central/server.crt",
+              "/etc/openvpn/twinpanel-central/server.key",
+              "openvpn_central_pki_runtime_failed",
+              "OPENVPN_CENTRAL_PKI=ACTIVATED",
+          ]
+
+          for token in required:
+              assert token in access, token
+
+          # Reconciliation owns only dedicated TwinPanel chains. It must not
+          # flush global tables/chains or reset third-party firewall state.
+          forbidden = [
+              "iptables -F",
+              "iptables -t nat -F POSTROUTING",
+              "iptables -t filter -F FORWARD",
+              "iptables-save >",
+              "netfilter-persistent save",
+          ]
+
+          for token in forbidden:
+              assert token not in access, token
+
+          assert "vpn_access_dataplane_v46" in manager
+          assert "vpn_access_dataplane_loop()" in manager
+          assert "twinpanel-vpn-access-dataplane-v46" in manager
+          assert "vpn_access_task" in manager
+
+          print("VPN_ACCESS_DATAPLANE_V46_SMOKE_OK")
+          PY
