@@ -151,11 +151,17 @@ def get_quota_config(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    return sync_node_config(
-        db,
-        node_id,
-        api_base=api_base_url(
+    try:
+        result = sync_node_config(
             db,
-            request,
-        ),
-    )
+            node_id,
+            api_base=api_base_url(db, request),
+        )
+        if result.get("ok"):
+            db.commit()
+        else:
+            db.rollback()
+        return result
+    except Exception:
+        db.rollback()
+        raise
