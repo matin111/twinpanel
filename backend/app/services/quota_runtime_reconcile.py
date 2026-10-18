@@ -20,7 +20,7 @@ from .reseller_traffic_pool import apply_usage_event, open_session
 
 
 # Session truth comes from the VPN daemon, not from page views or account
-# delivery.  This keeps first-use activation tied to a real authenticated VPN
+# delivery. This keeps first-use activation tied to a real authenticated VPN
 # session and makes the public Connect page reflect the same canonical quota
 # ledger used for enforcement.
 QUOTA_RUNTIME_INTERVAL_SECONDS = 5.0
@@ -339,7 +339,7 @@ async def reconcile_quota_runtime_once() -> dict:
                 Node.retired_at.is_(None),
                 or_(
                     Node.enable_cisco.is_(True),
-                    Node.is_mother.is_(True),
+                    Node.agent_url == "local://core",
                 ),
             )
             .order_by(Node.id.asc())
