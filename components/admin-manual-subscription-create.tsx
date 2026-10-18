@@ -168,7 +168,7 @@ export function AdminManualSubscriptionCreate(){
   ):null;
 
   const modal=open?createPortal(
-    <div className="runtime-modal" role="dialog" aria-modal="true" aria-label={pick("ساخت اشتراک دستی","Create manual subscription")}>
+    <div className="runtime-modal manual-subscription-modal" role="dialog" aria-modal="true" aria-label={pick("ساخت اشتراک دستی","Create manual subscription")}>
       <button type="button" className="runtime-modal-bg" aria-label="close" onClick={()=>!busy&&setOpen(false)}/>
       <div className="runtime-modal-card manage-card">
         <div className="card-head">
