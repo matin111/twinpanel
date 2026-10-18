@@ -1,0 +1,52 @@
+name: Public Connect Live V4 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/main.py"
+      - "backend/app/routers/public_connection_live_v4.py"
+      - "app/layout.tsx"
+      - "app/panel-copy-density-final.css"
+      - ".github/workflows/public-connect-live-v4-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/main.py"
+      - "backend/app/routers/public_connection_live_v4.py"
+      - "app/layout.tsx"
+      - "app/panel-copy-density-final.css"
+      - ".github/workflows/public-connect-live-v4-smoke.yml"
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile live router
+        run: |
+          python -m py_compile backend/app/routers/public_connection_live_v4.py backend/app/main.py
+
+      - name: Verify live route precedence and polling contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          main = Path("backend/app/main.py").read_text()
+          live = Path("backend/app/routers/public_connection_live_v4.py").read_text()
+          layout = Path("app/layout.tsx").read_text()
+          css = Path("app/panel-copy-density-final.css").read_text()
+
+          assert "public_connection_live_v4_router" in main
+          assert main.index("app.include_router(public_connection_live_v4_router)") < main.index("app.include_router(public_connection_v3_router)")
+          assert '@router.get("/{token}/live")' in live
+          assert '@router.get("/{token}", response_class=HTMLResponse)' in live
+          assert "setInterval(refresh,3000)" in live
+          assert "active_sessions" in live
+          assert "starts_at" in live and "expires_at" in live
+          assert "liveUsed" in live and "liveStart" in live and "liveStatus" in live
+          assert "panel-copy-density-final.css" in layout
+          assert ".page > .page-head > div > small" in css
+          assert ".reseller-connection-modal .reseller-connection-card" in css
+          assert "168px" in css
+          PY
