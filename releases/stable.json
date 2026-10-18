@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.33",
+  "version": "1.1.0-rc.34",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-18T10:07:44Z",
+  "released_at": "2026-10-18T10:19:58Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d69c1c727ff9e30ad3f0271f428b63adb40b7c7a",
+  "source_sha": "e3c200c97b512617d3138e660443657348f78ebe",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.33/twinpanel-1.1.0-rc.33-linux-x86_64.tar.gz",
-    "sha256": "db6de9fadce4045dd62a95ca30772e086237b36fe59140999ad52f1eab84b484",
-    "size_bytes": 12613646
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.34/twinpanel-1.1.0-rc.34-linux-x86_64.tar.gz",
+    "sha256": "c24718cdc5457cd9dd41ace7279c744226f320fdc92a18acf7bab91edb406187",
+    "size_bytes": 12615158
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.33 کنترل دامنه اختصاصی V2Ray/Xray را برای ساخت و مدیریت نودهای خروجی برمی‌گرداند؛ xray_domain کاملاً مستقل از دامنه عمومی نود ذخیره می‌شود و از صفحات Provision و Nodes/Network قابل ذخیره و آماده‌سازی TLS است. این نسخه همچنین خطای Xray 26.3.x در تشخیص فرمت فایل موقت Modern Xray را برطرف می‌کند: candidate اکنون با پسوند واقعی .json ساخته می‌شود و خطای Failed to get format of /usr/local/etc/xray/config.json.twinpanel-modern دیگر ناشی از نام فایل نخواهد بود. سیاست کاربر بدون تغییر باقی می‌ماند: WebSocket TLS، HTTPUpgrade TLS و VLESS TCP TLS قابل تحویل هستند و gRPC Reality، XHTTP Reality و VLESS Legacy فقط برای Rollback/Diagnostic داخلی حفظ می‌شوند. اصلاح rc.32 برای جلوگیری از نمایش HTML خام 502/503/504 و عدم تکرار خودکار عملیات تغییردهنده نیز حفظ شده است.",
-    "en": "TwinPanel 1.1.0-rc.33 restores a dedicated V2Ray/Xray domain control for both provisioning and existing Exit-node management. xray_domain is stored independently from the Node public/general domain and can be saved or prepared for TLS from Provision and Nodes/Network. It also fixes Xray 26.3.x Modern-config format detection by using a real .json suffix for the temporary candidate, eliminating the filename-driven Failed to get format of /usr/local/etc/xray/config.json.twinpanel-modern failure. The validated customer policy is unchanged: WebSocket TLS, HTTPUpgrade TLS and VLESS TCP TLS are customer-facing, while gRPC Reality, XHTTP Reality and VLESS Legacy remain internal-only for rollback/diagnostics. The rc.32 raw 502/503/504 shielding and non-replay mutation safety are retained."
+    "fa": "نسخه 1.1.0-rc.34 بن‌بست پرداخت پنل کاربری را برطرف می‌کند. سفارش‌های صفر تومانی دیگر پشت دکمه «ادامه پرداخت» گیر نمی‌کنند و بدون نیاز به روش پرداخت یا رسید، از مسیر امن و احراز هویت‌شده «فعال‌سازی اشتراک رایگان» وارد همان فرآیند اصلی ساخت و تحویل سرویس می‌شوند؛ سفارش‌های صفر تومانی قدیمی که در حالت در انتظار پرداخت مانده‌اند نیز قابل بازیابی هستند. برای سفارش‌های غیررایگان، اگر هیچ روش پرداختی در مدیریت فعال نشده باشد، به‌جای دکمه بی‌اثر پیام تنظیمات واضح نمایش داده می‌شود و کلیک دیگر بی‌صدا نادیده گرفته نمی‌شود. قراردادهای فعلی کارت‌به‌کارت، کریپتو و ارسال رسید بدون تغییر حفظ شده‌اند. تمام اصلاحات rc.33 شامل کنترل دامنه اختصاصی V2Ray/Xray، سازگاری Xray 26.3.x و ایمنی Update/Mutation نیز در این نسخه حفظ شده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.34 fixes the customer checkout dead end. Zero-price orders no longer get trapped behind Continue payment; they can be fulfilled through an authenticated, ownership-checked and replay-safe Activate free subscription flow without requiring a payment method or receipt, including recovery of older zero-price orders already stuck in pending payment. For paid orders, an installation with no enabled payment method now shows a clear configuration message instead of a no-op action, and missing method selection is never silently ignored. Existing card-to-card, crypto and receipt-upload contracts are preserved. All rc.33 Xray domain, Xray 26.3.x compatibility and update/mutation safety fixes are retained."
   }
 }
