@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.41",
+  "version": "1.1.0-rc.42",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-18T20:29:55Z",
+  "released_at": "2026-10-18T22:22:38Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "69766766b260be4c3ce5443ba875aefba2e31d53",
+  "source_sha": "f0e644657cf6e518dee6ac58a15604aeffd6e5cb",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.41/twinpanel-1.1.0-rc.41-linux-x86_64.tar.gz",
-    "sha256": "ce34c98ece697448191a8c598833938575e07aab790c3d5b73a3f3c3a97d12ed",
-    "size_bytes": 12748364
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.42/twinpanel-1.1.0-rc.42-linux-x86_64.tar.gz",
+    "sha256": "6207a52d42d7b53f3c5784d8a7ab896d45864449330a5f7d5237cc96f7ac3032",
+    "size_bytes": 12751200
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.41 مشکل باقی‌ماندن رابط قدیمی در تب‌های باز بعد از بروزرسانی را برطرف می‌کند. نسخه دقیق TwinPanel اکنون داخل Bundle فرانت‌اند ثبت می‌شود و تمام صفحات ادمین، کاربر، نماینده و فروشگاه نسخه Client را با نسخه سالم سرور مقایسه می‌کنند. اگر یک تب پس از بروزرسانی هنوز کد نسخه قبلی را اجرا کند، اختلاف نسخه دو بار تأیید و سپس همان صفحه با Cache-Buster نسخه جدید باز می‌شود؛ تب‌های پس‌زمینه و BFCache نیز هنگام بازگشت کاربر بررسی می‌شوند. زمان Restart و قطعی موقت Health هیچ خطایی ایجاد نمی‌کند. Publisher نیز از این پس وجود فایل‌های Static کامل در Standalone Artifact را اجباری می‌کند. اصلاح rc.40 برای ساخت واقعی اشتراک نماینده بدون پلن با plan_id=NULL، انتخاب حجم/مدت/پروتکل‌ها و Provision عادی، و همچنین بسته‌شدن منو با کلیک بیرون بدون تغییر حفظ شده است.",
-    "en": "TwinPanel 1.1.0-rc.41 fixes stale client UI remaining in already-open tabs after an in-panel update. The exact TwinPanel version is now embedded in the frontend bundle and every admin, customer, reseller and storefront page compares its client build against the healthy server version. When a tab is still executing an older release, the mismatch is confirmed twice and the current page is replaced with a version cache-buster so fresh HTML and client chunks are loaded. Background and BFCache tabs are checked when the user returns, while temporary restart/health outages remain silent. The release publisher now also requires complete standalone static assets. The rc.40 true planless reseller subscription flow with plan_id=NULL, direct traffic/duration/protocol selection and normal provisioning, plus portal click-away menus, remains unchanged."
+    "fa": "نسخه 1.1.0-rc.42 رابط تحویل اتصال را در ادمین و نمایندگی جمع‌وجورتر و حرفه‌ای‌تر می‌کند و توضیحات فرعی غیرضروری را از سربرگ‌ها و بخش‌های پنل حذف می‌کند. صفحه عمومی اتصال اکنون هر ۳ ثانیه وضعیت واقعی اشتراک را تازه می‌کند؛ بعد از اولین اتصال VPN، تاریخ شروع و انقضا بدون رفرش صفحه ظاهر می‌شوند، وضعیت «متصل» نمایش داده می‌شود و مصرف ترافیک با دقت KB/MB/GB به‌صورت زنده به‌روزرسانی می‌شود. قبل از اولین اتصال نیز تاریخ شروع به‌اشتباه تاریخ ساخت اشتراک را نشان نمی‌دهد.",
+    "en": "TwinPanel 1.1.0-rc.42 makes admin/reseller connection-delivery dialogs smaller and more polished and removes unnecessary secondary explanatory copy across panel headings and helper sections. The public connection page now refreshes real subscription state every 3 seconds: after the first accepted VPN session, start/expiry dates appear without reloading, connected state is shown, and traffic usage updates live with KB/MB/GB precision. Before first use, the start date no longer falls back to the subscription creation date."
   }
 }
