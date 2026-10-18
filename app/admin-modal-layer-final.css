@@ -3,7 +3,8 @@
  * the sticky admin navigation and keep a predictable desktop/mobile size.
  */
 
-.admin-shell .runtime-modal{
+.admin-shell .runtime-modal,
+body > .runtime-modal{
   position:fixed!important;
   inset:0!important;
   z-index:5000!important;
@@ -15,13 +16,15 @@
   overscroll-behavior:contain!important;
 }
 
-.admin-shell .runtime-modal-bg{
+.admin-shell .runtime-modal-bg,
+body > .runtime-modal > .runtime-modal-bg{
   position:absolute!important;
   inset:0!important;
   z-index:0!important;
 }
 
-.admin-shell .runtime-modal-card{
+.admin-shell .runtime-modal-card,
+body > .runtime-modal > .runtime-modal-card{
   position:relative!important;
   z-index:1!important;
   box-sizing:border-box!important;
@@ -33,12 +36,14 @@
 }
 
 /* Standard modal widths. */
-.admin-shell .runtime-modal-card.wide{
+.admin-shell .runtime-modal-card.wide,
+body > .runtime-modal > .runtime-modal-card.wide{
   width:min(900px,calc(100vw - 40px))!important;
   max-height:min(86dvh,840px)!important;
 }
 
-.admin-shell .runtime-modal-card.manage-card{
+.admin-shell .runtime-modal-card.manage-card,
+body > .runtime-modal > .runtime-modal-card.manage-card{
   width:min(980px,calc(100vw - 40px))!important;
   max-height:min(86dvh,840px)!important;
 }
@@ -83,7 +88,8 @@
 }
 
 @media(max-width:900px){
-  .admin-shell .runtime-modal{
+  .admin-shell .runtime-modal,
+  body > .runtime-modal{
     padding:10px!important;
   }
 
@@ -91,7 +97,10 @@
   .admin-shell .runtime-modal-card.wide,
   .admin-shell .runtime-modal-card.manage-card,
   .admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card,
-  .admin-shell .legacy-control-page .runtime-modal-card.manage-card{
+  .admin-shell .legacy-control-page .runtime-modal-card.manage-card,
+  body > .runtime-modal > .runtime-modal-card,
+  body > .runtime-modal > .runtime-modal-card.wide,
+  body > .runtime-modal > .runtime-modal-card.manage-card{
     width:calc(100vw - 20px)!important;
     max-width:calc(100vw - 20px)!important;
     max-height:calc(100dvh - 20px)!important;
@@ -99,7 +108,8 @@
 }
 
 @media(max-width:560px){
-  .admin-shell .runtime-modal{
+  .admin-shell .runtime-modal,
+  body > .runtime-modal{
     padding:6px!important;
   }
 
@@ -107,7 +117,10 @@
   .admin-shell .runtime-modal-card.wide,
   .admin-shell .runtime-modal-card.manage-card,
   .admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card,
-  .admin-shell .legacy-control-page .runtime-modal-card.manage-card{
+  .admin-shell .legacy-control-page .runtime-modal-card.manage-card,
+  body > .runtime-modal > .runtime-modal-card,
+  body > .runtime-modal > .runtime-modal-card.wide,
+  body > .runtime-modal > .runtime-modal-card.manage-card{
     width:calc(100vw - 12px)!important;
     max-width:calc(100vw - 12px)!important;
     max-height:calc(100dvh - 12px)!important;
