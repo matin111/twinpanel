@@ -106,7 +106,7 @@ export function useAdminNavAttention(_active:string){
 
     const refreshRelease=async()=>{
       try{
-        const release=await request<ReleaseStatus>("/v1/admin/system/release/check",{method:"POST"});
+        const release=await request<ReleaseStatus>("/v1/admin/system/release/status");
         if(!alive)return;
         setState(current=>({...current,updateAvailable:Boolean(release.update_available)}));
       }catch{}
