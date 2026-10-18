@@ -16,13 +16,17 @@ from ..deps import (
 )
 from ..models import (
     Plan,
+    Subscription,
     User,
 )
 from ..reseller_owned_plans import is_internal_reseller_plan
 from ..schemas import SubscriptionCreate
 from ..store_models import StoreOrder
 from .subscriptions import create_subscription
-from .account_delivery import provision_account
+from .account_delivery import (
+    _public_payload,
+    provision_account,
+)
 
 
 router = APIRouter(
@@ -106,6 +110,116 @@ def _order_out(
         "fulfilled_at":
             order.fulfilled_at,
     }
+
+
+def _requested_order_protocols(
+    order: StoreOrder,
+) -> set[str]:
+    return {
+        str(protocol).strip().lower()
+        for protocol in (
+            order.requested_protocols or []
+        )
+        if str(protocol).strip()
+    }
+
+
+def _delivered_protocols(
+    payload: dict | None,
+) -> set[str]:
+    if not isinstance(payload, dict):
+        return set()
+
+    credentials = payload.get("credentials")
+
+    if not isinstance(credentials, list):
+        return set()
+
+    delivered: set[str] = set()
+
+    for row in credentials:
+        if not isinstance(row, dict):
+            continue
+
+        protocol = str(
+            row.get("protocol") or ""
+        ).strip().lower()
+
+        items = row.get("items")
+
+        if not protocol:
+            continue
+
+        if isinstance(items, list):
+            usable = any(
+                isinstance(item, dict)
+                and bool(item)
+                for item in items
+            )
+        else:
+            usable = (
+                isinstance(items, dict)
+                and bool(items)
+            )
+
+        if usable:
+            delivered.add(protocol)
+
+    return delivered
+
+
+def _delivery_ready_for_order(
+    order: StoreOrder,
+    payload: dict | None,
+) -> bool:
+    delivered = _delivered_protocols(payload)
+    requested = _requested_order_protocols(order)
+
+    if requested:
+        return requested.issubset(delivered)
+
+    return bool(delivered)
+
+
+def _existing_delivery_snapshot(
+    order: StoreOrder,
+    db: Session,
+) -> dict | None:
+    if not order.subscription_id:
+        return None
+
+    sub = db.get(
+        Subscription,
+        int(order.subscription_id),
+    )
+
+    if not sub:
+        return None
+
+    try:
+        return _public_payload(db, sub)
+    except Exception:
+        # Existing-delivery inspection is a replay guard only.
+        # A transient read problem must not block the normal
+        # provisioning attempt below.
+        return None
+
+
+def _mark_order_fulfilled(
+    order: StoreOrder,
+    db: Session,
+) -> StoreOrder:
+    order.status = "fulfilled"
+
+    if order.fulfilled_at is None:
+        order.fulfilled_at = datetime.utcnow()
+
+    order.error_text = None
+
+    db.commit()
+    db.refresh(order)
+
+    return order
 
 
 @router.post("/orders")
@@ -424,6 +538,34 @@ async def _fulfill_paid_order(
 
             db.commit()
 
+        # TWINPANEL_STORE_PROVISION_REPLAY_GUARD_V1
+        # A previous attempt may already have created every customer-facing
+        # credential but still marked the order failed because provisioning
+        # returned non-fatal warnings (for example one node or quota refresh).
+        # Recover that order without replaying remote provisioning, especially
+        # important for WireGuard where a blind retry would create another peer.
+        existing_delivery = (
+            _existing_delivery_snapshot(
+                order,
+                db,
+            )
+        )
+
+        if _delivery_ready_for_order(
+            order,
+            existing_delivery,
+        ):
+            order = _mark_order_fulfilled(
+                order,
+                db,
+            )
+
+            return {
+                **_order_out(order),
+                "delivery_ready": True,
+                "recovered_existing_delivery": True,
+            }
+
         provision_result = (
             await provision_account(
                 int(order.subscription_id),
@@ -431,49 +573,53 @@ async def _fulfill_paid_order(
             )
         )
 
-        if isinstance(
+        if not isinstance(
             provision_result,
             dict,
         ):
-            errors = (
-                provision_result.get("errors")
-                or provision_result.get(
-                    "provision_errors"
-                )
-                or []
+            raise RuntimeError(
+                "invalid account provisioning response"
             )
 
+        errors = (
+            provision_result.get("errors")
+            or provision_result.get(
+                "provision_errors"
+            )
+            or []
+        )
+
+        # Provision-account intentionally reports partial node failures and
+        # quota refresh failures in `errors`, even when usable credentials were
+        # successfully created. Checkout must fail only when one of the
+        # customer-requested protocols has no usable delivered credential.
+        if not _delivery_ready_for_order(
+            order,
+            provision_result,
+        ):
             if errors:
                 raise RuntimeError(
                     str(errors)[:1000]
                 )
 
-            if (
-                "ok" in provision_result
-                and provision_result["ok"]
-                is False
-            ):
-                raise RuntimeError(
-                    "account provisioning failed"
-                )
+            raise RuntimeError(
+                "account delivery is incomplete"
+            )
 
         order = db.get(
             StoreOrder,
             order_id,
         )
 
-        order.status = "fulfilled"
-        order.fulfilled_at = (
-            datetime.utcnow()
+        order = _mark_order_fulfilled(
+            order,
+            db,
         )
-        order.error_text = None
-
-        db.commit()
-        db.refresh(order)
 
         return {
             **_order_out(order),
             "delivery_ready": True,
+            "provision_warnings": errors,
         }
 
     except HTTPException:
