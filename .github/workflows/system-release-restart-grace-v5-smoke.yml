@@ -1,0 +1,57 @@
+name: System Release Restart Grace V5 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/system-release-footer.tsx'
+      - 'components/admin-nav-attention.ts'
+      - '.github/workflows/system-release-restart-grace-v5-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify updater restart grace and release polling ownership
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          footer = Path('components/system-release-footer.tsx').read_text(encoding='utf-8')
+          nav = Path('components/admin-nav-attention.ts').read_text(encoding='utf-8')
+
+          footer_required = [
+              'const TRANSIENT_API_GRACE_MS=60*1000;',
+              'const RELEASE_CHECK_INTERVAL_MS=5*60*1000;',
+              'const loadInFlightRef=useRef<{status:boolean;check:boolean}>({status:false,check:false});',
+              'if(loadInFlightRef.current[lane])return;',
+              'setError("");',
+              'if(marker||Date.now()-started<TRANSIENT_API_GRACE_MS)return;',
+              'const checkTimer=window.setInterval(maybeCheckLatest,RELEASE_CHECK_INTERVAL_MS);',
+              'window.addEventListener("focus",refreshStatus);',
+              'document.addEventListener("visibilitychange",refreshStatus);',
+              'if(claimBackgroundReleaseCheck())checkLatest();',
+          ]
+          missing_footer = [item for item in footer_required if item not in footer]
+          if missing_footer:
+              raise SystemExit(f'missing release restart grace contract: {missing_footer}')
+
+          forbidden_footer = [
+              'window.setInterval(checkNow,60000)',
+              'window.addEventListener("focus",checkNow)',
+              'document.addEventListener("visibilitychange",checkNow)',
+          ]
+          leaked_footer = [item for item in forbidden_footer if item in footer]
+          if leaked_footer:
+              raise SystemExit(f'aggressive release/check polling returned: {leaked_footer}')
+
+          if 'const release=await request<ReleaseStatus>("/v1/admin/system/release/check",{method:"POST"});' in nav:
+              raise SystemExit('navigation attention must not own release/check POST polling')
+          if 'const release=await request<ReleaseStatus>("/v1/admin/system/release/status");' not in nav:
+              raise SystemExit('navigation attention must read release/status')
+
+          print('SYSTEM_RELEASE_RESTART_GRACE_V5_OK')
+          PY
