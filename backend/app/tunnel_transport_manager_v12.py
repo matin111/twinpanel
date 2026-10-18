@@ -8,6 +8,7 @@ from .runtime_reconciler_v3 import reconciler_loop as runtime_reconciler_loop
 from .manager_runtime_v16 import install_manager_runtime_v16
 from .smart_transport_auto_v21 import install_smart_transport_auto_v21
 from .smart_auto_bootstrap_v24 import reconciler_loop as smart_bootstrap_loop
+from .smart_candidate_bootstrap_v38 import reconciler_loop as candidate_bootstrap_loop
 
 
 # ============================================================
@@ -23,6 +24,14 @@ from .smart_auto_bootstrap_v24 import reconciler_loop as smart_bootstrap_loop
 # both have saved SSH access, it creates one AUTO logical pair and a disabled
 # seed row. It never guesses across multiple nodes and never installs a legacy
 # data plane itself.
+#
+# Smart Candidate Bootstrap V38 handles the distinct legacy-only topology case:
+# an AUTO logical tunnel may already exist and be online through ssh_relay while
+# having zero modern candidate rows. Historical V7 dispatch only enters the
+# Smart Auto selector after an overlay row exists, so such tunnels could remain
+# permanently on the slow legacy fallback. V38 invokes V21's existing bounded
+# candidate scheduler for every active AUTO tunnel until candidate rows exist.
+# It does not own installation, health, benchmarking or selection itself.
 #
 # Smart Auto owns transport qualification/selection:
 #   * installs isolated modern L3 candidates (GRE, GOST TUN/WSS,
@@ -49,6 +58,7 @@ async def main() -> None:
         "TWINPANEL_TRANSPORT_MANAGER_V12_START "
         "policy=smart-speed-health "
         "bootstrap=v24 "
+        "candidate_bootstrap=v38 "
         "reconciler=v3 "
         "candidates=kernel_gre,gost_tun,amneziawg,netrix",
         flush=True,
@@ -57,6 +67,11 @@ async def main() -> None:
     bootstrap_task = asyncio.create_task(
         smart_bootstrap_loop(),
         name="twinpanel-smart-auto-bootstrap-v24",
+    )
+
+    candidate_bootstrap_task = asyncio.create_task(
+        candidate_bootstrap_loop(),
+        name="twinpanel-smart-candidate-bootstrap-v38",
     )
 
     manager_task = asyncio.create_task(
@@ -76,6 +91,7 @@ async def main() -> None:
 
     tasks = {
         bootstrap_task,
+        candidate_bootstrap_task,
         manager_task,
         runtime_task,
         legacy_ingress_task,
