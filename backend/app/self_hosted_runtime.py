@@ -17,8 +17,26 @@ from . import xray_modern_runtime
 from .xray_modern_repair_runtime import (
     apply_xray_modern_repair_runtime,
 )
+from .xray_node_domain_runtime import (
+    apply_xray_node_domain_runtime,
+)
+from .xray_public_delivery_runtime import (
+    apply_xray_public_delivery_runtime,
+)
 from .xray_profile_reconcile_v36 import (
     apply_xray_profile_reconcile_v36,
+)
+from .xray_tcp_tls_v39 import (
+    apply_xray_tcp_tls_v39,
+)
+from .xray_tcp_tls_compat_v44 import (
+    apply_xray_tcp_tls_compat_v44,
+)
+from .xray_reconcile_infra_v41 import (
+    apply_xray_reconcile_infra_v41,
+)
+from .xray_customer_profile_policy_v30 import (
+    apply_xray_customer_profile_policy_v30,
 )
 from .tunnel_service_connections_admin_runtime import (
     apply_tunnel_service_connections_admin_runtime,
@@ -159,21 +177,33 @@ def apply_self_hosted_runtime() -> None:
     xray_modern_runtime.apply_xray_modern_runtime()
 
     # ------------------------------------------------------------
-    # Xray Modern Repair Runtime V1
+    # Xray production composition
+    #
+    # Keep the old Reality listeners internally for diagnostics/rollback, but
+    # restore the validated customer policy:
+    #   WebSocket TLS -> HTTPUpgrade TLS -> VLESS TCP TLS
+    #
+    # The dedicated Xray domain remains independent from the general Node
+    # domain. V44 keeps TCP TLS config validation compatible with Xray 26.3.x.
     # ------------------------------------------------------------
 
     apply_xray_modern_repair_runtime()
-
-    # ------------------------------------------------------------
-    # Service Connections V28
-    #
-    # These runtimes were previously merged and later lost from the public
-    # release lineage while their UI remained. Register them after Xray Modern
-    # has patched the service-route generator so UI and Agent desired-state read
-    # the same live route source.
-    # ------------------------------------------------------------
-
+    apply_xray_node_domain_runtime()
+    apply_xray_public_delivery_runtime()
     apply_xray_profile_reconcile_v36()
+    apply_xray_tcp_tls_v39()
+    apply_xray_tcp_tls_compat_v44()
+    apply_xray_reconcile_infra_v41()
+    apply_xray_customer_profile_policy_v30()
+
+    # ------------------------------------------------------------
+    # Service Connections V30
+    #
+    # Register the route only after the final Xray policy has wrapped the
+    # endpoint. This prevents Legacy/XHTTP/gRPC from leaking back into the
+    # normal customer/admin service cards while preserving them internally.
+    # ------------------------------------------------------------
+
     apply_tunnel_service_connections_admin_runtime()
     apply_tp2027_egress_v28()
     apply_service_connections_jobs_v28()
