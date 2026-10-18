@@ -26,7 +26,6 @@ const LegacySubscriptionsRuntimePage=dynamic(()=>import("./legacy-subscriptions-
 const AdminManualSubscriptionCreate=dynamic(()=>import("./admin-manual-subscription-create").then(m=>m.AdminManualSubscriptionCreate));
 const AdminUsersRuntime=dynamic(()=>import("./admin-users-runtime").then(m=>m.AdminUsersRuntime));
 const LegacyNodesRuntimePage=dynamic(()=>import("./legacy-nodes-exact").then(m=>m.LegacyNodesRuntimePage));
-const NodeXrayDomainRuntimeV33=dynamic(()=>import("./node-xray-domain-runtime-v33").then(m=>m.NodeXrayDomainRuntimeV33));
 const LegacyPlansRuntimePage=dynamic(()=>import("./legacy-plans-exact").then(m=>m.LegacyPlansRuntimePage));
 const TunnelsSimpleRuntimePage=dynamic(()=>import("./tunnels-simple-runtime").then(m=>m.TunnelsSimpleRuntimePage));
 const SmartTransportsRuntimeV25=dynamic(()=>import("./smart-transports-runtime-v25").then(m=>m.SmartTransportsRuntimeV25));
@@ -78,8 +77,8 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="admin/subscriptions") return admin(<><LegacySubscriptionsRuntimePage/><AdminManualSubscriptionCreate/></>);
   if(key==="admin/subscription-tools") return admin(<SubscriptionToolsRuntimePage/>);
   if(key==="admin/plans") return admin(<LegacyPlansRuntimePage/>);
-  if(key==="admin/nodes") return admin(<><LegacyNodesRuntimePage/><NodeXrayDomainRuntimeV33/></>);
-  if(key==="admin/network") return admin(<><LegacyNodesRuntimePage/><NodeXrayDomainRuntimeV33/></>);
+  if(key==="admin/nodes") return admin(<LegacyNodesRuntimePage/>);
+  if(key==="admin/network") return admin(<LegacyNodesRuntimePage/>);
   if(key==="admin/tunnels") return admin(<TunnelsSimpleRuntimePage/>);
   if(key==="admin/tunnel-transports") return admin(<SmartTransportsRuntimeV25/>);
   if(key==="admin/payments") return admin(<PaymentsReviewRuntime/>);
