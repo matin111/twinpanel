@@ -8,6 +8,7 @@ from .runtime_reconciler_v3 import reconciler_loop as runtime_reconciler_loop
 from .manager_runtime_v16 import install_manager_runtime_v16
 from .smart_transport_auto_v21 import install_smart_transport_auto_v21
 from .smart_auto_bootstrap_v24 import reconciler_loop as smart_bootstrap_loop
+from .smart_auto_discovery_v38 import install_smart_auto_discovery_v38
 
 
 # ============================================================
@@ -23,6 +24,12 @@ from .smart_auto_bootstrap_v24 import reconciler_loop as smart_bootstrap_loop
 # both have saved SSH access, it creates one AUTO logical pair and a disabled
 # seed row. It never guesses across multiple nodes and never installs a legacy
 # data plane itself.
+#
+# Smart Auto Discovery V38 fixes the zero-candidate starvation case: an AUTO
+# logical tunnel that has only legacy rows is routed into Smart Auto before the
+# old V7 overlay-row gate can delegate it back to V6. This lets the first GRE /
+# GOST / AWG / Netrix candidate be installed automatically while the existing
+# healthy legacy dataplane remains available until qualification succeeds.
 #
 # Smart Auto owns transport qualification/selection:
 #   * installs isolated modern L3 candidates (GRE, GOST TUN/WSS,
@@ -44,11 +51,13 @@ from .smart_auto_bootstrap_v24 import reconciler_loop as smart_bootstrap_loop
 async def main() -> None:
     install_manager_runtime_v16()
     install_smart_transport_auto_v21()
+    install_smart_auto_discovery_v38()
 
     print(
         "TWINPANEL_TRANSPORT_MANAGER_V12_START "
         "policy=smart-speed-health "
         "bootstrap=v24 "
+        "discovery=v38 "
         "reconciler=v3 "
         "candidates=kernel_gre,gost_tun,amneziawg,netrix",
         flush=True,
