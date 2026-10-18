@@ -1,0 +1,62 @@
+name: Smart Auto Zero Candidate V38 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/smart_auto_discovery_v38.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/app/smart_transport_auto_v21.py"
+      - ".github/workflows/smart-auto-zero-candidate-v38-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/smart_auto_discovery_v38.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/app/smart_transport_auto_v21.py"
+      - ".github/workflows/smart-auto-zero-candidate-v38-smoke.yml"
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile discovery runtime
+        run: |
+          python3 -m py_compile \
+            backend/app/smart_auto_discovery_v38.py \
+            backend/app/tunnel_transport_manager_v12.py
+
+      - name: Verify zero-candidate discovery contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          discovery = Path("backend/app/smart_auto_discovery_v38.py").read_text()
+          manager = Path("backend/app/tunnel_transport_manager_v12.py").read_text()
+          smart = Path("backend/app/smart_transport_auto_v21.py").read_text()
+
+          required_discovery = [
+              "ZERO_CANDIDATE_AUTO",
+              "manage_2027_v21(",
+              "Tunnel.mode",
+              "TunnelTransport.transport.in_(overlay_names)",
+              "v7.cycle = cycle_v38",
+          ]
+          for needle in required_discovery:
+              assert needle in discovery, needle
+
+          assert "install_smart_auto_discovery_v38" in manager
+          assert "install_smart_transport_auto_v21()" in manager
+          assert manager.index("install_smart_transport_auto_v21()") < manager.index("install_smart_auto_discovery_v38()")
+
+          # The first modern candidate must still be GRE; the wrapper only
+          # fixes discovery and must not silently change transport policy.
+          assert 'AUTO_INSTALL_NAMES = ("kernel_gre", "gost_tun", "amneziawg", "netrix")' in smart
+          assert "_maybe_schedule_install(int(tunnel.id))" in smart
+
+          # Manual tunnels are explicitly excluded from the discovery path.
+          assert 'if _name(tunnel.mode) != "auto":' in discovery
+
+          print("SMART_AUTO_ZERO_CANDIDATE_V38_CONTRACT=PASS")
+          PY
