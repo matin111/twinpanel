@@ -39,7 +39,7 @@ jobs:
           required_discovery = [
               "ZERO_CANDIDATE_AUTO",
               "manage_2027_v21(",
-              "Tunnel.mode",
+              "tunnel.mode",
               "TunnelTransport.transport.in_(overlay_names)",
               "v7.cycle = cycle_v38",
           ]
