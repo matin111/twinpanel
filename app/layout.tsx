@@ -6,6 +6,7 @@ import {SupportChatRuntime} from "../components/support-chat-runtime";
 import {ChatOpenBridge} from "../components/chat-open-bridge";
 import {CustomerDeliveryEnhancement} from "../components/customer-delivery-enhancement";
 import {CustomerStoreRedirect} from "../components/customer-store-redirect";
+import {PortalTopNavBehavior} from "../components/portal-topnav-behavior";
 import "./core.css";
 import "./pages.css";
 import "./i18n.css";
@@ -63,6 +64,6 @@ export const metadata:Metadata={title:"VPN Control 2027",description:"VPN manage
 
 export default function RootLayout({children}:{children:React.ReactNode}){
   return <html lang="fa" dir="rtl" data-theme="dark" suppressHydrationWarning>
-    <body><ThemeProvider><BrandingProvider><I18nProvider>{children}<CustomerStoreRedirect/><CustomerDeliveryEnhancement/><SupportChatRuntime/><ChatOpenBridge/></I18nProvider></BrandingProvider></ThemeProvider></body>
+    <body><ThemeProvider><BrandingProvider><I18nProvider>{children}<PortalTopNavBehavior/><CustomerStoreRedirect/><CustomerDeliveryEnhancement/><SupportChatRuntime/><ChatOpenBridge/></I18nProvider></BrandingProvider></ThemeProvider></body>
   </html>;
 }

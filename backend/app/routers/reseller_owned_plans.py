@@ -9,6 +9,7 @@ from ..deps import require_reseller
 from ..models import Plan, Subscription
 from ..models_reseller import Reseller, ResellerSubscription
 from ..reseller_bot_order_models import ResellerBotOrder
+from ..reseller_manual_subscriptions import create_manual_reseller_subscription
 from ..reseller_owned_plan_models import ResellerBotPlan
 from ..reseller_owned_plans import (
     create_owned_plan,
@@ -60,6 +61,16 @@ class ResellerManualSubscriptionIn(BaseModel):
     node_ids: list[int] = Field(default_factory=list)
     username: str | None = Field(default=None, max_length=64)
     password: str | None = Field(default=None, max_length=64)
+    idempotency_key: str = Field(min_length=8, max_length=100)
+
+
+class ResellerDirectSubscriptionIn(BaseModel):
+    traffic_gb: float = Field(gt=0, le=100000)
+    duration_days: int = Field(ge=1, le=3650)
+    node_ids: list[int] = Field(default_factory=list)
+    protocols: list[str] = Field(default_factory=list)
+    username: str | None = Field(default=None, max_length=120)
+    password: str | None = Field(default=None, min_length=4, max_length=256)
     idempotency_key: str = Field(min_length=8, max_length=100)
 
 
@@ -296,6 +307,25 @@ def create_reseller_subscription(
         username=payload.username,
         password=payload.password,
         sell_price_toman=0,
+    )
+
+
+@router.post("/subscriptions/manual-create")
+def create_reseller_manual_subscription(
+    payload: ResellerDirectSubscriptionIn,
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    return create_manual_reseller_subscription(
+        db,
+        reseller=reseller,
+        traffic_gb=payload.traffic_gb,
+        duration_days=payload.duration_days,
+        protocols=payload.protocols,
+        idempotency_key=payload.idempotency_key,
+        node_ids=payload.node_ids,
+        username=payload.username,
+        password=payload.password,
     )
 
 

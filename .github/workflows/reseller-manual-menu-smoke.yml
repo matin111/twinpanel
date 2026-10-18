@@ -1,0 +1,191 @@
+name: TwinPanel Reseller Manual Create And Menu Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/reseller_manual_subscriptions.py'
+      - 'backend/app/subscription_plan_schema.py'
+      - 'backend/app/routers/reseller_owned_plans.py'
+      - 'components/reseller-subscriptions-parity.tsx'
+      - 'components/portal-topnav-behavior.tsx'
+      - 'app/layout.tsx'
+      - 'lib/reseller-manual-subscription-api.ts'
+      - '.github/workflows/reseller-manual-menu-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  reseller-manual-menu:
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: twinpanel
+          POSTGRES_PASSWORD: twinpanel_test
+          POSTGRES_DB: twinpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U twinpanel -d twinpanel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      APP_NAME: TwinPanel-Reseller-Manual-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+      NEXT_TELEMETRY_DISABLED: '1'
+      NEXT_PUBLIC_API_BASE: ''
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Prepare runtime directories
+        run: |
+          sudo install -d -m 700 /etc/twinpanel
+          sudo install -d -m 700 /var/lib/twinpanel-backups
+          sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel-backups
+
+      - name: Verify true reseller manual creation runtime
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from sqlalchemy import inspect
+
+          from app.main import app
+          from app.database import SessionLocal, engine
+          from app.models import Subscription, SubscriptionProtocol, User
+          from app.models_reseller import Reseller, ResellerSubscription
+          from app.reseller_manual_subscriptions import create_manual_reseller_subscription
+          from app.security import hash_password
+
+          assert app.title
+          plan_column={c['name']:c for c in inspect(engine).get_columns('subscriptions')}['plan_id']
+          assert plan_column['nullable'] is True
+
+          db=SessionLocal()
+          try:
+              owner=User(
+                  email='reseller-manual-ci@example.com',
+                  password_hash=hash_password('TwinPanel-CI-Reseller-2026!'),
+                  full_name='Reseller Manual CI',
+                  is_active=True,
+              )
+              db.add(owner); db.flush()
+              reseller=Reseller(
+                  owner_user_id=owner.id,
+                  code='RSMANUALCI',
+                  name='Reseller Manual CI',
+                  traffic_balance_bytes=100 * 1024**3,
+                  traffic_credit_bytes=0,
+                  is_active=True,
+              )
+              db.add(reseller); db.commit(); db.refresh(reseller)
+
+              result=create_manual_reseller_subscription(
+                  db,
+                  reseller=reseller,
+                  traffic_gb=25.5,
+                  duration_days=45,
+                  protocols=['cisco','wireguard','v2ray'],
+                  idempotency_key='reseller-manual-ci-key-0001',
+                  node_ids=[],
+                  username=None,
+                  password=None,
+              )
+              assert result['creation_mode']=='manual'
+              assert result['plan_id'] is None
+              assert result['plan_name']=='دستی'
+              sub_id=int(result['subscription_id'])
+
+              sub=db.get(Subscription,sub_id)
+              assert sub is not None
+              assert sub.plan_id is None
+              assert sub.traffic_limit_bytes == round(25.5 * 1024**3)
+              assert sub.activation_duration_days == 45
+              linked=db.query(ResellerSubscription).filter(ResellerSubscription.subscription_id==sub_id).one()
+              assert linked.reseller_id == reseller.id
+              protocols=[row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==sub_id).order_by(SubscriptionProtocol.protocol).all()]
+              assert protocols == ['cisco','v2ray','wireguard']
+
+              duplicate=create_manual_reseller_subscription(
+                  db,
+                  reseller=reseller,
+                  traffic_gb=25.5,
+                  duration_days=45,
+                  protocols=['cisco'],
+                  idempotency_key='reseller-manual-ci-key-0001',
+              )
+              assert duplicate['duplicate'] is True
+              assert int(duplicate['subscription_id']) == sub_id
+          finally:
+              db.close()
+
+          print('RESELLER_MANUAL_CREATE_RUNTIME_OK')
+          PY
+
+      - name: Verify frontend and click-away contracts
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          ui=Path('components/reseller-subscriptions-parity.tsx').read_text(encoding='utf-8')
+          api=Path('lib/reseller-manual-subscription-api.ts').read_text(encoding='utf-8')
+          menu=Path('components/portal-topnav-behavior.tsx').read_text(encoding='utf-8')
+          layout=Path('app/layout.tsx').read_text(encoding='utf-8')
+          backend=Path('backend/app/routers/reseller_owned_plans.py').read_text(encoding='utf-8')
+          service=Path('backend/app/reseller_manual_subscriptions.py').read_text(encoding='utf-8')
+
+          assert '/subscriptions/manual-create' in backend
+          assert 'plan_id=None' in service
+          assert 'createResellerManualSubscription' in ui
+          assert 'sell.protocols.length===0' in ui
+          assert '!backingPlan' not in ui
+          assert '/v1/reseller/subscriptions/manual-create' in api
+          assert 'document.addEventListener("click",onClick,true)' in menu
+          assert 'if(!target.closest(".customer-portal-topnav"))closeGroups()' in menu
+          assert 'event.key==="Escape"' in menu
+          assert '<PortalTopNavBehavior/>' in layout
+
+          print('RESELLER_MANUAL_MENU_FRONTEND_OK')
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Build frontend
+        run: npm run build
