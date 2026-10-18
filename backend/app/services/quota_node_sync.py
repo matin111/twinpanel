@@ -1,61 +1,111 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from ..models import Node, SubscriptionNode, ProtocolCredential
+from ..models import Node, ProtocolCredential, SubscriptionNode
+from ..quota_models import QuotaDevice
 from ..quota_security import public_key_b64
 
 
-def build_node_devices(db: Session, node_id: int):
+_PROTOCOL_TO_QUOTA = {
+    "cisco": "openconnect",
+    "openvpn": "openvpn",
+    "wireguard": "wireguard",
+    "l2tp": "l2tp",
+    "v2ray": "xray",
+}
 
+
+def _quota_device_for_credential(
+    db: Session,
+    credential: ProtocolCredential,
+) -> QuotaDevice:
+    """Return the canonical quota device for one protocol credential.
+
+    QuotaSession.device_id is a foreign key to quota_devices.id.  Older node
+    config generation accidentally exported ProtocolCredential.id instead,
+    causing every real session-open/usage event to be rejected as
+    device_not_allowed.  Existing installations may also predate automatic
+    QuotaDevice creation, so this function performs an idempotent lazy backfill.
+    """
+
+    source_protocol = str(credential.protocol or "").strip().lower()
+
+    device = (
+        db.query(QuotaDevice)
+        .filter(
+            QuotaDevice.subscription_id == int(credential.subscription_id),
+            QuotaDevice.protocol == source_protocol,
+            QuotaDevice.status == "active",
+        )
+        .order_by(QuotaDevice.id.asc())
+        .first()
+    )
+
+    if device is not None:
+        return device
+
+    device = QuotaDevice(
+        subscription_id=int(credential.subscription_id),
+        protocol=source_protocol,
+        device_key=f"subscription:{int(credential.subscription_id)}:{source_protocol}",
+        credential_public_hash=f"legacy-backfill-{int(credential.subscription_id)}-{source_protocol}",
+        status="active",
+    )
+    db.add(device)
+    db.flush()
+    return device
+
+
+def build_node_devices(db: Session, node_id: int):
     result = []
 
     rows = (
-        db.query(
-            ProtocolCredential,
-            SubscriptionNode
-        )
+        db.query(ProtocolCredential, SubscriptionNode)
         .join(
             SubscriptionNode,
-            SubscriptionNode.subscription_id ==
-            ProtocolCredential.subscription_id
+            SubscriptionNode.subscription_id == ProtocolCredential.subscription_id,
         )
         .filter(
-            SubscriptionNode.node_id == node_id,
-            ProtocolCredential.is_active.is_(True)
+            SubscriptionNode.node_id == int(node_id),
+            ProtocolCredential.is_active.is_(True),
+        )
+        .order_by(
+            ProtocolCredential.subscription_id.asc(),
+            ProtocolCredential.id.asc(),
         )
         .all()
     )
 
-    for credential, link in rows:
+    seen: set[tuple[int, str]] = set()
 
-        protocol = str(
-            credential.protocol
-        ).lower()
+    for credential, _link in rows:
+        source_protocol = str(credential.protocol or "").strip().lower()
+        protocol = _PROTOCOL_TO_QUOTA.get(source_protocol)
 
-        if protocol == "cisco":
-            protocol = "openconnect"
+        if protocol is None:
+            continue
 
-        if protocol == "v2ray":
-            protocol = "xray"
+        dedupe_key = (int(credential.subscription_id), protocol)
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+
+        device = _quota_device_for_credential(db, credential)
 
         result.append(
             {
-                "device_id": credential.id,
-                "subscription_id": credential.subscription_id,
+                # IMPORTANT: quota sessions/events reference quota_devices.id,
+                # never protocol_credentials.id.
+                "device_id": int(device.id),
+                "subscription_id": int(credential.subscription_id),
                 "protocol": protocol,
                 "identity": (
-                    getattr(
-                        credential,
-                        "username",
-                        None
-                    )
-                    or
-                    f"mv-{credential.subscription_id}@twinpanel"
+                    getattr(credential, "username", None)
+                    or f"mv-{int(credential.subscription_id)}@twinpanel"
                 ),
             }
         )
@@ -63,56 +113,43 @@ def build_node_devices(db: Session, node_id: int):
     return result
 
 
-
 def sync_node_config(db: Session, node_id: int, api_base: str | None = None):
-
-    node = db.get(
-        Node,
-        node_id
-    )
+    node = db.get(Node, int(node_id))
 
     if not node:
         return {
             "ok": False,
-            "reason": "node_not_found"
+            "reason": "node_not_found",
         }
 
+    devices = build_node_devices(db, int(node_id))
 
-    devices = build_node_devices(
-        db,
-        node_id
-    )
-
-
-    path = Path(
-        f"/tmp/twinpanel-node-{node_id}.json"
-    )
-
+    path = Path(f"/tmp/twinpanel-node-{int(node_id)}.json")
 
     config = {
-        "version": 1,
-        "node_id": node_id,
-        "api_base":
-            str(api_base or "").rstrip("/"),
-        "command_public_key_b64":
-            public_key_b64(),
-        "devices":
-            devices,
+        "version": 2,
+        "node_id": int(node_id),
+        "api_base": str(api_base or "").rstrip("/"),
+        "command_public_key_b64": public_key_b64(),
+        "devices": devices,
     }
-
 
     path.write_text(
         json.dumps(
             config,
             ensure_ascii=False,
-            indent=2
-        )
+            indent=2,
+        ),
+        encoding="utf-8",
     )
 
+    # Lazy-backfilled QuotaDevice rows must survive after this request.
+    db.flush()
 
     return {
         "ok": True,
-        "node_id": node_id,
+        "node_id": int(node_id),
         "devices": len(devices),
-        "config": str(path)
+        "config": str(path),
+        "payload": config,
     }
