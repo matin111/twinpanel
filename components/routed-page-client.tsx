@@ -13,7 +13,7 @@ const AdminResellersManagementRuntime=dynamic(()=>import("./admin-resellers-mana
 const AdminResellerTrafficPlans=dynamic(()=>import("./admin-reseller-traffic-plans").then(m=>m.AdminResellerTrafficPlans));
 const StoreSettingsManager=dynamic(()=>import("./store-settings-manager").then(m=>m.StoreSettingsManager));
 const BackupsFullRuntimePage=dynamic(()=>import("./backups-full-runtime").then(m=>m.BackupsFullRuntimePage));
-const ProvisionRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.ProvisionRuntimePage));
+const ProvisionRuntimeXrayDomainPage=dynamic(()=>import("./provision-runtime-xray-domain").then(m=>m.ProvisionRuntimeXrayDomainPage));
 const SmsReaderRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.SmsReaderRuntimePage));
 const AdminSmsRelayDownload=dynamic(()=>import("./admin-sms-relay-download").then(m=>m.AdminSmsRelayDownload));
 const MotherAccessRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.MotherAccessRuntimePage));
@@ -26,6 +26,7 @@ const LegacySubscriptionsRuntimePage=dynamic(()=>import("./legacy-subscriptions-
 const AdminManualSubscriptionCreate=dynamic(()=>import("./admin-manual-subscription-create").then(m=>m.AdminManualSubscriptionCreate));
 const AdminUsersRuntime=dynamic(()=>import("./admin-users-runtime").then(m=>m.AdminUsersRuntime));
 const LegacyNodesRuntimePage=dynamic(()=>import("./legacy-nodes-exact").then(m=>m.LegacyNodesRuntimePage));
+const NodeXrayDomainRuntimeV33=dynamic(()=>import("./node-xray-domain-runtime-v33").then(m=>m.NodeXrayDomainRuntimeV33));
 const LegacyPlansRuntimePage=dynamic(()=>import("./legacy-plans-exact").then(m=>m.LegacyPlansRuntimePage));
 const TunnelsSimpleRuntimePage=dynamic(()=>import("./tunnels-simple-runtime").then(m=>m.TunnelsSimpleRuntimePage));
 const SmartTransportsRuntimeV25=dynamic(()=>import("./smart-transports-runtime-v25").then(m=>m.SmartTransportsRuntimeV25));
@@ -77,8 +78,8 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="admin/subscriptions") return admin(<><LegacySubscriptionsRuntimePage/><AdminManualSubscriptionCreate/></>);
   if(key==="admin/subscription-tools") return admin(<SubscriptionToolsRuntimePage/>);
   if(key==="admin/plans") return admin(<LegacyPlansRuntimePage/>);
-  if(key==="admin/nodes") return admin(<LegacyNodesRuntimePage/>);
-  if(key==="admin/network") return admin(<LegacyNodesRuntimePage/>);
+  if(key==="admin/nodes") return admin(<><LegacyNodesRuntimePage/><NodeXrayDomainRuntimeV33/></>);
+  if(key==="admin/network") return admin(<><LegacyNodesRuntimePage/><NodeXrayDomainRuntimeV33/></>);
   if(key==="admin/tunnels") return admin(<TunnelsSimpleRuntimePage/>);
   if(key==="admin/tunnel-transports") return admin(<SmartTransportsRuntimeV25/>);
   if(key==="admin/payments") return admin(<PaymentsReviewRuntime/>);
@@ -97,7 +98,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="admin/resellers") return admin(<AdminResellersManagementRuntime/>);
   if(key==="admin/reseller-traffic-plans") return admin(<AdminResellerTrafficPlans/>);
   if(key==="admin/domains") return admin(<DomainsRuntimePage/>);
-  if(key==="admin/provision") return admin(<ProvisionRuntimePage/>);
+  if(key==="admin/provision") return admin(<ProvisionRuntimeXrayDomainPage/>);
   if(key==="admin/account-delivery") return admin(<AccountDeliveryRuntimePage/>);
   if(key==="admin/downloads") return admin(<DownloadAssetsRuntime/>);
   if(key==="admin/vpn-settings") return admin(<VpnSettingsModernPage/>);

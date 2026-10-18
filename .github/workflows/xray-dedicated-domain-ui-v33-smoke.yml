@@ -1,0 +1,85 @@
+name: Xray Dedicated Domain UI V33 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "components/routed-page-client.tsx"
+      - "components/node-xray-domain-runtime-v33.tsx"
+      - "components/provision-runtime-xray-domain.tsx"
+      - "lib/admin-api.ts"
+      - "backend/app/xray_node_domain_runtime.py"
+      - "backend/app/xray_modern_config_compat_v45.py"
+      - "backend/app/self_hosted_runtime.py"
+      - ".github/workflows/xray-dedicated-domain-ui-v33-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "components/routed-page-client.tsx"
+      - "components/node-xray-domain-runtime-v33.tsx"
+      - "components/provision-runtime-xray-domain.tsx"
+      - "lib/admin-api.ts"
+      - "backend/app/xray_node_domain_runtime.py"
+      - "backend/app/xray_modern_config_compat_v45.py"
+      - "backend/app/self_hosted_runtime.py"
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify dedicated domain backend contract
+        run: |
+          set -euo pipefail
+          grep -F 'ADD COLUMN IF NOT EXISTS xray_domain' backend/app/xray_node_domain_runtime.py
+          grep -F '"/nodes/{node_id}/xray-domain"' backend/app/xray_node_domain_runtime.py
+          grep -F '"/nodes/{node_id}/xray-domain/prepare"' backend/app/xray_node_domain_runtime.py
+          grep -F '_effective_xray_domain' backend/app/xray_node_domain_runtime.py
+
+      - name: Verify Xray 26.3 modern candidate compatibility
+        run: |
+          set -euo pipefail
+          grep -F 'TWINPANEL_XRAY_MODERN_CONFIG_COMPAT_V45' backend/app/xray_modern_config_compat_v45.py
+          grep -F '/usr/local/etc/xray/config.json.twinpanel-modern' backend/app/xray_modern_config_compat_v45.py
+          grep -F '/usr/local/etc/xray/config.twinpanel-modern-v45.json' backend/app/xray_modern_config_compat_v45.py
+          grep -F 'apply_xray_modern_config_compat_v45()' backend/app/self_hosted_runtime.py
+          grep -F 'apply_xray_tcp_tls_compat_v44()' backend/app/self_hosted_runtime.py
+
+      - name: Verify provisioning route uses dedicated Xray page
+        run: |
+          set -euo pipefail
+          grep -F 'ProvisionRuntimeXrayDomainPage=dynamic' components/routed-page-client.tsx
+          grep -F 'if(key==="admin/provision") return admin(<ProvisionRuntimeXrayDomainPage/>)' components/routed-page-client.tsx
+          ! grep -F 'if(key==="admin/provision") return admin(<ProvisionRuntimePage/>)' components/routed-page-client.tsx
+
+      - name: Verify nodes page exposes dedicated Xray domain
+        run: |
+          set -euo pipefail
+          grep -F 'NodeXrayDomainRuntimeV33' components/routed-page-client.tsx
+          grep -F 'adminApi.xrayDomain' components/node-xray-domain-runtime-v33.tsx
+          grep -F 'adminApi.saveXrayDomain' components/node-xray-domain-runtime-v33.tsx
+          grep -F 'adminApi.prepareXrayDomain' components/node-xray-domain-runtime-v33.tsx
+          grep -F 'دامنه اختصاصی V2Ray / Xray' components/node-xray-domain-runtime-v33.tsx
+          grep -F 'VLESS TCP TLS' components/node-xray-domain-runtime-v33.tsx
+          grep -F 'ذخیره این مقدار دامنه عمومی نود را تغییر نمی‌دهد' components/node-xray-domain-runtime-v33.tsx
+
+      - name: Verify hardened shared API endpoints
+        run: |
+          set -euo pipefail
+          grep -F 'xrayDomain:(id:number)=>request<XrayDomainState>' lib/admin-api.ts
+          grep -F 'saveXrayDomain:(id:number,domain:string)=>request<XrayDomainState>' lib/admin-api.ts
+          grep -F 'prepareXrayDomain:(id:number,issueCertificate=true)=>request<XrayDomainState>' lib/admin-api.ts
+          grep -F '/v1/xray-modern-admin/nodes/${id}/xray-domain' lib/admin-api.ts
+
+      - name: Verify historical provisioning UI is still complete
+        run: |
+          set -euo pipefail
+          grep -F 'دامنه V2Ray / Xray' components/provision-runtime-xray-domain.tsx
+          grep -F 'دامنه اختصاصی Xray' components/provision-runtime-xray-domain.tsx
+          grep -F '/xray-domain/prepare' components/provision-runtime-xray-domain.tsx
+
+      - name: Compile new backend compatibility runtime
+        run: |
+          python3 -m py_compile \
+            backend/app/xray_modern_config_compat_v45.py \
+            backend/app/self_hosted_runtime.py

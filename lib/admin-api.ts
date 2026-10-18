@@ -10,6 +10,17 @@ export type AdminNode={id:number;name:string;node_type?:string;country_code?:str
 export type AdminTunnel={id:number;iran_node_id:number;exit_node_id:number;transport?:string;active_transport?:string|null;preferred_transport?:string|null;mode?:string|null;status?:string;latency_ms?:number|null;priority?:number;is_active?:boolean};
 export type RuntimeRow=Record<string,unknown>;
 export type PaymentReviewSummary={needs_review:number;purchase_review:number;receipt_review:number;wallet_review:number;generated_at?:string};
+export type XrayDomainState={
+  ok?:boolean;
+  node_id?:number;
+  xray_domain?:string|null;
+  effective_xray_domain?:string|null;
+  legacy_public_domain_fallback?:boolean;
+  public_domain?:string|null;
+  tls_enabled?:boolean;
+  available_profiles?:string[];
+  message?:string;
+};
 
 const READ_CACHE_TTL_MS=4000;
 const readCache=new Map<string,{expires:number;promise:Promise<unknown>}>();
@@ -78,11 +89,7 @@ async function performRequest<T>(path:string,init:RequestInit={}):Promise<T>{
       throw reason;
     }
 
-    if(
-      method==="GET"
-      &&TRANSIENT_GET_STATUSES.has(response.status)
-      &&attempt<TRANSIENT_GET_RETRY_MS.length
-    ){
+    if(method==="GET"&&TRANSIENT_GET_STATUSES.has(response.status)&&attempt<TRANSIENT_GET_RETRY_MS.length){
       try{await response.body?.cancel();}catch{}
       await wait(TRANSIENT_GET_RETRY_MS[attempt]);
       continue;
@@ -140,6 +147,9 @@ export const adminApi={
   toggleNodeMaintenance:(id:number)=>request<AdminNode>(`/v1/nodes/${id}/maintenance`,{method:"POST"}),
   nodeHealth:(id:number)=>request<RuntimeRow>(`/v1/nodes/${id}/health`),
   nodeProtocols:(id:number)=>request<RuntimeRow>(`/v1/nodes/${id}/protocols`),
+  xrayDomain:(id:number)=>request<XrayDomainState>(`/v1/xray-modern-admin/nodes/${id}/xray-domain`),
+  saveXrayDomain:(id:number,domain:string)=>request<XrayDomainState>(`/v1/xray-modern-admin/nodes/${id}/xray-domain`,{method:"PUT",body:JSON.stringify({domain})}),
+  prepareXrayDomain:(id:number,issueCertificate=true)=>request<XrayDomainState>(`/v1/xray-modern-admin/nodes/${id}/xray-domain/prepare`,{method:"POST",body:JSON.stringify({issue_certificate:issueCertificate})}),
   deleteNode:async(id:number)=>{
     try{
       return await request<RuntimeRow>(`/v1/nodes/${id}`,{method:"DELETE"});
