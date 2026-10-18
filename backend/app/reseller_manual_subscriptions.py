@@ -14,7 +14,9 @@ from .models_reseller import (
 )
 from .services.reseller_traffic_pool import _suspend_reseller_pool
 from .services.subscription_factory import create_subscription_core
-from .subscription_plan_schema import ensure_subscription_plan_schema
+# Importing this module normalizes metadata and repairs legacy PostgreSQL schema
+# before request authentication opens an ORM transaction.
+from . import subscription_plan_schema as _subscription_plan_schema
 
 
 GB = 1024 ** 3
@@ -112,11 +114,6 @@ def create_manual_reseller_subscription(
         raise HTTPException(status_code=422, detail="حجم باید بیشتر از صفر باشد")
     if days <= 0:
         raise HTTPException(status_code=422, detail="مدت باید بیشتر از صفر باشد")
-
-    # Existing installations may still carry the historical NOT NULL constraint.
-    # This helper is normally a no-op because the schema is repaired at import,
-    # but keeping the explicit guard makes direct service use safe as well.
-    ensure_subscription_plan_schema()
 
     balance_before = int(reseller.traffic_balance_bytes or 0)
     credit = int(reseller.traffic_credit_bytes or 0)
