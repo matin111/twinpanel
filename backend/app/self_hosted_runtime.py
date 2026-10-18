@@ -14,6 +14,9 @@ from .routers import nodes, provision, tunnels
 from .ssh_tunnel_self_hosted_v3 import provision_ssh_tunnel_self_hosted_v3
 from .transport_manager_service_v12 import ensure_transport_manager_service_v12
 from . import xray_modern_runtime
+from .xray_modern_config_compat_v45 import (
+    apply_xray_modern_config_compat_v45,
+)
 from .xray_modern_repair_runtime import (
     apply_xray_modern_repair_runtime,
 )
@@ -176,6 +179,12 @@ def apply_self_hosted_runtime() -> None:
 
     xray_modern_runtime.apply_xray_modern_runtime()
 
+    # Xray 26.3.x requires temporary candidate config names to end in .json.
+    # Apply this before repair/domain/TCP-TLS wrappers can invoke the Modern
+    # builder. Only the temporary path changes; ports, clients and rollback do
+    # not.
+    apply_xray_modern_config_compat_v45()
+
     # ------------------------------------------------------------
     # Xray production composition
     #
@@ -185,6 +194,7 @@ def apply_self_hosted_runtime() -> None:
     #
     # The dedicated Xray domain remains independent from the general Node
     # domain. V44 keeps TCP TLS config validation compatible with Xray 26.3.x.
+    # V45 does the same for the base Modern candidate config.
     # ------------------------------------------------------------
 
     apply_xray_modern_repair_runtime()
