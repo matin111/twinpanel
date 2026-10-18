@@ -13,11 +13,20 @@ from .models import Node
 from .routers import account_delivery
 
 
-# TWINPANEL_XRAY_NODE_DOMAIN_RUNTIME_V1
+# TWINPANEL_XRAY_NODE_DOMAIN_RUNTIME_V2
 #
-# Xray TLS identity must be independent from the Node's general/public domain.
+# Xray TLS identity is independent from the Node's general/public domain.
 # Existing installations remain compatible: when xray_domain is empty, Modern
 # Xray still falls back to public_domain until an explicit Xray domain is saved.
+#
+# V2 closes the historical-subscription gap: preparing a dedicated TLS domain
+# makes the remote Xray listeners ready, but old ProtocolCredential rows may
+# still contain only retired/internal profiles. After TLS is verified we start
+# the existing V36/V41 reconcile pipeline in the background. That pipeline
+# preserves UUIDs, prepares the final TCP-TLS runtime when needed, and rewrites
+# only incomplete V2Ray subscription credentials. The HTTP mutation therefore
+# stays bounded and does not wait for every subscription, avoiding update/admin
+# gateway timeouts while existing public share links become usable again.
 
 _runtime_applied = False
 _original_node_payload = None
@@ -165,6 +174,30 @@ def _node_or_404(
     )
 
 
+async def _schedule_subscription_reconcile(
+    exit_node_id: int,
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Start the existing UUID-preserving migration without blocking prepare.
+
+    Import lazily because xray_node_domain_runtime is applied before the V36/V41
+    reconciliation wrappers during process startup. By the time an HTTP request
+    reaches this function the complete self-hosted runtime has been composed.
+    """
+
+    try:
+        from . import xray_profile_reconcile_v36
+
+        job = await xray_profile_reconcile_v36.start_xray_reconcile_job(
+            int(exit_node_id)
+        )
+        return dict(job), None
+    except Exception as exc:
+        # TLS preparation already succeeded. Do not turn a background scheduling
+        # problem into a false 500/502 for the admin mutation; expose it as a
+        # bounded warning so the operation is truthful and retryable.
+        return None, str(exc)[:1000]
+
+
 @xray_modern_admin.router.get(
     "/nodes/{node_id}/xray-domain"
 )
@@ -296,20 +329,49 @@ async def prepare_dedicated_xray_domain(
             base_port,
         )
 
-        return {
-            "ok": True,
-            "node_id": int(node.id),
-            "xray_domain": _stored_xray_domain(node) or None,
-            "effective_xray_domain": domain,
-            "tls_enabled": bool(runtime.get("tls_enabled")),
-            "available_profiles": state.get("available_profiles") or [],
-            "runtime": runtime,
-            "message": "دامنه و پروفایل‌های Xray آماده شدند",
-        }
-
     finally:
         conn.close()
         await conn.wait_closed()
+
+    tls_enabled = bool(runtime.get("tls_enabled"))
+    reconcile_job: dict[str, Any] | None = None
+    reconcile_error: str | None = None
+
+    if tls_enabled:
+        reconcile_job, reconcile_error = await _schedule_subscription_reconcile(
+            int(node.id)
+        )
+
+    if reconcile_job is not None:
+        message = (
+            "دامنه و پروفایل‌های Xray آماده شدند؛ "
+            "همگام‌سازی اشتراک‌های موجود در پس‌زمینه شروع شد"
+        )
+    elif reconcile_error:
+        message = (
+            "دامنه و پروفایل‌های Xray آماده شدند؛ "
+            "شروع همگام‌سازی اشتراک‌های موجود ناموفق بود"
+        )
+    elif tls_enabled:
+        message = "دامنه و پروفایل‌های Xray آماده شدند"
+    else:
+        message = (
+            "دامنه ثبت شد اما TLS هنوز آماده نیست؛ "
+            "همگام‌سازی اشتراک‌ها شروع نشد"
+        )
+
+    return {
+        "ok": True,
+        "node_id": int(node.id),
+        "xray_domain": _stored_xray_domain(node) or None,
+        "effective_xray_domain": domain,
+        "tls_enabled": tls_enabled,
+        "available_profiles": state.get("available_profiles") or [],
+        "runtime": runtime,
+        "reconcile_job": reconcile_job,
+        "reconcile_error": reconcile_error,
+        "message": message,
+    }
 
 
 def apply_xray_node_domain_runtime() -> None:
@@ -353,7 +415,8 @@ def apply_xray_node_domain_runtime() -> None:
     _runtime_applied = True
 
     print(
-        "TWINPANEL_XRAY_NODE_DOMAIN_RUNTIME_V1_ACTIVE "
-        "dedicated_domain=1 legacy_public_domain_fallback=1",
+        "TWINPANEL_XRAY_NODE_DOMAIN_RUNTIME_V2_ACTIVE "
+        "dedicated_domain=1 legacy_public_domain_fallback=1 "
+        "subscription_reconcile_after_tls=1 background=1 uuid_preserved=1",
         flush=True,
     )
