@@ -6,8 +6,10 @@ import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
 
 const UPDATE_RELOAD_KEY="twinpanel-update-reload-pending-v3";
+const RELEASE_CHECK_STAMP_KEY="twinpanel-release-check-at-v1";
 const UPDATE_RECOVERY_MS=5*60*1000;
-const TRANSIENT_API_GRACE_MS=30*1000;
+const TRANSIENT_API_GRACE_MS=60*1000;
+const RELEASE_CHECK_INTERVAL_MS=5*60*1000;
 
 type LicenseState={
   status?:string;
@@ -117,6 +119,17 @@ function clearRecoveryMarker(){
   try{window.sessionStorage.removeItem(UPDATE_RELOAD_KEY);}catch{}
 }
 
+function claimBackgroundReleaseCheck(){
+  try{
+    if(typeof window==="undefined")return true;
+    const now=Date.now();
+    const last=Number(window.localStorage.getItem(RELEASE_CHECK_STAMP_KEY))||0;
+    if(now-last<RELEASE_CHECK_INTERVAL_MS)return false;
+    window.localStorage.setItem(RELEASE_CHECK_STAMP_KEY,String(now));
+  }catch{}
+  return true;
+}
+
 function isTransientReleaseError(reason:unknown){
   if(reason instanceof ReleaseRequestError)return [502,503,504].includes(reason.status);
   const text=reason instanceof Error?reason.message:String(reason||"");
@@ -133,8 +146,8 @@ export function SystemReleaseFooter(){
   const [reloading,setReloading]=useState(false);
   const initialVersionRef=useRef("");
   const reloadTimerRef=useRef<number|null>(null);
-  const lastHealthyRef=useRef<ReleaseStatus|null>(null);
   const transientSinceRef=useRef<number|null>(null);
+  const loadInFlightRef=useRef<{status:boolean;check:boolean}>({status:false,check:false});
   const pageInstanceRef=useRef("");
 
   if(!pageInstanceRef.current){
@@ -157,11 +170,14 @@ export function SystemReleaseFooter(){
   ].includes(updateState),[updateState]);
 
   const load=async(check=false)=>{
+    const lane=check?"check":"status";
+    if(loadInFlightRef.current[lane])return;
+    loadInFlightRef.current[lane]=true;
+
     try{
       const result=await request<ReleaseStatus>(check?"/v1/admin/system/release/check":"/v1/admin/system/release/status",check?{method:"POST"}:{});
       if(!initialVersionRef.current)initialVersionRef.current=String(result.current_version||"").trim();
 
-      lastHealthyRef.current=result;
       transientSinceRef.current=null;
       setData(result);
       setError("");
@@ -182,21 +198,28 @@ export function SystemReleaseFooter(){
     }catch(reason){
       if(isTransientReleaseError(reason)){
         const marker=readRecoveryMarker();
-        const hasHealthy=Boolean(lastHealthyRef.current);
         const started=transientSinceRef.current??Date.now();
         transientSinceRef.current=started;
+        setError("");
 
-        if(marker)return;
-        if(hasHealthy&&Date.now()-started<TRANSIENT_API_GRACE_MS)return;
+        if(marker||Date.now()-started<TRANSIENT_API_GRACE_MS)return;
+
+        setError(pick(
+          "ارتباط با سرویس پنل طولانی‌تر از حد انتظار قطع است. دوباره وضعیت را بررسی کنید.",
+          "Panel service is taking longer than expected to reconnect. Check status again.",
+        ));
+        return;
       }
 
       setError(reason instanceof Error?reason.message:String(reason));
+    }finally{
+      loadInFlightRef.current[lane]=false;
     }
   };
 
   useEffect(()=>{
     let alive=true;
-    const checkNow=()=>{
+    const checkLatest=()=>{
       if(!alive||document.visibilityState!=="visible")return;
       void load(true);
     };
@@ -204,19 +227,24 @@ export function SystemReleaseFooter(){
       if(!alive||document.visibilityState!=="visible")return;
       void load(false);
     };
+    const maybeCheckLatest=()=>{
+      if(!alive||document.visibilityState!=="visible")return;
+      if(claimBackgroundReleaseCheck())checkLatest();
+    };
 
-    checkNow();
+    refreshStatus();
+    maybeCheckLatest();
     const statusTimer=window.setInterval(refreshStatus,5000);
-    const checkTimer=window.setInterval(checkNow,60000);
-    window.addEventListener("focus",checkNow);
-    document.addEventListener("visibilitychange",checkNow);
+    const checkTimer=window.setInterval(maybeCheckLatest,RELEASE_CHECK_INTERVAL_MS);
+    window.addEventListener("focus",refreshStatus);
+    document.addEventListener("visibilitychange",refreshStatus);
 
     return()=>{
       alive=false;
       window.clearInterval(statusTimer);
       window.clearInterval(checkTimer);
-      window.removeEventListener("focus",checkNow);
-      document.removeEventListener("visibilitychange",checkNow);
+      window.removeEventListener("focus",refreshStatus);
+      document.removeEventListener("visibilitychange",refreshStatus);
     };
   },[]);
 
@@ -293,6 +321,7 @@ export function SystemReleaseFooter(){
       window.setTimeout(()=>void load(false),1500);
     }catch(reason){
       if(isTransientReleaseError(reason)){
+        setError("");
         window.setTimeout(()=>void load(false),1200);
       }else{
         clearRecoveryMarker();
@@ -307,7 +336,7 @@ export function SystemReleaseFooter(){
     setBusy("license");setError("");
     try{
       await request("/v1/admin/system/license/activate",{method:"POST",body:JSON.stringify({license_key:licenseKey.trim()})});
-      setLicenseKey("");setLicenseOpen(false);await load(true);
+      setLicenseKey("");setLicenseOpen(false);await load(false);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy("");}
   };
