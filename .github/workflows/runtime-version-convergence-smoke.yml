@@ -1,0 +1,73 @@
+name: TwinPanel Runtime Version Convergence Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/runtime-version-convergence.tsx'
+      - 'app/layout.tsx'
+      - 'next.config.ts'
+      - 'scripts/prepare-standalone.mjs'
+      - '.github/workflows/publish-prebuilt-release.yml'
+      - '.github/workflows/runtime-version-convergence-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  runtime-version-convergence:
+    runs-on: ubuntu-24.04
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      NEXT_PUBLIC_API_BASE: ''
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify convergence contracts
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          component=Path('components/runtime-version-convergence.tsx').read_text(encoding='utf-8')
+          layout=Path('app/layout.tsx').read_text(encoding='utf-8')
+          config=Path('next.config.ts').read_text(encoding='utf-8')
+          prepare=Path('scripts/prepare-standalone.mjs').read_text(encoding='utf-8')
+          publisher=Path('.github/workflows/publish-prebuilt-release.yml').read_text(encoding='utf-8')
+
+          assert 'NEXT_PUBLIC_TWINPANEL_VERSION' in config
+          assert 'readFileSync(join(process.cwd(),"VERSION")' in config
+          assert '<RuntimeVersionConvergence/>' in layout
+          assert 'fetch(`/health?runtime-version-check=' in component
+          assert 'confirmed!==serverVersion||confirmed===BUILD_VERSION' in component
+          assert 'window.location.replace(url.toString())' in component
+          assert 'visibilitychange' in component
+          assert 'pageshow' in component
+          assert 'cpSync(staticSource,staticTarget,{recursive:true})' in prepare
+          assert 'source/.next/standalone/.next/static' in publisher
+          assert 'stage/twinpanel/.next/standalone/.next/static' in publisher
+
+          print('RUNTIME_VERSION_CONVERGENCE_CONTRACT_OK')
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional --no-audit --no-fund
+          else
+            npm install --include=optional --no-audit --no-fund
+          fi
+
+      - name: Build production frontend
+        run: npm run build
+
+      - name: Verify complete versioned standalone runtime
+        run: |
+          set -Eeuo pipefail
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          test -n "$VERSION"
+          test -f .next/standalone/server.js
+          test -d .next/standalone/.next/static
+          test -n "$(find .next/standalone/.next/static -type f -print -quit)"
+          grep -R -F -q "$VERSION" .next/static
+          echo "RUNTIME_VERSIONED_STANDALONE_OK version=$VERSION"
