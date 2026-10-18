@@ -23,7 +23,7 @@ type Intent=PaymentIntent&{
 const MAX_RECEIPT_BYTES=12*1024*1024;
 const RECEIPT_TYPES=new Set(["image/jpeg","image/png","image/webp","image/gif","application/pdf"]);
 const money=(value:unknown)=>`${Number(value||0).toLocaleString("fa-IR")} تومان`;
-const statusFa=(status:string)=>({pending_payment:"در انتظار پرداخت",payment_submitted:"پرداخت ثبت شده",awaiting_review:"در انتظار تأیید",approved:"تأیید شده",auto_verified:"تأیید خودکار",rejected:"رد شده",paid:"پرداخت شده"} as Record<string,string>)[status]||status||"—";
+const statusFa=(status:string)=>({pending_payment:"در انتظار پرداخت",payment_submitted:"پرداخت ثبت شده",awaiting_review:"در انتظار تأیید",approved:"تأیید شده",auto_verified:"تأیید خودکار",rejected:"رد شده",paid:"پرداخت شده",provisioning:"در حال فعال‌سازی",provision_failed:"خطای فعال‌سازی",fulfilled:"فعال شده"} as Record<string,string>)[status]||status||"—";
 
 async function api<T>(path:string,init:RequestInit={},token?:string|null):Promise<T>{
   const headers=new Headers(init.headers);
@@ -61,19 +61,27 @@ function CustomerPaymentsBody(){
     setLoading(true);setError("");
     try{
       const [o,p,m]=await Promise.all([customerApi.orders(token),customerApi.payments(token),customerApi.paymentMethods()]);
-      setOrders(Array.isArray(o)?o:[]);setIntents(Array.isArray(p)?p as Intent[]:[]);setMethods(Array.isArray(m?.methods)?m.methods as Method[]:[]);
+      const orderRows=Array.isArray(o)?o:[];
+      const intentRows=Array.isArray(p)?p as Intent[]:[];
+      const methodRows=Array.isArray(m?.methods)?m.methods as Method[]:[];
+      setOrders(orderRows);setIntents(intentRows);setMethods(methodRows);
       const query=typeof window!=="undefined"?Number(new URLSearchParams(window.location.search).get("order")||0):0;
-      const pending=(Array.isArray(o)?o:[]).find(x=>x.id===query)|| (Array.isArray(o)?o:[]).find(x=>["pending_payment","payment_submitted","awaiting_review"].includes(x.status)) || null;
-      if(pending)setOrderId(pending.id);
-      const existing=(Array.isArray(p)?p:[]).find(x=>x.order_id===pending?.id&&["pending_payment","payment_submitted","awaiting_review"].includes(x.status)) as Intent|undefined;
+      const pending=orderRows.find(x=>x.id===query)||orderRows.find(x=>["pending_payment","payment_submitted","awaiting_review","provisioning","provision_failed"].includes(x.status))||null;
+      setOrderId(pending?.id||null);
+      const existing=intentRows.find(x=>x.order_id===pending?.id&&["pending_payment","payment_submitted","awaiting_review"].includes(x.status));
       if(existing){setIntent(existing);setMethod(existing.method||existing.payment_method||"");}
-      else if(Array.isArray(m?.methods)&&m.methods.length)setMethod(String((m.methods[0] as Method).id||""));
+      else{
+        setIntent(null);
+        if(methodRows.length)setMethod(current=>current&&methodRows.some(row=>row.id===current)?current:String(methodRows[0].id||""));
+        else setMethod("");
+      }
     }catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setLoading(false);}
   };
   useEffect(()=>{void load();},[token]);
 
   const order=useMemo(()=>orders.find(x=>x.id===orderId)||null,[orders,orderId]);
+  const freeOrder=Boolean(order&&Number(order.amount_toman||0)<=0);
   const currentMethod=useMemo(()=>methods.find(x=>x.id===(intent?.method||method))||null,[methods,intent,method]);
   const isCrypto=Boolean(intent&&intent.method!=="card_to_card");
   const cryptoAsset=String(intent?.crypto_asset||currentMethod?.asset||(String(intent?.method||"").startsWith("usdt_")?"USDT":"")).toUpperCase();
@@ -84,10 +92,28 @@ function CustomerPaymentsBody(){
   const cryptoDiscounted=Number(intent?.discounted_amount_toman||intent?.base_amount_toman||0);
 
   const createIntent=async()=>{
-    if(!token||!orderId||!method)return;
+    if(!token||!orderId)return;
+    if(!method){setError(pick("هیچ روش پرداخت فعالی تنظیم نشده است. ابتدا روش پرداخت را از پنل مدیریت فعال کنید.","No payment method is enabled. Enable a payment method in the admin panel first."));return;}
     setBusy(true);setError("");setMessage("");
     try{const row=await api<Intent>("/v1/payments/intents",{method:"POST",body:JSON.stringify({order_id:orderId,method})},token);setIntent(row);setMethod(row.method||method);setReceiptFile(null);setReceiptKey(v=>v+1);setTxid("");}
     catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{setBusy(false);}
+  };
+
+  const activateFree=async()=>{
+    if(!token||!order)return;
+    setBusy(true);setError("");setMessage("");
+    try{
+      const row=await api<StoreOrder>(`/v1/store/orders/${order.id}/activate-free`,{method:"POST"},token);
+      setOrders(current=>current.map(item=>item.id===row.id?{...item,...row}:item));
+      if(row.status==="fulfilled"){
+        setMessage(pick("اشتراک رایگان فعال شد. در حال انتقال به اشتراک من...","Free subscription activated. Opening your subscription..."));
+        window.setTimeout(()=>{window.location.href="/panel/subscription";},450);
+      }else{
+        setMessage(pick("فعال‌سازی در حال انجام است؛ وضعیت دوباره بررسی می‌شود.","Activation is in progress; status will be checked again."));
+        window.setTimeout(()=>{void load();},1200);
+      }
+    }catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setBusy(false);}
   };
 
@@ -135,11 +161,16 @@ function CustomerPaymentsBody(){
     <PageHead title={pick("پرداخت‌ها","Payments")}/>
     {error&&<div className="runtime-error">{error}</div>}{message&&<div className="runtime-success">{message}</div>}
 
-    {order&&!["fulfilled","paid"].includes(order.status)&&<Card className="paymentCheckoutCard">
-      <div className="card-head"><div><b>{pick("پرداخت سفارش","Order payment")} #{order.id}</b><small>{money(order.amount_toman)}</small></div><Badge tone="warn">{statusFa(order.status)}</Badge></div>
-      {!intent?<>
-        <div className="paymentMethodGrid">{methods.map(row=><button type="button" key={row.id} className={method===row.id?"active":""} onClick={()=>setMethod(row.id)}><b>{row.title||row.id}</b>{row.asset&&<small>{row.crypto_discount_percent?`${row.crypto_discount_percent}% ${pick("تخفیف", "discount")} · `:""}{row.rate_toman?`${money(row.rate_toman)} / ${row.asset}`:row.network||row.asset}</small>}</button>)}</div>
-        <button className="primary paymentMainAction" disabled={!method||busy} onClick={()=>void createIntent()}>{busy?"…":pick("ادامه پرداخت","Continue payment")}</button>
+    {order&&order.status!=="fulfilled"&&<Card className="paymentCheckoutCard">
+      <div className="card-head"><div><b>{freeOrder?pick("فعال‌سازی سفارش رایگان","Free order activation"):pick("پرداخت سفارش","Order payment")} #{order.id}</b><small>{money(order.amount_toman)}</small></div><Badge tone={order.status==="provision_failed"?"bad":"warn"}>{statusFa(order.status)}</Badge></div>
+      {freeOrder?<>
+        <div className="runtime-success"><b>{pick("این سفارش رایگان است و نیازی به انتخاب روش پرداخت یا ثبت رسید ندارد.","This order is free; no payment method or receipt is required.")}</b></div>
+        <button className="primary paymentMainAction" disabled={busy||order.status==="provisioning"} onClick={()=>void activateFree()}>{busy||order.status==="provisioning"?pick("در حال فعال‌سازی...","Activating..."):order.status==="provision_failed"?pick("تلاش دوباره برای فعال‌سازی","Retry activation"):pick("فعال‌سازی اشتراک رایگان","Activate free subscription")}</button>
+      </>:!intent?<>
+        {methods.length===0?<div className="runtime-error"><b>{pick("روش پرداخت فعالی وجود ندارد.","No payment method is enabled.")}</b><br/><small>{pick("مدیر سیستم باید حداقل کارت‌به‌کارت یا یکی از روش‌های پرداخت ارز دیجیتال را فعال کند.","The administrator must enable card-to-card or a supported crypto payment method.")}</small></div>:<>
+          <div className="paymentMethodGrid">{methods.map(row=><button type="button" key={row.id} className={method===row.id?"active":""} onClick={()=>setMethod(row.id)}><b>{row.title||row.id}</b>{row.asset&&<small>{row.crypto_discount_percent?`${row.crypto_discount_percent}% ${pick("تخفیف", "discount")} · `:""}{row.rate_toman?`${money(row.rate_toman)} / ${row.asset}`:row.network||row.asset}</small>}</button>)}</div>
+          <button className="primary paymentMainAction" disabled={!method||busy} onClick={()=>void createIntent()}>{busy?pick("در حال آماده‌سازی...","Preparing..."):pick("ادامه پرداخت","Continue payment")}</button>
+        </>}
       </>:<form onSubmit={submit} className="paymentIntentBody">
         <div className="paymentDestination">
           <div><span>{pick("روش","Method")}</span><b>{currentMethod?.title||intent.method}</b></div>

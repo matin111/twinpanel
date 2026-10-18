@@ -265,6 +265,78 @@ def my_store_orders(
     ]
 
 
+@router.post("/orders/{order_id}/activate-free")
+async def activate_free_store_order(
+    order_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Activate a zero-price order without creating a payment intent.
+
+    This also recovers zero-price orders created by older releases that were
+    left in pending_payment with no usable payment method. The row lock and
+    provisioning state make repeated clicks safe: one request owns the actual
+    fulfillment while concurrent/replayed requests only observe the state.
+    """
+    order = (
+        db.query(StoreOrder)
+        .filter(
+            StoreOrder.id == order_id,
+            StoreOrder.user_id == user.id,
+        )
+        .with_for_update()
+        .first()
+    )
+
+    if not order:
+        raise HTTPException(
+            status_code=404,
+            detail="سفارش پیدا نشد",
+        )
+
+    if int(order.amount_toman or 0) > 0:
+        raise HTTPException(
+            status_code=409,
+            detail="این سفارش رایگان نیست",
+        )
+
+    if order.status == "fulfilled":
+        return {
+            **_order_out(order),
+            "delivery_ready": True,
+        }
+
+    if order.status == "provisioning":
+        return {
+            **_order_out(order),
+            "delivery_ready": False,
+        }
+
+    if order.status not in {
+        "pending_payment",
+        "paid",
+        "provision_failed",
+    }:
+        raise HTTPException(
+            status_code=409,
+            detail="وضعیت سفارش برای فعال‌سازی رایگان معتبر نیست",
+        )
+
+    order.status = "provisioning"
+    order.payment_method = "free"
+    order.error_text = None
+
+    if order.paid_at is None:
+        order.paid_at = datetime.utcnow()
+
+    db.commit()
+
+    return await _fulfill_paid_order(
+        order_id,
+        db,
+    )
+
+
 async def _fulfill_paid_order(
     order_id: int,
     db: Session,
