@@ -5,16 +5,18 @@ import time
 from datetime import datetime
 
 from ..database import SessionLocal
+from ..main_receipt_cleanup import cleanup_receipts_once
 from ..payment_models import PaymentIntent
 from ..store_models import StoreOrder
 from ..user_notification_models import UserNotification
-from ..main_receipt_cleanup import cleanup_receipts_once
 from .payment_automation import (
     activate_existing_sms_auto_verify_once,
     process_pending_crypto_payments_once,
 )
-from .payment_native_crypto_exact import (
-    process_pending_native_crypto_exact_once,
+from .payment_native_crypto_exact import process_pending_native_crypto_exact_once
+from .quota_runtime_reconcile import (
+    QUOTA_RUNTIME_INTERVAL_SECONDS,
+    reconcile_quota_runtime_once,
 )
 
 
@@ -57,11 +59,7 @@ def sync_payment_notifications_once() -> dict:
             if not intent.user_id:
                 continue
 
-            order = (
-                db.get(StoreOrder, intent.order_id)
-                if intent.order_id
-                else None
-            )
+            order = db.get(StoreOrder, intent.order_id) if intent.order_id else None
 
             fulfilled = bool(
                 order
@@ -142,116 +140,160 @@ def sync_payment_notifications_once() -> dict:
         db.close()
 
 
+async def _quota_runtime_worker() -> None:
+    """Keep real VPN sessions synchronized with the quota ledger."""
+
+    while True:
+        try:
+            result = await reconcile_quota_runtime_once()
+            changed = [
+                item
+                for item in result.get("nodes", [])
+                if (
+                    item.get("opened")
+                    or item.get("closed")
+                    or item.get("usage_events")
+                )
+            ]
+            if changed:
+                print(
+                    "QUOTA_RUNTIME_RECONCILE",
+                    changed,
+                    flush=True,
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            print(
+                "quota runtime reconcile failed:",
+                str(exc),
+                flush=True,
+            )
+
+        await asyncio.sleep(QUOTA_RUNTIME_INTERVAL_SECONDS)
+
+
 async def customer_maintenance_loop() -> None:
-    """Customer payment automation and housekeeping loop."""
+    """Customer payment automation, quota telemetry and housekeeping loop."""
+
+    quota_runtime_task = asyncio.create_task(
+        _quota_runtime_worker(),
+        name="quota-runtime-reconcile",
+    )
 
     last_receipt_cleanup = 0.0
     last_crypto_verify = 0.0
     sms_bootstrap_done = False
 
-    while True:
-        now = time.monotonic()
+    try:
+        while True:
+            now = time.monotonic()
 
-        if not sms_bootstrap_done:
-            try:
-                result = await asyncio.to_thread(
-                    activate_existing_sms_auto_verify_once
-                )
+            if not sms_bootstrap_done:
+                try:
+                    result = await asyncio.to_thread(
+                        activate_existing_sms_auto_verify_once
+                    )
 
-                if result.get("changed"):
+                    if result.get("changed"):
+                        print(
+                            "PAYMENT_SMS_AUTO_VERIFY_ACTIVATED",
+                            result,
+                            flush=True,
+                        )
+
+                except Exception as exc:
                     print(
-                        "PAYMENT_SMS_AUTO_VERIFY_ACTIVATED",
+                        "payment sms auto verify bootstrap failed:",
+                        str(exc),
+                        flush=True,
+                    )
+                finally:
+                    sms_bootstrap_done = True
+
+            if (
+                last_crypto_verify == 0.0
+                or now - last_crypto_verify >= CRYPTO_VERIFY_INTERVAL_SECONDS
+            ):
+                try:
+                    # Legacy worker remains for existing USDT-BEP20 intents.
+                    legacy_result = await process_pending_crypto_payments_once()
+                    native_result = await process_pending_native_crypto_exact_once()
+
+                    checked = int(legacy_result.get("checked") or 0) + int(
+                        native_result.get("checked") or 0
+                    )
+                    verified = int(legacy_result.get("verified") or 0) + int(
+                        native_result.get("verified") or 0
+                    )
+                    errors = int(legacy_result.get("errors") or 0) + int(
+                        native_result.get("errors") or 0
+                    )
+
+                    if checked or verified or errors:
+                        print(
+                            "PAYMENT_CRYPTO_AUTO_VERIFY",
+                            {
+                                "checked": checked,
+                                "verified": verified,
+                                "errors": errors,
+                                "usdt_bep20": legacy_result,
+                                "native_trx_bnb": native_result,
+                            },
+                            flush=True,
+                        )
+
+                except Exception as exc:
+                    print(
+                        "payment crypto auto verify loop failed:",
+                        str(exc),
+                        flush=True,
+                    )
+                finally:
+                    last_crypto_verify = now
+
+            try:
+                result = await asyncio.to_thread(sync_payment_notifications_once)
+
+                if result.get("created") or result.get("updated"):
+                    print(
+                        "CUSTOMER_PAYMENT_NOTIFICATION_SYNC",
                         result,
                         flush=True,
                     )
 
             except Exception as exc:
                 print(
-                    "payment sms auto verify bootstrap failed:",
+                    "customer payment notification sync failed:",
                     str(exc),
                     flush=True,
                 )
-            finally:
-                sms_bootstrap_done = True
 
-        if (
-            last_crypto_verify == 0.0
-            or now - last_crypto_verify
-            >= CRYPTO_VERIFY_INTERVAL_SECONDS
-        ):
-            try:
-                # Legacy worker remains for existing USDT-BEP20 intents.
-                legacy_result = await process_pending_crypto_payments_once()
-                native_result = await process_pending_native_crypto_exact_once()
-
-                checked = int(legacy_result.get("checked") or 0) + int(native_result.get("checked") or 0)
-                verified = int(legacy_result.get("verified") or 0) + int(native_result.get("verified") or 0)
-                errors = int(legacy_result.get("errors") or 0) + int(native_result.get("errors") or 0)
-
-                if checked or verified or errors:
+            if (
+                last_receipt_cleanup == 0.0
+                or now - last_receipt_cleanup >= RECEIPT_CLEANUP_INTERVAL_SECONDS
+            ):
+                try:
+                    result = await asyncio.to_thread(cleanup_receipts_once)
                     print(
-                        "PAYMENT_CRYPTO_AUTO_VERIFY",
-                        {
-                            "checked": checked,
-                            "verified": verified,
-                            "errors": errors,
-                            "usdt_bep20": legacy_result,
-                            "native_trx_bnb": native_result,
-                        },
+                        "CUSTOMER_RECEIPT_CLEANUP",
+                        result,
                         flush=True,
                     )
+                except Exception as exc:
+                    print(
+                        "customer receipt cleanup failed:",
+                        str(exc),
+                        flush=True,
+                    )
+                finally:
+                    last_receipt_cleanup = now
 
-            except Exception as exc:
-                print(
-                    "payment crypto auto verify loop failed:",
-                    str(exc),
-                    flush=True,
-                )
-            finally:
-                last_crypto_verify = now
+            await asyncio.sleep(PAYMENT_NOTIFICATION_INTERVAL_SECONDS)
 
+    finally:
+        quota_runtime_task.cancel()
         try:
-            result = await asyncio.to_thread(
-                sync_payment_notifications_once
-            )
-
-            if result.get("created") or result.get("updated"):
-                print(
-                    "CUSTOMER_PAYMENT_NOTIFICATION_SYNC",
-                    result,
-                    flush=True,
-                )
-
-        except Exception as exc:
-            print(
-                "customer payment notification sync failed:",
-                str(exc),
-                flush=True,
-            )
-
-        if (
-            last_receipt_cleanup == 0.0
-            or now - last_receipt_cleanup
-            >= RECEIPT_CLEANUP_INTERVAL_SECONDS
-        ):
-            try:
-                result = await asyncio.to_thread(
-                    cleanup_receipts_once
-                )
-                print(
-                    "CUSTOMER_RECEIPT_CLEANUP",
-                    result,
-                    flush=True,
-                )
-            except Exception as exc:
-                print(
-                    "customer receipt cleanup failed:",
-                    str(exc),
-                    flush=True,
-                )
-            finally:
-                last_receipt_cleanup = now
-
-        await asyncio.sleep(
-            PAYMENT_NOTIFICATION_INTERVAL_SECONDS
-        )
+            await quota_runtime_task
+        except asyncio.CancelledError:
+            pass
