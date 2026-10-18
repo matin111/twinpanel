@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.29",
+  "version": "1.1.0-rc.30",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-18T00:20:19Z",
+  "released_at": "2026-10-18T00:30:43Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "f1ef7bccb2da6a9aaa7cdafeb926538ef67bd857",
+  "source_sha": "9e4412262b3642c8603064126427509baa4d9887",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.29/twinpanel-1.1.0-rc.29-linux-x86_64.tar.gz",
-    "sha256": "9338a07284a3c0fc204fd68fc87d8c82dff621ad5faee084ab93fc6778985278",
-    "size_bytes": 12540911
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.30/twinpanel-1.1.0-rc.30-linux-x86_64.tar.gz",
+    "sha256": "f37e2553bc4814d9faaf6311df4956365754ccd09809f134d2d75bbf96e29e05",
+    "size_bytes": 12543067
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.29 رگرسیون ارتفاع مودال ساخت اشتراک دستی را برطرف می‌کند. بعد از انتقال مودال به document.body برای قرارگیری صحیح بالای منوی مدیریت، قانون اندازه جمع‌وجور صفحه اشتراک‌ها دیگر روی آن اعمال نمی‌شد و پنجره بیش از حد کشیده می‌شد. در این نسخه مودال Portal کلاس اختصاصی دارد، ارتفاع آن دوباره content-driven و auto شده، min-height اجباری حذف شده و سقف ارتفاع compact قبلی با اسکرول داخلی حفظ می‌شود. Header و Actionهای مودال نیز در حالت اسکرول sticky باقی می‌مانند. این نسخه تمام اصلاحات rc.28 را نیز حفظ می‌کند.",
-    "en": "TwinPanel 1.1.0-rc.29 fixes the manual-subscription modal height regression. After the dialog was portaled to document.body to correctly layer above the admin navigation, the subscriptions-page compact sizing rule no longer matched and the dialog became unnecessarily tall. This release adds an explicit portal modal class, restores content-driven auto height with no forced minimum height, preserves the previous compact maximum height with internal scrolling, and keeps the modal header/actions sticky while scrolling. All rc.28 fixes remain included."
+    "fa": "نسخه 1.1.0-rc.30 رابط مدیریت را جمع‌وجورتر و حرفه‌ای‌تر می‌کند. پنجره ساخت اشتراک دستی در دسکتاپ ارتفاع و عرض کنترل‌شده‌تری دارد، فرم و پروتکل‌ها متراکم‌تر چیده می‌شوند و اسکرول داخلی با Header و Actionهای sticky حفظ شده است. در صفحه نودها نیز کارت بلند مدیریت از پایین جدول حذف شده و دکمه «مدیریت» اکنون یک پاپ‌آپ جمع‌وجور باز می‌کند که وضعیت، SSH، دامنه، تعداد پروتکل‌ها و تمام عملیات قبلی را بدون تغییر API/Backend در دسترس نگه می‌دارد. زیرپنجره‌های SSH، دامنه و سلامت پروتکل نیز پس از بستن به پنجره مدیریت نود برمی‌گردند.",
+    "en": "TwinPanel 1.1.0-rc.30 refines the admin UI with denser, more professional dialogs. The manual-subscription dialog now uses tighter desktop width/height, denser fields and protocol controls, while preserving internal scrolling with sticky header/actions. On the Nodes page, the long inline management card is removed; Manage now opens a compact popup containing status, SSH state, domain, enabled protocol count and all existing actions without changing backend/API behavior. SSH, domain and protocol-health subdialogs return to the node-management popup when closed."
   }
 }
