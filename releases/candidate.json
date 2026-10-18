@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.43",
-  "source_sha": "e6b68fb30f99b1e45aa0767a6744c518113ebc3c",
+  "version": "1.1.0-rc.44",
+  "source_sha": "9d9fc5e5a243ac4ad33388e067b09f0e386b412f",
   "notes": {
-    "fa": "نسخه 1.1.0-rc.43 خطای کاذب API 502/503/504 هنگام Restart طبیعی سرویس API در بروزرسانی داخل پنل را برطرف می‌کند. در پنجره Warm-up، وضعیت سالم قبلی حفظ می‌شود و خطای Gateway قرمز نمایش داده نمی‌شود؛ درخواست‌های همزمان status/check نیز Deduplicate شده‌اند، Focus و Visibility فقط وضعیت را می‌خوانند و بررسی خودکار نسخه جدید با فاصله ۵ دقیقه کنترل می‌شود. خطاهای واقعی بروزرسانی همچنان نمایش داده می‌شوند. این نسخه همچنین اصلاح ادغام‌شده دیتاپلین خروجی VPN و هم‌ترازی ایمن OpenVPN PKI را در بر دارد.",
-    "en": "TwinPanel 1.1.0-rc.43 removes false API 502/503/504 errors during the normal API service restart window of an in-panel update. Healthy release state is preserved through warm-up, transient gateway failures are not rendered as red update errors, concurrent status/check calls are deduplicated, focus/visibility events use read-only status refreshes, and background release discovery is throttled to a controlled 5-minute cadence. Real updater failures still surface normally. This release also includes the already-merged VPN access dataplane and safe OpenVPN PKI alignment fix."
+    "fa": "نسخه 1.1.0-rc.44 پایداری منوهای پنل را اصلاح می‌کند: منوهای مدیریت، کاربر و نماینده برای جابه‌جایی بین صفحات دیگر به Client/RSC Navigation حساس نیستند و هر کلیک مسیر را به‌صورت قطعی باز می‌کند، در حالی که رفتار باز و بسته‌شدن منوها حفظ شده است. قیمت‌گذاری نماینده نیز اصلاح شده و روی شناسه واقعی پلن اختصاصی نماینده ذخیره می‌شود؛ قیمت صفر برای فروش رایگان و هر مبلغ مثبت بدون سقف قیمت مجاز است و فقط مقدار منفی به‌عنوان داده مالی نامعتبر رد می‌شود.",
+    "en": "TwinPanel 1.1.0-rc.44 hardens panel navigation: admin, customer and reseller menus no longer depend on a fragile client/RSC transition for page changes, so each menu click performs a reliable route load while existing dropdown behavior is preserved. Reseller pricing now updates the actual reseller-owned plan identity; a zero/free selling price and any positive Toman amount are allowed with no maximum price cap, while only negative values are rejected as invalid accounting data."
   }
 }
