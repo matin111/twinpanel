@@ -28,6 +28,8 @@ body > .runtime-modal > .runtime-modal-card{
   position:relative!important;
   z-index:1!important;
   box-sizing:border-box!important;
+  height:auto!important;
+  min-height:0!important;
   max-width:calc(100vw - 32px)!important;
   max-height:calc(100dvh - 48px)!important;
   margin:auto!important;
@@ -49,12 +51,16 @@ body > .runtime-modal > .runtime-modal-card.manage-card{
 }
 
 /* Subscription create/edit is intentionally compact. */
-.admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card{
+.admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card,
+body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manage-card{
   width:min(760px,calc(100vw - 32px))!important;
+  height:auto!important;
+  min-height:0!important;
   max-height:min(78dvh,700px)!important;
 }
 
-.admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card>.card-head{
+.admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card>.card-head,
+body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manage-card>.card-head{
   position:sticky!important;
   top:-15px!important;
   z-index:5!important;
@@ -64,7 +70,8 @@ body > .runtime-modal > .runtime-modal-card.manage-card{
   background:var(--surface)!important;
 }
 
-.admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card .modalActions{
+.admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card .modalActions,
+body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manage-card .modalActions{
   position:sticky!important;
   bottom:-15px!important;
   z-index:4!important;
@@ -100,7 +107,8 @@ body > .runtime-modal > .runtime-modal-card.manage-card{
   .admin-shell .legacy-control-page .runtime-modal-card.manage-card,
   body > .runtime-modal > .runtime-modal-card,
   body > .runtime-modal > .runtime-modal-card.wide,
-  body > .runtime-modal > .runtime-modal-card.manage-card{
+  body > .runtime-modal > .runtime-modal-card.manage-card,
+  body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manage-card{
     width:calc(100vw - 20px)!important;
     max-width:calc(100vw - 20px)!important;
     max-height:calc(100dvh - 20px)!important;
@@ -120,7 +128,8 @@ body > .runtime-modal > .runtime-modal-card.manage-card{
   .admin-shell .legacy-control-page .runtime-modal-card.manage-card,
   body > .runtime-modal > .runtime-modal-card,
   body > .runtime-modal > .runtime-modal-card.wide,
-  body > .runtime-modal > .runtime-modal-card.manage-card{
+  body > .runtime-modal > .runtime-modal-card.manage-card,
+  body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manage-card{
     width:calc(100vw - 12px)!important;
     max-width:calc(100vw - 12px)!important;
     max-height:calc(100dvh - 12px)!important;
