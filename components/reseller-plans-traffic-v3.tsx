@@ -42,11 +42,11 @@ export function ResellerSubscriptionPlansV3(){
 
   const save=async(planId:number)=>{
     const value=Number(drafts[planId]||0);
-    if(!Number.isFinite(value)||value<=0){setError(pick("قیمت فروش معتبر نیست.","Selling price is invalid."));return;}
+    if(!Number.isFinite(value)||value<0){setError(pick("قیمت فروش نمی‌تواند منفی باشد.","Selling price cannot be negative."));return;}
     setBusy(planId);setError("");setOk("");
     try{
-      await resellerApi.setPlanPrice(planId,value);
-      setOk(pick("قیمت فروش پلن ذخیره شد و در ربات نمایندگی استفاده می‌شود.","Plan selling price saved and will be used by the reseller bot."));
+      await resellerApi.updatePlan(planId,{sell_price_toman:value});
+      setOk(pick("قیمت فروش ذخیره شد.","Selling price saved."));
       await load();
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy(null);}
@@ -68,8 +68,8 @@ export function ResellerSubscriptionPlansV3(){
 
     <Card>
       <div className="card-head"><div><b>{pick("قیمت فروش پلن‌های اشتراک","Subscription plan selling prices")}</b><small>{pick("تغییر قیمت اینجا، قیمت نمایش‌داده‌شده در ربات اختصاصی نمایندگی را هم تغییر می‌دهد.","Changing the price here also changes the price shown by your reseller bot.")}</small></div><Badge tone="violet">{plans.length}</Badge></div>
-      <div className="table"><table><thead><tr><th>{pick("پلن اشتراک","Subscription plan")}</th><th>{pick("حجم / مدت","Traffic / Duration")}</th><th>{pick("پروتکل‌ها","Protocols")}</th><th>{pick("قیمت فروش شما","Your selling price")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{plans.map((row,index)=>{const id=Number(row.plan_id||row.id||0);return <tr key={id||index}><td><b>{str(row,"name")||`#${id}`}</b><small>{str(row,"description")}</small></td><td>{num(row,"traffic_gb")} GB · {num(row,"duration_days")} {pick("روز","days")}</td><td>{protocols(row).join(" · ")||"—"}</td><td><input className="table-input" type="number" min={1} value={drafts[id]??""} onChange={event=>setDrafts(value=>({...value,[id]:event.target.value}))}/><small>{pick("تومان","Toman")}</small></td><td><button className="mini-btn primary-lite" disabled={busy===id} onClick={()=>void save(id)}>{busy===id?"…":pick("ذخیره قیمت","Save price")}</button></td></tr>})}</tbody></table></div>
-      {!plans.length&&<Empty>{pick("هنوز هیچ پلن اشتراکی از طرف مدیر برای این نمایندگی فعال نشده است.","No subscription plan has been assigned to this reseller yet.")}</Empty>}
+      <div className="table"><table><thead><tr><th>{pick("پلن اشتراک","Subscription plan")}</th><th>{pick("حجم / مدت","Traffic / Duration")}</th><th>{pick("پروتکل‌ها","Protocols")}</th><th>{pick("قیمت فروش شما","Your selling price")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{plans.map((row,index)=>{const id=Number(row.plan_id||row.id||0);return <tr key={id||index}><td><b>{str(row,"name","title")||`#${id}`}</b><small>{str(row,"description")}</small></td><td>{num(row,"traffic_gb")} GB · {num(row,"duration_days")} {pick("روز","days")}</td><td>{protocols(row).join(" · ")||"—"}</td><td><input className="table-input" type="number" step={1} value={drafts[id]??""} onChange={event=>setDrafts(value=>({...value,[id]:event.target.value}))}/><small>{pick("تومان","Toman")}</small></td><td><button className="mini-btn primary-lite" disabled={busy===id} onClick={()=>void save(id)}>{busy===id?"…":pick("ذخیره قیمت","Save price")}</button></td></tr>})}</tbody></table></div>
+      {!plans.length&&<Empty>{pick("هنوز هیچ پلن اشتراکی برای این نمایندگی فعال نشده است.","No subscription plan is active for this reseller yet.")}</Empty>}
     </Card>
 
     <Card>
