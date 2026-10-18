@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import {useEffect,useState} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
@@ -158,11 +157,11 @@ function ResellerAccessGuard({children}:{children:React.ReactNode}){
 function PortalMenuLink({item,active,onClick}:{item:MenuItem;active:string;onClick?:()=>void}){
   const {pick}=useI18n();
   const [fa,en,href,icon]=item;
-  return <Link prefetch href={href} className={active===href?"active":""} onClick={onClick}>
+  return <a href={href} className={active===href?"active":""} onClick={onClick}>
     <span className="customer-portal-nav-icon"><PortalIcon name={icon}/></span>
     <span className="customer-portal-nav-label">{pick(fa,en)}</span>
     {active===href&&<span className="customer-portal-active-dot"/>}
-  </Link>;
+  </a>;
 }
 
 function PortalTopNav({active,type}:{active:string;type:"customer"|"reseller"}){
