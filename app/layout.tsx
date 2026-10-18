@@ -60,6 +60,7 @@ import "./storefront-polish-v5.css";
 import "./storefront-mobile-hero-v6.css";
 import "./storefront-mobile-hero-v8.css";
 import "./storefront-protocol-art-v9.css";
+import "./panel-copy-density-final.css";
 
 export const metadata:Metadata={title:"VPN Control 2027",description:"VPN management control panel"};
 
