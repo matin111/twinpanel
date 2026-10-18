@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.45",
-  "source_sha": "682a44c453b5ae9441734d4e06d758dd2e783eae",
+  "version": "1.1.0-rc.46",
+  "source_sha": "15cde27ae51a154bc57a7983d7da5562514c6164",
   "notes": {
-    "fa": "نسخه 1.1.0-rc.45 مسیر Session/Quota برای Cisco AnyConnect را کامل می‌کند. تاریخ شروع و پایان اشتراک از اولین Session واقعی VPN آغاز می‌شود، شناسه صحیح QuotaDevice در پیکربندی نود استفاده می‌شود، Sessionهای واقعی ocserv هر ۵ ثانیه از occtl خوانده می‌شوند و RX/TX واقعی در دفتر ثبت افزایشی Quota ذخیره می‌شود تا مصرف حجم، حجم باقی‌مانده و درصد مصرف در صفحه Connect به‌روز شوند. قطع اتصال Session را می‌بندد بدون اینکه مصرف ثبت‌شده از بین برود و خطای موقت Collector باعث بسته‌شدن اشتباه Session فعال نمی‌شود.",
-    "en": "TwinPanel 1.1.0-rc.45 completes the Cisco AnyConnect Session/Quota path. Subscription start and expiry are activated by the first real VPN session, node quota configuration uses the canonical QuotaDevice identity, live ocserv sessions are reconciled from occtl every 5 seconds, and real RX/TX counters are recorded in the append-only quota ledger so Connect-page usage, remaining quota, and percentage stay current. Disconnects close tracked sessions without losing consumed traffic, and transient collector failures never falsely close an active session."
+    "fa": "نسخه 1.1.0-rc.46 مشکل افت شدید سرعت و افزایش تأخیر زیر بار برای Cisco/OpenConnect، OpenVPN و WireGuard در مسیرهای Iran → Exit را برطرف می‌کند. لایه خودترمیم Performance V47، MTU اینترفیس‌های مدیریت‌شده VPN را روی 1200 و TCP MSS دوطرفه را روی 1160 همگام می‌کند تا از Fragmentation و Retransmission در تونل‌های داخلی با MTU پایین‌تر جلوگیری شود. این اصلاح بدون نصب مجدد پروتکل‌ها روی سرورهای موجود اعمال می‌شود، فقط زنجیره اختصاصی TP_ACCESS_PERF را مدیریت می‌کند و V2Ray/Xray، انتخاب Transport، احراز هویت، هویت اشتراک و منطق Quota را تغییر نمی‌دهد.",
+    "en": "TwinPanel 1.1.0-rc.46 fixes severe throughput loss and loaded-latency spikes affecting routed Cisco/OpenConnect, OpenVPN, and WireGuard sessions across Iran → Exit overlays. The self-healing VPN Access Performance V47 layer normalizes managed VPN interfaces to MTU 1200 and applies bidirectional TCP MSS 1160 so inner traffic avoids fragmentation and retransmission across lower-MTU carriers. Existing servers are repaired without protocol reinstall, only the dedicated TP_ACCESS_PERF chain is owned, and V2Ray/Xray, transport selection, authentication, subscription identity, and quota logic remain unchanged."
   }
 }
