@@ -42,8 +42,20 @@ const CustomerPaymentsRuntime=dynamic(()=>import("./customer-payments-runtime").
 const CustomerConnectionModernPage=dynamic(()=>import("./customer-connection-modern").then(m=>m.CustomerConnectionModernPage));
 const VpnSettingsModernPage=dynamic(()=>import("./vpn-settings-modern").then(m=>m.VpnSettingsModernPage));
 const CustomerDashboardPro=dynamic(()=>import("./customer-dashboard-pro").then(m=>m.CustomerDashboardPro));
-const ResellerDashboardRuntime=dynamic(()=>import("./reseller-runtime").then(m=>m.ResellerDashboardRuntime));
-const ResellerSectionRuntime=dynamic(()=>import("./reseller-runtime").then(m=>m.ResellerSectionRuntime));
+
+const ResellerDashboardV3=dynamic(()=>import("./reseller-dashboard-v3").then(m=>m.ResellerDashboardV3));
+const ResellerSubscriptionsParityRuntime=dynamic(()=>import("./reseller-subscriptions-parity").then(m=>m.ResellerSubscriptionsParityRuntime));
+const ResellerSubscriptionPlansV3=dynamic(()=>import("./reseller-plans-traffic-v3").then(m=>m.ResellerSubscriptionPlansV3));
+const ResellerTrafficRechargeV3=dynamic(()=>import("./reseller-plans-traffic-v3").then(m=>m.ResellerTrafficRechargeV3));
+const ResellerWalletRuntime=dynamic(()=>import("./reseller-wallet-runtime").then(m=>m.ResellerWalletRuntime));
+const ResellerBotWalletRuntime=dynamic(()=>import("./reseller-bot-wallet-runtime").then(m=>m.ResellerBotWalletRuntime));
+const ResellerOrdersParityRuntime=dynamic(()=>import("./reseller-commerce-parity").then(m=>m.ResellerOrdersParityRuntime));
+const ResellerDiscountsParityRuntime=dynamic(()=>import("./reseller-commerce-parity").then(m=>m.ResellerDiscountsParityRuntime));
+const ResellerBotParityRuntime=dynamic(()=>import("./reseller-commerce-parity").then(m=>m.ResellerBotParityRuntime));
+const ResellerCustomersParityV2=dynamic(()=>import("./reseller-portal-parity-v2").then(m=>m.ResellerCustomersParityV2));
+const ResellerSettingsParityV2=dynamic(()=>import("./reseller-portal-parity-v2").then(m=>m.ResellerSettingsParityV2));
+const ResellerNotificationsLive=dynamic(()=>import("./reseller-notifications-live").then(m=>m.ResellerNotificationsLive));
+
 const StoreRuntime2027=dynamic(()=>import("./store-runtime").then(m=>m.StoreRuntime2027));
 const AdminDashboardRuntime=dynamic(()=>import("./admin-dashboard-runtime").then(m=>m.AdminDashboardRuntime));
 const PaymentsReviewRuntime=dynamic(()=>import("./payments-review-runtime").then(m=>m.PaymentsReviewRuntime));
@@ -51,7 +63,6 @@ const AdminPaymentsRuntime=dynamic(()=>import("./admin-payments-runtime").then(m
 const DownloadAssetsRuntime=dynamic(()=>import("./download-assets-runtime").then(m=>m.DownloadAssetsRuntime));
 
 const customerSections=new Set(["orders","wallet","notifications","profile"]);
-const resellerSections=new Set(["customers","subscriptions","sales","wallet","orders","traffic","bot","notifications","settings"]);
 const admin=(node:React.ReactNode)=><AdminAuthGuard><AdminOperationFeedback/>{node}</AdminAuthGuard>;
 
 function AdminUnknownRoute(){
@@ -104,22 +115,31 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="admin/l2tp") return admin(<L2tpSettingsPage/>);
   if(key==="admin/mother-access") return admin(<MotherAccessRuntimePage/>);
   if(key==="admin/branding") return admin(<BrandingSettingsPage/>);
+
   if(key==="panel") return <CustomerDashboardPro/>;
   if(key==="panel/buy") return <CustomerBuyRuntime/>;
   if(key==="panel/subscription") return <CustomerSubscriptionsRuntime/>;
   if(key==="panel/payments") return <CustomerPaymentsRuntime/>;
   if(key==="panel/connection") return <CustomerConnectionModernPage/>;
-  if(key==="reseller") return <ResellerDashboardRuntime/>;
+
+  if(key==="reseller") return <ResellerDashboardV3/>;
+  if(key==="reseller/customers") return <ResellerCustomersParityV2/>;
+  if(key==="reseller/subscriptions") return <ResellerSubscriptionsParityRuntime/>;
+  if(key==="reseller/sales") return <ResellerSubscriptionPlansV3/>;
+  if(key==="reseller/wallet") return <ResellerWalletRuntime/>;
+  if(key==="reseller/bot-wallet") return <ResellerBotWalletRuntime/>;
+  if(key==="reseller/traffic") return <ResellerTrafficRechargeV3/>;
+  if(key==="reseller/orders") return <ResellerOrdersParityRuntime/>;
+  if(key==="reseller/discounts") return <ResellerDiscountsParityRuntime/>;
+  if(key==="reseller/bot") return <ResellerBotParityRuntime/>;
+  if(key==="reseller/notifications") return <ResellerNotificationsLive/>;
+  if(key==="reseller/settings") return <ResellerSettingsParityV2/>;
+
   if(key==="store") return <StoreRuntime2027/>;
 
   if(key.startsWith("panel/")){
     const section=key.slice("panel/".length);
     if(customerSections.has(section)) return <CustomerSectionRuntime section={section}/>;
-  }
-
-  if(key.startsWith("reseller/")){
-    const section=key.slice("reseller/".length);
-    if(resellerSections.has(section)) return <ResellerSectionRuntime section={section}/>;
   }
 
   if(key.startsWith("admin/")) return admin(<AdminUnknownRoute/>);
