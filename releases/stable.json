@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.44",
+  "version": "1.1.0-rc.45",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-18T23:01:41Z",
+  "released_at": "2026-10-18T23:27:24Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9d9fc5e5a243ac4ad33388e067b09f0e386b412f",
+  "source_sha": "682a44c453b5ae9441734d4e06d758dd2e783eae",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.44/twinpanel-1.1.0-rc.44-linux-x86_64.tar.gz",
-    "sha256": "c4ecf24219465ca945821d0eca02268df86559fc22081daa5e962ada67b61438",
-    "size_bytes": 12743805
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.45/twinpanel-1.1.0-rc.45-linux-x86_64.tar.gz",
+    "sha256": "d15346899788aa92783212001c05b42a2756a75babc34f3541f9acb103897015",
+    "size_bytes": 12751634
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.44 پایداری منوهای پنل را اصلاح می‌کند: منوهای مدیریت، کاربر و نماینده برای جابه‌جایی بین صفحات دیگر به Client/RSC Navigation حساس نیستند و هر کلیک مسیر را به‌صورت قطعی باز می‌کند، در حالی که رفتار باز و بسته‌شدن منوها حفظ شده است. قیمت‌گذاری نماینده نیز اصلاح شده و روی شناسه واقعی پلن اختصاصی نماینده ذخیره می‌شود؛ قیمت صفر برای فروش رایگان و هر مبلغ مثبت بدون سقف قیمت مجاز است و فقط مقدار منفی به‌عنوان داده مالی نامعتبر رد می‌شود.",
-    "en": "TwinPanel 1.1.0-rc.44 hardens panel navigation: admin, customer and reseller menus no longer depend on a fragile client/RSC transition for page changes, so each menu click performs a reliable route load while existing dropdown behavior is preserved. Reseller pricing now updates the actual reseller-owned plan identity; a zero/free selling price and any positive Toman amount are allowed with no maximum price cap, while only negative values are rejected as invalid accounting data."
+    "fa": "نسخه 1.1.0-rc.45 مسیر Session/Quota برای Cisco AnyConnect را کامل می‌کند. تاریخ شروع و پایان اشتراک از اولین Session واقعی VPN آغاز می‌شود، شناسه صحیح QuotaDevice در پیکربندی نود استفاده می‌شود، Sessionهای واقعی ocserv هر ۵ ثانیه از occtl خوانده می‌شوند و RX/TX واقعی در دفتر ثبت افزایشی Quota ذخیره می‌شود تا مصرف حجم، حجم باقی‌مانده و درصد مصرف در صفحه Connect به‌روز شوند. قطع اتصال Session را می‌بندد بدون اینکه مصرف ثبت‌شده از بین برود و خطای موقت Collector باعث بسته‌شدن اشتباه Session فعال نمی‌شود.",
+    "en": "TwinPanel 1.1.0-rc.45 completes the Cisco AnyConnect Session/Quota path. Subscription start and expiry are activated by the first real VPN session, node quota configuration uses the canonical QuotaDevice identity, live ocserv sessions are reconciled from occtl every 5 seconds, and real RX/TX counters are recorded in the append-only quota ledger so Connect-page usage, remaining quota, and percentage stay current. Disconnects close tracked sessions without losing consumed traffic, and transient collector failures never falsely close an active session."
   }
 }
