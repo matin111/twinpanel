@@ -37,8 +37,8 @@ jobs:
           assert '<AdminAuthGuard><AdminOperationFeedback/>{node}</AdminAuthGuard>' in routed
           assert 'if(key==="admin/provision") return admin(<ProvisionRuntimePage/>);' in routed
           assert 'if(key==="admin/tunnels") return admin(<TunnelsSimpleRuntimePage/>);' in routed
-          assert 'if(key==="admin/subscriptions") return admin(<LegacySubscriptionsRuntimePage/>);' in routed
-          assert 'AdminManualSubscriptionCreate' not in routed
+          assert 'if(key==="admin/subscriptions") return admin(<><LegacySubscriptionsRuntimePage/><AdminManualSubscriptionCreate/></>);' in routed
+          assert 'AdminManualSubscriptionCreate' in routed
 
           assert 'parityApi.provisionInstall(draft)' in provision
           assert 'TunnelsUnifiedRuntimeV39' in tunnel_entry
