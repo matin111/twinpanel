@@ -2,18 +2,16 @@ name: TwinPanel Publish Prebuilt Release
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
-      - releases/candidate.json
-      - .github/workflows/publish-prebuilt-release.yml
+      - 'releases/candidate.json'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: twinpanel-publish-stable-release
+  group: twinpanel-publish-prebuilt-release
   cancel-in-progress: false
 
 jobs:
@@ -23,27 +21,25 @@ jobs:
       - name: Checkout publisher branch
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
+          path: publisher
 
       - name: Read release candidate
         id: candidate
+        working-directory: publisher
         shell: bash
         run: |
+          set -Eeuo pipefail
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
           import json
-          import re
           from pathlib import Path
 
-          path=Path('releases/candidate.json')
-          if not path.is_file():
-              raise SystemExit('releases/candidate.json is missing')
-          obj=json.loads(path.read_text(encoding='utf-8'))
-          version=str(obj.get('version') or '').strip()
-          source_sha=str(obj.get('source_sha') or '').strip().lower()
-          if not re.fullmatch(r'\d+\.\d+\.\d+(?:-[A-Za-z0-9._-]+)?',version):
-              raise SystemExit('candidate version is invalid')
-          if not re.fullmatch(r'[0-9a-f]{40}',source_sha):
-              raise SystemExit('candidate source_sha is invalid')
+          data=json.loads(Path('releases/candidate.json').read_text(encoding='utf-8'))
+          version=str(data.get('version') or '').strip()
+          source_sha=str(data.get('source_sha') or '').strip().lower()
+          if not version or len(source_sha)!=40 or any(c not in '0123456789abcdef' for c in source_sha):
+              raise SystemExit('invalid releases/candidate.json')
           print(f'version={version}')
           print(f'source_sha={source_sha}')
           print(f'tag=v{version}')
@@ -60,12 +56,16 @@ jobs:
       - name: Verify candidate source version
         shell: bash
         run: |
-          test "$(tr -d '[:space:]' < source/VERSION)" = "${{ steps.candidate.outputs.version }}"
+          set -Eeuo pipefail
+          test "$(tr -d '\r\n' < source/VERSION)" = "${{ steps.candidate.outputs.version }}"
+          test "$(git -C source rev-parse HEAD)" = "${{ steps.candidate.outputs.source_sha }}"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.13.0"
+          node-version: '22.13.0'
+          cache: npm
+          cache-dependency-path: source/package-lock.json
 
       - name: Install frontend dependencies
         working-directory: source
@@ -95,6 +95,8 @@ jobs:
           ASSET="${{ steps.candidate.outputs.asset }}"
 
           test -f source/.next/standalone/server.js
+          test -d source/.next/standalone/.next/static
+          test -n "$(find source/.next/standalone/.next/static -type f -print -quit)"
           rm -rf stage "$ASSET"
           mkdir -p stage/twinpanel/.next
 
@@ -107,6 +109,9 @@ jobs:
             source/ stage/twinpanel/
 
           cp -a source/.next/standalone stage/twinpanel/.next/standalone
+          test -f stage/twinpanel/.next/standalone/server.js
+          test -d stage/twinpanel/.next/standalone/.next/static
+          test -n "$(find stage/twinpanel/.next/standalone/.next/static -type f -print -quit)"
 
           python3 - "$VERSION" "$SOURCE_SHA" <<'PY'
           import json
@@ -219,9 +224,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add releases/stable.json
-          if git diff --cached --quiet; then
-            echo "Stable manifest already matches the published artifact."
-            exit 0
-          fi
-          git commit -m "Publish TwinPanel ${VERSION} prebuilt release"
+          git diff --cached --quiet && exit 0
+          git commit -m "Publish TwinPanel $VERSION prebuilt release"
           git push origin HEAD:main
