@@ -36,6 +36,9 @@ const SettingsPage2027=dynamic(()=>import("./settings-2027").then(m=>m.SettingsP
 const LoginPage2027=dynamic(()=>import("./login-2027").then(m=>m.LoginPage2027));
 const RegisterPage2027=dynamic(()=>import("./login-2027").then(m=>m.RegisterPage2027));
 const CustomerSectionRuntime=dynamic(()=>import("./customer-runtime").then(m=>m.CustomerSectionRuntime));
+const CustomerBuyRuntime=dynamic(()=>import("./customer-buy-runtime").then(m=>m.CustomerBuyRuntime));
+const CustomerSubscriptionsRuntime=dynamic(()=>import("./customer-subscriptions-runtime").then(m=>m.CustomerSubscriptionsRuntime));
+const CustomerPaymentsRuntime=dynamic(()=>import("./customer-payments-runtime").then(m=>m.CustomerPaymentsRuntime));
 const CustomerConnectionModernPage=dynamic(()=>import("./customer-connection-modern").then(m=>m.CustomerConnectionModernPage));
 const VpnSettingsModernPage=dynamic(()=>import("./vpn-settings-modern").then(m=>m.VpnSettingsModernPage));
 const CustomerDashboardPro=dynamic(()=>import("./customer-dashboard-pro").then(m=>m.CustomerDashboardPro));
@@ -47,7 +50,7 @@ const PaymentsReviewRuntime=dynamic(()=>import("./payments-review-runtime").then
 const AdminPaymentsRuntime=dynamic(()=>import("./admin-payments-runtime").then(m=>m.AdminPaymentsRuntime));
 const DownloadAssetsRuntime=dynamic(()=>import("./download-assets-runtime").then(m=>m.DownloadAssetsRuntime));
 
-const customerSections=new Set(["subscription","connection","usage","orders","wallet","payments","support","notifications","profile"]);
+const customerSections=new Set(["orders","wallet","notifications","profile"]);
 const resellerSections=new Set(["customers","subscriptions","sales","wallet","orders","traffic","bot","notifications","settings"]);
 const admin=(node:React.ReactNode)=><AdminAuthGuard><AdminOperationFeedback/>{node}</AdminAuthGuard>;
 
@@ -102,6 +105,9 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="admin/mother-access") return admin(<MotherAccessRuntimePage/>);
   if(key==="admin/branding") return admin(<BrandingSettingsPage/>);
   if(key==="panel") return <CustomerDashboardPro/>;
+  if(key==="panel/buy") return <CustomerBuyRuntime/>;
+  if(key==="panel/subscription") return <CustomerSubscriptionsRuntime/>;
+  if(key==="panel/payments") return <CustomerPaymentsRuntime/>;
   if(key==="panel/connection") return <CustomerConnectionModernPage/>;
   if(key==="reseller") return <ResellerDashboardRuntime/>;
   if(key==="store") return <StoreRuntime2027/>;
