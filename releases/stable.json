@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.28",
+  "version": "1.1.0-rc.29",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-18T00:10:44Z",
+  "released_at": "2026-10-18T00:20:19Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "c2d33f0e3cca7701c54b057914b9370be0463391",
+  "source_sha": "f1ef7bccb2da6a9aaa7cdafeb926538ef67bd857",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.28/twinpanel-1.1.0-rc.28-linux-x86_64.tar.gz",
-    "sha256": "69ccd5eab95c4832f18b86709d0dca1a06ed514546a9aa27db58fb2f5fef775e",
-    "size_bytes": 12539482
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.29/twinpanel-1.1.0-rc.29-linux-x86_64.tar.gz",
+    "sha256": "9338a07284a3c0fc204fd68fc87d8c82dff621ad5faee084ab93fc6778985278",
+    "size_bytes": 12540911
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.28 خطای قرمز Not Found در بخش «اتصال‌های عبوری» مدیریت تانل را برطرف می‌کند. مسیرهای Backend مربوط به Service Connections که در lineage انتشار از بین رفته بودند دوباره روی Runtime فعلی فعال شده‌اند؛ نمایش مسیرهای سرویس بدون افشای UUID، کلید REALITY، Short ID، Path یا Credential انجام می‌شود. Reconcile پروفایل‌های Xray با حفظ UUID و Jobهای آن بازگشته‌اند. تعمیر خروج واقعی TP2027 فقط با NAT/FORWARD محدود به همان تانل و بعد از تست واقعی Peer و خروج اینترنت فعال می‌شود؛ اگر هیچ TP2027 تایید نشود، مسیر سالم فعلی مانند SSH Relay/SSH TUN/Backhaul/MTunnel بدون تغییر حفظ می‌شود. دکمه‌های تعمیر نیز فقط وقتی Backend قابلیت مرتبط را تایید کند نمایش داده می‌شوند. این نسخه همچنین تغییر همزمان تاییدشده صفحه اشتراک‌ها از main را حفظ می‌کند.",
-    "en": "TwinPanel 1.1.0-rc.28 fixes the red Not Found error in Tunnel Service Connections by restoring the missing backend runtime routes on the current release lineage. Service inventory is sanitized and does not expose UUIDs, REALITY keys, short IDs, paths or credentials. UUID-preserving Xray profile reconciliation and its jobs are restored. TP2027 real-egress repair uses tunnel-scoped NAT/FORWARD plus real peer/public-egress verification, and preserves the existing healthy SSH Relay/SSH TUN/Backhaul/MTunnel fallback when no TP2027 candidate verifies. Repair actions are capability-gated by the backend. The concurrent verified subscriptions-page fix from main is preserved as well."
+    "fa": "نسخه 1.1.0-rc.29 رگرسیون ارتفاع مودال ساخت اشتراک دستی را برطرف می‌کند. بعد از انتقال مودال به document.body برای قرارگیری صحیح بالای منوی مدیریت، قانون اندازه جمع‌وجور صفحه اشتراک‌ها دیگر روی آن اعمال نمی‌شد و پنجره بیش از حد کشیده می‌شد. در این نسخه مودال Portal کلاس اختصاصی دارد، ارتفاع آن دوباره content-driven و auto شده، min-height اجباری حذف شده و سقف ارتفاع compact قبلی با اسکرول داخلی حفظ می‌شود. Header و Actionهای مودال نیز در حالت اسکرول sticky باقی می‌مانند. این نسخه تمام اصلاحات rc.28 را نیز حفظ می‌کند.",
+    "en": "TwinPanel 1.1.0-rc.29 fixes the manual-subscription modal height regression. After the dialog was portaled to document.body to correctly layer above the admin navigation, the subscriptions-page compact sizing rule no longer matched and the dialog became unnecessarily tall. This release adds an explicit portal modal class, restores content-driven auto height with no forced minimum height, preserves the previous compact maximum height with internal scrolling, and keeps the modal header/actions sticky while scrolling. All rc.28 fixes remain included."
   }
 }
