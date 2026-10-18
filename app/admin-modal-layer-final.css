@@ -11,7 +11,7 @@ body > .runtime-modal{
   display:grid!important;
   place-items:center!important;
   box-sizing:border-box!important;
-  padding:clamp(12px,2vw,24px)!important;
+  padding:clamp(10px,1.6vw,20px)!important;
   overflow:auto!important;
   overscroll-behavior:contain!important;
 }
@@ -30,8 +30,8 @@ body > .runtime-modal > .runtime-modal-card{
   box-sizing:border-box!important;
   height:auto!important;
   min-height:0!important;
-  max-width:calc(100vw - 32px)!important;
-  max-height:calc(100dvh - 48px)!important;
+  max-width:calc(100vw - 28px)!important;
+  max-height:calc(100dvh - 40px)!important;
   margin:auto!important;
   overflow:auto!important;
   overscroll-behavior:contain!important;
@@ -40,32 +40,34 @@ body > .runtime-modal > .runtime-modal-card{
 /* Standard modal widths. */
 .admin-shell .runtime-modal-card.wide,
 body > .runtime-modal > .runtime-modal-card.wide{
-  width:min(900px,calc(100vw - 40px))!important;
-  max-height:min(86dvh,840px)!important;
+  width:min(860px,calc(100vw - 36px))!important;
+  max-height:min(82dvh,760px)!important;
 }
 
 .admin-shell .runtime-modal-card.manage-card,
 body > .runtime-modal > .runtime-modal-card.manage-card{
-  width:min(980px,calc(100vw - 40px))!important;
-  max-height:min(86dvh,840px)!important;
+  width:min(900px,calc(100vw - 36px))!important;
+  max-height:min(82dvh,760px)!important;
 }
 
-/* Subscription create/edit is intentionally compact. */
+/* Subscription create/edit stays deliberately compact and content-driven. */
 .admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card,
 body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manage-card{
-  width:min(760px,calc(100vw - 32px))!important;
+  width:min(700px,calc(100vw - 28px))!important;
   height:auto!important;
   min-height:0!important;
-  max-height:min(78dvh,700px)!important;
+  max-height:min(70dvh,620px)!important;
+  padding:14px!important;
+  gap:9px!important;
 }
 
 .admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card>.card-head,
 body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manage-card>.card-head{
   position:sticky!important;
-  top:-15px!important;
+  top:-14px!important;
   z-index:5!important;
-  margin:-15px -15px 4px!important;
-  padding:13px 15px 11px!important;
+  margin:-14px -14px 2px!important;
+  padding:11px 14px 10px!important;
   border-bottom:1px solid var(--line)!important;
   background:var(--surface)!important;
 }
@@ -73,19 +75,145 @@ body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manage-car
 .admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card .modalActions,
 body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manage-card .modalActions{
   position:sticky!important;
-  bottom:-15px!important;
+  bottom:-14px!important;
   z-index:4!important;
-  margin:4px -15px -15px!important;
-  padding:11px 15px!important;
+  margin:2px -14px -14px!important;
+  padding:9px 14px!important;
   border-top:1px solid var(--line)!important;
   background:var(--surface)!important;
 }
 
-/* Infrastructure/tunnel management needs more horizontal room, but should
- * still never become a near-full-screen desktop dialog. */
+body > .runtime-modal.manual-subscription-modal .subscription-create-form{
+  gap:9px!important;
+}
+
+body > .runtime-modal.manual-subscription-modal .runtime-warning{
+  margin:0!important;
+  padding:8px 10px!important;
+  border-radius:10px!important;
+  font-size:11px!important;
+  line-height:1.55!important;
+}
+
+body > .runtime-modal.manual-subscription-modal .setting-grid.compact-create-grid{
+  gap:8px 10px!important;
+}
+
+body > .runtime-modal.manual-subscription-modal .field{
+  gap:4px!important;
+}
+
+body > .runtime-modal.manual-subscription-modal .field>span{
+  font-size:11px!important;
+}
+
+body > .runtime-modal.manual-subscription-modal .field input,
+body > .runtime-modal.manual-subscription-modal .field select{
+  min-height:38px!important;
+  height:38px!important;
+  padding-inline:10px!important;
+  border-radius:10px!important;
+}
+
+body > .runtime-modal.manual-subscription-modal .runtime-choice-section{
+  margin:0!important;
+  padding:9px 10px!important;
+  gap:7px!important;
+  border-radius:12px!important;
+}
+
+body > .runtime-modal.manual-subscription-modal .protocol-toggle-grid{
+  gap:6px!important;
+}
+
+body > .runtime-modal.manual-subscription-modal .module-toggle{
+  min-height:38px!important;
+  padding:7px 9px!important;
+  border-radius:10px!important;
+}
+
+/* Infrastructure/tunnel dialogs get enough horizontal room without becoming
+ * near-full-screen desktop sheets. */
 .admin-shell .legacy-control-page .runtime-modal-card.manage-card{
-  width:min(900px,calc(100vw - 40px))!important;
-  max-height:min(84dvh,800px)!important;
+  width:min(860px,calc(100vw - 36px))!important;
+  max-height:min(80dvh,720px)!important;
+}
+
+/* Node management is a compact command dialog instead of a full-width inline card. */
+.admin-shell .legacy-control-page .runtime-modal-card.node-manage-modal-card{
+  width:min(680px,calc(100vw - 28px))!important;
+  max-height:min(70dvh,600px)!important;
+  padding:15px!important;
+  gap:10px!important;
+}
+
+.admin-shell .legacy-control-page .node-manage-modal-card>.card-head{
+  margin-bottom:0!important;
+  padding-bottom:10px!important;
+  border-bottom:1px solid var(--line)!important;
+}
+
+.admin-shell .legacy-control-page .node-manage-hero{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:12px!important;
+  padding:10px 12px!important;
+  border:1px solid var(--line)!important;
+  border-radius:12px!important;
+  background:var(--surface2)!important;
+}
+
+.admin-shell .legacy-control-page .node-manage-hero>div{
+  display:grid!important;
+  gap:2px!important;
+}
+
+.admin-shell .legacy-control-page .node-manage-hero small{
+  color:var(--muted)!important;
+  font-size:10px!important;
+}
+
+.admin-shell .legacy-control-page .node-manage-hero b{
+  font-size:12px!important;
+}
+
+.admin-shell .legacy-control-page .node-manage-info{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:7px!important;
+}
+
+.admin-shell .legacy-control-page .node-manage-info>div{
+  min-width:0!important;
+  padding:9px 10px!important;
+  border:1px solid var(--line)!important;
+  border-radius:11px!important;
+  background:var(--surface2)!important;
+}
+
+.admin-shell .legacy-control-page .node-manage-info span{
+  font-size:10px!important;
+}
+
+.admin-shell .legacy-control-page .node-manage-info b{
+  font-size:12px!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+
+.admin-shell .legacy-control-page .node-manage-actions{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:7px!important;
+  margin-top:1px!important;
+}
+
+.admin-shell .legacy-control-page .node-manage-actions button{
+  width:100%!important;
+  min-height:38px!important;
+  margin:0!important;
+  justify-content:center!important;
 }
 
 /* Older user-management dialogs had their own lower z-index. Keep every
@@ -94,10 +222,20 @@ body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manage-car
   z-index:5000!important;
 }
 
+@media(min-width:780px){
+  body > .runtime-modal.manual-subscription-modal .setting-grid.compact-create-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  }
+
+  body > .runtime-modal.manual-subscription-modal .protocol-toggle-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  }
+}
+
 @media(max-width:900px){
   .admin-shell .runtime-modal,
   body > .runtime-modal{
-    padding:10px!important;
+    padding:9px!important;
   }
 
   .admin-shell .runtime-modal-card,
@@ -105,20 +243,28 @@ body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manage-car
   .admin-shell .runtime-modal-card.manage-card,
   .admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card,
   .admin-shell .legacy-control-page .runtime-modal-card.manage-card,
+  .admin-shell .legacy-control-page .runtime-modal-card.node-manage-modal-card,
   body > .runtime-modal > .runtime-modal-card,
   body > .runtime-modal > .runtime-modal-card.wide,
   body > .runtime-modal > .runtime-modal-card.manage-card,
   body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manage-card{
-    width:calc(100vw - 20px)!important;
-    max-width:calc(100vw - 20px)!important;
-    max-height:calc(100dvh - 20px)!important;
+    width:calc(100vw - 18px)!important;
+    max-width:calc(100vw - 18px)!important;
+    max-height:calc(100dvh - 18px)!important;
+  }
+}
+
+@media(max-width:640px){
+  .admin-shell .legacy-control-page .node-manage-info,
+  .admin-shell .legacy-control-page .node-manage-actions{
+    grid-template-columns:1fr 1fr!important;
   }
 }
 
 @media(max-width:560px){
   .admin-shell .runtime-modal,
   body > .runtime-modal{
-    padding:6px!important;
+    padding:5px!important;
   }
 
   .admin-shell .runtime-modal-card,
@@ -126,13 +272,18 @@ body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manage-car
   .admin-shell .runtime-modal-card.manage-card,
   .admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card,
   .admin-shell .legacy-control-page .runtime-modal-card.manage-card,
+  .admin-shell .legacy-control-page .runtime-modal-card.node-manage-modal-card,
   body > .runtime-modal > .runtime-modal-card,
   body > .runtime-modal > .runtime-modal-card.wide,
   body > .runtime-modal > .runtime-modal-card.manage-card,
   body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manage-card{
-    width:calc(100vw - 12px)!important;
-    max-width:calc(100vw - 12px)!important;
-    max-height:calc(100dvh - 12px)!important;
+    width:calc(100vw - 10px)!important;
+    max-width:calc(100vw - 10px)!important;
+    max-height:calc(100dvh - 10px)!important;
     border-radius:14px!important;
+  }
+
+  .admin-shell .legacy-control-page .node-manage-actions{
+    grid-template-columns:1fr!important;
   }
 }
