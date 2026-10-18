@@ -41,6 +41,27 @@ jobs:
           print("backend free-order activation contract OK")
           PY
 
+      - name: Verify provision warning recovery and replay guard
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("backend/app/routers/store.py").read_text()
+          required = [
+              'def _delivered_protocols(',
+              'def _delivery_ready_for_order(',
+              'requested.issubset(delivered)',
+              'def _existing_delivery_snapshot(',
+              '_public_payload(db, sub)',
+              'recovered_existing_delivery',
+              'provision_warnings',
+              'if not _delivery_ready_for_order(',
+          ]
+          missing = [item for item in required if item not in source]
+          if missing:
+              raise SystemExit(f"missing provision recovery contract: {missing}")
+          print("provision warning recovery contract OK")
+          PY
+
       - name: Verify customer checkout UI contract
         run: |
           python - <<'PY'
