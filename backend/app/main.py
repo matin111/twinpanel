@@ -56,6 +56,7 @@ from .admin_notification_service import notification_watch_loop
 from .services.customer_maintenance import customer_maintenance_loop
 from .services.payment_market_rates import payment_market_loop
 from .services.wallet_payment_automation import wallet_payment_automation_loop
+from .services.local_core_cisco_telemetry import local_core_cisco_telemetry_loop
 from .license_guard import LicenseMutationGuardMiddleware
 from .system_release import current_version, license_validation_loop
 # TWINPANEL_REAL_ADMIN_NOTIFICATION_REGISTER_V1
@@ -141,6 +142,10 @@ async def lifespan(app: FastAPI):
         wallet_payment_automation_loop(),
         name="wallet-payment-automation",
     )
+    local_core_cisco_task = asyncio.create_task(
+        local_core_cisco_telemetry_loop(),
+        name="local-core-cisco-telemetry",
+    )
     license_validation_task = asyncio.create_task(
         license_validation_loop(),
         name="license-validation",
@@ -155,6 +160,7 @@ async def lifespan(app: FastAPI):
         customer_maintenance_task.cancel()
         payment_market_task.cancel()
         wallet_payment_task.cancel()
+        local_core_cisco_task.cancel()
         license_validation_task.cancel()
 
         for task in (
@@ -163,6 +169,7 @@ async def lifespan(app: FastAPI):
             customer_maintenance_task,
             payment_market_task,
             wallet_payment_task,
+            local_core_cisco_task,
             license_validation_task,
         ):
             try:
