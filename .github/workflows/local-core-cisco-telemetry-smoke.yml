@@ -1,0 +1,111 @@
+name: TwinPanel Local Core Cisco Telemetry Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/main.py"
+      - "backend/app/services/local_core_cisco_telemetry.py"
+      - "backend/app/services/quota_node_sync.py"
+      - "backend/app/routers/quota_security.py"
+      - "backend/scripts/local_core_cisco_telemetry_smoke.py"
+      - ".github/workflows/local-core-cisco-telemetry-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/main.py"
+      - "backend/app/services/local_core_cisco_telemetry.py"
+      - "backend/app/services/quota_node_sync.py"
+      - "backend/app/routers/quota_security.py"
+      - "backend/scripts/local_core_cisco_telemetry_smoke.py"
+      - ".github/workflows/local-core-cisco-telemetry-smoke.yml"
+
+jobs:
+  local-core-cisco-telemetry:
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: twinpanel
+          POSTGRES_PASSWORD: twinpanel_test
+          POSTGRES_DB: twinpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U twinpanel -d twinpanel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      APP_NAME: TwinPanel-Telemetry-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Prepare runtime directories
+        run: |
+          sudo install -d -m 700 /etc/twinpanel /etc/vpnshop /var/lib/twinpanel-backups
+          sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /etc/vpnshop /var/lib/twinpanel-backups
+
+      - name: Compile telemetry runtime
+        run: |
+          python -m py_compile \
+            backend/app/services/local_core_cisco_telemetry.py \
+            backend/app/services/quota_node_sync.py \
+            backend/app/routers/quota_security.py \
+            backend/app/main.py \
+            backend/scripts/local_core_cisco_telemetry_smoke.py
+
+      - name: Verify telemetry wiring contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          main = Path("backend/app/main.py").read_text()
+          service = Path("backend/app/services/local_core_cisco_telemetry.py").read_text()
+          sync = Path("backend/app/services/quota_node_sync.py").read_text()
+          quota_router = Path("backend/app/routers/quota_security.py").read_text()
+
+          assert "local_core_cisco_telemetry_loop" in main
+          assert 'name="local-core-cisco-telemetry"' in main
+          assert '["occtl", "--json", "show", "users"]' in service
+          assert "reconcile_cisco_snapshot" in service
+          assert 'protocol="openconnect"' in service
+          assert "apply_usage_event" in service and "open_session" in service
+          assert "ensure_protocol_quota_device" in sync
+          assert 'device_key = f"protocol-credential:{int(credential.id)}"' in sync
+          assert '"device_id": int(device.id)' in sync
+          assert "db.commit()" in quota_router
+          PY
+
+      - name: Run PostgreSQL first-use and accounting smoke
+        working-directory: backend
+        run: python scripts/local_core_cisco_telemetry_smoke.py
