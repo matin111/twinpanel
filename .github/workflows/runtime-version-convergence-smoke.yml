@@ -42,6 +42,7 @@ jobs:
           assert 'cpSync(staticSource,staticTarget,{recursive:true})' in prepare
           assert 'source/.next/standalone/.next/static' in publisher
           assert 'stage/twinpanel/.next/standalone/.next/static' in publisher
+          assert publisher.count('working-directory: publisher') >= 2
 
           print('RUNTIME_VERSION_CONVERGENCE_CONTRACT_OK')
           PY
