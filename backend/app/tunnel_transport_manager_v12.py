@@ -10,6 +10,7 @@ from .smart_transport_auto_v21 import install_smart_transport_auto_v21
 from .smart_auto_bootstrap_v24 import reconciler_loop as smart_bootstrap_loop
 from .smart_candidate_bootstrap_v38 import reconciler_loop as candidate_bootstrap_loop
 from .vpn_access_dataplane_v46 import reconciler_loop as vpn_access_dataplane_loop
+from .vpn_access_performance_v47 import reconciler_loop as vpn_access_performance_loop
 
 
 # ============================================================
@@ -42,6 +43,13 @@ from .vpn_access_dataplane_v46 import reconciler_loop as vpn_access_dataplane_lo
 # OpenVPN server CA/cert/key with the same Central PKI used for delivered
 # client certificates, with rollback if the service does not come back healthy.
 #
+# VPN Access Performance V47 handles the distinct nested-MTU case. Access VPN
+# carrier packets may traverse an Iran -> Exit overlay with MTU as low as 1280,
+# while the Exit WAN is normally 1500. V47 bounds access interfaces to MTU 1200
+# and TCP MSS to 1160 in both directions using a dedicated TwinPanel mangle
+# chain. This avoids fragmentation/retransmission without changing V2Ray/Xray,
+# tunnel election, authentication, DNAT/SNAT ownership or subscription state.
+#
 # Smart Auto owns transport qualification/selection:
 #   * installs isolated modern L3 candidates (GRE, GOST TUN/WSS,
 #     AmneziaWG and licensed Netrix when available);
@@ -69,6 +77,7 @@ async def main() -> None:
         "bootstrap=v24 "
         "candidate_bootstrap=v38 "
         "vpn_access_dataplane=v46 "
+        "vpn_access_performance=v47 "
         "reconciler=v3 "
         "candidates=kernel_gre,gost_tun,amneziawg,netrix",
         flush=True,
@@ -87,6 +96,11 @@ async def main() -> None:
     vpn_access_task = asyncio.create_task(
         vpn_access_dataplane_loop(),
         name="twinpanel-vpn-access-dataplane-v46",
+    )
+
+    vpn_access_performance_task = asyncio.create_task(
+        vpn_access_performance_loop(),
+        name="twinpanel-vpn-access-performance-v47",
     )
 
     manager_task = asyncio.create_task(
@@ -108,6 +122,7 @@ async def main() -> None:
         bootstrap_task,
         candidate_bootstrap_task,
         vpn_access_task,
+        vpn_access_performance_task,
         manager_task,
         runtime_task,
         legacy_ingress_task,
