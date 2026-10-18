@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.32",
+  "version": "1.1.0-rc.33",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-18T00:53:12Z",
+  "released_at": "2026-10-18T10:07:44Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9f54d25cab68fd669a69a88a5a256e73927964f6",
+  "source_sha": "d69c1c727ff9e30ad3f0271f428b63adb40b7c7a",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.32/twinpanel-1.1.0-rc.32-linux-x86_64.tar.gz",
-    "sha256": "4103d7f01ac88a220b55eeffd83aaa267b17a89d98b06ccfab6dba9856f9d6b5",
-    "size_bytes": 12593656
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.33/twinpanel-1.1.0-rc.33-linux-x86_64.tar.gz",
+    "sha256": "db6de9fadce4045dd62a95ca30772e086237b36fe59140999ad52f1eab84b484",
+    "size_bytes": 12613646
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.32 نمایش خام خطاهای 502/503/504 Nginx را هنگام Restart موقت API برطرف می‌کند. کلاینت مدیریت دیگر HTML خطای Gateway را به کاربر نشان نمی‌دهد؛ درخواست‌های امن GET در قطعی کوتاه با Backoff محدود دوباره امتحان می‌شوند، اما POST/PUT/PATCH/DELETE هرگز خودکار تکرار نمی‌شوند تا عملیات مدیریتی دوبار اجرا نشود. منطق بازیابی بروزرسانی و سیاست تاییدشده Xray نسخه rc.31 بدون تغییر حفظ شده‌اند: WebSocket TLS، HTTPUpgrade TLS و VLESS TCP TLS برای کاربر و gRPC Reality/XHTTP Reality/VLESS Legacy فقط داخلی هستند.",
-    "en": "TwinPanel 1.1.0-rc.32 prevents raw Nginx 502/503/504 gateway HTML from leaking into the admin UI during short API restarts. Safe GET requests use bounded transient retry/backoff, while POST/PUT/PATCH/DELETE are never replayed automatically, avoiding duplicate administrative mutations after ambiguous gateway failures. Existing updater recovery behavior and the validated rc.31 Xray policy remain unchanged: WebSocket TLS, HTTPUpgrade TLS and VLESS TCP TLS are customer-facing while gRPC Reality, XHTTP Reality and VLESS Legacy remain internal-only."
+    "fa": "نسخه 1.1.0-rc.33 کنترل دامنه اختصاصی V2Ray/Xray را برای ساخت و مدیریت نودهای خروجی برمی‌گرداند؛ xray_domain کاملاً مستقل از دامنه عمومی نود ذخیره می‌شود و از صفحات Provision و Nodes/Network قابل ذخیره و آماده‌سازی TLS است. این نسخه همچنین خطای Xray 26.3.x در تشخیص فرمت فایل موقت Modern Xray را برطرف می‌کند: candidate اکنون با پسوند واقعی .json ساخته می‌شود و خطای Failed to get format of /usr/local/etc/xray/config.json.twinpanel-modern دیگر ناشی از نام فایل نخواهد بود. سیاست کاربر بدون تغییر باقی می‌ماند: WebSocket TLS، HTTPUpgrade TLS و VLESS TCP TLS قابل تحویل هستند و gRPC Reality، XHTTP Reality و VLESS Legacy فقط برای Rollback/Diagnostic داخلی حفظ می‌شوند. اصلاح rc.32 برای جلوگیری از نمایش HTML خام 502/503/504 و عدم تکرار خودکار عملیات تغییردهنده نیز حفظ شده است.",
+    "en": "TwinPanel 1.1.0-rc.33 restores a dedicated V2Ray/Xray domain control for both provisioning and existing Exit-node management. xray_domain is stored independently from the Node public/general domain and can be saved or prepared for TLS from Provision and Nodes/Network. It also fixes Xray 26.3.x Modern-config format detection by using a real .json suffix for the temporary candidate, eliminating the filename-driven Failed to get format of /usr/local/etc/xray/config.json.twinpanel-modern failure. The validated customer policy is unchanged: WebSocket TLS, HTTPUpgrade TLS and VLESS TCP TLS are customer-facing, while gRPC Reality, XHTTP Reality and VLESS Legacy remain internal-only for rollback/diagnostics. The rc.32 raw 502/503/504 shielding and non-replay mutation safety are retained."
   }
 }
