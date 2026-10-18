@@ -54,3 +54,11 @@ def ensure_subscription_plan_schema() -> None:
     raise RuntimeError(
         f"SUBSCRIPTION_PLAN_NULLABLE_MIGRATION_UNSUPPORTED:{dialect}"
     )
+
+
+# Existing PostgreSQL installations must be repaired before authentication or
+# reseller dependencies open request transactions. Fresh installations have no
+# subscriptions table yet and simply fall through to create_all with the
+# nullable SQLAlchemy metadata above. This keeps manual admin and reseller
+# creation on the same schema contract and avoids request-time ALTER lock waits.
+ensure_subscription_plan_schema()
