@@ -9,6 +9,7 @@ from .manager_runtime_v16 import install_manager_runtime_v16
 from .smart_transport_auto_v21 import install_smart_transport_auto_v21
 from .smart_auto_bootstrap_v24 import reconciler_loop as smart_bootstrap_loop
 from .smart_candidate_bootstrap_v38 import reconciler_loop as candidate_bootstrap_loop
+from .vpn_access_dataplane_v46 import reconciler_loop as vpn_access_dataplane_loop
 
 
 # ============================================================
@@ -32,6 +33,14 @@ from .smart_candidate_bootstrap_v38 import reconciler_loop as candidate_bootstra
 # permanently on the slow legacy fallback. V38 invokes V21's existing bounded
 # candidate scheduler for every active AUTO tunnel until candidate rows exist.
 # It does not own installation, health, benchmarking or selection itself.
+#
+# VPN Access Dataplane V46 repairs the service-side Exit path independently of
+# tunnel election. Cisco/OpenConnect, OpenVPN, WireGuard and L2TP client pools
+# always receive forwarding + WAN NAT on their Exit node. This closes the case
+# where the outer VPN handshake succeeds but inner client traffic has no data.
+# When Central OpenVPN PKI is explicitly enabled, V46 also aligns the running
+# OpenVPN server CA/cert/key with the same Central PKI used for delivered
+# client certificates, with rollback if the service does not come back healthy.
 #
 # Smart Auto owns transport qualification/selection:
 #   * installs isolated modern L3 candidates (GRE, GOST TUN/WSS,
@@ -59,6 +68,7 @@ async def main() -> None:
         "policy=smart-speed-health "
         "bootstrap=v24 "
         "candidate_bootstrap=v38 "
+        "vpn_access_dataplane=v46 "
         "reconciler=v3 "
         "candidates=kernel_gre,gost_tun,amneziawg,netrix",
         flush=True,
@@ -72,6 +82,11 @@ async def main() -> None:
     candidate_bootstrap_task = asyncio.create_task(
         candidate_bootstrap_loop(),
         name="twinpanel-smart-candidate-bootstrap-v38",
+    )
+
+    vpn_access_task = asyncio.create_task(
+        vpn_access_dataplane_loop(),
+        name="twinpanel-vpn-access-dataplane-v46",
     )
 
     manager_task = asyncio.create_task(
@@ -92,6 +107,7 @@ async def main() -> None:
     tasks = {
         bootstrap_task,
         candidate_bootstrap_task,
+        vpn_access_task,
         manager_task,
         runtime_task,
         legacy_ingress_task,
