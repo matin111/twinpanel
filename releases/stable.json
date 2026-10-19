@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.61",
+  "version": "1.1.0-rc.62",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-19T17:38:33Z",
+  "released_at": "2026-10-19T18:04:32Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "387827c5abab63bd19ad6570e44b90878b013d4d",
+  "source_sha": "426eac7191384b8d46616c0ec4ae6fe16ffb9cbe",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.61/twinpanel-1.1.0-rc.61-linux-x86_64.tar.gz",
-    "sha256": "1f48ab7cb686424827485933663b6453f1b68af07c166490e6141843a06a8b25",
-    "size_bytes": 12812718
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.62/twinpanel-1.1.0-rc.62-linux-x86_64.tar.gz",
+    "sha256": "1fa0716dd7142d8b0713d255bd0e6458c04c92cb7cca73ef403e5c763af299ec",
+    "size_bytes": 12817260
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.61 مسیر مدیریتی SSH نودهای Exit را در برابر خرابی مسیر عمومی مقاوم می‌کند. اتصال مستقیم به IP عمومی همچنان مسیر اصلی است، اما اگر کنترلر نتواند مستقیماً به Exit برسد و یک تانل L3 موجود بین ایران و Exit سالم باشد، پنل به‌صورت خودکار و با Timeout محدود از دسترسی ذخیره‌شده نود ایران برای اجرای nc به IP خصوصی همان تانل استفاده می‌کند و سپس با کلید اختصاصی خود Exit وارد SSH می‌شود. این اصلاح دقیقاً برای وضعیت فعلی usa طراحی شده که مسیر عمومی 64.49.12.176 از کنترلر قطع است ولی مسیر Controller → Iran → Kernel GRE → 10.248.0.6 سالم است. ایمنی حذف rc.60 حفظ شده و هیچ Route، iptables، رابط تانل، VPN dataplane، پروتکل، Quota، Enforcement، Subscription یا سیاست انتخاب Transport تغییر نکرده است.",
-    "en": "TwinPanel 1.1.0-rc.61 makes Exit-node SSH management resilient to public-route failures. Direct public-IP SSH remains the primary path, but when the Controller cannot reach an Exit directly and an existing Iran-to-Exit L3 carrier is available, the panel automatically races a bounded fallback through the paired Iran node: it uses Iran's stored management key to run nc to the Exit private tunnel address, then authenticates the final SSH session with the Exit node's own stored key. This directly addresses the current usa node where Controller-to-64.49.12.176 public routing is broken while Controller → Iran → Kernel GRE → 10.248.0.6 is healthy. The rc.60 destructive-delete safety remains intact, and no route, iptables, tunnel interface, VPN dataplane, protocol, quota, enforcement, subscription, or transport-selection behavior is changed."
+    "fa": "نسخه 1.1.0-rc.62 علاوه بر ساده‌سازی منوی مدیریت SSH دستورهای twinpanel و tp، خطای 504 صفحه تانل‌ها و ناپایداری مسیر مدیریتی نود Exit را نیز اصلاح می‌کند. پاسخ‌های موقت 502/503/504 و صفحات HTML خام nginx دیگر مستقیماً در UI نمایش داده نمی‌شوند؛ خواندن‌های تانل با Retry کوتاه و Last-Known-Good پایدار می‌مانند. مسیر SSH مدیریتی Exit نیز در صورت خرابی مسیر عمومی از مسیر ذخیره‌شده ایران به IP خصوصی تانل استفاده می‌کند و اگر اولین اتصال nc با Connection lost قطع شود یک بار با تأخیر کوتاه و محدود دوباره تلاش می‌کند. فرمان nc دیگر Timeout داخلی ندارد تا جریان SSH را زود قطع نکند. هیچ Route، iptables، رابط تانل، VPN dataplane، Quota، Enforcement، Subscription یا سیاست انتخاب Transport تغییر نکرده است.",
+    "en": "TwinPanel 1.1.0-rc.62 combines the refined twinpanel/tp SSH management menu with production fixes for tunnel-page gateway errors and Exit-node management relay stability. Temporary 502/503/504 responses and raw nginx HTML are no longer rendered directly in the tunnel UI; tunnel reads use bounded retries and last-known-good state. Exit SSH management keeps direct public SSH as the normal path, falls back through the paired Iran node to the existing private tunnel address when needed, and retries once after a first nc-backed handshake closes with Connection lost. The nc relay no longer has its own inactivity timeout, avoiding premature SSH stream termination. No route, iptables, tunnel interface, VPN dataplane, quota, enforcement, subscription, or transport-selection behavior is changed."
   }
 }
