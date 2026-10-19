@@ -1,0 +1,34 @@
+name: TwinPanel Node Bootstrap Control V64 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/node_bootstrap_control_v64.py"
+      - "backend/app/node_bootstrap_control_v63.py"
+      - "backend/app/routers/__init__.py"
+      - "backend/scripts/node_bootstrap_control_v64_smoke.py"
+      - ".github/workflows/node-bootstrap-control-v64-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile V64 control plane
+        run: |
+          python -m py_compile \
+            backend/app/node_bootstrap_control_v64.py \
+            backend/scripts/node_bootstrap_control_v64_smoke.py
+
+      - name: Run V64 management contract smoke
+        working-directory: backend
+        run: PYTHONPATH=. python scripts/node_bootstrap_control_v64_smoke.py
