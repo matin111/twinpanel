@@ -107,7 +107,7 @@ export function AdminDashboardRuntime(){
     <div className="stats dashboard-stats">
       <Stat label={pick("کل کاربران","Total users")} value={String(summary?.total_users??stats?.users??"—")} icon="♙"/>
       <Stat label={pick("اشتراک فعال","Active subscriptions")} value={String(subStats.total?subStats.active:stats?.active_subscriptions??"—")} icon="▱"/>
-      <Stat label={pick("کاربر آنلاین","Online users")} value={String(summary?.online_users??"—")} icon="◉"/>
+      <Stat label={pick("اشتراک آنلاین","Online subscriptions")} value={String(summary?.online_users??"—")} icon="◉"/>
       <Stat label={pick("فروش امروز","Sales today")} value={summary?money(summary.sales_today):"—"} icon="◫"/>
       <Stat label={pick("نود آنلاین","Online nodes")} value={summary?`${summary.online_nodes} / ${summary.total_nodes}`:stats?String(stats.online_nodes):"—"} icon="▦"/>
     </div>
@@ -130,7 +130,7 @@ export function AdminDashboardRuntime(){
         <div className="card-head"><div><b>{pick("وضعیت اشتراک‌ها","Subscription status")}</b><small>{pick("بر اساس اشتراک‌های واقعی","Based on live subscriptions")}</small></div></div>
         <div className="donut" style={donutStyle}><div><b>{subStats.total.toLocaleString("fa-IR")}</b><small>{pick("کل اشتراک","Total")}</small></div></div>
         <div className="legend"><span><i className="c1"/>{pick(`فعال ${subStats.activePct}٪`,`Active ${subStats.activePct}%`)}</span><span><i className="c2"/>{pick(`منقضی ${subStats.expiredPct}٪`,`Expired ${subStats.expiredPct}%`)}</span><span><i style={{background:"#2dd4bf"}}/>{pick(`سایر ${subStats.otherPct}٪`,`Other ${subStats.otherPct}%`)}</span></div>
-        <div className="online-summary"><span className="dot"/><b>{pick(`${summary?.online_users??0} کاربر اکنون آنلاین است`,`${summary?.online_users??0} users are online now`)}</b><small>{pick("وضعیت زنده از Backend خوانده می‌شود","Live status is read from the backend")}</small></div>
+        <div className="online-summary"><span className="dot"/><b>{pick(`${summary?.online_users??0} اشتراک اکنون آنلاین است`,`${summary?.online_users??0} subscriptions are online now`)}</b><small>{pick("وضعیت زنده از Backend خوانده می‌شود","Live status is read from the backend")}</small></div>
       </Card>
     </div>
 
