@@ -1,0 +1,59 @@
+name: Navigation Attention V58 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "components/reseller-nav-attention.ts"
+      - "components/portal-shells.tsx"
+      - "components/admin-nav-attention.ts"
+      - "app/portal-topnav-2027.css"
+      - "app/admin-nav-attention.css"
+      - ".github/workflows/nav-attention-v58-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  nav-attention-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate reseller and admin attention contracts
+        shell: python
+        run: |
+          from pathlib import Path
+
+          reseller = Path("components/reseller-nav-attention.ts").read_text()
+          shell = Path("components/portal-shells.tsx").read_text()
+          admin = Path("components/admin-nav-attention.ts").read_text()
+          portal_css = Path("app/portal-topnav-2027.css").read_text()
+          admin_css = Path("app/admin-nav-attention.css").read_text()
+
+          required_reseller = [
+              "/v1/reseller/bot-commerce/wallet-topups",
+              "/v1/reseller/bot-commerce/orders",
+              "/v1/reseller/notifications",
+              '"/reseller/bot-wallet"',
+              '"/reseller/orders"',
+              '"awaiting_review"',
+          ]
+          for needle in required_reseller:
+              assert needle in reseller, needle
+
+          assert "useResellerNavAttention" in shell
+          assert "portal-nav-attention-count" in shell
+          assert "has-attention" in shell
+          assert "groupHasAttention" in shell
+          assert "attention={attention}" in shell
+
+          assert '/v1/admin/system/release/check' in admin
+          assert 'method:"POST"' in admin
+          assert 'releaseStatusTimer' in admin
+          assert '5000' in admin
+          assert 'groupName==="System & Maintenance"&&state.updateAvailable' in admin
+
+          assert ".customer-portal-topnav-group.has-attention>summary" in portal_css
+          assert ".portal-nav-attention-count" in portal_css
+          assert ".customer-portal-nav>a.has-attention" in portal_css
+          assert ".topnav-release.has-attention .system-release-footer.has-update" in admin_css
+          assert ".system-update-button" in admin_css
+
+          print("NAV_ATTENTION_V58_SMOKE_OK")
