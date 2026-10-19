@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.67",
+  "version": "1.1.0-rc.68",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-19T20:40:33Z",
+  "released_at": "2026-10-19T21:16:38Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "69cc54fb1cbc76736921c2b58392230108d17202",
+  "source_sha": "e99a8fb0ce91f14da4623f59b42bfa7cf55115b7",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.67/twinpanel-1.1.0-rc.67-linux-x86_64.tar.gz",
-    "sha256": "35cfc425d74ca4baf2d25e2073d26cad0cf5863b3b5c5de10200244ac7c59418",
-    "size_bytes": 12841414
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.68/twinpanel-1.1.0-rc.68-linux-x86_64.tar.gz",
+    "sha256": "65f89c604821869c79e48bfa709548ac0a52ee3bd8eb6c8d15103c7a52c302b5",
+    "size_bytes": 12841117
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.67 اصلاح نهایی مسیر Update را منتشر می‌کند. لاگ واقعی سرور نشان داد rc.66 واقعاً بالا می‌آمد اما API قبلی به‌دلیل یک عملیات SSH/پس‌زمینه‌ای گیرکرده تمام TimeoutStopSec=30 را مصرف می‌کرد و سپس API جدید حدود 15 ثانیه برای Startup نیاز داشت؛ در نتیجه دقیقاً با پایان پنجره 45 ثانیه‌ای Health، Updater به‌اشتباه Rollback می‌کرد. در rc.67 وابستگی اشتباه systemd برای Updater حذف شده و Shutdown API با حفظ SIGTERM و Graceful Shutdown به 10 ثانیه محدود شده تا Task یا Child گیرکرده نتواند کل بودجه Health را مصرف کند. هیچ VPN dataplane، Route، Firewall، Tunnel Transport، Quota، Subscription، Auth، Payment یا ترافیک کاربر تغییر نمی‌کند.",
-    "en": "TwinPanel 1.1.0-rc.67 publishes the final update-activation fix. Production logs proved rc.66 actually started successfully, but the previous API consumed the full 30-second stop timeout because a control-plane SSH/background operation was still stuck, then the replacement API needed about 15 seconds to finish startup. That exhausted the updater's 45-second target-version health window exactly as the new API became ready and caused a false rollback. rc.67 removes the updater systemd ordering dependency on API/Web and keeps normal SIGTERM graceful shutdown while bounding a stuck API stop to 10 seconds so stale tasks cannot consume the health budget. No VPN dataplane, route, firewall, tunnel transport, quota, subscription, auth, payment, or customer-traffic behavior is changed."
+    "fa": "TwinPanel 1.1.0-rc.68 مشکل حذف تانل در شرایط خرابی یا عدم دسترسی یکی از نودها را برطرف می‌کند. حذف عادی همچنان با Preflight محدود SSH و پاک‌سازی کامل Runtime انجام می‌شود؛ اما اگر یکی از اعضای تانل در دسترس نباشد، Admin بعد از تأیید صریح می‌تواند Force Delete را اجرا کند تا همان تانل از Desired State کنترلر، Peer State، Transportها و Watchdog حذف شود بدون اینکه عملیات روی SSH نود خراب گیر کند. این مسیر صراحتاً پاک‌سازی Runtime سمت نود غیرقابل‌دسترسی را رد می‌کند و در Cleanup History ثبت می‌شود. هیچ Node Lifecycle دیگر، Subscription، Quota، VPN Protocol، Route، Firewall، Transport Selection، Auth، Payment یا ترافیک کاربر تغییر نمی‌کند.",
+    "en": "TwinPanel 1.1.0-rc.68 fixes tunnel deletion when one tunnel member is broken or unreachable. Normal deletion remains strict with bounded SSH preflight and full remote runtime cleanup. When a required node cannot be reached, an administrator can explicitly confirm Force Delete, which removes only the selected tunnel from controller desired state, peer state, transport rows, and watchdog caches without waiting on the dead node. Remote runtime cleanup on the unreachable host is deliberately skipped and recorded in cleanup history. No other node lifecycle, subscription, quota, VPN protocol, route, firewall, transport-selection, auth, payment, or customer-traffic behavior is changed."
   }
 }
