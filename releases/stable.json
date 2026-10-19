@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.46",
+  "version": "1.1.0-rc.47",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-18T23:44:10Z",
+  "released_at": "2026-10-19T00:16:16Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "15cde27ae51a154bc57a7983d7da5562514c6164",
+  "source_sha": "6b782cf9068ed1ae0aaa07d85d7f1fd8fabfcda7",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.46/twinpanel-1.1.0-rc.46-linux-x86_64.tar.gz",
-    "sha256": "f130c1f4fcd5e87d48249d3ef09038ebec14e2ba029d976f3be3baf3188e65ef",
-    "size_bytes": 12756443
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.47/twinpanel-1.1.0-rc.47-linux-x86_64.tar.gz",
+    "sha256": "257b27da76c3f760200ebc041545a9dfc77bc94a590440a134a5f4bd81fd43d1",
+    "size_bytes": 12758138
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.46 مشکل افت شدید سرعت و افزایش تأخیر زیر بار برای Cisco/OpenConnect، OpenVPN و WireGuard در مسیرهای Iran → Exit را برطرف می‌کند. لایه خودترمیم Performance V47، MTU اینترفیس‌های مدیریت‌شده VPN را روی 1200 و TCP MSS دوطرفه را روی 1160 همگام می‌کند تا از Fragmentation و Retransmission در تونل‌های داخلی با MTU پایین‌تر جلوگیری شود. این اصلاح بدون نصب مجدد پروتکل‌ها روی سرورهای موجود اعمال می‌شود، فقط زنجیره اختصاصی TP_ACCESS_PERF را مدیریت می‌کند و V2Ray/Xray، انتخاب Transport، احراز هویت، هویت اشتراک و منطق Quota را تغییر نمی‌دهد.",
-    "en": "TwinPanel 1.1.0-rc.46 fixes severe throughput loss and loaded-latency spikes affecting routed Cisco/OpenConnect, OpenVPN, and WireGuard sessions across Iran → Exit overlays. The self-healing VPN Access Performance V47 layer normalizes managed VPN interfaces to MTU 1200 and applies bidirectional TCP MSS 1160 so inner traffic avoids fragmentation and retransmission across lower-MTU carriers. Existing servers are repaired without protocol reinstall, only the dedicated TP_ACCESS_PERF chain is owned, and V2Ray/Xray, transport selection, authentication, subscription identity, and quota logic remain unchanged."
+    "fa": "نسخه 1.1.0-rc.47 مشکل فعال‌نشدن واقعی اصلاحات دیتاپلین بعد از بروزرسانی پنل را برطرف می‌کند. پیش از این Updater مسیر /opt/twinpanel/current را به نسخه جدید تغییر می‌داد و API را Restart می‌کرد، اما اگر twinpanel-transport-manager از قبل فعال بود، systemctl start هیچ کاری نمی‌کرد و Process قدیمی با ماژول‌های نسخه قبل در RAM باقی می‌ماند. در rc.47 هنگام فعال‌سازی Release، Transport Manager فعال به‌صورت کنترل‌شده Restart می‌شود و Manager غیرفعال همچنان Start عادی دارد؛ در نتیجه VPN Access Dataplane V46 و Performance V47 برای Cisco/OpenConnect، OpenVPN و WireGuard بدون Restart دستی یا Reboot واقعاً Load و اجرا می‌شوند. V2Ray/Xray، انتخاب Transport، احراز هویت، پرداخت، اشتراک و Quota تغییر نکرده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.47 fixes a release-activation bug that could leave the transport manager running old Python modules after an in-panel update. The updater already switched /opt/twinpanel/current and restarted the API, but an active twinpanel-transport-manager received only systemctl start, which is a no-op for an already-running unit. rc.47 restarts an active manager at the release activation boundary while preserving normal start behavior for inactive or first-install managers, so the shipped VPN Access Dataplane V46 and Performance V47 workers for Cisco/OpenConnect, OpenVPN and WireGuard are actually loaded without manual SSH restart or reboot. V2Ray/Xray, transport election, authentication, payments, subscriptions and quota behavior remain unchanged."
   }
 }
