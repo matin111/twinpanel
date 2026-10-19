@@ -1,0 +1,115 @@
+name: TwinPanel Exit Bootstrap Native V72 Integration
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/native_exit_bootstrap_v72.py'
+      - 'backend/app/node_bootstrap_control_v72.py'
+      - 'backend/app/routers/__init__.py'
+      - 'backend/tests/integration/test_exit_bootstrap_native_v72.py'
+      - 'backend/tests/integration/v72/Dockerfile.ssh-node'
+      - '.github/workflows/exit-bootstrap-native-v72-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile v72 modules
+        run: |
+          python3 -m py_compile backend/app/native_exit_bootstrap_v72.py
+          python3 -m py_compile backend/app/node_bootstrap_control_v72.py
+          python3 -m py_compile backend/tests/integration/test_exit_bootstrap_native_v72.py
+
+      - name: Reproduce the v71 command serialization root cause
+        run: |
+          python3 - <<'PY'
+          import shlex
+          import subprocess
+
+          remote_python = "import base64;exec(base64.b64decode('QQ=='))"
+          proxy = " ".join([
+              "ssh", "-T", "ci@iran", "python3", "-c", shlex.quote(remote_python)
+          ])
+          argv = shlex.split(proxy)
+          rebuilt_remote = " ".join(argv[3:])
+          proc = subprocess.run(
+              ["/bin/sh", "-c", rebuilt_remote],
+              text=True,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.PIPE,
+              check=False,
+          )
+          if proc.returncode == 0:
+              raise SystemExit("v71 serialization unexpectedly stayed shell-safe")
+          if "syntax" not in proc.stderr.lower():
+              raise SystemExit("v71 shell parse failure was not reproduced")
+          print("V71_PROXY_COMMAND_ROOT_CAUSE_REPRODUCED=PASS")
+          PY
+
+      - name: Build disposable SSH node image
+        run: |
+          docker build \
+            -f backend/tests/integration/v72/Dockerfile.ssh-node \
+            -t twinpanel-v72-ssh-test:ci \
+            .
+
+      - name: Create isolated controller Iran Exit topology
+        run: |
+          set -euo pipefail
+          docker network create --driver bridge --subnet 172.29.71.0/24 tp-v72-control
+          docker network create --driver bridge --internal --subnet 172.29.72.0/24 tp-v72-exit
+
+          docker run -d \
+            --name tp-v72-iran \
+            --hostname iran-v72 \
+            --network tp-v72-control \
+            --ip 172.29.71.10 \
+            twinpanel-v72-ssh-test:ci
+
+          docker network connect --ip 172.29.72.10 tp-v72-exit tp-v72-iran
+
+          docker run -d \
+            --name tp-v72-exit \
+            --hostname exit-v72 \
+            --network tp-v72-exit \
+            --ip 172.29.72.20 \
+            twinpanel-v72-ssh-test:ci
+
+          for n in $(seq 1 30); do
+            docker exec tp-v72-iran nc -z -w 1 127.0.0.1 22 \
+              && docker exec tp-v72-exit nc -z -w 1 127.0.0.1 22 \
+              && break
+            [ "$n" -eq 30 ] && exit 1
+            sleep 1
+          done
+
+      - name: Run real native bootstrap integration
+        run: |
+          docker run --rm \
+            --network tp-v72-control \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" \
+            -w /workspace \
+            python:3.12-slim \
+            bash -lc \
+            'pip install -q asyncssh==2.21.0 && python backend/tests/integration/test_exit_bootstrap_native_v72.py'
+
+      - name: Dump node logs on failure
+        if: failure()
+        run: |
+          docker logs tp-v72-iran 2>&1 || true
+          docker logs tp-v72-exit 2>&1 || true
+          docker inspect tp-v72-control tp-v72-exit || true
+
+      - name: Cleanup topology
+        if: always()
+        run: |
+          docker rm -f tp-v72-iran tp-v72-exit >/dev/null 2>&1 || true
+          docker network rm tp-v72-control tp-v72-exit >/dev/null 2>&1 || true
