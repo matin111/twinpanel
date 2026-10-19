@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fcntl
 import os
 import shutil
 import subprocess
@@ -10,6 +11,8 @@ UNIT_NAME = "twinpanel-transport-manager.service"
 UNIT_PATH = Path("/etc/systemd/system") / UNIT_NAME
 API_UNIT_PATH = Path("/etc/systemd/system/twinpanel-api.service")
 BACKUP_PATH = Path("/etc/systemd/system/twinpanel-transport-manager.service.pre-smart-v12")
+CURRENT_BACKEND_PATH = Path("/opt/twinpanel/current/backend")
+ACTIVATION_LOCK_PATH = Path("/run/twinpanel-transport-manager-activation.lock")
 
 UNIT_CONTENT = """[Unit]
 Description=TwinPanel Transport Manager V12 Smart Iran Path + Multi-Tunnel Self-Heal
@@ -57,56 +60,41 @@ def _run(*args: str) -> subprocess.CompletedProcess[str]:
         )
 
 
-def ensure_transport_manager_service_v12() -> dict:
-    """Best-effort activation of the controller-owned transport manager.
+def _active_manager_matches_current_release(systemctl: str) -> tuple[bool, str]:
+    """Return whether the live manager was started from the active release."""
 
-    The public release updater atomically changes /opt/twinpanel/current and
-    restarts the API. Existing installations created before Smart Auto V21 may
-    not have had a transport-manager unit installed at all, or may still carry
-    the old /opt/twinpanel-product working directory. Because twinpanel-api runs
-    as root, API startup is the compatibility bridge: install the exact
-    product-owned unit, preserve one rollback copy of an old unit, reload
-    systemd, enable the service, and make sure the running manager process is
-    restarted onto the newly activated /opt/twinpanel/current release.
+    pid_cp = _run(
+        systemctl,
+        "show",
+        UNIT_NAME,
+        "--property",
+        "MainPID",
+        "--value",
+    )
+    if pid_cp.returncode != 0:
+        return False, "mainpid_query_failed"
 
-    Restarting an already-active manager is intentional. ``systemctl start`` is
-    a no-op for an active unit, which previously left the old Python process in
-    RAM across panel updates. That meant newly shipped reconciliation workers
-    such as VPN Access Dataplane V46 / Performance V47 could exist on disk while
-    never actually running until a manual reboot or service restart.
+    try:
+        pid = int(str(pid_cp.stdout or "").strip() or "0")
+    except ValueError:
+        return False, "mainpid_invalid"
 
-    The initial installer imports app.main before it creates twinpanel-api.service.
-    We deliberately defer activation in that phase; the first real API service
-    start then reconciles the manager. CI/containers without systemd also no-op.
+    if pid <= 0:
+        return False, "mainpid_missing"
 
-    This function is deliberately non-fatal: transport-manager activation must
-    never prevent the API from starting. Failures are returned as state only.
-    """
+    try:
+        expected = CURRENT_BACKEND_PATH.resolve(strict=True)
+        actual = Path(f"/proc/{pid}/cwd").resolve(strict=True)
+    except (OSError, RuntimeError):
+        return False, f"runtime_path_unreadable:pid={pid}"
 
-    result = {
-        "ok": True,
-        "managed": False,
-        "changed": False,
-        "started": False,
-        "restarted": False,
-        "reason": None,
-    }
+    if actual == expected:
+        return True, f"pid={pid}:cwd={actual}"
 
-    if os.geteuid() != 0:
-        result["reason"] = "not_root"
-        return result
+    return False, f"pid={pid}:cwd={actual}:expected={expected}"
 
-    systemctl = shutil.which("systemctl")
-    if not systemctl or not Path("/run/systemd/system").is_dir():
-        result["reason"] = "systemd_unavailable"
-        return result
 
-    if not API_UNIT_PATH.is_file():
-        result["reason"] = "api_unit_missing_deferred"
-        return result
-
-    result["managed"] = True
-
+def _ensure_locked(systemctl: str, result: dict) -> dict:
     current = ""
     try:
         current = UNIT_PATH.read_text(encoding="utf-8") if UNIT_PATH.is_file() else ""
@@ -121,8 +109,6 @@ def ensure_transport_manager_service_v12() -> dict:
                 BACKUP_PATH.write_text(current, encoding="utf-8")
                 os.chmod(BACKUP_PATH, 0o644)
             except OSError:
-                # The full application updater still owns the primary rollback.
-                # This backup is only an extra unit-level convenience.
                 pass
 
         try:
@@ -149,14 +135,27 @@ def ensure_transport_manager_service_v12() -> dict:
         return result
 
     # TWINPANEL_TRANSPORT_MANAGER_RELEASE_RELOAD_V48
+    # TWINPANEL_TRANSPORT_MANAGER_RESTART_STORM_V54
     #
-    # API startup is the activation boundary after /opt/twinpanel/current is
-    # switched by the updater. An already-running manager has imported Python
-    # modules from the previous release and MUST be restarted; merely calling
-    # `systemctl start` leaves that old process untouched.
+    # V48 correctly reloaded a manager that was still running code from the
+    # previous /opt/twinpanel/current target, but it restarted every active
+    # manager on every API import. With multiple/restarting API workers this can
+    # create a systemd restart storm and prevent V46/V51 from reaching their
+    # reconciliation loops.
+    #
+    # V54 restarts only when the unit changed or MainPID is genuinely running
+    # from a different resolved release directory. An already-current process
+    # is a no-op.
     active_cp = _run(systemctl, "is-active", "--quiet", UNIT_NAME)
 
     if active_cp.returncode == 0:
+        is_current, runtime_detail = _active_manager_matches_current_release(systemctl)
+        result["runtime_detail"] = runtime_detail
+
+        if is_current and not changed:
+            result["reason"] = "already_current"
+            return result
+
         activate_cp = _run(
             systemctl,
             "restart",
@@ -186,3 +185,53 @@ def ensure_transport_manager_service_v12() -> dict:
         result["reason"] = "activated"
 
     return result
+
+
+def ensure_transport_manager_service_v12() -> dict:
+    """Best-effort, idempotent activation of the controller transport manager.
+
+    Release activation must reload a process that is genuinely still running
+    from the previous release, while ordinary app.main imports must not restart
+    a process already loaded from the current release. A cross-process flock
+    serializes concurrent API workers before the live MainPID/cwd check.
+
+    This function remains deliberately non-fatal: manager activation must never
+    prevent the API itself from starting.
+    """
+
+    result = {
+        "ok": True,
+        "managed": False,
+        "changed": False,
+        "started": False,
+        "restarted": False,
+        "reason": None,
+        "runtime_detail": None,
+    }
+
+    if os.geteuid() != 0:
+        result["reason"] = "not_root"
+        return result
+
+    systemctl = shutil.which("systemctl")
+    if not systemctl or not Path("/run/systemd/system").is_dir():
+        result["reason"] = "systemd_unavailable"
+        return result
+
+    if not API_UNIT_PATH.is_file():
+        result["reason"] = "api_unit_missing_deferred"
+        return result
+
+    result["managed"] = True
+
+    try:
+        with ACTIVATION_LOCK_PATH.open("a+", encoding="utf-8") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                return _ensure_locked(systemctl, result)
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+    except OSError as exc:
+        result["ok"] = False
+        result["reason"] = f"activation_lock_failed:{type(exc).__name__}"
+        return result
