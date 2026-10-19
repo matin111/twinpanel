@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.52",
+  "version": "1.1.0-rc.53",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-19T12:58:18Z",
+  "released_at": "2026-10-19T13:24:18Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "c1d2bc9c595431c66f15b18d06f099f9af596fcd",
+  "source_sha": "2991c92e9b48b86dd8bb1d0cc3204434f6764927",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.52/twinpanel-1.1.0-rc.52-linux-x86_64.tar.gz",
-    "sha256": "edff278ec2570f5c9bfdf67d5e80920fcd09415d0e5eec4daca1f8c4ee7e6020",
-    "size_bytes": 12769529
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.53/twinpanel-1.1.0-rc.53-linux-x86_64.tar.gz",
+    "sha256": "e786077d728b2000587eb0bf3169a50237ac2e78bade6e10b8ee2a3da340b38d",
+    "size_bytes": 12773740
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.52 مشکل Performance چهار پروتکل Cisco/OpenConnect، OpenVPN، WireGuard و L2TP را روی مسیر Unified L3 اصلاح می‌کند. تست واقعی rc.50 نشان داد Kernel GRE با MTU 1360 و حدود 152ms کاملاً سالم است، اما ocserv هنوز Link MTU 1500 و DTLS MTU 1434 مذاکره می‌کرد و Cisco به TLS fallback می‌افتاد. V51 اکنون MTU=1200 و TCP MSS=1160 را برای همه Exitهای فعال مستقل از وضعیت قدیمی پروتکل همگرا و تأیید می‌کند، تنظیمات پایدار ocserv/OpenVPN/WireGuard/L2TP را اصلاح می‌کند و فقط در صورت تغییر واقعی تنظیمات سرویس مربوطه را کنترل‌شده Restart می‌کند. Unified L3 V49، NAT/FORWARD V46، Xray/V2Ray، اطلاعات اتصال، Quota و انتخاب Transport بدون تغییر باقی می‌مانند.",
-    "en": "TwinPanel 1.1.0-rc.52 fixes access-VPN performance for Cisco/OpenConnect, OpenVPN, WireGuard and L2TP over the Unified L3 path. Real rc.50 validation proved the Kernel GRE carrier itself healthy at MTU 1360 and about 152 ms, while ocserv still negotiated Link MTU 1500 / DTLS MTU 1434 and Cisco fell back to TLS. V51 now converges and verifies MTU 1200 / TCP MSS 1160 on every active Exit independently of stale protocol status telemetry, repairs persistent ocserv/OpenVPN/WireGuard/L2TP settings, and performs a controlled protocol-service restart only when configuration actually changes. Unified L3 V49, V46 NAT/FORWARD, Xray/V2Ray, connection credentials, quota and transport election remain unchanged."
+    "fa": "نسخه 1.1.0-rc.53 نمایش وضعیت زنده اتصال را تکمیل می‌کند. در صفحه عمومی Connect، پروتکل یا پروتکل‌های واقعاً متصل با کادر و Glow سبز مشخص می‌شوند و وضعیت بدون Refresh صفحه به‌روزرسانی می‌شود. در بخش اشتراک‌های مدیریت نیز برای هر اشتراک وضعیت آنلاین/آفلاین و پروتکل فعال نمایش داده می‌شود. منطق تانل، MTU/MSS نسخه rc.52، Quota، Enforcement و انتخاب Transport بدون تغییر باقی می‌مانند.",
+    "en": "TwinPanel 1.1.0-rc.53 completes live connection visibility. On the public Connect page, the protocol or protocols that are actually live are highlighted with a green border/glow and update without a page refresh. The admin subscriptions page now shows online/offline state for each subscription together with the detected live protocol. rc.52 tunnel dataplane, MTU/MSS behavior, quota accounting, enforcement and transport election remain unchanged."
   }
 }
