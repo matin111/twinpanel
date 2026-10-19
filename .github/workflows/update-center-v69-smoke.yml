@@ -1,0 +1,66 @@
+name: TwinPanel Update Center V69 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/system-release-footer.tsx'
+      - 'components/admin-nav-attention.ts'
+      - 'app/system-release.css'
+      - 'backend/app/release_manifest_v25.py'
+      - 'backend/app/routers/system_release.py'
+      - '.github/workflows/update-center-v69-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify premium update center and fast manifest contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          ui = Path('components/system-release-footer.tsx').read_text(encoding='utf-8')
+          css = Path('app/system-release.css').read_text(encoding='utf-8')
+          nav = Path('components/admin-nav-attention.ts').read_text(encoding='utf-8')
+          manifest = Path('backend/app/release_manifest_v25.py').read_text(encoding='utf-8')
+          router = Path('backend/app/routers/system_release.py').read_text(encoding='utf-8')
+
+          # Update Center opens as a real modal and keeps the existing release APIs.
+          assert 'system-update-modal' in ui
+          assert 'مرکز بروزرسانی TwinPanel' in ui
+          assert '/v1/admin/system/release/check' in ui
+          assert '/v1/admin/system/release/status' in ui
+          assert '/v1/admin/system/update' in ui
+          assert 'UPDATE_STAGES' in ui
+          assert 'POST_UPDATE_HEALTH_VERSION_FAILED' in ui
+          assert 'release_notes' in ui
+          assert 'stage_seconds' in ui
+
+          # Admin menu receives an immediate red-attention signal and persists it.
+          assert 'twinpanel:release-status' in ui
+          assert 'twinpanel:release-status' in nav
+          assert 'twinpanel-release-update-available-v1' in nav
+          assert 'groupName==="System & Maintenance"&&state.updateAvailable' in nav
+
+          # CSS has a responsive modal, progress surface, and new-release badge.
+          for selector in (
+              '.system-update-card',
+              '.system-update-progress-panel',
+              '.system-update-steps',
+              '.system-release-new-badge',
+              '.system-update-spinner',
+          ):
+              assert selector in css, selector
+
+          # Status reads use a short-lived cache; explicit checks invalidate it.
+          assert 'MANIFEST_CACHE_TTL_SECONDS' in manifest
+          assert 'invalidate_release_manifest_cache' in manifest
+          assert 'PRIMARY_MANIFEST_URL' in manifest
+          assert 'timeout=httpx.Timeout(4.0, connect=2.5)' in manifest
+          assert 'invalidate_release_manifest_cache()' in router
+
+          print('UPDATE_CENTER_V69_SMOKE=PASS')
+          PY
