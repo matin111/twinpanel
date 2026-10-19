@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.48",
-  "source_sha": "e86a1f13475de82c1782789f774b25e5a5be3d6e",
+  "version": "1.1.0-rc.49",
+  "source_sha": "dfa9af00f6752c1054af9ee85509a783f578ef8c",
   "notes": {
-    "fa": "نسخه 1.1.0-rc.48 مسیر Session/Quota برای V2Ray/Xray را کامل می‌کند. Worker هر ۵ ثانیه StatsService محلی Xray روی 127.0.0.1:10085 را می‌خواند، شمارنده‌های تجمعی uplink/downlink هر کاربر را به QuotaDevice همان اشتراک نگاشت می‌کند و فقط Delta واقعی را در Quota Ledger ثبت می‌کند؛ بنابراین مصرف حجم و حجم باقی‌مانده در صفحه Connect به‌روز می‌شوند. اولین ترافیک واقعی غیرصفر Xray تاریخ شروع و پایان اشتراک را فعال می‌کند. Epoch پردازش Xray نیز ثبت می‌شود تا Restart سرویس باعث دوباره‌شماری مصرف یا خطای counter_decreased_without_new_epoch نشود. Local Core و نودهای Xray راه‌دور از طریق SSH ذخیره‌شده پشتیبانی می‌شوند و رفتار Cisco/ocserv بدون تغییر باقی می‌ماند.",
-    "en": "TwinPanel 1.1.0-rc.48 completes Session/Quota accounting for V2Ray/Xray. The 5-second runtime worker reads Xray's local StatsService on 127.0.0.1:10085, maps cumulative per-user uplink/downlink counters to the subscription's canonical QuotaDevice, and records only the real delta in the quota ledger so used and remaining traffic stay current on the Connect page. The first real non-zero Xray traffic activates subscription start and expiry. Xray process epochs are tracked so service restarts do not double-count prior traffic or trigger counter_decreased_without_new_epoch. Local Core and saved-SSH remote Xray nodes are supported, while Cisco/ocserv accounting behavior remains unchanged."
+    "fa": "نسخه 1.1.0-rc.49 وضعیت اتصال زنده V2Ray/Xray را در صفحه Connect اصلاح می‌کند. مصرف حجم و تاریخ‌ها همان رفتار rc.48 را حفظ می‌کنند؛ اما وضعیت «متصل» دیگر فقط به QuotaSession فعال وابسته نیست و برای Xray از ترافیک واقعی پذیرفته‌شده در ۳۰ ثانیه اخیر استفاده می‌شود. این بازه از چرخه ۵ ثانیه‌ای Collector بزرگ‌تر است تا UI نوسان نکند. رفتار Cisco/ocserv و منطق Quota، First-Use، Enforcement و Concurrency بدون تغییر باقی می‌مانند.",
+    "en": "TwinPanel 1.1.0-rc.49 fixes live V2Ray/Xray connection state on the public Connect page. Usage accounting and subscription dates keep the rc.48 behavior, while the connected badge no longer depends only on active QuotaSession rows. For Xray, the live state is derived from accepted real traffic within the last 30 seconds, wider than the 5-second collector cadence to avoid UI flapping. Cisco/ocserv behavior and quota, first-use, enforcement and concurrency semantics remain unchanged."
   }
 }
