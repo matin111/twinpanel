@@ -112,9 +112,13 @@ def _transport_names(tunnel: Tunnel, rows: list[TunnelTransport]) -> list[str]:
         if bool(row.enabled):
             add(row.transport)
 
-    # Current production carrier and other managed L3 candidates.
-    for name in ("kernel_gre", "gost_tun", "amneziawg", "netrix"):
-        add(name)
+    # Old installations can have the physical carrier on disk while a failed
+    # lifecycle request has already disabled/cleared aggregate DB state. Only
+    # then fall back to deterministic managed-L3 addresses. Do not spray relay
+    # attempts across unused transports when we already know the carrier.
+    if not names:
+        for name in ("kernel_gre", "gost_tun", "amneziawg", "netrix"):
+            add(name)
 
     return names
 
@@ -176,6 +180,8 @@ def _proxy_command(
         "StrictHostKeyChecking=no",
         "-o",
         "UserKnownHostsFile=/dev/null",
+        "-o",
+        "LogLevel=ERROR",
         "-o",
         "ConnectTimeout=8",
         "-o",
@@ -390,8 +396,7 @@ async def ssh_connect_saved_v61(node: Node, db: Session):
         )
 
     try:
-        conn, label = await _race_connections(attempts)
-        setattr(conn, "_twinpanel_management_path", label)
+        conn, _path_label = await _race_connections(attempts)
         return conn
     except BaseException as exc:
         detail = str(exc).strip() or exc.__class__.__name__
