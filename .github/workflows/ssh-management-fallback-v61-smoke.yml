@@ -45,4 +45,4 @@ jobs:
 
       - name: Run V61 management path contract smoke
         working-directory: backend
-        run: python scripts/ssh_management_fallback_v61_smoke.py
+        run: PYTHONPATH=. python scripts/ssh_management_fallback_v61_smoke.py
