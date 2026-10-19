@@ -1,6 +1,11 @@
 [Unit]
 Description=TwinPanel Public Release Updater
-After=network-online.target twinpanel-api.service
+# IMPORTANT: do not order this oneshot unit After=twinpanel-api.service or
+# twinpanel-web.service. The updater restarts both services while its own
+# ExecStart job is still running. Ordering the updater after either service can
+# keep the replacement start job queued behind the still-active updater job,
+# while the updater waits for the new health/version and eventually rolls back.
+After=network-online.target
 Wants=network-online.target
 
 [Service]
