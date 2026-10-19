@@ -18,12 +18,7 @@ from .public_connection_v3 import public_connection_page_v3
 router = APIRouter(prefix="/v1/connect", tags=["public-connection-live-v4"])
 
 
-# Xray StatsService does not expose an authoritative connection-open/close
-# stream in the same way ocserv does. Treat a user as live when real Xray
-# traffic has changed recently. The quota runtime polls every five seconds, so
-# a 30-second window is intentionally wider than one missed poll while still
-# expiring quickly after traffic stops.
-_XRAY_LIVE_ACTIVITY_SECONDS = 30
+_LIVE_ACTIVITY_SECONDS = 30
 
 
 def _iso_utc(value: datetime | None) -> str | None:
@@ -37,12 +32,30 @@ def _latest(value_a: datetime | None, value_b: datetime | None) -> datetime | No
     return max(values) if values else None
 
 
+def _normalized_protocol(value: str | None) -> str:
+    protocol = str(value or "").strip().lower()
+    if protocol == "v2ray":
+        return "xray"
+    if protocol in {"openconnect", "ocserv", "anyconnect"}:
+        return "cisco"
+    return protocol
+
+
 @router.get("/{token}/live")
 def public_connection_live(token: str, db: Session = Depends(get_db)):
     """Small public live-state payload used by the connection delivery page."""
     sub = _subscription_from_share_token(token, db)
     usage = _usage_payload(db, sub)
 
+    active_session_rows = (
+        db.query(QuotaSession.protocol, func.max(QuotaSession.last_seen_at))
+        .filter(
+            QuotaSession.subscription_id == sub.id,
+            QuotaSession.status == "active",
+        )
+        .group_by(QuotaSession.protocol)
+        .all()
+    )
     active_sessions = int(
         db.query(func.count(QuotaSession.id))
         .filter(
@@ -52,33 +65,35 @@ def public_connection_live(token: str, db: Session = Depends(get_db)):
         .scalar()
         or 0
     )
-    last_session_seen = (
-        db.query(func.max(QuotaSession.last_seen_at))
-        .filter(
-            QuotaSession.subscription_id == sub.id,
-            QuotaSession.status == "active",
-        )
-        .scalar()
-    )
 
-    # Cisco has authoritative active QuotaSession rows. Xray accounting uses
-    # cumulative StatsService counters and intentionally does not leave a fake
-    # permanent session open. A positive Xray traffic delta in the recent
-    # activity window is therefore the protocol-safe live signal for Xray.
-    xray_cutoff = datetime.utcnow() - timedelta(seconds=_XRAY_LIVE_ACTIVITY_SECONDS)
-    last_xray_activity = (
-        db.query(func.max(QuotaUsageEvent.reported_at))
+    online_protocols: set[str] = set()
+    last_session_seen: datetime | None = None
+    for raw_protocol, seen_at in active_session_rows:
+        protocol = _normalized_protocol(raw_protocol)
+        if protocol:
+            online_protocols.add(protocol)
+        last_session_seen = _latest(last_session_seen, seen_at)
+
+    activity_cutoff = datetime.utcnow() - timedelta(seconds=_LIVE_ACTIVITY_SECONDS)
+    recent_activity_rows = (
+        db.query(QuotaUsageEvent.protocol, func.max(QuotaUsageEvent.reported_at))
         .filter(
             QuotaUsageEvent.subscription_id == sub.id,
-            QuotaUsageEvent.protocol == "xray",
-            QuotaUsageEvent.billable_bytes > 0,
-            QuotaUsageEvent.reported_at >= xray_cutoff,
+            QuotaUsageEvent.accepted_bytes > 0,
+            QuotaUsageEvent.reported_at >= activity_cutoff,
         )
-        .scalar()
+        .group_by(QuotaUsageEvent.protocol)
+        .all()
     )
+    last_counter_activity: datetime | None = None
+    for raw_protocol, reported_at in recent_activity_rows:
+        protocol = _normalized_protocol(raw_protocol)
+        if protocol:
+            online_protocols.add(protocol)
+        last_counter_activity = _latest(last_counter_activity, reported_at)
 
-    connection_online = bool(active_sessions > 0 or last_xray_activity is not None)
-    last_connection_seen = _latest(last_session_seen, last_xray_activity)
+    connection_online = bool(online_protocols)
+    last_connection_seen = _latest(last_session_seen, last_counter_activity)
 
     status = str(getattr(sub.status, "value", sub.status)).lower()
     return {
@@ -88,6 +103,7 @@ def public_connection_live(token: str, db: Session = Depends(get_db)):
         "expires_at": _iso_utc(getattr(sub, "expires_at", None)),
         "active_sessions": active_sessions,
         "connection_online": connection_online,
+        "online_protocols": sorted(online_protocols),
         "last_session_seen_at": _iso_utc(last_connection_seen),
     }
 
@@ -98,10 +114,12 @@ _LIVE_CSS = r"""
 .traffic{grid-template-columns:178px 1fr;gap:16px;min-height:124px;padding:14px 18px;border-radius:16px;transition:border-color .2s,box-shadow .2s}
 .traffic[data-connection="online"]{border-color:color-mix(in srgb,var(--ok) 48%,#252c45);box-shadow:0 0 0 1px color-mix(in srgb,var(--ok) 12%,transparent),0 14px 42px rgba(0,0,0,.18)}
 .visual{gap:12px}.donut{width:88px;height:88px;flex-basis:88px}.donut:before{inset:10px}.donut b{font-size:18px}.visual h2{font-size:15px}.stats{grid-template-columns:repeat(5,1fr)}.stat{padding:0 12px}.stat strong{font-size:13px;margin-top:5px}
-.section-head{margin:18px 0 9px}.section-head h2{font-size:17px}.protocols{gap:9px}.protocol-choice{min-height:96px;border-radius:13px;gap:5px}.protocol-icon{width:38px;height:38px}.protocol-panel{margin-top:9px}.panel-head{min-height:58px;padding:11px 13px}.server-views{padding:12px}.fact{min-height:82px;padding:12px}.apps{margin-top:15px}.apps-head{padding:12px 14px}.platforms{padding:11px}.app-card{min-height:62px;padding:8px}
+.section-head{margin:18px 0 9px}.section-head h2{font-size:17px}.protocols{gap:9px}.protocol-choice{min-height:96px;border-radius:13px;gap:5px;transition:border-color .2s,box-shadow .2s,background .2s}.protocol-icon{width:38px;height:38px}.protocol-panel{margin-top:9px}.panel-head{min-height:58px;padding:11px 13px}.server-views{padding:12px}.fact{min-height:82px;padding:12px}.apps{margin-top:15px}.apps-head{padding:12px 14px}.platforms{padding:11px}.app-card{min-height:62px;padding:8px}
 .section-head small,.protocol-choice small,.panel-head small,.apps-head small,.platform-title small,.app-card small,.profile-copy small{display:none!important}
 .status.connected{color:#7af0b5;background:#0a3322;border:1px solid #1b8053;box-shadow:0 0 0 3px rgba(41,211,125,.08)}
 .status.connected i{box-shadow:0 0 0 4px rgba(41,211,125,.12)}
+.protocol-choice.live-online,.protocol-choice.live-online.active{border-color:#29d37d!important;box-shadow:0 0 0 1px rgba(41,211,125,.38),0 0 24px rgba(41,211,125,.14)!important;background:linear-gradient(180deg,rgba(41,211,125,.07),rgba(41,211,125,.02))!important}
+.protocol-choice.live-online em{color:#7af0b5!important;background:#0a3322!important;border-color:#1b8053!important}
 .live-flash{animation:liveFlash .45s ease}@keyframes liveFlash{0%{opacity:.48}100%{opacity:1}}
 @media(max-width:760px){.page{width:min(94vw,680px)}.traffic{grid-template-columns:1fr;padding:13px}.stats{grid-template-columns:repeat(2,1fr)}.stat{padding:10px}.protocol-choice{min-height:90px}}
 """
@@ -136,6 +154,21 @@ _LIVE_SCRIPT = r"""
   }
   function flash(el){if(!el)return;el.classList.remove('live-flash');void el.offsetWidth;el.classList.add('live-flash');}
   function write(el,value){if(!el||el.textContent===value)return;el.textContent=value;flash(el);}
+  function cardProtocol(card){
+    const text=(card.querySelector('b')?.textContent||'').toLowerCase();
+    if(text.includes('cisco')||text.includes('anyconnect')||text.includes('openconnect'))return 'cisco';
+    if(text.includes('openvpn'))return 'openvpn';
+    if(text.includes('wireguard'))return 'wireguard';
+    if(text.includes('l2tp'))return 'l2tp';
+    if(text.includes('v2ray')||text.includes('xray'))return 'xray';
+    return '';
+  }
+  function paintProtocols(protocols){
+    const live=new Set((Array.isArray(protocols)?protocols:[]).map(v=>String(v||'').toLowerCase()==='v2ray'?'xray':String(v||'').toLowerCase()));
+    document.querySelectorAll('.protocol-choice').forEach(card=>{
+      card.classList.toggle('live-online',live.has(cardProtocol(card)));
+    });
+  }
   function apply(u){
     const pct=u.unlimited?0:Math.max(0,Math.min(100,Number(u.percent||0)));
     write(used,bytes(u.used_bytes));
@@ -153,8 +186,9 @@ _LIVE_SCRIPT = r"""
       status.className='status '+(connected?'connected':active?'on':'off');
       status.innerHTML='<i></i>'+(connected?'متصل':active?'اشتراک فعال':'غیرفعال');
     }
+    paintProtocols(u.online_protocols);
 
-    const signature=[u.used_bytes,u.remaining_bytes,u.starts_at,u.expires_at,u.active_sessions,u.connection_online,u.subscription_status].join('|');
+    const signature=[u.used_bytes,u.remaining_bytes,u.starts_at,u.expires_at,u.active_sessions,u.connection_online,(u.online_protocols||[]).join(','),u.subscription_status].join('|');
     if(previous&&signature!==previous&&traffic)flash(traffic);
     previous=signature;
   }
