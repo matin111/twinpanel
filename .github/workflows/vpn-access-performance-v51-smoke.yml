@@ -1,0 +1,72 @@
+name: VPN Access Performance V51 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/vpn_access_performance_v51.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/app/transport_manager_service_v12.py"
+      - ".github/workflows/vpn-access-performance-v51-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  vpn-access-performance-v51:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Python syntax
+        run: |
+          python -m py_compile \
+            backend/app/vpn_access_performance_v51.py \
+            backend/app/tunnel_transport_manager_v12.py \
+            backend/app/transport_manager_service_v12.py
+
+      - name: Validate MTU convergence contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          perf = Path("backend/app/vpn_access_performance_v51.py").read_text(encoding="utf-8")
+          manager = Path("backend/app/tunnel_transport_manager_v12.py").read_text(encoding="utf-8")
+          service = Path("backend/app/transport_manager_service_v12.py").read_text(encoding="utf-8")
+
+          assert "ACCESS_MTU = 1200" in perf
+          assert "ACCESS_TCP_MSS = 1160" in perf
+          for subnet in ("10.91.0.0/24", "10.92.0.0/24", "10.93.0.0/24", "10.94.0.0/24"):
+              assert subnet in perf
+
+          # Cisco must negotiate below the carrier instead of advertising
+          # legacy 1500/1434 and falling back from DTLS to TLS.
+          assert '"/etc/ocserv/ocserv.conf"' in perf
+          assert 'f"mtu = {ACCESS_MTU}"' in perf
+          assert "systemctl restart ocserv.service" in perf
+
+          # OpenVPN/WireGuard/L2TP receive the same invariant.
+          assert 'f"tun-mtu {ACCESS_MTU}"' in perf
+          assert 'f"mssfix {ACCESS_MSS}"' in perf
+          assert '"/etc/wireguard/wg-access0.conf"' in perf
+          assert 'f"MTU = {ACCESS_MTU}"' in perf
+          assert '"/etc/ppp/options.xl2tpd"' in perf
+          assert 'f"mru {ACCESS_MTU}"' in perf
+
+          # Reconciler must not depend on NodeProtocolConfig.status anymore.
+          assert "NodeProtocolConfig" not in perf
+          assert "V51_OK=1" in perf
+          assert "TP_ACCESS_PERF" in perf
+
+          assert "vpn_access_performance_v51" in manager
+          assert "vpn_access_performance=v51" in manager
+
+          # API startup intentionally restarts an already-active manager after
+          # /opt/twinpanel/current changes, so new reconciliation code cannot
+          # remain only on disk after an update.
+          assert "TWINPANEL_TRANSPORT_MANAGER_RELEASE_RELOAD_V48" in service
+          assert '"restart"' in service
+          assert 'UNIT_NAME' in service
+
+          print("VPN_ACCESS_PERFORMANCE_V51=PASS")
+          PY
