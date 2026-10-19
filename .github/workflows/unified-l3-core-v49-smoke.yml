@@ -1,0 +1,113 @@
+name: Unified L3 Core V49 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/unified_l3_core_v49.py"
+      - "backend/app/unified_l3_agent_rollout_v49.py"
+      - "backend/app/self_hosted_runtime.py"
+      - "backend/app/twinpanel_agent.py.tpl"
+      - ".github/workflows/unified-l3-core-v49-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  unified-l3-core-v49:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Python syntax
+        run: |
+          python -m py_compile \
+            backend/app/unified_l3_core_v49.py \
+            backend/app/unified_l3_agent_rollout_v49.py \
+            backend/app/self_hosted_runtime.py
+
+      - name: Validate rendered Agent convergence contract
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          runtime_path = Path("backend/app/unified_l3_core_v49.py")
+          agent_path = Path("backend/app/twinpanel_agent.py.tpl")
+
+          runtime_source = runtime_path.read_text(encoding="utf-8")
+          agent_source = agent_path.read_text(encoding="utf-8")
+          tree = ast.parse(runtime_source)
+
+          agent_block = None
+          patch_function = None
+
+          for node in tree.body:
+              if isinstance(node, ast.Assign):
+                  for target in node.targets:
+                      if isinstance(target, ast.Name) and target.id == "_AGENT_RECONCILE_V49":
+                          agent_block = ast.literal_eval(node.value)
+              if isinstance(node, ast.FunctionDef) and node.name == "_patch_agent_source":
+                  patch_function = node
+
+          assert isinstance(agent_block, str) and agent_block
+          assert patch_function is not None
+
+          isolated = ast.Module(body=[patch_function], type_ignores=[])
+          ast.fix_missing_locations(isolated)
+          namespace = {"_AGENT_RECONCILE_V49": agent_block, "RuntimeError": RuntimeError}
+          exec(compile(isolated, "<v49-patch>", "exec"), namespace)
+
+          patched = namespace["_patch_agent_source"](agent_source)
+          compile(patched, "<rendered-agent-v49>", "exec")
+
+          start = patched.index("async def reconcile_tunnels(client):")
+          end = patched.index("# TWINPANEL_AGENT_ORPHAN_SELF_DISABLE_V1", start)
+          reconcile = patched[start:end]
+          real_call = "reconcile_service_routing(\n                items\n            )"
+          call_at = reconcile.index(real_call)
+
+          assert "TWINPANEL_UNIFIED_L3_AGENT_V49" in patched
+          assert "unified_l3_carrier_probe" in patched
+          assert '"mtunnel"' in reconcile
+          assert "route publish DEFERRED" in reconcile
+          assert "UNIFIED_L3_V49 COMMITTED" in reconcile
+          assert reconcile.index("runtime_results = {}") < call_at
+          assert reconcile.index("route_probe_errors = {}") < call_at
+
+          # The dangerous old behavior was route publication immediately after
+          # desired-state fetch, before any carrier convergence.
+          prefix = reconcile[:reconcile.index("runtime_results = {}")]
+          assert real_call not in prefix
+
+          print("RENDERED_AGENT_V49=PASS")
+          PY
+
+      - name: Validate one-core service policy
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path("backend/app/unified_l3_core_v49.py").read_text(encoding="utf-8")
+          hosted = Path("backend/app/self_hosted_runtime.py").read_text(encoding="utf-8")
+          rollout = Path("backend/app/unified_l3_agent_rollout_v49.py").read_text(encoding="utf-8")
+
+          for protocol in ("cisco", "openvpn", "wireguard", "l2tp", "v2ray"):
+              assert protocol in source
+
+          assert "_original_l2tp_routes_for_exit" in source
+          assert "routes.extend(" in source
+          assert 'route["core"] = "unified_l3_v49"' in source
+          assert "_l2tp_secondary_route_disabled_v49" in source
+          assert "account_delivery._tunnel_access_endpoint" in source
+          assert "preserve_previous_on_failover=1" in source
+
+          assert hosted.index("apply_service_connections_jobs_v28()") < hosted.index("apply_unified_l3_core_v49()")
+          assert hosted.index("apply_unified_l3_core_v49()") < hosted.index("apply_unified_l3_agent_rollout_v49()")
+
+          assert "/opt/twinpanel-agent/agent.py" in rollout
+          assert "_ROLLOUT_CONCURRENCY = 2" in rollout
+          assert "systemctl is-active --quiet twinpanel-agent.service" in rollout
+
+          print("UNIFIED_SERVICE_POLICY_V49=PASS")
+          PY
