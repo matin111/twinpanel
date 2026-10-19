@@ -21,5 +21,10 @@ from .. import node_bootstrap_control_v66 as _node_bootstrap_control_v66  # noqa
 # through a bounded ControlMaster. Iran is bootstrap/fallback only.
 from .. import node_bootstrap_control_v72 as _node_bootstrap_control_v72  # noqa: F401
 
+# V73 keeps the V72 architecture unchanged and only hardens failed-open
+# lifecycle cleanup so rejected auth/TCP/host-key attempts cannot leave a
+# bootstrap workspace or native ControlMaster behind.
+from .. import node_bootstrap_control_v73 as _node_bootstrap_control_v73  # noqa: F401
+
 # Register guarded DELETE routes before app.main includes nodes/tunnels.
 from . import destructive_safety as _destructive_safety  # noqa: F401
