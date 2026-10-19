@@ -4,8 +4,35 @@ import {API_BASE} from "./api";
 import {getCustomerToken} from "./customer-api";
 import type {AdminNode,AdminTunnel,DashboardSummary,RuntimeRow} from "./admin-api";
 
+const TRANSIENT_GET_STATUSES=new Set([502,503,504]);
+const TRANSIENT_GET_RETRY_MS=[350,900,1800] as const;
+const lastGoodRead=new Map<string,unknown>();
+
+function isHtmlErrorBody(value:string){
+  const sample=value.trim().slice(0,1024);
+  return /<(?:!doctype|html|head|body|title|center)\b|nginx\//i.test(sample);
+}
+
+function isTransientNetworkError(reason:unknown){
+  const text=reason instanceof Error?reason.message:String(reason||"");
+  return /failed to fetch|networkerror|network request failed|load failed|fetch failed|connection|timeout/i.test(text);
+}
+
+function transientStatusText(status:number){
+  return `سرویس پنل موقتاً در دسترس نیست. چند لحظه بعد دوباره تلاش کنید. (${status})`;
+}
+
+function networkErrorText(){
+  return "ارتباط با سرویس پنل موقتاً قطع شد. چند لحظه بعد دوباره تلاش کنید.";
+}
+
 function errorText(payload:unknown,status:number){
-  if(typeof payload==="string"&&payload.trim())return payload.trim();
+  if(TRANSIENT_GET_STATUSES.has(status))return transientStatusText(status);
+  if(typeof payload==="string"&&payload.trim()){
+    const text=payload.trim();
+    if(isHtmlErrorBody(text))return `خطای ارتباط با سرویس پنل (${status})`;
+    return text;
+  }
   if(payload&&typeof payload==="object"){
     const item=payload as {detail?:unknown;message?:unknown};
     if(typeof item.detail==="string")return item.detail;
@@ -23,19 +50,74 @@ function errorText(payload:unknown,status:number){
   return `API error ${status}`;
 }
 
+function requestBase(){
+  // Browser-side admin control must stay on the panel origin. This avoids a
+  // stale build-time API base and keeps /v1 behind the current TwinPanel proxy.
+  if(typeof window!=="undefined")return window.location.origin;
+  return API_BASE;
+}
+
+function wait(ms:number){
+  return new Promise<void>(resolve=>globalThis.setTimeout(resolve,ms));
+}
+
 async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
   const headers=new Headers(init.headers);
   headers.set("Authorization",`Bearer ${token}`);
   if(init.body&&!headers.has("Content-Type")&&!(init.body instanceof FormData))headers.set("Content-Type","application/json");
-  const response=await fetch(`${API_BASE}${path}`,{...init,headers,cache:"no-store"});
-  if(response.status===204)return undefined as T;
-  const raw=await response.text();
-  let payload:unknown=null;
-  if(raw){try{payload=JSON.parse(raw);}catch{payload=raw;}}
-  if(!response.ok)throw new Error(errorText(payload,response.status));
-  return payload as T;
+
+  const method=String(init.method||"GET").toUpperCase();
+  const maxAttempts=method==="GET"?TRANSIENT_GET_RETRY_MS.length+1:1;
+
+  for(let attempt=0;attempt<maxAttempts;attempt+=1){
+    let response:Response;
+
+    try{
+      response=await fetch(`${requestBase()}${path}`,{...init,headers,cache:"no-store"});
+    }catch(reason){
+      const canRetry=method==="GET"&&isTransientNetworkError(reason)&&attempt<TRANSIENT_GET_RETRY_MS.length;
+      if(canRetry){
+        await wait(TRANSIENT_GET_RETRY_MS[attempt]);
+        continue;
+      }
+
+      if(method==="GET"&&isTransientNetworkError(reason)&&lastGoodRead.has(path)){
+        return lastGoodRead.get(path) as T;
+      }
+
+      if(isTransientNetworkError(reason))throw new Error(networkErrorText());
+      throw reason;
+    }
+
+    if(method==="GET"&&TRANSIENT_GET_STATUSES.has(response.status)){
+      if(attempt<TRANSIENT_GET_RETRY_MS.length){
+        try{await response.body?.cancel();}catch{}
+        await wait(TRANSIENT_GET_RETRY_MS[attempt]);
+        continue;
+      }
+
+      if(lastGoodRead.has(path)){
+        try{await response.body?.cancel();}catch{}
+        return lastGoodRead.get(path) as T;
+      }
+    }
+
+    if(response.status===204)return undefined as T;
+    const raw=await response.text();
+    let payload:unknown=null;
+    if(raw){try{payload=JSON.parse(raw);}catch{payload=raw;}}
+    if(!response.ok)throw new Error(errorText(payload,response.status));
+
+    if(method==="GET")lastGoodRead.set(path,payload);
+    else lastGoodRead.clear();
+
+    return payload as T;
+  }
+
+  if(method==="GET"&&lastGoodRead.has(path))return lastGoodRead.get(path) as T;
+  throw new Error(networkErrorText());
 }
 
 async function requestWithTimeout<T>(path:string,init:RequestInit={},timeoutMs=120000):Promise<T>{
