@@ -21,6 +21,7 @@ C_DIM='\033[2m'
 C_RESET='\033[0m'
 
 WIDTH=58
+CHOICE=""
 
 line(){ printf '%*s\n' "$WIDTH" '' | tr ' ' '-'; }
 strong_line(){ printf '%*s\n' "$WIDTH" '' | tr ' ' '='; }
@@ -79,15 +80,30 @@ pause(){
   read -r -p "Press Enter to continue..." _ || true
 }
 
+pick(){
+  CHOICE=""
+  if ! IFS= read -r -n 1 -p "Choose: " CHOICE; then
+    echo
+    return 1
+  fi
+  echo "$CHOICE"
+  return 0
+}
+
 invalid_choice(){
   printf '\n%bInvalid selection.%b\n' "$C_RED" "$C_RESET"
   pause
 }
 
-confirm_yes(){
-  local prompt="$1" answer
-  read -r -p "$prompt [y/N]: " answer || answer=""
-  [[ "${answer,,}" == "y" || "${answer,,}" == "yes" ]]
+confirm_action(){
+  local title="$1"
+  echo "$title"
+  echo
+  echo "  [1] Continue"
+  echo "  [0] Cancel"
+  echo
+  pick || return 1
+  [[ "$CHOICE" == "1" ]]
 }
 
 require_runtime(){
@@ -168,18 +184,22 @@ restart_nginx(){
   restart_unit nginx.service
 }
 
-restart_stack(){
-  header "Restart TwinPanel"
-  printf 'This restarts only the panel API, Web and Nginx.\n\n'
-  if ! confirm_yes "Restart TwinPanel now?"; then
-    echo "Cancelled."
-    pause
-    return
-  fi
+restart_panel_now(){
   echo
   restart_unit twinpanel-api.service || true
   restart_unit twinpanel-web.service || true
   restart_nginx || true
+}
+
+restart_stack(){
+  header "Restart TwinPanel"
+  echo "Restarts the panel API, Web and Nginx."
+  echo
+  if confirm_action "Restart TwinPanel now?"; then
+    restart_panel_now
+  else
+    echo "Cancelled."
+  fi
   pause
 }
 
@@ -202,9 +222,8 @@ journal_unit(){
 }
 
 option_unit_state(){
-  local unit="$1" state
-  state="$(unit_state "$unit")"
-  printf '%s' "$state"
+  local unit="$1"
+  unit_state "$unit"
 }
 
 status_menu(){
@@ -213,7 +232,6 @@ status_menu(){
   printf '  %-18s %s\n' "Version" "$(version_value)"
   printf '  %-18s %s\n' "API port" "$API_PORT"
   printf '  %-18s %s\n' "Web port" "$WEB_PORT"
-  printf '  %-18s %s\n' "Release" "$(readlink -f "$ROOT" 2>/dev/null || echo "$ROOT")"
   echo
   printf '%bHealth%b\n' "$C_BLUE" "$C_RESET"
   http_health "API" "http://127.0.0.1:${API_PORT}/health/ready"
@@ -232,25 +250,20 @@ status_menu(){
 services_menu(){
   while true; do
     header "Service management"
-    echo "  [1] Restart API"
-    echo "  [2] Restart Web"
-    echo "  [3] Restart Nginx"
-    echo "  [4] Restart panel stack"
-    echo "  [5] Show all service states"
+    echo "  [1] Restart TwinPanel"
+    echo "  [2] Restart API"
+    echo "  [3] Restart Web"
+    echo "  [4] Restart Nginx"
+    echo "  [5] Show service states"
     echo
     echo "  [0] Back"
     echo
-    if ! read -r -p "Select: " choice; then return; fi
-    case "$choice" in
-      1) restart_unit twinpanel-api.service || true; pause ;;
-      2) restart_unit twinpanel-web.service || true; pause ;;
-      3) restart_nginx || true; pause ;;
-      4)
-        restart_unit twinpanel-api.service || true
-        restart_unit twinpanel-web.service || true
-        restart_nginx || true
-        pause
-        ;;
+    pick || return
+    case "$CHOICE" in
+      1) restart_panel_now; pause ;;
+      2) restart_unit twinpanel-api.service || true; pause ;;
+      3) restart_unit twinpanel-web.service || true; pause ;;
+      4) restart_nginx || true; pause ;;
       5) echo; show_service_table; pause ;;
       0) return ;;
       *) invalid_choice ;;
@@ -263,15 +276,16 @@ admin_menu(){
     header "Administrator management"
     echo "  [1] Show administrator"
     echo "  [2] Show initial login credentials"
-    echo "  [3] Reset password"
-    echo "  [4] Change email"
-    echo "  [5] Change name"
-    echo "  [6] Delete initial credentials file"
+    echo "  [3] Generate new random password"
+    echo "  [4] Set custom password"
+    echo "  [5] Change email"
+    echo "  [6] Change name"
+    echo "  [7] Delete initial credentials file"
     echo
     echo "  [0] Back"
     echo
-    if ! read -r -p "Select: " choice; then return; fi
-    case "$choice" in
+    pick || return
+    case "$CHOICE" in
       1)
         run_backend scripts/twinpanel_admin_cli.py show || true
         pause
@@ -285,37 +299,48 @@ admin_menu(){
         pause
         ;;
       3)
-        echo "Leave blank to generate a strong random password."
+        run_backend scripts/twinpanel_admin_cli.py reset-password || true
+        pause
+        ;;
+      4)
         read -r -s -p "New password: " pass || pass=""
         echo
         if [[ -n "$pass" ]]; then
           run_backend scripts/twinpanel_admin_cli.py reset-password --password "$pass" || true
         else
-          run_backend scripts/twinpanel_admin_cli.py reset-password || true
+          echo "Cancelled."
         fi
         unset pass
         pause
         ;;
-      4)
-        if read -r -p "New email: " email; then
-          run_backend scripts/twinpanel_admin_cli.py change-email "$email" || true
-        fi
-        pause
-        ;;
       5)
-        if read -r -p "New name: " name; then
-          run_backend scripts/twinpanel_admin_cli.py change-name "$name" || true
+        if read -r -p "New email: " email && [[ -n "$email" ]]; then
+          run_backend scripts/twinpanel_admin_cli.py change-email "$email" || true
+        else
+          echo "Cancelled."
         fi
         pause
         ;;
       6)
-        if [[ ! -f "$INITIAL_ADMIN_FILE" ]]; then
-          echo "Initial credentials file does not exist."
-        elif confirm_yes "Delete the initial credentials file?"; then
-          rm -f "$INITIAL_ADMIN_FILE"
-          echo "Deleted."
+        if read -r -p "New name: " name && [[ -n "$name" ]]; then
+          run_backend scripts/twinpanel_admin_cli.py change-name "$name" || true
         else
           echo "Cancelled."
+        fi
+        pause
+        ;;
+      7)
+        if [[ ! -f "$INITIAL_ADMIN_FILE" ]]; then
+          echo "Initial credentials file does not exist."
+        else
+          echo "This removes only the saved first-login credentials file."
+          echo
+          if confirm_action "Delete it now?"; then
+            rm -f "$INITIAL_ADMIN_FILE"
+            echo "Deleted."
+          else
+            echo "Cancelled."
+          fi
         fi
         pause
         ;;
@@ -334,48 +359,77 @@ protocol_menu(){
   echo "  [4] L2TP / IPsec"
   echo "  [5] V2Ray / Xray"
   echo
-  printf '%bTip:%b choose a protocol first, then choose Local or an Exit node.\n' "$C_DIM" "$C_RESET"
+  printf '%bOnly numbers are used for protocol, target and action choices.%b\n' "$C_DIM" "$C_RESET"
   echo
   run_backend scripts/twinpanel_protocol_cli_en.py || true
   pause
 }
 
+update_summary(){
+  run_backend -c 'from app.system_release import release_status; s=release_status(refresh_license_state=False); print("  Current :",s.get("current_version") or "unknown"); print("  Latest  :",s.get("latest_version") or "unknown"); print("  Update  :","AVAILABLE" if s.get("update_available") else "up to date"); e=s.get("manifest_error"); print("  Error   :",e) if e else None' || true
+}
+
+update_state_summary(){
+  printf '  Updater : %b\n' "$(state_badge "$(unit_state twinpanel-updater.service)")"
+  if [[ ! -s "$UPDATE_STATE_FILE" ]]; then
+    echo "  State   : no update state yet"
+    return
+  fi
+  python3 - "$UPDATE_STATE_FILE" <<'PY' || true
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+try:
+    data = json.loads(path.read_text(encoding="utf-8"))
+except Exception:
+    print("  State   : unavailable")
+    raise SystemExit(0)
+
+for label, keys in (
+    ("State", ("status", "state", "phase")),
+    ("Version", ("version", "target_version", "latest_version")),
+    ("Message", ("message", "detail")),
+    ("Error", ("error", "last_error")),
+):
+    value = next((data.get(key) for key in keys if data.get(key)), None)
+    if value is not None:
+        print(f"  {label:<7}: {value}")
+PY
+}
+
 update_menu(){
   while true; do
     header "Panel update"
-    echo "  [1] Check for update"
-    echo "  [2] Install update"
+    update_summary
+    echo
+    echo "  [1] Refresh update check"
+    echo "  [2] Install latest update"
     echo "  [3] Update status"
     echo
     echo "  [0] Back"
     echo
-    if ! read -r -p "Select: " choice; then return; fi
-    case "$choice" in
+    pick || return
+    case "$CHOICE" in
       1)
-        run_backend -c 'from app.system_release import release_status; s=release_status(refresh_license_state=False); print("Current :",s.get("current_version") or "unknown"); print("Latest  :",s.get("latest_version") or "unknown"); print("Channel :",s.get("channel") or "unknown"); print("Update  :","AVAILABLE" if s.get("update_available") else "up to date"); e=s.get("manifest_error"); print("Error   :",e) if e else None' || true
+        echo
+        update_summary
         pause
         ;;
       2)
-        if confirm_yes "Start the TwinPanel update?"; then
-          run_backend -c 'import json; from app.system_release import request_update; print(json.dumps(request_update(),ensure_ascii=True,indent=2,default=str))' || true
+        echo
+        if confirm_action "Install the latest TwinPanel update?"; then
+          echo
+          run_backend -c 'from app.system_release import request_update; r=request_update(); print("Update request:", "accepted" if r else "submitted")' || true
         else
           echo "Cancelled."
         fi
         pause
         ;;
       3)
-        if unit_exists twinpanel-updater.service; then
-          systemctl --no-pager --full status twinpanel-updater.service || true
-        else
-          echo "twinpanel-updater.service is not installed."
-        fi
         echo
-        if [[ -s "$UPDATE_STATE_FILE" ]]; then
-          echo "Update state:"
-          cat "$UPDATE_STATE_FILE"
-        else
-          echo "No update state has been recorded yet."
-        fi
+        update_state_summary
         pause
         ;;
       0) return ;;
@@ -393,27 +447,24 @@ backup_menu(){
     echo
     echo "  [0] Back"
     echo
-    if ! read -r -p "Select: " choice; then return; fi
-    case "$choice" in
+    pick || return
+    case "$CHOICE" in
       1)
-        run_backend -c "from app.backup_service import create_backup; import json; print(json.dumps(create_backup(kind='manual',send_telegram=False),ensure_ascii=True,indent=2,default=str))" || true
+        run_backend -c "from app.backup_service import create_backup; r=create_backup(kind='manual',send_telegram=False); print('Backup:', r.get('path') or r.get('filename') or 'created')" || true
         pause
         ;;
       2)
         if [[ -d "$BACKUP_ROOT" ]]; then
-          find "$BACKUP_ROOT" -maxdepth 1 -type f \( -name '*.tpbak' -o -name '*.tpbak.meta.json' \) -printf '%TY-%Tm-%Td %TH:%TM  %10s  %f\n' 2>/dev/null | sort -r || true
+          find "$BACKUP_ROOT" -maxdepth 1 -type f -name '*.tpbak' -printf '%TY-%Tm-%Td %TH:%TM  %10s  %f\n' 2>/dev/null | sort -r || true
         else
-          echo "Backup directory does not exist."
+          echo "No backups found."
         fi
         pause
         ;;
       3)
+        show_unit twinpanel-backup.timer
         if unit_exists twinpanel-backup.timer; then
-          systemctl --no-pager --full status twinpanel-backup.timer || true
-          echo
           systemctl list-timers twinpanel-backup.timer --no-pager || true
-        else
-          echo "twinpanel-backup.timer is not installed."
         fi
         pause
         ;;
@@ -437,8 +488,8 @@ logs_menu(){
     echo
     echo "  [0] Back"
     echo
-    if ! read -r -p "Select: " choice; then return; fi
-    case "$choice" in
+    pick || return
+    case "$CHOICE" in
       1) journal_unit twinpanel-api.service; pause ;;
       2) journal_unit twinpanel-web.service; pause ;;
       3) journal_unit twinpanel-updater.service; pause ;;
@@ -465,27 +516,23 @@ version_menu(){
   printf '  TwinPanel version : %s\n' "$(version_value)"
   printf '  Active release    : %s\n' "$(readlink -f "$ROOT" 2>/dev/null || echo "$ROOT")"
   printf '  GitHub            : https://github.com/matin111/twinpanel\n'
-  printf '  Public installer  : https://raw.githubusercontent.com/matin111/twinpanel/main/install.sh\n'
   printf '  Stable manifest   : https://raw.githubusercontent.com/matin111/twinpanel/main/releases/stable.json\n'
-  if git -C "$ROOT" rev-parse HEAD >/dev/null 2>&1; then
-    printf '  Git commit        : %s\n' "$(git -C "$ROOT" rev-parse HEAD)"
-  fi
   pause
 }
 
 more_menu(){
   while true; do
     header "More options"
-    echo "  [1] Administrator management"
+    echo "  [1] Administrator"
     echo "  [2] Backup"
-    echo "  [3] Service management"
-    echo "  [4] Logs and diagnostics"
-    echo "  [5] Version and GitHub"
+    echo "  [3] Services"
+    echo "  [4] Logs"
+    echo "  [5] Version"
     echo
     echo "  [0] Back"
     echo
-    if ! read -r -p "Select: " choice; then return; fi
-    case "$choice" in
+    pick || return
+    case "$CHOICE" in
       1) admin_menu ;;
       2) backup_menu ;;
       3) services_menu ;;
@@ -508,11 +555,11 @@ main_menu(){
     echo
     echo "  [0] Exit"
     echo
-    if ! read -r -p "Select: " choice; then
+    if ! pick; then
       echo
       exit 0
     fi
-    case "$choice" in
+    case "$CHOICE" in
       1) status_menu ;;
       2) restart_stack ;;
       3) protocol_menu ;;
