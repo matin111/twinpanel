@@ -8,6 +8,7 @@ import {CustomerDeliveryEnhancement} from "../components/customer-delivery-enhan
 import {CustomerStoreRedirect} from "../components/customer-store-redirect";
 import {PortalTopNavBehavior} from "../components/portal-topnav-behavior";
 import {RuntimeVersionConvergence} from "../components/runtime-version-convergence";
+import {SystemUpdateRecoveryBootstrap} from "../components/system-update-recovery-bootstrap";
 import "./core.css";
 import "./pages.css";
 import "./i18n.css";
@@ -57,6 +58,7 @@ import "./admin-modal-layer-final.css";
 import "./admin-nav-attention.css";
 import "./system-release.css";
 import "./system-release-theme.css";
+import "./system-release-dialog-v76.css";
 import "./storefront-polish-v5.css";
 import "./storefront-mobile-hero-v6.css";
 import "./storefront-mobile-hero-v8.css";
@@ -67,6 +69,6 @@ export const metadata:Metadata={title:"VPN Control 2027",description:"VPN manage
 
 export default function RootLayout({children}:{children:React.ReactNode}){
   return <html lang="fa" dir="rtl" data-theme="dark" suppressHydrationWarning>
-    <body><ThemeProvider><BrandingProvider><I18nProvider>{children}<RuntimeVersionConvergence/><PortalTopNavBehavior/><CustomerStoreRedirect/><CustomerDeliveryEnhancement/><SupportChatRuntime/><ChatOpenBridge/></I18nProvider></BrandingProvider></ThemeProvider></body>
+    <body><SystemUpdateRecoveryBootstrap/><ThemeProvider><BrandingProvider><I18nProvider>{children}<RuntimeVersionConvergence/><PortalTopNavBehavior/><CustomerStoreRedirect/><CustomerDeliveryEnhancement/><SupportChatRuntime/><ChatOpenBridge/></I18nProvider></BrandingProvider></ThemeProvider></body>
   </html>;
 }

@@ -1,0 +1,46 @@
+/*
+ * System Update Center viewport containment.
+ * Loaded after the legacy release styles so the dialog remains fully reachable
+ * even on short browser viewports and after browser chrome/zoom changes.
+ */
+.system-update-modal{
+  grid-template-columns:minmax(0,1fr);
+  align-items:center;
+  justify-items:center;
+  padding:clamp(10px,2vh,22px);
+  overflow:auto;
+  overscroll-behavior:contain;
+}
+
+.system-update-card{
+  width:min(860px,calc(100vw - 20px));
+  max-width:100%;
+  max-height:calc(100vh - 20px);
+  max-height:calc(100dvh - 20px);
+  min-width:0;
+  scrollbar-gutter:stable;
+}
+
+.system-update-card>*{
+  min-width:0;
+}
+
+.system-update-notes,
+.system-update-notes p,
+.system-update-alert,
+.system-update-alert p,
+.system-update-runtime-stats{
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+
+@media(max-width:760px){
+  .system-update-modal{
+    padding:6px;
+  }
+  .system-update-card{
+    width:calc(100vw - 12px);
+    max-height:calc(100vh - 12px);
+    max-height:calc(100dvh - 12px);
+  }
+}
