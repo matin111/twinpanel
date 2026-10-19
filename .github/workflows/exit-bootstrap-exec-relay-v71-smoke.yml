@@ -24,6 +24,7 @@ jobs:
       - name: Verify exec-stream fallback contract
         run: |
           python3 - <<'PY'
+          import ast
           from pathlib import Path
 
           module = Path('backend/app/node_bootstrap_control_v71.py').read_text(encoding='utf-8')
@@ -46,16 +47,26 @@ jobs:
           if missing:
               raise SystemExit('missing V71 contracts: ' + ', '.join(missing))
 
-          forbidden = [
-              'tunnel=iran_conn',
+          forbidden_text = [
               'ip route add',
               'iptables -A',
               'wg set',
               'kernel_gre',
           ]
-          present = [item for item in forbidden if item in module]
+          present = [item for item in forbidden_text if item in module]
           if present:
-              raise SystemExit('V71 must not depend on direct-tcpip/data-plane: ' + ', '.join(present))
+              raise SystemExit('V71 must not depend on data-plane mutation: ' + ', '.join(present))
+
+          tree = ast.parse(module)
+          bad_tunnel_keywords = []
+          for node in ast.walk(tree):
+              if not isinstance(node, ast.Call):
+                  continue
+              for keyword in node.keywords:
+                  if keyword.arg == 'tunnel':
+                      bad_tunnel_keywords.append(getattr(node, 'lineno', -1))
+          if bad_tunnel_keywords:
+              raise SystemExit('V71 must not use AsyncSSH direct-tcpip tunnel keyword')
 
           if 'node_bootstrap_control_v71' not in routers:
               raise SystemExit('V71 runtime import missing')
