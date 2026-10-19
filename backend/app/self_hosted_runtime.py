@@ -13,6 +13,10 @@ from .services.public_urls import api_base_url
 from .routers import nodes, provision, tunnels
 from .ssh_tunnel_self_hosted_v3 import provision_ssh_tunnel_self_hosted_v3
 from .transport_manager_service_v12 import ensure_transport_manager_service_v12
+from .unified_l3_core_v49 import apply_unified_l3_core_v49
+from .unified_l3_agent_rollout_v49 import (
+    apply_unified_l3_agent_rollout_v49,
+)
 from . import xray_modern_runtime
 from .xray_modern_config_compat_v45 import (
     apply_xray_modern_config_compat_v45,
@@ -217,6 +221,16 @@ def apply_self_hosted_runtime() -> None:
     apply_tunnel_service_connections_admin_runtime()
     apply_tp2027_egress_v28()
     apply_service_connections_jobs_v28()
+
+    # ------------------------------------------------------------
+    # Unified L3 Core V49
+    #
+    # Apply last after all route/profile wrappers so the final service route
+    # set is committed through one selected Iran <-> Exit L3 carrier.
+    # ------------------------------------------------------------
+
+    apply_unified_l3_core_v49()
+    apply_unified_l3_agent_rollout_v49()
 
     # ------------------------------------------------------------
     # SSH TUN
