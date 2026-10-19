@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.71",
+  "version": "1.1.0-rc.72",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-19T22:27:01Z",
+  "released_at": "2026-10-19T22:54:31Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "1abacc06235820e0c0f02498c85fb05301f81dbb",
+  "source_sha": "87019613e16d15dfb889c88dd476e9138e5a7b6c",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.71/twinpanel-1.1.0-rc.71-linux-x86_64.tar.gz",
-    "sha256": "91a6238630d2f773cae76daf10a88a55fdbfacbe06934f8e89a6d596ae9114e3",
-    "size_bytes": 12869620
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.72/twinpanel-1.1.0-rc.72-linux-x86_64.tar.gz",
+    "sha256": "df2643f209915576f719860e96d75e36d20438b43fad9f5da38d9804838735e8",
+    "size_bytes": 12877013
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.71 مسیر نصب و مدیریت نودهای Exit را در حالتی که SSH مستقیم Controller به Exit بسته است از ریشه اصلاح می‌کند. در rc.70 مسیر جایگزین ایران هنوز به SSH direct-tcpip وابسته بود و در محیطی که sshd ایران Forwarding را عبور نمی‌داد Timeout می‌شد، حتی با وجود اینکه خود سرور ایران به پورت SSH نود خارج دسترسی TCP داشت. در rc.71 این وابستگی حذف شده است: مسیر fallback با یک Relay اجرایی روی SSH معمولی ایران کار می‌کند؛ یک Bridge کوچک Python روی نود ایران به Exit وصل می‌شود و Handshake واقعی SSH نود خارج را از طریق stdin/stdout عبور می‌دهد. این مسیر به AllowTcpForwarding، ssh -W، GRE، WireGuard، Xray، Route، Policy Route یا iptables وابسته نیست. پس از نصب، Agent همچنان کنترل Outbound مستقیم Exit → Controller را ترجیح می‌دهد و ایران فقط fallback باقی می‌ماند.",
-    "en": "TwinPanel 1.1.0-rc.71 fixes Exit provisioning and management when direct Controller-to-Exit SSH is blocked and the Iran sshd does not allow direct-tcpip forwarding. rc.70 still depended on the SSH forwarding subsystem, which could time out even when the Iran host itself had TCP reachability to the Exit SSH port. rc.71 removes that dependency by using a normal SSH exec-stream relay: a tiny Python bridge runs on the Iran node, connects to the Exit SSH port, and carries the real Exit SSH handshake over stdin/stdout. No AllowTcpForwarding, ssh -W, GRE, WireGuard, Xray, route, policy-route, or iptables dependency is required. After installation, the Agent still prefers direct outbound Exit-to-Controller control, with Iran remaining fallback-only."
+    "fa": "TwinPanel 1.1.0-rc.72 مسیر Bootstrap نود Exit را برای حالتی که Controller مستقیماً به SSH نود خارج دسترسی ندارد بازطراحی می‌کند. Root Cause شکست rc.71 مشخص شد: فرمان Relay شامل python3 -c ابتدا برای shell quote می‌شد، اما هنگام عبور از AsyncSSH proxy_command دوباره به argv شکسته می‌شد و OpenSSH فرمان remote را بدون بازگرداندن quoting برای shell ایران می‌ساخت؛ در نتیجه Relay قبل از شروع واقعی با خطای parse بسته می‌شد و AsyncSSH آن را به صورت Connection lost نشان می‌داد. در rc.72 nested SSH proxy stream حذف شده است. پس از یک تلاش مستقیم محدود، Controller به SSH مدیریتی نود ایران وصل می‌شود و خود نود ایران با OpenSSH native یک ControlMaster کوتاه‌عمر به SSH عمومی Exit می‌سازد و دستورات نصب را اجرا می‌کند. رمز Exit فقط از stdin و file descriptor ناشناس به sshpass منتقل می‌شود و در argv، environment یا log قرار نمی‌گیرد؛ host key نیز پس از اولین اتصال TOFU پین می‌شود. پس از نصب، Agent همچنان مسیر outbound مستقیم Exit → Controller را ترجیح می‌دهد و ایران فقط Bootstrap/fallback است. یک integration test واقعی با توپولوژی ایزوله نیز اضافه شده که بسته بودن Controller→Exit، باز بودن Controller→Iran و Iran→Exit، اجرای نصب، fallback با کلید ذخیره‌شده، طبقه‌بندی خطا، pinning و cleanup را تست می‌کند.",
+    "en": "TwinPanel 1.1.0-rc.72 redesigns Exit bootstrap for deployments where the Controller cannot reach the Exit SSH port directly. The rc.71 failure now has a verified root cause: the Python relay command was shell-quoted before being passed as an AsyncSSH proxy_command string, AsyncSSH split it back into argv, and OpenSSH reconstructed the remote command without restoring the shell quoting. The Iran shell therefore parsed and terminated the python3 -c relay before it could actually start, while AsyncSSH surfaced the proxy process failure as a generic Connection lost. rc.72 removes nested SSH proxy streaming entirely. After one bounded direct attempt, the Controller opens a normal Iran management SSH session and native OpenSSH running on Iran creates a short-lived ControlMaster to the Exit public SSH endpoint and executes provisioning commands. The Exit password is delivered only through stdin and an anonymous file descriptor to sshpass, never argv, environment, or logs; the Exit host key is TOFU-pinned after first contact. After installation, the Agent still prefers direct outbound Exit-to-Controller control, leaving Iran bootstrap/fallback-only. A real isolated topology integration test now validates blocked Controller-to-Exit access, working Controller-to-Iran and Iran-to-Exit paths, installer execution, saved-key fallback, staged errors, host-key pinning, and cleanup."
   }
 }
