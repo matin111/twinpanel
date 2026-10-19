@@ -1,0 +1,113 @@
+name: TwinPanel Exit Bootstrap V73 Failure Cleanup Integration
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/native_exit_bootstrap_v73.py'
+      - 'backend/app/node_bootstrap_control_v73.py'
+      - 'backend/app/routers/__init__.py'
+      - 'backend/tests/integration/test_exit_bootstrap_failure_cleanup_v73.py'
+      - 'backend/tests/integration/v72/Dockerfile.ssh-node'
+      - '.github/workflows/exit-bootstrap-failure-cleanup-v73-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile v73 hardening modules
+        run: |
+          python3 -m py_compile backend/app/native_exit_bootstrap_v73.py
+          python3 -m py_compile backend/app/node_bootstrap_control_v73.py
+          python3 -m py_compile backend/tests/integration/test_exit_bootstrap_failure_cleanup_v73.py
+
+      - name: Verify v73 is lifecycle hardening only
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          control = Path('backend/app/node_bootstrap_control_v73.py').read_text(encoding='utf-8')
+          native = Path('backend/app/native_exit_bootstrap_v73.py').read_text(encoding='utf-8')
+          routers = Path('backend/app/routers/__init__.py').read_text(encoding='utf-8')
+
+          if 'node_bootstrap_control_v73' not in routers:
+              raise SystemExit('v73 runtime import missing')
+          if routers.index('node_bootstrap_control_v72') > routers.index('node_bootstrap_control_v73'):
+              raise SystemExit('v73 must load after v72')
+          if 'provision.ssh_connect =' in control or 'provision.ssh_connect_saved =' in control:
+              raise SystemExit('v73 must not add another bootstrap route')
+          for forbidden in ('proxy_command=', 'tunnel=', 'iptables ', 'ip route ', 'wg set ', 'xray'):
+              if forbidden in native:
+                  raise SystemExit(f'v73 must not add data-plane/proxy dependency: {forbidden}')
+          if '_cleanup_failed_open' not in native:
+              raise SystemExit('v73 failed-open cleanup missing')
+
+          print('V73_LIFECYCLE_ONLY_GUARD=PASS')
+          PY
+
+      - name: Build disposable SSH node image
+        run: |
+          docker build \
+            -f backend/tests/integration/v72/Dockerfile.ssh-node \
+            -t twinpanel-v73-ssh-test:ci \
+            .
+
+      - name: Create isolated controller Iran Exit topology
+        run: |
+          set -euo pipefail
+          docker network create --driver bridge --subnet 172.29.71.0/24 tp-v73-control
+          docker network create --driver bridge --internal --subnet 172.29.72.0/24 tp-v73-exit
+
+          docker run -d \
+            --name tp-v73-iran \
+            --hostname iran-v73 \
+            --network tp-v73-control \
+            --ip 172.29.71.10 \
+            twinpanel-v73-ssh-test:ci
+
+          docker network connect --ip 172.29.72.10 tp-v73-exit tp-v73-iran
+
+          docker run -d \
+            --name tp-v73-exit \
+            --hostname exit-v73 \
+            --network tp-v73-exit \
+            --ip 172.29.72.20 \
+            twinpanel-v73-ssh-test:ci
+
+          for n in $(seq 1 30); do
+            docker exec tp-v73-iran nc -z -w 1 127.0.0.1 22 \
+              && docker exec tp-v73-exit nc -z -w 1 127.0.0.1 22 \
+              && break
+            [ "$n" -eq 30 ] && exit 1
+            sleep 1
+          done
+
+      - name: Run failed-open cleanup integration
+        run: |
+          docker run --rm \
+            --network tp-v73-control \
+            -v "$GITHUB_WORKSPACE:/workspace:ro" \
+            -w /workspace \
+            python:3.12-slim \
+            bash -lc \
+            'pip install -q asyncssh==2.21.0 && python backend/tests/integration/test_exit_bootstrap_failure_cleanup_v73.py'
+
+      - name: Dump node logs on failure
+        if: failure()
+        run: |
+          docker logs tp-v73-iran 2>&1 || true
+          docker logs tp-v73-exit 2>&1 || true
+          docker inspect tp-v73-control tp-v73-exit || true
+
+      - name: Cleanup topology
+        if: always()
+        run: |
+          docker rm -f tp-v73-iran tp-v73-exit >/dev/null 2>&1 || true
+          docker network rm tp-v73-control tp-v73-exit >/dev/null 2>&1 || true
