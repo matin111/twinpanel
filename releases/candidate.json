@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.53",
-  "source_sha": "2991c92e9b48b86dd8bb1d0cc3204434f6764927",
+  "version": "1.1.0-rc.54",
+  "source_sha": "9ca528457f807218abea6f7ea2be7e0151fad2ad",
   "notes": {
-    "fa": "نسخه 1.1.0-rc.53 نمایش وضعیت زنده اتصال را تکمیل می‌کند. در صفحه عمومی Connect، پروتکل یا پروتکل‌های واقعاً متصل با کادر و Glow سبز مشخص می‌شوند و وضعیت بدون Refresh صفحه به‌روزرسانی می‌شود. در بخش اشتراک‌های مدیریت نیز برای هر اشتراک وضعیت آنلاین/آفلاین و پروتکل فعال نمایش داده می‌شود. منطق تانل، MTU/MSS نسخه rc.52، Quota، Enforcement و انتخاب Transport بدون تغییر باقی می‌مانند.",
-    "en": "TwinPanel 1.1.0-rc.53 completes live connection visibility. On the public Connect page, the protocol or protocols that are actually live are highlighted with a green border/glow and update without a page refresh. The admin subscriptions page now shows online/offline state for each subscription together with the detected live protocol. rc.52 tunnel dataplane, MTU/MSS behavior, quota accounting, enforcement and transport election remain unchanged."
+    "fa": "نسخه 1.1.0-rc.54 مشکل Restart Storm سرویس Transport Manager را اصلاح می‌کند. در rc.52/rc.53، هر Import مجدد API می‌توانست سرویس twinpanel-transport-manager را دوباره Restart کند؛ در نتیجه Manager هر چند ثانیه متوقف می‌شد و Workerهای V46/V51 فرصت اجرای NAT/FORWARD و همگرایی MTU/MSS را پیدا نمی‌کردند. V54 فعال‌سازی Manager را idempotent می‌کند: اگر Process فعلی از همان Release فعال اجرا شود هیچ Restartی انجام نمی‌شود، اگر Release واقعاً عوض شده باشد فقط یک Restart کنترل‌شده انجام می‌شود، و API workerهای همزمان با lock بین‌پردازشی سریال می‌شوند. GRE/Unified L3، Xray/V2Ray، اطلاعات اتصال، Quota و سیاست انتخاب Transport در این نسخه تغییر نکرده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.54 fixes a Transport Manager restart storm. In rc.52/rc.53, repeated API imports could restart twinpanel-transport-manager again and again, preventing V46/V51 workers from staying alive long enough to reconcile NAT/FORWARD and MTU/MSS state. V54 makes manager activation idempotent: a process already running from the active release is left untouched, a genuinely stale-release process receives only one controlled restart, and concurrent API workers are serialized with a cross-process lock. GRE/Unified L3, Xray/V2Ray, connection credentials, quota, and transport-selection policy are unchanged."
   }
 }
