@@ -11,14 +11,15 @@ from .. import ssh_management_fallback_v61 as _ssh_management_fallback_v61  # no
 # compatibility base for existing installations.
 from .. import node_bootstrap_control_v64 as _node_bootstrap_control_v64  # noqa: F401
 
-# V66/V70 add authenticated Iran bootstrap and first-install fallback.
+# V66/V70 keep the direct-outbound Agent preference and legacy compatibility
+# bases used by the current control plane.
 from .. import node_bootstrap_control_v66 as _node_bootstrap_control_v66  # noqa: F401
 
-# V71 replaces the Iran direct-tcpip fallback with an exec-stream TCP relay.
-# This only needs normal SSH command execution on Iran plus Iran -> Exit TCP
-# reachability, so sshd AllowTcpForwarding/direct-tcpip policy cannot block
-# first-time Exit provisioning or existing Exit management fallback.
-from .. import node_bootstrap_control_v71 as _node_bootstrap_control_v71  # noqa: F401
+# V72 replaces V71's nested AsyncSSH proxy stream completely. When direct
+# Controller -> Exit SSH is unavailable, one authenticated Iran management
+# session launches native OpenSSH on Iran and executes Exit installer commands
+# through a bounded ControlMaster. Iran is bootstrap/fallback only.
+from .. import node_bootstrap_control_v72 as _node_bootstrap_control_v72  # noqa: F401
 
 # Register guarded DELETE routes before app.main includes nodes/tunnels.
 from . import destructive_safety as _destructive_safety  # noqa: F401
