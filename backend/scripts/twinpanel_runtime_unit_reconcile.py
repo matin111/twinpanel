@@ -21,6 +21,9 @@ DEFAULT_API_UNIT_BACKUP = Path(
 DEFAULT_STATE_FILE = Path(
     "/var/lib/twinpanel-license/runtime-unit-reconcile.json"
 )
+DEFAULT_UPDATE_STATE_FILE = Path(
+    "/var/lib/twinpanel-license/update-state.json"
+)
 DEFAULT_SYSTEMCTL = "/usr/bin/systemctl"
 INFLIGHT_RESTART_GRACE_SECONDS = 12.0
 
@@ -206,6 +209,28 @@ def wait_for_api_process_match(
     )
 
 
+def _update_activation_in_progress(
+    release_root: Path,
+    state_path: Path = DEFAULT_UPDATE_STATE_FILE,
+) -> bool:
+    try:
+        payload = json.loads(state_path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    if not isinstance(payload, dict):
+        return False
+    if str(payload.get("state") or "").strip().lower() != "restarting":
+        return False
+    try:
+        active_version = (release_root / "VERSION").read_text(
+            encoding="utf-8"
+        ).strip()
+    except OSError:
+        return False
+    target_version = str(payload.get("target_version") or "").strip()
+    return bool(active_version and target_version == active_version)
+
+
 def reconcile_api_unit(
     *,
     release_root: Path,
@@ -215,6 +240,7 @@ def reconcile_api_unit(
     restart: bool = False,
     verify: bool = False,
     systemctl: str | None = None,
+    update_state_path: Path = DEFAULT_UPDATE_STATE_FILE,
 ) -> dict[str, object]:
     release_root = release_root.resolve(strict=True)
     expected = render_api_unit(release_root, api_port)
@@ -250,20 +276,26 @@ def reconcile_api_unit(
             systemctl=ctl,
         )
 
+    updater_activation = _update_activation_in_progress(
+        release_root,
+        state_path=update_state_path,
+    )
     restarted = False
     reused_inflight_restart = False
+    blocking_restart = False
     if restart and not process_matches:
-        # If the unit itself changed, any API restart that was queued before
-        # daemon-reload cannot be trusted to converge onto the new canonical
-        # runtime. Waiting for that stale transaction wastes the updater's
-        # health window and is exactly how migrated/legacy installs can end up
-        # with POST_UPDATE_HEALTH_VERSION_FAILED:api,web. In that case dispatch
-        # one recovery restart immediately from the freshly loaded unit.
+        # During an actual release activation the public updater has already
+        # switched /opt/twinpanel/current and queued API/Web restarts together.
+        # Waiting for that shared transaction on a canonical unit can consume a
+        # large part of the updater's fixed post-switch health window and was
+        # still able to reproduce POST_UPDATE_HEALTH_VERSION_FAILED:api,web on
+        # rc.64 -> rc.65. In that exact activation state, converge the API
+        # deterministically now instead of spending the normal in-flight grace.
         #
-        # If the unit was already canonical, the updater may simply have an API
-        # restart in flight. Reuse that restart first and only dispatch one
-        # recovery restart when the bounded grace really expires.
-        if not changed:
+        # Outside updater activation, preserve the bounded in-flight reuse path
+        # for ordinary Web/service restarts. A changed legacy unit also skips
+        # the grace because any previously queued restart used stale unit data.
+        if not changed and not updater_activation:
             try:
                 pid, cwd = wait_for_api_process_match(
                     active_root=release_root,
@@ -276,8 +308,14 @@ def reconcile_api_unit(
                 pass
 
         if not process_matches:
+            # Use a blocking restart for recovery. The old --no-block path could
+            # return while the API job was still queued behind the updater's
+            # original transaction, after which Web ExecStartPre spent its
+            # verification window observing the old runtime. Blocking here is
+            # bounded and guarantees that the recovery job has completed before
+            # runtime-path verification begins.
             result = _run(
-                [ctl, "--no-block", "restart", "twinpanel-api.service"],
+                [ctl, "restart", "twinpanel-api.service"],
                 timeout=20,
             )
             if result.returncode != 0:
@@ -286,12 +324,13 @@ def reconcile_api_unit(
                     + (result.stdout or "")[-500:].replace("\n", " ")
                 )
             restarted = True
+            blocking_restart = True
 
     if verify:
         pid, cwd = wait_for_api_process_match(
             active_root=release_root,
             systemctl=ctl,
-            seconds=30,
+            seconds=20 if blocking_restart else 30,
         )
         process_matches = True
 
@@ -302,7 +341,9 @@ def reconcile_api_unit(
         "api_port": int(api_port),
         "unit_path": str(unit_path),
         "unit_changed": changed,
+        "updater_activation": updater_activation,
         "api_restarted": restarted,
+        "api_restart_blocking": blocking_restart,
         "api_reused_inflight_restart": reused_inflight_restart,
         "api_process_matches_active_release": process_matches,
         "api_pid": pid,

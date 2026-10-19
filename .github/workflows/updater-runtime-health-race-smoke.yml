@@ -25,6 +25,7 @@ jobs:
           from pathlib import Path
           from types import SimpleNamespace
           import importlib.util
+          import json
           import shutil
           import tempfile
 
@@ -36,12 +37,14 @@ jobs:
 
           assert module.INFLIGHT_RESTART_GRACE_SECONDS >= 8.0
 
-          def make_release(root: Path) -> Path:
+          def make_release(root: Path, version: str | None = None) -> Path:
               release = root / 'release'
               (release / 'backend').mkdir(parents=True)
               target = release / 'deploy/systemd/twinpanel-api.service.tpl'
               target.parent.mkdir(parents=True)
               shutil.copyfile('deploy/systemd/twinpanel-api.service.tpl', target)
+              if version is not None:
+                  (release / 'VERSION').write_text(version + '\n', encoding='utf-8')
               return release
 
           def canonical_unit(release: Path) -> str:
@@ -53,9 +56,9 @@ jobs:
                   return SimpleNamespace(returncode=0, stdout='')
               return fake
 
-          # Scenario 1: the unit is already canonical and the updater already
-          # queued an API restart. Reuse that in-flight restart and do not add
-          # a second restart transaction.
+          # Scenario 1: the unit is already canonical and an ordinary service
+          # restart has an API restart in flight. Reuse it outside updater
+          # activation and do not add a second restart transaction.
           with tempfile.TemporaryDirectory() as td:
               root = Path(td)
               release = make_release(root)
@@ -80,6 +83,7 @@ jobs:
                   restart=True,
                   verify=True,
                   systemctl='/fake/systemctl',
+                  update_state_path=root / 'missing-update-state.json',
               )
 
               restart_calls = [
@@ -89,14 +93,14 @@ jobs:
               assert restart_calls == [], restart_calls
               assert waits['count'] == 2, waits
               assert result['unit_changed'] is False
+              assert result['updater_activation'] is False
               assert result['api_reused_inflight_restart'] is True
               assert result['api_restarted'] is False
               assert result['api_process_matches_active_release'] is True
 
           # Scenario 2: a migrated/legacy API unit must be rewritten and then
-          # restarted immediately. Waiting through the in-flight grace here is
-          # harmful because the already queued restart may still use the stale
-          # unit definition and consume most of the updater's health window.
+          # restarted immediately. Recovery is blocking so verification cannot
+          # race a merely queued restart job.
           with tempfile.TemporaryDirectory() as td:
               root = Path(td)
               release = make_release(root)
@@ -121,6 +125,7 @@ jobs:
                   restart=True,
                   verify=True,
                   systemctl='/fake/systemctl',
+                  update_state_path=root / 'missing-update-state.json',
               )
 
               restart_calls = [
@@ -128,15 +133,19 @@ jobs:
                   if 'restart' in c and 'twinpanel-api.service' in c
               ]
               assert len(restart_calls) == 1, restart_calls
+              assert '--no-block' not in restart_calls[0], restart_calls
               assert waits['count'] == 1, waits
               assert result['unit_changed'] is True
+              assert result['updater_activation'] is False
               assert result['api_reused_inflight_restart'] is False
               assert result['api_restarted'] is True
+              assert result['api_restart_blocking'] is True
               assert result['api_process_matches_active_release'] is True
               assert any('daemon-reload' in c for c in calls)
 
-          # Scenario 3: a canonical unit whose in-flight restart genuinely does
-          # not converge gets exactly one bounded recovery restart.
+          # Scenario 3: a canonical unit outside updater activation whose
+          # in-flight restart genuinely does not converge gets exactly one
+          # bounded blocking recovery restart.
           with tempfile.TemporaryDirectory() as td:
               root = Path(td)
               release = make_release(root)
@@ -163,6 +172,7 @@ jobs:
                   restart=True,
                   verify=True,
                   systemctl='/fake/systemctl',
+                  update_state_path=root / 'missing-update-state.json',
               )
 
               restart_calls = [
@@ -170,10 +180,65 @@ jobs:
                   if 'restart' in c and 'twinpanel-api.service' in c
               ]
               assert len(restart_calls) == 1, restart_calls
+              assert '--no-block' not in restart_calls[0], restart_calls
               assert waits['count'] == 2, waits
               assert result['unit_changed'] is False
+              assert result['updater_activation'] is False
               assert result['api_reused_inflight_restart'] is False
               assert result['api_restarted'] is True
+              assert result['api_restart_blocking'] is True
+              assert result['api_process_matches_active_release'] is True
+
+          # Scenario 4: this is the production rc.64 -> rc.65 failure shape.
+          # The API unit is already canonical, but the public updater is in its
+          # post-switch restarting phase and the old API process is still live.
+          # Do not spend the 12-second reuse grace here: issue one blocking
+          # recovery restart immediately, then verify the target runtime.
+          with tempfile.TemporaryDirectory() as td:
+              root = Path(td)
+              version = '1.1.0-rc.66-test'
+              release = make_release(root, version=version)
+              unit = root / 'twinpanel-api.service'
+              unit.write_text(canonical_unit(release), encoding='utf-8')
+              backup = root / 'api.backup'
+              update_state = root / 'update-state.json'
+              update_state.write_text(
+                  json.dumps({'state': 'restarting', 'target_version': version}),
+                  encoding='utf-8',
+              )
+              calls = []
+              module._run = ok_run(calls)
+              module.api_process_matches_active_release = lambda **_: (False, 100, '/old/backend')
+              waits = {'count': 0}
+
+              def wait_activation(**kwargs):
+                  waits['count'] += 1
+                  return 7272, str((release / 'backend').resolve())
+
+              module.wait_for_api_process_match = wait_activation
+              result = module.reconcile_api_unit(
+                  release_root=release,
+                  api_port=8095,
+                  unit_path=unit,
+                  backup_path=backup,
+                  restart=True,
+                  verify=True,
+                  systemctl='/fake/systemctl',
+                  update_state_path=update_state,
+              )
+
+              restart_calls = [
+                  c for c in calls
+                  if 'restart' in c and 'twinpanel-api.service' in c
+              ]
+              assert len(restart_calls) == 1, restart_calls
+              assert '--no-block' not in restart_calls[0], restart_calls
+              assert waits['count'] == 1, waits
+              assert result['unit_changed'] is False
+              assert result['updater_activation'] is True
+              assert result['api_reused_inflight_restart'] is False
+              assert result['api_restarted'] is True
+              assert result['api_restart_blocking'] is True
               assert result['api_process_matches_active_release'] is True
 
           print('UPDATER_RUNTIME_HEALTH_RACE_SMOKE_OK')
