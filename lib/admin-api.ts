@@ -155,6 +155,21 @@ export const adminApi={
       return await request<RuntimeRow>(`/v1/nodes/${id}`,{method:"DELETE"});
     }catch(error){
       const message=error instanceof Error?error.message:String(error);
+
+      // TWINPANEL_OFFLINE_NODE_FORCE_RETIRE_CONFIRM_V1
+      // The destructive-safety preflight intentionally returns 424 before
+      // mutating desired-state when an SSH cleanup target is unreachable.
+      // An explicit second confirmation lets the admin choose the existing
+      // force-retire control-plane path without silently skipping cleanup.
+      const unreachablePreflight=/(حذف شروع نشد|دسترسی SSH یکی از نودهای لازم|api error 424)/i.test(message);
+      if(unreachablePreflight){
+        const confirmed=globalThis.confirm(
+          "دسترسی SSH نود برقرار نیست و پاک‌سازی Runtime روی سرور انجام نمی‌شود. نود فقط از پنل حذف شود؟"
+        );
+        if(!confirmed)throw error;
+        return request<RuntimeRow>(`/v1/nodes/${id}/force-retire`,{method:"POST"});
+      }
+
       if(!/(پاک.?سازی|runtime|حذف را دوباره|api error 409|api error 500)/i.test(message))throw error;
       return request<RuntimeRow>(`/v1/nodes/${id}/force-retire`,{method:"POST"});
     }
