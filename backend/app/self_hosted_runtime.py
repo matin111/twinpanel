@@ -112,12 +112,24 @@ async def _self_hosted_install_or_upgrade_agent(
     )
 
 
-def apply_self_hosted_runtime() -> None:
+def apply_self_hosted_runtime(
+    *,
+    manage_transport_service: bool = True,
+) -> None:
     # ------------------------------------------------------------
     # Smart Auto V12 production activation
     # ------------------------------------------------------------
+    # TWINPANEL_TRANSPORT_MANAGER_SELF_RESTART_GUARD_V56
+    #
+    # The API/controller owns the systemd lifecycle of the standalone
+    # transport manager. The manager process itself also needs all of the
+    # self-hosted tunnel/runtime hooks below, but it must never attempt to
+    # start/restart its own systemd unit while those hooks are being installed.
+    # Otherwise startup can recursively stop the process before V46/V51 reach
+    # their reconciliation loops.
 
-    ensure_transport_manager_service_v12()
+    if manage_transport_service:
+        ensure_transport_manager_service_v12()
 
     # ------------------------------------------------------------
     # Node Agent
