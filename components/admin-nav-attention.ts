@@ -104,13 +104,16 @@ export function useAdminNavAttention(_active:string){
       }catch{}
     };
 
-    const refreshRelease=async()=>{
+    const applyRelease=async(path:string,init:RequestInit={})=>{
       try{
-        const release=await request<ReleaseStatus>("/v1/admin/system/release/status");
+        const release=await request<ReleaseStatus>(path,init);
         if(!alive)return;
         setState(current=>({...current,updateAvailable:Boolean(release.update_available)}));
       }catch{}
     };
+
+    const refreshRelease=()=>applyRelease("/v1/admin/system/release/status");
+    const checkRelease=()=>applyRelease("/v1/admin/system/release/check",{method:"POST"});
 
     const refreshVisible=()=>{
       if(document.visibilityState!=="visible")return;
@@ -121,6 +124,7 @@ export function useAdminNavAttention(_active:string){
     };
 
     refreshVisible();
+    void checkRelease();
 
     const fastTimer=window.setInterval(()=>{
       if(document.visibilityState!=="visible")return;
@@ -133,8 +137,12 @@ export function useAdminNavAttention(_active:string){
       void refreshNotifications();
     },10000);
 
-    const releaseTimer=window.setInterval(()=>{
+    const releaseStatusTimer=window.setInterval(()=>{
       if(document.visibilityState==="visible")void refreshRelease();
+    },5000);
+
+    const releaseCheckTimer=window.setInterval(()=>{
+      if(document.visibilityState==="visible")void checkRelease();
     },300000);
 
     window.addEventListener("focus",refreshVisible);
@@ -144,7 +152,8 @@ export function useAdminNavAttention(_active:string){
       alive=false;
       window.clearInterval(fastTimer);
       window.clearInterval(workTimer);
-      window.clearInterval(releaseTimer);
+      window.clearInterval(releaseStatusTimer);
+      window.clearInterval(releaseCheckTimer);
       window.removeEventListener("focus",refreshVisible);
       document.removeEventListener("visibilitychange",refreshVisible);
     };
