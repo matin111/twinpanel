@@ -29,31 +29,20 @@ async function request<T>(path:string):Promise<T>{
   return response.json() as Promise<T>;
 }
 
-function normalizeRoute(raw:unknown):string|null{
-  const value=String(raw||"").trim();
-  if(!value)return null;
-  if(value==="/reseller"||value.startsWith("/reseller/"))return value;
-  const clean=value.replace(/^\/+/,"").replace(/^reseller\//,"");
-  return clean?`/reseller/${clean}`:null;
-}
-
-function unreadNotificationRows(payload:NotificationPayload):Row[]{
-  if(!Array.isArray(payload.items))return [];
-  return payload.items.filter((value):value is Row=>{
+function unreadNotificationCount(payload:NotificationPayload):number{
+  if(Number.isFinite(Number(payload.unread_count))){
+    return Math.max(0,Number(payload.unread_count)||0);
+  }
+  if(!Array.isArray(payload.items))return 0;
+  return payload.items.filter(value=>{
     if(!value||typeof value!=="object")return false;
     const row=value as Row;
     return !Boolean(row.is_read)&&!row.read_at;
-  });
+  }).length;
 }
 
-function addCount(target:Record<string,number>,route:string,count=1){
-  if(count<=0)return;
-  target[route]=(target[route]||0)+count;
-}
-
-function ensureCount(target:Record<string,number>,route:string,count=1){
-  if(count<=0)return;
-  target[route]=Math.max(target[route]||0,count);
+function setCount(target:Record<string,number>,route:string,count:number){
+  if(count>0)target[route]=count;
 }
 
 export function useResellerNavAttention(enabled:boolean){
@@ -76,34 +65,25 @@ export function useResellerNavAttention(enabled:boolean){
       if(!alive)return;
 
       const routeCounts:Record<string,number>={};
-      let unreadCount=0;
 
       const topups=results[0].status==="fulfilled"&&Array.isArray(results[0].value)?results[0].value:[];
-      addCount(
+      setCount(
         routeCounts,
         "/reseller/bot-wallet",
         topups.filter(row=>String(row.status||"").toLowerCase()==="awaiting_review").length,
       );
 
       const orders=results[1].status==="fulfilled"&&Array.isArray(results[1].value)?results[1].value:[];
-      addCount(
+      setCount(
         routeCounts,
         "/reseller/orders",
         orders.filter(row=>ACTIONABLE_ORDER_STATUSES.has(String(row.status||"").toLowerCase())).length,
       );
 
-      if(results[2].status==="fulfilled"){
-        const payload=results[2].value||{};
-        const unreadRows=unreadNotificationRows(payload);
-        unreadCount=Number.isFinite(Number(payload.unread_count))
-          ?Math.max(0,Number(payload.unread_count)||0)
-          :unreadRows.length;
-        for(const row of unreadRows){
-          const route=normalizeRoute(row.route);
-          if(route)ensureCount(routeCounts,route);
-        }
-        ensureCount(routeCounts,"/reseller/notifications",unreadCount);
-      }
+      const unreadCount=results[2].status==="fulfilled"
+        ?unreadNotificationCount(results[2].value||{})
+        :0;
+      setCount(routeCounts,"/reseller/notifications",unreadCount);
 
       setState({routeCounts,unreadCount});
     };
