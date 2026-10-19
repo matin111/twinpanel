@@ -39,7 +39,7 @@ class TunnelSnapshot:
     latency_ms: float | None
 
 
-def _error_text(exc: BaseException) -> str:
+def _error_text(exc: Exception) -> str:
     detail = getattr(exc, "detail", None)
     if detail:
         return str(detail)
@@ -63,14 +63,14 @@ async def _probe_saved_ssh(node: Node, db: Session) -> tuple[int, str | None]:
         return int(node.id), None
     except asyncio.TimeoutError:
         return int(node.id), f"مهلت اتصال SSH تمام شد ({SSH_PREFLIGHT_SECONDS:g}s)"
-    except BaseException as exc:
+    except Exception as exc:
         return int(node.id), _error_text(exc)
     finally:
         if conn is not None:
             try:
                 conn.close()
                 await asyncio.wait_for(conn.wait_closed(), timeout=2.0)
-            except BaseException:
+            except Exception:
                 pass
 
 
@@ -244,7 +244,7 @@ async def safe_delete_node(
 
     try:
         return await nodes_module.delete_node(int(node_id), db)
-    except BaseException:
+    except Exception:
         _restore_tunnels(snapshots, db)
         raise
 
@@ -276,7 +276,7 @@ async def safe_delete_tunnel(
 
     try:
         return await tunnels_module.delete_tunnel(int(tunnel_id), db)
-    except BaseException:
+    except Exception:
         _restore_tunnels(snapshots, db)
         raise
 
