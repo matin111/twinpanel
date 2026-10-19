@@ -16,6 +16,12 @@ const protocolLabel=(value:string)=>({
   v2ray:"Xray",
 } as Record<string,string>)[String(value||"").toLowerCase()]||value;
 
+function rowSubscriptionId(row:HTMLTableRowElement){
+  const planText=row.cells?.[1]?.textContent||row.textContent||"";
+  const match=planText.match(/\bMV-(\d+)\b/i);
+  return match?Number(match[1]):0;
+}
+
 export function AdminSubscriptionLiveTable(){
   useEffect(()=>{
     if(typeof window==="undefined"||window.location.pathname!=="/admin/subscriptions")return;
@@ -23,10 +29,11 @@ export function AdminSubscriptionLiveTable(){
     let disposed=false;
     let timer:number|undefined;
     let observer:MutationObserver|undefined;
+    let loaded=false;
     const states=new Map<number,LiveItem>();
 
     const decorate=()=>{
-      const table=document.querySelector<HTMLTableElement>(".admin-runtime-list .table table");
+      const table=document.querySelector<HTMLTableElement>(".legacy-subscriptions-page .table table");
       if(!table)return;
 
       const headRow=table.tHead?.rows?.[0];
@@ -38,8 +45,7 @@ export function AdminSubscriptionLiveTable(){
       }
 
       for(const row of Array.from(table.tBodies?.[0]?.rows||[])){
-        const idText=row.cells?.[0]?.textContent?.trim()||"";
-        const id=Number(idText.replace(/[^0-9]/g,""));
+        const id=rowSubscriptionId(row);
         if(!Number.isFinite(id)||id<=0)continue;
 
         let cell=row.querySelector<HTMLTableCellElement>("td[data-live-sub-cell]");
@@ -52,7 +58,33 @@ export function AdminSubscriptionLiveTable(){
         const state=states.get(id);
         const online=Boolean(state?.online);
         const protocols=(state?.protocols||[]).map(protocolLabel).filter(Boolean);
-        cell.innerHTML=`<span class="badge ${online?"ok":"bad"}">${online?"آنلاین":"آفلاین"}</span>${online&&protocols.length?`<small style="display:block;margin-top:5px;opacity:.72" dir="ltr">${protocols.join(" · ")}</small>`:""}`;
+        const signature=loaded?`${online?"1":"0"}:${protocols.join(",")}`:"loading";
+        if(cell.dataset.liveSignature===signature)continue;
+        cell.dataset.liveSignature=signature;
+        cell.replaceChildren();
+
+        if(!loaded){
+          const pending=document.createElement("span");
+          pending.className="badge violet";
+          pending.textContent=document.documentElement.lang==="en"?"Checking…":"در حال بررسی…";
+          cell.appendChild(pending);
+          continue;
+        }
+
+        const badge=document.createElement("span");
+        badge.className=`badge ${online?"ok":"bad"}`;
+        badge.textContent=document.documentElement.lang==="en"?(online?"Online":"Offline"):(online?"آنلاین":"آفلاین");
+        cell.appendChild(badge);
+
+        if(online&&protocols.length){
+          const detail=document.createElement("small");
+          detail.style.display="block";
+          detail.style.marginTop="5px";
+          detail.style.opacity=".72";
+          detail.dir="ltr";
+          detail.textContent=protocols.join(" · ");
+          cell.appendChild(detail);
+        }
       }
     };
 
@@ -68,10 +100,12 @@ export function AdminSubscriptionLiveTable(){
         const payload=await response.json() as LivePayload;
         states.clear();
         for(const item of payload.items||[])states.set(Number(item.subscription_id),item);
+        loaded=true;
         decorate();
       }catch{}
     };
 
+    decorate();
     observer=new MutationObserver(decorate);
     observer.observe(document.body,{childList:true,subtree:true});
     void refresh();

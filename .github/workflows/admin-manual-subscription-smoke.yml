@@ -9,6 +9,7 @@ on:
       - 'backend/app/schemas.py'
       - 'components/admin-manual-subscription-create.tsx'
       - 'components/legacy-subscriptions-exact.tsx'
+      - 'components/admin-subscription-live-table.tsx'
       - 'components/routed-page-client.tsx'
       - 'lib/admin-api.ts'
       - '.github/workflows/admin-manual-subscription-smoke.yml'
@@ -207,7 +208,10 @@ jobs:
 
           assert 'plan_id?:number|null' in api
           assert 'AdminManualSubscriptionCreate=dynamic' in routed
-          assert 'admin(<><LegacySubscriptionsRuntimePage/><AdminManualSubscriptionCreate/></>)' in routed
+          assert 'if(key==="admin/subscriptions") return admin(' in routed
+          assert 'LegacySubscriptionsRuntimePage' in routed
+          assert 'AdminSubscriptionLiveTable' in routed
+          assert 'AdminManualSubscriptionCreate' in routed
           assert 'onClick={openCreate}' in subscriptions
           assert 'اشتراک جدید' in subscriptions
           assert 'adminApi.createSubscriptionV2' in subscriptions
