@@ -11,6 +11,7 @@ on:
       - 'components/tunnels-simple-runtime.tsx'
       - 'components/tunnels-unified-runtime-v39.tsx'
       - 'components/legacy-subscriptions-exact.tsx'
+      - 'components/admin-subscription-live-table.tsx'
       - 'lib/admin-parity-api.ts'
       - 'lib/legacy-control-api.ts'
       - 'lib/admin-api.ts'
@@ -43,7 +44,9 @@ jobs:
           assert 'if(key==="admin/network") return admin(<LegacyNodesRuntimePage/>);' in routed
           assert 'NodeXrayDomainRuntimeV33' not in routed
           assert 'if(key==="admin/tunnels") return admin(<TunnelsSimpleRuntimePage/>);' in routed
-          assert 'if(key==="admin/subscriptions") return admin(<><LegacySubscriptionsRuntimePage/><AdminManualSubscriptionCreate/></>);' in routed
+          assert 'if(key==="admin/subscriptions") return admin(' in routed
+          assert 'LegacySubscriptionsRuntimePage' in routed
+          assert 'AdminSubscriptionLiveTable' in routed
           assert 'AdminManualSubscriptionCreate' in routed
 
           assert 'parityApi.provisionInstall(installPayload)' in provision
