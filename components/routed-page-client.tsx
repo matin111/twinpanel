@@ -23,6 +23,7 @@ const NotificationsRuntimePage=dynamic(()=>import("./admin-ops-runtime").then(m=
 const SystemHealthRuntimePage=dynamic(()=>import("./system-health-runtime").then(m=>m.SystemHealthRuntimePage));
 const SubscriptionToolsRuntimePage=dynamic(()=>import("./subscription-tools-runtime").then(m=>m.SubscriptionToolsRuntimePage));
 const LegacySubscriptionsRuntimePage=dynamic(()=>import("./legacy-subscriptions-exact").then(m=>m.LegacySubscriptionsRuntimePage));
+const AdminSubscriptionLiveTable=dynamic(()=>import("./admin-subscription-live-table").then(m=>m.AdminSubscriptionLiveTable));
 const AdminManualSubscriptionCreate=dynamic(()=>import("./admin-manual-subscription-create").then(m=>m.AdminManualSubscriptionCreate));
 const AdminUsersRuntime=dynamic(()=>import("./admin-users-runtime").then(m=>m.AdminUsersRuntime));
 const LegacyNodesRuntimePage=dynamic(()=>import("./legacy-nodes-exact").then(m=>m.LegacyNodesRuntimePage));
@@ -85,7 +86,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="register") return <RegisterPage2027/>;
   if(key==="admin") return admin(<AdminDashboardRuntime/>);
   if(key==="admin/users") return admin(<AdminUsersRuntime/>);
-  if(key==="admin/subscriptions") return admin(<><LegacySubscriptionsRuntimePage/><AdminManualSubscriptionCreate/></>);
+  if(key==="admin/subscriptions") return admin(<><LegacySubscriptionsRuntimePage/><AdminSubscriptionLiveTable/><AdminManualSubscriptionCreate/></>);
   if(key==="admin/subscription-tools") return admin(<SubscriptionToolsRuntimePage/>);
   if(key==="admin/plans") return admin(<LegacyPlansRuntimePage/>);
   if(key==="admin/nodes") return admin(<LegacyNodesRuntimePage/>);
