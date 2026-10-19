@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse
@@ -10,7 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..quota_models import QuotaSession
+from ..quota_models import QuotaSession, QuotaUsageEvent
 from .account_delivery import _subscription_from_share_token, _usage_payload
 from .public_connection_v3 import public_connection_page_v3
 
@@ -18,10 +18,23 @@ from .public_connection_v3 import public_connection_page_v3
 router = APIRouter(prefix="/v1/connect", tags=["public-connection-live-v4"])
 
 
+# Xray StatsService does not expose an authoritative connection-open/close
+# stream in the same way ocserv does. Treat a user as live when real Xray
+# traffic has changed recently. The quota runtime polls every five seconds, so
+# a 30-second window is intentionally wider than one missed poll while still
+# expiring quickly after traffic stops.
+_XRAY_LIVE_ACTIVITY_SECONDS = 30
+
+
 def _iso_utc(value: datetime | None) -> str | None:
     if value is None:
         return None
     return value.isoformat() + "Z"
+
+
+def _latest(value_a: datetime | None, value_b: datetime | None) -> datetime | None:
+    values = [value for value in (value_a, value_b) if value is not None]
+    return max(values) if values else None
 
 
 @router.get("/{token}/live")
@@ -48,6 +61,25 @@ def public_connection_live(token: str, db: Session = Depends(get_db)):
         .scalar()
     )
 
+    # Cisco has authoritative active QuotaSession rows. Xray accounting uses
+    # cumulative StatsService counters and intentionally does not leave a fake
+    # permanent session open. A positive Xray traffic delta in the recent
+    # activity window is therefore the protocol-safe live signal for Xray.
+    xray_cutoff = datetime.utcnow() - timedelta(seconds=_XRAY_LIVE_ACTIVITY_SECONDS)
+    last_xray_activity = (
+        db.query(func.max(QuotaUsageEvent.reported_at))
+        .filter(
+            QuotaUsageEvent.subscription_id == sub.id,
+            QuotaUsageEvent.protocol == "xray",
+            QuotaUsageEvent.billable_bytes > 0,
+            QuotaUsageEvent.reported_at >= xray_cutoff,
+        )
+        .scalar()
+    )
+
+    connection_online = bool(active_sessions > 0 or last_xray_activity is not None)
+    last_connection_seen = _latest(last_session_seen, last_xray_activity)
+
     status = str(getattr(sub.status, "value", sub.status)).lower()
     return {
         **usage,
@@ -55,7 +87,8 @@ def public_connection_live(token: str, db: Session = Depends(get_db)):
         "starts_at": _iso_utc(getattr(sub, "starts_at", None)),
         "expires_at": _iso_utc(getattr(sub, "expires_at", None)),
         "active_sessions": active_sessions,
-        "last_session_seen_at": _iso_utc(last_session_seen),
+        "connection_online": connection_online,
+        "last_session_seen_at": _iso_utc(last_connection_seen),
     }
 
 
@@ -113,7 +146,7 @@ _LIVE_SCRIPT = r"""
     write(percent,u.unlimited?'∞':nf.format(pct)+'%');
     if(donut)donut.style.setProperty('--pct',String(pct));
 
-    const connected=Number(u.active_sessions||0)>0;
+    const connected=(u.connection_online===true)||Number(u.active_sessions||0)>0;
     if(traffic)traffic.dataset.connection=connected?'online':'idle';
     if(status){
       const active=String(u.subscription_status||'')==='active';
@@ -121,7 +154,7 @@ _LIVE_SCRIPT = r"""
       status.innerHTML='<i></i>'+(connected?'متصل':active?'اشتراک فعال':'غیرفعال');
     }
 
-    const signature=[u.used_bytes,u.remaining_bytes,u.starts_at,u.expires_at,u.active_sessions,u.subscription_status].join('|');
+    const signature=[u.used_bytes,u.remaining_bytes,u.starts_at,u.expires_at,u.active_sessions,u.connection_online,u.subscription_status].join('|');
     if(previous&&signature!==previous&&traffic)flash(traffic);
     previous=signature;
   }
