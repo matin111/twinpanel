@@ -1,0 +1,40 @@
+name: TwinPanel Tunnel Force Delete V68 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/destructive_safety.py'
+      - 'lib/admin-api.ts'
+      - '.github/workflows/tunnel-force-delete-v68-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify unreachable tunnel force-delete contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          backend = Path('backend/app/routers/destructive_safety.py').read_text(encoding='utf-8')
+          frontend = Path('lib/admin-api.ts').read_text(encoding='utf-8')
+
+          assert '@safe_tunnels_router.post(' in backend
+          assert '"/{tunnel_id}/force-delete"' in backend
+          assert 'force_remove_without_remote_cleanup' in backend
+          assert 'TunnelPeerState.tunnel_id == int(tunnel_id)' in backend
+          assert 'TunnelTransport.tunnel_id == int(tunnel_id)' in backend
+          assert 'db.delete(tunnel)' in backend
+          assert 'remote_cleanup_skipped' in backend
+
+          assert 'deleteTunnel:async' in frontend
+          assert '/v1/tunnels/${id}/force-delete' in frontend
+          assert 'api error 424' in frontend.lower()
+          assert 'globalThis.confirm' in frontend
+          assert 'تانل فقط از پنل و کنترل‌پلین حذف شود؟' in frontend
+
+          print('TUNNEL_FORCE_DELETE_V68_SMOKE=PASS')
+          PY

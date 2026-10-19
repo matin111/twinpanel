@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Iterable
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,7 +12,14 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..lifecycle_cleanup import related_tunnel_ids_for_node
-from ..models import Node, Tunnel, TunnelTransport
+from ..models import (
+    CleanupJob,
+    Node,
+    Tunnel,
+    TunnelPeerState,
+    TunnelStatus,
+    TunnelTransport,
+)
 from .provision import ssh_connect_saved
 from . import nodes as nodes_module
 from . import tunnels as tunnels_module
@@ -24,9 +32,10 @@ from . import tunnels as tunnels_module
 # the request could spend long enough retrying SSH to hit nginx's 504 timeout,
 # while the tunnel was already left inactive/offline.
 #
-# This shim is intentionally narrow: it overrides only the two DELETE routes,
-# performs a bounded SSH preflight before any mutation, and restores the tunnel
-# aggregate fields if the legacy cleanup raises after preflight.
+# Normal deletion therefore keeps a strict bounded SSH preflight before any
+# mutation. Explicit force-delete/force-retire paths are separate admin actions
+# for broken or permanently unreachable infrastructure and deliberately skip
+# remote runtime cleanup while removing control-plane desired state.
 
 SSH_PREFLIGHT_SECONDS = 14.0
 
@@ -95,8 +104,6 @@ async def _require_reachable_nodes(nodes: Iterable[Node], db: Session) -> None:
         failures.append(f"{_node_label(node)}: {error}")
 
     if failures:
-        # 424 is deliberate: admin-api's historical 409/500 force-retire
-        # fallback must NOT run when preflight blocks a destructive action.
         raise HTTPException(
             status_code=424,
             detail=(
@@ -203,6 +210,89 @@ def _restore_tunnels(snapshots: Iterable[TunnelSnapshot], db: Session) -> None:
         db.commit()
 
 
+def _clear_tunnel_runtime_cache(tunnel_id: int) -> None:
+    for name in (
+        "_tunnel_watchdog_failures",
+        "_tunnel_watchdog_last_repair",
+    ):
+        value = getattr(tunnels_module, name, None)
+        if isinstance(value, dict):
+            value.pop(int(tunnel_id), None)
+
+
+def _force_delete_tunnel_control_plane(tunnel_id: int, db: Session) -> dict:
+    """Remove a tunnel from desired state without contacting remote nodes.
+
+    This is intentionally separate from normal DELETE. It is only used after
+    explicit admin confirmation when one of the tunnel nodes is broken or
+    unreachable. Remote interfaces/services may remain on an unreachable host,
+    but the controller stops managing/rebuilding the deleted tunnel.
+    """
+
+    tunnel = db.get(Tunnel, int(tunnel_id))
+    if tunnel is None:
+        raise HTTPException(status_code=404, detail="تونل پیدا نشد")
+
+    iran_node_id = int(tunnel.iran_node_id)
+    exit_node_id = int(tunnel.exit_node_id)
+
+    cleanup_job = CleanupJob(
+        target_type="tunnel",
+        target_id=int(tunnel_id),
+        action="force_remove_without_remote_cleanup",
+        status="running",
+    )
+    db.add(cleanup_job)
+    db.flush()
+
+    try:
+        tunnel.is_active = False
+        tunnel.status = TunnelStatus.OFFLINE
+        tunnel.latency_ms = None
+        db.flush()
+
+        db.query(TunnelPeerState).filter(
+            TunnelPeerState.tunnel_id == int(tunnel_id)
+        ).delete(synchronize_session=False)
+
+        db.query(TunnelTransport).filter(
+            TunnelTransport.tunnel_id == int(tunnel_id)
+        ).delete(synchronize_session=False)
+
+        db.delete(tunnel)
+
+        cleanup_job.status = "completed"
+        cleanup_job.error = (
+            "Remote runtime cleanup was skipped by explicit admin force-delete"
+        )
+        cleanup_job.finished_at = datetime.utcnow()
+
+        db.commit()
+
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "حذف اجباری تانل از کنترل‌پلین کامل نشد. "
+                f"جزئیات: {str(exc)[:1200]}"
+            ),
+        ) from exc
+
+    _clear_tunnel_runtime_cache(int(tunnel_id))
+
+    return {
+        "ok": True,
+        "deleted_tunnel_id": int(tunnel_id),
+        "iran_node_id": iran_node_id,
+        "exit_node_id": exit_node_id,
+        "remote_cleanup_skipped": True,
+        "message": (
+            "تانل از پنل حذف شد؛ پاک‌سازی Runtime روی نود غیرقابل‌دسترسی رد شد"
+        ),
+    }
+
+
 safe_nodes_router = APIRouter(
     prefix="/v1/nodes",
     tags=["nodes"],
@@ -235,8 +325,6 @@ async def safe_delete_node(
     tunnel_ids = related_tunnel_ids_for_node(db, int(node_id))
     snapshots = _snapshot_tunnels(tunnel_ids, db)
 
-    # Critical ordering: prove every cleanup target is reachable BEFORE the
-    # legacy delete endpoint can disable a tunnel or create destructive intent.
     await _require_reachable_nodes(
         _nodes_needed_for_node_delete(int(node_id), db),
         db,
@@ -253,6 +341,17 @@ safe_tunnels_router = APIRouter(
     prefix="/v1/tunnels",
     tags=["tunnels"],
 )
+
+
+@safe_tunnels_router.post(
+    "/{tunnel_id}/force-delete",
+    dependencies=[Depends(require_admin)],
+)
+def force_delete_tunnel(
+    tunnel_id: int,
+    db: Session = Depends(get_db),
+):
+    return _force_delete_tunnel_control_plane(int(tunnel_id), db)
 
 
 @safe_tunnels_router.delete(
@@ -283,6 +382,6 @@ async def safe_delete_tunnel(
 
 # Route precedence is intentional. app.main later includes nodes.router and
 # tunnels.router; FastAPI resolves the first matching method+path. Prepending
-# these two guarded DELETE routes leaves every other legacy route untouched.
+# these guarded routes leaves every other legacy route untouched.
 nodes_module.router.routes[:0] = list(safe_nodes_router.routes)
 tunnels_module.router.routes[:0] = list(safe_tunnels_router.routes)

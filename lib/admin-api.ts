@@ -157,10 +157,6 @@ export const adminApi={
       const message=error instanceof Error?error.message:String(error);
 
       // TWINPANEL_OFFLINE_NODE_FORCE_RETIRE_CONFIRM_V1
-      // The destructive-safety preflight intentionally returns 424 before
-      // mutating desired-state when an SSH cleanup target is unreachable.
-      // An explicit second confirmation lets the admin choose the existing
-      // force-retire control-plane path without silently skipping cleanup.
       const unreachablePreflight=/(حذف شروع نشد|دسترسی SSH یکی از نودهای لازم|api error 424)/i.test(message);
       if(unreachablePreflight){
         const confirmed=globalThis.confirm(
@@ -181,7 +177,27 @@ export const adminApi={
   toggleTunnel:(id:number)=>request<AdminTunnel>(`/v1/tunnels/${id}/toggle`,{method:"POST"}),
   prepareTunnel:(id:number)=>request<AdminTunnel>(`/v1/tunnels/${id}/prepare`,{method:"POST"}),
   tunnelHealth:(id:number)=>request<RuntimeRow>(`/v1/tunnels/${id}/health`),
-  deleteTunnel:(id:number)=>request<{ok:boolean}>(`/v1/tunnels/${id}`,{method:"DELETE"}),
+  deleteTunnel:async(id:number)=>{
+    try{
+      return await request<RuntimeRow>(`/v1/tunnels/${id}`,{method:"DELETE"});
+    }catch(error){
+      const message=error instanceof Error?error.message:String(error);
+
+      // TWINPANEL_UNREACHABLE_TUNNEL_FORCE_DELETE_CONFIRM_V1
+      // Normal deletion keeps strict SSH cleanup. If a node is dead, let the
+      // admin explicitly remove only the controller desired-state so broken
+      // infrastructure can never trap an undeletable tunnel in the panel.
+      const canForce=/(حذف شروع نشد|دسترسی SSH یکی از نودهای لازم|پاک.?سازی کامل تونل|تونل از دیتابیس حذف نشد|api error 424|api error 409)/i.test(message);
+      if(!canForce)throw error;
+
+      const confirmed=globalThis.confirm(
+        "یکی از نودهای تانل در دسترس نیست. پاک‌سازی Runtime روی نود خراب ممکن نیست. تانل فقط از پنل و کنترل‌پلین حذف شود؟"
+      );
+      if(!confirmed)throw error;
+
+      return request<RuntimeRow>(`/v1/tunnels/${id}/force-delete`,{method:"POST"});
+    }
+  },
 
   subscriptions:()=>request<RuntimeRow[]>("/v1/subscriptions"),
   subscriptionsV2:()=>request<RuntimeRow[]>("/v1/subscriptions/admin-list-v2"),
