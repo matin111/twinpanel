@@ -1,0 +1,46 @@
+name: Quota Local Core Live V57 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/services/quota_runtime_reconcile.py"
+      - "backend/app/local_core_runtime.py"
+      - ".github/workflows/quota-local-core-live-v57-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/services/quota_runtime_reconcile.py"
+      - "backend/app/local_core_runtime.py"
+      - ".github/workflows/quota-local-core-live-v57-smoke.yml"
+
+jobs:
+  quota-local-core-live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate local-core telemetry routing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("backend/app/services/quota_runtime_reconcile.py")
+          source = path.read_text(encoding="utf-8")
+
+          compile(source, str(path), "exec")
+
+          assert "def _is_local_runtime_node(node: Node) -> bool:" in source
+          assert '== "local://core"' in source
+          assert source.count("if _is_local_runtime_node(node):") >= 2
+          assert "await asyncio.to_thread(_local_occtl_json)" in source
+          assert "await asyncio.to_thread(_local_xray_stats)" in source
+          assert "await _remote_occtl_json(node, db)" in source
+          assert "await _remote_xray_stats(node, db)" in source
+
+          local_core = Path("backend/app/local_core_runtime.py").read_text(encoding="utf-8")
+          assert 'LOCAL_AGENT_URL = "local://core"' in local_core
+          assert "node.agent_url == LOCAL_AGENT_URL" in local_core or "agent_url" in local_core
+
+          print("QUOTA_LOCAL_CORE_LIVE_V57_SMOKE=OK")
+          PY
