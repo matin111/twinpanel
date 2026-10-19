@@ -1,0 +1,50 @@
+name: TwinPanel System Release Dark Mode V75 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "app/system-release.css"
+      - "app/system-release-theme.css"
+      - "app/layout.tsx"
+      - ".github/workflows/system-release-dark-mode-v75-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  theme-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify system release theme contract
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          layout = Path("app/layout.tsx").read_text(encoding="utf-8")
+          css = Path("app/system-release-theme.css").read_text(encoding="utf-8")
+
+          base_import = 'import "./system-release.css";'
+          theme_import = 'import "./system-release-theme.css";'
+          assert base_import in layout, "system-release.css import missing"
+          assert theme_import in layout, "system-release-theme.css import missing"
+          assert layout.index(base_import) < layout.index(theme_import), "theme contract must load after base release CSS"
+
+          required_roots = (
+              ".system-release-footer",
+              ".system-update-modal",
+              ".system-license-modal",
+          )
+          for selector in required_roots:
+              assert selector in css, f"missing scoped release root: {selector}"
+
+          assert "--panel:var(--surface);" in css, "legacy --panel must map to design-system --surface"
+          assert "--border:var(--line);" in css, "legacy --border must map to design-system --line"
+          assert "color:var(--text);" in css, "release UI must inherit active theme text"
+          assert 'html[data-theme="dark"] .system-update-alert code' in css, "dark technical details contract missing"
+          assert "!important" not in css, "theme adapter must not introduce override escalation"
+          assert "#fff" not in css.lower(), "theme adapter must not add hard-coded white surfaces"
+
+          print("SYSTEM_RELEASE_DARK_MODE_V75_CONTRACT=PASS")
+          PY

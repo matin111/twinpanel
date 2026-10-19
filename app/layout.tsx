@@ -56,6 +56,7 @@ import "./admin-shell-final.css";
 import "./admin-modal-layer-final.css";
 import "./admin-nav-attention.css";
 import "./system-release.css";
+import "./system-release-theme.css";
 import "./storefront-polish-v5.css";
 import "./storefront-mobile-hero-v6.css";
 import "./storefront-mobile-hero-v8.css";

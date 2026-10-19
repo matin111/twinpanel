@@ -1,0 +1,29 @@
+/*
+ * System release theme contract.
+ *
+ * The release center predates the current TwinPanel design-system token names
+ * and still consumes --panel / --border. Keep those compatibility aliases
+ * local to the release UI instead of leaking legacy tokens into :root.
+ */
+.system-release-footer,
+.system-update-modal,
+.system-license-modal{
+  --panel:var(--surface);
+  --border:var(--line);
+  color:var(--text);
+}
+
+/* Muted release metadata must follow the active theme as well. */
+.system-update-version-grid article>small{
+  color:var(--muted);
+}
+.system-update-version-grid article.target>small{
+  color:var(--purple2);
+}
+
+/* Technical details should stay legible on the dark surface. */
+html[data-theme="dark"] .system-update-alert code{
+  background:var(--surface2);
+  border:1px solid var(--line);
+  color:var(--text);
+}
