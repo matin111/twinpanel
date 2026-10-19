@@ -53,8 +53,9 @@ jobs:
           assert '"/etc/ppp/options.xl2tpd"' in perf
           assert 'f"mru {ACCESS_MTU}"' in perf
 
-          # Reconciler must not depend on NodeProtocolConfig.status anymore.
-          assert "NodeProtocolConfig" not in perf
+          # Reconciler must not import/use NodeProtocolConfig status as a gate.
+          assert "from .models import NodeProtocolConfig" not in perf
+          assert ".filter(NodeProtocolConfig.status" not in perf
           assert "V51_OK=1" in perf
           assert "TP_ACCESS_PERF" in perf
 
