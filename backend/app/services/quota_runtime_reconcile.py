@@ -267,8 +267,16 @@ def _parse_xray_stats(raw: str) -> tuple[str, list[dict]]:
     return epoch[:96], list(by_identity.values())
 
 
+def _is_local_runtime_node(node: Node) -> bool:
+    """Return True when protocol telemetry lives on this TwinPanel host."""
+
+    return bool(getattr(node, "is_mother", False)) or str(
+        getattr(node, "agent_url", "") or ""
+    ).strip() == "local://core"
+
+
 async def _collect_node_users(node: Node, db) -> tuple[bool, list[dict], str | None]:
-    if bool(getattr(node, "is_mother", False)):
+    if _is_local_runtime_node(node):
         ok, output = await asyncio.to_thread(_local_occtl_json)
     else:
         ok, output = await _remote_occtl_json(node, db)
@@ -285,7 +293,7 @@ async def _collect_xray_users(
     node: Node,
     db,
 ) -> tuple[bool, str, list[dict], str | None]:
-    if bool(getattr(node, "is_mother", False)):
+    if _is_local_runtime_node(node):
         ok, output = await asyncio.to_thread(_local_xray_stats)
     else:
         ok, output = await _remote_xray_stats(node, db)
