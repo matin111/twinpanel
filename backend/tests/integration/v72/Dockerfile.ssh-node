@@ -4,7 +4,11 @@ RUN apt-get update -qq \
  && apt-get install -y -qq --no-install-recommends \
       openssh-server openssh-client sshpass python3 procps iproute2 netcat-openbsd ca-certificates \
  && rm -rf /var/lib/apt/lists/* \
- && useradd -m -s /bin/bash tpci \
+ && useradd -m -s /bin/bash -p '$6$twinpanelv72$oyqRHZa7/KZ.az55KDnLvJuU.J9IsBMGSi7kAg6HHwtHbc2T6qTppU35eASo7KFgSnkdh3baJcWcwjwMmUqNX0' tpci \
+ && install -d -o tpci -g tpci -m 0700 /home/tpci/.ssh \
+ && printf '%s\n' 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICFS+NGbeR0kRTJC4V8uq2y3z/p7al7TAJeWDgaYgdsS twinpanel-v72-ci' > /home/tpci/.ssh/authorized_keys \
+ && chown tpci:tpci /home/tpci/.ssh/authorized_keys \
+ && chmod 0600 /home/tpci/.ssh/authorized_keys \
  && mkdir -p /run/sshd /run/twinpanel-bootstrap \
  && chown tpci:tpci /run/twinpanel-bootstrap \
  && chmod 0700 /run/twinpanel-bootstrap \
