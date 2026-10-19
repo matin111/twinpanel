@@ -1,0 +1,40 @@
+name: TwinPanel Updater Systemd Ordering V67 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/systemd/twinpanel-updater.service.tpl'
+      - 'installer/install.sh'
+      - '.github/workflows/updater-systemd-ordering-v67-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify updater can restart API and Web without ordering deadlock
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          unit = Path('deploy/systemd/twinpanel-updater.service.tpl').read_text(encoding='utf-8')
+          installer = Path('installer/install.sh').read_text(encoding='utf-8')
+
+          assert 'Type=oneshot' in unit
+          assert 'After=network-online.target\n' in unit
+          assert 'After=network-online.target twinpanel-api.service' not in unit
+
+          # The updater's ExecStart restarts API/Web while this oneshot job is
+          # active. It must never be ordered after those same runtime services.
+          for line in unit.splitlines():
+              stripped = line.strip()
+              if stripped.startswith(('After=', 'Before=', 'Requires=', 'BindsTo=')):
+                  assert 'twinpanel-api.service' not in stripped, stripped
+                  assert 'twinpanel-web.service' not in stripped, stripped
+
+          assert 'install -m 644 "$RELEASE_ROOT/deploy/systemd/twinpanel-updater.service.tpl" /etc/systemd/system/twinpanel-updater.service' in installer
+
+          print('UPDATER_SYSTEMD_ORDERING_V67_SMOKE=PASS')
+          PY
