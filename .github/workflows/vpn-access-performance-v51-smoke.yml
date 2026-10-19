@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - "backend/app/vpn_access_performance_v51.py"
-      - "backend/app/vpn_access_performance_v51_runtime_guard_v57.py"
       - "backend/app/tunnel_transport_manager_v12.py"
       - "backend/app/transport_manager_service_v12.py"
       - ".github/workflows/vpn-access-performance-v51-smoke.yml"
@@ -23,7 +22,6 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/vpn_access_performance_v51.py \
-            backend/app/vpn_access_performance_v51_runtime_guard_v57.py \
             backend/app/tunnel_transport_manager_v12.py \
             backend/app/transport_manager_service_v12.py
 
@@ -78,4 +76,38 @@ jobs:
 
       - name: Render actual V51 remote script
         run: |
-          python backend/app/vpn_access_performance_v51_runtime_guard_v57.py
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          path = Path("backend/app/vpn_access_performance_v51.py")
+          source = path.read_text(encoding="utf-8")
+          tree = ast.parse(source, filename=str(path))
+
+          wanted = {"ACCESS_MTU", "ACCESS_TCP_MSS", "_PROTOCOL_SUBNETS"}
+          body = []
+          for node in tree.body:
+              if isinstance(node, ast.Assign):
+                  names = {
+                      target.id
+                      for target in node.targets
+                      if isinstance(target, ast.Name)
+                  }
+                  if names & wanted:
+                      body.append(node)
+              elif isinstance(node, ast.FunctionDef) and node.name == "_performance_script":
+                  body.append(node)
+
+          module = ast.Module(body=body, type_ignores=[])
+          ast.fix_missing_locations(module)
+          namespace = {}
+          exec(compile(module, str(path), "exec"), namespace, namespace)
+
+          rendered = namespace["_performance_script"]()
+          assert "ACCESS_MTU=1200" in rendered
+          assert "ACCESS_MSS=1160" in rendered
+          assert 'f"mssfix {ACCESS_MSS}"' in rendered
+          assert "V51_OK=1" in rendered
+          assert "TP_ACCESS_PERF" in rendered
+          print("VPN_ACCESS_PERFORMANCE_V51_RUNTIME_RENDER=PASS")
+          PY
