@@ -5,6 +5,7 @@ on:
     paths:
       - 'components/system-release-footer.tsx'
       - 'components/admin-nav-attention.ts'
+      - 'backend/app/release_manifest_v25.py'
       - '.github/workflows/system-release-restart-grace-v5-smoke.yml'
 
 permissions:
@@ -22,10 +23,11 @@ jobs:
 
           footer = Path('components/system-release-footer.tsx').read_text(encoding='utf-8')
           nav = Path('components/admin-nav-attention.ts').read_text(encoding='utf-8')
+          manifest = Path('backend/app/release_manifest_v25.py').read_text(encoding='utf-8')
 
           footer_required = [
               'const TRANSIENT_API_GRACE_MS=60*1000;',
-              'const RELEASE_CHECK_INTERVAL_MS=5*60*1000;',
+              'const RELEASE_CHECK_INTERVAL_MS=2*60*1000;',
               'const loadInFlightRef=useRef<{status:boolean;check:boolean}>({status:false,check:false});',
               'if(loadInFlightRef.current[lane])return;',
               'setError("");',
@@ -33,7 +35,7 @@ jobs:
               'const checkTimer=window.setInterval(maybeCheckLatest,RELEASE_CHECK_INTERVAL_MS);',
               'window.addEventListener("focus",refreshStatus);',
               'document.addEventListener("visibilitychange",refreshStatus);',
-              'if(claimBackgroundReleaseCheck())checkLatest();',
+              'if(claimBackgroundReleaseCheck())void load(true);',
           ]
           missing_footer = [item for item in footer_required if item not in footer]
           if missing_footer:
@@ -52,6 +54,9 @@ jobs:
               raise SystemExit('navigation attention must not own release/check POST polling')
           if 'const release=await request<ReleaseStatus>("/v1/admin/system/release/status");' not in nav:
               raise SystemExit('navigation attention must read release/status')
+
+          assert 'MANIFEST_CACHE_TTL_SECONDS' in manifest
+          assert 'invalidate_release_manifest_cache' in manifest
 
           print('SYSTEM_RELEASE_RESTART_GRACE_V5_OK')
           PY

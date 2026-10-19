@@ -5,7 +5,10 @@ from pydantic import BaseModel, Field
 
 from ..deps import require_admin
 from .. import system_release as release
-from ..release_manifest_v25 import release_manifest_v25
+from ..release_manifest_v25 import (
+    invalidate_release_manifest_cache,
+    release_manifest_v25,
+)
 
 
 # Install the resilient manifest resolver before any route calls release_status
@@ -27,11 +30,17 @@ class LicenseActivateIn(BaseModel):
 
 @router.get("/release/status")
 def admin_release_status():
+    # Fast path: release_manifest_v25 serves the short-lived manifest cache.
+    # This route is polled by the admin nav and must not repeatedly block on
+    # GitHub/provider latency.
     return release.release_status(refresh_license_state=False)
 
 
 @router.post("/release/check")
 def admin_release_check():
+    # Explicit admin action always means a real provider refresh. Once this
+    # succeeds, subsequent status/nav reads are immediate from the shared cache.
+    invalidate_release_manifest_cache()
     return release.release_status(refresh_license_state=True)
 
 
