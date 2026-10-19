@@ -51,6 +51,11 @@ function addCount(target:Record<string,number>,route:string,count=1){
   target[route]=(target[route]||0)+count;
 }
 
+function ensureCount(target:Record<string,number>,route:string,count=1){
+  if(count<=0)return;
+  target[route]=Math.max(target[route]||0,count);
+}
+
 export function useResellerNavAttention(enabled:boolean){
   const [state,setState]=useState<AttentionState>({routeCounts:{},unreadCount:0});
 
@@ -95,9 +100,9 @@ export function useResellerNavAttention(enabled:boolean){
           :unreadRows.length;
         for(const row of unreadRows){
           const route=normalizeRoute(row.route);
-          if(route)addCount(routeCounts,route);
+          if(route)ensureCount(routeCounts,route);
         }
-        if(unreadCount>0)addCount(routeCounts,"/reseller/notifications",unreadCount);
+        ensureCount(routeCounts,"/reseller/notifications",unreadCount);
       }
 
       setState({routeCounts,unreadCount});
