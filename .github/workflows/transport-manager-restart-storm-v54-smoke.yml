@@ -1,0 +1,66 @@
+name: Transport Manager Restart Storm V54 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/transport_manager_service_v12.py"
+      - ".github/workflows/transport-manager-restart-storm-v54-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/transport_manager_service_v12.py"
+      - ".github/workflows/transport-manager-restart-storm-v54-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile manager service runtime
+        run: |
+          python -m py_compile backend/app/transport_manager_service_v12.py
+
+      - name: Verify idempotent release reload contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          source = Path("backend/app/transport_manager_service_v12.py").read_text(encoding="utf-8")
+
+          required = [
+              "TWINPANEL_TRANSPORT_MANAGER_RESTART_STORM_V54",
+              "ACTIVATION_LOCK_PATH",
+              "fcntl.flock",
+              '"MainPID"',
+              'Path(f"/proc/{pid}/cwd")',
+              "CURRENT_BACKEND_PATH.resolve(strict=True)",
+              'result["reason"] = "already_current"',
+              'result["reason"] = "release_reloaded"',
+              'action = "restart"',
+              'action = "start"',
+          ]
+          for token in required:
+              assert token in source, token
+
+          # Critical regression guard: an active current process must return
+          # before the restart command is reached.
+          current_guard = 'if is_current and not changed:'
+          no_op = 'result["reason"] = "already_current"'
+          restart = 'systemctl,\n            "restart",'
+          assert source.index(current_guard) < source.index(no_op) < source.index(restart)
+
+          # A unit change or stale release still preserves V48's one-time reload.
+          assert '"restart",\n            "--no-block",' in source
+          assert '"start",\n            "--no-block",' in source
+
+          print("TRANSPORT_MANAGER_RESTART_STORM_V54=PASS")
+          PY
