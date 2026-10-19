@@ -34,31 +34,38 @@ def main() -> None:
     argv = shlex.split(command)
 
     assert argv[0] == "ssh"
+    assert "-T" in argv
     assert "BatchMode=yes" in argv
     assert "StrictHostKeyChecking=no" in argv
     assert "193.39.9.222" in " ".join(argv)
-    assert argv[-5:] == ["nc", "-w", "10", "10.248.0.6", "22"]
+    assert argv[-3:] == ["nc", "10.248.0.6", "22"]
+    assert "-w" not in argv[-5:]
     assert "password" not in command.lower()
 
-    asyncio.run(_relay_connect_contract(relay_node, relay_access))
+    asyncio.run(_relay_retry_contract(relay_node, relay_access))
 
-    print("SSH_MANAGEMENT_FALLBACK_V61_SMOKE=OK")
+    print("SSH_MANAGEMENT_FALLBACK_V62_SMOKE=OK")
     print("KERNEL_GRE_TUNNEL_1_EXIT_IP=10.248.0.6")
     print("MANAGEMENT_PATH=controller->iran-ssh->nc->exit-private-ssh")
+    print("RELAY_RETRY=FIRST_CONNECTION_LOST_SECOND_SUCCESS")
 
 
-async def _relay_connect_contract(relay_node, relay_access) -> None:
+async def _relay_retry_contract(relay_node, relay_access) -> None:
     calls = []
     original_connect = fallback.asyncssh.connect
+    original_delay = fallback._RELAY_RETRY_DELAY_SECONDS
 
     class FakeConnection:
         pass
 
     async def fake_connect(host, **kwargs):
         calls.append((host, kwargs))
+        if len(calls) == 1:
+            raise ConnectionError("Connection lost")
         return FakeConnection()
 
     fallback.asyncssh.connect = fake_connect
+    fallback._RELAY_RETRY_DELAY_SECONDS = 0
 
     try:
         node = SimpleNamespace(public_ip="64.49.12.176")
@@ -79,24 +86,26 @@ async def _relay_connect_contract(relay_node, relay_access) -> None:
         )
 
         assert isinstance(result, FakeConnection)
-        assert len(calls) == 1
+        assert len(calls) == 2
 
-        host, kwargs = calls[0]
-        assert host == "10.248.0.6"
-        assert kwargs["port"] == 22
-        assert kwargs["username"] == "root"
-        assert kwargs["known_hosts"] is None
-        assert kwargs["client_keys"] == [
-            "/var/lib/vpnshop/node-keys/node-3.key"
-        ]
-        assert "proxy_command" in kwargs
-        assert "193.39.9.222" in kwargs["proxy_command"]
-        assert "10.248.0.6" in kwargs["proxy_command"]
-        assert kwargs["connect_timeout"] <= 15
-        assert kwargs["login_timeout"] <= 15
+        for host, kwargs in calls:
+            assert host == "10.248.0.6"
+            assert kwargs["port"] == 22
+            assert kwargs["username"] == "root"
+            assert kwargs["known_hosts"] is None
+            assert kwargs["client_keys"] == [
+                "/var/lib/vpnshop/node-keys/node-3.key"
+            ]
+            assert "proxy_command" in kwargs
+            assert "193.39.9.222" in kwargs["proxy_command"]
+            assert "10.248.0.6" in kwargs["proxy_command"]
+            assert "nc -w" not in kwargs["proxy_command"]
+            assert kwargs["connect_timeout"] <= 10
+            assert kwargs["login_timeout"] <= 10
 
     finally:
         fallback.asyncssh.connect = original_connect
+        fallback._RELAY_RETRY_DELAY_SECONDS = original_delay
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import ipaddress
+import json
 import shlex
 from pathlib import Path
 from typing import Any
@@ -16,7 +17,7 @@ from .routers import provision
 
 
 # ============================================================
-# TWINPANEL EXIT SSH MANAGEMENT FALLBACK V61
+# TWINPANEL EXIT SSH MANAGEMENT FALLBACK V62
 #
 # Production incident 2026-10-19:
 # Controller -> Exit public SSH became unreachable upstream while the existing
@@ -24,21 +25,24 @@ from .routers import provision
 #
 #   Controller -> saved SSH to Iran -> remote `nc` -> Exit tunnel IP:22
 #
-# The old ssh_connect_saved() only tried node.public_ip, so Node management,
-# cleanup, Agent upgrades and tunnel lifecycle all treated the Exit as
-# unreachable even though a working management path still existed.
+# V61 introduced the automatic fallback, but production later showed one
+# additional failure mode: the first nc-backed SSH handshake can occasionally
+# close immediately with "Connection lost" while a second attempt succeeds.
+# The manual production validation had shown the same first-attempt flakiness.
 #
-# V61 keeps direct public SSH as the first/parallel path and adds a bounded
-# management fallback for EXIT nodes through their paired Iran node and an
-# existing L3 tunnel address. No route, iptables or VPN dataplane mutation is
-# performed by this module.
+# V62 keeps direct public SSH as the parallel primary path, makes the relay
+# command match the validated manual command (no nc inactivity timer), and
+# retries the relay once with a short bounded delay. No route, iptables,
+# tunnel interface or VPN dataplane mutation is performed by this module.
 # ============================================================
 
 _RUNTIME_APPLIED = False
 _ORIGINAL_SSH_CONNECT_SAVED = provision.ssh_connect_saved
 
 _DIRECT_TIMEOUT_SECONDS = 12
-_RELAY_TIMEOUT_SECONDS = 12
+_RELAY_TIMEOUT_SECONDS = 7
+_RELAY_ATTEMPTS = 2
+_RELAY_RETRY_DELAY_SECONDS = 0.35
 _MAX_RELAY_CANDIDATES = 4
 
 
@@ -69,11 +73,17 @@ def _config_dict(row: TunnelTransport | None) -> dict[str, Any]:
     text = str(row.config_text).strip()
     if not text:
         return {}
-    try:
-        value = ast.literal_eval(text)
-    except Exception:
-        return {}
-    return value if isinstance(value, dict) else {}
+
+    # Most current rows are JSON. Older installs used Python-literal text.
+    for loader in (json.loads, ast.literal_eval):
+        try:
+            value = loader(text)
+        except Exception:
+            continue
+        if isinstance(value, dict):
+            return value
+
+    return {}
 
 
 def _runtime_exit_ip(transport: str, tunnel_id: int) -> str | None:
@@ -164,12 +174,15 @@ def _proxy_command(
     relay_user = str(relay_access.ssh_username or "root").strip() or "root"
     relay_port = int(relay_access.ssh_port or 22)
 
-    # This is the exact production topology which succeeded manually:
+    # Match the production-validated manual ProxyCommand exactly in topology:
     # local OpenSSH -> Iran -> remote nc -> Exit private tunnel IP.
-    # Strict host-key persistence is intentionally disabled here because the
-    # controller already authenticates both managed nodes with its stored keys.
+    #
+    # Do NOT give nc its own -w inactivity timer. It can terminate the byte
+    # stream during SSH negotiation/rekey and manifested as "Connection lost".
+    # AsyncSSH and the outer preflight already provide bounded deadlines.
     parts = [
         "ssh",
+        "-T",
         "-i",
         shlex.quote(relay_key),
         "-p",
@@ -183,15 +196,13 @@ def _proxy_command(
         "-o",
         "LogLevel=ERROR",
         "-o",
-        "ConnectTimeout=8",
+        "ConnectTimeout=7",
         "-o",
         "ServerAliveInterval=5",
         "-o",
         "ServerAliveCountMax=1",
         shlex.quote(f"{relay_user}@{relay_node.public_ip}"),
         "nc",
-        "-w",
-        "10",
         shlex.quote(str(target_ip)),
         str(int(target_port)),
     ]
@@ -284,23 +295,36 @@ async def _relay_connect(
     candidate: dict[str, Any],
 ):
     target_ip = str(candidate["target_ip"])
-    proxy = _proxy_command(
-        candidate["relay_node"],
-        candidate["relay_access"],
-        target_ip,
-        int(access.ssh_port or 22),
-    )
+    errors: list[str] = []
 
-    return await asyncssh.connect(
-        target_ip,
-        port=int(access.ssh_port or 22),
-        username=str(access.ssh_username or "root"),
-        client_keys=[str(key_path)],
-        known_hosts=None,
-        proxy_command=proxy,
-        connect_timeout=_RELAY_TIMEOUT_SECONDS,
-        login_timeout=_RELAY_TIMEOUT_SECONDS,
-    )
+    for attempt in range(1, _RELAY_ATTEMPTS + 1):
+        proxy = _proxy_command(
+            candidate["relay_node"],
+            candidate["relay_access"],
+            target_ip,
+            int(access.ssh_port or 22),
+        )
+
+        try:
+            return await asyncssh.connect(
+                target_ip,
+                port=int(access.ssh_port or 22),
+                username=str(access.ssh_username or "root"),
+                client_keys=[str(key_path)],
+                known_hosts=None,
+                proxy_command=proxy,
+                connect_timeout=_RELAY_TIMEOUT_SECONDS,
+                login_timeout=_RELAY_TIMEOUT_SECONDS,
+            )
+        except asyncio.CancelledError:
+            raise
+        except BaseException as exc:
+            text = str(exc).strip() or exc.__class__.__name__
+            errors.append(f"attempt_{attempt}={text[:300]}")
+            if attempt < _RELAY_ATTEMPTS:
+                await asyncio.sleep(_RELAY_RETRY_DELAY_SECONDS)
+
+    raise RuntimeError(" | ".join(errors)[:900] or "relay_failed")
 
 
 async def _race_connections(attempts: list[tuple[str, Any]]):
@@ -326,7 +350,7 @@ async def _race_connections(attempts: list[tuple[str, Any]]):
                     conn = task.result()
                 except BaseException as exc:
                     text = str(exc).strip() or exc.__class__.__name__
-                    errors.append(f"{label}={text[:350]}")
+                    errors.append(f"{label}={text[:500]}")
                     continue
 
                 if winner is None:

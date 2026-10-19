@@ -68,13 +68,32 @@ export type XrayReconcileJob={
   error?:string|null;
 };
 
+const TRANSIENT_GET_STATUSES=new Set([502,503,504]);
+const TRANSIENT_GET_RETRY_MS=[350,900,1800] as const;
+const lastGoodRead=new Map<string,unknown>();
+
 function requestBase(){
   if(typeof window!=="undefined")return window.location.origin;
   return API_BASE;
 }
 
+function isHtmlErrorBody(value:string){
+  const sample=value.trim().slice(0,1024);
+  return /<(?:!doctype|html|head|body|title|center)\b|nginx\//i.test(sample);
+}
+
+function isTransientNetworkError(reason:unknown){
+  const text=reason instanceof Error?reason.message:String(reason||"");
+  return /failed to fetch|networkerror|network request failed|load failed|fetch failed|connection|timeout/i.test(text);
+}
+
 function errorText(payload:unknown,status:number){
-  if(typeof payload==="string"&&payload.trim())return payload.trim();
+  if(TRANSIENT_GET_STATUSES.has(status))return `سرویس مسیرهای تانل موقتاً در دسترس نیست. چند لحظه بعد دوباره تلاش کنید. (${status})`;
+  if(typeof payload==="string"&&payload.trim()){
+    const text=payload.trim();
+    if(isHtmlErrorBody(text))return `خطای ارتباط با سرویس مسیرهای تانل (${status})`;
+    return text;
+  }
   if(payload&&typeof payload==="object"){
     const row=payload as {detail?:unknown;message?:unknown};
     if(typeof row.detail==="string")return row.detail;
@@ -89,6 +108,10 @@ function errorText(payload:unknown,status:number){
   return `API error ${status}`;
 }
 
+function sleep(ms:number){
+  return new Promise<void>(resolve=>globalThis.setTimeout(resolve,ms));
+}
+
 async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
@@ -97,21 +120,56 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   headers.set("Authorization",`Bearer ${token}`);
   if(init.body&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");
 
-  const response=await fetch(`${requestBase()}${path}`,{
-    ...init,
-    headers,
-    cache:"no-store",
-  });
+  const method=String(init.method||"GET").toUpperCase();
+  const maxAttempts=method==="GET"?TRANSIENT_GET_RETRY_MS.length+1:1;
 
-  const raw=await response.text();
-  let payload:unknown=null;
-  if(raw){try{payload=JSON.parse(raw);}catch{payload=raw;}}
-  if(!response.ok)throw new Error(errorText(payload,response.status));
-  return payload as T;
-}
+  for(let attempt=0;attempt<maxAttempts;attempt+=1){
+    let response:Response;
 
-function sleep(ms:number){
-  return new Promise<void>(resolve=>window.setTimeout(resolve,ms));
+    try{
+      response=await fetch(`${requestBase()}${path}`,{
+        ...init,
+        headers,
+        cache:"no-store",
+      });
+    }catch(reason){
+      const canRetry=method==="GET"&&isTransientNetworkError(reason)&&attempt<TRANSIENT_GET_RETRY_MS.length;
+      if(canRetry){
+        await sleep(TRANSIENT_GET_RETRY_MS[attempt]);
+        continue;
+      }
+      if(method==="GET"&&isTransientNetworkError(reason)&&lastGoodRead.has(path)){
+        return lastGoodRead.get(path) as T;
+      }
+      if(isTransientNetworkError(reason))throw new Error("ارتباط با سرویس مسیرهای تانل موقتاً قطع شد. چند لحظه بعد دوباره تلاش کنید.");
+      throw reason;
+    }
+
+    if(method==="GET"&&TRANSIENT_GET_STATUSES.has(response.status)){
+      if(attempt<TRANSIENT_GET_RETRY_MS.length){
+        try{await response.body?.cancel();}catch{}
+        await sleep(TRANSIENT_GET_RETRY_MS[attempt]);
+        continue;
+      }
+      if(lastGoodRead.has(path)){
+        try{await response.body?.cancel();}catch{}
+        return lastGoodRead.get(path) as T;
+      }
+    }
+
+    const raw=await response.text();
+    let payload:unknown=null;
+    if(raw){try{payload=JSON.parse(raw);}catch{payload=raw;}}
+    if(!response.ok)throw new Error(errorText(payload,response.status));
+
+    if(method==="GET")lastGoodRead.set(path,payload);
+    else lastGoodRead.clear();
+
+    return payload as T;
+  }
+
+  if(method==="GET"&&lastGoodRead.has(path))return lastGoodRead.get(path) as T;
+  throw new Error("ارتباط با سرویس مسیرهای تانل موقتاً قطع شد. چند لحظه بعد دوباره تلاش کنید.");
 }
 
 async function reconcileXray(tunnelId:number):Promise<XrayReconcileJob>{
