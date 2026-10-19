@@ -52,22 +52,21 @@ jobs:
           for token in required_service:
               assert token in service, token
 
-          # Regression guard: a newly installed/inactive manager must still be
-          # started normally, while active managers are restarted onto current.
           assert 'action = "restart"' in service
           assert 'action = "start"' in service
           assert 'result["started"] = True' in service
 
-          # The workers whose code must be reloaded across a release remain
-          # part of the manager process.
-          required_manager = [
-              "vpn_access_dataplane_v46",
-              "vpn_access_performance_v47",
-              "vpn_access_dataplane_loop()",
-              "vpn_access_performance_loop()",
-          ]
-          for token in required_manager:
-              assert token in manager, token
+          # Dataplane V46 and the current access-performance worker must remain
+          # inside the manager process so an API-start release reload activates
+          # their newly shipped code. V51 supersedes V47 without weakening the
+          # release-reload contract.
+          assert "vpn_access_dataplane_v46" in manager
+          assert "vpn_access_dataplane_loop()" in manager
+          assert "vpn_access_performance_loop()" in manager
+          assert (
+              "vpn_access_performance_v51" in manager
+              or "vpn_access_performance_v47" in manager
+          )
 
           print("TRANSPORT_MANAGER_RELEASE_RELOAD_V48_SMOKE_OK")
           PY

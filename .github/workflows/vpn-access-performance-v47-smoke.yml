@@ -33,7 +33,7 @@ jobs:
             backend/app/vpn_access_performance_v47.py \
             backend/app/tunnel_transport_manager_v12.py
 
-      - name: Verify V47 contracts
+      - name: Verify V47 baseline contracts
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -41,6 +41,8 @@ jobs:
           perf = Path("backend/app/vpn_access_performance_v47.py").read_text()
           manager = Path("backend/app/tunnel_transport_manager_v12.py").read_text()
 
+          # V47 remains the rollback/reference implementation and its safety
+          # contract must not regress even after V51 supersedes it at runtime.
           required = [
               "ACCESS_MTU = 1200",
               "ACCESS_TCP_MSS = 1160",
@@ -58,7 +60,6 @@ jobs:
               "systemctl kill -s HUP ocserv.service",
               "v2ray=untouched",
           ]
-
           for token in required:
               assert token in perf, token
 
@@ -71,14 +72,16 @@ jobs:
               "systemctl restart openvpn",
               "systemctl restart wg-quick",
           ]
-
           for token in forbidden:
               assert token not in perf, token
 
-          assert "vpn_access_performance_v47" in manager
+          # Runtime may use the original V47 or its verified V51 successor.
           assert "vpn_access_performance_loop()" in manager
-          assert "twinpanel-vpn-access-performance-v47" in manager
           assert "vpn_access_performance_task" in manager
+          assert (
+              "vpn_access_performance_v51" in manager
+              or "vpn_access_performance_v47" in manager
+          )
 
-          print("VPN_ACCESS_PERFORMANCE_V47_SMOKE_OK")
+          print("VPN_ACCESS_PERFORMANCE_V47_BASELINE_SMOKE_OK")
           PY
