@@ -76,8 +76,9 @@ header(){
 }
 
 pause(){
-  printf '\n'
-  read -r -p "Press Enter to continue..." _ || true
+  printf '\nPress any key to continue...'
+  IFS= read -r -n 1 -s _ || true
+  echo
 }
 
 pick(){
@@ -271,38 +272,46 @@ services_menu(){
   done
 }
 
-admin_menu(){
+admin_account_info(){
+  echo "Administrator"
+  run_backend scripts/twinpanel_admin_cli.py show || true
+  echo
+  if [[ -s "$INITIAL_ADMIN_FILE" ]]; then
+    echo "First-login credentials"
+    cat "$INITIAL_ADMIN_FILE"
+  else
+    echo "First-login credentials file: not available"
+  fi
+}
+
+admin_edit_menu(){
   while true; do
-    header "Administrator management"
-    echo "  [1] Show administrator"
-    echo "  [2] Show initial login credentials"
-    echo "  [3] Generate new random password"
-    echo "  [4] Set custom password"
-    echo "  [5] Change email"
-    echo "  [6] Change name"
-    echo "  [7] Delete initial credentials file"
+    header "Edit administrator"
+    echo "  [1] Change email"
+    echo "  [2] Change name"
+    echo "  [3] Set custom password"
     echo
     echo "  [0] Back"
     echo
     pick || return
     case "$CHOICE" in
       1)
-        run_backend scripts/twinpanel_admin_cli.py show || true
+        if read -r -p "New email: " email && [[ -n "$email" ]]; then
+          run_backend scripts/twinpanel_admin_cli.py change-email "$email" || true
+        else
+          echo "Cancelled."
+        fi
         pause
         ;;
       2)
-        if [[ -s "$INITIAL_ADMIN_FILE" ]]; then
-          cat "$INITIAL_ADMIN_FILE"
+        if read -r -p "New name: " name && [[ -n "$name" ]]; then
+          run_backend scripts/twinpanel_admin_cli.py change-name "$name" || true
         else
-          echo "Initial credentials file does not exist."
+          echo "Cancelled."
         fi
         pause
         ;;
       3)
-        run_backend scripts/twinpanel_admin_cli.py reset-password || true
-        pause
-        ;;
-      4)
         read -r -s -p "New password: " pass || pass=""
         echo
         if [[ -n "$pass" ]]; then
@@ -313,29 +322,48 @@ admin_menu(){
         unset pass
         pause
         ;;
-      5)
-        if read -r -p "New email: " email && [[ -n "$email" ]]; then
-          run_backend scripts/twinpanel_admin_cli.py change-email "$email" || true
+      0) return ;;
+      *) invalid_choice ;;
+    esac
+  done
+}
+
+admin_menu(){
+  while true; do
+    header "Administrator"
+    echo "  [1] Account info"
+    echo "  [2] Reset password"
+    echo "  [3] Edit account"
+    echo "  [4] Delete saved first-login file"
+    echo
+    echo "  [0] Back"
+    echo
+    pick || return
+    case "$CHOICE" in
+      1)
+        admin_account_info
+        pause
+        ;;
+      2)
+        echo "A new random password will be generated and shown once."
+        echo
+        if confirm_action "Reset administrator password?"; then
+          run_backend scripts/twinpanel_admin_cli.py reset-password || true
         else
           echo "Cancelled."
         fi
         pause
         ;;
-      6)
-        if read -r -p "New name: " name && [[ -n "$name" ]]; then
-          run_backend scripts/twinpanel_admin_cli.py change-name "$name" || true
-        else
-          echo "Cancelled."
-        fi
-        pause
+      3)
+        admin_edit_menu
         ;;
-      7)
+      4)
         if [[ ! -f "$INITIAL_ADMIN_FILE" ]]; then
-          echo "Initial credentials file does not exist."
+          echo "Saved first-login file does not exist."
         else
           echo "This removes only the saved first-login credentials file."
           echo
-          if confirm_action "Delete it now?"; then
+          if confirm_action "Delete saved first-login file?"; then
             rm -f "$INITIAL_ADMIN_FILE"
             echo "Deleted."
           else
@@ -352,15 +380,6 @@ admin_menu(){
 
 protocol_menu(){
   header "Protocol management"
-  echo "Available protocols:"
-  echo "  [1] Cisco / OpenConnect"
-  echo "  [2] OpenVPN"
-  echo "  [3] WireGuard"
-  echo "  [4] L2TP / IPsec"
-  echo "  [5] V2Ray / Xray"
-  echo
-  printf '%bOnly numbers are used for protocol, target and action choices.%b\n' "$C_DIM" "$C_RESET"
-  echo
   run_backend scripts/twinpanel_protocol_cli_en.py || true
   pause
 }
