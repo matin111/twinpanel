@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.54",
+  "version": "1.1.0-rc.55",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-19T13:39:30Z",
+  "released_at": "2026-10-19T13:59:40Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9ca528457f807218abea6f7ea2be7e0151fad2ad",
+  "source_sha": "fdc191386b848ffba20e69b0295e83e479cf4de6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.54/twinpanel-1.1.0-rc.54-linux-x86_64.tar.gz",
-    "sha256": "5b01fb3a74ed0876dcc6d8b735ba1664b63379cebf8e4e557f94af2118e5e6f9",
-    "size_bytes": 12774400
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.55/twinpanel-1.1.0-rc.55-linux-x86_64.tar.gz",
+    "sha256": "35cb36317b4c312d3227ef6aa8e97fedf86b992de85079ab62f80fc71bfe5498",
+    "size_bytes": 12775762
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.54 مشکل Restart Storm سرویس Transport Manager را اصلاح می‌کند. در rc.52/rc.53، هر Import مجدد API می‌توانست سرویس twinpanel-transport-manager را دوباره Restart کند؛ در نتیجه Manager هر چند ثانیه متوقف می‌شد و Workerهای V46/V51 فرصت اجرای NAT/FORWARD و همگرایی MTU/MSS را پیدا نمی‌کردند. V54 فعال‌سازی Manager را idempotent می‌کند: اگر Process فعلی از همان Release فعال اجرا شود هیچ Restartی انجام نمی‌شود، اگر Release واقعاً عوض شده باشد فقط یک Restart کنترل‌شده انجام می‌شود، و API workerهای همزمان با lock بین‌پردازشی سریال می‌شوند. GRE/Unified L3، Xray/V2Ray، اطلاعات اتصال، Quota و سیاست انتخاب Transport در این نسخه تغییر نکرده‌اند.",
-    "en": "TwinPanel 1.1.0-rc.54 fixes a Transport Manager restart storm. In rc.52/rc.53, repeated API imports could restart twinpanel-transport-manager again and again, preventing V46/V51 workers from staying alive long enough to reconcile NAT/FORWARD and MTU/MSS state. V54 makes manager activation idempotent: a process already running from the active release is left untouched, a genuinely stale-release process receives only one controlled restart, and concurrent API workers are serialized with a cross-process lock. GRE/Unified L3, Xray/V2Ray, connection credentials, quota, and transport-selection policy are unchanged."
+    "fa": "نسخه 1.1.0-rc.55 فیکس نمایش زنده وضعیت اتصال اشتراک‌ها در پنل مدیریت را منتشر می‌کند. در صفحه /admin/subscriptions ستون «اتصال» اکنون به runtime واقعی صفحه متصل است، هر اشتراک را با شناسه پایدار MV-{subscription_id} پیدا می‌کند و وضعیت آنلاین/آفلاین را همراه پروتکل فعال نمایش می‌دهد. وضعیت هر 3 ثانیه بدون رفرش صفحه به‌روزرسانی می‌شود. رفتار سبز شدن پروتکل فعال در صفحه Connect حفظ شده است و در این نسخه تغییری در dataplane تانل، Quota/Session، Routing یا Credentialها انجام نشده است.",
+    "en": "TwinPanel 1.1.0-rc.55 publishes the admin subscription live-connection status fix. The /admin/subscriptions page now mounts the live status runtime correctly, identifies each row by its stable MV-{subscription_id} marker, and shows online/offline state plus the active protocol. Live state refreshes every 3 seconds without a page reload. Public Connect protocol-green behavior is preserved, with no changes to tunnel dataplane, quota/session semantics, routing, or credentials."
   }
 }
