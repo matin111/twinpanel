@@ -17,22 +17,77 @@ C_BLUE='\033[1;34m'
 C_GREEN='\033[1;32m'
 C_YELLOW='\033[1;33m'
 C_RED='\033[1;31m'
+C_DIM='\033[2m'
 C_RESET='\033[0m'
 
-line(){ printf '%*s\n' 68 '' | tr ' ' '='; }
+WIDTH=58
+
+line(){ printf '%*s\n' "$WIDTH" '' | tr ' ' '-'; }
+strong_line(){ printf '%*s\n' "$WIDTH" '' | tr ' ' '='; }
+
+version_value(){
+  tr -d '\r\n' < "$ROOT/VERSION" 2>/dev/null || printf 'unknown'
+}
+
+unit_exists(){
+  systemctl cat "$1" >/dev/null 2>&1
+}
+
+unit_state(){
+  local unit="$1"
+  if ! unit_exists "$unit"; then
+    printf 'not-installed'
+    return 0
+  fi
+  systemctl is-active "$unit" 2>/dev/null || true
+}
+
+state_badge(){
+  local state="$1"
+  case "$state" in
+    active) printf '%bONLINE%b' "$C_GREEN" "$C_RESET" ;;
+    failed) printf '%bFAILED%b' "$C_RED" "$C_RESET" ;;
+    inactive) printf '%bOFFLINE%b' "$C_YELLOW" "$C_RESET" ;;
+    not-installed) printf '%bN/A%b' "$C_DIM" "$C_RESET" ;;
+    *) printf '%b%s%b' "$C_YELLOW" "${state:-unknown}" "$C_RESET" ;;
+  esac
+}
 
 header(){
+  local title="${1:-Server management}"
+  local version api_state web_state
   clear 2>/dev/null || true
-  printf "${C_PURPLE}"
+  version="$(version_value)"
+  api_state="$(unit_state twinpanel-api.service)"
+  web_state="$(unit_state twinpanel-web.service)"
+
+  printf '%b' "$C_PURPLE"
+  strong_line
+  printf '  TwinPanel  |  Simple SSH Manager\n'
+  strong_line
+  printf '%b' "$C_RESET"
+  printf '  Version: %b%s%b\n' "$C_GREEN" "$version" "$C_RESET"
+  printf '  API: %-18b Web: %b\n' "$(state_badge "$api_state")" "$(state_badge "$web_state")"
   line
-  printf "  TwinPanel 2027 - SSH Management\n"
+  printf '  %b%s%b\n' "$C_BLUE" "$title" "$C_RESET"
   line
-  printf "${C_RESET}\n"
+  printf '\n'
 }
 
 pause(){
   printf '\n'
   read -r -p "Press Enter to continue..." _ || true
+}
+
+invalid_choice(){
+  printf '\n%bInvalid selection.%b\n' "$C_RED" "$C_RESET"
+  pause
+}
+
+confirm_yes(){
+  local prompt="$1" answer
+  read -r -p "$prompt [y/N]: " answer || answer=""
+  [[ "${answer,,}" == "y" || "${answer,,}" == "yes" ]]
 }
 
 require_runtime(){
@@ -67,28 +122,10 @@ runtime_ports(){
   fi
 }
 
-unit_exists(){
-  systemctl cat "$1" >/dev/null 2>&1
-}
-
-unit_state(){
-  local unit="$1"
-  if ! unit_exists "$unit"; then
-    printf 'not-installed'
-    return 0
-  fi
-  systemctl is-active "$unit" 2>/dev/null || true
-}
-
 show_unit(){
-  local unit="$1" state color
+  local unit="$1" state
   state="$(unit_state "$unit")"
-  case "$state" in
-    active) color="$C_GREEN" ;;
-    failed) color="$C_RED" ;;
-    *) color="$C_YELLOW" ;;
-  esac
-  printf '%-38s %b%s%b\n' "$unit" "$color" "${state:-unknown}" "$C_RESET"
+  printf '  %-38s %b\n' "$unit" "$(state_badge "$state")"
 }
 
 show_service_table(){
@@ -107,43 +144,58 @@ show_service_table(){
 restart_unit(){
   local unit="$1"
   if ! unit_exists "$unit"; then
-    printf "${C_YELLOW}%s is not installed.${C_RESET}\n" "$unit"
+    printf "%b%s is not installed.%b\n" "$C_YELLOW" "$unit" "$C_RESET"
     return 1
   fi
   if systemctl restart "$unit"; then
-    printf "${C_GREEN}%s restarted successfully.${C_RESET}\n" "$unit"
+    printf "%b%s restarted successfully.%b\n" "$C_GREEN" "$unit" "$C_RESET"
     return 0
   fi
-  printf "${C_RED}Failed to restart %s.${C_RESET}\n" "$unit"
+  printf "%bFailed to restart %s.%b\n" "$C_RED" "$unit" "$C_RESET"
   systemctl --no-pager --full status "$unit" 2>/dev/null | tail -n 25 || true
   return 1
 }
 
 restart_nginx(){
   if ! command -v nginx >/dev/null 2>&1; then
-    printf "${C_YELLOW}Nginx is not installed.${C_RESET}\n"
+    printf "%bNginx is not installed.%b\n" "$C_YELLOW" "$C_RESET"
     return 1
   fi
   if ! nginx -t; then
-    printf "${C_RED}Nginx configuration test failed. Restart cancelled.${C_RESET}\n"
+    printf "%bNginx configuration test failed. Restart cancelled.%b\n" "$C_RED" "$C_RESET"
     return 1
   fi
   restart_unit nginx.service
 }
 
+restart_stack(){
+  header "Restart TwinPanel"
+  printf 'This restarts only the panel API, Web and Nginx.\n\n'
+  if ! confirm_yes "Restart TwinPanel now?"; then
+    echo "Cancelled."
+    pause
+    return
+  fi
+  echo
+  restart_unit twinpanel-api.service || true
+  restart_unit twinpanel-web.service || true
+  restart_nginx || true
+  pause
+}
+
 http_health(){
   local label="$1" url="$2"
   if curl -fsS --max-time 4 "$url" >/dev/null 2>&1; then
-    printf '%-24s %b%s%b\n' "$label" "$C_GREEN" "OK" "$C_RESET"
+    printf '  %-24s %bOK%b\n' "$label" "$C_GREEN" "$C_RESET"
   else
-    printf '%-24s %b%s%b\n' "$label" "$C_RED" "UNREACHABLE" "$C_RESET"
+    printf '  %-24s %bUNREACHABLE%b\n' "$label" "$C_RED" "$C_RESET"
   fi
 }
 
 journal_unit(){
   local unit="$1"
   if ! unit_exists "$unit"; then
-    printf "${C_YELLOW}%s is not installed on this server.${C_RESET}\n" "$unit"
+    printf "%b%s is not installed on this server.%b\n" "$C_YELLOW" "$unit" "$C_RESET"
     return 0
   fi
   journalctl -u "$unit" -n 120 --no-pager || true
@@ -156,35 +208,39 @@ option_unit_state(){
 }
 
 status_menu(){
-  header
+  header "Panel status"
   runtime_ports
-  printf "${C_BLUE}Panel status${C_RESET}\n\n"
-  printf '%-24s %s\n' "Version:" "$(cat "$ROOT/VERSION" 2>/dev/null || echo unknown)"
-  printf '%-24s %s\n' "Active release:" "$(readlink -f "$ROOT" 2>/dev/null || echo "$ROOT")"
-  printf '%-24s %s\n' "API port:" "$API_PORT"
-  printf '%-24s %s\n' "Web port:" "$WEB_PORT"
+  printf '  %-18s %s\n' "Version" "$(version_value)"
+  printf '  %-18s %s\n' "API port" "$API_PORT"
+  printf '  %-18s %s\n' "Web port" "$WEB_PORT"
+  printf '  %-18s %s\n' "Release" "$(readlink -f "$ROOT" 2>/dev/null || echo "$ROOT")"
   echo
-  printf "${C_BLUE}Services${C_RESET}\n"
-  show_service_table
+  printf '%bHealth%b\n' "$C_BLUE" "$C_RESET"
+  http_health "API" "http://127.0.0.1:${API_PORT}/health/ready"
+  http_health "Web" "http://127.0.0.1:${WEB_PORT}/health"
+  http_health "Nginx" "http://127.0.0.1/health"
   echo
-  printf "${C_BLUE}Health${C_RESET}\n"
-  http_health "API ready:" "http://127.0.0.1:${API_PORT}/health/ready"
-  http_health "Web health:" "http://127.0.0.1:${WEB_PORT}/health"
-  http_health "Nginx health:" "http://127.0.0.1/health"
+  printf '%bCore services%b\n' "$C_BLUE" "$C_RESET"
+  show_unit twinpanel-api.service
+  show_unit twinpanel-web.service
+  show_unit nginx.service
+  show_unit postgresql.service
+  show_unit redis-server.service
   pause
 }
 
 services_menu(){
   while true; do
-    header
-    printf "${C_BLUE}Service management${C_RESET}\n\n"
-    echo "1) Restart API"
-    echo "2) Restart Web"
-    echo "3) Restart Nginx"
-    echo "4) Restart API + Web + Nginx"
-    echo "5) Show service status"
-    echo "0) Back"
-    if ! read -r -p "> " choice; then return; fi
+    header "Service management"
+    echo "  [1] Restart API"
+    echo "  [2] Restart Web"
+    echo "  [3] Restart Nginx"
+    echo "  [4] Restart panel stack"
+    echo "  [5] Show all service states"
+    echo
+    echo "  [0] Back"
+    echo
+    if ! read -r -p "Select: " choice; then return; fi
     case "$choice" in
       1) restart_unit twinpanel-api.service || true; pause ;;
       2) restart_unit twinpanel-web.service || true; pause ;;
@@ -195,29 +251,26 @@ services_menu(){
         restart_nginx || true
         pause
         ;;
-      5)
-        echo
-        show_service_table
-        pause
-        ;;
+      5) echo; show_service_table; pause ;;
       0) return ;;
-      *) echo "Invalid selection."; pause ;;
+      *) invalid_choice ;;
     esac
   done
 }
 
 admin_menu(){
   while true; do
-    header
-    printf "${C_BLUE}Administrator management${C_RESET}\n\n"
-    echo "1) Show current administrator"
-    echo "2) Show initial login credentials"
-    echo "3) Reset administrator password"
-    echo "4) Change administrator email"
-    echo "5) Change administrator name"
-    echo "6) Delete initial credentials file"
-    echo "0) Back"
-    if ! read -r -p "> " choice; then return; fi
+    header "Administrator management"
+    echo "  [1] Show administrator"
+    echo "  [2] Show initial login credentials"
+    echo "  [3] Reset password"
+    echo "  [4] Change email"
+    echo "  [5] Change name"
+    echo "  [6] Delete initial credentials file"
+    echo
+    echo "  [0] Back"
+    echo
+    if ! read -r -p "Select: " choice; then return; fi
     case "$choice" in
       1)
         run_backend scripts/twinpanel_admin_cli.py show || true
@@ -258,35 +311,30 @@ admin_menu(){
       6)
         if [[ ! -f "$INITIAL_ADMIN_FILE" ]]; then
           echo "Initial credentials file does not exist."
+        elif confirm_yes "Delete the initial credentials file?"; then
+          rm -f "$INITIAL_ADMIN_FILE"
+          echo "Deleted."
         else
-          read -r -p "Type YES to delete: " confirm || confirm=""
-          if [[ "$confirm" == "YES" ]]; then
-            rm -f "$INITIAL_ADMIN_FILE"
-            echo "Deleted."
-          else
-            echo "Cancelled."
-          fi
+          echo "Cancelled."
         fi
         pause
         ;;
       0) return ;;
-      *) echo "Invalid selection."; pause ;;
+      *) invalid_choice ;;
     esac
   done
 }
 
 protocol_menu(){
-  header
-  printf "${C_BLUE}Protocol management${C_RESET}\n\n"
+  header "Protocol management"
   echo "Available protocols:"
-  echo "  1) Cisco / OpenConnect"
-  echo "  2) OpenVPN"
-  echo "  3) WireGuard"
-  echo "  4) L2TP / IPsec"
-  echo "  5) V2Ray / Xray"
+  echo "  [1] Cisco / OpenConnect"
+  echo "  [2] OpenVPN"
+  echo "  [3] WireGuard"
+  echo "  [4] L2TP / IPsec"
+  echo "  [5] V2Ray / Xray"
   echo
-  echo "The selected protocol can be managed on this server or a remote Exit node."
-  echo "Remove creates a backup on the selected target before changing protocol files."
+  printf '%bTip:%b choose a protocol first, then choose Local or an Exit node.\n' "$C_DIM" "$C_RESET"
   echo
   run_backend scripts/twinpanel_protocol_cli_en.py || true
   pause
@@ -294,21 +342,21 @@ protocol_menu(){
 
 update_menu(){
   while true; do
-    header
-    printf "${C_BLUE}Panel update${C_RESET}\n\n"
-    echo "1) Check for update"
-    echo "2) Start update"
-    echo "3) Show updater status"
-    echo "0) Back"
-    if ! read -r -p "> " choice; then return; fi
+    header "Panel update"
+    echo "  [1] Check for update"
+    echo "  [2] Install update"
+    echo "  [3] Update status"
+    echo
+    echo "  [0] Back"
+    echo
+    if ! read -r -p "Select: " choice; then return; fi
     case "$choice" in
       1)
-        run_backend -c 'import json; from app.system_release import release_status; s=release_status(refresh_license_state=False); print(json.dumps({"current_version":s.get("current_version"),"latest_version":s.get("latest_version"),"channel":s.get("channel"),"update_available":s.get("update_available"),"released_at":s.get("released_at"),"manifest_error":s.get("manifest_error"),"update":s.get("update")},ensure_ascii=True,indent=2,default=str))' || true
+        run_backend -c 'from app.system_release import release_status; s=release_status(refresh_license_state=False); print("Current :",s.get("current_version") or "unknown"); print("Latest  :",s.get("latest_version") or "unknown"); print("Channel :",s.get("channel") or "unknown"); print("Update  :","AVAILABLE" if s.get("update_available") else "up to date"); e=s.get("manifest_error"); print("Error   :",e) if e else None' || true
         pause
         ;;
       2)
-        read -r -p "Type UPDATE to start: " confirm || confirm=""
-        if [[ "$confirm" == "UPDATE" ]]; then
+        if confirm_yes "Start the TwinPanel update?"; then
           run_backend -c 'import json; from app.system_release import request_update; print(json.dumps(request_update(),ensure_ascii=True,indent=2,default=str))' || true
         else
           echo "Cancelled."
@@ -331,20 +379,21 @@ update_menu(){
         pause
         ;;
       0) return ;;
-      *) echo "Invalid selection."; pause ;;
+      *) invalid_choice ;;
     esac
   done
 }
 
 backup_menu(){
   while true; do
-    header
-    printf "${C_BLUE}Backup${C_RESET}\n\n"
-    echo "1) Create manual backup"
-    echo "2) List backup files"
-    echo "3) Show automatic backup timer"
-    echo "0) Back"
-    if ! read -r -p "> " choice; then return; fi
+    header "Backup"
+    echo "  [1] Create backup now"
+    echo "  [2] List backups"
+    echo "  [3] Automatic backup status"
+    echo
+    echo "  [0] Back"
+    echo
+    if ! read -r -p "Select: " choice; then return; fi
     case "$choice" in
       1)
         run_backend -c "from app.backup_service import create_backup; import json; print(json.dumps(create_backup(kind='manual',send_telegram=False),ensure_ascii=True,indent=2,default=str))" || true
@@ -369,25 +418,26 @@ backup_menu(){
         pause
         ;;
       0) return ;;
-      *) echo "Invalid selection."; pause ;;
+      *) invalid_choice ;;
     esac
   done
 }
 
 logs_menu(){
   while true; do
-    header
-    printf "${C_BLUE}Logs and diagnostics${C_RESET}\n\n"
-    echo "1) API"
-    echo "2) Web"
-    echo "3) Updater"
-    echo "4) Backup"
-    echo "5) Reseller Bots       [$(option_unit_state twinpanel-reseller-bots.service)]"
-    echo "6) Transport Manager   [$(option_unit_state twinpanel-transport-manager.service)]"
-    echo "7) Telegram Bot        [$(option_unit_state twinpanel-bot.service)]"
-    echo "8) Nginx"
-    echo "0) Back"
-    if ! read -r -p "> " choice; then return; fi
+    header "Logs and diagnostics"
+    echo "  [1] API"
+    echo "  [2] Web"
+    echo "  [3] Updater"
+    echo "  [4] Backup"
+    echo "  [5] Reseller Bots       [$(option_unit_state twinpanel-reseller-bots.service)]"
+    echo "  [6] Transport Manager   [$(option_unit_state twinpanel-transport-manager.service)]"
+    echo "  [7] Telegram Bot        [$(option_unit_state twinpanel-bot.service)]"
+    echo "  [8] Nginx"
+    echo
+    echo "  [0] Back"
+    echo
+    if ! read -r -p "Select: " choice; then return; fi
     case "$choice" in
       1) journal_unit twinpanel-api.service; pause ;;
       2) journal_unit twinpanel-web.service; pause ;;
@@ -405,55 +455,71 @@ logs_menu(){
         pause
         ;;
       0) return ;;
-      *) echo "Invalid selection."; pause ;;
+      *) invalid_choice ;;
     esac
   done
 }
 
 version_menu(){
-  header
-  version="$(cat "$ROOT/VERSION" 2>/dev/null || echo unknown)"
-  printf 'TwinPanel version: %s\n' "$version"
-  printf 'Active release: %s\n' "$(readlink -f "$ROOT" 2>/dev/null || echo "$ROOT")"
-  printf 'GitHub: https://github.com/matin111/twinpanel\n'
-  printf 'Public installer: https://raw.githubusercontent.com/matin111/twinpanel/main/install.sh\n'
-  printf 'Stable manifest: https://raw.githubusercontent.com/matin111/twinpanel/main/releases/stable.json\n'
+  header "Version and GitHub"
+  printf '  TwinPanel version : %s\n' "$(version_value)"
+  printf '  Active release    : %s\n' "$(readlink -f "$ROOT" 2>/dev/null || echo "$ROOT")"
+  printf '  GitHub            : https://github.com/matin111/twinpanel\n'
+  printf '  Public installer  : https://raw.githubusercontent.com/matin111/twinpanel/main/install.sh\n'
+  printf '  Stable manifest   : https://raw.githubusercontent.com/matin111/twinpanel/main/releases/stable.json\n'
   if git -C "$ROOT" rev-parse HEAD >/dev/null 2>&1; then
-    printf 'Git commit: %s\n' "$(git -C "$ROOT" rev-parse HEAD)"
+    printf '  Git commit        : %s\n' "$(git -C "$ROOT" rev-parse HEAD)"
   fi
   pause
 }
 
+more_menu(){
+  while true; do
+    header "More options"
+    echo "  [1] Administrator management"
+    echo "  [2] Backup"
+    echo "  [3] Service management"
+    echo "  [4] Logs and diagnostics"
+    echo "  [5] Version and GitHub"
+    echo
+    echo "  [0] Back"
+    echo
+    if ! read -r -p "Select: " choice; then return; fi
+    case "$choice" in
+      1) admin_menu ;;
+      2) backup_menu ;;
+      3) services_menu ;;
+      4) logs_menu ;;
+      5) version_menu ;;
+      0) return ;;
+      *) invalid_choice ;;
+    esac
+  done
+}
+
 main_menu(){
   while true; do
-    header
-    version="$(cat "$ROOT/VERSION" 2>/dev/null || echo unknown)"
-    printf "${C_GREEN}TwinPanel v%s${C_RESET}\n\n" "$version"
-    echo "1) Panel status"
-    echo "2) Service management"
-    echo "3) Administrator management"
-    echo "4) Protocol management"
-    echo "5) Panel update"
-    echo "6) Backup"
-    echo "7) Logs and diagnostics"
-    echo "8) Version and GitHub"
-    echo "0) Exit"
+    header "Quick actions"
+    echo "  [1] Panel status"
+    echo "  [2] Restart TwinPanel"
+    echo "  [3] VPN protocols"
+    echo "  [4] Panel update"
+    echo "  [5] More options"
     echo
-    if ! read -r -p "> " choice; then
+    echo "  [0] Exit"
+    echo
+    if ! read -r -p "Select: " choice; then
       echo
       exit 0
     fi
     case "$choice" in
       1) status_menu ;;
-      2) services_menu ;;
-      3) admin_menu ;;
-      4) protocol_menu ;;
-      5) update_menu ;;
-      6) backup_menu ;;
-      7) logs_menu ;;
-      8) version_menu ;;
+      2) restart_stack ;;
+      3) protocol_menu ;;
+      4) update_menu ;;
+      5) more_menu ;;
       0) clear 2>/dev/null || true; exit 0 ;;
-      *) echo "Invalid selection."; pause ;;
+      *) invalid_choice ;;
     esac
   done
 }
