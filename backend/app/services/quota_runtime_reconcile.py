@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shlex
 import subprocess
 import time
 import uuid
@@ -102,7 +103,7 @@ async def _remote_xray_stats(node: Node, db) -> tuple[bool, str]:
     try:
         conn = await ssh_connect_saved(node, db)
         result = await conn.run(
-            "bash -lc " + repr(_XRAY_STATS_COMMAND),
+            "bash -lc " + shlex.quote(_XRAY_STATS_COMMAND),
             check=False,
             timeout=12,
         )
@@ -442,9 +443,9 @@ def _apply_xray_stats(db, node: Node, epoch: str, observed: list[dict]) -> dict:
         if uplink <= 0 and downlink <= 0:
             continue
 
-        # Xray StatsService provides cumulative traffic but not authoritative
-        # connection-open/close events. Use one short accounting session only to
-        # trigger first-use activation. Do not leave a synthetic session active.
+        # StatsService exposes cumulative traffic but not authoritative
+        # connection-open/close events. Use a short accounting session only to
+        # trigger first-use activation; never leave a synthetic Xray session up.
         if subscription.starts_at is None and subscription.expires_at is None:
             activation_key = (
                 f"xray-activation:{node_id}:{subscription_id}:{identity}:"
