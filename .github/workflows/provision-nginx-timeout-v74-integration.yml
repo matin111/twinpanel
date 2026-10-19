@@ -1,0 +1,173 @@
+name: TwinPanel Provision Nginx Timeout V74 Integration
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/nginx/twinpanel.conf.tpl'
+      - 'deploy/systemd/twinpanel-web.service.tpl'
+      - 'backend/scripts/twinpanel_nginx_reconcile.py'
+      - 'backend/tests/integration/test_provision_nginx_timeout_v74.py'
+      - '.github/workflows/provision-nginx-timeout-v74-integration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile migration and integration test
+        run: |
+          python3 -m py_compile backend/scripts/twinpanel_nginx_reconcile.py
+          python3 -m py_compile backend/tests/integration/test_provision_nginx_timeout_v74.py
+
+      - name: Test safe existing-install convergence
+        run: |
+          python3 backend/tests/integration/test_provision_nginx_timeout_v74.py
+
+      - name: Install Nginx for real proxy smoke
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nginx
+
+      - name: Prove long timeout is real and scoped to provision install
+        shell: bash
+        run: |
+          set -euo pipefail
+          TMP="$(mktemp -d -t tp-nginx-v74-XXXXXX)"
+          BACKEND_PID=""
+
+          cleanup() {
+            if [ -f "$TMP/nginx.pid" ]; then
+              nginx -c "$TMP/nginx.conf" -p "$TMP" -s quit >/dev/null 2>&1 || true
+            fi
+            if [ -n "$BACKEND_PID" ]; then
+              kill "$BACKEND_PID" >/dev/null 2>&1 || true
+              wait "$BACKEND_PID" >/dev/null 2>&1 || true
+            fi
+            rm -rf "$TMP"
+          }
+          trap cleanup EXIT
+
+          mkdir -p \
+            "$TMP/client_body" \
+            "$TMP/proxy_temp"
+
+          python3 - "$TMP" <<'PY' &
+          import json
+          import sys
+          import time
+          from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+
+          class Handler(BaseHTTPRequestHandler):
+              def log_message(self, *args):
+                  pass
+
+              def _handle(self):
+                  if self.path in {"/v1/provision/install", "/v1/provision/slow"}:
+                      time.sleep(2.0)
+                  body = json.dumps({"ok": True, "path": self.path}).encode()
+                  self.send_response(200)
+                  self.send_header("Content-Type", "application/json")
+                  self.send_header("Content-Length", str(len(body)))
+                  self.end_headers()
+                  try:
+                      self.wfile.write(body)
+                  except BrokenPipeError:
+                      pass
+
+              do_GET = _handle
+              do_POST = _handle
+
+          server = ThreadingHTTPServer(("127.0.0.1", 19095), Handler)
+          (root / "backend.ready").write_text("ready", encoding="utf-8")
+          server.serve_forever()
+          PY
+          BACKEND_PID=$!
+
+          for n in $(seq 1 40); do
+            [ -f "$TMP/backend.ready" ] && break
+            [ "$n" -eq 40 ] && { echo "backend did not start"; exit 1; }
+            sleep 0.1
+          done
+
+          python3 - "$TMP/server.conf" <<'PY'
+          import sys
+          from pathlib import Path
+
+          target = Path(sys.argv[1])
+          text = Path("deploy/nginx/twinpanel.conf.tpl").read_text(encoding="utf-8")
+          text = text.replace("__DOMAIN__", "127.0.0.1")
+          text = text.replace("__API_PORT__", "19095")
+          text = text.replace("__WEB_PORT__", "19096")
+          text = text.replace("listen 80 default_server;", "listen 18080 default_server;", 1)
+
+          # Make the generic API timeout tiny only in this disposable CI config.
+          # The exact provisioning location must override it and survive a 2s
+          # silent backend response, while the generic route must still 504.
+          needle = "  location /v1/ {\n"
+          replacement = needle + "    proxy_read_timeout 1s;\n"
+          if needle not in text:
+              raise SystemExit("generic /v1 location missing")
+          text = text.replace(needle, replacement, 1)
+          target.write_text(text, encoding="utf-8")
+          PY
+
+          cat > "$TMP/nginx.conf" <<EOF
+          worker_processes 1;
+          pid $TMP/nginx.pid;
+          error_log $TMP/error.log info;
+          events { worker_connections 128; }
+          http {
+            access_log $TMP/access.log;
+            client_body_temp_path $TMP/client_body;
+            proxy_temp_path $TMP/proxy_temp;
+          $(cat "$TMP/server.conf")
+          }
+          EOF
+
+          nginx -t -c "$TMP/nginx.conf" -p "$TMP"
+          nginx -c "$TMP/nginx.conf" -p "$TMP"
+
+          for n in $(seq 1 40); do
+            if curl -fsS --max-time 1 http://127.0.0.1:18080/health >/dev/null 2>&1; then
+              break
+            fi
+            [ "$n" -eq 40 ] && { cat "$TMP/error.log"; exit 1; }
+            sleep 0.1
+          done
+
+          exact_status="$(
+            curl -sS \
+              --max-time 8 \
+              -o "$TMP/exact.out" \
+              -w '%{http_code}' \
+              -X POST \
+              -H 'Content-Type: application/json' \
+              --data '{}' \
+              http://127.0.0.1:18080/v1/provision/install
+          )"
+          test "$exact_status" = "200"
+          grep -q '"ok": true' "$TMP/exact.out"
+
+          generic_status="$(
+            curl -sS \
+              --max-time 5 \
+              -o "$TMP/generic.out" \
+              -w '%{http_code}' \
+              http://127.0.0.1:18080/v1/provision/slow
+          )"
+          test "$generic_status" = "504"
+
+          grep -q 'TWINPANEL_PROVISION_LONG_REQUEST_V1' "$TMP/server.conf"
+          echo "PROVISION_EXACT_ROUTE_STATUS=$exact_status"
+          echo "GENERIC_ROUTE_STATUS=$generic_status"
+          echo "REAL_NGINX_SCOPED_TIMEOUT=PASS"
