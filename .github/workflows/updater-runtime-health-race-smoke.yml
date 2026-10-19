@@ -44,26 +44,34 @@ jobs:
               shutil.copyfile('deploy/systemd/twinpanel-api.service.tpl', target)
               return release
 
+          def canonical_unit(release: Path) -> str:
+              return module.render_api_unit(release, 8095)
+
           def ok_run(calls):
               def fake(argv, *, timeout=30):
                   calls.append(list(argv))
                   return SimpleNamespace(returncode=0, stdout='')
               return fake
 
-          # Scenario 1: the updater already queued the API restart. The Web
-          # pre-start reconciler must reuse that in-flight restart instead of
-          # scheduling a second/destructive restart transaction.
+          # Scenario 1: the unit is already canonical and the updater already
+          # queued an API restart. Reuse that in-flight restart and do not add
+          # a second restart transaction.
           with tempfile.TemporaryDirectory() as td:
               root = Path(td)
               release = make_release(root)
               unit = root / 'twinpanel-api.service'
-              unit.write_text('legacy unit\n', encoding='utf-8')
+              unit.write_text(canonical_unit(release), encoding='utf-8')
               backup = root / 'api.backup'
               calls = []
               module._run = ok_run(calls)
               module.api_process_matches_active_release = lambda **_: (False, 100, '/old/backend')
-              module.wait_for_api_process_match = lambda **_: (4242, str((release / 'backend').resolve()))
+              waits = {'count': 0}
 
+              def wait_reuse(**kwargs):
+                  waits['count'] += 1
+                  return 4242, str((release / 'backend').resolve())
+
+              module.wait_for_api_process_match = wait_reuse
               result = module.reconcile_api_unit(
                   release_root=release,
                   api_port=8095,
@@ -79,13 +87,16 @@ jobs:
                   if 'restart' in c and 'twinpanel-api.service' in c
               ]
               assert restart_calls == [], restart_calls
+              assert waits['count'] == 2, waits
+              assert result['unit_changed'] is False
               assert result['api_reused_inflight_restart'] is True
               assert result['api_restarted'] is False
               assert result['api_process_matches_active_release'] is True
-              assert any('daemon-reload' in c for c in calls)
 
-          # Scenario 2: no in-flight restart converges. Exactly one bounded
-          # recovery restart is allowed, followed by the normal verification.
+          # Scenario 2: a migrated/legacy API unit must be rewritten and then
+          # restarted immediately. Waiting through the in-flight grace here is
+          # harmful because the already queued restart may still use the stale
+          # unit definition and consume most of the updater's health window.
           with tempfile.TemporaryDirectory() as td:
               root = Path(td)
               release = make_release(root)
@@ -97,13 +108,11 @@ jobs:
               module.api_process_matches_active_release = lambda **_: (False, 100, '/old/backend')
               waits = {'count': 0}
 
-              def wait(**kwargs):
+              def wait_changed(**kwargs):
                   waits['count'] += 1
-                  if waits['count'] == 1:
-                      raise RuntimeError('API_RUNTIME_PATH_MISMATCH:simulated')
                   return 5252, str((release / 'backend').resolve())
 
-              module.wait_for_api_process_match = wait
+              module.wait_for_api_process_match = wait_changed
               result = module.reconcile_api_unit(
                   release_root=release,
                   api_port=8095,
@@ -119,6 +128,50 @@ jobs:
                   if 'restart' in c and 'twinpanel-api.service' in c
               ]
               assert len(restart_calls) == 1, restart_calls
+              assert waits['count'] == 1, waits
+              assert result['unit_changed'] is True
+              assert result['api_reused_inflight_restart'] is False
+              assert result['api_restarted'] is True
+              assert result['api_process_matches_active_release'] is True
+              assert any('daemon-reload' in c for c in calls)
+
+          # Scenario 3: a canonical unit whose in-flight restart genuinely does
+          # not converge gets exactly one bounded recovery restart.
+          with tempfile.TemporaryDirectory() as td:
+              root = Path(td)
+              release = make_release(root)
+              unit = root / 'twinpanel-api.service'
+              unit.write_text(canonical_unit(release), encoding='utf-8')
+              backup = root / 'api.backup'
+              calls = []
+              module._run = ok_run(calls)
+              module.api_process_matches_active_release = lambda **_: (False, 100, '/old/backend')
+              waits = {'count': 0}
+
+              def wait_recovery(**kwargs):
+                  waits['count'] += 1
+                  if waits['count'] == 1:
+                      raise RuntimeError('API_RUNTIME_PATH_MISMATCH:simulated')
+                  return 6262, str((release / 'backend').resolve())
+
+              module.wait_for_api_process_match = wait_recovery
+              result = module.reconcile_api_unit(
+                  release_root=release,
+                  api_port=8095,
+                  unit_path=unit,
+                  backup_path=backup,
+                  restart=True,
+                  verify=True,
+                  systemctl='/fake/systemctl',
+              )
+
+              restart_calls = [
+                  c for c in calls
+                  if 'restart' in c and 'twinpanel-api.service' in c
+              ]
+              assert len(restart_calls) == 1, restart_calls
+              assert waits['count'] == 2, waits
+              assert result['unit_changed'] is False
               assert result['api_reused_inflight_restart'] is False
               assert result['api_restarted'] is True
               assert result['api_process_matches_active_release'] is True
