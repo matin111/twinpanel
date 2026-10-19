@@ -125,7 +125,7 @@ ovpn_changed |= replace_or_append(
 ovpn_changed |= replace_or_append(
     ovpn,
     r"^\s*mssfix\s+.*$",
-    f"mssfix {ACCESS_MSS}",
+    f"mssfix {{ACCESS_MSS}}",
 )
 if ovpn_changed:
     Path("/run/twinpanel-v51-restart-openvpn").touch()
