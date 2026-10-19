@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.75",
+  "version": "1.1.0-rc.76",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-19T23:41:23Z",
+  "released_at": "2026-10-19T23:55:42Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "6d56ba70b8743f6c008e4f5b3dca4a0e5eddd800",
+  "source_sha": "c13ddeaf2123f4cab213aa0042cb88159b46722d",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.75/twinpanel-1.1.0-rc.75-linux-x86_64.tar.gz",
-    "sha256": "c4088a801a9a19adfc7e9acf1f47ab42af35da86718c3e06dd2f81217dac37bf",
-    "size_bytes": 12891172
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.76/twinpanel-1.1.0-rc.76-linux-x86_64.tar.gz",
+    "sha256": "3f47c2d91f7d6ed29aaf667aebb715e0b4767c6715cb2a796b443513bafaff27",
+    "size_bytes": 12893416
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.75 مشکل خوانایی مرکز بروزرسانی و اجزای مرتبط در Dark Mode را اصلاح می‌کند، بدون تغییر Backend، API، Route، Auth یا اصلاح Provisioning نسخه rc.74. Root Cause از روی اسکرین‌شات واقعی rc.74 و Audit کد مشخص شد: فایل app/system-release.css هنوز از توکن‌های قدیمی --panel و --border با fallback روشن مانند #fff و #dce3ef استفاده می‌کرد، در حالی که Design System فعلی TwinPanel بر پایه --surface، --surface2، --line، --text و --muted است. در نتیجه در Dark Mode کارت بروزرسانی، کارت‌های نسخه، توضیحات نسخه، Stepها، Footer بروزرسانی و پنجره لایسنس به سطح روشن fallback می‌کردند اما متن از تم تاریک روشن باقی می‌ماند و کنتراست از بین می‌رفت. rc.75 یک Theme Contract محدود به همین Release UI اضافه می‌کند که --panel را به --surface و --border را به --line نگاشت می‌کند، متن و metadata را با توکن‌های فعلی هماهنگ می‌کند و جزئیات فنی در Dark Mode را روی --surface2 نمایش می‌دهد. هیچ !important، متغیر legacy سراسری یا override زنجیره‌ای برای صفحات دیگر اضافه نشده است. CI شامل Smoke اختصاصی قرارداد Dark Mode به‌همراه Build/Validation عمومی پنل است. رفع 504 نصب نود و Nginx migration نسخه rc.74 بدون تغییر باقی مانده‌اند.",
-    "en": "TwinPanel 1.1.0-rc.75 corrects the System Update Center and related release UI readability in dark mode without changing backend, API, routes, authentication, or the rc.74 provisioning correction. The root cause was established from the real rc.74 screenshots and code audit: app/system-release.css still consumed legacy --panel and --border tokens with light fallbacks such as #fff and #dce3ef, while the current TwinPanel design system uses --surface, --surface2, --line, --text, and --muted. In dark mode the update card, version cards, release notes, progress steps, release footer, and license dialog therefore fell back to light surfaces while inheriting light dark-theme text, destroying contrast. rc.75 adds a narrowly scoped release-UI theme contract mapping --panel to --surface and --border to --line, aligns text and metadata with current theme tokens, and renders technical details on --surface2 in dark mode. It introduces no !important escalation, no global legacy variables, and no cross-page override chain. CI includes a dedicated dark-mode contract smoke plus the normal panel build and validation checks. The rc.74 node-provisioning 504 fix and Nginx migration remain unchanged."
+    "fa": "TwinPanel 1.1.0-rc.76 دو ایراد واقعی مرکز بروزرسانی را که روی سرور 217.179.6.142 در rc.75 دیده شد اصلاح می‌کند. ایراد اول مربوط به خارج شدن/بریده دیده شدن محتوای پنجره بروزرسانی در برخی ابعاد viewport و پس از restore شدن scroll بود؛ لایه V76 اکنون عرض را به viewport محدود می‌کند، max-height را با 100dvh/100vh محاسبه می‌کند، shell مودال را قابل scroll و overscroll را محدود می‌کند و برای متن‌های طولانی release/error شکست خط ایمن دارد. ایراد دوم این بود که SystemReleaseFooter قبل از reload موفق، recovery marker را با reload_from ذخیره می‌کرد اما mount بعدی هر recovery marker را دلیل باز کردن خودکار مودال می‌دانست؛ درخواست status بعداً marker را پاک می‌کرد ولی مودال بازشده دیگر بسته نمی‌شد. rc.76 یک cleanup قبل از hydration اضافه می‌کند که فقط marker دارای reload_from را حذف می‌کند، بنابراین بعد از refresh موفق مودال دوباره باز نمی‌ماند، در حالی که markerهای واقعی update در حال اجرا بدون reload_from حفظ می‌شوند تا progress بعد از refresh دستی بازیابی شود. Backend، API، Route، Auth، Provisioning و اصلاح Nginx/504 نسخه rc.74 بدون تغییر باقی مانده‌اند. CI شامل regression اختصاصی lifecycle/viewport به‌همراه Preview Validation، API Build و smokeهای موجود است.",
+    "en": "TwinPanel 1.1.0-rc.76 fixes two real System Update Center defects reproduced on server 217.179.6.142 under rc.75. First, the update dialog could appear cropped/out of frame after viewport changes or restored inner scrolling; V76 now hard-bounds width to the live viewport, uses 100dvh/100vh for safe max height, makes the modal shell scrollable with contained overscroll, and safely wraps long release/error text. Second, SystemReleaseFooter wrote a recovery marker with reload_from immediately before the successful forced reload, while the next mount treated any recovery marker as a reason to auto-open the dialog. A later status request cleared the marker but did not close the already-open modal, leaving the operator to press Close manually. rc.76 adds a pre-hydration cleanup which removes only markers that already contain reload_from, so a completed update no longer reopens after refresh while genuine in-progress markers without reload_from are preserved for progress recovery after a manual refresh. Backend, API, routes, auth, provisioning, and the rc.74 Nginx/504 correction are unchanged. CI includes a dedicated lifecycle/viewport regression plus Preview Validation, API Build, and the existing smoke suite."
   }
 }
