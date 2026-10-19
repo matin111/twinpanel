@@ -31,16 +31,13 @@ type AttentionState={
   updateAvailable:boolean;
 };
 
-async function request<T>(path:string,init:RequestInit={}):Promise<T>{
+async function request<T>(path:string):Promise<T>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
-  const headers=new Headers(init.headers);
-  headers.set("Authorization",`Bearer ${token}`);
   const response=await fetch(`${API_BASE}${path}`,{
-    ...init,
-    headers,
+    headers:{Authorization:`Bearer ${token}`},
     cache:"no-store",
-    signal:init.signal??AbortSignal.timeout(5000),
+    signal:AbortSignal.timeout(5000),
   });
   if(!response.ok)throw new Error(`API ${response.status}`);
   return response.json() as Promise<T>;
@@ -133,9 +130,9 @@ export function useAdminNavAttention(_active:string){
       void refreshNotifications();
     },10000);
 
-    const releaseTimer=window.setInterval(()=>{
+    const releaseStatusTimer=window.setInterval(()=>{
       if(document.visibilityState==="visible")void refreshRelease();
-    },300000);
+    },5000);
 
     window.addEventListener("focus",refreshVisible);
     document.addEventListener("visibilitychange",refreshVisible);
@@ -144,7 +141,7 @@ export function useAdminNavAttention(_active:string){
       alive=false;
       window.clearInterval(fastTimer);
       window.clearInterval(workTimer);
-      window.clearInterval(releaseTimer);
+      window.clearInterval(releaseStatusTimer);
       window.removeEventListener("focus",refreshVisible);
       document.removeEventListener("visibilitychange",refreshVisible);
     };

@@ -218,6 +218,84 @@ html[data-theme="light"] .customer-portal-topnav-menu{
   box-shadow:0 18px 45px rgba(22,34,55,.12);
 }
 
+/* Actionable reseller transactions use the same red attention language as admin. */
+.customer-portal-topnav-group.has-attention>summary{
+  color:#ff9aa4;
+  border-color:rgba(239,68,68,.48);
+  background:linear-gradient(180deg,rgba(239,68,68,.12),rgba(239,68,68,.04));
+  box-shadow:0 8px 22px rgba(239,68,68,.08);
+}
+.customer-portal-topnav-group.has-attention:hover>summary,
+.customer-portal-topnav-group.has-attention[open]>summary,
+.customer-portal-topnav-group.active.has-attention>summary{
+  color:#ffd7db;
+  border-color:rgba(248,113,113,.62);
+  background:rgba(239,68,68,.13);
+}
+.customer-portal-topnav-menu>a.has-attention,
+.customer-portal-sidebar .customer-portal-nav>a.has-attention{
+  color:#ff9aa4;
+  border-color:rgba(239,68,68,.32);
+  background:rgba(239,68,68,.07);
+}
+.customer-portal-topnav-menu>a.has-attention:hover,
+.customer-portal-sidebar .customer-portal-nav>a.has-attention:hover,
+.customer-portal-topnav-menu>a.active.has-attention,
+.customer-portal-sidebar .customer-portal-nav>a.active.has-attention{
+  color:#ffe1e4;
+  border-color:rgba(248,113,113,.55);
+  background:rgba(239,68,68,.12);
+}
+.portal-nav-attention-dot{
+  width:8px;
+  height:8px;
+  flex:0 0 8px;
+  border-radius:999px;
+  background:#ef4444;
+  box-shadow:0 0 0 0 rgba(239,68,68,.58);
+  opacity:1;
+  transform:none;
+  animation:portal-nav-attention-pulse 1.15s ease-out infinite;
+}
+.customer-portal-topnav-group[open]>summary .portal-nav-attention-dot{transform:none}
+.portal-nav-attention-count{
+  min-width:20px;
+  height:20px;
+  margin-inline-start:auto;
+  padding:0 6px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+  border-radius:999px;
+  color:#fff;
+  background:#dc2626;
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 0 0 2px rgba(220,38,38,.12);
+  font-size:10px;
+  font-weight:900;
+  line-height:1;
+}
+@keyframes portal-nav-attention-pulse{
+  0%{box-shadow:0 0 0 0 rgba(239,68,68,.62)}
+  55%{box-shadow:0 0 0 7px rgba(239,68,68,0)}
+  100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}
+}
+@media(prefers-reduced-motion:reduce){
+  .portal-nav-attention-dot{animation:none}
+}
+html[data-theme="light"] .customer-portal-topnav-group.has-attention>summary{
+  color:#c6283d;
+  border-color:#fecdd3;
+  background:#fff1f2;
+}
+html[data-theme="light"] .customer-portal-topnav-menu>a.has-attention,
+html[data-theme="light"] .customer-portal-sidebar .customer-portal-nav>a.has-attention{
+  color:#b42336;
+  border-color:#fecdd3;
+  background:#fff5f6;
+}
+
 @media(max-width:1100px) and (min-width:901px){
   .customer-portal-topnav{max-width:calc(100% - 330px);gap:4px}
   .customer-portal-topnav-group>summary{padding-inline:9px;font-size:12px}

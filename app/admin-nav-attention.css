@@ -60,6 +60,18 @@
   box-shadow:0 0 0 1px rgba(239,68,68,.08) inset!important;
 }
 
+/* Release attention must be unmistakable, not just a subtle border. */
+.topnav-release.has-attention .system-release-footer.has-update{
+  color:#ffe1e4;
+  background:linear-gradient(180deg,rgba(239,68,68,.13),rgba(239,68,68,.055));
+}
+.topnav-release.has-attention .system-release-footer.has-update .system-update-button{
+  color:#fff;
+  border-color:rgba(248,113,113,.72);
+  background:linear-gradient(135deg,#dc2626,#be123c);
+  box-shadow:0 8px 20px rgba(220,38,38,.22);
+}
+
 @keyframes twinpanel-nav-attention-pulse{
   0%{box-shadow:0 0 0 0 rgba(239,68,68,.62);opacity:1}
   55%{box-shadow:0 0 0 7px rgba(239,68,68,0);opacity:.76}
@@ -84,4 +96,14 @@ html[data-theme="light"] .topnav-menu-grid>a.has-attention{
 
 html[data-theme="light"] .topnav-menu-grid>a.has-attention i{
   color:#e11d48!important;
+}
+
+html[data-theme="light"] .topnav-release.has-attention .system-release-footer.has-update{
+  color:#9f1239;
+  background:#fff1f2;
+}
+html[data-theme="light"] .topnav-release.has-attention .system-release-footer.has-update .system-update-button{
+  color:#fff;
+  border-color:#e11d48;
+  background:linear-gradient(135deg,#dc2626,#be123c);
 }
