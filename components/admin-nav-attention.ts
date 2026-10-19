@@ -4,6 +4,9 @@ import {useEffect,useMemo,useState} from "react";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 
+const RELEASE_NOTICE_KEY="twinpanel-release-update-available-v1";
+const RELEASE_EVENT="twinpanel:release-status";
+
 type NotificationItem={
   route?:string|null;
   read_at?:string|null;
@@ -31,6 +34,17 @@ type AttentionState={
   updateAvailable:boolean;
 };
 
+function cachedUpdateAttention(){
+  try{
+    if(typeof window==="undefined")return false;
+    return window.localStorage.getItem(RELEASE_NOTICE_KEY)==="1";
+  }catch{return false;}
+}
+
+function persistUpdateAttention(value:boolean){
+  try{window.localStorage.setItem(RELEASE_NOTICE_KEY,value?"1":"0");}catch{}
+}
+
 async function request<T>(path:string):Promise<T>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
@@ -51,13 +65,13 @@ function normalizeRoute(raw:unknown):string|null{
 }
 
 export function useAdminNavAttention(_active:string){
-  const [state,setState]=useState<AttentionState>({
+  const [state,setState]=useState<AttentionState>(()=>({
     paymentReviewCount:0,
     supportNeedsReplyCount:0,
     notificationUnreadCount:0,
     unreadRoutes:[],
-    updateAvailable:false,
-  });
+    updateAvailable:cachedUpdateAttention(),
+  }));
 
   useEffect(()=>{
     let alive=true;
@@ -66,9 +80,7 @@ export function useAdminNavAttention(_active:string){
       try{
         const rows=await request<SupportTicket[]>("/v1/admin/support/tickets?status=open");
         if(!alive)return;
-        const count=Array.isArray(rows)
-          ?rows.filter(row=>String(row?.status||"").toLowerCase()==="open").length
-          :0;
+        const count=Array.isArray(rows)?rows.filter(row=>String(row?.status||"").toLowerCase()==="open").length:0;
         setState(current=>({...current,supportNeedsReplyCount:count}));
       }catch{}
     };
@@ -85,18 +97,10 @@ export function useAdminNavAttention(_active:string){
       try{
         const payload=await request<NotificationPayload>("/v1/admin/panel-notifications");
         if(!alive)return;
-        const rows=Array.isArray(payload.items)
-          ?payload.items.filter((row):row is NotificationItem=>Boolean(row&&typeof row==="object"))
-          :[];
+        const rows=Array.isArray(payload.items)?payload.items.filter((row):row is NotificationItem=>Boolean(row&&typeof row==="object")):[];
         const unreadRows=rows.filter(row=>!row.is_read&&!row.read_at);
-        const routes=Array.from(new Set(
-          unreadRows
-            .map(row=>normalizeRoute(row.route))
-            .filter((route):route is string=>Boolean(route))
-        ));
-        const unread=Number.isFinite(Number(payload.unread_count))
-          ?Math.max(0,Number(payload.unread_count)||0)
-          :unreadRows.length;
+        const routes=Array.from(new Set(unreadRows.map(row=>normalizeRoute(row.route)).filter((route):route is string=>Boolean(route))));
+        const unread=Number.isFinite(Number(payload.unread_count))?Math.max(0,Number(payload.unread_count)||0):unreadRows.length;
         setState(current=>({...current,notificationUnreadCount:unread,unreadRoutes:routes}));
       }catch{}
     };
@@ -105,8 +109,17 @@ export function useAdminNavAttention(_active:string){
       try{
         const release=await request<ReleaseStatus>("/v1/admin/system/release/status");
         if(!alive)return;
-        setState(current=>({...current,updateAvailable:Boolean(release.update_available)}));
+        const available=Boolean(release.update_available);
+        persistUpdateAttention(available);
+        setState(current=>({...current,updateAvailable:available}));
       }catch{}
+    };
+
+    const handleReleaseEvent=(event:Event)=>{
+      const detail=(event as CustomEvent<{updateAvailable?:boolean}>).detail;
+      const available=Boolean(detail?.updateAvailable);
+      persistUpdateAttention(available);
+      setState(current=>({...current,updateAvailable:available}));
     };
 
     const refreshVisible=()=>{
@@ -132,9 +145,10 @@ export function useAdminNavAttention(_active:string){
 
     const releaseStatusTimer=window.setInterval(()=>{
       if(document.visibilityState==="visible")void refreshRelease();
-    },5000);
+    },30000);
 
     window.addEventListener("focus",refreshVisible);
+    window.addEventListener(RELEASE_EVENT,handleReleaseEvent as EventListener);
     document.addEventListener("visibilitychange",refreshVisible);
 
     return()=>{
@@ -143,6 +157,7 @@ export function useAdminNavAttention(_active:string){
       window.clearInterval(workTimer);
       window.clearInterval(releaseStatusTimer);
       window.removeEventListener("focus",refreshVisible);
+      window.removeEventListener(RELEASE_EVENT,handleReleaseEvent as EventListener);
       document.removeEventListener("visibilitychange",refreshVisible);
     };
   },[]);
