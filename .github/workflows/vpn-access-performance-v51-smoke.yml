@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "backend/app/vpn_access_performance_v51.py"
+      - "backend/app/vpn_access_performance_v51_runtime_guard_v57.py"
       - "backend/app/tunnel_transport_manager_v12.py"
       - "backend/app/transport_manager_service_v12.py"
       - ".github/workflows/vpn-access-performance-v51-smoke.yml"
@@ -22,6 +23,7 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/vpn_access_performance_v51.py \
+            backend/app/vpn_access_performance_v51_runtime_guard_v57.py \
             backend/app/tunnel_transport_manager_v12.py \
             backend/app/transport_manager_service_v12.py
 
@@ -45,9 +47,11 @@ jobs:
           assert 'f"mtu = {ACCESS_MTU}"' in perf
           assert "systemctl restart ocserv.service" in perf
 
-          # OpenVPN/WireGuard/L2TP receive the same invariant.
+          # OpenVPN/WireGuard/L2TP receive the same invariant. ACCESS_MSS is a
+          # variable in the embedded remote Python payload, so its braces must
+          # remain escaped in this outer controller-side f-string.
           assert 'f"tun-mtu {ACCESS_MTU}"' in perf
-          assert 'f"mssfix {ACCESS_MSS}"' in perf
+          assert 'f"mssfix {{ACCESS_MSS}}"' in perf
           assert '"/etc/wireguard/wg-access0.conf"' in perf
           assert 'f"MTU = {ACCESS_MTU}"' in perf
           assert '"/etc/ppp/options.xl2tpd"' in perf
@@ -71,3 +75,7 @@ jobs:
 
           print("VPN_ACCESS_PERFORMANCE_V51=PASS")
           PY
+
+      - name: Render actual V51 remote script
+        run: |
+          python backend/app/vpn_access_performance_v51_runtime_guard_v57.py
