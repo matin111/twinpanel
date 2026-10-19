@@ -39,7 +39,7 @@ jobs:
           python3 -m py_compile backend/scripts/twinpanel_protocol_cli.py
           python3 -m py_compile backend/scripts/twinpanel_protocol_cli_en.py
 
-      - name: Verify SSH menu is English-only and ASCII-safe
+      - name: Verify SSH menu is English-only, ASCII-safe and one-key
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -57,15 +57,13 @@ jobs:
           assert "Language" not in menu
           assert "Panel status" in menu
           assert "Service management" in menu
-          assert "Administrator management" in menu
+          assert 'header "Administrator"' in menu
           assert "Protocol management" in menu
-          assert "Available protocols:" in menu
-          assert "Cisco / OpenConnect" in menu
-          assert "OpenVPN" in menu
-          assert "WireGuard" in menu
-          assert "L2TP / IPsec" in menu
-          assert "V2Ray / Xray" in menu
           assert "scripts/twinpanel_protocol_cli_en.py" in menu
+          assert 'read -r -n 1 -p "Choose: "' in menu
+          assert "Press any key to continue..." in menu
+          assert "Type UPDATE" not in menu
+          assert "[y/N]" not in menu
           assert 'export PYTHONPATH="$BACKEND${PYTHONPATH:+:$PYTHONPATH}"' in menu
           assert "unit_exists" in menu
           assert "not-installed" in menu
@@ -73,13 +71,19 @@ jobs:
           assert "restart_nginx || true" in menu
 
           protocol = protocol_path.read_text(encoding="utf-8")
-          assert 'print("\\nAvailable protocols")' not in protocol
           main_start = protocol.index("def main()")
           main_body = protocol[main_start:]
           assert main_body.index("_select_protocol()") < main_body.index("_select_node(db)")
-          assert "Local / This server" in protocol
+          assert "This server" in protocol
           assert "No Exit nodes are configured yet." not in protocol
           assert "_managed_nodes" in protocol
+          assert "def _read_key(" in protocol
+          assert "tty.setcbreak(fd)" in protocol
+          assert "Type 'REMOVE" not in protocol
+          assert 'print("  [1] Remove")' in protocol
+          assert 'print("  [0] Cancel")' in protocol
+          for name in ("Cisco / OpenConnect", "OpenVPN", "WireGuard", "L2TP", "V2Ray"):
+              assert name in Path("backend/app/routers/provision.py").read_text(encoding="utf-8") or name in protocol
 
           local_runtime = local_path.read_text(encoding="utf-8")
           assert 'LOCAL_AGENT_URL = "local://core"' in local_runtime
