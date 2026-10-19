@@ -6,6 +6,7 @@ import {ThemeSwitch} from "../lib/theme";
 import {BrandMark} from "../lib/branding";
 import {AdminNotificationCenter} from "./admin-notification-center";
 import {useAdminNavAttention} from "./admin-nav-attention";
+import {AdminSubscriptionLiveTable} from "./admin-subscription-live-table";
 import {SystemReleaseFooter} from "./system-release-footer";
 
 const menuGroups=[
@@ -113,6 +114,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
         <div className="search">⌕ <input placeholder={pick("جستجو در پنل...","Search panel...")}/></div>
         <div className="head-actions"><LanguageSwitch compact/><ThemeSwitch compact/><AdminNotificationCenter/><span className="avatar">M</span></div>
       </header>
+      {active==="/admin/subscriptions"&&<AdminSubscriptionLiveTable/>}
       {children}
     </main>
   </div>;
