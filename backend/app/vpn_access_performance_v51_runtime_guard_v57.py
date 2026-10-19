@@ -53,3 +53,27 @@ def render_v51_performance_script() -> str:
         raise RuntimeError("v51_performance_script_render_empty")
 
     return rendered
+
+
+def validate_v51_performance_script() -> str:
+    rendered = render_v51_performance_script()
+
+    required = (
+        "ACCESS_MTU=1200",
+        "ACCESS_MSS=1160",
+        'f"mssfix {ACCESS_MSS}"',
+        "V51_OK=1",
+        "TP_ACCESS_PERF",
+    )
+    missing = [token for token in required if token not in rendered]
+    if missing:
+        raise RuntimeError(
+            "v51_performance_script_contract_missing:" + ",".join(missing)
+        )
+
+    return rendered
+
+
+if __name__ == "__main__":
+    validate_v51_performance_script()
+    print("VPN_ACCESS_PERFORMANCE_V51_RUNTIME_RENDER=PASS")
