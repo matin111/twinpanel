@@ -33,10 +33,18 @@ jobs:
               "/v1/reseller/notifications",
               '"/reseller/bot-wallet"',
               '"/reseller/orders"',
+              '"/reseller/notifications"',
               '"awaiting_review"',
           ]
           for needle in required_reseller:
               assert needle in reseller, needle
+
+          # Transaction menus are driven only by actionable transaction state.
+          # Unread notifications must not pin a resolved transaction menu red.
+          assert "normalizeRoute" not in reseller
+          assert "row.route" not in reseller
+          assert "unreadNotificationCount" in reseller
+          assert "4000" in reseller
 
           assert "useResellerNavAttention" in shell
           assert "portal-nav-attention-count" in shell
@@ -44,8 +52,10 @@ jobs:
           assert "groupHasAttention" in shell
           assert "attention={attention}" in shell
 
-          assert '/v1/admin/system/release/check' in admin
-          assert 'method:"POST"' in admin
+          # The nav observes backend release status only. SystemReleaseFooter owns
+          # the real remote release/check POST so duplicate checks are forbidden.
+          assert '/v1/admin/system/release/status' in admin
+          assert '/v1/admin/system/release/check' not in admin
           assert 'releaseStatusTimer' in admin
           assert '5000' in admin
           assert 'groupName==="System & Maintenance"&&state.updateAvailable' in admin
