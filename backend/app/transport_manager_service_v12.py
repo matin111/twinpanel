@@ -66,7 +66,14 @@ def ensure_transport_manager_service_v12() -> dict:
     the old /opt/twinpanel-product working directory. Because twinpanel-api runs
     as root, API startup is the compatibility bridge: install the exact
     product-owned unit, preserve one rollback copy of an old unit, reload
-    systemd, enable the service and start it asynchronously.
+    systemd, enable the service, and make sure the running manager process is
+    restarted onto the newly activated /opt/twinpanel/current release.
+
+    Restarting an already-active manager is intentional. ``systemctl start`` is
+    a no-op for an active unit, which previously left the old Python process in
+    RAM across panel updates. That meant newly shipped reconciliation workers
+    such as VPN Access Dataplane V46 / Performance V47 could exist on disk while
+    never actually running until a manual reboot or service restart.
 
     The initial installer imports app.main before it creates twinpanel-api.service.
     We deliberately defer activation in that phase; the first real API service
@@ -81,6 +88,7 @@ def ensure_transport_manager_service_v12() -> dict:
         "managed": False,
         "changed": False,
         "started": False,
+        "restarted": False,
         "reason": None,
     }
 
@@ -140,14 +148,41 @@ def ensure_transport_manager_service_v12() -> dict:
         result["reason"] = "enable_failed"
         return result
 
-    # Do not block API startup on the manager. --no-block avoids a dependency
-    # cycle because the manager is ordered After=twinpanel-api.service.
-    start_cp = _run(systemctl, "start", "--no-block", UNIT_NAME)
-    if start_cp.returncode != 0:
+    # TWINPANEL_TRANSPORT_MANAGER_RELEASE_RELOAD_V48
+    #
+    # API startup is the activation boundary after /opt/twinpanel/current is
+    # switched by the updater. An already-running manager has imported Python
+    # modules from the previous release and MUST be restarted; merely calling
+    # `systemctl start` leaves that old process untouched.
+    active_cp = _run(systemctl, "is-active", "--quiet", UNIT_NAME)
+
+    if active_cp.returncode == 0:
+        activate_cp = _run(
+            systemctl,
+            "restart",
+            "--no-block",
+            UNIT_NAME,
+        )
+        action = "restart"
+    else:
+        activate_cp = _run(
+            systemctl,
+            "start",
+            "--no-block",
+            UNIT_NAME,
+        )
+        action = "start"
+
+    if activate_cp.returncode != 0:
         result["ok"] = False
-        result["reason"] = "start_failed"
+        result["reason"] = f"{action}_failed"
         return result
 
-    result["started"] = True
-    result["reason"] = "activated"
+    if action == "restart":
+        result["restarted"] = True
+        result["reason"] = "release_reloaded"
+    else:
+        result["started"] = True
+        result["reason"] = "activated"
+
     return result

@@ -1,0 +1,73 @@
+name: Transport Manager Release Reload V48 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/transport_manager_service_v12.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/transport-manager-release-reload-v48-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/transport_manager_service_v12.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/transport-manager-release-reload-v48-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile manager activation code
+        run: |
+          python -m py_compile \
+            backend/app/transport_manager_service_v12.py \
+            backend/app/tunnel_transport_manager_v12.py
+
+      - name: Verify release reload contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          service = Path("backend/app/transport_manager_service_v12.py").read_text()
+          manager = Path("backend/app/tunnel_transport_manager_v12.py").read_text()
+
+          required_service = [
+              "TWINPANEL_TRANSPORT_MANAGER_RELEASE_RELOAD_V48",
+              '"is-active", "--quiet", UNIT_NAME',
+              '"restart",',
+              '"--no-block",',
+              'result["restarted"] = True',
+              'result["reason"] = "release_reloaded"',
+          ]
+          for token in required_service:
+              assert token in service, token
+
+          # Regression guard: a newly installed/inactive manager must still be
+          # started normally, while active managers are restarted onto current.
+          assert 'action = "restart"' in service
+          assert 'action = "start"' in service
+          assert 'result["started"] = True' in service
+
+          # The workers whose code must be reloaded across a release remain
+          # part of the manager process.
+          required_manager = [
+              "vpn_access_dataplane_v46",
+              "vpn_access_performance_v47",
+              "vpn_access_dataplane_loop()",
+              "vpn_access_performance_loop()",
+          ]
+          for token in required_manager:
+              assert token in manager, token
+
+          print("TRANSPORT_MANAGER_RELEASE_RELOAD_V48_SMOKE_OK")
+          PY
