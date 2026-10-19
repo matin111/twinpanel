@@ -31,16 +31,13 @@ type AttentionState={
   updateAvailable:boolean;
 };
 
-async function request<T>(path:string,init:RequestInit={}):Promise<T>{
+async function request<T>(path:string):Promise<T>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
-  const headers=new Headers(init.headers);
-  headers.set("Authorization",`Bearer ${token}`);
   const response=await fetch(`${API_BASE}${path}`,{
-    ...init,
-    headers,
+    headers:{Authorization:`Bearer ${token}`},
     cache:"no-store",
-    signal:init.signal??AbortSignal.timeout(5000),
+    signal:AbortSignal.timeout(5000),
   });
   if(!response.ok)throw new Error(`API ${response.status}`);
   return response.json() as Promise<T>;
@@ -104,16 +101,13 @@ export function useAdminNavAttention(_active:string){
       }catch{}
     };
 
-    const applyRelease=async(path:string,init:RequestInit={})=>{
+    const refreshRelease=async()=>{
       try{
-        const release=await request<ReleaseStatus>(path,init);
+        const release=await request<ReleaseStatus>("/v1/admin/system/release/status");
         if(!alive)return;
         setState(current=>({...current,updateAvailable:Boolean(release.update_available)}));
       }catch{}
     };
-
-    const refreshRelease=()=>applyRelease("/v1/admin/system/release/status");
-    const checkRelease=()=>applyRelease("/v1/admin/system/release/check",{method:"POST"});
 
     const refreshVisible=()=>{
       if(document.visibilityState!=="visible")return;
@@ -124,7 +118,6 @@ export function useAdminNavAttention(_active:string){
     };
 
     refreshVisible();
-    void checkRelease();
 
     const fastTimer=window.setInterval(()=>{
       if(document.visibilityState!=="visible")return;
@@ -141,10 +134,6 @@ export function useAdminNavAttention(_active:string){
       if(document.visibilityState==="visible")void refreshRelease();
     },5000);
 
-    const releaseCheckTimer=window.setInterval(()=>{
-      if(document.visibilityState==="visible")void checkRelease();
-    },300000);
-
     window.addEventListener("focus",refreshVisible);
     document.addEventListener("visibilitychange",refreshVisible);
 
@@ -153,7 +142,6 @@ export function useAdminNavAttention(_active:string){
       window.clearInterval(fastTimer);
       window.clearInterval(workTimer);
       window.clearInterval(releaseStatusTimer);
-      window.clearInterval(releaseCheckTimer);
       window.removeEventListener("focus",refreshVisible);
       document.removeEventListener("visibilitychange",refreshVisible);
     };
