@@ -22,6 +22,7 @@ DEFAULT_STATE_FILE = Path(
     "/var/lib/twinpanel-license/runtime-unit-reconcile.json"
 )
 DEFAULT_SYSTEMCTL = "/usr/bin/systemctl"
+INFLIGHT_RESTART_GRACE_SECONDS = 12.0
 
 
 def _now() -> str:
@@ -250,17 +251,34 @@ def reconcile_api_unit(
         )
 
     restarted = False
-    if restart and (changed or not process_matches):
-        result = _run(
-            [ctl, "--no-block", "restart", "twinpanel-api.service"],
-            timeout=20,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(
-                "API_RESTART_FAILED:"
-                + (result.stdout or "")[-500:].replace("\n", " ")
+    reused_inflight_restart = False
+    if restart and not process_matches:
+        # During a public update, API and Web can already be part of the same
+        # systemd restart transaction. Web reaches this reconciler from its
+        # ExecStartPre while that API restart is still settling. A second API
+        # restart here races the updater's first restart and can leave both
+        # health endpoints reporting the previous version until rollback.
+        # Reuse the already in-flight restart when it converges in a bounded
+        # window; only schedule one recovery restart when it does not.
+        try:
+            pid, cwd = wait_for_api_process_match(
+                active_root=release_root,
+                systemctl=ctl,
+                seconds=INFLIGHT_RESTART_GRACE_SECONDS,
             )
-        restarted = True
+            process_matches = True
+            reused_inflight_restart = True
+        except RuntimeError:
+            result = _run(
+                [ctl, "--no-block", "restart", "twinpanel-api.service"],
+                timeout=20,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(
+                    "API_RESTART_FAILED:"
+                    + (result.stdout or "")[-500:].replace("\n", " ")
+                )
+            restarted = True
 
     if verify:
         pid, cwd = wait_for_api_process_match(
@@ -278,6 +296,7 @@ def reconcile_api_unit(
         "unit_path": str(unit_path),
         "unit_changed": changed,
         "api_restarted": restarted,
+        "api_reused_inflight_restart": reused_inflight_restart,
         "api_process_matches_active_release": process_matches,
         "api_pid": pid,
         "api_cwd": cwd,
