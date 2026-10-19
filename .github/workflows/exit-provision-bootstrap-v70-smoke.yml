@@ -1,0 +1,55 @@
+name: TwinPanel Exit Provision Bootstrap V70 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/node_bootstrap_control_v66.py'
+      - '.github/workflows/exit-provision-bootstrap-v70-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate bootstrap module syntax
+        run: python3 -m py_compile backend/app/node_bootstrap_control_v66.py
+
+      - name: Verify first-install and outbound-control contracts
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('backend/app/node_bootstrap_control_v66.py')
+          text = path.read_text(encoding='utf-8')
+
+          required = [
+              'async def ssh_connect_bootstrap_v70(payload):',
+              'provision.ssh_connect = ssh_connect_bootstrap_v70',
+              'via_iran_bootstrap_',
+              'password=str(payload.password)',
+              'tunnel=iran_conn',
+              'async def _install_or_upgrade_agent_v70(',
+              '"mode": "direct_outbound"',
+              '"iran_dependency": False',
+              'fallback_only',
+          ]
+
+          missing = [item for item in required if item not in text]
+          if missing:
+              raise SystemExit('missing V70 contracts: ' + ', '.join(missing))
+
+          forbidden = [
+              'ip route add',
+              'iptables -A',
+              'wg set',
+              'gre1',
+              'kernel_gre',
+          ]
+          present = [item for item in forbidden if item in text]
+          if present:
+              raise SystemExit('bootstrap must not depend on data-plane mutations: ' + ', '.join(present))
+
+          print('EXIT_PROVISION_BOOTSTRAP_V70=OK')
+          PY
