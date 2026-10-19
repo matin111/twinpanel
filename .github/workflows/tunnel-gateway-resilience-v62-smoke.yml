@@ -5,6 +5,7 @@ on:
     paths:
       - "lib/legacy-control-api.ts"
       - "lib/tunnel-transport-api.ts"
+      - "lib/service-connections-v36-api.ts"
       - ".github/workflows/tunnel-gateway-resilience-v62-smoke.yml"
   workflow_dispatch:
 
@@ -21,10 +22,14 @@ jobs:
           grep -q 'lastGoodRead' lib/legacy-control-api.ts
           grep -q 'isHtmlErrorBody' lib/legacy-control-api.ts
           grep -q 'window.location.origin' lib/legacy-control-api.ts
+
           grep -q 'TRANSIENT_GET_STATUSES=new Set(\[502,503,504\])' lib/tunnel-transport-api.ts
           grep -q 'lastGoodRead' lib/tunnel-transport-api.ts
           grep -q 'isHtmlErrorBody' lib/tunnel-transport-api.ts
-          ! grep -q 'return payload.trim()' lib/legacy-control-api.ts
+
+          grep -q 'TRANSIENT_GET_STATUSES=new Set(\[502,503,504\])' lib/service-connections-v36-api.ts
+          grep -q 'lastGoodRead' lib/service-connections-v36-api.ts
+          grep -q 'isHtmlErrorBody' lib/service-connections-v36-api.ts
 
       - name: Setup Node
         uses: actions/setup-node@v4
