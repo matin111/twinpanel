@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.66",
+  "version": "1.1.0-rc.67",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-19T19:55:07Z",
+  "released_at": "2026-10-19T20:40:33Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "03512143b19e7778f92745e7ea2cbd41392b6935",
+  "source_sha": "69cc54fb1cbc76736921c2b58392230108d17202",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.66/twinpanel-1.1.0-rc.66-linux-x86_64.tar.gz",
-    "sha256": "b60cf84b555193c882066aa1d58628aa7fcc9f5aa4779f484ad62cd6d8319951",
-    "size_bytes": 12840132
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.67/twinpanel-1.1.0-rc.67-linux-x86_64.tar.gz",
+    "sha256": "35cfc425d74ca4baf2d25e2073d26cad0cf5863b3b5c5de10200244ac7c59418",
+    "size_bytes": 12841414
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.66 مجموعه اصلاحات Production بعد از rc.65 را منتشر می‌کند: خطای 500 ذخیره Bot Token نمایندگی با Bootstrap امن کلید Fernet روی نصب‌های قدیمی برطرف شده؛ Race باقی‌مانده‌ی Update هنگام فعال‌سازی نسخه با Restart همگرا و محدود اصلاح شده؛ مدیریت نود Exit در شرایطی که Controller مستقیماً به SSH خارج دسترسی ندارد ولی ایران به Exit دسترسی دارد، اکنون از همان اتصال احراز هویت‌شده‌ی ذخیره‌شده TwinPanel به نود ایران و تونل native خود AsyncSSH برای رسیدن به SSH عمومی Exit استفاده می‌کند و دیگر به اجرای جداگانه ssh -W روی Controller وابسته نیست. همچنین حذف نود آفلاین غیرقابل‌دسترسی با تأیید صریح Admin می‌تواند از مسیر force-retire موجود انجام شود. هیچ VPN dataplane، GRE/WireGuard/Xray/Backhaul، Route، Firewall، Quota، Subscription، Auth، Payment یا سیاست انتخاب Transport تغییر نمی‌کند.",
-    "en": "TwinPanel 1.1.0-rc.66 publishes the production fixes merged after rc.65: reseller Bot Token saves no longer fail with HTTP 500 when the persistent Fernet key was never initialized; the remaining updater activation convergence race is fixed with one bounded blocking recovery restart; Exit management now reuses TwinPanel's authenticated saved-access session to the Iran node and opens the Exit public SSH connection through that live AsyncSSH connection when Controller-to-Exit public SSH is unavailable, removing the separate local ssh -W dependency; and unreachable offline nodes can use the existing force-retire path only after explicit admin confirmation. No VPN dataplane, GRE/WireGuard/Xray/Backhaul transport, route, firewall, quota, subscription, auth, payment, or transport-selection behavior is changed."
+    "fa": "TwinPanel 1.1.0-rc.67 اصلاح نهایی مسیر Update را منتشر می‌کند. لاگ واقعی سرور نشان داد rc.66 واقعاً بالا می‌آمد اما API قبلی به‌دلیل یک عملیات SSH/پس‌زمینه‌ای گیرکرده تمام TimeoutStopSec=30 را مصرف می‌کرد و سپس API جدید حدود 15 ثانیه برای Startup نیاز داشت؛ در نتیجه دقیقاً با پایان پنجره 45 ثانیه‌ای Health، Updater به‌اشتباه Rollback می‌کرد. در rc.67 وابستگی اشتباه systemd برای Updater حذف شده و Shutdown API با حفظ SIGTERM و Graceful Shutdown به 10 ثانیه محدود شده تا Task یا Child گیرکرده نتواند کل بودجه Health را مصرف کند. هیچ VPN dataplane، Route، Firewall، Tunnel Transport، Quota، Subscription، Auth، Payment یا ترافیک کاربر تغییر نمی‌کند.",
+    "en": "TwinPanel 1.1.0-rc.67 publishes the final update-activation fix. Production logs proved rc.66 actually started successfully, but the previous API consumed the full 30-second stop timeout because a control-plane SSH/background operation was still stuck, then the replacement API needed about 15 seconds to finish startup. That exhausted the updater's 45-second target-version health window exactly as the new API became ready and caused a false rollback. rc.67 removes the updater systemd ordering dependency on API/Web and keeps normal SIGTERM graceful shutdown while bounding a stuck API stop to 10 seconds so stale tasks cannot consume the health budget. No VPN dataplane, route, firewall, tunnel transport, quota, subscription, auth, payment, or customer-traffic behavior is changed."
   }
 }
