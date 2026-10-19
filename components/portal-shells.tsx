@@ -11,11 +11,17 @@ import {readPortalAccess,writePortalAccess} from "../lib/access-cache";
 import {resellerApi,ResellerRow} from "../lib/reseller-runtime-api";
 import {CustomerNotificationCenter} from "./customer-notification-center";
 import {ResellerNotificationCenter} from "./reseller-notification-center";
+import {useResellerNavAttention} from "./reseller-nav-attention";
 
 type IconName="home"|"cart"|"subscription"|"orders"|"wallet"|"payments"|"bell"|"profile";
 type MenuItem=readonly [string,string,string,IconName];
 type MenuGroup={fa:string;en:string;items:MenuItem[]};
 type PortalShellProps={children:React.ReactNode;active?:string;type:"customer"|"reseller"};
+type NavAttention={
+  countForPath:(href:string)=>number;
+  hasPathAttention:(href:string)=>boolean;
+  groupHasAttention:(paths:readonly string[])=>boolean;
+};
 
 const customerMenu:MenuItem[]=[
   ["داشبورد","Dashboard","/panel","home"],
@@ -154,33 +160,39 @@ function ResellerAccessGuard({children}:{children:React.ReactNode}){
   return <>{children}</>;
 }
 
-function PortalMenuLink({item,active,onClick}:{item:MenuItem;active:string;onClick?:()=>void}){
+function PortalMenuLink({item,active,onClick,attention}:{item:MenuItem;active:string;onClick?:()=>void;attention?:NavAttention}){
   const {pick}=useI18n();
   const [fa,en,href,icon]=item;
-  return <a href={href} className={active===href?"active":""} onClick={onClick}>
+  const attentionCount=attention?.countForPath(href)||0;
+  const classes=[active===href?"active":"",attentionCount>0?"has-attention":""].filter(Boolean).join(" ");
+  return <a href={href} className={classes} onClick={onClick}>
     <span className="customer-portal-nav-icon"><PortalIcon name={icon}/></span>
     <span className="customer-portal-nav-label">{pick(fa,en)}</span>
-    {active===href&&<span className="customer-portal-active-dot"/>}
+    {attentionCount>0&&<span className="portal-nav-attention-count" aria-label={String(attentionCount)}>{attentionCount>99?"99+":attentionCount}</span>}
+    {active===href&&attentionCount===0&&<span className="customer-portal-active-dot"/>}
   </a>;
 }
 
-function PortalTopNav({active,type}:{active:string;type:"customer"|"reseller"}){
+function PortalTopNav({active,type,attention}:{active:string;type:"customer"|"reseller";attention?:NavAttention}){
   const {pick}=useI18n();
   const groups=type==="customer"?customerGroups:resellerGroups;
   return <nav className="customer-portal-topnav" aria-label={type==="customer"?pick("منوی حساب کاربری","Customer navigation"):pick("منوی نمایندگی","Reseller navigation")}>
     {groups.map(group=>{
       const groupActive=group.items.some(([, ,href])=>href===active);
-      return <details className={`customer-portal-topnav-group ${groupActive?"active":""}`} key={group.fa}>
-        <summary>{pick(group.fa,group.en)} <span>⌄</span></summary>
+      const paths=group.items.map(([, ,href])=>href);
+      const groupAttention=Boolean(attention?.groupHasAttention(paths));
+      const classes=["customer-portal-topnav-group",groupActive?"active":"",groupAttention?"has-attention":""].filter(Boolean).join(" ");
+      return <details className={classes} key={group.fa}>
+        <summary>{pick(group.fa,group.en)} {groupAttention&&<span className="portal-nav-attention-dot"/>}<span>⌄</span></summary>
         <div className="customer-portal-topnav-menu">
-          {group.items.map(item=><PortalMenuLink key={item[2]} item={item} active={active}/>)}
+          {group.items.map(item=><PortalMenuLink key={item[2]} item={item} active={active} attention={attention}/>)}
         </div>
       </details>;
     })}
   </nav>;
 }
 
-function PortalMobileDrawer({active,type,open,close}:{active:string;type:"customer"|"reseller";open:boolean;close:()=>void}){
+function PortalMobileDrawer({active,type,open,close,attention}:{active:string;type:"customer"|"reseller";open:boolean;close:()=>void;attention?:NavAttention}){
   const {pick}=useI18n();
   const menu=type==="customer"?customerMenu:resellerMenu;
   return <>
@@ -188,7 +200,7 @@ function PortalMobileDrawer({active,type,open,close}:{active:string;type:"custom
     <aside className={`customer-portal-sidebar ${open?"open":""} ${type==="reseller"?"reseller-portal-sidebar":""}`}>
       <div className="customer-portal-brand-row"><div className="customer-portal-brand"><BrandMark/></div><button className="customer-portal-mobile-close" type="button" onClick={close} aria-label={pick("بستن منو","Close menu")}>×</button></div>
       <div className="customer-portal-section-label">{type==="customer"?pick("حساب کاربری","Customer account"):pick("مرکز نمایندگی","Reseller center")}</div>
-      <nav className="customer-portal-nav">{menu.map(item=><PortalMenuLink key={item[2]} item={item} active={active} onClick={close}/>)}</nav>
+      <nav className="customer-portal-nav">{menu.map(item=><PortalMenuLink key={item[2]} item={item} active={active} onClick={close} attention={attention}/>)}</nav>
       {type==="customer"?<CustomerIdentity/>:<ResellerIdentity/>}
     </aside>
   </>;
@@ -197,12 +209,14 @@ function PortalMobileDrawer({active,type,open,close}:{active:string;type:"custom
 function PortalFrame({children,active="",type}:PortalShellProps){
   const {pick}=useI18n();
   const [mobileOpen,setMobileOpen]=useState(false);
+  const resellerAttention=useResellerNavAttention(type==="reseller");
+  const attention=type==="reseller"?resellerAttention:undefined;
   return <div className={`customer-portal-shell ${type==="reseller"?"reseller-portal-shell":""}`}>
     <main className="customer-portal-main">
       <header className="customer-portal-header">
         <div className="customer-portal-primarybar">
           <div className="customer-portal-header-brand"><BrandMark/></div>
-          <PortalTopNav active={active} type={type}/>
+          <PortalTopNav active={active} type={type} attention={attention}/>
           <div className="customer-portal-header-actions">
             {type==="customer"?<CustomerNotificationCenter/>:<ResellerNotificationCenter/>}
             <LanguageSwitch compact/>
@@ -214,7 +228,7 @@ function PortalFrame({children,active="",type}:PortalShellProps){
           <div className="customer-portal-search"><span>⌕</span><input placeholder={type==="customer"?pick("جستجو در حساب...","Search account..."):pick("جستجو در نمایندگی...","Search reseller panel...")}/></div>
           <div className="customer-portal-top-identity">{type==="customer"?<CustomerIdentity/>:<ResellerIdentity/>}</div>
         </div>
-        <PortalMobileDrawer active={active} type={type} open={mobileOpen} close={()=>setMobileOpen(false)}/>
+        <PortalMobileDrawer active={active} type={type} open={mobileOpen} close={()=>setMobileOpen(false)} attention={attention}/>
       </header>
       {children}
     </main>
