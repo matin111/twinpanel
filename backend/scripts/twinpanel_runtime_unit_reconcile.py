@@ -253,22 +253,29 @@ def reconcile_api_unit(
     restarted = False
     reused_inflight_restart = False
     if restart and not process_matches:
-        # During a public update, API and Web can already be part of the same
-        # systemd restart transaction. Web reaches this reconciler from its
-        # ExecStartPre while that API restart is still settling. A second API
-        # restart here races the updater's first restart and can leave both
-        # health endpoints reporting the previous version until rollback.
-        # Reuse the already in-flight restart when it converges in a bounded
-        # window; only schedule one recovery restart when it does not.
-        try:
-            pid, cwd = wait_for_api_process_match(
-                active_root=release_root,
-                systemctl=ctl,
-                seconds=INFLIGHT_RESTART_GRACE_SECONDS,
-            )
-            process_matches = True
-            reused_inflight_restart = True
-        except RuntimeError:
+        # If the unit itself changed, any API restart that was queued before
+        # daemon-reload cannot be trusted to converge onto the new canonical
+        # runtime. Waiting for that stale transaction wastes the updater's
+        # health window and is exactly how migrated/legacy installs can end up
+        # with POST_UPDATE_HEALTH_VERSION_FAILED:api,web. In that case dispatch
+        # one recovery restart immediately from the freshly loaded unit.
+        #
+        # If the unit was already canonical, the updater may simply have an API
+        # restart in flight. Reuse that restart first and only dispatch one
+        # recovery restart when the bounded grace really expires.
+        if not changed:
+            try:
+                pid, cwd = wait_for_api_process_match(
+                    active_root=release_root,
+                    systemctl=ctl,
+                    seconds=INFLIGHT_RESTART_GRACE_SECONDS,
+                )
+                process_matches = True
+                reused_inflight_restart = True
+            except RuntimeError:
+                pass
+
+        if not process_matches:
             result = _run(
                 [ctl, "--no-block", "restart", "twinpanel-api.service"],
                 timeout=20,
