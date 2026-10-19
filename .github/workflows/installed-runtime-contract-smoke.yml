@@ -71,7 +71,7 @@ jobs:
           assert 'transientSinceRef=useRef<number|null>(null)' in release_ui
           assert 'loadInFlightRef=useRef<{status:boolean;check:boolean}>({status:false,check:false})' in release_ui
           assert 'TRANSIENT_API_GRACE_MS=60*1000' in release_ui
-          assert 'RELEASE_CHECK_INTERVAL_MS=5*60*1000' in release_ui
+          assert 'RELEASE_CHECK_INTERVAL_MS=2*60*1000' in release_ui
           assert 'marker.reload_from!==pageInstanceRef.current' in release_ui
           assert 'markRecoveryReloadRequested(pageInstanceRef.current)' in release_ui
           assert 'if(marker||Date.now()-started<TRANSIENT_API_GRACE_MS)return;' in release_ui
