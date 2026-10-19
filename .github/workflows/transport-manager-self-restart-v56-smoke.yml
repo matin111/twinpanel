@@ -1,0 +1,102 @@
+name: Transport Manager Self Restart V56 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/self_hosted_runtime.py"
+      - "backend/app/manager_runtime_v16.py"
+      - "backend/app/transport_manager_service_v12.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/deploy/systemd/twinpanel-transport-manager.service"
+      - "backend/app/main.py"
+      - ".github/workflows/transport-manager-self-restart-v56-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/self_hosted_runtime.py"
+      - "backend/app/manager_runtime_v16.py"
+      - "backend/app/transport_manager_service_v12.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/deploy/systemd/twinpanel-transport-manager.service"
+      - "backend/app/main.py"
+      - ".github/workflows/transport-manager-self-restart-v56-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile manager lifecycle code
+        run: |
+          python -m py_compile \
+            backend/app/self_hosted_runtime.py \
+            backend/app/manager_runtime_v16.py \
+            backend/app/transport_manager_service_v12.py \
+            backend/app/tunnel_transport_manager_v12.py
+
+      - name: Verify manager never manages its own systemd lifecycle
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          self_hosted = Path("backend/app/self_hosted_runtime.py").read_text()
+          manager_runtime = Path("backend/app/manager_runtime_v16.py").read_text()
+          service = Path("backend/app/transport_manager_service_v12.py").read_text()
+          manager = Path("backend/app/tunnel_transport_manager_v12.py").read_text()
+          api_main = Path("backend/app/main.py").read_text()
+          deployed_unit = Path(
+              "backend/deploy/systemd/twinpanel-transport-manager.service"
+          ).read_text()
+
+          # API/controller remains the owner of service activation.
+          assert "manage_transport_service: bool = True" in self_hosted
+          assert "if manage_transport_service:" in self_hosted
+          assert "ensure_transport_manager_service_v12()" in self_hosted
+          assert "apply_self_hosted_runtime()" in api_main
+
+          # The standalone manager installs the same tunnel/runtime hooks but
+          # explicitly disables the systemd lifecycle side effect.
+          assert (
+              "apply_self_hosted_runtime(manage_transport_service=False)"
+              in manager_runtime
+          )
+          assert "TWINPANEL_TRANSPORT_MANAGER_SELF_RESTART_GUARD_V56" in manager_runtime
+          assert "self_service_management=0" in manager_runtime
+
+          # Defense in depth: even if a future refactor accidentally calls the
+          # activation helper from the manager process, it cannot restart its
+          # own MainPID.
+          assert "manager_pid == os.getpid()" in service
+          assert 'result["reason"] = "self_process_no_restart"' in service
+
+          # Keep the embedded API-managed unit byte-for-byte aligned with the
+          # packaged unit. Exact-string drift previously made `changed=True`
+          # possible on every reconciliation boundary.
+          match = re.search(
+              r'UNIT_CONTENT = """(.*?)"""',
+              service,
+              flags=re.DOTALL,
+          )
+          assert match, "embedded UNIT_CONTENT missing"
+          assert match.group(1) == deployed_unit, "manager unit definitions drifted"
+
+          # Existing dataplane workers and startup ordering stay intact.
+          assert "install_manager_runtime_v16()" in manager
+          assert "TWINPANEL_TRANSPORT_MANAGER_V12_START" in manager
+          assert "vpn_access_dataplane_v46" in manager
+          assert "vpn_access_dataplane_loop()" in manager
+          assert "vpn_access_performance_v51" in manager
+          assert "vpn_access_performance_loop()" in manager
+
+          print("TRANSPORT_MANAGER_SELF_RESTART_V56_SMOKE_OK")
+          PY
