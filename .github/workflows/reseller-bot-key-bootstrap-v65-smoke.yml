@@ -1,0 +1,77 @@
+name: Reseller Bot Key Bootstrap V65 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/reseller_bot_crypto.py'
+      - '.github/workflows/reseller-bot-key-bootstrap-v65-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  reseller-bot-key-bootstrap-v65-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install crypto dependency
+        run: python -m pip install 'cryptography>=42,<46'
+
+      - name: Verify first-save bootstrap and fail-closed decrypt
+        run: |
+          python - <<'PY'
+          import importlib.util
+          import os
+          import stat
+          import tempfile
+          from pathlib import Path
+
+          module_path = Path('backend/app/reseller_bot_crypto.py').resolve()
+          spec = importlib.util.spec_from_file_location('reseller_bot_crypto_smoke', module_path)
+          module = importlib.util.module_from_spec(spec)
+          assert spec.loader is not None
+          spec.loader.exec_module(module)
+
+          with tempfile.TemporaryDirectory() as tmp:
+              key_path = Path(tmp) / 'nested' / 'twinpanel-reseller-bot.key'
+              module.KEY_FILE = str(key_path)
+
+              # Decryption must never invent a replacement key.
+              try:
+                  module.decrypt_bot_token('not-a-token')
+              except RuntimeError as exc:
+                  assert 'missing' in str(exc).lower()
+              else:
+                  raise AssertionError('decrypt unexpectedly created a missing key')
+              assert not key_path.exists()
+
+              # First encryption creates a persistent 0600 key atomically.
+              probe = '123456789:test-reseller-bot-key'
+              encrypted = module.encrypt_bot_token(probe)
+              assert encrypted != probe
+              assert key_path.is_file()
+              mode = stat.S_IMODE(key_path.stat().st_mode)
+              assert mode == 0o600, oct(mode)
+              first_key = key_path.read_bytes()
+              assert module.decrypt_bot_token(encrypted) == probe
+
+              # Repeated saves reuse the same key rather than rotating it.
+              encrypted_2 = module.encrypt_bot_token(probe + '-2')
+              assert key_path.read_bytes() == first_key
+              assert module.decrypt_bot_token(encrypted_2) == probe + '-2'
+
+              # Existing empty/invalid keys fail closed and are never replaced.
+              key_path.write_bytes(b'')
+              try:
+                  module.encrypt_bot_token(probe)
+              except RuntimeError as exc:
+                  assert 'empty' in str(exc).lower()
+              else:
+                  raise AssertionError('empty key was silently replaced')
+              assert key_path.read_bytes() == b''
+
+          print('RESELLER_BOT_KEY_BOOTSTRAP_V65_OK')
+          PY
