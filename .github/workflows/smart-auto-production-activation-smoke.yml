@@ -50,7 +50,21 @@ jobs:
           assert 'api_unit_missing_deferred' in manager
           assert 'ExecStartPre=/bin/sleep 2' in manager
           assert 'BACKUP_PATH' in manager
-          assert 'systemctl, "start", "--no-block"' in manager
+
+          # Release activation contract V48:
+          # - a first/inactive install starts normally;
+          # - an already-running manager MUST restart so Python imports move
+          #   from the previous /opt/twinpanel/current target to the new one.
+          assert 'TWINPANEL_TRANSPORT_MANAGER_RELEASE_RELOAD_V48' in manager
+          assert '"is-active", "--quiet", UNIT_NAME' in manager
+          assert '"restart",' in manager
+          assert '"start",' in manager
+          assert 'action = "restart"' in manager
+          assert 'action = "start"' in manager
+          assert 'result["restarted"] = True' in manager
+          assert 'result["reason"] = "release_reloaded"' in manager
+          assert 'result["started"] = True' in manager
+
           assert 'ensure_transport_manager_service_v12' in runtime
           assert 'ensure_transport_manager_service_v12()' in runtime
 
