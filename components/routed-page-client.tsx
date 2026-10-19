@@ -46,7 +46,7 @@ const CustomerDashboardPro=dynamic(()=>import("./customer-dashboard-pro").then(m
 
 const ResellerDashboardV3=dynamic(()=>import("./reseller-dashboard-v3").then(m=>m.ResellerDashboardV3));
 const ResellerSubscriptionsParityRuntime=dynamic(()=>import("./reseller-subscriptions-parity").then(m=>m.ResellerSubscriptionsParityRuntime));
-const ResellerSubscriptionPlansV3=dynamic(()=>import("./reseller-plans-traffic-v3").then(m=>m.ResellerSubscriptionPlansV3));
+const ResellerOwnedPlansRuntime=dynamic(()=>import("./reseller-owned-plans").then(m=>m.ResellerOwnedPlansRuntime));
 const ResellerTrafficRechargeV3=dynamic(()=>import("./reseller-plans-traffic-v3").then(m=>m.ResellerTrafficRechargeV3));
 const ResellerWalletRuntime=dynamic(()=>import("./reseller-wallet-runtime").then(m=>m.ResellerWalletRuntime));
 const ResellerBotWalletRuntime=dynamic(()=>import("./reseller-bot-wallet-runtime").then(m=>m.ResellerBotWalletRuntime));
@@ -126,7 +126,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="reseller") return <ResellerDashboardV3/>;
   if(key==="reseller/customers") return <ResellerCustomersParityV2/>;
   if(key==="reseller/subscriptions") return <ResellerSubscriptionsParityRuntime/>;
-  if(key==="reseller/sales") return <ResellerSubscriptionPlansV3/>;
+  if(key==="reseller/sales") return <ResellerOwnedPlansRuntime/>;
   if(key==="reseller/wallet") return <ResellerWalletRuntime/>;
   if(key==="reseller/bot-wallet") return <ResellerBotWalletRuntime/>;
   if(key==="reseller/traffic") return <ResellerTrafficRechargeV3/>;
