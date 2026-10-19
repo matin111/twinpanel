@@ -33,7 +33,7 @@ jobs:
           expected = {
               "reseller": "ResellerDashboardV3",
               "reseller/subscriptions": "ResellerSubscriptionsParityRuntime",
-              "reseller/sales": "ResellerSubscriptionPlansV3",
+              "reseller/sales": "ResellerOwnedPlansRuntime",
               "reseller/wallet": "ResellerWalletRuntime",
               "reseller/bot-wallet": "ResellerBotWalletRuntime",
               "reseller/traffic": "ResellerTrafficRechargeV3",
