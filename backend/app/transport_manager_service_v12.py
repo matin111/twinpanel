@@ -35,6 +35,8 @@ Restart=always
 RestartSec=3
 TimeoutStopSec=20
 LimitNOFILE=65535
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
@@ -60,9 +62,7 @@ def _run(*args: str) -> subprocess.CompletedProcess[str]:
         )
 
 
-def _active_manager_matches_current_release(systemctl: str) -> tuple[bool, str]:
-    """Return whether the live manager was started from the active release."""
-
+def _manager_main_pid(systemctl: str) -> tuple[int, str]:
     pid_cp = _run(
         systemctl,
         "show",
@@ -72,15 +72,25 @@ def _active_manager_matches_current_release(systemctl: str) -> tuple[bool, str]:
         "--value",
     )
     if pid_cp.returncode != 0:
-        return False, "mainpid_query_failed"
+        return 0, "mainpid_query_failed"
 
     try:
         pid = int(str(pid_cp.stdout or "").strip() or "0")
     except ValueError:
-        return False, "mainpid_invalid"
+        return 0, "mainpid_invalid"
 
     if pid <= 0:
-        return False, "mainpid_missing"
+        return 0, "mainpid_missing"
+
+    return pid, f"pid={pid}"
+
+
+def _active_manager_matches_current_release(systemctl: str) -> tuple[bool, str]:
+    """Return whether the live manager was started from the active release."""
+
+    pid, pid_detail = _manager_main_pid(systemctl)
+    if pid <= 0:
+        return False, pid_detail
 
     try:
         expected = CURRENT_BACKEND_PATH.resolve(strict=True)
@@ -136,19 +146,26 @@ def _ensure_locked(systemctl: str, result: dict) -> dict:
 
     # TWINPANEL_TRANSPORT_MANAGER_RELEASE_RELOAD_V48
     # TWINPANEL_TRANSPORT_MANAGER_RESTART_STORM_V54
+    # TWINPANEL_TRANSPORT_MANAGER_SELF_RESTART_GUARD_V56
     #
     # V48 correctly reloaded a manager that was still running code from the
     # previous /opt/twinpanel/current target, but it restarted every active
-    # manager on every API import. With multiple/restarting API workers this can
-    # create a systemd restart storm and prevent V46/V51 from reaching their
-    # reconciliation loops.
+    # manager on every API import. V54 made that decision release-aware.
     #
-    # V54 restarts only when the unit changed or MainPID is genuinely running
-    # from a different resolved release directory. An already-current process
-    # is a no-op.
+    # V56 additionally guarantees that even an accidental future call from the
+    # standalone manager itself can never systemctl-restart its own MainPID.
+    # The manager may reconcile a drifted unit file and daemon-reload systemd,
+    # but the currently executing process remains alive; the API/controller is
+    # the only owner allowed to perform a release activation restart.
     active_cp = _run(systemctl, "is-active", "--quiet", UNIT_NAME)
 
     if active_cp.returncode == 0:
+        manager_pid, pid_detail = _manager_main_pid(systemctl)
+        if manager_pid == os.getpid():
+            result["runtime_detail"] = f"{pid_detail}:self_process"
+            result["reason"] = "self_process_no_restart"
+            return result
+
         is_current, runtime_detail = _active_manager_matches_current_release(systemctl)
         result["runtime_detail"] = runtime_detail
 
@@ -195,6 +212,7 @@ def ensure_transport_manager_service_v12() -> dict:
     a process already loaded from the current release. A cross-process flock
     serializes concurrent API workers before the live MainPID/cwd check.
 
+    The standalone manager is never permitted to restart its own MainPID.
     This function remains deliberately non-fatal: manager activation must never
     prevent the API itself from starting.
     """
