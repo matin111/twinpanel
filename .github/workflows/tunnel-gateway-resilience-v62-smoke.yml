@@ -1,0 +1,39 @@
+name: TwinPanel Tunnel Gateway Resilience V62 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "lib/legacy-control-api.ts"
+      - "lib/tunnel-transport-api.ts"
+      - ".github/workflows/tunnel-gateway-resilience-v62-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify transient gateway contract
+        run: |
+          grep -q 'TRANSIENT_GET_STATUSES=new Set(\[502,503,504\])' lib/legacy-control-api.ts
+          grep -q 'lastGoodRead' lib/legacy-control-api.ts
+          grep -q 'isHtmlErrorBody' lib/legacy-control-api.ts
+          grep -q 'window.location.origin' lib/legacy-control-api.ts
+          grep -q 'TRANSIENT_GET_STATUSES=new Set(\[502,503,504\])' lib/tunnel-transport-api.ts
+          grep -q 'lastGoodRead' lib/tunnel-transport-api.ts
+          grep -q 'isHtmlErrorBody' lib/tunnel-transport-api.ts
+          ! grep -q 'return payload.trim()' lib/legacy-control-api.ts
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
