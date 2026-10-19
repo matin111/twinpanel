@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.58",
-  "source_sha": "40e929c02b657ab028048f929e9a6020fae62087",
+  "version": "1.1.0-rc.59",
+  "source_sha": "11db0cdb0ef2117d71db8958b5d33cc507308eb6",
   "notes": {
-    "fa": "نسخه 1.1.0-rc.58 وضعیت توجه منوها را در پنل نماینده و ادمین تکمیل می‌کند. در پنل نماینده، منوی کیف پول ربات فقط برای شارژهای واقعاً منتظر بررسی و منوی سفارش‌ها فقط برای سفارش‌های نیازمند اقدام قرمز می‌شود؛ پس از تأیید، رد یا رفع وضعیت، قرمزی در Poll بعدی پاک می‌شود و اعلان خوانده‌نشده دیگر منوی تراکنش حل‌شده را قرمز نگه نمی‌دارد. در پنل ادمین نیز بخش سیستم و نگهداری وضعیت واقعی Update را نمایش می‌دهد و بدون ارسال درخواست تکراری Release Check قرمز می‌شود. رفتار دسکتاپ و موبایل هماهنگ است. API/Auth، Tunnel، Protocol، Quota، Enforcement و منطق انتخاب Transport تغییر نکرده‌اند.",
-    "en": "TwinPanel 1.1.0-rc.58 completes navigation attention behavior for reseller and admin panels. In the reseller panel, Bot Wallet turns red only for wallet top-ups that are genuinely awaiting review, while Orders turns red only for actionable order states. After approval, rejection, or resolution, transaction attention clears on the next poll, and unread notifications no longer keep a resolved transaction menu red. In the admin panel, System & Maintenance reflects actual update availability without issuing duplicate release-check requests. Desktop and mobile behavior remain synchronized. API/auth, tunnel, protocol, quota, enforcement, and transport-selection logic are unchanged."
+    "fa": "نسخه 1.1.0-rc.59 مسیر فروش نماینده را به مدیر پلن‌های اختصاصی خود نماینده متصل می‌کند. هر نماینده اکنون می‌تواند پلن‌های مستقل از کاتالوگ پلن ادمین بسازد و برای هر پلن عنوان، حجم، مدت، محدودیت دستگاه، قیمت فروش و پروتکل‌های فعال را تعیین کند؛ همچنین ویرایش، فعال/غیرفعال‌سازی و حذف پلن اختصاصی با حفظ تاریخچه سفارش و اشتراک پشتیبانی می‌شود. مسیر شارژ حجم نماینده بدون تغییر باقی مانده است. هیچ تغییری در Tunnel، Protocol dataplane، Quota، Enforcement یا رفتار پلن‌های ادمین انجام نشده است.",
+    "en": "TwinPanel 1.1.0-rc.59 routes reseller sales to the reseller-owned plan manager. Each reseller can now create plans independently from the admin plan catalog and configure title, traffic quota, duration, device limit, selling price, and enabled protocols, with edit, enable/disable, and protected deletion behavior that preserves order/subscription history. Reseller traffic recharge remains unchanged. No tunnel/protocol dataplane, quota, enforcement, or admin-plan behavior changes are included."
   }
 }
