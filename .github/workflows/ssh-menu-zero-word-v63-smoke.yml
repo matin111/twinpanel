@@ -1,0 +1,51 @@
+name: TwinPanel SSH Menu Zero-Word V63 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "scripts/twinpanel-menu.sh"
+      - "backend/scripts/twinpanel_protocol_cli_en.py"
+      - ".github/workflows/ssh-menu-zero-word-v63-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate syntax
+        run: |
+          bash -n scripts/twinpanel-menu.sh
+          python3 -m py_compile backend/scripts/twinpanel_protocol_cli_en.py
+
+      - name: Verify one-key numeric terminal UX
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          shell = Path("scripts/twinpanel-menu.sh").read_text(encoding="utf-8")
+          protocol = Path("backend/scripts/twinpanel_protocol_cli_en.py").read_text(encoding="utf-8")
+
+          assert 'read -r -n 1 -p "Choose: "' in shell
+          assert 'Press any key to continue...' in shell
+          assert 'Type UPDATE' not in shell
+          assert '[y/N]' not in shell
+          assert 'confirm_action "Install the latest TwinPanel update?"' in shell
+          assert 'header "Administrator"' in shell
+          assert 'echo "  [1] Account info"' in shell
+          assert 'echo "  [2] Reset password"' in shell
+          assert 'echo "  [3] Edit account"' in shell
+          assert 'header "Protocol management"' in shell
+          assert 'echo "Available protocols:"' not in shell
+
+          assert 'def _read_key(' in protocol
+          assert 'tty.setcbreak(fd)' in protocol
+          assert 'Type \'REMOVE' not in protocol
+          assert 'print("  [1] Remove")' in protocol
+          assert 'print("  [0] Cancel")' in protocol
+          assert 'input("Protocol: ")' not in protocol
+          assert 'input("Target ID: ")' not in protocol
+
+          print("SSH_MENU_ZERO_WORD_V63_OK")
+          PY
