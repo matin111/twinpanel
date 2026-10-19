@@ -1,0 +1,38 @@
+name: TwinPanel API Shutdown Bound V68 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/systemd/twinpanel-api.service.tpl'
+      - 'deploy/systemd/twinpanel-web.service.tpl'
+      - 'backend/scripts/twinpanel_runtime_unit_reconcile.py'
+      - '.github/workflows/api-shutdown-bound-v68-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify bounded API shutdown contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          api_unit = Path('deploy/systemd/twinpanel-api.service.tpl').read_text(encoding='utf-8')
+          web_unit = Path('deploy/systemd/twinpanel-web.service.tpl').read_text(encoding='utf-8')
+          reconcile = Path('backend/scripts/twinpanel_runtime_unit_reconcile.py').read_text(encoding='utf-8')
+
+          match = re.search(r'^TimeoutStopSec=(\d+)$', api_unit, re.MULTILINE)
+          assert match, 'API TimeoutStopSec is missing'
+          timeout_stop = int(match.group(1))
+          assert timeout_stop <= 10, f'API shutdown bound regressed to {timeout_stop}s'
+
+          assert 'twinpanel_runtime_unit_reconcile.py --restart --verify' in web_unit
+          assert '[ctl, "restart", "twinpanel-api.service"]' in reconcile
+          assert 'timeout=20' in reconcile
+
+          print(f'API_SHUTDOWN_BOUND_V68_OK timeout_stop={timeout_stop}s')
+          PY
