@@ -22,7 +22,7 @@ from app import native_exit_bootstrap_v73 as v73  # noqa: E402
 
 IRAN_HOST = "172.29.71.10"
 EXIT_HOST = "172.29.72.20"
-EXIT_TEST_SECRET = "v73-ci-exit-secret"
+EXIT_TEST_SECRET = "v72-ci-exit-secret"
 IRAN_TEST_KEY = Ed25519PrivateKey.from_private_bytes(b"B" * 32)
 IRAN_TEST_KEY_PEM = IRAN_TEST_KEY.private_bytes(
     serialization.Encoding.PEM,
