@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Request
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -15,10 +16,11 @@ from .admin import dashboard_summary_v2
 router = APIRouter(tags=["runtime"])
 
 
-# Keep this window identical to the public Connect live-state rule. Xray's
-# StatsService exposes cumulative traffic rather than authoritative open/close
-# events, so a recent positive accepted delta is the safest live signal.
-_XRAY_LIVE_ACTIVITY_SECONDS = 30
+# Keep this window identical to the public Connect live-state rule. Protocols
+# with authoritative QuotaSession rows use those directly. Recent accepted
+# traffic is also considered so counter-driven protocols such as Xray can
+# expose a useful live state without inventing permanent sessions.
+_LIVE_ACTIVITY_SECONDS = 30
 
 
 def _active_api_domain(db: Session) -> Domain | None:
@@ -34,41 +36,81 @@ def _active_api_domain(db: Session) -> Domain | None:
     )
 
 
+def _normalized_protocol(value: str | None) -> str:
+    protocol = str(value or "").strip().lower()
+    if protocol == "v2ray":
+        return "xray"
+    if protocol in {"openconnect", "ocserv", "anyconnect"}:
+        return "cisco"
+    return protocol
+
+
+def _subscription_live_states(db: Session) -> dict[int, dict]:
+    states: dict[int, dict] = {}
+
+    for subscription_id, protocol, last_seen_at in (
+        db.query(
+            QuotaSession.subscription_id,
+            QuotaSession.protocol,
+            func.max(QuotaSession.last_seen_at),
+        )
+        .join(Subscription, Subscription.id == QuotaSession.subscription_id)
+        .filter(
+            Subscription.status == SubscriptionStatus.ACTIVE,
+            QuotaSession.status == "active",
+        )
+        .group_by(QuotaSession.subscription_id, QuotaSession.protocol)
+        .all()
+    ):
+        sid = int(subscription_id)
+        item = states.setdefault(
+            sid,
+            {"subscription_id": sid, "online": False, "protocols": set(), "last_seen_at": None},
+        )
+        normalized = _normalized_protocol(protocol)
+        if normalized:
+            item["protocols"].add(normalized)
+        item["online"] = True
+        if last_seen_at is not None and (
+            item["last_seen_at"] is None or last_seen_at > item["last_seen_at"]
+        ):
+            item["last_seen_at"] = last_seen_at
+
+    cutoff = datetime.utcnow() - timedelta(seconds=_LIVE_ACTIVITY_SECONDS)
+    for subscription_id, protocol, reported_at in (
+        db.query(
+            QuotaUsageEvent.subscription_id,
+            QuotaUsageEvent.protocol,
+            func.max(QuotaUsageEvent.reported_at),
+        )
+        .join(Subscription, Subscription.id == QuotaUsageEvent.subscription_id)
+        .filter(
+            Subscription.status == SubscriptionStatus.ACTIVE,
+            QuotaUsageEvent.accepted_bytes > 0,
+            QuotaUsageEvent.reported_at >= cutoff,
+        )
+        .group_by(QuotaUsageEvent.subscription_id, QuotaUsageEvent.protocol)
+        .all()
+    ):
+        sid = int(subscription_id)
+        item = states.setdefault(
+            sid,
+            {"subscription_id": sid, "online": False, "protocols": set(), "last_seen_at": None},
+        )
+        normalized = _normalized_protocol(protocol)
+        if normalized:
+            item["protocols"].add(normalized)
+        item["online"] = True
+        if reported_at is not None and (
+            item["last_seen_at"] is None or reported_at > item["last_seen_at"]
+        ):
+            item["last_seen_at"] = reported_at
+
+    return states
+
+
 def _online_subscription_ids(db: Session) -> set[int]:
-    active_session_ids = {
-        int(row[0])
-        for row in (
-            db.query(QuotaSession.subscription_id)
-            .join(Subscription, Subscription.id == QuotaSession.subscription_id)
-            .filter(
-                Subscription.status == SubscriptionStatus.ACTIVE,
-                QuotaSession.status == "active",
-            )
-            .distinct()
-            .all()
-        )
-    }
-
-    xray_cutoff = datetime.utcnow() - timedelta(seconds=_XRAY_LIVE_ACTIVITY_SECONDS)
-    recent_xray_ids = {
-        int(row[0])
-        for row in (
-            db.query(QuotaUsageEvent.subscription_id)
-            .join(Subscription, Subscription.id == QuotaUsageEvent.subscription_id)
-            .filter(
-                Subscription.status == SubscriptionStatus.ACTIVE,
-                QuotaUsageEvent.protocol == "xray",
-                QuotaUsageEvent.accepted_bytes > 0,
-                QuotaUsageEvent.reported_at >= xray_cutoff,
-            )
-            .distinct()
-            .all()
-        )
-    }
-
-    # A subscription connected on more than one protocol is still one online
-    # subscription on the dashboard, so union the identifiers before counting.
-    return active_session_ids | recent_xray_ids
+    return set(_subscription_live_states(db))
 
 
 @router.get("/v1/runtime/endpoints")
@@ -108,16 +150,46 @@ def runtime_endpoints(
     dependencies=[Depends(require_admin)],
 )
 def dashboard_summary_live_subscriptions(db: Session = Depends(get_db)):
-    """Admin dashboard summary with protocol-aware online subscriptions.
-
-    This route is registered before the legacy admin router. It deliberately
-    preserves every legacy summary field while replacing the old node-agent
-    ``current_users`` estimate with canonical quota telemetry. ``online_users``
-    remains as a compatibility alias for older frontends.
-    """
+    """Admin dashboard summary with protocol-aware online subscriptions."""
 
     payload = dict(dashboard_summary_v2(db))
     online_subscriptions = len(_online_subscription_ids(db))
     payload["online_subscriptions"] = online_subscriptions
     payload["online_users"] = online_subscriptions
     return payload
+
+
+@router.get(
+    "/v1/admin/subscriptions/live-status",
+    dependencies=[Depends(require_admin)],
+)
+def admin_subscription_live_status(db: Session = Depends(get_db)):
+    """Return per-subscription live state for the admin subscriptions table."""
+
+    states = _subscription_live_states(db)
+    active_ids = {
+        int(row[0])
+        for row in db.query(Subscription.id)
+        .filter(Subscription.status == SubscriptionStatus.ACTIVE)
+        .all()
+    }
+
+    items = []
+    for subscription_id in sorted(active_ids):
+        state = states.get(subscription_id)
+        protocols = sorted(state["protocols"]) if state else []
+        last_seen_at = state["last_seen_at"] if state else None
+        items.append(
+            {
+                "subscription_id": subscription_id,
+                "online": bool(state and state["online"]),
+                "protocols": protocols,
+                "last_seen_at": last_seen_at.isoformat() + "Z" if last_seen_at else None,
+            }
+        )
+
+    return {
+        "items": items,
+        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "activity_window_seconds": _LIVE_ACTIVITY_SECONDS,
+    }
