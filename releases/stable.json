@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.60",
+  "version": "1.1.0-rc.61",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-19T17:13:00Z",
+  "released_at": "2026-10-19T17:38:33Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "89bcad74463e9d2c3fc5a5e7532d22b50d1c5dac",
+  "source_sha": "387827c5abab63bd19ad6570e44b90878b013d4d",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.60/twinpanel-1.1.0-rc.60-linux-x86_64.tar.gz",
-    "sha256": "fb4c6021683c8a98807a31534e09fd13edfe3a251c04bfbd0a2871d422807f3a",
-    "size_bytes": 12806311
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.61/twinpanel-1.1.0-rc.61-linux-x86_64.tar.gz",
+    "sha256": "1f48ab7cb686424827485933663b6453f1b68af07c166490e6141843a06a8b25",
+    "size_bytes": 12812718
   },
   "notes": {
-    "fa": "نسخه 1.1.0-rc.60 اصلاح ایمنی حذف نود و تانل را اضافه می‌کند. قبل از هر حذف مخرب، دسترسی SSH همه نودهای لازم با مهلت محدود بررسی می‌شود؛ اگر نود مقصد در دسترس نباشد، عملیات قبل از هر تغییر متوقف می‌شود و دیگر تانل سالم به‌صورت ناخواسته inactive/offline نمی‌ماند یا درخواست تا خطای 504 Nginx معطل نمی‌شود. اگر پاک‌سازی پس از Preflight خطا بدهد، وضعیت تجمیعی تانل به Snapshot قبل از عملیات برگردانده می‌شود. این نسخه همچنین تغییرات rc.59 برای پلن‌های اختصاصی نماینده را در خود دارد. هیچ تغییری در VPN dataplane، پروتکل‌ها، Quota، Enforcement یا منطق انتخاب Transport انجام نشده است.",
-    "en": "TwinPanel 1.1.0-rc.60 adds destructive-operation safety for Node and Tunnel deletion. Before a destructive delete starts, saved SSH reachability for every required node is checked with a bounded timeout; if a target is unreachable, the operation stops before mutating desired state, preventing a healthy tunnel from being left inactive/offline or the request hanging until an nginx 504. If cleanup fails after preflight, aggregate tunnel state is restored from its pre-delete snapshot. This candidate also includes the reseller-owned plan changes from rc.59. VPN dataplane, protocols, quota, enforcement, and transport-selection logic are unchanged."
+    "fa": "نسخه 1.1.0-rc.61 مسیر مدیریتی SSH نودهای Exit را در برابر خرابی مسیر عمومی مقاوم می‌کند. اتصال مستقیم به IP عمومی همچنان مسیر اصلی است، اما اگر کنترلر نتواند مستقیماً به Exit برسد و یک تانل L3 موجود بین ایران و Exit سالم باشد، پنل به‌صورت خودکار و با Timeout محدود از دسترسی ذخیره‌شده نود ایران برای اجرای nc به IP خصوصی همان تانل استفاده می‌کند و سپس با کلید اختصاصی خود Exit وارد SSH می‌شود. این اصلاح دقیقاً برای وضعیت فعلی usa طراحی شده که مسیر عمومی 64.49.12.176 از کنترلر قطع است ولی مسیر Controller → Iran → Kernel GRE → 10.248.0.6 سالم است. ایمنی حذف rc.60 حفظ شده و هیچ Route، iptables، رابط تانل، VPN dataplane، پروتکل، Quota، Enforcement، Subscription یا سیاست انتخاب Transport تغییر نکرده است.",
+    "en": "TwinPanel 1.1.0-rc.61 makes Exit-node SSH management resilient to public-route failures. Direct public-IP SSH remains the primary path, but when the Controller cannot reach an Exit directly and an existing Iran-to-Exit L3 carrier is available, the panel automatically races a bounded fallback through the paired Iran node: it uses Iran's stored management key to run nc to the Exit private tunnel address, then authenticates the final SSH session with the Exit node's own stored key. This directly addresses the current usa node where Controller-to-64.49.12.176 public routing is broken while Controller → Iran → Kernel GRE → 10.248.0.6 is healthy. The rc.60 destructive-delete safety remains intact, and no route, iptables, tunnel interface, VPN dataplane, protocol, quota, enforcement, subscription, or transport-selection behavior is changed."
   }
 }
