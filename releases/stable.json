@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.69",
+  "version": "1.1.0-rc.70",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-19T21:40:32Z",
+  "released_at": "2026-10-19T22:11:53Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "5901976f9f1f954b155948917a329975d05981c8",
+  "source_sha": "5aaab26b4ba61360f8d29baa4f3bce17023bf281",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.69/twinpanel-1.1.0-rc.69-linux-x86_64.tar.gz",
-    "sha256": "e2b3f1a8dca07bfd249c502f35a9ea71d3d12c6a88f51c1d70c405f253149550",
-    "size_bytes": 12860976
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.70/twinpanel-1.1.0-rc.70-linux-x86_64.tar.gz",
+    "sha256": "4017b67a8705c92bb4ad2856525e7d13793d5d423ec385f0dfa76c7aebba7650",
+    "size_bytes": 12864631
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.69 تجربه بروزرسانی پنل را بازطراحی می‌کند: مرکز بروزرسانی حرفه‌ای و واکنش‌گرا جای کارت کوچک قبلی را می‌گیرد و نسخه فعلی/جدید، کانال و تاریخ انتشار، یادداشت‌های نسخه، مراحل زنده بروزرسانی، زمان سپری‌شده، حجم دانلود، وضعیت موفق/ناموفق و خطاهای قابل‌فهم را نمایش می‌دهد. هنگام وجود نسخه جدید، بخش «سیستم و نگهداری» فوراً با نشان قرمز مشخص می‌شود و این وضعیت هنگام جابه‌جایی بین صفحات حفظ می‌شود. بررسی نسخه جدید نیز با کش کوتاه‌مدت سمت سرور، اولویت منبع رسمی TwinPanel و Failover سریع‌تر سبک‌تر و سریع‌تر شده است؛ دکمه «بررسی دوباره» همچنان بررسی تازه و اجباری انجام می‌دهد. مسیر اجرای بروزرسانی، بکاپ، Rollback، احراز هویت و منطق اصلی Updater تغییری نکرده و هیچ تغییری در پروتکل‌های VPN، نودها، تانل‌ها، سهمیه، مسیرها، فایروال، پرداخت یا ترافیک کاربران ایجاد نشده است.",
-    "en": "TwinPanel 1.1.0-rc.69 redesigns the panel update experience with a professional responsive Update Center replacing the old compact updater card. It shows current/latest versions, channel and release date, release notes, live update stages, elapsed time, download size, success/failure state, and human-readable errors. When a newer release exists, System & Maintenance now receives an immediate red attention indicator that persists across navigation. Release checks are also lighter and faster through a short-lived server-side manifest cache, canonical TwinPanel source priority, and quicker provider failover, while Check again still forces a fresh lookup. Update execution, backup, rollback, authentication, and the core updater dataplane are unchanged. No VPN protocol, node, tunnel, quota, route, firewall, payment, or customer-traffic behavior is modified."
+    "fa": "TwinPanel 1.1.0-rc.70 مشکل ریشه‌ای اضافه نشدن نود خارج را برطرف می‌کند. نصب اولیه Exit دیگر فقط به SSH مستقیم Controller وابسته نیست؛ مسیر مستقیم همزمان با مسیرهای Bootstrap امن از نودهای ایران دارای دسترسی ذخیره‌شده امتحان می‌شود، بدون نیاز به NodeAccess قبلی برای نود جدید و بدون وابستگی به GRE، WireGuard، Xray، Route، Policy Route یا iptables. پس از نصب، Agent نود خارج در صورت دسترسی مستقیم به API، کنترل را به‌صورت Outbound مستقیم Exit → Controller انجام می‌دهد و ایران فقط در صورت نبود دسترسی مستقیم API به‌عنوان fallback باقی می‌ماند. مسیر مدیریت نودهای موجود و سایر قابلیت‌های پنل حفظ شده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.70 fixes the root cause preventing new Exit nodes from being added when the Controller cannot reach their SSH port directly. First-time Exit provisioning now races direct SSH with authenticated bootstrap paths through configured Iran management nodes, without requiring a pre-existing target NodeAccess record and without depending on GRE, WireGuard, Xray, routes, policy routing, or iptables. After installation, the Exit Agent prefers a direct outbound Exit-to-Controller API control path; the Iran relay remains fallback-only when direct API reachability is unavailable. Existing-node management fallback and the rest of the panel behavior remain intact."
   }
 }
