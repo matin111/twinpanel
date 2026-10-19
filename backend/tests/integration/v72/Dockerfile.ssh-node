@@ -1,0 +1,15 @@
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -qq \
+ && apt-get install -y -qq --no-install-recommends \
+      openssh-server openssh-client sshpass python3 procps iproute2 netcat-openbsd ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && mkdir -p /run/sshd \
+ && printf '%s\n' \
+      'PermitRootLogin yes' \
+      'PasswordAuthentication yes' \
+      'KbdInteractiveAuthentication yes' \
+      'UsePAM no' \
+      'LogLevel ERROR' \
+      >> /etc/ssh/sshd_config
+CMD ["/usr/sbin/sshd", "-D", "-e"]
