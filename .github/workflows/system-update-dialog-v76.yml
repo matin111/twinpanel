@@ -1,0 +1,61 @@
+name: TwinPanel System Update Dialog V76 Regression
+
+on:
+  pull_request:
+    paths:
+      - "app/layout.tsx"
+      - "app/system-release.css"
+      - "app/system-release-theme.css"
+      - "app/system-release-dialog-v76.css"
+      - "components/system-release-footer.tsx"
+      - "components/system-update-recovery-bootstrap.tsx"
+      - ".github/workflows/system-update-dialog-v76.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/layout.tsx"
+      - "app/system-release.css"
+      - "app/system-release-theme.css"
+      - "app/system-release-dialog-v76.css"
+      - "components/system-release-footer.tsx"
+      - "components/system-update-recovery-bootstrap.tsx"
+      - ".github/workflows/system-update-dialog-v76.yml"
+
+jobs:
+  lifecycle-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify completed-refresh cleanup and viewport containment
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          footer = Path("components/system-release-footer.tsx").read_text()
+          bootstrap = Path("components/system-update-recovery-bootstrap.tsx").read_text()
+          css = Path("app/system-release-dialog-v76.css").read_text()
+          layout = Path("app/layout.tsx").read_text()
+
+          footer_key = re.search(r'UPDATE_RELOAD_KEY="([^"]+)"', footer)
+          bootstrap_key = re.search(r'UPDATE_RELOAD_KEY="([^"]+)"', bootstrap)
+          assert footer_key and bootstrap_key
+          assert footer_key.group(1) == bootstrap_key.group(1), "recovery key drift"
+
+          assert "marker.reload_from" in bootstrap
+          assert "sessionStorage.removeItem(key)" in bootstrap
+          assert "Markers without `reload_from`" in bootstrap
+
+          assert 'import "./system-release-theme.css";' in layout
+          assert 'import "./system-release-dialog-v76.css";' in layout
+          assert layout.index('import "./system-release-theme.css";') < layout.index('import "./system-release-dialog-v76.css";')
+          assert "<SystemUpdateRecoveryBootstrap/><ThemeProvider>" in layout
+
+          assert "100dvh" in css
+          assert "overflow:auto" in css
+          assert "width:min(860px,calc(100vw - 20px))" in css
+          assert "overflow-wrap:anywhere" in css
+          assert "!important" not in css
+
+          print("System Update Dialog V76 regression contract: OK")
+          PY
