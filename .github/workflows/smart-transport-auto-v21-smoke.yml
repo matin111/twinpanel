@@ -19,6 +19,7 @@ on:
       - 'backend/app/unified_l3_candidate_registry_v79.py'
       - 'backend/tests/integration/test_tunnel_core_candidate_registry_v79.py'
       - 'backend/tests/integration/test_gost_profile_canary_v81.py'
+      - 'backend/tests/integration/test_gost_upstream_udp_fix_v82.py'
       - 'backend/deploy/systemd/twinpanel-transport-manager.service'
       - '.github/workflows/smart-transport-auto-v21-smoke.yml'
   push:
@@ -41,6 +42,7 @@ on:
       - 'backend/app/unified_l3_candidate_registry_v79.py'
       - 'backend/tests/integration/test_tunnel_core_candidate_registry_v79.py'
       - 'backend/tests/integration/test_gost_profile_canary_v81.py'
+      - 'backend/tests/integration/test_gost_upstream_udp_fix_v82.py'
       - 'backend/deploy/systemd/twinpanel-transport-manager.service'
       - '.github/workflows/smart-transport-auto-v21-smoke.yml'
 
@@ -77,7 +79,8 @@ jobs:
             backend/app/unified_l3_agent_rollout_v49.py \
             backend/app/unified_l3_candidate_registry_v79.py \
             backend/tests/integration/test_tunnel_core_candidate_registry_v79.py \
-            backend/tests/integration/test_gost_profile_canary_v81.py
+            backend/tests/integration/test_gost_profile_canary_v81.py \
+            backend/tests/integration/test_gost_upstream_udp_fix_v82.py
 
       - name: Smart transport static contracts
         run: |
@@ -150,7 +153,16 @@ jobs:
           assert 'health = await probe(' in gost
           assert '"selected_profile": profile' in gost
           assert 'gost_all_profiles_failed' in gost
-          print('SMART_TRANSPORT_AUTO_V81_CONTRACT_OK')
+
+          # V82: pin the official post-fix GOST artifact for upstream #911.
+          assert 'TWINPANEL_GOST_UPSTREAM_UDP_FRAME_FIX_V82' in gost
+          assert 'VERSION = "3.3.1-nightly.20261017"' in gost
+          assert 'UPSTREAM_ISSUE = "go-gost/gost#911"' in gost
+          assert 'bc137fbd832276f2a8631c7320df3e3adaa1ddf0' in gost
+          assert 'd7656ef3deafec6bf97107b20a332b938153fd54' in gost
+          assert 'UPSTREAM_X_VERSION = "v0.19.5"' in gost
+          assert '"profile_canary": "v82"' in gost
+          print('SMART_TRANSPORT_AUTO_V82_CONTRACT_OK')
           PY
 
       - name: Tunnel Core V79 regression
@@ -160,3 +172,7 @@ jobs:
       - name: GOST profile canary V81 regression
         run: |
           python backend/tests/integration/test_gost_profile_canary_v81.py
+
+      - name: GOST upstream UDP fix V82 regression
+        run: |
+          python backend/tests/integration/test_gost_upstream_udp_fix_v82.py
