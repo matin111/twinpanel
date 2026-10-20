@@ -1,4 +1,4 @@
-name: TwinPanel System Update Dialog V76 Regression
+name: TwinPanel System Update Dialog V77 Regression
 
 on:
   pull_request:
@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Verify completed-refresh cleanup and viewport containment
+      - name: Verify authoritative recovery and border-box viewport containment
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -42,20 +42,38 @@ jobs:
           assert footer_key and bootstrap_key
           assert footer_key.group(1) == bootstrap_key.group(1), "recovery key drift"
 
-          assert "marker.reload_from" in bootstrap
-          assert "sessionStorage.removeItem(key)" in bootstrap
-          assert "Markers without `reload_from`" in bootstrap
+          # A full document load must discard the stale client marker. The
+          # backend release/status state is authoritative and reopens progress
+          # when an update is actually still active.
+          assert "sessionStorage.removeItem" in bootstrap
+          assert "JSON.parse" not in bootstrap
+          assert "marker.reload_from" not in bootstrap
+          assert "authoritative update" in bootstrap
 
           assert 'import "./system-release-theme.css";' in layout
           assert 'import "./system-release-dialog-v76.css";' in layout
           assert layout.index('import "./system-release-theme.css";') < layout.index('import "./system-release-dialog-v76.css";')
           assert "<SystemUpdateRecoveryBootstrap/><ThemeProvider>" in layout
 
+          # The complete card border-box, including padding and borders from
+          # the legacy component stylesheet, must fit inside the live viewport.
+          assert "box-sizing:border-box" in css
           assert "100dvh" in css
-          assert "overflow:auto" in css
-          assert "width:min(860px,calc(100vw - 20px))" in css
+          assert "overflow:hidden" in css
+          assert "overflow-y:auto" in css
+          assert "overflow-x:hidden" in css
+          assert "calc(100dvh - var(--system-update-gutter) - var(--system-update-gutter))" in css
           assert "overflow-wrap:anywhere" in css
+          assert ".system-update-modal" in css
+          assert ".system-update-card" in css
           assert "!important" not in css
 
-          print("System Update Dialog V76 regression contract: OK")
+          modal = css.split(".system-update-modal{",1)[1].split("}",1)[0]
+          card = css.split(".system-update-card{",1)[1].split("}",1)[0]
+          assert "overflow:hidden" in modal, "modal shell must never become the scroll container"
+          assert "overflow:auto" not in modal, "rc.76 outer-scroll regression returned"
+          assert "box-sizing:border-box" in card
+          assert "overflow-y:auto" in card, "card must own vertical scrolling"
+
+          print("System Update Dialog V77 regression contract: OK")
           PY

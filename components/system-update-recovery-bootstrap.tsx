@@ -3,17 +3,19 @@ const UPDATE_RELOAD_KEY="twinpanel-update-reload-pending-v4";
 /*
  * Runs before React hydration.
  *
- * SystemReleaseFooter marks a completed update with `reload_from` immediately
- * before forcing the one intentional page reload. On the next document the
- * marker is no longer a recovery-in-progress marker; keeping it would make
- * the client footer auto-open the update dialog again and leave it open until
- * the operator closes it manually.
+ * A full document load is a hard lifecycle boundary. The authoritative update
+ * state is the release status endpoint, not a stale sessionStorage marker. In
+ * rc.76 we only removed markers carrying `reload_from`, which left a race with
+ * RuntimeVersionConvergence: that runtime can refresh the page before the
+ * footer writes `reload_from`, so the next mount sees the stale marker and
+ * reopens the update dialog even though the new version is already active.
  *
- * Clear only that post-completion marker here. Markers without `reload_from`
- * are preserved so a genuine in-progress update still restores its progress UI
- * after an operator-initiated refresh.
+ * Clear the recovery marker on every full document load. If an update is still
+ * active, SystemReleaseFooter will reopen the progress UI from the backend's
+ * queued/downloading/restarting state as soon as status is reachable. This
+ * removes the stale-marker race without hiding genuine in-progress updates.
  */
-const BOOTSTRAP_SOURCE=`(()=>{try{const key=${JSON.stringify(UPDATE_RELOAD_KEY)};const raw=sessionStorage.getItem(key);if(!raw)return;const marker=JSON.parse(raw);if(marker&&typeof marker.reload_from==="string"&&marker.reload_from.trim())sessionStorage.removeItem(key);}catch{}})();`;
+const BOOTSTRAP_SOURCE=`(()=>{try{sessionStorage.removeItem(${JSON.stringify(UPDATE_RELOAD_KEY)});}catch{}})();`;
 
 export function SystemUpdateRecoveryBootstrap(){
   return <script id="twinpanel-system-update-recovery-bootstrap" dangerouslySetInnerHTML={{__html:BOOTSTRAP_SOURCE}}/>;
