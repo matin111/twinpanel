@@ -22,12 +22,6 @@ def _utc_naive(value: datetime) -> datetime:
     return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
-def _local(value: datetime) -> datetime:
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(TEHRAN)
-
-
 def _month_start(value: datetime) -> datetime:
     return value.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
@@ -237,14 +231,27 @@ def reseller_sales_analytics(
         .all()
     )
 
-    # New bot purchases also create a ResellerSubscription row. Renewals do not.
-    # Exclude only non-renewal bot-created links so the same sale is never counted
-    # twice while fulfilled renewal orders remain visible as real reseller sales.
+    # A fulfilled initial bot order also creates a ResellerSubscription row.
+    # Resolve the ownership link without a date window so boundary timestamps
+    # can never make the same initial sale appear twice. Renewal bot orders are
+    # intentionally excluded from this set because they do not create a new link.
+    bot_link_rows = (
+        db.query(
+            ResellerBotOrder.subscription_id,
+            ResellerBotOrder.payment_note,
+        )
+        .filter(
+            ResellerBotOrder.reseller_id == int(reseller_id),
+            ResellerBotOrder.status == "fulfilled",
+            ResellerBotOrder.subscription_id.isnot(None),
+        )
+        .all()
+    )
     bot_created_subscription_ids = {
-        int(row.subscription_id)
-        for row in bot_rows
-        if row.subscription_id is not None
-        and not str(row.payment_note or "").strip().startswith("renewal:")
+        int(subscription_id)
+        for subscription_id, payment_note in bot_link_rows
+        if subscription_id is not None
+        and not str(payment_note or "").strip().startswith("renewal:")
     }
 
     link_rows = (
