@@ -48,10 +48,15 @@ export type BackupSettings={
   telegram_chat_id:string;
   retention:number;
 };
+export type BackupTelegramBotStatus={
+  configured:boolean;
+  bot?:{id:number|null;username:string|null;first_name:string|null};
+};
 export type BackupHome={
   ok:boolean;
   backups:AnyRow[];
   settings:BackupSettings;
+  telegram_bot?:BackupTelegramBotStatus;
   key_fingerprint?:string|null;
   included_tables?:string[];
   excluded_runtime_tables?:string[];
@@ -117,6 +122,9 @@ export const parityApi={
   backups:()=>request<BackupHome>("/v1/admin/backups"),
   backupCreate:(sendTelegram:boolean)=>request<AnyRow>("/v1/admin/backups/create",{method:"POST",body:JSON.stringify({send_telegram:sendTelegram})}),
   backupSettings:(settings:BackupSettings)=>request<AnyRow>("/v1/admin/backups/settings",{method:"PUT",body:JSON.stringify(settings)}),
+  backupTelegramSaveToken:(token:string)=>request<BackupTelegramBotStatus>("/v1/admin/backups/telegram-bot",{method:"PUT",body:JSON.stringify({token})}),
+  backupTelegramDeleteToken:()=>request<BackupTelegramBotStatus>("/v1/admin/backups/telegram-bot",{method:"DELETE"}),
+  backupVerifyTelegram:(chatId:string)=>request<AnyRow>("/v1/admin/backups/verify-telegram",{method:"POST",body:JSON.stringify({chat_id:chatId})}),
   backupTestTelegram:()=>request<AnyRow>("/v1/admin/backups/test-telegram",{method:"POST"}),
   backupRestore:(filename:string)=>request<AnyRow>(`/v1/admin/backups/${encodeURIComponent(filename)}/restore`,{method:"POST",body:JSON.stringify({confirm:"RESTORE"})}),
   backupDelete:(filename:string)=>request<AnyRow>(`/v1/admin/backups/${encodeURIComponent(filename)}`,{method:"DELETE"}),

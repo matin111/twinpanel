@@ -35,6 +35,11 @@ from ..backup_service import (
     test_telegram,
     verify_telegram_chat,
 )
+from ..backup_telegram_credentials import (
+    backup_telegram_bot_status,
+    delete_backup_telegram_bot_token,
+    save_backup_telegram_bot_token,
+)
 from ..deps import require_admin
 
 
@@ -98,12 +103,19 @@ class BackupSettingsIn(BaseModel):
     )
 
 
-
 class TelegramVerifyIn(BaseModel):
 
     chat_id: str = Field(
         min_length=1,
         max_length=80,
+    )
+
+
+class BackupTelegramBotTokenIn(BaseModel):
+
+    token: str = Field(
+        min_length=20,
+        max_length=300,
     )
 
 
@@ -120,6 +132,8 @@ def backup_home():
             list_backups(),
         "settings":
             load_settings(),
+        "telegram_bot":
+            backup_telegram_bot_status(),
         "key_fingerprint":
             recovery_key_fingerprint(),
         "included_tables":
@@ -129,8 +143,45 @@ def backup_home():
     }
 
 
-@router.put("/settings")
+@router.get("/telegram-bot")
+def backup_telegram_bot():
+    return backup_telegram_bot_status()
 
+
+@router.put("/telegram-bot")
+def update_backup_telegram_bot(
+    payload: BackupTelegramBotTokenIn,
+):
+    try:
+        return save_backup_telegram_bot_token(
+            payload.token
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=str(exc),
+        ) from exc
+
+
+@router.delete("/telegram-bot")
+def remove_backup_telegram_bot():
+    try:
+        return delete_backup_telegram_bot_token()
+    except OSError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "حذف تنظیمات ربات اختصاصی بکاپ ناموفق بود"
+            ),
+        ) from exc
+
+
+@router.put("/settings")
 def update_backup_settings(
     payload: BackupSettingsIn,
 ):
@@ -185,6 +236,7 @@ def update_backup_settings(
             telegram_verification,
     }
 
+
 def manual_backup(
     payload: BackupCreateIn,
 ):
@@ -207,7 +259,6 @@ def manual_backup(
         "ok": True,
         "backup": result,
     }
-
 
 
 # TWINPANEL_BACKUP_TELEGRAM_VERIFY_ROUTE_V3
@@ -234,9 +285,7 @@ def backup_verify_telegram(
         ) from exc
 
 
-
 # TWINPANEL_MANUAL_BACKUP_CREATE_ROUTE_V146
-
 @router.post("/create")
 def manual_backup(
     payload: BackupCreateIn,
