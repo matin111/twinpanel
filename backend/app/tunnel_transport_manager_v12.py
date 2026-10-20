@@ -4,83 +4,56 @@ import asyncio
 
 from . import tunnel_transport_manager_v10 as v10
 from .legacy_ingress_reconciler import reconciler_loop as legacy_ingress_loop
-from .runtime_reconciler_v3 import reconciler_loop as runtime_reconciler_loop
+from .runtime_reconciler_v4 import reconciler_loop as runtime_reconciler_loop
 from .manager_runtime_v16 import install_manager_runtime_v16
 from .smart_transport_auto_v21 import install_smart_transport_auto_v21
 from .smart_auto_bootstrap_v24 import reconciler_loop as smart_bootstrap_loop
 from .smart_candidate_bootstrap_v38 import reconciler_loop as candidate_bootstrap_loop
+from .tp27_reference_runtime_v91 import (
+    activate_manager_candidate_policy_v91,
+    reconciler_loop as tp27_reference_loop,
+)
 from .vpn_access_dataplane_v46 import reconciler_loop as vpn_access_dataplane_loop
 from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performance_loop
 
 
 # ============================================================
-# TWINPANEL TRANSPORT MANAGER V12 - SMART IRAN PATH
+# TWINPANEL TRANSPORT MANAGER V12 - TP27 FAST MIGRATION V91
 #
-# V12 preserves the proven V10/V9/V7 repair + relay core and the V11
-# reconciliation workers, then layers Smart Auto V21 on top of Runtime V16.
-# Runtime Reconciler V3 extends orphan cleanup to every Smart Auto candidate
-# while retaining the existing DB-authority and two-pass deletion guard.
+# V91 keeps the proven controller/manager, VPN access dataplane and SmartAuto
+# scoring policy, but changes the active carrier product surface:
+#   * TP27 Fast is the only candidate auto-installed for new/active tunnels.
+#   * Existing kernel_gre remains health-visible only until TP27 is qualified
+#     and promoted (make-before-break).
+#   * GOST / AmneziaWG / Netrix are retired and never installed again.
+#   * after TP27 becomes active, V91 removes the retired candidate runtime and
+#     DB rows with ownership-scoped cleanup.
+#   * Cisco/OpenVPN/WireGuard are reconciled to TP27 preserve-port delivery so
+#     advertised protocol ports equal Iran public ingress ports.
 #
-# Smart Auto Bootstrap V24 handles the empty-topology first-run case safely:
-# when no logical tunnel exists and exactly one ONLINE Iran + one ONLINE Exit
-# both have saved SSH access, it creates one AUTO logical pair and a disabled
-# seed row. It never guesses across multiple nodes and never installs a legacy
-# data plane itself.
-#
-# Smart Candidate Bootstrap V38 handles the distinct legacy-only topology case:
-# an AUTO logical tunnel may already exist and be online through ssh_relay while
-# having zero modern candidate rows. Historical V7 dispatch only enters the
-# Smart Auto selector after an overlay row exists, so such tunnels could remain
-# permanently on the slow legacy fallback. V38 invokes V21's existing bounded
-# candidate scheduler for every active AUTO tunnel until candidate rows exist.
-# It does not own installation, health, benchmarking or selection itself.
-#
-# VPN Access Dataplane V46 repairs the service-side Exit path independently of
-# tunnel election. Cisco/OpenConnect, OpenVPN, WireGuard and L2TP client pools
-# always receive forwarding + WAN NAT on their Exit node. This closes the case
-# where the outer VPN handshake succeeds but inner client traffic has no data.
-# When Central OpenVPN PKI is explicitly enabled, V46 also aligns the running
-# OpenVPN server CA/cert/key with the same Central PKI used for delivered
-# client certificates, with rollback if the service does not come back healthy.
-#
-# VPN Access Performance V51 makes the nested-MTU policy an Exit-node invariant
-# instead of depending on potentially stale protocol status telemetry. It
-# enforces and verifies MTU 1200 / TCP MSS 1160 for Cisco/OpenConnect, OpenVPN,
-# WireGuard and L2TP, persists each service config, repairs live interfaces and
-# performs a controlled service restart only when a persistent value changes.
-# This fixes the production case where GRE was healthy at MTU 1360 while
-# ocserv still negotiated Link MTU 1500 / DTLS MTU 1434 and fell back to TLS.
-#
-# Smart Auto owns transport qualification/selection:
-#   * installs isolated modern L3 candidates (GRE, GOST TUN/WSS,
-#     AmneziaWG and licensed Netrix when available);
-#   * validates peer + TCP egress + UDP egress;
-#   * requires sustained stability before promotion;
-#   * measures bounded bidirectional tunnel throughput;
-#   * weights download 70%, upload 30%;
-#   * quarantines failing candidates;
-#   * never overrides manual mode;
-#   * keeps legacy transports available as rollback/fallback.
-#
-# QUIC 0.6.1-frag is excluded from autonomous selection by Smart Auto because
-# production A/B testing proved lanes=8 dataplane failure and recurring idle
-# receive timeouts. The row/runtime is not deleted, preserving rollback data.
+# SmartAuto health/stability/benchmark/promotion thresholds are unchanged.
+# VPN Access V46/V51 remain the sole Exit client-egress and nested-MTU owners.
+# Runtime Reconciler V4 adds DB-authoritative TP27 orphan cleanup.
 # ============================================================
 
 
 async def main() -> None:
     install_manager_runtime_v16()
     install_smart_transport_auto_v21()
+    activate_manager_candidate_policy_v91()
 
     print(
         "TWINPANEL_TRANSPORT_MANAGER_V12_START "
         "policy=smart-speed-health "
         "bootstrap=v24 "
         "candidate_bootstrap=v38 "
+        "tp27_reference=v91 "
         "vpn_access_dataplane=v46 "
         "vpn_access_performance=v51 "
-        "reconciler=v3 "
-        "candidates=kernel_gre,gost_tun,amneziawg,netrix",
+        "reconciler=v4 "
+        "active_candidate=tp27_fast "
+        "migration_fallback=kernel_gre "
+        "retired=gost_tun,amneziawg,netrix",
         flush=True,
     )
 
@@ -92,6 +65,11 @@ async def main() -> None:
     candidate_bootstrap_task = asyncio.create_task(
         candidate_bootstrap_loop(),
         name="twinpanel-smart-candidate-bootstrap-v38",
+    )
+
+    tp27_reference_task = asyncio.create_task(
+        tp27_reference_loop(),
+        name="twinpanel-tp27-reference-v91",
     )
 
     vpn_access_task = asyncio.create_task(
@@ -111,7 +89,7 @@ async def main() -> None:
 
     runtime_task = asyncio.create_task(
         runtime_reconciler_loop(),
-        name="twinpanel-runtime-reconciler-v3",
+        name="twinpanel-runtime-reconciler-v4",
     )
 
     legacy_ingress_task = asyncio.create_task(
@@ -122,6 +100,7 @@ async def main() -> None:
     tasks = {
         bootstrap_task,
         candidate_bootstrap_task,
+        tp27_reference_task,
         vpn_access_task,
         vpn_access_performance_task,
         manager_task,
