@@ -1,53 +1,377 @@
-/* Subscription link modal: QR first, then link and actions underneath. */
-.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) {
-  grid-template-columns: minmax(0, 1fr) !important;
-  width: min(100%, 430px);
-  margin: 16px auto 0;
-  gap: 12px;
+/* TwinPanel 2027 — premium subscription-link delivery surface.
+   Scoped to the existing admin and reseller sub-link modals only. */
+
+.runtime-modal-card:has(.subscription-link-stack),
+.reseller-connection-card {
+  width: min(720px, calc(100vw - 32px));
+  max-width: 720px;
+  max-height: min(90dvh, 860px);
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
+  border-radius: 22px;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .38), 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
-.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:first-child {
-  order: 1;
-  width: 100%;
+.runtime-modal-card:has(.subscription-link-stack) > .card-head,
+.reseller-connection-card > .card-head {
+  margin: 0;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 11%, var(--surface)), var(--surface));
 }
 
-.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:last-child {
-  order: 2;
-  width: 100%;
+.runtime-modal-card:has(.subscription-link-stack) > .card-head b,
+.reseller-connection-card > .card-head b {
+  font-size: 1rem;
+  letter-spacing: -.01em;
+}
+
+.runtime-modal-card:has(.subscription-link-stack) > .card-head small,
+.reseller-connection-card > .card-head small {
+  margin-top: 5px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+/* Admin subscription link ------------------------------------------------- */
+.subscription-link-stack {
   display: grid;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 218px;
+  gap: 14px;
+  width: 100%;
+  margin: 0;
+  padding: 18px;
+  box-sizing: border-box;
+}
+
+.subscription-link-stack > .setting-box {
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 5%, var(--surface2)), var(--surface2));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .025);
+}
+
+.subscription-link-stack > .setting-box:first-child {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   text-align: center;
 }
 
-.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:last-child code {
+.subscription-link-stack > .setting-box:first-child > small,
+.subscription-link-stack > .setting-box:last-child > small {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  color: var(--text);
+  font-size: .84rem;
+  font-weight: 800;
+}
+
+.subscription-link-stack > .setting-box:first-child > small {
+  justify-content: center;
+}
+
+.subscription-link-stack > .setting-box:first-child > small::before {
+  content: "⌗";
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--accent);
+  font-size: .78rem;
+}
+
+.subscription-link-stack > .setting-box:first-child > div {
+  display: grid;
+  place-items: center;
+  width: min(100%, 194px);
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, .82);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .18);
+}
+
+.subscription-link-stack > .setting-box:first-child svg {
   display: block;
   width: 100%;
-  box-sizing: border-box;
-  padding: 11px 12px;
-  border: 1px solid var(--border, rgba(148, 163, 184, .18));
-  border-radius: 12px;
-  direction: ltr;
-  text-align: left;
-  line-height: 1.7;
-  overflow-wrap: anywhere;
+  height: 100%;
 }
 
-.runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:last-child .row-actions {
+.subscription-link-stack > .setting-box:last-child {
+  grid-column: 1;
+  grid-row: 1;
   display: flex;
+  flex-direction: column;
   justify-content: center;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 2px;
+  gap: 12px;
 }
 
-@media (max-width: 620px) {
-  .runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) {
-    width: 100%;
+.subscription-link-stack > .setting-box:last-child > small::before {
+  content: "↗";
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--accent);
+  font-size: .82rem;
+}
+
+.subscription-link-stack > .setting-box:last-child code {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 68px;
+  box-sizing: border-box;
+  padding: 13px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 72%, var(--surface2));
+  color: var(--text);
+  direction: ltr;
+  unicode-bidi: plaintext;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.75;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: .79rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .02);
+}
+
+.subscription-link-stack > .setting-box:last-child .row-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin: 0;
+}
+
+.subscription-link-stack > .setting-box:last-child .row-actions > * {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  margin: 0;
+  text-align: center;
+}
+
+/* Reseller subscription link --------------------------------------------- */
+.reseller-connection-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 218px;
+  gap: 14px;
+  margin: 0;
+  padding: 18px;
+}
+
+.reseller-connection-content > .reseller-secret-grid {
+  grid-column: 1;
+  grid-row: 1;
+  display: block;
+  min-width: 0;
+}
+
+.reseller-connection-content > .reseller-secret-grid > div.wide {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  align-content: center;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 5%, var(--surface2)), var(--surface2));
+}
+
+.reseller-connection-content > .reseller-secret-grid > div.wide > span {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text);
+  font-size: .84rem;
+  font-weight: 800;
+}
+
+.reseller-connection-content > .reseller-secret-grid > div.wide > span::before {
+  content: "↗";
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--accent);
+  font-size: .82rem;
+}
+
+.reseller-connection-content > .reseller-secret-grid > div.wide > code {
+  grid-column: 1 / -1;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 68px;
+  box-sizing: border-box;
+  padding: 13px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 72%, var(--surface2));
+  color: var(--text);
+  direction: ltr;
+  unicode-bidi: plaintext;
+  text-align: left;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.75;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: .79rem;
+}
+
+.reseller-connection-content > .reseller-secret-grid > div.wide > button {
+  min-height: 42px;
+  justify-content: center;
+}
+
+.reseller-connection-content > .reseller-public-delivery {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 5%, var(--surface2)), var(--surface2));
+  text-align: center;
+}
+
+.reseller-connection-content > .reseller-public-delivery > div:first-child {
+  display: grid;
+  gap: 5px;
+  order: 1;
+}
+
+.reseller-connection-content > .reseller-public-delivery > div:first-child b {
+  font-size: .84rem;
+}
+
+.reseller-connection-content > .reseller-public-delivery > div:first-child small {
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: .75rem;
+}
+
+.reseller-connection-content > .reseller-public-delivery img {
+  position: static;
+  grid-row: auto;
+  grid-column: auto;
+  order: 2;
+  display: block;
+  width: 178px;
+  height: 178px;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, .82);
+  border-radius: 18px;
+  background: #fff;
+  object-fit: contain;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .18);
+}
+
+.reseller-connection-card > .runtime-modal-actions {
+  margin: 0;
+  padding: 0 18px 18px;
+  border-top: 0;
+}
+
+html[data-theme="light"] .subscription-link-stack > .setting-box,
+html[data-theme="light"] .reseller-connection-content > .reseller-secret-grid > div.wide,
+html[data-theme="light"] .reseller-connection-content > .reseller-public-delivery {
+  box-shadow: 0 8px 24px rgba(15, 23, 42, .04);
+}
+
+@media (max-width: 680px) {
+  .runtime-modal-card:has(.subscription-link-stack),
+  .reseller-connection-card {
+    width: calc(100vw - 18px);
+    max-height: 92dvh;
+    border-radius: 18px;
   }
 
-  .runtime-modal-card:not(.manage-card) > .setting-grid:has(> .setting-box svg) > .setting-box:last-child .row-actions > * {
-    flex: 1 1 120px;
-    justify-content: center;
+  .subscription-link-stack,
+  .reseller-connection-content {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 14px;
+  }
+
+  .subscription-link-stack > .setting-box:first-child,
+  .subscription-link-stack > .setting-box:last-child,
+  .reseller-connection-content > .reseller-secret-grid,
+  .reseller-connection-content > .reseller-public-delivery {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .subscription-link-stack > .setting-box:first-child,
+  .reseller-connection-content > .reseller-public-delivery {
+    order: 1;
+  }
+
+  .subscription-link-stack > .setting-box:last-child,
+  .reseller-connection-content > .reseller-secret-grid {
+    order: 2;
+  }
+
+  .subscription-link-stack > .setting-box:first-child > div,
+  .reseller-connection-content > .reseller-public-delivery img {
+    width: 168px;
+    height: 168px;
+  }
+
+  .reseller-connection-content > .reseller-secret-grid > div.wide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reseller-connection-content > .reseller-secret-grid > div.wide > span,
+  .reseller-connection-content > .reseller-secret-grid > div.wide > code {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 440px) {
+  .subscription-link-stack > .setting-box:last-child .row-actions,
+  .reseller-connection-content > .reseller-secret-grid > div.wide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .subscription-link-stack > .setting-box,
+  .reseller-connection-content > .reseller-secret-grid > div.wide,
+  .reseller-connection-content > .reseller-public-delivery {
+    padding: 13px;
   }
 }
