@@ -31,8 +31,9 @@ jobs:
           from pathlib import Path
 
           shared = Path("components/subscription-link-delivery-modal.tsx").read_text()
-          bridge = Path("components/subscription-link-role-bridge.tsx").read_text()
           customer = Path("components/customer-subscriptions-runtime.tsx").read_text()
+          admin = Path("components/legacy-subscriptions-exact.tsx").read_text()
+          reseller = Path("components/reseller-subscriptions-parity.tsx").read_text()
           layout = Path("app/layout.tsx").read_text()
           css = Path("app/subscription-link-modal.css").read_text()
 
@@ -44,17 +45,22 @@ jobs:
           assert 'createPortal' in shared and 'document.body' in shared
           assert 'QRCodeSVG' in shared
 
-          assert 'SubscriptionLinkDeliveryModal' in customer
-          assert 'SubscriptionLinkDeliveryModal' in bridge
-          assert 'pathname==="/admin/subscriptions"' in bridge
-          assert 'pathname==="/reseller/subscriptions"' in bridge
-          assert 'adminApi.subscriptionConnectionInfo(subscriptionId)' in bridge
-          assert 'resellerApi.connectionInfo(subscriptionId)' in bridge
-          assert 'event.stopImmediatePropagation()' in bridge
-          assert 'setReference(`MV-${subscriptionId}`)' in bridge
+          for role, source in (("customer", customer), ("admin", admin), ("reseller", reseller)):
+              assert 'import {SubscriptionLinkDeliveryModal}' in source, f"{role} must import the shared modal directly"
+              assert '<SubscriptionLinkDeliveryModal' in source, f"{role} must render the shared modal directly"
 
-          assert 'SubscriptionLinkRoleBridge' in layout
-          assert '<SubscriptionLinkRoleBridge/>' in layout
+          assert 'adminApi.subscriptionConnectionInfo(id)' in admin
+          assert 'onClick={()=>void openSubscriptionLink(item)}' in admin
+          assert 'modal==="sublink"' not in admin
+          assert 'className="subscription-link-stack"' not in admin
+
+          assert 'resellerApi.connectionInfo(id)' in reseller
+          assert 'onClick={()=>void openConnection(row)}' in reseller
+          assert 'reseller-connection-modal' not in reseller
+          assert 'ConnectionDetails' not in reseller
+
+          assert 'SubscriptionLinkRoleBridge' not in layout
+          assert '<SubscriptionLinkRoleBridge/>' not in layout
 
           for token in [
               '.subscription-link-unified-card',
