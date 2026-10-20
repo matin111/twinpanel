@@ -78,7 +78,7 @@ def _runtime_identity(
     Name. Legacy per-node EasyRSA profiles use mv<subscription>n<node>, while
     Central PKI uses the stable subscription-scoped mv-sub-<subscription> CN.
     Keeping this separate from ``identity`` preserves existing consumers while
-    giving node telemetry an exact, non-guessing runtime mapping.
+    giving runtime telemetry an exact, non-guessing identity.
     """
 
     if protocol != "openvpn":
