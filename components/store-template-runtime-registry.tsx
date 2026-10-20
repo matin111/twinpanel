@@ -2,14 +2,20 @@
 
 import type {ReactNode} from "react";
 import {DEFAULT_STORE_TEMPLATE_ID,resolveStoreTemplateId} from "../lib/store-template-registry";
+import type {StoreTemplateOptionMap} from "../lib/store-template-options";
 import {EditorialGrid2027Template} from "./store-template-editorial-grid";
 import {StoreTemplateRenderer,type StoreTemplateProps} from "./store-template-renderer";
 
-export type StoreTemplateRuntimeRenderer=(props:StoreTemplateProps)=>ReactNode;
+export type StoreThemeRuntimeProps=StoreTemplateProps&{
+  templateId:string;
+  themeOptions:StoreTemplateOptionMap;
+};
+
+export type StoreTemplateRuntimeRenderer=(props:StoreThemeRuntimeProps)=>ReactNode;
 
 const STORE_TEMPLATE_RUNTIME_RENDERERS:Record<string,StoreTemplateRuntimeRenderer>={
-  "conversion-2027":props=><StoreTemplateRenderer {...props}/>,
-  "editorial-grid-2027":props=><EditorialGrid2027Template {...props}/>,
+  "conversion-2027":({templateId:_,themeOptions:__,...props})=><StoreTemplateRenderer {...props}/>,
+  "editorial-grid-2027":({templateId:_,themeOptions:__,...props})=><EditorialGrid2027Template {...props}/>,
 };
 
 export function installedStoreTemplateRuntime(templateId:unknown){
@@ -17,7 +23,7 @@ export function installedStoreTemplateRuntime(templateId:unknown){
   return STORE_TEMPLATE_RUNTIME_RENDERERS[resolved]||STORE_TEMPLATE_RUNTIME_RENDERERS[DEFAULT_STORE_TEMPLATE_ID];
 }
 
-export function StoreTemplateRuntime({templateId,...props}:StoreTemplateProps&{templateId:string}){
-  const renderer=installedStoreTemplateRuntime(templateId);
+export function StoreTemplateRuntime(props:StoreThemeRuntimeProps){
+  const renderer=installedStoreTemplateRuntime(props.templateId);
   return <>{renderer(props)}</>;
 }
