@@ -114,7 +114,6 @@ export function SystemHealthRuntimePage(){
     <div className="page-head">
       <div>
         <h1>{pick("امنیت","Security Center")}</h1>
-        <small>{pick("پایش ریسک اشتراک‌ها بر اساس نشست، دستگاه و تغییر IP در ۲۴ ساعت گذشته","Subscription risk monitoring from sessions, devices and 24-hour IP activity")}</small>
       </div>
       <div className="action-row"><button className="ghost" disabled={loading} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button></div>
     </div>

@@ -206,7 +206,7 @@ export function SettingsPage2027(){
 
       <Card>
         <div className="card-head"><b>{pick("نمایش پنل","Panel appearance")}</b><Badge tone="violet">{mode.toUpperCase()} · {resolved}</Badge></div>
-        <div className="theme-setting-panel"><ThemeSwitch/><b>{pick("حالت روشن، تاریک یا سیستم","Light, dark or system")}</b></div>
+        <div className="theme-setting-panel"><ThemeSwitch/></div>
       </Card>
     </div>
 

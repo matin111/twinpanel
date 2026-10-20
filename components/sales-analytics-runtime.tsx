@@ -15,11 +15,11 @@ const compactMoney=(value:number)=>{
   return n.toLocaleString("fa-IR");
 };
 
-const rangeItems:{key:SalesRange;fa:string;en:string;subtitleFa:string;subtitleEn:string}[]=[
-  {key:"daily",fa:"روزانه",en:"Daily",subtitleFa:"۳۰ روز گذشته",subtitleEn:"Last 30 days"},
-  {key:"weekly",fa:"هفتگی",en:"Weekly",subtitleFa:"۱۲ هفته گذشته",subtitleEn:"Last 12 weeks"},
-  {key:"monthly",fa:"ماهانه",en:"Monthly",subtitleFa:"۱۲ ماه گذشته",subtitleEn:"Last 12 months"},
-  {key:"yearly",fa:"سالانه",en:"Yearly",subtitleFa:"۵ سال گذشته",subtitleEn:"Last 5 years"},
+const rangeItems:{key:SalesRange;fa:string;en:string}[]=[
+  {key:"daily",fa:"روزانه",en:"Daily"},
+  {key:"weekly",fa:"هفتگی",en:"Weekly"},
+  {key:"monthly",fa:"ماهانه",en:"Monthly"},
+  {key:"yearly",fa:"سالانه",en:"Yearly"},
 ];
 
 function periodLabel(point:SalesSeriesPoint,range:SalesRange){
@@ -93,7 +93,6 @@ function SalesAnalyticsContent({scope}:{scope:"admin"|"reseller"}){
   const series=data?.series||[];
   const chart=useMemo(()=>chartGeometry(series),[series]);
   const activePoint=hoverIndex==null?null:chart.points[hoverIndex]||null;
-  const selectedRange=rangeItems.find(item=>item.key===range)||rangeItems[0];
   const xLabelIndexes=useMemo(()=>{
     if(series.length<=5)return series.map((_,index)=>index);
     return Array.from(new Set([0,Math.floor((series.length-1)*.25),Math.floor((series.length-1)*.5),Math.floor((series.length-1)*.75),series.length-1]));
@@ -110,9 +109,6 @@ function SalesAnalyticsContent({scope}:{scope:"admin"|"reseller"}){
     <div className="page-head sales-analytics-head">
       <div>
         <h1>{pick("آمار فروش","Sales Analytics")}</h1>
-        <p>{scope==="admin"
-          ?pick("گزارش دقیق درآمد ثبت‌شده از پرداخت‌های تأییدشده","Accurate confirmed-payment revenue reporting")
-          :pick("گزارش فروش موفق متعلق به همین نمایندگی","Successful sales scoped to this reseller only")}</p>
       </div>
       <div className="sales-range-switch" role="tablist" aria-label={pick("بازه گزارش","Report range")}>
         {rangeItems.map(item=><button key={item.key} type="button" className={range===item.key?"active":""} onClick={()=>setRange(item.key)}>{pick(item.fa,item.en)}</button>)}
@@ -134,7 +130,6 @@ function SalesAnalyticsContent({scope}:{scope:"admin"|"reseller"}){
     <Card className="sales-chart-card">
       <div className="sales-card-head">
         <div>
-          <small>{pick(selectedRange.subtitleFa,selectedRange.subtitleEn)}</small>
           <h2>{pick("روند درآمد فروش","Sales revenue trend")}</h2>
         </div>
         <div className="sales-selected-summary">
@@ -192,24 +187,11 @@ function SalesAnalyticsContent({scope}:{scope:"admin"|"reseller"}){
           }):<div className="sales-empty small">{pick("داده‌ای برای تفکیک درآمد وجود ندارد","No revenue breakdown yet")}</div>}
         </div>
       </Card>
-
-      <Card className="sales-accounting-card">
-        <div className="sales-card-head compact"><div><small>{pick("منبع محاسبه","Accounting source")}</small><h2>{pick("آمار قابل اتکا","Authoritative metrics")}</h2></div></div>
-        {scope==="admin"?<>
-          <p>{pick("فقط پرداخت‌هایی وارد درآمد می‌شوند که واقعاً تأیید شده‌اند. زمان حسابداری verified_at است و مبلغ نهایی قابل پرداخت مبنای محاسبه است.","Only confirmed payments contribute to revenue. verified_at is the accounting timestamp and the final payable amount is authoritative.")}</p>
-          <div className="sales-rule"><span>✓</span><div><b>{pick("بدون شمارش اشتراک به‌عنوان فروش","No subscription-count revenue")}</b><small>{pick("فروش مالی از PaymentIntent محاسبه می‌شود","Financial sales come from PaymentIntent")}</small></div></div>
-        </>:<>
-          <p>{pick("فقط فروش‌های همین نماینده نمایش داده می‌شوند. فروش موفق ربات، تمدید ربات و فروش مستقیم پوشش داده شده و فروش اولیه ربات دوبار شمرده نمی‌شود.","Only this reseller's sales are shown. Fulfilled bot sales, bot renewals, and direct sales are covered without double-counting initial bot purchases.")}</p>
-          <div className="sales-rule"><span>✓</span><div><b>{pick("ایزوله بر اساس شناسه نماینده","Strict reseller isolation")}</b><small>{pick("اطلاعات نماینده دیگر وارد گزارش نمی‌شود","Other resellers never enter this report")}</small></div></div>
-        </>}
-        <div className="sales-generated"><span className="sales-live-dot"/>{pick("منطقه زمانی: تهران","Timezone: Tehran")} · {data?.generated_at?new Date(data.generated_at).toLocaleString("fa-IR"):"—"}</div>
-      </Card>
     </div>
 
     <style jsx>{`
       .sales-analytics-page{display:grid;gap:18px}
       .sales-analytics-head{align-items:flex-end;gap:18px}
-      .sales-analytics-head p{margin:6px 0 0;opacity:.62;font-size:13px}
       .sales-range-switch{display:flex;gap:4px;padding:4px;border:1px solid rgba(139,92,246,.18);border-radius:14px;background:rgba(139,92,246,.055)}
       .sales-range-switch button{border:0;background:transparent;color:inherit;padding:9px 14px;border-radius:10px;font:inherit;font-size:12px;cursor:pointer;opacity:.68;transition:.18s ease}
       .sales-range-switch button:hover{opacity:1;background:rgba(139,92,246,.08)}
@@ -243,18 +225,13 @@ function SalesAnalyticsContent({scope}:{scope:"admin"|"reseller"}){
       .sales-tooltip{position:absolute;transform:translate(-50%,-100%);pointer-events:none;z-index:4;display:grid;gap:3px;min-width:145px;padding:10px 12px;border-radius:12px;background:rgba(22,17,36,.95);color:#fff;box-shadow:0 14px 35px rgba(0,0,0,.22);font-size:11px}
       .sales-tooltip small{opacity:.65}.sales-tooltip b{font-size:13px}.sales-tooltip span{opacity:.72}
       .sales-empty{height:300px;display:grid;place-items:center;opacity:.55;font-size:13px}.sales-empty.small{height:auto;min-height:100px}
-      .sales-bottom-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,.65fr);gap:14px}
+      .sales-bottom-grid{display:grid;grid-template-columns:1fr;gap:14px}
       .sales-breakdown-list{display:grid;gap:9px}
       .sales-breakdown-row{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:9px 14px;padding:11px 0}
       .sales-breakdown-row>div{display:flex;align-items:center;gap:10px}.sales-breakdown-row>div>div{display:grid;gap:3px}
       .sales-breakdown-row b{font-size:12px}.sales-breakdown-row small{font-size:10px;opacity:.55}.sales-breakdown-row strong{font-size:12px;align-self:center}
       .sales-rank{width:28px;height:28px;display:grid;place-items:center;border-radius:9px;background:rgba(139,92,246,.09);color:#8b5cf6;font-size:11px;font-weight:700}
       .sales-share-track{grid-column:1/-1;height:4px;border-radius:99px;background:rgba(139,92,246,.08);overflow:hidden}.sales-share-track i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#7c3aed,#a78bfa)}
-      .sales-accounting-card p{margin:6px 0 16px;line-height:1.9;font-size:12px;opacity:.68}
-      .sales-rule{display:flex;gap:10px;align-items:flex-start;padding:11px;border-radius:12px;background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.14)}
-      .sales-rule>span{color:#10b981;font-weight:800}.sales-rule>div{display:grid;gap:4px}.sales-rule b{font-size:11px}.sales-rule small{font-size:10px;opacity:.56}
-      .sales-generated{margin-top:14px;display:flex;align-items:center;gap:6px;font-size:10px;opacity:.52}
-      .sales-live-dot{width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 0 4px rgba(16,185,129,.1)}
       @media(max-width:1100px){.sales-period-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sales-card-head{display:grid}.sales-selected-summary{grid-template-columns:repeat(3,1fr)}.sales-bottom-grid{grid-template-columns:1fr}}
       @media(max-width:680px){.sales-analytics-head{align-items:stretch}.sales-range-switch{width:100%;overflow:auto}.sales-range-switch button{flex:1;white-space:nowrap}.sales-period-grid{grid-template-columns:1fr}.sales-selected-summary{grid-template-columns:1fr}.sales-chart-wrap{min-height:260px}.sales-chart-wrap svg{min-height:250px}.sales-breakdown-row{grid-template-columns:1fr}.sales-breakdown-row strong{padding-inline-start:38px}.sales-share-track{grid-column:1}.sales-card-head{gap:10px}}
     `}</style>

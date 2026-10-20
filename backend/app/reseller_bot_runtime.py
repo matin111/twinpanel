@@ -646,10 +646,7 @@ def build_router(
                 welcome = (
                     f"👋 به <b>"
                     f"{escape(brand)}"
-                    f"</b> خوش آمدید.\n\n"
-                    "از این ربات می‌توانید "
-                    "اشتراک‌های خود را مدیریت "
-                    "و اطلاعات اتصال را دریافت کنید."
+                    f"</b> خوش آمدید."
                 )
 
             if created:
@@ -804,8 +801,7 @@ def build_router(
                 "📦 <b>اشتراک‌های من</b>\n\n"
                 f"تعداد: <b>{len(rows)}</b>\n\n"
                 "🟢 فعال   🟡 رو به اتمام   "
-                "🔴 غیرفعال\n\n"
-                "یک کاربری را انتخاب کنید."
+                "🔴 غیرفعال"
             )
 
             markup = (
@@ -1058,9 +1054,7 @@ def build_router(
                 return
 
             await message.answer(
-                "🎫 <b>پشتیبانی</b>\n\n"
-                "برای ارتباط با پشتیبانی "
-                "دکمه زیر را بزنید.",
+                "🎫 <b>پشتیبانی</b>",
                 reply_markup=InlineKeyboardMarkup(
                     inline_keyboard=[
                         [
