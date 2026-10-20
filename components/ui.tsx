@@ -35,6 +35,7 @@ const menuGroups=[
   ]},
   {fa:"ارتباطات و پشتیبانی",en:"Communications & Support",items:[
     ["ربات تلگرام","Telegram Bot","/admin/telegram","✈"],
+    ["متن‌های ربات","Bot Texts","/admin/bot-texts","✎"],
     ["پشتیبانی","Support","/admin/support","◌"],
     ["اعلان‌ها","Notifications","/admin/notifications","◎"]
   ]},
@@ -147,5 +148,5 @@ export const names=[
   ["سارا محمدی","Sara Mohammadi"],
   ["محمد کریمی","Mohammad Karimi"],
   ["نگار حسینی","Negar Hosseini"],
-  ["رضا احمدی","Reza Ahmadi"]
+  ["رضا احمدی","Reza Ahmadi"],
 ] as const;
