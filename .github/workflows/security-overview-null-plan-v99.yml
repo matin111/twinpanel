@@ -10,11 +10,27 @@ on:
 jobs:
   regression:
     runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: twinpanel
+          POSTGRES_PASSWORD: twinpanel_test
+          POSTGRES_DB: twinpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U twinpanel -d twinpanel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
     env:
       APP_NAME: TwinPanel-CI
       APP_ENV: test
       APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
-      DATABASE_URL: "sqlite+pysqlite:///:memory:"
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
       REDIS_URL: redis://127.0.0.1:6379/0
       NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
       PUBLIC_API_FALLBACK: http://127.0.0.1:8095
