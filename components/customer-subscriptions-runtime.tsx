@@ -4,6 +4,7 @@ import {useEffect,useMemo,useState} from "react";
 import Link from "next/link";
 import {PortalShell} from "./portal-shells";
 import {Badge,Card,PageHead} from "./ui";
+import {SubscriptionLinkDeliveryModal} from "./subscription-link-delivery-modal";
 import {customerApi,CustomerConnectionInfo,MySubscription} from "../lib/customer-api";
 import {useCustomerSession} from "../lib/customer-session";
 import {useI18n} from "../lib/i18n";
@@ -12,11 +13,6 @@ const statusFa=(v:string)=>({active:"فعال",pending:"در انتظار",suspe
 const tone=(v:string):"ok"|"warn"|"bad"|"violet"=>v==="active"?"ok":["expired","canceled"].includes(v)?"bad":"warn";
 const pct=(u:number,l:number)=>l>0?Math.min(100,Math.max(0,Math.round(u/l*100))):0;
 const protocol=(v:string)=>({cisco:"Cisco / OpenConnect",openvpn:"OpenVPN",wireguard:"WireGuard",l2tp:"L2TP / IPsec",v2ray:"V2Ray / Xray",xray:"V2Ray / Xray"} as Record<string,string>)[v]||v;
-
-function absoluteLink(value:string){
-  if(typeof window==="undefined")return value;
-  try{return new URL(value,window.location.origin).toString();}catch{return value;}
-}
 
 function Body(){
   const {pick}=useI18n();
@@ -30,6 +26,7 @@ function Body(){
   const [connections,setConnections]=useState<Record<number,CustomerConnectionInfo>>({});
   const [visiblePasswords,setVisiblePasswords]=useState<Record<number,boolean>>({});
   const [copied,setCopied]=useState("");
+  const [linkModalId,setLinkModalId]=useState<number|null>(null);
 
   const load=async()=>{
     if(!token)return;
@@ -59,13 +56,19 @@ function Body(){
   };
 
   const ensureConnection=async(id:number)=>{
-    if(!token||connections[id])return;
+    if(!token||connections[id])return connections[id]||null;
     setConnectionBusy(id);setError("");
     try{
       const result=await customerApi.connectionInfo(token,id);
       setConnections(current=>({...current,[id]:result}));
-    }catch(e){setError(e instanceof Error?e.message:String(e));}
+      return result;
+    }catch(e){setError(e instanceof Error?e.message:String(e));return null;}
     finally{setConnectionBusy(null);}
+  };
+
+  const openSubscriptionLink=(id:number)=>{
+    setLinkModalId(id);
+    if(!connections[id])void ensureConnection(id);
   };
 
   const copyValue=async(key:string,value:string)=>{
@@ -75,6 +78,8 @@ function Body(){
       window.setTimeout(()=>setCopied(""),1400);
     }catch{setError(pick("کپی انجام نشد.","Could not copy."));}
   };
+
+  const modalConnection=linkModalId?connections[linkModalId]:undefined;
 
   return <div className="page customer-runtime customerSubscriptionsParity">
     <PageHead title={pick("اشتراک‌های من","My subscriptions")}/>
@@ -125,20 +130,28 @@ function Body(){
               {password&&<button type="button" onClick={()=>void copyValue(`pass-${row.id}`,password)}>{copied===`pass-${row.id}`?"✓":pick("کپی","Copy")}</button>}
             </div>
 
-            <div className="customerSubSecretRow link">
-              <span>{pick("لینک اتصال","Connection link")}</span>
-              <code dir="ltr">{link?absoluteLink(link):"—"}</code>
-              {link&&<button type="button" onClick={()=>void copyValue(`link-${row.id}`,absoluteLink(link))}>{copied===`link-${row.id}`?"✓":pick("کپی","Copy")}</button>}
-              {link&&<button type="button" onClick={()=>window.open(absoluteLink(link),"_blank","noopener,noreferrer")}>{pick("باز کردن","Open")}</button>}
+            <div className="customerSubSecretRow link customerSubLinkLauncher">
+              <span>{pick("سابلینک","Subscription link")}</span>
+              <code dir="ltr">{link?pick("آماده استفاده","Ready to use"):"—"}</code>
+              <button type="button" disabled={connectionBusy===row.id} onClick={()=>openSubscriptionLink(row.id)}>{connectionBusy===row.id?"…":pick("نمایش","View")}</button>
             </div>
           </>}
         </section>}
 
         <div className="customerSubActions">
+          {row.status==="active"&&<button className="ghost" disabled={connectionBusy===row.id} onClick={()=>openSubscriptionLink(row.id)}>{connectionBusy===row.id?"…":pick("سابلینک","Sub-link")}</button>}
           <button className="primary" disabled={busy===row.id} onClick={()=>void renew(row.id)}>{busy===row.id?"…":pick("تمدید","Renew")}</button>
         </div>
       </Card>;
     })}</div>}
+
+    <SubscriptionLinkDeliveryModal
+      open={linkModalId!==null}
+      link={modalConnection?.subscription_link||""}
+      reference={linkModalId?`MV-${linkModalId}`:""}
+      loading={Boolean(linkModalId&&connectionBusy===linkModalId)}
+      onClose={()=>setLinkModalId(null)}
+    />
   </div>;
 }
 

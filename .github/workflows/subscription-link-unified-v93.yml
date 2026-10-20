@@ -1,0 +1,77 @@
+name: TwinPanel Unified Subscription Link V93
+
+on:
+  pull_request:
+    paths:
+      - "app/subscription-link-modal.css"
+      - "components/subscription-link-delivery-modal.tsx"
+      - "components/customer-subscriptions-runtime.tsx"
+      - "components/legacy-subscriptions-exact.tsx"
+      - "components/reseller-subscriptions-parity.tsx"
+      - ".github/workflows/subscription-link-unified-v93.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unified-subscription-link:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify three-role visual contract
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          css = Path("app/subscription-link-modal.css").read_text()
+          shared = Path("components/subscription-link-delivery-modal.tsx").read_text()
+          customer = Path("components/customer-subscriptions-runtime.tsx").read_text()
+          admin = Path("components/legacy-subscriptions-exact.tsx").read_text()
+          reseller = Path("components/reseller-subscriptions-parity.tsx").read_text()
+
+          for token in [
+              ".subscription-link-stack",
+              ".reseller-connection-content",
+              ".subscription-link-unified-card",
+              ".subscription-link-qr-shell",
+              ".subscription-link-url-field",
+              ".subscription-link-actions",
+              "overflow-wrap: anywhere",
+              "unicode-bidi: plaintext",
+              "@media (max-width: 720px)",
+          ]:
+              assert token in css, f"missing unified CSS token: {token}"
+
+          assert "!important" not in css, "unified subscription-link CSS must not use !important"
+          assert "SubscriptionLinkDeliveryModal" in customer
+          assert 'pick("سابلینک","Subscription link")' in customer
+          assert 'modal==="sublink"' in admin
+          assert 'className="subscription-link-stack"' in admin
+          assert 'className="reseller-connection-content"' in reseller
+          assert 'pick("سابلینک","Subscription link")' in reseller
+          assert "createPortal" in shared
+          assert "QRCodeSVG" in shared
+          assert 'document.body' in shared
+          assert 'pick("سابلینک اشتراک","Subscription link")' in shared
+          PY
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional
+          else
+            npm install --include=optional --no-audit --no-fund
+          fi
+
+      - name: Production frontend build
+        run: npm run build
