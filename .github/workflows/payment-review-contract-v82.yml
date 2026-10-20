@@ -1,0 +1,240 @@
+name: TwinPanel Payment Review Contract V82
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/payment_receipts_local.py"
+      - "backend/app/routers/payments.py"
+      - "backend/app/routers/wallet_payment_v2.py"
+      - "components/admin-nav-attention.ts"
+      - "components/payment-review-badge.tsx"
+      - "components/payments-review-runtime.tsx"
+      - "lib/admin-api.ts"
+      - ".github/workflows/payment-review-contract-v82.yml"
+  workflow_dispatch:
+
+jobs:
+  payment-review-contract:
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: twinpanel
+          POSTGRES_PASSWORD: twinpanel_test
+          POSTGRES_DB: twinpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U twinpanel -d twinpanel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      APP_NAME: TwinPanel-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+      TWINPANEL_ADMIN_EMAIL: admin-ci@example.com
+      TWINPANEL_ADMIN_PASSWORD: TwinPanel-CI-Admin-2026!
+      TWINPANEL_ADMIN_NAME: TwinPanel CI Admin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Prepare runtime directories
+        run: |
+          sudo install -d -m 700 /etc/twinpanel
+          sudo install -d -m 750 /var/lib/twinpanel/payment-receipts
+          sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel
+
+      - name: Create schema and bootstrap admin
+        working-directory: backend
+        run: |
+          python -c 'from app.main import app; print("PAYMENT_REVIEW_APP_IMPORT_OK", app.title)'
+          python scripts/bootstrap_admin.py
+
+      - name: Seed a pending payment with a submitted receipt
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from datetime import datetime
+          from app.database import SessionLocal
+          from app.models import Plan, User
+          from app.payment_models import PaymentIntent
+          from app.security import hash_password
+          from app.store_models import StoreOrder
+
+          db = SessionLocal()
+          try:
+              user = User(
+                  id=820001,
+                  email="payment-review-v82@example.com",
+                  password_hash=hash_password("Payment-Review-V82!"),
+                  full_name="Payment Review V82",
+                  is_active=True,
+              )
+              plan = Plan(
+                  id=820001,
+                  name="Payment Review V82 Plan",
+                  duration_days=30,
+                  traffic_gb=10,
+                  device_limit=1,
+                  price_toman=100000,
+                  is_active=True,
+              )
+              db.add_all([user, plan])
+              db.flush()
+
+              order = StoreOrder(
+                  id=820001,
+                  user_id=user.id,
+                  plan_id=plan.id,
+                  amount_toman=100000,
+                  base_amount_toman=100000,
+                  discount_amount_toman=0,
+                  requested_protocols=[],
+                  status="pending_payment",
+                  idempotency_key="payment-review-v82-order",
+              )
+              db.add(order)
+              db.flush()
+
+              intent = PaymentIntent(
+                  id=820001,
+                  order_id=order.id,
+                  user_id=user.id,
+                  method="card_to_card",
+                  status="pending_payment",
+                  base_amount_toman=100000,
+                  payable_amount_toman=100321,
+                  receipt_telegram_file_id="local:payment-review-v82.jpg",
+                  receipt_submitted_at=datetime.utcnow(),
+              )
+              db.add(intent)
+              db.commit()
+              print("PAYMENT_REVIEW_V82_SEED_OK", intent.id)
+          finally:
+              db.close()
+          PY
+
+      - name: Start API
+        working-directory: backend
+        run: |
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8095 > /tmp/twinpanel-payment-review-v82.log 2>&1 &
+          echo $! > /tmp/twinpanel-payment-review-v82.pid
+
+      - name: Wait for API
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8095/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/twinpanel-payment-review-v82.log
+          exit 1
+
+      - name: Verify live payment review API and approval route
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          import httpx
+
+          base = "http://127.0.0.1:8095"
+          client = httpx.Client(base_url=base, timeout=10.0)
+
+          login = client.post(
+              "/v1/auth/login",
+              json={
+                  "email": "admin-ci@example.com",
+                  "password": "TwinPanel-CI-Admin-2026!",
+              },
+          )
+          login.raise_for_status()
+          token = login.json().get("access_token")
+          assert token, login.text
+          headers = {"Authorization": f"Bearer {token}"}
+
+          summary = client.get(
+              "/v1/payments/admin/review-summary",
+              headers=headers,
+          )
+          summary.raise_for_status()
+          payload = summary.json()
+          assert payload["needs_review"] == 1, payload
+          assert payload["purchase_review"] == 1, payload
+          assert payload["receipt_review"] == 1, payload
+          assert payload["wallet_review"] == 0, payload
+
+          # A missing real intent must be handled by the canonical approval
+          # endpoint itself. Generic FastAPI "Not Found" means route drift.
+          approval = client.post(
+              "/v1/payments/admin/intents/999999999/approve",
+              headers=headers,
+          )
+          assert approval.status_code == 404, approval.text
+          detail = approval.json().get("detail")
+          assert detail == "پرداخت پیدا نشد", approval.text
+
+          stale = client.post(
+              "/v1/admin/wallet/payment-intents/999999999/approve-safe",
+              headers=headers,
+          )
+          assert stale.status_code == 404, stale.text
+          assert stale.json().get("detail") == "Not Found", stale.text
+
+          print("PAYMENT_REVIEW_V82_LIVE_CONTRACT_OK", payload)
+          PY
+
+      - name: Verify frontend uses only canonical payment-review routes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          api = Path("lib/admin-api.ts").read_text(encoding="utf-8")
+          nav = Path("components/admin-nav-attention.ts").read_text(encoding="utf-8")
+          badge = Path("components/payment-review-badge.tsx").read_text(encoding="utf-8")
+
+          canonical_summary = "/v1/payments/admin/review-summary"
+          canonical_approve = "/v1/payments/admin/intents/${id}/approve"
+          stale_summary = "/v1/admin/wallet/payment-review-summary"
+          stale_approve = "/v1/admin/wallet/payment-intents/${id}/approve-safe"
+
+          assert canonical_summary in api
+          assert canonical_summary in nav
+          assert canonical_summary in badge
+          assert canonical_approve in api
+          assert stale_summary not in api + nav + badge
+          assert stale_approve not in api
+          print("PAYMENT_REVIEW_V82_FRONTEND_CONTRACT_OK")
+          PY
+
+      - name: Show API log on failure
+        if: failure()
+        run: cat /tmp/twinpanel-payment-review-v82.log 2>/dev/null || true
