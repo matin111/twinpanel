@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.76",
+  "version": "1.1.0-rc.77",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-19T23:55:42Z",
+  "released_at": "2026-10-20T00:08:30Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "c13ddeaf2123f4cab213aa0042cb88159b46722d",
+  "source_sha": "8ce0dd59b8c32c88ac808df3d79c9e5c8a98ecde",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.76/twinpanel-1.1.0-rc.76-linux-x86_64.tar.gz",
-    "sha256": "3f47c2d91f7d6ed29aaf667aebb715e0b4767c6715cb2a796b443513bafaff27",
-    "size_bytes": 12893416
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.77/twinpanel-1.1.0-rc.77-linux-x86_64.tar.gz",
+    "sha256": "c27daafd686d972fab357be79cfff10411bc73c5bf9628c93587364042a96ed2",
+    "size_bytes": 12893029
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.76 دو ایراد واقعی مرکز بروزرسانی را که روی سرور 217.179.6.142 در rc.75 دیده شد اصلاح می‌کند. ایراد اول مربوط به خارج شدن/بریده دیده شدن محتوای پنجره بروزرسانی در برخی ابعاد viewport و پس از restore شدن scroll بود؛ لایه V76 اکنون عرض را به viewport محدود می‌کند، max-height را با 100dvh/100vh محاسبه می‌کند، shell مودال را قابل scroll و overscroll را محدود می‌کند و برای متن‌های طولانی release/error شکست خط ایمن دارد. ایراد دوم این بود که SystemReleaseFooter قبل از reload موفق، recovery marker را با reload_from ذخیره می‌کرد اما mount بعدی هر recovery marker را دلیل باز کردن خودکار مودال می‌دانست؛ درخواست status بعداً marker را پاک می‌کرد ولی مودال بازشده دیگر بسته نمی‌شد. rc.76 یک cleanup قبل از hydration اضافه می‌کند که فقط marker دارای reload_from را حذف می‌کند، بنابراین بعد از refresh موفق مودال دوباره باز نمی‌ماند، در حالی که markerهای واقعی update در حال اجرا بدون reload_from حفظ می‌شوند تا progress بعد از refresh دستی بازیابی شود. Backend، API، Route، Auth، Provisioning و اصلاح Nginx/504 نسخه rc.74 بدون تغییر باقی مانده‌اند. CI شامل regression اختصاصی lifecycle/viewport به‌همراه Preview Validation، API Build و smokeهای موجود است.",
-    "en": "TwinPanel 1.1.0-rc.76 fixes two real System Update Center defects reproduced on server 217.179.6.142 under rc.75. First, the update dialog could appear cropped/out of frame after viewport changes or restored inner scrolling; V76 now hard-bounds width to the live viewport, uses 100dvh/100vh for safe max height, makes the modal shell scrollable with contained overscroll, and safely wraps long release/error text. Second, SystemReleaseFooter wrote a recovery marker with reload_from immediately before the successful forced reload, while the next mount treated any recovery marker as a reason to auto-open the dialog. A later status request cleared the marker but did not close the already-open modal, leaving the operator to press Close manually. rc.76 adds a pre-hydration cleanup which removes only markers that already contain reload_from, so a completed update no longer reopens after refresh while genuine in-progress markers without reload_from are preserved for progress recovery after a manual refresh. Backend, API, routes, auth, provisioning, and the rc.74 Nginx/504 correction are unchanged. CI includes a dedicated lifecycle/viewport regression plus Preview Validation, API Build, and the existing smoke suite."
+    "fa": "TwinPanel 1.1.0-rc.77 اصلاح تکمیلی مرکز بروزرسانی بر اساس تست واقعی rc.76 روی سرور 217.179.6.142 است. rc.76 دو ایراد باقی گذاشته بود: نخست، max-height روی content-box کارت اعمال می‌شد در حالی که padding و border خارج از آن محاسبه می‌شدند و shell مودال نیز scrollable و هم‌زمان vertically centered بود؛ در viewport کوتاه، border-box واقعی می‌توانست از صفحه بزرگ‌تر شود و لبه بالایی پنجره قابل دسترس نباشد. rc.77 کارت را با box-sizing:border-box داخل 100dvh/100vh محدود می‌کند، shell را fixed و non-scrollable نگه می‌دارد و فقط خود کارت را scroll container عمودی می‌کند. دوم، cleanup نسخه rc.76 فقط recovery marker دارای reload_from را حذف می‌کرد، اما RuntimeVersionConvergence می‌تواند قبل از نوشته‌شدن reload_from صفحه را refresh کند؛ در نتیجه marker قدیمی باقی می‌ماند و پنجره بعد از موفقیت دوباره باز می‌شد. rc.77 هر full document load را مرز lifecycle می‌داند و marker کلاینت را قبل از hydration حذف می‌کند؛ وضعیت واقعی بروزرسانی همچنان از release/status بک‌اند خوانده می‌شود، بنابراین اگر بروزرسانی واقعاً در حال اجرا باشد progress دوباره از وضعیت سرور باز می‌شود. Backend، API، Auth، Provisioning، Tunnel و اصلاح Nginx/504 بدون تغییر باقی مانده‌اند. CI شامل Regression اختصاصی V77، Preview Validation، API Build و Tunnel Control Smoke است.",
+    "en": "TwinPanel 1.1.0-rc.77 is a follow-up System Update Center correction based on the real rc.76 test on server 217.179.6.142. rc.76 left two defects. First, max-height constrained the card content box while existing padding and borders were outside that bound, and the modal shell itself was scrollable while the card remained vertically centered. On short viewports the rendered border-box could still exceed the viewport and its top edge could become unreachable. rc.77 applies border-box sizing, bounds the complete card against 100dvh/100vh, keeps the modal shell fixed and non-scrollable, and makes only the card the vertical scroll container. Second, rc.76 cleanup removed only recovery markers already carrying reload_from, but RuntimeVersionConvergence can refresh the document before reload_from is written; that stale marker could then reopen a completed update dialog. rc.77 treats every full document load as a lifecycle boundary and clears the client marker before hydration. The backend release/status endpoint remains authoritative, so a genuinely active update still restores its progress UI from server state. Backend, API, auth, provisioning, tunnel behavior, and the rc.74 Nginx/504 correction are unchanged. CI includes the dedicated V77 regression plus Preview Validation, API Build, and Tunnel Control Smoke."
   }
 }
