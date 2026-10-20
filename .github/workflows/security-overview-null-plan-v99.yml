@@ -38,4 +38,4 @@ jobs:
 
       - name: Run NULL-plan regression
         working-directory: backend
-        run: python tests/integration/test_security_overview_null_plan_v99.py
+        run: PYTHONPATH=. python tests/integration/test_security_overview_null_plan_v99.py
