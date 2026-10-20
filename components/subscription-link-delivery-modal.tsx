@@ -52,7 +52,7 @@ export function SubscriptionLinkDeliveryModal({open,link,reference,loading=false
   if(!mounted||!open)return null;
 
   return createPortal(
-    <div className="runtime-modal subscription-link-unified-modal" role="dialog" aria-modal="true" aria-label={pick("سابلینک اشتراک","Subscription link")}>
+    <div className="runtime-modal subscription-link-unified-modal" data-subscription-link-surface="unified" role="dialog" aria-modal="true" aria-label={pick("سابلینک اشتراک","Subscription link")}>
       <button className="runtime-modal-bg" type="button" aria-label={pick("بستن","Close")} onClick={onClose}/>
       <section className="runtime-modal-card subscription-link-unified-card">
         <header className="subscription-link-unified-head">
@@ -68,14 +68,14 @@ export function SubscriptionLinkDeliveryModal({open,link,reference,loading=false
 
         {error&&<div className="subscription-link-unified-alert">{error}</div>}
 
-        {loading?<div className="subscription-link-unified-loading"><span/><b>{pick("در حال آماده‌سازی سابلینک...","Preparing subscription link...")}</b></div>:publicLink?<div className="subscription-link-stack subscription-link-unified-grid">
-          <div className="setting-box subscription-link-qr-card">
+        {loading?<div className="subscription-link-unified-loading"><span/><b>{pick("در حال آماده‌سازی سابلینک...","Preparing subscription link...")}</b></div>:publicLink?<div className="subscription-link-unified-grid">
+          <div className="subscription-link-qr-card">
             <div className="subscription-link-card-title"><span aria-hidden="true">▦</span><div><b>{pick("کد QR","QR code")}</b><small>{pick("برای اتصال سریع اسکن کنید","Scan for quick access")}</small></div></div>
             <div className="subscription-link-qr-shell"><QRCodeSVG value={publicLink} size={196} level="M"/></div>
             <span className="subscription-link-ready"><i/>{pick("آماده استفاده","Ready to use")}</span>
           </div>
 
-          <div className="setting-box subscription-link-url-card">
+          <div className="subscription-link-url-card">
             <div className="subscription-link-card-title"><span aria-hidden="true">↗</span><div><b>{pick("لینک اشتراک","Subscription link")}</b><small>{pick("قابل استفاده در همه دستگاه‌ها","Works across all devices")}</small></div></div>
             <div className="subscription-link-url-field" dir="ltr"><code>{publicLink}</code></div>
             <div className="subscription-link-actions">

@@ -1,0 +1,89 @@
+name: TwinPanel Subscription Link Exact Parity V95
+
+on:
+  pull_request:
+    paths:
+      - "app/layout.tsx"
+      - "app/subscription-link-modal.css"
+      - "components/subscription-link-delivery-modal.tsx"
+      - "components/subscription-link-role-bridge.tsx"
+      - "components/customer-subscriptions-runtime.tsx"
+      - "components/legacy-subscriptions-exact.tsx"
+      - "components/reseller-subscriptions-parity.tsx"
+      - ".github/workflows/subscription-link-exact-parity-v95.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-role-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify one shared modal is authoritative for all three roles
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          shared = Path("components/subscription-link-delivery-modal.tsx").read_text()
+          bridge = Path("components/subscription-link-role-bridge.tsx").read_text()
+          customer = Path("components/customer-subscriptions-runtime.tsx").read_text()
+          layout = Path("app/layout.tsx").read_text()
+          css = Path("app/subscription-link-modal.css").read_text()
+
+          assert 'data-subscription-link-surface="unified"' in shared
+          assert 'className="subscription-link-unified-grid"' in shared
+          assert 'subscription-link-stack subscription-link-unified-grid' not in shared
+          assert 'setting-box subscription-link-qr-card' not in shared
+          assert 'setting-box subscription-link-url-card' not in shared
+          assert 'createPortal' in shared and 'document.body' in shared
+          assert 'QRCodeSVG' in shared
+
+          assert 'SubscriptionLinkDeliveryModal' in customer
+          assert 'SubscriptionLinkDeliveryModal' in bridge
+          assert 'pathname==="/admin/subscriptions"' in bridge
+          assert 'pathname==="/reseller/subscriptions"' in bridge
+          assert 'adminApi.subscriptionConnectionInfo(subscriptionId)' in bridge
+          assert 'resellerApi.connectionInfo(subscriptionId)' in bridge
+          assert 'event.stopImmediatePropagation()' in bridge
+          assert 'setReference(`MV-${subscriptionId}`)' in bridge
+
+          assert 'SubscriptionLinkRoleBridge' in layout
+          assert '<SubscriptionLinkRoleBridge/>' in layout
+
+          for token in [
+              '.subscription-link-unified-card',
+              '.subscription-link-unified-grid',
+              '.subscription-link-qr-card',
+              '.subscription-link-qr-shell',
+              '.subscription-link-url-card',
+              '.subscription-link-url-field',
+              '.subscription-link-actions',
+              'overflow-wrap: anywhere',
+              'unicode-bidi: plaintext',
+          ]:
+              assert token in css, f"missing shared visual contract: {token}"
+
+          assert '!important' not in css
+          PY
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional
+          else
+            npm install --include=optional --no-audit --no-fund
+          fi
+
+      - name: Production frontend build
+        run: npm run build
