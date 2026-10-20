@@ -1,23 +1,38 @@
 /*
- * System Update Center viewport containment.
- * Loaded after the legacy release styles so the dialog remains fully reachable
- * even on short browser viewports and after browser chrome/zoom changes.
+ * System Update Center viewport containment (V77 correction).
+ *
+ * rc.76 bounded the content box but left the legacy card padding outside that
+ * bound and made the modal shell scrollable while keeping the card vertically
+ * centered. On a short live viewport the rendered border-box could therefore
+ * exceed the viewport and the centered top edge became unreachable.
+ *
+ * Keep the shell fixed and non-scrollable. Bound the complete card border-box
+ * to the available dynamic viewport and make the card itself the only scroll
+ * container. This guarantees that the title/close control always has a
+ * reachable top edge while long release notes remain scrollable inside.
  */
 .system-update-modal{
-  grid-template-columns:minmax(0,1fr);
+  --system-update-gutter:clamp(10px,2dvh,22px);
+  box-sizing:border-box;
+  display:flex;
   align-items:center;
-  justify-items:center;
-  padding:clamp(10px,2vh,22px);
-  overflow:auto;
-  overscroll-behavior:contain;
+  justify-content:center;
+  padding:var(--system-update-gutter);
+  overflow:hidden;
+  overscroll-behavior:none;
 }
 
 .system-update-card{
-  width:min(860px,calc(100vw - 20px));
+  box-sizing:border-box;
+  width:min(860px,100%);
   max-width:100%;
-  max-height:calc(100vh - 20px);
-  max-height:calc(100dvh - 20px);
   min-width:0;
+  min-height:0;
+  max-height:min(900px,calc(100vh - var(--system-update-gutter) - var(--system-update-gutter)));
+  max-height:min(900px,calc(100dvh - var(--system-update-gutter) - var(--system-update-gutter)));
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior:contain;
   scrollbar-gutter:stable;
 }
 
@@ -36,11 +51,6 @@
 
 @media(max-width:760px){
   .system-update-modal{
-    padding:6px;
-  }
-  .system-update-card{
-    width:calc(100vw - 12px);
-    max-height:calc(100vh - 12px);
-    max-height:calc(100dvh - 12px);
+    --system-update-gutter:6px;
   }
 }
