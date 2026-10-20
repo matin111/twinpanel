@@ -1,10 +1,11 @@
-name: TwinPanel Payment Approval Fast Path V119
+name: TwinPanel Payment Approval Fast Path V120
 
 on:
   pull_request:
     paths:
       - "backend/app/main.py"
       - "backend/app/routers/payment_approval_fast.py"
+      - "backend/app/routers/payment_receipts_local.py"
       - "backend/app/services/payment_fulfillment_fast_path.py"
       - ".github/workflows/payment-approval-fast-v119.yml"
   workflow_dispatch:
@@ -24,6 +25,7 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/routers/payment_approval_fast.py \
+            backend/app/routers/payment_receipts_local.py \
             backend/app/services/payment_fulfillment_fast_path.py \
             backend/app/main.py
 
@@ -35,9 +37,22 @@ jobs:
 
           main = Path("backend/app/main.py").read_text(encoding="utf-8")
           fast = Path("backend/app/routers/payment_approval_fast.py").read_text(encoding="utf-8")
+          receipts = Path("backend/app/routers/payment_receipts_local.py").read_text(encoding="utf-8")
           worker = Path("backend/app/services/payment_fulfillment_fast_path.py").read_text(encoding="utf-8")
 
-          assert main.index("app.include_router(payment_approval_fast_router)") < main.index("app.include_router(payments_router)")
+          receipt_pos = main.index("app.include_router(payment_receipts_local_router)")
+          fast_pos = main.index("app.include_router(payment_approval_fast_router)")
+          legacy_pos = main.index("app.include_router(payments_router)")
+          assert receipt_pos < fast_pos < legacy_pos
+
+          # FastAPI resolves the first matching route. The isolated receipt
+          # router intentionally owns the public approve URL, so that wrapper
+          # must delegate to the non-blocking fast approval implementation.
+          assert "from .payment_approval_fast import approve_payment_fast" in receipts
+          assert "return await approve_payment_fast(" in receipts
+          assert "legacy_approve_payment" not in receipts
+          assert "background_tasks: BackgroundTasks" in receipts
+
           assert "payment_fulfillment_recovery_loop()" in main
           assert "background_tasks.add_task" in fast
           assert "await _fulfill_paid_order" not in fast
@@ -48,8 +63,26 @@ jobs:
           assert "recover_interrupted_payment_orders_once" in worker
           assert "PAYMENT_FULFILL_FAST_PATH" in worker
 
+          receipts_tree = ast.parse(receipts)
           fast_tree = ast.parse(fast)
           worker_tree = ast.parse(worker)
+
+          isolated = next(
+              node
+              for node in ast.walk(receipts_tree)
+              if isinstance(node, ast.AsyncFunctionDef)
+              and node.name == "admin_payment_approve_isolated"
+          )
+          calls = [
+              node for node in ast.walk(isolated)
+              if isinstance(node, ast.Call)
+          ]
+          assert any(
+              isinstance(call.func, ast.Name)
+              and call.func.id == "approve_payment_fast"
+              for call in calls
+          )
+
           assert any(
               isinstance(node, ast.AsyncFunctionDef)
               and node.name == "approve_payment_fast"
@@ -61,5 +94,5 @@ jobs:
               for node in ast.walk(worker_tree)
           )
 
-          print("PAYMENT_APPROVAL_FAST_V119_SOURCE_CONTRACT_OK")
+          print("PAYMENT_APPROVAL_FAST_V120_ROUTE_CONTRACT_OK")
           PY

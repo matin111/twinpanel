@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import secrets
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
@@ -15,8 +15,8 @@ from ..database import get_db
 from ..deps import get_current_user, require_admin
 from ..models import User
 from ..payment_models import PaymentIntent
+from .payment_approval_fast import approve_payment_fast
 from .payments import admin_payment_receipt as telegram_admin_payment_receipt
-from .payments import approve_payment as legacy_approve_payment
 from .payments import intent_out
 from .payments import reject_payment as legacy_reject_payment
 
@@ -337,10 +337,15 @@ def admin_payment_review_summary(
 )
 async def admin_payment_approve_isolated(
     intent_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     _admin_visible_intent(db, intent_id)
-    return await legacy_approve_payment(intent_id, db)
+    return await approve_payment_fast(
+        intent_id,
+        background_tasks,
+        db,
+    )
 
 
 @router.post(
