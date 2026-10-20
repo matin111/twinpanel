@@ -10,6 +10,7 @@ from .smart_transport_auto_v21 import install_smart_transport_auto_v21
 from .smart_auto_bootstrap_v24 import reconciler_loop as smart_bootstrap_loop
 from .smart_candidate_bootstrap_v38 import reconciler_loop as candidate_bootstrap_loop
 from .vpn_access_dataplane_v46 import reconciler_loop as vpn_access_dataplane_loop
+from .vpn_access_dataplane_v53 import install_vpn_access_dataplane_v53
 from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performance_loop
 
 
@@ -43,6 +44,12 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 # OpenVPN server CA/cert/key with the same Central PKI used for delivered
 # client certificates, with rollback if the service does not come back healthy.
 #
+# VPN Access Dataplane V53 hardens V46's egress ownership. NAT/FORWARD/MSS for
+# the four managed access pools are installed on every non-retired Exit whether
+# or not NodeProtocolConfig status telemetry currently says ONLINE. Dashboard
+# telemetry must never be allowed to flush a live user's Internet path.
+# OpenVPN PKI keeps the separate V46 runtime/status gate unchanged.
+#
 # VPN Access Performance V51 makes the nested-MTU policy an Exit-node invariant
 # instead of depending on potentially stale protocol status telemetry. It
 # enforces and verifies MTU 1200 / TCP MSS 1160 for Cisco/OpenConnect, OpenVPN,
@@ -71,6 +78,7 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 async def main() -> None:
     install_manager_runtime_v16()
     install_smart_transport_auto_v21()
+    install_vpn_access_dataplane_v53()
 
     print(
         "TWINPANEL_TRANSPORT_MANAGER_V12_START "
@@ -78,6 +86,7 @@ async def main() -> None:
         "bootstrap=v24 "
         "candidate_bootstrap=v38 "
         "vpn_access_dataplane=v46 "
+        "vpn_access_egress_policy=v53 "
         "vpn_access_performance=v51 "
         "reconciler=v3 "
         "candidates=kernel_gre,gost_tun,amneziawg,netrix",
