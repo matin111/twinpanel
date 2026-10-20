@@ -1,0 +1,48 @@
+name: TwinPanel Mother Subscription Delivery Policy V108
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/mother_subscription_delivery_policy_v108.py"
+      - "backend/app/self_hosted_runtime.py"
+      - "backend/app/mother_access.py"
+      - "backend/app/routers/account_delivery.py"
+      - "backend/app/models_reseller.py"
+      - "backend/tests/integration/test_mother_subscription_delivery_policy_v108.py"
+      - ".github/workflows/mother-subscription-delivery-policy-v108.yml"
+
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    env:
+      APP_NAME: TwinPanel-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Compile Mother delivery policy
+        run: |
+          python -m py_compile backend/app/mother_subscription_delivery_policy_v108.py
+          python -m py_compile backend/app/self_hosted_runtime.py
+
+      - name: Run Mother subscription delivery regression
+        working-directory: backend
+        run: PYTHONPATH=. python tests/integration/test_mother_subscription_delivery_policy_v108.py
