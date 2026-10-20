@@ -1,59 +1,158 @@
-/* TwinPanel 2027 — premium subscription-link delivery surface.
-   Scoped to the existing admin and reseller sub-link modals only. */
+/* TwinPanel 2027 — unified premium subscription-link delivery surface.
+   One visual contract for customer, reseller and admin. */
 
 .runtime-modal-card:has(.subscription-link-stack),
-.reseller-connection-card {
-  width: min(720px, calc(100vw - 32px));
-  max-width: 720px;
-  max-height: min(90dvh, 860px);
+.reseller-connection-card,
+.subscription-link-unified-card {
+  position: relative;
+  width: min(780px, calc(100vw - 32px));
+  max-width: 780px;
+  max-height: min(92dvh, 880px);
   overflow: auto;
-  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--border));
-  border-radius: 22px;
-  box-shadow: 0 28px 90px rgba(0, 0, 0, .38), 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 88% -12%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 34%),
+    linear-gradient(155deg, color-mix(in srgb, var(--surface) 96%, var(--accent) 4%), var(--surface));
+  box-shadow:
+    0 34px 110px rgba(0, 0, 0, .48),
+    0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, .035);
+  isolation: isolate;
+}
+
+.runtime-modal-card:has(.subscription-link-stack)::before,
+.reseller-connection-card::before,
+.subscription-link-unified-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  border-radius: 26px 26px 0 0;
+  background: linear-gradient(90deg, transparent, var(--accent), var(--purple2, var(--accent)), transparent);
+  opacity: .95;
+  pointer-events: none;
+  z-index: 2;
 }
 
 .runtime-modal-card:has(.subscription-link-stack) > .card-head,
-.reseller-connection-card > .card-head {
+.reseller-connection-card > .card-head,
+.subscription-link-unified-head {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
   margin: 0;
-  padding: 18px 20px;
-  border-bottom: 1px solid var(--border);
-  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 11%, var(--surface)), var(--surface));
+  padding: 22px 24px 19px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 12%, var(--border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent 58%);
+}
+
+.runtime-modal-card:has(.subscription-link-stack) > .card-head > div,
+.reseller-connection-card > .card-head > div {
+  display: grid;
+  gap: 5px;
 }
 
 .runtime-modal-card:has(.subscription-link-stack) > .card-head b,
-.reseller-connection-card > .card-head b {
-  font-size: 1rem;
-  letter-spacing: -.01em;
+.reseller-connection-card > .card-head b,
+.subscription-link-unified-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: -.025em;
 }
 
 .runtime-modal-card:has(.subscription-link-stack) > .card-head small,
-.reseller-connection-card > .card-head small {
-  margin-top: 5px;
+.reseller-connection-card > .card-head small,
+.subscription-link-unified-head p {
+  margin: 0;
   color: var(--muted);
-  line-height: 1.7;
+  font-size: .78rem;
+  line-height: 1.8;
 }
 
-/* Admin subscription link ------------------------------------------------- */
-.subscription-link-stack {
+.runtime-modal-card:has(.subscription-link-stack) > .card-head .icon-button,
+.reseller-connection-card > .card-head .icon-button,
+.subscription-link-unified-close {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 218px;
-  gap: 14px;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface2) 84%, transparent);
+  color: var(--muted);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform .18s ease, border-color .18s ease, background .18s ease, color .18s ease;
+}
+
+.runtime-modal-card:has(.subscription-link-stack) > .card-head .icon-button:hover,
+.reseller-connection-card > .card-head .icon-button:hover,
+.subscription-link-unified-close:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface2));
+  color: var(--text);
+}
+
+/* Shared body geometry --------------------------------------------------- */
+.subscription-link-stack,
+.reseller-connection-content,
+.subscription-link-unified-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  align-items: stretch;
+  gap: 16px;
   width: 100%;
   margin: 0;
-  padding: 18px;
+  padding: 20px;
   box-sizing: border-box;
 }
 
-.subscription-link-stack > .setting-box {
+.subscription-link-stack > .setting-box,
+.reseller-connection-content > .reseller-secret-grid > div.wide,
+.reseller-connection-content > .reseller-public-delivery,
+.subscription-link-qr-card,
+.subscription-link-url-card {
+  position: relative;
   min-width: 0;
   margin: 0;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 5%, var(--surface2)), var(--surface2));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .025);
+  padding: 18px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 15%, var(--border));
+  border-radius: 20px;
+  background:
+    linear-gradient(155deg, color-mix(in srgb, var(--accent) 5%, var(--surface2)), color-mix(in srgb, var(--surface2) 96%, transparent));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .03),
+    0 12px 34px rgba(0, 0, 0, .10);
 }
 
+.subscription-link-stack > .setting-box::before,
+.reseller-connection-content > .reseller-secret-grid > div.wide::before,
+.reseller-connection-content > .reseller-public-delivery::before,
+.subscription-link-qr-card::before,
+.subscription-link-url-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  filter: blur(34px);
+  transform: translate(-35%, -42%);
+  pointer-events: none;
+}
+
+/* Admin legacy structure mapped onto the shared contract ---------------- */
 .subscription-link-stack > .setting-box:first-child {
   grid-column: 2;
   grid-row: 1;
@@ -61,54 +160,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 13px;
   text-align: center;
-}
-
-.subscription-link-stack > .setting-box:first-child > small,
-.subscription-link-stack > .setting-box:last-child > small {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  width: 100%;
-  color: var(--text);
-  font-size: .84rem;
-  font-weight: 800;
-}
-
-.subscription-link-stack > .setting-box:first-child > small {
-  justify-content: center;
-}
-
-.subscription-link-stack > .setting-box:first-child > small::before {
-  content: "⌗";
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
-  color: var(--accent);
-  font-size: .78rem;
-}
-
-.subscription-link-stack > .setting-box:first-child > div {
-  display: grid;
-  place-items: center;
-  width: min(100%, 194px);
-  aspect-ratio: 1;
-  box-sizing: border-box;
-  padding: 15px;
-  border: 1px solid rgba(255, 255, 255, .82);
-  border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, .18);
-}
-
-.subscription-link-stack > .setting-box:first-child svg {
-  display: block;
-  width: 100%;
-  height: 100%;
 }
 
 .subscription-link-stack > .setting-box:last-child {
@@ -117,32 +170,86 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 12px;
+  gap: 14px;
+}
+
+.subscription-link-stack > .setting-box:first-child > small,
+.subscription-link-stack > .setting-box:last-child > small {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  color: var(--text);
+  font-size: .86rem;
+  font-weight: 900;
+}
+
+.subscription-link-stack > .setting-box:first-child > small {
+  justify-content: center;
+}
+
+.subscription-link-stack > .setting-box:first-child > small::before {
+  content: "QR";
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 24%, var(--surface)), color-mix(in srgb, var(--accent) 8%, var(--surface)));
+  color: var(--accent);
+  font-size: .58rem;
+  font-weight: 950;
+  letter-spacing: .04em;
 }
 
 .subscription-link-stack > .setting-box:last-child > small::before {
   content: "↗";
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 24%, var(--surface)), color-mix(in srgb, var(--accent) 8%, var(--surface)));
   color: var(--accent);
-  font-size: .82rem;
+  font-size: .9rem;
+}
+
+.subscription-link-stack > .setting-box:first-child > div {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 196px;
+  height: 196px;
+  box-sizing: border-box;
+  padding: 13px;
+  border: 1px solid rgba(255, 255, 255, .9);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, .22), 0 0 0 5px color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.subscription-link-stack > .setting-box:first-child svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .subscription-link-stack > .setting-box:last-child code {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
   min-width: 0;
-  min-height: 68px;
+  min-height: 104px;
   box-sizing: border-box;
-  padding: 13px 14px;
-  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--surface) 72%, var(--surface2));
+  padding: 15px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--surface) 76%, var(--surface2));
   color: var(--text);
   direction: ltr;
   unicode-bidi: plaintext;
@@ -150,16 +257,18 @@
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
-  line-height: 1.75;
+  line-height: 1.8;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: .79rem;
+  font-size: .8rem;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .02);
 }
 
 .subscription-link-stack > .setting-box:last-child .row-actions {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
+  gap: 10px;
   margin: 0;
 }
 
@@ -167,20 +276,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 42px;
+  min-height: 44px;
   margin: 0;
+  border-radius: 13px;
   text-align: center;
+  font-weight: 800;
 }
 
-/* Reseller subscription link --------------------------------------------- */
-.reseller-connection-content {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 218px;
-  gap: 14px;
-  margin: 0;
-  padding: 18px;
-}
-
+/* Reseller legacy structure mapped onto the same contract ---------------- */
 .reseller-connection-content > .reseller-secret-grid {
   grid-column: 1;
   grid-row: 1;
@@ -191,50 +294,49 @@
 .reseller-connection-content > .reseller-secret-grid > div.wide {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
+  gap: 10px;
   align-content: center;
   min-height: 100%;
   box-sizing: border-box;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 5%, var(--surface2)), var(--surface2));
 }
 
 .reseller-connection-content > .reseller-secret-grid > div.wide > span {
   grid-column: 1 / -1;
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 9px;
   color: var(--text);
-  font-size: .84rem;
-  font-weight: 800;
+  font-size: .86rem;
+  font-weight: 900;
 }
 
 .reseller-connection-content > .reseller-secret-grid > div.wide > span::before {
   content: "↗";
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  flex: 0 0 24px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 24%, var(--surface)), color-mix(in srgb, var(--accent) 8%, var(--surface)));
   color: var(--accent);
-  font-size: .82rem;
 }
 
 .reseller-connection-content > .reseller-secret-grid > div.wide > code {
   grid-column: 1 / -1;
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
   min-width: 0;
-  min-height: 68px;
+  min-height: 104px;
   box-sizing: border-box;
-  padding: 13px 14px;
-  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--surface) 72%, var(--surface2));
+  padding: 15px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--surface) 76%, var(--surface2));
   color: var(--text);
   direction: ltr;
   unicode-bidi: plaintext;
@@ -243,14 +345,18 @@
   overflow: visible;
   overflow-wrap: anywhere;
   word-break: break-word;
-  line-height: 1.75;
+  line-height: 1.8;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  font-size: .79rem;
+  font-size: .8rem;
 }
 
 .reseller-connection-content > .reseller-secret-grid > div.wide > button {
-  min-height: 42px;
+  position: relative;
+  z-index: 1;
+  min-height: 44px;
   justify-content: center;
+  border-radius: 13px;
+  font-weight: 800;
 }
 
 .reseller-connection-content > .reseller-public-delivery {
@@ -260,71 +366,417 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  margin: 0;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 5%, var(--surface2)), var(--surface2));
+  gap: 13px;
   text-align: center;
 }
 
 .reseller-connection-content > .reseller-public-delivery > div:first-child {
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: 5px;
   order: 1;
 }
 
 .reseller-connection-content > .reseller-public-delivery > div:first-child b {
-  font-size: .84rem;
+  color: var(--text);
+  font-size: .86rem;
+  font-weight: 900;
 }
 
 .reseller-connection-content > .reseller-public-delivery > div:first-child small {
   color: var(--muted);
-  line-height: 1.6;
-  font-size: .75rem;
+  line-height: 1.65;
+  font-size: .74rem;
 }
 
 .reseller-connection-content > .reseller-public-delivery img {
-  position: static;
-  grid-row: auto;
-  grid-column: auto;
+  position: relative;
+  z-index: 1;
   order: 2;
   display: block;
-  width: 178px;
-  height: 178px;
+  width: 196px;
+  height: 196px;
   box-sizing: border-box;
   margin: 0 auto;
-  padding: 12px;
-  border: 1px solid rgba(255, 255, 255, .82);
-  border-radius: 18px;
+  padding: 13px;
+  border: 1px solid rgba(255, 255, 255, .9);
+  border-radius: 20px;
   background: #fff;
   object-fit: contain;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, .18);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, .22), 0 0 0 5px color-mix(in srgb, var(--accent) 5%, transparent);
 }
 
 .reseller-connection-card > .runtime-modal-actions {
   margin: 0;
-  padding: 0 18px 18px;
+  padding: 0 20px 20px;
   border-top: 0;
+}
+
+.reseller-connection-card > .runtime-modal-actions .ghost {
+  min-height: 42px;
+  border-radius: 12px;
+}
+
+/* New shared customer modal --------------------------------------------- */
+.subscription-link-unified-head {
+  grid-template-columns: 46px minmax(0, 1fr) auto 38px;
+}
+
+.subscription-link-unified-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border));
+  border-radius: 15px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 24%, var(--surface2)), color-mix(in srgb, var(--accent) 8%, var(--surface2)));
+  color: var(--accent);
+  font-size: 1.45rem;
+  font-weight: 900;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 9px 24px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.subscription-link-unified-heading {
+  display: grid;
+  gap: 2px;
+}
+
+.subscription-link-unified-kicker {
+  color: var(--accent);
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .01em;
+}
+
+.subscription-link-unified-head h2 {
+  font-size: 1.08rem;
+}
+
+.subscription-link-unified-ref {
+  align-self: center;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface2));
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.subscription-link-qr-card {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  text-align: center;
+}
+
+.subscription-link-url-card {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+}
+
+.subscription-link-card-title {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.subscription-link-card-title > span {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 23%, var(--surface)), color-mix(in srgb, var(--accent) 7%, var(--surface)));
+  color: var(--accent);
+  font-weight: 950;
+}
+
+.subscription-link-card-title > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.subscription-link-card-title b {
+  color: var(--text);
+  font-size: .86rem;
+  font-weight: 900;
+}
+
+.subscription-link-card-title small {
+  color: var(--muted);
+  font-size: .72rem;
+  line-height: 1.5;
+}
+
+.subscription-link-qr-card .subscription-link-card-title {
+  justify-content: center;
+  text-align: start;
+}
+
+.subscription-link-qr-shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 196px;
+  height: 196px;
+  box-sizing: border-box;
+  padding: 13px;
+  border: 1px solid rgba(255,255,255,.9);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, .22), 0 0 0 5px color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.subscription-link-qr-shell svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.subscription-link-ready {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, #22c55e 26%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, #22c55e 7%, var(--surface));
+  color: color-mix(in srgb, #22c55e 76%, var(--text));
+  font-size: .7rem;
+  font-weight: 850;
+}
+
+.subscription-link-ready i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #22c55e 12%, transparent);
+}
+
+.subscription-link-url-field {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  min-height: 104px;
+  box-sizing: border-box;
+  padding: 15px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--surface) 76%, var(--surface2));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.02);
+}
+
+.subscription-link-url-field code {
+  width: 100%;
+  min-width: 0;
+  color: var(--text);
+  direction: ltr;
+  unicode-bidi: plaintext;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: .8rem;
+  user-select: all;
+}
+
+.subscription-link-actions {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.subscription-link-actions > * {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: 13px;
+  font-size: .8rem;
+  font-weight: 900;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.subscription-link-actions > *:hover {
+  transform: translateY(-1px);
+}
+
+.subscription-link-copy {
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface2));
+  color: var(--text);
+}
+
+.subscription-link-copy.is-copied {
+  border-color: color-mix(in srgb, #22c55e 38%, var(--border));
+  background: color-mix(in srgb, #22c55e 9%, var(--surface2));
+  color: color-mix(in srgb, #22c55e 75%, var(--text));
+}
+
+.subscription-link-open {
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, var(--accent), var(--purple2, var(--accent)));
+  color: #fff;
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--accent) 24%, transparent);
+}
+
+.subscription-link-hint {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 22%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+  color: var(--muted);
+  font-size: .69rem;
+  line-height: 1.7;
+}
+
+.subscription-link-hint > span {
+  color: var(--accent);
+  flex: 0 0 auto;
+}
+
+.subscription-link-unified-alert {
+  margin: 16px 20px 0;
+  padding: 11px 13px;
+  border: 1px solid color-mix(in srgb, #ef4444 34%, var(--border));
+  border-radius: 13px;
+  background: color-mix(in srgb, #ef4444 8%, var(--surface2));
+  color: color-mix(in srgb, #ef4444 72%, var(--text));
+  font-size: .78rem;
+  line-height: 1.7;
+}
+
+.subscription-link-unified-loading,
+.subscription-link-unified-empty {
+  display: grid;
+  place-items: center;
+  gap: 9px;
+  min-height: 280px;
+  padding: 28px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.subscription-link-unified-loading > span {
+  width: 34px;
+  height: 34px;
+  border: 3px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: subscriptionLinkSpin .75s linear infinite;
+}
+
+.subscription-link-unified-empty > span {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  border-radius: 17px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface2));
+  color: var(--accent);
+  font-size: 1.55rem;
+}
+
+.subscription-link-unified-empty b {
+  color: var(--text);
+}
+
+.subscription-link-unified-empty small {
+  color: var(--muted);
+}
+
+.customerSubLinkLauncher > code {
+  color: color-mix(in srgb, #22c55e 72%, var(--text));
+  font-family: inherit;
+  font-weight: 800;
+}
+
+@keyframes subscriptionLinkSpin { to { transform: rotate(360deg); } }
+
+/* Light mode ------------------------------------------------------------- */
+html[data-theme="light"] .runtime-modal-card:has(.subscription-link-stack),
+html[data-theme="light"] .reseller-connection-card,
+html[data-theme="light"] .subscription-link-unified-card {
+  box-shadow: 0 32px 90px rgba(15, 23, 42, .20), 0 0 0 1px color-mix(in srgb, var(--accent) 7%, transparent);
 }
 
 html[data-theme="light"] .subscription-link-stack > .setting-box,
 html[data-theme="light"] .reseller-connection-content > .reseller-secret-grid > div.wide,
-html[data-theme="light"] .reseller-connection-content > .reseller-public-delivery {
-  box-shadow: 0 8px 24px rgba(15, 23, 42, .04);
+html[data-theme="light"] .reseller-connection-content > .reseller-public-delivery,
+html[data-theme="light"] .subscription-link-qr-card,
+html[data-theme="light"] .subscription-link-url-card {
+  box-shadow: 0 12px 30px rgba(15, 23, 42, .055), inset 0 1px 0 rgba(255,255,255,.8);
 }
 
-@media (max-width: 680px) {
+/* Responsive ------------------------------------------------------------- */
+@media (max-width: 720px) {
   .runtime-modal-card:has(.subscription-link-stack),
-  .reseller-connection-card {
+  .reseller-connection-card,
+  .subscription-link-unified-card {
     width: calc(100vw - 18px);
-    max-height: 92dvh;
-    border-radius: 18px;
+    max-height: 94dvh;
+    border-radius: 20px;
+  }
+
+  .subscription-link-unified-head {
+    grid-template-columns: 40px minmax(0,1fr) 36px;
+    padding: 17px 16px;
+  }
+
+  .subscription-link-unified-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 13px;
+  }
+
+  .subscription-link-unified-ref {
+    display: none;
+  }
+
+  .runtime-modal-card:has(.subscription-link-stack) > .card-head,
+  .reseller-connection-card > .card-head {
+    padding: 17px 16px;
   }
 
   .subscription-link-stack,
-  .reseller-connection-content {
+  .reseller-connection-content,
+  .subscription-link-unified-grid {
     grid-template-columns: minmax(0, 1fr);
     padding: 14px;
   }
@@ -332,25 +784,30 @@ html[data-theme="light"] .reseller-connection-content > .reseller-public-deliver
   .subscription-link-stack > .setting-box:first-child,
   .subscription-link-stack > .setting-box:last-child,
   .reseller-connection-content > .reseller-secret-grid,
-  .reseller-connection-content > .reseller-public-delivery {
+  .reseller-connection-content > .reseller-public-delivery,
+  .subscription-link-qr-card,
+  .subscription-link-url-card {
     grid-column: 1;
     grid-row: auto;
   }
 
   .subscription-link-stack > .setting-box:first-child,
-  .reseller-connection-content > .reseller-public-delivery {
+  .reseller-connection-content > .reseller-public-delivery,
+  .subscription-link-qr-card {
     order: 1;
   }
 
   .subscription-link-stack > .setting-box:last-child,
-  .reseller-connection-content > .reseller-secret-grid {
+  .reseller-connection-content > .reseller-secret-grid,
+  .subscription-link-url-card {
     order: 2;
   }
 
   .subscription-link-stack > .setting-box:first-child > div,
-  .reseller-connection-content > .reseller-public-delivery img {
-    width: 168px;
-    height: 168px;
+  .reseller-connection-content > .reseller-public-delivery img,
+  .subscription-link-qr-shell {
+    width: 178px;
+    height: 178px;
   }
 
   .reseller-connection-content > .reseller-secret-grid > div.wide {
@@ -363,15 +820,23 @@ html[data-theme="light"] .reseller-connection-content > .reseller-public-deliver
   }
 }
 
-@media (max-width: 440px) {
+@media (max-width: 460px) {
+  .subscription-link-stack > .setting-box,
+  .reseller-connection-content > .reseller-secret-grid > div.wide,
+  .reseller-connection-content > .reseller-public-delivery,
+  .subscription-link-qr-card,
+  .subscription-link-url-card {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
   .subscription-link-stack > .setting-box:last-child .row-actions,
-  .reseller-connection-content > .reseller-secret-grid > div.wide {
+  .reseller-connection-content > .reseller-secret-grid > div.wide,
+  .subscription-link-actions {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .subscription-link-stack > .setting-box,
-  .reseller-connection-content > .reseller-secret-grid > div.wide,
-  .reseller-connection-content > .reseller-public-delivery {
-    padding: 13px;
+  .subscription-link-hint {
+    display: none;
   }
 }
