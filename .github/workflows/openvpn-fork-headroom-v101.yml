@@ -1,0 +1,31 @@
+name: TwinPanel OpenVPN Fork Headroom V101
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/openvpn_fork_headroom_v101.py"
+      - "backend/app/self_hosted_runtime.py"
+      - "backend/tests/integration/test_openvpn_fork_headroom_v101.py"
+      - ".github/workflows/openvpn-fork-headroom-v101.yml"
+
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile OpenVPN fork-headroom runtime
+        run: |
+          python -m py_compile backend/app/openvpn_fork_headroom_v101.py
+          python -m py_compile backend/app/self_hosted_runtime.py
+
+      - name: Run OpenVPN fork-headroom regression
+        working-directory: backend
+        run: PYTHONPATH=. python tests/integration/test_openvpn_fork_headroom_v101.py
