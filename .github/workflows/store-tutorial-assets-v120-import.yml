@@ -1,0 +1,95 @@
+name: TwinPanel Store Tutorial Assets V120 Import
+
+on:
+  push:
+    branches:
+      - feat/store-tutorial-screenshots-v120-final
+
+permissions:
+  contents: write
+
+concurrency:
+  group: store-tutorial-assets-v120-import
+  cancel-in-progress: false
+
+jobs:
+  import-verified-legacy-screenshots:
+    runs-on: ubuntu-latest
+    if: github.repository == 'matin111/twinpanel'
+    steps:
+      - name: Checkout import branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/store-tutorial-screenshots-v120-final
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Download exact screenshots verified against backup manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          count=0
+          while read -r expected path; do
+            [[ -n "${expected:-}" && -n "${path:-}" ]] || continue
+            target="public/$path"
+            mkdir -p "$(dirname "$target")"
+            tmp="${target}.tmp"
+            curl -fL --retry 4 --retry-delay 2 --connect-timeout 15 --max-time 90 \
+              "https://movilineapp.com/$path" \
+              -o "$tmp"
+            actual="$(sha256sum "$tmp" | awk '{print $1}')"
+            if [[ "$actual" != "$expected" ]]; then
+              echo "SHA256 mismatch for $path" >&2
+              echo "expected=$expected" >&2
+              echo "actual=$actual" >&2
+              exit 41
+            fi
+            mv "$tmp" "$target"
+            count=$((count+1))
+          done < assets/legacy-learning-screenshots.sha256
+
+          [[ "$count" -eq 65 ]] || {
+            echo "Expected 65 verified screenshots, got $count" >&2
+            exit 42
+          }
+
+          test "$(find public/learning/screenshots -type f -name '*.webp' | wc -l)" -eq 65
+          echo "VERIFIED_LEGACY_SCREENSHOTS=$count"
+
+      - name: Bind storefront guides to repository-local screenshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('lib/store-guide-content.ts')
+          text=path.read_text(encoding='utf-8')
+          old='const LEGACY_STEP_IMAGE_BASE="https://movilineapp.com/learning/screenshots";'
+          new='const LEGACY_STEP_IMAGE_BASE="/learning/screenshots";'
+          if text.count(old) != 1:
+              raise SystemExit('legacy screenshot base contract changed')
+          path.write_text(text.replace(old,new),encoding='utf-8')
+          PY
+          grep -F 'const LEGACY_STEP_IMAGE_BASE="/learning/screenshots";' lib/store-guide-content.ts
+
+      - name: Production frontend build with local tutorial images
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --include=optional --no-audit --no-fund
+          npm run build
+          test -f .next/standalone/public/learning/screenshots/windows/cisco/01.webp
+          test -f .next/standalone/public/learning/screenshots/android/wireguard/05.webp
+          test -f .next/standalone/public/learning/screenshots/ios/l2tp/05.webp
+
+      - name: Commit verified screenshots to GitHub branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "TwinPanel Release Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add public/learning/screenshots lib/store-guide-content.ts assets/legacy-learning-screenshots.sha256
+          git rm .github/workflows/store-tutorial-assets-v120-import.yml
+          git diff --cached --check
+          git commit -m "Import verified legacy storefront tutorial screenshots"
+          git push origin HEAD:feat/store-tutorial-screenshots-v120-final
