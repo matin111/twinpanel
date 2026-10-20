@@ -24,10 +24,10 @@ L2TP_TELEMETRY_DOWN_HOOK = "/etc/ppp/ip-down.d/twinpanel-l2tp-telemetry"
 L2TP_TELEMETRY_STATE_DIR = "/run/twinpanel/l2tp-sessions"
 L2TP_TELEMETRY_MARKER = "TWINPANEL_L2TP_QUOTA_TELEMETRY_V113"
 
-_L2TP_RUNTIME_COMMAND = rf'''set +e
-UP={L2TP_TELEMETRY_UP_HOOK!r}
-DOWN={L2TP_TELEMETRY_DOWN_HOOK!r}
-MARKER={L2TP_TELEMETRY_MARKER!r}
+_L2TP_RUNTIME_COMMAND = r'''set +e
+UP="/etc/ppp/ip-up.d/twinpanel-l2tp-telemetry"
+DOWN="/etc/ppp/ip-down.d/twinpanel-l2tp-telemetry"
+MARKER="TWINPANEL_L2TP_QUOTA_TELEMETRY_V113"
 
 if ! test -x "$UP" \
   || ! test -x "$DOWN" \
