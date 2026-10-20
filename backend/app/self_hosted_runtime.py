@@ -11,6 +11,9 @@ from .modern_runtime_v18 import apply_modern_runtime_v18
 from .mother_subscription_delivery_policy_v108 import (
     apply_mother_subscription_delivery_policy_v108,
 )
+from .node_subscription_convergence_v114 import (
+    apply_node_subscription_convergence_v114,
+)
 from .openvpn_fork_headroom_v101 import (
     apply_openvpn_fork_headroom_v101,
 )
@@ -151,6 +154,14 @@ def apply_self_hosted_runtime(
     # ------------------------------------------------------------
 
     apply_mother_subscription_delivery_policy_v108()
+
+    # ------------------------------------------------------------
+    # Node subscription convergence V114
+    # ------------------------------------------------------------
+    # Fresh node install already performs immediate subscription synchronization.
+    # V114 adds a fail-safe retry worker for any partial historical-user sync.
+
+    apply_node_subscription_convergence_v114()
 
     # ------------------------------------------------------------
     # Node Agent
