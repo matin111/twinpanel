@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from .models import NodeType
 from .routers import provision
 
@@ -137,6 +139,11 @@ async def _provision_protocols_v101(
         headroom = await ensure_openvpn_fork_headroom_v101(
             conn,
         )
+
+        # A changed drop-in restarts the instance. Give the listener a short,
+        # bounded settle window before the existing live-health probe.
+        if headroom.get("restarted"):
+            await asyncio.sleep(1)
 
         stored = provision._protocol_settings_from_db(
             db,
