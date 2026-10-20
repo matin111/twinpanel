@@ -127,65 +127,6 @@ RESELLER_DEFAULTS = {
 }
 
 
-def _install_main_runtime_service_override() -> None:
-    """Keep the existing service manager but point it at the text-aware wrapper."""
-    try:
-        from .routers import telegram_manager
-    except Exception:
-        return
-
-    if getattr(
-        telegram_manager,
-        "_twinpanel_bot_text_runtime_v1",
-        False,
-    ):
-        return
-
-    original_service_text = telegram_manager._service_text
-
-    def service_text_with_copy_runtime() -> str:
-        return original_service_text().replace(
-            "-m app.telegram_runtime_bot",
-            "-m app.telegram_runtime_custom",
-        )
-
-    telegram_manager._service_text = service_text_with_copy_runtime
-    telegram_manager._twinpanel_bot_text_runtime_v1 = True
-
-
-def _reload_main_bot_runtime() -> None:
-    """Repair the unit and reload an already-running main bot after text saves."""
-    try:
-        from .routers import telegram_manager
-
-        _install_main_runtime_service_override()
-
-        if not telegram_manager.SERVICE_FILE.exists():
-            return
-
-        was_active = telegram_manager._service_state() == "active"
-        telegram_manager._ensure_internal_secret()
-        telegram_manager._repair_existing_service_env()
-
-        if was_active:
-            telegram_manager._run(
-                [
-                    "systemctl",
-                    "restart",
-                    "twinpanel-bot.service",
-                ],
-                timeout=40,
-            )
-    except Exception:
-        # The setting itself is durable even when the service is currently
-        # unavailable. Existing install/repair/restart controls will use the
-        # patched service definition on the next operator action.
-        return
-
-
-_install_main_runtime_service_override()
-
-
 def _setting_key(scope: str, key: str, reseller_id: int | None = None) -> str:
     if scope == "admin":
         return f"telegram.bot_text.admin.{key}"
@@ -356,10 +297,6 @@ def save_bot_texts(
         )
 
     db.commit()
-
-    if scope == "admin":
-        _reload_main_bot_runtime()
-
     return bot_text_catalog(db, scope=scope, reseller=reseller)
 
 
@@ -393,10 +330,6 @@ def reset_bot_texts(
         )
 
     db.commit()
-
-    if scope == "admin":
-        _reload_main_bot_runtime()
-
     return bot_text_catalog(db, scope=scope, reseller=reseller)
 
 
