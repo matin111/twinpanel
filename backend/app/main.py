@@ -54,12 +54,14 @@ from .xray_modern_runtime import router as xray_modern_router
 from .xray_modern_admin import router as xray_modern_admin_router
 from .admin_notification_service import notification_watch_loop
 from .services.customer_maintenance import customer_maintenance_loop
+from .services.payment_fulfillment_fast_path import payment_fulfillment_recovery_loop
 from .services.payment_market_rates import payment_market_loop
 from .services.wallet_payment_automation import wallet_payment_automation_loop
 from .license_guard import LicenseMutationGuardMiddleware
 from .system_release import current_version, license_validation_loop
 # TWINPANEL_REAL_ADMIN_NOTIFICATION_REGISTER_V1
 # TWINPANEL_USERNAME_SETTINGS_REGISTER_V2
+from .routers.payment_approval_fast import router as payment_approval_fast_router
 from .routers.payments import router as payments_router
 from .routers.payment_crypto_discount import router as payment_crypto_discount_router
 from .routers.payment_native_gateways import router as payment_native_gateways_router
@@ -133,6 +135,10 @@ async def lifespan(app: FastAPI):
         customer_maintenance_loop(),
         name="customer-maintenance",
     )
+    payment_fulfillment_task = asyncio.create_task(
+        payment_fulfillment_recovery_loop(),
+        name="payment-fulfillment-recovery",
+    )
     payment_market_task = asyncio.create_task(
         payment_market_loop(),
         name="payment-market-rates",
@@ -153,6 +159,7 @@ async def lifespan(app: FastAPI):
         watchdog_task.cancel()
         notification_task.cancel()
         customer_maintenance_task.cancel()
+        payment_fulfillment_task.cancel()
         payment_market_task.cancel()
         wallet_payment_task.cancel()
         license_validation_task.cancel()
@@ -161,6 +168,7 @@ async def lifespan(app: FastAPI):
             watchdog_task,
             notification_task,
             customer_maintenance_task,
+            payment_fulfillment_task,
             payment_market_task,
             wallet_payment_task,
             license_validation_task,
@@ -265,6 +273,9 @@ app.include_router(payment_automation_router)
 # Register local receipt handling before the legacy payments router so the
 # admin receipt path can transparently serve both local and Telegram receipts.
 app.include_router(payment_receipts_local_router)
+# Canonical approval fast path must precede the legacy payments router. All
+# other payment endpoints continue to come from the existing router unchanged.
+app.include_router(payment_approval_fast_router)
 app.include_router(payments_router)
 # Operational SMS dashboard stays available, while the wallet-aware event
 # endpoints come before the legacy reader so the same bank SMS can safely match
