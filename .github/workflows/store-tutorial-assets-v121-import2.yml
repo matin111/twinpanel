@@ -27,13 +27,13 @@ jobs:
           while read -r expected rel; do
             [[ -n "${expected:-}" && -n "${rel:-}" ]] || continue
             case "$rel" in
-              learning/screenshots/*/*/*.webp) ;;
+              screenshots/*/*/*.webp) ;;
               *) echo "Unexpected tutorial path: $rel" >&2; exit 41 ;;
             esac
-            target="public/$rel"
+            target="public/learning/$rel"
             mkdir -p "$(dirname "$target")"
             curl -fL --retry 1 --retry-delay 1 --connect-timeout 8 --max-time 30 \
-              "http://217.179.6.142/$rel" -o "$target"
+              "http://217.179.6.142/learning/$rel" -o "$target"
             actual="$(sha256sum "$target" | awk '{print $1}')"
             [[ "$actual" == "$expected" ]] || {
               echo "Backup checksum mismatch for $rel" >&2
