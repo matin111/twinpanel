@@ -1,0 +1,69 @@
+name: TwinPanel Subscription Link Visual Contract V96
+
+on:
+  pull_request:
+    paths:
+      - 'app/subscription-link-modal.css'
+      - 'app/subscription-link-modal-v96.css'
+      - 'app/layout.tsx'
+      - 'components/subscription-link-delivery-modal.tsx'
+      - 'components/subscription-link-role-bridge.tsx'
+      - '.github/workflows/subscription-link-visual-contract-v96.yml'
+  workflow_dispatch:
+
+jobs:
+  visual-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify V96 visual token and parity contract
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          layout = Path('app/layout.tsx').read_text()
+          css = Path('app/subscription-link-modal-v96.css').read_text()
+          modal = Path('components/subscription-link-delivery-modal.tsx').read_text()
+          bridge = Path('components/subscription-link-role-bridge.tsx').read_text()
+
+          old_import = 'import "./subscription-link-modal.css";'
+          new_import = 'import "./subscription-link-modal-v96.css";'
+          assert old_import in layout and new_import in layout
+          assert layout.index(old_import) < layout.index(new_import), 'V96 must load after legacy subscription-link CSS'
+
+          assert '.subscription-link-unified-modal {' in css
+          assert '--accent: var(--purple);' in css
+          assert '--border: var(--line);' in css
+          assert '--sl-accent: var(--purple);' in css
+          assert '--sl-line: var(--line);' in css
+          assert '> .subscription-link-unified-card {' in css
+          assert 'padding: 0;' in css
+          assert '.subscription-link-open {' in css
+          assert 'background: linear-gradient(135deg, var(--sl-accent)' in css
+          assert 'html[data-theme="light"] .subscription-link-unified-modal > .runtime-modal-bg' in css
+          assert 'background: rgba(15, 23, 42, .30);' in css
+          assert 'html[data-theme="light"] .subscription-link-unified-modal > .subscription-link-unified-card' in css
+          assert 'linear-gradient(155deg, #ffffff, #f8faff)' in css
+
+          assert 'data-subscription-link-surface="unified"' in modal
+          assert 'subscription-link-unified-card' in modal
+          assert 'SubscriptionLinkDeliveryModal' in bridge
+          assert '/admin/subscriptions' in bridge
+          assert '/reseller/subscriptions' in bridge
+
+          assert '!important' not in css, 'V96 must not add override-chain !important rules'
+          print('V96 subscription-link visual contract OK')
+          PY
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        run: npm install --include=optional --no-audit --no-fund
+
+      - name: Production frontend build
+        run: npm run build
