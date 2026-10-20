@@ -17,9 +17,18 @@ const protocolLabel=(value:string)=>({
 } as Record<string,string>)[String(value||"").toLowerCase()]||value;
 
 function rowSubscriptionId(row:HTMLTableRowElement){
-  const planText=row.cells?.[1]?.textContent||row.textContent||"";
-  const match=planText.match(/\bMV-(\d+)\b/i);
+  const text=row.textContent||"";
+  const match=text.match(/MV-\s*(\d+)/i);
   return match?Number(match[1]):0;
+}
+
+function statusCell(row:HTMLTableRowElement){
+  // The production table has Status immediately before Actions. We decorate
+  // that existing React-owned cell instead of inserting an extra <td>. The old
+  // sidecar inserted cells imperatively, which desynchronised React's table DOM
+  // after the 15s subscription refresh and caused new rows to lose live state
+  // or appear visually misaligned.
+  return row.cells.length>=2?row.cells[row.cells.length-2] as HTMLTableCellElement:null;
 }
 
 export function AdminSubscriptionLiveTable(){
@@ -36,54 +45,51 @@ export function AdminSubscriptionLiveTable(){
       const table=document.querySelector<HTMLTableElement>(".legacy-subscriptions-page .table table");
       if(!table)return;
 
-      const headRow=table.tHead?.rows?.[0];
-      if(headRow&&!headRow.querySelector("[data-live-sub-head]")){
-        const th=document.createElement("th");
-        th.dataset.liveSubHead="1";
-        th.textContent=document.documentElement.lang==="en"?"Connection":"اتصال";
-        headRow.insertBefore(th,headRow.lastElementChild);
-      }
+      // Clean up cells/header left behind by pre-v87 builds if a soft navigation
+      // kept the old document alive. Fresh v87 renders never create them.
+      table.querySelectorAll("[data-live-sub-head]").forEach(node=>node.remove());
+      table.querySelectorAll("td[data-live-sub-cell]").forEach(node=>node.remove());
 
       for(const row of Array.from(table.tBodies?.[0]?.rows||[])){
         const id=rowSubscriptionId(row);
         if(!Number.isFinite(id)||id<=0)continue;
+        const cell=statusCell(row);
+        if(!cell)continue;
 
-        let cell=row.querySelector<HTMLTableCellElement>("td[data-live-sub-cell]");
-        if(!cell){
-          cell=document.createElement("td");
-          cell.dataset.liveSubCell="1";
-          row.insertBefore(cell,row.lastElementChild);
+        let host=cell.querySelector<HTMLDivElement>("div[data-live-sub-state]");
+        if(!host){
+          host=document.createElement("div");
+          host.dataset.liveSubState="1";
+          host.style.marginTop="6px";
+          host.style.display="flex";
+          host.style.alignItems="center";
+          host.style.gap="5px";
+          host.style.flexWrap="wrap";
+          cell.appendChild(host);
         }
 
         const state=states.get(id);
         const online=Boolean(state?.online);
         const protocols=(state?.protocols||[]).map(protocolLabel).filter(Boolean);
         const signature=loaded?`${online?"1":"0"}:${protocols.join(",")}`:"loading";
-        if(cell.dataset.liveSignature===signature)continue;
-        cell.dataset.liveSignature=signature;
-        cell.replaceChildren();
-
-        if(!loaded){
-          const pending=document.createElement("span");
-          pending.className="badge violet";
-          pending.textContent=document.documentElement.lang==="en"?"Checking…":"در حال بررسی…";
-          cell.appendChild(pending);
-          continue;
-        }
+        if(host.dataset.liveSignature===signature)continue;
+        host.dataset.liveSignature=signature;
+        host.replaceChildren();
 
         const badge=document.createElement("span");
-        badge.className=`badge ${online?"ok":"bad"}`;
-        badge.textContent=document.documentElement.lang==="en"?(online?"Online":"Offline"):(online?"آنلاین":"آفلاین");
-        cell.appendChild(badge);
+        badge.className=`badge ${loaded?(online?"ok":"bad"):"violet"}`;
+        badge.textContent=document.documentElement.lang==="en"
+          ?loaded?(online?"Online":"Offline"):"Checking…"
+          :loaded?(online?"آنلاین":"آفلاین"):"در حال بررسی…";
+        badge.title=document.documentElement.lang==="en"?"Connection status":"وضعیت اتصال";
+        host.appendChild(badge);
 
-        if(online&&protocols.length){
+        if(loaded&&online&&protocols.length){
           const detail=document.createElement("small");
-          detail.style.display="block";
-          detail.style.marginTop="5px";
           detail.style.opacity=".72";
           detail.dir="ltr";
           detail.textContent=protocols.join(" · ");
-          cell.appendChild(detail);
+          host.appendChild(detail);
         }
       }
     };
