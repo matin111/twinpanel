@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {useEffect,useMemo,useState} from "react";
 import {useI18n} from "../lib/i18n";
+import type {StorefrontSettings} from "../lib/storefront-config";
 import {
   normalizeStoreTemplateOptions,
   storeTemplateOptionDefinition,
@@ -27,10 +28,11 @@ const SECTION_LABELS:Record<string,{fa:string;en:string}>={
 
 type Props={
   templateId:string;
+  sharedSettings:StorefrontSettings;
   onClose:()=>void;
 };
 
-export function StoreTemplateCustomizer({templateId,onClose}:Props){
+export function StoreTemplateCustomizer({templateId,sharedSettings,onClose}:Props){
   const {pick}=useI18n();
   const definition=useMemo(()=>storeTemplateOptionDefinition(templateId),[templateId]);
   const [locale,setLocale]=useState<"fa"|"en">("fa");
@@ -48,7 +50,20 @@ export function StoreTemplateCustomizer({templateId,onClose}:Props){
         const envelope=await loadStoreTemplateSettings();
         if(!active)return;
         const raw=envelope.templates?.[templateId]||{};
-        setDraft({...normalizeStoreTemplateOptions(templateId,raw),...raw} as StoreTemplateOptionMap);
+        const normalized=normalizeStoreTemplateOptions(templateId,raw);
+        if(Object.keys(raw).length===0&&definition){
+          const shared=sharedSettings as unknown as Record<string,unknown>;
+          for(const [key,fallback] of Object.entries(definition.defaults)){
+            if(key in shared)normalized[key]=shared[key] as StoreTemplateOptionMap[string];
+            if(typeof fallback==="string"){
+              const localizedKey=`${key}_en`;
+              if(localizedKey in shared&&typeof shared[localizedKey]==="string")normalized[localizedKey]=shared[localizedKey] as string;
+            }
+          }
+          setDraft(normalized);
+        }else{
+          setDraft({...normalized,...raw} as StoreTemplateOptionMap);
+        }
       }catch(reason){
         if(active)setError(reason instanceof Error?reason.message:String(reason));
       }finally{
@@ -57,7 +72,7 @@ export function StoreTemplateCustomizer({templateId,onClose}:Props){
     };
     void run();
     return()=>{active=false;};
-  },[templateId]);
+  },[templateId,definition,sharedSettings]);
 
   if(!definition)return null;
 
