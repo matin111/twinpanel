@@ -58,11 +58,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          node-version: '22.13.0'
 
       - name: Install frontend dependencies
-        run: npm ci --include=optional
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional
+          else
+            npm install --include=optional --no-audit --no-fund
+          fi
 
       - name: Production frontend build
         run: npm run build
