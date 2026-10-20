@@ -31,7 +31,7 @@ jobs:
           set -Eeuo pipefail
           test -f .tutorial-import-v121/READY
           parts=(.tutorial-import-v121/part-*.b64)
-          [[ "${#parts[@]}" -eq 32 ]] || { echo "Expected 32 archive chunks, got ${#parts[@]}" >&2; exit 41; }
+          [[ "${#parts[@]}" -eq 30 ]] || { echo "Expected 30 archive chunks, got ${#parts[@]}" >&2; exit 41; }
           cat "${parts[@]}" | base64 -d > /tmp/tutorial-screenshots.tar.gz
           actual="$(sha256sum /tmp/tutorial-screenshots.tar.gz | awk '{print $1}')"
           expected="c64b6802ca795d2813e208109ff13453500a7450e6735c5922154ce065a631f8"
