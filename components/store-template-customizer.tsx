@@ -3,7 +3,8 @@
 import Link from "next/link";
 import {useEffect,useMemo,useState} from "react";
 import {useI18n} from "../lib/i18n";
-import type {StorefrontSettings} from "../lib/storefront-config";
+import {parityApi} from "../lib/admin-parity-api";
+import {normalizeStorefrontSettings} from "../lib/storefront-config";
 import {
   normalizeStoreTemplateOptions,
   storeTemplateOptionDefinition,
@@ -28,11 +29,10 @@ const SECTION_LABELS:Record<string,{fa:string;en:string}>={
 
 type Props={
   templateId:string;
-  sharedSettings:StorefrontSettings;
   onClose:()=>void;
 };
 
-export function StoreTemplateCustomizer({templateId,sharedSettings,onClose}:Props){
+export function StoreTemplateCustomizer({templateId,onClose}:Props){
   const {pick}=useI18n();
   const definition=useMemo(()=>storeTemplateOptionDefinition(templateId),[templateId]);
   const [locale,setLocale]=useState<"fa"|"en">("fa");
@@ -47,14 +47,17 @@ export function StoreTemplateCustomizer({templateId,sharedSettings,onClose}:Prop
     const run=async()=>{
       setLoading(true);setError("");setOk("");
       try{
-        const envelope=await loadStoreTemplateSettings();
+        const [envelope,sharedRaw]=await Promise.all([
+          loadStoreTemplateSettings(),
+          parityApi.storefrontSettings(),
+        ]);
         if(!active)return;
         const raw=envelope.templates?.[templateId]||{};
         const normalized=normalizeStoreTemplateOptions(templateId,raw);
         if(Object.keys(raw).length===0&&definition){
-          const shared=sharedSettings as unknown as Record<string,unknown>;
+          const shared=normalizeStorefrontSettings(sharedRaw) as unknown as Record<string,unknown>;
           for(const [key,fallback] of Object.entries(definition.defaults)){
-            if(key in shared)normalized[key]=shared[key] as StoreTemplateOptionMap[string];
+            if(key in shared)normalized[key]=shared[key] as string|number|boolean|string[];
             if(typeof fallback==="string"){
               const localizedKey=`${key}_en`;
               if(localizedKey in shared&&typeof shared[localizedKey]==="string")normalized[localizedKey]=shared[localizedKey] as string;
@@ -72,7 +75,7 @@ export function StoreTemplateCustomizer({templateId,sharedSettings,onClose}:Prop
     };
     void run();
     return()=>{active=false;};
-  },[templateId,definition,sharedSettings]);
+  },[templateId,definition]);
 
   if(!definition)return null;
 
@@ -145,7 +148,7 @@ export function StoreTemplateCustomizer({templateId,sharedSettings,onClose}:Prop
     {error&&<div className={styles.error}>{error}</div>}
     {ok&&<div className={styles.success}>{ok}</div>}
     {loading?<div className={styles.loading}>{pick("در حال دریافت تنظیمات قالب...","Loading template settings...")}</div>:<>
-      <div className={styles.toolbar}><div className={styles.locale}><button type="button" className={locale==="fa"?styles.active:""} onClick={()=>setLocale("fa")}>FA</button><button type="button" className={locale==="en"?styles.active:""} onClick={()=>setLocale("en")}>EN</button></div><small>{pick(`Theme settings schema v${definition.version}`,`Theme settings schema v${definition.version}`)}</small></div>
+      <div className={styles.toolbar}><div className={styles.locale}><button type="button" className={locale==="fa"?styles.active:""} onClick={()=>setLocale("fa")}>FA</button><button type="button" className={locale==="en"?styles.active:""} onClick={()=>setLocale("en")}>EN</button></div><small>Theme settings schema v{definition.version}</small></div>
       <div className={styles.groups}>{definition.groups.map(group=><section className={styles.group} key={group.id}><div className={styles.groupHead}><b>{pick(group.fa,group.en)}</b>{(group.descriptionFa||group.descriptionEn)&&<p>{pick(group.descriptionFa||"",group.descriptionEn||"")}</p>}</div><div className={styles.fields}>{group.fields.map(renderField)}</div></section>)}</div>
     </>}
   </section>;
