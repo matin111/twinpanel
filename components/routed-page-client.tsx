@@ -57,6 +57,8 @@ const ResellerBotParityRuntime=dynamic(()=>import("./reseller-commerce-parity").
 const ResellerCustomersParityV2=dynamic(()=>import("./reseller-portal-parity-v2").then(m=>m.ResellerCustomersParityV2));
 const ResellerSettingsParityV2=dynamic(()=>import("./reseller-portal-parity-v2").then(m=>m.ResellerSettingsParityV2));
 const ResellerNotificationsLive=dynamic(()=>import("./reseller-notifications-live").then(m=>m.ResellerNotificationsLive));
+const AdminSalesAnalyticsRuntime=dynamic(()=>import("./sales-analytics-runtime").then(m=>m.AdminSalesAnalyticsRuntime));
+const ResellerSalesAnalyticsRuntime=dynamic(()=>import("./sales-analytics-runtime").then(m=>m.ResellerSalesAnalyticsRuntime));
 
 const StoreRuntime2027=dynamic(()=>import("./store-runtime").then(m=>m.StoreRuntime2027));
 const AdminDashboardRuntime=dynamic(()=>import("./admin-dashboard-runtime").then(m=>m.AdminDashboardRuntime));
@@ -94,6 +96,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="admin/network") return admin(<LegacyNodesRuntimePage/>);
   if(key==="admin/tunnels") return admin(<TunnelsSimpleRuntimePage/>);
   if(key==="admin/tunnel-transports") return admin(<SmartTransportsRuntimeV25/>);
+  if(key==="admin/sales-analytics") return admin(<AdminSalesAnalyticsRuntime/>);
   if(key==="admin/payments") return admin(<PaymentsReviewRuntime/>);
   if(key==="admin/payment-settings") return admin(<AdminPaymentsRuntime/>);
   if(key==="admin/settings") return admin(<SettingsPage2027/>);
@@ -127,6 +130,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="reseller") return <ResellerDashboardV3/>;
   if(key==="reseller/customers") return <ResellerCustomersParityV2/>;
   if(key==="reseller/subscriptions") return <><ResellerSubscriptionsParityRuntime/><ResellerSubscriptionLiveTable/></>;
+  if(key==="reseller/sales-analytics") return <ResellerSalesAnalyticsRuntime/>;
   if(key==="reseller/sales") return <ResellerOwnedPlansRuntime/>;
   if(key==="reseller/wallet") return <ResellerWalletRuntime/>;
   if(key==="reseller/bot-wallet") return <ResellerBotWalletRuntime/>;
