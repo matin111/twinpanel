@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feat/store-tutorial-screenshots-v120-final
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -15,7 +18,7 @@ concurrency:
 jobs:
   import-verified-legacy-screenshots:
     runs-on: ubuntu-latest
-    if: github.repository == 'matin111/twinpanel'
+    if: github.repository == 'matin111/twinpanel' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     steps:
       - name: Checkout import branch
         uses: actions/checkout@v4
