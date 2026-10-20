@@ -4,14 +4,20 @@ on:
   pull_request:
     paths:
       - "backend/app/vpn_access_dataplane_v46.py"
+      - "backend/app/protocol_dataplane_desired_state_v87.py"
+      - "backend/app/self_hosted_runtime.py"
       - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/tests/integration/test_protocol_dataplane_desired_state_v87.py"
       - ".github/workflows/vpn-access-dataplane-v46-smoke.yml"
   push:
     branches:
       - main
     paths:
       - "backend/app/vpn_access_dataplane_v46.py"
+      - "backend/app/protocol_dataplane_desired_state_v87.py"
+      - "backend/app/self_hosted_runtime.py"
       - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/tests/integration/test_protocol_dataplane_desired_state_v87.py"
       - ".github/workflows/vpn-access-dataplane-v46-smoke.yml"
 
 jobs:
@@ -31,7 +37,10 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/vpn_access_dataplane_v46.py \
-            backend/app/tunnel_transport_manager_v12.py
+            backend/app/protocol_dataplane_desired_state_v87.py \
+            backend/app/self_hosted_runtime.py \
+            backend/app/tunnel_transport_manager_v12.py \
+            backend/tests/integration/test_protocol_dataplane_desired_state_v87.py
 
       - name: Verify access dataplane contracts
         run: |
@@ -83,3 +92,7 @@ jobs:
 
           print("VPN_ACCESS_DATAPLANE_V46_SMOKE_OK")
           PY
+
+      - name: Verify desired-state dataplane V87 regression
+        run: |
+          python backend/tests/integration/test_protocol_dataplane_desired_state_v87.py
