@@ -5,6 +5,7 @@ on:
     paths:
       - "components/legacy-subscriptions-exact.tsx"
       - "components/reseller-subscriptions-parity.tsx"
+      - "components/subscription-link-delivery-modal.tsx"
       - ".github/workflows/subscription-actions-v90.yml"
   workflow_dispatch:
 
@@ -21,11 +22,16 @@ jobs:
 
           admin = Path("components/legacy-subscriptions-exact.tsx").read_text(encoding="utf-8")
           reseller = Path("components/reseller-subscriptions-parity.tsx").read_text(encoding="utf-8")
+          shared = Path("components/subscription-link-delivery-modal.tsx").read_text(encoding="utf-8")
 
-          admin_sublink = 'loadConnection(item,"sublink")'
+          admin_sublink = 'onClick={()=>void openSubscriptionLink(item)}'
           admin_connect = 'loadConnection(item,"connect")'
           if admin_sublink not in admin:
-              raise SystemExit("admin sub-link action missing")
+              raise SystemExit("admin direct sub-link action missing")
+          if 'await adminApi.subscriptionConnectionInfo(id)' not in admin:
+              raise SystemExit("admin sub-link action must use authorized connection-info API")
+          if '<SubscriptionLinkDeliveryModal' not in admin:
+              raise SystemExit("admin must render the shared subscription-link modal")
           if admin_connect in admin:
               raise SystemExit("duplicate admin Connect row action must stay removed")
           if 'مدیریت اشتراک، تمدید، وضعیت و سابلینک' not in admin:
@@ -34,14 +40,21 @@ jobs:
           reseller_trigger = 'onClick={()=>void openConnection(row)}'
           if reseller_trigger not in reseller:
               raise SystemExit("reseller subscription delivery action missing")
+          if 'await resellerApi.connectionInfo(id)' not in reseller:
+              raise SystemExit("reseller sub-link action must use authorized connection-info API")
           if 'pick("سابلینک","Sub-link")' not in reseller:
               raise SystemExit("reseller row action must be labelled Sub-link")
           if 'pick("اتصال","Connection")' in reseller:
               raise SystemExit("reseller row action regressed to Connection")
-          if 'pick("سابلینک","Subscription link")' not in reseller:
-              raise SystemExit("reseller delivery modal must identify itself as Subscription link")
-          if 'subscription_link' not in reseller or 'QR Code اشتراک' not in reseller:
-              raise SystemExit("reseller sub-link delivery must keep link and QR output")
+          if '<SubscriptionLinkDeliveryModal' not in reseller:
+              raise SystemExit("reseller must render the shared subscription-link modal")
+
+          if 'pick("سابلینک اشتراک","Subscription link")' not in shared:
+              raise SystemExit("shared delivery modal must identify itself as Subscription link")
+          if 'subscription-link-qr-card' not in shared or 'QRCodeSVG' not in shared:
+              raise SystemExit("shared sub-link delivery must keep the canonical QR output")
+          if 'subscription-link-url-card' not in shared:
+              raise SystemExit("shared sub-link delivery must keep the canonical link output")
 
           print("SUBSCRIPTION_ACTIONS_V90_CONTRACT_OK")
           PY
