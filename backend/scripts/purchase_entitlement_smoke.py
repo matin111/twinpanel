@@ -1,9 +1,8 @@
+import ast
 from pathlib import Path
 from types import SimpleNamespace
 
 from fastapi import HTTPException
-
-from app.routers.store import _plan_subscription_terms
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,18 +12,49 @@ def _source(relative: str) -> str:
     return (ROOT / relative).read_text(encoding="utf-8")
 
 
+def _plan_terms_function():
+    """Load only the Store entitlement helper without importing the app.
+
+    Importing app.routers.store loads runtime settings and a database engine,
+    which is unrelated to this regression contract. Executing just the parsed
+    helper keeps this smoke deterministic while still testing the committed
+    implementation rather than a copied test function.
+    """
+    source = _source("app/routers/store.py")
+    tree = ast.parse(source, filename="app/routers/store.py")
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_plan_subscription_terms"
+    )
+    module = ast.Module(body=[function], type_ignores=[])
+    ast.fix_missing_locations(module)
+    namespace = {
+        "Plan": object,
+        "HTTPException": HTTPException,
+    }
+    exec(
+        compile(module, "app/routers/store.py", "exec"),
+        namespace,
+    )
+    return namespace["_plan_subscription_terms"]
+
+
 def main() -> None:
+    plan_terms = _plan_terms_function()
+
     # Central Store: finite plans must stay finite; 0 GB remains the explicit
     # legacy unlimited-plan contract.
-    assert _plan_subscription_terms(
+    assert plan_terms(
         SimpleNamespace(traffic_gb=50, duration_days=30)
     ) == (50, 30)
-    assert _plan_subscription_terms(
+    assert plan_terms(
         SimpleNamespace(traffic_gb=0, duration_days=30)
     ) == (None, 30)
 
     try:
-        _plan_subscription_terms(
+        plan_terms(
             SimpleNamespace(traffic_gb=50, duration_days=0)
         )
     except HTTPException as exc:
