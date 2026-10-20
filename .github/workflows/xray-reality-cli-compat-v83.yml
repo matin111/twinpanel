@@ -23,6 +23,7 @@ jobs:
       REDIS_URL: redis://127.0.0.1:6379/0
       NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
       PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+      PYTHONPATH: .
 
     steps:
       - uses: actions/checkout@v4
