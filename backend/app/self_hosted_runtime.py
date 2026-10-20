@@ -8,6 +8,9 @@ from .config import settings
 from .database import SessionLocal
 from .managed_relay_recovery_v20 import apply_managed_relay_recovery_v20
 from .modern_runtime_v18 import apply_modern_runtime_v18
+from .protocol_dataplane_desired_state_v87 import (
+    apply_protocol_dataplane_desired_state_v87,
+)
 from .public_direct_tuning_v19 import apply_public_direct_tuning_v19
 from .services.public_urls import api_base_url
 from .routers import nodes, provision, tunnels
@@ -245,6 +248,17 @@ def apply_self_hosted_runtime(
     apply_tunnel_service_connections_admin_runtime()
     apply_tp2027_egress_v28()
     apply_service_connections_jobs_v28()
+
+    # ------------------------------------------------------------
+    # Protocol dataplane desired-state V87
+    #
+    # This must run before Unified L3 V49 because V49 captures the final
+    # service-route builders when it is applied. Protocol health/status stays
+    # telemetry-only; configured+enabled protocols keep their ingress and Exit
+    # VPN-client egress rules even during stale/offline telemetry windows.
+    # ------------------------------------------------------------
+
+    apply_protocol_dataplane_desired_state_v87()
 
     # ------------------------------------------------------------
     # Unified L3 Core V49 + candidate registry V79
