@@ -8,6 +8,7 @@ from ..config import settings
 from ..database import get_db
 from ..deps import require_admin
 from ..models import Node, NodeProtocolConfig, NodeStatus, Subscription, SubscriptionNode, Tunnel, TunnelPeerState, TunnelTransport, TunnelStatus, CleanupJob
+from ..mother_access import admin_can_use_mother
 from ..schemas import NodeCreate, NodeHeartbeatIn, NodeOut, NodeUpdate
 
 router = APIRouter(prefix="/v1/nodes", tags=["nodes"])
@@ -54,6 +55,18 @@ def list_nodes(db: Session = Depends(get_db)):
     changed = any(_refresh_stale_status(node, now) for node in nodes)
     if changed:
         db.commit()
+
+    # TWINPANEL_MOTHER_ADMIN_VISIBILITY_V100
+    # Keep the Mother row and its local runtime intact. The admin access
+    # setting controls whether it is exposed through the admin node discovery
+    # API used by node tables and selectors.
+    if not admin_can_use_mother(db):
+        nodes = [
+            node
+            for node in nodes
+            if not getattr(node, "is_mother", False)
+        ]
+
     return nodes
 
 
@@ -1285,5 +1298,4 @@ def bootstrap_mother_node_v1(
 
 
 # VPNShop_MOTHER_NODE_V1_END
-
 
