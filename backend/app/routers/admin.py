@@ -1497,7 +1497,6 @@ def security_overview(
                 "disconnected_at",
             ),
         )
-
         is_open = (
             status in {
                 "open",
@@ -1578,8 +1577,12 @@ def security_overview(
             int(sub.user_id)
         )
 
-        plan = plans.get(
-            int(sub.plan_id)
+        # Manual/legacy subscriptions may not have a backing plan.
+        # Missing plan metadata falls back to the conservative default below.
+        plan = (
+            plans.get(int(sub.plan_id))
+            if sub.plan_id is not None
+            else None
         )
 
         stats = session_stats[sid]
@@ -1804,5 +1807,4 @@ def security_overview(
         },
         "items": rows[:500],
     }
-
 
