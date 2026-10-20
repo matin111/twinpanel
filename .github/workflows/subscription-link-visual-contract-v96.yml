@@ -7,7 +7,8 @@ on:
       - 'app/subscription-link-modal-v96.css'
       - 'app/layout.tsx'
       - 'components/subscription-link-delivery-modal.tsx'
-      - 'components/subscription-link-role-bridge.tsx'
+      - 'components/legacy-subscriptions-exact.tsx'
+      - 'components/reseller-subscriptions-parity.tsx'
       - '.github/workflows/subscription-link-visual-contract-v96.yml'
   workflow_dispatch:
 
@@ -26,7 +27,8 @@ jobs:
           layout = Path('app/layout.tsx').read_text()
           css = Path('app/subscription-link-modal-v96.css').read_text()
           modal = Path('components/subscription-link-delivery-modal.tsx').read_text()
-          bridge = Path('components/subscription-link-role-bridge.tsx').read_text()
+          admin = Path('components/legacy-subscriptions-exact.tsx').read_text()
+          reseller = Path('components/reseller-subscriptions-parity.tsx').read_text()
 
           old_import = 'import "./subscription-link-modal.css";'
           new_import = 'import "./subscription-link-modal-v96.css";'
@@ -49,9 +51,9 @@ jobs:
 
           assert 'data-subscription-link-surface="unified"' in modal
           assert 'subscription-link-unified-card' in modal
-          assert 'SubscriptionLinkDeliveryModal' in bridge
-          assert '/admin/subscriptions' in bridge
-          assert '/reseller/subscriptions' in bridge
+          assert '<SubscriptionLinkDeliveryModal' in admin
+          assert '<SubscriptionLinkDeliveryModal' in reseller
+          assert 'SubscriptionLinkRoleBridge' not in layout
 
           assert '!important' not in css, 'V96 must not add override-chain !important rules'
           print('V96 subscription-link visual contract OK')
