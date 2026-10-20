@@ -9,7 +9,9 @@ import {
   StorefrontSettings,
   normalizeStorefrontSettings,
 } from "../lib/storefront-config";
+import {resolveStoreTemplateId} from "../lib/store-template-registry";
 import {StoreTemplateRenderer} from "./store-template-renderer";
+import {EditorialGrid2027Template} from "./store-template-editorial-grid";
 
 export function StoreRuntime2027(){
   const {pick}=useI18n();
@@ -54,13 +56,19 @@ export function StoreRuntime2027(){
     finally{setBuying(null);}
   };
 
-  return <StoreTemplateRenderer
-    settings={settings}
-    plans={plans}
-    loading={loading}
-    error={error}
-    message={message}
-    buying={buying}
-    onBuy={plan=>void buy(plan)}
-  />;
+  const templateProps={
+    settings,
+    plans,
+    loading,
+    error,
+    message,
+    buying,
+    onBuy:(plan:StorePlan)=>void buy(plan),
+  };
+
+  if(resolveStoreTemplateId(settings.active_template)==="editorial-grid-2027"){
+    return <EditorialGrid2027Template {...templateProps}/>;
+  }
+
+  return <StoreTemplateRenderer {...templateProps}/>;
 }
