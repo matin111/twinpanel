@@ -5,9 +5,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..deps import require_admin
+from ..deps import require_admin, require_reseller
 from ..domain_models import Domain, DomainType, SSLStatus
 from ..models import Subscription, SubscriptionStatus
+from ..models_reseller import Reseller, ResellerSubscription
 from ..quota_models import QuotaSession, QuotaUsageEvent
 from ..services.dashboard_revenue import dashboard_revenue
 from ..services.public_urls import api_base_url
@@ -114,6 +115,18 @@ def _online_subscription_ids(db: Session) -> set[int]:
     return set(_subscription_live_states(db))
 
 
+def _live_item(subscription_id: int, states: dict[int, dict]) -> dict:
+    state = states.get(subscription_id)
+    protocols = sorted(state["protocols"]) if state else []
+    last_seen_at = state["last_seen_at"] if state else None
+    return {
+        "subscription_id": subscription_id,
+        "online": bool(state and state["online"]),
+        "protocols": protocols,
+        "last_seen_at": last_seen_at.isoformat() + "Z" if last_seen_at else None,
+    }
+
+
 @router.get("/v1/runtime/endpoints")
 def runtime_endpoints(
     request: Request,
@@ -181,22 +194,42 @@ def admin_subscription_live_status(db: Session = Depends(get_db)):
         .all()
     }
 
-    items = []
-    for subscription_id in sorted(active_ids):
-        state = states.get(subscription_id)
-        protocols = sorted(state["protocols"]) if state else []
-        last_seen_at = state["last_seen_at"] if state else None
-        items.append(
-            {
-                "subscription_id": subscription_id,
-                "online": bool(state and state["online"]),
-                "protocols": protocols,
-                "last_seen_at": last_seen_at.isoformat() + "Z" if last_seen_at else None,
-            }
+    return {
+        "items": [_live_item(subscription_id, states) for subscription_id in sorted(active_ids, reverse=True)],
+        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "activity_window_seconds": _LIVE_ACTIVITY_SECONDS,
+    }
+
+
+@router.get("/v1/reseller/subscriptions/live-status")
+def reseller_subscription_live_status(
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    """Return live state only for subscriptions owned by the authenticated reseller.
+
+    The response intentionally includes an offline item for every visible owned
+    subscription. That makes newly-created subscriptions deterministic in the UI
+    instead of leaving the connection column blank until traffic exists.
+    """
+
+    owned_ids = [
+        int(row[0])
+        for row in (
+            db.query(ResellerSubscription.subscription_id)
+            .join(Subscription, Subscription.id == ResellerSubscription.subscription_id)
+            .filter(
+                ResellerSubscription.reseller_id == reseller.id,
+                Subscription.status != SubscriptionStatus.CANCELED,
+            )
+            .order_by(Subscription.id.desc())
+            .all()
         )
+    ]
+    states = _subscription_live_states(db)
 
     return {
-        "items": items,
+        "items": [_live_item(subscription_id, states) for subscription_id in owned_ids],
         "generated_at": datetime.utcnow().isoformat() + "Z",
         "activity_window_seconds": _LIVE_ACTIVITY_SECONDS,
     }
