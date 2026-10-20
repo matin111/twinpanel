@@ -7,6 +7,7 @@ from ..deps import require_admin
 from .. import system_release as release
 from ..release_manifest_v25 import (
     invalidate_release_manifest_cache,
+    refresh_release_manifest_cache,
     release_manifest_v25,
 )
 
@@ -30,23 +31,28 @@ class LicenseActivateIn(BaseModel):
 
 @router.get("/release/status")
 def admin_release_status():
-    # Fast path: release_manifest_v25 serves the short-lived manifest cache.
-    # This route is polled by the admin nav and must not repeatedly block on
-    # GitHub/provider latency.
+    # Fast path: release_manifest_v25 serves a fresh cache immediately, or a
+    # stale last-known-good value while one background refresh runs. Admin page
+    # navigation therefore never waits on a slow/filtered GitHub route.
     return release.release_status(refresh_license_state=False)
 
 
 @router.post("/release/check")
 def admin_release_check():
-    # Explicit admin action always means a real provider refresh. Once this
-    # succeeds, subsequent status/nav reads are immediate from the shared cache.
+    # Explicit admin action means a real provider refresh. Keep the last known
+    # good manifest available during the attempt, but synchronously use the
+    # larger slow-network budget before building the response.
     invalidate_release_manifest_cache()
+    refresh_release_manifest_cache()
     return release.release_status(refresh_license_state=True)
 
 
 @router.post("/update")
 def admin_start_update():
     try:
+        # Do not let a stale navigation cache suppress a newly published
+        # release. Starting an update always refreshes the release provider first.
+        refresh_release_manifest_cache()
         return release.request_update()
     except RuntimeError as exc:
         message = str(exc)
