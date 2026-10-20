@@ -14,11 +14,15 @@ export type StoreTemplateDefinition={
 export const DEFAULT_STORE_TEMPLATE_ID="conversion-2027";
 
 /**
- * Installed storefront templates ship with TwinPanel updates.
- * Adding a new template does not require a database migration: add its metadata
- * here, register its renderer in components/store-template-renderer.tsx and ship
- * both files with the product update. The admin's selected template id is stored
- * in storefront_settings.content and survives future updates.
+ * Installed storefront themes ship with TwinPanel updates.
+ * A theme is made of three explicit contracts:
+ * 1) metadata in this catalog,
+ * 2) its isolated option schema/defaults in lib/store-template-options.ts,
+ * 3) its renderer registration in components/store-template-runtime-registry.tsx.
+ *
+ * Per-theme admin settings are persisted under the storefront JSON namespace and
+ * survive activation switches and later product updates. No database migration is
+ * required when a new built-in theme is added.
  */
 export const STORE_TEMPLATE_CATALOG:readonly StoreTemplateDefinition[]=[
   {
