@@ -14,6 +14,7 @@ from ..smart_transport_auto_v21 import (
     auto_block_reason,
 )
 from ..transport_candidates import (
+    ACTIVE_SPECS,
     SPECS,
     catalog,
     install_transport,
@@ -29,21 +30,18 @@ router = APIRouter(
 
 
 _PROFILE = {
+    "tp27_fast": {
+        "iran_profile": "tp27-auto-gre",
+        "description": (
+            "TP27 Fast full-L3: keyed native GRE first, then GRE/UDP FoU "
+            "fallback with fail-closed health and throughput qualification."
+        ),
+    },
+    # Legacy migration-only descriptions are retained for API compatibility if
+    # an old row is inspected directly. They are not returned by catalog().
     "kernel_gre": {
-        "iran_profile": "direct-gre",
-        "description": "Kernel GRE full-L3; lowest overhead when protocol 47 is usable.",
-    },
-    "gost_tun": {
-        "iran_profile": "tun-over-wss",
-        "description": "Full-L3 GOST TUN over WebSocket transport; web-like TCP carrier for restrictive paths.",
-    },
-    "amneziawg": {
-        "iran_profile": "obfuscated-udp",
-        "description": "Obfuscated WireGuard-style L3 path for UDP-capable networks.",
-    },
-    "netrix": {
-        "iran_profile": "licensed-multipath",
-        "description": "Licensed TUN/multipath candidate; enabled only when the controller binary is present.",
+        "iran_profile": "direct-gre-retired",
+        "description": "Retired migration fallback; removed after TP27 Fast promotion.",
     },
 }
 
@@ -161,7 +159,7 @@ def list_modern_transports(
         for row in db.query(TunnelTransport)
         .filter(
             TunnelTransport.tunnel_id == tunnel_id,
-            TunnelTransport.transport.in_(tuple(SPECS)),
+            TunnelTransport.transport.in_(tuple(ACTIVE_SPECS)),
         )
         .all()
     }
@@ -200,8 +198,8 @@ async def install_modern_transport(
     db: Session = Depends(get_db),
 ):
     name = str(transport or "").strip().lower()
-    if name not in SPECS:
-        raise HTTPException(status_code=404, detail="Unknown modern transport")
+    if name not in ACTIVE_SPECS:
+        raise HTTPException(status_code=404, detail="Unknown or retired modern transport")
 
     try:
         return await install_transport(name, tunnel_id, db)
@@ -210,7 +208,7 @@ async def install_modern_transport(
         raise HTTPException(
             status_code=502,
             detail={
-                "message": f"{SPECS[name]['label']} canary failed",
+                "message": f"{ACTIVE_SPECS[name]['label']} canary failed",
                 "transport": name,
                 "error": str(exc)[:7000],
             },
@@ -224,7 +222,7 @@ async def remove_modern_transport(
     db: Session = Depends(get_db),
 ):
     name = str(transport or "").strip().lower()
-    if name not in SPECS:
+    if name not in SPECS and name not in {"gost_tun", "amneziawg", "netrix"}:
         raise HTTPException(status_code=404, detail="Unknown modern transport")
 
     if str(tunnel_id).strip() == "":
@@ -237,7 +235,7 @@ async def remove_modern_transport(
         raise HTTPException(
             status_code=502,
             detail={
-                "message": f"{SPECS[name]['label']} removal failed",
+                "message": f"{name} removal failed",
                 "transport": name,
                 "error": str(exc)[:4000],
             },
