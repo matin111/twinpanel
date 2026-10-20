@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.114",
+  "version": "1.1.0-rc.115",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-20T19:19:01Z",
+  "released_at": "2026-10-20T19:39:56Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "41c28c104de23807ea65ee5042503903dce5c91e",
+  "source_sha": "973fd06a21915730ccb19a5514f446c263691ebc",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.114/twinpanel-1.1.0-rc.114-linux-x86_64.tar.gz",
-    "sha256": "74da62d25ffb877e51e6cde5b8a87726f3ae53129653fb62abc2b6e7dd7f9c80",
-    "size_bytes": 13032760
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.115/twinpanel-1.1.0-rc.115-linux-x86_64.tar.gz",
+    "sha256": "97ff44ff11f3b33da022ac949a389d4e0f26f2ec44cd8be533ad3554e81360f2",
+    "size_bytes": 13052549
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.114 کاندید انتشار برای دو بهبود Production است. اول، عملیات طولانی صفحه Provision مثل Repair پروتکل‌ها، Health Check، Restart سرویس، ثبت دسترسی امن، Upgrade Agent و Tunnel Fabric از لحظه کلیک Feedback واضح، زمان سپری‌شده و نتیجه موفق/خطا نشان می‌دهند تا کاربر تصور نکند دکمه کار نمی‌کند؛ Backend/API/Provisioning این عملیات تغییر نکرده است. دوم، مسیر موجود نصب Exit که همه Subscriptionهای قدیمی را عضو نود جدید می‌کند و برای اشتراک‌های Active فقط credentialهای گمشده پروتکل‌های فعال را اضافه می‌کند حفظ شده و V114 یک لایه self-healing اضافه می‌کند: Exitهای غیر بازنشسته دارای Saved Access بعد از Grace نصب بررسی می‌شوند و هر Sync ناقص بدون حذف credentialهای سالم نودهای قبلی تا موفق‌شدن Retry می‌شود. CI اختصاصی همچنین قرارداد Fresh L2TP را قفل می‌کند تا نصب نود جدید همچنان هوک‌های PPP telemetry V113 را از مسیر رسمی installer دریافت کند. پذیرش Production اصلاح L2TP در rc.113 قبلاً روی Node #5 با PPP واقعی mv11_14، QuotaSession/UsageEvent، Online و سپس بسته‌شدن Session و Offline پس از Disconnect پاس شد. TP27، Tunnel election، VPN dataplane، Auth، Payment و فرمت credentialها در rc.114 تغییر نکرده‌اند. Production acceptance rc.114 هنوز pending است و بعد از Update روی سرور تست باید marker V114، پوشش Subscriptionهای فعلی و Feedback واقعی صفحه Provision بررسی شود.",
-    "en": "TwinPanel 1.1.0-rc.114 is the release candidate for two production refinements. First, long-running Provision actions such as protocol Repair, Health Check, service Restart, secure-access save, Agent Upgrade and Tunnel Fabric now provide immediate visible progress, elapsed time and success/error feedback so operators do not mistake a running request for a dead button; the underlying Backend/API/Provisioning behavior is unchanged. Second, the existing fresh-Exit install path that adds every historical subscription to the new node and provisions only missing enabled-protocol credentials for active subscriptions is preserved, while V114 adds a self-healing safety net: non-retired Exits with saved access are rechecked after an install grace period and any incomplete synchronization is retried until successful without removing healthy credential items from older Exits. Dedicated CI also locks the fresh-L2TP contract so a newly installed node continues to receive the V113 PPP telemetry hooks through the managed installer. The rc.113 L2TP production acceptance already passed on Node #5 with a real mv11_14 PPP session, QuotaSession/UsageEvent, Online state, then proper session close and Offline after disconnect. TP27, tunnel election, VPN dataplane, Auth, Payment and credential formats are unchanged in rc.114. Production acceptance for rc.114 remains pending an update on the test server plus verification of the V114 marker, current-subscription coverage and real Provision action feedback."
+    "fa": "TwinPanel 1.1.0-rc.115 بخش «متن‌های ربات» را برای ربات فروش اصلی و ربات اختصاصی هر نماینده اضافه می‌کند. ادمین و هر نماینده می‌توانند متن‌های ثابت خوش‌آمدگویی، انتخاب پلن، انتخاب روش پرداخت، درخواست رسید، وضعیت انتظار تأیید، خرید موفق، رد پرداخت، تمدید و پشتیبانی را مستقل از هم ویرایش کنند، پیش‌نمایش ببینند و هر متن یا همه متن‌ها را به پیش‌فرض برگردانند. اطلاعات عملیاتی مثل شماره سفارش، مبلغ، اطلاعات پرداخت، نام کاربری و لینک اتصال همچنان توسط Runtime فعلی ساخته می‌شوند و قابل حذف با متن سفارشی نیستند. متن سفارشی قبل از ارسال Escape می‌شود و در خطای خواندن تنظیمات، متن استاندارد فعلی بدون اختلال در فروش ارسال می‌شود. مسیر خرید فقط با رسید، ایزولیشن Bot Token، Auth، Payment transaction logic، Quota، Provisioning، VPN/Tunnel و TP27 تغییر نکرده‌اند. CI اختصاصی Bot Texts Management، Compile Backend، Regression تست ایزولیشن Scope و حفظ داده‌های پویا را پاس کرده است. Production acceptance پس از Update روی سرور تست و بررسی واقعی ربات ادمین و نماینده انجام می‌شود.",
+    "en": "TwinPanel 1.1.0-rc.115 adds configurable Bot Texts for the main sales Telegram bot and each reseller's dedicated bot. Admin and every reseller can independently edit, preview and reset static welcome, plan selection, payment selection, receipt request, awaiting approval, purchase success, payment rejection, renewal and support copy. Operational data such as order IDs, amounts, payment details, usernames and subscription links remain generated by the existing runtime and cannot be removed through custom copy. Custom text is escaped before Telegram delivery, and settings read failures fall back to the canonical runtime text without interrupting sales. Receipt-only purchase behavior, Bot Token isolation, Auth, payment transaction logic, Quota, Provisioning, VPN/Tunnel and TP27 are unchanged. Dedicated Bot Texts Management CI, backend compilation, scope-isolation regression tests and dynamic-data preservation tests passed. Production acceptance follows after updating the test server and validating both admin and reseller bots in the real runtime."
   }
 }
