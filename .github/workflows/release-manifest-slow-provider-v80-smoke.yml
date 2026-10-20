@@ -1,0 +1,88 @@
+name: TwinPanel Release Manifest Slow Provider V80 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/release_manifest_v25.py'
+      - 'backend/app/routers/system_release.py'
+      - '.github/workflows/release-manifest-slow-provider-v80-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  stale-while-revalidate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install focused test dependency
+        run: python3 -m pip install --disable-pip-version-check httpx
+
+      - name: Compile release resolver
+        run: |
+          python3 -m py_compile \
+            backend/app/release_manifest_v25.py \
+            backend/app/routers/system_release.py
+
+      - name: Verify slow-provider stale-while-revalidate contract
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import time
+          from pathlib import Path
+
+          path = Path('backend/app/release_manifest_v25.py')
+          spec = importlib.util.spec_from_file_location('release_manifest_v80_test', path)
+          mod = importlib.util.module_from_spec(spec)
+          assert spec and spec.loader
+          spec.loader.exec_module(mod)
+
+          assert mod.CANONICAL_PROVIDER_TIMEOUT_SECONDS >= 12.0
+          assert mod.CANONICAL_CONNECT_TIMEOUT_SECONDS >= 3.0
+          assert mod.MANIFEST_CACHE_TTL_SECONDS <= 60.0
+
+          mod._manifest_cache = {
+              'version': '1.1.0-rc.79',
+              'manifest_source': 'seed',
+          }
+          mod._manifest_cache_at = 0.0
+          mod._manifest_refreshing = False
+
+          def fake_refresh():
+              time.sleep(0.20)
+              return mod._cache_value({
+                  'version': '1.1.0-rc.80',
+                  'manifest_source': 'slow-provider',
+                  'manifest_cached': False,
+              })
+
+          mod.refresh_release_manifest_cache = fake_refresh
+
+          started = time.monotonic()
+          stale = mod.release_manifest_v25()
+          elapsed = time.monotonic() - started
+
+          assert elapsed < 0.10, elapsed
+          assert stale['version'] == '1.1.0-rc.79'
+          assert stale['manifest_cached'] is True
+          assert stale['manifest_stale'] is True
+          assert stale['manifest_refreshing'] is True
+
+          deadline = time.monotonic() + 2.0
+          fresh = None
+          while time.monotonic() < deadline:
+              candidate = mod.release_manifest_v25()
+              if candidate.get('version') == '1.1.0-rc.80':
+                  fresh = candidate
+                  break
+              time.sleep(0.02)
+
+          assert fresh is not None
+          assert fresh['manifest_stale'] is False
+          assert fresh['manifest_cached'] is True
+
+          router = Path('backend/app/routers/system_release.py').read_text(encoding='utf-8')
+          assert 'refresh_release_manifest_cache()' in router
+          assert router.count('refresh_release_manifest_cache()') >= 2
+
+          print('RELEASE_MANIFEST_SLOW_PROVIDER_V80=PASS')
+          PY
