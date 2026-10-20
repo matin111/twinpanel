@@ -3,6 +3,7 @@ name: TwinPanel Payment Review Contract V82
 on:
   pull_request:
     paths:
+      - "backend/app/main.py"
       - "backend/app/routers/payment_receipts_local.py"
       - "backend/app/routers/payments.py"
       - "backend/app/routers/wallet_payment_v2.py"
