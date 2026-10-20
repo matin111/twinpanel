@@ -48,14 +48,43 @@ jobs:
         working-directory: backend
         run: python tests/integration/test_xray_reality_cli_compat_v83.py
 
-      - name: Verify self-hosted runtime wiring imports
-        working-directory: backend
+      - name: Verify self-hosted runtime wiring order
         run: |
           python - <<'PY'
-          from app import self_hosted_runtime
-          from app import xray_reality_cli_compat_v83
+          import ast
+          from pathlib import Path
 
-          assert callable(self_hosted_runtime.apply_xray_reality_cli_compat_v83)
-          assert callable(xray_reality_cli_compat_v83.apply_xray_reality_cli_compat_v83)
+          path = Path("backend/app/self_hosted_runtime.py")
+          source = path.read_text(encoding="utf-8")
+          tree = ast.parse(source, filename=str(path))
+
+          imported = False
+          apply_body = None
+
+          for node in tree.body:
+              if isinstance(node, ast.ImportFrom) and node.module == "xray_reality_cli_compat_v83":
+                  imported = any(alias.name == "apply_xray_reality_cli_compat_v83" for alias in node.names)
+              if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "apply_self_hosted_runtime":
+                  apply_body = node
+
+          assert imported, "V83 compatibility hook is not imported by self_hosted_runtime"
+          assert apply_body is not None, "apply_self_hosted_runtime is missing"
+
+          calls = []
+          for node in ast.walk(apply_body):
+              if not isinstance(node, ast.Call):
+                  continue
+              func = node.func
+              if isinstance(func, ast.Name):
+                  calls.append((getattr(node, "lineno", 0), func.id))
+              elif isinstance(func, ast.Attribute):
+                  calls.append((getattr(node, "lineno", 0), func.attr))
+
+          ordered = [name for _, name in sorted(calls)]
+          base_index = ordered.index("apply_xray_modern_runtime")
+          compat_index = ordered.index("apply_xray_reality_cli_compat_v83")
+          config_index = ordered.index("apply_xray_modern_config_compat_v45")
+
+          assert base_index < compat_index < config_index, ordered
           print("XRAY_REALITY_CLI_COMPAT_V83_WIRING_OK")
           PY
