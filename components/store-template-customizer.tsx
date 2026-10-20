@@ -47,7 +47,8 @@ export function StoreTemplateCustomizer({templateId,onClose}:Props){
       try{
         const envelope=await loadStoreTemplateSettings();
         if(!active)return;
-        setDraft(normalizeStoreTemplateOptions(templateId,envelope.templates?.[templateId]||{}));
+        const raw=envelope.templates?.[templateId]||{};
+        setDraft({...normalizeStoreTemplateOptions(templateId,raw),...raw} as StoreTemplateOptionMap);
       }catch(reason){
         if(active)setError(reason instanceof Error?reason.message:String(reason));
       }finally{
