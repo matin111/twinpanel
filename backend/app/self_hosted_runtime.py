@@ -8,6 +8,9 @@ from .config import settings
 from .database import SessionLocal
 from .managed_relay_recovery_v20 import apply_managed_relay_recovery_v20
 from .modern_runtime_v18 import apply_modern_runtime_v18
+from .mother_subscription_delivery_policy_v108 import (
+    apply_mother_subscription_delivery_policy_v108,
+)
 from .openvpn_fork_headroom_v101 import (
     apply_openvpn_fork_headroom_v101,
 )
@@ -142,6 +145,12 @@ def apply_self_hosted_runtime(
 
     if manage_transport_service:
         ensure_transport_manager_service_v12()
+
+    # ------------------------------------------------------------
+    # Mother subscription delivery policy V108
+    # ------------------------------------------------------------
+
+    apply_mother_subscription_delivery_policy_v108()
 
     # ------------------------------------------------------------
     # Node Agent
