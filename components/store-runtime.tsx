@@ -69,13 +69,16 @@ export function StoreRuntime2027(){
 
   const templateId=resolveStoreTemplateId(settings.active_template);
   const rawTemplateOptions=templateSettings[templateId]||{};
-  const applied=applyStoreTemplateOptions(settings,templateId,rawTemplateOptions);
+  const hasTemplateOptions=Object.keys(rawTemplateOptions).length>0;
+  const applied=hasTemplateOptions?applyStoreTemplateOptions(settings,templateId,rawTemplateOptions):{settings,options:{} as StoreTemplateOptionMap};
   const effectiveSettings={...applied.settings} as StorefrontSettings;
   const effectiveTarget=effectiveSettings as unknown as Record<string,unknown>;
-  for(const [key,value] of Object.entries(rawTemplateOptions)){
-    if(key in effectiveTarget&&(typeof value==="string"||typeof value==="boolean"||typeof value==="number"))effectiveTarget[key]=value;
+  if(hasTemplateOptions){
+    for(const [key,value] of Object.entries(rawTemplateOptions)){
+      if(key in effectiveTarget&&(typeof value==="string"||typeof value==="boolean"||typeof value==="number"))effectiveTarget[key]=value;
+    }
   }
-  const effectiveOptions={...applied.options,...rawTemplateOptions} as StoreTemplateOptionMap;
+  const effectiveOptions=hasTemplateOptions?{...applied.options,...rawTemplateOptions} as StoreTemplateOptionMap:{};
   const themeStyle=storeTemplateCssVariables(effectiveOptions) as CSSProperties;
 
   const templateProps={
@@ -88,7 +91,7 @@ export function StoreRuntime2027(){
     onBuy:(plan:StorePlan)=>void buy(plan),
   };
 
-  return <div data-store-theme-engine="v1" data-store-template-active={templateId} style={themeStyle}>
+  return <div data-store-theme-engine="v1" data-store-template-active={templateId} data-store-template-customized={hasTemplateOptions?"true":"false"} style={themeStyle}>
     {templateId==="editorial-grid-2027"?<EditorialGrid2027Template {...templateProps}/>:<StoreTemplateRenderer {...templateProps}/>}
   </div>;
 }
