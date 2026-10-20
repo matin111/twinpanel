@@ -33,6 +33,18 @@ export const STORE_TEMPLATE_CATALOG:readonly StoreTemplateDefinition[]=[
     supportsDark:true,
     supportsLight:true,
   },
+  {
+    id:"editorial-grid-2027",
+    nameFa:"ادیتوریال گرید 2027",
+    nameEn:"Editorial Grid 2027",
+    descriptionFa:"قالب دوم با هویت کاملاً متفاوت: طراحی ادیتوریال و مینیمال، تایپوگرافی درشت، Grid ساختاری، پلن‌های تخت، پروتکل‌های شماره‌دار و آموزش Rail/Article؛ با پشتیبانی کامل از RTL، موبایل و Dark/Light.",
+    descriptionEn:"A distinctly different editorial storefront with oversized typography, structural grids, flat plan cards, numbered protocol rows and rail/article setup guides, with full RTL, mobile and dark/light support.",
+    version:"1.0.0",
+    author:"TwinPanel",
+    builtIn:true,
+    supportsDark:true,
+    supportsLight:true,
+  },
 ] as const;
 
 export function installedStoreTemplate(id:unknown){
