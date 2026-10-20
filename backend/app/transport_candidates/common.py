@@ -23,6 +23,34 @@ SPECS: dict[str, dict[str, Any]] = {
     "netrix": {"priority": 140, "label": "Netrix TUN", "family": "licensed-multipath-l3"},
 }
 
+_PACKET_LOSS_RE = re.compile(
+    r"([0-9]+(?:\.[0-9]+)?)%\s*packet loss",
+    flags=re.IGNORECASE,
+)
+
+
+def parse_packet_loss_pct(output: str) -> float | None:
+    """Return ping packet loss as a percentage, or None when unavailable.
+
+    Candidate health must fail closed when ping output cannot be interpreted;
+    silently treating a missing loss field as 0% can promote a degraded L3
+    carrier. Probe commands force LC_ALL=C so the parser receives the standard
+    iputils summary format.
+    """
+
+    match = _PACKET_LOSS_RE.search(str(output or ""))
+    if not match:
+        return None
+
+    try:
+        value = float(match.group(1))
+    except (TypeError, ValueError):
+        return None
+
+    if value < 0.0 or value > 100.0:
+        return None
+    return value
+
 
 def runtime(name: str, tunnel_id: int) -> dict[str, Any]:
     tid = max(int(tunnel_id), 1)
@@ -155,11 +183,27 @@ ip rule add priority {priority} from {shlex.quote(rt['iran_ip'])}/32 table {tabl
 """, "canary_policy", 45)
 
     p1, p2 = await asyncio.gather(
-        ci.run(f"ping -I {shlex.quote(rt['interface'])} -c 3 -W 2 {shlex.quote(rt['exit_ip'])}", check=False, timeout=15),
-        ce.run(f"ping -I {shlex.quote(rt['interface'])} -c 3 -W 2 {shlex.quote(rt['iran_ip'])}", check=False, timeout=15),
+        ci.run(f"LC_ALL=C ping -I {shlex.quote(rt['interface'])} -c 3 -W 2 {shlex.quote(rt['exit_ip'])}", check=False, timeout=15),
+        ce.run(f"LC_ALL=C ping -I {shlex.quote(rt['interface'])} -c 3 -W 2 {shlex.quote(rt['iran_ip'])}", check=False, timeout=15),
     )
+
+    iran_loss = parse_packet_loss_pct(p1.stdout or "")
+    exit_loss = parse_packet_loss_pct(p2.stdout or "")
+
+    if iran_loss is None or exit_loss is None:
+        raise RuntimeError(
+            "peer_ping_loss_parse_failed: "
+            f"iran={iran_loss!r} exit={exit_loss!r}"
+        )
+
     if p1.exit_status != 0 or p2.exit_status != 0:
-        raise RuntimeError(f"peer_ping_failed: iran={p1.exit_status} exit={p2.exit_status}")
+        raise RuntimeError(
+            "peer_ping_failed: "
+            f"iran={p1.exit_status}/{iran_loss:.1f}% "
+            f"exit={p2.exit_status}/{exit_loss:.1f}%"
+        )
+
+    packet_loss = max(float(iran_loss), float(exit_loss))
     latency = None
     match = re.search(r"=\s*[0-9.]+/([0-9.]+)/", (p1.stdout or ""))
     if match:
@@ -189,7 +233,16 @@ PY""", check=False, timeout=12)
     if udp.exit_status != 0:
         raise RuntimeError("udp_egress_probe_failed")
 
-    return {"peer_ping": True, "tcp_egress": True, "udp_egress": True, "egress_ip": (tcp.stdout or "").strip(), "latency_ms": latency}
+    return {
+        "peer_ping": True,
+        "tcp_egress": True,
+        "udp_egress": True,
+        "egress_ip": (tcp.stdout or "").strip(),
+        "latency_ms": latency,
+        "packet_loss_pct": packet_loss,
+        "iran_packet_loss_pct": float(iran_loss),
+        "exit_packet_loss_pct": float(exit_loss),
+    }
 
 
 async def copy_binary(conn, local_path: str, remote_path: str) -> None:
