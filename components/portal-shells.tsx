@@ -38,6 +38,7 @@ const resellerMenu:MenuItem[]=[
   ["داشبورد","Dashboard","/reseller","home"],
   ["ساخت اشتراک","Create Subscription","/reseller/subscriptions","subscription"],
   ["پلن‌های ربات","Bot Plans","/reseller/sales","payments"],
+  ["آمار فروش","Sales Analytics","/reseller/sales-analytics","payments"],
   ["کیف پول و شارژ","Wallet & Top-up","/reseller/wallet","wallet"],
   ["کیف پول ربات","Bot Wallet","/reseller/bot-wallet","wallet"],
   ["خرید و شارژ حجم","Traffic Recharge","/reseller/traffic","cart"],
@@ -55,10 +56,10 @@ const customerGroups:MenuGroup[]=[
 ];
 
 const resellerGroups:MenuGroup[]=[
-  {fa:"مدیریت",en:"Management",items:[resellerMenu[0],resellerMenu[1],resellerMenu[5]]},
-  {fa:"مالی",en:"Finance",items:[resellerMenu[3],resellerMenu[4],resellerMenu[6]]},
-  {fa:"فروش و ربات",en:"Sales & Bot",items:[resellerMenu[2],resellerMenu[7],resellerMenu[8]]},
-  {fa:"حساب",en:"Account",items:[resellerMenu[9],resellerMenu[10]]}
+  {fa:"مدیریت",en:"Management",items:[resellerMenu[0],resellerMenu[1],resellerMenu[6]]},
+  {fa:"مالی",en:"Finance",items:[resellerMenu[4],resellerMenu[5],resellerMenu[7]]},
+  {fa:"فروش و ربات",en:"Sales & Bot",items:[resellerMenu[2],resellerMenu[3],resellerMenu[8],resellerMenu[9]]},
+  {fa:"حساب",en:"Account",items:[resellerMenu[10],resellerMenu[11]]}
 ];
 
 function PortalIcon({name}:{name:IconName}){

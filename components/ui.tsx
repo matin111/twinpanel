@@ -24,6 +24,7 @@ const menuGroups=[
     ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"]
   ]},
   {fa:"فروش و مالی",en:"Sales & Finance",items:[
+    ["آمار فروش","Sales Analytics","/admin/sales-analytics","▥"],
     ["پرداخت‌ها","Payments","/admin/payments","◫"],
     ["تنظیمات پرداخت","Payment Settings","/admin/payment-settings","⌁"],
     ["تأیید خودکار کارت","Auto Payment Verification","/admin/sms-reader","▤"],

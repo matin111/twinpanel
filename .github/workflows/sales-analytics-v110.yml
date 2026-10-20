@@ -1,0 +1,455 @@
+name: TwinPanel Sales Analytics V110
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/runtime_endpoints.py"
+      - "backend/app/services/sales_analytics.py"
+      - "components/sales-analytics-runtime.tsx"
+      - "components/routed-page-client.tsx"
+      - "components/ui.tsx"
+      - "components/portal-shells.tsx"
+      - "lib/sales-analytics-api.ts"
+      - ".github/workflows/sales-analytics-v110.yml"
+  workflow_dispatch:
+
+jobs:
+  sales-analytics:
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: twinpanel
+          POSTGRES_PASSWORD: twinpanel_test
+          POSTGRES_DB: twinpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U twinpanel -d twinpanel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      APP_NAME: TwinPanel-Sales-Analytics-V110-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+      TWINPANEL_ADMIN_EMAIL: admin-sales-v110@example.com
+      TWINPANEL_ADMIN_PASSWORD: TwinPanel-CI-Admin-2026!
+      TWINPANEL_ADMIN_NAME: Sales Analytics V110 Admin
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_API_BASE: ""
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Prepare runtime directories
+        run: |
+          sudo install -d -m 700 /etc/twinpanel
+          sudo install -d -m 700 /var/lib/twinpanel-backups
+          sudo install -d -m 750 /var/lib/twinpanel/payment-receipts
+          sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel /var/lib/twinpanel-backups
+
+      - name: Create schema and bootstrap admin
+        working-directory: backend
+        run: |
+          python -c 'from app.main import app; print("SALES_ANALYTICS_V110_APP_IMPORT_OK", app.title)'
+          python scripts/bootstrap_admin.py
+
+      - name: Seed authoritative admin and isolated reseller sales
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from datetime import datetime, timedelta
+
+          from app.database import SessionLocal
+          from app.models import Plan, Subscription, SubscriptionStatus, User
+          from app.models_reseller import Reseller, ResellerSubscription
+          from app.payment_models import PaymentIntent
+          from app.reseller_bot_order_models import ResellerBotOrder
+          from app.security import hash_password
+          from app.store_models import StoreOrder
+
+          db = SessionLocal()
+          try:
+              now = datetime.utcnow()
+
+              owner_a = User(
+                  email="reseller-a-sales-v110@example.com",
+                  password_hash=hash_password("TwinPanel-CI-Reseller-A-2026!"),
+                  full_name="Reseller A Sales V110",
+                  is_active=True,
+              )
+              owner_b = User(
+                  email="reseller-b-sales-v110@example.com",
+                  password_hash=hash_password("TwinPanel-CI-Reseller-B-2026!"),
+                  full_name="Reseller B Sales V110",
+                  is_active=True,
+              )
+              customer_a = User(
+                  email="customer-a-sales-v110@example.com",
+                  password_hash=hash_password("TwinPanel-CI-Customer-A-2026!"),
+                  full_name="Customer A Sales V110",
+                  is_active=True,
+              )
+              customer_b = User(
+                  email="customer-b-sales-v110@example.com",
+                  password_hash=hash_password("TwinPanel-CI-Customer-B-2026!"),
+                  full_name="Customer B Sales V110",
+                  is_active=True,
+              )
+              db.add_all([owner_a, owner_b, customer_a, customer_b])
+              db.flush()
+
+              plan = Plan(
+                  name="Sales Analytics V110 Plan",
+                  duration_days=30,
+                  traffic_gb=50,
+                  device_limit=2,
+                  price_toman=120000,
+                  is_active=True,
+              )
+              db.add(plan)
+              db.flush()
+
+              reseller_a = Reseller(
+                  owner_user_id=owner_a.id,
+                  code="SALESV110A",
+                  name="Sales V110 Reseller A",
+                  is_active=True,
+              )
+              reseller_b = Reseller(
+                  owner_user_id=owner_b.id,
+                  code="SALESV110B",
+                  name="Sales V110 Reseller B",
+                  is_active=True,
+              )
+              db.add_all([reseller_a, reseller_b])
+              db.flush()
+
+              sub_direct_a = Subscription(
+                  user_id=customer_a.id,
+                  plan_id=plan.id,
+                  status=SubscriptionStatus.ACTIVE,
+                  created_at=now - timedelta(minutes=30),
+                  starts_at=now - timedelta(minutes=30),
+                  traffic_limit_bytes=50 * 1024**3,
+                  traffic_used_bytes=0,
+              )
+              sub_bot_a = Subscription(
+                  user_id=customer_a.id,
+                  plan_id=plan.id,
+                  status=SubscriptionStatus.ACTIVE,
+                  created_at=now - timedelta(minutes=20),
+                  starts_at=now - timedelta(minutes=20),
+                  traffic_limit_bytes=50 * 1024**3,
+                  traffic_used_bytes=0,
+              )
+              sub_direct_b = Subscription(
+                  user_id=customer_b.id,
+                  plan_id=plan.id,
+                  status=SubscriptionStatus.ACTIVE,
+                  created_at=now - timedelta(minutes=15),
+                  starts_at=now - timedelta(minutes=15),
+                  traffic_limit_bytes=50 * 1024**3,
+                  traffic_used_bytes=0,
+              )
+              db.add_all([sub_direct_a, sub_bot_a, sub_direct_b])
+              db.flush()
+
+              db.add_all([
+                  ResellerSubscription(
+                      reseller_id=reseller_a.id,
+                      subscription_id=sub_direct_a.id,
+                      customer_user_id=customer_a.id,
+                      buy_price_toman=50000,
+                      sell_price_toman=80000,
+                      created_at=now - timedelta(minutes=30),
+                  ),
+                  # Initial bot fulfillment also owns this reseller link. The
+                  # analytics service must count the bot order, not this link,
+                  # so the same 120000 Toman sale appears exactly once.
+                  ResellerSubscription(
+                      reseller_id=reseller_a.id,
+                      subscription_id=sub_bot_a.id,
+                      customer_user_id=customer_a.id,
+                      buy_price_toman=70000,
+                      sell_price_toman=120000,
+                      created_at=now - timedelta(minutes=20),
+                  ),
+                  ResellerSubscription(
+                      reseller_id=reseller_b.id,
+                      subscription_id=sub_direct_b.id,
+                      customer_user_id=customer_b.id,
+                      buy_price_toman=500000,
+                      sell_price_toman=999000,
+                      created_at=now - timedelta(minutes=15),
+                  ),
+              ])
+
+              db.add_all([
+                  ResellerBotOrder(
+                      reseller_id=reseller_a.id,
+                      customer_user_id=customer_a.id,
+                      telegram_id=110001,
+                      plan_id=plan.id,
+                      traffic_gb=50,
+                      duration_days=30,
+                      sell_price_toman=120000,
+                      base_sell_price_toman=120000,
+                      protocols=["openvpn"],
+                      node_ids=[],
+                      status="fulfilled",
+                      sale_idempotency_key="sales-v110-bot-initial-a",
+                      subscription_id=sub_bot_a.id,
+                      fulfilled_at=now - timedelta(minutes=20),
+                      created_at=now - timedelta(minutes=22),
+                  ),
+                  ResellerBotOrder(
+                      reseller_id=reseller_a.id,
+                      customer_user_id=customer_a.id,
+                      telegram_id=110001,
+                      plan_id=plan.id,
+                      traffic_gb=50,
+                      duration_days=30,
+                      sell_price_toman=50000,
+                      base_sell_price_toman=50000,
+                      protocols=["openvpn"],
+                      node_ids=[],
+                      status="fulfilled",
+                      sale_idempotency_key="sales-v110-bot-renewal-a",
+                      subscription_id=sub_bot_a.id,
+                      payment_note=f"renewal:{sub_bot_a.id}",
+                      fulfilled_at=now - timedelta(minutes=10),
+                      created_at=now - timedelta(minutes=12),
+                  ),
+              ])
+
+              payment_specs = [
+                  ("approved", 120000, 120321, now - timedelta(minutes=8)),
+                  ("auto_verified", 75000, None, now - timedelta(minutes=7)),
+                  ("awaiting_review", 999999, 999999, None),
+              ]
+              for index, (status, base, payable, verified_at) in enumerate(payment_specs, start=1):
+                  order = StoreOrder(
+                      user_id=customer_a.id,
+                      plan_id=plan.id,
+                      amount_toman=int(payable or base),
+                      base_amount_toman=base,
+                      discount_amount_toman=0,
+                      requested_protocols=[],
+                      status=("paid" if status in {"approved", "auto_verified"} else "awaiting_review"),
+                      idempotency_key=f"sales-v110-admin-order-{index}",
+                  )
+                  db.add(order)
+                  db.flush()
+                  db.add(
+                      PaymentIntent(
+                          order_id=order.id,
+                          user_id=customer_a.id,
+                          method="card_to_card",
+                          status=status,
+                          base_amount_toman=base,
+                          payable_amount_toman=payable,
+                          verified_at=verified_at,
+                          submitted_at=now - timedelta(minutes=9),
+                      )
+                  )
+
+              db.commit()
+              print(
+                  "SALES_ANALYTICS_V110_SEED_OK",
+                  "reseller_a=", reseller_a.id,
+                  "reseller_b=", reseller_b.id,
+              )
+          finally:
+              db.close()
+          PY
+
+      - name: Start API
+        working-directory: backend
+        run: |
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8095 > /tmp/twinpanel-sales-analytics-v110.log 2>&1 &
+          echo $! > /tmp/twinpanel-sales-analytics-v110.pid
+
+      - name: Wait for API
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8095/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/twinpanel-sales-analytics-v110.log
+          exit 1
+
+      - name: Verify admin revenue truth, reseller isolation, and bot deduplication
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          import httpx
+
+          base = "http://127.0.0.1:8095"
+          client = httpx.Client(base_url=base, timeout=20.0)
+
+          def login(email, password):
+              response = client.post(
+                  "/v1/auth/login",
+                  json={"email": email, "password": password},
+              )
+              response.raise_for_status()
+              token = response.json().get("access_token")
+              assert token, response.text
+              return {"Authorization": f"Bearer {token}"}
+
+          admin = login(
+              "admin-sales-v110@example.com",
+              "TwinPanel-CI-Admin-2026!",
+          )
+          reseller_a = login(
+              "reseller-a-sales-v110@example.com",
+              "TwinPanel-CI-Reseller-A-2026!",
+          )
+          reseller_b = login(
+              "reseller-b-sales-v110@example.com",
+              "TwinPanel-CI-Reseller-B-2026!",
+          )
+
+          expected_lengths = {
+              "daily": 30,
+              "weekly": 12,
+              "monthly": 12,
+              "yearly": 5,
+          }
+
+          for range_name, expected_length in expected_lengths.items():
+              response = client.get(
+                  f"/v1/admin/sales-analytics?range={range_name}",
+                  headers=admin,
+              )
+              response.raise_for_status()
+              payload = response.json()
+              assert payload["scope"] == "admin", payload
+              assert payload["timezone"] == "Asia/Tehran", payload
+              assert payload["range"] == range_name, payload
+              assert len(payload["series"]) == expected_length, payload
+              assert payload["selected"]["revenue_toman"] == 195321, payload
+              assert payload["selected"]["sales_count"] == 2, payload
+
+          for range_name, expected_length in expected_lengths.items():
+              response = client.get(
+                  f"/v1/reseller/sales-analytics?range={range_name}",
+                  headers=reseller_a,
+              )
+              response.raise_for_status()
+              payload = response.json()
+              assert payload["scope"] == "reseller", payload
+              assert payload["timezone"] == "Asia/Tehran", payload
+              assert payload["range"] == range_name, payload
+              assert len(payload["series"]) == expected_length, payload
+              assert payload["selected"]["revenue_toman"] == 250000, payload
+              assert payload["selected"]["sales_count"] == 3, payload
+
+              breakdown = {row["key"]: row for row in payload["breakdown"]}
+              assert breakdown["direct_sale"]["revenue_toman"] == 80000, breakdown
+              assert breakdown["direct_sale"]["sales_count"] == 1, breakdown
+              assert breakdown["bot_sale"]["revenue_toman"] == 120000, breakdown
+              assert breakdown["bot_sale"]["sales_count"] == 1, breakdown
+              assert breakdown["bot_renewal"]["revenue_toman"] == 50000, breakdown
+              assert breakdown["bot_renewal"]["sales_count"] == 1, breakdown
+
+          response = client.get(
+              "/v1/reseller/sales-analytics?range=daily",
+              headers=reseller_b,
+          )
+          response.raise_for_status()
+          payload_b = response.json()
+          assert payload_b["selected"]["revenue_toman"] == 999000, payload_b
+          assert payload_b["selected"]["sales_count"] == 1, payload_b
+          assert {row["key"] for row in payload_b["breakdown"]} == {"direct_sale"}, payload_b
+
+          # Role boundaries are part of the analytics contract: an authenticated
+          # reseller cannot read admin-wide revenue and an admin without a
+          # reseller identity cannot read reseller-scoped revenue.
+          assert client.get(
+              "/v1/admin/sales-analytics?range=daily",
+              headers=reseller_a,
+          ).status_code == 403
+          assert client.get(
+              "/v1/reseller/sales-analytics?range=daily",
+              headers=admin,
+          ).status_code == 403
+
+          print("SALES_ANALYTICS_V110_LIVE_API_OK")
+          PY
+
+      - name: Verify admin and reseller frontend contracts
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          routed = Path("components/routed-page-client.tsx").read_text(encoding="utf-8")
+          ui = Path("components/sales-analytics-runtime.tsx").read_text(encoding="utf-8")
+          admin_nav = Path("components/ui.tsx").read_text(encoding="utf-8")
+          reseller_nav = Path("components/portal-shells.tsx").read_text(encoding="utf-8")
+          api = Path("lib/sales-analytics-api.ts").read_text(encoding="utf-8")
+          backend = Path("backend/app/routers/runtime_endpoints.py").read_text(encoding="utf-8")
+
+          assert 'key==="admin/sales-analytics"' in routed
+          assert 'key==="reseller/sales-analytics"' in routed
+          assert 'active="/admin/sales-analytics"' in ui
+          assert 'active="/reseller/sales-analytics"' in ui
+          assert '/admin/sales-analytics' in admin_nav
+          assert '["آمار فروش","Sales Analytics","/reseller/sales-analytics","payments"]' in reseller_nav
+          assert '/v1/admin/sales-analytics' in api
+          assert '/v1/reseller/sales-analytics' in api
+          assert 'Depends(require_admin)' in backend
+          assert 'Depends(require_reseller)' in backend
+
+          print("SALES_ANALYTICS_V110_FRONTEND_CONTRACT_OK")
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional --no-audit --no-fund
+          else
+            npm install --include=optional --no-audit --no-fund
+          fi
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Show API log on failure
+        if: failure()
+        run: cat /tmp/twinpanel-sales-analytics-v110.log 2>/dev/null || true

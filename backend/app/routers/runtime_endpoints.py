@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,10 @@ from ..models_reseller import Reseller, ResellerSubscription
 from ..quota_models import QuotaSession, QuotaUsageEvent
 from ..services.dashboard_revenue import dashboard_revenue
 from ..services.public_urls import api_base_url
+from ..services.sales_analytics import (
+    admin_sales_analytics as build_admin_sales_analytics,
+    reseller_sales_analytics as build_reseller_sales_analytics,
+)
 from .admin import dashboard_summary_v2
 
 
@@ -177,6 +181,42 @@ def dashboard_summary_live_subscriptions(db: Session = Depends(get_db)):
     payload["online_subscriptions"] = online_subscriptions
     payload["online_users"] = online_subscriptions
     return payload
+
+
+@router.get(
+    "/v1/admin/sales-analytics",
+    dependencies=[Depends(require_admin)],
+)
+def admin_sales_analytics(
+    range_name: str = Query(
+        default="daily",
+        alias="range",
+        pattern="^(daily|weekly|monthly|yearly)$",
+    ),
+    db: Session = Depends(get_db),
+):
+    """Authoritative confirmed-payment analytics for the admin panel."""
+
+    return build_admin_sales_analytics(db, range_name)
+
+
+@router.get("/v1/reseller/sales-analytics")
+def reseller_sales_analytics(
+    range_name: str = Query(
+        default="daily",
+        alias="range",
+        pattern="^(daily|weekly|monthly|yearly)$",
+    ),
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    """Sales analytics scoped strictly to the authenticated reseller."""
+
+    return build_reseller_sales_analytics(
+        db,
+        reseller_id=int(reseller.id),
+        range_name=range_name,
+    )
 
 
 @router.get(
