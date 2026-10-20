@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
+from ..customer_wallet_models import CustomerWalletTopup
 from ..database import get_db
 from ..deps import get_current_user, require_admin
 from ..models import User
@@ -45,6 +46,22 @@ ALLOWED_TYPES = {
 
 RESELLER_INTERNAL_EMAIL_SUFFIX = "@internal.twinpanel.invalid"
 RESELLER_INTERNAL_EMAIL_PREFIX = "tg-r"
+RESELLER_TOPUP_METHOD_PATTERN = "reseller_card:%"
+REVIEW_STATUSES = {
+    "awaiting_review",
+    "payment_submitted",
+    "submitted",
+    "review",
+    "waiting",
+}
+FINAL_REVIEW_STATUSES = {
+    "approved",
+    "auto_verified",
+    "paid",
+    "rejected",
+    "completed",
+    "fulfilled",
+}
 
 
 def _ensure_receipt_root() -> None:
@@ -118,6 +135,16 @@ def _admin_visible_intent(
             detail="پرداخت پیدا نشد",
         )
     return row
+
+
+def _purchase_needs_review(row: PaymentIntent) -> bool:
+    status = str(row.status or "").strip().lower()
+    if status in FINAL_REVIEW_STATUSES:
+        return False
+    return bool(
+        status in REVIEW_STATUSES
+        or str(row.receipt_telegram_file_id or "").strip()
+    )
 
 
 @router.post("/intents/{intent_id}/receipt-upload")
@@ -242,6 +269,66 @@ def admin_payment_intents_isolated(
         intent_out(row)
         for row in visible[:500]
     ]
+
+
+@router.get(
+    "/admin/review-summary",
+    dependencies=[Depends(require_admin)],
+)
+def admin_payment_review_summary(
+    db: Session = Depends(get_db),
+):
+    """Return the one canonical payment-review attention count.
+
+    The admin payments page, top navigation and red review badge must all derive
+    attention from the same rules. A card receipt is actionable even when an
+    older row still says ``pending_payment``; this is the exact state produced
+    by the receipt-upload flow and must never disappear from navigation.
+    """
+    purchase_rows = (
+        db.query(PaymentIntent)
+        .order_by(PaymentIntent.id.desc())
+        .limit(5000)
+        .all()
+    )
+    visible_purchases = [
+        row
+        for row in purchase_rows
+        if not _is_reseller_bot_internal_user(
+            db,
+            int(row.user_id) if row.user_id is not None else None,
+        )
+    ]
+
+    purchase_review_rows = [
+        row for row in visible_purchases
+        if _purchase_needs_review(row)
+    ]
+    receipt_review = sum(
+        1
+        for row in purchase_review_rows
+        if str(row.receipt_telegram_file_id or "").strip()
+    )
+
+    wallet_review = (
+        db.query(CustomerWalletTopup)
+        .filter(
+            ~CustomerWalletTopup.method.like(
+                RESELLER_TOPUP_METHOD_PATTERN
+            ),
+            CustomerWalletTopup.status.in_(REVIEW_STATUSES),
+        )
+        .count()
+    )
+
+    purchase_review = len(purchase_review_rows)
+    return {
+        "needs_review": purchase_review + int(wallet_review),
+        "purchase_review": purchase_review,
+        "receipt_review": receipt_review,
+        "wallet_review": int(wallet_review),
+        "generated_at": datetime.utcnow().isoformat() + "Z",
+    }
 
 
 @router.post(

@@ -230,7 +230,7 @@ export const adminApi={
   deletePlan:(id:number)=>request<RuntimeRow>(`/v1/plans/${id}`,{method:"DELETE"}),
 
   payments:()=>request<RuntimeRow[]>("/v1/payments/admin/intents"),
-  paymentReviewSummary:()=>request<PaymentReviewSummary>("/v1/admin/wallet/payment-review-summary"),
-  approvePayment:(id:number)=>request<RuntimeRow>(`/v1/admin/wallet/payment-intents/${id}/approve-safe`,{method:"POST"}),
+  paymentReviewSummary:()=>request<PaymentReviewSummary>("/v1/payments/admin/review-summary"),
+  approvePayment:(id:number)=>request<RuntimeRow>(`/v1/payments/admin/intents/${id}/approve`,{method:"POST"}),
   rejectPayment:(id:number,reason:string)=>request<RuntimeRow>(`/v1/payments/admin/intents/${id}/reject`,{method:"POST",body:JSON.stringify({reason})})
 };

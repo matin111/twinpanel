@@ -87,7 +87,7 @@ export function useAdminNavAttention(_active:string){
 
     const refreshPayments=async()=>{
       try{
-        const summary=await request<PaymentReviewSummary>("/v1/admin/wallet/payment-review-summary");
+        const summary=await request<PaymentReviewSummary>("/v1/payments/admin/review-summary");
         if(!alive)return;
         setState(current=>({...current,paymentReviewCount:Math.max(0,Number(summary.needs_review)||0)}));
       }catch{}
