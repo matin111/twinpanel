@@ -1,0 +1,69 @@
+name: TwinPanel Unified Subscription Link V93
+
+on:
+  pull_request:
+    paths:
+      - "components/subscription-link-delivery.tsx"
+      - "components/customer-delivery-enhancement.tsx"
+      - "app/subscription-link-modal.css"
+      - "app/layout.tsx"
+      - ".github/workflows/subscription-link-unified-v93.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unified-subscription-link:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify one shared delivery experience
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          shared = Path("components/subscription-link-delivery.tsx").read_text()
+          customer = Path("components/customer-delivery-enhancement.tsx").read_text()
+          layout = Path("app/layout.tsx").read_text()
+          css = Path("app/subscription-link-modal.css").read_text()
+
+          required_shared = [
+              "export function SubscriptionLinkPanel",
+              "export function SubscriptionLinkModal",
+              "export function UnifiedSubscriptionLinkBridge",
+              "QRCodeSVG",
+              '.subscription-link-stack, .reseller-connection-content',
+              'pathname==="/admin/subscriptions"',
+              'pathname==="/reseller/subscriptions"',
+              "createPortal",
+          ]
+          for needle in required_shared:
+              assert needle in shared, needle
+
+          assert 'SubscriptionLinkPanel' in customer
+          assert 'delivery-unified-sublink' in customer
+          assert 'delivery-qr-card' not in customer
+
+          assert 'UnifiedSubscriptionLinkBridge' in layout
+          assert '<UnifiedSubscriptionLinkBridge/>' in layout
+          assert 'subscription-link-modal.css' in layout
+
+          required_css = [
+              ".unified-sublink-modal-card",
+              ".unified-subscription-link",
+              ".usl-qr-card",
+              ".usl-link-card",
+              ".usl-link-field",
+              ".usl-actions",
+              ".delivery-unified-sublink",
+              "@media (max-width:720px)",
+          ]
+          for needle in required_css:
+              assert needle in css, needle
+
+          assert "!important" not in css
+          print("UNIFIED_SUBSCRIPTION_LINK_V93=PASS")
+          PY
