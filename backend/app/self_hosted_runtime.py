@@ -24,6 +24,9 @@ from . import xray_modern_runtime
 from .xray_modern_config_compat_v45 import (
     apply_xray_modern_config_compat_v45,
 )
+from .xray_reality_cli_compat_v83 import (
+    apply_xray_reality_cli_compat_v83,
+)
 from .xray_modern_repair_runtime import (
     apply_xray_modern_repair_runtime,
 )
@@ -197,6 +200,12 @@ def apply_self_hosted_runtime(
     ]["public_base"] = 27000
 
     xray_modern_runtime.apply_xray_modern_runtime()
+
+    # Xray's x25519 CLI has used Public key, Password, and now
+    # Password (PublicKey) for the same REALITY client-side value. Apply the
+    # punctuation-insensitive parser compatibility before any repair/profile
+    # wrapper can provision Modern Xray on a local or remote Exit.
+    apply_xray_reality_cli_compat_v83()
 
     # Xray 26.3.x requires temporary candidate config names to end in .json.
     # Apply this before repair/domain/TCP-TLS wrappers can invoke the Modern

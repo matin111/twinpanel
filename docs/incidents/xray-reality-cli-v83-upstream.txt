@@ -1,0 +1,9 @@
+Upstream reference checked 2026-10-20:
+https://github.com/XTLS/Xray-core/blob/main/main/commands/all/curve25519.go
+
+Current Curve25519Genkey output contract:
+PrivateKey: <private>
+Password (PublicKey): <public/password>
+Hash32: <hash>
+
+TwinPanel V83 regression covers this current form plus the legacy Public key and Password forms.

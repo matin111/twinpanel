@@ -1,0 +1,1 @@
+TwinPanel V83 incident note: see `xray-reality-cli-v83.md` for the production reseller approval failure, exact Xray `Password (PublicKey)` parser root cause, compatibility design, and executable regression coverage.
