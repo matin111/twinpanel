@@ -61,4 +61,4 @@ jobs:
 
       - name: Verify main and reseller purchase entitlements
         working-directory: backend
-        run: python scripts/purchase_entitlement_smoke.py
+        run: PYTHONPATH=. python scripts/purchase_entitlement_smoke.py
