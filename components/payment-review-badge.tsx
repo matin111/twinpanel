@@ -33,7 +33,7 @@ async function fetchSummary():Promise<ReviewSummary>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
   const response=await fetch(
-    `${API_BASE}/v1/admin/wallet/payment-review-summary`,
+    `${API_BASE}/v1/payments/admin/review-summary`,
     {
       headers:{Authorization:`Bearer ${token}`},
       cache:"no-store",
@@ -64,7 +64,7 @@ export function PaymentReviewBadge(){
     };
 
     void refresh();
-    const timer=window.setInterval(()=>void refresh(),30000);
+    const timer=window.setInterval(()=>void refresh(),10000);
     window.addEventListener("focus",refresh);
     document.addEventListener("visibilitychange",onVisible);
 
