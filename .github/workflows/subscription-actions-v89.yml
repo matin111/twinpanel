@@ -1,0 +1,62 @@
+name: TwinPanel Subscription Actions V89
+
+on:
+  pull_request:
+    paths:
+      - "components/legacy-subscriptions-exact.tsx"
+      - "components/reseller-subscriptions-parity.tsx"
+      - ".github/workflows/subscription-actions-v89.yml"
+  workflow_dispatch:
+
+jobs:
+  subscription-actions:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify admin and reseller subscription action contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          admin = Path("components/legacy-subscriptions-exact.tsx").read_text(encoding="utf-8")
+          reseller = Path("components/reseller-subscriptions-parity.tsx").read_text(encoding="utf-8")
+
+          admin_sublink = 'loadConnection(item,"sublink")'
+          admin_connect = 'loadConnection(item,"connect")'
+          if admin_sublink not in admin:
+              raise SystemExit("admin sub-link action missing")
+          if admin_connect in admin:
+              raise SystemExit("duplicate admin Connect row action must stay removed")
+          if 'مدیریت اشتراک، تمدید، وضعیت و سابلینک' not in admin:
+              raise SystemExit("admin subscriptions description still advertises the removed Connect action")
+
+          reseller_trigger = 'onClick={()=>void openConnection(row)}'
+          if reseller_trigger not in reseller:
+              raise SystemExit("reseller subscription delivery action missing")
+          if 'pick("سابلینک","Sub-link")' not in reseller:
+              raise SystemExit("reseller row action must be labelled Sub-link")
+          if 'pick("اتصال","Connection")' in reseller:
+              raise SystemExit("reseller row action regressed to Connection")
+          if 'pick("سابلینک","Subscription link")' not in reseller:
+              raise SystemExit("reseller delivery modal must identify itself as Subscription link")
+          if 'subscription_link' not in reseller or 'QR Code اشتراک' not in reseller:
+              raise SystemExit("reseller sub-link delivery must keep link and QR output")
+
+          print("SUBSCRIPTION_ACTIONS_V89_CONTRACT_OK")
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional
+          else
+            npm install --include=optional --no-audit --no-fund
+          fi
+
+      - name: Build frontend
+        run: npm run build
