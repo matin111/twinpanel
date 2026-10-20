@@ -1,6 +1,7 @@
 "use client";
 
 import {useEffect,useMemo,useRef,useState} from "react";
+import {createPortal} from "react-dom";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
@@ -238,11 +239,13 @@ export function SystemReleaseFooter(){
   const [licenseOpen,setLicenseOpen]=useState(false);
   const [licenseKey,setLicenseKey]=useState("");
   const [reloading,setReloading]=useState(false);
+  const [portalReady,setPortalReady]=useState(false);
   const initialVersionRef=useRef("");
   const reloadTimerRef=useRef<number|null>(null);
   const transientSinceRef=useRef<number|null>(null);
   const loadInFlightRef=useRef<{status:boolean;check:boolean}>({status:false,check:false});
   const pageInstanceRef=useRef("");
+  const updateCardRef=useRef<HTMLElement|null>(null);
 
   if(!pageInstanceRef.current){
     pageInstanceRef.current=`release-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -288,6 +291,18 @@ export function SystemReleaseFooter(){
       if(check)setChecking(false);
     }
   };
+
+  useEffect(()=>{
+    setPortalReady(true);
+  },[]);
+
+  useEffect(()=>{
+    if(!portalReady||!updateOpen)return;
+    const frame=window.requestAnimationFrame(()=>{
+      updateCardRef.current?.scrollTo({top:0,left:0,behavior:"auto"});
+    });
+    return()=>window.cancelAnimationFrame(frame);
+  },[portalReady,updateOpen]);
 
   useEffect(()=>{
     let alive=true;
@@ -414,6 +429,110 @@ export function SystemReleaseFooter(){
 
   if(!data)return <div className="system-release-footer is-loading"><span className="release-skeleton"/><span className="release-skeleton short"/></div>;
 
+  const updateDialog=<div className="system-update-modal" role="dialog" aria-modal="true" aria-labelledby="system-update-title">
+    <button className="system-update-backdrop" type="button" aria-label={pick("بستن","Close")} onClick={()=>{if(!reloading)setUpdateOpen(false);}}/>
+    <section ref={updateCardRef} className="system-update-card" dir={fa?"rtl":"ltr"}>
+      <header className="system-update-head">
+        <div className="system-update-title-wrap">
+          <span className={`system-update-orb ${data.update_available||updateBusy?"active":""}`} aria-hidden="true">↻</span>
+          <div>
+            <div className="system-update-eyebrow">{pick("سیستم و نگهداری","System & Maintenance")}</div>
+            <h2 id="system-update-title">{pick("مرکز بروزرسانی TwinPanel","TwinPanel Update Center")}</h2>
+            <p>{updateBusy?pick("نسخه جدید در حال اعمال است؛ وضعیت سرویس‌ها به‌صورت زنده بررسی می‌شود.","The new release is being applied and service health is monitored live."):pick("نسخه، تغییرات و سلامت بروزرسانی را از یکجا مدیریت کنید.","Manage release checks, changes, and update health in one place.")}</p>
+          </div>
+        </div>
+        <button className="system-update-close" type="button" disabled={reloading} onClick={()=>setUpdateOpen(false)} aria-label={pick("بستن","Close")}>×</button>
+      </header>
+
+      <div className="system-update-version-grid">
+        <article>
+          <span>{pick("نسخه فعلی","Current version")}</span>
+          <strong dir="ltr">v{currentVersion}</strong>
+          <small>{pick("در حال اجرا","Running")}</small>
+        </article>
+        <span className="system-update-version-arrow" aria-hidden="true">←</span>
+        <article className={data.update_available?"target":""}>
+          <span>{pick("آخرین نسخه","Latest version")}</span>
+          <strong dir="ltr">v{latestVersion}</strong>
+          <small>{data.update_available?pick("آماده نصب","Ready to install"):pick("به‌روز است","Up to date")}</small>
+        </article>
+      </div>
+
+      <div className="system-update-meta">
+        <span><i aria-hidden="true">◈</i><em>{pick("کانال انتشار","Channel")}</em><b>{String(data.channel||"stable").toUpperCase()}</b></span>
+        <span><i aria-hidden="true">◷</i><em>{pick("انتشار","Released")}</em><b>{formatReleaseDate(data.released_at,fa)}</b></span>
+        <span><i aria-hidden="true">⌁</i><em>{pick("روش دریافت","Delivery")}</em><b>{String(data.update?.delivery||"Prebuilt")}</b></span>
+      </div>
+
+      {(updateBusy||updateCompleted||updateFailed)&&<div className={`system-update-progress-panel ${updateFailed?"failed":updateCompleted?"completed":""}`}>
+        <div className="system-update-progress-head">
+          <div>
+            <span>{updateFailed?pick("بروزرسانی کامل نشد","Update did not complete"):updateCompleted?pick("بروزرسانی با موفقیت انجام شد","Update completed successfully"):pick(`در حال بروزرسانی به ${targetVersion}`,`Updating to ${targetVersion}`)}</span>
+            <small>{elapsed?pick(`زمان سپری‌شده: ${elapsed}`,`Elapsed: ${elapsed}`):updateBusy?pick("پنل ممکن است هنگام راه‌اندازی مجدد چند لحظه پاسخ ندهد.","The panel may briefly reconnect while services restart."):""}</small>
+          </div>
+          <strong>{updateFailed?"!":`${progressPercent.toLocaleString(fa?"fa-IR":"en-US")}%`}</strong>
+        </div>
+        <div className="system-update-progress-track"><span style={{width:`${progressPercent}%`}}/></div>
+        <div className="system-update-steps">
+          {UPDATE_STAGES.map((stage,index)=>{
+            const done=updateCompleted||stageIndex>index;
+            const active=updateBusy&&stageIndex===index;
+            const failed=updateFailed&&index===Math.max(0,stageIndex);
+            return <div className={`${done?"done":""} ${active?"active":""} ${failed?"failed":""}`.trim()} key={stage.key}>
+              <span className="system-update-step-mark">{done?"✓":failed?"!":index+1}</span>
+              <small>{fa?stage.fa:stage.en}</small>
+            </div>;
+          })}
+        </div>
+        {(downloaded||elapsed)&&<div className="system-update-runtime-stats">
+          {downloaded&&<span>{pick("دریافت‌شده","Downloaded")} <b>{downloaded}</b></span>}
+          {elapsed&&<span>{pick("زمان کل","Total time")} <b>{elapsed}</b></span>}
+        </div>}
+      </div>}
+
+      {updateFailed&&<div className="system-update-alert error">
+        <span aria-hidden="true">!</span>
+        <div><b>{pick("بروزرسانی کامل نشد","Update did not complete")}</b><p>{displayError}</p>{String(data.update?.error||error||"")&&<details><summary>{pick("جزئیات فنی","Technical details")}</summary><code dir="ltr">{String(data.update?.error||error)}</code></details>}</div>
+      </div>}
+
+      {!updateFailed&&error&&<div className="system-update-alert error"><span aria-hidden="true">!</span><div><b>{pick("بررسی ناموفق بود","Check failed")}</b><p>{displayError}</p></div></div>}
+
+      {data.manifest_error&&!error&&<div className="system-update-alert warn"><span aria-hidden="true">i</span><div><b>{pick("آخرین وضعیت نسخه در دسترس نیست","Latest release status is unavailable")}</b><p>{pick("اطلاعات ذخیره‌شده نمایش داده می‌شود. بررسی دوباره را بزنید.","Cached information is shown. Run the check again.")}</p></div></div>}
+
+      {releaseNotes&&<div className="system-update-notes">
+        <div className="system-update-section-title"><span>{pick("تغییرات این نسخه","What’s new")}</span><small dir="ltr">{latestVersion}</small></div>
+        <p>{releaseNotes}</p>
+      </div>}
+
+      {!releaseNotes&&!updateBusy&&<div className="system-update-notes compact">
+        <div className="system-update-section-title"><span>{pick("وضعیت نسخه","Release status")}</span></div>
+        <p>{data.update_available?pick("نسخه جدید آماده دریافت است. قبل از فعال‌سازی، بکاپ خودکار ساخته می‌شود.","A newer release is ready. An automatic backup is created before activation."):pick("این نصب روی آخرین نسخه عمومی قرار دارد.","This installation is on the latest public release.")}</p>
+      </div>}
+
+      <footer className="system-update-actions">
+        <div className="system-update-actions-secondary">
+          <button className="ghost" type="button" disabled={checking||updateBusy||reloading} onClick={()=>void load(true)}>{checking?<><span className="system-update-spinner"/> {pick("در حال بررسی…","Checking…")}</>:pick("بررسی دوباره","Check again")}</button>
+          {data.github_url&&<a href={data.github_url} target="_blank" rel="noreferrer">{pick("مشاهده GitHub","View GitHub")}</a>}
+        </div>
+        <div className="system-update-actions-primary">
+          {!updateBusy&&!reloading&&<button className="ghost" type="button" onClick={()=>setUpdateOpen(false)}>{pick("بستن","Close")}</button>}
+          {data.update_available&&!updateBusy&&!reloading&&<button className="primary" type="button" disabled={busy==="update"||checking} onClick={()=>void startUpdate()}>{busy==="update"?pick("در حال شروع…","Starting…"):pick(`شروع بروزرسانی به ${latestVersion}`,`Update to ${latestVersion}`)}</button>}
+          {updateBusy&&<button className="primary" type="button" disabled><span className="system-update-spinner"/> {pick("بروزرسانی در حال انجام است","Update in progress")}</button>}
+          {reloading&&<button className="success" type="button" disabled>✓ {pick("انجام شد؛ در حال تازه‌سازی","Done; refreshing")}</button>}
+        </div>
+      </footer>
+    </section>
+  </div>;
+
+  const licenseDialog=<div className="system-license-modal" role="dialog" aria-modal="true">
+    <button className="system-license-backdrop" type="button" aria-label={pick("بستن","Close")} onClick={()=>setLicenseOpen(false)}/>
+    <div className="system-license-card">
+      <div className="system-license-head"><div><b>{pick("فعال‌سازی لایسنس","License activation")}</b><small>{pick("کلید خریداری‌شده را وارد کنید. فعال‌سازی روی همین نصب انجام می‌شود.","Enter your purchased key. Activation upgrades this installation in place.")}</small></div><button type="button" onClick={()=>setLicenseOpen(false)}>×</button></div>
+      <input dir="ltr" value={licenseKey} onChange={event=>setLicenseKey(event.target.value)} placeholder="TP-XXXX-XXXX-XXXX" autoComplete="off"/>
+      <div className="system-license-actions"><button type="button" className="ghost" onClick={()=>setLicenseOpen(false)}>{pick("انصراف","Cancel")}</button><button type="button" className="primary" disabled={busy==="license"||licenseKey.trim().length<8} onClick={()=>void activate()}>{busy==="license"?"…":pick("فعال‌سازی","Activate")}</button></div>
+    </div>
+  </div>;
+
   return <>
     <div className={`system-release-footer ${data.update_available?"has-update":""}`}>
       <button className="system-release-summary" type="button" onClick={openUpdateCenter}>
@@ -436,108 +555,7 @@ export function SystemReleaseFooter(){
       </button>
     </div>
 
-    {updateOpen&&<div className="system-update-modal" role="dialog" aria-modal="true" aria-labelledby="system-update-title">
-      <button className="system-update-backdrop" type="button" aria-label={pick("بستن","Close")} onClick={()=>{if(!reloading)setUpdateOpen(false);}}/>
-      <section className="system-update-card" dir={fa?"rtl":"ltr"}>
-        <header className="system-update-head">
-          <div className="system-update-title-wrap">
-            <span className={`system-update-orb ${data.update_available||updateBusy?"active":""}`} aria-hidden="true">↻</span>
-            <div>
-              <div className="system-update-eyebrow">{pick("سیستم و نگهداری","System & Maintenance")}</div>
-              <h2 id="system-update-title">{pick("مرکز بروزرسانی TwinPanel","TwinPanel Update Center")}</h2>
-              <p>{updateBusy?pick("نسخه جدید در حال اعمال است؛ وضعیت سرویس‌ها به‌صورت زنده بررسی می‌شود.","The new release is being applied and service health is monitored live."):pick("نسخه، تغییرات و سلامت بروزرسانی را از یکجا مدیریت کنید.","Manage release checks, changes, and update health in one place.")}</p>
-            </div>
-          </div>
-          <button className="system-update-close" type="button" disabled={reloading} onClick={()=>setUpdateOpen(false)} aria-label={pick("بستن","Close")}>×</button>
-        </header>
-
-        <div className="system-update-version-grid">
-          <article>
-            <span>{pick("نسخه فعلی","Current version")}</span>
-            <strong dir="ltr">v{currentVersion}</strong>
-            <small>{pick("در حال اجرا","Running")}</small>
-          </article>
-          <span className="system-update-version-arrow" aria-hidden="true">←</span>
-          <article className={data.update_available?"target":""}>
-            <span>{pick("آخرین نسخه","Latest version")}</span>
-            <strong dir="ltr">v{latestVersion}</strong>
-            <small>{data.update_available?pick("آماده نصب","Ready to install"):pick("به‌روز است","Up to date")}</small>
-          </article>
-        </div>
-
-        <div className="system-update-meta">
-          <span><i aria-hidden="true">◈</i><em>{pick("کانال انتشار","Channel")}</em><b>{String(data.channel||"stable").toUpperCase()}</b></span>
-          <span><i aria-hidden="true">◷</i><em>{pick("انتشار","Released")}</em><b>{formatReleaseDate(data.released_at,fa)}</b></span>
-          <span><i aria-hidden="true">⌁</i><em>{pick("روش دریافت","Delivery")}</em><b>{String(data.update?.delivery||"Prebuilt")}</b></span>
-        </div>
-
-        {(updateBusy||updateCompleted||updateFailed)&&<div className={`system-update-progress-panel ${updateFailed?"failed":updateCompleted?"completed":""}`}>
-          <div className="system-update-progress-head">
-            <div>
-              <span>{updateFailed?pick("بروزرسانی کامل نشد","Update did not complete"):updateCompleted?pick("بروزرسانی با موفقیت انجام شد","Update completed successfully"):pick(`در حال بروزرسانی به ${targetVersion}`,`Updating to ${targetVersion}`)}</span>
-              <small>{elapsed?pick(`زمان سپری‌شده: ${elapsed}`,`Elapsed: ${elapsed}`):updateBusy?pick("پنل ممکن است هنگام راه‌اندازی مجدد چند لحظه پاسخ ندهد.","The panel may briefly reconnect while services restart."):""}</small>
-            </div>
-            <strong>{updateFailed?"!":`${progressPercent.toLocaleString(fa?"fa-IR":"en-US")}%`}</strong>
-          </div>
-          <div className="system-update-progress-track"><span style={{width:`${progressPercent}%`}}/></div>
-          <div className="system-update-steps">
-            {UPDATE_STAGES.map((stage,index)=>{
-              const done=updateCompleted||stageIndex>index;
-              const active=updateBusy&&stageIndex===index;
-              const failed=updateFailed&&index===Math.max(0,stageIndex);
-              return <div className={`${done?"done":""} ${active?"active":""} ${failed?"failed":""}`.trim()} key={stage.key}>
-                <span className="system-update-step-mark">{done?"✓":failed?"!":index+1}</span>
-                <small>{fa?stage.fa:stage.en}</small>
-              </div>;
-            })}
-          </div>
-          {(downloaded||elapsed)&&<div className="system-update-runtime-stats">
-            {downloaded&&<span>{pick("دریافت‌شده","Downloaded")} <b>{downloaded}</b></span>}
-            {elapsed&&<span>{pick("زمان کل","Total time")} <b>{elapsed}</b></span>}
-          </div>}
-        </div>}
-
-        {updateFailed&&<div className="system-update-alert error">
-          <span aria-hidden="true">!</span>
-          <div><b>{pick("بروزرسانی کامل نشد","Update did not complete")}</b><p>{displayError}</p>{String(data.update?.error||error||"")&&<details><summary>{pick("جزئیات فنی","Technical details")}</summary><code dir="ltr">{String(data.update?.error||error)}</code></details>}</div>
-        </div>}
-
-        {!updateFailed&&error&&<div className="system-update-alert error"><span aria-hidden="true">!</span><div><b>{pick("بررسی ناموفق بود","Check failed")}</b><p>{displayError}</p></div></div>}
-
-        {data.manifest_error&&!error&&<div className="system-update-alert warn"><span aria-hidden="true">i</span><div><b>{pick("آخرین وضعیت نسخه در دسترس نیست","Latest release status is unavailable")}</b><p>{pick("اطلاعات ذخیره‌شده نمایش داده می‌شود. بررسی دوباره را بزنید.","Cached information is shown. Run the check again.")}</p></div></div>}
-
-        {releaseNotes&&<div className="system-update-notes">
-          <div className="system-update-section-title"><span>{pick("تغییرات این نسخه","What’s new")}</span><small dir="ltr">{latestVersion}</small></div>
-          <p>{releaseNotes}</p>
-        </div>}
-
-        {!releaseNotes&&!updateBusy&&<div className="system-update-notes compact">
-          <div className="system-update-section-title"><span>{pick("وضعیت نسخه","Release status")}</span></div>
-          <p>{data.update_available?pick("نسخه جدید آماده دریافت است. قبل از فعال‌سازی، بکاپ خودکار ساخته می‌شود.","A newer release is ready. An automatic backup is created before activation."):pick("این نصب روی آخرین نسخه عمومی قرار دارد.","This installation is on the latest public release.")}</p>
-        </div>}
-
-        <footer className="system-update-actions">
-          <div className="system-update-actions-secondary">
-            <button className="ghost" type="button" disabled={checking||updateBusy||reloading} onClick={()=>void load(true)}>{checking?<><span className="system-update-spinner"/> {pick("در حال بررسی…","Checking…")}</>:pick("بررسی دوباره","Check again")}</button>
-            {data.github_url&&<a href={data.github_url} target="_blank" rel="noreferrer">{pick("مشاهده GitHub","View GitHub")}</a>}
-          </div>
-          <div className="system-update-actions-primary">
-            {!updateBusy&&!reloading&&<button className="ghost" type="button" onClick={()=>setUpdateOpen(false)}>{pick("بستن","Close")}</button>}
-            {data.update_available&&!updateBusy&&!reloading&&<button className="primary" type="button" disabled={busy==="update"||checking} onClick={()=>void startUpdate()}>{busy==="update"?pick("در حال شروع…","Starting…"):pick(`شروع بروزرسانی به ${latestVersion}`,`Update to ${latestVersion}`)}</button>}
-            {updateBusy&&<button className="primary" type="button" disabled><span className="system-update-spinner"/> {pick("بروزرسانی در حال انجام است","Update in progress")}</button>}
-            {reloading&&<button className="success" type="button" disabled>✓ {pick("انجام شد؛ در حال تازه‌سازی","Done; refreshing")}</button>}
-          </div>
-        </footer>
-      </section>
-    </div>}
-
-    {licenseOpen&&<div className="system-license-modal" role="dialog" aria-modal="true">
-      <button className="system-license-backdrop" type="button" aria-label={pick("بستن","Close")} onClick={()=>setLicenseOpen(false)}/>
-      <div className="system-license-card">
-        <div className="system-license-head"><div><b>{pick("فعال‌سازی لایسنس","License activation")}</b><small>{pick("کلید خریداری‌شده را وارد کنید. فعال‌سازی روی همین نصب انجام می‌شود.","Enter your purchased key. Activation upgrades this installation in place.")}</small></div><button type="button" onClick={()=>setLicenseOpen(false)}>×</button></div>
-        <input dir="ltr" value={licenseKey} onChange={event=>setLicenseKey(event.target.value)} placeholder="TP-XXXX-XXXX-XXXX" autoComplete="off"/>
-        <div className="system-license-actions"><button type="button" className="ghost" onClick={()=>setLicenseOpen(false)}>{pick("انصراف","Cancel")}</button><button type="button" className="primary" disabled={busy==="license"||licenseKey.trim().length<8} onClick={()=>void activate()}>{busy==="license"?"…":pick("فعال‌سازی","Activate")}</button></div>
-      </div>
-    </div>}
+    {portalReady&&updateOpen?createPortal(updateDialog,document.body):null}
+    {portalReady&&licenseOpen?createPortal(licenseDialog,document.body):null}
   </>;
 }

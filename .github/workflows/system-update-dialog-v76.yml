@@ -1,4 +1,4 @@
-name: TwinPanel System Update Dialog V77 Regression
+name: TwinPanel System Update Dialog V78 Regression
 
 on:
   pull_request:
@@ -7,6 +7,8 @@ on:
       - "app/system-release.css"
       - "app/system-release-theme.css"
       - "app/system-release-dialog-v76.css"
+      - "app/admin-shell-final.css"
+      - "components/ui.tsx"
       - "components/system-release-footer.tsx"
       - "components/system-update-recovery-bootstrap.tsx"
       - ".github/workflows/system-update-dialog-v76.yml"
@@ -17,6 +19,8 @@ on:
       - "app/system-release.css"
       - "app/system-release-theme.css"
       - "app/system-release-dialog-v76.css"
+      - "app/admin-shell-final.css"
+      - "components/ui.tsx"
       - "components/system-release-footer.tsx"
       - "components/system-update-recovery-bootstrap.tsx"
       - ".github/workflows/system-update-dialog-v76.yml"
@@ -26,7 +30,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Verify authoritative recovery and border-box viewport containment
+      - name: Verify document-root portal, recovery, and viewport containment
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -36,15 +40,16 @@ jobs:
           bootstrap = Path("components/system-update-recovery-bootstrap.tsx").read_text()
           css = Path("app/system-release-dialog-v76.css").read_text()
           layout = Path("app/layout.tsx").read_text()
+          shell = Path("components/ui.tsx").read_text()
+          shell_css = Path("app/admin-shell-final.css").read_text()
 
           footer_key = re.search(r'UPDATE_RELOAD_KEY="([^"]+)"', footer)
           bootstrap_key = re.search(r'UPDATE_RELOAD_KEY="([^"]+)"', bootstrap)
           assert footer_key and bootstrap_key
           assert footer_key.group(1) == bootstrap_key.group(1), "recovery key drift"
 
-          # A full document load must discard the stale client marker. The
-          # backend release/status state is authoritative and reopens progress
-          # when an update is actually still active.
+          # A full document load discards stale client recovery state. Backend
+          # release/status remains authoritative for a genuinely active update.
           assert "sessionStorage.removeItem" in bootstrap
           assert "JSON.parse" not in bootstrap
           assert "marker.reload_from" not in bootstrap
@@ -55,8 +60,31 @@ jobs:
           assert layout.index('import "./system-release-theme.css";') < layout.index('import "./system-release-dialog-v76.css";')
           assert "<SystemUpdateRecoveryBootstrap/><ThemeProvider>" in layout
 
-          # The complete card border-box, including padding and borders from
-          # the legacy component stylesheet, must fit inside the live viewport.
+          # Root cause guard: SystemReleaseFooter intentionally lives inside the
+          # System & Maintenance dropdown, whose visual ancestry contains a
+          # transformed navigation wrapper and an overflow-hidden menu. A fixed
+          # descendant must therefore never be mounted there.
+          assert "<SystemReleaseFooter/>" in shell
+          assert "topnav-release" in shell
+          assert 'transform:"translate(-50%,-50%)"' in shell
+          assert ".topnav-menu" in shell_css
+          assert "overflow:hidden!important" in shell_css
+
+          # Both dialogs must escape that ancestry through a hydration-safe
+          # React portal to document.body. The card resets to the top whenever
+          # the Update Center is opened, avoiding restored inner-scroll state.
+          assert 'import {createPortal} from "react-dom";' in footer
+          assert "const [portalReady,setPortalReady]=useState(false)" in footer
+          assert "setPortalReady(true)" in footer
+          assert "createPortal(updateDialog,document.body)" in footer
+          assert "createPortal(licenseDialog,document.body)" in footer
+          assert "portalReady&&updateOpen" in footer
+          assert "portalReady&&licenseOpen" in footer
+          assert "updateCardRef.current?.scrollTo({top:0,left:0,behavior:\"auto\"})" in footer
+          assert 'ref={updateCardRef}' in footer
+
+          # The complete card border-box, including legacy padding/borders,
+          # remains bounded to the live viewport once portaled to document.body.
           assert "box-sizing:border-box" in css
           assert "100dvh" in css
           assert "overflow:hidden" in css
@@ -71,9 +99,9 @@ jobs:
           modal = css.split(".system-update-modal{",1)[1].split("}",1)[0]
           card = css.split(".system-update-card{",1)[1].split("}",1)[0]
           assert "overflow:hidden" in modal, "modal shell must never become the scroll container"
-          assert "overflow:auto" not in modal, "rc.76 outer-scroll regression returned"
+          assert "overflow:auto" not in modal, "outer-scroll regression returned"
           assert "box-sizing:border-box" in card
           assert "overflow-y:auto" in card, "card must own vertical scrolling"
 
-          print("System Update Dialog V77 regression contract: OK")
+          print("System Update Dialog V78 portal regression contract: OK")
           PY
