@@ -8,6 +8,9 @@ from .config import settings
 from .database import SessionLocal
 from .managed_relay_recovery_v20 import apply_managed_relay_recovery_v20
 from .modern_runtime_v18 import apply_modern_runtime_v18
+from .openvpn_fork_headroom_v101 import (
+    apply_openvpn_fork_headroom_v101,
+)
 from .protocol_dataplane_desired_state_v87 import (
     apply_protocol_dataplane_desired_state_v87,
 )
@@ -147,6 +150,18 @@ def apply_self_hosted_runtime(
     tunnels._install_or_upgrade_agent = (
         _self_hosted_install_or_upgrade_agent
     )
+
+    # ------------------------------------------------------------
+    # OpenVPN client-connect fork headroom V101
+    #
+    # Debian/Ubuntu's OpenVPN template may impose LimitNPROC=10. Since the
+    # managed OpenVPN worker and other services can share the nobody UID, that
+    # UID-global rlimit can make a valid client-connect hook fail with EAGAIN.
+    # Keep TasksMax/cgroup limits intact and converge only the managed OpenVPN
+    # instance during install/repair.
+    # ------------------------------------------------------------
+
+    apply_openvpn_fork_headroom_v101()
 
     # ------------------------------------------------------------
     # Logical tunnel lifecycle V21
