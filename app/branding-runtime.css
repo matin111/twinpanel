@@ -1,0 +1,86 @@
+:root{
+  --brand-primary:#7C3AED;
+  --brand-secondary:#4F46E5;
+}
+
+.primary{
+  background:linear-gradient(135deg,var(--brand-primary),color-mix(in srgb,var(--brand-primary) 70%,var(--brand-secondary)));
+  box-shadow:0 8px 22px color-mix(in srgb,var(--brand-primary) 24%,transparent);
+}
+.page-head small,.eyebrow{color:var(--brand-primary)}
+.card-head a{color:color-mix(in srgb,var(--brand-primary) 72%,white)}
+.badge.violet{
+  color:color-mix(in srgb,var(--brand-primary) 40%,white);
+  background:color-mix(in srgb,var(--brand-primary) 14%,transparent);
+  border-color:color-mix(in srgb,var(--brand-primary) 34%,transparent);
+}
+.theme-switch button.active{
+  background:color-mix(in srgb,var(--brand-primary) 28%,transparent);
+}
+
+.login-art{
+  background:
+    radial-gradient(circle at 40% 40%,color-mix(in srgb,var(--brand-primary) 16%,transparent),transparent 34%),
+    var(--surface2);
+}
+.planet{
+  background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--brand-secondary) 72%,white),color-mix(in srgb,var(--brand-primary) 82%,#171025) 38%,#09070e 72%);
+  border-color:color-mix(in srgb,var(--brand-primary) 42%,transparent);
+  box-shadow:0 0 70px color-mix(in srgb,var(--brand-primary) 28%,transparent),inset 0 0 35px color-mix(in srgb,var(--brand-secondary) 20%,transparent);
+}
+
+.tpStore{
+  --store-violet:var(--brand-primary);
+  --store-violet-2:var(--brand-secondary);
+  --store-violet-3:color-mix(in srgb,var(--brand-primary) 42%,white);
+  --store-line-strong:color-mix(in srgb,var(--brand-primary) 42%,#202b42);
+}
+.tpStoreBrand img{
+  filter:drop-shadow(0 6px 18px color-mix(in srgb,var(--brand-primary) 35%,transparent));
+}
+.tpStoreNavLinks a:after{background:var(--store-violet-3)}
+.tpStoreHeaderBuy,.tpStorePrimary,.tpStorePlanRibbon{
+  background:linear-gradient(135deg,var(--brand-secondary),var(--brand-primary) 58%,color-mix(in srgb,var(--brand-primary) 72%,#120826));
+  box-shadow:0 12px 32px color-mix(in srgb,var(--brand-primary) 28%,transparent);
+}
+.tpStorePrimary:hover,.tpStoreHeaderBuy:hover{
+  box-shadow:0 18px 42px color-mix(in srgb,var(--brand-primary) 38%,transparent);
+}
+.tpStorePill{
+  border-color:color-mix(in srgb,var(--brand-primary) 34%,transparent);
+  background:color-mix(in srgb,var(--brand-primary) 11%,transparent);
+  color:color-mix(in srgb,var(--brand-primary) 34%,white);
+}
+.tpStoreHero h1 em{
+  background:linear-gradient(95deg,color-mix(in srgb,var(--brand-secondary) 24%,white),color-mix(in srgb,var(--brand-primary) 44%,white) 50%,var(--brand-primary));
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+}
+.tpStoreHeroGlow{
+  background:radial-gradient(circle,color-mix(in srgb,var(--brand-primary) 24%,transparent),transparent 67%);
+}
+.tpStorePhonePower,.tpStorePower{
+  border-color:color-mix(in srgb,var(--brand-primary) 42%,transparent);
+  background:radial-gradient(circle,color-mix(in srgb,var(--brand-primary) 62%,white) 0%,var(--brand-primary) 55%,color-mix(in srgb,var(--brand-primary) 56%,#130626) 100%);
+  box-shadow:0 0 0 12px color-mix(in srgb,var(--brand-primary) 8%,transparent),0 0 40px color-mix(in srgb,var(--brand-primary) 48%,transparent);
+}
+.tpStorePlanCard.featured{
+  border-color:color-mix(in srgb,var(--brand-primary) 68%,#202b42);
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--brand-primary) 15%,transparent),0 25px 70px color-mix(in srgb,var(--brand-primary) 22%,transparent);
+}
+.tpStoreTrustStrip article>span{
+  background:color-mix(in srgb,var(--brand-primary) 14%,transparent);
+  color:color-mix(in srgb,var(--brand-primary) 40%,white);
+}
+
+html[data-theme="light"] .badge.violet{
+  color:color-mix(in srgb,var(--brand-primary) 80%,#19132a);
+  background:color-mix(in srgb,var(--brand-primary) 10%,white);
+  border-color:color-mix(in srgb,var(--brand-primary) 24%,white);
+}
+html[data-theme="light"] .login-art{
+  background:
+    radial-gradient(circle at 40% 40%,color-mix(in srgb,var(--brand-primary) 12%,transparent),transparent 34%),
+    #eef1f7;
+}
