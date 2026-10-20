@@ -11,7 +11,7 @@ const protocolLabel=(key:string)=>({cisco:"Cisco / OpenConnect",openvpn:"OpenVPN
 const valueOf=(row:RuntimeRow,...keys:string[])=>{for(const key of keys){const value=row[key];if(value!==undefined&&value!==null)return value;}return undefined;};
 const numberOf=(row:RuntimeRow,...keys:string[])=>{const raw=valueOf(row,...keys);const parsed=Number(String(raw??0).replace(/[,٬]/g,""));return Number.isFinite(parsed)?parsed:0;};
 const stringOf=(row:RuntimeRow,...keys:string[])=>String(valueOf(row,...keys)??"");
-const successfulPayment=(row:RuntimeRow)=>["paid","approved","verified","completed","fulfilled","success","successful"].includes(stringOf(row,"status","payment_status").toLowerCase());
+const successfulPayment=(row:RuntimeRow)=>["paid","approved","auto_verified","verified","completed","fulfilled","success","successful"].includes(stringOf(row,"status","payment_status").toLowerCase());
 
 function revenueSeries(payments:RuntimeRow[]){
   const now=new Date();
@@ -27,7 +27,7 @@ function revenueSeries(payments:RuntimeRow[]){
     const date=new Date(raw);if(Number.isNaN(date.getTime()))continue;
     const key=new Date(date.getFullYear(),date.getMonth(),date.getDate()).toISOString().slice(0,10);
     const item=map.get(key);if(!item)continue;
-    item.value+=numberOf(payment,"amount_toman","amount","final_amount_toman","total_toman");
+    item.value+=numberOf(payment,"payable_amount_toman","base_amount_toman","amount_toman","amount","final_amount_toman","total_toman");
   }
   return rows;
 }
@@ -44,7 +44,7 @@ function chartGeometry(series:ReturnType<typeof revenueSeries>){
 
 function paymentTitle(row:RuntimeRow,pick:(fa:string,en:string)=>string){
   const id=stringOf(row,"id")||"—";
-  const amount=numberOf(row,"amount_toman","amount","final_amount_toman","total_toman");
+  const amount=numberOf(row,"payable_amount_toman","base_amount_toman","amount_toman","amount","final_amount_toman","total_toman");
   return `${pick("پرداخت","Payment")} #${id}${amount?` · ${money(amount)}`:""}`;
 }
 
