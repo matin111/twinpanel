@@ -29,6 +29,19 @@ VERSION = "3.3.0"
 BASE = f"https://github.com/go-gost/gost/releases/download/v{VERSION}"
 FORWARD_PORT = 8421
 
+# TWINPANEL_GOST_PROFILE_CANARY_V81
+#
+# Production evidence on Tunnel #5 showed that relay+wss could establish the
+# outer TCP/WebSocket session while carrying zero TUN payload bytes. Keep the
+# documented WSS profile first, but fail over inside this *candidate install*
+# to a plain TLS data channel before the candidate is allowed to become
+# eligible for SmartAuto. A profile is accepted only after the common L3
+# canary passes peer ping in both directions plus TCP and UDP egress.
+PROFILE_ORDER: tuple[str, ...] = (
+    "relay+wss",
+    "relay+tls",
+)
+
 
 def _download(raw_arch: str) -> str:
     a = arch(raw_arch)
@@ -112,7 +125,131 @@ PY""",
     )
     if result.exit_status != 0:
         text = ((result.stdout or "") + "\n" + (result.stderr or "")).strip()
-        raise RuntimeError(f"gost_wss_tcp_preflight_failed: {text[-2000:] or 'connect_failed'}")
+        raise RuntimeError(
+            f"gost_profile_tcp_preflight_failed: {text[-2000:] or 'connect_failed'}"
+        )
+
+
+def _profile_label(profile: str) -> str:
+    if profile == "relay+wss":
+        return "WSS"
+    if profile == "relay+tls":
+        return "TLS"
+    raise ValueError(f"unsupported_gost_profile:{profile}")
+
+
+async def _reset_profile_runtime(ci, ce, rt: dict) -> None:
+    """Stop only this candidate's pair before trying another profile."""
+
+    await asyncio.gather(
+        ci.run(
+            f"""
+set +e
+systemctl stop {shlex.quote(str(rt['iran_service']))} >/dev/null 2>&1 || true
+ip link del {shlex.quote(str(rt['interface']))} >/dev/null 2>&1 || true
+true
+""",
+            check=False,
+            timeout=30,
+        ),
+        ce.run(
+            f"""
+set +e
+systemctl stop {shlex.quote(str(rt['exit_service']))} >/dev/null 2>&1 || true
+ip link del {shlex.quote(str(rt['interface']))} >/dev/null 2>&1 || true
+true
+""",
+            check=False,
+            timeout=30,
+        ),
+    )
+
+
+async def _install_profile_services(
+    ci,
+    ce,
+    *,
+    profile: str,
+    tunnel_id: int,
+    exit_public_ip: str,
+    rt: dict,
+) -> None:
+    """Render one documented GOST relay data-channel profile on both nodes."""
+
+    label = _profile_label(profile)
+    port = int(rt["port"])
+
+    await run(
+        ce,
+        f"""
+set -e
+cat > /etc/systemd/system/{shlex.quote(str(rt['exit_service']))} <<'EOF'
+[Unit]
+Description=TwinPanel GOST TUN/{label} {int(tunnel_id)} Exit
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/twinpanel-gost -L=tun://:{FORWARD_PORT}?net={rt['exit_addr']}&name={rt['interface']}&mtu=1360 -L={profile}://:{port}?bind=true
+Restart=always
+RestartSec=2
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable {shlex.quote(str(rt['exit_service']))} >/dev/null
+systemctl restart {shlex.quote(str(rt['exit_service']))}
+""",
+        f"gost_{label.lower()}_exit_install",
+        90,
+    )
+
+    await _wait_interface(
+        ce,
+        str(rt["interface"]),
+        str(rt["exit_service"]),
+        f"gost_{label.lower()}_exit",
+    )
+
+    await _raw_tcp_preflight(ci, str(exit_public_ip), port)
+
+    await run(
+        ci,
+        f"""
+set -e
+cat > /etc/systemd/system/{shlex.quote(str(rt['iran_service']))} <<'EOF'
+[Unit]
+Description=TwinPanel GOST TUN/{label} {int(tunnel_id)} Iran
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/twinpanel-gost -L=tun://:0/:{FORWARD_PORT}?net={rt['iran_addr']}&name={rt['interface']}&mtu=1360&keepAlive=true&ttl=10s -F={profile}://{exit_public_ip}:{port}?secure=false
+Restart=always
+RestartSec=2
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable {shlex.quote(str(rt['iran_service']))} >/dev/null
+systemctl restart {shlex.quote(str(rt['iran_service']))}
+""",
+        f"gost_{label.lower()}_iran_install",
+        90,
+    )
+
+    await _wait_interface(
+        ci,
+        str(rt["interface"]),
+        str(rt["iran_service"]),
+        f"gost_{label.lower()}_iran",
+    )
 
 
 async def install(tunnel_id: int, db: Session) -> dict:
@@ -122,6 +259,8 @@ async def install(tunnel_id: int, db: Session) -> dict:
     mark(db, tunnel_id, name, status="installing", meta=str(rt))
 
     ci = ce = None
+    attempts: list[dict[str, str]] = []
+
     try:
         ci, ce = await connect_pair(iran, exit_node, db)
         await asyncio.gather(prerequisites(ci), prerequisites(ce))
@@ -141,8 +280,8 @@ async def install(tunnel_id: int, db: Session) -> dict:
 
         port = int(rt["port"])
 
-        # Use GOST's documented TUN-over-WSS forward-chain form exactly.
-        # KeepAlive belongs to the TUN client, not to the WSS chain URL.
+        # One ownership-scoped TCP listener rule is sufficient for both WSS
+        # and TLS because profiles are tried sequentially on the same port.
         await run(
             ce,
             f"""
@@ -151,110 +290,89 @@ if command -v iptables >/dev/null 2>&1; then
   iptables -C INPUT -p tcp --dport {port} -s {shlex.quote(str(iran.public_ip))} -m comment --comment TwinPanel-GOST-{int(tunnel_id)} -j ACCEPT 2>/dev/null || \
   iptables -I INPUT -p tcp --dport {port} -s {shlex.quote(str(iran.public_ip))} -m comment --comment TwinPanel-GOST-{int(tunnel_id)} -j ACCEPT
 fi
-cat > /etc/systemd/system/{shlex.quote(rt['exit_service'])} <<'EOF'
-[Unit]
-Description=TwinPanel GOST TUN/WSS {int(tunnel_id)} Exit
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/twinpanel-gost -L=tun://:{FORWARD_PORT}?net={rt['exit_addr']}&name={rt['interface']}&mtu=1360 -L=relay+wss://:{port}?bind=true
-Restart=always
-RestartSec=2
-LimitNOFILE=1048576
-
-[Install]
-WantedBy=multi-user.target
-EOF
-systemctl daemon-reload
-systemctl enable {shlex.quote(rt['exit_service'])} >/dev/null
-systemctl restart {shlex.quote(rt['exit_service'])}
 """,
-            "gost_exit_install",
-            90,
+            "gost_firewall",
+            45,
         )
 
-        await _wait_interface(
-            ce,
-            str(rt["interface"]),
-            str(rt["exit_service"]),
-            "gost_exit",
+        for profile in PROFILE_ORDER:
+            try:
+                await _reset_profile_runtime(ci, ce, rt)
+                await _install_profile_services(
+                    ci,
+                    ce,
+                    profile=profile,
+                    tunnel_id=tunnel_id,
+                    exit_public_ip=str(exit_node.public_ip),
+                    rt=rt,
+                )
+
+                # Give the chain a short window to establish before the real
+                # peer/TCP/UDP canary sends traffic through the TUN device.
+                await asyncio.sleep(2)
+
+                health = await probe(
+                    ci,
+                    ce,
+                    name=name,
+                    tunnel_id=tunnel_id,
+                    rt=rt,
+                )
+
+                attempts.append(
+                    {
+                        "profile": profile,
+                        "result": "passed",
+                    }
+                )
+
+                meta = {
+                    **rt,
+                    **health,
+                    "version": VERSION,
+                    "carrier": profile,
+                    "selected_profile": profile,
+                    "profile_canary": "v81",
+                    "profile_attempts": attempts,
+                }
+                mark(
+                    db,
+                    tunnel_id,
+                    name,
+                    status="online",
+                    latency_ms=health["latency_ms"],
+                    meta=str(meta),
+                )
+                return {
+                    "ok": True,
+                    "transport": name,
+                    "runtime": rt,
+                    "probe": health,
+                    "version": VERSION,
+                    "carrier": profile,
+                    "selected_profile": profile,
+                    "profile_canary": "v81",
+                    "profile_attempts": attempts,
+                }
+
+            except Exception as profile_exc:
+                attempts.append(
+                    {
+                        "profile": profile,
+                        "result": "failed",
+                        "error": f"{type(profile_exc).__name__}: {profile_exc}"[-2500:],
+                    }
+                )
+
+        await _reset_profile_runtime(ci, ce, rt)
+        summary = "; ".join(
+            f"{item['profile']}={item['error']}"
+            for item in attempts
+            if item.get("result") == "failed"
         )
-
-        await _raw_tcp_preflight(ci, str(exit_node.public_ip), port)
-
-        await run(
-            ci,
-            f"""
-set -e
-cat > /etc/systemd/system/{shlex.quote(rt['iran_service'])} <<'EOF'
-[Unit]
-Description=TwinPanel GOST TUN/WSS {int(tunnel_id)} Iran
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/twinpanel-gost -L=tun://:0/:{FORWARD_PORT}?net={rt['iran_addr']}&name={rt['interface']}&mtu=1360&keepAlive=true&ttl=10s -F=relay+wss://{exit_node.public_ip}:{port}?secure=false
-Restart=always
-RestartSec=2
-LimitNOFILE=1048576
-
-[Install]
-WantedBy=multi-user.target
-EOF
-systemctl daemon-reload
-systemctl enable {shlex.quote(rt['iran_service'])} >/dev/null
-systemctl restart {shlex.quote(rt['iran_service'])}
-""",
-            "gost_iran_install",
-            90,
+        raise RuntimeError(
+            f"gost_all_profiles_failed: {summary or 'no_profile_passed'}"
         )
-
-        await _wait_interface(
-            ci,
-            str(rt["interface"]),
-            str(rt["iran_service"]),
-            "gost_iran",
-        )
-
-        # Give the forward-chain a short window to establish before the real
-        # peer/TCP/UDP probe sends traffic through the TUN device.
-        await asyncio.sleep(2)
-
-        health = await probe(
-            ci,
-            ce,
-            name=name,
-            tunnel_id=tunnel_id,
-            rt=rt,
-        )
-
-        meta = {
-            **rt,
-            **health,
-            "version": VERSION,
-            "carrier": "relay+wss",
-            "profile": "documented-forward-chain-v2",
-        }
-        mark(
-            db,
-            tunnel_id,
-            name,
-            status="online",
-            latency_ms=health["latency_ms"],
-            meta=str(meta),
-        )
-        return {
-            "ok": True,
-            "transport": name,
-            "runtime": rt,
-            "probe": health,
-            "version": VERSION,
-            "carrier": "relay+wss",
-            "profile": "documented-forward-chain-v2",
-        }
 
     except Exception as exc:
         iran_diag = (
@@ -269,6 +387,7 @@ systemctl restart {shlex.quote(rt['iran_service'])}
         )
         msg = (
             f"{type(exc).__name__}: {exc} | "
+            f"attempts={attempts!r} | "
             f"iran={iran_diag[-2500:]} | exit={exit_diag[-2500:]}"
         )
         mark(db, tunnel_id, name, status="failed", error=msg)
