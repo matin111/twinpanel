@@ -1,0 +1,66 @@
+name: TwinPanel Store Tutorial Backup Assets V124 Final
+
+on:
+  push:
+    branches:
+      - feat/store-tutorial-backup-v124-final
+    paths:
+      - '.tutorial-import-v124/READY'
+
+permissions:
+  contents: write
+
+jobs:
+  restore-tutorial-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/store-tutorial-backup-v124-final
+          fetch-depth: 0
+
+      - name: Restore 65 tutorial images from uploaded backup payload
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cat .tutorial-import-v124/part-* > /tmp/tutorial.b64
+          base64 -d /tmp/tutorial.b64 > /tmp/tutorial.tar.gz
+          echo '064048459dfa39f7a910edde34d1699b8d6f6053e7c689bdc1950f633582c5a6  /tmp/tutorial.tar.gz' | sha256sum -c -
+          test "$(tar -tzf /tmp/tutorial.tar.gz | grep -E '^screenshots/.+\.webp$' | wc -l | tr -d ' ')" = 65
+          if tar -tzf /tmp/tutorial.tar.gz | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+            echo 'unsafe archive path' >&2
+            exit 41
+          fi
+          rm -rf public/learning/screenshots
+          mkdir -p public/learning
+          tar -xzf /tmp/tutorial.tar.gz -C public/learning
+          test "$(find public/learning/screenshots -type f -name '*.webp' | wc -l | tr -d ' ')" = 65
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('lib/store-guide-content.ts')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace(
+              'const LEGACY_STEP_IMAGE_BASE="https://movilineapp.com/learning/screenshots";',
+              'const LEGACY_STEP_IMAGE_BASE="/learning/screenshots";'
+          )
+          pattern=r'export function storeGuideAppImage\(platform:StoreGuidePlatform,protocol:StoreGuideProtocol\):string\{.*?\n\}\n\nexport function storeGuideScreenshot'
+          replacement='export function storeGuideAppImage(platform:StoreGuidePlatform,protocol:StoreGuideProtocol):string{\n  void platform;\n  void protocol;\n  return "";\n}\n\nexport function storeGuideScreenshot'
+          s,count=re.subn(pattern,replacement,s,flags=re.S)
+          if count != 1:
+              raise SystemExit(f'app-image-function replacement count={count}')
+          if 'https://movilineapp.com/learning/' in s:
+              raise SystemExit('external tutorial asset URL still present')
+          p.write_text(s,encoding='utf-8')
+          PY
+
+      - name: Commit local tutorial assets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/learning/screenshots lib/store-guide-content.ts
+          git commit -m 'Bundle legacy storefront tutorial screenshots locally'
+          git push origin HEAD:feat/store-tutorial-backup-v124-final
