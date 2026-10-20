@@ -1,0 +1,28 @@
+name: TwinPanel OpenVPN Client Connect Exec V102
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/openvpn_fork_headroom_v101.py"
+      - "backend/tests/integration/test_openvpn_client_connect_exec_v102.py"
+      - ".github/workflows/openvpn-client-connect-exec-v102.yml"
+
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile OpenVPN runtime
+        run: python -m py_compile backend/app/openvpn_fork_headroom_v101.py
+
+      - name: Run client-connect execution regression
+        working-directory: backend
+        run: PYTHONPATH=. python tests/integration/test_openvpn_client_connect_exec_v102.py
