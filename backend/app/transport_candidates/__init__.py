@@ -12,7 +12,9 @@ from . import amnezia, common as _common, gost, gre, netrix, tp27_fast
 #
 # The previous experimental candidates remain understood only by the scoped
 # cleanup path so existing installations can remove their owned runtime. They
-# are no longer exposed, auto-installed, benchmarked, or selectable.
+# are no longer exposed or auto-installed. kernel_gre stays health-visible only
+# during make-before-break migration so SmartAuto does not drop the proven live
+# carrier before TP27 Fast is qualified and promoted.
 # ============================================================
 
 _LEGACY_SPECS = dict(_common.SPECS)
@@ -23,11 +25,18 @@ TP27_SPEC = {
 }
 
 # common.mark/probe resolve this module global at call time. Append TP27 to the
-# internal registry for those shared helpers, while exporting only TP27 as the
-# active product registry below.
+# internal registry for those shared helpers.
 _common.SPECS["tp27_fast"] = TP27_SPEC
 
+# SmartAuto/Unified-L3 compatibility registry during migration. Only TP27 is
+# installable and visible in the product catalog; kernel_gre is retained here
+# temporarily so the live pre-migration path remains health-checkable.
 SPECS = {
+    "kernel_gre": _LEGACY_SPECS["kernel_gre"],
+    "tp27_fast": TP27_SPEC,
+}
+
+ACTIVE_SPECS = {
     "tp27_fast": TP27_SPEC,
 }
 
@@ -39,8 +48,6 @@ def _tp27_runtime(tunnel_id: int) -> dict:
     """Deterministic /30 inside the TP27 10.253.0.0/16 carrier pool."""
 
     tid = max(int(tunnel_id), 1)
-    # /16 contains 16384 /30 networks. Tunnel IDs are persistent DB identities;
-    # using the ID keeps addressing deterministic across controller restarts.
     slot = tid % 16384
     base = slot * 4
     third = (base // 256) & 0xFF
@@ -79,9 +86,6 @@ def policy_ids(name: str, tunnel_id: int) -> tuple[int, int]:
     return _legacy_policy_ids(value, tunnel_id)
 
 
-# Shared helpers such as common.probe() and common.mark() resolve these globals
-# dynamically, so patching them once gives TP27 the same fail-closed probe while
-# preserving legacy cleanup semantics.
 _common.runtime = runtime
 _common.policy_ids = policy_ids
 # tp27_fast imported common.runtime by name during package import; point that
@@ -97,7 +101,7 @@ mark = _common.mark
 def catalog() -> list[dict]:
     return [
         {"transport": name, **spec}
-        for name, spec in SPECS.items()
+        for name, spec in ACTIVE_SPECS.items()
     ]
 
 
@@ -119,7 +123,7 @@ async def uninstall_transport(name: str, tunnel_id: int, db: Session):
 
     Legacy names stay accepted here solely so V91 can remove old GOST/AWG/
     Netrix/Kernel-GRE runtime after TP27 is proven active. They are not part of
-    SPECS/catalog and cannot be installed or selected again.
+    ACTIVE_SPECS/catalog and cannot be installed again.
     """
 
     name = str(name or "").strip().lower()
@@ -200,7 +204,6 @@ true
                 check=False,
             )
 
-        # Remove candidate-only source-policy state.
         await ci.run(
             f"""
 set +e
@@ -211,7 +214,6 @@ true
             check=False,
         )
 
-        # Remove the exact candidate /30 egress NAT ownership rule.
         exit_if = await default_interface(ce)
         nat_comment = f"TwinPanel-{name}-{int(tunnel_id)}"
         await ce.run(
@@ -347,8 +349,17 @@ true
         await close_pair(ci, ce)
 
 
+# Apply preserve-port behavior in both API and standalone manager processes as
+# soon as the transport candidate package is loaded. The reconciler itself is
+# started explicitly by tunnel_transport_manager_v12.
+from ..tp27_reference_runtime_v91 import apply_tp27_reference_runtime_v91
+
+apply_tp27_reference_runtime_v91()
+
+
 __all__ = [
     "SPECS",
+    "ACTIVE_SPECS",
     "catalog",
     "runtime",
     "policy_ids",
