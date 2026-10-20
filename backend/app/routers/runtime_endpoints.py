@@ -9,6 +9,7 @@ from ..deps import require_admin
 from ..domain_models import Domain, DomainType, SSLStatus
 from ..models import Subscription, SubscriptionStatus
 from ..quota_models import QuotaSession, QuotaUsageEvent
+from ..services.dashboard_revenue import dashboard_revenue
 from ..services.public_urls import api_base_url
 from .admin import dashboard_summary_v2
 
@@ -150,9 +151,15 @@ def runtime_endpoints(
     dependencies=[Depends(require_admin)],
 )
 def dashboard_summary_live_subscriptions(db: Session = Depends(get_db)):
-    """Admin dashboard summary with protocol-aware online subscriptions."""
+    """Admin dashboard summary with live state and canonical revenue."""
 
+    # This router is included before the legacy/admin-isolation routers and is
+    # therefore the production winner for this exact path. The legacy summary
+    # still supplies account/node/protocol counters, but its historical
+    # subscription-count `sales_*` values must never escape to the UI.
     payload = dict(dashboard_summary_v2(db))
+    payload.update(dashboard_revenue(db))
+
     online_subscriptions = len(_online_subscription_ids(db))
     payload["online_subscriptions"] = online_subscriptions
     payload["online_users"] = online_subscriptions

@@ -1,0 +1,309 @@
+name: TwinPanel Admin Dashboard Revenue V86
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/admin.py"
+      - "backend/app/routers/admin_user_isolation.py"
+      - "backend/app/routers/runtime_endpoints.py"
+      - "backend/app/services/dashboard_revenue.py"
+      - "backend/app/payment_models.py"
+      - "backend/app/routers/payments.py"
+      - "components/admin-dashboard-runtime.tsx"
+      - "lib/admin-dashboard-revenue.ts"
+      - ".github/workflows/admin-dashboard-revenue-v86.yml"
+  workflow_dispatch:
+
+jobs:
+  dashboard-revenue:
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: twinpanel
+          POSTGRES_PASSWORD: twinpanel_test
+          POSTGRES_DB: twinpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U twinpanel -d twinpanel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      APP_NAME: TwinPanel-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+      TWINPANEL_ADMIN_EMAIL: admin-ci@example.com
+      TWINPANEL_ADMIN_PASSWORD: TwinPanel-CI-Admin-2026!
+      TWINPANEL_ADMIN_NAME: TwinPanel CI Admin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Prepare runtime directories
+        run: |
+          sudo install -d -m 700 /etc/twinpanel
+          sudo install -d -m 700 /var/lib/twinpanel-backups
+          sudo install -d -m 750 /var/lib/twinpanel/payment-receipts
+          sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel /var/lib/twinpanel-backups
+
+      - name: Create schema and bootstrap admin
+        working-directory: backend
+        run: |
+          python -c 'from app.main import app; print("DASHBOARD_REVENUE_APP_IMPORT_OK", app.title)'
+          python scripts/bootstrap_admin.py
+
+      - name: Seed confirmed payments, excluded payment, and misleading subscriptions
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from datetime import datetime, timedelta
+
+          from app.database import SessionLocal
+          from app.models import Plan, Subscription, SubscriptionStatus, User
+          from app.payment_models import PaymentIntent
+          from app.security import hash_password
+          from app.store_models import StoreOrder
+
+          db = SessionLocal()
+          try:
+              user = User(
+                  id=860001,
+                  email="dashboard-revenue-v86@example.com",
+                  password_hash=hash_password("Dashboard-Revenue-V86!"),
+                  full_name="Dashboard Revenue V86",
+                  is_active=True,
+              )
+              plan = Plan(
+                  id=860001,
+                  name="Dashboard Revenue V86 Plan",
+                  duration_days=30,
+                  traffic_gb=10,
+                  device_limit=1,
+                  price_toman=120000,
+                  is_active=True,
+              )
+              db.add_all([user, plan])
+              db.flush()
+
+              now = datetime.utcnow() - timedelta(minutes=2)
+              old = datetime.utcnow() - timedelta(days=45)
+
+              payment_specs = [
+                  (860001, "approved", 120000, 120321, now),
+                  (860002, "auto_verified", 75000, None, now),
+                  (860003, "awaiting_review", 999999, 999999, now),
+                  (860004, "approved", 500000, 500000, old),
+              ]
+
+              for order_id, status, base, payable, verified_at in payment_specs:
+                  order = StoreOrder(
+                      id=order_id,
+                      user_id=user.id,
+                      plan_id=plan.id,
+                      amount_toman=int(payable or base),
+                      base_amount_toman=base,
+                      discount_amount_toman=0,
+                      requested_protocols=[],
+                      status=("paid" if status in {"approved", "auto_verified"} else "awaiting_review"),
+                      idempotency_key=f"dashboard-revenue-v86-{order_id}",
+                  )
+                  db.add(order)
+                  db.flush()
+
+                  intent = PaymentIntent(
+                      id=order_id,
+                      order_id=order.id,
+                      user_id=user.id,
+                      method="card_to_card",
+                      status=status,
+                      base_amount_toman=base,
+                      payable_amount_toman=payable,
+                      verified_at=(verified_at if status in {"approved", "auto_verified"} else None),
+                      submitted_at=now,
+                  )
+                  db.add(intent)
+
+              # These rows reproduce the production symptom. The old backend
+              # returned this subscription count as sales money (for example,
+              # two starts became "2 تومان"). They must not affect revenue.
+              for offset in range(3):
+                  db.add(
+                      Subscription(
+                          id=860101 + offset,
+                          user_id=user.id,
+                          plan_id=plan.id,
+                          status=SubscriptionStatus.ACTIVE,
+                          starts_at=now,
+                          traffic_limit_bytes=10 * 1024**3,
+                          traffic_used_bytes=0,
+                      )
+                  )
+
+              db.commit()
+              print("DASHBOARD_REVENUE_V86_SEED_OK")
+          finally:
+              db.close()
+          PY
+
+      - name: Start API
+        working-directory: backend
+        run: |
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8095 > /tmp/twinpanel-dashboard-revenue-v86.log 2>&1 &
+          echo $! > /tmp/twinpanel-dashboard-revenue-v86.pid
+
+      - name: Wait for API
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8095/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/twinpanel-dashboard-revenue-v86.log
+          exit 1
+
+      - name: Verify live dashboard returns Toman revenue, not subscription counts
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          import httpx
+
+          base = "http://127.0.0.1:8095"
+          client = httpx.Client(base_url=base, timeout=15.0)
+
+          login = client.post(
+              "/v1/auth/login",
+              json={
+                  "email": "admin-ci@example.com",
+                  "password": "TwinPanel-CI-Admin-2026!",
+              },
+          )
+          login.raise_for_status()
+          token = login.json().get("access_token")
+          assert token, login.text
+          headers = {"Authorization": f"Bearer {token}"}
+
+          response = client.get(
+              "/v1/admin/dashboard-summary",
+              headers=headers,
+          )
+          response.raise_for_status()
+          payload = response.json()
+
+          expected = 120321 + 75000
+          assert payload["sales_today"] == expected, payload
+          assert payload["sales_week"] == expected, payload
+          assert payload["sales_month"] == expected, payload
+
+          # Strong regression proof: three subscriptions started today, but the
+          # dashboard must expose 195321 Toman, never the count 3.
+          assert payload["sales_today"] != 3, payload
+
+          payments = client.get(
+              "/v1/payments/admin/intents",
+              headers=headers,
+          )
+          payments.raise_for_status()
+          rows = {row["id"]: row for row in payments.json()}
+          assert rows[860001]["payable_amount_toman"] == 120321, rows[860001]
+          assert rows[860002]["base_amount_toman"] == 75000, rows[860002]
+          assert rows[860002]["payable_amount_toman"] is None, rows[860002]
+          assert rows[860002]["status"] == "auto_verified", rows[860002]
+          assert rows[860003]["status"] == "awaiting_review", rows[860003]
+
+          print("DASHBOARD_REVENUE_V86_LIVE_API_OK", payload)
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional
+          else
+            npm install --include=optional --no-audit --no-fund
+          fi
+
+      - name: Execute the production revenue adapter
+        run: |
+          node --experimental-strip-types --input-type=module <<'JS'
+          import assert from "node:assert/strict";
+          import {
+            dashboardPaymentAmount,
+            revenueSeries,
+            successfulDashboardPayment,
+          } from "./lib/admin-dashboard-revenue.ts";
+
+          const now = new Date("2026-10-20T12:00:00Z");
+          const payments = [
+            {
+              id: 1,
+              status: "approved",
+              payable_amount_toman: 120321,
+              base_amount_toman: 120000,
+              verified_at: "2026-10-20T08:00:00Z",
+            },
+            {
+              id: 2,
+              status: "auto_verified",
+              payable_amount_toman: null,
+              base_amount_toman: 75000,
+              verified_at: "2026-10-20T09:00:00Z",
+            },
+            {
+              id: 3,
+              status: "awaiting_review",
+              payable_amount_toman: 999999,
+              base_amount_toman: 999999,
+              verified_at: "2026-10-20T09:00:00Z",
+            },
+          ];
+
+          assert.equal(successfulDashboardPayment(payments[0]), true);
+          assert.equal(successfulDashboardPayment(payments[1]), true);
+          assert.equal(successfulDashboardPayment(payments[2]), false);
+          assert.equal(dashboardPaymentAmount(payments[0]), 120321);
+          assert.equal(dashboardPaymentAmount(payments[1]), 75000);
+
+          const series = revenueSeries(payments, now);
+          assert.equal(series.at(-1).value, 195321, series);
+          console.log("DASHBOARD_REVENUE_V86_FRONTEND_ADAPTER_OK");
+          JS
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Show API log on failure
+        if: failure()
+        run: cat /tmp/twinpanel-dashboard-revenue-v86.log 2>/dev/null || true
