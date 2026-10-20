@@ -1,0 +1,70 @@
+name: Branding Persistence V121
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/branding.py"
+      - "components/branding-settings.tsx"
+      - "lib/branding.tsx"
+      - "lib/branding-api.ts"
+      - "app/branding-theme.css"
+      - "app/admin-shell-final.css"
+      - "app/layout.tsx"
+      - ".github/workflows/branding-persistence-v121.yml"
+
+jobs:
+  branding:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile branding backend
+        run: python -m py_compile backend/app/routers/branding.py
+
+      - name: Verify branding persistence contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          backend = Path("backend/app/routers/branding.py").read_text()
+          provider = Path("lib/branding.tsx").read_text()
+          api = Path("lib/branding-api.ts").read_text()
+          page = Path("components/branding-settings.tsx").read_text()
+          theme = Path("app/branding-theme.css").read_text()
+          admin_shell = Path("app/admin-shell-final.css").read_text()
+
+          assert 'prefix="/v1/settings/branding"' in backend
+          assert '@router.post("/assets/{kind}")' in backend
+          assert '@router.delete("/assets/{kind}")' in backend
+          assert 'branding_asset_invalid_image' in backend
+          assert 'MAX_LOGO_BYTES = 4 * 1024 * 1024' in backend
+          assert 'localStorage' not in provider
+          assert 'brandingApi.get()' in provider
+          assert 'replaceBrand' in provider
+          assert 'uploadAsset' in api and 'deleteAsset' in api
+          assert 'type="file"' in page
+          assert 'supportLink' not in page
+          assert 'tagline' not in page
+          assert '/admin/store-settings' in page
+          assert '--brand-primary' in theme and '--brand-secondary' in theme
+          assert '--admin-accent:var(--brand-primary' in admin_shell
+          print("BRANDING_V121_CONTRACT_OK")
+          PY
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
