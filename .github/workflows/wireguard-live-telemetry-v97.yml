@@ -1,0 +1,52 @@
+name: WireGuard Live Telemetry V97
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/wireguard_live_telemetry_v97.py'
+      - 'backend/app/routers/public_connection_live_v4.py'
+      - 'backend/tests/integration/test_wireguard_live_telemetry_v97.py'
+      - '.github/workflows/wireguard-live-telemetry-v97.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile changed Python files
+        run: |
+          python -m py_compile \
+            backend/app/wireguard_live_telemetry_v97.py \
+            backend/app/routers/public_connection_live_v4.py \
+            backend/tests/integration/test_wireguard_live_telemetry_v97.py
+
+      - name: Run parser regression without external dependencies
+        env:
+          PYTHONPATH: backend
+        run: |
+          python - <<'PY'
+          from app.wireguard_live_telemetry_v97 import (
+              _client_ip,
+              parse_wireguard_dump,
+              peer_is_live,
+          )
+
+          assert _client_ip('[Interface]\nAddress = 10.93.0.18/32\n') == '10.93.0.18'
+
+          now = 1_800_000_000
+          dump = (
+              'server-private\tserver-public\t22005\toff\n'
+              'peer-public\t(none)\t10.253.0.21:39561\t'
+              '10.93.0.18/32\t1799999978\t95037020\t343805980\t25\n'
+          )
+          peer = parse_wireguard_dump(dump, now_epoch=now)['10.93.0.18']
+          assert peer['handshake_age_seconds'] == 22
+          assert peer_is_live(peer) is True
+          print('WIREGUARD_LIVE_TELEMETRY_V97_SMOKE=PASS')
+          PY
