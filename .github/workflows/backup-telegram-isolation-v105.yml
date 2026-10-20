@@ -1,0 +1,59 @@
+name: Backup Telegram Isolation V105
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert dedicated backup bot contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          service = Path('backend/app/backup_service.py').read_text(encoding='utf-8')
+          credentials = Path('backend/app/backup_telegram_credentials.py').read_text(encoding='utf-8')
+          router = Path('backend/app/routers/backups.py').read_text(encoding='utf-8')
+          api = Path('lib/admin-parity-api.ts').read_text(encoding='utf-8')
+          ui = Path('components/backups-full-runtime.tsx').read_text(encoding='utf-8')
+
+          assert 'from .backup_telegram_credentials import load_backup_telegram_bot_token as load_bot_token' in service
+          assert 'from .routers.telegram_manager import load_bot_token' not in service
+
+          assert 'TWINPANEL_BACKUP_TELEGRAM_CREDENTIALS_V1' in credentials
+          assert 'backup-telegram-token.enc' in credentials
+          assert 'Fernet' in credentials
+          assert 'getMe' in credentials
+
+          assert '@router.get("/telegram-bot")' in router
+          assert '@router.put("/telegram-bot")' in router
+          assert '@router.delete("/telegram-bot")' in router
+          assert 'backup_telegram_bot_status' in router
+
+          assert 'backupTelegramSaveToken' in api
+          assert 'backupTelegramDeleteToken' in api
+          assert 'backupVerifyTelegram' in api
+          assert 'telegram_bot?:BackupTelegramBotStatus' in api
+
+          assert 'ربات اختصاصی بکاپ' in ui
+          assert 'هیچ وابستگی به ربات فروش ندارد' in ui
+          assert 'backupTelegramSaveToken' in ui
+          assert 'backupTelegramDeleteToken' in ui
+          assert 'backupVerifyTelegram(chatId)' in ui
+          assert 'parityApi.backupTestTelegram' not in ui
+          PY
+
+      - name: Compile backup backend modules
+        run: |
+          python3 -m py_compile \
+            backend/app/backup_service.py \
+            backend/app/backup_telegram_credentials.py \
+            backend/app/routers/backups.py
