@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.116",
+  "version": "1.1.0-rc.117",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-20T20:00:57Z",
+  "released_at": "2026-10-20T20:13:10Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e0e764f2bbf2f48ba6d3557a73b14d09ec0a51a2",
+  "source_sha": "982c96f14645a1cbb50142a911ee9a24addf3638",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.116/twinpanel-1.1.0-rc.116-linux-x86_64.tar.gz",
-    "sha256": "7ff1db6592d28faae2f745b6c964ee87e3f51cf278d12e26af18f83a8fee0e33",
-    "size_bytes": 13045934
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.117/twinpanel-1.1.0-rc.117-linux-x86_64.tar.gz",
+    "sha256": "0c678889ad487e356d03f0623ffb5226809166e92a32470b1bfaedc8569349be",
+    "size_bytes": 13054132
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.116 بازخورد عملیاتی دکمه‌های صفحه راه‌اندازی نود را اصلاح می‌کند. دکمه‌های Repair پروتکل‌ها، بررسی سلامت، ریستارت سرویس، ارتقای Agent، نصب/وضعیت Fabric و ذخیره/آماده‌سازی SSL دامنه Xray هنگام اجرای عملیات وضعیت در حال اجرا و زمان سپری‌شده را نشان می‌دهند و پاسخ‌های HTTP 200 که در payload مقدار ok=false دارند دیگر به‌اشتباه موفق نمایش داده نمی‌شوند. پیام detail/message واقعی Backend نیز در بازخورد همان عملیات نمایش داده می‌شود. Backend/API/Auth/Provisioning/Quota/Payment/VPN/Tunnel و منطق اجرای خود پروتکل‌ها تغییر نکرده‌اند. CI اختصاصی Admin Operation Feedback، Build رابط، API Build و Smokeهای مرتبط پاس شده‌اند. Production acceptance پس از Update روی سرور تست 217.179.6.142 و تست واقعی دکمه‌های /admin/provision انجام می‌شود.",
-    "en": "TwinPanel 1.1.0-rc.116 corrects operational feedback for existing-node actions on the provisioning page. Protocol Repair, health checks, service restart, Agent upgrade, Fabric install/status, and Xray domain/TLS actions now show an in-progress state with elapsed time, and HTTP 200 responses carrying payload ok=false are no longer misreported as successful. Backend detail/message text is surfaced in the operation feedback. Backend/API/Auth/Provisioning/Quota/Payment/VPN/Tunnel behavior and protocol execution logic are unchanged. Dedicated Admin Operation Feedback CI, UI build, API build, and related smoke checks passed. Production acceptance follows after updating 217.179.6.142 and validating the real /admin/provision buttons."
+    "fa": "TwinPanel 1.1.0-rc.117 مشکل نامحدود ثبت‌شدن اشتراک‌های حجمی خریداری‌شده از فروشگاه کاربر و ربات فروش اصلی را اصلاح می‌کند. علت، منتقل‌نشدن traffic_gb و duration_days پلن هنگام Fulfill سفارش Store بود که باعث ذخیره traffic_limit_bytes=0 می‌شد. از این نسخه، حجم و مدت واقعی پلن هنگام ساخت اشتراک منتقل می‌شود؛ پلن‌هایی که صراحتاً 0GB تعریف شده‌اند همچنان طبق قرارداد قبلی نامحدود باقی می‌مانند. مسیر Production ربات نماینده نیز Audit شد: سفارش نماینده حجم و مدت را Snapshot می‌کند و همان مقادیر را از owned_v3 تا Subscription Factory حفظ می‌کند. CI اختصاصی Purchase Entitlement Regression این سه مسیر را پوشش می‌دهد. Payment، Quota، Provisioning، VPN/Tunnel، Bot Token و خرید فقط با رسید تغییر نکرده‌اند. Production acceptance پس از Update سرور تست و خرید واقعی یک پلن حجمی از پنل کاربر، ربات اصلی و ربات نماینده انجام می‌شود.",
+    "en": "TwinPanel 1.1.0-rc.117 fixes finite-volume subscriptions being stored as unlimited when purchased through the customer Store or the main sales Telegram bot. Store fulfillment previously omitted the Plan traffic_gb and duration_days values, causing traffic_limit_bytes=0. This release carries the Plan's actual traffic and duration into subscription creation while preserving the existing explicit 0GB = unlimited contract. The production reseller-bot path was also audited: reseller orders snapshot traffic and duration and preserve those values through owned_v3 into the Subscription Factory. Dedicated Purchase Entitlement Regression CI now covers the customer Store, main Telegram bot, and production reseller owned-plan chain. Payment, Quota, Provisioning, VPN/Tunnel, Bot Token isolation, and receipt-only purchase behavior are unchanged. Production acceptance follows after updating the test server and making real finite-plan purchases through all three paths."
   }
 }
