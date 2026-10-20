@@ -20,6 +20,15 @@ from . import vpn_access_dataplane_v46
 # temporarily-offline telemetry cannot tear down the data plane. This mirrors
 # the proven TP27 model where configured port mappings remain installed while
 # transport/service health is measured independently.
+#
+# TWINPANEL_XRAY_PUBLIC_PROFILE_ROUTE_RESTORE_V109
+# V87 originally rebuilt the service-route list from scratch and reduced Xray
+# to one generic legacy V2Ray route. The customer Xray policy later filters that
+# legacy row from normal admin/customer cards, so all three approved public
+# profiles disappeared from the tunnel dialog and Unified L3 no longer received
+# their dedicated Iran ingress routes. Keep the generic legacy route for old
+# clients/rollback, then add the exact customer-policy profiles as desired-state
+# routes without consulting transient protocol health.
 # ============================================================
 
 _RUNTIME_APPLIED = False
@@ -61,6 +70,61 @@ def _configured_protocols(db, node_id: int) -> dict[str, NodeProtocolConfig]:
         protocol = _normalise_protocol(row.protocol)
         if protocol:
             output[protocol] = row
+    return output
+
+
+def _xray_public_profile_routes_v109(
+    exit_node: Node,
+    exit_tunnel_ip: str,
+    cfg: NodeProtocolConfig,
+) -> list[dict]:
+    """Restore the current customer-safe Xray routes after the V87 rebuild.
+
+    Imports are intentionally lazy so the historical V87 module does not alter
+    Xray runtime import ordering. By the time this route builder is executed,
+    self_hosted_runtime has already registered TCP-TLS in PROFILE_META and
+    applied the final customer policy.
+    """
+
+    from . import xray_customer_profile_policy_v30, xray_modern_runtime
+
+    required_profiles = set(
+        xray_customer_profile_policy_v30._required_profiles_v30(exit_node)
+    )
+    if not required_profiles:
+        return []
+
+    base_port = int(
+        cfg.port
+        or tunnels._SERVICE_DEFAULT_PORT["v2ray"]
+    )
+
+    output: list[dict] = []
+    for profile in xray_customer_profile_policy_v30.PUBLIC_PROFILE_ORDER:
+        if profile not in required_profiles:
+            continue
+        if profile not in xray_modern_runtime.PROFILE_META:
+            # Keep legacy ingress available rather than breaking every service
+            # route if a future Xray composition is only partially applied.
+            continue
+
+        output.append({
+            "protocol": "v2ray",
+            "profile": profile,
+            "exit_node_id": int(exit_node.id),
+            "public_port": xray_modern_runtime._public_port(
+                int(exit_node.id),
+                profile,
+            ),
+            "target_ip": exit_tunnel_ip,
+            "target_port": xray_modern_runtime._target_port(
+                base_port,
+                profile,
+            ),
+            "transport": "tcp",
+            "client_subnet": None,
+        })
+
     return output
 
 
@@ -117,6 +181,15 @@ def _service_routes_for_exit_v87(
             "transport": transport,
             "client_subnet": tunnels._SERVICE_CLIENT_SUBNET[protocol],
         })
+
+        if protocol == "v2ray":
+            output.extend(
+                _xray_public_profile_routes_v109(
+                    exit_node,
+                    exit_tunnel_ip,
+                    cfg,
+                )
+            )
 
     return output
 
@@ -240,6 +313,7 @@ def apply_protocol_dataplane_desired_state_v87() -> None:
         "ingress_authority=config+node_enable "
         "egress_authority=config+node_enable "
         "telemetry_status_authority=0 "
+        "xray_public_profiles=restored_v109 "
         "protocols=cisco,openvpn,wireguard,l2tp,v2ray",
         flush=True,
     )

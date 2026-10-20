@@ -8,6 +8,7 @@ BACKEND = Path(__file__).resolve().parents[2]
 POLICY_PATH = BACKEND / "app" / "protocol_dataplane_desired_state_v87.py"
 SELF_HOSTED_PATH = BACKEND / "app" / "self_hosted_runtime.py"
 MANAGER_PATH = BACKEND / "app" / "tunnel_transport_manager_v12.py"
+XRAY_POLICY_PATH = BACKEND / "app" / "xray_customer_profile_policy_v30.py"
 
 
 def _function_source(source: str, tree: ast.AST, name: str) -> str:
@@ -26,6 +27,7 @@ def main() -> None:
     policy = POLICY_PATH.read_text(encoding="utf-8")
     self_hosted = SELF_HOSTED_PATH.read_text(encoding="utf-8")
     manager = MANAGER_PATH.read_text(encoding="utf-8")
+    xray_policy = XRAY_POLICY_PATH.read_text(encoding="utf-8")
     tree = ast.parse(policy)
 
     # Desired state must be explicit at the Node level. A stale telemetry row
@@ -41,6 +43,7 @@ def main() -> None:
 
     for function_name in (
         "_service_routes_for_exit_v87",
+        "_xray_public_profile_routes_v109",
         "_l2tp_routes_for_exit_v87",
         "_enabled_access_protocols_v87",
     ):
@@ -57,7 +60,8 @@ def main() -> None:
     assert "NodeProtocolConfig.status" not in l2tp_primary
     assert "Tunnel.status == TunnelStatus.ONLINE" in l2tp_primary
 
-    # Preserve the existing protocol-specific ingress behavior.
+    # Preserve the existing protocol-specific ingress behavior, including the
+    # historical generic V2Ray route used by old links/rollback.
     service_routes = _function_source(
         policy,
         tree,
@@ -73,8 +77,44 @@ def main() -> None:
         'transport = "tcp"',
         "_service_public_port",
         "_SERVICE_CLIENT_SUBNET",
+        "_xray_public_profile_routes_v109",
+        "output.extend",
     ):
         assert token in service_routes, token
+
+    # Root-cause regression: V87 must not collapse Xray to only the generic
+    # legacy route. Reuse the final customer policy as the single source of
+    # truth and materialize its three approved public profiles with their
+    # dedicated Iran public ports and Exit target ports.
+    xray_routes = _function_source(
+        policy,
+        tree,
+        "_xray_public_profile_routes_v109",
+    )
+    for token in (
+        "TWINPANEL_XRAY_PUBLIC_PROFILE_ROUTE_RESTORE_V109",
+        "xray_customer_profile_policy_v30._required_profiles_v30",
+        "xray_customer_profile_policy_v30.PUBLIC_PROFILE_ORDER",
+        "xray_modern_runtime.PROFILE_META",
+        "xray_modern_runtime._public_port",
+        "xray_modern_runtime._target_port",
+        '"protocol": "v2ray"',
+        '"profile": profile',
+        '"transport": "tcp"',
+        '"client_subnet": None',
+    ):
+        assert token in policy or token in xray_routes, token
+
+    for token in (
+        '"websocket_tls"',
+        '"httpupgrade_tls"',
+        "PROFILE_TCP_TLS",
+    ):
+        assert token in xray_policy, token
+
+    assert "HIDDEN_ROUTED_PROFILES" in xray_policy
+    assert '"legacy"' in xray_policy
+    assert "if profile not in PUBLIC_PROFILE_IDS" in xray_policy
 
     l2tp_routes = _function_source(
         policy,
@@ -103,8 +143,8 @@ def main() -> None:
         assert token in apply_source, token
 
     # V49 captures the route builders when apply_unified_l3_core_v49() runs,
-    # so V87 must be activated before that capture in both API and manager
-    # processes through apply_self_hosted_runtime().
+    # so V87 (including the V109 Xray refinement) must be activated before that
+    # capture in both API and manager processes through apply_self_hosted_runtime().
     v87_pos = self_hosted.index("apply_protocol_dataplane_desired_state_v87()")
     v49_pos = self_hosted.index("apply_unified_l3_core_v49()")
     assert v87_pos < v49_pos
@@ -114,7 +154,7 @@ def main() -> None:
     assert "vpn_access_dataplane_loop()" in manager
     assert "twinpanel-vpn-access-dataplane-v46" in manager
 
-    print("PROTOCOL_DATAPLANE_DESIRED_STATE_V87_OK")
+    print("PROTOCOL_DATAPLANE_DESIRED_STATE_V87_XRAY_V109_OK")
 
 
 if __name__ == "__main__":
