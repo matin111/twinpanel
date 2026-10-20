@@ -8,6 +8,7 @@ import {normalizeStorefrontSettings} from "../lib/storefront-config";
 import {
   normalizeStoreTemplateOptions,
   storeTemplateOptionDefinition,
+  type StoreTemplateOptionDefinition,
   type StoreTemplateOptionField,
   type StoreTemplateOptionMap,
 } from "../lib/store-template-options";
@@ -32,11 +33,29 @@ type Props={
   onClose:()=>void;
 };
 
+function inheritedTemplateDraft(
+  templateId:string,
+  definition:StoreTemplateOptionDefinition,
+  sharedRaw:unknown,
+):StoreTemplateOptionMap{
+  const draft=normalizeStoreTemplateOptions(templateId,{});
+  const shared=normalizeStorefrontSettings(sharedRaw) as unknown as Record<string,unknown>;
+  for(const [key,fallback] of Object.entries(definition.defaults)){
+    if(key in shared)draft[key]=shared[key] as string|number|boolean|string[];
+    if(typeof fallback==="string"){
+      const localizedKey=`${key}_en`;
+      if(localizedKey in shared&&typeof shared[localizedKey]==="string")draft[localizedKey]=shared[localizedKey] as string;
+    }
+  }
+  return draft;
+}
+
 export function StoreTemplateCustomizer({templateId,onClose}:Props){
   const {pick}=useI18n();
   const definition=useMemo(()=>storeTemplateOptionDefinition(templateId),[templateId]);
   const [locale,setLocale]=useState<"fa"|"en">("fa");
   const [draft,setDraft]=useState<StoreTemplateOptionMap>({});
+  const [hasSavedCustomization,setHasSavedCustomization]=useState(false);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
@@ -53,19 +72,12 @@ export function StoreTemplateCustomizer({templateId,onClose}:Props){
         ]);
         if(!active)return;
         const raw=envelope.templates?.[templateId]||{};
-        const normalized=normalizeStoreTemplateOptions(templateId,raw);
-        if(Object.keys(raw).length===0&&definition){
-          const shared=normalizeStorefrontSettings(sharedRaw) as unknown as Record<string,unknown>;
-          for(const [key,fallback] of Object.entries(definition.defaults)){
-            if(key in shared)normalized[key]=shared[key] as string|number|boolean|string[];
-            if(typeof fallback==="string"){
-              const localizedKey=`${key}_en`;
-              if(localizedKey in shared&&typeof shared[localizedKey]==="string")normalized[localizedKey]=shared[localizedKey] as string;
-            }
-          }
-          setDraft(normalized);
+        const customized=Object.keys(raw).length>0;
+        setHasSavedCustomization(customized);
+        if(!customized&&definition){
+          setDraft(inheritedTemplateDraft(templateId,definition,sharedRaw));
         }else{
-          setDraft({...normalized,...raw} as StoreTemplateOptionMap);
+          setDraft({...normalizeStoreTemplateOptions(templateId,raw),...raw} as StoreTemplateOptionMap);
         }
       }catch(reason){
         if(active)setError(reason instanceof Error?reason.message:String(reason));
@@ -88,19 +100,29 @@ export function StoreTemplateCustomizer({templateId,onClose}:Props){
     setBusy(true);setError("");setOk("");
     try{
       await saveStoreTemplateSettings(templateId,draft as unknown as Record<string,unknown>);
-      setOk(pick("تنظیمات همین قالب ذخیره شد.","This template's settings were saved."));
+      setHasSavedCustomization(true);
+      setOk(pick("تنظیمات مستقل همین قالب ذخیره شد.","This template's independent settings were saved."));
       window.setTimeout(()=>setOk(""),3000);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy(false);}
   };
 
-  const reset=async()=>{
-    if(busy||!window.confirm(pick("تنظیمات این قالب به حالت پیش‌فرض خودش برگردد؟","Reset this template to its own defaults?")))return;
+  const removeCustomization=async()=>{
+    if(busy||!hasSavedCustomization)return;
+    if(!window.confirm(pick(
+      "تنظیمات اختصاصی این قالب حذف شود و قالب دوباره از تنظیمات عمومی فروشگاه ارث‌بری کند؟",
+      "Remove this template's custom settings and make it inherit the shared storefront settings again?",
+    )))return;
     setBusy(true);setError("");setOk("");
     try{
       await resetStoreTemplateSettings(templateId);
-      setDraft(normalizeStoreTemplateOptions(templateId,{}));
-      setOk(pick("تنظیمات قالب به پیش‌فرض خودش برگشت.","Template settings were reset to its own defaults."));
+      const sharedRaw=await parityApi.storefrontSettings();
+      setDraft(inheritedTemplateDraft(templateId,definition,sharedRaw));
+      setHasSavedCustomization(false);
+      setOk(pick(
+        "شخصی‌سازی این قالب حذف شد؛ اکنون از تنظیمات عمومی فروشگاه ارث‌بری می‌کند.",
+        "This template's customization was removed; it now inherits the shared storefront settings.",
+      ));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy(false);}
   };
@@ -139,12 +161,19 @@ export function StoreTemplateCustomizer({templateId,onClose}:Props){
       </div>
       <div className={styles.headerActions}>
         <button type="button" onClick={onClose}>{pick("بستن","Close")}</button>
-        <button type="button" onClick={()=>void reset()} disabled={busy}>{pick("بازنشانی پیش‌فرض","Reset defaults")}</button>
+        <button type="button" onClick={()=>void removeCustomization()} disabled={busy||!hasSavedCustomization}>{pick("حذف شخصی‌سازی","Remove customization")}</button>
         <Link href="/store" target="_blank">{pick("مشاهده فروشگاه","Open storefront")} ↗</Link>
         <button type="button" className={styles.primary} onClick={()=>void save()} disabled={busy}>{busy?"…":pick("ذخیره قالب","Save template")}</button>
       </div>
     </div>
-    <div className={styles.notice}>{pick("اطلاعات تجاری زنده مثل پلن‌ها، قیمت، حجم، مدت، دستگاه‌ها و مسیر خرید همچنان از Backend می‌آیند. چیزی که اینجا ذخیره می‌شود لایه نمایش و محتوای اختصاصی همین قالب است.","Live business data such as plans, prices, traffic, duration, devices and purchase flow still comes from the backend. This customizer stores only the presentation and template-specific content layer.")}</div>
+    <div className={styles.notice}>{pick(
+      hasSavedCustomization
+        ?"این قالب اکنون تنظیمات مستقل خودش را دارد. اطلاعات تجاری زنده مثل پلن‌ها، قیمت، حجم، مدت، دستگاه‌ها و مسیر خرید همچنان از Backend می‌آیند."
+        :"این قالب هنوز شخصی‌سازی مستقل ذخیره‌شده ندارد و از تنظیمات عمومی فروشگاه ارث‌بری می‌کند. با «ذخیره قالب» یک نسخه مستقل برای همین قالب ساخته می‌شود.",
+      hasSavedCustomization
+        ?"This template currently has its own independent settings. Live business data such as plans, prices, traffic, duration, devices and purchase flow still comes from the backend."
+        :"This template has no saved independent customization yet and currently inherits the shared storefront settings. Saving creates an isolated configuration for this template.",
+    )}</div>
     {error&&<div className={styles.error}>{error}</div>}
     {ok&&<div className={styles.success}>{ok}</div>}
     {loading?<div className={styles.loading}>{pick("در حال دریافت تنظیمات قالب...","Loading template settings...")}</div>:<>
