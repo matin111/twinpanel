@@ -4,7 +4,7 @@ import asyncio
 
 from . import tunnel_transport_manager_v10 as v10
 from .legacy_ingress_reconciler import reconciler_loop as legacy_ingress_loop
-from .runtime_reconciler_v3 import reconciler_loop as runtime_reconciler_loop
+from .runtime_reconciler_v4 import reconciler_loop as runtime_reconciler_loop
 from .manager_runtime_v16 import install_manager_runtime_v16
 from .smart_transport_auto_v21 import install_smart_transport_auto_v21
 from .smart_auto_bootstrap_v24 import reconciler_loop as smart_bootstrap_loop
@@ -33,6 +33,7 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 #
 # SmartAuto health/stability/benchmark/promotion thresholds are unchanged.
 # VPN Access V46/V51 remain the sole Exit client-egress and nested-MTU owners.
+# Runtime Reconciler V4 adds DB-authoritative TP27 orphan cleanup.
 # ============================================================
 
 
@@ -49,7 +50,7 @@ async def main() -> None:
         "tp27_reference=v91 "
         "vpn_access_dataplane=v46 "
         "vpn_access_performance=v51 "
-        "reconciler=v3 "
+        "reconciler=v4 "
         "active_candidate=tp27_fast "
         "migration_fallback=kernel_gre "
         "retired=gost_tun,amneziawg,netrix",
@@ -88,7 +89,7 @@ async def main() -> None:
 
     runtime_task = asyncio.create_task(
         runtime_reconciler_loop(),
-        name="twinpanel-runtime-reconciler-v3",
+        name="twinpanel-runtime-reconciler-v4",
     )
 
     legacy_ingress_task = asyncio.create_task(
