@@ -65,6 +65,8 @@ import "./storefront-protocol-art-v9.css";
 import "./panel-copy-density-final.css";
 import "./subscription-link-modal.css";
 import "./subscription-link-modal-v96.css";
+import "./branding-runtime.css";
+import "./branding-admin.css";
 
 export const metadata:Metadata={title:"VPN Control 2027",description:"VPN management control panel"};
 

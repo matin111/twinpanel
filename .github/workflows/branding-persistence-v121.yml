@@ -1,0 +1,84 @@
+name: Branding Persistence V121
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/branding.py"
+      - "lib/branding.tsx"
+      - "lib/branding-api.ts"
+      - "components/branding-settings.tsx"
+      - "app/branding-runtime.css"
+      - "app/branding-admin.css"
+      - "app/layout.tsx"
+      - ".github/workflows/branding-persistence-v121.yml"
+
+jobs:
+  branding-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile branding backend
+        run: python -m compileall -q backend/app/routers/branding.py
+
+      - name: Verify branding backend contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source=Path('backend/app/routers/branding.py').read_text()
+          for marker in (
+              '@router.get("")',
+              '@router.put("")',
+              '@router.get("/assets/{kind}")',
+              '@router.post("/assets/{kind}")',
+              '@router.delete("/assets/{kind}")',
+              'MAX_BRAND_ASSET_BYTES = 2 * 1024 * 1024',
+              '_detected_extension',
+              'primary_color',
+              'secondary_color',
+          ):
+              assert marker in source, marker
+          assert 'setattr(item,k,v)' not in source
+          print('BRANDING_BACKEND_CONTRACT_OK')
+          PY
+
+      - name: Verify frontend ownership and persistence contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          provider=Path('lib/branding.tsx').read_text()
+          client=Path('lib/branding-api.ts').read_text()
+          page=Path('components/branding-settings.tsx').read_text()
+          layout=Path('app/layout.tsx').read_text()
+          assert 'localStorage' not in provider
+          assert '/v1/settings/branding' in client
+          assert 'uploadAsset' in client and 'deleteAsset' in client
+          assert 'Store Settings' in page or 'تنظیمات فروشگاه' in page
+          assert 'supportLink' not in page
+          assert 'tagline' not in page
+          assert 'branding-runtime.css' in layout
+          assert 'branding-admin.css' in layout
+          print('BRANDING_FRONTEND_CONTRACT_OK')
+          PY
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional
+          else
+            npm install --include=optional --no-audit --no-fund
+          fi
+
+      - name: Build frontend
+        run: npm run build
