@@ -44,11 +44,18 @@ jobs:
               'version': '1.1.0-rc.79',
               'manifest_source': 'seed',
           }
-          mod._manifest_cache_at = 0.0
+          # Force the seeded cache to be expired regardless of the GitHub runner
+          # VM's monotonic uptime. Setting this to zero is not deterministic on a
+          # freshly booted runner whose uptime can still be below the 45s TTL.
+          mod._manifest_cache_at = (
+              time.monotonic() - mod.MANIFEST_CACHE_TTL_SECONDS - 1.0
+          )
           mod._manifest_refreshing = False
 
           def fake_refresh():
-              time.sleep(0.20)
+              # Long enough to prove the stale status path does not wait for the
+              # provider refresh, while remaining fast and deterministic in CI.
+              time.sleep(0.50)
               return mod._cache_value({
                   'version': '1.1.0-rc.80',
                   'manifest_source': 'slow-provider',
@@ -61,13 +68,13 @@ jobs:
           stale = mod.release_manifest_v25()
           elapsed = time.monotonic() - started
 
-          assert elapsed < 0.10, elapsed
-          assert stale['version'] == '1.1.0-rc.79'
-          assert stale['manifest_cached'] is True
-          assert stale['manifest_stale'] is True
-          assert stale['manifest_refreshing'] is True
+          assert elapsed < 0.25, elapsed
+          assert stale['version'] == '1.1.0-rc.79', stale
+          assert stale['manifest_cached'] is True, stale
+          assert stale['manifest_stale'] is True, stale
+          assert stale['manifest_refreshing'] is True, stale
 
-          deadline = time.monotonic() + 2.0
+          deadline = time.monotonic() + 3.0
           fresh = None
           while time.monotonic() < deadline:
               candidate = mod.release_manifest_v25()
@@ -77,8 +84,8 @@ jobs:
               time.sleep(0.02)
 
           assert fresh is not None
-          assert fresh['manifest_stale'] is False
-          assert fresh['manifest_cached'] is True
+          assert fresh['manifest_stale'] is False, fresh
+          assert fresh['manifest_cached'] is True, fresh
 
           router = Path('backend/app/routers/system_release.py').read_text(encoding='utf-8')
           assert 'refresh_release_manifest_cache()' in router
