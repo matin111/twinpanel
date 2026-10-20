@@ -74,6 +74,37 @@
   color:color-mix(in srgb,var(--brand-primary) 40%,white);
 }
 
+/* Admin shell uses a legacy high-specificity navigation layer. This canonical
+   branding layer is intentionally loaded after it so the persisted brand
+   tokens own only the accent properties without changing layout/behavior. */
+.admin-shell{
+  --admin-brand-primary:var(--brand-primary);
+  --admin-brand-secondary:var(--brand-secondary);
+}
+.topnav-group-trigger:hover,
+.topnav-group[open]>.topnav-group-trigger{
+  border-color:color-mix(in srgb,var(--admin-brand-primary) 36%,transparent)!important;
+  background:color-mix(in srgb,var(--admin-brand-primary) 11%,transparent)!important;
+  color:color-mix(in srgb,var(--admin-brand-primary) 28%,white)!important;
+}
+.topnav-group.active>.topnav-group-trigger{
+  border-color:color-mix(in srgb,var(--admin-brand-primary) 46%,transparent)!important;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--admin-brand-primary) 18%,transparent),color-mix(in srgb,var(--admin-brand-secondary) 8%,transparent))!important;
+  color:color-mix(in srgb,var(--admin-brand-primary) 22%,white)!important;
+  box-shadow:inset 0 -2px 0 var(--admin-brand-primary)!important;
+}
+.topnav-chevron{
+  color:color-mix(in srgb,var(--admin-brand-primary) 48%,white)!important;
+}
+.topnav-menu-grid>a.active{
+  background:linear-gradient(90deg,color-mix(in srgb,var(--admin-brand-primary) 20%,transparent),color-mix(in srgb,var(--admin-brand-secondary) 8%,transparent))!important;
+  border-color:color-mix(in srgb,var(--admin-brand-primary) 46%,transparent)!important;
+  color:color-mix(in srgb,var(--admin-brand-primary) 20%,white)!important;
+}
+.topnav-menu-grid>a i{
+  color:color-mix(in srgb,var(--admin-brand-primary) 52%,white)!important;
+}
+
 html[data-theme="light"] .badge.violet{
   color:color-mix(in srgb,var(--brand-primary) 80%,#19132a);
   background:color-mix(in srgb,var(--brand-primary) 10%,white);
@@ -83,4 +114,23 @@ html[data-theme="light"] .login-art{
   background:
     radial-gradient(circle at 40% 40%,color-mix(in srgb,var(--brand-primary) 12%,transparent),transparent 34%),
     #eef1f7;
+}
+html[data-theme="light"] .topnav-group-trigger:hover,
+html[data-theme="light"] .topnav-group[open]>.topnav-group-trigger{
+  color:color-mix(in srgb,var(--admin-brand-primary) 76%,#211a30)!important;
+  background:color-mix(in srgb,var(--admin-brand-primary) 8%,white)!important;
+  border-color:color-mix(in srgb,var(--admin-brand-primary) 24%,#e4e8ef)!important;
+}
+html[data-theme="light"] .topnav-group.active>.topnav-group-trigger{
+  color:color-mix(in srgb,var(--admin-brand-primary) 80%,#211a30)!important;
+  border-color:color-mix(in srgb,var(--admin-brand-primary) 28%,#e4e8ef)!important;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--admin-brand-primary) 12%,white),color-mix(in srgb,var(--admin-brand-secondary) 4%,white))!important;
+}
+html[data-theme="light"] .topnav-menu-grid>a.active{
+  color:color-mix(in srgb,var(--admin-brand-primary) 80%,#211a30)!important;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--admin-brand-primary) 13%,white),color-mix(in srgb,var(--admin-brand-secondary) 4%,white))!important;
+  border-color:color-mix(in srgb,var(--admin-brand-primary) 28%,#e4e8ef)!important;
+}
+html[data-theme="light"] .topnav-menu-grid>a i{
+  color:color-mix(in srgb,var(--admin-brand-primary) 78%,#504066)!important;
 }
