@@ -30,6 +30,7 @@ jobs:
           from pathlib import Path
 
           routes = Path("components/routed-page-client.tsx").read_text(encoding="utf-8")
+          route_lines = routes.splitlines()
           expected = {
               "reseller": "ResellerDashboardV3",
               "reseller/subscriptions": "ResellerSubscriptionsParityRuntime",
@@ -45,9 +46,10 @@ jobs:
           }
           missing = []
           for key, component in expected.items():
-              needle = f'if(key==="{key}") return <{component}/>'
-              if needle not in routes:
-                  missing.append(needle)
+              prefix = f'if(key==="{key}") return '
+              route_line = next((line for line in route_lines if prefix in line), "")
+              if not route_line or f'<{component}/>' not in route_line:
+                  missing.append(f'{prefix}...<{component}/>...')
           if missing:
               raise SystemExit("missing dedicated reseller routes: " + repr(missing))
 
