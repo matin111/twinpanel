@@ -9,6 +9,7 @@ import {CustomerStoreRedirect} from "../components/customer-store-redirect";
 import {PortalTopNavBehavior} from "../components/portal-topnav-behavior";
 import {RuntimeVersionConvergence} from "../components/runtime-version-convergence";
 import {SystemUpdateRecoveryBootstrap} from "../components/system-update-recovery-bootstrap";
+import {UnifiedSubscriptionLinkBridge} from "../components/subscription-link-delivery";
 import "./core.css";
 import "./pages.css";
 import "./i18n.css";
@@ -69,6 +70,6 @@ export const metadata:Metadata={title:"VPN Control 2027",description:"VPN manage
 
 export default function RootLayout({children}:{children:React.ReactNode}){
   return <html lang="fa" dir="rtl" data-theme="dark" suppressHydrationWarning>
-    <body><SystemUpdateRecoveryBootstrap/><ThemeProvider><BrandingProvider><I18nProvider>{children}<RuntimeVersionConvergence/><PortalTopNavBehavior/><CustomerStoreRedirect/><CustomerDeliveryEnhancement/><SupportChatRuntime/><ChatOpenBridge/></I18nProvider></BrandingProvider></ThemeProvider></body>
+    <body><SystemUpdateRecoveryBootstrap/><ThemeProvider><BrandingProvider><I18nProvider>{children}<RuntimeVersionConvergence/><PortalTopNavBehavior/><CustomerStoreRedirect/><CustomerDeliveryEnhancement/><UnifiedSubscriptionLinkBridge/><SupportChatRuntime/><ChatOpenBridge/></I18nProvider></BrandingProvider></ThemeProvider></body>
   </html>;
 }
