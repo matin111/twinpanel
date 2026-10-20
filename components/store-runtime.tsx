@@ -16,8 +16,7 @@ import {
   type StoreTemplateOptionMap,
 } from "../lib/store-template-options";
 import {loadStoreTemplateSettings} from "../lib/store-template-settings-api";
-import {StoreTemplateRenderer} from "./store-template-renderer";
-import {EditorialGrid2027Template} from "./store-template-editorial-grid";
+import {StoreTemplateRuntime} from "./store-template-runtime-registry";
 
 export function StoreRuntime2027(){
   const {pick}=useI18n();
@@ -78,7 +77,9 @@ export function StoreRuntime2027(){
       if(key in effectiveTarget&&(typeof value==="string"||typeof value==="boolean"||typeof value==="number"))effectiveTarget[key]=value;
     }
   }
-  const effectiveOptions=hasTemplateOptions?{...applied.options,...rawTemplateOptions} as StoreTemplateOptionMap:{};
+  const effectiveOptions:StoreTemplateOptionMap=hasTemplateOptions
+    ?({...applied.options,...rawTemplateOptions} as StoreTemplateOptionMap)
+    :{};
   const themeStyle=storeTemplateCssVariables(effectiveOptions) as CSSProperties;
 
   const templateProps={
@@ -92,6 +93,6 @@ export function StoreRuntime2027(){
   };
 
   return <div data-store-theme-engine="v1" data-store-template-active={templateId} data-store-template-customized={hasTemplateOptions?"true":"false"} style={themeStyle}>
-    {templateId==="editorial-grid-2027"?<EditorialGrid2027Template {...templateProps}/>:<StoreTemplateRenderer {...templateProps}/>}
+    <StoreTemplateRuntime templateId={templateId} {...templateProps}/>
   </div>;
 }
