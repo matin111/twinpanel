@@ -22,6 +22,7 @@ OPENVPN_MANAGEMENT_SOCKET = "/run/openvpn-server/twinpanel-mgmt.sock"
 
 _REMOTE_OPENVPN_STATUS_COMMAND = r'''python3 - <<'PY'
 import socket
+import time
 
 path = "/run/openvpn-server/twinpanel-mgmt.sock"
 
@@ -36,23 +37,33 @@ try:
     except Exception:
         pass
 
-    sock.sendall(b"status 2\nquit\n")
+    # OpenVPN 2.6 management can close immediately when status and quit are
+    # pipelined in one write. Production rc.106 proved that this returns zero
+    # status bytes even while the client is live. Read status fully first.
+    sock.sendall(b"status 2\n")
 
     chunks = []
+    deadline = time.monotonic() + 4.0
 
-    while True:
+    while time.monotonic() < deadline:
         try:
             data = sock.recv(65536)
         except socket.timeout:
-            break
+            continue
 
         if not data:
             break
 
         chunks.append(data)
+        joined = b"".join(chunks)
 
-        if b"\nEND\n" in data or data.endswith(b"END\n"):
+        if b"\nEND\n" in joined or joined.endswith(b"END\n"):
             break
+
+    try:
+        sock.sendall(b"quit\n")
+    except Exception:
+        pass
 
     print(b"".join(chunks).decode("utf-8", errors="replace"), end="")
 finally:
@@ -65,6 +76,42 @@ def _int_counter(value) -> int:
         return max(int(str(value or "0").strip()), 0)
     except (TypeError, ValueError):
         return 0
+
+
+def _read_openvpn_management_status(sock) -> str:
+    """Read one complete `status 2` response before sending `quit`.
+
+    OpenVPN 2.6.19 on the production exit node returned an empty response when
+    `status 2\nquit\n` was sent as one batched write. The management protocol is
+    therefore intentionally sequenced: request status, read through END, then
+    ask the management connection to quit.
+    """
+
+    sock.sendall(b"status 2\n")
+    chunks: list[bytes] = []
+    deadline = time.monotonic() + 4.0
+
+    while time.monotonic() < deadline:
+        try:
+            data = sock.recv(65536)
+        except socket.timeout:
+            continue
+
+        if not data:
+            break
+
+        chunks.append(data)
+        joined = b"".join(chunks)
+
+        if b"\nEND\n" in joined or joined.endswith(b"END\n"):
+            break
+
+    try:
+        sock.sendall(b"quit\n")
+    except Exception:
+        pass
+
+    return b"".join(chunks).decode("utf-8", errors="replace")
 
 
 def _query_openvpn_management_local() -> tuple[bool, str]:
@@ -80,24 +127,7 @@ def _query_openvpn_management_local() -> tuple[bool, str]:
         except Exception:
             pass
 
-        sock.sendall(b"status 2\nquit\n")
-        chunks: list[bytes] = []
-
-        while True:
-            try:
-                data = sock.recv(65536)
-            except socket.timeout:
-                break
-
-            if not data:
-                break
-
-            chunks.append(data)
-
-            if b"\nEND\n" in data or data.endswith(b"END\n"):
-                break
-
-        return True, b"".join(chunks).decode("utf-8", errors="replace")
+        return True, _read_openvpn_management_status(sock)
 
     except Exception as exc:
         return False, str(exc)
@@ -118,7 +148,7 @@ async def _query_openvpn_management_remote(node: Node, db) -> tuple[bool, str]:
         result = await conn.run(
             _REMOTE_OPENVPN_STATUS_COMMAND,
             check=False,
-            timeout=8,
+            timeout=10,
         )
 
         output = str(result.stdout or "")
