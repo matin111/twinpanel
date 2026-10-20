@@ -67,6 +67,8 @@ jobs:
               '/v1/provision/repair-protocols-saved',
               '/v1/provision/upgrade-agent',
               '/v1/provision/install-fabric',
+              '/v1/tunnels/create-managed',
+              '/v1/subscriptions/admin-create-v2',
               'fabric-status',
               'xray-domain-save',
               'xray-domain-prepare',
