@@ -33,13 +33,27 @@ jobs:
           while IFS=, read -r rel width height ahash dhash; do
             test -n "$rel" || continue
             mkdir -p "/tmp/tutorial-downloads/$(dirname "$rel")"
-            curl -fLsS \
+
+            meta="$(curl -sS \
               --retry 2 \
               --retry-delay 1 \
-              --connect-timeout 10 \
-              --max-time 30 \
-              "https://movilineapp.com/learning/screenshots/$rel" \
-              -o "/tmp/tutorial-downloads/$rel"
+              --connect-timeout 8 \
+              --max-time 20 \
+              -H 'Host: movilineapp.com' \
+              -w '%{http_code} %{content_type}' \
+              -o "/tmp/tutorial-downloads/$rel" \
+              "http://217.179.6.142/learning/screenshots/$rel")"
+
+            status="${meta%% *}"
+            content_type="${meta#* }"
+            [[ "$status" == "200" ]] || {
+              echo "Unexpected HTTP status for $rel: $status" >&2
+              exit 41
+            }
+            [[ "$content_type" == image/* ]] || {
+              echo "Unexpected content type for $rel: $content_type" >&2
+              exit 42
+            }
           done < assets/legacy-learning-visual.csv
 
           python3 scripts/verify-legacy-tutorial-images.py \
