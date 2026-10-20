@@ -1,7 +1,7 @@
 "use client";
 
 import {FormEvent,useEffect,useState} from "react";
-import {Badge,Card,Shell,Stat} from "./ui";
+import {Badge,Card,Shell} from "./ui";
 import {adminApi,AdminNode} from "../lib/admin-api";
 import {AnyRow,parityApi,ProvisionInstallPayload,ProvisionProtocolSettings} from "../lib/admin-parity-api";
 import {API_BASE} from "../lib/api";
@@ -224,19 +224,36 @@ export function ProvisionRuntimeXrayDomainPage(){
 
   const selectedNode=nodes.find(n=>n.id===selected);
   const showNewXrayDomain=draft.node_type==="exit"&&draft.install_v2ray;
+  const onlineNodes=nodes.filter(n=>String(n.status).toLowerCase()==="online").length;
+  const iranNodes=nodes.filter(n=>n.node_type==="iran").length;
+  const exitNodes=nodes.filter(n=>n.node_type==="exit").length;
 
   return <Shell active="/admin/provision"><div className="page">
     <div className="page-head"><div><h1>{pick("راه‌اندازی نود","Node Provisioning")}</h1></div><button className="ghost" onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button></div>
     <Notice error={error} warning={warning} ok={ok}/>
 
-    <div className="stats dashboard-stats">
-      <Stat label={pick("نودها","Nodes")} value={String(nodes.length)} icon="▦"/>
-      <Stat label={pick("آنلاین","Online")} value={String(nodes.filter(n=>String(n.status).toLowerCase()==="online").length)}/>
-      <Stat label={pick("ایران","Iran")} value={String(nodes.filter(n=>n.node_type==="iran").length)}/>
-      <Stat label={pick("خروجی","Exit")} value={String(nodes.filter(n=>n.node_type==="exit").length)}/>
-    </div>
+    {result!==null&&<Card>
+      <div className="card-head">
+        <div><b>{pick("آخرین نتیجه عملیات","Latest operation result")}</b><small>{pick("خلاصه نتیجه بالا نمایش داده می‌شود؛ جزئیات فنی فقط در صورت نیاز باز می‌شود.","The result summary stays visible here; technical details are collapsed by default.")}</small></div>
+        <button className="mini-btn" onClick={()=>setResult(null)}>×</button>
+      </div>
+      <details className="runtime-choice-section">
+        <summary>{pick("نمایش جزئیات فنی","Show technical details")}</summary>
+        <pre className="runtime-log" dir="ltr">{JSON.stringify(result,null,2)}</pre>
+      </details>
+    </Card>}
 
-    <div className="module-grid two">
+    <Card>
+      <div className="module-row">
+        <div className="grow"><b>{pick("وضعیت نودها","Node status")}</b><small>{pick("خلاصه زیرساخت فعال","Active infrastructure summary")}</small></div>
+        <Badge tone="warn">{pick("نودها","Nodes")} · {nodes.length}</Badge>
+        <Badge tone="ok">{pick("آنلاین","Online")} · {onlineNodes}</Badge>
+        <Badge tone="warn">{pick("ایران","Iran")} · {iranNodes}</Badge>
+        <Badge tone="warn">{pick("خروجی","Exit")} · {exitNodes}</Badge>
+      </div>
+    </Card>
+
+    <div className="module-grid two" style={{alignItems:"start"}}>
       <Card>
         <div className="card-head"><div><b>{pick("نصب نود جدید","Install new node")}</b><small>{pick("Provision امن با مدیریت خودکار پروتکل‌ها","Secure provisioning with automatic protocol management")}</small></div></div>
         <form onSubmit={submit}>
@@ -252,17 +269,20 @@ export function ProvisionRuntimeXrayDomainPage(){
             {showNewXrayDomain&&<label className="field span-two"><span>{pick("دامنه V2Ray / Xray","V2Ray / Xray domain")}</span><input dir="ltr" value={draft.xray_domain} onChange={e=>setDraft(d=>({...d,xray_domain:e.target.value}))} placeholder="xray.example.com"/><small>{pick("مستقل از دامنه عمومی نود؛ برای WebSocket TLS و HTTPUpgrade TLS. برای SSL خودکار، DNS باید به IP همین نود خروجی اشاره کند.","Independent from the Node public domain; used by WebSocket TLS and HTTPUpgrade TLS. For automatic TLS, DNS must point to this Exit node IP.")}</small></label>}
           </div>
 
-          <div className="runtime-choice-section"><b>{pick("پروتکل‌ها و پورت‌ها","Protocols & ports")}</b><div className="protocol-toggle-grid">
-            <Toggle label="Cisco / OpenConnect" checked={draft.install_cisco} onChange={v=>setProtocol("install_cisco",v)}/>
-            <label className="field"><span>Cisco Port</span><input type="number" min={1} max={65535} value={draft.cisco_port} onChange={e=>setProtocol("cisco_port",Number(e.target.value))}/></label>
-            <Toggle label="OpenVPN" checked={draft.install_openvpn} onChange={v=>setProtocol("install_openvpn",v)}/>
-            <label className="field"><span>OpenVPN</span><div className="inline-fields"><input type="number" min={1} max={65535} value={draft.openvpn_port} onChange={e=>setProtocol("openvpn_port",Number(e.target.value))}/><select value={draft.openvpn_transport} onChange={e=>setProtocol("openvpn_transport",e.target.value)}><option value="udp">UDP</option><option value="tcp">TCP</option></select></div></label>
-            <Toggle label="WireGuard" checked={draft.install_wireguard} onChange={v=>setProtocol("install_wireguard",v)}/>
-            <label className="field"><span>WireGuard Port</span><input type="number" min={1} max={65535} value={draft.wireguard_port} onChange={e=>setProtocol("wireguard_port",Number(e.target.value))}/></label>
-            <Toggle label="L2TP / IPsec" checked={draft.install_l2tp} onChange={v=>setProtocol("install_l2tp",v)}/>
-            <Toggle label="V2Ray / Xray" checked={draft.install_v2ray} onChange={v=>setProtocol("install_v2ray",v)}/>
-            <label className="field"><span>Xray Port</span><input type="number" min={1} max={65535} value={draft.xray_port} onChange={e=>setProtocol("xray_port",Number(e.target.value))}/></label>
-          </div></div>
+          <details className="runtime-choice-section">
+            <summary><b>{pick("پروتکل‌ها و پورت‌ها","Protocols & ports")}</b> · {pick("تنظیمات پیشرفته","Advanced settings")}</summary>
+            <div className="protocol-toggle-grid">
+              <Toggle label="Cisco / OpenConnect" checked={draft.install_cisco} onChange={v=>setProtocol("install_cisco",v)}/>
+              <label className="field"><span>Cisco Port</span><input type="number" min={1} max={65535} value={draft.cisco_port} onChange={e=>setProtocol("cisco_port",Number(e.target.value))}/></label>
+              <Toggle label="OpenVPN" checked={draft.install_openvpn} onChange={v=>setProtocol("install_openvpn",v)}/>
+              <label className="field"><span>OpenVPN</span><div className="inline-fields"><input type="number" min={1} max={65535} value={draft.openvpn_port} onChange={e=>setProtocol("openvpn_port",Number(e.target.value))}/><select value={draft.openvpn_transport} onChange={e=>setProtocol("openvpn_transport",e.target.value)}><option value="udp">UDP</option><option value="tcp">TCP</option></select></div></label>
+              <Toggle label="WireGuard" checked={draft.install_wireguard} onChange={v=>setProtocol("install_wireguard",v)}/>
+              <label className="field"><span>WireGuard Port</span><input type="number" min={1} max={65535} value={draft.wireguard_port} onChange={e=>setProtocol("wireguard_port",Number(e.target.value))}/></label>
+              <Toggle label="L2TP / IPsec" checked={draft.install_l2tp} onChange={v=>setProtocol("install_l2tp",v)}/>
+              <Toggle label="V2Ray / Xray" checked={draft.install_v2ray} onChange={v=>setProtocol("install_v2ray",v)}/>
+              <label className="field"><span>Xray Port</span><input type="number" min={1} max={65535} value={draft.xray_port} onChange={e=>setProtocol("xray_port",Number(e.target.value))}/></label>
+            </div>
+          </details>
 
           <div className="action-row">
             <button type="button" className="ghost" disabled={busy||!draft.host||!draft.password} onClick={()=>void act(pick("اتصال SSH موفق بود","SSH connection passed"),()=>parityApi.provisionTest({host:draft.host,port:draft.port,username:draft.username,password:draft.password}),false)}>{pick("تست SSH","Test SSH")}</button>
@@ -276,12 +296,12 @@ export function ProvisionRuntimeXrayDomainPage(){
         <label className="field"><span>{pick("نود","Node")}</span><select value={selected} onChange={e=>setSelected(Number(e.target.value))}>{nodes.map(n=><option key={n.id} value={n.id}>{n.name} · {n.public_ip} · {n.status}</option>)}</select></label>
         {selectedNode&&<div className="module-row"><div className="grow"><b>{selectedNode.name}</b><small dir="ltr">{selectedNode.public_ip}</small></div><StatusBadge value={selectedNode.status}/></div>}
 
-        {selectedNode?.node_type==="exit"&&<div className="runtime-choice-section">
-          <b>{pick("دامنه اختصاصی Xray","Dedicated Xray domain")}</b>
+        {selectedNode?.node_type==="exit"&&<details className="runtime-choice-section">
+          <summary><b>{pick("دامنه اختصاصی Xray","Dedicated Xray domain")}</b></summary>
           <label className="field"><span>{pick("دامنه V2Ray / Xray","V2Ray / Xray domain")}</span><input dir="ltr" value={selectedXrayDomain} onChange={e=>setSelectedXrayDomain(e.target.value)} placeholder="xray.example.com"/></label>
           <div className="module-row"><div className="grow"><small>{pick("دامنه موثر","Effective domain")}</small><b dir="ltr">{selectedXrayMeta?.effective_xray_domain||"—"}</b></div>{selectedXrayMeta?.legacy_public_domain_fallback&&<Badge tone="warn">{pick("Fallback قدیمی","Legacy fallback")}</Badge>}{selectedXrayMeta?.tls_enabled&&<Badge tone="ok">TLS</Badge>}</div>
           <div className="action-row"><button type="button" className="ghost" disabled={busy} onClick={()=>void saveExistingDomain(false)}>{pick("ذخیره دامنه Xray","Save Xray domain")}</button><button type="button" className="primary" disabled={busy||!selectedXrayDomain.trim()} onClick={()=>void saveExistingDomain(true)}>{pick("ذخیره و آماده‌سازی SSL","Save & prepare TLS")}</button></div>
-        </div>}
+        </details>}
 
         <div className="action-grid">
           <button className="ghost" disabled={!selected||busy} onClick={()=>void act(pick("سلامت پروتکل‌ها دریافت شد","Protocol health loaded"),()=>parityApi.provisionProtocolHealth(selected))}>{pick("بررسی پروتکل‌ها","Protocol health")}</button>
@@ -292,7 +312,5 @@ export function ProvisionRuntimeXrayDomainPage(){
         </div>
       </Card>
     </div>
-
-    {result!==null&&<Card><div className="card-head"><b>{pick("نتیجه عملیات","Operation result")}</b><button className="mini-btn" onClick={()=>setResult(null)}>×</button></div><pre className="runtime-log" dir="ltr">{JSON.stringify(result,null,2)}</pre></Card>}
   </div></Shell>;
 }
