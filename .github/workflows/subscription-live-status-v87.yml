@@ -1,0 +1,327 @@
+name: TwinPanel Subscription Live Status V87
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/runtime_endpoints.py"
+      - "components/admin-subscription-live-table.tsx"
+      - "components/reseller-subscription-live-table.tsx"
+      - "components/routed-page-client.tsx"
+      - ".github/workflows/subscription-live-status-v87.yml"
+  workflow_dispatch:
+
+jobs:
+  live-status:
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: twinpanel
+          POSTGRES_PASSWORD: twinpanel_test
+          POSTGRES_DB: twinpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U twinpanel -d twinpanel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      APP_NAME: TwinPanel-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+      TWINPANEL_ADMIN_EMAIL: admin-ci@example.com
+      TWINPANEL_ADMIN_PASSWORD: TwinPanel-CI-Admin-2026!
+      TWINPANEL_ADMIN_NAME: TwinPanel CI Admin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Prepare runtime directories
+        run: |
+          sudo install -d -m 700 /etc/twinpanel
+          sudo install -d -m 700 /var/lib/twinpanel-backups
+          sudo install -d -m 750 /var/lib/twinpanel/payment-receipts
+          sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel /var/lib/twinpanel-backups
+
+      - name: Create schema and bootstrap admin
+        working-directory: backend
+        run: |
+          python -c 'from app.main import app; print("SUB_LIVE_APP_IMPORT_OK", app.title)'
+          python scripts/bootstrap_admin.py
+
+      - name: Seed reseller ownership and online/offline subscriptions
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from datetime import datetime, timedelta
+
+          from app.database import SessionLocal
+          from app.models import Node, NodeStatus, NodeType, Plan, Subscription, SubscriptionStatus, User, UserRole
+          from app.models_reseller import Reseller, ResellerSubscription
+          from app.quota_models import QuotaDevice, QuotaSession
+          from app.security import hash_password
+
+          db = SessionLocal()
+          try:
+              owner = User(
+                  id=870001,
+                  email="reseller-live-v87@example.com",
+                  password_hash=hash_password("Reseller-Live-V87!"),
+                  full_name="Reseller Live V87",
+                  role=UserRole.USER,
+                  is_active=True,
+              )
+              foreign = User(
+                  id=870002,
+                  email="foreign-live-v87@example.com",
+                  password_hash=hash_password("Foreign-Live-V87!"),
+                  full_name="Foreign Live V87",
+                  role=UserRole.USER,
+                  is_active=True,
+              )
+              plan = Plan(
+                  id=870001,
+                  name="Subscription Live V87 Plan",
+                  duration_days=30,
+                  traffic_gb=50,
+                  device_limit=1,
+                  price_toman=100000,
+                  is_active=True,
+              )
+              node = Node(
+                  id=870001,
+                  name="subscription-live-v87-node",
+                  node_type=NodeType.EXIT,
+                  country_code="US",
+                  public_ip="192.0.2.87",
+                  agent_url="https://192.0.2.87:9443",
+                  status=NodeStatus.ONLINE,
+              )
+              reseller = Reseller(
+                  id=870001,
+                  owner_user_id=owner.id,
+                  code="live-v87",
+                  name="Live V87",
+                  is_active=True,
+              )
+              db.add_all([owner, foreign, plan, node, reseller])
+              db.flush()
+
+              now = datetime.utcnow()
+              newest_online = Subscription(
+                  id=870003,
+                  user_id=owner.id,
+                  plan_id=plan.id,
+                  status=SubscriptionStatus.ACTIVE,
+                  created_at=now,
+                  activation_duration_days=30,
+                  traffic_limit_bytes=50 * 1024**3,
+                  traffic_used_bytes=0,
+                  account_username="live_v87_online",
+              )
+              owned_offline = Subscription(
+                  id=870002,
+                  user_id=owner.id,
+                  plan_id=plan.id,
+                  status=SubscriptionStatus.ACTIVE,
+                  created_at=now - timedelta(minutes=1),
+                  activation_duration_days=30,
+                  traffic_limit_bytes=50 * 1024**3,
+                  traffic_used_bytes=0,
+                  account_username="live_v87_offline",
+              )
+              foreign_online = Subscription(
+                  id=870001,
+                  user_id=foreign.id,
+                  plan_id=plan.id,
+                  status=SubscriptionStatus.ACTIVE,
+                  created_at=now - timedelta(minutes=2),
+                  activation_duration_days=30,
+                  traffic_limit_bytes=50 * 1024**3,
+                  traffic_used_bytes=0,
+                  account_username="live_v87_foreign",
+              )
+              db.add_all([newest_online, owned_offline, foreign_online])
+              db.flush()
+
+              db.add_all([
+                  ResellerSubscription(
+                      id=870001,
+                      reseller_id=reseller.id,
+                      subscription_id=owned_offline.id,
+                      customer_user_id=owner.id,
+                      buy_price_toman=0,
+                      sell_price_toman=0,
+                      created_at=now - timedelta(minutes=1),
+                  ),
+                  ResellerSubscription(
+                      id=870002,
+                      reseller_id=reseller.id,
+                      subscription_id=newest_online.id,
+                      customer_user_id=owner.id,
+                      buy_price_toman=0,
+                      sell_price_toman=0,
+                      created_at=now,
+                  ),
+              ])
+
+              for index, sub in enumerate((newest_online, foreign_online), start=1):
+                  device = QuotaDevice(
+                      id=870000 + index,
+                      subscription_id=sub.id,
+                      device_key=f"v87-device-{index}",
+                      protocol="openvpn",
+                      credential_public_hash=f"v87-hash-{index}",
+                      status="active",
+                  )
+                  db.add(device)
+                  db.flush()
+                  db.add(
+                      QuotaSession(
+                          id=870000 + index,
+                          session_key=f"v87-session-{index}",
+                          subscription_id=sub.id,
+                          device_id=device.id,
+                          node_id=node.id,
+                          protocol="openvpn",
+                          status="active",
+                          started_at=now,
+                          last_seen_at=now,
+                      )
+                  )
+
+              db.commit()
+              print("SUB_LIVE_V87_SEED_OK")
+          finally:
+              db.close()
+          PY
+
+      - name: Start API
+        working-directory: backend
+        run: |
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8095 > /tmp/twinpanel-sub-live-v87.log 2>&1 &
+          echo $! > /tmp/twinpanel-sub-live-v87.pid
+
+      - name: Wait for API
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8095/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/twinpanel-sub-live-v87.log
+          exit 1
+
+      - name: Verify admin and reseller live-state contracts
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          import httpx
+
+          client = httpx.Client(base_url="http://127.0.0.1:8095", timeout=15.0)
+
+          admin_login = client.post("/v1/auth/login", json={
+              "email": "admin-ci@example.com",
+              "password": "TwinPanel-CI-Admin-2026!",
+          })
+          admin_login.raise_for_status()
+          admin_headers = {"Authorization": f"Bearer {admin_login.json()['access_token']}"}
+
+          admin_live = client.get("/v1/admin/subscriptions/live-status", headers=admin_headers)
+          admin_live.raise_for_status()
+          admin_rows = {int(row["subscription_id"]): row for row in admin_live.json()["items"]}
+          assert admin_rows[870003]["online"] is True, admin_rows
+          assert admin_rows[870002]["online"] is False, admin_rows
+          assert admin_rows[870001]["online"] is True, admin_rows
+
+          admin_list = client.get("/v1/subscriptions/admin-list-v2", headers=admin_headers)
+          admin_list.raise_for_status()
+          ids = [int(row["id"]) for row in admin_list.json() if int(row["id"]) >= 870001]
+          assert ids[:3] == [870003, 870002, 870001], ids
+
+          reseller_login = client.post("/v1/auth/login", json={
+              "email": "reseller-live-v87@example.com",
+              "password": "Reseller-Live-V87!",
+          })
+          reseller_login.raise_for_status()
+          reseller_headers = {"Authorization": f"Bearer {reseller_login.json()['access_token']}"}
+
+          reseller_live = client.get("/v1/reseller/subscriptions/live-status", headers=reseller_headers)
+          reseller_live.raise_for_status()
+          payload = reseller_live.json()
+          rows = {int(row["subscription_id"]): row for row in payload["items"]}
+          assert list(rows) == [870003, 870002], payload
+          assert rows[870003]["online"] is True, payload
+          assert rows[870002]["online"] is False, payload
+          assert 870001 not in rows, payload
+
+          print("SUB_LIVE_V87_REAL_API_OK", payload)
+          PY
+
+      - name: Verify table decorators never mutate table structure
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          admin = Path("components/admin-subscription-live-table.tsx").read_text()
+          reseller = Path("components/reseller-subscription-live-table.tsx").read_text()
+          routed = Path("components/routed-page-client.tsx").read_text()
+
+          for source in (admin, reseller):
+              assert 'createElement("td")' not in source
+              assert 'createElement("th")' not in source
+              assert "insertBefore(" not in source
+              assert "row.cells[row.cells.length-2]" in source
+
+          assert "ResellerSubscriptionLiveTable" in routed
+          assert "<ResellerSubscriptionsParityRuntime/><ResellerSubscriptionLiveTable/>" in routed
+          print("SUB_LIVE_V87_DOM_CONTRACT_OK")
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional
+          else
+            npm install --include=optional --no-audit --no-fund
+          fi
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Show API log on failure
+        if: failure()
+        run: cat /tmp/twinpanel-sub-live-v87.log 2>/dev/null || true
