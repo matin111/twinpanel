@@ -13,6 +13,9 @@ from .services.public_urls import api_base_url
 from .routers import nodes, provision, tunnels
 from .ssh_tunnel_self_hosted_v3 import provision_ssh_tunnel_self_hosted_v3
 from .transport_manager_service_v12 import ensure_transport_manager_service_v12
+from .unified_l3_candidate_registry_v79 import (
+    apply_unified_l3_candidate_registry_v79,
+)
 from .unified_l3_core_v49 import apply_unified_l3_core_v49
 from .unified_l3_agent_rollout_v49 import (
     apply_unified_l3_agent_rollout_v49,
@@ -235,12 +238,14 @@ def apply_self_hosted_runtime(
     apply_service_connections_jobs_v28()
 
     # ------------------------------------------------------------
-    # Unified L3 Core V49
+    # Unified L3 Core V49 + candidate registry V79
     #
-    # Apply last after all route/profile wrappers so the final service route
-    # set is committed through one selected Iran <-> Exit L3 carrier.
+    # V79 must patch the rendered Agent source before V49 captures make_agent
+    # and before the startup rollout checks its active marker. This keeps the
+    # Smart Auto candidate registry and the Unified L3 Agent in sync.
     # ------------------------------------------------------------
 
+    apply_unified_l3_candidate_registry_v79()
     apply_unified_l3_core_v49()
     apply_unified_l3_agent_rollout_v49()
 

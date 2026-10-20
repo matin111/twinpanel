@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import shlex
 
 from .database import SessionLocal
 from .models import Node, Tunnel
@@ -15,7 +16,7 @@ from .routers import tunnels
 # manual Repair/Upgrade action.
 #
 # V49 performs one bounded, idempotent rollout before the normal tunnel
-# watchdog loop begins. Nodes already carrying the V49 marker are untouched.
+# watchdog loop begins. Nodes already carrying the active marker are untouched.
 # Installation itself still uses TwinPanel's existing atomic Agent installer:
 # syntax-check -> backup -> rename -> systemd restart.
 
@@ -23,6 +24,16 @@ _runtime_applied = False
 _original_tunnel_watchdog_loop = None
 _ROLLOUT_CONCURRENCY = 2
 _AGENT_MARKER = "TWINPANEL_UNIFIED_L3_AGENT_V49"
+
+
+def _marker_probe_command(*, verify_service: bool = False) -> str:
+    command = (
+        f"grep -q {shlex.quote(_AGENT_MARKER)} "
+        "/opt/twinpanel-agent/agent.py 2>/dev/null"
+    )
+    if verify_service:
+        command += " && systemctl is-active --quiet twinpanel-agent.service"
+    return command
 
 
 async def _rollout_node(node_id: int) -> dict:
@@ -58,8 +69,7 @@ async def _rollout_node(node_id: int) -> dict:
         )
 
         check = await conn.run(
-            "grep -q 'TWINPANEL_UNIFIED_L3_AGENT_V49' "
-            "/opt/twinpanel-agent/agent.py 2>/dev/null",
+            _marker_probe_command(),
             check=False,
             timeout=12,
         )
@@ -80,16 +90,15 @@ async def _rollout_node(node_id: int) -> dict:
         )
 
         verify = await conn.run(
-            "grep -q 'TWINPANEL_UNIFIED_L3_AGENT_V49' "
-            "/opt/twinpanel-agent/agent.py && "
-            "systemctl is-active --quiet twinpanel-agent.service",
+            _marker_probe_command(verify_service=True),
             check=False,
             timeout=15,
         )
 
         if verify.exit_status != 0:
             raise RuntimeError(
-                "agent_v49_verify_failed"
+                "agent_rollout_verify_failed:"
+                + _AGENT_MARKER
             )
 
         return {
@@ -182,6 +191,7 @@ async def rollout_unified_l3_agents_once() -> None:
 
     print(
         "TWINPANEL_UNIFIED_L3_AGENT_ROLLOUT_V49 "
+        f"marker={_AGENT_MARKER} "
         f"nodes={len(node_ids)} "
         f"upgraded={upgraded} "
         f"current={current} "
@@ -235,6 +245,7 @@ def apply_unified_l3_agent_rollout_v49() -> None:
 
     print(
         "TWINPANEL_UNIFIED_L3_AGENT_ROLLOUT_V49_ACTIVE "
+        f"marker={_AGENT_MARKER} "
         "startup_rollout=1 atomic_agent_install=1 concurrency=2",
         flush=True,
     )
