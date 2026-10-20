@@ -3,10 +3,14 @@ from __future__ import annotations
 from html import escape
 import logging
 
-from aiogram import Router
+from aiogram import Bot, Dispatcher, Router
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
+from aiogram.fsm.storage.memory import MemoryStorage
 
 from . import reseller_bot_review
 from . import reseller_bot_runtime as legacy_runtime
+from .bot_text_middleware import BotTextRequestMiddleware
 from .discount_schema import ensure_discount_schema
 from .models import Plan
 from .reseller_bot_owned_runtime import build_owned_plan_router
@@ -74,9 +78,57 @@ def build_router(reseller_id: int) -> Router:
     return parent
 
 
+async def _run_bot_with_texts(
+    reseller_id: int,
+    token: str,
+):
+    bot = Bot(
+        token=token,
+        default=DefaultBotProperties(
+            parse_mode=ParseMode.HTML
+        ),
+    )
+    bot.session.middleware(
+        BotTextRequestMiddleware(
+            scope="reseller",
+            reseller_id=reseller_id,
+        )
+    )
+
+    dp = Dispatcher(
+        storage=MemoryStorage()
+    )
+    dp.include_router(
+        build_router(reseller_id)
+    )
+
+    try:
+        me = await bot.get_me()
+        log.info(
+            "starting reseller=%s bot=@%s",
+            reseller_id,
+            me.username,
+        )
+
+        await bot.delete_webhook(
+            drop_pending_updates=False
+        )
+
+        await dp.start_polling(
+            bot,
+            handle_signals=False,
+            allowed_updates=(
+                dp.resolve_used_update_types()
+            ),
+        )
+    finally:
+        await bot.session.close()
+
+
 def install_runtime_overrides() -> None:
     legacy_runtime.build_router = build_router
     legacy_runtime._main_keyboard = wallet_main_keyboard
+    legacy_runtime._run_bot = _run_bot_with_texts
 
     # Direct Python callers inside receipt review and legacy wallet code import
     # this symbol at callback time. Point them to the usage-pool aware approval.
