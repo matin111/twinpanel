@@ -5,6 +5,7 @@ on:
     paths:
       - "backend/app/l2tp_ppp_convergence_v111.py"
       - "backend/app/protocol_dataplane_desired_state_v87.py"
+      - "backend/app/self_hosted_runtime.py"
       - "backend/app/routers/provision.py"
       - "backend/tests/integration/test_l2tp_ppp_convergence_v111.py"
       - ".github/workflows/l2tp-ppp-convergence-v111.yml"
@@ -14,6 +15,7 @@ on:
     paths:
       - "backend/app/l2tp_ppp_convergence_v111.py"
       - "backend/app/protocol_dataplane_desired_state_v87.py"
+      - "backend/app/self_hosted_runtime.py"
       - "backend/app/routers/provision.py"
       - "backend/tests/integration/test_l2tp_ppp_convergence_v111.py"
       - ".github/workflows/l2tp-ppp-convergence-v111.yml"
