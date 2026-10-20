@@ -1,0 +1,64 @@
+name: TwinPanel Purchase Entitlement Regression
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/store.py"
+      - "backend/app/telegram_purchase_bot.py"
+      - "backend/app/reseller_bot_payment_runtime.py"
+      - "backend/app/reseller_bot_owned_runtime.py"
+      - "backend/app/reseller_bot_runtime_owned.py"
+      - "backend/app/routers/reseller_bot_orders_owned_v3.py"
+      - "backend/app/reseller_owned_plans.py"
+      - "backend/app/reseller_bot_order_models.py"
+      - "backend/scripts/purchase_entitlement_smoke.py"
+      - ".github/workflows/purchase-entitlement-regression.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/routers/store.py"
+      - "backend/app/telegram_purchase_bot.py"
+      - "backend/app/reseller_bot_payment_runtime.py"
+      - "backend/app/reseller_bot_owned_runtime.py"
+      - "backend/app/reseller_bot_runtime_owned.py"
+      - "backend/app/routers/reseller_bot_orders_owned_v3.py"
+      - "backend/app/reseller_owned_plans.py"
+      - "backend/app/reseller_bot_order_models.py"
+      - "backend/scripts/purchase_entitlement_smoke.py"
+      - ".github/workflows/purchase-entitlement-regression.yml"
+
+jobs:
+  purchase-entitlement-smoke:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Compile purchase paths
+        run: |
+          python -m compileall -q \
+            backend/app/routers/store.py \
+            backend/app/telegram_purchase_bot.py \
+            backend/app/reseller_bot_payment_runtime.py \
+            backend/app/reseller_bot_owned_runtime.py \
+            backend/app/reseller_bot_runtime_owned.py \
+            backend/app/routers/reseller_bot_orders_owned_v3.py \
+            backend/app/reseller_owned_plans.py \
+            backend/app/reseller_bot_order_models.py \
+            backend/scripts/purchase_entitlement_smoke.py
+
+      - name: Verify main and reseller purchase entitlements
+        working-directory: backend
+        run: python scripts/purchase_entitlement_smoke.py
