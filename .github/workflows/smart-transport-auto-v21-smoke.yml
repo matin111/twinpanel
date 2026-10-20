@@ -161,7 +161,8 @@ jobs:
           assert 'bc137fbd832276f2a8631c7320df3e3adaa1ddf0' in gost
           assert 'd7656ef3deafec6bf97107b20a332b938153fd54' in gost
           assert 'UPSTREAM_X_VERSION = "v0.19.5"' in gost
-          assert '"profile_canary": "v82"' in gost
+          assert '"profile_canary": "v81"' in gost
+          assert '"upstream_binary_fix": "v82"' in gost
           print('SMART_TRANSPORT_AUTO_V82_CONTRACT_OK')
           PY
 
