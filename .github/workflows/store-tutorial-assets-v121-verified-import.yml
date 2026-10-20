@@ -1,0 +1,60 @@
+name: TwinPanel Store Tutorial Assets V121 Verified Import
+
+on:
+  push:
+    branches:
+      - feat/store-tutorial-images-v121
+    paths:
+      - assets/legacy-learning-visual.csv
+      - .github/workflows/store-tutorial-assets-v121-verified-import.yml
+
+permissions:
+  contents: write
+
+jobs:
+  import-verified-legacy-screenshots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/store-tutorial-images-v121
+          fetch-depth: 0
+      - run: python3 -m pip install --disable-pip-version-check pillow
+      - name: Verify and stage tutorial screenshots
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p /tmp/tutorial-downloads
+          while IFS=, read -r rel width height ahash dhash; do
+            test -n "$rel" || continue
+            mkdir -p "/tmp/tutorial-downloads/$(dirname "$rel")"
+            curl -fsSL --connect-timeout 10 --max-time 30 \
+              "http://217.179.6.142/learning/screenshots/$rel" \
+              -o "/tmp/tutorial-downloads/$rel"
+          done < assets/legacy-learning-visual.csv
+          python3 scripts/verify-legacy-tutorial-images.py \
+            assets/legacy-learning-visual.csv \
+            /tmp/tutorial-downloads
+          rm -rf public/learning/screenshots
+          mkdir -p public/learning
+          cp -a /tmp/tutorial-downloads public/learning/screenshots
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('lib/store-guide-content.ts')
+          s=p.read_text(encoding='utf-8')
+          old='const LEGACY_STEP_IMAGE_BASE="https://movilineapp.com/learning/screenshots";'
+          new='const LEGACY_STEP_IMAGE_BASE="/learning/screenshots";'
+          if old not in s and new not in s:
+              raise SystemExit('store tutorial screenshot base not found')
+          p.write_text(s.replace(old,new),encoding='utf-8')
+          PY
+      - name: Commit imported assets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(find public/learning/screenshots -type f -name '*.webp' | wc -l | tr -d ' ')" = 65
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/learning/screenshots lib/store-guide-content.ts
+          git commit -m "Bundle verified legacy storefront tutorial screenshots"
+          git push origin HEAD:feat/store-tutorial-images-v121
