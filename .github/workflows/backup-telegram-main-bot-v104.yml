@@ -1,0 +1,47 @@
+name: Backup Telegram Main Bot V104
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert backup uses primary panel Telegram bot
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          service = Path('backend/app/backup_service.py').read_text(encoding='utf-8')
+          router = Path('backend/app/routers/backups.py').read_text(encoding='utf-8')
+          ui = Path('components/backups-full-runtime.tsx').read_text(encoding='utf-8')
+
+          assert 'from .routers.telegram_manager import load_bot_token' in service
+          assert 'backup_telegram_credentials' not in service
+
+          assert 'backup_telegram_credentials' not in router
+          assert '@router.put("/telegram-bot")' not in router
+          assert '@router.delete("/telegram-bot")' not in router
+
+          assert 'ارسال بکاپ با همان ربات اصلی Telegram پنل انجام می‌شود.' in ui
+          assert 'Main panel bot' in ui
+          assert 'backupTelegramSaveToken' not in ui
+          assert 'backupTelegramDeleteToken' not in ui
+          assert 'backupVerifyTelegram(chatId)' in ui
+          assert 'backupBotToken' not in ui
+
+          assert not Path('backend/app/backup_telegram_credentials.py').exists()
+          PY
+
+      - name: Compile affected backend modules
+        run: |
+          python3 -m py_compile \
+            backend/app/backup_service.py \
+            backend/app/routers/backups.py
