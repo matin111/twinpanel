@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {useEffect,useMemo,useState} from "react";
 import {Badge,Card,Shell} from "./ui";
+import {StoreTemplateCustomizer} from "./store-template-customizer";
 import {AnyRow,parityApi} from "../lib/admin-parity-api";
 import {useI18n} from "../lib/i18n";
 import {
@@ -158,6 +159,7 @@ export function StoreSettingsManager(){
   const [tab,setTab]=useState<Tab>("templates");
   const [contentLocale,setContentLocale]=useState<StorefrontLocale>("fa");
   const [settings,setSettings]=useState<StorefrontSettings>(DEFAULT_STOREFRONT_SETTINGS);
+  const [customizingTemplate,setCustomizingTemplate]=useState<string|null>(null);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
@@ -207,15 +209,15 @@ export function StoreSettingsManager(){
   const renderGroups=(groups:ContentGroup[])=><div className="storeContentGrid">{groups.map(group=><Card key={group.id}><div className="card-head"><b>{pick(group.fa,group.en)}</b></div>{group.fields.map(field=><label className="field" key={field.key}><span>{pick(field.fa,field.en)}</span>{field.long?<textarea rows={3} value={textValue(field.key)} onChange={event=>setText(field.key,event.target.value)}/>:<input value={textValue(field.key)} onChange={event=>setText(field.key,event.target.value)}/>}</label>)}</Card>)}</div>;
 
   return <Shell active="/admin/store-settings"><div className="page storeAdminManager">
-    <div className="page-head"><div><h1>{pick("مدیریت فروشگاه","Storefront Manager")}</h1><small>{pick("محتوا، شبکه‌های اجتماعی، فوتر، چیدمان، SEO و قالب فروشگاه عمومی را از همین بخش مدیریت کنید.","Manage public storefront content, social links, footer, layout, SEO and the active template from one place.")}</small></div><div className="action-row"><Link className="ghost" href="/store" target="_blank">{pick("مشاهده فروشگاه","Open storefront")} ↗</Link><button className="ghost" onClick={()=>void load()} disabled={loading||busy}>{pick("بازخوانی","Reload")}</button><button className="primary" onClick={()=>void save()} disabled={busy}>{busy?"…":pick("ذخیره تغییرات","Save changes")}</button></div></div>
+    <div className="page-head"><div><h1>{pick("مدیریت فروشگاه","Storefront Manager")}</h1><small>{pick("قالب‌ها تنظیمات مستقل خودشان را دارند؛ داده‌های مشترک و SEO همچنان از همین بخش قابل مدیریت است.","Templates now have independent settings; shared data and SEO remain manageable here.")}</small></div><div className="action-row"><Link className="ghost" href="/store" target="_blank">{pick("مشاهده فروشگاه","Open storefront")} ↗</Link><button className="ghost" onClick={()=>void load()} disabled={loading||busy}>{pick("بازخوانی","Reload")}</button><button className="primary" onClick={()=>void save()} disabled={busy}>{busy?"…":pick("ذخیره تغییرات","Save changes")}</button></div></div>
 
     {error&&<div className="runtime-error">{error}</div>}
     {ok&&<div className="runtime-success">{ok}</div>}
 
     <div className="storeAdminTabs" role="tablist">
       <button className={tab==="templates"?"active":""} onClick={()=>setTab("templates")}>{pick("قالب‌ها","Templates")}</button>
-      <button className={tab==="content"?"active":""} onClick={()=>setTab("content")}>{pick("محتوا","Content")}</button>
-      <button className={tab==="sections"?"active":""} onClick={()=>setTab("sections")}>{pick("بخش‌ها و ترتیب","Sections & order")}</button>
+      <button className={tab==="content"?"active":""} onClick={()=>setTab("content")}>{pick("محتوای عمومی","Shared content")}</button>
+      <button className={tab==="sections"?"active":""} onClick={()=>setTab("sections")}>{pick("بخش‌های عمومی","Shared sections")}</button>
       <button className={tab==="contact"?"active":""} onClick={()=>setTab("contact")}>{pick("ارتباط و فوتر","Contact & footer")}</button>
       <button className={tab==="seo"?"active":""} onClick={()=>setTab("seo")}>SEO</button>
     </div>
@@ -223,7 +225,7 @@ export function StoreSettingsManager(){
     {loading?<div className="runtime-loading">{pick("در حال دریافت تنظیمات فروشگاه...","Loading storefront settings...")}</div>:null}
 
     {!loading&&tab==="templates"&&<>
-      <Card className="storeAdminIntro"><div><b>{pick("معماری قالب قابل ارتقا","Update-friendly template architecture")}</b><p>{pick("قالب‌ها همراه آپدیت نصب می‌شوند اما محتوای فروشگاه و قالب انتخابی داخل دیتابیس باقی می‌ماند.","Templates ship with product updates while storefront content and the selected template remain persisted in the database.")}</p></div><Badge tone="violet">{STORE_TEMPLATE_CATALOG.length} {pick("قالب نصب‌شده","installed")}</Badge></Card>
+      <Card className="storeAdminIntro"><div><b>{pick("Theme Engine مستقل برای هر قالب","Independent Theme Engine")}</b><p>{pick("هر قالب حالا تنظیمات، متن‌ها، رنگ‌ها، نمایش بخش‌ها و ترتیب خودش را دارد. تعویض قالب تنظیمات قالب قبلی را پاک نمی‌کند و اطلاعات تجاری زنده مثل پلن و قیمت همچنان از Backend می‌آید.","Each template now owns its settings, copy, colors, section visibility and ordering. Switching templates does not erase the previous template settings, while live business data such as plans and prices still comes from the backend.")}</p></div><Badge tone="violet">{STORE_TEMPLATE_CATALOG.length} {pick("قالب نصب‌شده","installed")}</Badge></Card>
       {unknownTemplate&&<div className="runtime-warning">{pick(`قالب ذخیره‌شده «${settings.active_template}» در این نسخه نصب نیست؛ فروشگاه از قالب پیش‌فرض استفاده می‌کند.`,`Saved template “${settings.active_template}” is not installed in this version; the storefront falls back to the default template.`)}</div>}
       <div className="storeTemplateGrid">{STORE_TEMPLATE_CATALOG.map(template=>{
         const active=settings.active_template===template.id||(!activeTemplate&&template.id==="conversion-2027");
@@ -232,15 +234,16 @@ export function StoreSettingsManager(){
           <div className="card-head"><div><b>{pick(template.nameFa,template.nameEn)}</b><small>v{template.version} · {template.author}</small></div>{active?<Badge tone="ok">{pick("فعال","Active")}</Badge>:<Badge tone="violet">{pick("نصب‌شده","Installed")}</Badge>}</div>
           <p>{pick(template.descriptionFa,template.descriptionEn)}</p>
           <div className="storeTemplateMeta"><span>◐ {pick("دارک","Dark")}</span><span>☀ {pick("لایت","Light")}</span><span>{template.builtIn?pick("داخلی","Built-in"):pick("افزونه","Extension")}</span></div>
-          <div className="action-row"><button className={active?"ghost":"primary"} disabled={active||busy} onClick={()=>{const next={...settings,active_template:template.id};setSettings(next);void save(next,pick("قالب فروشگاه فعال شد.","Storefront template activated."));}}>{active?pick("قالب فعال","Active template"):pick("فعال‌سازی قالب","Activate template")}</button><Link className="ghost" href="/store" target="_blank">{pick("پیش‌نمایش زنده","Live preview")}</Link></div>
+          <div className="action-row"><button className={active?"ghost":"primary"} disabled={active||busy} onClick={()=>{const next={...settings,active_template:template.id};setSettings(next);void save(next,pick("قالب فروشگاه فعال شد.","Storefront template activated."));}}>{active?pick("قالب فعال","Active template"):pick("فعال‌سازی قالب","Activate template")}</button><button className="ghost" type="button" onClick={()=>setCustomizingTemplate(template.id)}>{pick("شخصی‌سازی قالب","Customize")}</button><Link className="ghost" href="/store" target="_blank">{pick("پیش‌نمایش زنده","Live preview")}</Link></div>
         </Card>;
       })}</div>
+      {customizingTemplate&&<StoreTemplateCustomizer templateId={customizingTemplate} onClose={()=>setCustomizingTemplate(null)}/>} 
     </>}
 
-    {!loading&&tab==="content"&&<>{localeBar}{renderGroups(CONTENT_GROUPS)}</>}
+    {!loading&&tab==="content"&&<>{localeBar}<Card className="storeAdminIntro"><div><b>{pick("محتوای عمومی / سازگاری","Shared fallback content")}</b><p>{pick("این بخش برای سازگاری با قالب‌های قدیمی و داده‌های عمومی باقی مانده است. قالب‌های جدید می‌توانند متن‌های خودشان را از «شخصی‌سازی قالب» مستقل نگه دارند.","This area remains for compatibility and shared fallback data. New templates can keep their own copy independently in the template customizer.")}</p></div></Card>{renderGroups(CONTENT_GROUPS)}</>}
 
     {!loading&&tab==="sections"&&<div className="storeContentGrid">
-      <Card><div className="card-head"><div><b>{pick("نمایش و ترتیب بخش‌ها","Section visibility & order")}</b><small>{pick("ترتیب این لیست مستقیماً ترتیب بخش‌های اصلی فروشگاه است.","This list directly controls the order of the main storefront sections.")}</small></div></div><div className="storeSectionList">{sectionRows.map((section,index)=>{
+      <Card><div className="card-head"><div><b>{pick("نمایش و ترتیب عمومی بخش‌ها","Shared section visibility & order")}</b><small>{pick("قالب‌های جدید می‌توانند این مقدارها را داخل تنظیمات خودشان Override کنند.","New templates can override these values from their own settings.")}</small></div></div><div className="storeSectionList">{sectionRows.map((section,index)=>{
         const labels=SECTION_LABELS[section];const visible=Boolean((settings as unknown as Record<string,unknown>)[`show_${section}`]);
         return <div className="storeSectionRow" key={section}><span className="storeSectionIndex">{index+1}</span><div className="grow"><b>{pick(labels.fa,labels.en)}</b><small>#{section}</small></div><label className="toggle module-toggle"><span>{visible?pick("نمایش","Visible"):pick("مخفی","Hidden")}</span><input type="checkbox" checked={visible} onChange={event=>setSettings(current=>({...current,[`show_${section}`]:event.target.checked} as StorefrontSettings))}/><i/></label><div className="row-actions"><button className="mini-btn" disabled={index===0} onClick={()=>moveSection(section,-1)}>↑</button><button className="mini-btn" disabled={index===sectionRows.length-1} onClick={()=>moveSection(section,1)}>↓</button></div></div>;
       })}</div></Card>
