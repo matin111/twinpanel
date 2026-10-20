@@ -6,9 +6,12 @@ on:
       - "backend/app/transport_candidates/tp27_fast.py"
       - "backend/app/transport_candidates/__init__.py"
       - "backend/app/tp27_reference_runtime_v91.py"
+      - "backend/app/active_l3_route_binding_v94.py"
+      - "backend/app/unified_l3_candidate_registry_v79.py"
       - "backend/app/runtime_reconciler_v4.py"
       - "backend/app/tunnel_transport_manager_v12.py"
       - "backend/tests/integration/test_tp27_fast_preserve_port_v91.py"
+      - "backend/tests/integration/test_active_l3_route_binding_v94.py"
       - ".github/workflows/tp27-fast-preserve-port-v91-smoke.yml"
   push:
     branches:
@@ -17,9 +20,12 @@ on:
       - "backend/app/transport_candidates/tp27_fast.py"
       - "backend/app/transport_candidates/__init__.py"
       - "backend/app/tp27_reference_runtime_v91.py"
+      - "backend/app/active_l3_route_binding_v94.py"
+      - "backend/app/unified_l3_candidate_registry_v79.py"
       - "backend/app/runtime_reconciler_v4.py"
       - "backend/app/tunnel_transport_manager_v12.py"
       - "backend/tests/integration/test_tp27_fast_preserve_port_v91.py"
+      - "backend/tests/integration/test_active_l3_route_binding_v94.py"
       - ".github/workflows/tp27-fast-preserve-port-v91-smoke.yml"
 
 jobs:
@@ -41,10 +47,17 @@ jobs:
             backend/app/transport_candidates/tp27_fast.py \
             backend/app/transport_candidates/__init__.py \
             backend/app/tp27_reference_runtime_v91.py \
+            backend/app/active_l3_route_binding_v94.py \
+            backend/app/unified_l3_candidate_registry_v79.py \
             backend/app/runtime_reconciler_v4.py \
             backend/app/tunnel_transport_manager_v12.py \
-            backend/tests/integration/test_tp27_fast_preserve_port_v91.py
+            backend/tests/integration/test_tp27_fast_preserve_port_v91.py \
+            backend/tests/integration/test_active_l3_route_binding_v94.py
 
       - name: Verify TP27 carrier and preserve-port contracts
         run: |
           python backend/tests/integration/test_tp27_fast_preserve_port_v91.py
+
+      - name: Verify active L3 route binding V94
+        run: |
+          python backend/tests/integration/test_active_l3_route_binding_v94.py
