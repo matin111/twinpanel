@@ -42,7 +42,6 @@ import "./customer-delivery-enhancement.css";
 import "./parity-runtime.css";
 import "./subscriptions-full-runtime.css";
 import "./legacy-parity-batch1.css";
-import "./subscription-link-modal.css";
 import "./admin-payments-runtime.css";
 import "./reseller-parity.css";
 import "./reseller-parity-v2.css";
@@ -64,6 +63,7 @@ import "./storefront-mobile-hero-v6.css";
 import "./storefront-mobile-hero-v8.css";
 import "./storefront-protocol-art-v9.css";
 import "./panel-copy-density-final.css";
+import "./subscription-link-modal.css";
 
 export const metadata:Metadata={title:"VPN Control 2027",description:"VPN management control panel"};
 
