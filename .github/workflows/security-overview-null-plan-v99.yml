@@ -14,7 +14,7 @@ jobs:
       APP_NAME: TwinPanel-CI
       APP_ENV: test
       APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
-      DATABASE_URL: sqlite+pysqlite:///:memory:
+      DATABASE_URL: "sqlite+pysqlite:///:memory:"
       REDIS_URL: redis://127.0.0.1:6379/0
       NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
       PUBLIC_API_FALLBACK: http://127.0.0.1:8095
