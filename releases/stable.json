@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.119",
+  "version": "1.1.0-rc.120",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-20T20:52:32Z",
+  "released_at": "2026-10-20T21:26:43Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "86ee5a2eb50b4671ce22ed32beb13b47226a4ef3",
+  "source_sha": "5f38799c109fe2e18d4cf83c7270277d4894df7a",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.119/twinpanel-1.1.0-rc.119-linux-x86_64.tar.gz",
-    "sha256": "fbdbb8910bb7cb5fc1b0224f245f51177757ed7653725e9cb348a1a9760cf424",
-    "size_bytes": 13055069
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.120/twinpanel-1.1.0-rc.120-linux-x86_64.tar.gz",
+    "sha256": "03b4818778801372f5fc109d74f42bbd1dcfd1617651a0df71f20832f90fe9f4",
+    "size_bytes": 13056028
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.119 مسیر تأیید پرداخت را از Provisioning سنگین اکانت جدا می‌کند تا تأیید رسید پس از ثبت قطعی وضعیت پرداخت، منتظر ساخت اکانت روی نودها نماند. Fulfillment سفارش در پس‌زمینه شروع می‌شود و Recovery مقاوم برای سفارش‌های پرداخت‌شده/درحال‌Provisioning بازگردانده شده است؛ Claim اتمیک از اجرای تکراری هم‌زمان جلوگیری می‌کند. URL و قرارداد فعلی تأیید، خرید فقط با ارسال رسید، منطق Payment، Quota، VPN/Tunnel و Bot Token isolation حفظ شده‌اند و هیچ بهینه‌سازی حدسی داخل account delivery/protocol provisioning وارد نشده است. CI اختصاصی Payment Approval Fast V119 به‌همراه API Build و Payment Review Contract پاس شده‌اند. Production acceptance پس از Update سرور تست 217.179.6.142 و اندازه‌گیری واقعی زمان پاسخ تأیید و زمان تکمیل ساخت اکانت انجام می‌شود.",
-    "en": "TwinPanel 1.1.0-rc.119 separates payment approval latency from slow account provisioning. After the payment state is durably committed, the approval response no longer waits for node-side account creation; fulfillment starts in the background and durable recovery for paid/provisioning orders is restored, with an atomic claim preventing concurrent duplicate fulfillment. The existing approval URL and contract, receipt-only purchase flow, Payment, Quota, VPN/Tunnel behavior and Bot Token isolation are preserved, and no speculative optimization is introduced inside account delivery or protocol provisioning. Dedicated Payment Approval Fast V119 CI, API Build and Payment Review Contract checks passed. Production acceptance follows after updating test server 217.179.6.142 and measuring real approval-response and account-fulfillment timings."
+    "fa": "TwinPanel 1.1.0-rc.120 ایراد واقعی Shadow شدن Fast Path تأیید پرداخت را اصلاح می‌کند. Audit روی سرور تست نشان داد Route فعال POST /v1/payments/admin/intents/{intent_id}/approve از payment_receipts_local زودتر Resolve می‌شود و هنوز legacy_approve_payment را اجرا می‌کند؛ به همین دلیل rc.119 در کلیک واقعی ادمین وارد Fast Path نمی‌شد، درخواست طولانی می‌ماند و در Nginx به 499 ختم می‌شد. در rc.120 همان Route ایزوله و کنترل عدم نمایش پرداخت‌های داخلی نماینده حفظ شده، اما Handler فعال اکنون با BackgroundTasks به approve_payment_fast واگذار می‌شود تا ثبت قطعی تأیید همگام بماند و Provisioning سنگین بعد از پاسخ اجرا شود. CI اختصاصی Payment Approval Fast Path V120، API Build، Payment Review Contract، Preview Validation و regression smokeها سبز شده‌اند. URL و قرارداد پرداخت، خرید فقط با ارسال رسید، منطق Payment/Quota/VPN/Tunnel و Bot Token isolation تغییر نکرده‌اند. Production acceptance پس از Update سرور تست 217.179.6.142 و اندازه‌گیری واقعی زمان پاسخ و مشاهده Markerهای fulfillment انجام می‌شود.",
+    "en": "TwinPanel 1.1.0-rc.120 fixes the production root cause that shadowed the payment approval fast path. Server audit proved that the first resolved POST /v1/payments/admin/intents/{intent_id}/approve route came from payment_receipts_local and still delegated to legacy_approve_payment, so rc.119 never entered the fast path for the real admin click; the request remained long-running and ended as Nginx 499. rc.120 preserves the isolated route and reseller-internal payment visibility guard, but the active handler now delegates with BackgroundTasks to approve_payment_fast so durable approval remains synchronous while heavy provisioning runs after the response. Dedicated Payment Approval Fast Path V120, API Build, Payment Review Contract, Preview Validation and regression smokes are green. The payment URL/contract, receipt-only purchase flow, Payment/Quota/VPN/Tunnel behavior and Bot Token isolation are unchanged. Production acceptance follows after updating test server 217.179.6.142 and measuring the real approval response plus fulfillment markers."
   }
 }
