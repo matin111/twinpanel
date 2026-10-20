@@ -25,8 +25,27 @@ from .common import (
     tunnel_nodes,
 )
 
-VERSION = "3.3.0"
+# TWINPANEL_GOST_UPSTREAM_UDP_FRAME_FIX_V82
+#
+# GOST v3.3.0 bundles go-gost/x v0.16.0. Upstream issue go-gost/gost#911
+# confirmed a datagram framing race in the shared relay UDP stream: one frame
+# could be split across several writes and interleave with another endpoint,
+# producing corrupted frames, unexpected EOF/reset cycles, and heavy packet
+# loss. Upstream fixed the frame write in x@bc137fbd832276f2a8631c7320df3e3adaa1ddf0
+# and added an end-to-end regression in
+# gost@d7656ef3deafec6bf97107b20a332b938153fd54.
+#
+# The first official GOST artifact currently available after that fix is the
+# pinned 3.3.1 nightly below. It is checksum-verified exactly like the stable
+# artifact and is used only by the fail-closed gost_tun candidate. It never
+# becomes SmartAuto-eligible until the common bidirectional peer ping + TCP
+# egress + UDP egress canary passes.
+VERSION = "3.3.1-nightly.20261017"
 BASE = f"https://github.com/go-gost/gost/releases/download/v{VERSION}"
+UPSTREAM_ISSUE = "go-gost/gost#911"
+UPSTREAM_FIX_COMMIT = "bc137fbd832276f2a8631c7320df3e3adaa1ddf0"
+UPSTREAM_E2E_COMMIT = "d7656ef3deafec6bf97107b20a332b938153fd54"
+UPSTREAM_X_VERSION = "v0.19.5"
 FORWARD_PORT = 8421
 
 # TWINPANEL_GOST_PROFILE_CANARY_V81
@@ -333,7 +352,12 @@ fi
                     "carrier": profile,
                     "selected_profile": profile,
                     "profile_canary": "v81",
+                    "upstream_binary_fix": "v82",
                     "profile_attempts": attempts,
+                    "upstream_issue": UPSTREAM_ISSUE,
+                    "upstream_fix_commit": UPSTREAM_FIX_COMMIT,
+                    "upstream_e2e_commit": UPSTREAM_E2E_COMMIT,
+                    "upstream_x_version": UPSTREAM_X_VERSION,
                 }
                 mark(
                     db,
@@ -352,7 +376,12 @@ fi
                     "carrier": profile,
                     "selected_profile": profile,
                     "profile_canary": "v81",
+                    "upstream_binary_fix": "v82",
                     "profile_attempts": attempts,
+                    "upstream_issue": UPSTREAM_ISSUE,
+                    "upstream_fix_commit": UPSTREAM_FIX_COMMIT,
+                    "upstream_e2e_commit": UPSTREAM_E2E_COMMIT,
+                    "upstream_x_version": UPSTREAM_X_VERSION,
                 }
 
             except Exception as profile_exc:
@@ -388,6 +417,7 @@ fi
         msg = (
             f"{type(exc).__name__}: {exc} | "
             f"attempts={attempts!r} | "
+            f"version={VERSION} upstream={UPSTREAM_ISSUE} | "
             f"iran={iran_diag[-2500:]} | exit={exit_diag[-2500:]}"
         )
         mark(db, tunnel_id, name, status="failed", error=msg)
