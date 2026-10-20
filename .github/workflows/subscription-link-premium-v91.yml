@@ -1,0 +1,68 @@
+name: TwinPanel Subscription Link Premium V91
+
+on:
+  pull_request:
+    paths:
+      - "app/subscription-link-modal.css"
+      - "app/layout.tsx"
+      - "components/legacy-subscriptions-exact.tsx"
+      - "components/reseller-subscriptions-parity.tsx"
+      - ".github/workflows/subscription-link-premium-v91.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  subscription-link-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify scoped premium contract
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          css = Path("app/subscription-link-modal.css").read_text()
+          layout = Path("app/layout.tsx").read_text()
+          admin = Path("components/legacy-subscriptions-exact.tsx").read_text()
+          reseller = Path("components/reseller-subscriptions-parity.tsx").read_text()
+
+          required_css = [
+              ".subscription-link-stack",
+              ".reseller-connection-content",
+              ".reseller-public-delivery",
+              "overflow-wrap: anywhere",
+              "unicode-bidi: plaintext",
+              "grid-template-columns: minmax(0, 1fr) 218px",
+              "@media (max-width: 680px)",
+          ]
+          for token in required_css:
+              assert token in css, f"missing CSS contract: {token}"
+
+          assert "!important" not in css, "premium modal CSS must not use !important"
+          assert 'import "./subscription-link-modal.css";' in layout
+          assert layout.rfind('import "./subscription-link-modal.css";') > layout.rfind('import "./panel-copy-density-final.css";'), "subscription modal CSS must load after portal/panel polish"
+
+          assert 'className="subscription-link-stack"' in admin
+          assert 'className="reseller-connection-content"' in reseller
+          assert 'className="reseller-public-delivery"' in reseller
+          assert 'wordBreak:"break-all"' in admin, "admin long-link fallback must remain"
+          assert 'subscription_link' in reseller and 'subscription_link' in admin
+          PY
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci --include=optional
+
+      - name: Production frontend build
+        run: npm run build
