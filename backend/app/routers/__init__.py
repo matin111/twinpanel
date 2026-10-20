@@ -3,6 +3,10 @@
 # the existing support admin router without changing its public prefix.
 from . import support_live_delta as _support_live_delta  # noqa: F401
 
+# Register Telegram sales-copy settings on the existing admin and reseller bot
+# routers before app.main includes those routers.
+from . import telegram_sales_copy as _telegram_sales_copy  # noqa: F401
+
 # Register the existing Exit management compatibility layer first.
 from .. import ssh_management_fallback_v61 as _ssh_management_fallback_v61  # noqa: F401
 
