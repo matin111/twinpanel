@@ -55,12 +55,18 @@ jobs:
           ):
               assert selector in css, selector
 
-          # Status reads use a short-lived cache; explicit checks invalidate it.
+          # Status reads keep a short cache but must not block the admin nav on a
+          # slow GitHub path after that cache expires. Explicit checks and update
+          # starts synchronously refresh with a larger bounded network budget.
           assert 'MANIFEST_CACHE_TTL_SECONDS' in manifest
-          assert 'invalidate_release_manifest_cache' in manifest
-          assert 'PRIMARY_MANIFEST_URL' in manifest
-          assert 'timeout=httpx.Timeout(4.0, connect=2.5)' in manifest
+          assert 'CANONICAL_PROVIDER_TIMEOUT_SECONDS = 14.0' in manifest
+          assert 'LEGACY_PROVIDER_TIMEOUT_SECONDS = 8.0' in manifest
+          assert 'ThreadPoolExecutor' in manifest
+          assert '_start_background_refresh()' in manifest
+          assert 'manifest_refreshing' in manifest
+          assert 'refresh_release_manifest_cache' in manifest
           assert 'invalidate_release_manifest_cache()' in router
+          assert router.count('refresh_release_manifest_cache()') >= 2
 
           print('UPDATE_CENTER_V69_SMOKE=PASS')
           PY
