@@ -23,6 +23,13 @@ from .routers.provision import ssh_connect_saved
 # files/interfaces are simply ignored, so this remains safe for partial nodes.
 # Persistent config and live interfaces are verified on every pass; service
 # restarts happen only when a persistent MTU setting actually changed.
+#
+# TWINPANEL_VPN_ACCESS_PERFORMANCE_RENDER_V89
+# The controller emits an embedded Python program into a quoted shell heredoc.
+# Newlines needed by that embedded program must be expressed without escape
+# sequences that the outer f-string can consume while rendering. Using chr(10)
+# keeps the generated remote Python syntactically stable and makes the payload
+# directly compilable in CI before a release can reach production.
 # ============================================================
 
 RECONCILE_INTERVAL_SECONDS = 20.0
@@ -93,7 +100,7 @@ def replace_or_append(path: str, pattern: str, line: str) -> bool:
     if re.search(pattern, text, flags=re.MULTILINE):
         updated = re.sub(pattern, line, text, count=1, flags=re.MULTILINE)
     else:
-        updated = text.rstrip() + "\n" + line + "\n"
+        updated = text.rstrip() + chr(10) + line + chr(10)
     if updated == text:
         return False
     backup = p.with_name(p.name + ".twinpanel-v51.bak")
@@ -107,7 +114,7 @@ def replace_or_append(path: str, pattern: str, line: str) -> bool:
 # can leave existing workers on the old negotiated MTU and hide the defect.
 if replace_or_append(
     "/etc/ocserv/ocserv.conf",
-    r"^\s*mtu\s*=.*$",
+    r"^[ \t]*mtu[ \t]*=.*$",
     f"mtu = {ACCESS_MTU}",
 ):
     Path("/run/twinpanel-v51-restart-ocserv").touch()
@@ -119,12 +126,12 @@ ovpn = "/etc/openvpn/server/twinpanel.conf"
 ovpn_changed = False
 ovpn_changed |= replace_or_append(
     ovpn,
-    r"^\s*tun-mtu\s+.*$",
+    r"^[ \t]*tun-mtu[ \t]+.*$",
     f"tun-mtu {ACCESS_MTU}",
 )
 ovpn_changed |= replace_or_append(
     ovpn,
-    r"^\s*mssfix\s+.*$",
+    r"^[ \t]*mssfix[ \t]+.*$",
     f"mssfix {{ACCESS_MSS}}",
 )
 if ovpn_changed:
@@ -135,18 +142,21 @@ if ovpn_changed:
 p = Path("/etc/wireguard/wg-access0.conf")
 if p.is_file():
     text = p.read_text(encoding="utf-8", errors="ignore")
-    if re.search(r"(?m)^\s*MTU\s*=.*$", text):
+    if re.search(r"(?m)^[ \t]*MTU[ \t]*=.*$", text):
         updated = re.sub(
-            r"(?m)^\s*MTU\s*=.*$",
+            r"(?m)^[ \t]*MTU[ \t]*=.*$",
             f"MTU = {ACCESS_MTU}",
             text,
             count=1,
         )
     else:
-        match = re.search(r"(?m)^\[Interface\]\s*$", text)
+        match = re.search(
+            r"(?m)^" + re.escape("[Interface]") + r"[ \t]*$",
+            text,
+        )
         if match:
             pos = match.end()
-            updated = text[:pos] + f"\nMTU = {ACCESS_MTU}" + text[pos:]
+            updated = text[:pos] + chr(10) + f"MTU = {ACCESS_MTU}" + text[pos:]
         else:
             updated = text
     if updated != text:
@@ -162,12 +172,12 @@ l2tp = "/etc/ppp/options.xl2tpd"
 l2tp_changed = False
 l2tp_changed |= replace_or_append(
     l2tp,
-    r"^\s*mtu\s+.*$",
+    r"^[ \t]*mtu[ \t]+.*$",
     f"mtu {ACCESS_MTU}",
 )
 l2tp_changed |= replace_or_append(
     l2tp,
-    r"^\s*mru\s+.*$",
+    r"^[ \t]*mru[ \t]+.*$",
     f"mru {ACCESS_MTU}",
 )
 if l2tp_changed:
@@ -224,18 +234,18 @@ fi
 # Runtime verification. Missing services are acceptable on partial Exit nodes;
 # an installed service with a wrong value is not.
 if [ -f /etc/ocserv/ocserv.conf ]; then
-  grep -Eq '^\s*mtu\s*=\s*1200\s*$' /etc/ocserv/ocserv.conf
+  grep -Eq '^[[:space:]]*mtu[[:space:]]*=[[:space:]]*1200[[:space:]]*$' /etc/ocserv/ocserv.conf
 fi
 if [ -f /etc/openvpn/server/twinpanel.conf ]; then
-  grep -Eq '^\s*tun-mtu\s+1200\s*$' /etc/openvpn/server/twinpanel.conf
-  grep -Eq '^\s*mssfix\s+1160\s*$' /etc/openvpn/server/twinpanel.conf
+  grep -Eq '^[[:space:]]*tun-mtu[[:space:]]+1200[[:space:]]*$' /etc/openvpn/server/twinpanel.conf
+  grep -Eq '^[[:space:]]*mssfix[[:space:]]+1160[[:space:]]*$' /etc/openvpn/server/twinpanel.conf
 fi
 if [ -f /etc/wireguard/wg-access0.conf ]; then
-  grep -Eq '^\s*MTU\s*=\s*1200\s*$' /etc/wireguard/wg-access0.conf
+  grep -Eq '^[[:space:]]*MTU[[:space:]]*=[[:space:]]*1200[[:space:]]*$' /etc/wireguard/wg-access0.conf
 fi
 if [ -f /etc/ppp/options.xl2tpd ]; then
-  grep -Eq '^\s*mtu\s+1200\s*$' /etc/ppp/options.xl2tpd
-  grep -Eq '^\s*mru\s+1200\s*$' /etc/ppp/options.xl2tpd
+  grep -Eq '^[[:space:]]*mtu[[:space:]]+1200[[:space:]]*$' /etc/ppp/options.xl2tpd
+  grep -Eq '^[[:space:]]*mru[[:space:]]+1200[[:space:]]*$' /etc/ppp/options.xl2tpd
 fi
 
 for IFACE in $(ls /sys/class/net 2>/dev/null | grep '^vpns' || true); do
@@ -344,6 +354,7 @@ async def reconciler_loop() -> None:
     print(
         "TWINPANEL_VPN_ACCESS_PERFORMANCE_V51_START "
         f"access_mtu={ACCESS_MTU} tcp_mss={ACCESS_TCP_MSS} "
+        "render_fix=v89 "
         "exit_invariant=1 protocols=cisco,openvpn,wireguard,l2tp",
         flush=True,
     )
