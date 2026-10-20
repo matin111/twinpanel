@@ -1,0 +1,32 @@
+name: TwinPanel OpenVPN Management Sequence V107
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/services/openvpn_quota_runtime_v106.py"
+      - "backend/tests/integration/test_openvpn_management_sequence_v107.py"
+      - ".github/workflows/openvpn-management-sequence-v107.yml"
+
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile OpenVPN quota runtime
+        run: python -m py_compile backend/app/services/openvpn_quota_runtime_v106.py
+
+      - name: Run OpenVPN management sequencing regression
+        working-directory: backend
+        run: PYTHONPATH=. python tests/integration/test_openvpn_management_sequence_v107.py
+
+      - name: Run existing OpenVPN quota runtime regression
+        working-directory: backend
+        run: PYTHONPATH=. python tests/integration/test_openvpn_quota_runtime_v106.py
