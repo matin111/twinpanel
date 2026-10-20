@@ -3,7 +3,17 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import {useI18n} from "../lib/i18n";
 
-type OperationKind="node-provision"|"tunnel-create"|"subscription-create";
+type OperationKind=
+  |"node-provision"
+  |"node-access"
+  |"node-health"
+  |"node-restart"
+  |"node-repair"
+  |"agent-upgrade"
+  |"fabric-install"
+  |"tunnel-create"
+  |"subscription-create";
+
 type ActivityState={
   id:number;
   kind:OperationKind;
@@ -16,6 +26,12 @@ const operationFor=(pathname:string,method:string):OperationKind|null=>{
   const verb=method.toUpperCase();
   if(verb!=="POST")return null;
   if(pathname==="/v1/provision/install")return "node-provision";
+  if(pathname==="/v1/provision/save-node-access")return "node-access";
+  if(pathname==="/v1/provision/protocol-health")return "node-health";
+  if(pathname==="/v1/provision/restart-protocol")return "node-restart";
+  if(pathname==="/v1/provision/repair-protocols-saved")return "node-repair";
+  if(pathname==="/v1/provision/upgrade-agent")return "agent-upgrade";
+  if(pathname==="/v1/provision/install-fabric")return "fabric-install";
   if(pathname==="/v1/tunnels/create-managed")return "tunnel-create";
   if(pathname==="/v1/subscriptions/admin-create-v2")return "subscription-create";
   return null;
@@ -103,25 +119,55 @@ export function AdminOperationFeedback(){
 
   const label=useMemo(()=>{
     if(!activity)return "";
-    if(activity.kind==="node-provision"){
-      return activity.status==="pending"
-        ?pick("در حال نصب و راه‌اندازی نود و پروتکل‌ها…","Installing and provisioning the node and protocols…")
-        :activity.status==="success"
-          ?pick("نصب نود با موفقیت پاسخ گرفت.","Node provisioning completed successfully.")
-          :pick("نصب نود با خطا متوقف شد.","Node provisioning failed.");
-    }
-    if(activity.kind==="tunnel-create"){
-      return activity.status==="pending"
-        ?pick("در حال ساخت تانل و بررسی مسیرهای ارتباطی…","Creating the tunnel and validating transport paths…")
-        :activity.status==="success"
-          ?pick("ساخت تانل با موفقیت پاسخ گرفت.","Tunnel creation completed successfully.")
-          :pick("ساخت تانل با خطا متوقف شد.","Tunnel creation failed.");
-    }
-    return activity.status==="pending"
-      ?pick("در حال ساخت اشتراک و صدور اکانت…","Creating the subscription and provisioning the account…")
-      :activity.status==="success"
-        ?pick("اشتراک با موفقیت ساخته شد.","Subscription created successfully.")
-        :pick("ساخت اشتراک با خطا متوقف شد.","Subscription creation failed.");
+
+    const statusLabel=(pending:string,success:string,error:string)=>
+      activity.status==="pending"?pending:activity.status==="success"?success:error;
+
+    if(activity.kind==="node-provision")return statusLabel(
+      pick("در حال نصب و راه‌اندازی نود و پروتکل‌ها…","Installing and provisioning the node and protocols…"),
+      pick("نصب نود با موفقیت پاسخ گرفت.","Node provisioning completed successfully."),
+      pick("نصب نود با خطا متوقف شد.","Node provisioning failed."),
+    );
+    if(activity.kind==="node-access")return statusLabel(
+      pick("در حال ثبت دسترسی امن سرور…","Saving secure server access…"),
+      pick("دسترسی امن سرور با موفقیت ثبت شد.","Secure server access was saved successfully."),
+      pick("ثبت دسترسی امن سرور با خطا متوقف شد.","Saving secure server access failed."),
+    );
+    if(activity.kind==="node-health")return statusLabel(
+      pick("در حال بررسی سلامت سرویس‌های نود…","Checking node service health…"),
+      pick("بررسی سلامت سرویس‌ها کامل شد.","Service health check completed."),
+      pick("بررسی سلامت سرویس‌ها با خطا متوقف شد.","Service health check failed."),
+    );
+    if(activity.kind==="node-restart")return statusLabel(
+      pick("در حال ریستارت و بررسی سرویس انتخاب‌شده…","Restarting and checking the selected service…"),
+      pick("ریستارت سرویس با موفقیت پاسخ گرفت.","Service restart completed successfully."),
+      pick("ریستارت سرویس با خطا متوقف شد.","Service restart failed."),
+    );
+    if(activity.kind==="node-repair")return statusLabel(
+      pick("در حال تعمیر و همگام‌سازی پروتکل‌های نود…","Repairing and reconciling node protocols…"),
+      pick("تعمیر پروتکل‌های نود کامل شد.","Node protocol repair completed."),
+      pick("تعمیر پروتکل‌های نود با خطا متوقف شد.","Node protocol repair failed."),
+    );
+    if(activity.kind==="agent-upgrade")return statusLabel(
+      pick("در حال ارتقای Agent نود…","Upgrading the node Agent…"),
+      pick("ارتقای Agent نود کامل شد.","Node Agent upgrade completed."),
+      pick("ارتقای Agent نود با خطا متوقف شد.","Node Agent upgrade failed."),
+    );
+    if(activity.kind==="fabric-install")return statusLabel(
+      pick("در حال آماده‌سازی Tunnel Fabric نود…","Preparing the node Tunnel Fabric…"),
+      pick("Tunnel Fabric نود آماده شد.","Node Tunnel Fabric is ready."),
+      pick("آماده‌سازی Tunnel Fabric با خطا متوقف شد.","Tunnel Fabric preparation failed."),
+    );
+    if(activity.kind==="tunnel-create")return statusLabel(
+      pick("در حال ساخت تانل و بررسی مسیرهای ارتباطی…","Creating the tunnel and validating transport paths…"),
+      pick("ساخت تانل با موفقیت پاسخ گرفت.","Tunnel creation completed successfully."),
+      pick("ساخت تانل با خطا متوقف شد.","Tunnel creation failed."),
+    );
+    return statusLabel(
+      pick("در حال ساخت اشتراک و صدور اکانت…","Creating the subscription and provisioning the account…"),
+      pick("اشتراک با موفقیت ساخته شد.","Subscription created successfully."),
+      pick("ساخت اشتراک با خطا متوقف شد.","Subscription creation failed."),
+    );
   },[activity,pick]);
 
   if(!activity)return null;
@@ -133,7 +179,7 @@ export function AdminOperationFeedback(){
       `The request was accepted and is still running on the server. Keep this page open. Elapsed: ${elapsed}s`,
     )
     :activity.status==="success"
-      ?pick("لیست صفحه به‌صورت خودکار بروزرسانی می‌شود.","The page list will refresh automatically.")
+      ?pick("عملیات پایان یافت و اطلاعات صفحه در حال بروزرسانی است.","The operation finished and the page data is refreshing.")
       :pick(
         `پاسخ عملیات ناموفق بود${activity.httpStatus?` (HTTP ${activity.httpStatus})`:""}. جزئیات خطا در همان صفحه نمایش داده می‌شود.`,
         `The operation failed${activity.httpStatus?` (HTTP ${activity.httpStatus})`:""}. The detailed error remains visible on the page.`,
@@ -145,6 +191,7 @@ export function AdminOperationFeedback(){
     role="status"
     aria-live="polite"
     aria-atomic="true"
+    aria-busy={activity.status==="pending"}
     style={{
       position:"fixed",
       insetInlineStart:24,
