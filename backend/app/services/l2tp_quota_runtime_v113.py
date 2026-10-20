@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import shlex
 import subprocess
 import time
 import uuid
@@ -124,7 +125,7 @@ async def _remote_l2tp_runtime(node: Node, db) -> tuple[bool, str]:
     try:
         conn = await ssh_connect_saved(node, db)
         result = await conn.run(
-            "bash -lc " + repr(_L2TP_RUNTIME_COMMAND),
+            "bash -lc " + shlex.quote(_L2TP_RUNTIME_COMMAND),
             check=False,
             timeout=12,
         )
