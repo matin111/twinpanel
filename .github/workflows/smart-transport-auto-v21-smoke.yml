@@ -13,10 +13,12 @@ on:
       - 'backend/app/routers/modern_transports.py'
       - 'backend/app/transport_candidates/__init__.py'
       - 'backend/app/transport_candidates/common.py'
+      - 'backend/app/transport_candidates/gost.py'
       - 'backend/app/unified_l3_core_v49.py'
       - 'backend/app/unified_l3_agent_rollout_v49.py'
       - 'backend/app/unified_l3_candidate_registry_v79.py'
       - 'backend/tests/integration/test_tunnel_core_candidate_registry_v79.py'
+      - 'backend/tests/integration/test_gost_profile_canary_v81.py'
       - 'backend/deploy/systemd/twinpanel-transport-manager.service'
       - '.github/workflows/smart-transport-auto-v21-smoke.yml'
   push:
@@ -33,10 +35,12 @@ on:
       - 'backend/app/routers/modern_transports.py'
       - 'backend/app/transport_candidates/__init__.py'
       - 'backend/app/transport_candidates/common.py'
+      - 'backend/app/transport_candidates/gost.py'
       - 'backend/app/unified_l3_core_v49.py'
       - 'backend/app/unified_l3_agent_rollout_v49.py'
       - 'backend/app/unified_l3_candidate_registry_v79.py'
       - 'backend/tests/integration/test_tunnel_core_candidate_registry_v79.py'
+      - 'backend/tests/integration/test_gost_profile_canary_v81.py'
       - 'backend/deploy/systemd/twinpanel-transport-manager.service'
       - '.github/workflows/smart-transport-auto-v21-smoke.yml'
 
@@ -68,10 +72,12 @@ jobs:
             backend/app/routers/modern_transports.py \
             backend/app/transport_candidates/__init__.py \
             backend/app/transport_candidates/common.py \
+            backend/app/transport_candidates/gost.py \
             backend/app/unified_l3_core_v49.py \
             backend/app/unified_l3_agent_rollout_v49.py \
             backend/app/unified_l3_candidate_registry_v79.py \
-            backend/tests/integration/test_tunnel_core_candidate_registry_v79.py
+            backend/tests/integration/test_tunnel_core_candidate_registry_v79.py \
+            backend/tests/integration/test_gost_profile_canary_v81.py
 
       - name: Smart transport static contracts
         run: |
@@ -88,6 +94,7 @@ jobs:
           api = Path('backend/app/routers/modern_transports.py').read_text()
           cleanup = Path('backend/app/transport_candidates/__init__.py').read_text()
           common = Path('backend/app/transport_candidates/common.py').read_text()
+          gost = Path('backend/app/transport_candidates/gost.py').read_text()
           registry = Path('backend/app/unified_l3_candidate_registry_v79.py').read_text()
           rollout = Path('backend/app/unified_l3_agent_rollout_v49.py').read_text()
           unit = Path('backend/deploy/systemd/twinpanel-transport-manager.service').read_text()
@@ -132,9 +139,24 @@ jobs:
           assert 'shlex.quote(_AGENT_MARKER)' in rollout
           assert 'apply_unified_l3_candidate_registry_v79()' in runtime
           assert runtime.index('apply_unified_l3_candidate_registry_v79()') < runtime.index('apply_unified_l3_core_v49()')
-          print('SMART_TRANSPORT_AUTO_V79_CONTRACT_OK')
+
+          # V81: GOST WSS remains the first profile, TLS is an internal
+          # candidate fallback, and neither profile becomes eligible until the
+          # common L3/TCP/UDP probe passes.
+          assert 'TWINPANEL_GOST_PROFILE_CANARY_V81' in gost
+          assert '"relay+wss"' in gost
+          assert '"relay+tls"' in gost
+          assert 'for profile in PROFILE_ORDER:' in gost
+          assert 'health = await probe(' in gost
+          assert '"selected_profile": profile' in gost
+          assert 'gost_all_profiles_failed' in gost
+          print('SMART_TRANSPORT_AUTO_V81_CONTRACT_OK')
           PY
 
       - name: Tunnel Core V79 regression
         run: |
           python backend/tests/integration/test_tunnel_core_candidate_registry_v79.py
+
+      - name: GOST profile canary V81 regression
+        run: |
+          python backend/tests/integration/test_gost_profile_canary_v81.py
