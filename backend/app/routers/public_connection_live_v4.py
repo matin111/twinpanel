@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..quota_models import QuotaSession, QuotaUsageEvent
+from ..wireguard_live_telemetry_v97 import subscription_wireguard_live
 from .account_delivery import _subscription_from_share_token, _usage_payload
 from .public_connection_v3 import public_connection_page_v3
 
@@ -42,7 +43,7 @@ def _normalized_protocol(value: str | None) -> str:
 
 
 @router.get("/{token}/live")
-def public_connection_live(token: str, db: Session = Depends(get_db)):
+async def public_connection_live(token: str, db: Session = Depends(get_db)):
     """Small public live-state payload used by the connection delivery page."""
     sub = _subscription_from_share_token(token, db)
     usage = _usage_payload(db, sub)
@@ -92,8 +93,18 @@ def public_connection_live(token: str, db: Session = Depends(get_db)):
             online_protocols.add(protocol)
         last_counter_activity = _latest(last_counter_activity, reported_at)
 
+    # TWINPANEL_WIREGUARD_LIVE_TELEMETRY_V97
+    # WireGuard does not reliably create QuotaSession/QuotaUsageEvent rows even
+    # when the real peer has a fresh handshake and active byte counters. Read
+    # that native per-peer telemetry as an additional *display-only* signal.
+    # Billing/quota tables are intentionally not mutated here.
+    wireguard_online, wireguard_seen = await subscription_wireguard_live(db, sub)
+    if wireguard_online:
+        online_protocols.add("wireguard")
+
     connection_online = bool(online_protocols)
     last_connection_seen = _latest(last_session_seen, last_counter_activity)
+    last_connection_seen = _latest(last_connection_seen, wireguard_seen)
 
     status = str(getattr(sub.status, "value", sub.status)).lower()
     return {
