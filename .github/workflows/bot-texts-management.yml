@@ -1,0 +1,58 @@
+name: Bot Texts Management
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/bot_texts.py"
+      - "backend/app/bot_text_middleware.py"
+      - "backend/app/telegram_runtime_custom.py"
+      - "backend/app/reseller_bot_runtime_owned.py"
+      - "backend/app/routers/runtime_endpoints.py"
+      - "backend/tests/test_bot_texts_management.py"
+      - "components/bot-texts-editor.tsx"
+      - "components/routed-page-client.tsx"
+      - "components/ui.tsx"
+      - "components/portal-shells.tsx"
+      - ".github/workflows/bot-texts-management.yml"
+
+jobs:
+  bot-texts:
+    runs-on: ubuntu-24.04
+    env:
+      APP_NAME: TwinPanel-BotTexts-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt pytest
+
+      - name: Compile bot text runtime
+        run: |
+          python -m compileall -q \
+            backend/app/bot_texts.py \
+            backend/app/bot_text_middleware.py \
+            backend/app/telegram_runtime_custom.py \
+            backend/app/reseller_bot_runtime_owned.py \
+            backend/app/routers/runtime_endpoints.py
+
+      - name: Run bot text regression tests
+        working-directory: backend
+        run: python -m pytest -q tests/test_bot_texts_management.py

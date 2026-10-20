@@ -45,6 +45,7 @@ const resellerMenu:MenuItem[]=[
   ["سفارش‌ها","Orders","/reseller/orders","orders"],
   ["کدهای تخفیف","Discounts","/reseller/discounts","payments"],
   ["ربات نمایندگی","Reseller Bot","/reseller/bot","bell"],
+  ["متن‌های ربات","Bot Texts","/reseller/bot-texts","bell"],
   ["اعلان‌ها","Notifications","/reseller/notifications","bell"],
   ["تنظیمات","Settings","/reseller/settings","profile"]
 ];
@@ -58,8 +59,8 @@ const customerGroups:MenuGroup[]=[
 const resellerGroups:MenuGroup[]=[
   {fa:"مدیریت",en:"Management",items:[resellerMenu[0],resellerMenu[1],resellerMenu[6]]},
   {fa:"مالی",en:"Finance",items:[resellerMenu[4],resellerMenu[5],resellerMenu[7]]},
-  {fa:"فروش و ربات",en:"Sales & Bot",items:[resellerMenu[2],resellerMenu[3],resellerMenu[8],resellerMenu[9]]},
-  {fa:"حساب",en:"Account",items:[resellerMenu[10],resellerMenu[11]]}
+  {fa:"فروش و ربات",en:"Sales & Bot",items:[resellerMenu[2],resellerMenu[3],resellerMenu[8],resellerMenu[9],resellerMenu[10]]},
+  {fa:"حساب",en:"Account",items:[resellerMenu[11],resellerMenu[12]]}
 ];
 
 function PortalIcon({name}:{name:IconName}){

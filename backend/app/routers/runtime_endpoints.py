@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ..bot_texts import bot_text_catalog, reset_bot_texts, save_bot_texts
 from ..database import get_db
 from ..deps import require_admin, require_reseller
 from ..domain_models import Domain, DomainType, SSLStatus
@@ -20,6 +22,14 @@ from .admin import dashboard_summary_v2
 
 
 router = APIRouter(tags=["runtime"])
+
+
+class BotTextsUpdateIn(BaseModel):
+    texts: dict[str, str | None] = Field(default_factory=dict)
+
+
+class BotTextsResetIn(BaseModel):
+    keys: list[str] | None = None
 
 
 # Keep this window identical to the public Connect live-state rule. Protocols
@@ -170,10 +180,6 @@ def runtime_endpoints(
 def dashboard_summary_live_subscriptions(db: Session = Depends(get_db)):
     """Admin dashboard summary with live state and canonical revenue."""
 
-    # This router is included before the legacy/admin-isolation routers and is
-    # therefore the production winner for this exact path. The legacy summary
-    # still supplies account/node/protocol counters, but its historical
-    # subscription-count `sales_*` values must never escape to the UI.
     payload = dict(dashboard_summary_v2(db))
     payload.update(dashboard_revenue(db))
 
@@ -195,8 +201,6 @@ def admin_sales_analytics(
     ),
     db: Session = Depends(get_db),
 ):
-    """Authoritative confirmed-payment analytics for the admin panel."""
-
     return build_admin_sales_analytics(db, range_name)
 
 
@@ -210,8 +214,6 @@ def reseller_sales_analytics(
     reseller: Reseller = Depends(require_reseller),
     db: Session = Depends(get_db),
 ):
-    """Sales analytics scoped strictly to the authenticated reseller."""
-
     return build_reseller_sales_analytics(
         db,
         reseller_id=int(reseller.id),
@@ -224,8 +226,6 @@ def reseller_sales_analytics(
     dependencies=[Depends(require_admin)],
 )
 def admin_subscription_live_status(db: Session = Depends(get_db)):
-    """Return per-subscription live state for the admin subscriptions table."""
-
     states = _subscription_live_states(db)
     active_ids = {
         int(row[0])
@@ -246,13 +246,6 @@ def reseller_subscription_live_status(
     reseller: Reseller = Depends(require_reseller),
     db: Session = Depends(get_db),
 ):
-    """Return live state only for subscriptions owned by the authenticated reseller.
-
-    The response intentionally includes an offline item for every visible owned
-    subscription. That makes newly-created subscriptions deterministic in the UI
-    instead of leaving the connection column blank until traffic exists.
-    """
-
     owned_ids = [
         int(row[0])
         for row in (
@@ -273,3 +266,93 @@ def reseller_subscription_live_status(
         "generated_at": datetime.utcnow().isoformat() + "Z",
         "activity_window_seconds": _LIVE_ACTIVITY_SECONDS,
     }
+
+
+@router.get(
+    "/v1/admin/telegram-bot/texts",
+    dependencies=[Depends(require_admin)],
+)
+def admin_bot_texts(db: Session = Depends(get_db)):
+    return bot_text_catalog(db, scope="admin")
+
+
+@router.put(
+    "/v1/admin/telegram-bot/texts",
+    dependencies=[Depends(require_admin)],
+)
+def update_admin_bot_texts(
+    payload: BotTextsUpdateIn,
+    db: Session = Depends(get_db),
+):
+    try:
+        return save_bot_texts(
+            db,
+            scope="admin",
+            values=payload.texts,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post(
+    "/v1/admin/telegram-bot/texts/reset",
+    dependencies=[Depends(require_admin)],
+)
+def reset_admin_bot_texts(
+    payload: BotTextsResetIn,
+    db: Session = Depends(get_db),
+):
+    try:
+        return reset_bot_texts(
+            db,
+            scope="admin",
+            keys=payload.keys,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/v1/reseller/bot/texts")
+def reseller_bot_texts(
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    return bot_text_catalog(
+        db,
+        scope="reseller",
+        reseller=reseller,
+    )
+
+
+@router.put("/v1/reseller/bot/texts")
+def update_reseller_bot_texts(
+    payload: BotTextsUpdateIn,
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    try:
+        return save_bot_texts(
+            db,
+            scope="reseller",
+            reseller=reseller,
+            values=payload.texts,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/v1/reseller/bot/texts/reset")
+def reset_reseller_bot_texts(
+    payload: BotTextsResetIn,
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    try:
+        return reset_bot_texts(
+            db,
+            scope="reseller",
+            reseller=reseller,
+            keys=payload.keys,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
