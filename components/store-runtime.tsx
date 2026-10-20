@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect,useState} from "react";
+import {useEffect,useState,type CSSProperties} from "react";
 import {getCustomerToken} from "../lib/customer-api";
 import {planProtocols,StorePlan,storeRuntimeApi} from "../lib/store-runtime-api";
 import {useI18n} from "../lib/i18n";
@@ -10,6 +10,12 @@ import {
   normalizeStorefrontSettings,
 } from "../lib/storefront-config";
 import {resolveStoreTemplateId} from "../lib/store-template-registry";
+import {
+  applyStoreTemplateOptions,
+  storeTemplateCssVariables,
+  type StoreTemplateOptionMap,
+} from "../lib/store-template-options";
+import {loadStoreTemplateSettings} from "../lib/store-template-settings-api";
 import {StoreTemplateRenderer} from "./store-template-renderer";
 import {EditorialGrid2027Template} from "./store-template-editorial-grid";
 
@@ -17,6 +23,7 @@ export function StoreRuntime2027(){
   const {pick}=useI18n();
   const [plans,setPlans]=useState<StorePlan[]>([]);
   const [settings,setSettings]=useState<StorefrontSettings>(DEFAULT_STOREFRONT_SETTINGS);
+  const [templateSettings,setTemplateSettings]=useState<Record<string,Record<string,unknown>>>({});
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
   const [buying,setBuying]=useState<number|null>(null);
@@ -24,9 +31,10 @@ export function StoreRuntime2027(){
 
   const load=async()=>{
     setLoading(true);setError("");
-    const [plansResult,settingsResult]=await Promise.allSettled([
+    const [plansResult,settingsResult,templateSettingsResult]=await Promise.allSettled([
       storeRuntimeApi.plans(),
       storeRuntimeApi.storefrontSettings(),
+      loadStoreTemplateSettings(),
     ]);
 
     if(plansResult.status==="fulfilled")setPlans(plansResult.value.filter(plan=>plan.is_active));
@@ -34,6 +42,9 @@ export function StoreRuntime2027(){
 
     if(settingsResult.status==="fulfilled")setSettings(normalizeStorefrontSettings(settingsResult.value));
     else if(plansResult.status==="fulfilled")setError(settingsResult.reason instanceof Error?settingsResult.reason.message:String(settingsResult.reason));
+
+    if(templateSettingsResult.status==="fulfilled")setTemplateSettings(templateSettingsResult.value.templates||{});
+    else setTemplateSettings({});
 
     setLoading(false);
   };
@@ -56,8 +67,19 @@ export function StoreRuntime2027(){
     finally{setBuying(null);}
   };
 
+  const templateId=resolveStoreTemplateId(settings.active_template);
+  const rawTemplateOptions=templateSettings[templateId]||{};
+  const applied=applyStoreTemplateOptions(settings,templateId,rawTemplateOptions);
+  const effectiveSettings={...applied.settings} as StorefrontSettings;
+  const effectiveTarget=effectiveSettings as unknown as Record<string,unknown>;
+  for(const [key,value] of Object.entries(rawTemplateOptions)){
+    if(key in effectiveTarget&&(typeof value==="string"||typeof value==="boolean"||typeof value==="number"))effectiveTarget[key]=value;
+  }
+  const effectiveOptions={...applied.options,...rawTemplateOptions} as StoreTemplateOptionMap;
+  const themeStyle=storeTemplateCssVariables(effectiveOptions) as CSSProperties;
+
   const templateProps={
-    settings,
+    settings:effectiveSettings,
     plans,
     loading,
     error,
@@ -66,9 +88,7 @@ export function StoreRuntime2027(){
     onBuy:(plan:StorePlan)=>void buy(plan),
   };
 
-  if(resolveStoreTemplateId(settings.active_template)==="editorial-grid-2027"){
-    return <EditorialGrid2027Template {...templateProps}/>;
-  }
-
-  return <StoreTemplateRenderer {...templateProps}/>;
+  return <div data-store-theme-engine="v1" data-store-template-active={templateId} style={themeStyle}>
+    {templateId==="editorial-grid-2027"?<EditorialGrid2027Template {...templateProps}/>:<StoreTemplateRenderer {...templateProps}/>}
+  </div>;
 }
