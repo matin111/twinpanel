@@ -9,6 +9,7 @@ from ..main_receipt_cleanup import cleanup_receipts_once
 from ..payment_models import PaymentIntent
 from ..store_models import StoreOrder
 from ..user_notification_models import UserNotification
+from .l2tp_quota_runtime_v113 import reconcile_l2tp_quota_runtime_once
 from .openvpn_quota_runtime_v106 import reconcile_openvpn_quota_runtime_once
 from .payment_automation import (
     activate_existing_sms_auto_verify_once,
@@ -185,6 +186,28 @@ async def _quota_runtime_worker() -> None:
             # failure never changes the OpenVPN service or client-connect path.
             print(
                 "openvpn quota runtime reconcile failed:",
+                str(exc),
+                flush=True,
+            )
+
+        try:
+            l2tp_result = await reconcile_l2tp_quota_runtime_once()
+            changed.extend(
+                item
+                for item in l2tp_result.get("nodes", [])
+                if (
+                    item.get("opened")
+                    or item.get("closed")
+                    or item.get("usage_events")
+                )
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            # L2TP telemetry is also fail-open. PPP/IPsec availability is never
+            # coupled to controller accounting or an SSH polling failure.
+            print(
+                "l2tp quota runtime reconcile failed:",
                 str(exc),
                 flush=True,
             )

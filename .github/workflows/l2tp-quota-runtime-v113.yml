@@ -1,0 +1,47 @@
+name: TwinPanel L2TP Quota Runtime V113
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/l2tp_ppp_convergence_v111.py"
+      - "backend/app/services/l2tp_quota_runtime_v113.py"
+      - "backend/app/services/customer_maintenance.py"
+      - "backend/app/services/quota_node_sync.py"
+      - "backend/tests/integration/test_l2tp_quota_runtime_v113.py"
+      - ".github/workflows/l2tp-quota-runtime-v113.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/l2tp_ppp_convergence_v111.py"
+      - "backend/app/services/l2tp_quota_runtime_v113.py"
+      - "backend/app/services/customer_maintenance.py"
+      - "backend/app/services/quota_node_sync.py"
+      - "backend/tests/integration/test_l2tp_quota_runtime_v113.py"
+      - ".github/workflows/l2tp-quota-runtime-v113.yml"
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile changed runtime
+        run: |
+          python -W error::SyntaxWarning -m py_compile \
+            backend/app/l2tp_ppp_convergence_v111.py \
+            backend/app/services/l2tp_quota_runtime_v113.py \
+            backend/app/services/customer_maintenance.py \
+            backend/tests/integration/test_l2tp_quota_runtime_v113.py
+
+      - name: Verify L2TP quota telemetry contracts
+        run: |
+          python backend/tests/integration/test_l2tp_ppp_convergence_v111.py
+          python backend/tests/integration/test_l2tp_quota_runtime_v113.py
