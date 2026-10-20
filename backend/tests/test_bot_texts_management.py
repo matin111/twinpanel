@@ -1,5 +1,6 @@
 from app.bot_text_middleware import BotTextRequestMiddleware
 from app.bot_texts import _setting_key
+from app.routers import runtime_endpoints, telegram_manager
 
 
 def _middleware(scope: str, values: dict[str, str]) -> BotTextRequestMiddleware:
@@ -18,6 +19,22 @@ def test_bot_text_keys_are_isolated_by_owner():
         _setting_key("reseller", "welcome", 8)
         != _setting_key("reseller", "welcome", 7)
     )
+
+
+def test_admin_and_reseller_text_routes_are_registered():
+    paths = {route.path for route in runtime_endpoints.router.routes}
+
+    assert "/v1/admin/telegram-bot/texts" in paths
+    assert "/v1/admin/telegram-bot/texts/reset" in paths
+    assert "/v1/reseller/bot/texts" in paths
+    assert "/v1/reseller/bot/texts/reset" in paths
+
+
+def test_main_bot_service_uses_text_aware_runtime():
+    service_text = telegram_manager._service_text()
+
+    assert "-m app.telegram_runtime_custom" in service_text
+    assert "-m app.telegram_runtime_bot\n" not in service_text
 
 
 def test_success_copy_changes_without_touching_dynamic_order_data():
@@ -71,3 +88,20 @@ def test_receipt_prompt_changes_copy_only():
     assert "لطفاً تصویر رسید را ارسال کنید." in result
     assert "#91" in result
     assert "250,000 تومان" in result
+
+
+def test_pending_review_copy_does_not_remove_receipt_id():
+    middleware = _middleware(
+        "admin",
+        {"awaiting_approval": "در انتظار تأیید ادمین"},
+    )
+    source = (
+        "✅ <b>رسید پرداخت ثبت شد</b>\n\n"
+        "شناسه پرداخت: <b>#77</b>\n"
+        "وضعیت: <b>در انتظار بررسی</b>"
+    )
+
+    result = middleware._rewrite(source)
+
+    assert "در انتظار تأیید ادمین" in result
+    assert "#77" in result
