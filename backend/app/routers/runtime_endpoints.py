@@ -1,11 +1,10 @@
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..bot_texts import bot_text_catalog, reset_bot_texts, save_bot_texts
+from .. import bot_texts as _bot_text_runtime  # noqa: F401 - installs main bot runtime override
 from ..database import get_db
 from ..deps import require_admin, require_reseller
 from ..domain_models import Domain, DomainType, SSLStatus
@@ -22,14 +21,6 @@ from .admin import dashboard_summary_v2
 
 
 router = APIRouter(tags=["runtime"])
-
-
-class BotTextsUpdateIn(BaseModel):
-    texts: dict[str, str | None] = Field(default_factory=dict)
-
-
-class BotTextsResetIn(BaseModel):
-    keys: list[str] | None = None
 
 
 # Keep this window identical to the public Connect live-state rule. Protocols
@@ -283,93 +274,3 @@ def reseller_subscription_live_status(
         "generated_at": datetime.utcnow().isoformat() + "Z",
         "activity_window_seconds": _LIVE_ACTIVITY_SECONDS,
     }
-
-
-@router.get(
-    "/v1/admin/telegram-bot/texts",
-    dependencies=[Depends(require_admin)],
-)
-def admin_bot_texts(db: Session = Depends(get_db)):
-    return bot_text_catalog(db, scope="admin")
-
-
-@router.put(
-    "/v1/admin/telegram-bot/texts",
-    dependencies=[Depends(require_admin)],
-)
-def update_admin_bot_texts(
-    payload: BotTextsUpdateIn,
-    db: Session = Depends(get_db),
-):
-    try:
-        return save_bot_texts(
-            db,
-            scope="admin",
-            values=payload.texts,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@router.post(
-    "/v1/admin/telegram-bot/texts/reset",
-    dependencies=[Depends(require_admin)],
-)
-def reset_admin_bot_texts(
-    payload: BotTextsResetIn,
-    db: Session = Depends(get_db),
-):
-    try:
-        return reset_bot_texts(
-            db,
-            scope="admin",
-            keys=payload.keys,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@router.get("/v1/reseller/bot/texts")
-def reseller_bot_texts(
-    reseller: Reseller = Depends(require_reseller),
-    db: Session = Depends(get_db),
-):
-    return bot_text_catalog(
-        db,
-        scope="reseller",
-        reseller=reseller,
-    )
-
-
-@router.put("/v1/reseller/bot/texts")
-def update_reseller_bot_texts(
-    payload: BotTextsUpdateIn,
-    reseller: Reseller = Depends(require_reseller),
-    db: Session = Depends(get_db),
-):
-    try:
-        return save_bot_texts(
-            db,
-            scope="reseller",
-            reseller=reseller,
-            values=payload.texts,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@router.post("/v1/reseller/bot/texts/reset")
-def reset_reseller_bot_texts(
-    payload: BotTextsResetIn,
-    reseller: Reseller = Depends(require_reseller),
-    db: Session = Depends(get_db),
-):
-    try:
-        return reset_bot_texts(
-            db,
-            scope="reseller",
-            reseller=reseller,
-            keys=payload.keys,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
