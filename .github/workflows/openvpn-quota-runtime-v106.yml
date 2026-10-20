@@ -1,0 +1,38 @@
+name: TwinPanel OpenVPN Quota Runtime V106
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/services/openvpn_quota_runtime_v106.py"
+      - "backend/app/services/quota_node_sync.py"
+      - "backend/app/services/customer_maintenance.py"
+      - "backend/tests/integration/test_openvpn_quota_identity_v106.py"
+      - "backend/tests/integration/test_openvpn_quota_runtime_v106.py"
+      - ".github/workflows/openvpn-quota-runtime-v106.yml"
+
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile OpenVPN quota runtime
+        run: |
+          python -m py_compile backend/app/services/openvpn_quota_runtime_v106.py
+          python -m py_compile backend/app/services/quota_node_sync.py
+          python -m py_compile backend/app/services/customer_maintenance.py
+
+      - name: Run OpenVPN identity regression
+        working-directory: backend
+        run: PYTHONPATH=. python tests/integration/test_openvpn_quota_identity_v106.py
+
+      - name: Run OpenVPN runtime telemetry regression
+        working-directory: backend
+        run: PYTHONPATH=. python tests/integration/test_openvpn_quota_runtime_v106.py

@@ -9,6 +9,7 @@ from ..main_receipt_cleanup import cleanup_receipts_once
 from ..payment_models import PaymentIntent
 from ..store_models import StoreOrder
 from ..user_notification_models import UserNotification
+from .openvpn_quota_runtime_v106 import reconcile_openvpn_quota_runtime_once
 from .payment_automation import (
     activate_existing_sms_auto_verify_once,
     process_pending_crypto_payments_once,
@@ -144,9 +145,11 @@ async def _quota_runtime_worker() -> None:
     """Keep real VPN sessions synchronized with the quota ledger."""
 
     while True:
+        changed: list[dict] = []
+
         try:
             result = await reconcile_quota_runtime_once()
-            changed = [
+            changed.extend(
                 item
                 for item in result.get("nodes", [])
                 if (
@@ -154,19 +157,42 @@ async def _quota_runtime_worker() -> None:
                     or item.get("closed")
                     or item.get("usage_events")
                 )
-            ]
-            if changed:
-                print(
-                    "QUOTA_RUNTIME_RECONCILE",
-                    changed,
-                    flush=True,
-                )
+            )
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             print(
                 "quota runtime reconcile failed:",
                 str(exc),
+                flush=True,
+            )
+
+        try:
+            openvpn_result = await reconcile_openvpn_quota_runtime_once()
+            changed.extend(
+                item
+                for item in openvpn_result.get("nodes", [])
+                if (
+                    item.get("opened")
+                    or item.get("closed")
+                    or item.get("usage_events")
+                )
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            # Telemetry is intentionally fail-open. A controller/SSH/management
+            # failure never changes the OpenVPN service or client-connect path.
+            print(
+                "openvpn quota runtime reconcile failed:",
+                str(exc),
+                flush=True,
+            )
+
+        if changed:
+            print(
+                "QUOTA_RUNTIME_RECONCILE",
+                changed,
                 flush=True,
             )
 

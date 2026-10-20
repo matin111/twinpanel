@@ -6,6 +6,7 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 
 from ..models import Node, ProtocolCredential, SubscriptionNode
+from ..protocol_identity import is_openvpn_central_pki_enabled
 from ..quota_models import QuotaDevice
 from ..quota_security import public_key_b64
 
@@ -63,8 +64,36 @@ def _quota_device_for_credential(
     return device
 
 
+def _runtime_identity(
+    *,
+    protocol: str,
+    subscription_id: int,
+    node_id: int,
+    fallback_identity: str,
+    openvpn_central_pki_enabled: bool,
+) -> str:
+    """Return the identity observed by the protocol runtime on this node.
+
+    The generic credential username is not the OpenVPN certificate Common
+    Name. Legacy per-node EasyRSA profiles use mv<subscription>n<node>, while
+    Central PKI uses the stable subscription-scoped mv-sub-<subscription> CN.
+    Keeping this separate from ``identity`` preserves existing consumers while
+    giving runtime telemetry an exact, non-guessing identity.
+    """
+
+    if protocol != "openvpn":
+        return fallback_identity
+
+    if openvpn_central_pki_enabled:
+        return f"mv-sub-{int(subscription_id)}"
+
+    return f"mv{int(subscription_id)}n{int(node_id)}"
+
+
 def build_node_devices(db: Session, node_id: int):
     result = []
+    node_id = int(node_id)
+    openvpn_central_pki_enabled = is_openvpn_central_pki_enabled(db)
 
     rows = (
         db.query(ProtocolCredential, SubscriptionNode)
@@ -73,7 +102,7 @@ def build_node_devices(db: Session, node_id: int):
             SubscriptionNode.subscription_id == ProtocolCredential.subscription_id,
         )
         .filter(
-            SubscriptionNode.node_id == int(node_id),
+            SubscriptionNode.node_id == node_id,
             ProtocolCredential.is_active.is_(True),
         )
         .order_by(
@@ -92,7 +121,8 @@ def build_node_devices(db: Session, node_id: int):
         if protocol is None:
             continue
 
-        dedupe_key = (int(credential.subscription_id), protocol)
+        subscription_id = int(credential.subscription_id)
+        dedupe_key = (subscription_id, protocol)
         if dedupe_key in seen:
             continue
         seen.add(dedupe_key)
@@ -101,16 +131,25 @@ def build_node_devices(db: Session, node_id: int):
         if device is None:
             continue
 
+        identity = (
+            getattr(credential, "username", None)
+            or f"mv-{subscription_id}@twinpanel"
+        )
+
         result.append(
             {
                 # IMPORTANT: quota sessions/events reference quota_devices.id,
                 # never protocol_credentials.id.
                 "device_id": int(device.id),
-                "subscription_id": int(credential.subscription_id),
+                "subscription_id": subscription_id,
                 "protocol": protocol,
-                "identity": (
-                    getattr(credential, "username", None)
-                    or f"mv-{int(credential.subscription_id)}@twinpanel"
+                "identity": identity,
+                "telemetry_identity": _runtime_identity(
+                    protocol=protocol,
+                    subscription_id=subscription_id,
+                    node_id=node_id,
+                    fallback_identity=identity,
+                    openvpn_central_pki_enabled=openvpn_central_pki_enabled,
                 ),
             }
         )
@@ -132,7 +171,7 @@ def sync_node_config(db: Session, node_id: int, api_base: str | None = None):
     path = Path(f"/tmp/twinpanel-node-{int(node_id)}.json")
 
     config = {
-        "version": 2,
+        "version": 3,
         "node_id": int(node_id),
         "api_base": str(api_base or "").rstrip("/"),
         "command_public_key_b64": public_key_b64(),
