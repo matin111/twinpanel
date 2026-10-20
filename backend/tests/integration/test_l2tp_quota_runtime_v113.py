@@ -25,7 +25,7 @@ def main() -> None:
         "/etc/ppp/ip-up.d/twinpanel-l2tp-telemetry",
         "/etc/ppp/ip-down.d/twinpanel-l2tp-telemetry",
         "/run/twinpanel/l2tp-sessions",
-        'PEER="${PEERNAME:-}"',
+        'PEER="${{PEERNAME:-}}"',
         '[ "$LOCAL_IP" = "10.94.0.1" ]',
         "10.94.0.*",
         "pppd_pid=%s",
