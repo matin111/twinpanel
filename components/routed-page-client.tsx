@@ -45,8 +45,15 @@ const VpnSettingsModernPage=dynamic(()=>import("./vpn-settings-modern").then(m=>
 const CustomerDashboardPro=dynamic(()=>import("./customer-dashboard-pro").then(m=>m.CustomerDashboardPro));
 
 const ResellerDashboardV3=dynamic(()=>import("./reseller-dashboard-v3").then(m=>m.ResellerDashboardV3));
-const ResellerSubscriptionsParityRuntime=dynamic(()=>import("./reseller-subscriptions-parity").then(m=>m.ResellerSubscriptionsParityRuntime));
-const ResellerSubscriptionLiveTable=dynamic(()=>import("./reseller-subscription-live-table").then(m=>m.ResellerSubscriptionLiveTable));
+const ResellerSubscriptionsParityRuntime=dynamic(async()=>{
+  const [{ResellerSubscriptionsParityRuntime},{ResellerSubscriptionLiveTable}]=await Promise.all([
+    import("./reseller-subscriptions-parity"),
+    import("./reseller-subscription-live-table"),
+  ]);
+  return function ResellerSubscriptionsWithLiveStatus(){
+    return <><ResellerSubscriptionsParityRuntime/><ResellerSubscriptionLiveTable/></>;
+  };
+});
 const ResellerOwnedPlansRuntime=dynamic(()=>import("./reseller-owned-plans").then(m=>m.ResellerOwnedPlansRuntime));
 const ResellerTrafficRechargeV3=dynamic(()=>import("./reseller-plans-traffic-v3").then(m=>m.ResellerTrafficRechargeV3));
 const ResellerWalletRuntime=dynamic(()=>import("./reseller-wallet-runtime").then(m=>m.ResellerWalletRuntime));
@@ -126,7 +133,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
 
   if(key==="reseller") return <ResellerDashboardV3/>;
   if(key==="reseller/customers") return <ResellerCustomersParityV2/>;
-  if(key==="reseller/subscriptions") return <><ResellerSubscriptionsParityRuntime/><ResellerSubscriptionLiveTable/></>;
+  if(key==="reseller/subscriptions") return <ResellerSubscriptionsParityRuntime/>;
   if(key==="reseller/sales") return <ResellerOwnedPlansRuntime/>;
   if(key==="reseller/wallet") return <ResellerWalletRuntime/>;
   if(key==="reseller/bot-wallet") return <ResellerBotWalletRuntime/>;
