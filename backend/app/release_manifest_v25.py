@@ -315,29 +315,15 @@ def release_manifest_v25() -> dict[str, Any]:
     if cached is not None:
         return cached
 
-    # Keep normal nav/status polling instant. Once the cache expires, return the
-    # last known-good release immediately and refresh it in one background job.
+    # Keep normal nav/status polling instant after the first successful lookup.
+    # Once the cache expires, return the last known-good release immediately and
+    # refresh it in one background job.
     stale = _stale_manifest(refreshing=True)
     if stale is not None:
         _start_background_refresh()
         return stale
 
-    # First process start has no cache yet. Do not make every admin page wait on
-    # a restricted GitHub route; seed asynchronously and let the next 15 second
-    # status poll consume the fresh value. Explicit /release/check remains the
-    # synchronous path when the admin requests an immediate provider check.
-    _start_background_refresh()
-
-    from . import system_release as base
-
-    return {
-        "channel": os.getenv(
-            "TWINPANEL_RELEASE_CHANNEL",
-            base.DEFAULT_RELEASE_CHANNEL,
-        ),
-        "version": base.current_version(),
-        "manifest_source": None,
-        "manifest_cached": False,
-        "manifest_stale": True,
-        "manifest_refreshing": True,
-    }
+    # Preserve the existing first-load contract: when no successful manifest is
+    # cached yet, resolve one synchronously. This avoids returning a fabricated
+    # local version on process start and keeps existing API fallback semantics.
+    return refresh_release_manifest_cache()
