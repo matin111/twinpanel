@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import csv
 import socket
-import subprocess
 import time
 import uuid
 from datetime import datetime, timezone
@@ -69,6 +68,8 @@ def _int_counter(value) -> int:
 
 
 def _query_openvpn_management_local() -> tuple[bool, str]:
+    sock = None
+
     try:
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         sock.settimeout(3.0)
@@ -96,15 +97,17 @@ def _query_openvpn_management_local() -> tuple[bool, str]:
             if b"\nEND\n" in data or data.endswith(b"END\n"):
                 break
 
-        sock.close()
         return True, b"".join(chunks).decode("utf-8", errors="replace")
 
     except Exception as exc:
-        try:
-            sock.close()
-        except Exception:
-            pass
         return False, str(exc)
+
+    finally:
+        if sock is not None:
+            try:
+                sock.close()
+            except Exception:
+                pass
 
 
 async def _query_openvpn_management_remote(node: Node, db) -> tuple[bool, str]:
@@ -175,8 +178,6 @@ def _parse_openvpn_status(raw: str) -> list[dict]:
             {
                 "identity": common_name,
                 "session_identity": session_identity[:140],
-                # OpenVPN management reports bytes received by the server
-                # from the client and bytes sent by the server to the client.
                 "uplink": _int_counter(row[5] if len(row) > 5 else 0),
                 "downlink": _int_counter(row[6] if len(row) > 6 else 0),
             }
@@ -215,8 +216,6 @@ def _openvpn_device_map(db, node_id: int) -> dict[str, dict]:
         if str(item.get("protocol") or "") != "openvpn":
             continue
 
-        # Exact runtime mapping only. Do not guess or fall back to the generic
-        # credential username: legacy EasyRSA CNs and Central-PKI CNs differ.
         identity = str(item.get("telemetry_identity") or "").strip()
 
         if identity:
@@ -322,9 +321,6 @@ def _apply_openvpn_sessions(db, node: Node, observed: list[dict]) -> dict:
         )
         usage_events += 1
 
-    # Only a successful management poll is allowed to close sessions. Collector
-    # errors return before this function is called, so telemetry/API failures can
-    # never tear down or falsely close a live OpenVPN session.
     open_rows = (
         db.query(QuotaSession)
         .filter(
