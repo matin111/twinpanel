@@ -20,6 +20,12 @@ from ..reseller_bot_crypto import (
     decrypt_bot_token,
     encrypt_bot_token,
 )
+from .general_settings import (
+    BotTextsIn,
+    _bot_texts_out,
+    _reset_bot_texts,
+    _set_bot_texts,
+)
 from .reseller_portal import require_reseller
 from .telegram_manager import load_bot_token
 
@@ -100,40 +106,17 @@ def _out(
     row: ResellerBotSettings,
 ) -> dict:
     return {
-        "reseller_id":
-            reseller.id,
-
-        "reseller_name":
-            reseller.name,
-
-        "brand_name":
-            _brand(reseller),
-
-        "token_configured":
-            bool(
-                row.bot_token_encrypted
-            ),
-
-        "token_masked":
-            _masked_token(row),
-
-        "bot_username":
-            row.bot_username,
-
-        "welcome_message":
-            row.welcome_message,
-
-        "support_username":
-            row.support_username,
-
-        "is_active":
-            bool(row.is_active),
-
-        "created_at":
-            row.created_at,
-
-        "updated_at":
-            row.updated_at,
+        "reseller_id": reseller.id,
+        "reseller_name": reseller.name,
+        "brand_name": _brand(reseller),
+        "token_configured": bool(row.bot_token_encrypted),
+        "token_masked": _masked_token(row),
+        "bot_username": row.bot_username,
+        "welcome_message": row.welcome_message,
+        "support_username": row.support_username,
+        "is_active": bool(row.is_active),
+        "created_at": row.created_at,
+        "updated_at": row.updated_at,
     }
 
 
@@ -150,13 +133,7 @@ def _assert_token_available(
     except RuntimeError:
         main_token = ""
 
-    if (
-        main_token
-        and hmac.compare_digest(
-            token,
-            main_token,
-        )
-    ):
+    if main_token and hmac.compare_digest(token, main_token):
         raise HTTPException(
             status_code=409,
             detail=(
@@ -168,27 +145,19 @@ def _assert_token_available(
     rows = (
         db.query(ResellerBotSettings)
         .filter(
-            ResellerBotSettings.reseller_id
-            != int(reseller_id),
-            ResellerBotSettings.bot_token_encrypted.isnot(
-                None
-            ),
+            ResellerBotSettings.reseller_id != int(reseller_id),
+            ResellerBotSettings.bot_token_encrypted.isnot(None),
         )
         .all()
     )
 
     for other in rows:
         try:
-            other_token = decrypt_bot_token(
-                other.bot_token_encrypted
-            )
+            other_token = decrypt_bot_token(other.bot_token_encrypted)
         except Exception:
             continue
 
-        if hmac.compare_digest(
-            token,
-            other_token,
-        ):
+        if hmac.compare_digest(token, other_token):
             raise HTTPException(
                 status_code=409,
                 detail=(
@@ -198,30 +167,16 @@ def _assert_token_available(
             )
 
 
-async def _telegram_get_me(
-    token: str,
-) -> dict:
-    url = (
-        "https://api.telegram.org/bot"
-        + token
-        + "/getMe"
-    )
+async def _telegram_get_me(token: str) -> dict:
+    url = "https://api.telegram.org/bot" + token + "/getMe"
 
     try:
-        async with httpx.AsyncClient(
-            timeout=12.0,
-        ) as client:
-            response = await client.get(
-                url
-            )
-
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            response = await client.get(url)
     except Exception as exc:
         raise HTTPException(
             status_code=502,
-            detail=(
-                "اتصال به Telegram ناموفق بود: "
-                + str(exc)
-            ),
+            detail="اتصال به Telegram ناموفق بود: " + str(exc),
         )
 
     try:
@@ -232,24 +187,16 @@ async def _telegram_get_me(
             detail="پاسخ Telegram معتبر نیست",
         )
 
-    if (
-        response.status_code != 200
-        or not data.get("ok")
-    ):
+    if response.status_code != 200 or not data.get("ok"):
         description = str(
-            data.get("description")
-            or "توکن ربات معتبر نیست"
+            data.get("description") or "توکن ربات معتبر نیست"
         )
-
         raise HTTPException(
             status_code=422,
             detail=description,
         )
 
-    result = (
-        data.get("result")
-        or {}
-    )
+    result = data.get("result") or {}
 
     if not result.get("id"):
         raise HTTPException(
@@ -262,147 +209,128 @@ async def _telegram_get_me(
 
 @router.get("")
 def reseller_bot_status(
-    reseller: Reseller = Depends(
-        require_reseller
-    ),
+    reseller: Reseller = Depends(require_reseller),
     db: Session = Depends(get_db),
 ):
-    row = _row(
-        db,
-        reseller,
-    )
-
+    row = _row(db, reseller)
     db.commit()
-
-    return _out(
-        reseller,
-        row,
-    )
+    return _out(reseller, row)
 
 
 @router.put("/token")
 async def save_reseller_bot_token(
     payload: BotTokenIn,
-    reseller: Reseller = Depends(
-        require_reseller
-    ),
+    reseller: Reseller = Depends(require_reseller),
     db: Session = Depends(get_db),
 ):
     token = payload.token.strip()
-
-    _assert_token_available(
-        db,
-        int(reseller.id),
-        token,
-    )
-
-    info = await _telegram_get_me(
-        token
-    )
-
-    row = _row(
-        db,
-        reseller,
-    )
-
-    row.bot_token_encrypted = (
-        encrypt_bot_token(token)
-    )
-
-    row.bot_username = (
-        str(
-            info.get("username")
-            or ""
-        ).strip()
-        or None
-    )
-
-    # Token change always pauses runtime
-    # until reseller explicitly enables it.
+    _assert_token_available(db, int(reseller.id), token)
+    info = await _telegram_get_me(token)
+    row = _row(db, reseller)
+    row.bot_token_encrypted = encrypt_bot_token(token)
+    row.bot_username = str(info.get("username") or "").strip() or None
     row.is_active = False
     row.updated_at = datetime.utcnow()
-
     db.commit()
     db.refresh(row)
 
     return {
         "ok": True,
         "bot": {
-            "id":
-                info.get("id"),
-            "username":
-                info.get("username"),
-            "first_name":
-                info.get("first_name"),
+            "id": info.get("id"),
+            "username": info.get("username"),
+            "first_name": info.get("first_name"),
         },
-        "settings":
-            _out(
-                reseller,
-                row,
-            ),
+        "settings": _out(reseller, row),
     }
 
 
 @router.patch("/settings")
 def update_reseller_bot_settings(
     payload: BotSettingsIn,
-    reseller: Reseller = Depends(
-        require_reseller
-    ),
+    reseller: Reseller = Depends(require_reseller),
     db: Session = Depends(get_db),
 ):
-    row = _row(
-        db,
-        reseller,
-    )
+    row = _row(db, reseller)
 
-    if (
-        payload.welcome_message
-        is not None
-    ):
-        row.welcome_message = (
-            payload.welcome_message.strip()
-            or None
-        )
+    if payload.welcome_message is not None:
+        row.welcome_message = payload.welcome_message.strip() or None
 
-    if (
-        payload.support_username
-        is not None
-    ):
-        support = (
-            payload.support_username
-            .strip()
-        )
-
+    if payload.support_username is not None:
+        support = payload.support_username.strip()
         if support.startswith("@"):
             support = support[1:]
-
-        row.support_username = (
-            support or None
-        )
+        row.support_username = support or None
 
     row.updated_at = datetime.utcnow()
-
     db.commit()
     db.refresh(row)
+    return _out(reseller, row)
 
-    return _out(
-        reseller,
-        row,
+
+@router.get("/texts")
+def reseller_bot_texts(
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    return _bot_texts_out(
+        db,
+        "reseller",
+        int(reseller.id),
+    )
+
+
+@router.put("/texts")
+def update_reseller_bot_texts(
+    payload: BotTextsIn,
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    try:
+        _set_bot_texts(
+            db,
+            "reseller",
+            payload.texts,
+            int(reseller.id),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
+    db.commit()
+    return _bot_texts_out(
+        db,
+        "reseller",
+        int(reseller.id),
+    )
+
+
+@router.delete("/texts")
+def reset_reseller_bot_texts(
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    _reset_bot_texts(
+        db,
+        "reseller",
+        int(reseller.id),
+    )
+    db.commit()
+    return _bot_texts_out(
+        db,
+        "reseller",
+        int(reseller.id),
     )
 
 
 @router.post("/test")
 async def test_reseller_bot(
-    reseller: Reseller = Depends(
-        require_reseller
-    ),
+    reseller: Reseller = Depends(require_reseller),
     db: Session = Depends(get_db),
 ):
-    row = _row(
-        db,
-        reseller,
-    )
+    row = _row(db, reseller)
 
     if not row.bot_token_encrypted:
         raise HTTPException(
@@ -411,61 +339,35 @@ async def test_reseller_bot(
         )
 
     try:
-        token = decrypt_bot_token(
-            row.bot_token_encrypted
-        )
+        token = decrypt_bot_token(row.bot_token_encrypted)
     except Exception:
         raise HTTPException(
             status_code=500,
             detail="خواندن امن توکن ربات ناموفق بود",
         )
 
-    _assert_token_available(
-        db,
-        int(reseller.id),
-        token,
-    )
-
-    info = await _telegram_get_me(
-        token
-    )
-
-    row.bot_username = (
-        str(
-            info.get("username")
-            or ""
-        ).strip()
-        or None
-    )
-
+    _assert_token_available(db, int(reseller.id), token)
+    info = await _telegram_get_me(token)
+    row.bot_username = str(info.get("username") or "").strip() or None
     row.updated_at = datetime.utcnow()
-
     db.commit()
 
     return {
         "ok": True,
         "bot": {
-            "id":
-                info.get("id"),
-            "username":
-                info.get("username"),
-            "first_name":
-                info.get("first_name"),
+            "id": info.get("id"),
+            "username": info.get("username"),
+            "first_name": info.get("first_name"),
         },
     }
 
 
 @router.post("/activate")
 async def activate_reseller_bot(
-    reseller: Reseller = Depends(
-        require_reseller
-    ),
+    reseller: Reseller = Depends(require_reseller),
     db: Session = Depends(get_db),
 ):
-    row = _row(
-        db,
-        reseller,
-    )
+    row = _row(db, reseller)
 
     if not row.bot_token_encrypted:
         raise HTTPException(
@@ -474,72 +376,39 @@ async def activate_reseller_bot(
         )
 
     try:
-        token = decrypt_bot_token(
-            row.bot_token_encrypted
-        )
+        token = decrypt_bot_token(row.bot_token_encrypted)
     except Exception:
         raise HTTPException(
             status_code=500,
             detail="خواندن امن توکن ربات ناموفق بود",
         )
 
-    _assert_token_available(
-        db,
-        int(reseller.id),
-        token,
-    )
-
-    info = await _telegram_get_me(
-        token
-    )
-
-    row.bot_username = (
-        str(
-            info.get("username")
-            or ""
-        ).strip()
-        or None
-    )
-
+    _assert_token_available(db, int(reseller.id), token)
+    info = await _telegram_get_me(token)
+    row.bot_username = str(info.get("username") or "").strip() or None
     row.is_active = True
     row.updated_at = datetime.utcnow()
-
     db.commit()
     db.refresh(row)
 
     return {
         "ok": True,
-        "settings":
-            _out(
-                reseller,
-                row,
-            ),
+        "settings": _out(reseller, row),
     }
 
 
 @router.post("/deactivate")
 def deactivate_reseller_bot(
-    reseller: Reseller = Depends(
-        require_reseller
-    ),
+    reseller: Reseller = Depends(require_reseller),
     db: Session = Depends(get_db),
 ):
-    row = _row(
-        db,
-        reseller,
-    )
-
+    row = _row(db, reseller)
     row.is_active = False
     row.updated_at = datetime.utcnow()
-
     db.commit()
     db.refresh(row)
 
     return {
         "ok": True,
-        "settings":
-            _out(
-                reseller,
-                row,
-            ),
+        "settings": _out(reseller, row),
     }
