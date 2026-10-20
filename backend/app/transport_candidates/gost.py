@@ -61,6 +61,27 @@ PROFILE_ORDER: tuple[str, ...] = (
     "relay+tls",
 )
 
+# TWINPANEL_GOST_RELAY_REGISTRATION_V85
+#
+# rc.82 production evidence narrowed the remaining failure to registration of
+# the TUN peer route, not to the outer TCP/TLS/WSS path: the relay CONNECT
+# reached 127.0.0.1:8421 on Exit, both TUN interfaces existed, yet both peer
+# pings remained at 100% loss. The old canary then tore the profile down about
+# seven seconds after start, before the configured 10s TUN keepalive could
+# provide a second registration attempt.
+#
+# GOST relay defaults nodelay=false. In that mode the connector buffers the
+# relay request together with the first UDP datagram, while the handler also
+# buffers its response with the first return datagram. For TUN-over-relay the
+# first UDP datagram is the address-registration frame that teaches the Exit
+# TUN handler how to route return traffic. Make control-plane establishment
+# explicit on *both* relay ends with nodelay=true, then allow more than one
+# keepalive interval before the fail-closed L3 probe. This keeps the documented
+# TUN-over-relay topology while removing first-datagram timing from canary
+# eligibility.
+TUN_KEEPALIVE_SECONDS = 10
+REGISTRATION_SETTLE_SECONDS = 12.0
+
 
 def _download(raw_arch: str) -> str:
     a = arch(raw_arch)
@@ -210,7 +231,7 @@ After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/twinpanel-gost -L=tun://:{FORWARD_PORT}?net={rt['exit_addr']}&name={rt['interface']}&mtu=1360 -L={profile}://:{port}?bind=true
+ExecStart=/usr/local/bin/twinpanel-gost -L=tun://:{FORWARD_PORT}?net={rt['exit_addr']}&name={rt['interface']}&mtu=1360 -L={profile}://:{port}?bind=true&nodelay=true
 Restart=always
 RestartSec=2
 LimitNOFILE=1048576
@@ -247,7 +268,7 @@ After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/twinpanel-gost -L=tun://:0/:{FORWARD_PORT}?net={rt['iran_addr']}&name={rt['interface']}&mtu=1360&keepAlive=true&ttl=10s -F={profile}://{exit_public_ip}:{port}?secure=false
+ExecStart=/usr/local/bin/twinpanel-gost -L=tun://:0/:{FORWARD_PORT}?net={rt['iran_addr']}&name={rt['interface']}&mtu=1360&keepalive=true&ttl={TUN_KEEPALIVE_SECONDS}s -F={profile}://{exit_public_ip}:{port}?secure=false&nodelay=true
 Restart=always
 RestartSec=2
 LimitNOFILE=1048576
@@ -326,9 +347,12 @@ fi
                     rt=rt,
                 )
 
-                # Give the chain a short window to establish before the real
-                # peer/TCP/UDP canary sends traffic through the TUN device.
-                await asyncio.sleep(2)
+                # Give the TUN registration path more than one configured
+                # keepalive interval. The relay control exchange itself is
+                # nodelay=true on both ends, so the first registration is no
+                # longer coupled to the relay request/response framing; this
+                # grace also permits one clean retry before fail-closed probe.
+                await asyncio.sleep(REGISTRATION_SETTLE_SECONDS)
 
                 health = await probe(
                     ci,
@@ -353,6 +377,8 @@ fi
                     "selected_profile": profile,
                     "profile_canary": "v81",
                     "upstream_binary_fix": "v82",
+                    "relay_registration_fix": "v85",
+                    "registration_settle_seconds": REGISTRATION_SETTLE_SECONDS,
                     "profile_attempts": attempts,
                     "upstream_issue": UPSTREAM_ISSUE,
                     "upstream_fix_commit": UPSTREAM_FIX_COMMIT,
@@ -377,6 +403,8 @@ fi
                     "selected_profile": profile,
                     "profile_canary": "v81",
                     "upstream_binary_fix": "v82",
+                    "relay_registration_fix": "v85",
+                    "registration_settle_seconds": REGISTRATION_SETTLE_SECONDS,
                     "profile_attempts": attempts,
                     "upstream_issue": UPSTREAM_ISSUE,
                     "upstream_fix_commit": UPSTREAM_FIX_COMMIT,
@@ -417,7 +445,7 @@ fi
         msg = (
             f"{type(exc).__name__}: {exc} | "
             f"attempts={attempts!r} | "
-            f"version={VERSION} upstream={UPSTREAM_ISSUE} | "
+            f"version={VERSION} upstream={UPSTREAM_ISSUE} relay_registration=v85 | "
             f"iran={iran_diag[-2500:]} | exit={exit_diag[-2500:]}"
         )
         mark(db, tunnel_id, name, status="failed", error=msg)

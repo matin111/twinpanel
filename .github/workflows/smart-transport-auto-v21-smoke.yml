@@ -20,6 +20,7 @@ on:
       - 'backend/tests/integration/test_tunnel_core_candidate_registry_v79.py'
       - 'backend/tests/integration/test_gost_profile_canary_v81.py'
       - 'backend/tests/integration/test_gost_upstream_udp_fix_v82.py'
+      - 'backend/tests/integration/test_gost_relay_registration_v85.py'
       - 'backend/deploy/systemd/twinpanel-transport-manager.service'
       - '.github/workflows/smart-transport-auto-v21-smoke.yml'
   push:
@@ -43,6 +44,7 @@ on:
       - 'backend/tests/integration/test_tunnel_core_candidate_registry_v79.py'
       - 'backend/tests/integration/test_gost_profile_canary_v81.py'
       - 'backend/tests/integration/test_gost_upstream_udp_fix_v82.py'
+      - 'backend/tests/integration/test_gost_relay_registration_v85.py'
       - 'backend/deploy/systemd/twinpanel-transport-manager.service'
       - '.github/workflows/smart-transport-auto-v21-smoke.yml'
 
@@ -80,7 +82,8 @@ jobs:
             backend/app/unified_l3_candidate_registry_v79.py \
             backend/tests/integration/test_tunnel_core_candidate_registry_v79.py \
             backend/tests/integration/test_gost_profile_canary_v81.py \
-            backend/tests/integration/test_gost_upstream_udp_fix_v82.py
+            backend/tests/integration/test_gost_upstream_udp_fix_v82.py \
+            backend/tests/integration/test_gost_relay_registration_v85.py
 
       - name: Smart transport static contracts
         run: |
@@ -163,7 +166,17 @@ jobs:
           assert 'UPSTREAM_X_VERSION = "v0.19.5"' in gost
           assert '"profile_canary": "v81"' in gost
           assert '"upstream_binary_fix": "v82"' in gost
-          print('SMART_TRANSPORT_AUTO_V82_CONTRACT_OK')
+
+          # V85: relay control establishment must be explicit on both ends and
+          # the canary must survive at least one configured TUN keepalive retry.
+          assert 'TWINPANEL_GOST_RELAY_REGISTRATION_V85' in gost
+          assert '?bind=true&nodelay=true' in gost
+          assert '?secure=false&nodelay=true' in gost
+          assert 'TUN_KEEPALIVE_SECONDS = 10' in gost
+          assert 'REGISTRATION_SETTLE_SECONDS = 12.0' in gost
+          assert 'await asyncio.sleep(REGISTRATION_SETTLE_SECONDS)' in gost
+          assert '"relay_registration_fix": "v85"' in gost
+          print('SMART_TRANSPORT_AUTO_V85_CONTRACT_OK')
           PY
 
       - name: Tunnel Core V79 regression
@@ -177,3 +190,7 @@ jobs:
       - name: GOST upstream UDP fix V82 regression
         run: |
           python backend/tests/integration/test_gost_upstream_udp_fix_v82.py
+
+      - name: GOST relay registration V85 regression
+        run: |
+          python backend/tests/integration/test_gost_relay_registration_v85.py
