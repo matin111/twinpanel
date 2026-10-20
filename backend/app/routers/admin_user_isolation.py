@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
@@ -8,6 +11,7 @@ from ..database import get_db
 from ..deps import require_admin
 from ..models import Subscription, SubscriptionStatus, User, UserRole
 from ..models_reseller import Reseller, ResellerCustomer
+from ..payment_models import PaymentIntent
 from ..schemas import AdminPasswordResetIn, AdminStatsOut, AdminUserUpdateIn, UserOut
 from . import admin as legacy_admin
 
@@ -74,6 +78,73 @@ def _require_central_user(db: Session, user_id: int) -> None:
         raise HTTPException(status_code=404, detail="کاربر پیدا نشد")
 
 
+# TWINPANEL_ADMIN_DASHBOARD_REVENUE_V86
+# The dashboard renders sales_today/week/month as Toman. The legacy summary
+# returned counts of subscriptions whose starts_at fell in each window, so two
+# new subscriptions were literally rendered as "2 تومان". Revenue must come
+# from the canonical payment ledger instead: only confirmed PaymentIntent rows,
+# timestamped by verified_at, with the immutable payable amount preferred and
+# the base amount used only as a backward-compatible fallback.
+_CONFIRMED_PAYMENT_STATUSES = (
+    "approved",
+    "auto_verified",
+)
+
+
+def _tehran_revenue_boundaries() -> tuple[datetime, datetime, datetime]:
+    tehran = ZoneInfo("Asia/Tehran")
+    now_local = datetime.now(tehran)
+    today_local = now_local.replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+    week_local = today_local - timedelta(
+        days=(now_local.weekday() - 5) % 7
+    )
+    month_local = today_local.replace(day=1)
+
+    def to_utc_naive(value: datetime) -> datetime:
+        return (
+            value.astimezone(timezone.utc)
+            .replace(tzinfo=None)
+        )
+
+    return (
+        to_utc_naive(today_local),
+        to_utc_naive(week_local),
+        to_utc_naive(month_local),
+    )
+
+
+def _confirmed_revenue_since(db: Session, start_at: datetime) -> int:
+    amount = func.coalesce(
+        PaymentIntent.payable_amount_toman,
+        PaymentIntent.base_amount_toman,
+        0,
+    )
+    total = (
+        db.query(func.coalesce(func.sum(amount), 0))
+        .filter(
+            PaymentIntent.status.in_(_CONFIRMED_PAYMENT_STATUSES),
+            PaymentIntent.verified_at.isnot(None),
+            PaymentIntent.verified_at >= start_at,
+        )
+        .scalar()
+    )
+    return int(total or 0)
+
+
+def _dashboard_revenue(db: Session) -> dict[str, int]:
+    today_utc, week_utc, month_utc = _tehran_revenue_boundaries()
+    return {
+        "sales_today": _confirmed_revenue_since(db, today_utc),
+        "sales_week": _confirmed_revenue_since(db, week_utc),
+        "sales_month": _confirmed_revenue_since(db, month_utc),
+    }
+
+
 @router.get("/stats", response_model=AdminStatsOut)
 def stats(db: Session = Depends(get_db)):
     legacy = legacy_admin.stats(db)
@@ -89,8 +160,10 @@ def stats(db: Session = Depends(get_db)):
 def dashboard_summary(db: Session = Depends(get_db)):
     # Keep all subscription/account counters intact: reseller subscriptions are
     # intentionally visible to the central admin. Only the user identity count
-    # is isolated.
+    # is isolated. Revenue is replaced with canonical confirmed-payment totals;
+    # the legacy function's subscription-count sales fields are never exposed.
     payload = legacy_admin.dashboard_summary_v2(db)
+    payload.update(_dashboard_revenue(db))
     payload["total_users"] = (
         _visible_users_query(db)
         .filter(User.role == UserRole.USER)
