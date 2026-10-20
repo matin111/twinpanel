@@ -3,6 +3,9 @@ from __future__ import annotations
 from .models import Node, NodeProtocolConfig, Tunnel, TunnelStatus
 from .routers import tunnels
 from . import vpn_access_dataplane_v46
+from .l2tp_ppp_convergence_v111 import (
+    apply_l2tp_ppp_convergence_v111,
+)
 
 
 # ============================================================
@@ -293,6 +296,12 @@ def apply_protocol_dataplane_desired_state_v87() -> None:
     if _RUNTIME_APPLIED:
         return
 
+    # L2TP V111 refines provisioning/repair health before V87 publishes the
+    # protocol as desired. It does not mutate a node on import/startup; it only
+    # changes how explicit install/repair operations validate and converge the
+    # managed L2TP runtime.
+    apply_l2tp_ppp_convergence_v111()
+
     # Unified L3 V49 captures these two route builders when it is applied.
     # self_hosted_runtime intentionally invokes V87 first.
     tunnels._service_routes_for_exit = _service_routes_for_exit_v87
@@ -314,6 +323,7 @@ def apply_protocol_dataplane_desired_state_v87() -> None:
         "egress_authority=config+node_enable "
         "telemetry_status_authority=0 "
         "xray_public_profiles=restored_v109 "
+        "l2tp_ppp_convergence=v111 "
         "protocols=cisco,openvpn,wireguard,l2tp,v2ray",
         flush=True,
     )
