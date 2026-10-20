@@ -24,6 +24,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
+          test -f scripts/verify-legacy-tutorial-images.py
           mkdir -p /tmp/tutorial-downloads
           while IFS=, read -r rel width height ahash dhash; do
             test -n "$rel" || continue
