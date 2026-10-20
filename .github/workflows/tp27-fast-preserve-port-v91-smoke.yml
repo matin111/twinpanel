@@ -1,0 +1,50 @@
+name: TP27 Fast Preserve Port V91 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/transport_candidates/tp27_fast.py"
+      - "backend/app/transport_candidates/__init__.py"
+      - "backend/app/tp27_reference_runtime_v91.py"
+      - "backend/app/runtime_reconciler_v4.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/tests/integration/test_tp27_fast_preserve_port_v91.py"
+      - ".github/workflows/tp27-fast-preserve-port-v91-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/transport_candidates/tp27_fast.py"
+      - "backend/app/transport_candidates/__init__.py"
+      - "backend/app/tp27_reference_runtime_v91.py"
+      - "backend/app/runtime_reconciler_v4.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/tests/integration/test_tp27_fast_preserve_port_v91.py"
+      - ".github/workflows/tp27-fast-preserve-port-v91-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile TP27 runtime
+        run: |
+          python -W error::SyntaxWarning -m py_compile \
+            backend/app/transport_candidates/tp27_fast.py \
+            backend/app/transport_candidates/__init__.py \
+            backend/app/tp27_reference_runtime_v91.py \
+            backend/app/runtime_reconciler_v4.py \
+            backend/app/tunnel_transport_manager_v12.py \
+            backend/tests/integration/test_tp27_fast_preserve_port_v91.py
+
+      - name: Verify TP27 carrier and preserve-port contracts
+        run: |
+          python backend/tests/integration/test_tp27_fast_preserve_port_v91.py
