@@ -1,0 +1,68 @@
+name: TwinPanel Store Tutorial Assets V121 Import
+
+on:
+  push:
+    branches:
+      - feat/store-tutorial-images-v121
+
+permissions:
+  contents: write
+
+concurrency:
+  group: store-tutorial-assets-v121-import
+  cancel-in-progress: false
+
+jobs:
+  import-verified-legacy-screenshots:
+    runs-on: ubuntu-latest
+    if: github.repository == 'matin111/twinpanel'
+    steps:
+      - name: Checkout import branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/store-tutorial-images-v121
+          fetch-depth: 0
+
+      - name: Download screenshots and verify against backup manifest
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          manifest="assets/legacy-learning-screenshots.sha256"
+          test -s "$manifest"
+          count=0
+          while read -r expected rel; do
+            [[ -n "${expected:-}" && -n "${rel:-}" ]] || continue
+            case "$rel" in
+              screenshots/*/*.webp) ;;
+              *) echo "Unexpected tutorial path: $rel" >&2; exit 41 ;;
+            esac
+            target="public/learning/$rel"
+            mkdir -p "$(dirname "$target")"
+            curl -fL --retry 4 --retry-delay 2 --connect-timeout 15 --max-time 90 \
+              "https://movilineapp.com/learning/$rel" \
+              -o "$target"
+            actual="$(sha256sum "$target" | awk '{print $1}')"
+            if [[ "$actual" != "$expected" ]]; then
+              echo "Backup checksum mismatch for $rel" >&2
+              echo "expected=$expected" >&2
+              echo "actual=$actual" >&2
+              exit 42
+            fi
+            count=$((count + 1))
+          done < "$manifest"
+          [[ "$count" -eq 65 ]] || { echo "Expected 65 verified screenshots, got $count" >&2; exit 43; }
+          echo "VERIFIED_TUTORIAL_SCREENSHOTS=$count"
+
+      - name: Commit verified images to GitHub branch
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git add public/learning/screenshots assets/legacy-learning-screenshots.sha256
+          if git diff --cached --quiet; then
+            echo "Tutorial assets already match the verified backup."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Import verified legacy storefront tutorial screenshots"
+          git push origin HEAD:feat/store-tutorial-images-v121
