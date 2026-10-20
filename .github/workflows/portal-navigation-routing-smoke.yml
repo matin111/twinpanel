@@ -27,6 +27,7 @@ jobs:
       - name: Verify every reseller menu route has a dedicated runtime
         run: |
           python - <<'PY'
+          import re
           from pathlib import Path
 
           routes = Path("components/routed-page-client.tsx").read_text(encoding="utf-8")
@@ -45,9 +46,14 @@ jobs:
           }
           missing = []
           for key, component in expected.items():
-              needle = f'if(key==="{key}") return <{component}/>'
-              if needle not in routes:
-                  missing.append(needle)
+              # A route may legitimately render a small sidecar/helper beside its
+              # dedicated runtime. Keep the contract strict about the route and
+              # primary component without requiring an exact single-component JSX
+              # expression.
+              pattern = rf'if\(key==="{re.escape(key)}"\)\s+return\s+([^;\n]+);'
+              match = re.search(pattern, routes)
+              if not match or f'<{component}/>' not in match.group(1):
+                  missing.append(f'{key} -> <{component}/>')
           if missing:
               raise SystemExit("missing dedicated reseller routes: " + repr(missing))
 
