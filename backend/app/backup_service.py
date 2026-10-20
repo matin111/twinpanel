@@ -21,9 +21,9 @@ from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import MetaData, Table, create_engine, inspect, select, text
 from sqlalchemy.pool import NullPool
 
-from .backup_telegram_credentials import load_backup_telegram_bot_token as load_bot_token
 from .config import settings
 from .database import engine
+from .routers.telegram_manager import load_bot_token
 
 
 BACKUP_FORMAT = "twinpanel-selective-backup-v1"
@@ -437,7 +437,8 @@ def _unpack(value: Any) -> Any:
 
     return {
         key: _unpack(item)
-        for key, item in value.items()
+        for key, item
+        in value.items()
     }
 
 
