@@ -71,8 +71,9 @@ jobs:
       - name: Prepare runtime directories
         run: |
           sudo install -d -m 700 /etc/twinpanel
+          sudo install -d -m 700 /var/lib/twinpanel-backups
           sudo install -d -m 750 /var/lib/twinpanel/payment-receipts
-          sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel
+          sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel /var/lib/twinpanel-backups
 
       - name: Create schema and bootstrap admin
         working-directory: backend
