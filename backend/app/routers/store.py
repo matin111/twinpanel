@@ -70,6 +70,31 @@ class StoreOrderConfirmIn(BaseModel):
     )
 
 
+def _plan_subscription_terms(
+    plan: Plan,
+) -> tuple[int | None, int]:
+    """Return the exact plan limits used when a store order is fulfilled.
+
+    ``SubscriptionCreate`` uses ``None`` for an omitted traffic override, while
+    the subscription factory interprets zero bytes as unlimited traffic. Keep
+    that legacy unlimited-plan contract, but never turn a positive plan quota
+    into zero merely because the store did not send an override before.
+    """
+    traffic_gb = int(plan.traffic_gb or 0)
+    duration_days = int(plan.duration_days or 0)
+
+    if traffic_gb < 0 or duration_days <= 0:
+        raise HTTPException(
+            status_code=409,
+            detail="حجم یا مدت پلن فروشگاه معتبر نیست",
+        )
+
+    return (
+        traffic_gb if traffic_gb > 0 else None,
+        duration_days,
+    )
+
+
 def _order_out(
     order: StoreOrder,
 ) -> dict:
@@ -510,6 +535,10 @@ async def _fulfill_paid_order(
                     detail="پلن فروشگاه پیدا نشد",
                 )
 
+            traffic_gb, duration_days = (
+                _plan_subscription_terms(plan)
+            )
+
             payload = SubscriptionCreate(
                 user_id=order.user_id,
                 plan_id=order.plan_id,
@@ -518,6 +547,8 @@ async def _fulfill_paid_order(
                     order.requested_protocols
                     or []
                 ),
+                traffic_gb=traffic_gb,
+                duration_days=duration_days,
             )
 
             subscription = (
