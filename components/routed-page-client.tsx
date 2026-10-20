@@ -7,6 +7,8 @@ import {Card,Shell} from "./ui";
 
 const TelegramManagerPage=dynamic(()=>import("./admin-control-screens").then(m=>m.TelegramManagerPage));
 const AdminTelegramLegacyPage=dynamic(()=>import("./admin-telegram-legacy-parity").then(m=>m.AdminTelegramLegacyPage));
+const AdminBotTextsEditor=dynamic(()=>import("./bot-texts-editor").then(m=>m.AdminBotTextsEditor));
+const ResellerBotTextsEditor=dynamic(()=>import("./bot-texts-editor").then(m=>m.ResellerBotTextsEditor));
 const WalletRuntimePage=dynamic(()=>import("./admin-parity-runtime").then(m=>m.WalletRuntimePage));
 const DiscountsRuntimePage=dynamic(()=>import("./admin-parity-runtime").then(m=>m.DiscountsRuntimePage));
 const AdminResellersManagementRuntime=dynamic(()=>import("./admin-resellers-management-runtime").then(m=>m.AdminResellersManagementRuntime));
@@ -104,6 +106,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="admin/notifications") return admin(<NotificationsRuntimePage/>);
   if(key==="admin/support") return admin(<SupportRuntimePage/>);
   if(key==="admin/telegram") return admin(<AdminTelegramLegacyPage/>);
+  if(key==="admin/bot-texts") return admin(<AdminBotTextsEditor/>);
   if(key==="admin/telegram-manager") return admin(<TelegramManagerPage/>);
   if(key==="admin/sms-reader") return admin(<><SmsReaderRuntimePage/><AdminSmsRelayDownload/></>);
   if(key==="admin/backups") return admin(<BackupsFullRuntimePage/>);
@@ -138,6 +141,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="reseller/orders") return <ResellerOrdersParityRuntime/>;
   if(key==="reseller/discounts") return <ResellerDiscountsParityRuntime/>;
   if(key==="reseller/bot") return <ResellerBotParityRuntime/>;
+  if(key==="reseller/bot-texts") return <ResellerBotTextsEditor/>;
   if(key==="reseller/notifications") return <ResellerNotificationsLive/>;
   if(key==="reseller/settings") return <ResellerSettingsParityV2/>;
 
