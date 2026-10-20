@@ -11,6 +11,9 @@ type OperationKind=
   |"node-repair"
   |"agent-upgrade"
   |"fabric-install"
+  |"fabric-status"
+  |"xray-domain-save"
+  |"xray-domain-prepare"
   |"tunnel-create"
   |"subscription-create";
 
@@ -20,20 +23,24 @@ type ActivityState={
   status:"pending"|"success"|"error";
   startedAt:number;
   httpStatus?:number;
+  message?:string;
 };
 
 const operationFor=(pathname:string,method:string):OperationKind|null=>{
   const verb=method.toUpperCase();
-  if(verb!=="POST")return null;
-  if(pathname==="/v1/provision/install")return "node-provision";
-  if(pathname==="/v1/provision/save-node-access")return "node-access";
-  if(pathname==="/v1/provision/protocol-health")return "node-health";
-  if(pathname==="/v1/provision/restart-protocol")return "node-restart";
-  if(pathname==="/v1/provision/repair-protocols-saved")return "node-repair";
-  if(pathname==="/v1/provision/upgrade-agent")return "agent-upgrade";
-  if(pathname==="/v1/provision/install-fabric")return "fabric-install";
-  if(pathname==="/v1/tunnels/create-managed")return "tunnel-create";
-  if(pathname==="/v1/subscriptions/admin-create-v2")return "subscription-create";
+
+  if(verb==="POST"&&pathname==="/v1/provision/install")return "node-provision";
+  if(verb==="POST"&&pathname==="/v1/provision/save-node-access")return "node-access";
+  if(verb==="POST"&&pathname==="/v1/provision/protocol-health")return "node-health";
+  if(verb==="POST"&&pathname==="/v1/provision/restart-protocol")return "node-restart";
+  if(verb==="POST"&&pathname==="/v1/provision/repair-protocols-saved")return "node-repair";
+  if(verb==="POST"&&pathname==="/v1/provision/upgrade-agent")return "agent-upgrade";
+  if(verb==="POST"&&pathname==="/v1/provision/install-fabric")return "fabric-install";
+  if(verb==="GET"&&/^\/v1\/provision\/fabric-status\/\d+$/.test(pathname))return "fabric-status";
+  if(verb==="PUT"&&/^\/v1\/xray-modern-admin\/nodes\/\d+\/xray-domain$/.test(pathname))return "xray-domain-save";
+  if(verb==="POST"&&/^\/v1\/xray-modern-admin\/nodes\/\d+\/xray-domain\/prepare$/.test(pathname))return "xray-domain-prepare";
+  if(verb==="POST"&&pathname==="/v1/tunnels/create-managed")return "tunnel-create";
+  if(verb==="POST"&&pathname==="/v1/subscriptions/admin-create-v2")return "subscription-create";
   return null;
 };
 
@@ -45,6 +52,22 @@ function requestMeta(input:RequestInfo|URL,init?:RequestInit){
   }catch{
     return {method,pathname:""};
   }
+}
+
+function responseOutcome(payload:unknown){
+  if(!payload||typeof payload!=="object")return {ok:undefined as boolean|undefined,message:""};
+  const row=payload as Record<string,unknown>;
+  const ok=typeof row.ok==="boolean"?row.ok:undefined;
+  let message="";
+
+  if(typeof row.detail==="string")message=row.detail;
+  else if(typeof row.message==="string")message=row.message;
+
+  if(!message&&Array.isArray(row.failed_protocols)&&row.failed_protocols.length){
+    message=`Failed protocols: ${row.failed_protocols.map(String).join(", ")}`;
+  }
+
+  return {ok,message};
 }
 
 export function AdminOperationFeedback(){
@@ -81,27 +104,43 @@ export function AdminOperationFeedback(){
 
       try{
         const response=await originalFetch(input,init);
+        let payload:unknown=null;
+        try{
+          const type=response.headers.get("content-type")||"";
+          if(type.includes("application/json"))payload=await response.clone().json();
+        }catch{}
+
+        const outcome=responseOutcome(payload);
+        const success=response.ok&&outcome.ok!==false;
+
         if(sequenceRef.current===id){
           setActivity({
             id,
             kind,
-            status:response.ok?"success":"error",
+            status:success?"success":"error",
             startedAt,
             httpStatus:response.status,
+            message:outcome.message||undefined,
           });
           clearTimerRef.current=window.setTimeout(()=>{
             setActivity(current=>current?.id===id?null:current);
             clearTimerRef.current=null;
-          },response.ok?4500:8000);
+          },success?5500:10000);
         }
         return response;
       }catch(error){
         if(sequenceRef.current===id){
-          setActivity({id,kind,status:"error",startedAt});
+          setActivity({
+            id,
+            kind,
+            status:"error",
+            startedAt,
+            message:error instanceof Error?error.message:String(error),
+          });
           clearTimerRef.current=window.setTimeout(()=>{
             setActivity(current=>current?.id===id?null:current);
             clearTimerRef.current=null;
-          },8000);
+          },10000);
         }
         throw error;
       }
@@ -136,7 +175,7 @@ export function AdminOperationFeedback(){
     if(activity.kind==="node-health")return statusLabel(
       pick("در حال بررسی سلامت سرویس‌های نود…","Checking node service health…"),
       pick("بررسی سلامت سرویس‌ها کامل شد.","Service health check completed."),
-      pick("بررسی سلامت سرویس‌ها با خطا متوقف شد.","Service health check failed."),
+      pick("بررسی سلامت سرویس‌ها مشکل پیدا کرد.","Service health check reported a problem."),
     );
     if(activity.kind==="node-restart")return statusLabel(
       pick("در حال ریستارت و بررسی سرویس انتخاب‌شده…","Restarting and checking the selected service…"),
@@ -146,7 +185,7 @@ export function AdminOperationFeedback(){
     if(activity.kind==="node-repair")return statusLabel(
       pick("در حال تعمیر و همگام‌سازی پروتکل‌های نود…","Repairing and reconciling node protocols…"),
       pick("تعمیر پروتکل‌های نود کامل شد.","Node protocol repair completed."),
-      pick("تعمیر پروتکل‌های نود با خطا متوقف شد.","Node protocol repair failed."),
+      pick("تعمیر پروتکل‌های نود کامل نشد.","Node protocol repair did not complete successfully."),
     );
     if(activity.kind==="agent-upgrade")return statusLabel(
       pick("در حال ارتقای Agent نود…","Upgrading the node Agent…"),
@@ -157,6 +196,21 @@ export function AdminOperationFeedback(){
       pick("در حال آماده‌سازی Tunnel Fabric نود…","Preparing the node Tunnel Fabric…"),
       pick("Tunnel Fabric نود آماده شد.","Node Tunnel Fabric is ready."),
       pick("آماده‌سازی Tunnel Fabric با خطا متوقف شد.","Tunnel Fabric preparation failed."),
+    );
+    if(activity.kind==="fabric-status")return statusLabel(
+      pick("در حال دریافت وضعیت Tunnel Fabric…","Loading Tunnel Fabric status…"),
+      pick("وضعیت Tunnel Fabric دریافت شد.","Tunnel Fabric status loaded."),
+      pick("Tunnel Fabric در وضعیت آماده نیست.","Tunnel Fabric is not ready."),
+    );
+    if(activity.kind==="xray-domain-save")return statusLabel(
+      pick("در حال ذخیره دامنه Xray…","Saving the Xray domain…"),
+      pick("دامنه Xray ذخیره شد.","Xray domain saved."),
+      pick("ذخیره دامنه Xray ناموفق بود.","Saving the Xray domain failed."),
+    );
+    if(activity.kind==="xray-domain-prepare")return statusLabel(
+      pick("در حال آماده‌سازی SSL دامنه Xray…","Preparing TLS for the Xray domain…"),
+      pick("SSL دامنه Xray آماده شد.","Xray domain TLS is ready."),
+      pick("آماده‌سازی SSL دامنه Xray کامل نشد.","Xray domain TLS preparation did not complete."),
     );
     if(activity.kind==="tunnel-create")return statusLabel(
       pick("در حال ساخت تانل و بررسی مسیرهای ارتباطی…","Creating the tunnel and validating transport paths…"),
@@ -179,11 +233,13 @@ export function AdminOperationFeedback(){
       `The request was accepted and is still running on the server. Keep this page open. Elapsed: ${elapsed}s`,
     )
     :activity.status==="success"
-      ?pick("عملیات پایان یافت و اطلاعات صفحه در حال بروزرسانی است.","The operation finished and the page data is refreshing.")
-      :pick(
-        `پاسخ عملیات ناموفق بود${activity.httpStatus?` (HTTP ${activity.httpStatus})`:""}. جزئیات خطا در همان صفحه نمایش داده می‌شود.`,
-        `The operation failed${activity.httpStatus?` (HTTP ${activity.httpStatus})`:""}. The detailed error remains visible on the page.`,
-      );
+      ?activity.message||pick("عملیات پایان یافت و اطلاعات صفحه در حال بروزرسانی است.","The operation finished and the page data is refreshing.")
+      :activity.message
+        ?`${activity.message}${activity.httpStatus?` (HTTP ${activity.httpStatus})`:""}`
+        :pick(
+          `پاسخ عملیات ناموفق بود${activity.httpStatus?` (HTTP ${activity.httpStatus})`:""}.`,
+          `The operation failed${activity.httpStatus?` (HTTP ${activity.httpStatus})`:""}.`,
+        );
 
   const toneClass=activity.status==="pending"?"runtime-warning":activity.status==="success"?"runtime-success":"runtime-error";
 
