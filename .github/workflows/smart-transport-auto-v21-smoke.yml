@@ -9,10 +9,13 @@ on:
       - 'backend/app/tunnel_transport_manager_v12.py'
       - 'backend/app/candidate_lifecycle_v21.py'
       - 'backend/app/runtime_reconciler_v3.py'
+      - 'backend/app/runtime_reconciler_v4.py'
+      - 'backend/app/tp27_reference_runtime_v91.py'
       - 'backend/app/self_hosted_runtime.py'
       - 'backend/app/routers/modern_transports.py'
       - 'backend/app/transport_candidates/__init__.py'
       - 'backend/app/transport_candidates/common.py'
+      - 'backend/app/transport_candidates/tp27_fast.py'
       - 'backend/app/transport_candidates/gost.py'
       - 'backend/app/unified_l3_core_v49.py'
       - 'backend/app/unified_l3_agent_rollout_v49.py'
@@ -21,30 +24,25 @@ on:
       - 'backend/tests/integration/test_gost_profile_canary_v81.py'
       - 'backend/tests/integration/test_gost_upstream_udp_fix_v82.py'
       - 'backend/tests/integration/test_gost_relay_registration_v85.py'
+      - 'backend/tests/integration/test_tp27_fast_preserve_port_v91.py'
       - 'backend/deploy/systemd/twinpanel-transport-manager.service'
       - '.github/workflows/smart-transport-auto-v21-smoke.yml'
   push:
     branches:
-      - feat/smart-auto-bootstrap-v24
+      - main
     paths:
       - 'backend/app/smart_transport_auto_v21.py'
       - 'backend/app/smart_auto_bootstrap_v24.py'
-      - 'backend/app/tp2027_transport.py'
       - 'backend/app/tunnel_transport_manager_v12.py'
-      - 'backend/app/candidate_lifecycle_v21.py'
-      - 'backend/app/runtime_reconciler_v3.py'
-      - 'backend/app/self_hosted_runtime.py'
+      - 'backend/app/runtime_reconciler_v4.py'
+      - 'backend/app/tp27_reference_runtime_v91.py'
       - 'backend/app/routers/modern_transports.py'
       - 'backend/app/transport_candidates/__init__.py'
       - 'backend/app/transport_candidates/common.py'
-      - 'backend/app/transport_candidates/gost.py'
-      - 'backend/app/unified_l3_core_v49.py'
-      - 'backend/app/unified_l3_agent_rollout_v49.py'
+      - 'backend/app/transport_candidates/tp27_fast.py'
       - 'backend/app/unified_l3_candidate_registry_v79.py'
       - 'backend/tests/integration/test_tunnel_core_candidate_registry_v79.py'
-      - 'backend/tests/integration/test_gost_profile_canary_v81.py'
-      - 'backend/tests/integration/test_gost_upstream_udp_fix_v82.py'
-      - 'backend/tests/integration/test_gost_relay_registration_v85.py'
+      - 'backend/tests/integration/test_tp27_fast_preserve_port_v91.py'
       - 'backend/deploy/systemd/twinpanel-transport-manager.service'
       - '.github/workflows/smart-transport-auto-v21-smoke.yml'
 
@@ -65,17 +63,19 @@ jobs:
 
       - name: Python syntax compile
         run: |
-          python -m py_compile \
+          python -W error::SyntaxWarning -m py_compile \
             backend/app/smart_transport_auto_v21.py \
             backend/app/smart_auto_bootstrap_v24.py \
-            backend/app/tp2027_transport.py \
             backend/app/tunnel_transport_manager_v12.py \
             backend/app/candidate_lifecycle_v21.py \
             backend/app/runtime_reconciler_v3.py \
+            backend/app/runtime_reconciler_v4.py \
+            backend/app/tp27_reference_runtime_v91.py \
             backend/app/self_hosted_runtime.py \
             backend/app/routers/modern_transports.py \
             backend/app/transport_candidates/__init__.py \
             backend/app/transport_candidates/common.py \
+            backend/app/transport_candidates/tp27_fast.py \
             backend/app/transport_candidates/gost.py \
             backend/app/unified_l3_core_v49.py \
             backend/app/unified_l3_agent_rollout_v49.py \
@@ -83,7 +83,8 @@ jobs:
             backend/tests/integration/test_tunnel_core_candidate_registry_v79.py \
             backend/tests/integration/test_gost_profile_canary_v81.py \
             backend/tests/integration/test_gost_upstream_udp_fix_v82.py \
-            backend/tests/integration/test_gost_relay_registration_v85.py
+            backend/tests/integration/test_gost_relay_registration_v85.py \
+            backend/tests/integration/test_tp27_fast_preserve_port_v91.py
 
       - name: Smart transport static contracts
         run: |
@@ -92,33 +93,27 @@ jobs:
 
           smart = Path('backend/app/smart_transport_auto_v21.py').read_text()
           bootstrap = Path('backend/app/smart_auto_bootstrap_v24.py').read_text()
-          route = Path('backend/app/tp2027_transport.py').read_text()
           manager = Path('backend/app/tunnel_transport_manager_v12.py').read_text()
           lifecycle = Path('backend/app/candidate_lifecycle_v21.py').read_text()
-          reconciler = Path('backend/app/runtime_reconciler_v3.py').read_text()
+          reconciler3 = Path('backend/app/runtime_reconciler_v3.py').read_text()
+          reconciler4 = Path('backend/app/runtime_reconciler_v4.py').read_text()
           runtime = Path('backend/app/self_hosted_runtime.py').read_text()
           api = Path('backend/app/routers/modern_transports.py').read_text()
-          cleanup = Path('backend/app/transport_candidates/__init__.py').read_text()
+          candidates = Path('backend/app/transport_candidates/__init__.py').read_text()
           common = Path('backend/app/transport_candidates/common.py').read_text()
+          tp27 = Path('backend/app/transport_candidates/tp27_fast.py').read_text()
+          tp27_runtime = Path('backend/app/tp27_reference_runtime_v91.py').read_text()
           gost = Path('backend/app/transport_candidates/gost.py').read_text()
           registry = Path('backend/app/unified_l3_candidate_registry_v79.py').read_text()
           rollout = Path('backend/app/unified_l3_agent_rollout_v49.py').read_text()
           unit = Path('backend/deploy/systemd/twinpanel-transport-manager.service').read_text()
 
-          required_candidates = ('kernel_gre', 'gost_tun', 'amneziawg', 'netrix')
-          for name in required_candidates:
-              assert name in smart, f'{name} missing from Smart Auto'
-              assert name in route, f'{name} missing from route metadata'
-              assert name in api, f'{name} missing from API surface'
-              assert name in cleanup, f'{name} missing from cleanup surface'
-              assert name in reconciler, f'{name} missing from orphan reconciler'
-
+          # SmartAuto selection mechanics remain unchanged.
           assert 'download_weight=0.70' in smart
           assert 'upload_weight=0.30' in smart
           assert 'known_bad_quic_0.6.1_frag_dataplane_idle_timeout' in smart
           assert 'CANDIDATE_STABLE_SECONDS = 60.0' in smart
           assert 'install_smart_transport_auto_v21()' in manager
-          assert 'runtime_reconciler_v3' in manager
           assert 'smart_bootstrap_loop()' in manager
           assert 'bootstrap=v24' in manager
           assert 'pg_try_advisory_xact_lock' in bootstrap
@@ -128,13 +123,41 @@ jobs:
           assert 'cleanup_tunnel_runtime_v21' in lifecycle
           assert 'cleanup_tunnel_runtime_v21' in runtime
           assert 'tunnel_transport_manager_v12' in unit
+
+          # V91 product surface: TP27 Fast is the only installable/catalog
+          # candidate. kernel_gre remains health-visible solely for bounded
+          # make-before-break migration and is retired after TP27 promotion.
+          assert '"tp27_fast": TP27_SPEC' in candidates
+          assert 'ACTIVE_SPECS' in candidates
+          active_block = candidates.split('ACTIVE_SPECS =', 1)[1].split('_legacy_runtime', 1)[0]
+          assert '"tp27_fast"' in active_block
+          assert '"kernel_gre"' not in active_block
+          installer_block = candidates.split('INSTALLERS =', 1)[1].split('async def install_transport', 1)[0]
+          assert '"tp27_fast": tp27_fast.install' in installer_block
+          for retired in ('kernel_gre', 'gost_tun', 'amneziawg', 'netrix'):
+              assert f'"{retired}"' not in installer_block
+              assert retired in tp27_runtime
+          assert 'smart.AUTO_INSTALL_NAMES = ("tp27_fast",)' in tp27_runtime
+          assert 'if active != "tp27_fast":' in tp27_runtime
+          assert 'runtime_reconciler_v4' in manager
+          assert 'twinpanel-tp27-reference-v91' in manager
+          assert 'twinpanel-tp27_fast-' in reconciler4
+          assert 'TP27 Fast' in api
+          assert 'ACTIVE_SPECS' in api
           assert '"selectable": qualified' in api
           assert 'selectable": False' not in api
-          assert 'CANDIDATE_L3_TRANSPORTS' in route
-          assert 'Shared binaries/toolchains are intentionally preserved' in cleanup
+          assert 'NAME = "tp27_fast"' in tp27
+          assert 'FOU_PORT_CANDIDATES = (443, 8443, 2053, 2083, 10443)' in tp27
+          assert 'await probe(' in tp27
 
-          # V79: one candidate registry for Smart Auto -> Unified L3 Agent,
-          # real packet-loss telemetry, and marker-driven Agent rollout.
+          # Historical V3 still understands old candidate runtime so V4 can
+          # clean installations left by previous releases.
+          for retired in ('kernel_gre', 'gost_tun', 'amneziawg', 'netrix'):
+              assert retired in reconciler3
+              assert retired in candidates
+
+          # V79 remains the bridge from the current migration SPECS registry to
+          # the Unified L3 Agent; packet loss is still fail-closed.
           assert 'from .transport_candidates import SPECS' in registry
           assert 'managed_candidates.update(' in registry
           assert 'or selected in' in registry
@@ -146,51 +169,25 @@ jobs:
           assert 'apply_unified_l3_candidate_registry_v79()' in runtime
           assert runtime.index('apply_unified_l3_candidate_registry_v79()') < runtime.index('apply_unified_l3_core_v49()')
 
-          # V81: GOST WSS remains the first profile, TLS is an internal
-          # candidate fallback, and neither profile becomes eligible until the
-          # common L3/TCP/UDP probe passes.
+          # Historical GOST source remains compilable solely for idempotent
+          # cleanup/rollback archaeology; it is no longer installable/cataloged.
           assert 'TWINPANEL_GOST_PROFILE_CANARY_V81' in gost
-          assert '"relay+wss"' in gost
-          assert '"relay+tls"' in gost
-          assert 'for profile in PROFILE_ORDER:' in gost
-          assert 'health = await probe(' in gost
-          assert '"selected_profile": profile' in gost
-          assert 'gost_all_profiles_failed' in gost
-
-          # V82: pin the official post-fix GOST artifact for upstream #911.
           assert 'TWINPANEL_GOST_UPSTREAM_UDP_FRAME_FIX_V82' in gost
-          assert 'VERSION = "3.3.1-nightly.20261017"' in gost
-          assert 'UPSTREAM_ISSUE = "go-gost/gost#911"' in gost
-          assert 'bc137fbd832276f2a8631c7320df3e3adaa1ddf0' in gost
-          assert 'd7656ef3deafec6bf97107b20a332b938153fd54' in gost
-          assert 'UPSTREAM_X_VERSION = "v0.19.5"' in gost
-          assert '"profile_canary": "v81"' in gost
-          assert '"upstream_binary_fix": "v82"' in gost
-
-          # V85: relay control establishment must be explicit on both ends and
-          # the canary must survive at least one configured TUN keepalive retry.
           assert 'TWINPANEL_GOST_RELAY_REGISTRATION_V85' in gost
-          assert '?bind=true&nodelay=true' in gost
-          assert '?secure=false&nodelay=true' in gost
-          assert 'TUN_KEEPALIVE_SECONDS = 10' in gost
-          assert 'REGISTRATION_SETTLE_SECONDS = 12.0' in gost
-          assert 'await asyncio.sleep(REGISTRATION_SETTLE_SECONDS)' in gost
-          assert '"relay_registration_fix": "v85"' in gost
-          print('SMART_TRANSPORT_AUTO_V85_CONTRACT_OK')
+
+          print('SMART_TRANSPORT_AUTO_TP27_V91_CONTRACT_OK')
           PY
 
       - name: Tunnel Core V79 regression
         run: |
           python backend/tests/integration/test_tunnel_core_candidate_registry_v79.py
 
-      - name: GOST profile canary V81 regression
+      - name: TP27 Fast V91 regression
+        run: |
+          python backend/tests/integration/test_tp27_fast_preserve_port_v91.py
+
+      - name: Historical GOST profile regression
         run: |
           python backend/tests/integration/test_gost_profile_canary_v81.py
-
-      - name: GOST upstream UDP fix V82 regression
-        run: |
           python backend/tests/integration/test_gost_upstream_udp_fix_v82.py
-
-      - name: GOST relay registration V85 regression
-        run: |
           python backend/tests/integration/test_gost_relay_registration_v85.py
