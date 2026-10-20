@@ -6,6 +6,7 @@ on:
       - "backend/app/vpn_access_performance_v51.py"
       - "backend/app/tunnel_transport_manager_v12.py"
       - "backend/app/transport_manager_service_v12.py"
+      - "backend/tests/integration/test_vpn_access_performance_v51_render.py"
       - ".github/workflows/vpn-access-performance-v51-smoke.yml"
   workflow_dispatch:
 
@@ -20,10 +21,11 @@ jobs:
 
       - name: Validate Python syntax
         run: |
-          python -m py_compile \
+          python -W error::SyntaxWarning -m py_compile \
             backend/app/vpn_access_performance_v51.py \
             backend/app/tunnel_transport_manager_v12.py \
-            backend/app/transport_manager_service_v12.py
+            backend/app/transport_manager_service_v12.py \
+            backend/tests/integration/test_vpn_access_performance_v51_render.py
 
       - name: Validate MTU convergence contract
         run: |
@@ -36,6 +38,7 @@ jobs:
 
           assert "ACCESS_MTU = 1200" in perf
           assert "ACCESS_TCP_MSS = 1160" in perf
+          assert "TWINPANEL_VPN_ACCESS_PERFORMANCE_RENDER_V89" in perf
           for subnet in ("10.91.0.0/24", "10.92.0.0/24", "10.93.0.0/24", "10.94.0.0/24"):
               assert subnet in perf
 
@@ -45,9 +48,7 @@ jobs:
           assert 'f"mtu = {ACCESS_MTU}"' in perf
           assert "systemctl restart ocserv.service" in perf
 
-          # OpenVPN/WireGuard/L2TP receive the same invariant. ACCESS_MSS is a
-          # variable in the embedded remote Python payload, so its braces must
-          # remain escaped in this outer controller-side f-string.
+          # OpenVPN/WireGuard/L2TP receive the same invariant.
           assert 'f"tun-mtu {ACCESS_MTU}"' in perf
           assert 'f"mssfix {{ACCESS_MSS}}"' in perf
           assert '"/etc/wireguard/wg-access0.conf"' in perf
@@ -76,38 +77,4 @@ jobs:
 
       - name: Render actual V51 remote script
         run: |
-          python - <<'PY'
-          import ast
-          from pathlib import Path
-
-          path = Path("backend/app/vpn_access_performance_v51.py")
-          source = path.read_text(encoding="utf-8")
-          tree = ast.parse(source, filename=str(path))
-
-          wanted = {"ACCESS_MTU", "ACCESS_TCP_MSS", "_PROTOCOL_SUBNETS"}
-          body = []
-          for node in tree.body:
-              if isinstance(node, ast.Assign):
-                  names = {
-                      target.id
-                      for target in node.targets
-                      if isinstance(target, ast.Name)
-                  }
-                  if names & wanted:
-                      body.append(node)
-              elif isinstance(node, ast.FunctionDef) and node.name == "_performance_script":
-                  body.append(node)
-
-          module = ast.Module(body=body, type_ignores=[])
-          ast.fix_missing_locations(module)
-          namespace = {}
-          exec(compile(module, str(path), "exec"), namespace, namespace)
-
-          rendered = namespace["_performance_script"]()
-          assert "ACCESS_MTU=1200" in rendered
-          assert "ACCESS_MSS=1160" in rendered
-          assert 'f"mssfix {ACCESS_MSS}"' in rendered
-          assert "V51_OK=1" in rendered
-          assert "TP_ACCESS_PERF" in rendered
-          print("VPN_ACCESS_PERFORMANCE_V51_RUNTIME_RENDER=PASS")
-          PY
+          python backend/tests/integration/test_vpn_access_performance_v51_render.py
