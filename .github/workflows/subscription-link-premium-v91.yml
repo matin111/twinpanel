@@ -37,9 +37,6 @@ jobs:
           shared = Path("components/subscription-link-delivery-modal.tsx").read_text()
 
           required_css = [
-              ".subscription-link-stack",
-              ".reseller-connection-content",
-              ".reseller-public-delivery",
               ".subscription-link-unified-card",
               ".subscription-link-qr-shell",
               ".subscription-link-url-field",
@@ -55,12 +52,13 @@ jobs:
           assert 'import "./subscription-link-modal.css";' in layout
           assert layout.rfind('import "./subscription-link-modal.css";') > layout.rfind('import "./panel-copy-density-final.css";'), "subscription modal CSS must load after portal/panel polish"
 
-          assert 'className="subscription-link-stack"' in admin
-          assert 'className="reseller-connection-content"' in reseller
-          assert 'className="reseller-public-delivery"' in reseller
-          assert 'wordBreak:"break-all"' in admin, "admin long-link fallback must remain"
-          assert 'subscription_link' in reseller and 'subscription_link' in admin
-          assert "SubscriptionLinkDeliveryModal" in customer
+          for source in (customer, admin, reseller):
+              assert "SubscriptionLinkDeliveryModal" in source
+
+          assert 'modal==="sublink"' not in admin
+          assert 'className="subscription-link-stack"' not in admin
+          assert 'reseller-connection-modal' not in reseller
+          assert 'className="reseller-connection-content"' not in reseller
           assert "createPortal" in shared and "QRCodeSVG" in shared
           PY
 

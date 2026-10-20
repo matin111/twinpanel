@@ -3,6 +3,7 @@
 import {FormEvent,useEffect,useMemo,useState} from "react";
 import {Badge,Card,Stat} from "./ui";
 import {PortalShell} from "./portal-shells";
+import {SubscriptionLinkDeliveryModal} from "./subscription-link-delivery-modal";
 import {resellerApi,ResellerRow} from "../lib/reseller-runtime-api";
 import {createResellerManualSubscription} from "../lib/reseller-manual-subscription-api";
 import {useI18n} from "../lib/i18n";
@@ -18,7 +19,6 @@ const statusTone=(status:string):"ok"|"warn"|"bad"|"violet"=>status==="active"?"
 const idempotency=(prefix:string)=>`${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
 const DEFAULT_PROTOCOLS=["cisco","openvpn","wireguard","l2tp","v2ray"];
 const PROTOCOL_LABELS:Record<string,string>={cisco:"Cisco",openvpn:"OpenVPN",wireguard:"WireGuard",l2tp:"L2TP",v2ray:"V2Ray/Xray"};
-const absoluteLink=(value:string)=>{if(typeof window==="undefined")return value;try{return new URL(value,window.location.origin).toString();}catch{return value;}};
 
 type ExpiryUnit="days"|"months"|"years";
 const expiryPreset=(value:unknown):{value:number;unit:ExpiryUnit}=>{
@@ -55,7 +55,8 @@ export function ResellerSubscriptionsParityRuntime(){
   const [extendRow,setExtendRow]=useState<ResellerRow|null>(null);
   const [connectionRow,setConnectionRow]=useState<ResellerRow|null>(null);
   const [connection,setConnection]=useState<ResellerRow|null>(null);
-  const [copied,setCopied]=useState("");
+  const [connectionLoading,setConnectionLoading]=useState(false);
+  const [connectionError,setConnectionError]=useState("");
   const [saleKey,setSaleKey]=useState(()=>idempotency("manual-sale"));
   const [extendKey,setExtendKey]=useState(()=>idempotency("extend"));
 
@@ -97,11 +98,6 @@ export function ResellerSubscriptionsParityRuntime(){
     try{await fn();setOk(label);await load();}
     catch(reason){setError(reason instanceof Error?reason.message:String(reason));await load();}
     finally{setBusy(false);}
-  };
-
-  const copy=async(key:string,value:string)=>{
-    try{await navigator.clipboard.writeText(value);setCopied(key);window.setTimeout(()=>setCopied(""),1300);}
-    catch{setError(pick("کپی انجام نشد.","Copy failed."));}
   };
 
   const openSale=()=>{
@@ -188,15 +184,17 @@ export function ResellerSubscriptionsParityRuntime(){
 
   const openConnection=async(row:ResellerRow)=>{
     const id=Number(row.id||row.subscription_id||0);if(!id)return;
-    setConnectionRow(row);setConnection(null);setBusy(true);setError("");
+    setConnectionRow(row);setConnection(null);setConnectionLoading(true);setConnectionError("");
     try{setConnection(await resellerApi.connectionInfo(id));}
-    catch(reason){setError(reason instanceof Error?reason.message:String(reason));setConnectionRow(null);}
-    finally{setBusy(false);}
+    catch(reason){setConnectionError(reason instanceof Error?reason.message:String(reason));}
+    finally{setConnectionLoading(false);}
   };
+  const closeConnection=()=>{setConnectionRow(null);setConnection(null);setConnectionLoading(false);setConnectionError("");};
 
   const activeCount=subs.filter(row=>str(row,"status")==="active").length;
   const totalTraffic=subs.reduce((sum,row)=>sum+num(row,"traffic_limit_bytes"),0);
   const totalUsed=subs.reduce((sum,row)=>sum+num(row,"traffic_used_bytes"),0);
+  const connectionId=connectionRow?Number(connectionRow.id||connectionRow.subscription_id||0):0;
 
   return <PortalShell type="reseller" active="/reseller/subscriptions">
     <div className="page reseller-parity-page reseller-subscriptions-parity">
@@ -219,7 +217,7 @@ export function ResellerSubscriptionsParityRuntime(){
           <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="all">{pick("همه وضعیت‌ها","All statuses")}</option>{statuses.map(status=><option key={status} value={status}>{status}</option>)}</select>
           <Badge tone="violet">{filtered.length}</Badge>
         </div>
-        <div className="table reseller-sub-table"><table><thead><tr><th>ID</th><th>{pick("مشتری","Customer")}</th><th>{pick("اکانت","Account")}</th><th>{pick("پلن","Plan")}</th><th>{pick("مصرف","Usage")}</th><th>{pick("انقضا","Expires")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map((row,index)=>{const id=Number(row.id||row.subscription_id||0),status=str(row,"status"),limit=num(row,"traffic_limit_bytes"),used=num(row,"traffic_used_bytes"),usage=limit?Math.min(100,Math.round(used/limit*100)):0;const planLabel=str(row,"plan_name")||(row.plan_id?`#${str(row,"plan_id")}`:pick("دستی","Manual"));return <tr key={id||index}><td>#{id}</td><td><b>{str(row,"customer_name")||`#${str(row,"customer_user_id")}`}</b><small dir="ltr">{str(row,"customer_phone")||str(row,"customer_email")||"—"}</small></td><td><code dir="ltr">{str(row,"account_username")||"—"}</code></td><td><b>{planLabel}</b><small>{money(num(row,"sell_price_toman"))}</small></td><td><div className="reseller-usage-cell"><span>{gbText(used)} / {gbText(limit)}</span><div className="progress"><i style={{width:`${usage}%`}}/></div></div></td><td>{dateText(row.expires_at)}</td><td><Badge tone={statusTone(status)}>{status||"—"}</Badge></td><td><div className="row-actions"><button className="mini-btn" onClick={()=>void openConnection(row)} disabled={busy}>{pick("سابلینک","Sub-link")}</button><button className="mini-btn" onClick={()=>openEdit(row)}>{pick("ویرایش","Edit")}</button><button className="mini-btn" onClick={()=>openExtend(row)}>{pick("تمدید","Extend")}</button><button className="mini-btn" disabled={busy} onClick={()=>void act(status==="active"?pick("اشتراک تعلیق شد","Subscription suspended"):pick("اشتراک فعال شد","Subscription activated"),()=>resellerApi.toggleSubscription(id))}>{status==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button><button className="mini-btn danger" disabled={busy} onClick={()=>{if(window.confirm(pick("این اشتراک حذف شود؟ دسترسی آن از سرورها نیز لغو می‌شود.","Delete this subscription and revoke server access?")))void act(pick("اشتراک حذف شد","Subscription deleted"),()=>resellerApi.deleteSubscription(id));}}>{pick("حذف","Delete")}</button></div></td></tr>})}</tbody></table></div>
+        <div className="table reseller-sub-table"><table><thead><tr><th>ID</th><th>{pick("مشتری","Customer")}</th><th>{pick("اکانت","Account")}</th><th>{pick("پلن","Plan")}</th><th>{pick("مصرف","Usage")}</th><th>{pick("انقضا","Expires")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map((row,index)=>{const id=Number(row.id||row.subscription_id||0),status=str(row,"status"),limit=num(row,"traffic_limit_bytes"),used=num(row,"traffic_used_bytes"),usage=limit?Math.min(100,Math.round(used/limit*100)):0;const planLabel=str(row,"plan_name")||(row.plan_id?`#${str(row,"plan_id")}`:pick("دستی","Manual"));return <tr key={id||index}><td>#{id}</td><td><b>{str(row,"customer_name")||`#${str(row,"customer_user_id")}`}</b><small dir="ltr">{str(row,"customer_phone")||str(row,"customer_email")||"—"}</small></td><td><code dir="ltr">{str(row,"account_username")||"—"}</code></td><td><b>{planLabel}</b><small>{money(num(row,"sell_price_toman"))}</small></td><td><div className="reseller-usage-cell"><span>{gbText(used)} / {gbText(limit)}</span><div className="progress"><i style={{width:`${usage}%`}}/></div></div></td><td>{dateText(row.expires_at)}</td><td><Badge tone={statusTone(status)}>{status||"—"}</Badge></td><td><div className="row-actions"><button className="mini-btn" onClick={()=>void openConnection(row)} disabled={connectionLoading}>{pick("سابلینک","Sub-link")}</button><button className="mini-btn" onClick={()=>openEdit(row)}>{pick("ویرایش","Edit")}</button><button className="mini-btn" onClick={()=>openExtend(row)}>{pick("تمدید","Extend")}</button><button className="mini-btn" disabled={busy} onClick={()=>void act(status==="active"?pick("اشتراک تعلیق شد","Subscription suspended"):pick("اشتراک فعال شد","Subscription activated"),()=>resellerApi.toggleSubscription(id))}>{status==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button><button className="mini-btn danger" disabled={busy} onClick={()=>{if(window.confirm(pick("این اشتراک حذف شود؟ دسترسی آن از سرورها نیز لغو می‌شود.","Delete this subscription and revoke server access?")))void act(pick("اشتراک حذف شد","Subscription deleted"),()=>resellerApi.deleteSubscription(id));}}>{pick("حذف","Delete")}</button></div></td></tr>})}</tbody></table></div>
         {!filtered.length&&<Empty>{pick("اشتراکی با این فیلتر پیدا نشد.","No subscription matches this filter.")}</Empty>}
       </Card>
 
@@ -229,23 +227,14 @@ export function ResellerSubscriptionsParityRuntime(){
 
       {extendRow&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>!busy&&setExtendRow(null)}/><form className="runtime-modal-card reseller-sub-modal" onSubmit={submitExtend}><div className="card-head"><div><b>{pick("تمدید اشتراک","Extend subscription")} #{str(extendRow,"id")}</b><small>{extend.reset_usage?pick("دوره جدید: مصرف فعلی صفر و سهمیه/تاریخ دوره جایگزین می‌شود.","New cycle: current usage resets and the cycle quota/date are replaced."):pick("تمدید افزایشی: حجم یا روز به اشتراک فعلی اضافه می‌شود.","Additive extension: traffic or days are added to the existing subscription.")}</small></div><button className="icon-button" type="button" onClick={()=>setExtendRow(null)}>×</button></div><label className="toggle module-toggle reseller-cycle-toggle"><span>{pick("شروع دوره جدید و صفر شدن مصرف","Start a new cycle and reset usage")}</span><input type="checkbox" checked={extend.reset_usage} onChange={e=>setExtend(v=>({...v,reset_usage:e.target.checked}))}/><i/></label><div className="setting-grid"><label className="field"><span>{extend.reset_usage?pick("حجم دوره جدید GB","New-cycle traffic GB"):pick("حجم اضافه GB","Additional traffic GB")}</span><input type="number" min={0} step="0.01" value={extend.add_traffic_gb} onChange={e=>setExtend(v=>({...v,add_traffic_gb:Number(e.target.value)}))}/></label><label className="field"><span>{extend.reset_usage?pick("مدت دوره جدید","New-cycle days"):pick("روز اضافه","Additional days")}</span><input type="number" min={0} value={extend.add_days} onChange={e=>setExtend(v=>({...v,add_days:Number(e.target.value)}))}/></label></div><div className="reseller-volume-note"><b>{pick("مدل حجمی نمایندگی","Volume-only reseller model")}</b><small>{pick("ساخت یا تمدید اشتراک از موجودی حجم نماینده رزرو نمی‌کند؛ موجودی فقط با مصرف واقعی کاربران کم می‌شود.","Creating or extending a subscription does not reserve reseller traffic; the pool is reduced only by real customer usage.")}</small></div><div className="runtime-modal-actions"><button className="ghost" type="button" onClick={()=>setExtendRow(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy||(extend.reset_usage?(!extend.add_days||!extend.add_traffic_gb):(!extend.add_days&&!extend.add_traffic_gb))}>{extend.reset_usage?pick("شروع دوره جدید","Start new cycle"):pick("ثبت تمدید","Apply extension")}</button></div></form></div>}
 
-      {connectionRow&&<div className="runtime-modal reseller-connection-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>setConnectionRow(null)}/><div className="runtime-modal-card reseller-connection-card"><div className="card-head"><div><b>{pick("سابلینک","Subscription link")} #{str(connectionRow,"id")}</b><small>{pick("برای مشتری فقط لینک اشتراک یا QR را ارسال کنید.","Send only the subscription link or QR to the customer.")}</small></div><button className="icon-button" type="button" onClick={()=>setConnectionRow(null)}>×</button></div>{!connection?<div className="runtime-loading">{pick("در حال دریافت لینک اشتراک...","Loading subscription link...")}</div>:<ConnectionDetails info={connection} copied={copied} copy={copy} pick={pick}/>}<div className="runtime-modal-actions"><button className="ghost" type="button" onClick={()=>setConnectionRow(null)}>{pick("بستن","Close")}</button></div></div></div>}
+      <SubscriptionLinkDeliveryModal
+        open={connectionRow!==null}
+        link={connection?str(connection,"subscription_link"):""}
+        reference={connectionId?`MV-${connectionId}`:""}
+        loading={connectionLoading}
+        error={connectionError}
+        onClose={closeConnection}
+      />
     </div>
   </PortalShell>;
-}
-
-function ConnectionDetails({info,copied,copy,pick}:{info:ResellerRow;copied:string;copy:(key:string,value:string)=>Promise<void>;pick:(fa:string,en:string)=>string}){
-  const link=str(info,"subscription_link");
-  const publicLink=link?absoluteLink(link):"";
-  const qrLink=publicLink?`${publicLink.replace(/\/$/,"")}/qr`:"";
-
-  if(!publicLink)return <Empty>{pick("لینک اشتراک برای این سرویس آماده نیست.","The subscription link is not ready for this service.")}</Empty>;
-
-  return <div className="reseller-connection-content">
-    <div className="reseller-secret-grid">
-      <div className="wide"><span>{pick("لینک ساب‌لینک","Subscription link")}</span><code dir="ltr">{publicLink}</code><button type="button" className="mini-btn" onClick={()=>void copy("link",publicLink)}>{copied==="link"?"✓":pick("کپی","Copy")}</button><button type="button" className="mini-btn" onClick={()=>window.open(publicLink,"_blank","noopener,noreferrer")}>{pick("باز کردن","Open")}</button></div>
-    </div>
-
-    {qrLink&&<div className="reseller-public-delivery"><div><b>{pick("QR Code اشتراک","Subscription QR Code")}</b><small>{pick("مشتری می‌تواند این QR را اسکن کند و صفحه اتصال را باز کند.","The customer can scan this QR to open the connection page.")}</small></div><img src={qrLink} alt={pick("QR لینک اشتراک","Subscription link QR")}/></div>}
-  </div>;
 }

@@ -1,0 +1,123 @@
+name: TwinPanel Subscription Link Direct Parity V98
+
+on:
+  pull_request:
+    paths:
+      - "app/layout.tsx"
+      - "app/subscription-link-modal.css"
+      - "app/subscription-link-modal-v96.css"
+      - "components/subscription-link-delivery-modal.tsx"
+      - "components/customer-subscriptions-runtime.tsx"
+      - "components/legacy-subscriptions-exact.tsx"
+      - "components/reseller-subscriptions-parity.tsx"
+      - "lib/admin-api.ts"
+      - "lib/reseller-runtime-api.ts"
+      - ".github/workflows/subscription-link-direct-parity-v98.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  direct-three-role-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify direct role wiring and absence of legacy sub-link modals
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          shared_path = Path("components/subscription-link-delivery-modal.tsx")
+          customer_path = Path("components/customer-subscriptions-runtime.tsx")
+          admin_path = Path("components/legacy-subscriptions-exact.tsx")
+          reseller_path = Path("components/reseller-subscriptions-parity.tsx")
+          layout_path = Path("app/layout.tsx")
+          admin_api_path = Path("lib/admin-api.ts")
+          reseller_api_path = Path("lib/reseller-runtime-api.ts")
+
+          shared = shared_path.read_text()
+          customer = customer_path.read_text()
+          admin = admin_path.read_text()
+          reseller = reseller_path.read_text()
+          layout = layout_path.read_text()
+          admin_api = admin_api_path.read_text()
+          reseller_api = reseller_api_path.read_text()
+
+          # One authoritative DOM surface.
+          for token in [
+              'data-subscription-link-surface="unified"',
+              'subscription-link-unified-head',
+              'subscription-link-qr-card',
+              'subscription-link-url-card',
+              'subscription-link-copy',
+              'subscription-link-open',
+              'createPortal(',
+              'document.body',
+          ]:
+              assert token in shared, f"missing shared modal token: {token}"
+
+          # All three role runtimes import and render the same component directly.
+          for role, source in (("customer", customer), ("admin", admin), ("reseller", reseller)):
+              assert 'import {SubscriptionLinkDeliveryModal}' in source, f"{role} missing direct import"
+              assert '<SubscriptionLinkDeliveryModal' in source, f"{role} missing direct render"
+              assert 'reference=' in source and 'loading=' in source and 'onClose=' in source, f"{role} missing shared modal props"
+
+          # Admin click -> authorized admin API -> shared modal. No legacy sublink Modal remains.
+          assert 'onClick={()=>void openSubscriptionLink(item)}' in admin
+          assert 'const openSubscriptionLink=async(item:RuntimeRow)' in admin
+          assert 'await adminApi.subscriptionConnectionInfo(id)' in admin
+          assert 'modal==="sublink"' not in admin
+          assert 'className="subscription-link-stack"' not in admin
+          assert 'type ModalKind="create"|"edit"|"extend"|"connect"|null;' in admin
+
+          # Reseller click -> authorized reseller API -> shared modal. No legacy delivery DOM remains.
+          assert 'onClick={()=>void openConnection(row)}' in reseller
+          assert 'const openConnection=async(row:ResellerRow)' in reseller
+          assert 'await resellerApi.connectionInfo(id)' in reseller
+          assert 'reseller-connection-modal' not in reseller
+          assert 'reseller-connection-card' not in reseller
+          assert 'ConnectionDetails' not in reseller
+          assert 'reseller-public-delivery' not in reseller
+
+          # Event-delegation bridge is gone from runtime wiring.
+          assert 'SubscriptionLinkRoleBridge' not in layout
+          assert not Path("components/subscription-link-role-bridge.tsx").exists()
+
+          # The role-specific APIs remain the only data differences.
+          assert 'subscriptionConnectionInfo' in admin_api
+          assert 'connectionInfo' in reseller_api
+
+          # Shared component owns the canonical QR/link DOM classes; role runtimes must not clone them.
+          canonical_classes = [
+              'subscription-link-unified-head',
+              'subscription-link-qr-card',
+              'subscription-link-url-card',
+              'subscription-link-actions',
+          ]
+          for role, source in (("customer", customer), ("admin", admin), ("reseller", reseller)):
+              for cls in canonical_classes:
+                  assert cls not in source, f"{role} duplicates shared DOM class {cls}"
+
+          print("V98 direct three-role subscription-link parity OK")
+          PY
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional
+          else
+            npm install --include=optional --no-audit --no-fund
+          fi
+
+      - name: Production frontend build
+        run: npm run build
