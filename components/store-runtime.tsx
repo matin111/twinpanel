@@ -93,6 +93,6 @@ export function StoreRuntime2027(){
   };
 
   return <div data-store-theme-engine="v1" data-store-template-active={templateId} data-store-template-customized={hasTemplateOptions?"true":"false"} style={themeStyle}>
-    <StoreTemplateRuntime templateId={templateId} {...templateProps}/>
+    <StoreTemplateRuntime templateId={templateId} themeOptions={effectiveOptions} {...templateProps}/>
   </div>;
 }
