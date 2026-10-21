@@ -43,7 +43,7 @@ function Notice({error, warning, ok}: {error: string; warning: string; ok: strin
 
 function StatusBadge({value}: {value: unknown}) {
   const status = String(value || "unknown").toLowerCase();
-  const tone = ["online", "active", "ok", "healthy", "paired"].includes(status)
+  const tone: "ok" | "warn" | "bad" = ["online", "active", "ok", "healthy", "paired"].includes(status)
     ? "ok"
     : ["offline", "failed", "error", "revoked"].includes(status)
       ? "bad"
@@ -127,7 +127,8 @@ export function ProvisionRuntimeXrayDomainPage() {
   const onlineNodes = nodes.filter(node => String(node.status).toLowerCase() === "online").length;
   const iranNodes = nodes.filter(node => node.node_type === "iran").length;
   const exitNodes = nodes.filter(node => node.node_type === "exit").length;
-  const protocolsHref = `/admin/modern-protocols${lastNodeId ? `?node=${lastNodeId}` : selected ? `?node=${selected}` : ""}`;
+  const lastProtocolsHref = `/admin/modern-protocols?node=${lastNodeId}`;
+  const selectedProtocolsHref = `/admin/modern-protocols${selected ? `?node=${selected}` : ""}`;
 
   return <Shell active="/admin/provision">
     <div className="page">
@@ -153,7 +154,7 @@ export function ProvisionRuntimeXrayDomainPage() {
               "Base infrastructure is installed. Now choose and install the protocols for this server in Protocol Studio.",
             )}</small>
           </div>
-          <a className="primary" href={protocolsHref}>{pick("مدیریت پروتکل‌ها", "Manage protocols")}</a>
+          <a className="primary" href={lastProtocolsHref}>{pick("مدیریت پروتکل‌ها", "Manage protocols")}</a>
         </div>
       </Card>}
 
@@ -313,7 +314,7 @@ export function ProvisionRuntimeXrayDomainPage() {
             <button className="ghost" type="button" disabled={!selected || busy} onClick={() => void act(pick("Agent ارتقا یافت", "Agent upgraded"), () => parityApi.provisionUpgradeAgent(selected))}>{pick("ارتقا Agent", "Upgrade agent")}</button>
             <button className="ghost" type="button" disabled={!selected || busy} onClick={() => void act(pick("Fabric نصب شد", "Fabric installed"), () => parityApi.provisionInstallFabric(selected))}>{pick("نصب Fabric", "Install fabric")}</button>
             <button className="ghost" type="button" disabled={!selected || busy} onClick={() => void act(pick("وضعیت Fabric دریافت شد", "Fabric status loaded"), () => parityApi.provisionFabricStatus(selected), false)}>{pick("وضعیت Fabric", "Fabric status")}</button>
-            <a className="primary" href={protocolsHref}>{pick("مدیریت پروتکل‌ها", "Manage protocols")}</a>
+            <a className="primary" href={selectedProtocolsHref}>{pick("مدیریت پروتکل‌ها", "Manage protocols")}</a>
           </div>
         </Card>
       </div>
