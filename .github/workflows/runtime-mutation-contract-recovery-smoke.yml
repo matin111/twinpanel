@@ -103,7 +103,13 @@ jobs:
           provision_ui=Path('components/provision-runtime-xray-domain.tsx').read_text(encoding='utf-8')
           provision_api=Path('backend/app/routers/provision.py').read_text(encoding='utf-8')
           assert '"/v1/provision/install"' in parity
-          assert 'parityApi.provisionInstall(installPayload)' in provision_ui
+          assert 'parityApi.provisionInstall(payload)' in provision_ui
+          assert '...BASE_ONLY_PROTOCOLS' in provision_ui
+          assert 'install_cisco: false' in provision_ui
+          assert 'install_openvpn: false' in provision_ui
+          assert 'install_wireguard: false' in provision_ui
+          assert 'install_l2tp: false' in provision_ui
+          assert 'install_v2ray: false' in provision_ui
           assert '@router.post("/install")' in provision_api
 
           subscription_proxy=Path('app/v1/subscriptions/admin-create-v2/route.ts').read_text(encoding='utf-8')
