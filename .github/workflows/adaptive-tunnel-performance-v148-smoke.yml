@@ -1,0 +1,114 @@
+name: Adaptive Tunnel Performance V148 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "VERSION"
+      - "backend/app/adaptive_tunnel_performance_v148.py"
+      - "backend/app/vpn_access_performance_v51.py"
+      - "backend/app/exit_access_dataplane_stability_v144.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/app/transport_candidates/tp27_fast.py"
+      - ".github/workflows/adaptive-tunnel-performance-v148-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "VERSION"
+      - "backend/app/adaptive_tunnel_performance_v148.py"
+      - "backend/app/vpn_access_performance_v51.py"
+      - "backend/app/exit_access_dataplane_stability_v144.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/app/transport_candidates/tp27_fast.py"
+      - ".github/workflows/adaptive-tunnel-performance-v148-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile V148 runtime
+        run: |
+          python -m py_compile \
+            backend/app/adaptive_tunnel_performance_v148.py \
+            backend/app/vpn_access_performance_v51.py \
+            backend/app/exit_access_dataplane_stability_v144.py \
+            backend/app/tunnel_transport_manager_v12.py \
+            backend/app/transport_candidates/tp27_fast.py
+
+      - name: Verify V148 performance contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          version = Path("VERSION").read_text().strip()
+          adaptive = Path(
+              "backend/app/adaptive_tunnel_performance_v148.py"
+          ).read_text()
+          performance = Path(
+              "backend/app/vpn_access_performance_v51.py"
+          ).read_text()
+          stability = Path(
+              "backend/app/exit_access_dataplane_stability_v144.py"
+          ).read_text()
+          manager = Path(
+              "backend/app/tunnel_transport_manager_v12.py"
+          ).read_text()
+          carrier = Path(
+              "backend/app/transport_candidates/tp27_fast.py"
+          ).read_text()
+
+          assert version == "1.1.0-rc.148"
+
+          required_adaptive = [
+              "TWINPANEL_ADAPTIVE_TUNNEL_PERFORMANCE_V148",
+              "TP27_CARRIER_MTU = 1400",
+              "ACCESS_OVERLAY_HEADROOM = 100",
+              "ACCESS_MTU = TP27_CARRIER_MTU - ACCESS_OVERLAY_HEADROOM",
+              "ACCESS_TCP_MSS = ACCESS_MTU - IPV4_TCP_HEADER_BYTES",
+              "access_performance.ACCESS_MTU = ACCESS_MTU",
+              "access_performance.ACCESS_TCP_MSS = ACCESS_TCP_MSS",
+              "carrier=unchanged",
+              "steady_state=v144-read-only",
+          ]
+          for token in required_adaptive:
+              assert token in adaptive, token
+
+          # The proven carrier PMTU remains unchanged in this release.
+          assert "MTU = 1400" in carrier
+
+          # V51 repair verification must use the active runtime constants, not
+          # force the old 1200/1160 values after V148 has rendered 1300/1260.
+          assert "{ACCESS_MTU}[[:space:]]*$" in performance
+          assert "{ACCESS_TCP_MSS}[[:space:]]*$" in performance
+
+          # V144 must follow V51's current contract dynamically and must not
+          # reintroduce direct steady-state chain flushes.
+          assert "access_mtu = int(performance.ACCESS_MTU)" in stability
+          assert "access_mss = int(performance.ACCESS_TCP_MSS)" in stability
+          assert "[[:space:]]*1200[[:space:]]*$" not in stability
+          assert "[[:space:]]*1160[[:space:]]*$" not in stability
+          assert "iptables -F" not in stability
+          assert "ipt -t nat -F" not in stability
+          assert "ipt -t filter -F" not in stability
+          assert "ipt -t mangle -F" not in stability
+
+          # V148 must be applied before V144 captures steady-state Desired
+          # State so the first 1200->1300 migration is a real one-time drift.
+          apply_v148 = "apply_adaptive_tunnel_performance_v148()"
+          apply_v144 = "apply_exit_access_dataplane_stability_v144()"
+          assert apply_v148 in manager
+          assert apply_v144 in manager
+          assert manager.index(apply_v148) < manager.index(apply_v144)
+          assert "adaptive_tunnel_performance=v148" in manager
+
+          print("ADAPTIVE_TUNNEL_PERFORMANCE_V148_SMOKE_OK")
+          PY
