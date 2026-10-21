@@ -1,5 +1,5 @@
 from app.bot_text_middleware import BotTextRequestMiddleware
-from app.bot_texts import _setting_key
+from app.bot_texts import _install_main_runtime_service_override, _setting_key
 from app.routers import runtime_endpoints, telegram_manager
 
 
@@ -31,6 +31,10 @@ def test_admin_and_reseller_text_routes_are_registered():
 
 
 def test_main_bot_service_uses_text_aware_runtime():
+    # bot_texts intentionally tolerates an early circular/import-time failure.
+    # Re-apply the idempotent override after router imports are complete so the
+    # test validates the production repair path instead of Python import order.
+    _install_main_runtime_service_override()
     service_text = telegram_manager._service_text()
 
     assert "-m app.telegram_runtime_custom" in service_text
