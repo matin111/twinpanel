@@ -1,0 +1,111 @@
+name: Adaptive Multi-Lane V149 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "VERSION"
+      - "backend/app/adaptive_multilane_v149.py"
+      - "backend/app/transport_candidates/__init__.py"
+      - "backend/app/transport_candidates/common.py"
+      - "backend/app/transport_candidates/tp27_tcp_direct.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/adaptive-multilane-v149-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "VERSION"
+      - "backend/app/adaptive_multilane_v149.py"
+      - "backend/app/transport_candidates/__init__.py"
+      - "backend/app/transport_candidates/common.py"
+      - "backend/app/transport_candidates/tp27_tcp_direct.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/adaptive-multilane-v149-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile V149 runtime
+        run: |
+          python -m py_compile \
+            backend/app/adaptive_multilane_v149.py \
+            backend/app/transport_candidates/__init__.py \
+            backend/app/transport_candidates/common.py \
+            backend/app/transport_candidates/tp27_tcp_direct.py \
+            backend/app/tunnel_transport_manager_v12.py
+
+      - name: Verify V149 independent-lane contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          version = Path("VERSION").read_text().strip()
+          adaptive = Path("backend/app/adaptive_multilane_v149.py").read_text()
+          registry = Path("backend/app/transport_candidates/__init__.py").read_text()
+          common = Path("backend/app/transport_candidates/common.py").read_text()
+          tcp = Path("backend/app/transport_candidates/tp27_tcp_direct.py").read_text()
+          manager = Path("backend/app/tunnel_transport_manager_v12.py").read_text()
+
+          assert version == "1.1.0-rc.149"
+
+          for token in (
+              "TWINPANEL_ADAPTIVE_MULTILANE_V149",
+              '"tp27_fast",',
+              '"tp27_tcp_direct",',
+              "reference_v91.activate_manager_candidate_policy_v91 = _apply_lane_policy",
+              "udp_dependency=not-required",
+          ):
+              assert token in adaptive, token
+
+          for token in (
+              "TP27_TCP_DIRECT_SPEC",
+              '"tp27_tcp_direct": TP27_TCP_DIRECT_SPEC',
+              '"tp27_tcp_direct": tp27_tcp_direct.install',
+              "10.254.",
+              "30000 +",
+          ):
+              assert token in registry, token
+
+          for token in (
+              "TWINPANEL TP27 DIRECT TCP L3 V149",
+              'carrier_class": "direct-tcp-l3"',
+              '"depends_on": None',
+              "--mode client",
+              "--mode server",
+              "--lanes {LANES}",
+              "--mtu {MTU}",
+              "TCP_PORT_BASES = (46200, 47200, 48200)",
+          ):
+              assert token in tcp, token
+
+          # This lane must be independent from the shared TP2027 Backhaul.
+          assert "install_tp2027_overlays" not in tcp
+          assert "backhaul_runtime_values" not in tcp
+          assert "encap fou" not in tcp
+
+          # Health probes now expose jitter telemetry for path-quality scoring
+          # and future carrier policy without changing existing loss gates.
+          assert "parse_ping_rtt" in common
+          assert '"jitter_ms": jitter' in common
+          assert '"iran_jitter_ms"' in common
+          assert '"exit_jitter_ms"' in common
+
+          # V149 must override V91 single-lane install policy before tasks start.
+          assert "apply_adaptive_multilane_v149()" in manager
+          assert "active_candidates=tp27_fast,tp27_tcp_direct" in manager
+          assert manager.index("activate_manager_candidate_policy_v91()") < manager.index(
+              "apply_adaptive_multilane_v149()"
+          )
+
+          print("ADAPTIVE_MULTILANE_V149_SMOKE_OK")
+          PY

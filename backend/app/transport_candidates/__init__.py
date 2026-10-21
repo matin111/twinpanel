@@ -4,40 +4,59 @@ import shlex
 
 from sqlalchemy.orm import Session
 
-from . import amnezia, common as _common, gost, gre, netrix, tp27_fast
+from . import (
+    amnezia,
+    common as _common,
+    gost,
+    gre,
+    netrix,
+    tp27_fast,
+    tp27_tcp_direct,
+)
 
 
 # ============================================================
-# TWINPANEL TP27 ACTIVE CANDIDATE REGISTRY V91
+# TWINPANEL TP27 ACTIVE CANDIDATE REGISTRY V149
 #
-# The previous experimental candidates remain understood only by the scoped
-# cleanup path so existing installations can remove their owned runtime. They
-# are no longer exposed or auto-installed. kernel_gre stays health-visible only
-# during make-before-break migration so SmartAuto does not drop the proven live
-# carrier before TP27 Fast is qualified and promoted.
+# V149 keeps TP27 Fast as the preferred low-overhead lane and adds one truly
+# independent direct-TCP L3 lane. Unlike TP2027 overlays, the new lane does not
+# depend on the shared Backhaul carrier, so SmartAuto can actually fail over
+# when one carrier family degrades.
+#
+# Legacy experimental candidates remain understood only by scoped cleanup.
+# kernel_gre stays health-visible during migration but is not auto-installed.
 # ============================================================
 
 _LEGACY_SPECS = dict(_common.SPECS)
+
 TP27_SPEC = {
     "priority": 100,
     "label": "TP27 Fast",
     "family": "tp27-gre-l3",
 }
 
-# common.mark/probe resolve this module global at call time. Append TP27 to the
-# internal registry for those shared helpers.
-_common.SPECS["tp27_fast"] = TP27_SPEC
+TP27_TCP_DIRECT_SPEC = {
+    "priority": 120,
+    "label": "TP27 Direct TCP",
+    "family": "tp27-direct-tcp-l3",
+}
 
-# SmartAuto/Unified-L3 compatibility registry during migration. Only TP27 is
-# installable and visible in the product catalog; kernel_gre is retained here
-# temporarily so the live pre-migration path remains health-checkable.
+# common.mark/probe resolve this module global at call time. Append active TP27
+# lanes to the internal registry used by shared helpers.
+_common.SPECS["tp27_fast"] = TP27_SPEC
+_common.SPECS["tp27_tcp_direct"] = TP27_TCP_DIRECT_SPEC
+
+# SmartAuto/Unified-L3 compatibility registry. kernel_gre is retained only so
+# a pre-migration live path remains health-checkable until TP27 is promoted.
 SPECS = {
     "kernel_gre": _LEGACY_SPECS["kernel_gre"],
     "tp27_fast": TP27_SPEC,
+    "tp27_tcp_direct": TP27_TCP_DIRECT_SPEC,
 }
 
 ACTIVE_SPECS = {
     "tp27_fast": TP27_SPEC,
+    "tp27_tcp_direct": TP27_TCP_DIRECT_SPEC,
 }
 
 _legacy_runtime = _common.runtime
@@ -70,10 +89,38 @@ def _tp27_runtime(tunnel_id: int) -> dict:
     }
 
 
+def _tp27_tcp_direct_runtime(tunnel_id: int) -> dict:
+    """Independent /30 in 10.254.0.0/16 for the direct-TCP fallback lane."""
+
+    tid = max(int(tunnel_id), 1)
+    slot = tid % 16384
+    base = slot * 4
+    third = (base // 256) & 0xFF
+    fourth = base % 256
+    iran_ip = f"10.254.{third}.{fourth + 1}"
+    exit_ip = f"10.254.{third}.{fourth + 2}"
+
+    return {
+        "transport": "tp27_tcp_direct",
+        "interface": f"tp27t{tid}"[:15],
+        "network": f"10.254.{third}.{fourth}/30",
+        "iran_ip": iran_ip,
+        "exit_ip": exit_ip,
+        "iran_addr": f"{iran_ip}/30",
+        "exit_addr": f"{exit_ip}/30",
+        "port": 46200 + (tid % 500),
+        "iran_service": f"twinpanel-tp27_tcp_direct-{tid}-iran.service",
+        "exit_service": f"twinpanel-tp27_tcp_direct-{tid}-exit.service",
+        "priority": int(TP27_TCP_DIRECT_SPEC["priority"]),
+    }
+
+
 def runtime(name: str, tunnel_id: int) -> dict:
     value = str(name or "").strip().lower()
     if value == "tp27_fast":
         return _tp27_runtime(tunnel_id)
+    if value == "tp27_tcp_direct":
+        return _tp27_tcp_direct_runtime(tunnel_id)
     return _legacy_runtime(value, tunnel_id)
 
 
@@ -83,14 +130,18 @@ def policy_ids(name: str, tunnel_id: int) -> tuple[int, int]:
         # Keep migration make-before-break: legacy kernel_gre uses 220xx.
         table = 29000 + (int(tunnel_id) % 900)
         return table, table
+    if value == "tp27_tcp_direct":
+        table = 30000 + (int(tunnel_id) % 900)
+        return table, table
     return _legacy_policy_ids(value, tunnel_id)
 
 
 _common.runtime = runtime
 _common.policy_ids = policy_ids
-# tp27_fast imported common.runtime by name during package import; point that
-# module-level binding at the V91 dispatcher too.
+# Candidate modules imported common.runtime by name during package import;
+# point their module-level bindings at the V149 dispatcher too.
 tp27_fast.runtime = runtime
+tp27_tcp_direct.runtime = runtime
 
 close_pair = _common.close_pair
 connect_pair = _common.connect_pair
@@ -107,6 +158,7 @@ def catalog() -> list[dict]:
 
 INSTALLERS = {
     "tp27_fast": tp27_fast.install,
+    "tp27_tcp_direct": tp27_tcp_direct.install,
 }
 
 
@@ -119,12 +171,7 @@ async def install_transport(name: str, tunnel_id: int, db: Session):
 
 
 async def uninstall_transport(name: str, tunnel_id: int, db: Session):
-    """Remove only TwinPanel-owned runtime for one active/retired candidate.
-
-    Legacy names stay accepted here solely so V91 can remove old GOST/AWG/
-    Netrix/Kernel-GRE runtime after TP27 is proven active. They are not part of
-    ACTIVE_SPECS/catalog and cannot be installed again.
-    """
+    """Remove only TwinPanel-owned runtime for one active/retired candidate."""
 
     name = str(name or "").strip().lower()
     if name not in _common.SPECS:
@@ -260,6 +307,27 @@ true
 """,
                     check=False,
                 )
+
+        elif name == "tp27_tcp_direct":
+            comment = f"TwinPanel-TP27-TCP-{int(tunnel_id)}"
+            ports = " ".join(
+                str(value)
+                for value in tp27_tcp_direct._port_candidates(int(tunnel_id))
+            )
+            await ce.run(
+                f"""
+set +e
+if command -v iptables >/dev/null 2>&1; then
+ for p in {ports}; do
+  while iptables -C INPUT -p tcp --dport "$p" -s {shlex.quote(str(iran.public_ip))} -m comment --comment {shlex.quote(comment)} -j ACCEPT 2>/dev/null; do
+   iptables -D INPUT -p tcp --dport "$p" -s {shlex.quote(str(iran.public_ip))} -m comment --comment {shlex.quote(comment)} -j ACCEPT || break
+  done
+ done
+fi
+true
+""",
+                check=False,
+            )
 
         elif name == "kernel_gre":
             await ci.run(

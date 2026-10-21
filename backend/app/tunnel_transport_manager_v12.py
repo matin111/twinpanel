@@ -3,6 +3,9 @@ from __future__ import annotations
 import asyncio
 
 from . import tunnel_transport_manager_v10 as v10
+from .adaptive_multilane_v149 import (
+    apply_adaptive_multilane_v149,
+)
 from .adaptive_tunnel_performance_v148 import (
     apply_adaptive_tunnel_performance_v148,
 )
@@ -24,30 +27,21 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 
 
 # ============================================================
-# TWINPANEL TRANSPORT MANAGER V12 - TP27 FAST MIGRATION V91
+# TWINPANEL TRANSPORT MANAGER V12
+# + TP27 REFERENCE V91
 # + ADAPTIVE TUNNEL PERFORMANCE V148
+# + ADAPTIVE MULTI-LANE V149
 #
-# V91 keeps the proven controller/manager, VPN access dataplane and SmartAuto
-# scoring policy, but changes the active carrier product surface:
-#   * TP27 Fast is the only candidate auto-installed for new/active tunnels.
-#   * Existing kernel_gre remains health-visible only until TP27 is qualified
-#     and promoted (make-before-break).
-#   * GOST / AmneziaWG / Netrix are retired and never installed again.
-#   * after TP27 becomes active, V91 removes the retired candidate runtime and
-#     DB rows with ownership-scoped cleanup.
-#   * Cisco/OpenVPN/WireGuard are reconciled to TP27 preserve-port delivery so
-#     advertised protocol ports equal Iran public ingress ports.
+# V148 keeps the production-proven TP27 carrier MTU=1400 and raises routed VPN
+# access to the conservative 1300/1260 MTU/MSS contract.
 #
-# V148 keeps the proven TP27 carrier MTU=1400 and GRE/FoU behavior unchanged,
-# but raises routed VPN access from the old 1200/1160 nested-MTU contract to a
-# conservative 1300/1260 contract with 100 bytes of carrier headroom. It is
-# applied before V144 wraps V51 so the one-time real drift is repaired and all
-# later steady-state passes remain read-only.
+# V149 keeps more than one independent carrier family warm:
+#   * tp27_fast       : native keyed GRE first; FoU only install fallback
+#   * tp27_tcp_direct : independent direct public-IP TCP L3 carrier
 #
-# VPN Access V46/V51 remain the sole Exit client-egress and nested-MTU owners.
-# V144 wraps their publication paths so unchanged Desired State is read-only
-# instead of flushing live client-pool chains every 20/30 seconds.
-# Runtime Reconciler V4 adds DB-authoritative TP27 orphan cleanup.
+# SmartAuto V21 continues to own health, loss, latency, throughput benchmark,
+# quarantine, dwell and promotion. No lane is forced merely because of its
+# protocol family; the currently healthiest/faster qualified path wins.
 # ============================================================
 
 
@@ -55,6 +49,7 @@ async def main() -> None:
     install_manager_runtime_v16()
     install_smart_transport_auto_v21()
     activate_manager_candidate_policy_v91()
+    apply_adaptive_multilane_v149()
     apply_adaptive_tunnel_performance_v148()
     apply_exit_access_dataplane_stability_v144()
 
@@ -65,11 +60,12 @@ async def main() -> None:
         "candidate_bootstrap=v38 "
         "tp27_reference=v91 "
         "adaptive_tunnel_performance=v148 "
+        "adaptive_multilane=v149 "
         "vpn_access_dataplane=v46 "
         "vpn_access_performance=v51 "
         "exit_access_stability=v144 "
         "reconciler=v4 "
-        "active_candidate=tp27_fast "
+        "active_candidates=tp27_fast,tp27_tcp_direct "
         "migration_fallback=kernel_gre "
         "retired=gost_tun,amneziawg,netrix",
         flush=True,

@@ -66,7 +66,9 @@ jobs:
               "backend/app/transport_candidates/tp27_fast.py"
           ).read_text()
 
-          assert version == "1.1.0-rc.148"
+          prefix = "1.1.0-rc."
+          assert version.startswith(prefix), version
+          assert int(version[len(prefix):]) >= 148, version
 
           required_adaptive = [
               "TWINPANEL_ADAPTIVE_TUNNEL_PERFORMANCE_V148",
@@ -82,7 +84,7 @@ jobs:
           for token in required_adaptive:
               assert token in adaptive, token
 
-          # The proven carrier PMTU remains unchanged in this release.
+          # The proven carrier PMTU remains unchanged in this release line.
           assert "MTU = 1400" in carrier
 
           # V51 repair verification must use the active runtime constants, not
@@ -101,8 +103,8 @@ jobs:
           assert "ipt -t filter -F" not in stability
           assert "ipt -t mangle -F" not in stability
 
-          # V148 must be applied before V144 captures steady-state Desired
-          # State so the first 1200->1300 migration is a real one-time drift.
+          # V148 must still be applied before V144 captures steady-state
+          # Desired State in every later release.
           apply_v148 = "apply_adaptive_tunnel_performance_v148()"
           apply_v144 = "apply_exit_access_dataplane_stability_v144()"
           assert apply_v148 in manager

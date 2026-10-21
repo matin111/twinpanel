@@ -28,15 +28,14 @@ _PACKET_LOSS_RE = re.compile(
     flags=re.IGNORECASE,
 )
 
+_PING_RTT_RE = re.compile(
+    r"=\s*([0-9.]+)/([0-9.]+)/([0-9.]+)/([0-9.]+)\s*ms",
+    flags=re.IGNORECASE,
+)
+
 
 def parse_packet_loss_pct(output: str) -> float | None:
-    """Return ping packet loss as a percentage, or None when unavailable.
-
-    Candidate health must fail closed when ping output cannot be interpreted;
-    silently treating a missing loss field as 0% can promote a degraded L3
-    carrier. Probe commands force LC_ALL=C so the parser receives the standard
-    iputils summary format.
-    """
+    """Return ping packet loss as a percentage, or None when unavailable."""
 
     match = _PACKET_LOSS_RE.search(str(output or ""))
     if not match:
@@ -50,6 +49,24 @@ def parse_packet_loss_pct(output: str) -> float | None:
     if value < 0.0 or value > 100.0:
         return None
     return value
+
+
+def parse_ping_rtt(output: str) -> tuple[float, float] | None:
+    """Return (average_ms, jitter_mdev_ms) from an iputils ping summary."""
+
+    match = _PING_RTT_RE.search(str(output or ""))
+    if not match:
+        return None
+
+    try:
+        average = float(match.group(2))
+        mdev = float(match.group(4))
+    except (TypeError, ValueError):
+        return None
+
+    if average < 0.0 or mdev < 0.0:
+        return None
+    return average, mdev
 
 
 def runtime(name: str, tunnel_id: int) -> dict[str, Any]:
@@ -204,10 +221,20 @@ ip rule add priority {priority} from {shlex.quote(rt['iran_ip'])}/32 table {tabl
         )
 
     packet_loss = max(float(iran_loss), float(exit_loss))
+
+    iran_rtt = parse_ping_rtt(p1.stdout or "")
+    exit_rtt = parse_ping_rtt(p2.stdout or "")
+
     latency = None
-    match = re.search(r"=\s*[0-9.]+/([0-9.]+)/", (p1.stdout or ""))
-    if match:
-        latency = max(1, int(round(float(match.group(1)))))
+    if iran_rtt is not None:
+        latency = max(1, int(round(float(iran_rtt[0]))))
+
+    jitter_values = [
+        float(value[1])
+        for value in (iran_rtt, exit_rtt)
+        if value is not None
+    ]
+    jitter = max(jitter_values) if jitter_values else None
 
     tcp = await ci.run(f"""
 set +e
@@ -239,9 +266,12 @@ PY""", check=False, timeout=12)
         "udp_egress": True,
         "egress_ip": (tcp.stdout or "").strip(),
         "latency_ms": latency,
+        "jitter_ms": jitter,
         "packet_loss_pct": packet_loss,
         "iran_packet_loss_pct": float(iran_loss),
         "exit_packet_loss_pct": float(exit_loss),
+        "iran_jitter_ms": None if iran_rtt is None else float(iran_rtt[1]),
+        "exit_jitter_ms": None if exit_rtt is None else float(exit_rtt[1]),
     }
 
 
