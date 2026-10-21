@@ -1,0 +1,45 @@
+name: Protocol Command Center V147 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/protocol-command-center.tsx'
+      - 'components/protocol-command-center.module.css'
+      - 'app/admin/modern-protocols/page.tsx'
+      - '.github/workflows/protocol-command-center-v147-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify single-workspace protocol UX
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          page = Path('app/admin/modern-protocols/page.tsx').read_text(encoding='utf-8')
+          ui = Path('components/protocol-command-center.tsx').read_text(encoding='utf-8')
+          css = Path('components/protocol-command-center.module.css').read_text(encoding='utf-8')
+
+          assert 'ProtocolCommandCenter' in page
+          assert 'ModernProtocolsAdminPage' not in page
+          assert 'LegacyProtocolsStudio' not in ui
+          assert 'nodeRail' in ui
+          assert 'Protocol Library' in ui
+          assert 'filterRail' in ui
+          assert 'classicProtocols()' in ui
+          assert '/v1/settings/vpn/modern-protocols' in ui
+          assert 'ensureClassicProtocol' in ui
+          assert 'protocolHealth' in ui
+          assert 'saveXrayDomain' in ui
+          assert 'prepareXrayDomain' in ui
+          assert 'modernApply' in ui
+          assert 'previewModern' in ui
+          assert '.protocolGrid' in css
+          assert '.drawer' in css
+          assert '.nodePillActive' in css
+
+          print('PROTOCOL_COMMAND_CENTER_V147_OK')
+          PY
