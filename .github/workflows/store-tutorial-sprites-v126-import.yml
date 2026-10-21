@@ -24,7 +24,17 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          cat .tutorial-import-v126/part-*.b64 > /tmp/tutorial-sprites.b64
+          cat \
+            .tutorial-import-v126/part-001.b64 \
+            .tutorial-import-v126/part-002.b64 \
+            .tutorial-import-v126/part-003.b64 \
+            .tutorial-import-v126/fix-004a.b64 \
+            .tutorial-import-v126/fix-004b.b64 \
+            .tutorial-import-v126/fix-004c.b64 \
+            .tutorial-import-v126/fix-004d.b64 \
+            .tutorial-import-v126/part-005.b64 \
+            .tutorial-import-v126/part-006.b64 \
+            > /tmp/tutorial-sprites.b64
           base64 -d /tmp/tutorial-sprites.b64 > /tmp/tutorial-sprites.tar.gz
           echo 'c8c0ae4b6e1230fb19cf4d1d2e754fa4d738446a1bd8c2990ab390fc0dc611c3  /tmp/tutorial-sprites.tar.gz' | sha256sum -c -
 
@@ -34,7 +44,6 @@ jobs:
           rm -rf public/learning/screenshots
           mkdir -p public/learning/screenshots
           tar -xzf /tmp/tutorial-sprites.tar.gz -C public/learning/screenshots
-
           test "$(find public/learning/screenshots -type f -name '*.webp' | wc -l | tr -d ' ')" = '15'
 
           python3 - <<'PY'
@@ -76,5 +85,3 @@ jobs:
           fi
           git commit -m 'Bundle legacy storefront tutorial images locally'
           git push origin HEAD:feat/store-tutorial-sprites-v126-final
-
-# retrigger after all five backup chunks are present
