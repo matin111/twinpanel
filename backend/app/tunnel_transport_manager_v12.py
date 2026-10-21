@@ -12,6 +12,9 @@ from .adaptive_multilane_v149 import (
 from .adaptive_multilane_v151 import (
     apply_adaptive_multilane_v151,
 )
+from .adaptive_multilane_v165 import (
+    apply_adaptive_multilane_v165,
+)
 from .adaptive_tunnel_performance_v148 import (
     apply_adaptive_tunnel_performance_v148,
 )
@@ -38,6 +41,7 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 # + ADAPTIVE TUNNEL PERFORMANCE V148
 # + ADAPTIVE MULTI-LANE V149
 # + TP27 MASQUE CONNECT-IP V151
+# + TP27 MIERU TCP CARRIER V165
 # + ADAPTIVE CANDIDATE QUALIFICATION V155
 # + RUNTIME RECONCILER V5 (extends runtime_reconciler_v4)
 # ============================================================
@@ -49,6 +53,7 @@ async def main() -> None:
     activate_manager_candidate_policy_v91()
     apply_adaptive_multilane_v149()
     apply_adaptive_multilane_v151()
+    apply_adaptive_multilane_v165()
     apply_adaptive_candidate_qualification_v155()
     apply_adaptive_tunnel_performance_v148()
     apply_exit_access_dataplane_stability_v144()
@@ -62,15 +67,16 @@ async def main() -> None:
         "adaptive_tunnel_performance=v148 "
         "adaptive_multilane=v149 "
         "adaptive_multilane=v151 "
+        "adaptive_multilane=v165 "
         "adaptive_candidate_qualification=v155 "
         "vpn_access_dataplane=v46 "
         "vpn_access_performance=v51 "
         "exit_access_stability=v144 "
         "reconciler=v5 "
-        "active_candidates=tp27_fast,tp27_masque,tp27_tcp_direct "
+        "active_candidates=tp27_fast,tp27_masque,tp27_mieru_tcp,tp27_tcp_direct "
         "direct_gate=peer-l3+throughput "
         "udp_policy=quality-gated "
-        "non_udp_fallback=tp27_tcp_direct "
+        "non_udp_fallback=tp27_mieru_tcp,tp27_tcp_direct "
         "migration_fallback=kernel_gre "
         "retired=gost_tun,amneziawg,netrix",
         flush=True,
