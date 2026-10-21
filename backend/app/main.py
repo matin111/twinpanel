@@ -37,6 +37,7 @@ from .routers.runtime_endpoints import router as runtime_endpoints_router
 from .routers.node_recovery import router as node_recovery_router
 from .routers.tunnel_managed import router as tunnel_managed_router
 from .routers.modern_transports import router as modern_transports_router
+from .routers.modern_protocol_admin_v3 import router as modern_protocol_admin_v3_router
 from .routers.download_assets import admin_router as download_assets_admin_router, public_router as download_assets_public_router
 from .routers.public_connection_hub_live_v5 import router as public_connection_hub_live_v5_router
 from .routers.public_connection_live_v4 import router as public_connection_live_v4_router
@@ -345,6 +346,11 @@ app.include_router(public_connection_live_v4_router)
 app.include_router(public_connection_v3_router)
 app.include_router(account_delivery.public_router)
 app.include_router(account_delivery.customer_router)
+
+# Unified modern protocol V3 must be registered before the legacy VPN settings
+# router so /modern-protocols uses Local Core + Exit dispatch while L2TP and
+# compatibility-only routes continue to be served by the legacy router.
+app.include_router(modern_protocol_admin_v3_router)
 
 # TWINPANEL_VPN_SETTINGS_V1
 from .routers.vpn_settings import router as vpn_settings_router
