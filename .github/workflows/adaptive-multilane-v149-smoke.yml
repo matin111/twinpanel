@@ -56,10 +56,16 @@ jobs:
           go-version: "1.26.0"
           cache: false
 
-      - name: Build source-owned Direct TCP carrier
+      - name: Test and build source-owned Direct TCP carrier
         shell: bash
         run: |
           set -Eeuo pipefail
+          (
+            cd tools/tp27-tcp-direct
+            GOWORK=off go test ./...
+            GOWORK=off go vet ./...
+          )
+
           BUILD_DIR="$(mktemp -d)"
           trap 'rm -rf "$BUILD_DIR"' EXIT
           cp tools/tp27-tcp-direct/go.mod "$BUILD_DIR/go.mod"
@@ -77,7 +83,7 @@ jobs:
           )
           test -z "$(git status --short -- tools/tp27-tcp-direct)"
 
-      - name: Verify V149 independent-lane and V152 packaging contracts
+      - name: Verify V149 independent-lane, V152 packaging and V158 health contracts
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -88,6 +94,7 @@ jobs:
           common = Path("backend/app/transport_candidates/common.py").read_text()
           tcp = Path("backend/app/transport_candidates/tp27_tcp_direct.py").read_text()
           tcp_go = Path("tools/tp27-tcp-direct/main.go").read_text()
+          tcp_test = Path("tools/tp27-tcp-direct/main_test.go").read_text()
           manager = Path("backend/app/tunnel_transport_manager_v12.py").read_text()
           publisher = Path(".github/workflows/publish-prebuilt-release.yml").read_text()
 
@@ -138,15 +145,22 @@ jobs:
               assert forbidden not in tcp, forbidden
 
           for token in (
-              'magic     = "TP27TCP1"',
+              'magic     = "TP27TCP2"',
               'flag.String("token-file"',
               "subtle.ConstantTimeCompare",
               "flowHash(packet)",
+              "heartbeatLoop",
+              "heartbeat_timeout",
+              "tcpUserTimeoutMS",
+              "forwardPacket",
+              "retrying packet on healthy fallback",
               "SetNoDelay(true)",
               "SetKeepAlive(true)",
           ):
               assert token in tcp_go, token
 
+          assert "TestIncidentICMPPreferredLanes" in tcp_test
+          assert "TestForwardPacketRetriesNextHealthyLane" in tcp_test
           assert "parse_ping_rtt" in common
           assert '"jitter_ms": jitter' in common
           assert '"iran_jitter_ms"' in common
@@ -163,5 +177,5 @@ jobs:
           assert "tp27-tcp-direct-linux-x86_64.sha256" in publisher
           assert "source/tools/tp27-tcp-direct/main.go" in publisher
 
-          print("ADAPTIVE_MULTILANE_V149_V152_SMOKE_OK")
+          print("ADAPTIVE_MULTILANE_V149_V152_V158_SMOKE_OK")
           PY
