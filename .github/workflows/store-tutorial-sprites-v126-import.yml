@@ -1,0 +1,78 @@
+name: TwinPanel Store Tutorial Sprites V126 Import
+
+on:
+  push:
+    branches:
+      - feat/store-tutorial-sprites-v126-final
+    paths:
+      - '.tutorial-import-v126/**'
+      - '.github/workflows/store-tutorial-sprites-v126-import.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  import-local-tutorial-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/store-tutorial-sprites-v126-final
+          fetch-depth: 0
+
+      - name: Restore tutorial images from legacy backup archive
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cat .tutorial-import-v126/part-*.b64 > /tmp/tutorial-sprites.b64
+          base64 -d /tmp/tutorial-sprites.b64 > /tmp/tutorial-sprites.tar.gz
+          echo 'c8c0ae4b6e1230fb19cf4d1d2e754fa4d738446a1bd8c2990ab390fc0dc611c3  /tmp/tutorial-sprites.tar.gz' | sha256sum -c -
+
+          count="$(tar -tzf /tmp/tutorial-sprites.tar.gz | grep -E '\.webp$' | wc -l | tr -d ' ')"
+          test "$count" = '15'
+
+          rm -rf public/learning/screenshots
+          mkdir -p public/learning/screenshots
+          tar -xzf /tmp/tutorial-sprites.tar.gz -C public/learning/screenshots
+
+          test "$(find public/learning/screenshots -type f -name '*.webp' | wc -l | tr -d ' ')" = '15'
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          guide=Path('lib/store-guide-content.ts')
+          s=guide.read_text(encoding='utf-8')
+          s=s.replace(
+              'const LEGACY_STEP_IMAGE_BASE="https://movilineapp.com/learning/screenshots";',
+              'const LEGACY_STEP_IMAGE_BASE="/learning/screenshots";'
+          )
+          old='''export function storeGuideScreenshot(platform:StoreGuidePlatform,protocol:StoreGuideProtocol,index:number):string{\n  return `${LEGACY_STEP_IMAGE_BASE}/${platform}/${protocol}/${String(index+1).padStart(2,"0")}.webp`;\n}'''
+          new='''export function storeGuideScreenshot(platform:StoreGuidePlatform,protocol:StoreGuideProtocol,index:number):string{\n  if(index!==0||platform==="macos"||platform==="linux")return "";\n  return `${LEGACY_STEP_IMAGE_BASE}/${platform}/${protocol}.webp`;\n}'''
+          if old not in s and new not in s:
+              raise SystemExit('storeGuideScreenshot implementation not found')
+          s=s.replace(old,new)
+          guide.write_text(s,encoding='utf-8')
+
+          renderer=Path('components/store-template-renderer.tsx')
+          r=renderer.read_text(encoding='utf-8')
+          old_figure='''                <figure className="tpRealGuideScreenshot">\n                  <img src={screenshot} alt={`${step.title} - ${selectedProtocol.name} - ${pick(selectedPlatform.fa,selectedPlatform.en)}`} loading="lazy" decoding="async" onError={event=>{const figure=event.currentTarget.closest(".tpRealGuideScreenshot");if(figure instanceof HTMLElement)figure.style.display="none";}}/>\n                  <figcaption>{pick("تصویر واقعی مرحله","Real step image")} {number(index+1)} · {selectedProtocol.name} · {pick(selectedPlatform.fa,selectedPlatform.en)}</figcaption>\n                </figure>'''
+          new_figure='''                {screenshot&&<figure className="tpRealGuideScreenshot">\n                  <img src={screenshot} alt={`${selectedProtocol.name} - ${pick(selectedPlatform.fa,selectedPlatform.en)} - tutorial`} loading="lazy" decoding="async" onError={event=>{const figure=event.currentTarget.closest(".tpRealGuideScreenshot");if(figure instanceof HTMLElement)figure.style.display="none";}}/>\n                  <figcaption>{pick("تصاویر واقعی مراحل آموزش","Real tutorial step images")} · {selectedProtocol.name} · {pick(selectedPlatform.fa,selectedPlatform.en)}</figcaption>\n                </figure>}'''
+          if old_figure not in r and new_figure not in r:
+              raise SystemExit('tutorial screenshot figure not found')
+          r=r.replace(old_figure,new_figure)
+          renderer.write_text(r,encoding='utf-8')
+          PY
+
+      - name: Commit local tutorial assets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/learning/screenshots lib/store-guide-content.ts components/store-template-renderer.tsx
+          if git diff --cached --quiet; then
+            echo 'No tutorial changes to commit'
+            exit 0
+          fi
+          git commit -m 'Bundle legacy storefront tutorial images locally'
+          git push origin HEAD:feat/store-tutorial-sprites-v126-final
