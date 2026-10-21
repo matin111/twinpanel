@@ -49,9 +49,23 @@ jobs:
           assert 'AdminSubscriptionLiveTable' in routed
           assert 'AdminManualSubscriptionCreate' in routed
 
-          assert 'parityApi.provisionInstall(installPayload)' in provision
-          assert 'saveXrayDomain(nodeId,domain)' in provision
-          assert 'prepareXrayDomain(nodeId)' in provision
+          # Add Node is now intentionally protocol-agnostic. It still uses the
+          # production provision/install path so base setup, secure SSH access,
+          # Agent, Fabric, quota sync and subscription membership are preserved.
+          assert 'parityApi.provisionInstall(buildInstallPayload({' in provision
+          for marker in (
+              'install_cisco:false',
+              'install_openvpn:false',
+              'install_wireguard:false',
+              'install_l2tp:false',
+              'install_v2ray:false',
+              '/admin/modern-protocols?node=${createdNodeId}',
+          ):
+              assert marker in provision, marker
+          assert 'saveXrayDomain(' not in provision
+          assert 'prepareXrayDomain(' not in provision
+
+          # Xray domain/TLS management remains available outside Add Node.
           assert 'adminApi.xrayDomain(selected.id)' in nodes
           assert 'adminApi.saveXrayDomain(selected.id,xrayDomainDraft.trim())' in nodes
           assert 'adminApi.prepareXrayDomain(selected.id,true)' in nodes
