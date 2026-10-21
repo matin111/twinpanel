@@ -203,11 +203,11 @@ export function ModernProtocolsAdminPage() {
   };
 
   return (
-    <Shell active="/admin/vpn-settings">
+    <Shell active="/admin/modern-protocols">
       <div className="page legacy-control-page">
         <PageHead
           title={pick("پروتکل‌های جدید", "Modern protocols")}
-          subtitle={pick(
+          sub={pick(
             "مدیریت Hysteria2، TUIC v5 و AnyTLS روی Core مستقل sing-box",
             "Manage Hysteria2, TUIC v5 and AnyTLS on an isolated sing-box core",
           )}
