@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
+import re
+import secrets
 import shlex
 from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from ..tp2027_provision import ARTIFACTS, ARTIFACT_STORE
 from .common import (
     close_pair,
     connect_pair,
@@ -23,28 +25,28 @@ from .common import (
 
 
 # ============================================================
-# TWINPANEL TP27 DIRECT TCP L3 V149
+# TWINPANEL TP27 DIRECT TCP L3 V152
 #
-# Independent carrier lane for environments where the Iran-side UDP path is
-# degraded or unavailable. This lane does not depend on TP2027 Backhaul, FoU,
-# QUIC, KCP, ARQ, or the active TP27 GRE interface. It uses the already-vetted
-# TwinPanel TCP TUN artifact directly between the Iran and Exit public IPs.
+# Independent non-UDP carrier built from source inside the verified TwinPanel
+# release. V149 referenced a controller-local TP2027 artifact that is not part
+# of prebuilt releases, so production could never install this lane on a clean
+# controller. V152 packages its own deterministic Go carrier + SHA256 sidecar.
 #
-# The lane is intentionally a fallback, not a replacement for native GRE:
-#   * TP27 Fast / native GRE remains the lowest-overhead fast path.
-#   * Direct TCP is independently health-checked and benchmarked by SmartAuto.
-#   * Multiple deterministic high TCP ports are tried only when installation
-#     or full L3 qualification fails; occupied ports are skipped fail-closed.
-#   * No TLS impersonation, packet mutation, or application-protocol spoofing
-#     is introduced here; this is a plain independent L3 resilience lane.
+# Data-plane properties:
+#   * independent from GRE/FoU/MASQUE/TP2027 Backhaul
+#   * 8 parallel TCP lanes with stable per-flow hashing
+#   * source-restricted Exit firewall ports
+#   * per-tunnel root-only shared token before lane admission
+#   * reconnecting client lanes and TCP_NODELAY/keepalive
+#   * full shared candidate probe + SmartAuto throughput qualification
 # ============================================================
 
 NAME = "tp27_tcp_direct"
 MTU = 1320
 LANES = 8
-ARTIFACT_KEY = "tcp_2027"
 REMOTE_BINARY = "/opt/twinpanel/transport/tp27-tcp-direct"
 TCP_PORT_BASES = (46200, 47200, 48200)
+ARTIFACT_NAME = "tp27-tcp-direct-linux-x86_64"
 
 
 def _port_candidates(tunnel_id: int) -> tuple[int, ...]:
@@ -53,20 +55,46 @@ def _port_candidates(tunnel_id: int) -> tuple[int, ...]:
 
 
 def _artifact() -> tuple[Path, str]:
-    filename, expected = ARTIFACTS[ARTIFACT_KEY]
-    path = ARTIFACT_STORE / filename
+    backend_dir = Path(__file__).resolve().parents[2]
+    artifact = backend_dir / "artifacts" / ARTIFACT_NAME
+    sidecar = backend_dir / "artifacts" / f"{ARTIFACT_NAME}.sha256"
 
-    if not path.is_file():
-        raise RuntimeError(f"tp27_tcp_direct_artifact_missing:{path}")
+    if not artifact.is_file():
+        raise RuntimeError(f"tp27_tcp_direct_artifact_missing:{artifact}")
+    if not sidecar.is_file():
+        raise RuntimeError(f"tp27_tcp_direct_checksum_missing:{sidecar}")
 
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    expected = sidecar.read_text(encoding="utf-8").strip().split()[0].lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise RuntimeError("tp27_tcp_direct_checksum_invalid")
+
+    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
     if digest != expected:
         raise RuntimeError(
             "tp27_tcp_direct_artifact_checksum_mismatch:"
             f"expected={expected}:actual={digest}"
         )
 
-    return path, expected
+    return artifact, expected
+
+
+def _token_path(tunnel_id: int) -> str:
+    return f"/etc/twinpanel/tcp-direct/tunnel-{int(tunnel_id)}.token"
+
+
+async def _write_token(conn, path: str, value: str) -> None:
+    payload = base64.b64encode(value.encode("utf-8")).decode("ascii")
+    await run(
+        conn,
+        f"""
+set -e
+install -d -m 0700 /etc/twinpanel/tcp-direct
+printf %s {shlex.quote(payload)} | base64 -d > {shlex.quote(path)}
+chmod 0600 {shlex.quote(path)}
+""",
+        "tp27_tcp_direct_token_write",
+        15,
+    )
 
 
 async def _reset_pair(ci, ce, rt: dict, iran_public: str) -> None:
@@ -116,6 +144,7 @@ async def _install_profile(
     exit_public: str,
     rt: dict,
     port: int,
+    token_path: str,
 ) -> None:
     comment = f"TwinPanel-TP27-TCP-{int(tunnel_id)}"
 
@@ -135,11 +164,14 @@ After=network-online.target
 [Service]
 Type=simple
 User=root
-ExecStart={REMOTE_BINARY} --mode server --tun {rt['interface']} --local {rt['exit_addr']} --listen :{int(port)} --lanes {LANES} --mtu {MTU}
+ExecStart={REMOTE_BINARY} --mode server --tun {rt['interface']} --local {rt['exit_addr']} --listen :{int(port)} --lanes {LANES} --mtu {MTU} --token-file {token_path}
 Restart=always
 RestartSec=2
 TimeoutStopSec=10
 LimitNOFILE=1048576
+AmbientCapabilities=CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_ADMIN
+NoNewPrivileges=true
 
 [Install]
 WantedBy=multi-user.target
@@ -153,11 +185,14 @@ After=network-online.target
 [Service]
 Type=simple
 User=root
-ExecStart={REMOTE_BINARY} --mode client --tun {rt['interface']} --local {rt['iran_addr']} --peer {exit_public}:{int(port)} --lanes {LANES} --mtu {MTU}
+ExecStart={REMOTE_BINARY} --mode client --tun {rt['interface']} --local {rt['iran_addr']} --peer {exit_public}:{int(port)} --lanes {LANES} --mtu {MTU} --token-file {token_path}
 Restart=always
 RestartSec=2
 TimeoutStopSec=10
 LimitNOFILE=1048576
+AmbientCapabilities=CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_ADMIN
+NoNewPrivileges=true
 
 [Install]
 WantedBy=multi-user.target
@@ -201,7 +236,7 @@ systemctl restart {shlex.quote(rt['iran_service'])}
         45,
     )
 
-    await asyncio.sleep(1.5)
+    await asyncio.sleep(2.0)
 
 
 async def install(tunnel_id: int, db: Session) -> dict:
@@ -210,6 +245,8 @@ async def install(tunnel_id: int, db: Session) -> dict:
     rt["tunnel_id"] = int(tunnel_id)
 
     artifact_path, artifact_sha = _artifact()
+    token = secrets.token_urlsafe(36)
+    token_path = _token_path(tunnel_id)
     attempts: list[dict] = []
 
     mark(
@@ -220,13 +257,14 @@ async def install(tunnel_id: int, db: Session) -> dict:
         meta=str(
             {
                 **rt,
-                "generation": 149,
+                "generation": 152,
                 "carrier_class": "direct-tcp-l3",
                 "depends_on": None,
                 "mtu": MTU,
                 "lanes": LANES,
                 "artifact_sha256": artifact_sha,
                 "port_candidates": list(_port_candidates(tunnel_id)),
+                "source_built": True,
             }
         ),
     )
@@ -240,6 +278,10 @@ async def install(tunnel_id: int, db: Session) -> dict:
         await asyncio.gather(
             copy_binary(ci, str(artifact_path), REMOTE_BINARY),
             copy_binary(ce, str(artifact_path), REMOTE_BINARY),
+        )
+        await asyncio.gather(
+            _write_token(ci, token_path, token),
+            _write_token(ce, token_path, token),
         )
 
         for port in _port_candidates(tunnel_id):
@@ -258,6 +300,7 @@ async def install(tunnel_id: int, db: Session) -> dict:
                     exit_public=str(exit_node.public_ip),
                     rt=rt,
                     port=int(port),
+                    token_path=token_path,
                 )
                 health = await probe(
                     ci,
@@ -277,13 +320,14 @@ async def install(tunnel_id: int, db: Session) -> dict:
                 meta = {
                     **rt,
                     **health,
-                    "generation": 149,
+                    "generation": 152,
                     "carrier_class": "direct-tcp-l3",
                     "depends_on": None,
                     "selected_port": int(port),
                     "mtu": MTU,
                     "lanes": LANES,
                     "artifact_sha256": artifact_sha,
+                    "source_built": True,
                     "attempts": attempts,
                 }
 
