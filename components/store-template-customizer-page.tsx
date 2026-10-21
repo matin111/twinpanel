@@ -4,6 +4,7 @@ import Link from "next/link";
 import {useRouter} from "next/navigation";
 import {useI18n} from "../lib/i18n";
 import {installedStoreTemplate} from "../lib/store-template-registry";
+import {ConversionTemplateCustomizer} from "./store-template-conversion-customizer";
 import {EditorialTemplateCustomizer} from "./store-template-editorial-customizer";
 import {StoreTemplateCustomizer} from "./store-template-customizer";
 import {Card,Shell} from "./ui";
@@ -23,10 +24,14 @@ export function StoreTemplateCustomizerPage({templateId}:{templateId:string}){
     </div></Shell>;
   }
 
+  const close=()=>router.push("/admin/store-settings");
+
   return <Shell active="/admin/store-settings"><div className="page storeAdminManager">
     {template.id==="editorial-grid-2027"
-      ?<EditorialTemplateCustomizer onClose={()=>router.push("/admin/store-settings")}/>
-      :<StoreTemplateCustomizer templateId={template.id} onClose={()=>router.push("/admin/store-settings")}/>
+      ?<EditorialTemplateCustomizer onClose={close}/>
+      :template.id==="conversion-2027"
+        ?<ConversionTemplateCustomizer onClose={close}/>
+        :<StoreTemplateCustomizer templateId={template.id} onClose={close}/>
     }
   </div></Shell>;
 }

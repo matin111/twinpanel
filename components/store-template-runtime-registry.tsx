@@ -3,8 +3,9 @@
 import type {ReactNode} from "react";
 import {DEFAULT_STORE_TEMPLATE_ID,resolveStoreTemplateId} from "../lib/store-template-registry";
 import type {StoreTemplateOptionMap} from "../lib/store-template-options";
+import {ConversionPro2027Template} from "./store-template-conversion-pro";
 import {EditorialPro2027Template} from "./store-template-editorial-pro";
-import {StoreTemplateRenderer,type StoreTemplateProps} from "./store-template-renderer";
+import type {StoreTemplateProps} from "./store-template-renderer";
 
 export type StoreThemeRuntimeProps=StoreTemplateProps&{
   templateId:string;
@@ -14,7 +15,7 @@ export type StoreThemeRuntimeProps=StoreTemplateProps&{
 export type StoreTemplateRuntimeRenderer=(props:StoreThemeRuntimeProps)=>ReactNode;
 
 const STORE_TEMPLATE_RUNTIME_RENDERERS:Record<string,StoreTemplateRuntimeRenderer>={
-  "conversion-2027":({templateId:_,themeOptions:__,...props})=><StoreTemplateRenderer {...props}/>,
+  "conversion-2027":({templateId:_,themeOptions,...props})=><ConversionPro2027Template themeOptions={themeOptions} {...props}/>,
   "editorial-grid-2027":({templateId:_,themeOptions,...props})=><EditorialPro2027Template themeOptions={themeOptions} {...props}/>,
 };
 
