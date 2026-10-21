@@ -13,7 +13,7 @@ const categoryLabel:Record<Exclude<StoreProtocolCategory,"classic">,{fa:string;e
 };
 
 export function StoreProtocolCatalogLayer({templateId}:{templateId:string}){
-  const {pick}=useI18n();
+  const {pick,lang}=useI18n();
   const [target,setTarget]=useState<HTMLElement|null>(null);
 
   useEffect(()=>{
@@ -40,7 +40,7 @@ export function StoreProtocolCatalogLayer({templateId}:{templateId:string}){
   if(!target)return null;
 
   return createPortal(
-    <section className={styles.extension} data-template={templateId} aria-label={pick("پروتکل‌های مدرن","Modern protocols")}>
+    <section className={styles.extension} data-template={templateId} dir={lang==="en"?"ltr":"rtl"} aria-label={pick("پروتکل‌های مدرن","Modern protocols")}>
       <header className={styles.heading}>
         <div>
           <span className={styles.eyebrow}>{pick("نسل جدید اتصال","NEXT-GEN CONNECTIVITY")}</span>
@@ -62,10 +62,10 @@ export function StoreProtocolCatalogLayer({templateId}:{templateId:string}){
             </div>
             <div className={styles.cardBody}>
               <small>{pick(label.fa,label.en)}</small>
-              <h4>{protocol.name}</h4>
+              <h4 dir="ltr">{protocol.name}</h4>
               <p>{pick(protocol.fa,protocol.en)}</p>
             </div>
-            <div className={styles.meta}>
+            <div className={styles.meta} dir="ltr">
               <span>{protocol.transport}</span>
               {protocol.defaultPort&&<span>Port {protocol.defaultPort}</span>}
             </div>
