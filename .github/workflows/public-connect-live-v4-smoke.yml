@@ -100,7 +100,7 @@ jobs:
           assert "TWINPANEL_PUBLIC_CONNECT_MOBILE_V7" in mobile
           assert "مولتی‌لینک V2Ray / Xray" in mobile
           assert "has_v2ray" in mobile
-          assert 'r\'<details class="advanced">.*?</details>\'' in mobile
+          assert '<details class=\"advanced\">.*?</details>' in mobile
           assert "navigator.share" in mobile
           assert "new File" in mobile
           assert "ارسال به موبایل" in mobile
