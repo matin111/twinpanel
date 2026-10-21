@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.160",
+  "version": "1.1.0-rc.161",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-21T22:12:42Z",
+  "released_at": "2026-10-21T22:21:12Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "64e74065cd811c65fc04f874b9d5ae722d340e34",
+  "source_sha": "27ba29fc54b0ba7aec61d95d3e71b0ef9c270d3f",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.160/twinpanel-1.1.0-rc.160-linux-x86_64.tar.gz",
-    "sha256": "d690419914e6ec8076433004900e8f3d49d6f76539816faee640da53ac3df5a5",
-    "size_bytes": 18082194
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.161/twinpanel-1.1.0-rc.161-linux-x86_64.tar.gz",
+    "sha256": "d22a8fb6e33d250cf9d84c55fd81ca293bef4949ee1de87f6258eb892c76fd68",
+    "size_bytes": 18084668
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.160 اصلاح Production مربوط به Health پس از Restart در Modern Protocol Studio را منتشر می‌کند. تست واقعی AnyTLS روی TwinPanel Local Core در rc.157 ثابت کرد نصب می‌تواند با HTTP 200 تمام شود، سرویس twinpanel-sing-box فعال شود و listener واقعی روی پورت 8446 بالا بیاید، اما Health فوری بعد از systemctl restart قبل از bind شدن listener اجرا شود و DB/UI به‌اشتباه service_or_listener_unhealthy ثبت کند. Runtime اکنون فقط در مسیر install/apply برای sing-box یک readiness polling محدود و bounded تا 20 تلاش با فاصله 250ms دارد؛ اگر اولین Health سالم باشد هیچ تأخیری اضافه نمی‌شود، Health دستی همچنان fail-fast باقی می‌ماند و خرابی واقعی بعد از پنجره محدود همچنان unhealthy گزارش می‌شود. Regression CI سناریوی دو Health ناموفق اولیه و سپس listener سالم، و همچنین failure ماندگار را پوشش می‌دهد. Fix قبلی bootstrap unit، Nginx long-request policy، پروتکل‌های Classic/Standalone، Payment، Subscription، Quota، Auth، Tunnel و Storefront تغییر نکرده‌اند. موفقیت نهایی نیازمند Update به rc.160 و نصب واقعی AnyTLS روی Local Core است تا HTTP، DB status، service و listener هم‌زمان تأیید شوند.",
-    "en": "TwinPanel 1.1.0-rc.160 publishes the production correction for post-restart health in Modern Protocol Studio. Real AnyTLS testing on TwinPanel Local Core with rc.157 proved an install could finish with HTTP 200, start twinpanel-sing-box successfully, and later expose the real 8446 listener while the immediate health sample after systemctl restart ran before the listener had bound and incorrectly persisted service_or_listener_unhealthy in DB/UI. The runtime now uses bounded readiness polling only on the sing-box install/apply path: up to 20 attempts at 250ms intervals, with no added delay when the first health sample is already healthy. Manual health checks remain fail-fast, and persistent failures remain unhealthy after the bounded window. CI regression coverage reproduces two initial unhealthy samples followed by a healthy listener and also verifies the bounded persistent-failure case. The prior service-unit bootstrap fix, Nginx long-request policy, Classic/Standalone protocols, Payment, Subscription, Quota, Auth, Tunnel and Storefront behavior are unchanged. Final success still requires updating the real test server to rc.160 and performing a real AnyTLS install on Local Core while verifying HTTP result, DB status, service and listener together."
+    "fa": "TwinPanel 1.1.0-rc.161 دو اصلاح Presentation فروشگاه را منتشر می‌کند که در Browser Acceptance واقعی مشخص شدند. در قالب Conversion 2027 کارت‌های ۱۰ پروتکل Modern دیگر سطح تقریباً سفید Hard-code شده ندارند و اکنون از همان تنظیمات موجود Customizer برای پس‌زمینه کارت، Border، متن اصلی و متن فرعی استفاده می‌کنند؛ بنابراین Dark/Light با Theme اصلی هماهنگ می‌ماند و تنظیم تکراری جدیدی اضافه نشده است. در Orbit Neo 2027 متن Poster جایگزین آموزش در نبود Media Studio HD با عرض کنترل‌شده، فاصله و تراز وسط واقعی نمایش داده می‌شود تا تیتر Protocol، Platform و زیرمتن در فارسی و انگلیسی داخل کادر مرتب و متعادل باشند. Catalog مشترک ۱۵ پروتکل، داده واقعی Protocolهای هر Plan و Guideهای تأییدشده بدون تغییر باقی مانده‌اند. Backend/API/Auth/Payment/Subscription/Quota/Tunnel/VPN تغییر نکرده‌اند. موفقیت نهایی UI نیازمند Update روی سرور تست و Browser Acceptance واقعی در Dark/Light، Persian/English و Desktop/Mobile است.",
+    "en": "TwinPanel 1.1.0-rc.161 publishes two Storefront presentation corrections found during real browser acceptance. In Conversion 2027, the ten Modern protocol cards no longer use an almost-white hard-coded surface and now follow the existing Customizer variables for card background, border, primary text and muted text, keeping Dark/Light rendering aligned with the theme without adding duplicate settings. In Orbit Neo 2027, the fallback guide poster used when no custom HD Media Studio artwork exists now gives the Protocol title, Platform line and summary controlled centered widths, spacing and true text alignment so Persian and English copy stays visually balanced inside the poster. The shared 15-protocol catalog, truthful per-plan protocol data and verified guide content remain unchanged. Backend/API/Auth/Payment/Subscription/Quota/Tunnel/VPN are unchanged. Final UI success still requires update on the real test server and browser acceptance in Dark/Light, Persian/English and Desktop/Mobile."
   }
 }
