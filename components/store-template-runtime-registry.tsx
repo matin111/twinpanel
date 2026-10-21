@@ -7,6 +7,7 @@ import {ConversionPro2027Template} from "./store-template-conversion-pro";
 import {EditorialFooterSocial} from "./store-template-editorial-footer-social";
 import {EditorialPro2027Template} from "./store-template-editorial-pro";
 import {OrbitNeoPolishedTemplate} from "./store-template-orbit-polished";
+import {StoreProtocolCatalogLayer} from "./store-protocol-catalog-layer";
 import editorialBridge from "./store-template-editorial-theme-bridge.module.css";
 import type {StoreTemplateProps} from "./store-template-renderer";
 
@@ -51,6 +52,7 @@ export function installedStoreTemplateRuntime(templateId:unknown){
 }
 
 export function StoreTemplateRuntime(props:StoreThemeRuntimeProps){
-  const renderer=installedStoreTemplateRuntime(props.templateId);
-  return <>{renderer(props)}</>;
+  const resolved=resolveStoreTemplateId(props.templateId);
+  const renderer=installedStoreTemplateRuntime(resolved);
+  return <>{renderer(props)}<StoreProtocolCatalogLayer templateId={resolved}/></>;
 }
