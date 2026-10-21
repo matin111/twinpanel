@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "backend/app/standalone_protocol_runtime.py"
+      - "backend/app/singbox_service_runtime.py"
       - "backend/app/modern_protocol_dispatch.py"
       - "backend/app/routers/modern_protocol_admin_v3.py"
       - "backend/app/main.py"
@@ -42,6 +43,7 @@ jobs:
         run: |
           python -m compileall -q \
             backend/app/standalone_protocol_runtime.py \
+            backend/app/singbox_service_runtime.py \
             backend/app/modern_protocol_dispatch.py \
             backend/app/routers/modern_protocol_admin_v3.py \
             backend/app/main.py \
