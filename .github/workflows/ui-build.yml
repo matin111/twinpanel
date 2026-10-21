@@ -31,17 +31,7 @@ jobs:
           fi
 
       - name: Build frontend
-        run: |
-          set -o pipefail
-          npm run build 2>&1 | tee /tmp/twinpanel-build.log
-
-      - name: Upload frontend build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: orbit-next-build-log
-          path: /tmp/twinpanel-build.log
-          if-no-files-found: error
+        run: npm run build
 
       - name: Setup Python
         uses: actions/setup-python@v5
