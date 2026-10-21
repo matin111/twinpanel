@@ -9,6 +9,7 @@ from ..deps import require_admin
 from ..models import Node, NodeProtocolConfig
 from ..node_runtime_connection import (
     connect_protocol_runtime,
+    is_local_core,
     is_protocol_runtime_node,
     protocol_runtime_node_clause,
 )
@@ -54,6 +55,7 @@ ClassicPreset = Literal[
 ]
 
 _CLASSIC_PROTOCOLS = CLASSIC_PROTOCOL_KEYS
+_LOCAL_CORE_CISCO_PORT = 4443
 
 
 class EnsureClassicProtocolIn(BaseModel):
@@ -104,6 +106,12 @@ def _default_port(protocol: str) -> int | None:
     return int(value) if value is not None else None
 
 
+def _default_port_for_node(node: Node, protocol: str) -> int | None:
+    if protocol == "cisco" and is_local_core(node):
+        return _LOCAL_CORE_CISCO_PORT
+    return _default_port(protocol)
+
+
 def _default_transport(protocol: str) -> str:
     return str(CLASSIC_PROTOCOL_REGISTRY[protocol].get("transport") or "")
 
@@ -117,9 +125,17 @@ def _default_port_text(protocol: str) -> str:
     return str(port) if port else ""
 
 
+def _default_port_text_for_node(node: Node, protocol: str) -> str:
+    port = _default_port_for_node(node, protocol)
+    if protocol == "cisco" and is_local_core(node):
+        return str(port or _LOCAL_CORE_CISCO_PORT)
+    return _default_port_text(protocol)
+
+
 def _settings_for(
     payload: EnsureClassicProtocolIn,
     existing: NodeProtocolConfig | None,
+    node: Node,
 ) -> ProtocolSettings:
     values = {
         "install_cisco": False,
@@ -134,12 +150,15 @@ def _settings_for(
     preset = _preset_values(payload)
 
     if protocol == "cisco":
+        default_port = _default_port_for_node(node, protocol) or 443
+        preset_port = preset.get("port")
+        if is_local_core(node) and not payload.port and not (existing and existing.port):
+            preset_port = default_port
         values["cisco_port"] = int(
             payload.port
-            or preset.get("port")
             or (existing.port if existing and existing.port else 0)
-            or _default_port(protocol)
-            or 443
+            or preset_port
+            or default_port
         )
 
     elif protocol == "openvpn":
@@ -252,7 +271,7 @@ def classic_protocol_inventory(
             port = (
                 int(row.port)
                 if row and row.port
-                else _default_port(protocol)
+                else _default_port_for_node(node, protocol)
             )
             transport = (
                 str(row.transport or "").strip().lower()
@@ -263,7 +282,7 @@ def classic_protocol_inventory(
                 str(row.port_text or "").strip()
                 if row
                 else ""
-            ) or _default_port_text(protocol)
+            ) or _default_port_text_for_node(node, protocol)
             protocols.append(
                 {
                     "protocol": protocol,
@@ -314,7 +333,7 @@ async def ensure_classic_protocol(
         node.id,
         payload.protocol,
     )
-    settings = _settings_for(payload, existing)
+    settings = _settings_for(payload, existing, node)
 
     conn = await connect_protocol_runtime(node, db)
     try:
