@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile device action refiner
+      - name: Compile device intelligence refiner
         run: |
           python -m py_compile \
             backend/app/routers/public_connection_device_actions_v11.py \
@@ -40,7 +40,7 @@ jobs:
           PY
           node --check /tmp/twinpanel-public-connect-v11.js
 
-      - name: Verify desktop/mobile action contract
+      - name: Verify unified platform intelligence contract
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -50,14 +50,29 @@ jobs:
 
           assert "TWINPANEL_PUBLIC_CONNECT_DEVICE_ACTIONS_V11" in v11
           assert 'body[data-public-connect-mobile="v7"] .mobile-send-btn' in v11
+          assert '.v9-icon-btn.mobile' in v11
           assert 'display:none' in v11
-          assert '.tp-mobile-device .mobile-send-btn' in v11
+          assert '.tp-phone-actions .mobile-send-btn' in v11
           assert 'display:inline-flex' in v11
+          assert '.tp-phone-actions .v9-icon-btn.mobile' in v11
+
+          for platform in ('windows', 'macos', 'android', 'ios', 'linux', 'unknown'):
+              assert platform in v11
+
           assert 'navigator.userAgentData' in v11
-          assert 'uaData.mobile' in v11
           assert 'Android|iPhone|iPad|iPod' in v11
+          assert 'windows|win32|win64|winarm' in v11
           assert 'Macintosh' in v11 and 'maxTouchPoints' in v11
-          assert "tp-desktop-device" in v11
+          assert 'linux|x11|cros' in v11
+          assert 'body.dataset.tpPlatform=platform' in v11
+          assert "platform==='android'||platform==='ios'" in v11
+
+          assert "sourceAppLinks" in v11
+          assert '.platform-group[data-platform=' in v11
+          assert "list.replaceChildren()" in v11
+          assert "برنامه‌های مناسب" in v11
+          assert "همه سیستم‌ها" in v11
+          assert "tp-show-all-platforms" in v11
           assert "!important" not in v11
 
           assert "refine_public_connection_device_actions_v11" in live
