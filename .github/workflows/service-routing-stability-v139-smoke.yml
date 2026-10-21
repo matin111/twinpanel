@@ -1,0 +1,203 @@
+name: Service Routing Stability V139 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/service_routing_stability_v139.py'
+      - 'backend/app/unified_l3_candidate_registry_v79.py'
+      - 'backend/app/twinpanel_agent.py.tpl'
+      - 'backend/app/unified_l3_core_v49.py'
+      - '.github/workflows/service-routing-stability-v139-smoke.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/app/service_routing_stability_v139.py'
+      - 'backend/app/unified_l3_candidate_registry_v79.py'
+      - 'backend/app/twinpanel_agent.py.tpl'
+      - 'backend/app/unified_l3_core_v49.py'
+      - '.github/workflows/service-routing-stability-v139-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  service-routing-stability-v139:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate stable service-route reconciliation
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          module_path = Path('backend/app/service_routing_stability_v139.py')
+          registry_path = Path('backend/app/unified_l3_candidate_registry_v79.py')
+          template_path = Path('backend/app/twinpanel_agent.py.tpl')
+
+          module_text = module_path.read_text(encoding='utf-8')
+          registry_text = registry_path.read_text(encoding='utf-8')
+          template = template_path.read_text(encoding='utf-8')
+
+          compile(module_text, str(module_path), 'exec')
+          compile(registry_text, str(registry_path), 'exec')
+
+          tree = ast.parse(module_text)
+          routing_source = None
+
+          for node in tree.body:
+              if not isinstance(node, ast.Assign):
+                  continue
+              if not any(
+                  isinstance(target, ast.Name)
+                  and target.id == '_AGENT_ROUTING_V139'
+                  for target in node.targets
+              ):
+                  continue
+              routing_source = ast.literal_eval(node.value)
+              break
+
+          assert routing_source, 'V139 rendered Agent block missing'
+          assert 'TWINPANEL_SERVICE_ROUTING_STABILITY_V139' in routing_source
+          assert '_service_routing_matches' in routing_source
+          assert 'iptables-restore' in routing_source
+          assert '--noflush' in routing_source
+          assert '--test' in routing_source
+
+          # The regression being fixed was a live `iptables -F` followed by
+          # individual `iptables -A` calls. No direct ipt()/must_ipt() call in
+          # the new block may flush a live managed chain.
+          routing_tree = ast.parse(routing_source)
+          for node in ast.walk(routing_tree):
+              if not isinstance(node, ast.Call):
+                  continue
+              if not isinstance(node.func, ast.Name):
+                  continue
+              if node.func.id not in {'ipt', '_service_routing_must_ipt'}:
+                  continue
+              constants = [
+                  arg.value
+                  for arg in node.args
+                  if isinstance(arg, ast.Constant)
+              ]
+              assert '-F' not in constants, (
+                  'direct live chain flush reintroduced: '
+                  + ast.unparse(node)
+              )
+
+          # Contract-test the actual rendered block against the current Agent
+          # template so a future marker/layout change fails CI rather than
+          # silently shipping an unpatched node Agent.
+          start_marker = '# TWINPANEL_SERVICE_ROUTING_STRICT_V2'
+          end_marker = (
+              '\n\n# ============================================================\n'
+              '# API REPORT'
+          )
+          start = template.find(start_marker)
+          end = template.find(end_marker, start + 1)
+          assert start >= 0 and end > start, 'Agent routing markers changed'
+
+          patched = template[:start] + routing_source.rstrip() + template[end:]
+          compile(patched, 'rendered-twinpanel-agent-v139.py', 'exec')
+          assert 'TWINPANEL_SERVICE_ROUTING_STABILITY_V139' in patched
+          assert '# TWINPANEL_SERVICE_ROUTING_STRICT_V2' not in patched
+
+          # Execute only the injected routing block. It has no top-level I/O,
+          # which lets CI exercise reconcile control flow without root or a
+          # real iptables namespace.
+          ns = {'__name__': 'service_routing_v139_smoke'}
+          exec(compile(routing_source, 'routing-v139.py', 'exec'), ns)
+
+          ns['default_interface'] = lambda: 'ens3'
+          ns['expand_transport'] = lambda value: (
+              ['tcp', 'udp'] if value in {'tcp+udp', 'udp+tcp'}
+              else [value] if value in {'tcp', 'udp'}
+              else []
+          )
+          ns['_service_routing_ensure_prerequisites'] = lambda: None
+
+          state = {
+              'applied': False,
+              'restore_calls': 0,
+          }
+
+          def fake_matches(_desired):
+              return state['applied']
+
+          def fake_restore(_desired):
+              state['restore_calls'] += 1
+              state['applied'] = True
+
+          ns['_service_routing_matches'] = fake_matches
+          ns['_service_routing_restore'] = fake_restore
+
+          items = [
+              {
+                  'id': 5,
+                  'node_role': 'iran',
+                  'interface': 'tp275',
+                  'local_address': '10.253.0.21/30',
+                  'exit_tunnel_ip': '10.253.0.22',
+                  'service_routes': [
+                      {
+                          'protocol': 'cisco',
+                          'transport': 'tcp+udp',
+                          'public_port': 20005,
+                          'target_port': 20005,
+                      },
+                      {
+                          'protocol': 'v2ray',
+                          'transport': 'tcp',
+                          'public_port': 28005,
+                          'target_port': 8448,
+                      },
+                  ],
+              },
+          ]
+
+          first = ns['_reconcile_service_routing_strict'](items)
+          assert first == (True, None)
+          assert state['restore_calls'] == 1, state
+
+          second = ns['_reconcile_service_routing_strict'](items)
+          assert second == (True, None)
+          assert state['restore_calls'] == 1, (
+              'unchanged desired state caused a second restore',
+              state,
+          )
+
+          # Validate the real rule renderer and restore transaction shape.
+          desired = ns['_service_routing_rule_map'](items, 'ens3')
+          restore_script = ns['_service_routing_restore_script'](desired)
+          assert '*nat\n' in restore_script
+          assert '-F TP_DNAT\n' in restore_script
+          assert '-F TP_SNAT\n' in restore_script
+          assert '*filter\n' in restore_script
+          assert '-F TP_FWD\n' in restore_script
+          assert '*mangle\n' in restore_script
+          assert '-F TP_CISCO_MSS\n' in restore_script
+          assert '--dport 28005' in restore_script
+          assert '--to-destination 10.253.0.22:8448' in restore_script
+          assert restore_script.count('COMMIT\n') == 3
+
+          # V79 is intentionally the activation point: it runs before V49
+          # captures make_agent, and V139 then becomes the rollout marker so
+          # already-installed nodes are upgraded too.
+          assert 'apply_service_routing_stability_v139' in registry_text
+          assert 'agent_rollout_marker=v139' in registry_text
+
+          print('SERVICE_ROUTING_STABILITY_V139_SMOKE=PASS')
+          print('STEADY_STATE_RESTORE_CALLS=0_AFTER_FIRST_CONVERGENCE')
+          print('PUBLICATION=IPTABLES_RESTORE_NOFLUSH')
+          PY
