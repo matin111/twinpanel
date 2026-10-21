@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.157",
+  "version": "1.1.0-rc.158",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-21T21:26:48Z",
+  "released_at": "2026-10-21T21:55:32Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d86235f5ced29d6177047e55fedeb9c51fb461d7",
+  "source_sha": "513adfa2d53da6bb7331f6c1887949c74c47bd59",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.157/twinpanel-1.1.0-rc.157-linux-x86_64.tar.gz",
-    "sha256": "24f928a7a6dfc187ba4735afa3aa3a1f2f091f5d89ba535e9c84010902dee50d",
-    "size_bytes": 18075227
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.158/twinpanel-1.1.0-rc.158-linux-x86_64.tar.gz",
+    "sha256": "3a065a9591fb7534b67411bdec623a8406d939f096207202427c3cc57ea8d01e",
+    "size_bytes": 18080059
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.157 نمایش پروتکل‌های Storefront را با Protocol Studio همگام می‌کند. هر سه قالب Conversion 2027، Editorial Grid 2027 و Orbit Neo 2027 اکنون در همان بخش پروتکل‌ها علاوه بر ۵ گزینه کلاسیک Cisco/OpenConnect، OpenVPN، WireGuard، L2TP/IPSec و V2Ray/Xray، ده پروتکل مدرن Hysteria2، TUIC v5، AnyTLS، NaiveProxy، ShadowTLS v3، Snell، Mieru، TrustTunnel، AmneziaWG و Sudoku را نیز نمایش می‌دهند. داده‌های Modern از یک Catalog مشترک Storefront با کلیدهای canonical Runtime، توضیح فارسی/انگلیسی، transport و پورت مدیریت‌شده تغذیه می‌شود و هر قالب استایل مستقل خودش را حفظ می‌کند. چیپ‌های پروتکل داخل کارت پلن همچنان فقط از داده واقعی همان پلن می‌آیند و آموزش مرحله‌به‌مرحله به ۵ پروتکلی محدود می‌ماند که محتوای Guide تأییدشده دارند؛ برای پروتکل‌های جدید آموزش ساختگی تولید نشده است. Protocol runtime، نصب/حذف، Payment، Subscription، Quota، Auth و Tunnel توسط این Release تغییر داده نشده‌اند. تأیید نهایی ظاهر هر سه قالب روی مرورگر سرور واقعی بعد از Update لازم است.",
-    "en": "TwinPanel 1.1.0-rc.157 aligns Storefront protocol presentation with Protocol Studio. Conversion 2027, Editorial Grid 2027 and Orbit Neo 2027 now show the ten managed modern protocols alongside the five existing classic options inside each theme's protocol section: Hysteria2, TUIC v5, AnyTLS, NaiveProxy, ShadowTLS v3, Snell, Mieru, TrustTunnel, AmneziaWG and Sudoku, plus Cisco/OpenConnect, OpenVPN, WireGuard, L2TP/IPSec and V2Ray/Xray. Modern presentation is driven by one shared Storefront catalog using canonical runtime IDs with bilingual descriptions, transport and managed port metadata while each theme keeps its own visual treatment. Plan-card protocol chips remain driven only by real plan data, and detailed step-by-step guides remain limited to the five protocols with verified guide content rather than fabricating instructions for the newer protocols. Protocol runtime, install/remove, Payment, Subscription, Quota, Auth and Tunnel behavior are unchanged by this release. Final browser acceptance of all three themes is still required after update."
+    "fa": "TwinPanel 1.1.0-rc.158 اصلاح Production دیتاپلین TP27 Direct TCP را منتشر می‌کند. Audit واقعی Tunnel #5 ثابت کرد هر دو سرویس ایران و Exit بدون Restart فعال بودند، هر دو TUN و Route سالم بودند و هر ۸ اتصال TCP بیرونی ESTABLISHED می‌ماندند، اما چند Lane وارد cwnd=1 و RTO/backoff بسیار بالا می‌شدند. Carrier قدیمی هر socket غیر-nil را سالم فرض می‌کرد، Flow را روی Lane ثابت نگه می‌داشت، یک Write کند می‌توانست goroutine واحد TUN را تا ۵ ثانیه متوقف کند و packet جاری بعد از Write failure روی Lane سالم دیگر retry نمی‌شد. TP27TCP2 اکنون heartbeat انتها‌به‌انتها برای هر Lane، TCP_USER_TIMEOUT، write bound کوتاه‌تر، حذف و reconnect سریع Lane stalled، serialization امن frame و retry همان packet روی Lane سالم بعدی دارد. Regression test دقیق Incident Tunnel #5 را با hash شدن ICMP ایران→خارج روی Lane 1 و برگشت روی Lane 5 پوشش می‌دهد. TP27 Fast/GRE/FoU، MASQUE، Access VPN، Payment، Subscription، Quota و Auth تغییر نکرده‌اند. موفقیت نهایی نیازمند Update و Production Acceptance واقعی روی Tunnel #5 است.",
+    "en": "TwinPanel 1.1.0-rc.158 publishes the production TP27 Direct TCP dataplane correction. Real Tunnel #5 evidence proved both Iran and Exit services stayed active without restarts, both TUN interfaces and routes were present, and all eight outer TCP connections remained ESTABLISHED while several lanes degraded to cwnd=1 with extreme RTO/backoff. The previous carrier treated every non-nil socket as healthy, pinned each flow to a fixed lane, could block the single TUN forwarding goroutine for up to five seconds on one slow write, and did not retry the current packet on another healthy lane after a write failure. TP27TCP2 adds per-lane end-to-end heartbeat, TCP_USER_TIMEOUT, shorter bounded writes, fast stalled-lane close/reconnect, serialized frame writes, and retry of the same packet on the next healthy lane. Regression coverage reproduces Tunnel #5 ICMP hashing to lane 1 Iran-to-Exit and lane 5 in reverse. TP27 Fast/GRE/FoU, MASQUE, Access VPN, Payment, Subscription, Quota and Auth are unchanged. Final success still requires update and real production acceptance on Tunnel #5."
   }
 }
