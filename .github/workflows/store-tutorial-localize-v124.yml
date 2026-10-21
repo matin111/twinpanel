@@ -1,0 +1,82 @@
+name: TwinPanel Store Tutorial Localize V124
+
+on:
+  push:
+    branches:
+      - feat/store-tutorial-inline-v124-final
+    paths:
+      - '.github/workflows/store-tutorial-localize-v124.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  localize-store-tutorials:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/store-tutorial-inline-v124-final
+          fetch-depth: 0
+
+      - name: Wire storefront to bundled tutorial images
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          content = Path('lib/store-guide-content.ts')
+          s = content.read_text(encoding='utf-8')
+          s = re.sub(
+              r'const LEGACY_APP_IMAGE_BASE=.*?export function storeGuideScreenshot\(platform:StoreGuidePlatform,protocol:StoreGuideProtocol,index:number\):string\{\n  return .*?\n\}',
+              '''export function storeGuideAppImage(_platform:StoreGuidePlatform,_protocol:StoreGuideProtocol):string{\n  return "";\n}\n\nexport function storeGuideTutorialImage(platform:StoreGuidePlatform,protocol:StoreGuideProtocol):string{\n  if(platform!=="android"&&platform!=="ios"&&platform!=="windows")return "";\n  return `/learning/screenshots/${platform}/${protocol}.webp`;\n}''',
+              s,
+              flags=re.S,
+          )
+          if 'movilineapp.com/learning' in s:
+              raise SystemExit('external learning dependency remains')
+          if 'storeGuideTutorialImage' not in s:
+              raise SystemExit('local tutorial helper missing')
+          content.write_text(s, encoding='utf-8')
+
+          renderer = Path('components/store-template-renderer.tsx')
+          r = renderer.read_text(encoding='utf-8')
+          r = r.replace('  storeGuideScreenshot,\n', '  storeGuideTutorialImage,\n')
+          needle = '  const guideAppImage=storeGuideAppImage(guidePlatform,activeGuideProtocol);\n'
+          if needle not in r:
+              raise SystemExit('guide app image anchor missing')
+          r = r.replace(needle, needle + '  const guideTutorialImage=storeGuideTutorialImage(guidePlatform,activeGuideProtocol);\n', 1)
+
+          r = r.replace('''          {guideEntry.steps.map((step,index)=>{\n            const screenshot=storeGuideScreenshot(guidePlatform,activeGuideProtocol,index);\n            return <article className="tpRealGuideStep" key={`${activeGuideProtocol}-${guidePlatform}-${step.title}`}>''', '''          {guideEntry.steps.map((step,index)=>{\n            return <article className="tpRealGuideStep" key={`${activeGuideProtocol}-${guidePlatform}-${step.title}`}>''')
+
+          r = re.sub(
+              r'\n\s*<figure className="tpRealGuideScreenshot">\n\s*<img src=\{screenshot\}.*?</figure>',
+              '',
+              r,
+              flags=re.S,
+          )
+
+          anchor = '      <div className="tpRealGuideLayout">\n'
+          figure = '''      {guideTutorialImage&&<figure className="tpRealGuideScreenshot tpRealGuideTutorialSheet">\n        <img src={guideTutorialImage} alt={`${selectedProtocol.name} - ${pick(selectedPlatform.fa,selectedPlatform.en)}`} loading="lazy" decoding="async"/>\n        <figcaption>{pick("تصاویر واقعی مراحل آموزش از نسخه قبلی پنل","Real tutorial screenshots from the previous panel")}</figcaption>\n      </figure>}\n\n'''
+          if anchor not in r:
+              raise SystemExit('guide layout anchor missing')
+          r = r.replace(anchor, figure + anchor, 1)
+          if 'storeGuideScreenshot' in r:
+              raise SystemExit('legacy per-step screenshot helper remains')
+          renderer.write_text(r, encoding='utf-8')
+          PY
+
+          test "$(find public/learning/screenshots -type f -name '*.webp' | wc -l | tr -d ' ')" = 15
+          ! grep -R 'movilineapp.com/learning' lib/store-guide-content.ts components/store-template-renderer.tsx
+
+      - name: Commit storefront localization
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lib/store-guide-content.ts components/store-template-renderer.tsx
+          git commit -m 'Use bundled legacy tutorial images in storefront'
+          git push origin HEAD:feat/store-tutorial-inline-v124-final
