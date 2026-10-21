@@ -69,8 +69,8 @@ jobs:
               go build -mod=readonly -trimpath -o tp27-masque .
             test -s tp27-masque
             ./tp27-masque -h >help.txt 2>&1 || true
-            grep -q -- '--pin-sha256' help.txt
-            grep -q -- '--token-file' help.txt
+            grep -q -- '-pin-sha256' help.txt
+            grep -q -- '-token-file' help.txt
           )
           test -z "$(git status --short -- tools/tp27-masque)"
 
