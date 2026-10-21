@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.145",
+  "version": "1.1.0-rc.146",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-21T17:41:55Z",
+  "released_at": "2026-10-21T17:51:18Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "91c78443e3ecea446b0da78172543a78f21ed8dd",
+  "source_sha": "3401256142dc9d2e4355d74190947987d8aefd98",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.145/twinpanel-1.1.0-rc.145-linux-x86_64.tar.gz",
-    "sha256": "23305f0cfeb6f497b9ef59f0ee69ae95966975f1f259eeae5085b889d0d5a15c",
-    "size_bytes": 13543323
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.146/twinpanel-1.1.0-rc.146-linux-x86_64.tar.gz",
+    "sha256": "e7171e686752d9c58226acba572c6a9ecadd9fc7fc5a55fb165cda6715cfcbac",
+    "size_bytes": 13544479
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.145 جریان «افزودن سرور» را پس از یکپارچه‌شدن Protocol Studio ساده و تک‌مسئولیتی می‌کند. صفحه Add Server اکنون فقط مشخصات نود، نقش، کشور، ظرفیت و دسترسی SSH را دریافت می‌کند و هنگام ثبت، هیچ Cisco/OpenConnect، OpenVPN، WireGuard، L2TP/IPsec یا V2Ray/Xray را به‌صورت خودکار نصب نمی‌کند. زیرساخت پایه موجود شامل ثبت Node، SSH key امن، Node Agent، Tunnel Fabric base، Quota bootstrap و sync عضویت اشتراک‌ها از همان مسیر Production حفظ شده است. پس از ثبت موفق، مدیریت و نصب تمام پروتکل‌های کلاسیک و مدرن مستقیماً به صفحه یکپارچه «پروتکل‌ها» همان نود تحویل داده می‌شود. Xray Domain/TLS و mutationهای پروتکل نیز در Protocol Studio باقی می‌مانند. PR #652 این Refine را Merge کرد و PR #654 قراردادهای Regression قدیمی Xray/Mutation را با مالکیت جدید هماهنگ کرد؛ هر دو پس از Build و Smokeهای مربوط تأیید شدند. Payment، Quota logic، Tunnel topology، Subscription accounting و installerهای پروتکل در این تغییر بازنویسی نشده‌اند.",
-    "en": "TwinPanel 1.1.0-rc.145 simplifies Add Server after Protocol Studio became the unified protocol management surface. Add Server now collects only node identity, role, country, capacity and SSH access, and explicitly installs no Cisco/OpenConnect, OpenVPN, WireGuard, L2TP/IPsec or V2Ray/Xray protocol during registration. The existing production bootstrap path is preserved for Node registration, secure SSH key setup, Node Agent, Tunnel Fabric base, Quota bootstrap and subscription membership sync. After a successful registration, all classic and modern protocol installation and management is handed off directly to the unified Protocols page for that node. Xray Domain/TLS and protocol mutation actions remain owned by Protocol Studio. PR #652 merged the node-only flow and PR #654 aligned stale Xray/Mutation regression contracts with the new ownership model; both were validated by their relevant builds and smoke checks. Payment, quota logic, tunnel topology, subscription accounting and protocol installers were not rewritten by this change."
+    "fa": "TwinPanel 1.1.0-rc.146 نام‌گذاری منوی زیرساخت را با معماری جدید Add Server یکدست می‌کند. پس از Refine اصلی rc.145 که افزودن سرور را از نصب پروتکل‌ها جدا کرد، ورودی `/admin/provision` اکنون در منو به‌طور شفاف «افزودن سرور» نمایش داده می‌شود و صفحه مستقل «پروتکل‌ها» همچنان تنها مرکز نصب، تنظیم، Health، Repair و Xray Domain/TLS باقی می‌ماند. Smoke اختصاصی Simple Add Node نیز این جداسازی و وجود هر دو ورودی منو را به‌صورت Regression Contract محافظت می‌کند. هیچ تغییر Backend، Payment، Quota، Tunnel، Subscription یا Protocol Runtime در این Release انجام نشده است.",
+    "en": "TwinPanel 1.1.0-rc.146 aligns infrastructure navigation with the new Add Server architecture. After rc.145 separated server registration from protocol installation, `/admin/provision` is now clearly labeled Add Server in the admin navigation while the separate Protocols page remains the canonical surface for protocol install, configuration, health, repair and Xray Domain/TLS. The dedicated Simple Add Node smoke now guards this separation and both navigation entries as a regression contract. No Backend, Payment, Quota, Tunnel, Subscription or protocol runtime behavior is changed in this release."
   }
 }
