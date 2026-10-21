@@ -29,49 +29,64 @@ export const ADVANCED_LAYOUT_DEFAULTS={
   ui_button_shape:"native",
 } as const;
 
-const conversionDark={
-  primary_bg:"#7c3aed",primary_text:"#ffffff",secondary_bg:"#0f1526",secondary_text:"#f7f8ff",
-  plan_bg:"#101728",protocol_bg:"#0f1526",service_bg:"#0f1526",guide_bg:"#0f1526",account_bg:"#0f1526",faq_bg:"#0f1526",contact_bg:"#0f1526",
-  card_text:"#f7f8ff",muted:"#9aa7bf",border:"#202b42",
-};
-const conversionLight={
-  primary_bg:"#7c3aed",primary_text:"#ffffff",secondary_bg:"#ffffff",secondary_text:"#273244",
-  plan_bg:"#ffffff",protocol_bg:"#ffffff",service_bg:"#ffffff",guide_bg:"#ffffff",account_bg:"#ffffff",faq_bg:"#ffffff",contact_bg:"#ffffff",
-  card_text:"#111827",muted:"#667085",border:"#d7dee8",
-};
-const editorialDark={
-  primary_bg:"#f7f3ec",primary_text:"#0f1014",secondary_bg:"#1b1e24",secondary_text:"#f7f3ec",
-  plan_bg:"#15171c",protocol_bg:"#15171c",service_bg:"#15171c",guide_bg:"#15171c",account_bg:"#15171c",faq_bg:"#15171c",contact_bg:"#15171c",
-  card_text:"#f7f3ec",muted:"#a8a29a",border:"#30343b",
-};
-const editorialLight={
-  primary_bg:"#171719",primary_text:"#fffdf9",secondary_bg:"#f8f4ed",secondary_text:"#171719",
-  plan_bg:"#fffdf9",protocol_bg:"#fffdf9",service_bg:"#fffdf9",guide_bg:"#fffdf9",account_bg:"#fffdf9",faq_bg:"#fffdf9",contact_bg:"#fffdf9",
-  card_text:"#171719",muted:"#67635d",border:"#d8d1c8",
-};
-const orbitDark={
-  primary_bg:"#6d5dfc",primary_text:"#ffffff",secondary_bg:"#131824",secondary_text:"#f8fafc",
-  plan_bg:"#0c0f16",protocol_bg:"#0c0f16",service_bg:"#0c0f16",guide_bg:"#0c0f16",account_bg:"#0c0f16",faq_bg:"#0c0f16",contact_bg:"#0c0f16",
-  card_text:"#f8fafc",muted:"#9aa4b5",border:"#253043",
-};
-const orbitLight={
-  primary_bg:"#6d5dfc",primary_text:"#ffffff",secondary_bg:"#edf1f8",secondary_text:"#10131a",
-  plan_bg:"#ffffff",protocol_bg:"#ffffff",service_bg:"#ffffff",guide_bg:"#ffffff",account_bg:"#ffffff",faq_bg:"#ffffff",contact_bg:"#ffffff",
-  card_text:"#10131a",muted:"#667085",border:"#d9e0ec",
-};
+function option(options:StoreTemplateOptionMap,key:string,fallback:string){
+  const value=options[key];
+  return typeof value==="string"&&value.trim()?value:fallback;
+}
 
-export function advancedDesignFallbacks(templateId:AdvancedDesignTemplateId,mode:AdvancedDesignMode):Record<string,string>{
+function conversionPalette(mode:AdvancedDesignMode,options:StoreTemplateOptionMap){
+  if(mode==="light"){
+    return {
+      primary_bg:option(options,"conversion_button_bg",option(options,"conversion_accent","#7c3aed")),primary_text:option(options,"conversion_button_text","#ffffff"),secondary_bg:"#ffffff",secondary_text:"#273244",
+      plan_bg:"#ffffff",protocol_bg:"#ffffff",service_bg:"#ffffff",guide_bg:"#ffffff",account_bg:"#ffffff",faq_bg:"#ffffff",contact_bg:"#ffffff",
+      card_text:"#111827",muted:"#667085",border:"#d7dee8",
+    };
+  }
+  const card=option(options,"conversion_card_bg","#0f1526");
+  return {
+    primary_bg:option(options,"conversion_button_bg",option(options,"conversion_accent","#7c3aed")),primary_text:option(options,"conversion_button_text","#ffffff"),secondary_bg:card,secondary_text:option(options,"conversion_text","#f7f8ff"),
+    plan_bg:card,protocol_bg:card,service_bg:card,guide_bg:card,account_bg:card,faq_bg:card,contact_bg:card,
+    card_text:option(options,"conversion_text","#f7f8ff"),muted:option(options,"conversion_muted","#9aa7bf"),border:option(options,"conversion_card_border","#202b42"),
+  };
+}
+
+function editorialPalette(mode:AdvancedDesignMode,options:StoreTemplateOptionMap){
+  if(mode==="light"){
+    return {
+      primary_bg:"#171719",primary_text:"#fffdf9",secondary_bg:"#f8f4ed",secondary_text:"#171719",
+      plan_bg:"#fffdf9",protocol_bg:"#fffdf9",service_bg:"#fffdf9",guide_bg:"#fffdf9",account_bg:"#fffdf9",faq_bg:"#fffdf9",contact_bg:"#fffdf9",
+      card_text:"#171719",muted:"#67635d",border:"#d8d1c8",
+    };
+  }
+  const surface=option(options,"editorial_surface_bg","#15171c");
+  return {
+    primary_bg:option(options,"editorial_button_bg","#f7f3ec"),primary_text:option(options,"editorial_button_text","#0f1014"),secondary_bg:option(options,"editorial_surface_alt","#1b1e24"),secondary_text:option(options,"editorial_text","#f7f3ec"),
+    plan_bg:surface,protocol_bg:surface,service_bg:surface,guide_bg:surface,account_bg:surface,faq_bg:surface,contact_bg:surface,
+    card_text:option(options,"editorial_text","#f7f3ec"),muted:option(options,"editorial_muted","#a8a29a"),border:option(options,"editorial_border","#30343b"),
+  };
+}
+
+function orbitPalette(mode:AdvancedDesignMode,options:StoreTemplateOptionMap){
+  const prefix=mode==="dark"?"orbit_dark":"orbit_light";
+  const surface=option(options,`${prefix}_surface`,mode==="dark"?"#0c0f16":"#ffffff");
+  return {
+    primary_bg:option(options,"theme_primary","#6d5dfc"),primary_text:option(options,"orbit_button_text","#ffffff"),secondary_bg:option(options,`${prefix}_surface_alt`,mode==="dark"?"#131824":"#edf1f8"),secondary_text:option(options,`${prefix}_text`,mode==="dark"?"#f8fafc":"#10131a"),
+    plan_bg:surface,protocol_bg:surface,service_bg:surface,guide_bg:surface,account_bg:surface,faq_bg:surface,contact_bg:surface,
+    card_text:option(options,`${prefix}_text`,mode==="dark"?"#f8fafc":"#10131a"),muted:option(options,`${prefix}_muted`,mode==="dark"?"#9aa4b5":"#667085"),border:option(options,`${prefix}_border`,mode==="dark"?"#253043":"#d9e0ec"),
+  };
+}
+
+export function advancedDesignFallbacks(templateId:AdvancedDesignTemplateId,mode:AdvancedDesignMode,options:StoreTemplateOptionMap={}):Record<string,string>{
   const palette=templateId==="editorial-grid-2027"
-    ?(mode==="dark"?editorialDark:editorialLight)
+    ?editorialPalette(mode,options)
     :templateId==="orbit-neo-2027"
-      ?(mode==="dark"?orbitDark:orbitLight)
-      :(mode==="dark"?conversionDark:conversionLight);
+      ?orbitPalette(mode,options)
+      :conversionPalette(mode,options);
   return Object.fromEntries(Object.entries(palette).map(([key,value])=>[`ui_${mode}_${key}`,value]));
 }
 
 export function advancedString(options:StoreTemplateOptionMap,key:string,fallback="native"){
-  const value=options[key];
-  return typeof value==="string"&&value.trim()?value:fallback;
+  return option(options,key,fallback);
 }
 
 export function hasAdvancedValue(options:StoreTemplateOptionMap,key:string){
