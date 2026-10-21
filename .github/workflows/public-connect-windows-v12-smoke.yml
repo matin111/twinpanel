@@ -1,0 +1,74 @@
+name: Public Connect Windows V12 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/public_connection_windows_v12.py"
+      - "backend/app/routers/public_connection_hub_live_v5.py"
+      - ".github/workflows/public-connect-windows-v12-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/routers/public_connection_windows_v12.py"
+      - "backend/app/routers/public_connection_hub_live_v5.py"
+      - ".github/workflows/public-connect-windows-v12-smoke.yml"
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile Windows V12 refiner
+        run: |
+          python -m py_compile \
+            backend/app/routers/public_connection_windows_v12.py \
+            backend/app/routers/public_connection_hub_live_v5.py
+
+      - name: Parse V12 inline JavaScript
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          source = Path("backend/app/routers/public_connection_windows_v12.py").read_text()
+          match = re.search(r'_V12_SCRIPT\s*=\s*r"""(.*?)"""', source, re.S)
+          assert match, "V12 script block not found"
+          script = match.group(1).strip()
+          script = re.sub(r'^<script[^>]*>\s*', '', script)
+          script = re.sub(r'\s*</script>$', '', script)
+          Path('/tmp/twinpanel-public-connect-v12.js').write_text(script)
+          PY
+          node --check /tmp/twinpanel-public-connect-v12.js
+
+      - name: Verify Windows app import contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          v12 = Path("backend/app/routers/public_connection_windows_v12.py").read_text()
+          live = Path("backend/app/routers/public_connection_hub_live_v5.py").read_text()
+
+          assert "TWINPANEL_PUBLIC_CONNECT_WINDOWS_V12" in v12
+          assert "body.dataset.tpPlatform!=='windows'" in v12
+          assert "hiddify://import/" in v12
+          assert "افزودن به Hiddify" in v12
+          assert "کپی برای v2rayN" in v12
+          assert "Subscription Settings" in v12
+          assert "data-v7-copy-url" in v12
+          assert "data-v7-share-url" in v12
+          assert "isV2RayUri" in v12
+          assert "navigator.clipboard" in v12
+          assert "document.execCommand('copy')" in v12
+          assert "!important" not in v12
+
+          forbidden = (
+              "sqlalchemy", "get_db", "Subscription", "ProtocolCredential",
+              "quota", "provision", "ssh_connect", "payment"
+          )
+          lower = v12.lower()
+          for item in forbidden:
+              assert item.lower() not in lower, item
+
+          assert "refine_public_connection_windows_v12" in live
+          assert live.index("refine_public_connection_device_actions_v11(source)") < live.index("refine_public_connection_windows_v12(source)")
+          PY
