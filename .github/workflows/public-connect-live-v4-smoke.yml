@@ -10,6 +10,7 @@ on:
       - "backend/app/routers/public_connection_hub_refine_v6.py"
       - "backend/app/routers/public_connection_mobile_v7.py"
       - "backend/app/routers/public_connection_multilink_v7.py"
+      - "backend/app/routers/public_connection_hub_v8.py"
       - "app/layout.tsx"
       - "app/panel-copy-density-final.css"
       - ".github/workflows/public-connect-live-v4-smoke.yml"
@@ -23,6 +24,7 @@ on:
       - "backend/app/routers/public_connection_hub_refine_v6.py"
       - "backend/app/routers/public_connection_mobile_v7.py"
       - "backend/app/routers/public_connection_multilink_v7.py"
+      - "backend/app/routers/public_connection_hub_v8.py"
       - "app/layout.tsx"
       - "app/panel-copy-density-final.css"
       - ".github/workflows/public-connect-live-v4-smoke.yml"
@@ -42,9 +44,10 @@ jobs:
             backend/app/routers/public_connection_hub_refine_v6.py \
             backend/app/routers/public_connection_mobile_v7.py \
             backend/app/routers/public_connection_multilink_v7.py \
+            backend/app/routers/public_connection_hub_v8.py \
             backend/app/main.py
 
-      - name: Verify live route precedence, polling and V7 mobile/multilink contract
+      - name: Verify live route precedence, polling and V8 mobile contract
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -56,6 +59,7 @@ jobs:
           refine = Path("backend/app/routers/public_connection_hub_refine_v6.py").read_text()
           mobile = Path("backend/app/routers/public_connection_mobile_v7.py").read_text()
           multilink = Path("backend/app/routers/public_connection_multilink_v7.py").read_text()
+          v8 = Path("backend/app/routers/public_connection_hub_v8.py").read_text()
           layout = Path("app/layout.tsx").read_text()
           css = Path("app/panel-copy-density-final.css").read_text()
 
@@ -85,7 +89,7 @@ jobs:
           assert "hubQrModal" in refine
           assert "!important" not in refine
 
-          # V7 attaches a real read-only V2Ray subscription and a compact phone UI.
+          # V7 attaches a real read-only V2Ray subscription and mobile share fallbacks.
           assert "public_connection_multilink_v7_router" in hub_live
           assert "router.include_router(public_connection_multilink_v7_router)" in hub_live
           assert "refine_public_connection_mobile_v7(source, token)" in hub_live
@@ -95,20 +99,27 @@ jobs:
           assert 'protocol not in {"v2ray", "xray"}' in multilink
           assert 'status != "active"' in multilink
           assert "request.url_for" in multilink
-
-          # Redundant advanced account box is replaced only when a real V2Ray credential exists.
-          assert "TWINPANEL_PUBLIC_CONNECT_MOBILE_V7" in mobile
-          assert "مولتی‌لینک V2Ray / Xray" in mobile
-          assert "has_v2ray" in mobile
-          assert '<details class=\"advanced\">.*?</details>' in mobile
           assert "navigator.share" in mobile
           assert "new File" in mobile
           assert "ارسال به موبایل" in mobile
-          assert "باز کردن در برنامه" in mobile
-          assert "grid-template-columns:repeat(2,minmax(0,1fr))" in mobile
-          assert "!important" not in mobile
 
-          # V7 may read delivery data but must not mutate subscriptions/credentials/quota.
+          # V8 is a mobile-first presentation layer inspired by app-launcher UX.
+          assert "TWINPANEL_PUBLIC_CONNECT_HUB_V8" in v8
+          assert "refine_public_connection_hub_v8(source)" in hub_live
+          assert "v8-app-launch" in v8
+          assert "v8-primary" in v8
+          assert "OpenVPN Connect" in v8
+          assert "WireGuard" in v8
+          assert "V2Ray / Xray" in v8
+          assert "وارد کردن در OpenVPN Connect" in v8
+          assert "وارد کردن در WireGuard" in v8
+          assert "باز کردن در برنامه" in v8
+          assert "window.isSecureContext" in v8
+          assert "v8-insecure" in v8
+          assert "overflow-x:auto" in v8
+          assert "!important" not in v8
+
+          # V7/V8 must stay presentation/read-only and never become provisioning/quota mutation layers.
           forbidden = (
               "db.add(",
               "db.commit(",
@@ -119,6 +130,7 @@ jobs:
           )
           assert all(token not in mobile for token in forbidden)
           assert all(token not in multilink for token in forbidden)
+          assert all(token not in v8 for token in forbidden)
 
           # Existing panel density contract remains available.
           assert "panel-copy-density-final.css" in layout
