@@ -490,7 +490,7 @@ if not isinstance(value, dict) or not value.get("master_public_key") or not valu
         json.dump(value, h, separators=(",", ":"))
         h.write("\\n")
     os.chmod(path+".new", 0o600)
-os.replace(path+".new", path)
+    os.replace(path+".new", path)
 print(json.dumps(value, separators=(",", ":")))
 '''
     raw = await cmd(
