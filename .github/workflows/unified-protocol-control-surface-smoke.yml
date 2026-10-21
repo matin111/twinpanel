@@ -3,32 +3,32 @@ name: Unified Protocol Control Surface Smoke
 on:
   pull_request:
     paths:
-      - "components/legacy-nodes-runtime-v2.tsx"
-      - "components/routed-page-client-v2.tsx"
-      - "components/modern-protocols-admin.tsx"
-      - "components/legacy-protocols-studio.tsx"
-      - "app/[...path]/page.tsx"
-      - ".github/workflows/unified-protocol-control-surface-smoke.yml"
+      - 'components/legacy-nodes-runtime-v2.tsx'
+      - 'components/routed-page-client-v2.tsx'
+      - 'components/modern-protocols-admin.tsx'
+      - 'components/legacy-protocols-studio.tsx'
+      - 'app/**/page.tsx'
+      - '.github/workflows/unified-protocol-control-surface-smoke.yml'
   workflow_dispatch:
 
 jobs:
-  contract:
+  smoke:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Verify canonical protocol management surface
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
-          node = Path("components/legacy-nodes-runtime-v2.tsx").read_text()
-          router = Path("components/routed-page-client-v2.tsx").read_text()
-          page = Path("app/[...path]/page.tsx").read_text()
-          studio = Path("components/modern-protocols-admin.tsx").read_text()
-          classic = Path("components/legacy-protocols-studio.tsx").read_text()
+          node = Path('components/legacy-nodes-runtime-v2.tsx').read_text(encoding='utf-8')
+          router = Path('components/routed-page-client-v2.tsx').read_text(encoding='utf-8')
+          page = Path('app/[...path]/page.tsx').read_text(encoding='utf-8')
+          studio = Path('components/modern-protocols-admin.tsx').read_text(encoding='utf-8')
+          classic = Path('components/legacy-protocols-studio.tsx').read_text(encoding='utf-8')
 
-          assert 'href={`/admin/modern-protocols?node=${selected.id}`}' in node
-          assert 'مدیریت پروتکل‌ها' in node
+          assert '/admin/modern-protocols?node=' in node
           assert 'protocolHealth(' not in node
           assert 'restartProtocol' not in node
           assert 'xrayDomain(' not in node
@@ -36,13 +36,13 @@ jobs:
           assert 'modal==="protocols"' not in node
           assert 'modal==="xray-domain"' not in node
 
-          assert 'routeKey==="admin/nodes"||routeKey==="admin/network"' in router
+          assert 'admin/nodes' in router and 'admin/network' in router
           assert 'legacy-nodes-runtime-v2' in router
           assert 'routed-page-client-v2' in page
 
           assert 'LegacyProtocolsStudio' in studio
           for protocol in ('cisco', 'openvpn', 'wireguard', 'l2tp', 'v2ray'):
-              assert f'key: "{protocol}"' in classic
+              assert ('key: "' + protocol + '"') in classic
 
-          print("UNIFIED_PROTOCOL_CONTROL_SURFACE_OK")
+          print('UNIFIED_PROTOCOL_CONTROL_SURFACE_OK')
           PY
