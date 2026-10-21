@@ -49,4 +49,4 @@ jobs:
 
       - name: Run runtime contract smoke
         working-directory: backend
-        run: python scripts/modern_protocol_runtime_v3_smoke.py
+        run: PYTHONPATH=. python scripts/modern_protocol_runtime_v3_smoke.py
