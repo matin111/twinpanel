@@ -1,5 +1,5 @@
-import {ModernProtocolsAdminPage} from "../../../components/modern-protocols-admin";
+import {ProtocolCommandCenter} from "../../../components/protocol-command-center";
 
 export default function Page(){
-  return <ModernProtocolsAdminPage/>;
+  return <ProtocolCommandCenter/>;
 }
