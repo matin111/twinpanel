@@ -38,6 +38,9 @@ assert "connect_protocol_runtime(node, db)" in classic
 assert '@router.post("/classic-protocol-health")' in classic
 assert '@router.post("/classic-restart-protocol")' in classic
 assert "ssh_connect_saved" not in classic
+assert "_LOCAL_CORE_CISCO_PORT = 4443" in classic
+assert "_default_port_for_node(node, protocol)" in classic
+assert "is_local_core(node)" in classic
 
 assert "protocol_runtime_node_clause()" in modern
 assert "connect_protocol_runtime(node, db)" in modern
