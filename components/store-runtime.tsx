@@ -21,15 +21,16 @@ import {StoreTemplateRuntime} from "./store-template-runtime-registry";
 export function StoreRuntime2027(){
   const {pick}=useI18n();
   const [plans,setPlans]=useState<StorePlan[]>([]);
-  const [settings,setSettings]=useState<StorefrontSettings>(DEFAULT_STOREFRONT_SETTINGS);
+  const [settings,setSettings]=useState<StorefrontSettings|null>(null);
   const [templateSettings,setTemplateSettings]=useState<Record<string,Record<string,unknown>>>({});
+  const [ready,setReady]=useState(false);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState("");
   const [buying,setBuying]=useState<number|null>(null);
   const [message,setMessage]=useState("");
 
   const load=async()=>{
-    setLoading(true);setError("");
+    setLoading(true);setReady(false);setError("");
     const [plansResult,settingsResult,templateSettingsResult]=await Promise.allSettled([
       storeRuntimeApi.plans(),
       storeRuntimeApi.storefrontSettings(),
@@ -40,12 +41,16 @@ export function StoreRuntime2027(){
     else setError(plansResult.reason instanceof Error?plansResult.reason.message:String(plansResult.reason));
 
     if(settingsResult.status==="fulfilled")setSettings(normalizeStorefrontSettings(settingsResult.value));
-    else if(plansResult.status==="fulfilled")setError(settingsResult.reason instanceof Error?settingsResult.reason.message:String(settingsResult.reason));
+    else{
+      setSettings(DEFAULT_STOREFRONT_SETTINGS);
+      if(plansResult.status==="fulfilled")setError(settingsResult.reason instanceof Error?settingsResult.reason.message:String(settingsResult.reason));
+    }
 
     if(templateSettingsResult.status==="fulfilled")setTemplateSettings(templateSettingsResult.value.templates||{});
     else setTemplateSettings({});
 
     setLoading(false);
+    setReady(true);
   };
 
   useEffect(()=>{void load();},[]);
@@ -66,10 +71,11 @@ export function StoreRuntime2027(){
     finally{setBuying(null);}
   };
 
-  const templateId=resolveStoreTemplateId(settings.active_template);
+  const currentSettings=settings??DEFAULT_STOREFRONT_SETTINGS;
+  const templateId=resolveStoreTemplateId(currentSettings.active_template);
   const rawTemplateOptions=templateSettings[templateId]||{};
   const hasTemplateOptions=Object.keys(rawTemplateOptions).length>0;
-  const applied=hasTemplateOptions?applyStoreTemplateOptions(settings,templateId,rawTemplateOptions):{settings,options:{} as StoreTemplateOptionMap};
+  const applied=hasTemplateOptions?applyStoreTemplateOptions(currentSettings,templateId,rawTemplateOptions):{settings:currentSettings,options:{} as StoreTemplateOptionMap};
   const effectiveSettings={...applied.settings} as StorefrontSettings;
   const effectiveTarget=effectiveSettings as unknown as Record<string,unknown>;
   if(hasTemplateOptions){
@@ -81,6 +87,24 @@ export function StoreRuntime2027(){
     ?({...applied.options,...rawTemplateOptions} as StoreTemplateOptionMap)
     :{};
   const themeStyle=storeTemplateCssVariables(effectiveOptions) as CSSProperties;
+  const chatAccent=templateId==="conversion-2027"
+    ?String(effectiveOptions.conversion_button_bg||effectiveOptions.conversion_accent||"#7c3aed")
+    :String(effectiveOptions.theme_primary||"#8b5cf6");
+
+  useEffect(()=>{
+    if(!ready||!settings)return;
+    const root=document.documentElement;
+    root.dataset.storeTemplate=templateId;
+    root.style.setProperty("--store-chat-accent",chatAccent);
+    return()=>{
+      if(root.dataset.storeTemplate===templateId)delete root.dataset.storeTemplate;
+      root.style.removeProperty("--store-chat-accent");
+    };
+  },[ready,settings,templateId,chatAccent]);
+
+  if(!ready||!settings){
+    return <div aria-busy="true" data-store-runtime-loading="true" style={{minHeight:"100vh",background:"var(--bg,#060915)"}}/>;
+  }
 
   const templateProps={
     settings:effectiveSettings,
