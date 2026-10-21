@@ -124,6 +124,74 @@ def _assert_singbox_readiness_retry() -> None:
     assert len(failures) == 3
 
 
+def _assert_standalone_readiness_retry() -> None:
+    samples = [False, False, True]
+    calls: list[tuple[str, int | None]] = []
+
+    async def fake_health(_conn, protocol: str, port: int | None = None):
+        calls.append((protocol, port))
+        ok = samples.pop(0)
+        return {
+            "ok": ok,
+            "protocol": protocol,
+            "service": "twinpanel-sudoku",
+            "service_active": True,
+            "listener": ok,
+            "port": port,
+            "transport": "tcp",
+        }
+
+    original = modern_protocol_dispatch.standalone_health
+    modern_protocol_dispatch.standalone_health = fake_health
+    try:
+        result = asyncio.run(
+            modern_protocol_dispatch._wait_for_standalone_health(
+                object(),
+                "sudoku",
+                8453,
+                attempts=5,
+                delay_seconds=0,
+            )
+        )
+    finally:
+        modern_protocol_dispatch.standalone_health = original
+
+    assert result["ok"] is True
+    assert result["listener"] is True
+    assert calls == [("sudoku", 8453)] * 3
+
+    failures: list[int] = []
+
+    async def always_unhealthy(_conn, protocol: str, port: int | None = None):
+        failures.append(1)
+        return {
+            "ok": False,
+            "protocol": protocol,
+            "service": "twinpanel-sudoku",
+            "service_active": True,
+            "listener": False,
+            "port": port,
+            "transport": "tcp",
+        }
+
+    modern_protocol_dispatch.standalone_health = always_unhealthy
+    try:
+        result = asyncio.run(
+            modern_protocol_dispatch._wait_for_standalone_health(
+                object(),
+                "sudoku",
+                8453,
+                attempts=3,
+                delay_seconds=0,
+            )
+        )
+    finally:
+        modern_protocol_dispatch.standalone_health = original
+
+    assert result["ok"] is False
+    assert len(failures) == 3
+
+
 def main() -> None:
     assert STANDALONE <= SINGBOX_PROTOCOLS
     assert EXPECTED_READY <= SINGBOX_PROTOCOLS
@@ -163,11 +231,16 @@ def main() -> None:
     bootstrap_call = "await ensure_singbox_service_unit(conn)"
     apply_call = "singbox = await _apply_singbox_profiles(conn, node, singbox_profiles)"
     readiness_call = "await _wait_for_singbox_health("
+    standalone_apply_call = "standalone = await apply_standalone_profile(conn, node, profile)"
+    standalone_readiness_call = "await _wait_for_standalone_health("
     assert bootstrap_call in dispatch_py
     assert apply_call in dispatch_py
     assert readiness_call in dispatch_py
+    assert standalone_apply_call in dispatch_py
+    assert standalone_readiness_call in dispatch_py
     assert dispatch_py.index(bootstrap_call) < dispatch_py.index(apply_call)
     assert dispatch_py.index(apply_call) < dispatch_py.index(readiness_call)
+    assert dispatch_py.index(standalone_apply_call) < dispatch_py.index(standalone_readiness_call)
 
     runtime_py = (root / "backend" / "app" / "standalone_protocol_runtime.py").read_text(
         encoding="utf-8"
@@ -183,6 +256,7 @@ def main() -> None:
 
     _assert_singbox_service_bootstrap()
     _assert_singbox_readiness_retry()
+    _assert_standalone_readiness_retry()
 
     print("MODERN_PROTOCOL_RUNTIME_V3_SMOKE_OK")
 
