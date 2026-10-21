@@ -6,6 +6,7 @@ import {useI18n} from "../lib/i18n";
 import {installedStoreTemplate} from "../lib/store-template-registry";
 import {ConversionTemplateCustomizer} from "./store-template-conversion-customizer";
 import {EditorialTemplateCustomizer} from "./store-template-editorial-customizer";
+import {OrbitTemplateCustomizer} from "./store-template-orbit-customizer";
 import {StoreTemplateCustomizer} from "./store-template-customizer";
 import {Card,Shell} from "./ui";
 
@@ -31,7 +32,9 @@ export function StoreTemplateCustomizerPage({templateId}:{templateId:string}){
       ?<EditorialTemplateCustomizer onClose={close}/>
       :template.id==="conversion-2027"
         ?<ConversionTemplateCustomizer onClose={close}/>
-        :<StoreTemplateCustomizer templateId={template.id} onClose={close}/>
+        :template.id==="orbit-neo-2027"
+          ?<OrbitTemplateCustomizer onClose={close}/>
+          :<StoreTemplateCustomizer templateId={template.id} onClose={close}/>
     }
   </div></Shell>;
 }
