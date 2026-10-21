@@ -76,3 +76,5 @@ jobs:
           fi
           git commit -m 'Bundle legacy storefront tutorial images locally'
           git push origin HEAD:feat/store-tutorial-sprites-v126-final
+
+# retrigger after all five backup chunks are present
