@@ -1,0 +1,25 @@
+name: TwinPanel Store Tutorial Assets V124 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'public/learning/screenshots/**'
+      - 'lib/store-guide-content.ts'
+      - 'components/store-template-renderer.tsx'
+      - '.github/workflows/store-tutorial-assets-v124-smoke.yml'
+
+jobs:
+  verify-local-tutorial-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify bundled storefront tutorial images
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          count="$(find public/learning/screenshots -type f -name '*.webp' | wc -l | tr -d ' ')"
+          test "$count" = 15
+          ! grep -R 'movilineapp.com/learning' lib/store-guide-content.ts components/store-template-renderer.tsx
+          grep -q 'storeGuideTutorialImage' lib/store-guide-content.ts
+          grep -q 'storeGuideTutorialImage' components/store-template-renderer.tsx
+          ! grep -q 'storeGuideScreenshot' components/store-template-renderer.tsx

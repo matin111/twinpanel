@@ -17,7 +17,7 @@ import {
   storeGuideAppImage,
   storeGuideContent,
   storeGuidePlatforms,
-  storeGuideScreenshot,
+  storeGuideTutorialImage,
   type StoreGuidePlatform,
   type StoreGuideProtocol,
 } from "../lib/store-guide-content";
@@ -87,6 +87,7 @@ function Conversion2027Template({settings,plans,loading,error,message,buying,onB
   const guide=storeGuideContent[activeGuideProtocol];
   const guideEntry=guide.systems[guidePlatform];
   const guideAppImage=storeGuideAppImage(guidePlatform,activeGuideProtocol);
+  const guideTutorialImage=storeGuideTutorialImage(guidePlatform,activeGuideProtocol);
   const featuredPlanIndex=plans.length>2?Math.floor(plans.length/2):0;
   const faqItems=[1,2,3,4,5].map(index=>({
     question:content(`faq_${index}_question`),
@@ -164,20 +165,20 @@ function Conversion2027Template({settings,plans,loading,error,message,buying,onB
         <article><small>{pick("اطلاعات لازم از حساب","Required account data")}</small><b dir="ltr">{guideEntry.credential}</b></article>
       </div>
 
+      {guideTutorialImage&&<figure className="tpRealGuideScreenshot tpRealGuideTutorialSheet">
+        <img src={guideTutorialImage} alt={`${selectedProtocol.name} - ${pick(selectedPlatform.fa,selectedPlatform.en)}`} loading="lazy" decoding="async"/>
+        <figcaption>{pick("تصاویر واقعی مراحل آموزش از نسخه قبلی پنل","Real tutorial screenshots from the previous panel")}</figcaption>
+      </figure>}
+
       <div className="tpRealGuideLayout">
         <div className="tpRealGuideSteps">
           <header><span><small>{pick("اجرای مرحله‌به‌مرحله","Step by step")}</small><h3>{pick("از نصب تا اتصال موفق","From install to successful connection")}</h3></span><em>{number(guideEntry.steps.length)} {pick("مرحله","steps")}</em></header>
           {guideEntry.steps.map((step,index)=>{
-            const screenshot=storeGuideScreenshot(guidePlatform,activeGuideProtocol,index);
             return <article className="tpRealGuideStep" key={`${activeGuideProtocol}-${guidePlatform}-${step.title}`}>
               <i>{number(index+1)}</i>
               <div>
                 <b>{step.title}</b>
                 <p>{step.detail}</p>
-                <figure className="tpRealGuideScreenshot">
-                  <img src={screenshot} alt={`${step.title} - ${selectedProtocol.name} - ${pick(selectedPlatform.fa,selectedPlatform.en)}`} loading="lazy" decoding="async" onError={event=>{const figure=event.currentTarget.closest(".tpRealGuideScreenshot");if(figure instanceof HTMLElement)figure.style.display="none";}}/>
-                  <figcaption>{pick("تصویر واقعی مرحله","Real step image")} {number(index+1)} · {selectedProtocol.name} · {pick(selectedPlatform.fa,selectedPlatform.en)}</figcaption>
-                </figure>
               </div>
             </article>;
           })}
