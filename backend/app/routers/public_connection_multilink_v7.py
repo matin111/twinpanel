@@ -13,10 +13,7 @@ from ..database import get_db
 from .account_delivery import _public_payload, _subscription_from_share_token
 
 
-router = APIRouter(
-    prefix="/v1/connect",
-    tags=["public-connection-multilink-v7"],
-)
+router = APIRouter(tags=["public-connection-multilink-v7"])
 
 
 def _active_public_payload(token: str, db: Session) -> dict[str, Any]:
