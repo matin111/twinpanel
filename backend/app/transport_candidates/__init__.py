@@ -86,15 +86,20 @@ def _subnet(pool_second_octet: int, tunnel_id: int) -> tuple[str, str, str, int,
 
 
 def _tp27_runtime(tunnel_id: int) -> dict:
-    """Deterministic /30 inside the TP27 10.253.0.0/16 carrier pool."""
+    """Preserve the production-proven V91 10.253/16 runtime contract."""
 
     tid = max(int(tunnel_id), 1)
-    network, iran_ip, exit_ip, _third, _fourth = _subnet(253, tid)
+    slot = tid % 16384
+    base = slot * 4
+    third = (base // 256) & 0xFF
+    fourth = base % 256
+    iran_ip = f"10.253.{third}.{fourth + 1}"
+    exit_ip = f"10.253.{third}.{fourth + 2}"
 
     return {
         "transport": "tp27_fast",
         "interface": f"tp27{tid}"[:15],
-        "network": network,
+        "network": f"10.253.{third}.{fourth}/30",
         "iran_ip": iran_ip,
         "exit_ip": exit_ip,
         "iran_addr": f"{iran_ip}/30",
