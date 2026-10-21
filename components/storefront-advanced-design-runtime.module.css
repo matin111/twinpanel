@@ -1,74 +1,74 @@
 .runtime{min-width:0}
 
-/* Mode-aware card surfaces. These rules only activate for explicitly saved slots. */
-:global(html[data-theme="dark"]) .runtime[data-ui-dark-plan-bg="on"] :global(#plans article){background:var(--ui-dark-plan-bg)}
-:global(html[data-theme="dark"]) .runtime[data-ui-dark-protocol-bg="on"] :global(#protocols article){background:var(--ui-dark-protocol-bg)}
-:global(html[data-theme="dark"]) .runtime[data-ui-dark-service-bg="on"] :global(#services article){background:var(--ui-dark-service-bg)}
-:global(html[data-theme="dark"]) .runtime[data-ui-dark-guide-bg="on"] :global(#guides>div){background:var(--ui-dark-guide-bg)}
-:global(html[data-theme="dark"]) .runtime[data-ui-dark-account-bg="on"] :global(#account>div){background:var(--ui-dark-account-bg)}
-:global(html[data-theme="dark"]) .runtime[data-ui-dark-faq-bg="on"] :global(#faq details){background:var(--ui-dark-faq-bg)}
-:global(html[data-theme="dark"]) .runtime[data-ui-dark-contact-bg="on"] :global(:is(#contact article,#contact a,#contact>div)){background:var(--ui-dark-contact-bg)}
+/* Explicit semantic targets are assigned by the shared runtime adapter. */
+:global(html[data-theme="dark"]) .runtime[data-ui-dark-plan-bg="on"] :global([data-store-card="plan"]){background:var(--ui-dark-plan-bg)}
+:global(html[data-theme="dark"]) .runtime[data-ui-dark-protocol-bg="on"] :global([data-store-card="protocol"]){background:var(--ui-dark-protocol-bg)}
+:global(html[data-theme="dark"]) .runtime[data-ui-dark-service-bg="on"] :global([data-store-card="service"]){background:var(--ui-dark-service-bg)}
+:global(html[data-theme="dark"]) .runtime[data-ui-dark-guide-bg="on"] :global([data-store-card="guide"]){background:var(--ui-dark-guide-bg)}
+:global(html[data-theme="dark"]) .runtime[data-ui-dark-account-bg="on"] :global([data-store-card="account"]){background:var(--ui-dark-account-bg)}
+:global(html[data-theme="dark"]) .runtime[data-ui-dark-faq-bg="on"] :global([data-store-card="faq"]){background:var(--ui-dark-faq-bg)}
+:global(html[data-theme="dark"]) .runtime[data-ui-dark-contact-bg="on"] :global([data-store-card="contact"]){background:var(--ui-dark-contact-bg)}
 
-:global(html[data-theme="light"]) .runtime[data-ui-light-plan-bg="on"] :global(#plans article){background:var(--ui-light-plan-bg)}
-:global(html[data-theme="light"]) .runtime[data-ui-light-protocol-bg="on"] :global(#protocols article){background:var(--ui-light-protocol-bg)}
-:global(html[data-theme="light"]) .runtime[data-ui-light-service-bg="on"] :global(#services article){background:var(--ui-light-service-bg)}
-:global(html[data-theme="light"]) .runtime[data-ui-light-guide-bg="on"] :global(#guides>div){background:var(--ui-light-guide-bg)}
-:global(html[data-theme="light"]) .runtime[data-ui-light-account-bg="on"] :global(#account>div){background:var(--ui-light-account-bg)}
-:global(html[data-theme="light"]) .runtime[data-ui-light-faq-bg="on"] :global(#faq details){background:var(--ui-light-faq-bg)}
-:global(html[data-theme="light"]) .runtime[data-ui-light-contact-bg="on"] :global(:is(#contact article,#contact a,#contact>div)){background:var(--ui-light-contact-bg)}
+:global(html[data-theme="light"]) .runtime[data-ui-light-plan-bg="on"] :global([data-store-card="plan"]){background:var(--ui-light-plan-bg)}
+:global(html[data-theme="light"]) .runtime[data-ui-light-protocol-bg="on"] :global([data-store-card="protocol"]){background:var(--ui-light-protocol-bg)}
+:global(html[data-theme="light"]) .runtime[data-ui-light-service-bg="on"] :global([data-store-card="service"]){background:var(--ui-light-service-bg)}
+:global(html[data-theme="light"]) .runtime[data-ui-light-guide-bg="on"] :global([data-store-card="guide"]){background:var(--ui-light-guide-bg)}
+:global(html[data-theme="light"]) .runtime[data-ui-light-account-bg="on"] :global([data-store-card="account"]){background:var(--ui-light-account-bg)}
+:global(html[data-theme="light"]) .runtime[data-ui-light-faq-bg="on"] :global([data-store-card="faq"]){background:var(--ui-light-faq-bg)}
+:global(html[data-theme="light"]) .runtime[data-ui-light-contact-bg="on"] :global([data-store-card="contact"]){background:var(--ui-light-contact-bg)}
 
 /* Card typography and borders. */
-:global(html[data-theme="dark"]) .runtime[data-ui-dark-card-text="on"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a)){color:var(--ui-dark-card-text)}
-:global(html[data-theme="dark"]) .runtime[data-ui-dark-card-text="on"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a) :is(h3,h4,b,strong,summary)){color:var(--ui-dark-card-text)}
-:global(html[data-theme="dark"]) .runtime[data-ui-dark-muted="on"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a) :is(p,small)){color:var(--ui-dark-muted)}
-:global(html[data-theme="dark"]) .runtime[data-ui-dark-border="on"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a)){border-color:var(--ui-dark-border)}
+:global(html[data-theme="dark"]) .runtime[data-ui-dark-card-text="on"] :global([data-store-card]){color:var(--ui-dark-card-text)}
+:global(html[data-theme="dark"]) .runtime[data-ui-dark-card-text="on"] :global([data-store-card] :is(h2,h3,h4,b,strong,summary)){color:var(--ui-dark-card-text)}
+:global(html[data-theme="dark"]) .runtime[data-ui-dark-muted="on"] :global([data-store-card] :is(p,small)){color:var(--ui-dark-muted)}
+:global(html[data-theme="dark"]) .runtime[data-ui-dark-border="on"] :global([data-store-card]){border-color:var(--ui-dark-border)}
 
-:global(html[data-theme="light"]) .runtime[data-ui-light-card-text="on"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a)){color:var(--ui-light-card-text)}
-:global(html[data-theme="light"]) .runtime[data-ui-light-card-text="on"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a) :is(h3,h4,b,strong,summary)){color:var(--ui-light-card-text)}
-:global(html[data-theme="light"]) .runtime[data-ui-light-muted="on"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a) :is(p,small)){color:var(--ui-light-muted)}
-:global(html[data-theme="light"]) .runtime[data-ui-light-border="on"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a)){border-color:var(--ui-light-border)}
+:global(html[data-theme="light"]) .runtime[data-ui-light-card-text="on"] :global([data-store-card]){color:var(--ui-light-card-text)}
+:global(html[data-theme="light"]) .runtime[data-ui-light-card-text="on"] :global([data-store-card] :is(h2,h3,h4,b,strong,summary)){color:var(--ui-light-card-text)}
+:global(html[data-theme="light"]) .runtime[data-ui-light-muted="on"] :global([data-store-card] :is(p,small)){color:var(--ui-light-muted)}
+:global(html[data-theme="light"]) .runtime[data-ui-light-border="on"] :global([data-store-card]){border-color:var(--ui-light-border)}
 
-/* Primary and secondary actions stay inside actionable content, never navigation links. */
-:global(html[data-theme="dark"]) .runtime[data-ui-dark-primary-bg="on"] :global(:is(.tpStorePrimary,.tpStoreHeaderBuy,.tpStoreBuyButton,#plans button,main a[href="#plans"],#account a[href="/panel"])){background:var(--ui-dark-primary-bg);border-color:color-mix(in srgb,var(--ui-dark-primary-bg) 82%,transparent)}
-:global(html[data-theme="dark"]) .runtime[data-ui-dark-primary-text="on"] :global(:is(.tpStorePrimary,.tpStoreHeaderBuy,.tpStoreBuyButton,#plans button,main a[href="#plans"],#account a[href="/panel"])){color:var(--ui-dark-primary-text)}
-:global(html[data-theme="dark"]) .runtime[data-ui-dark-secondary-bg="on"] :global(:is(.tpStoreSecondary,.tpStoreLogin,main a[href="#guides"],#account button,#contact button)){background:var(--ui-dark-secondary-bg);border-color:color-mix(in srgb,var(--ui-dark-secondary-bg) 74%,transparent)}
-:global(html[data-theme="dark"]) .runtime[data-ui-dark-secondary-text="on"] :global(:is(.tpStoreSecondary,.tpStoreLogin,main a[href="#guides"],#account button,#contact button)){color:var(--ui-dark-secondary-text)}
+/* Primary/secondary action colors are independent from card surfaces. */
+:global(html[data-theme="dark"]) .runtime[data-ui-dark-primary-bg="on"] :global([data-store-action="primary"]){background:var(--ui-dark-primary-bg);border-color:color-mix(in srgb,var(--ui-dark-primary-bg) 82%,transparent)}
+:global(html[data-theme="dark"]) .runtime[data-ui-dark-primary-text="on"] :global([data-store-action="primary"]){color:var(--ui-dark-primary-text)}
+:global(html[data-theme="dark"]) .runtime[data-ui-dark-secondary-bg="on"] :global([data-store-action="secondary"]){background:var(--ui-dark-secondary-bg);border-color:color-mix(in srgb,var(--ui-dark-secondary-bg) 74%,transparent)}
+:global(html[data-theme="dark"]) .runtime[data-ui-dark-secondary-text="on"] :global([data-store-action="secondary"]){color:var(--ui-dark-secondary-text)}
 
-:global(html[data-theme="light"]) .runtime[data-ui-light-primary-bg="on"] :global(:is(.tpStorePrimary,.tpStoreHeaderBuy,.tpStoreBuyButton,#plans button,main a[href="#plans"],#account a[href="/panel"])){background:var(--ui-light-primary-bg);border-color:color-mix(in srgb,var(--ui-light-primary-bg) 82%,transparent)}
-:global(html[data-theme="light"]) .runtime[data-ui-light-primary-text="on"] :global(:is(.tpStorePrimary,.tpStoreHeaderBuy,.tpStoreBuyButton,#plans button,main a[href="#plans"],#account a[href="/panel"])){color:var(--ui-light-primary-text)}
-:global(html[data-theme="light"]) .runtime[data-ui-light-secondary-bg="on"] :global(:is(.tpStoreSecondary,.tpStoreLogin,main a[href="#guides"],#account button,#contact button)){background:var(--ui-light-secondary-bg);border-color:color-mix(in srgb,var(--ui-light-secondary-bg) 74%,transparent)}
-:global(html[data-theme="light"]) .runtime[data-ui-light-secondary-text="on"] :global(:is(.tpStoreSecondary,.tpStoreLogin,main a[href="#guides"],#account button,#contact button)){color:var(--ui-light-secondary-text)}
+:global(html[data-theme="light"]) .runtime[data-ui-light-primary-bg="on"] :global([data-store-action="primary"]){background:var(--ui-light-primary-bg);border-color:color-mix(in srgb,var(--ui-light-primary-bg) 82%,transparent)}
+:global(html[data-theme="light"]) .runtime[data-ui-light-primary-text="on"] :global([data-store-action="primary"]){color:var(--ui-light-primary-text)}
+:global(html[data-theme="light"]) .runtime[data-ui-light-secondary-bg="on"] :global([data-store-action="secondary"]){background:var(--ui-light-secondary-bg);border-color:color-mix(in srgb,var(--ui-light-secondary-bg) 74%,transparent)}
+:global(html[data-theme="light"]) .runtime[data-ui-light-secondary-text="on"] :global([data-store-action="secondary"]){color:var(--ui-light-secondary-text)}
 
 /* Shared card geometry. */
-.runtime[data-ui-card-size="compact"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a)){padding:14px;min-height:0}
-.runtime[data-ui-card-size="balanced"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a)){padding:20px}
-.runtime[data-ui-card-size="spacious"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a)){padding:28px;min-height:220px}
-.runtime[data-ui-card-shape="sharp"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a)){border-radius:4px}
-.runtime[data-ui-card-shape="soft"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a)){border-radius:16px}
-.runtime[data-ui-card-shape="round"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a)){border-radius:28px}
-.runtime[data-ui-card-effect="flat"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a)){box-shadow:none;backdrop-filter:none}
-.runtime[data-ui-card-effect="bordered"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a)){box-shadow:none;border-width:1px;border-style:solid;backdrop-filter:none}
-.runtime[data-ui-card-effect="shadow"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a)){box-shadow:0 20px 48px rgba(15,23,42,.16)}
-.runtime[data-ui-card-effect="glass"] :global(:is(#plans article,#protocols article,#services article,#guides>div,#account>div,#faq details,#contact article,#contact a)){backdrop-filter:blur(18px) saturate(130%);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 18px 44px rgba(15,23,42,.1)}
+.runtime[data-ui-card-size="compact"] :global([data-store-card]){padding:14px;min-height:0}
+.runtime[data-ui-card-size="balanced"] :global([data-store-card]){padding:20px}
+.runtime[data-ui-card-size="spacious"] :global([data-store-card]){padding:28px;min-height:220px}
+.runtime[data-ui-card-shape="sharp"] :global([data-store-card]){border-radius:4px}
+.runtime[data-ui-card-shape="soft"] :global([data-store-card]){border-radius:16px}
+.runtime[data-ui-card-shape="round"] :global([data-store-card]){border-radius:28px}
+.runtime[data-ui-card-effect="flat"] :global([data-store-card]){box-shadow:none;backdrop-filter:none}
+.runtime[data-ui-card-effect="bordered"] :global([data-store-card]){box-shadow:none;border-width:1px;border-style:solid;backdrop-filter:none}
+.runtime[data-ui-card-effect="shadow"] :global([data-store-card]){box-shadow:0 20px 48px rgba(15,23,42,.16)}
+.runtime[data-ui-card-effect="glass"] :global([data-store-card]){backdrop-filter:blur(18px) saturate(130%);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 18px 44px rgba(15,23,42,.1)}
 
 /* Button geometry. */
-.runtime[data-ui-button-size="compact"] :global(:is(.tpStorePrimary,.tpStoreHeaderBuy,.tpStoreBuyButton,.tpStoreSecondary,.tpStoreLogin,#plans button,#account a,#account button,#contact button)){min-height:34px;padding:7px 12px;font-size:11px}
-.runtime[data-ui-button-size="balanced"] :global(:is(.tpStorePrimary,.tpStoreHeaderBuy,.tpStoreBuyButton,.tpStoreSecondary,.tpStoreLogin,#plans button,#account a,#account button,#contact button)){min-height:42px;padding:9px 16px}
-.runtime[data-ui-button-size="large"] :global(:is(.tpStorePrimary,.tpStoreHeaderBuy,.tpStoreBuyButton,.tpStoreSecondary,.tpStoreLogin,#plans button,#account a,#account button,#contact button)){min-height:50px;padding:12px 21px;font-size:13px}
-.runtime[data-ui-button-shape="square"] :global(:is(.tpStorePrimary,.tpStoreHeaderBuy,.tpStoreBuyButton,.tpStoreSecondary,.tpStoreLogin,#plans button,#account a,#account button,#contact button)){border-radius:8px}
-.runtime[data-ui-button-shape="soft"] :global(:is(.tpStorePrimary,.tpStoreHeaderBuy,.tpStoreBuyButton,.tpStoreSecondary,.tpStoreLogin,#plans button,#account a,#account button,#contact button)){border-radius:14px}
-.runtime[data-ui-button-shape="pill"] :global(:is(.tpStorePrimary,.tpStoreHeaderBuy,.tpStoreBuyButton,.tpStoreSecondary,.tpStoreLogin,#plans button,#account a,#account button,#contact button)){border-radius:999px}
+.runtime[data-ui-button-size="compact"] :global([data-store-action]){min-height:34px;padding:7px 12px;font-size:11px}
+.runtime[data-ui-button-size="balanced"] :global([data-store-action]){min-height:42px;padding:9px 16px}
+.runtime[data-ui-button-size="large"] :global([data-store-action]){min-height:50px;padding:12px 21px;font-size:13px}
+.runtime[data-ui-button-shape="square"] :global([data-store-action]){border-radius:8px}
+.runtime[data-ui-button-shape="soft"] :global([data-store-action]){border-radius:14px}
+.runtime[data-ui-button-shape="pill"] :global([data-store-action]){border-radius:999px}
 
-/* Layout controls intentionally target only containers that directly own cards. */
-.runtime[data-ui-plan-layout="one"] :global(#plans div:has(>article)){display:grid;grid-template-columns:minmax(0,1fr)}
-.runtime[data-ui-plan-layout="two"] :global(#plans div:has(>article)){display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
-.runtime[data-ui-plan-layout="three"] :global(#plans div:has(>article)){display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
-.runtime[data-ui-protocol-layout="one"] :global(#protocols div:has(>article)){display:grid;grid-template-columns:minmax(0,1fr)}
-.runtime[data-ui-protocol-layout="two"] :global(#protocols div:has(>article)){display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
-.runtime[data-ui-protocol-layout="three"] :global(#protocols div:has(>article)){display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
-.runtime[data-ui-protocol-layout="five"] :global(#protocols div:has(>article)){display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
-.runtime[data-ui-service-layout="one"] :global(#services div:has(>article)){display:grid;grid-template-columns:minmax(0,1fr)}
-.runtime[data-ui-service-layout="two"] :global(#services div:has(>article)){display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
-.runtime[data-ui-service-layout="three"] :global(#services div:has(>article)){display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+/* Grid presentation is independent per section. */
+.runtime[data-ui-plan-layout="one"] :global([data-store-grid="plans"]){display:grid;grid-template-columns:minmax(0,1fr)}
+.runtime[data-ui-plan-layout="two"] :global([data-store-grid="plans"]){display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.runtime[data-ui-plan-layout="three"] :global([data-store-grid="plans"]){display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.runtime[data-ui-protocol-layout="one"] :global([data-store-grid="protocols"]){display:grid;grid-template-columns:minmax(0,1fr)}
+.runtime[data-ui-protocol-layout="two"] :global([data-store-grid="protocols"]){display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.runtime[data-ui-protocol-layout="three"] :global([data-store-grid="protocols"]){display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.runtime[data-ui-protocol-layout="five"] :global([data-store-grid="protocols"]){display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.runtime[data-ui-service-layout="one"] :global([data-store-grid="services"]){display:grid;grid-template-columns:minmax(0,1fr)}
+.runtime[data-ui-service-layout="two"] :global([data-store-grid="services"]){display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.runtime[data-ui-service-layout="three"] :global([data-store-grid="services"]){display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
 
-@media(max-width:760px){.runtime[data-ui-plan-layout] :global(#plans div:has(>article)),.runtime[data-ui-protocol-layout] :global(#protocols div:has(>article)),.runtime[data-ui-service-layout] :global(#services div:has(>article)){grid-template-columns:minmax(0,1fr)}}
+@media(max-width:760px){.runtime[data-ui-plan-layout] :global([data-store-grid="plans"]),.runtime[data-ui-protocol-layout] :global([data-store-grid="protocols"]),.runtime[data-ui-service-layout] :global([data-store-grid="services"]){grid-template-columns:minmax(0,1fr)}}
