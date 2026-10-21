@@ -1,0 +1,116 @@
+name: Protocol Catalog V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/protocol_catalog.py'
+      - 'backend/app/modern_protocol_models.py'
+      - 'backend/app/modern_protocol_runtime_v2.py'
+      - 'backend/app/routers/modern_protocol_admin_v2.py'
+      - 'backend/app/routers/__init__.py'
+      - 'components/modern-protocols-admin.tsx'
+      - 'components/modern-protocols-admin-v2.module.css'
+      - '.github/workflows/protocol-catalog-v1-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile protocol control-plane modules
+        run: |
+          python -m py_compile \
+            backend/app/protocol_catalog.py \
+            backend/app/modern_protocol_models.py \
+            backend/app/modern_protocol_runtime_v2.py \
+            backend/app/routers/modern_protocol_admin_v2.py \
+            backend/app/routers/__init__.py
+
+      - name: Validate catalog presets and safety contracts
+        env:
+          PYTHONPATH: backend
+        run: |
+          python - <<'PY'
+          from app.protocol_catalog import PROTOCOL_CATALOG, catalog_payload, resolve_settings
+
+          expected_ready = {'hysteria2', 'tuic', 'anytls', 'naive', 'shadowtls', 'snell'}
+          ready = {key for key, item in PROTOCOL_CATALOG.items() if item['runtime_status'] == 'ready'}
+          assert expected_ready == ready, (expected_ready, ready)
+          assert {'mieru', 'trusttunnel', 'amneziawg', 'sudoku'} <= set(PROTOCOL_CATALOG)
+
+          for item in catalog_payload():
+              key = item['key']
+              assert item['presets'].get('recommended') is not None, key
+              preset, settings, warnings = resolve_settings(key, 'recommended', {})
+              assert preset == 'recommended'
+              assert isinstance(settings, dict)
+              assert isinstance(warnings, list)
+
+          _, tuic, warnings = resolve_settings('tuic', 'recommended', {})
+          assert tuic['zero_rtt_handshake'] is False
+          assert tuic['auth_timeout'] == '3s'
+          assert tuic['heartbeat'] == '10s'
+
+          _, shadowtls, _ = resolve_settings('shadowtls', 'recommended', {})
+          assert shadowtls['version'] == 3
+          assert shadowtls['strict_mode'] is True
+
+          _, snell, _ = resolve_settings('snell', 'recommended', {})
+          assert snell['version'] == 6
+          assert snell['mode'] == 'default'
+
+          try:
+              resolve_settings('hysteria2', 'custom', {
+                  'ignore_client_bandwidth': True,
+                  'up_mbps': 100,
+              })
+          except ValueError:
+              pass
+          else:
+              raise AssertionError('Hysteria2 conflicting bandwidth settings must fail')
+          PY
+
+      - name: Verify current sing-box feature baseline is fail-closed
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          body = Path('backend/app/modern_protocol_runtime_v2.py').read_text(encoding='utf-8')
+          required = [
+              'MIN_SING_BOX_VERSION = (1, 14, 0)',
+              'version < MIN_SING_BOX_VERSION',
+              'apt-get -o DPkg::Lock::Timeout=300 update -y',
+              'installed version:',
+              'Snell v6 PSK must be 12..255 bytes',
+              'bak-v2-',
+              'bak-remove-',
+          ]
+          missing = [item for item in required if item not in body]
+          assert not missing, missing
+          PY
+
+      - name: Verify V2 route precedence registration and rollback path
+        run: |
+          grep -q 'runtime_endpoints.router.include_router(_modern_protocol_admin_v2_router)' backend/app/routers/__init__.py
+          grep -q 'modern_protocol_admin_v2' backend/app/routers/__init__.py
+          grep -q '@router.get("/modern-protocols")' backend/app/routers/modern_protocol_admin_v2.py
+          grep -q '@router.post("/modern-protocols/{node_id}/preview")' backend/app/routers/modern_protocol_admin_v2.py
+          grep -q 'Runtime قبلی Rollback شد' backend/app/routers/modern_protocol_admin_v2.py
+
+      - name: Verify production-ready and pending adapters stay explicit
+        run: |
+          grep -q '"naive"' backend/app/protocol_catalog.py
+          grep -q '"shadowtls"' backend/app/protocol_catalog.py
+          grep -q '"snell"' backend/app/protocol_catalog.py
+          grep -q '"adapter_pending"' backend/app/protocol_catalog.py
+          grep -q 'experimental_pending' backend/app/protocol_catalog.py
+          grep -q 'Adapter رسمی' components/modern-protocols-admin.tsx
