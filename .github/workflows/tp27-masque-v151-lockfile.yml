@@ -1,0 +1,29 @@
+name: TP27 MASQUE V151 Dependency Lock
+
+on:
+  pull_request:
+    paths:
+      - "tools/tp27-masque/**"
+      - ".github/workflows/tp27-masque-v151-lockfile.yml"
+
+jobs:
+  lock:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.0"
+      - name: Generate verified module sums
+        shell: bash
+        working-directory: tools/tp27-masque
+        run: |
+          set -Eeuo pipefail
+          GOWORK=off go mod tidy
+          echo 'TP27_MASQUE_GO_SUM_BEGIN'
+          cat go.sum
+          echo 'TP27_MASQUE_GO_SUM_END'
+          GOWORK=off go vet -mod=readonly ./...
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOWORK=off \
+            go build -mod=readonly -trimpath -o /tmp/tp27-masque .
+          test -s /tmp/tp27-masque
