@@ -27,11 +27,52 @@ server {
     proxy_set_header X-Forwarded-Proto $scheme;
   }
 
-  # TWINPANEL_PROVISION_LONG_REQUEST_V1
-  # Node provisioning intentionally performs bounded package/protocol setup in
-  # the request lifecycle. Keep the long timeout scoped to this one endpoint;
-  # ordinary /v1 API calls retain Nginx defaults and fail fast normally.
+  # TWINPANEL_LONG_REQUESTS_V2
+  # Keep only bounded package/runtime mutations on the long timeout.
+  # Ordinary /v1 reads and fast mutations retain Nginx defaults.
   location = /v1/provision/install {
+    proxy_pass http://127.0.0.1:__API_PORT__;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_connect_timeout 15s;
+    proxy_send_timeout 1800s;
+    proxy_read_timeout 1800s;
+    send_timeout 1800s;
+  }
+
+  location = /v1/provision/ensure-classic-protocol {
+    proxy_pass http://127.0.0.1:__API_PORT__;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_connect_timeout 15s;
+    proxy_send_timeout 1800s;
+    proxy_read_timeout 1800s;
+    send_timeout 1800s;
+  }
+
+  location = /v1/provision/repair-protocols-saved {
+    proxy_pass http://127.0.0.1:__API_PORT__;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_connect_timeout 15s;
+    proxy_send_timeout 1800s;
+    proxy_read_timeout 1800s;
+    send_timeout 1800s;
+  }
+
+  location ~ ^/v1/settings/vpn/modern-protocols/[0-9]+/install$ {
     proxy_pass http://127.0.0.1:__API_PORT__;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
