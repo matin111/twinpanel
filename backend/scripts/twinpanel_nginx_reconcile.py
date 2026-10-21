@@ -13,13 +13,23 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 
-MARKER = "# TWINPANEL_PROVISION_LONG_REQUEST_V1"
+MARKER = "# TWINPANEL_LONG_REQUESTS_V2"
+LEGACY_MARKER = "# TWINPANEL_PROVISION_LONG_REQUEST_V1"
 DEFAULT_SITE = Path("/etc/nginx/sites-available/twinpanel")
 DEFAULT_BACKUP = Path(
-    "/etc/nginx/sites-available/twinpanel.pre-provision-timeout-v74"
+    "/etc/nginx/sites-available/twinpanel.pre-long-requests-v2"
 )
 DEFAULT_STATE = Path(
     "/var/lib/twinpanel-license/nginx-reconcile.json"
+)
+
+LONG_EXACT_PATHS = (
+    "/v1/provision/install",
+    "/v1/provision/ensure-classic-protocol",
+    "/v1/provision/repair-protocols-saved",
+)
+MODERN_INSTALL_LOCATION = (
+    r"location ~ ^/v1/settings/vpn/modern-protocols/[0-9]+/install$ {"
 )
 
 
@@ -77,16 +87,10 @@ def detect_api_port() -> int:
     return 8095
 
 
-def _provision_block(api_port: int, indent: str = "  ") -> str:
-    if not 1 <= int(api_port) <= 65535:
-        raise RuntimeError("API_PORT_INVALID")
+def _proxy_block(location: str, api_port: int, indent: str) -> str:
     child = indent + "  "
     return (
-        f"{indent}{MARKER}\n"
-        f"{indent}# Node provisioning intentionally performs bounded package/protocol setup in\n"
-        f"{indent}# the request lifecycle. Keep the long timeout scoped to this one endpoint;\n"
-        f"{indent}# ordinary /v1 API calls retain Nginx defaults and fail fast normally.\n"
-        f"{indent}location = /v1/provision/install {{\n"
+        f"{indent}{location}\n"
         f"{child}proxy_pass http://127.0.0.1:{int(api_port)};\n"
         f"{child}proxy_http_version 1.1;\n"
         f"{child}proxy_set_header Host $host;\n"
@@ -102,24 +106,78 @@ def _provision_block(api_port: int, indent: str = "  ") -> str:
     )
 
 
-def _managed_block_valid(content: str) -> bool:
+def _long_request_block(api_port: int, indent: str = "  ") -> str:
+    if not 1 <= int(api_port) <= 65535:
+        raise RuntimeError("API_PORT_INVALID")
+    parts = [
+        f"{indent}{MARKER}\n",
+        f"{indent}# Keep only bounded package/runtime mutations on the long timeout.\n",
+        f"{indent}# Ordinary /v1 reads and fast mutations retain Nginx defaults.\n",
+    ]
+    for path in LONG_EXACT_PATHS:
+        parts.append(_proxy_block(f"location = {path} {{", api_port, indent))
+    parts.append(_proxy_block(MODERN_INSTALL_LOCATION, api_port, indent))
+    return "".join(parts)
+
+
+def _legacy_managed_block_valid(content: str) -> bool:
     required = (
-        MARKER,
+        LEGACY_MARKER,
         "location = /v1/provision/install {",
         "proxy_connect_timeout 15s;",
         "proxy_send_timeout 1800s;",
         "proxy_read_timeout 1800s;",
         "send_timeout 1800s;",
     )
-    return content.count(MARKER) == 1 and all(item in content for item in required)
+    return (
+        content.count(LEGACY_MARKER) == 1
+        and all(item in content for item in required)
+    )
+
+
+def _managed_block_valid(content: str) -> bool:
+    required = [
+        MARKER,
+        MODERN_INSTALL_LOCATION,
+        "proxy_connect_timeout 15s;",
+        "proxy_send_timeout 1800s;",
+        "proxy_read_timeout 1800s;",
+        "send_timeout 1800s;",
+    ]
+    required.extend(f"location = {path} {{" for path in LONG_EXACT_PATHS)
+    return (
+        content.count(MARKER) == 1
+        and LEGACY_MARKER not in content
+        and all(item in content for item in required)
+        and content.count("proxy_read_timeout 1800s;") >= 4
+    )
+
+
+def _remove_legacy_block(content: str) -> str:
+    if LEGACY_MARKER not in content:
+        return content
+    if not _legacy_managed_block_valid(content):
+        raise RuntimeError("NGINX_PROVISION_BLOCK_INVALID")
+
+    pattern = re.compile(
+        r"(?ms)^[ \t]*"
+        + re.escape(LEGACY_MARKER)
+        + r"\n.*?^[ \t]*}\n\n(?=[ \t]*location[ \t]+/v1/[ \t]*\{)"
+    )
+    upgraded, count = pattern.subn("", content, count=1)
+    if count != 1:
+        raise RuntimeError("NGINX_LEGACY_BLOCK_UPGRADE_FAILED")
+    return upgraded
 
 
 def patch_nginx_site_text(content: str, api_port: int) -> str:
-    """Insert the scoped provisioning location without rewriting site policy."""
+    """Converge scoped long-running API routes without rewriting site policy."""
     if MARKER in content:
         if not _managed_block_valid(content):
-            raise RuntimeError("NGINX_PROVISION_BLOCK_INVALID")
+            raise RuntimeError("NGINX_LONG_REQUEST_BLOCK_INVALID")
         return content
+
+    content = _remove_legacy_block(content)
 
     generic = re.search(
         r"(?m)^(?P<indent>[ \t]*)location[ \t]+/v1/[ \t]*\{[ \t]*$",
@@ -128,14 +186,20 @@ def patch_nginx_site_text(content: str, api_port: int) -> str:
     if generic is None:
         raise RuntimeError("NGINX_V1_LOCATION_NOT_FOUND")
 
-    block = _provision_block(api_port, generic.group("indent"))
+    block = _long_request_block(api_port, generic.group("indent"))
     patched = content[: generic.start()] + block + content[generic.start() :]
     if not _managed_block_valid(patched):
-        raise RuntimeError("NGINX_PROVISION_BLOCK_RENDER_FAILED")
-    if patched.find("location = /v1/provision/install {") > patched.find(
-        "location /v1/ {"
+        raise RuntimeError("NGINX_LONG_REQUEST_BLOCK_RENDER_FAILED")
+
+    generic_index = patched.find("location /v1/ {")
+    managed_locations = [
+        f"location = {path} {{" for path in LONG_EXACT_PATHS
+    ] + [MODERN_INSTALL_LOCATION]
+    if generic_index < 0 or any(
+        patched.find(location) < 0 or patched.find(location) > generic_index
+        for location in managed_locations
     ):
-        raise RuntimeError("NGINX_PROVISION_LOCATION_ORDER_INVALID")
+        raise RuntimeError("NGINX_LONG_REQUEST_LOCATION_ORDER_INVALID")
     return patched
 
 
@@ -265,7 +329,7 @@ def _write_state(payload: dict[str, object], state: Path) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Safely converge TwinPanel Nginx provisioning timeout policy",
+        description="Safely converge TwinPanel Nginx long-request timeout policy",
     )
     parser.add_argument(
         "--site",
