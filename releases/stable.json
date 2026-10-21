@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.152",
+  "version": "1.1.0-rc.153",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-21T20:23:11Z",
+  "released_at": "2026-10-21T20:44:28Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "6ad57d30f66ba5ae7d34a0fc0e1c3cdc16cd41bb",
+  "source_sha": "714166b966c3a33dc7c5a535296622034e02a184",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.152/twinpanel-1.1.0-rc.152-linux-x86_64.tar.gz",
-    "sha256": "ec1b9b243ae8ae255fdb8c4856a4332977744c2e7ee38aaeb6d785fca8656a29",
-    "size_bytes": 16891282
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.153/twinpanel-1.1.0-rc.153-linux-x86_64.tar.gz",
+    "sha256": "ac1ecb69ccdc12595329d31e7b76c524a0ebad1c3f3e5e51a73f6cebc63a9caa",
+    "size_bytes": 18058535
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.152 مدیریت پروتکل‌ها روی TwinPanel Local Core و Exit Node را تکمیل می‌کند. Modern Protocol Runtime V3 مسیر نصب، Health و حذف را برای ۱۰ پروتکل مدیریت‌شده یکپارچه می‌کند: Hysteria2، TUIC v5، AnyTLS، NaiveProxy، ShadowTLS v3 و Snell v6 روی Runtime موجود، به‌همراه Adapterهای مستقل Mieru، TrustTunnel، AmneziaWG و Sudoku. Runtimeهای مستقل با نسخه/Artifact مشخص و بررسی SHA256، Secretهای پایدار، systemd lifecycle و Health مبتنی بر Listener واقعی نصب می‌شوند. Local Core از executor محلی امن استفاده می‌کند و Exit Node همچنان از SSH ذخیره‌شده استفاده می‌کند. Router V3 قبل از مسیر Legacy فعال می‌شود و L2TP و compatibility endpointهای قبلی حفظ شده‌اند. پشتیبانی Classic روی Local Core که در نسخه‌های قبلی منتشر شده بود نیز بدون بازنویسی حفظ می‌شود. این Source همچنین اصلاح Release Gate مربوط به TP27 MASQUE V151 را دارد تا RCهای بعدی با حفظ تمام Contractهای MASQUE به rc.151 قفل نشوند. Payment، Subscription، Quota و منطق Tunnel در این Release توسط تغییر Protocol Runtime بازنویسی نشده‌اند. تأیید نهایی نصب واقعی پروتکل‌ها روی سرور اصلی و Exit بعد از Update همچنان لازم است.",
-    "en": "TwinPanel 1.1.0-rc.152 completes managed protocol operation on both TwinPanel Local Core and remote Exit nodes. Modern Protocol Runtime V3 unifies install, health and remove dispatch for 10 managed modern protocols: Hysteria2, TUIC v5, AnyTLS, NaiveProxy, ShadowTLS v3 and Snell v6 on the existing runtime, plus standalone Mieru, TrustTunnel, AmneziaWG and Sudoku adapters. Standalone runtimes use pinned/versioned artifacts with SHA256 verification, persistent bootstrap secrets, systemd lifecycle management and real listener-based health checks. Local Core uses the safe local executor while Exit nodes continue to use saved SSH. V3 routing takes precedence over the legacy modern route while preserving L2TP and legacy compatibility endpoints. Previously published Classic Local Core support remains intact without rewriting its proven runtimes. The locked source also includes the TP27 MASQUE V151 release-gate correction so later RCs can inherit the carrier while retaining all V151 contracts. Payment, Subscription, Quota and tunnel runtime logic are not rewritten by this protocol-runtime release. Final real-server installation acceptance on Local Core and Exit remains required after update."
+    "fa": "TwinPanel 1.1.0-rc.153 دو مجموعه اصلاح CI-green را در یک Source قفل‌شده منتشر می‌کند. در Storefront، قالب Orbit Neo 2027 تیترهای فارسی متعادل‌تر و کوچک‌تر، line-height و wrapping بهتر و فاصله‌های عمودی جمع‌وجورتر دارد. اسکرین‌شات‌های آموزشی کم‌کیفیت پیش‌فرض دیگر در Guide Stage نمایش داده نمی‌شوند و وقتی تصویر HD سفارشی آپلود نشده باشد، یک Orbit Guide Lab Poster گرافیکی با متادیتای واقعی Protocol/OS نمایش داده می‌شود؛ Media Studio و تصویر سفارشی HD همچنان اولویت دارند. در Tunnel runtime، نصب TP27 MASQUE قرارداد واقعی خروجی common.run() را برای fingerprint گواهی رعایت می‌کند و TP27 Direct TCP به carrier سورس‌محور Go با build و SHA256 رسمی Release، 8 lane، hashing پایدار per-flow، keepalive/reconnect و token مستقل per-tunnel منتقل شده است. Runtime Reconciler پاکسازی tokenهای Direct TCP را نیز پوشش می‌دهد. Payment، Subscription، Quota، Auth و قالب‌های Conversion/Editorial توسط این Release بازنویسی نشده‌اند. تأیید نهایی UI Orbit و laneهای جدید روی سرور واقعی بعد از Update همچنان لازم است.",
+    "en": "TwinPanel 1.1.0-rc.153 publishes two CI-green change sets from one locked source. Orbit Neo 2027 now uses smaller, better-balanced Persian headings with improved line-height, wrapping and tighter vertical scale. Tiny bundled tutorial screenshots are no longer shown in the Orbit guide stage; when no custom HD guide image is uploaded, the theme renders a native Orbit Guide Lab poster while keeping live protocol/platform metadata. Custom HD Media Studio uploads still take precedence. In the tunnel runtime, TP27 MASQUE now follows the real common.run() string contract for certificate fingerprinting, while TP27 Direct TCP is a source-owned Go carrier built and SHA256-verified by the official release pipeline with 8 lanes, stable per-flow hashing, keepalive/reconnect and a per-tunnel token. Runtime Reconciler cleanup includes Direct TCP tokens. Payment, Subscription, Quota, Auth, Conversion and Editorial are not rewritten by this release. Final real-server acceptance of the Orbit UI and new lane runtime remains required after update."
   }
 }
