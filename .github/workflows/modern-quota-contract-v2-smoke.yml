@@ -1,0 +1,29 @@
+name: Modern Quota Contract V2 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/quota_schemas.py"
+      - "backend/app/services/quota_node_sync.py"
+      - "backend/app/services/subscription_factory.py"
+      - "scripts/smoke-modern-quota-contract-v2.py"
+      - ".github/workflows/modern-quota-contract-v2-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile quota contract files
+        run: |
+          python -m py_compile \
+            backend/app/quota_schemas.py \
+            backend/app/services/quota_node_sync.py \
+            backend/app/services/subscription_factory.py \
+            scripts/smoke-modern-quota-contract-v2.py
+      - name: Verify modern quota contract
+        run: python scripts/smoke-modern-quota-contract-v2.py
