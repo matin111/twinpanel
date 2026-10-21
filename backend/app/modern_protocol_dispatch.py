@@ -32,6 +32,14 @@ SINGBOX_PROTOCOLS = set(_SINGBOX_PROTOCOLS) | set(STANDALONE_PROTOCOLS)
 SINGBOX_READINESS_ATTEMPTS = 20
 SINGBOX_READINESS_DELAY_SECONDS = 0.25
 
+# Standalone services have the same systemd/listener ordering risk. Production
+# rc.162 proved Sudoku could report service_or_listener_unhealthy immediately
+# after restart while its v0.5.1 process was still initializing tables and then
+# bound the configured listener moments later. Keep manual health fail-fast and
+# retry only the install-time readiness sample.
+STANDALONE_READINESS_ATTEMPTS = 20
+STANDALONE_READINESS_DELAY_SECONDS = 0.25
+
 
 async def _wait_for_singbox_health(
     conn,
@@ -46,6 +54,32 @@ async def _wait_for_singbox_health(
 
     for index in range(tries):
         last = await _singbox_health(conn, protocol, port)
+        if bool(last.get("ok")):
+            return last
+        if index + 1 < tries and delay_seconds > 0:
+            await asyncio.sleep(delay_seconds)
+
+    return last or {
+        "ok": False,
+        "protocol": protocol,
+        "port": port,
+        "error": "service_or_listener_unhealthy",
+    }
+
+
+async def _wait_for_standalone_health(
+    conn,
+    protocol: str,
+    port: int | None,
+    *,
+    attempts: int = STANDALONE_READINESS_ATTEMPTS,
+    delay_seconds: float = STANDALONE_READINESS_DELAY_SECONDS,
+) -> dict[str, Any]:
+    tries = max(1, int(attempts))
+    last: dict[str, Any] | None = None
+
+    for index in range(tries):
+        last = await standalone_health(conn, protocol, port)
         if bool(last.get("ok")):
             return last
         if index + 1 < tries and delay_seconds > 0:
@@ -102,6 +136,17 @@ async def apply_profiles(conn, node, profiles: list[dict[str, Any]]) -> dict[str
         protocol = str(profile.get("protocol") or "").strip().lower()
         standalone = await apply_standalone_profile(conn, node, profile)
         core = standalone.pop("core", {})
+        if not bool(standalone.get("ok")):
+            raw_port = profile.get("port")
+            port = int(raw_port) if raw_port is not None else None
+            readiness = await _wait_for_standalone_health(
+                conn,
+                protocol,
+                port,
+            )
+            for key, value in standalone.items():
+                readiness.setdefault(key, value)
+            standalone = readiness
         result["core"][protocol] = core
         result["protocols"][protocol] = standalone
 
