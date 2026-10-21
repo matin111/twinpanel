@@ -1,0 +1,71 @@
+name: TP27 Mieru TCP V165 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/transport_candidates/tp27_mieru_tcp.py'
+      - 'backend/app/adaptive_multilane_v165.py'
+      - 'backend/app/tunnel_transport_manager_v12.py'
+      - '.github/workflows/adaptive-multilane-v165-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/transport_candidates/tp27_mieru_tcp.py'
+      - 'backend/app/adaptive_multilane_v165.py'
+      - 'backend/app/tunnel_transport_manager_v12.py'
+      - '.github/workflows/adaptive-multilane-v165-smoke.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax and embedded bridge validation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile \
+            backend/app/transport_candidates/tp27_mieru_tcp.py \
+            backend/app/adaptive_multilane_v165.py \
+            backend/app/tunnel_transport_manager_v12.py
+
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          candidate = Path('backend/app/transport_candidates/tp27_mieru_tcp.py')
+          tree = ast.parse(candidate.read_text(encoding='utf-8'))
+          values = {}
+          for node in tree.body:
+              if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+                  try:
+                      values[node.targets[0].id] = ast.literal_eval(node.value)
+                  except Exception:
+                      pass
+
+          bridge = values.get('BRIDGE_SCRIPT')
+          if not isinstance(bridge, str) or 'asyncio.start_server' not in bridge:
+              raise SystemExit('embedded SOCKS bridge missing')
+          compile(bridge, 'tp27-socks-bridge.py', 'exec')
+
+          assert values['MIERU_VERSION'] == '3.38.1'
+          assert values['MTU'] == 1280
+          assert values['LANES'] == 8
+          assert tuple(values['MIERU_PORT_BASES']) == (38200, 39200, 40200)
+          print('TP27_MIERU_EMBEDDED_BRIDGE_OK')
+          PY
+
+      - name: Candidate contract smoke
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          grep -q 'NAME = "tp27_mieru_tcp"' backend/app/transport_candidates/tp27_mieru_tcp.py
+          grep -q 'allowLoopbackIP' backend/app/transport_candidates/tp27_mieru_tcp.py
+          grep -q 'HANDSHAKE_NO_WAIT' backend/app/transport_candidates/tp27_mieru_tcp.py
+          grep -q 'MULTIPLEXING_MIDDLE' backend/app/transport_candidates/tp27_mieru_tcp.py
+          grep -q 'tp27_mieru_tcp_all_ports_failed' backend/app/transport_candidates/tp27_mieru_tcp.py
+          grep -q 'tp27_mieru_tcp' backend/app/adaptive_multilane_v165.py
+          grep -q 'apply_adaptive_multilane_v165' backend/app/tunnel_transport_manager_v12.py
+          grep -q 'existing_candidates=unchanged' backend/app/adaptive_multilane_v165.py
+          echo TP27_MIERU_V165_SMOKE_OK
