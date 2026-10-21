@@ -8,6 +8,7 @@ import {EditorialFooterSocial} from "./store-template-editorial-footer-social";
 import {EditorialPro2027Template} from "./store-template-editorial-pro";
 import {OrbitNeoPolishedTemplate} from "./store-template-orbit-polished";
 import {StoreProtocolCatalogLayer} from "./store-protocol-catalog-layer";
+import {StorefrontAdvancedDesignRuntime} from "./storefront-advanced-design-runtime";
 import editorialBridge from "./store-template-editorial-theme-bridge.module.css";
 import type {StoreTemplateProps} from "./store-template-renderer";
 
@@ -54,5 +55,9 @@ export function installedStoreTemplateRuntime(templateId:unknown){
 export function StoreTemplateRuntime(props:StoreThemeRuntimeProps){
   const resolved=resolveStoreTemplateId(props.templateId);
   const renderer=installedStoreTemplateRuntime(resolved);
-  return <>{renderer(props)}<StoreProtocolCatalogLayer templateId={resolved}/></>;
+  const runtimeProps={...props,templateId:resolved};
+  return <StorefrontAdvancedDesignRuntime templateId={resolved} themeOptions={props.themeOptions}>
+    {renderer(runtimeProps)}
+    <StoreProtocolCatalogLayer templateId={resolved} themeOptions={props.themeOptions}/>
+  </StorefrontAdvancedDesignRuntime>;
 }
