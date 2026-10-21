@@ -1,0 +1,54 @@
+name: Release Candidate Manifest Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'VERSION'
+      - 'releases/candidate.json'
+      - '.github/workflows/release-candidate-manifest-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'VERSION'
+      - 'releases/candidate.json'
+      - '.github/workflows/release-candidate-manifest-smoke.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate candidate/source contract
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import json
+          import re
+          import subprocess
+          from pathlib import Path
+
+          candidate = json.loads(Path('releases/candidate.json').read_text(encoding='utf-8'))
+          version = str(candidate.get('version') or '').strip()
+          source_sha = str(candidate.get('source_sha') or '').strip().lower()
+          current_version = Path('VERSION').read_text(encoding='utf-8').strip()
+          notes = candidate.get('notes') or {}
+
+          assert re.fullmatch(r'1\.1\.0-rc\.\d+', version), version
+          assert re.fullmatch(r'[0-9a-f]{40}', source_sha), source_sha
+          assert version == current_version, (version, current_version)
+          assert str(notes.get('fa') or '').strip(), 'missing fa release notes'
+          assert str(notes.get('en') or '').strip(), 'missing en release notes'
+
+          subprocess.run(['git', 'cat-file', '-e', f'{source_sha}^{{commit}}'], check=True)
+          source_version = subprocess.check_output(
+              ['git', 'show', f'{source_sha}:VERSION'],
+              text=True,
+          ).strip()
+          assert source_version == version, (source_version, version)
+
+          print('RELEASE_CANDIDATE_MANIFEST_SMOKE_OK')
+          PY
