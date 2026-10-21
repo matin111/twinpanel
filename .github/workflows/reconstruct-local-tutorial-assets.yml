@@ -1,0 +1,115 @@
+name: Reconstruct Local Tutorial Assets
+
+on:
+  push:
+    branches:
+      - feat/store-tutorial-images-v121
+    paths:
+      - '.github/workflows/reconstruct-local-tutorial-assets.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  reconstruct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/store-tutorial-images-v121
+          fetch-depth: 0
+
+      - name: Reconstruct the legacy backup archive from staged repository chunks
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p /tmp/tutorial-reconstruct
+          found=0
+
+          try_group() {
+            local label="$1"
+            shift
+            local files=("$@")
+            [ "${#files[@]}" -gt 0 ] || return 1
+            printf 'Trying %s with %s chunks\n' "$label" "${#files[@]}"
+            cat "${files[@]}" | tr -d '\r\n ' > "/tmp/tutorial-reconstruct/${label}.b64"
+            if ! base64 -d "/tmp/tutorial-reconstruct/${label}.b64" > "/tmp/tutorial-reconstruct/${label}.tar.gz" 2>/dev/null; then
+              return 1
+            fi
+            if ! tar -tzf "/tmp/tutorial-reconstruct/${label}.tar.gz" >/tmp/tutorial-reconstruct/list.txt 2>/dev/null; then
+              return 1
+            fi
+            local count
+            count="$(grep -E '(^|/)screenshots/.+\.webp$' /tmp/tutorial-reconstruct/list.txt | wc -l | tr -d ' ')"
+            printf '%s contains %s tutorial screenshots\n' "$label" "$count"
+            if [ "$count" = "65" ]; then
+              cp "/tmp/tutorial-reconstruct/${label}.tar.gz" /tmp/tutorial-assets.tar.gz
+              found=1
+              return 0
+            fi
+            return 1
+          }
+
+          mapfile -t finals < <(find .tutorial-import-v121 -maxdepth 1 -type f -name 'final-*.b64' | sort -V)
+          try_group finals "${finals[@]}" || true
+
+          if [ "$found" != 1 ]; then
+            mapfile -t parts3 < <(find .tutorial-import-v121 -maxdepth 1 -type f -regextype posix-extended -regex '.*/part-[0-9]{3}\.b64' | sort -V)
+            try_group parts3 "${parts3[@]}" || true
+          fi
+
+          if [ "$found" != 1 ]; then
+            mapfile -t parts2 < <(find .tutorial-import-v121 -maxdepth 1 -type f -regextype posix-extended -regex '.*/part-[0-9]{2}\.b64' | sort -V)
+            try_group parts2 "${parts2[@]}" || true
+          fi
+
+          if [ "$found" != 1 ]; then
+            echo 'No staged chunk set reconstructed a valid 65-image legacy tutorial archive.' >&2
+            exit 42
+          fi
+
+      - name: Rebase the result onto current main and bundle assets locally
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf /tmp/tutorial-unpack
+          mkdir -p /tmp/tutorial-unpack
+          tar -xzf /tmp/tutorial-assets.tar.gz -C /tmp/tutorial-unpack
+
+          screenshots_root="$(find /tmp/tutorial-unpack -type d -path '*/screenshots' | head -n1)"
+          [ -n "$screenshots_root" ] || { echo 'screenshots root missing' >&2; exit 43; }
+          [ "$(find "$screenshots_root" -type f -name '*.webp' | wc -l | tr -d ' ')" = 65 ] || { echo 'screenshot count mismatch' >&2; exit 44; }
+
+          apps_root="$(find /tmp/tutorial-unpack -type d -path '*/apps' | head -n1 || true)"
+
+          git fetch origin main
+          git reset --hard origin/main
+
+          rm -rf public/learning/screenshots
+          mkdir -p public/learning
+          cp -a "$screenshots_root" public/learning/screenshots
+
+          if [ -n "$apps_root" ]; then
+            rm -rf public/learning/apps
+            cp -a "$apps_root" public/learning/apps
+          fi
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('lib/store-guide-content.ts')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('const LEGACY_APP_IMAGE_BASE="https://movilineapp.com/learning/apps";', 'const LEGACY_APP_IMAGE_BASE="/learning/apps";')
+          s=s.replace('const LEGACY_STEP_IMAGE_BASE="https://movilineapp.com/learning/screenshots";', 'const LEGACY_STEP_IMAGE_BASE="/learning/screenshots";')
+          if 'https://movilineapp.com/learning/' in s:
+              raise SystemExit('external legacy learning dependency still present')
+          p.write_text(s, encoding='utf-8')
+          PY
+
+          test "$(find public/learning/screenshots -type f -name '*.webp' | wc -l | tr -d ' ')" = 65
+          grep -Fq 'const LEGACY_STEP_IMAGE_BASE="/learning/screenshots";' lib/store-guide-content.ts
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/learning lib/store-guide-content.ts
+          git commit -m 'Bundle legacy storefront tutorial images locally'
+          git push --force-with-lease origin HEAD:feat/store-tutorial-images-v121
