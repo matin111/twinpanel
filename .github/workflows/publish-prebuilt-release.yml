@@ -83,7 +83,7 @@ jobs:
           NEXT_PUBLIC_API_BASE: ""
         run: npm run build
 
-      - name: Setup Go for TP27 MASQUE
+      - name: Setup Go for TP27 carriers
         uses: actions/setup-go@v5
         with:
           go-version: '1.26.0'
@@ -120,6 +120,38 @@ jobs:
             source/backend/artifacts/tp27-masque-linux-x86_64.sha256
           test -z "$(git -C source status --short -- tools/tp27-masque)"
 
+      - name: Build verified TP27 Direct TCP carrier
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          BUILD_DIR="$(mktemp -d)"
+          trap 'rm -rf "$BUILD_DIR"' EXIT
+          cp source/tools/tp27-tcp-direct/go.mod "$BUILD_DIR/go.mod"
+          cp source/tools/tp27-tcp-direct/main.go "$BUILD_DIR/main.go"
+          (
+            cd "$BUILD_DIR"
+            GOWORK=off go vet ./...
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOWORK=off \
+              go build -trimpath -ldflags='-s -w' \
+              -o tp27-tcp-direct-linux-x86_64 .
+            ./tp27-tcp-direct-linux-x86_64 -h >help.txt 2>&1 || true
+            grep -q -- '-token-file' help.txt
+            grep -q -- '-lanes' help.txt
+          )
+          mkdir -p source/backend/artifacts
+          install -m 0755 \
+            "$BUILD_DIR/tp27-tcp-direct-linux-x86_64" \
+            source/backend/artifacts/tp27-tcp-direct-linux-x86_64
+          (
+            cd source/backend/artifacts
+            sha256sum tp27-tcp-direct-linux-x86_64 \
+              > tp27-tcp-direct-linux-x86_64.sha256
+          )
+          test -s source/backend/artifacts/tp27-tcp-direct-linux-x86_64
+          grep -Eq '^[0-9a-f]{64}  tp27-tcp-direct-linux-x86_64$' \
+            source/backend/artifacts/tp27-tcp-direct-linux-x86_64.sha256
+          test -z "$(git -C source status --short -- tools/tp27-tcp-direct)"
+
       - name: Build verified production package
         id: package
         shell: bash
@@ -134,6 +166,8 @@ jobs:
           test -n "$(find source/.next/standalone/.next/static -type f -print -quit)"
           test -x source/backend/artifacts/tp27-masque-linux-x86_64
           test -s source/backend/artifacts/tp27-masque-linux-x86_64.sha256
+          test -x source/backend/artifacts/tp27-tcp-direct-linux-x86_64
+          test -s source/backend/artifacts/tp27-tcp-direct-linux-x86_64.sha256
           rm -rf stage "$ASSET"
           mkdir -p stage/twinpanel/.next
 
