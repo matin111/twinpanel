@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.163",
+  "version": "1.1.0-rc.164",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-21T22:54:03Z",
+  "released_at": "2026-10-21T23:12:24Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "405ef140df1a7b22e29fb8ee640e7f367022eec7",
+  "source_sha": "b15b71a276f0760705064ab71dba73bda1a25040",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.163/twinpanel-1.1.0-rc.163-linux-x86_64.tar.gz",
-    "sha256": "08f5c6ced9d616885a00078e7e8abeb087571d19ab68800daf7c331e41405e44",
-    "size_bytes": 18080983
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.164/twinpanel-1.1.0-rc.164-linux-x86_64.tar.gz",
+    "sha256": "bbf9a36e750b901f3d524aeda12f93e218eb9f0b884d7ff7b8a0d23819dc4860",
+    "size_bytes": 18105169
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.163 اصلاح Production مربوط به readiness پس از نصب پروتکل‌های Standalone در Modern Protocol Studio را منتشر می‌کند. Acceptance واقعی Sudoku روی Local Core در rc.162 نشان داد parser کلید، ساخت keys.json، systemd و listener همگی سالم‌اند و Health زنده ok=true است، اما نمونه Health بلافاصله پس از restart حدود نیم‌ثانیه قبل از bind شدن listener اجرا می‌شود و DB/UI به‌اشتباه service_or_listener_unhealthy ثبت می‌کند. Dispatcher اکنون فقط در مسیر install/apply برای Mieru، TrustTunnel، AmneziaWG و Sudoku از bounded readiness polling استفاده می‌کند؛ Health دستی همچنان fail-fast باقی می‌ماند. Regression CI الگوی unhealthy/unhealthy/healthy و پایان bounded در حالت failure را پوشش می‌دهد و metadata مرحله apply را حفظ می‌کند. Binaryها، configها، پورت‌ها، کلیدها، systemd unitها، Nginx، پروتکل‌های Classic، Auth، Payment، Subscription، Quota، Tunnel و Storefront تغییر نکرده‌اند. موفقیت نهایی نیازمند Update سرور تست به rc.163 و Retry واقعی Sudoku با تأیید HTTP 200، STATUS=online، LAST_ERROR=-، service/listener و Health است.",
-    "en": "TwinPanel 1.1.0-rc.163 publishes the production correction for post-install readiness of standalone protocols in Modern Protocol Studio. Real Sudoku acceptance on Local Core under rc.162 proved key parsing, keys.json persistence, systemd, listener, and live Health were all healthy, while the immediate install-time health sample ran roughly half a second before the listener bound and incorrectly stored service_or_listener_unhealthy in DB/UI. The dispatcher now uses bounded readiness polling only during install/apply for Mieru, TrustTunnel, AmneziaWG, and Sudoku; manual Health remains fail-fast. Regression CI covers unhealthy/unhealthy/healthy startup samples and bounded failure behavior while preserving apply-time metadata. Protocol binaries, configs, ports, keys, systemd units, Nginx, Classic protocols, Auth, Payment, Subscription, Quota, Tunnel, and Storefront are unchanged. Final success still requires updating the real test server to rc.163 and retrying Sudoku while verifying HTTP 200, STATUS=online, LAST_ERROR=-, service/listener, and live Health together."
+    "fa": "TwinPanel 1.1.0-rc.164 کنترل‌های طراحی عمیق فروشگاه را برای هر سه قالب آماده انتشار می‌کند. Customizer اکنون برای حالت‌های Dark و Light امکان تنظیم مستقل رنگ سطوح، Border و کارت‌های پلن، پروتکل، خدمات، آموزش، حساب، FAQ و ارتباط را می‌دهد و رنگ و اندازه دکمه‌های اصلی و ثانویه، اندازه کارت، گردی، Shadow/Glass و چند مدل چیدمان کارت قابل انتخاب است. Runtime مشترک با نشانه‌گذاری semantic عناصر واقعی Store از طریق data-store-card، data-store-grid و data-store-action و MutationObserver برای Portalهای پروتکل‌های Modern، تنظیمات را بدون selectorهای شکننده به DOM واقعی متصل می‌کند و تنظیمات ui_* به‌صورت merge-safe ذخیره می‌شوند. کارت‌های Modern Protocol نیز Accent، Surface، Border، Text و Muted واقعی Theme فعال را مصرف می‌کنند. در Orbit Neo، Poster پیش‌فرض آموزش در نبود Media Studio اکنون فقط قاب تزئینی بدون متن قابل‌مشاهده نشان می‌دهد و aria-label پویا و artwork سفارشی حفظ شده‌اند. Backend، API، Auth، Payment، Subscription، Quota، Tunnel و VPN تغییر نکرده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.164 prepares deep storefront design controls across all three themes for release. The Customizer now supports independent Dark and Light surface, border, and per-card colors for plans, protocols, services, guides, account, FAQ, and contact areas, plus primary and secondary button colors and sizing, card sizing, radius, shadow/glass treatment, and multiple selectable card layouts. A shared semantic runtime marks the actual Store DOM through data-store-card, data-store-grid, and data-store-action and observes dynamically mounted Modern Protocol portals, avoiding brittle structural selectors while keeping ui_* settings merge-safe. Modern Protocol cards now consume the active theme's real accent, surface, border, text, and muted colors. Orbit Neo's fallback guide poster now keeps only the decorative frame with no visible copy when Media Studio artwork is absent, while preserving its dynamic aria-label and custom artwork path. Backend, API, Auth, Payment, Subscription, Quota, Tunnel, and VPN behavior are unchanged."
   }
 }
