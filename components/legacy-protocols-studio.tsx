@@ -1,6 +1,6 @@
 "use client";
 
-import {useMemo, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
 
 import {adminApi, type AdminNode, type XrayDomainState} from "../lib/admin-api";
 import {legacyAdminApi} from "../lib/legacy-admin-api";
@@ -112,9 +112,12 @@ export function LegacyProtocolsStudio() {
     setLoaded(true);
   };
 
-  useState(() => {
-    void load().catch(reason => setError(reason instanceof Error ? reason.message : String(reason)));
-  });
+  useEffect(() => {
+    void load().catch(reason => {
+      setLoaded(true);
+      setError(reason instanceof Error ? reason.message : String(reason));
+    });
+  }, []);
 
   const enabledCount = useMemo(
     () => nodes.reduce((total, node) => total + LEGACY_PROTOCOLS.filter(protocol => protocol.enabled(node)).length, 0),
