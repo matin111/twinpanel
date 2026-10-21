@@ -1,0 +1,58 @@
+name: Add Server Node-Only Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/provision-runtime-xray-domain.tsx'
+      - 'lib/admin-parity-api.ts'
+      - 'backend/app/routers/provision.py'
+      - '.github/workflows/add-server-node-only-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify node-only provisioning contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          ui = Path('components/provision-runtime-xray-domain.tsx').read_text()
+          backend = Path('backend/app/routers/provision.py').read_text()
+
+          # Add Server must explicitly opt out of all access protocols.
+          for flag in (
+              'install_cisco:false',
+              'install_openvpn:false',
+              'install_wireguard:false',
+              'install_l2tp:false',
+              'install_v2ray:false',
+          ):
+              assert flag in ui, flag
+
+          # Protocol controls no longer belong to Add Server.
+          assert 'function Toggle' not in ui
+          assert 'پروتکل‌ها و پورت‌ها' not in ui
+          assert 'xray_domain' not in ui
+          assert 'provisionProtocolHealth' not in ui
+          assert 'provisionRepairSaved' not in ui
+
+          # The successful handoff must target the canonical Protocol Studio.
+          assert '/admin/modern-protocols?node=${createdNodeId}' in ui
+          assert '/admin/modern-protocols?node=${selected}' in ui
+          assert 'مدیریت پروتکل‌های این سرور' in ui
+
+          # Existing backend supports a node with zero selected protocols and
+          # still proceeds with Agent, SSH key, Fabric, Quota and subscription sync.
+          assert 'selected_protocols = [' in backend
+          assert 'agent=await _install_or_upgrade_agent' in backend
+          assert 'await _ensure_node_key_on_remote' in backend
+          assert '_install_tunnel_fabric_base' in backend
+          assert 'TWINPANEL_AUTO_QUOTA_AFTER_NODE_INSTALL_V1' in backend
+          assert 'sync_installed_node_to_subscriptions' in backend
+
+          print('ADD_SERVER_NODE_ONLY_SMOKE_OK')
+          PY
