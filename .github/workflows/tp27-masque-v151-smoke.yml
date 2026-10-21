@@ -8,6 +8,7 @@ on:
       - "backend/app/adaptive_multilane_v151.py"
       - "backend/app/runtime_reconciler_v5.py"
       - "backend/app/transport_candidates/__init__.py"
+      - "backend/app/transport_candidates/common.py"
       - "backend/app/transport_candidates/tp27_masque.py"
       - "backend/app/tunnel_transport_manager_v12.py"
       - ".github/workflows/publish-prebuilt-release.yml"
@@ -21,6 +22,7 @@ on:
       - "backend/app/adaptive_multilane_v151.py"
       - "backend/app/runtime_reconciler_v5.py"
       - "backend/app/transport_candidates/__init__.py"
+      - "backend/app/transport_candidates/common.py"
       - "backend/app/transport_candidates/tp27_masque.py"
       - "backend/app/tunnel_transport_manager_v12.py"
       - ".github/workflows/publish-prebuilt-release.yml"
@@ -44,6 +46,7 @@ jobs:
             backend/app/adaptive_multilane_v151.py \
             backend/app/runtime_reconciler_v5.py \
             backend/app/transport_candidates/__init__.py \
+            backend/app/transport_candidates/common.py \
             backend/app/transport_candidates/tp27_masque.py \
             backend/app/tunnel_transport_manager_v12.py
 
@@ -74,7 +77,7 @@ jobs:
           )
           test -z "$(git status --short -- tools/tp27-masque)"
 
-      - name: Verify V151 contracts
+      - name: Verify V151 contracts and production regression
         run: |
           python - <<'PY'
           import re
@@ -85,6 +88,7 @@ jobs:
           go_sum = Path("tools/tp27-masque/go.sum").read_text()
           go_src = Path("tools/tp27-masque/main.go").read_text()
           candidate = Path("backend/app/transport_candidates/tp27_masque.py").read_text()
+          common = Path("backend/app/transport_candidates/common.py").read_text()
           registry = Path("backend/app/transport_candidates/__init__.py").read_text()
           adaptive = Path("backend/app/adaptive_multilane_v151.py").read_text()
           reconciler = Path("backend/app/runtime_reconciler_v5.py").read_text()
@@ -113,6 +117,14 @@ jobs:
           ):
               assert token in candidate, token
 
+          # Production rc.151 failed before service creation because common.run()
+          # returns stdout as str while _certificate_fingerprint accessed .stdout.
+          assert 'return (result.stdout or "").strip()' in common
+          assert 'output = await run(' in candidate
+          assert 'lines = str(output or "").strip().splitlines()' in candidate
+          assert 'value = lines[-1].strip().lower() if lines else ""' in candidate
+          assert 'value = (result.stdout' not in candidate
+
           for token in (
               "TP27_MASQUE_SPEC",
               '"tp27_masque": TP27_MASQUE_SPEC',
@@ -136,7 +148,7 @@ jobs:
               "apply_adaptive_multilane_v151()"
           )
 
-          assert "Setup Go for TP27 MASQUE" in publisher
+          assert "Setup Go for TP27 carriers" in publisher
           assert "tp27-masque-linux-x86_64.sha256" in publisher
           assert "go build -mod=readonly" in publisher
           assert "source/tools/tp27-masque/go.sum" in publisher
@@ -149,5 +161,5 @@ jobs:
           ):
               assert forbidden not in candidate
 
-          print("TP27_MASQUE_V151_SMOKE_OK")
+          print("TP27_MASQUE_V151_PRODUCTION_REGRESSION_OK")
           PY

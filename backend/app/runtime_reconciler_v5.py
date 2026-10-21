@@ -112,6 +112,7 @@ while ip -4 rule del priority {masque_table} >/dev/null 2>&1; do :; done
 ip -4 route flush table {masque_table} >/dev/null 2>&1 || true
 
 rm -f \
+  "/etc/twinpanel/tcp-direct/tunnel-$TID.token" \
   "/etc/twinpanel/masque/tunnel-$TID.token" \
   "/etc/twinpanel/masque/tunnel-$TID.crt" \
   "/etc/twinpanel/masque/tunnel-$TID.key"
