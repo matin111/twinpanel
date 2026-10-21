@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
@@ -25,8 +26,16 @@ const (
 	tunSetIFF = 0x400454ca
 	iffTun    = 0x0001
 	iffNoPI   = 0x1000
-	magic     = "TP27TCP1"
+	magic     = "TP27TCP2"
 	maxPacket = 65535
+
+	framePing uint32 = 0
+	framePong uint32 = ^uint32(0)
+
+	heartbeatInterval = 1 * time.Second
+	heartbeatTimeout  = 4 * time.Second
+	writeTimeout      = 1500 * time.Millisecond
+	tcpUserTimeoutMS  = 6000
 )
 
 type ifreqFlags struct {
@@ -35,36 +44,129 @@ type ifreqFlags struct {
 	pad   [22]byte
 }
 
-type laneSet struct {
-	mu    sync.RWMutex
-	lanes map[int]net.Conn
+type laneConn struct {
+	id       int
+	conn     net.Conn
+	writeMu  sync.Mutex
+	lastPong atomic.Int64
+	closed   atomic.Bool
 }
 
-func newLaneSet() *laneSet { return &laneSet{lanes: make(map[int]net.Conn)} }
+func newLaneConn(id int, c net.Conn) *laneConn {
+	lane := &laneConn{id: id, conn: c}
+	lane.lastPong.Store(time.Now().UnixNano())
+	return lane
+}
 
-func (s *laneSet) set(id int, c net.Conn) {
-	s.mu.Lock()
-	old := s.lanes[id]
-	s.lanes[id] = c
-	s.mu.Unlock()
-	if old != nil && old != c {
-		_ = old.Close()
+func (l *laneConn) close() {
+	if l == nil || l.conn == nil {
+		return
+	}
+	if l.closed.CompareAndSwap(false, true) {
+		_ = l.conn.Close()
 	}
 }
 
-func (s *laneSet) remove(id int, c net.Conn) {
+func (l *laneConn) healthy() bool {
+	if l == nil || l.conn == nil || l.closed.Load() {
+		return false
+	}
+	stamp := l.lastPong.Load()
+	if stamp <= 0 {
+		return false
+	}
+	return time.Since(time.Unix(0, stamp)) <= heartbeatTimeout
+}
+
+func (l *laneConn) markPong() {
+	l.lastPong.Store(time.Now().UnixNano())
+}
+
+func writeFull(w io.Writer, data []byte) error {
+	for len(data) > 0 {
+		n, err := w.Write(data)
+		if err != nil {
+			return err
+		}
+		if n <= 0 {
+			return io.ErrUnexpectedEOF
+		}
+		data = data[n:]
+	}
+	return nil
+}
+
+func (l *laneConn) writeControl(code uint32) error {
+	if l == nil || l.closed.Load() {
+		return net.ErrClosed
+	}
+	var hdr [4]byte
+	binary.BigEndian.PutUint32(hdr[:], code)
+	l.writeMu.Lock()
+	defer l.writeMu.Unlock()
+	if l.closed.Load() {
+		return net.ErrClosed
+	}
+	_ = l.conn.SetWriteDeadline(time.Now().Add(writeTimeout))
+	err := writeFull(l.conn, hdr[:])
+	_ = l.conn.SetWriteDeadline(time.Time{})
+	return err
+}
+
+func (l *laneConn) writePacket(packet []byte) error {
+	if l == nil || l.closed.Load() {
+		return net.ErrClosed
+	}
+	if len(packet) == 0 || len(packet) > maxPacket {
+		return errors.New("invalid packet size")
+	}
+	frame := make([]byte, 4+len(packet))
+	binary.BigEndian.PutUint32(frame[:4], uint32(len(packet)))
+	copy(frame[4:], packet)
+
+	l.writeMu.Lock()
+	defer l.writeMu.Unlock()
+	if l.closed.Load() {
+		return net.ErrClosed
+	}
+	_ = l.conn.SetWriteDeadline(time.Now().Add(writeTimeout))
+	err := writeFull(l.conn, frame)
+	_ = l.conn.SetWriteDeadline(time.Time{})
+	return err
+}
+
+type laneSet struct {
+	mu    sync.RWMutex
+	lanes map[int]*laneConn
+}
+
+func newLaneSet() *laneSet { return &laneSet{lanes: make(map[int]*laneConn)} }
+
+func (s *laneSet) set(id int, c net.Conn) *laneConn {
+	lane := newLaneConn(id, c)
 	s.mu.Lock()
-	if s.lanes[id] == c {
+	old := s.lanes[id]
+	s.lanes[id] = lane
+	s.mu.Unlock()
+	if old != nil && old != lane {
+		old.close()
+	}
+	return lane
+}
+
+func (s *laneSet) remove(id int, lane *laneConn) {
+	s.mu.Lock()
+	if s.lanes[id] == lane {
 		delete(s.lanes, id)
 	}
 	s.mu.Unlock()
 }
 
-func (s *laneSet) get(id int) net.Conn {
+func (s *laneSet) get(id int) *laneConn {
 	s.mu.RLock()
-	c := s.lanes[id]
+	lane := s.lanes[id]
 	s.mu.RUnlock()
-	return c
+	return lane
 }
 
 func (s *laneSet) count() int {
@@ -127,7 +229,7 @@ func handshakeClient(c net.Conn, lane int, tokenHash []byte) error {
 	buf = append(buf, byte(lane))
 	buf = append(buf, tokenHash...)
 	_ = c.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	if _, err := c.Write(buf); err != nil {
+	if err := writeFull(c, buf); err != nil {
 		return err
 	}
 	_ = c.SetWriteDeadline(time.Time{})
@@ -161,43 +263,52 @@ func handshakeServer(c net.Conn, laneCount int, tokenHash []byte) (int, error) {
 	if subtle.ConstantTimeCompare(got, tokenHash) != 1 {
 		return 0, errors.New("bad token")
 	}
-	if _, err := c.Write([]byte{1}); err != nil {
+	if err := writeFull(c, []byte{1}); err != nil {
 		return 0, err
 	}
 	return lane, nil
 }
 
 func setTCPOptions(c net.Conn) {
-	if tcp, ok := c.(*net.TCPConn); ok {
-		_ = tcp.SetNoDelay(true)
-		_ = tcp.SetKeepAlive(true)
-		_ = tcp.SetKeepAlivePeriod(15 * time.Second)
-		_ = tcp.SetReadBuffer(4 * 1024 * 1024)
-		_ = tcp.SetWriteBuffer(4 * 1024 * 1024)
+	tcp, ok := c.(*net.TCPConn)
+	if !ok {
+		return
+	}
+	_ = tcp.SetNoDelay(true)
+	_ = tcp.SetKeepAlive(true)
+	_ = tcp.SetKeepAlivePeriod(10 * time.Second)
+	_ = tcp.SetReadBuffer(4 * 1024 * 1024)
+	_ = tcp.SetWriteBuffer(4 * 1024 * 1024)
+
+	// Linux TCP_USER_TIMEOUT (option 18) bounds how long unacknowledged data may
+	// remain outstanding. This is a backup to the end-to-end TP27 heartbeat and
+	// prevents an ESTABLISHED-but-dead lane from lingering for minute-scale RTOs.
+	if raw, err := tcp.SyscallConn(); err == nil {
+		_ = raw.Control(func(fd uintptr) {
+			_ = syscall.SetsockoptInt(int(fd), syscall.IPPROTO_TCP, 18, tcpUserTimeoutMS)
+		})
 	}
 }
 
-func writeFrame(w io.Writer, packet []byte) error {
-	if len(packet) == 0 || len(packet) > maxPacket {
-		return errors.New("invalid packet size")
-	}
-	var hdr [4]byte
-	binary.BigEndian.PutUint32(hdr[:], uint32(len(packet)))
-	if _, err := w.Write(hdr[:]); err != nil {
-		return err
-	}
-	_, err := w.Write(packet)
-	return err
-}
-
-func receiveFrames(c net.Conn, tun *os.File, tunWriteMu *sync.Mutex) error {
-	r := bufio.NewReaderSize(c, 512*1024)
+func receiveFrames(lane *laneConn, tun *os.File, tunWriteMu *sync.Mutex) error {
+	r := bufio.NewReaderSize(lane.conn, 512*1024)
 	var hdr [4]byte
 	for {
 		if _, err := io.ReadFull(r, hdr[:]); err != nil {
 			return err
 		}
-		n := int(binary.BigEndian.Uint32(hdr[:]))
+		code := binary.BigEndian.Uint32(hdr[:])
+		switch code {
+		case framePing:
+			if err := lane.writeControl(framePong); err != nil {
+				return err
+			}
+			continue
+		case framePong:
+			lane.markPong()
+			continue
+		}
+		n := int(code)
 		if n <= 0 || n > maxPacket {
 			return fmt.Errorf("invalid frame length %d", n)
 		}
@@ -214,9 +325,30 @@ func receiveFrames(c net.Conn, tun *os.File, tunWriteMu *sync.Mutex) error {
 	}
 }
 
+func heartbeatLoop(lane *laneConn) {
+	ticker := time.NewTicker(heartbeatInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		if lane.closed.Load() {
+			return
+		}
+		if !lane.healthy() {
+			log.Printf("lane unhealthy=%d reason=heartbeat_timeout", lane.id)
+			lane.close()
+			return
+		}
+		if err := lane.writeControl(framePing); err != nil {
+			log.Printf("lane unhealthy=%d reason=heartbeat_write error=%v", lane.id, err)
+			lane.close()
+			return
+		}
+	}
+}
+
 func flowHash(packet []byte) uint32 {
-	// FNV-1a over stable IPv4/IPv6 flow fields. This keeps packets from the same
-	// flow on one TCP lane and avoids cross-lane reordering for TCP/QUIC flows.
+	// FNV-1a over stable IPv4/IPv6 flow fields. Packets remain on their preferred
+	// lane while it is healthy; a stalled lane is closed and the flow migrates
+	// atomically to the next healthy lane rather than being pinned to kernel RTO.
 	var data []byte
 	if len(packet) >= 20 && packet[0]>>4 == 4 {
 		ihl := int(packet[0]&0x0f) * 4
@@ -249,6 +381,30 @@ func flowHash(packet []byte) uint32 {
 	return h
 }
 
+func forwardPacket(lanes *laneSet, laneCount int, packet []byte) bool {
+	preferred := int(flowHash(packet) % uint32(laneCount))
+	for i := 0; i < laneCount; i++ {
+		id := (preferred + i) % laneCount
+		lane := lanes.get(id)
+		if lane == nil {
+			continue
+		}
+		if !lane.healthy() {
+			lane.close()
+			lanes.remove(id, lane)
+			continue
+		}
+		if err := lane.writePacket(packet); err == nil {
+			return true
+		} else {
+			log.Printf("lane write-fail=%d error=%v; retrying packet on healthy fallback", id, err)
+			lane.close()
+			lanes.remove(id, lane)
+		}
+	}
+	return false
+}
+
 func tunToNetwork(tun *os.File, lanes *laneSet, laneCount int) {
 	buf := make([]byte, maxPacket)
 	for {
@@ -260,23 +416,20 @@ func tunToNetwork(tun *os.File, lanes *laneSet, laneCount int) {
 			continue
 		}
 		packet := append([]byte(nil), buf[:n]...)
-		preferred := int(flowHash(packet) % uint32(laneCount))
-		var c net.Conn
-		for i := 0; i < laneCount; i++ {
-			c = lanes.get((preferred + i) % laneCount)
-			if c != nil {
+		if forwardPacket(lanes, laneCount, packet) {
+			continue
+		}
+
+		// Give reconnecting lanes a short bounded chance without blocking the TUN
+		// for the previous five-second per-lane deadline. Inner TCP can retransmit
+		// if no lane becomes healthy during this small grace period.
+		deadline := time.Now().Add(250 * time.Millisecond)
+		for time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+			if forwardPacket(lanes, laneCount, packet) {
 				break
 			}
 		}
-		if c == nil {
-			time.Sleep(10 * time.Millisecond)
-			continue
-		}
-		_ = c.SetWriteDeadline(time.Now().Add(5 * time.Second))
-		if err := writeFrame(c, packet); err != nil {
-			_ = c.Close()
-		}
-		_ = c.SetWriteDeadline(time.Time{})
 	}
 }
 
@@ -289,7 +442,7 @@ func runServer(listen string, laneCount int, tokenHash []byte, tun *os.File) err
 	lanes := newLaneSet()
 	var tunWriteMu sync.Mutex
 	go tunToNetwork(tun, lanes, laneCount)
-	log.Printf("server listening=%s lanes=%d", listen, laneCount)
+	log.Printf("server listening=%s lanes=%d protocol=%s", listen, laneCount, magic)
 	for {
 		c, err := ln.Accept()
 		if err != nil {
@@ -297,29 +450,30 @@ func runServer(listen string, laneCount int, tokenHash []byte, tun *os.File) err
 		}
 		setTCPOptions(c)
 		go func(conn net.Conn) {
-			lane, err := handshakeServer(conn, laneCount, tokenHash)
+			laneID, err := handshakeServer(conn, laneCount, tokenHash)
 			if err != nil {
 				_ = conn.Close()
 				return
 			}
-			lanes.set(lane, conn)
-			log.Printf("lane online=%d remote=%s", lane, conn.RemoteAddr())
-			err = receiveFrames(conn, tun, &tunWriteMu)
-			lanes.remove(lane, conn)
-			_ = conn.Close()
-			log.Printf("lane offline=%d error=%v", lane, err)
+			lane := lanes.set(laneID, conn)
+			log.Printf("lane online=%d remote=%s", laneID, conn.RemoteAddr())
+			go heartbeatLoop(lane)
+			err = receiveFrames(lane, tun, &tunWriteMu)
+			lanes.remove(laneID, lane)
+			lane.close()
+			log.Printf("lane offline=%d error=%v", laneID, err)
 		}(c)
 	}
 }
 
-func clientLaneLoop(peer string, lane int, laneCount int, tokenHash []byte, tun *os.File, lanes *laneSet, tunWriteMu *sync.Mutex) {
+func clientLaneLoop(peer string, laneID int, laneCount int, tokenHash []byte, tun *os.File, lanes *laneSet, tunWriteMu *sync.Mutex) {
 	backoff := time.Second
 	for {
-		d := net.Dialer{Timeout: 5 * time.Second, KeepAlive: 15 * time.Second}
+		d := net.Dialer{Timeout: 5 * time.Second, KeepAlive: 10 * time.Second}
 		c, err := d.Dial("tcp", peer)
 		if err == nil {
 			setTCPOptions(c)
-			err = handshakeClient(c, lane, tokenHash)
+			err = handshakeClient(c, laneID, tokenHash)
 		}
 		if err != nil {
 			if c != nil {
@@ -332,12 +486,13 @@ func clientLaneLoop(peer string, lane int, laneCount int, tokenHash []byte, tun 
 			continue
 		}
 		backoff = time.Second
-		lanes.set(lane, c)
-		log.Printf("lane online=%d peer=%s", lane, peer)
-		err = receiveFrames(c, tun, tunWriteMu)
-		lanes.remove(lane, c)
-		_ = c.Close()
-		log.Printf("lane offline=%d error=%v", lane, err)
+		lane := lanes.set(laneID, c)
+		log.Printf("lane online=%d peer=%s", laneID, peer)
+		go heartbeatLoop(lane)
+		err = receiveFrames(lane, tun, tunWriteMu)
+		lanes.remove(laneID, lane)
+		lane.close()
+		log.Printf("lane offline=%d error=%v", laneID, err)
 	}
 }
 
@@ -397,7 +552,7 @@ func main() {
 		log.Fatalf("configure tun: %v", err)
 	}
 
-	log.Printf("tp27-tcp-direct mode=%s tun=%s local=%s mtu=%d lanes=%d", *mode, *tunName, *local, *mtu, *lanes)
+	log.Printf("tp27-tcp-direct mode=%s tun=%s local=%s mtu=%d lanes=%d protocol=%s", *mode, *tunName, *local, *mtu, *lanes, magic)
 	if *mode == "server" {
 		err = runServer(*listen, *lanes, tokenHash, tun)
 	} else {
