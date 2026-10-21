@@ -3,6 +3,9 @@ from __future__ import annotations
 import asyncio
 
 from . import tunnel_transport_manager_v10 as v10
+from .exit_access_dataplane_stability_v144 import (
+    apply_exit_access_dataplane_stability_v144,
+)
 from .legacy_ingress_reconciler import reconciler_loop as legacy_ingress_loop
 from .runtime_reconciler_v4 import reconciler_loop as runtime_reconciler_loop
 from .manager_runtime_v16 import install_manager_runtime_v16
@@ -33,6 +36,8 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 #
 # SmartAuto health/stability/benchmark/promotion thresholds are unchanged.
 # VPN Access V46/V51 remain the sole Exit client-egress and nested-MTU owners.
+# V144 wraps their publication paths so unchanged Desired State is read-only
+# instead of flushing live client-pool chains every 20/30 seconds.
 # Runtime Reconciler V4 adds DB-authoritative TP27 orphan cleanup.
 # ============================================================
 
@@ -41,6 +46,7 @@ async def main() -> None:
     install_manager_runtime_v16()
     install_smart_transport_auto_v21()
     activate_manager_candidate_policy_v91()
+    apply_exit_access_dataplane_stability_v144()
 
     print(
         "TWINPANEL_TRANSPORT_MANAGER_V12_START "
@@ -50,6 +56,7 @@ async def main() -> None:
         "tp27_reference=v91 "
         "vpn_access_dataplane=v46 "
         "vpn_access_performance=v51 "
+        "exit_access_stability=v144 "
         "reconciler=v4 "
         "active_candidate=tp27_fast "
         "migration_fallback=kernel_gre "
