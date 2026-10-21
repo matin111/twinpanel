@@ -77,6 +77,7 @@ jobs:
       - name: Verify V151 contracts
         run: |
           python - <<'PY'
+          import re
           from pathlib import Path
 
           version = Path("VERSION").read_text().strip()
@@ -90,7 +91,8 @@ jobs:
           manager = Path("backend/app/tunnel_transport_manager_v12.py").read_text()
           publisher = Path(".github/workflows/publish-prebuilt-release.yml").read_text()
 
-          assert version == "1.1.0-rc.151"
+          match = re.fullmatch(r"1\.1\.0-rc\.(\d+)", version)
+          assert match and int(match.group(1)) >= 151, version
           assert "github.com/quic-go/connect-ip-go v0.4.0" in go_mod
           assert "github.com/quic-go/connect-ip-go v0.4.0 h1:m9xcVslaw9OzLQV79shdXHhKJZZhUmYQhWe6J342W3w=" in go_sum
           assert "github.com/quic-go/quic-go v0.63.0 h1:LIFGHI4PFUhhw2dDD1ARHdCff143ffMHwZtbnbuJ78A=" in go_sum
