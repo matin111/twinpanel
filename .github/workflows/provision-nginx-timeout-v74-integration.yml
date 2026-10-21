@@ -1,4 +1,4 @@
-name: TwinPanel Provision Nginx Timeout V74 Integration
+name: TwinPanel Long-request Nginx Timeout V2 Integration
 
 on:
   pull_request:
@@ -6,6 +6,7 @@ on:
       - 'deploy/nginx/twinpanel.conf.tpl'
       - 'deploy/systemd/twinpanel-web.service.tpl'
       - 'backend/scripts/twinpanel_nginx_reconcile.py'
+      - 'backend/scripts/twinpanel_public_updater.py'
       - 'backend/tests/integration/test_provision_nginx_timeout_v74.py'
       - '.github/workflows/provision-nginx-timeout-v74-integration.yml'
   workflow_dispatch:
@@ -21,12 +22,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile migration and integration test
+      - name: Compile reconciler and integration test
         run: |
           python3 -m py_compile backend/scripts/twinpanel_nginx_reconcile.py
           python3 -m py_compile backend/tests/integration/test_provision_nginx_timeout_v74.py
 
-      - name: Test safe existing-install convergence
+      - name: Test existing-install V1 to V2 convergence
         run: |
           python3 backend/tests/integration/test_provision_nginx_timeout_v74.py
 
@@ -35,11 +36,11 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq nginx
 
-      - name: Prove long timeout is real and scoped to provision install
+      - name: Prove protocol install timeouts are long and scoped
         shell: bash
         run: |
           set -euo pipefail
-          TMP="$(mktemp -d -t tp-nginx-v74-XXXXXX)"
+          TMP="$(mktemp -d -t tp-nginx-long-v2-XXXXXX)"
           BACKEND_PID=""
 
           cleanup() {
@@ -54,25 +55,36 @@ jobs:
           }
           trap cleanup EXIT
 
-          mkdir -p \
-            "$TMP/client_body" \
-            "$TMP/proxy_temp"
+          mkdir -p "$TMP/client_body" "$TMP/proxy_temp"
 
           python3 - "$TMP" <<'PY' &
           import json
+          import re
           import sys
           import time
           from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
           from pathlib import Path
 
           root = Path(sys.argv[1])
+          long_exact = {
+              "/v1/provision/install",
+              "/v1/provision/ensure-classic-protocol",
+              "/v1/provision/repair-protocols-saved",
+          }
 
           class Handler(BaseHTTPRequestHandler):
               def log_message(self, *args):
                   pass
 
               def _handle(self):
-                  if self.path in {"/v1/provision/install", "/v1/provision/slow"}:
+                  if (
+                      self.path in long_exact
+                      or re.fullmatch(
+                          r"/v1/settings/vpn/modern-protocols/[0-9]+/install",
+                          self.path,
+                      )
+                      or self.path == "/v1/provision/slow"
+                  ):
                       time.sleep(2.0)
                   body = json.dumps({"ok": True, "path": self.path}).encode()
                   self.send_response(200)
@@ -108,11 +120,14 @@ jobs:
           text = text.replace("__DOMAIN__", "127.0.0.1")
           text = text.replace("__API_PORT__", "19095")
           text = text.replace("__WEB_PORT__", "19096")
-          text = text.replace("listen 80 default_server;", "listen 18080 default_server;", 1)
+          text = text.replace(
+              "listen 80 default_server;",
+              "listen 18080 default_server;",
+              1,
+          )
 
-          # Make the generic API timeout tiny only in this disposable CI config.
-          # The exact provisioning location must override it and survive a 2s
-          # silent backend response, while the generic route must still 504.
+          # Disposable CI config: force generic /v1 to fail after 1s.
+          # Only explicitly managed long-running mutations may survive 2s.
           needle = "  location /v1/ {\n"
           replacement = needle + "    proxy_read_timeout 1s;\n"
           if needle not in text:
@@ -145,18 +160,27 @@ jobs:
             sleep 0.1
           done
 
-          exact_status="$(
-            curl -sS \
-              --max-time 8 \
-              -o "$TMP/exact.out" \
-              -w '%{http_code}' \
-              -X POST \
-              -H 'Content-Type: application/json' \
-              --data '{}' \
-              http://127.0.0.1:18080/v1/provision/install
-          )"
-          test "$exact_status" = "200"
-          grep -q '"ok": true' "$TMP/exact.out"
+          for path in \
+            /v1/provision/install \
+            /v1/provision/ensure-classic-protocol \
+            /v1/provision/repair-protocols-saved \
+            /v1/settings/vpn/modern-protocols/1/install
+          do
+            safe="$(printf '%s' "$path" | tr '/-' '__')"
+            status="$(
+              curl -sS \
+                --max-time 8 \
+                -o "$TMP/$safe.out" \
+                -w '%{http_code}' \
+                -X POST \
+                -H 'Content-Type: application/json' \
+                --data '{}' \
+                "http://127.0.0.1:18080$path"
+            )"
+            test "$status" = "200"
+            grep -q '"ok": true' "$TMP/$safe.out"
+            echo "LONG_ROUTE_STATUS path=$path status=$status"
+          done
 
           generic_status="$(
             curl -sS \
@@ -167,7 +191,6 @@ jobs:
           )"
           test "$generic_status" = "504"
 
-          grep -q 'TWINPANEL_PROVISION_LONG_REQUEST_V1' "$TMP/server.conf"
-          echo "PROVISION_EXACT_ROUTE_STATUS=$exact_status"
+          grep -q 'TWINPANEL_LONG_REQUESTS_V2' "$TMP/server.conf"
           echo "GENERIC_ROUTE_STATUS=$generic_status"
-          echo "REAL_NGINX_SCOPED_TIMEOUT=PASS"
+          echo "REAL_NGINX_SCOPED_LONG_REQUESTS_V2=PASS"
