@@ -31,13 +31,14 @@ from . import destructive_safety as _destructive_safety  # noqa: F401
 
 # TWINPANEL_PROTOCOL_CATALOG_V1
 # runtime_endpoints is the first APIRouter included by app.main and has no
-# prefix of its own. Attach protocol-management routes here so they are
-# registered before compatibility routers without removing rollback paths.
+# prefix of its own. Keep Classic Protocol Studio and Storefront compatibility
+# routes registered here. Modern Protocol Admin V3 is mounted explicitly by
+# app.main before the legacy vpn_settings router. Avoid importing a modern
+# protocol router from this package initializer: modern runtimes import
+# routers.provision, so hidden registration here creates a circular import.
 from . import runtime_endpoints as _runtime_endpoints
 from .classic_protocol_admin_v1 import router as _classic_protocol_admin_v1_router
-from .modern_protocol_admin_v2 import router as _modern_protocol_admin_v2_router
 from .storefront_theme_media import router as _storefront_theme_media_router
 
 _runtime_endpoints.router.include_router(_classic_protocol_admin_v1_router)
-_runtime_endpoints.router.include_router(_modern_protocol_admin_v2_router)
 _runtime_endpoints.router.include_router(_storefront_theme_media_router)
