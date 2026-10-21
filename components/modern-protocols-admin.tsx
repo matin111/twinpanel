@@ -5,6 +5,7 @@ import {useEffect, useMemo, useState} from "react";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
+import {ClassicProtocolsStudioSection} from "./classic-protocols-studio-section";
 import {Badge, PageHead, Shell} from "./ui";
 import styles from "./modern-protocols-admin-v2.module.css";
 
@@ -386,8 +387,8 @@ export function ModernProtocolsAdminPage() {
         <PageHead
           title={pick("استودیوی پروتکل‌ها", "Protocol Studio")}
           sub={pick(
-            "Preset پیشنهادی، تنظیمات حرفه‌ای، Preview، Validation و Runtime امن برای پروتکل‌های مدرن",
-            "Recommended presets, advanced settings, preview, validation and safe runtimes for modern protocols",
+            "مدیریت یکپارچه پروتکل‌های اصلی و مدرن، Health Check، Runtime و تنظیمات حرفه‌ای هر نود خروجی",
+            "Unified classic and modern protocol management, health checks, runtimes and advanced settings for every exit node",
           )}
         />
 
@@ -397,9 +398,9 @@ export function ModernProtocolsAdminPage() {
 
           <div className={styles.summaryGrid}>
             <div className={styles.summaryCard}><small>{pick("نود خروجی", "Exit nodes")}</small><strong>{stats.nodes.toLocaleString("fa-IR")}</strong></div>
-            <div className={styles.summaryCard}><small>{pick("Runtime آماده نصب", "Installable runtimes")}</small><strong>{stats.ready.toLocaleString("fa-IR")}</strong></div>
-            <div className={styles.summaryCard}><small>{pick("Listener آنلاین", "Online listeners")}</small><strong>{stats.online.toLocaleString("fa-IR")}</strong></div>
-            <div className={styles.summaryCard}><small>{pick("Adapter بعدی", "Upcoming adapters")}</small><strong>{stats.planned.toLocaleString("fa-IR")}</strong></div>
+            <div className={styles.summaryCard}><small>{pick("Runtime مدرن آماده نصب", "Installable modern runtimes")}</small><strong>{stats.ready.toLocaleString("fa-IR")}</strong></div>
+            <div className={styles.summaryCard}><small>{pick("Listener مدرن آنلاین", "Online modern listeners")}</small><strong>{stats.online.toLocaleString("fa-IR")}</strong></div>
+            <div className={styles.summaryCard}><small>{pick("Adapter مدرن بعدی", "Upcoming modern adapters")}</small><strong>{stats.planned.toLocaleString("fa-IR")}</strong></div>
           </div>
 
           {(inventory?.nodes || []).map(node => (
@@ -412,10 +413,12 @@ export function ModernProtocolsAdminPage() {
                 <div className={styles.nodeActions}>
                   <Badge tone={tone(node.status)}>{node.status}</Badge>
                   <button className={styles.secondary} disabled={!!busy} onClick={() => void health(node)}>
-                    {busy === `health:${node.id}` ? "…" : pick("بررسی سلامت", "Health check")}
+                    {busy === `health:${node.id}` ? "…" : pick("بررسی سلامت مدرن", "Modern health check")}
                   </button>
                 </div>
               </div>
+
+              <ClassicProtocolsStudioSection nodeId={node.id}/>
 
               {CATEGORY_ORDER.map(category => {
                 const rows = node.protocols.filter(row => row.category === category);
@@ -446,7 +449,7 @@ export function ModernProtocolsAdminPage() {
                               <span className={`${styles.chip} ${row.installable ? styles.chipReady : styles.chipPending}`}>
                                 {row.installable ? pick("Runtime آماده", "Runtime ready") : pick("Adapter در راه", "Adapter pending")}
                               </span>
-                              <span className={styles.chip}>{PRESET_LABELS[row.preset]?.[0] || row.preset}</span>
+                              <span className={styles.chip}>{pick(...(PRESET_LABELS[row.preset] || [row.preset, row.preset]))}</span>
                               {Object.entries(definition.formats).filter(([, enabled]) => enabled).slice(0, 3).map(([format]) => (
                                 <span className={styles.chip} key={format}>{format.replace("_", "-")}</span>
                               ))}
