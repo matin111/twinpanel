@@ -40,7 +40,7 @@ jobs:
           PY
           node --check /tmp/twinpanel-public-connect-v10.js
 
-      - name: Verify Cisco and L2TP mobile credential contract
+      - name: Verify compact Cisco and L2TP mobile contract
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -57,7 +57,21 @@ jobs:
           assert "نام کاربری" in v10
           assert "رمز عبور" in v10
           assert "کلید IPsec" in v10
-          assert "کپی همه" in v10
+
+          assert "v10-account-summary" in v10
+          assert "اطلاعات حساب" in v10
+          assert "برای همه سرورهای زیر" in v10
+          assert "renderAccountSummary" in v10
+          assert "body.insertBefore(summary,list)" in v10
+
+          assert "v10-expand" in v10
+          assert "v10-server-details" in v10
+          assert "toggleRow(row)" in v10
+          assert "collapseSiblings(row)" in v10
+          assert "v10-manual-row.open" in v10
+          assert "subtitle.textContent=server.value" in v10
+          assert "aria-expanded" in v10
+
           assert "v10-field-copy" in v10
           assert "fact.querySelector('strong')" in v10
           assert "fact.querySelector('[data-copy]')" in v10

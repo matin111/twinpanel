@@ -4,81 +4,133 @@ from __future__ import annotations
 _V10_CSS = r"""
 /* TWINPANEL_PUBLIC_CONNECT_MANUAL_FIELDS_V10 */
 @media(max-width:720px){
-  .v9-server-row.v10-manual-row{
-    grid-template-columns:minmax(0,1fr);
-    align-items:stretch;
-    gap:9px;
-    padding:10px;
-  }
-  .v10-manual-row > .v9-server-main{
-    width:100%;
-  }
-  .v10-credential-grid{
-    grid-column:1/-1;
+  .v10-account-summary{
+    margin-bottom:8px;
+    padding:9px;
     display:grid;
     grid-template-columns:repeat(2,minmax(0,1fr));
     gap:7px;
-    direction:rtl;
+    border:1px solid color-mix(in srgb,var(--p) 16%,var(--line));
+    border-radius:13px;
+    background:color-mix(in srgb,var(--p) 4%,var(--surface));
   }
-  .v10-grid-head{
+  .v10-account-title{
     grid-column:1/-1;
-    min-height:32px;
     display:flex;
     align-items:center;
     justify-content:space-between;
-    gap:9px;
-    padding:0 2px;
+    gap:8px;
+    padding:0 1px 2px;
   }
-  .v10-grid-head b{
-    font-size:9px;
-    font-weight:900;
-    color:var(--text);
-  }
-  .v10-copy-all,
-  .v10-field-copy{
-    border:1px solid color-mix(in srgb,var(--p) 28%,var(--line));
-    border-radius:9px;
-    background:color-mix(in srgb,var(--p) 7%,var(--surface));
-    color:var(--p);
-    font-family:inherit;
-    font-weight:900;
-    cursor:pointer;
-  }
-  .v10-copy-all{
-    min-height:29px;
-    padding:0 9px;
-    display:inline-flex;
-    align-items:center;
-    gap:5px;
-    font-size:7.5px;
-  }
-  .v10-copy-all svg,
-  .v10-field-copy svg{
-    width:14px;
-    height:14px;
-    display:block;
-    flex:0 0 14px;
-  }
-  .v10-field{
+  .v10-account-title b{font-size:9px;font-weight:900}
+  .v10-account-title small{color:var(--muted);font-size:7px}
+  .v10-account-field{
     min-width:0;
-    min-height:62px;
-    padding:9px 10px;
+    min-height:58px;
+    padding:8px 9px;
     display:grid;
     grid-template-columns:minmax(0,1fr) auto;
     grid-template-rows:auto 1fr;
     align-items:center;
-    gap:5px 7px;
+    gap:4px 6px;
+    border:1px solid var(--line);
+    border-radius:11px;
+    background:var(--surface);
+  }
+  .v10-account-field span{
+    grid-column:1/-1;
+    color:var(--muted);
+    font-size:7px;
+    font-weight:800;
+  }
+  .v10-account-field code{
+    min-width:0;
+    direction:ltr;
+    text-align:left;
+    color:var(--text);
+    font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
+    font-size:10.5px;
+    font-weight:850;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    user-select:text;
+  }
+
+  .v9-server-row.v10-manual-row{
+    grid-template-columns:minmax(0,1fr) 36px;
+    align-items:center;
+    gap:7px;
+    padding:8px 9px;
+  }
+  .v10-manual-row > .v9-server-main{
+    width:100%;
+    min-width:0;
+    cursor:pointer;
+    user-select:none;
+  }
+  .v10-manual-row .v9-server-copy small{
+    direction:ltr;
+    text-align:left;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
+    font-size:7px;
+  }
+  .v10-expand{
+    width:36px;
+    height:36px;
+    display:grid;
+    place-items:center;
+    border:1px solid color-mix(in srgb,var(--p) 28%,var(--line));
+    border-radius:10px;
+    background:color-mix(in srgb,var(--p) 7%,var(--surface));
+    color:var(--p);
+    cursor:pointer;
+  }
+  .v10-expand svg{
+    width:16px;
+    height:16px;
+    display:block;
+    transition:transform .2s ease;
+  }
+  .v10-manual-row.open .v10-expand svg{transform:rotate(180deg)}
+  .v10-server-details{
+    grid-column:1/-1;
+    display:none;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:7px;
+    padding-top:2px;
+    direction:rtl;
+  }
+  .v10-manual-row.open .v10-server-details{display:grid}
+  .v10-server-head{
+    grid-column:1/-1;
+    min-height:28px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    padding:0 1px;
+  }
+  .v10-server-head b{font-size:8.5px;font-weight:900}
+  .v10-server-head small{color:var(--muted);font-size:7px}
+  .v10-field{
+    min-width:0;
+    min-height:58px;
+    padding:8px 9px;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    grid-template-rows:auto 1fr;
+    align-items:center;
+    gap:4px 6px;
     border:1px solid color-mix(in srgb,var(--p) 13%,var(--line));
-    border-radius:12px;
+    border-radius:11px;
     background:color-mix(in srgb,var(--p) 3%,var(--surface));
   }
-  .v10-field.server{
-    grid-column:1/-1;
-  }
+  .v10-field.server{grid-column:1/-1}
   .v10-field-label{
     grid-column:1/-1;
     color:var(--muted);
-    font-size:7.5px;
+    font-size:7px;
     font-weight:800;
     line-height:1.5;
   }
@@ -88,7 +140,7 @@ _V10_CSS = r"""
     text-align:left;
     color:var(--text);
     font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
-    font-size:11px;
+    font-size:10.5px;
     font-weight:850;
     line-height:1.55;
     overflow-wrap:anywhere;
@@ -96,18 +148,34 @@ _V10_CSS = r"""
     user-select:text;
   }
   .v10-field-copy{
-    min-height:30px;
+    min-height:29px;
     padding:0 8px;
     display:inline-flex;
     align-items:center;
     justify-content:center;
     gap:4px;
+    border:1px solid color-mix(in srgb,var(--p) 28%,var(--line));
+    border-radius:9px;
+    background:color-mix(in srgb,var(--p) 7%,var(--surface));
+    color:var(--p);
+    font-family:inherit;
     font-size:7px;
+    font-weight:900;
+    cursor:pointer;
+  }
+  .v10-field-copy svg{
+    width:13px;
+    height:13px;
+    display:block;
+    flex:0 0 13px;
   }
 }
 
 @media(max-width:340px){
-  .v10-credential-grid{grid-template-columns:1fr}
+  .v10-account-summary,
+  .v10-server-details{grid-template-columns:1fr}
+  .v10-account-title,
+  .v10-server-head,
   .v10-field.server{grid-column:auto}
 }
 """
@@ -121,6 +189,7 @@ _V10_SCRIPT = r"""
   if(!mount)return;
   const toast=document.getElementById('toast');
   const copyIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 16H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v1"/></svg>';
+  const chevronIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>';
   const titles={cisco:'Cisco / OpenConnect',l2tp:'L2TP / IPsec'};
   const labels={
     'Server & Port':'آدرس سرور',
@@ -168,6 +237,12 @@ _V10_SCRIPT = r"""
       (card.querySelector('.v9-card-title b')?.textContent||'').trim()===title
     );
   }
+  function findField(fields,name){
+    return fields.find(field=>field.rawLabel===name)||null;
+  }
+  function serverField(fields){
+    return fields.find(field=>field.rawLabel==='Server & Port'||field.rawLabel==='Server')||null;
+  }
   function removeLegacyActions(row){
     [...row.children].forEach(child=>{
       if(child.classList.contains('v9-icon-btn')||child.classList.contains('v9-details'))child.remove();
@@ -179,33 +254,97 @@ _V10_SCRIPT = r"""
     button.className='v10-field-copy';
     button.innerHTML=copyIcon+'<span>کپی</span>';
     button.setAttribute('aria-label','کپی '+label);
-    button.addEventListener('click',async()=>{
+    button.addEventListener('click',async event=>{
+      event.stopPropagation();
       notify(await copyText(value)?label+' کپی شد':'کپی انجام نشد');
     });
     return button;
   }
-  function renderFields(row,fields){
+  function accountBox(field){
+    const box=document.createElement('div');
+    box.className='v10-account-field';
+    const label=document.createElement('span');
+    label.textContent=field.label;
+    const value=document.createElement('code');
+    value.textContent=field.value;
+    box.append(label,value,makeCopyButton(field.copyValue,field.label));
+    return box;
+  }
+  function renderAccountSummary(card,fieldSets){
+    const username=fieldSets.map(fields=>findField(fields,'Username')).find(Boolean);
+    const password=fieldSets.map(fields=>findField(fields,'Password')).find(Boolean);
+    if(!username&&!password)return;
+    const body=card.querySelector('.v9-card-body');
+    const list=card.querySelector('.v9-server-list');
+    if(!body||!list||body.querySelector('.v10-account-summary'))return;
+
+    const summary=document.createElement('section');
+    summary.className='v10-account-summary';
+    const title=document.createElement('div');
+    title.className='v10-account-title';
+    title.innerHTML='<b>اطلاعات حساب</b><small>برای همه سرورهای زیر</small>';
+    summary.appendChild(title);
+    if(username)summary.appendChild(accountBox(username));
+    if(password)summary.appendChild(accountBox(password));
+    body.insertBefore(summary,list);
+  }
+  function collapseSiblings(row){
+    const list=row.closest('.v9-server-list');
+    if(!list)return;
+    list.querySelectorAll('.v10-manual-row.open').forEach(other=>{
+      if(other===row)return;
+      other.classList.remove('open');
+      other.querySelector('.v10-expand')?.setAttribute('aria-expanded','false');
+    });
+  }
+  function toggleRow(row){
+    const willOpen=!row.classList.contains('open');
+    if(willOpen)collapseSiblings(row);
+    row.classList.toggle('open',willOpen);
+    row.querySelector('.v10-expand')?.setAttribute('aria-expanded',willOpen?'true':'false');
+  }
+  function renderServerRow(row,fields){
     removeLegacyActions(row);
     row.classList.add('v10-manual-row');
-    const grid=document.createElement('div');
-    grid.className='v10-credential-grid';
 
-    const head=document.createElement('div');
-    head.className='v10-grid-head';
-    const heading=document.createElement('b');
-    heading.textContent='اطلاعات اتصال';
-    const copyAll=document.createElement('button');
-    copyAll.type='button';
-    copyAll.className='v10-copy-all';
-    copyAll.innerHTML=copyIcon+'<span>کپی همه</span>';
-    copyAll.addEventListener('click',async()=>{
-      const text=fields.map(field=>field.label+': '+field.copyValue).join('\n');
-      notify(await copyText(text)?'همه اطلاعات کپی شد':'کپی انجام نشد');
+    const server=serverField(fields);
+    const psk=findField(fields,'IPsec Secret');
+    const main=row.querySelector('.v9-server-main');
+    if(main){
+      const subtitle=main.querySelector('.v9-server-copy small');
+      if(subtitle&&server)subtitle.textContent=server.value;
+      main.setAttribute('role','button');
+      main.setAttribute('tabindex','0');
+      main.setAttribute('aria-label','نمایش اطلاعات این سرور');
+      main.addEventListener('click',()=>toggleRow(row));
+      main.addEventListener('keydown',event=>{
+        if(event.key==='Enter'||event.key===' '){
+          event.preventDefault();
+          toggleRow(row);
+        }
+      });
+    }
+
+    const expand=document.createElement('button');
+    expand.type='button';
+    expand.className='v10-expand';
+    expand.innerHTML=chevronIcon;
+    expand.setAttribute('aria-label','نمایش اطلاعات سرور');
+    expand.setAttribute('aria-expanded','false');
+    expand.addEventListener('click',event=>{
+      event.stopPropagation();
+      toggleRow(row);
     });
-    head.append(heading,copyAll);
-    grid.appendChild(head);
+    row.appendChild(expand);
 
-    fields.forEach(field=>{
+    const details=document.createElement('div');
+    details.className='v10-server-details';
+    const head=document.createElement('div');
+    head.className='v10-server-head';
+    head.innerHTML='<b>اطلاعات این سرور</b><small>برای مشاهده و کپی</small>';
+    details.appendChild(head);
+
+    [server,psk].filter(Boolean).forEach(field=>{
       const box=document.createElement('div');
       box.className='v10-field'+(field.rawLabel.startsWith('Server')?' server':'');
       const label=document.createElement('span');
@@ -215,9 +354,9 @@ _V10_SCRIPT = r"""
       value.className='v10-field-value';
       value.textContent=field.value;
       box.append(label,value,makeCopyButton(field.copyValue,field.label));
-      grid.appendChild(box);
+      details.appendChild(box);
     });
-    row.appendChild(grid);
+    row.appendChild(details);
   }
 
   document.querySelectorAll('.protocol-panel').forEach(panel=>{
@@ -228,11 +367,11 @@ _V10_SCRIPT = r"""
     if(!card)return;
     const views=[...panel.querySelectorAll('.server-view')];
     const rows=[...card.querySelectorAll('.v9-server-row')];
-    views.forEach((view,index)=>{
+    const fieldSets=views.map(fieldData);
+    renderAccountSummary(card,fieldSets);
+    fieldSets.forEach((fields,index)=>{
       const row=rows[index];
-      if(!row)return;
-      const fields=fieldData(view);
-      if(fields.length)renderFields(row,fields);
+      if(row&&fields.length)renderServerRow(row,fields);
     });
   });
 })();
@@ -241,7 +380,7 @@ _V10_SCRIPT = r"""
 
 
 def refine_public_connection_manual_fields_v10(source: str) -> str:
-    """Make Cisco/OpenConnect and L2TP/IPsec credentials readable and individually copyable on phones."""
+    """Keep shared Cisco/L2TP account credentials once, then render compact expandable server rows on phones."""
     if "TWINPANEL_PUBLIC_CONNECT_MANUAL_FIELDS_V10" in source:
         return source
     source = source.replace("</style>", _V10_CSS + "\n</style>", 1)
