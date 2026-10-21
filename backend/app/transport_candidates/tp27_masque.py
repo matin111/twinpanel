@@ -100,7 +100,12 @@ chmod 0600 {shlex.quote(path)}
 
 
 async def _certificate_fingerprint(ce, cert_path: str, key_path: str) -> str:
-    result = await run(
+    # transport_candidates.common.run() deliberately returns normalized stdout
+    # as a plain string. V151 incorrectly treated that string like an AsyncSSH
+    # result object (`result.stdout`), so installation failed before either
+    # systemd unit was created. Keep the shared run() contract unchanged and
+    # parse its returned text directly.
+    output = await run(
         ce,
         f"""
 set -e
@@ -119,7 +124,8 @@ openssl x509 -in {shlex.quote(cert_path)} -outform DER | sha256sum | awk '{{prin
         "tp27_masque_certificate",
         30,
     )
-    value = (result.stdout or "").strip().splitlines()[-1].strip().lower()
+    lines = str(output or "").strip().splitlines()
+    value = lines[-1].strip().lower() if lines else ""
     if not re.fullmatch(r"[0-9a-f]{64}", value):
         raise RuntimeError("tp27_masque_certificate_fingerprint_invalid")
     return value
