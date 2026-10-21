@@ -3,7 +3,9 @@ name: Adaptive Multi-Lane V149 Smoke
 on:
   pull_request:
     paths:
+      - "VERSION"
       - "backend/app/adaptive_multilane_v149.py"
+      - "backend/app/adaptive_multilane_v151.py"
       - "backend/app/transport_candidates/__init__.py"
       - "backend/app/transport_candidates/common.py"
       - "backend/app/transport_candidates/tp27_tcp_direct.py"
@@ -13,7 +15,9 @@ on:
     branches:
       - main
     paths:
+      - "VERSION"
       - "backend/app/adaptive_multilane_v149.py"
+      - "backend/app/adaptive_multilane_v151.py"
       - "backend/app/transport_candidates/__init__.py"
       - "backend/app/transport_candidates/common.py"
       - "backend/app/transport_candidates/tp27_tcp_direct.py"
@@ -47,11 +51,16 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
+          version = Path("VERSION").read_text().strip()
           adaptive = Path("backend/app/adaptive_multilane_v149.py").read_text()
           registry = Path("backend/app/transport_candidates/__init__.py").read_text()
           common = Path("backend/app/transport_candidates/common.py").read_text()
           tcp = Path("backend/app/transport_candidates/tp27_tcp_direct.py").read_text()
           manager = Path("backend/app/tunnel_transport_manager_v12.py").read_text()
+
+          prefix = "1.1.0-rc."
+          assert version.startswith(prefix), version
+          assert int(version[len(prefix):]) >= 149, version
 
           for token in (
               "TWINPANEL_ADAPTIVE_MULTILANE_V149",
@@ -83,21 +92,18 @@ jobs:
           ):
               assert token in tcp, token
 
-          # This lane must be independent from the shared TP2027 Backhaul.
           assert "install_tp2027_overlays" not in tcp
           assert "backhaul_runtime_values" not in tcp
           assert "encap fou" not in tcp
 
-          # Health probes now expose jitter telemetry for path-quality scoring
-          # and future carrier policy without changing existing loss gates.
           assert "parse_ping_rtt" in common
           assert '"jitter_ms": jitter' in common
           assert '"iran_jitter_ms"' in common
           assert '"exit_jitter_ms"' in common
 
-          # V149 must override V91 single-lane install policy before tasks start.
           assert "apply_adaptive_multilane_v149()" in manager
-          assert "active_candidates=tp27_fast,tp27_tcp_direct" in manager
+          assert "tp27_fast" in manager
+          assert "tp27_tcp_direct" in manager
           assert manager.index("activate_manager_candidate_policy_v91()") < manager.index(
               "apply_adaptive_multilane_v149()"
           )

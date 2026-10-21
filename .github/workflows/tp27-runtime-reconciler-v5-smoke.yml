@@ -1,0 +1,84 @@
+name: TP27 Runtime Reconciler V5 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/runtime_reconciler_v5.py"
+      - "backend/app/runtime_reconciler_v4.py"
+      - "backend/app/transport_candidates/__init__.py"
+      - "backend/app/transport_candidates/tp27_tcp_direct.py"
+      - "backend/app/transport_candidates/tp27_masque.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/tp27-runtime-reconciler-v5-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/runtime_reconciler_v5.py"
+      - "backend/app/runtime_reconciler_v4.py"
+      - "backend/app/transport_candidates/__init__.py"
+      - "backend/app/transport_candidates/tp27_tcp_direct.py"
+      - "backend/app/transport_candidates/tp27_masque.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/tp27-runtime-reconciler-v5-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile reconciler chain
+        run: |
+          python -m py_compile \
+            backend/app/runtime_reconciler_v3.py \
+            backend/app/runtime_reconciler_v4.py \
+            backend/app/runtime_reconciler_v5.py \
+            backend/app/tunnel_transport_manager_v12.py
+
+      - name: Verify scoped V5 ownership contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          v5 = Path("backend/app/runtime_reconciler_v5.py").read_text()
+          manager = Path("backend/app/tunnel_transport_manager_v12.py").read_text()
+
+          for token in (
+              "runtime_reconciler_v4 as v4",
+              "await v4._inventory_node_v4(node, db)",
+              "v4._cleanup_script_v4(tid)",
+              "tp27_tcp_direct",
+              "tp27_masque",
+              "tp27t",
+              "tp27m",
+              "30000 +",
+              "31000 +",
+              "TwinPanel-TP27-TCP-",
+              "TwinPanel-TP27-MASQUE-",
+              "TwinPanel-tp27_tcp_direct-",
+              "TwinPanel-tp27_masque-",
+              "/etc/twinpanel/masque/tunnel-$TID.token",
+              "CLEANED_TP27_INDEPENDENT_LANES_TUNNEL_ID",
+          ):
+              assert token in v5, token
+
+          for forbidden in (
+              "iptables -F",
+              "iptables -t nat -F",
+              "iptables -t filter -F",
+              "ip route flush table main",
+              "ip route flush table default",
+              "rm -f /opt/twinpanel/transport/tp27-masque",
+              "rm -f /opt/twinpanel/transport/tp27-tcp-direct",
+          ):
+              assert forbidden not in v5, forbidden
+
+          assert "from .runtime_reconciler_v5 import reconciler_loop as runtime_reconciler_loop" in manager
+          assert "reconciler=v5" in manager
+          assert "twinpanel-runtime-reconciler-v5" in manager
+
+          print("TP27_RUNTIME_RECONCILER_V5_SMOKE_OK")
+          PY

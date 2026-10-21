@@ -1,0 +1,151 @@
+name: TP27 MASQUE V151 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "VERSION"
+      - "tools/tp27-masque/**"
+      - "backend/app/adaptive_multilane_v151.py"
+      - "backend/app/runtime_reconciler_v5.py"
+      - "backend/app/transport_candidates/__init__.py"
+      - "backend/app/transport_candidates/tp27_masque.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/publish-prebuilt-release.yml"
+      - ".github/workflows/tp27-masque-v151-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "VERSION"
+      - "tools/tp27-masque/**"
+      - "backend/app/adaptive_multilane_v151.py"
+      - "backend/app/runtime_reconciler_v5.py"
+      - "backend/app/transport_candidates/__init__.py"
+      - "backend/app/transport_candidates/tp27_masque.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/publish-prebuilt-release.yml"
+      - ".github/workflows/tp27-masque-v151-smoke.yml"
+
+jobs:
+  masque:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile Python runtime
+        run: |
+          python -m py_compile \
+            backend/app/adaptive_multilane_v151.py \
+            backend/app/runtime_reconciler_v5.py \
+            backend/app/transport_candidates/__init__.py \
+            backend/app/transport_candidates/tp27_masque.py \
+            backend/app/tunnel_transport_manager_v12.py
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.0"
+          cache-dependency-path: tools/tp27-masque/go.sum
+
+      - name: Build TP27 MASQUE carrier from locked graph
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          BUILD_DIR="$(mktemp -d)"
+          trap 'rm -rf "$BUILD_DIR"' EXIT
+          cp tools/tp27-masque/go.mod "$BUILD_DIR/go.mod"
+          cp tools/tp27-masque/go.sum "$BUILD_DIR/go.sum"
+          cp tools/tp27-masque/main.go "$BUILD_DIR/main.go"
+          (
+            cd "$BUILD_DIR"
+            GOWORK=off go vet -mod=readonly ./...
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOWORK=off \
+              go build -mod=readonly -trimpath -o tp27-masque .
+            test -s tp27-masque
+            ./tp27-masque -h >help.txt 2>&1 || true
+            grep -q -- '-pin-sha256' help.txt
+            grep -q -- '-token-file' help.txt
+          )
+          test -z "$(git status --short -- tools/tp27-masque)"
+
+      - name: Verify V151 contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          version = Path("VERSION").read_text().strip()
+          go_mod = Path("tools/tp27-masque/go.mod").read_text()
+          go_sum = Path("tools/tp27-masque/go.sum").read_text()
+          go_src = Path("tools/tp27-masque/main.go").read_text()
+          candidate = Path("backend/app/transport_candidates/tp27_masque.py").read_text()
+          registry = Path("backend/app/transport_candidates/__init__.py").read_text()
+          adaptive = Path("backend/app/adaptive_multilane_v151.py").read_text()
+          reconciler = Path("backend/app/runtime_reconciler_v5.py").read_text()
+          manager = Path("backend/app/tunnel_transport_manager_v12.py").read_text()
+          publisher = Path(".github/workflows/publish-prebuilt-release.yml").read_text()
+
+          assert version == "1.1.0-rc.151"
+          assert "github.com/quic-go/connect-ip-go v0.4.0" in go_mod
+          assert "github.com/quic-go/connect-ip-go v0.4.0 h1:m9xcVslaw9OzLQV79shdXHhKJZZhUmYQhWe6J342W3w=" in go_sum
+          assert "github.com/quic-go/quic-go v0.63.0 h1:LIFGHI4PFUhhw2dDD1ARHdCff143ffMHwZtbnbuJ78A=" in go_sum
+          assert "EnableDatagrams" in go_src
+          assert "connectip.NewRequest" in go_src
+          assert "connectip.ParseProxyRequest" in go_src
+          assert "VerifyConnection" in go_src
+          assert "server certificate pin mismatch" in go_src
+          assert "Authorization" in go_src
+
+          for token in (
+              'NAME = "tp27_masque"',
+              'carrier_class": "masque-connect-ip-h3"',
+              '"udp_dependency": True',
+              "MTU = 1280",
+              "UDP_PORT_BASES = (28400, 29400, 30400)",
+              "--pin-sha256 {cert_pin}",
+          ):
+              assert token in candidate, token
+
+          for token in (
+              "TP27_MASQUE_SPEC",
+              '"tp27_masque": TP27_MASQUE_SPEC',
+              '"tp27_masque": tp27_masque.install',
+              '"network": f"10.255.',
+              "31000 +",
+          ):
+              assert token in registry, token
+
+          assert "TWINPANEL_ADAPTIVE_MULTILANE_V151" in adaptive
+          assert "tp27_masque" in adaptive
+          assert "udp_policy=quality-gated" in adaptive
+          assert "non_udp_fallback=tp27_tcp_direct" in adaptive
+          assert "runtime_reconciler_v4 as v4" in reconciler
+          assert "tp27_masque" in reconciler
+          assert "tp27_tcp_direct" in reconciler
+          assert "apply_adaptive_multilane_v151()" in manager
+          assert "active_candidates=tp27_fast,tp27_masque,tp27_tcp_direct" in manager
+          assert "reconciler=v5" in manager
+          assert manager.index("apply_adaptive_multilane_v149()") < manager.index(
+              "apply_adaptive_multilane_v151()"
+          )
+
+          assert "Setup Go for TP27 MASQUE" in publisher
+          assert "tp27-masque-linux-x86_64.sha256" in publisher
+          assert "go build -mod=readonly" in publisher
+          assert "source/tools/tp27-masque/go.sum" in publisher
+
+          for forbidden in (
+              "install_tp2027_overlays",
+              "backhaul_runtime_values",
+              "encap fou",
+              "tp27_tcp_direct.install",
+          ):
+              assert forbidden not in candidate
+
+          print("TP27_MASQUE_V151_SMOKE_OK")
+          PY
