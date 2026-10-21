@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from .modern_protocol_runtime_v2 import (
@@ -24,6 +25,41 @@ from .standalone_protocol_runtime import (
 # Kept under the historical exported name so the existing admin router can use
 # the same install/health/remove guards without duplicating dispatch logic.
 SINGBOX_PROTOCOLS = set(_SINGBOX_PROTOCOLS) | set(STANDALONE_PROTOCOLS)
+
+# systemd marks Type=simple services active as soon as ExecStart is spawned.
+# sing-box can therefore be active a fraction of a second before its managed
+# listener is bound. Production rc.157 reproduced that race on Local Core:
+# install returned 200 and the listener became healthy, but the immediate
+# post-restart health sample persisted service_or_listener_unhealthy. Retry
+# only the post-apply readiness sample; normal health endpoints stay fail-fast.
+SINGBOX_READINESS_ATTEMPTS = 20
+SINGBOX_READINESS_DELAY_SECONDS = 0.25
+
+
+async def _wait_for_singbox_health(
+    conn,
+    protocol: str,
+    port: int | None,
+    *,
+    attempts: int = SINGBOX_READINESS_ATTEMPTS,
+    delay_seconds: float = SINGBOX_READINESS_DELAY_SECONDS,
+) -> dict[str, Any]:
+    tries = max(1, int(attempts))
+    last: dict[str, Any] | None = None
+
+    for index in range(tries):
+        last = await _singbox_health(conn, protocol, port)
+        if bool(last.get("ok")):
+            return last
+        if index + 1 < tries and delay_seconds > 0:
+            await asyncio.sleep(delay_seconds)
+
+    return last or {
+        "ok": False,
+        "protocol": protocol,
+        "port": port,
+        "error": "service_or_listener_unhealthy",
+    }
 
 
 async def apply_profiles(conn, node, profiles: list[dict[str, Any]]) -> dict[str, Any]:
@@ -51,8 +87,27 @@ async def apply_profiles(conn, node, profiles: list[dict[str, Any]]) -> dict[str
         # the unit first without starting it before a valid config exists.
         await ensure_singbox_service_unit(conn)
         singbox = await _apply_singbox_profiles(conn, node, singbox_profiles)
+
+        # The underlying runtime performs one immediate health sample after
+        # restart. Only retry profiles that missed that first readiness window;
+        # already-healthy profiles incur no delay, and persistent failures still
+        # return unhealthy after a bounded wait.
+        singbox_results = singbox.setdefault("protocols", {})
+        for profile in singbox_profiles:
+            protocol = str(profile.get("protocol") or "").strip().lower()
+            current = singbox_results.get(protocol)
+            if isinstance(current, dict) and current.get("ok"):
+                continue
+            raw_port = profile.get("port")
+            port = int(raw_port) if raw_port is not None else None
+            singbox_results[protocol] = await _wait_for_singbox_health(
+                conn,
+                protocol,
+                port,
+            )
+
         result["core"]["sing-box"] = singbox.get("core", {})
-        result["protocols"].update(singbox.get("protocols", {}))
+        result["protocols"].update(singbox_results)
 
     for profile in standalone_profiles:
         protocol = str(profile.get("protocol") or "").strip().lower()
