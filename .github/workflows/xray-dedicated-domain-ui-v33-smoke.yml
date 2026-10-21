@@ -5,6 +5,7 @@ on:
     paths:
       - "components/routed-page-client.tsx"
       - "components/legacy-nodes-exact.tsx"
+      - "components/legacy-protocols-studio.tsx"
       - "components/provision-runtime-xray-domain.tsx"
       - "lib/admin-api.ts"
       - "backend/app/xray_node_domain_runtime.py"
@@ -20,6 +21,7 @@ on:
     paths:
       - "components/routed-page-client.tsx"
       - "components/legacy-nodes-exact.tsx"
+      - "components/legacy-protocols-studio.tsx"
       - "components/provision-runtime-xray-domain.tsx"
       - "lib/admin-api.ts"
       - "backend/app/xray_node_domain_runtime.py"
@@ -80,14 +82,27 @@ jobs:
           grep -F 'apply_xray_modern_config_compat_v45()' backend/app/self_hosted_runtime.py
           grep -F 'apply_xray_tcp_tls_compat_v44()' backend/app/self_hosted_runtime.py
 
-      - name: Verify provisioning route uses dedicated Xray page
+      - name: Verify provisioning route remains the infrastructure-only Add Server page
         run: |
           set -euo pipefail
           grep -F 'ProvisionRuntimeXrayDomainPage=dynamic' components/routed-page-client.tsx
           grep -F 'if(key==="admin/provision") return admin(<ProvisionRuntimeXrayDomainPage/>)' components/routed-page-client.tsx
           ! grep -F 'if(key==="admin/provision") return admin(<ProvisionRuntimePage/>)' components/routed-page-client.tsx
+          grep -F '...BASE_ONLY_PROTOCOLS' components/provision-runtime-xray-domain.tsx
+          ! grep -F 'saveXrayDomain' components/provision-runtime-xray-domain.tsx
+          ! grep -F 'prepareXrayDomain' components/provision-runtime-xray-domain.tsx
 
-      - name: Verify node management modal exposes dedicated Xray domain
+      - name: Verify Protocol Studio owns dedicated Xray domain controls
+        run: |
+          set -euo pipefail
+          grep -F 'adminApi.xrayDomain(node.id)' components/legacy-protocols-studio.tsx
+          grep -F 'adminApi.saveXrayDomain(domainNodeId, domainDraft.trim())' components/legacy-protocols-studio.tsx
+          grep -F 'adminApi.prepareXrayDomain(domainNodeId, true)' components/legacy-protocols-studio.tsx
+          grep -F 'دامنه اختصاصی V2Ray / Xray' components/legacy-protocols-studio.tsx
+          grep -F 'ذخیره و آماده‌سازی TLS' components/legacy-protocols-studio.tsx
+          grep -F 'if(key==="admin/modern-protocols") return admin(<ModernProtocolsAdminPage/>);' components/routed-page-client.tsx
+
+      - name: Verify node management modal still exposes dedicated Xray domain
         run: |
           set -euo pipefail
           grep -F 'type NodeModal="manage"|"ssh"|"domain"|"xray-domain"|"protocols"|null;' components/legacy-nodes-exact.tsx
@@ -110,13 +125,6 @@ jobs:
           grep -F 'saveXrayDomain:(id:number,domain:string)=>request<XrayDomainState>' lib/admin-api.ts
           grep -F 'prepareXrayDomain:(id:number,issueCertificate=true)=>request<XrayDomainState>' lib/admin-api.ts
           grep -F '/v1/xray-modern-admin/nodes/${id}/xray-domain' lib/admin-api.ts
-
-      - name: Verify provisioning UI is still complete
-        run: |
-          set -euo pipefail
-          grep -F 'دامنه V2Ray / Xray' components/provision-runtime-xray-domain.tsx
-          grep -F 'دامنه اختصاصی Xray' components/provision-runtime-xray-domain.tsx
-          grep -F '/xray-domain/prepare' components/provision-runtime-xray-domain.tsx
 
       - name: Compile backend compatibility runtime
         run: |
