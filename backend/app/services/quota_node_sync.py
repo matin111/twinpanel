@@ -11,12 +11,23 @@ from ..quota_models import QuotaDevice
 from ..quota_security import public_key_b64
 
 
+# Panel/database protocol name -> canonical node quota protocol name.
+# Modern sing-box entries are deliberately explicit.  A credential is exported
+# only when it really exists, so adding a mapping here does not make an
+# unprovisioned protocol sellable or fabricate telemetry.
 _PROTOCOL_TO_QUOTA = {
     "cisco": "openconnect",
     "openvpn": "openvpn",
     "wireguard": "wireguard",
     "l2tp": "l2tp",
     "v2ray": "xray",
+    "hysteria2": "hysteria2",
+    "tuic": "tuic",
+    "anytls": "anytls",
+    "naive": "naive",
+    "naiveproxy": "naive",
+    "shadowtls": "shadowtls",
+    "snell": "snell",
 }
 
 
@@ -171,10 +182,16 @@ def sync_node_config(db: Session, node_id: int, api_base: str | None = None):
     path = Path(f"/tmp/twinpanel-node-{int(node_id)}.json")
 
     config = {
-        "version": 3,
+        "version": 4,
         "node_id": int(node_id),
         "api_base": str(api_base or "").rstrip("/"),
         "command_public_key_b64": public_key_b64(),
+        # Contract V4: a node must never turn missing/unsupported telemetry into
+        # synthetic zero-byte usage.  Unsupported collectors stay fail-closed
+        # until their real runtime counter source is available.
+        "telemetry_policy": {
+            "fail_closed": True,
+        },
         "devices": devices,
     }
 
