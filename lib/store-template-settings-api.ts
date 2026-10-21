@@ -8,6 +8,12 @@ export type StoreTemplateSettingsEnvelope={
   updated_at?:string|null;
 };
 
+export type StoreTemplateMediaUpload={
+  template_id:string;
+  slot:string;
+  url:string;
+};
+
 async function parseResponse<T>(response:Response):Promise<T>{
   if(response.ok)return response.json() as Promise<T>;
   let detail=`API error ${response.status}`;
@@ -43,6 +49,31 @@ export async function resetStoreTemplateSettings(templateId:string):Promise<Reco
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
   const response=await fetch(`${API_BASE}/v1/storefront/settings/templates/${encodeURIComponent(templateId)}`,{
+    method:"DELETE",
+    headers:{"Authorization":`Bearer ${token}`},
+    cache:"no-store",
+  });
+  return parseResponse<Record<string,unknown>>(response);
+}
+
+export async function uploadStoreTemplateMedia(templateId:string,slot:string,file:File):Promise<StoreTemplateMediaUpload>{
+  const token=getCustomerToken();
+  if(!token)throw new Error("AUTH_REQUIRED");
+  const body=new FormData();
+  body.append("file",file);
+  const response=await fetch(`${API_BASE}/v1/storefront/settings/media/${encodeURIComponent(templateId)}/${encodeURIComponent(slot)}`,{
+    method:"POST",
+    headers:{"Authorization":`Bearer ${token}`},
+    body,
+    cache:"no-store",
+  });
+  return parseResponse<StoreTemplateMediaUpload>(response);
+}
+
+export async function deleteStoreTemplateMedia(templateId:string,slot:string):Promise<Record<string,unknown>>{
+  const token=getCustomerToken();
+  if(!token)throw new Error("AUTH_REQUIRED");
+  const response=await fetch(`${API_BASE}/v1/storefront/settings/media/${encodeURIComponent(templateId)}/${encodeURIComponent(slot)}`,{
     method:"DELETE",
     headers:{"Authorization":`Bearer ${token}`},
     cache:"no-store",
