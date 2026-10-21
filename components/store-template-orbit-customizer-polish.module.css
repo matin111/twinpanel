@@ -1,0 +1,8 @@
+.polish{--card:var(--surface);--bg:var(--surface-2);--border:var(--line);min-width:0}
+.polish>section{min-width:0}
+.polish>section>header{border-color:var(--line)!important;background:linear-gradient(135deg,color-mix(in srgb,var(--purple) 7%,var(--surface)),var(--surface))!important;box-shadow:0 14px 40px rgba(0,0,0,.06)!important}
+.polish>section>div:nth-of-type(1){border-color:var(--line)!important;background:var(--surface)!important}
+.polish>section>div:last-child>aside,.polish>section>div:last-child>main{border-color:var(--line)!important;background:var(--surface)!important;box-shadow:0 12px 34px rgba(0,0,0,.04)!important}
+.polish>section>div:last-child>main>div:first-child{border-color:var(--line)!important;background:linear-gradient(135deg,color-mix(in srgb,var(--purple) 5%,var(--surface)),var(--surface))!important}
+:global(html[data-theme="dark"]) .polish{--card:color-mix(in srgb,var(--surface) 94%,#ffffff 6%);--bg:color-mix(in srgb,var(--surface-2) 90%,#ffffff 10%);--border:color-mix(in srgb,var(--line) 78%,#ffffff 22%)}
+:global(html[data-theme="dark"]) .polish>section>header,:global(html[data-theme="dark"]) .polish>section>div:last-child>aside,:global(html[data-theme="dark"]) .polish>section>div:last-child>main{box-shadow:0 16px 42px rgba(0,0,0,.2)!important}
