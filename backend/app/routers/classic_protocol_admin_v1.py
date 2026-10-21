@@ -22,6 +22,10 @@ from ..protocol_adapter_registry import (
 )
 from .provision import (
     ProtocolSettings,
+    _protocol_live_health,
+    _protocol_settings_from_db,
+    _restart_protocol_service,
+    _save_live_health,
     cmd,
     ensure_base,
     provision_protocols,
@@ -66,6 +70,11 @@ class EnsureClassicProtocolIn(BaseModel):
         if self.protocol != "openvpn" and self.transport is not None:
             raise ValueError("transport override is only supported for OpenVPN")
         return self
+
+
+class ClassicProtocolControlIn(BaseModel):
+    node_id: int = Field(gt=0)
+    protocol: ClassicProtocol | None = None
 
 
 def _existing_config(
@@ -170,6 +179,25 @@ def _settings_for(
         )
 
     return ProtocolSettings(**values)
+
+
+def _runtime_node(db: Session, node_id: int) -> Node:
+    node = (
+        db.query(Node)
+        .filter(
+            Node.retired_at.is_(None),
+            Node.id == int(node_id),
+        )
+        .first()
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="سرور پیدا نشد")
+    if not is_protocol_runtime_node(node):
+        raise HTTPException(
+            status_code=422,
+            detail="پروتکل‌های دسترسی فقط روی نود خروجی یا TwinPanel Local Core نصب می‌شوند",
+        )
+    return node
 
 
 @router.get("/protocol-registry")
@@ -280,24 +308,7 @@ async def ensure_classic_protocol(
     payload: EnsureClassicProtocolIn,
     db: Session = Depends(get_db),
 ):
-    node = (
-        db.query(Node)
-        .filter(
-            Node.retired_at.is_(None),
-            Node.id == payload.node_id,
-        )
-        .first()
-    )
-
-    if not node:
-        raise HTTPException(status_code=404, detail="سرور پیدا نشد")
-
-    if not is_protocol_runtime_node(node):
-        raise HTTPException(
-            status_code=422,
-            detail="پروتکل‌های دسترسی فقط روی نود خروجی یا TwinPanel Local Core نصب می‌شوند",
-        )
-
+    node = _runtime_node(db, payload.node_id)
     existing = _existing_config(
         db,
         node.id,
@@ -356,6 +367,79 @@ async def ensure_classic_protocol(
             "message": "پروتکل نصب/Repair و Health Check شد",
         }
 
+    finally:
+        conn.close()
+        await conn.wait_closed()
+
+
+@router.post("/classic-protocol-health")
+async def classic_protocol_health(
+    payload: ClassicProtocolControlIn,
+    db: Session = Depends(get_db),
+):
+    node = _runtime_node(db, payload.node_id)
+    conn = await connect_protocol_runtime(node, db)
+    try:
+        stored = _protocol_settings_from_db(db, node.id)
+        names = [payload.protocol] if payload.protocol else list(_CLASSIC_PROTOCOLS)
+        results = {}
+        for protocol in names:
+            result = await _protocol_live_health(conn, protocol, stored.get(protocol))
+            result["protocol"] = protocol
+            result["name"] = CLASSIC_PROTOCOL_REGISTRY[protocol]["title"]
+            results[protocol] = result
+            _save_live_health(db, node, protocol, result)
+        db.commit()
+        return {
+            "ok": all(item["ok"] for item in results.values()),
+            "node_id": node.id,
+            "execution": "local" if getattr(node, "is_mother", False) else "ssh",
+            "protocols": results,
+            "message": "بررسی سرویس‌ها انجام شد",
+        }
+    finally:
+        conn.close()
+        await conn.wait_closed()
+
+
+@router.post("/classic-restart-protocol")
+async def classic_restart_protocol(
+    payload: ClassicProtocolControlIn,
+    db: Session = Depends(get_db),
+):
+    node = _runtime_node(db, payload.node_id)
+    if not payload.protocol:
+        raise HTTPException(status_code=400, detail="پروتکل برای ریستارت مشخص نشده است")
+
+    conn = await connect_protocol_runtime(node, db)
+    try:
+        stored = _protocol_settings_from_db(db, node.id)
+        used_service = await _restart_protocol_service(
+            conn,
+            payload.protocol,
+            stored.get(payload.protocol),
+        )
+        result = await _protocol_live_health(
+            conn,
+            payload.protocol,
+            stored.get(payload.protocol),
+        )
+        result["protocol"] = payload.protocol
+        result["restarted_service"] = used_service
+        result["name"] = CLASSIC_PROTOCOL_REGISTRY[payload.protocol]["title"]
+        _save_live_health(db, node, payload.protocol, result)
+        db.commit()
+        return {
+            "ok": result["ok"],
+            "node_id": node.id,
+            "execution": "local" if getattr(node, "is_mother", False) else "ssh",
+            "protocol": result,
+            "message": (
+                f"{CLASSIC_PROTOCOL_REGISTRY[payload.protocol]['title']} ریستارت شد و سالم است"
+                if result["ok"]
+                else f"{CLASSIC_PROTOCOL_REGISTRY[payload.protocol]['title']} ریستارت شد اما Health Check ناموفق بود"
+            ),
+        }
     finally:
         conn.close()
         await conn.wait_closed()
