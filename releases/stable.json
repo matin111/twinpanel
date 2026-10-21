@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.155",
+  "version": "1.1.0-rc.156",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-21T21:16:36Z",
+  "released_at": "2026-10-21T21:22:44Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "acab554de5bc2a1e597d962930130702a9cbaadf",
+  "source_sha": "d488ba9e623d0b7d7bff5a801d1977eafcd4ccf2",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.155/twinpanel-1.1.0-rc.155-linux-x86_64.tar.gz",
-    "sha256": "66158e21de800289f8f34c523ee9bae74162130ef8fe76eda85126f3eda6f640",
-    "size_bytes": 18059862
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.156/twinpanel-1.1.0-rc.156-linux-x86_64.tar.gz",
+    "sha256": "c5538b60a8cca76639139123f0f2bd8fc68e1e083e06562a58aabc16cc3138b5",
+    "size_bytes": 18066122
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.155 خطای واقعی 502 هنگام نصب AnyTLS و سایر پروتکل‌های Sing-box روی Local Core یا نود تمیز را برطرف می‌کند. Acceptance واقعی rc.154 ثابت کرد Fix قبلی Nginx موفق بوده و 504 دیگر رخ نمی‌دهد، اما Backend با خطای `Unit twinpanel-sing-box.service not found` متوقف می‌شد. Audit کد نشان داد مسیر V2/V3 باینری Sing-box و TLS را آماده و config را validate می‌کرد ولی bootstrap ساخت systemd unit که در runtime قدیمی وجود داشت، هنگام Refactor حذف شده بود. این Release یک helper مشترک و idempotent اضافه می‌کند که unit استاندارد `/etc/systemd/system/twinpanel-sing-box.service` را به‌صورت اتمیک converge می‌کند، فقط در صورت تغییر `daemon-reload` می‌زند و سرویس را enable می‌کند، اما قبل از معتبر شدن config آن را start/restart نمی‌کند. Dispatcher فعال این bootstrap را قبل از V2 profile apply اجرا می‌کند؛ سپس همان validation، config apply، restart و health/listener check موجود ادامه پیدا می‌کند. Regression smoke جدید ترتیب bootstrap-before-apply، ExecStart استاندارد و ممنوع بودن start زودهنگام را enforce می‌کند. Nginx V2، Payment، Subscription، Quota، Auth، Tunnel و standalone protocol runtimes بازنویسی نشده‌اند. تأیید نهایی روی سرور واقعی بعد از Update و نصب مجدد AnyTLS روی Local Core لازم است.",
-    "en": "TwinPanel 1.1.0-rc.155 fixes the production 502 seen when installing AnyTLS and other Sing-box-backed protocols on Local Core or another clean node. Real rc.154 acceptance proved the prior Nginx fix works and the 504 is gone, but the backend then failed with `Unit twinpanel-sing-box.service not found`. Code audit found that the V2/V3 path prepared the Sing-box binary and TLS material and validated the config, but the managed systemd-unit bootstrap from the older runtime had been lost during refactoring. This release adds one shared idempotent helper that atomically converges `/etc/systemd/system/twinpanel-sing-box.service`, runs daemon-reload only when needed, enables the service, and deliberately does not start/restart it before a valid config exists. The active dispatcher invokes this bootstrap before V2 profile apply, after which the existing config validation, apply, restart and health/listener checks continue unchanged. New regression coverage enforces bootstrap-before-apply, the canonical ExecStart, and the absence of any premature service start. Nginx V2, Payment, Subscription, Quota, Auth, Tunnel and standalone protocol runtimes are not rewritten. Final real-server acceptance still requires updating and retrying AnyTLS installation on Local Core."
+    "fa": "TwinPanel 1.1.0-rc.156 علاوه بر اصلاح Sing-box منتشرشده در rc.155، اصلاح Production مربوط به TP27 Direct TCP را از PR #701 اضافه می‌کند. Audit واقعی Tunnel #5 ثابت کرد carrier هشت Lane TCP را برقرار می‌کند و packetهای L3 تا Exit می‌رسند، اما Probe عمومی Candidate به‌اشتباه public Internet TCP/UDP egress روی subnet داخلی carrier را شرط سخت نصب قرار می‌داد و مسیر سالم را حذف می‌کرد. V155 qualification اکنون فقط برای tp27_tcp_direct سلامت peer-L3 و packet-loss را hard gate می‌کند، Internet egress را telemetry کمکی نگه می‌دارد و همچنان 60 ثانیه پایداری و benchmark دوطرفه SmartAuto را قبل از Promotion الزام می‌کند. tp27_fast/GRE/FoU بدون تغییر است؛ MASQUE به‌دلیل وابستگی واقعی به UDP همچنان strict باقی می‌ماند. Retry مسیرهای warm یعنی MASQUE و Direct TCP از 30 دقیقه به 120 ثانیه کاهش یافته، در حالی که Fast Path cooldown قبلی را حفظ می‌کند. Payment، Subscription، Quota، Auth و Access VPN runtime بازنویسی نشده‌اند. موفقیت نهایی نیازمند Update و Production Acceptance روی Tunnel #5 است.",
+    "en": "TwinPanel 1.1.0-rc.156 carries forward the Sing-box fix published in rc.155 and adds the production TP27 Direct TCP correction from PR #701. Real Tunnel #5 evidence proved the carrier could establish all eight outer TCP lanes and deliver L3 packets to the Exit node, while the generic candidate probe incorrectly treated public Internet TCP/UDP egress from the carrier's internal /30 as a hard installation gate and removed an otherwise viable carrier. V155 qualification now hard-gates only tp27_tcp_direct on peer-L3 reachability and packet loss, keeps public Internet egress as advisory telemetry, and still requires SmartAuto's 60-second stability window plus bidirectional throughput benchmark before promotion. tp27_fast/GRE/FoU remains unchanged; MASQUE remains strict because its outer transport is genuinely UDP-dependent. Warm-lane retry for MASQUE and Direct TCP is reduced from 30 minutes to 120 seconds while the Fast Path keeps the previous conservative retry. Payment, Subscription, Quota, Auth and Access VPN runtime are not rewritten. Final success still requires update and real production acceptance on Tunnel #5."
   }
 }
