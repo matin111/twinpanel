@@ -240,13 +240,13 @@ body[data-public-connect-mobile="v7"] .v8-app-launch{
     gap:7px;
   }
   body[data-public-connect-mobile="v7"] .v8-tools{
-    display:grid;
-    grid-template-columns:repeat(3,minmax(0,1fr));
+    display:flex;
     gap:1px;
     border-top:1px solid var(--line);
     background:var(--line);
   }
   body[data-public-connect-mobile="v7"] .v8-tools button{
+    flex:1;
     min-height:34px;
     padding:6px 4px;
     border:0;
@@ -348,6 +348,15 @@ _V8_SCRIPT = r"""
     area.value=value;area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);area.select();
     let ok=false;try{ok=document.execCommand('copy')}catch(_error){}area.remove();return ok;
   }
+  function openQr(src){
+    const modal=document.getElementById('hubQrModal');
+    const image=document.getElementById('hubQrImage');
+    if(!modal||!image||!src)return false;
+    image.src=src;
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden','false');
+    return true;
+  }
   function protocolFor(panel){
     const choice=document.querySelector('.protocol-choice[data-protocol="'+CSS.escape(panel.id)+'"]');
     return String(choice?.dataset.protocolKey||'').toLowerCase();
@@ -365,6 +374,7 @@ _V8_SCRIPT = r"""
     const download=view.querySelector('.download-config');
     const share=view.querySelector('.mobile-send-config');
     const direct=view.querySelector('a.primary-btn[href]');
+    const qr=view.querySelector('.qr');
     if(!download&&!direct)return;
     const card=document.createElement('section');card.className='v8-app-launch';
     const head=document.createElement('div');head.className='v8-app-head';
@@ -397,13 +407,13 @@ _V8_SCRIPT = r"""
       if(download){download.click();return}
       const multi=document.querySelector('[data-v7-share-url]');if(multi)multi.click();
     });
-    const qrBtn=document.createElement('button');qrBtn.type='button';qrBtn.textContent='QR';
-    qrBtn.addEventListener('click',()=>{
-      const qr=view.querySelector('.qr');
-      if(qr){qr.scrollIntoView({behavior:'smooth',block:'center'});return}
-      const multiQr=document.querySelector('[data-v7-qr]');if(multiQr)multiQr.click();
-    });
-    tools.append(copyBtn,fileBtn,qrBtn);card.appendChild(tools);
+    tools.append(copyBtn,fileBtn);
+    if(qr){
+      const qrBtn=document.createElement('button');qrBtn.type='button';qrBtn.textContent='QR';
+      qrBtn.addEventListener('click',()=>openQr(qr.getAttribute('src')||''));
+      tools.appendChild(qrBtn);
+    }
+    card.appendChild(tools);
     const note=document.createElement('div');note.className='v8-http-note';note.textContent='برای Share مستقیم به برنامه، دامنه HTTPS بهترین تجربه را می‌دهد؛ روی HTTP دانلود/کپی به‌عنوان مسیر امن استفاده می‌شود.';card.appendChild(note);
     view.appendChild(card);
   }
