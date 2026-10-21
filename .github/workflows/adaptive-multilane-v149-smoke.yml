@@ -4,29 +4,33 @@ on:
   pull_request:
     paths:
       - "VERSION"
+      - "tools/tp27-tcp-direct/**"
       - "backend/app/adaptive_multilane_v149.py"
       - "backend/app/adaptive_multilane_v151.py"
       - "backend/app/transport_candidates/__init__.py"
       - "backend/app/transport_candidates/common.py"
       - "backend/app/transport_candidates/tp27_tcp_direct.py"
       - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/publish-prebuilt-release.yml"
       - ".github/workflows/adaptive-multilane-v149-smoke.yml"
   push:
     branches:
       - main
     paths:
       - "VERSION"
+      - "tools/tp27-tcp-direct/**"
       - "backend/app/adaptive_multilane_v149.py"
       - "backend/app/adaptive_multilane_v151.py"
       - "backend/app/transport_candidates/__init__.py"
       - "backend/app/transport_candidates/common.py"
       - "backend/app/transport_candidates/tp27_tcp_direct.py"
       - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/publish-prebuilt-release.yml"
       - ".github/workflows/adaptive-multilane-v149-smoke.yml"
 
 jobs:
   smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -37,7 +41,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile V149 runtime
+      - name: Compile V149/V152 runtime
         run: |
           python -m py_compile \
             backend/app/adaptive_multilane_v149.py \
@@ -46,7 +50,34 @@ jobs:
             backend/app/transport_candidates/tp27_tcp_direct.py \
             backend/app/tunnel_transport_manager_v12.py
 
-      - name: Verify V149 independent-lane contracts
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.0"
+          cache: false
+
+      - name: Build source-owned Direct TCP carrier
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          BUILD_DIR="$(mktemp -d)"
+          trap 'rm -rf "$BUILD_DIR"' EXIT
+          cp tools/tp27-tcp-direct/go.mod "$BUILD_DIR/go.mod"
+          cp tools/tp27-tcp-direct/main.go "$BUILD_DIR/main.go"
+          (
+            cd "$BUILD_DIR"
+            GOWORK=off go vet ./...
+            CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOWORK=off \
+              go build -trimpath -o tp27-tcp-direct .
+            test -s tp27-tcp-direct
+            ./tp27-tcp-direct -h >help.txt 2>&1 || true
+            grep -q -- '-token-file' help.txt
+            grep -q -- '-lanes' help.txt
+            grep -q -- '-mtu' help.txt
+          )
+          test -z "$(git status --short -- tools/tp27-tcp-direct)"
+
+      - name: Verify V149 independent-lane and V152 packaging contracts
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -56,7 +87,9 @@ jobs:
           registry = Path("backend/app/transport_candidates/__init__.py").read_text()
           common = Path("backend/app/transport_candidates/common.py").read_text()
           tcp = Path("backend/app/transport_candidates/tp27_tcp_direct.py").read_text()
+          tcp_go = Path("tools/tp27-tcp-direct/main.go").read_text()
           manager = Path("backend/app/tunnel_transport_manager_v12.py").read_text()
+          publisher = Path(".github/workflows/publish-prebuilt-release.yml").read_text()
 
           prefix = "1.1.0-rc."
           assert version.startswith(prefix), version
@@ -81,20 +114,38 @@ jobs:
               assert token in registry, token
 
           for token in (
-              "TWINPANEL TP27 DIRECT TCP L3 V149",
+              "TWINPANEL TP27 DIRECT TCP L3 V152",
               'carrier_class": "direct-tcp-l3"',
               '"depends_on": None',
+              'ARTIFACT_NAME = "tp27-tcp-direct-linux-x86_64"',
+              '"source_built": True',
               "--mode client",
               "--mode server",
               "--lanes {LANES}",
               "--mtu {MTU}",
+              "--token-file {token_path}",
               "TCP_PORT_BASES = (46200, 47200, 48200)",
           ):
               assert token in tcp, token
 
-          assert "install_tp2027_overlays" not in tcp
-          assert "backhaul_runtime_values" not in tcp
-          assert "encap fou" not in tcp
+          for forbidden in (
+              "ARTIFACT_STORE",
+              "twinpanel-backhaul-tcp-0.3.0",
+              "install_tp2027_overlays",
+              "backhaul_runtime_values",
+              "encap fou",
+          ):
+              assert forbidden not in tcp, forbidden
+
+          for token in (
+              'magic     = "TP27TCP1"',
+              'flag.String("token-file"',
+              "subtle.ConstantTimeCompare",
+              "flowHash(packet)",
+              "SetNoDelay(true)",
+              "SetKeepAlive(true)",
+          ):
+              assert token in tcp_go, token
 
           assert "parse_ping_rtt" in common
           assert '"jitter_ms": jitter' in common
@@ -108,5 +159,9 @@ jobs:
               "apply_adaptive_multilane_v149()"
           )
 
-          print("ADAPTIVE_MULTILANE_V149_SMOKE_OK")
+          assert "Build verified TP27 Direct TCP carrier" in publisher
+          assert "tp27-tcp-direct-linux-x86_64.sha256" in publisher
+          assert "source/tools/tp27-tcp-direct/main.go" in publisher
+
+          print("ADAPTIVE_MULTILANE_V149_V152_SMOKE_OK")
           PY
