@@ -1,316 +1,322 @@
 "use client";
 
-import {FormEvent,useEffect,useState} from "react";
-import {Badge,Card,Shell} from "./ui";
-import {adminApi,AdminNode} from "../lib/admin-api";
-import {AnyRow,parityApi,ProvisionInstallPayload,ProvisionProtocolSettings} from "../lib/admin-parity-api";
-import {API_BASE} from "../lib/api";
-import {getCustomerToken} from "../lib/customer-api";
+import {FormEvent, useEffect, useState} from "react";
+
+import {Badge, Card, Shell} from "./ui";
+import {adminApi, type AdminNode} from "../lib/admin-api";
+import {type AnyRow, parityApi, type ProvisionInstallPayload, type ProvisionProtocolSettings} from "../lib/admin-parity-api";
 import {useI18n} from "../lib/i18n";
 
 
-type ProvisionDraft=ProvisionInstallPayload&{
-  xray_domain:string;
+const BASE_ONLY_PROTOCOLS: ProvisionProtocolSettings = {
+  install_cisco: false,
+  cisco_port: 443,
+  install_openvpn: false,
+  openvpn_port: 1194,
+  openvpn_transport: "udp",
+  install_wireguard: false,
+  wireguard_port: 51820,
+  install_l2tp: false,
+  install_v2ray: false,
+  xray_port: 8443,
 };
 
-type XrayDomainState={
-  ok?:boolean;
-  node_id?:number;
-  xray_domain?:string|null;
-  effective_xray_domain?:string|null;
-  legacy_public_domain_fallback?:boolean;
-  public_domain?:string|null;
-  tls_enabled?:boolean;
-  available_profiles?:string[];
-  message?:string;
+const defaultInstall: ProvisionInstallPayload = {
+  host: "",
+  port: 22,
+  username: "root",
+  password: "",
+  name: "",
+  node_type: "exit",
+  country_code: "DE",
+  capacity_users: 1000,
+  ...BASE_ONLY_PROTOCOLS,
 };
 
-
-const defaultProtocols:ProvisionProtocolSettings={
-  install_cisco:true,
-  cisco_port:443,
-  install_openvpn:true,
-  openvpn_port:1194,
-  openvpn_transport:"udp",
-  install_wireguard:true,
-  wireguard_port:51820,
-  install_l2tp:true,
-  install_v2ray:true,
-  xray_port:8443,
-};
-
-const defaultInstall:ProvisionDraft={
-  host:"",
-  port:22,
-  username:"root",
-  password:"",
-  name:"",
-  node_type:"exit",
-  country_code:"DE",
-  capacity_users:1000,
-  xray_domain:"",
-  ...defaultProtocols,
-};
-
-
-function Notice({error,warning,ok}:{error:string;warning:string;ok:string}){
+function Notice({error, warning, ok}: {error: string; warning: string; ok: string}) {
   return <>
-    {error&&<div className="runtime-error">{error}</div>}
-    {warning&&<div className="runtime-warning">{warning}</div>}
-    {ok&&<div className="runtime-success">{ok}</div>}
+    {error && <div className="runtime-error">{error}</div>}
+    {warning && <div className="runtime-warning">{warning}</div>}
+    {ok && <div className="runtime-success">{ok}</div>}
   </>;
 }
 
-function Toggle({label,checked,onChange}:{label:string;checked:boolean;onChange:(value:boolean)=>void}){
-  return <label className="toggle module-toggle"><span>{label}</span><input type="checkbox" checked={checked} onChange={e=>onChange(e.target.checked)}/><i/></label>;
+function StatusBadge({value}: {value: unknown}) {
+  const status = String(value || "unknown").toLowerCase();
+  const tone = ["online", "active", "ok", "healthy", "paired"].includes(status)
+    ? "ok"
+    : ["offline", "failed", "error", "revoked"].includes(status)
+      ? "bad"
+      : "warn";
+  return <Badge tone={tone}>{String(value || "—")}</Badge>;
 }
 
-function StatusBadge({value}:{value:unknown}){
-  const s=String(value||"unknown").toLowerCase();
-  return <Badge tone={["online","active","ok","healthy","paired"].includes(s)?"ok":["offline","failed","error","revoked"].includes(s)?"bad":"warn"}>{String(value||"—")}</Badge>;
-}
+export function ProvisionRuntimeXrayDomainPage() {
+  const {pick} = useI18n();
+  const [nodes, setNodes] = useState<AdminNode[]>([]);
+  const [draft, setDraft] = useState<ProvisionInstallPayload>(defaultInstall);
+  const [selected, setSelected] = useState(0);
+  const [lastNodeId, setLastNodeId] = useState(0);
+  const [result, setResult] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [warning, setWarning] = useState("");
+  const [ok, setOk] = useState("");
 
-function errorText(payload:unknown,status:number){
-  if(payload&&typeof payload==="object"){
-    const item=payload as {detail?:unknown;message?:unknown};
-    if(typeof item.detail==="string")return item.detail;
-    if(typeof item.message==="string")return item.message;
-    if(item.detail&&typeof item.detail==="object"&&"message" in item.detail)return String((item.detail as {message:unknown}).message);
-  }
-  return `API error ${status}`;
-}
-
-async function xrayRequest<T>(path:string,init:RequestInit={}):Promise<T>{
-  const token=getCustomerToken();
-  if(!token)throw new Error("AUTH_REQUIRED");
-  const headers=new Headers(init.headers);
-  headers.set("Authorization",`Bearer ${token}`);
-  if(init.body&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");
-  const response=await fetch(`${API_BASE}${path}`,{...init,headers,cache:"no-store"});
-  let payload:unknown=null;
-  try{payload=await response.json();}catch{}
-  if(!response.ok)throw new Error(errorText(payload,response.status));
-  return payload as T;
-}
-
-const getXrayDomain=(nodeId:number)=>xrayRequest<XrayDomainState>(`/v1/xray-modern-admin/nodes/${nodeId}/xray-domain`);
-const saveXrayDomain=(nodeId:number,domain:string)=>xrayRequest<XrayDomainState>(`/v1/xray-modern-admin/nodes/${nodeId}/xray-domain`,{method:"PUT",body:JSON.stringify({domain})});
-const prepareXrayDomain=(nodeId:number)=>xrayRequest<XrayDomainState>(`/v1/xray-modern-admin/nodes/${nodeId}/xray-domain/prepare`,{method:"POST",body:JSON.stringify({issue_certificate:true})});
-
-
-export function ProvisionRuntimeXrayDomainPage(){
-  const {pick}=useI18n();
-  const [nodes,setNodes]=useState<AdminNode[]>([]);
-  const [draft,setDraft]=useState<ProvisionDraft>(defaultInstall);
-  const [selected,setSelected]=useState(0);
-  const [result,setResult]=useState<unknown>(null);
-  const [busy,setBusy]=useState(false);
-  const [error,setError]=useState("");
-  const [warning,setWarning]=useState("");
-  const [ok,setOk]=useState("");
-  const [selectedXrayDomain,setSelectedXrayDomain]=useState("");
-  const [selectedXrayMeta,setSelectedXrayMeta]=useState<XrayDomainState|null>(null);
-
-  const load=async()=>{
+  const load = async () => {
     setError("");
-    try{
-      const data=await adminApi.nodes();
+    try {
+      const data = await adminApi.nodes();
       setNodes(data);
-      setSelected(current=>current&&data.some(row=>row.id===current)?current:(data[0]?.id||0));
-    }catch(e){setError(e instanceof Error?e.message:String(e));}
+      setSelected(current => current && data.some(row => row.id === current) ? current : (data[0]?.id || 0));
+    }
+    catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    }
   };
 
-  useEffect(()=>{void load();},[]);
+  useEffect(() => {
+    void load();
+  }, []);
 
-  useEffect(()=>{
-    if(!selected){setSelectedXrayDomain("");setSelectedXrayMeta(null);return;}
-    const node=nodes.find(row=>row.id===selected);
-    if(!node||node.node_type!=="exit"){setSelectedXrayDomain("");setSelectedXrayMeta(null);return;}
-    let active=true;
-    getXrayDomain(selected).then(data=>{
-      if(!active)return;
-      setSelectedXrayMeta(data);
-      setSelectedXrayDomain(String(data.xray_domain||""));
-    }).catch(()=>{
-      if(active){setSelectedXrayMeta(null);setSelectedXrayDomain("");}
-    });
-    return()=>{active=false;};
-  },[selected,nodes]);
-
-  const act=async(label:string,fn:()=>Promise<unknown>,refresh=true)=>{
-    if(busy)return;
-    setBusy(true);setError("");setWarning("");setOk("");
-    try{
-      const out=await fn();
+  const act = async (label: string, fn: () => Promise<unknown>, refresh = true) => {
+    if (busy) return undefined;
+    setBusy(true);
+    setError("");
+    setWarning("");
+    setOk("");
+    try {
+      const out = await fn();
       setResult(out);
       setOk(label);
-      if(refresh)await load();
+      if (refresh) await load();
       return out;
-    }catch(e){setError(e instanceof Error?e.message:String(e));}
-    finally{setBusy(false);}
+    }
+    catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+      return undefined;
+    }
+    finally {
+      setBusy(false);
+    }
   };
 
-  const setProtocol=(key:keyof ProvisionProtocolSettings,value:boolean|number|string)=>setDraft(current=>({...current,[key]:value} as ProvisionDraft));
-
-  const submit=(e:FormEvent)=>{
-    e.preventDefault();
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
     void act(
-      pick("نود نصب شد","Node installed"),
-      async()=>{
-        const {xray_domain,...installPayload}=draft;
-        const provisionResult=await parityApi.provisionInstall(installPayload);
-        const output=provisionResult as AnyRow;
-        const nodeId=Number(output.node_id||0);
-        const domain=xray_domain.trim();
+      pick("زیرساخت سرور با موفقیت راه‌اندازی شد.", "Server infrastructure was provisioned successfully."),
+      async () => {
+        const payload: ProvisionInstallPayload = {
+          ...draft,
+          country_code: draft.node_type === "iran" ? "IR" : draft.country_code.trim().toUpperCase(),
+          ...BASE_ONLY_PROTOCOLS,
+        };
 
-        if(
-          nodeId>0
-          && draft.node_type==="exit"
-          && draft.install_v2ray
-          && domain
-        ){
-          try{
-            const saved=await saveXrayDomain(nodeId,domain);
-            let prepared:XrayDomainState|null=null;
-            let prepareWarning="";
-            try{
-              prepared=await prepareXrayDomain(nodeId);
-            }catch(prepareError){
-              prepareWarning=prepareError instanceof Error?prepareError.message:String(prepareError);
-              setWarning(pick(
-                `نود نصب شد و دامنه Xray ذخیره شد، اما SSL هنوز آماده نشد: ${prepareWarning}`,
-                `Node installed and Xray domain saved, but TLS preparation is not ready yet: ${prepareWarning}`,
-              ));
-            }
-            return {...output,xray_domain_setup:{saved,prepared,warning:prepareWarning||null}};
-          }catch(domainError){
-            const message=domainError instanceof Error?domainError.message:String(domainError);
-            setWarning(pick(
-              `نود نصب شد، اما ثبت دامنه Xray کامل نشد: ${message}`,
-              `Node installed, but saving the Xray domain did not complete: ${message}`,
-            ));
-            return {...output,xray_domain_setup:{ok:false,error:message}};
-          }
+        const output = await parityApi.provisionInstall(payload) as AnyRow;
+        const nodeId = Number(output.node_id || 0);
+        if (nodeId > 0) {
+          setLastNodeId(nodeId);
+          setSelected(nodeId);
         }
-
         return output;
       },
     );
   };
 
-  const saveExistingDomain=async(prepare:boolean)=>{
-    if(!selected||busy)return;
-    setBusy(true);setError("");setWarning("");setOk("");
-    try{
-      const saved=await saveXrayDomain(selected,selectedXrayDomain.trim());
-      setSelectedXrayMeta(saved);
-      if(prepare&&selectedXrayDomain.trim()){
-        try{
-          const prepared=await prepareXrayDomain(selected);
-          setSelectedXrayMeta(current=>({...current,...prepared}));
-          setOk(pick("دامنه Xray ذخیره و TLS آماده شد.","Xray domain saved and TLS prepared."));
-        }catch(e){
-          setWarning(pick(
-            `دامنه ذخیره شد، اما آماده‌سازی TLS کامل نشد: ${e instanceof Error?e.message:String(e)}`,
-            `Domain saved, but TLS preparation did not complete: ${e instanceof Error?e.message:String(e)}`,
-          ));
-        }
-      }else{
-        setOk(pick("دامنه Xray ذخیره شد.","Xray domain saved."));
-      }
-    }catch(e){setError(e instanceof Error?e.message:String(e));}
-    finally{setBusy(false);}
-  };
+  const selectedNode = nodes.find(node => node.id === selected);
+  const onlineNodes = nodes.filter(node => String(node.status).toLowerCase() === "online").length;
+  const iranNodes = nodes.filter(node => node.node_type === "iran").length;
+  const exitNodes = nodes.filter(node => node.node_type === "exit").length;
+  const protocolsHref = `/admin/modern-protocols${lastNodeId ? `?node=${lastNodeId}` : selected ? `?node=${selected}` : ""}`;
 
-  const selectedNode=nodes.find(n=>n.id===selected);
-  const showNewXrayDomain=draft.node_type==="exit"&&draft.install_v2ray;
-  const onlineNodes=nodes.filter(n=>String(n.status).toLowerCase()==="online").length;
-  const iranNodes=nodes.filter(n=>n.node_type==="iran").length;
-  const exitNodes=nodes.filter(n=>n.node_type==="exit").length;
-
-  return <Shell active="/admin/provision"><div className="page">
-    <div className="page-head"><div><h1>{pick("راه‌اندازی نود","Node Provisioning")}</h1></div><button className="ghost" onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button></div>
-    <Notice error={error} warning={warning} ok={ok}/>
-
-    {result!==null&&<Card>
-      <div className="card-head">
-        <div><b>{pick("آخرین نتیجه عملیات","Latest operation result")}</b><small>{pick("خلاصه نتیجه بالا نمایش داده می‌شود؛ جزئیات فنی فقط در صورت نیاز باز می‌شود.","The result summary stays visible here; technical details are collapsed by default.")}</small></div>
-        <button className="mini-btn" onClick={()=>setResult(null)}>×</button>
+  return <Shell active="/admin/provision">
+    <div className="page">
+      <div className="page-head">
+        <div>
+          <h1>{pick("افزودن سرور", "Add Server")}</h1>
+          <small>{pick(
+            "اینجا فقط زیرساخت سرور، SSH، Agent و Fabric آماده می‌شود؛ نصب و تنظیم همه پروتکل‌ها از صفحه «پروتکل‌ها» انجام می‌شود.",
+            "This page prepares only server infrastructure, SSH, Agent and Fabric; all protocol installation and configuration is managed from the Protocols page.",
+          )}</small>
+        </div>
+        <button className="ghost" type="button" onClick={() => void load()}>{pick("بروزرسانی", "Refresh")}</button>
       </div>
-      <details className="runtime-choice-section">
-        <summary>{pick("نمایش جزئیات فنی","Show technical details")}</summary>
-        <pre className="runtime-log" dir="ltr">{JSON.stringify(result,null,2)}</pre>
-      </details>
-    </Card>}
 
-    <Card>
-      <div className="module-row">
-        <div className="grow"><b>{pick("وضعیت نودها","Node status")}</b><small>{pick("خلاصه زیرساخت فعال","Active infrastructure summary")}</small></div>
-        <Badge tone="warn">{pick("نودها","Nodes")} · {nodes.length}</Badge>
-        <Badge tone="ok">{pick("آنلاین","Online")} · {onlineNodes}</Badge>
-        <Badge tone="warn">{pick("ایران","Iran")} · {iranNodes}</Badge>
-        <Badge tone="warn">{pick("خروجی","Exit")} · {exitNodes}</Badge>
-      </div>
-    </Card>
+      <Notice error={error} warning={warning} ok={ok}/>
 
-    <div className="module-grid two" style={{alignItems:"start"}}>
-      <Card>
-        <div className="card-head"><div><b>{pick("نصب نود جدید","Install new node")}</b><small>{pick("Provision امن با مدیریت خودکار پروتکل‌ها","Secure provisioning with automatic protocol management")}</small></div></div>
-        <form onSubmit={submit}>
-          <div className="setting-grid">
-            <label className="field"><span>{pick("نام نود","Node name")}</span><input required value={draft.name} onChange={e=>setDraft(d=>({...d,name:e.target.value}))}/></label>
-            <label className="field"><span>IP / Host</span><input required dir="ltr" value={draft.host} onChange={e=>setDraft(d=>({...d,host:e.target.value}))}/></label>
-            <label className="field"><span>{pick("نوع","Type")}</span><select value={draft.node_type} onChange={e=>setDraft(d=>({...d,node_type:e.target.value as "iran"|"exit",country_code:e.target.value==="iran"?"IR":d.country_code==="IR"?"DE":d.country_code,xray_domain:e.target.value==="iran"?"":d.xray_domain}))}><option value="iran">Iran</option><option value="exit">Exit</option></select></label>
-            <label className="field"><span>{pick("کشور","Country")}</span><input dir="ltr" maxLength={2} value={draft.country_code} onChange={e=>setDraft(d=>({...d,country_code:e.target.value.toUpperCase()}))}/></label>
-            <label className="field"><span>SSH Port</span><input type="number" min={1} max={65535} value={draft.port} onChange={e=>setDraft(d=>({...d,port:Number(e.target.value)}))}/></label>
-            <label className="field"><span>SSH Username</span><input dir="ltr" value={draft.username} onChange={e=>setDraft(d=>({...d,username:e.target.value}))}/></label>
-            <label className="field"><span>SSH Password</span><input type="password" autoComplete="new-password" value={draft.password} onChange={e=>setDraft(d=>({...d,password:e.target.value}))}/></label>
-            <label className="field"><span>{pick("ظرفیت کاربر","User capacity")}</span><input type="number" min={1} value={draft.capacity_users} onChange={e=>setDraft(d=>({...d,capacity_users:Number(e.target.value)}))}/></label>
-            {showNewXrayDomain&&<label className="field span-two"><span>{pick("دامنه V2Ray / Xray","V2Ray / Xray domain")}</span><input dir="ltr" value={draft.xray_domain} onChange={e=>setDraft(d=>({...d,xray_domain:e.target.value}))} placeholder="xray.example.com"/><small>{pick("مستقل از دامنه عمومی نود؛ برای WebSocket TLS و HTTPUpgrade TLS. برای SSL خودکار، DNS باید به IP همین نود خروجی اشاره کند.","Independent from the Node public domain; used by WebSocket TLS and HTTPUpgrade TLS. For automatic TLS, DNS must point to this Exit node IP.")}</small></label>}
+      {lastNodeId > 0 && <Card>
+        <div className="module-row">
+          <div className="grow">
+            <b>{pick("سرور آماده مدیریت پروتکل است", "Server is ready for protocol management")}</b>
+            <small>{pick(
+              "زیرساخت پایه نصب شده است. حالا پروتکل‌های موردنیاز همین سرور را در مرکز پروتکل‌ها انتخاب و نصب کنید.",
+              "Base infrastructure is installed. Now choose and install the protocols for this server in Protocol Studio.",
+            )}</small>
           </div>
+          <a className="primary" href={protocolsHref}>{pick("مدیریت پروتکل‌ها", "Manage protocols")}</a>
+        </div>
+      </Card>}
 
-          <details className="runtime-choice-section">
-            <summary><b>{pick("پروتکل‌ها و پورت‌ها","Protocols & ports")}</b> · {pick("تنظیمات پیشرفته","Advanced settings")}</summary>
-            <div className="protocol-toggle-grid">
-              <Toggle label="Cisco / OpenConnect" checked={draft.install_cisco} onChange={v=>setProtocol("install_cisco",v)}/>
-              <label className="field"><span>Cisco Port</span><input type="number" min={1} max={65535} value={draft.cisco_port} onChange={e=>setProtocol("cisco_port",Number(e.target.value))}/></label>
-              <Toggle label="OpenVPN" checked={draft.install_openvpn} onChange={v=>setProtocol("install_openvpn",v)}/>
-              <label className="field"><span>OpenVPN</span><div className="inline-fields"><input type="number" min={1} max={65535} value={draft.openvpn_port} onChange={e=>setProtocol("openvpn_port",Number(e.target.value))}/><select value={draft.openvpn_transport} onChange={e=>setProtocol("openvpn_transport",e.target.value)}><option value="udp">UDP</option><option value="tcp">TCP</option></select></div></label>
-              <Toggle label="WireGuard" checked={draft.install_wireguard} onChange={v=>setProtocol("install_wireguard",v)}/>
-              <label className="field"><span>WireGuard Port</span><input type="number" min={1} max={65535} value={draft.wireguard_port} onChange={e=>setProtocol("wireguard_port",Number(e.target.value))}/></label>
-              <Toggle label="L2TP / IPsec" checked={draft.install_l2tp} onChange={v=>setProtocol("install_l2tp",v)}/>
-              <Toggle label="V2Ray / Xray" checked={draft.install_v2ray} onChange={v=>setProtocol("install_v2ray",v)}/>
-              <label className="field"><span>Xray Port</span><input type="number" min={1} max={65535} value={draft.xray_port} onChange={e=>setProtocol("xray_port",Number(e.target.value))}/></label>
-            </div>
-          </details>
-
-          <div className="action-row">
-            <button type="button" className="ghost" disabled={busy||!draft.host||!draft.password} onClick={()=>void act(pick("اتصال SSH موفق بود","SSH connection passed"),()=>parityApi.provisionTest({host:draft.host,port:draft.port,username:draft.username,password:draft.password}),false)}>{pick("تست SSH","Test SSH")}</button>
-            <button className="primary" disabled={busy||!draft.host||!draft.password||!draft.name}>{pick("نصب و راه‌اندازی","Install & Provision")}</button>
+      {result !== null && <Card>
+        <div className="card-head">
+          <div>
+            <b>{pick("آخرین نتیجه عملیات", "Latest operation result")}</b>
+            <small>{pick("جزئیات فنی فقط برای بررسی و عیب‌یابی نمایش داده می‌شوند.", "Technical details are available only for inspection and troubleshooting.")}</small>
           </div>
-        </form>
-      </Card>
+          <button className="mini-btn" type="button" onClick={() => setResult(null)}>×</button>
+        </div>
+        <details className="runtime-choice-section">
+          <summary>{pick("نمایش جزئیات فنی", "Show technical details")}</summary>
+          <pre className="runtime-log" dir="ltr">{JSON.stringify(result, null, 2)}</pre>
+        </details>
+      </Card>}
 
       <Card>
-        <div className="card-head"><div><b>{pick("مدیریت نود موجود","Existing node operations")}</b><small>{pick("Health، Repair، Agent، Tunnel Fabric و دامنه Xray","Health, repair, agent, tunnel fabric and Xray domain")}</small></div></div>
-        <label className="field"><span>{pick("نود","Node")}</span><select value={selected} onChange={e=>setSelected(Number(e.target.value))}>{nodes.map(n=><option key={n.id} value={n.id}>{n.name} · {n.public_ip} · {n.status}</option>)}</select></label>
-        {selectedNode&&<div className="module-row"><div className="grow"><b>{selectedNode.name}</b><small dir="ltr">{selectedNode.public_ip}</small></div><StatusBadge value={selectedNode.status}/></div>}
-
-        {selectedNode?.node_type==="exit"&&<details className="runtime-choice-section">
-          <summary><b>{pick("دامنه اختصاصی Xray","Dedicated Xray domain")}</b></summary>
-          <label className="field"><span>{pick("دامنه V2Ray / Xray","V2Ray / Xray domain")}</span><input dir="ltr" value={selectedXrayDomain} onChange={e=>setSelectedXrayDomain(e.target.value)} placeholder="xray.example.com"/></label>
-          <div className="module-row"><div className="grow"><small>{pick("دامنه موثر","Effective domain")}</small><b dir="ltr">{selectedXrayMeta?.effective_xray_domain||"—"}</b></div>{selectedXrayMeta?.legacy_public_domain_fallback&&<Badge tone="warn">{pick("Fallback قدیمی","Legacy fallback")}</Badge>}{selectedXrayMeta?.tls_enabled&&<Badge tone="ok">TLS</Badge>}</div>
-          <div className="action-row"><button type="button" className="ghost" disabled={busy} onClick={()=>void saveExistingDomain(false)}>{pick("ذخیره دامنه Xray","Save Xray domain")}</button><button type="button" className="primary" disabled={busy||!selectedXrayDomain.trim()} onClick={()=>void saveExistingDomain(true)}>{pick("ذخیره و آماده‌سازی SSL","Save & prepare TLS")}</button></div>
-        </details>}
-
-        <div className="action-grid">
-          <button className="ghost" disabled={!selected||busy} onClick={()=>void act(pick("سلامت پروتکل‌ها دریافت شد","Protocol health loaded"),()=>parityApi.provisionProtocolHealth(selected))}>{pick("بررسی پروتکل‌ها","Protocol health")}</button>
-          <button className="ghost" disabled={!selected||busy} onClick={()=>void act(pick("پروتکل‌ها تعمیر شدند","Protocols repaired"),()=>parityApi.provisionRepairSaved({node_id:selected,...defaultProtocols}))}>{pick("Repair پروتکل‌ها","Repair protocols")}</button>
-          <button className="ghost" disabled={!selected||busy} onClick={()=>void act(pick("Agent ارتقا یافت","Agent upgraded"),()=>parityApi.provisionUpgradeAgent(selected))}>{pick("ارتقا Agent","Upgrade agent")}</button>
-          <button className="ghost" disabled={!selected||busy} onClick={()=>void act(pick("Fabric نصب شد","Fabric installed"),()=>parityApi.provisionInstallFabric(selected))}>{pick("نصب Fabric","Install fabric")}</button>
-          <button className="ghost" disabled={!selected||busy} onClick={()=>void act(pick("وضعیت Fabric دریافت شد","Fabric status loaded"),()=>parityApi.provisionFabricStatus(selected),false)}>{pick("وضعیت Fabric","Fabric status")}</button>
+        <div className="module-row">
+          <div className="grow">
+            <b>{pick("وضعیت زیرساخت", "Infrastructure status")}</b>
+            <small>{pick("خلاصه نودهای ثبت‌شده", "Registered node summary")}</small>
+          </div>
+          <Badge tone="warn">{pick("کل", "Total")} · {nodes.length}</Badge>
+          <Badge tone="ok">{pick("آنلاین", "Online")} · {onlineNodes}</Badge>
+          <Badge tone="warn">{pick("ایران", "Iran")} · {iranNodes}</Badge>
+          <Badge tone="warn">{pick("خروجی", "Exit")} · {exitNodes}</Badge>
         </div>
       </Card>
+
+      <div className="module-grid two" style={{alignItems: "start"}}>
+        <Card>
+          <div className="card-head">
+            <div>
+              <b>{pick("سرور جدید", "New server")}</b>
+              <small>{pick(
+                "اتصال SSH تست می‌شود و سپس Base، دسترسی امن، Node Agent و Tunnel Fabric نصب می‌شوند.",
+                "SSH is verified, then the Base layer, secure access, Node Agent and Tunnel Fabric are installed.",
+              )}</small>
+            </div>
+          </div>
+
+          <form onSubmit={submit}>
+            <div className="setting-grid">
+              <label className="field">
+                <span>{pick("نام سرور", "Server name")}</span>
+                <input required value={draft.name} onChange={event => setDraft(current => ({...current, name: event.target.value}))}/>
+              </label>
+
+              <label className="field">
+                <span>IP / Host</span>
+                <input required dir="ltr" value={draft.host} onChange={event => setDraft(current => ({...current, host: event.target.value}))}/>
+              </label>
+
+              <label className="field">
+                <span>{pick("نقش سرور", "Server role")}</span>
+                <select
+                  value={draft.node_type}
+                  onChange={event => setDraft(current => ({
+                    ...current,
+                    node_type: event.target.value as "iran" | "exit",
+                    country_code: event.target.value === "iran" ? "IR" : current.country_code === "IR" ? "DE" : current.country_code,
+                  }))}
+                >
+                  <option value="iran">{pick("ایران · Relay / Tunnel", "Iran · Relay / Tunnel")}</option>
+                  <option value="exit">{pick("خارج · Exit / VPN Access", "Exit · VPN Access")}</option>
+                </select>
+              </label>
+
+              <label className="field">
+                <span>{pick("کد کشور", "Country code")}</span>
+                <input
+                  required
+                  dir="ltr"
+                  maxLength={2}
+                  minLength={2}
+                  pattern="[A-Za-z]{2}"
+                  disabled={draft.node_type === "iran"}
+                  value={draft.node_type === "iran" ? "IR" : draft.country_code}
+                  onChange={event => setDraft(current => ({...current, country_code: event.target.value.toUpperCase()}))}
+                />
+              </label>
+
+              <label className="field">
+                <span>SSH Port</span>
+                <input type="number" min={1} max={65535} value={draft.port} onChange={event => setDraft(current => ({...current, port: Number(event.target.value)}))}/>
+              </label>
+
+              <label className="field">
+                <span>SSH Username</span>
+                <input required dir="ltr" value={draft.username} onChange={event => setDraft(current => ({...current, username: event.target.value}))}/>
+              </label>
+
+              <label className="field">
+                <span>SSH Password</span>
+                <input required type="password" autoComplete="new-password" value={draft.password} onChange={event => setDraft(current => ({...current, password: event.target.value}))}/>
+              </label>
+
+              <label className="field">
+                <span>{pick("ظرفیت کاربر", "User capacity")}</span>
+                <input type="number" min={1} value={draft.capacity_users} onChange={event => setDraft(current => ({...current, capacity_users: Number(event.target.value)}))}/>
+              </label>
+            </div>
+
+            <div className="runtime-info-list">
+              <div><span>{pick("پروتکل‌های کاربری", "Access protocols")}</span><b>{pick("در این مرحله نصب نمی‌شوند", "Not installed at this stage")}</b></div>
+              <div><span>{pick("مرحله بعد", "Next step")}</span><b>{pick("پروتکل‌ها → انتخاب سرور → نصب", "Protocols → choose server → install")}</b></div>
+            </div>
+
+            <div className="action-row">
+              <button
+                type="button"
+                className="ghost"
+                disabled={busy || !draft.host || !draft.password}
+                onClick={() => void act(
+                  pick("اتصال SSH موفق بود", "SSH connection passed"),
+                  () => parityApi.provisionTest({host: draft.host, port: draft.port, username: draft.username, password: draft.password}),
+                  false,
+                )}
+              >
+                {pick("تست SSH", "Test SSH")}
+              </button>
+              <button className="primary" disabled={busy || !draft.host || !draft.password || !draft.name}>
+                {busy ? "…" : pick("افزودن و آماده‌سازی سرور", "Add & prepare server")}
+              </button>
+            </div>
+          </form>
+        </Card>
+
+        <Card>
+          <div className="card-head">
+            <div>
+              <b>{pick("عملیات زیرساخت نود موجود", "Existing node infrastructure")}</b>
+              <small>{pick(
+                "عملیات مربوط به Agent و Tunnel Fabric؛ مدیریت پروتکل‌ها عمداً از این بخش حذف شده است.",
+                "Agent and Tunnel Fabric operations only; protocol management is intentionally removed from this section.",
+              )}</small>
+            </div>
+          </div>
+
+          <label className="field">
+            <span>{pick("نود", "Node")}</span>
+            <select value={selected} onChange={event => setSelected(Number(event.target.value))}>
+              {nodes.map(node => <option key={node.id} value={node.id}>{node.name} · {node.public_ip} · {node.status}</option>)}
+            </select>
+          </label>
+
+          {selectedNode && <div className="module-row">
+            <div className="grow">
+              <b>{selectedNode.name}</b>
+              <small dir="ltr">{selectedNode.public_ip}</small>
+            </div>
+            <StatusBadge value={selectedNode.status}/>
+          </div>}
+
+          <div className="action-grid">
+            <button className="ghost" type="button" disabled={!selected || busy} onClick={() => void act(pick("Agent ارتقا یافت", "Agent upgraded"), () => parityApi.provisionUpgradeAgent(selected))}>{pick("ارتقا Agent", "Upgrade agent")}</button>
+            <button className="ghost" type="button" disabled={!selected || busy} onClick={() => void act(pick("Fabric نصب شد", "Fabric installed"), () => parityApi.provisionInstallFabric(selected))}>{pick("نصب Fabric", "Install fabric")}</button>
+            <button className="ghost" type="button" disabled={!selected || busy} onClick={() => void act(pick("وضعیت Fabric دریافت شد", "Fabric status loaded"), () => parityApi.provisionFabricStatus(selected), false)}>{pick("وضعیت Fabric", "Fabric status")}</button>
+            <a className="primary" href={protocolsHref}>{pick("مدیریت پروتکل‌ها", "Manage protocols")}</a>
+          </div>
+        </Card>
+      </div>
     </div>
-  </div></Shell>;
+  </Shell>;
 }
