@@ -60,15 +60,16 @@ jobs:
               assert platform in v11
 
           assert 'navigator.userAgentData' in v11
-          assert 'Android|iPhone|iPad|iPod' in v11
+          assert '/android/i' in v11
+          assert 'iphone|ipad|ipod' in v11
           assert 'windows|win32|win64|winarm' in v11
-          assert 'Macintosh' in v11 and 'maxTouchPoints' in v11
+          assert 'macintosh|mac os|macintel' in v11 and 'maxTouchPoints' in v11
           assert 'linux|x11|cros' in v11
           assert 'body.dataset.tpPlatform=platform' in v11
           assert "platform==='android'||platform==='ios'" in v11
 
           assert "sourceAppLinks" in v11
-          assert '.platform-group[data-platform=' in v11
+          assert 'platform-group[data-platform=' in v11
           assert "list.replaceChildren()" in v11
           assert "برنامه‌های مناسب" in v11
           assert "همه سیستم‌ها" in v11
