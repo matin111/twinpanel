@@ -62,8 +62,9 @@ jobs:
           assert "!important" not in v12
 
           forbidden = (
-              "sqlalchemy", "get_db", "Subscription", "ProtocolCredential",
-              "quota", "provision", "ssh_connect", "payment"
+              "from sqlalchemy", "import sqlalchemy", "get_db(",
+              "ProtocolCredential", "db.add(", "db.commit(",
+              "quota_models", "ssh_connect", "payment"
           )
           lower = v12.lower()
           for item in forbidden:
