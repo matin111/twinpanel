@@ -65,9 +65,16 @@ jobs:
         run: |
           python - <<'PY'
           from app.database import Base, SessionLocal, engine
+          # Mirror app.main's model-registration contract before create_all().
+          # PaymentIntent has an FK to store_orders, so both sides must be in
+          # Base.metadata even in this intentionally minimal installer smoke.
+          from app import store_models, payment_models
           from app.local_core_runtime import LOCAL_AGENT_URL
           from scripts.twinpanel_installer_protocols import parse_protocols
           from app.local_core_runtime import ensure_local_core_node
+
+          _ = store_models
+          _ = payment_models
 
           assert parse_protocols("all") == ["cisco", "openvpn", "wireguard", "l2tp", "v2ray"]
           assert parse_protocols("cisco,openvpn,wg") == ["cisco", "openvpn", "wireguard"]
