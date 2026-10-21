@@ -1,0 +1,79 @@
+name: Public Connect Manual Fields V10 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/public_connection_manual_fields_v10.py"
+      - "backend/app/routers/public_connection_hub_live_v5.py"
+      - ".github/workflows/public-connect-manual-fields-v10-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/routers/public_connection_manual_fields_v10.py"
+      - "backend/app/routers/public_connection_hub_live_v5.py"
+      - ".github/workflows/public-connect-manual-fields-v10-smoke.yml"
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile public connect refiners
+        run: |
+          python -m py_compile \
+            backend/app/routers/public_connection_manual_fields_v10.py \
+            backend/app/routers/public_connection_hub_live_v5.py
+
+      - name: Parse V10 inline JavaScript
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          source = Path("backend/app/routers/public_connection_manual_fields_v10.py").read_text()
+          match = re.search(r'_V10_SCRIPT\s*=\s*r"""(.*?)"""', source, re.S)
+          assert match, "V10 script block not found"
+          script = match.group(1).strip()
+          script = re.sub(r'^<script[^>]*>\s*', '', script)
+          script = re.sub(r'\s*</script>$', '', script)
+          Path('/tmp/twinpanel-public-connect-v10.js').write_text(script)
+          PY
+          node --check /tmp/twinpanel-public-connect-v10.js
+
+      - name: Verify Cisco and L2TP mobile credential contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          v10 = Path("backend/app/routers/public_connection_manual_fields_v10.py").read_text()
+          live = Path("backend/app/routers/public_connection_hub_live_v5.py").read_text()
+
+          assert "TWINPANEL_PUBLIC_CONNECT_MANUAL_FIELDS_V10" in v10
+          assert "Cisco / OpenConnect" in v10
+          assert "L2TP / IPsec" in v10
+          assert "Server & Port" in v10
+          assert "IPsec Secret" in v10
+          assert "آدرس سرور" in v10
+          assert "نام کاربری" in v10
+          assert "رمز عبور" in v10
+          assert "کلید IPsec" in v10
+          assert "کپی همه" in v10
+          assert "v10-field-copy" in v10
+          assert "fact.querySelector('strong')" in v10
+          assert "fact.querySelector('[data-copy]')" in v10
+          assert "document.execCommand('copy')" in v10
+          assert "!important" not in v10
+
+          assert "refine_public_connection_manual_fields_v10" in live
+          assert live.index("refine_public_connection_hub_v9(source, token)") < live.index("refine_public_connection_manual_fields_v10(source)")
+
+          forbidden = (
+              "db.add(",
+              "db.commit(",
+              "subprocess",
+              "asyncssh",
+              "ProtocolCredential",
+              "QuotaDevice",
+          )
+          assert all(token not in v10 for token in forbidden)
+          PY
