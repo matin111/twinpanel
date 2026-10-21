@@ -1,0 +1,27 @@
+.themeBridge{
+  --conversion-accent:var(--conversion-theme-accent,#8b5cf6);
+  --conversion-accent-2:var(--conversion-theme-accent-2,#6d28d9);
+  --conversion-page-bg:var(--conversion-theme-page,#060915);
+  --conversion-section-bg:var(--conversion-theme-section,#0b1020);
+  --conversion-card-bg:var(--conversion-theme-card,#0f1526);
+  --conversion-card-border:var(--conversion-theme-border,#202b42);
+  --conversion-header-bg:var(--conversion-theme-header,#080c18);
+  --conversion-header-text:var(--conversion-theme-header-text,#f7f8ff);
+  --conversion-button-bg:var(--conversion-theme-button,#7c3aed);
+  --conversion-button-text:var(--conversion-theme-button-text,#ffffff);
+  --conversion-text:var(--conversion-theme-text,#f7f8ff);
+  --conversion-muted:var(--conversion-theme-muted,#9aa7bf);
+  color-scheme:dark;
+}
+
+:global(html[data-theme="light"]) .themeBridge{
+  --conversion-page-bg:color-mix(in srgb,var(--conversion-accent) 3%,#f8fafc);
+  --conversion-section-bg:color-mix(in srgb,var(--conversion-accent) 5%,#f1f5f9);
+  --conversion-card-bg:#ffffff;
+  --conversion-card-border:color-mix(in srgb,var(--conversion-accent) 12%,#d7dee8);
+  --conversion-header-bg:color-mix(in srgb,var(--conversion-accent) 2%,#ffffff);
+  --conversion-header-text:#111827;
+  --conversion-text:#111827;
+  --conversion-muted:#667085;
+  color-scheme:light;
+}
