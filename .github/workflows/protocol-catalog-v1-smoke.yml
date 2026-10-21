@@ -81,12 +81,22 @@ jobs:
 
       - name: Verify current sing-box feature baseline is fail-closed
         run: |
-          grep -q 'MIN_SING_BOX_VERSION = (1, 14, 0)' backend/app/modern_protocol_runtime_v2.py
-          grep -q 'apt-get -o DPkg::Lock::Timeout=300 update -y' backend/app/modern_protocol_runtime_v2.py
-          grep -q 'sing-box 1.14.0+' backend/app/modern_protocol_runtime_v2.py
-          grep -q 'Snell v6 PSK must be 12..255 bytes' backend/app/modern_protocol_runtime_v2.py
-          grep -q 'bak-v2-' backend/app/modern_protocol_runtime_v2.py
-          grep -q 'bak-remove-' backend/app/modern_protocol_runtime_v2.py
+          python - <<'PY'
+          from pathlib import Path
+
+          body = Path('backend/app/modern_protocol_runtime_v2.py').read_text(encoding='utf-8')
+          required = [
+              'MIN_SING_BOX_VERSION = (1, 14, 0)',
+              'version < MIN_SING_BOX_VERSION',
+              'apt-get -o DPkg::Lock::Timeout=300 update -y',
+              'installed version:',
+              'Snell v6 PSK must be 12..255 bytes',
+              'bak-v2-',
+              'bak-remove-',
+          ]
+          missing = [item for item in required if item not in body]
+          assert not missing, missing
+          PY
 
       - name: Verify V2 route precedence registration and rollback path
         run: |
