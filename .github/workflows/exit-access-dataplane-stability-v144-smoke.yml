@@ -1,0 +1,89 @@
+name: Exit Access Dataplane Stability V144 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/exit_access_dataplane_stability_v144.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/exit-access-dataplane-stability-v144-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/exit_access_dataplane_stability_v144.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/exit-access-dataplane-stability-v144-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile stability layer
+        run: |
+          python -m py_compile \
+            backend/app/exit_access_dataplane_stability_v144.py \
+            backend/app/tunnel_transport_manager_v12.py
+
+      - name: Verify V144 contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          stability = Path(
+              "backend/app/exit_access_dataplane_stability_v144.py"
+          ).read_text()
+          manager = Path(
+              "backend/app/tunnel_transport_manager_v12.py"
+          ).read_text()
+
+          required = [
+              "TWINPANEL_EXIT_ACCESS_DATAPLANE_STABILITY_V144",
+              "_egress_stability_guard",
+              "_performance_stability_guard",
+              "TP_ACCESS_EGRESS",
+              "TP_ACCESS_FWD",
+              "TP_ACCESS_MSS",
+              "TP_ACCESS_PERF",
+              "STABLE=1",
+              "V46_STABLE=1",
+              "V51_STABLE=1",
+              "drift fallback: existing V46 repair path",
+              "drift fallback: existing V51 repair path",
+              "dataplane._egress_script = _egress_script_v144",
+              "performance._performance_script = _performance_script_v144",
+          ]
+
+          for token in required:
+              assert token in stability, token
+
+          # The steady-state guards must be placed before the legacy repair
+          # fallback so unchanged Desired State exits before V46/V51 can flush.
+          assert stability.index("V46_STABLE=1") < stability.index(
+              "drift fallback: existing V46 repair path"
+          )
+          assert stability.index("V51_STABLE=1") < stability.index(
+              "drift fallback: existing V51 repair path"
+          )
+
+          # V144 itself must not add a new direct live-chain flush.
+          assert "iptables -F" not in stability
+          assert "ipt -t nat -F" not in stability
+          assert "ipt -t filter -F" not in stability
+          assert "ipt -t mangle -F" not in stability
+
+          assert (
+              "apply_exit_access_dataplane_stability_v144" in manager
+          )
+          assert "exit_access_stability=v144" in manager
+
+          print("EXIT_ACCESS_DATAPLANE_STABILITY_V144_SMOKE_OK")
+          PY

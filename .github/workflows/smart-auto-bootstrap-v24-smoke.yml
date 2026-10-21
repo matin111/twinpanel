@@ -64,6 +64,13 @@ jobs:
       - name: Run bootstrap database contract
         run: |
           python - <<'PY'
+          # Register Store tables before create_all(). payment_models is pulled
+          # into metadata by the runtime import graph and has an FK from
+          # payment_intents.order_id -> store_orders.id. This smoke owns a
+          # standalone metadata lifecycle, so it must import the referenced
+          # table model explicitly just like the full application bootstrap.
+          import app.store_models  # noqa: F401
+
           from app.database import Base, SessionLocal, engine
           from app.models import (
               Node,
