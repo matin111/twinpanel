@@ -1,0 +1,35 @@
+name: Unified Protocol Adapter Registry V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/protocol_adapter_registry.py"
+      - "backend/app/protocol_catalog.py"
+      - "backend/app/routers/classic_protocol_admin_v1.py"
+      - "backend/app/routers/modern_protocol_admin_v2.py"
+      - "components/protocol-command-center.tsx"
+      - "scripts/smoke-unified-protocol-adapter-registry-v1.py"
+      - ".github/workflows/unified-protocol-adapter-registry-v1-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  registry:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile adapter contract
+        run: |
+          python -m py_compile \
+            backend/app/protocol_adapter_registry.py \
+            backend/app/routers/classic_protocol_admin_v1.py \
+            scripts/smoke-unified-protocol-adapter-registry-v1.py
+
+      - name: Verify unified registry and fail-closed capabilities
+        run: python scripts/smoke-unified-protocol-adapter-registry-v1.py
