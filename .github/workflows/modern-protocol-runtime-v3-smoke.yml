@@ -1,0 +1,52 @@
+name: Modern Protocol Runtime V3 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/standalone_protocol_runtime.py"
+      - "backend/app/modern_protocol_dispatch.py"
+      - "backend/app/routers/modern_protocol_admin_v3.py"
+      - "backend/app/main.py"
+      - "backend/scripts/modern_protocol_runtime_v3_smoke.py"
+      - ".github/workflows/modern-protocol-runtime-v3-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    env:
+      APP_NAME: TwinPanel-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: sqlite:////tmp/twinpanel-modern-v3.db
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Compile modern protocol runtime
+        run: |
+          python -m compileall -q \
+            backend/app/standalone_protocol_runtime.py \
+            backend/app/modern_protocol_dispatch.py \
+            backend/app/routers/modern_protocol_admin_v3.py \
+            backend/app/main.py \
+            backend/scripts/modern_protocol_runtime_v3_smoke.py
+
+      - name: Run runtime contract smoke
+        working-directory: backend
+        run: PYTHONPATH=. python scripts/modern_protocol_runtime_v3_smoke.py

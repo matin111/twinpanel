@@ -6,8 +6,13 @@ on:
       - 'backend/app/protocol_catalog.py'
       - 'backend/app/modern_protocol_models.py'
       - 'backend/app/modern_protocol_runtime_v2.py'
+      - 'backend/app/modern_protocol_dispatch.py'
+      - 'backend/app/standalone_protocol_runtime.py'
       - 'backend/app/routers/modern_protocol_admin_v2.py'
+      - 'backend/app/routers/modern_protocol_admin_v3.py'
       - 'backend/app/routers/__init__.py'
+      - 'backend/app/main.py'
+      - 'backend/requirements.txt'
       - 'components/modern-protocols-admin.tsx'
       - 'components/modern-protocols-admin-v2.module.css'
       - '.github/workflows/protocol-catalog-v1-smoke.yml'
@@ -19,12 +24,27 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    env:
+      APP_NAME: TwinPanel-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: sqlite:////tmp/twinpanel-protocol-catalog-v3.db
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
 
       - name: Compile protocol control-plane modules
         run: |
@@ -32,28 +52,43 @@ jobs:
             backend/app/protocol_catalog.py \
             backend/app/modern_protocol_models.py \
             backend/app/modern_protocol_runtime_v2.py \
+            backend/app/modern_protocol_dispatch.py \
+            backend/app/standalone_protocol_runtime.py \
             backend/app/routers/modern_protocol_admin_v2.py \
-            backend/app/routers/__init__.py
+            backend/app/routers/modern_protocol_admin_v3.py \
+            backend/app/routers/__init__.py \
+            backend/app/main.py
 
-      - name: Validate catalog presets and safety contracts
+      - name: Validate catalog presets and active runtime contracts
         env:
           PYTHONPATH: backend
         run: |
           python - <<'PY'
+          # Import the active dispatcher first. Standalone adapters register
+          # their production runtime capabilities before catalog serialization.
+          from app.modern_protocol_dispatch import SINGBOX_PROTOCOLS
           from app.protocol_catalog import PROTOCOL_CATALOG, catalog_payload, resolve_settings
 
-          expected_ready = {'hysteria2', 'tuic', 'anytls', 'naive', 'shadowtls', 'snell'}
+          expected_ready = {
+              'hysteria2', 'tuic', 'anytls', 'naive', 'shadowtls', 'snell',
+              'mieru', 'trusttunnel', 'amneziawg', 'sudoku',
+          }
           ready = {key for key, item in PROTOCOL_CATALOG.items() if item['runtime_status'] == 'ready'}
           assert expected_ready == ready, (expected_ready, ready)
-          assert {'mieru', 'trusttunnel', 'amneziawg', 'sudoku'} <= set(PROTOCOL_CATALOG)
+          assert expected_ready <= set(SINGBOX_PROTOCOLS)
 
-          for item in catalog_payload():
-              key = item['key']
+          payload = {item['key']: item for item in catalog_payload()}
+          for key in expected_ready:
+              item = payload[key]
+              assert item['installable'] is True, key
               assert item['presets'].get('recommended') is not None, key
               preset, settings, warnings = resolve_settings(key, 'recommended', {})
               assert preset == 'recommended'
               assert isinstance(settings, dict)
               assert isinstance(warnings, list)
+
+          assert payload['sudoku']['transport'] == 'tcp'
+          assert payload['sudoku']['platforms']
 
           _, tuic, warnings = resolve_settings('tuic', 'recommended', {})
           assert tuic['zero_rtt_handshake'] is False
@@ -98,19 +133,28 @@ jobs:
           assert not missing, missing
           PY
 
-      - name: Verify V2 route precedence registration and rollback path
+      - name: Verify V3 route precedence and V2 rollback reference
         run: |
-          grep -q 'runtime_endpoints.router.include_router(_modern_protocol_admin_v2_router)' backend/app/routers/__init__.py
-          grep -q 'modern_protocol_admin_v2' backend/app/routers/__init__.py
-          grep -q '@router.get("/modern-protocols")' backend/app/routers/modern_protocol_admin_v2.py
-          grep -q '@router.post("/modern-protocols/{node_id}/preview")' backend/app/routers/modern_protocol_admin_v2.py
-          grep -q 'Runtime قبلی Rollback شد' backend/app/routers/modern_protocol_admin_v2.py
+          grep -q 'app.include_router(modern_protocol_admin_v3_router)' backend/app/main.py
+          grep -q 'app.include_router(vpn_settings_router)' backend/app/main.py
+          ! grep -q '_modern_protocol_admin_v2_router' backend/app/routers/__init__.py
+          grep -q '@router.get("/modern-protocols")' backend/app/routers/modern_protocol_admin_v3.py
+          grep -q '@router.post("/modern-protocols/{node_id}/preview")' backend/app/routers/modern_protocol_admin_v3.py
+          grep -q 'Runtime قبلی Rollback شد' backend/app/routers/modern_protocol_admin_v3.py
+          test -s backend/app/routers/modern_protocol_admin_v2.py
+          python - <<'PY'
+          from pathlib import Path
+          body = Path('backend/app/main.py').read_text(encoding='utf-8')
+          v3 = 'app.include_router(modern_protocol_admin_v3_router)'
+          legacy = 'app.include_router(vpn_settings_router)'
+          assert body.index(v3) < body.index(legacy)
+          PY
 
-      - name: Verify production-ready and pending adapters stay explicit
+      - name: Verify standalone production adapters stay explicit
         run: |
-          grep -q '"naive"' backend/app/protocol_catalog.py
-          grep -q '"shadowtls"' backend/app/protocol_catalog.py
-          grep -q '"snell"' backend/app/protocol_catalog.py
-          grep -q '"adapter_pending"' backend/app/protocol_catalog.py
-          grep -q 'experimental_pending' backend/app/protocol_catalog.py
+          grep -q 'MIERU_VERSION = "3.38.1"' backend/app/standalone_protocol_runtime.py
+          grep -q 'TRUSTTUNNEL_VERSION = "1.1.0"' backend/app/standalone_protocol_runtime.py
+          grep -q 'SUDOKU_VERSION = "0.5.1"' backend/app/standalone_protocol_runtime.py
+          grep -q '"amneziawg"' backend/app/standalone_protocol_runtime.py
+          grep -q 'sha256sum -c' backend/app/standalone_protocol_runtime.py
           grep -q 'Adapter رسمی' components/modern-protocols-admin.tsx
