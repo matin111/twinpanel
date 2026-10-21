@@ -170,6 +170,14 @@ function tone(value: string): "ok" | "warn" | "bad" | "violet" {
 }
 
 
+function localizedPair(
+  value: string,
+  table: Record<string, [string, string]>,
+): [string, string] {
+  return table[value] ?? [value, value];
+}
+
+
 function shownValue(editor: EditorState, field: FieldDef): unknown {
   if (field.key in editor.settings) return editor.settings[field.key];
   const preset = editor.preset === "custom" ? "recommended" : editor.preset;
@@ -432,6 +440,7 @@ export function ModernProtocolsAdminPage() {
                         const definition = catalogMap.get(row.protocol);
                         const key = `${node.id}:${row.protocol}`;
                         if (!definition) return null;
+                        const presetLabels = localizedPair(row.preset, PRESET_LABELS);
                         return (
                           <article className={styles.protocolCard} key={row.protocol}>
                             <div className={styles.protocolTop}>
@@ -446,7 +455,7 @@ export function ModernProtocolsAdminPage() {
                               <span className={`${styles.chip} ${row.installable ? styles.chipReady : styles.chipPending}`}>
                                 {row.installable ? pick("Runtime آماده", "Runtime ready") : pick("Adapter در راه", "Adapter pending")}
                               </span>
-                              <span className={styles.chip}>{PRESET_LABELS[row.preset]?.[0] || row.preset}</span>
+                              <span className={styles.chip}>{pick(presetLabels[0], presetLabels[1])}</span>
                               {Object.entries(definition.formats).filter(([, enabled]) => enabled).slice(0, 3).map(([format]) => (
                                 <span className={styles.chip} key={format}>{format.replace("_", "-")}</span>
                               ))}
@@ -559,9 +568,10 @@ export function ModernProtocolsAdminPage() {
               {Object.entries(editor.definition.formats).filter(([, enabled]) => enabled).map(([format]) => <span className={styles.chip} key={format}>{format}</span>)}
             </div>
 
-            {(preview?.warnings || editor.row.warnings || []).map(code => (
-              <div className={styles.warningBox} key={code}>{pick(...(WARNING_LABELS[code] || [code, code]))}</div>
-            ))}
+            {(preview?.warnings || editor.row.warnings || []).map(code => {
+              const labels: [string, string] = WARNING_LABELS[code] ?? [code, code];
+              return <div className={styles.warningBox} key={code}>{pick(labels[0], labels[1])}</div>;
+            })}
 
             {preview && (
               <div className={styles.previewBox}>
