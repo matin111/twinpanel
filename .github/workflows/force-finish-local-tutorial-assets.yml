@@ -1,0 +1,132 @@
+name: Force Finish Local Tutorial Assets
+
+on:
+  push:
+    branches:
+      - feat/store-tutorial-images-v121
+    paths:
+      - '.github/workflows/force-finish-local-tutorial-assets.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  finish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/store-tutorial-images-v121
+          fetch-depth: 0
+
+      - name: Build exact local asset set
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf /tmp/tutorial-final
+          mkdir -p /tmp/tutorial-final/screenshots /tmp/tutorial-final/apps
+
+          if [ -d public/learning/screenshots ] && [ "$(find public/learning/screenshots -type f -name '*.webp' | wc -l | tr -d ' ')" = 65 ]; then
+            cp -a public/learning/screenshots/. /tmp/tutorial-final/screenshots/
+            [ ! -d public/learning/apps ] || cp -a public/learning/apps/. /tmp/tutorial-final/apps/
+          else
+            test -f assets/legacy-learning-visual.csv
+            test -f scripts/verify-legacy-tutorial-images.py
+            python3 -m pip install --disable-pip-version-check pillow
+
+            while IFS=, read -r rel width height ahash dhash; do
+              test -n "$rel" || continue
+              mkdir -p "/tmp/tutorial-final/screenshots/$(dirname "$rel")"
+              curl -kfsS \
+                --retry 3 \
+                --retry-delay 1 \
+                --connect-timeout 10 \
+                --max-time 45 \
+                --resolve 'movilineapp.com:443:217.179.6.142' \
+                "https://movilineapp.com/learning/screenshots/$rel" \
+                -o "/tmp/tutorial-final/screenshots/$rel"
+            done < assets/legacy-learning-visual.csv
+
+            python3 scripts/verify-legacy-tutorial-images.py \
+              assets/legacy-learning-visual.csv \
+              /tmp/tutorial-final/screenshots
+
+            for icon in openvpn.png wireguard.png cisco.png openconnect.png v2rayng.png hiddify.png v2rayn.png; do
+              curl -kfsS \
+                --retry 3 \
+                --retry-delay 1 \
+                --connect-timeout 10 \
+                --max-time 45 \
+                --resolve 'movilineapp.com:443:217.179.6.142' \
+                "https://movilineapp.com/learning/apps/$icon" \
+                -o "/tmp/tutorial-final/apps/$icon" || rm -f "/tmp/tutorial-final/apps/$icon"
+            done
+          fi
+
+          test "$(find /tmp/tutorial-final/screenshots -type f -name '*.webp' | wc -l | tr -d ' ')" = 65
+
+      - name: Replace branch with a clean current-main commit containing only local assets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+
+          rm -rf public/learning/screenshots public/learning/apps
+          mkdir -p public/learning/screenshots public/learning/apps
+          cp -a /tmp/tutorial-final/screenshots/. public/learning/screenshots/
+          if find /tmp/tutorial-final/apps -type f | grep -q .; then
+            cp -a /tmp/tutorial-final/apps/. public/learning/apps/
+          fi
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('lib/store-guide-content.ts')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('const LEGACY_APP_IMAGE_BASE="https://movilineapp.com/learning/apps";', 'const LEGACY_APP_IMAGE_BASE="/learning/apps";')
+          s=s.replace('const LEGACY_STEP_IMAGE_BASE="https://movilineapp.com/learning/screenshots";', 'const LEGACY_STEP_IMAGE_BASE="/learning/screenshots";')
+          if 'https://movilineapp.com/learning/' in s:
+              raise SystemExit('external learning dependency still present')
+          p.write_text(s,encoding='utf-8')
+          PY
+
+          test "$(find public/learning/screenshots -type f -name '*.webp' | wc -l | tr -d ' ')" = 65
+          grep -Fq 'const LEGACY_STEP_IMAGE_BASE="/learning/screenshots";' lib/store-guide-content.ts
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/learning lib/store-guide-content.ts
+          git commit -m 'Bundle legacy storefront tutorial assets locally'
+          git push --force origin HEAD:feat/store-tutorial-images-v121
+
+      - name: Create or reuse PR, wait for CI, and merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          pr="$(gh pr list --head feat/store-tutorial-images-v121 --base main --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$pr" ]; then
+            url="$(gh pr create --base main --head feat/store-tutorial-images-v121 --title 'Bundle legacy storefront tutorial images locally' --body 'Bundles the 65 verified legacy tutorial screenshots and available app icons directly inside TwinPanel and switches storefront guides to local /learning assets. The shipped product has no dependency on the legacy domain.')"
+            pr="${url##*/}"
+          fi
+          echo "PR #$pr"
+
+          for i in $(seq 1 120); do
+            checks="$(gh pr checks "$pr" --json name,state,bucket 2>/dev/null || true)"
+            if [ -z "$checks" ] || [ "$checks" = '[]' ]; then sleep 10; continue; fi
+            if echo "$checks" | jq -e 'any(.[]; (.bucket=="fail" or .bucket=="cancel"))' >/dev/null; then
+              echo "$checks"
+              exit 50
+            fi
+            if echo "$checks" | jq -e 'all(.[]; (.bucket=="pass" or .bucket=="skipping"))' >/dev/null; then
+              echo "$checks"
+              gh pr merge "$pr" --squash --delete-branch
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Timed out waiting for CI' >&2
+          exit 51
