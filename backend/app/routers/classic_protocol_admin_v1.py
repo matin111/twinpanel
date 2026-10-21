@@ -7,6 +7,14 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..models import Node, NodeProtocolConfig, NodeType
+from ..protocol_adapter_registry import (
+    CLASSIC_PROTOCOL_KEYS,
+    CLASSIC_PROTOCOL_REGISTRY,
+    REGISTRY_SCHEMA_VERSION,
+    classic_catalog_payload,
+    classic_definition,
+    unified_registry_payload,
+)
 from .provision import (
     ProtocolSettings,
     cmd,
@@ -30,33 +38,14 @@ ClassicProtocol = Literal[
     "l2tp",
     "v2ray",
 ]
+ClassicPreset = Literal[
+    "recommended",
+    "performance",
+    "compatibility",
+    "custom",
+]
 
-_CLASSIC_PROTOCOLS: tuple[str, ...] = (
-    "cisco",
-    "openvpn",
-    "wireguard",
-    "l2tp",
-    "v2ray",
-)
-
-_DEFAULT_PORTS: dict[str, int] = {
-    "cisco": 443,
-    "openvpn": 1194,
-    "wireguard": 51820,
-    "v2ray": 8443,
-}
-
-_DEFAULT_TRANSPORTS: dict[str, str] = {
-    "cisco": "tcp+udp",
-    "openvpn": "udp",
-    "wireguard": "udp",
-    "l2tp": "udp",
-    "v2ray": "tcp",
-}
-
-_DEFAULT_PORT_TEXT: dict[str, str] = {
-    "l2tp": "500/4500/1701",
-}
+_CLASSIC_PROTOCOLS = CLASSIC_PROTOCOL_KEYS
 
 
 class EnsureClassicProtocolIn(BaseModel):
@@ -64,6 +53,7 @@ class EnsureClassicProtocolIn(BaseModel):
     protocol: ClassicProtocol
     port: int | None = Field(default=None, ge=1, le=65535)
     transport: Literal["udp", "tcp"] | None = None
+    preset: ClassicPreset = "custom"
 
     @model_validator(mode="after")
     def validate_protocol_options(self):
@@ -89,6 +79,31 @@ def _existing_config(
     )
 
 
+def _preset_values(payload: EnsureClassicProtocolIn) -> dict:
+    if payload.preset == "custom":
+        return {}
+    definition = CLASSIC_PROTOCOL_REGISTRY[payload.protocol]
+    return dict(definition.get("presets", {}).get(payload.preset, {}))
+
+
+def _default_port(protocol: str) -> int | None:
+    value = CLASSIC_PROTOCOL_REGISTRY[protocol].get("default_port")
+    return int(value) if value is not None else None
+
+
+def _default_transport(protocol: str) -> str:
+    return str(CLASSIC_PROTOCOL_REGISTRY[protocol].get("transport") or "")
+
+
+def _default_port_text(protocol: str) -> str:
+    definition = CLASSIC_PROTOCOL_REGISTRY[protocol]
+    value = str(definition.get("port_text") or "").strip()
+    if value:
+        return value
+    port = _default_port(protocol)
+    return str(port) if port else ""
+
+
 def _settings_for(
     payload: EnsureClassicProtocolIn,
     existing: NodeProtocolConfig | None,
@@ -103,43 +118,66 @@ def _settings_for(
 
     protocol = payload.protocol
     values[f"install_{protocol}"] = True
+    preset = _preset_values(payload)
 
     if protocol == "cisco":
         values["cisco_port"] = int(
             payload.port
+            or preset.get("port")
             or (existing.port if existing and existing.port else 0)
-            or _DEFAULT_PORTS[protocol]
+            or _default_port(protocol)
+            or 443
         )
 
     elif protocol == "openvpn":
         values["openvpn_port"] = int(
             payload.port
+            or preset.get("port")
             or (existing.port if existing and existing.port else 0)
-            or _DEFAULT_PORTS[protocol]
+            or _default_port(protocol)
+            or 1194
         )
         saved_transport = str(
             existing.transport if existing else ""
         ).strip().lower()
+        preset_transport = str(preset.get("transport") or "").strip().lower()
         values["openvpn_transport"] = (
             payload.transport
+            or (preset_transport if preset_transport in {"udp", "tcp"} else None)
             or (saved_transport if saved_transport in {"udp", "tcp"} else "udp")
         )
 
     elif protocol == "wireguard":
         values["wireguard_port"] = int(
             payload.port
+            or preset.get("port")
             or (existing.port if existing and existing.port else 0)
-            or _DEFAULT_PORTS[protocol]
+            or _default_port(protocol)
+            or 51820
         )
 
     elif protocol == "v2ray":
         values["xray_port"] = int(
             payload.port
+            or preset.get("port")
             or (existing.port if existing and existing.port else 0)
-            or _DEFAULT_PORTS[protocol]
+            or _default_port(protocol)
+            or 8443
         )
 
     return ProtocolSettings(**values)
+
+
+@router.get("/protocol-registry")
+def protocol_registry():
+    """Unified, capability-aware catalog for Protocol Studio.
+
+    The registry is descriptive and fail-closed.  In particular, classic
+    disable/uninstall remains false until a separately audited adapter exists.
+    Runtime execution continues through the existing production adapters.
+    """
+
+    return unified_registry_payload()
 
 
 @router.get("/classic-protocols")
@@ -176,26 +214,24 @@ def classic_protocol_inventory(
     for node in nodes:
         protocols = []
         for protocol in _CLASSIC_PROTOCOLS:
+            definition = classic_definition(protocol)
             row = config_map.get((node.id, protocol))
             enabled = bool(getattr(node, f"enable_{protocol}", False))
             port = (
                 int(row.port)
                 if row and row.port
-                else _DEFAULT_PORTS.get(protocol)
+                else _default_port(protocol)
             )
             transport = (
                 str(row.transport or "").strip().lower()
                 if row
                 else ""
-            ) or _DEFAULT_TRANSPORTS[protocol]
+            ) or _default_transport(protocol)
             port_text = (
                 str(row.port_text or "").strip()
                 if row
                 else ""
-            ) or _DEFAULT_PORT_TEXT.get(
-                protocol,
-                str(port) if port else "",
-            )
+            ) or _default_port_text(protocol)
             protocols.append(
                 {
                     "protocol": protocol,
@@ -209,6 +245,10 @@ def classic_protocol_inventory(
                     ),
                     "last_error": row.last_error if row else None,
                     "checked_at": row.checked_at if row else None,
+                    "core": definition["core"],
+                    "adapter": definition["adapter"],
+                    "runtime_status": definition["runtime_status"],
+                    "capabilities": definition["capabilities"],
                 }
             )
 
@@ -225,6 +265,8 @@ def classic_protocol_inventory(
 
     return {
         "ok": True,
+        "schema_version": REGISTRY_SCHEMA_VERSION,
+        "catalog": classic_catalog_payload(),
         "nodes": payload_nodes,
     }
 
@@ -300,6 +342,8 @@ async def ensure_classic_protocol(
             "ok": True,
             "node_id": node.id,
             "protocol": payload.protocol,
+            "adapter": CLASSIC_PROTOCOL_REGISTRY[payload.protocol]["adapter"],
+            "preset": payload.preset,
             "runtime": result,
             "enabled": bool(
                 getattr(node, f"enable_{payload.protocol}", False)
