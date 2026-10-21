@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from .modern_protocol_runtime_v2 import (
@@ -21,9 +22,41 @@ from .standalone_protocol_runtime import (
 )
 
 
-# Kept under the historical exported name so the existing admin router can use
-# the same install/health/remove guards without duplicating dispatch logic.
 SINGBOX_PROTOCOLS = set(_SINGBOX_PROTOCOLS) | set(STANDALONE_PROTOCOLS)
+
+# Type=simple becomes active before the process necessarily binds listeners.
+# Production rc.157 proved the immediate post-restart health sample can race
+# the AnyTLS listener even though the install completes and the listener comes
+# online moments later. Retry only install-time readiness; manual health stays
+# fail-fast.
+SINGBOX_READINESS_ATTEMPTS = 20
+SINGBOX_READINESS_DELAY_SECONDS = 0.25
+
+
+async def _wait_for_singbox_health(
+    conn,
+    protocol: str,
+    port: int | None,
+    *,
+    attempts: int = SINGBOX_READINESS_ATTEMPTS,
+    delay_seconds: float = SINGBOX_READINESS_DELAY_SECONDS,
+) -> dict[str, Any]:
+    tries = max(1, int(attempts))
+    last: dict[str, Any] | None = None
+
+    for index in range(tries):
+        last = await _singbox_health(conn, protocol, port)
+        if bool(last.get("ok")):
+            return last
+        if index + 1 < tries and delay_seconds > 0:
+            await asyncio.sleep(delay_seconds)
+
+    return last or {
+        "ok": False,
+        "protocol": protocol,
+        "port": port,
+        "error": "service_or_listener_unhealthy",
+    }
 
 
 async def apply_profiles(conn, node, profiles: list[dict[str, Any]]) -> dict[str, Any]:
@@ -45,14 +78,25 @@ async def apply_profiles(conn, node, profiles: list[dict[str, Any]]) -> dict[str
 
     result: dict[str, Any] = {"core": {}, "protocols": {}}
     if singbox_profiles:
-        # V2/V3 applies profiles by restarting the managed service after a
-        # successful config check. Clean nodes (including Local Core) may have
-        # the sing-box package but no TwinPanel service unit yet, so converge
-        # the unit first without starting it before a valid config exists.
         await ensure_singbox_service_unit(conn)
         singbox = await _apply_singbox_profiles(conn, node, singbox_profiles)
+
+        singbox_results = singbox.setdefault("protocols", {})
+        for profile in singbox_profiles:
+            protocol = str(profile.get("protocol") or "").strip().lower()
+            current = singbox_results.get(protocol)
+            if isinstance(current, dict) and current.get("ok"):
+                continue
+            raw_port = profile.get("port")
+            port = int(raw_port) if raw_port is not None else None
+            singbox_results[protocol] = await _wait_for_singbox_health(
+                conn,
+                protocol,
+                port,
+            )
+
         result["core"]["sing-box"] = singbox.get("core", {})
-        result["protocols"].update(singbox.get("protocols", {}))
+        result["protocols"].update(singbox_results)
 
     for profile in standalone_profiles:
         protocol = str(profile.get("protocol") or "").strip().lower()
