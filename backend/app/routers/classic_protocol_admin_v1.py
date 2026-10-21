@@ -6,7 +6,12 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import require_admin
-from ..models import Node, NodeProtocolConfig, NodeType
+from ..models import Node, NodeProtocolConfig
+from ..node_runtime_connection import (
+    connect_protocol_runtime,
+    is_protocol_runtime_node,
+    protocol_runtime_node_clause,
+)
 from ..protocol_adapter_registry import (
     CLASSIC_PROTOCOL_KEYS,
     CLASSIC_PROTOCOL_REGISTRY,
@@ -20,7 +25,6 @@ from .provision import (
     cmd,
     ensure_base,
     provision_protocols,
-    ssh_connect_saved,
 )
 
 
@@ -188,7 +192,7 @@ def classic_protocol_inventory(
         db.query(Node)
         .filter(
             Node.retired_at.is_(None),
-            Node.node_type == NodeType.EXIT,
+            protocol_runtime_node_clause(),
         )
         .order_by(Node.id.asc())
         .all()
@@ -288,10 +292,10 @@ async def ensure_classic_protocol(
     if not node:
         raise HTTPException(status_code=404, detail="سرور پیدا نشد")
 
-    if node.node_type != NodeType.EXIT:
+    if not is_protocol_runtime_node(node):
         raise HTTPException(
             status_code=422,
-            detail="پروتکل‌های دسترسی فقط روی نود خروجی نصب می‌شوند",
+            detail="پروتکل‌های دسترسی فقط روی نود خروجی یا TwinPanel Local Core نصب می‌شوند",
         )
 
     existing = _existing_config(
@@ -301,7 +305,7 @@ async def ensure_classic_protocol(
     )
     settings = _settings_for(payload, existing)
 
-    conn = await ssh_connect_saved(node, db)
+    conn = await connect_protocol_runtime(node, db)
     try:
         os_id = (
             await cmd(
@@ -348,7 +352,8 @@ async def ensure_classic_protocol(
             "enabled": bool(
                 getattr(node, f"enable_{payload.protocol}", False)
             ),
-            "message": "پروتکل با SSH ذخیره‌شده نصب/Repair و Health Check شد",
+            "execution": "local" if getattr(node, "is_mother", False) else "ssh",
+            "message": "پروتکل نصب/Repair و Health Check شد",
         }
 
     finally:
