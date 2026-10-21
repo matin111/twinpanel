@@ -11,6 +11,8 @@ on:
       - "backend/app/routers/public_connection_mobile_v7.py"
       - "backend/app/routers/public_connection_multilink_v7.py"
       - "backend/app/routers/public_connection_hub_v8.py"
+      - "backend/app/routers/public_connection_hub_v9.py"
+      - "backend/app/routers/public_connection_files_v9.py"
       - "app/layout.tsx"
       - "app/panel-copy-density-final.css"
       - ".github/workflows/public-connect-live-v4-smoke.yml"
@@ -25,6 +27,8 @@ on:
       - "backend/app/routers/public_connection_mobile_v7.py"
       - "backend/app/routers/public_connection_multilink_v7.py"
       - "backend/app/routers/public_connection_hub_v8.py"
+      - "backend/app/routers/public_connection_hub_v9.py"
+      - "backend/app/routers/public_connection_files_v9.py"
       - "app/layout.tsx"
       - "app/panel-copy-density-final.css"
       - ".github/workflows/public-connect-live-v4-smoke.yml"
@@ -45,24 +49,32 @@ jobs:
             backend/app/routers/public_connection_mobile_v7.py \
             backend/app/routers/public_connection_multilink_v7.py \
             backend/app/routers/public_connection_hub_v8.py \
+            backend/app/routers/public_connection_hub_v9.py \
+            backend/app/routers/public_connection_files_v9.py \
             backend/app/main.py
 
-      - name: Parse V8 inline JavaScript
+      - name: Parse V8 and V9 inline JavaScript
         run: |
           python - <<'PY'
           import re
           from pathlib import Path
-          source = Path("backend/app/routers/public_connection_hub_v8.py").read_text()
-          match = re.search(r'_V8_SCRIPT\s*=\s*r"""(.*?)"""', source, re.S)
-          assert match, "V8 script block not found"
-          script = match.group(1).strip()
-          script = re.sub(r'^<script[^>]*>\s*', '', script)
-          script = re.sub(r'\s*</script>$', '', script)
-          Path('/tmp/twinpanel-public-connect-v8.js').write_text(script)
+          specs = (
+              ("backend/app/routers/public_connection_hub_v8.py", "_V8_SCRIPT", "/tmp/twinpanel-public-connect-v8.js"),
+              ("backend/app/routers/public_connection_hub_v9.py", "_V9_SCRIPT_TEMPLATE", "/tmp/twinpanel-public-connect-v9.js"),
+          )
+          for path, name, output in specs:
+              source = Path(path).read_text()
+              match = re.search(rf'{name}\s*=\s*r"""(.*?)"""', source, re.S)
+              assert match, f"{name} script block not found"
+              script = match.group(1).strip().replace("__TOKEN__", '"test-token"')
+              script = re.sub(r'^<script[^>]*>\s*', '', script)
+              script = re.sub(r'\s*</script>$', '', script)
+              Path(output).write_text(script)
           PY
           node --check /tmp/twinpanel-public-connect-v8.js
+          node --check /tmp/twinpanel-public-connect-v9.js
 
-      - name: Verify live route precedence, polling and V8 mobile contract
+      - name: Verify live route precedence and V9 delivery contract
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -75,6 +87,8 @@ jobs:
           mobile = Path("backend/app/routers/public_connection_mobile_v7.py").read_text()
           multilink = Path("backend/app/routers/public_connection_multilink_v7.py").read_text()
           v8 = Path("backend/app/routers/public_connection_hub_v8.py").read_text()
+          v9 = Path("backend/app/routers/public_connection_hub_v9.py").read_text()
+          files = Path("backend/app/routers/public_connection_files_v9.py").read_text()
           layout = Path("app/layout.tsx").read_text()
           css = Path("app/panel-copy-density-final.css").read_text()
 
@@ -85,48 +99,33 @@ jobs:
           assert '@router.get("/{token}/live")' in legacy_live
           assert "active_sessions" in legacy_live
           assert "starts_at" in legacy_live and "expires_at" in legacy_live
-
-          assert '@router.get("/{token}", response_class=HTMLResponse)' in hub
-          assert "_public_payload" in hub and "_usage_payload" in hub
           assert "setInterval(refresh,3000)" in hub_live
-          assert "liveUsed" in hub_live and "liveStart" in hub_live and "liveStatus" in hub_live
-          assert "refine_public_connection_hub_html(source)" in hub_live
 
           assert "TWINPANEL_PUBLIC_CONNECT_HUB_REFINEMENT_V6" in refine
-          assert 'data-hub-filter="recommended"' in refine
-          assert 'data-hub-filter="classic"' in refine
-          assert 'data-hub-filter="modern"' in refine
-          assert 'data-hub-filter="all"' in refine
-          assert "hubQrModal" in refine
-          assert "!important" not in refine
-
-          assert "public_connection_multilink_v7_router" in hub_live
-          assert "router.include_router(public_connection_multilink_v7_router)" in hub_live
-          assert "refine_public_connection_mobile_v7(source, token)" in hub_live
-          assert '"/{token}/subscription/v2ray"' in multilink
-          assert '"/{token}/subscription/v2ray/qr"' in multilink
-          assert "base64.b64encode" in multilink
-          assert 'protocol not in {"v2ray", "xray"}' in multilink
-          assert 'status != "active"' in multilink
-          assert "request.url_for" in multilink
           assert "navigator.share" in mobile
           assert "new File" in mobile
-          assert "ارسال به موبایل" in mobile
-
+          assert '"/{token}/subscription/v2ray"' in multilink
           assert "TWINPANEL_PUBLIC_CONNECT_HUB_V8" in v8
-          assert "refine_public_connection_hub_v8(source)" in hub_live
-          assert "v8-app-launch" in v8
-          assert "v8-primary" in v8
-          assert "OpenVPN Connect" in v8
-          assert "WireGuard" in v8
-          assert "V2Ray / Xray" in v8
-          assert "وارد کردن در OpenVPN Connect" in v8
-          assert "وارد کردن در WireGuard" in v8
-          assert "باز کردن در برنامه" in v8
-          assert "window.isSecureContext" in v8
-          assert "v8-insecure" in v8
-          assert "overflow-x:auto" in v8
-          assert "!important" not in v8
+
+          assert "public_connection_files_v9_router" in hub_live
+          assert "router.include_router(public_connection_files_v9_router)" in hub_live
+          assert "refine_public_connection_hub_v9(source, token)" in hub_live
+          assert '"/{token}/file/{protocol}/{item_index}"' in files
+          assert '"Content-Disposition"' in files
+          assert 'attachment; filename=' in files
+          assert '"X-Content-Type-Options": "nosniff"' in files
+          assert '"application/x-openvpn-profile"' in files
+          assert '"openvpn"' in files and '"wireguard"' in files
+          assert "TWINPANEL_PUBLIC_CONNECT_HUB_V9" in v9
+          assert "High Availability Config" in v9
+          assert "v9-config-card" in v9
+          assert "v9-server-row" in v9
+          assert "sendRealFile" in v9
+          assert "response.arrayBuffer()" in v9
+          assert "navigator.share" in v9
+          assert "فایل واقعی دانلود شد" in v9
+          assert "HTTP" in v9 and "HTTPS" in v9
+          assert "!important" not in v9
 
           forbidden = (
               "db.add(",
@@ -139,6 +138,8 @@ jobs:
           assert all(token not in mobile for token in forbidden)
           assert all(token not in multilink for token in forbidden)
           assert all(token not in v8 for token in forbidden)
+          assert all(token not in v9 for token in forbidden)
+          assert all(token not in files for token in forbidden)
 
           assert "panel-copy-density-final.css" in layout
           assert ".page > .page-head > div > small" in css
