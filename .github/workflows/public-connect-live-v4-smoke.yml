@@ -47,6 +47,21 @@ jobs:
             backend/app/routers/public_connection_hub_v8.py \
             backend/app/main.py
 
+      - name: Parse V8 inline JavaScript
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          source = Path("backend/app/routers/public_connection_hub_v8.py").read_text()
+          match = re.search(r'_V8_SCRIPT\s*=\s*r"""(.*?)"""', source, re.S)
+          assert match, "V8 script block not found"
+          script = match.group(1).strip()
+          script = re.sub(r'^<script[^>]*>\s*', '', script)
+          script = re.sub(r'\s*</script>$', '', script)
+          Path('/tmp/twinpanel-public-connect-v8.js').write_text(script)
+          PY
+          node --check /tmp/twinpanel-public-connect-v8.js
+
       - name: Verify live route precedence, polling and V8 mobile contract
         run: |
           python - <<'PY'
@@ -63,24 +78,20 @@ jobs:
           layout = Path("app/layout.tsx").read_text()
           css = Path("app/panel-copy-density-final.css").read_text()
 
-          # Exact public page is owned by Live V5 before V4/V3 compatibility fallbacks.
           assert "public_connection_hub_live_v5_router" in main
           assert main.index("app.include_router(public_connection_hub_live_v5_router)") < main.index("app.include_router(public_connection_live_v4_router)")
           assert main.index("app.include_router(public_connection_live_v4_router)") < main.index("app.include_router(public_connection_v3_router)")
 
-          # V4 remains the telemetry source and retains the 3-second polling contract.
           assert '@router.get("/{token}/live")' in legacy_live
           assert "active_sessions" in legacy_live
           assert "starts_at" in legacy_live and "expires_at" in legacy_live
 
-          # V5 keeps real account-delivery data and the live wrapper keeps existing IDs.
           assert '@router.get("/{token}", response_class=HTMLResponse)' in hub
           assert "_public_payload" in hub and "_usage_payload" in hub
           assert "setInterval(refresh,3000)" in hub_live
           assert "liveUsed" in hub_live and "liveStart" in hub_live and "liveStatus" in hub_live
           assert "refine_public_connection_hub_html(source)" in hub_live
 
-          # V6 remains presentation-only and scales the real cards already rendered by V5.
           assert "TWINPANEL_PUBLIC_CONNECT_HUB_REFINEMENT_V6" in refine
           assert 'data-hub-filter="recommended"' in refine
           assert 'data-hub-filter="classic"' in refine
@@ -89,7 +100,6 @@ jobs:
           assert "hubQrModal" in refine
           assert "!important" not in refine
 
-          # V7 attaches a real read-only V2Ray subscription and mobile share fallbacks.
           assert "public_connection_multilink_v7_router" in hub_live
           assert "router.include_router(public_connection_multilink_v7_router)" in hub_live
           assert "refine_public_connection_mobile_v7(source, token)" in hub_live
@@ -103,7 +113,6 @@ jobs:
           assert "new File" in mobile
           assert "ارسال به موبایل" in mobile
 
-          # V8 is a mobile-first presentation layer inspired by app-launcher UX.
           assert "TWINPANEL_PUBLIC_CONNECT_HUB_V8" in v8
           assert "refine_public_connection_hub_v8(source)" in hub_live
           assert "v8-app-launch" in v8
@@ -119,7 +128,6 @@ jobs:
           assert "overflow-x:auto" in v8
           assert "!important" not in v8
 
-          # V7/V8 must stay presentation/read-only and never become provisioning/quota mutation layers.
           forbidden = (
               "db.add(",
               "db.commit(",
@@ -132,7 +140,6 @@ jobs:
           assert all(token not in multilink for token in forbidden)
           assert all(token not in v8 for token in forbidden)
 
-          # Existing panel density contract remains available.
           assert "panel-copy-density-final.css" in layout
           assert ".page > .page-head > div > small" in css
           assert ".reseller-connection-modal .reseller-connection-card" in css
