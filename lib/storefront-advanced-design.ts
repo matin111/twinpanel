@@ -14,6 +14,7 @@ export const ADVANCED_LAYOUT_KEYS=[
 ] as const;
 
 export const ADVANCED_DESIGN_KEYS=[
+  ...ADVANCED_COLOR_SLOTS.map(slot=>`ui_${slot}`),
   ...ADVANCED_COLOR_SLOTS.flatMap(slot=>[`ui_dark_${slot}`,`ui_light_${slot}`]),
   ...ADVANCED_LAYOUT_KEYS,
 ] as const;
