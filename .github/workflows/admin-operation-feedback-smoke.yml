@@ -7,12 +7,14 @@ on:
       - 'components/routed-page-client.tsx'
       - 'components/admin-infra-runtime.tsx'
       - 'components/provision-runtime-xray-domain.tsx'
+      - 'components/legacy-protocols-studio.tsx'
       - 'components/legacy-nodes-exact.tsx'
       - 'components/tunnels-simple-runtime.tsx'
       - 'components/tunnels-unified-runtime-v39.tsx'
       - 'components/legacy-subscriptions-exact.tsx'
       - 'components/admin-subscription-live-table.tsx'
       - 'lib/admin-parity-api.ts'
+      - 'lib/legacy-admin-api.ts'
       - 'lib/legacy-control-api.ts'
       - 'lib/admin-api.ts'
       - '.github/workflows/admin-operation-feedback-smoke.yml'
@@ -32,6 +34,7 @@ jobs:
           routed=Path('components/routed-page-client.tsx').read_text(encoding='utf-8')
           feedback=Path('components/admin-operation-feedback.tsx').read_text(encoding='utf-8')
           provision=Path('components/provision-runtime-xray-domain.tsx').read_text(encoding='utf-8')
+          protocol_studio=Path('components/legacy-protocols-studio.tsx').read_text(encoding='utf-8')
           nodes=Path('components/legacy-nodes-exact.tsx').read_text(encoding='utf-8')
           tunnel_entry=Path('components/tunnels-simple-runtime.tsx').read_text(encoding='utf-8')
           tunnels=Path('components/tunnels-unified-runtime-v39.tsx').read_text(encoding='utf-8')
@@ -49,9 +52,8 @@ jobs:
           assert 'AdminSubscriptionLiveTable' in routed
           assert 'AdminManualSubscriptionCreate' in routed
 
-          # Add Node is now intentionally protocol-agnostic. It still uses the
-          # production provision/install path so base setup, secure SSH access,
-          # Agent, Fabric, quota sync and subscription membership are preserved.
+          # Add Node owns only node bootstrap. Protocol mutations are delegated
+          # to the canonical Protocol Studio.
           assert 'parityApi.provisionInstall(buildInstallPayload({' in provision
           for marker in (
               'install_cisco:false',
@@ -65,7 +67,14 @@ jobs:
           assert 'saveXrayDomain(' not in provision
           assert 'prepareXrayDomain(' not in provision
 
-          # Xray domain/TLS management remains available outside Add Node.
+          assert 'legacyAdminApi.ensureClassicProtocol' in protocol_studio
+          assert 'legacyAdminApi.protocolHealth(node.id, protocol)' in protocol_studio
+          assert 'legacyAdminApi.restartProtocol(node.id, protocol)' in protocol_studio
+          assert 'adminApi.xrayDomain(node.id)' in protocol_studio
+          assert 'adminApi.saveXrayDomain(domainNodeId, domainDraft.trim())' in protocol_studio
+          assert 'adminApi.prepareXrayDomain(domainNodeId, true)' in protocol_studio
+
+          # Node management keeps its independent Xray-domain operational path.
           assert 'adminApi.xrayDomain(selected.id)' in nodes
           assert 'adminApi.saveXrayDomain(selected.id,xrayDomainDraft.trim())' in nodes
           assert 'adminApi.prepareXrayDomain(selected.id,true)' in nodes
