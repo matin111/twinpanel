@@ -1,0 +1,18 @@
+.themeBridge :global([data-store-template="editorial-grid-2027"]){
+  --ep-accent:var(--ep-theme-primary,#8b5cf6)!important;
+  --ep-accent-2:var(--ep-theme-secondary,#6366f1)!important;
+  --ep-bg:var(--ep-theme-page,#0f1014)!important;
+  --ep-surface:var(--ep-theme-surface,#15171c)!important;
+  --ep-surface-2:var(--ep-theme-surface-alt,#1b1e24)!important;
+  --ep-surface-3:color-mix(in srgb,var(--ep-theme-surface-alt,#1b1e24) 82%,var(--ep-theme-text,#f7f3ec))!important;
+  --ep-text:var(--ep-theme-text,#f7f3ec)!important;
+  --ep-muted:var(--ep-theme-muted,#a8a29a)!important;
+  --ep-soft:color-mix(in srgb,var(--ep-theme-muted,#a8a29a) 72%,transparent)!important;
+  --ep-line:var(--ep-theme-border,#30343b)!important;
+  --ep-line-strong:color-mix(in srgb,var(--ep-theme-border,#30343b) 72%,var(--ep-theme-text,#f7f3ec))!important;
+}
+.themeBridge :global([data-store-template="editorial-grid-2027"] > header > div:first-child){background:var(--ep-theme-header,#15171c)!important}
+.themeBridge :global([data-store-template="editorial-grid-2027"] > footer){background:var(--ep-theme-footer,#0f1014);padding-inline:24px;border-radius:18px 18px 0 0}
+.themeBridge :global([data-store-template="editorial-grid-2027"] #plans button),
+.themeBridge :global([data-store-template="editorial-grid-2027"] main a[href="#plans"]),
+.themeBridge :global([data-store-template="editorial-grid-2027"] #account a[href="/panel"]){background:var(--ep-theme-button,#f7f3ec)!important;color:var(--ep-theme-button-text,#0f1014)!important}
