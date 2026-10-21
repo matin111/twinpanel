@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.162",
+  "version": "1.1.0-rc.163",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-21T22:35:32Z",
+  "released_at": "2026-10-21T22:54:03Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7f22d4b94b3a0a9212deee7a15884d9859915f65",
+  "source_sha": "405ef140df1a7b22e29fb8ee640e7f367022eec7",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.162/twinpanel-1.1.0-rc.162-linux-x86_64.tar.gz",
-    "sha256": "3ba3cf1ee5dcc8d4334cbc24f7f9783283a0d629153e7541b15f6a5c9f0ba39c",
-    "size_bytes": 18084851
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.163/twinpanel-1.1.0-rc.163-linux-x86_64.tar.gz",
+    "sha256": "08f5c6ced9d616885a00078e7e8abeb087571d19ab68800daf7c331e41405e44",
+    "size_bytes": 18080983
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.162 اصلاح Production مربوط به نصب Sudoku در Modern Protocol Studio را منتشر می‌کند. تست واقعی Local Core نشان داد تنها Sudoku با خطای missing Available Private Key متوقف می‌شود. Root Cause در parser کلید TwinPanel بود: parser انتظار داشت labelهای خروجی -keygen از ابتدای خط شروع شوند، در حالی‌که Sudoku v0.5.1 این مقادیر را از طریق logger با پیشوند زمان، سطح info و [CLI] چاپ می‌کند. Runtime اکنون label دقیق Available Private Key، Master Private Key و Master Public Key را در خط logger پیدا می‌کند و اعتبارسنجی مقدار hex تا انتهای خط را حفظ می‌کند. Regression CI خروجی واقعی‌مانند v0.5.1 با پیشوند logger را برای هر سه کلید پوشش می‌دهد. رفتار Sing-box، Mieru، TrustTunnel، AmneziaWG، Nginx، پروتکل‌های Classic، Payment، Subscription، Quota، Auth، Tunnel و Storefront تغییر نکرده است. موفقیت نهایی نیازمند Update سرور تست به rc.162 و نصب واقعی Sudoku روی Local Core با تأیید HTTP، DB، systemd، listener و Health است.",
-    "en": "TwinPanel 1.1.0-rc.162 publishes the production correction for Sudoku installation in Modern Protocol Studio. Real Local Core acceptance showed Sudoku was the only managed protocol failing with `missing Available Private Key`. The root cause was TwinPanel's key parser: it required `-keygen` labels to begin at column zero, while Sudoku v0.5.1 emits those values through its logger with time, `info`, and `[CLI]` prefixes. The runtime now locates the exact Available Private Key, Master Private Key, and Master Public Key labels within the logged line while preserving trailing hexadecimal validation through end-of-line. CI regression coverage reproduces v0.5.1-style logger-prefixed output for all three keys. Sing-box, Mieru, TrustTunnel, AmneziaWG, Nginx, Classic protocols, Payment, Subscription, Quota, Auth, Tunnel, and Storefront behavior are unchanged. Final success still requires updating the real test server to rc.162 and performing a real Sudoku install on Local Core while verifying HTTP, DB, systemd, listener, and Health together."
+    "fa": "TwinPanel 1.1.0-rc.163 اصلاح Production مربوط به readiness پس از نصب پروتکل‌های Standalone در Modern Protocol Studio را منتشر می‌کند. Acceptance واقعی Sudoku روی Local Core در rc.162 نشان داد parser کلید، ساخت keys.json، systemd و listener همگی سالم‌اند و Health زنده ok=true است، اما نمونه Health بلافاصله پس از restart حدود نیم‌ثانیه قبل از bind شدن listener اجرا می‌شود و DB/UI به‌اشتباه service_or_listener_unhealthy ثبت می‌کند. Dispatcher اکنون فقط در مسیر install/apply برای Mieru، TrustTunnel، AmneziaWG و Sudoku از bounded readiness polling استفاده می‌کند؛ Health دستی همچنان fail-fast باقی می‌ماند. Regression CI الگوی unhealthy/unhealthy/healthy و پایان bounded در حالت failure را پوشش می‌دهد و metadata مرحله apply را حفظ می‌کند. Binaryها، configها، پورت‌ها، کلیدها، systemd unitها، Nginx، پروتکل‌های Classic، Auth، Payment، Subscription، Quota، Tunnel و Storefront تغییر نکرده‌اند. موفقیت نهایی نیازمند Update سرور تست به rc.163 و Retry واقعی Sudoku با تأیید HTTP 200، STATUS=online، LAST_ERROR=-، service/listener و Health است.",
+    "en": "TwinPanel 1.1.0-rc.163 publishes the production correction for post-install readiness of standalone protocols in Modern Protocol Studio. Real Sudoku acceptance on Local Core under rc.162 proved key parsing, keys.json persistence, systemd, listener, and live Health were all healthy, while the immediate install-time health sample ran roughly half a second before the listener bound and incorrectly stored service_or_listener_unhealthy in DB/UI. The dispatcher now uses bounded readiness polling only during install/apply for Mieru, TrustTunnel, AmneziaWG, and Sudoku; manual Health remains fail-fast. Regression CI covers unhealthy/unhealthy/healthy startup samples and bounded failure behavior while preserving apply-time metadata. Protocol binaries, configs, ports, keys, systemd units, Nginx, Classic protocols, Auth, Payment, Subscription, Quota, Tunnel, and Storefront are unchanged. Final success still requires updating the real test server to rc.163 and retrying Sudoku while verifying HTTP 200, STATUS=online, LAST_ERROR=-, service/listener, and live Health together."
   }
 }
