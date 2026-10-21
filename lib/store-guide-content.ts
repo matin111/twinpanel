@@ -231,21 +231,11 @@ export const storeGuideContent:Record<StoreGuideProtocol,{summary:string;systems
   v2ray:{summary:"برای V2Ray/Xray یک لینک اشتراک یا لینک کانفیگ از نوع VLESS/VMess/Trojan از پنل کاربری دریافت می‌کنی.",systems:v2raySystems},
 };
 
-const LEGACY_APP_IMAGE_BASE="https://movilineapp.com/learning/apps";
-const LEGACY_STEP_IMAGE_BASE="https://movilineapp.com/learning/screenshots";
-
-export function storeGuideAppImage(platform:StoreGuidePlatform,protocol:StoreGuideProtocol):string{
-  if(protocol==="openvpn")return `${LEGACY_APP_IMAGE_BASE}/openvpn.png`;
-  if(protocol==="wireguard")return `${LEGACY_APP_IMAGE_BASE}/wireguard.png`;
-  if(protocol==="cisco")return `${LEGACY_APP_IMAGE_BASE}/${platform==="ios"||platform==="macos"?"cisco":"openconnect"}.png`;
-  if(protocol==="v2ray"){
-    if(platform==="android")return `${LEGACY_APP_IMAGE_BASE}/v2rayng.png`;
-    if(platform==="ios")return `${LEGACY_APP_IMAGE_BASE}/hiddify.png`;
-    return `${LEGACY_APP_IMAGE_BASE}/v2rayn.png`;
-  }
+export function storeGuideAppImage(_platform:StoreGuidePlatform,_protocol:StoreGuideProtocol):string{
   return "";
 }
 
-export function storeGuideScreenshot(platform:StoreGuidePlatform,protocol:StoreGuideProtocol,index:number):string{
-  return `${LEGACY_STEP_IMAGE_BASE}/${platform}/${protocol}/${String(index+1).padStart(2,"0")}.webp`;
+export function storeGuideTutorialImage(platform:StoreGuidePlatform,protocol:StoreGuideProtocol):string{
+  if(platform!=="android"&&platform!=="ios"&&platform!=="windows")return "";
+  return `/learning/screenshots/${platform}/${protocol}.webp`;
 }
