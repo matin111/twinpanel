@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.166",
+  "version": "1.1.0-rc.167",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-21T23:36:12Z",
+  "released_at": "2026-10-21T23:58:48Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "0d62514a2d34cbbe92b9eaac648926eab6845683",
+  "source_sha": "b57abadeae5b8297af1355687c986e50ec669915",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.166/twinpanel-1.1.0-rc.166-linux-x86_64.tar.gz",
-    "sha256": "1c0f7e91898a22464631fd40fbcf83c0376123688c94b7fb133eb64f074085f1",
-    "size_bytes": 18117252
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.167/twinpanel-1.1.0-rc.167-linux-x86_64.tar.gz",
+    "sha256": "2f7ca2287fc754a1eb74c19c378bbf345f735f01092999ea8d842bcd7014d56a",
+    "size_bytes": 18119996
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.166 یک مسیر مستقل جدید TP27 Mieru TCP را به SmartAuto اضافه می‌کند تا روی مسیرهایی که اتصال TCP برقرار می‌شود اما Direct TCP یا MASQUE پایداری دیتاپلین لازم را ندارند، گزینه TCP جدیدی برای Qualification و Failover وجود داشته باشد. این Candidate، لایه L3/TUN موجود TP27 را حفظ می‌کند و Laneهای ایران را از طریق یک Bridge محلی SOCKS5 و Mieru 3.38.1 روی TCP به Mita در Exit می‌رساند؛ TP27 سمت Exit فقط روی Loopback گوش می‌دهد. برای هر Tunnel سرویس‌ها، شبکه /30، Policy Table و سه پورت عمومی مستقل وجود دارد؛ دسترسی پورت Mieru در Exit به IP عمومی نود ایران محدود است و SHA256 بسته‌های upstream برای amd64/arm64 قفل شده است. TP27 Fast، MASQUE و Direct TCP موجود بدون تغییر باقی مانده‌اند. SmartAuto مسیر جدید را همانند سایر Candidateها با Peer L3، TCP/UDP egress، پایداری و Benchmark ارزیابی می‌کند. پذیرش Production نهایی نیازمند Update سرور تست به rc.166 و تأیید نصب Mieru/Mita، بالا آمدن tp27r5، Peer L3، Egress، پایداری 60 ثانیه و Qualification روی Tunnel #5 است.",
-    "en": "TwinPanel 1.1.0-rc.166 adds an independent TP27 Mieru TCP SmartAuto path for networks where TCP establishment succeeds but Direct TCP or MASQUE does not provide stable dataplane service. The candidate preserves the existing TP27 L3/TUN layer and carries Iran-side TP27 lanes through a local SOCKS5 bridge and Mieru 3.38.1 over TCP to Mita on the Exit, where the inner TP27 server listens only on loopback. Each tunnel gets independent services, a /30 network, policy table and three public port candidates; the Exit Mieru port is restricted to the Iran node public IP and upstream package SHA256 values are pinned for amd64/arm64. Existing TP27 Fast, MASQUE and Direct TCP implementations remain unchanged. SmartAuto evaluates the new path with the same peer-L3, TCP/UDP egress, stability and throughput qualification stages. Final production acceptance requires updating the real test server to rc.166 and verifying Mieru/Mita installation, tp27r5, peer L3, egress, 60-second stability and qualification on Tunnel #5."
+    "fa": "TwinPanel 1.1.0-rc.167 یک Race واقعی در چرخه نصب Candidateهای SmartAuto را اصلاح می‌کند. پیش از این، Health Probe می‌توانست در فاصله‌ای که Installer وضعیت Candidate را installing کرده بود اما فقط بخشی از سرویس‌های Iran/Exit بالا آمده بودند اجرا شود؛ در نتیجه وضعیت موقت مانند iran=False exit=True به‌اشتباه به candidate_service_inactive یا candidate_interface_missing تبدیل می‌شد و همان Candidate به offline و Quarantine 120 ثانیه‌ای می‌رفت. V167 وضعیت installing را یک Lifecycle موقت و معتبر می‌داند: Remote Health در این بازه defer می‌شود و مسیر عمومی write_overlay_rows نیز حق ندارد Row در حال نصب را بازنویسی کند؛ Installer تا پایان online/failed تنها Writer معتبر است و Probe عادی در Pass بعدی از سر گرفته می‌شود. TP27 Mieru TCP معرفی‌شده در rc.166، TP27 Fast، MASQUE و Direct TCP بدون تغییر باقی مانده‌اند. پذیرش Production نهایی نیازمند Update سرور تست به rc.167 و Qualification واقعی Tunnel #5 است: نصب بدون Quarantine کاذب، بالا آمدن tp27r5، Peer L3 دوطرفه، TCP/UDP Egress، حداقل 60 ثانیه پایداری و ثبت Benchmark مثبت.",
+    "en": "TwinPanel 1.1.0-rc.167 fixes a real SmartAuto candidate installation lifecycle race. Previously, the health probe could run after an installer had marked a candidate as installing but before both Iran and Exit services/interfaces had converged; an intentional transient state such as iran=False exit=True could therefore be persisted as candidate_service_inactive or candidate_interface_missing, forcing the candidate offline and into a 120-second quarantine. V167 treats installing as an explicit transient lifecycle state: remote health is deferred during that window and the generic write_overlay_rows path cannot overwrite an installing row. The installer remains the sole authoritative writer until it finishes online/failed, after which normal probing resumes on the next manager pass. TP27 Mieru TCP introduced in rc.166, TP27 Fast, MASQUE and Direct TCP remain unchanged. Final production acceptance requires updating the real test server to rc.167 and qualifying Tunnel #5 with no false install-time quarantine, tp27r5 online, bidirectional peer L3, TCP/UDP egress, at least 60 seconds stability and a positive throughput benchmark."
   }
 }
