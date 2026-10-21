@@ -9,6 +9,7 @@ on:
       - "backend/app/routers/modern_protocol_admin_v3.py"
       - "backend/app/main.py"
       - "backend/scripts/modern_protocol_runtime_v3_smoke.py"
+      - "backend/scripts/sudoku_keygen_v051_smoke.py"
       - ".github/workflows/modern-protocol-runtime-v3-smoke.yml"
   workflow_dispatch:
 
@@ -47,8 +48,11 @@ jobs:
             backend/app/modern_protocol_dispatch.py \
             backend/app/routers/modern_protocol_admin_v3.py \
             backend/app/main.py \
-            backend/scripts/modern_protocol_runtime_v3_smoke.py
+            backend/scripts/modern_protocol_runtime_v3_smoke.py \
+            backend/scripts/sudoku_keygen_v051_smoke.py
 
       - name: Run runtime contract smoke
         working-directory: backend
-        run: PYTHONPATH=. python scripts/modern_protocol_runtime_v3_smoke.py
+        run: |
+          PYTHONPATH=. python scripts/modern_protocol_runtime_v3_smoke.py
+          PYTHONPATH=. python scripts/sudoku_keygen_v051_smoke.py

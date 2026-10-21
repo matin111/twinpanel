@@ -477,7 +477,7 @@ except Exception:
 if not isinstance(value, dict) or not value.get("master_public_key") or not value.get("available_private_key"):
     out=subprocess.check_output(["/usr/local/bin/twinpanel-sudoku", "-keygen"], text=True, stderr=subprocess.STDOUT)
     def pick(name):
-        m=re.search(r"^"+re.escape(name)+r":\\s*([0-9a-fA-F]+)\\s*$", out, re.M)
+        m=re.search(re.escape(name)+r":\\s*([0-9a-fA-F]+)\\s*$", out, re.M)
         if not m:
             raise SystemExit("missing "+name)
         return m.group(1)
