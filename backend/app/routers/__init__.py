@@ -31,11 +31,11 @@ from . import destructive_safety as _destructive_safety  # noqa: F401
 
 # TWINPANEL_PROTOCOL_CATALOG_V1
 # runtime_endpoints is the first APIRouter included by app.main and has no
-# prefix of its own.  Attach the V2 modern-protocol routes here so they win
-# FastAPI's route-order resolution over the legacy vpn_settings compatibility
-# endpoints without deleting those rollback routes.  Importing the V2 router
-# also registers ModernProtocolSetting before Base.metadata.create_all().
+# prefix of its own. Attach protocol-management routes here so they are
+# registered before compatibility routers without removing rollback paths.
 from . import runtime_endpoints as _runtime_endpoints
+from .classic_protocol_admin_v1 import router as _classic_protocol_admin_v1_router
 from .modern_protocol_admin_v2 import router as _modern_protocol_admin_v2_router
 
+_runtime_endpoints.router.include_router(_classic_protocol_admin_v1_router)
 _runtime_endpoints.router.include_router(_modern_protocol_admin_v2_router)

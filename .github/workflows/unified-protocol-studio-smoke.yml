@@ -1,0 +1,61 @@
+name: Unified Protocol Studio Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/classic_protocol_admin_v1.py'
+      - 'backend/app/routers/__init__.py'
+      - 'components/legacy-protocols-studio.tsx'
+      - 'components/modern-protocols-admin.tsx'
+      - 'lib/legacy-admin-api.ts'
+      - 'app/admin/l2tp/page.tsx'
+      - 'app/admin/vpn-settings/page.tsx'
+      - '.github/workflows/unified-protocol-studio-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile classic protocol API
+        run: python3 -m py_compile backend/app/routers/classic_protocol_admin_v1.py
+
+      - name: Verify unified classic protocol contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          api = Path('backend/app/routers/classic_protocol_admin_v1.py').read_text()
+          client = Path('lib/legacy-admin-api.ts').read_text()
+          ui = Path('components/legacy-protocols-studio.tsx').read_text()
+          router_init = Path('backend/app/routers/__init__.py').read_text()
+
+          for protocol in ('cisco', 'openvpn', 'wireguard', 'l2tp', 'v2ray'):
+              assert f'"{protocol}"' in api, protocol
+              assert f'"{protocol}"' in ui, protocol
+
+          assert '@router.get("/classic-protocols")' in api
+          assert '@router.post("/ensure-classic-protocol")' in api
+          assert 'ssh_connect_saved' in api
+          assert 'provision_protocols' in api
+          assert 'repair=True' in api
+          assert '_secrets' in api
+          assert '"l2tp_psk"' not in api
+          assert '_classic_protocol_admin_v1_router' in router_init
+
+          assert 'classicProtocols:' in client
+          assert 'ensureClassicProtocol:' in client
+          assert 'protocolHealth:(nodeId:number,protocol?:ClassicProtocolKey)' in client
+          assert 'protocol:ClassicProtocolKey' in client
+
+          assert 'نصب / فعال‌سازی' in ui
+          assert 'اعمال / Repair' in ui
+          assert 'legacyAdminApi.protocolHealth(node.id, protocol)' in ui
+          assert 'legacyAdminApi.ensureClassicProtocol' in ui
+          assert '500 / 4500 / 1701 UDP' in ui
+          assert 'window.location.search' in ui
+
+          print('UNIFIED_PROTOCOL_STUDIO_SMOKE_OK')
+          PY
