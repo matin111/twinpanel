@@ -9,6 +9,10 @@ function errorText(payload:unknown,status:number){
     const item=payload as {detail?:unknown;message?:unknown};
     if(typeof item.detail==="string")return item.detail;
     if(typeof item.message==="string")return item.message;
+    if(item.detail&&typeof item.detail==="object"&&"message" in item.detail){
+      const message=(item.detail as {message?:unknown}).message;
+      if(typeof message==="string")return message;
+    }
     if(Array.isArray(item.detail))return item.detail.map(x=>typeof x==="object"&&x&&"msg" in x?String((x as {msg:unknown}).msg):String(x)).join("، ");
   }
   return `API error ${status}`;
@@ -34,13 +38,22 @@ export type UsersPageResponse={
   summary:{total_users:number;active_users:number;inactive_users:number;subscribed_users:number};
 };
 
+export type ClassicProtocolKey="cisco"|"openvpn"|"wireguard"|"l2tp"|"v2ray";
+export type EnsureClassicProtocolPayload={
+  node_id:number;
+  protocol:ClassicProtocolKey;
+  port?:number;
+  transport?:"udp"|"tcp";
+};
+
 export const legacyAdminApi={
   usersPage:(params:{limit:number;offset:number;q:string;status:"all"|"active"|"inactive"|"subscribed"})=>request<UsersPageResponse>(`/v1/admin/users-page?limit=${encodeURIComponent(String(params.limit))}&offset=${encodeURIComponent(String(params.offset))}&q=${encodeURIComponent(params.q)}&status=${encodeURIComponent(params.status)}`),
   subscriptionsByUser:(userId:number)=>request<RuntimeRow[]>(`/v1/subscriptions/by-user/${userId}`),
   extendSubscription:(id:number,payload:{add_traffic_gb?:number;add_days?:number})=>request<RuntimeRow>(`/v1/subscriptions/${id}/extend`,{method:"PATCH",body:JSON.stringify(payload)}),
   nodeAccess:(id:number)=>request<RuntimeRow>(`/v1/provision/node-access/${id}`),
   saveNodeAccess:(payload:{node_id:number;host:string;port:number;username:string;password:string})=>request<RuntimeRow>("/v1/provision/save-node-access",{method:"POST",body:JSON.stringify(payload)}),
-  protocolHealth:(nodeId:number)=>request<RuntimeRow>("/v1/provision/protocol-health",{method:"POST",body:JSON.stringify({node_id:nodeId})}),
+  protocolHealth:(nodeId:number,protocol?:ClassicProtocolKey)=>request<RuntimeRow>("/v1/provision/protocol-health",{method:"POST",body:JSON.stringify({node_id:nodeId,...(protocol?{protocol}:{})})}),
+  ensureClassicProtocol:(payload:EnsureClassicProtocolPayload)=>request<RuntimeRow>("/v1/provision/ensure-classic-protocol",{method:"POST",body:JSON.stringify(payload)}),
   restartProtocol:(nodeId:number,protocol:string)=>request<RuntimeRow>("/v1/provision/restart-protocol",{method:"POST",body:JSON.stringify({node_id:nodeId,protocol})}),
   repairProtocolsSaved:(nodeId:number)=>request<RuntimeRow>("/v1/provision/repair-protocols-saved",{method:"POST",body:JSON.stringify({node_id:nodeId})}),
   upgradeAgent:(nodeId:number)=>request<RuntimeRow>("/v1/provision/upgrade-agent",{method:"POST",body:JSON.stringify({node_id:nodeId})}),
