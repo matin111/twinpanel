@@ -108,6 +108,21 @@ def _safe_settings(row: ModernProtocolSetting | None) -> dict[str, Any]:
         return {}
 
 
+def _effective_setting(row: ModernProtocolSetting | None, key: str) -> dict[str, Any]:
+    if not row:
+        _, effective, _ = resolve_settings(key, "recommended", {})
+        return effective
+    try:
+        _, effective, _ = resolve_settings(
+            key,
+            row.preset_name or "recommended",
+            _safe_settings(row),
+        )
+        return effective
+    except Exception:
+        return _safe_settings(row)
+
+
 def _row_payload(
     key: str,
     status: NodeProtocolConfig | None,
@@ -375,12 +390,12 @@ async def install(
         failed: list[str] = []
         warning_map: dict[str, list[str]] = {}
         for key in protocols:
-            health = result["protocols"][key]
-            _save_status(db, node, key, health)
+            health_result = result["protocols"][key]
+            _save_status(db, node, key, health_result)
             preset, effective, warnings, port = resolved_by_key[key]
             _save_setting(db, node.id, key, preset, effective, port)
             warning_map[key] = warnings
-            if not health.get("ok"):
+            if not health_result.get("ok"):
                 failed.append(key)
         db.commit()
         return {
@@ -404,6 +419,7 @@ async def health(
 ):
     node = _exit_node(db, node_id)
     rows = _status_rows(db, node.id)
+    saved_settings = _setting_rows(db, node.id)
     protocols = (
         _normalize_protocols(payload.protocols)
         if payload.protocols
@@ -421,8 +437,9 @@ async def health(
         for key in protocols:
             row = rows.get(key)
             port = int(row.port) if row and row.port else int(PROTOCOL_CATALOG[key]["default_port"])
+            effective = _effective_setting(saved_settings.get(key), key)
             try:
-                result = await profile_health(conn, key, port)
+                result = await profile_health(conn, key, port, effective)
             except Exception as exc:
                 result = {
                     "ok": False,
@@ -464,7 +481,7 @@ async def remove(
     try:
         try:
             result = await remove_profile(conn, key)
-        except (ModernRuntimeV2Error, Exception) as exc:
+        except Exception as exc:
             raise HTTPException(
                 status_code=502,
                 detail={"message": "حذف پروتکل ناموفق بود", "error": str(exc)[:1800]},
