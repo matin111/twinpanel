@@ -28,3 +28,14 @@ from .. import node_bootstrap_control_v73 as _node_bootstrap_control_v73  # noqa
 
 # Register guarded DELETE routes before app.main includes nodes/tunnels.
 from . import destructive_safety as _destructive_safety  # noqa: F401
+
+# TWINPANEL_PROTOCOL_CATALOG_V1
+# runtime_endpoints is the first APIRouter included by app.main and has no
+# prefix of its own.  Attach the V2 modern-protocol routes here so they win
+# FastAPI's route-order resolution over the legacy vpn_settings compatibility
+# endpoints without deleting those rollback routes.  Importing the V2 router
+# also registers ModernProtocolSetting before Base.metadata.create_all().
+from . import runtime_endpoints as _runtime_endpoints
+from .modern_protocol_admin_v2 import router as _modern_protocol_admin_v2_router
+
+_runtime_endpoints.router.include_router(_modern_protocol_admin_v2_router)
