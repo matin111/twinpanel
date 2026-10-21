@@ -1,0 +1,35 @@
+name: Local Core Protocol Runtime V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/node_runtime_connection.py"
+      - "backend/app/routers/classic_protocol_admin_v1.py"
+      - "backend/app/routers/modern_protocol_admin_v2.py"
+      - "lib/legacy-admin-api.ts"
+      - "scripts/smoke-local-core-protocol-runtime-v1.py"
+      - ".github/workflows/local-core-protocol-runtime-v1-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/node_runtime_connection.py"
+      - "backend/app/routers/classic_protocol_admin_v1.py"
+      - "backend/app/routers/modern_protocol_admin_v2.py"
+      - "lib/legacy-admin-api.ts"
+      - "scripts/smoke-local-core-protocol-runtime-v1.py"
+      - ".github/workflows/local-core-protocol-runtime-v1-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify Local Core protocol runtime integration
+        run: python scripts/smoke-local-core-protocol-runtime-v1.py

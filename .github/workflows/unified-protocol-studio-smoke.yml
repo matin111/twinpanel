@@ -3,7 +3,9 @@ name: Unified Protocol Studio Smoke
 on:
   pull_request:
     paths:
+      - 'backend/app/node_runtime_connection.py'
       - 'backend/app/routers/classic_protocol_admin_v1.py'
+      - 'backend/app/routers/modern_protocol_admin_v2.py'
       - 'backend/app/routers/__init__.py'
       - 'components/legacy-protocols-studio.tsx'
       - 'components/modern-protocols-admin.tsx'
@@ -19,8 +21,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compile classic protocol API
-        run: python3 -m py_compile backend/app/routers/classic_protocol_admin_v1.py
+      - name: Compile classic protocol API and runtime selector
+        run: |
+          python3 -m py_compile backend/app/node_runtime_connection.py
+          python3 -m py_compile backend/app/routers/classic_protocol_admin_v1.py
+          python3 -m py_compile backend/app/routers/modern_protocol_admin_v2.py
 
       - name: Verify unified classic protocol contract
         run: |
@@ -28,6 +33,7 @@ jobs:
           from pathlib import Path
 
           api = Path('backend/app/routers/classic_protocol_admin_v1.py').read_text()
+          runtime = Path('backend/app/node_runtime_connection.py').read_text()
           client = Path('lib/legacy-admin-api.ts').read_text()
           ui = Path('components/legacy-protocols-studio.tsx').read_text()
           router_init = Path('backend/app/routers/__init__.py').read_text()
@@ -38,16 +44,25 @@ jobs:
 
           assert '@router.get("/classic-protocols")' in api
           assert '@router.post("/ensure-classic-protocol")' in api
-          assert 'ssh_connect_saved' in api
+          assert '@router.post("/classic-protocol-health")' in api
+          assert '@router.post("/classic-restart-protocol")' in api
+          assert 'connect_protocol_runtime' in api
+          assert 'ssh_connect_saved' not in api
           assert 'provision_protocols' in api
           assert 'repair=True' in api
           assert '_secrets' in api
           assert '"l2tp_psk"' not in api
           assert '_classic_protocol_admin_v1_router' in router_init
 
+          assert 'class LocalRuntimeConnection' in runtime
+          assert 'Node.agent_url == "local://core"' in runtime
+          assert 'return await ssh_connect_saved(node, db)' in runtime
+
           assert 'classicProtocols:' in client
           assert 'ensureClassicProtocol:' in client
           assert 'protocolHealth:(nodeId:number,protocol?:ClassicProtocolKey)' in client
+          assert '"/v1/provision/classic-protocol-health"' in client
+          assert '"/v1/provision/classic-restart-protocol"' in client
           assert 'protocol:ClassicProtocolKey' in client
 
           assert 'نصب / فعال‌سازی' in ui
