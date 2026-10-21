@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import {useMemo,useState,type ReactNode} from "react";
+import {useState,type ReactNode} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {useBranding} from "../lib/branding";
 import {planProtocols,type StorePlan} from "../lib/store-runtime-api";
+import {STORE_PROTOCOL_CATALOG,storeProtocolMeta} from "../lib/store-protocol-catalog";
 import {
   isStorefrontSectionVisible,
   storefrontText,
@@ -77,19 +78,14 @@ export function EditorialPro2027Template({settings,themeOptions,plans,loading,er
   const showProtocolMarks=flag("editorial_show_protocol_marks",true);
   const showGuideScreenshots=flag("editorial_show_guide_screenshots",true);
 
-  const availableProtocols=useMemo(()=>{
-    const found=new Set<string>();
-    plans.forEach(plan=>planProtocols(plan).forEach(protocol=>found.add(protocol)));
-    const ordered=Object.keys(PROTOCOLS).filter(protocol=>found.size===0||found.has(protocol));
-    return ordered.length?ordered:Object.keys(PROTOCOLS);
-  },[plans]);
+  const availableProtocols=Object.keys(PROTOCOLS);
 
   const visibleSections=settings.section_order.filter(section=>isStorefrontSectionVisible(settings,section));
   const navLabels:Partial<Record<StorefrontSectionId,string>>={
     plans:pick("پلن‌ها","Plans"),protocols:pick("اتصال","Connect"),services:pick("امکانات","Experience"),guides:pick("راهنما","Guides"),account:pick("حساب","Account"),faq:pick("سوالات","FAQ"),
   };
 
-  const guideProtocolIds=GUIDE_PROTOCOL_ORDER.filter(protocol=>availableProtocols.includes(protocol));
+  const guideProtocolIds=GUIDE_PROTOCOL_ORDER;
   const activeGuideProtocol=(guideProtocolIds.includes(guideProtocol)?guideProtocol:(guideProtocolIds[0]||"wireguard")) as StoreGuideProtocol;
   const selectedPlatform=storeGuidePlatforms.find(item=>item.id===guidePlatform)||storeGuidePlatforms[0];
   const selectedProtocol=PROTOCOLS[activeGuideProtocol]||PROTOCOLS.wireguard;
@@ -114,14 +110,14 @@ export function EditorialPro2027Template({settings,themeOptions,plans,loading,er
         <div className={styles.planTop}><span className={styles.planNumber}>{String(index+1).padStart(2,"0")}</span>{featured&&<span className={styles.recommended}>{option("editorial_recommended_label",pick("انتخاب پیشنهادی","Recommended"))}</span>}</div>
         <div className={styles.planMain}><div className={styles.planName}><small>{pick("اشتراک","Subscription")}</small><h3>{plan.name}</h3>{plan.description&&<p>{plan.description}</p>}</div><div className={styles.price}><strong>{number(plan.price_toman)}</strong><span>{pick("تومان","Toman")}</span></div></div>
         <div className={styles.planFacts}><div><small>{pick("حجم","Traffic")}</small><b>{number(plan.traffic_gb,{maximumFractionDigits:2})} GB</b></div><div><small>{pick("مدت","Duration")}</small><b>{number(plan.duration_days)} {pick("روز","days")}</b></div><div><small>{pick("دستگاه","Devices")}</small><b>{number(plan.device_limit)}</b></div></div>
-        <div className={styles.planBottom}>{showProtocolMarks&&<div className={styles.protocolChips}>{protocols.slice(0,5).map(protocol=><span key={protocol}>{PROTOCOLS[protocol]?.short||protocol}</span>)}</div>}{showPlanBenefits&&<ul className={styles.planBenefits}><li>{content("plan_feature_1")}</li><li>{content("plan_feature_2")}</li><li>{content("plan_feature_3")}</li></ul>}<button className={styles.buyButton} disabled={buying===plan.id} onClick={()=>onBuy(plan)}><span>{buying===plan.id?pick("در حال ثبت سفارش...","Creating order..."):pick("انتخاب این پلن","Choose this plan")}</span><i>↗</i></button></div>
+        <div className={styles.planBottom}>{showProtocolMarks&&<div className={styles.protocolChips}>{protocols.slice(0,5).map(protocol=><span key={protocol}>{storeProtocolMeta(protocol)?.short||PROTOCOLS[protocol]?.short||protocol}</span>)}</div>}{showPlanBenefits&&<ul className={styles.planBenefits}><li>{content("plan_feature_1")}</li><li>{content("plan_feature_2")}</li><li>{content("plan_feature_3")}</li></ul>}<button className={styles.buyButton} disabled={buying===plan.id} onClick={()=>onBuy(plan)}><span>{buying===plan.id?pick("در حال ثبت سفارش...","Creating order..."):pick("انتخاب این پلن","Choose this plan")}</span><i>↗</i></button></div>
       </article>;
     })}</div>}
   </section>;
 
   const protocolsSection=<section className={styles.section} id="protocols" key="protocols">
     {sectionIntro("02",content("protocols_tag"),content("protocols_title"),content("protocols_description"))}
-    <div className={styles.protocolList}>{availableProtocols.map((id,index)=>{const protocol=PROTOCOLS[id];return <article key={id}><span className={styles.protocolIndex}>{String(index+1).padStart(2,"0")}</span>{showProtocolMarks&&<span className={styles.protocolMark}>{protocol.mark}</span>}<div><h3>{protocol.name}</h3><p>{pick(protocol.fa,protocol.en)}</p></div><span className={styles.protocolAvailable}>{option("editorial_protocol_available_label",pick("آماده استفاده","Available"))}</span></article>;})}</div>
+    <div className={styles.protocolList}>{availableProtocols.map((id,index)=>{const protocol=PROTOCOLS[id];return <article key={id}><span className={styles.protocolIndex}>{String(index+1).padStart(2,"0")}</span>{showProtocolMarks&&<span className={styles.protocolMark}>{protocol.mark}</span>}<div><h3 dir="ltr">{protocol.name}</h3><p>{pick(protocol.fa,protocol.en)}</p></div><span className={styles.protocolAvailable}>{option("editorial_protocol_available_label",pick("آماده استفاده","Available"))}</span></article>;})}</div>
   </section>;
 
   const servicesSection=<section className={styles.section} id="services" key="services">
@@ -151,10 +147,10 @@ export function EditorialPro2027Template({settings,themeOptions,plans,loading,er
 
     <main>
       <section className={styles.hero}><div className={styles.heroCopy}><div className={styles.heroMeta}><span>{content("hero_kicker")}</span><small>EDITORIAL PRO / 2027</small></div><h1>{content("hero_title")} <em>{content("hero_highlight")}</em></h1><p>{content("hero_description")}</p><div className={styles.heroActions}>{settings.show_plans&&<a href="#plans">{content("hero_primary_button")}<span>↗</span></a>}<a href="#guides">{content("hero_secondary_button")}</a></div><div className={styles.heroProof}><span>{content("hero_proof_1")}</span><span>{content("hero_proof_2")}</span><span>{content("hero_proof_3")}</span></div></div>
-        {showStatusBoard&&<div className={styles.heroBoard}><div className={styles.boardTop}><span>{option("editorial_status_label",pick("وضعیت شبکه","Network status"))}</span><b>{option("editorial_status_value","ONLINE")}</b></div><div className={styles.boardMetric}><strong>{String(availableProtocols.length).padStart(2,"0")}</strong><span>{pick("روش اتصال فعال","active connection methods")}</span></div><div className={styles.boardStats}><div><small>{pick("پایداری","Uptime")}</small><b>{content("trust_uptime_value")}</b></div><div><small>{option("editorial_delivery_label",pick("تحویل سرویس","Delivery"))}</small><b>{option("editorial_delivery_value",pick("داخل پنل کاربری","In your account"))}</b></div></div><span className={styles.boardStamp}>{brand.shortName}</span></div>}
+        {showStatusBoard&&<div className={styles.heroBoard}><div className={styles.boardTop}><span>{option("editorial_status_label",pick("وضعیت شبکه","Network status"))}</span><b>{option("editorial_status_value","ONLINE")}</b></div><div className={styles.boardMetric}><strong>{String(STORE_PROTOCOL_CATALOG.length).padStart(2,"0")}</strong><span>{pick("روش اتصال فعال","active connection methods")}</span></div><div className={styles.boardStats}><div><small>{pick("پایداری","Uptime")}</small><b>{content("trust_uptime_value")}</b></div><div><small>{option("editorial_delivery_label",pick("تحویل سرویس","Delivery"))}</small><b>{option("editorial_delivery_value",pick("داخل پنل کاربری","In your account"))}</b></div></div><span className={styles.boardStamp}>{brand.shortName}</span></div>}
       </section>
 
-      {showTrustStrip&&<section className={styles.trustStrip}><article><span>01</span><b>{content("trust_speed_title")}</b><small>{content("trust_speed_description")}</small></article><article><span>02</span><b>{content("trust_uptime_value")}</b><small>{content("trust_uptime_description")}</small></article><article><span>03</span><b>{content("trust_support_title")}</b><small>{content("trust_support_description")}</small></article><article><span>04</span><b>{number(availableProtocols.length)}</b><small>{content("trust_protocols_description")}</small></article></section>}
+      {showTrustStrip&&<section className={styles.trustStrip}><article><span>01</span><b>{content("trust_speed_title")}</b><small>{content("trust_speed_description")}</small></article><article><span>02</span><b>{content("trust_uptime_value")}</b><small>{content("trust_uptime_description")}</small></article><article><span>03</span><b>{content("trust_support_title")}</b><small>{content("trust_support_description")}</small></article><article><span>04</span><b>{number(STORE_PROTOCOL_CATALOG.length)}</b><small>{content("trust_protocols_description")}</small></article></section>}
       {error&&<div className={`${styles.alert} ${styles.alertError}`}>{error}</div>}{message&&<div className={`${styles.alert} ${styles.alertSuccess}`}>{message}</div>}
       {visibleSections.map(section=>sections[section])}
       {settings.show_final_cta&&<section className={styles.finalCta}><small>{content("final_cta_tag")}</small><h2>{content("final_cta_title")}</h2><p>{content("final_cta_description")}</p><a href="#plans">{content("final_cta_button")}<i>↗</i></a></section>}

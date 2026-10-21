@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import {useMemo,useState,type CSSProperties,type ReactNode} from "react";
+import {useState,type CSSProperties,type ReactNode} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {useBranding} from "../lib/branding";
 import {planProtocols,type StorePlan} from "../lib/store-runtime-api";
+import {STORE_PROTOCOL_CATALOG,storeProtocolMeta} from "../lib/store-protocol-catalog";
 import {storefrontText,type StorefrontSectionId} from "../lib/storefront-config";
 import {
   ORBIT_DEFAULTS,
@@ -16,7 +17,6 @@ import {
   storeGuideAppImage,
   storeGuideContent,
   storeGuidePlatforms,
-  storeGuideTutorialImage,
   type StoreGuidePlatform,
   type StoreGuideProtocol,
 } from "../lib/store-guide-content";
@@ -34,6 +34,13 @@ const PROTOCOLS:Record<string,ProtocolMeta>={
   v2ray:{name:"V2Ray / Xray",short:"V2Ray",symbol:"V",fa:"انعطاف‌پذیر برای سناریوهای شبکه متنوع.",en:"Flexible for varied network scenarios."},
 };
 const GUIDE_ORDER:StoreGuideProtocol[]=["cisco","openvpn","wireguard","l2tp","v2ray"];
+const GUIDE_POSTER_COPY:Record<StoreGuideProtocol,{fa:string;en:string}>={
+  cisco:{fa:"افزودن سرور، ورود حساب و اتصال نهایی",en:"Add the server, sign in, and connect"},
+  openvpn:{fa:"دریافت فایل OVPN، افزودن پروفایل و اتصال نهایی",en:"Import the OVPN file, add the profile, and connect"},
+  wireguard:{fa:"دریافت کانفیگ، افزودن Tunnel و اتصال نهایی",en:"Import config, create tunnel, and connect"},
+  l2tp:{fa:"افزودن VPN، ورود اطلاعات حساب و اتصال نهایی",en:"Add the VPN, enter account details, and connect"},
+  v2ray:{fa:"دریافت اطلاعات اتصال، افزودن پروفایل و اتصال نهایی",en:"Import connection details, add the profile, and connect"},
+};
 
 function stringOption(options:StoreTemplateOptionMap,key:string,fallback:string){
   const value=options[key];
@@ -67,22 +74,15 @@ export function OrbitNeo2027Template({themeOptions,settings,plans,loading,error,
   const number=(value:number,options?:Intl.NumberFormatOptions)=>Number(value||0).toLocaleString(locale,options);
   const openChat=()=>window.dispatchEvent(new Event("twinpanel:open-chat"));
 
-  const availableProtocols=useMemo(()=>{
-    const found=new Set<string>();
-    plans.forEach(plan=>planProtocols(plan).forEach(protocol=>found.add(protocol)));
-    const ordered=Object.keys(PROTOCOLS).filter(protocol=>found.size===0||found.has(protocol));
-    return ordered.length?ordered:Object.keys(PROTOCOLS);
-  },[plans]);
-  const guideProtocolIds=useMemo(()=>{
-    const visible=GUIDE_ORDER.filter(protocol=>availableProtocols.includes(protocol));
-    return visible.length?visible:GUIDE_ORDER;
-  },[availableProtocols]);
+  const availableProtocols=Object.keys(PROTOCOLS);
+  const guideProtocolIds=GUIDE_ORDER;
   const activeGuideProtocol=guideProtocolIds.includes(guideProtocol)?guideProtocol:guideProtocolIds[0];
   const selectedPlatform=storeGuidePlatforms.find(item=>item.id===guidePlatform)||storeGuidePlatforms[0];
+  const selectedProtocol=PROTOCOLS[activeGuideProtocol]||{name:activeGuideProtocol,short:activeGuideProtocol,symbol:"•",fa:"",en:""};
   const guide=storeGuideContent[activeGuideProtocol];
   const guideEntry=guide.systems[guidePlatform];
   const guideAppImage=storeGuideAppImage(guidePlatform,activeGuideProtocol);
-  const guideTutorialImage=storeGuideTutorialImage(guidePlatform,activeGuideProtocol);
+  const posterCopy=GUIDE_POSTER_COPY[activeGuideProtocol];
 
   const order=Array.isArray(themeOptions.section_order)
     ?themeOptions.section_order.map(String).filter(section=>["plans","protocols","services","guides","account","faq"].includes(section)) as StorefrontSectionId[]
@@ -133,8 +133,8 @@ export function OrbitNeo2027Template({themeOptions,settings,plans,loading,error,
   const protocolsSection=<section className={`${styles.section} ${styles.protocolSection}`} id="protocols" key="protocols">
     <SectionHeading index="02" tag={copy("protocols_tag")} title={copy("protocols_title")} description={copy("protocols_description")}/>
     <div className={styles.protocolStage}>
-      <div className={styles.protocolMedia}>{media.protocol?<img src={media.protocol} alt={copy("protocols_title")}/>:<div className={styles.generatedOrb}><span>ORBIT</span><b>{availableProtocols.length}</b><small>{pick("روش اتصال","connection methods")}</small></div>}{showMediaLabels&&<em>{pick("CONNECTION MAP","CONNECTION MAP")}</em>}</div>
-      <div className={styles.protocolGrid}>{availableProtocols.map((id,index)=>{const protocol=PROTOCOLS[id]||{name:id,short:id,symbol:"•",fa:"",en:""};return <article className={styles.protocolCard} key={id}><div className={styles.protocolIndex}>{String(index+1).padStart(2,"0")}</div><span className={styles.protocolSymbol}>{protocol.symbol}</span><div><h3>{protocol.name}</h3><p>{pick(protocol.fa,protocol.en)}</p></div><small>{pick("فعال در پلن‌های سازگار","Available on supported plans")}</small></article>;})}</div>
+      <div className={styles.protocolMedia}>{media.protocol?<img src={media.protocol} alt={copy("protocols_title")}/>:<div className={styles.generatedOrb}><span>ORBIT</span><b>{availableProtocols.length}</b><small>{pick("روش اتصال کلاسیک","classic connection methods")}</small></div>}{showMediaLabels&&<em>{pick("CONNECTION MAP","CONNECTION MAP")}</em>}</div>
+      <div className={styles.protocolGrid}>{availableProtocols.map((id,index)=>{const protocol=PROTOCOLS[id]||{name:id,short:id,symbol:"•",fa:"",en:""};return <article className={styles.protocolCard} key={id}><div className={styles.protocolIndex}>{String(index+1).padStart(2,"0")}</div><span className={styles.protocolSymbol}>{protocol.symbol}</span><div><h3 dir="ltr">{protocol.name}</h3><p>{pick(protocol.fa,protocol.en)}</p></div><small>{pick("فعال در پلن‌های سازگار","Available on supported plans")}</small></article>;})}</div>
     </div>
   </section>;
 
@@ -149,7 +149,7 @@ export function OrbitNeo2027Template({themeOptions,settings,plans,loading,error,
   const guidesSection=<section className={styles.section} id="guides" key="guides">
     <SectionHeading index="04" tag={copy("guides_tag")} title={copy("guides_title")} description={copy("guides_description")}/>
     <div className={styles.guideShell}>
-      <aside className={styles.guideVisual}>{media.guides?<img src={media.guides} alt={copy("guides_title")}/>:guideTutorialImage?<img src={guideTutorialImage} alt={`${PROTOCOLS[activeGuideProtocol]?.name||activeGuideProtocol} tutorial`}/>:<div className={styles.guideFallback}>GUIDE LAB</div>}<div className={styles.guideVisualMeta}><small>{pick(selectedPlatform.fa,selectedPlatform.en)}</small><strong>{PROTOCOLS[activeGuideProtocol]?.name||activeGuideProtocol}</strong><span>{guideEntry.client}</span></div></aside>
+      <aside className={styles.guideVisual}>{media.guides?<><img src={media.guides} alt={copy("guides_title")}/><div className={styles.guideVisualMeta}><small>{pick(selectedPlatform.fa,selectedPlatform.en)}</small><strong dir="ltr">{selectedProtocol.name}</strong><span>{guideEntry.client}</span></div></>:<div className={styles.guideFallback} role="img" aria-label={`${selectedProtocol.name} ${pick(selectedPlatform.fa,selectedPlatform.en)}`}><span>{pick(`آموزش اتصال ${selectedProtocol.name}`,`${selectedProtocol.name} Setup Guide`)}</span><strong>{pick(`برای ${selectedPlatform.fa}`,`for ${selectedPlatform.en}`)}</strong><small>{pick(posterCopy.fa,posterCopy.en)}</small></div>}</aside>
       <div className={styles.guideContent}>
         <div className={styles.guideSelectors}><div>{guideProtocolIds.map(protocol=><button type="button" key={protocol} className={protocol===activeGuideProtocol?styles.activeChip:""} onClick={()=>setGuideProtocol(protocol)}>{PROTOCOLS[protocol]?.short||protocol}</button>)}</div><div>{storeGuidePlatforms.map(platform=><button type="button" key={platform.id} className={platform.id===guidePlatform?styles.activeChip:""} onClick={()=>setGuidePlatform(platform.id)}><span>{platform.icon}</span>{pick(platform.fa,platform.en)}</button>)}</div></div>
         <div className={styles.guideApp}><div className={styles.guideAppIcon}>{guideAppImage?<img src={guideAppImage} alt={guideEntry.client}/>:<span>{selectedPlatform.icon}</span>}</div><div><small>{pick("نرم‌افزار / روش پیشنهادی","Recommended client / method")}</small><h3>{guideEntry.client}</h3><p>{guide.summary}</p></div>{guideEntry.downloadUrl?<a href={guideEntry.downloadUrl} target="_blank" rel="noopener noreferrer">{guideEntry.downloadLabel} ↗</a>:<span className={styles.noDownload}>✓ {guideEntry.downloadLabel}</span>}</div>
@@ -190,7 +190,7 @@ export function OrbitNeo2027Template({themeOptions,settings,plans,loading,error,
     <main>
       <section className={styles.hero}>
         <div className={styles.heroCopy}><span className={styles.tag}>{copy("hero_kicker")}</span><h1>{copy("hero_title")}<strong>{copy("hero_highlight")}</strong></h1><p>{copy("hero_description")}</p><div className={styles.heroActions}><a href="#plans" className={styles.primaryButton}>{copy("hero_primary_button")} ↗</a><a href="#guides" className={styles.secondaryButton}>{copy("hero_secondary_button")}</a></div><div className={styles.proofs}>{[1,2,3].map(index=><span key={index}><i>✓</i>{copy(`hero_proof_${index}`)}</span>)}</div></div>
-        <div className={styles.heroMedia}>{media.hero?<img src={media.hero} alt={copy("hero_title")}/>:<div className={styles.heroGenerated}><div className={styles.heroOrbitRing}/><span>ORBIT</span><strong>{plans.length||"∞"}</strong><small>{pick("پلن / مسیر زنده","live plans / routes")}</small></div>}{showMediaLabels&&<div className={styles.mediaLabel}><span>LIVE STOREFRONT</span><b>{pick("تصویر Hero قابل آپلود","Uploadable hero media")}</b></div>}{booleanOption(themeOptions,"orbit_show_metrics",true)&&<div className={styles.metrics}><div><small>{pick("پروتکل","Protocols")}</small><b>{availableProtocols.length}</b></div><div><small>{pick("پلن فعال","Live plans")}</small><b>{plans.length}</b></div><div><small>{pick("مدیریت","Control")}</small><b>24/7</b></div></div>}</div>
+        <div className={styles.heroMedia}>{media.hero?<img src={media.hero} alt={copy("hero_title")}/>:<div className={styles.heroGenerated}><div className={styles.heroOrbitRing}/><span>ORBIT</span><strong>{plans.length||"∞"}</strong><small>{pick("پلن / مسیر زنده","live plans / routes")}</small></div>}{showMediaLabels&&<div className={styles.mediaLabel}><span>LIVE STOREFRONT</span><b>{pick("تصویر Hero قابل آپلود","Uploadable hero media")}</b></div>}{booleanOption(themeOptions,"orbit_show_metrics",true)&&<div className={styles.metrics}><div><small>{pick("پروتکل","Protocols")}</small><b>{STORE_PROTOCOL_CATALOG.length}</b></div><div><small>{pick("پلن فعال","Live plans")}</small><b>{plans.length}</b></div><div><small>{pick("مدیریت","Control")}</small><b>24/7</b></div></div>}</div>
       </section>
 
       <div className={styles.marquee}><span>PRIVATE ACCESS</span><i/> <span>MULTI PROTOCOL</span><i/> <span>REAL PLANS</span><i/> <span>SETUP LAB</span><i/> <span>ACCOUNT CONTROL</span></div>
@@ -217,7 +217,7 @@ function PlanCard({plan,index,featured,buying,number,pick,copy,onBuy}:{plan:Stor
     <div className={styles.planPrice}><strong>{number(plan.price_toman)}</strong><span>{pick("تومان","Toman")}</span></div>
     <div className={styles.planFacts}><div><small>{pick("حجم","Traffic")}</small><b>{number(plan.traffic_gb,{maximumFractionDigits:2})} GB</b></div><div><small>{pick("مدت","Duration")}</small><b>{number(plan.duration_days)} {pick("روز","days")}</b></div><div><small>{pick("دستگاه","Devices")}</small><b>{number(plan.device_limit)}</b></div></div>
     <div className={styles.planBenefits}>{[1,2,3].map(item=><span key={item}>✓ {copy(`plan_feature_${item}`)}</span>)}</div>
-    <div className={styles.planProtocols}>{protocols.slice(0,6).map(protocol=><span key={protocol}>{PROTOCOLS[protocol]?.short||protocol}</span>)}</div>
+    <div className={styles.planProtocols}>{protocols.slice(0,6).map(protocol=><span key={protocol}>{storeProtocolMeta(protocol)?.short||PROTOCOLS[protocol]?.short||protocol}</span>)}</div>
     <button type="button" disabled={buying} onClick={onBuy}>{buying?pick("در حال ثبت سفارش...","Creating order..."):pick("خرید این پلن","Buy this plan")}<span>↗</span></button>
   </article>;
 }
