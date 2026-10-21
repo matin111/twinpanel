@@ -42,7 +42,7 @@ const CustomerSectionRuntime=dynamic(()=>import("./customer-runtime").then(m=>m.
 const CustomerBuyRuntime=dynamic(()=>import("./customer-buy-runtime").then(m=>m.CustomerBuyRuntime));
 const CustomerSubscriptionsRuntime=dynamic(()=>import("./customer-subscriptions-runtime").then(m=>m.CustomerSubscriptionsRuntime));
 const CustomerPaymentsRuntime=dynamic(()=>import("./customer-payments-runtime").then(m=>m.CustomerPaymentsRuntime));
-const CustomerConnectionModernPage=dynamic(()=>import("./customer-connection-modern").then(m=>m.CustomerConnectionModernPage));
+const CustomerConnectionHubPage=dynamic(()=>import("./customer-connection-hub").then(m=>m.CustomerConnectionHubPage));
 const VpnSettingsModernPage=dynamic(()=>import("./vpn-settings-modern").then(m=>m.VpnSettingsModernPage));
 const CustomerDashboardPro=dynamic(()=>import("./customer-dashboard-pro").then(m=>m.CustomerDashboardPro));
 
@@ -128,7 +128,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="panel/buy") return <CustomerBuyRuntime/>;
   if(key==="panel/subscription") return <CustomerSubscriptionsRuntime/>;
   if(key==="panel/payments") return <CustomerPaymentsRuntime/>;
-  if(key==="panel/connection") return <CustomerConnectionModernPage/>;
+  if(key==="panel/connection") return <CustomerConnectionHubPage/>;
 
   if(key==="reseller") return <ResellerDashboardV3/>;
   if(key==="reseller/customers") return <ResellerCustomersParityV2/>;
