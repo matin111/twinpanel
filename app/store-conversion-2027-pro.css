@@ -1,0 +1,55 @@
+.tpConversionThemeRuntime .tpStore{
+  --store-bg:var(--conversion-page-bg);
+  --store-bg-2:var(--conversion-section-bg);
+  --store-surface:var(--conversion-card-bg);
+  --store-surface-2:var(--conversion-section-bg);
+  --store-card:var(--conversion-card-bg);
+  --store-line:var(--conversion-card-border);
+  --store-line-strong:color-mix(in srgb,var(--conversion-accent) 48%,var(--conversion-card-border));
+  --store-text:var(--conversion-text);
+  --store-muted:var(--conversion-muted);
+  --store-violet:var(--conversion-accent);
+  --store-violet-2:var(--conversion-accent-2);
+  --store-violet-3:color-mix(in srgb,var(--conversion-accent) 70%,#fff);
+  color:var(--conversion-text);
+  background:linear-gradient(180deg,var(--conversion-page-bg),color-mix(in srgb,var(--conversion-page-bg) 88%,#000));
+}
+.tpConversionThemeRuntime[data-glow="soft"] .tpStore{background:radial-gradient(circle at 15% 8%,color-mix(in srgb,var(--conversion-accent) 18%,transparent),transparent 30%),radial-gradient(circle at 88% 22%,color-mix(in srgb,var(--conversion-accent-2) 14%,transparent),transparent 34%),linear-gradient(180deg,var(--conversion-page-bg),color-mix(in srgb,var(--conversion-page-bg) 90%,#000))}
+.tpConversionThemeRuntime[data-glow="strong"] .tpStore{background:radial-gradient(circle at 12% 5%,color-mix(in srgb,var(--conversion-accent) 30%,transparent),transparent 33%),radial-gradient(circle at 90% 20%,color-mix(in srgb,var(--conversion-accent-2) 24%,transparent),transparent 36%),linear-gradient(180deg,var(--conversion-page-bg),color-mix(in srgb,var(--conversion-page-bg) 86%,#000))}
+.tpConversionThemeRuntime[data-glow="off"] .tpStoreHeroGlow,.tpConversionThemeRuntime[data-glow="off"] .tpStoreGlobe{box-shadow:none}.tpConversionThemeRuntime[data-glow="off"] .tpStoreHeroGlow{display:none}
+
+.tpConversionThemeRuntime .tpStoreHeader{color:var(--conversion-header-text)}
+.tpConversionThemeRuntime[data-header="glass"] .tpStoreHeader{background:color-mix(in srgb,var(--conversion-header-bg) 82%,transparent);border-bottom-color:color-mix(in srgb,var(--conversion-card-border) 80%,transparent);backdrop-filter:blur(22px)}
+.tpConversionThemeRuntime[data-header="solid"] .tpStoreHeader{background:var(--conversion-header-bg);border-bottom-color:var(--conversion-card-border);backdrop-filter:none}
+.tpConversionThemeRuntime[data-header="minimal"] .tpStoreHeader{background:color-mix(in srgb,var(--conversion-page-bg) 70%,transparent);border-bottom-color:transparent;backdrop-filter:blur(14px)}
+.tpConversionThemeRuntime .tpStoreNavLinks,.tpConversionThemeRuntime .tpStoreHeaderActions{color:var(--conversion-header-text)}
+.tpConversionThemeRuntime .tpStoreNavLinks a:hover{color:var(--conversion-header-text)}
+.tpConversionThemeRuntime .tpStoreNavLinks a:after{background:var(--conversion-accent)}
+
+.tpConversionThemeRuntime .tpStoreHeaderBuy,.tpConversionThemeRuntime .tpStorePrimary,.tpConversionThemeRuntime .tpStoreBuyButton{background:var(--conversion-button-bg);color:var(--conversion-button-text);border-color:transparent;box-shadow:0 12px 32px color-mix(in srgb,var(--conversion-button-bg) 30%,transparent)}
+.tpConversionThemeRuntime[data-buttons="gradient"] .tpStoreHeaderBuy,.tpConversionThemeRuntime[data-buttons="gradient"] .tpStorePrimary,.tpConversionThemeRuntime[data-buttons="gradient"] .tpStoreBuyButton{background:linear-gradient(135deg,color-mix(in srgb,var(--conversion-button-bg) 78%,#fff),var(--conversion-button-bg) 52%,color-mix(in srgb,var(--conversion-button-bg) 72%,#000))}
+.tpConversionThemeRuntime[data-buttons="outline"] .tpStoreHeaderBuy,.tpConversionThemeRuntime[data-buttons="outline"] .tpStorePrimary,.tpConversionThemeRuntime[data-buttons="outline"] .tpStoreBuyButton{background:transparent;color:var(--conversion-button-bg);border-color:var(--conversion-button-bg);box-shadow:none}
+.tpConversionThemeRuntime .tpStorePrimary:hover,.tpConversionThemeRuntime .tpStoreHeaderBuy:hover,.tpConversionThemeRuntime .tpStoreBuyButton:hover{box-shadow:0 18px 42px color-mix(in srgb,var(--conversion-button-bg) 36%,transparent)}
+.tpConversionThemeRuntime .tpStorePill{border-color:color-mix(in srgb,var(--conversion-accent) 32%,transparent);background:color-mix(in srgb,var(--conversion-accent) 10%,transparent);color:color-mix(in srgb,var(--conversion-accent) 65%,#fff)}
+.tpConversionThemeRuntime .tpStoreHero h1 em{background:linear-gradient(95deg,color-mix(in srgb,var(--conversion-accent) 22%,#fff),color-mix(in srgb,var(--conversion-accent) 58%,#fff) 50%,var(--conversion-accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+.tpConversionThemeRuntime .tpStoreHeroProof i,.tpConversionThemeRuntime .tpStorePlanList i{color:var(--conversion-accent)}
+.tpConversionThemeRuntime .tpStorePhone{border-color:color-mix(in srgb,var(--conversion-card-border) 75%,#000);background:linear-gradient(180deg,color-mix(in srgb,var(--conversion-card-bg) 86%,#000),var(--conversion-card-bg))}
+.tpConversionThemeRuntime .tpStorePower{background:radial-gradient(circle,color-mix(in srgb,var(--conversion-accent) 75%,#fff),var(--conversion-accent) 55%,var(--conversion-accent-2));box-shadow:0 0 0 12px color-mix(in srgb,var(--conversion-accent) 8%,transparent),0 0 40px color-mix(in srgb,var(--conversion-accent) 48%,transparent)}
+
+.tpConversionThemeRuntime .tpStoreSoftSection{background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--conversion-section-bg) 76%,transparent),transparent)}
+.tpConversionThemeRuntime .tpStorePlanCard,.tpConversionThemeRuntime .tpStoreProtocolCard,.tpConversionThemeRuntime .tpStoreBenefitsGrid article,.tpConversionThemeRuntime .tpStoreAccountPanel,.tpConversionThemeRuntime .tpStoreFaqList details,.tpConversionThemeRuntime .tpStoreSocialGrid a,.tpConversionThemeRuntime .tpStoreChatCard,.tpConversionThemeRuntime .tpRealGuideShell{background:var(--conversion-card-bg);border-color:var(--conversion-card-border)}
+.tpConversionThemeRuntime[data-cards="glass"] .tpStorePlanCard,.tpConversionThemeRuntime[data-cards="glass"] .tpStoreProtocolCard,.tpConversionThemeRuntime[data-cards="glass"] .tpStoreBenefitsGrid article,.tpConversionThemeRuntime[data-cards="glass"] .tpStoreAccountPanel,.tpConversionThemeRuntime[data-cards="glass"] .tpStoreFaqList details{background:color-mix(in srgb,var(--conversion-card-bg) 86%,transparent);backdrop-filter:blur(16px)}
+.tpConversionThemeRuntime[data-cards="bordered"] .tpStorePlanCard,.tpConversionThemeRuntime[data-cards="bordered"] .tpStoreProtocolCard,.tpConversionThemeRuntime[data-cards="bordered"] .tpStoreBenefitsGrid article,.tpConversionThemeRuntime[data-cards="bordered"] .tpStoreAccountPanel,.tpConversionThemeRuntime[data-cards="bordered"] .tpStoreFaqList details{background:transparent;border-color:color-mix(in srgb,var(--conversion-accent) 32%,var(--conversion-card-border))}
+.tpConversionThemeRuntime .tpStorePlanCard.featured{border-color:color-mix(in srgb,var(--conversion-accent) 70%,var(--conversion-card-border));box-shadow:0 0 0 1px color-mix(in srgb,var(--conversion-accent) 15%,transparent),0 25px 70px color-mix(in srgb,var(--conversion-accent) 20%,transparent)}
+.tpConversionThemeRuntime .tpStorePlanRibbon{background:linear-gradient(135deg,color-mix(in srgb,var(--conversion-accent) 74%,#fff),var(--conversion-accent))}
+.tpConversionThemeRuntime .tpStoreSectionHead p,.tpConversionThemeRuntime .tpStoreHeroCopy>p,.tpConversionThemeRuntime .tpStorePlanDesc,.tpConversionThemeRuntime .tpStoreBenefitsGrid p,.tpConversionThemeRuntime .tpStoreProtocolCard p,.tpConversionThemeRuntime .tpStoreFooter p{color:var(--conversion-muted)}
+.tpConversionThemeRuntime .tpStoreFooter{border-top-color:var(--conversion-card-border);background:color-mix(in srgb,var(--conversion-page-bg) 88%,#000)}
+
+.tpConversionThemeRuntime[data-corners="sharp"] :is(.tpStoreLogin,.tpStoreHeaderBuy,.tpStorePrimary,.tpStoreSecondary,.tpStorePill,.tpStorePlanCard,.tpStoreProtocolCard,.tpStoreBenefitsGrid article,.tpStoreAccountPanel,.tpStoreFaqList details,.tpStoreSocialGrid a,.tpStoreChatCard,.tpRealGuideShell){border-radius:4px!important}
+.tpConversionThemeRuntime[data-corners="round"] :is(.tpStoreLogin,.tpStoreHeaderBuy,.tpStorePrimary,.tpStoreSecondary,.tpStorePill,.tpStorePlanCard,.tpStoreProtocolCard,.tpStoreBenefitsGrid article,.tpStoreAccountPanel,.tpStoreFaqList details,.tpStoreSocialGrid a,.tpStoreChatCard,.tpRealGuideShell){border-radius:28px}
+
+.tpConversionThemeRuntime[data-density="compact"] .tpStoreHero{min-height:560px;padding-top:58px;padding-bottom:46px}.tpConversionThemeRuntime[data-density="compact"] .tpStoreSection{padding-top:62px;padding-bottom:62px}.tpConversionThemeRuntime[data-density="compact"] .tpStorePlanCard{min-height:450px}.tpConversionThemeRuntime[data-density="airy"] .tpStoreHero{min-height:760px;padding-top:110px;padding-bottom:90px}.tpConversionThemeRuntime[data-density="airy"] .tpStoreSection{padding-top:116px;padding-bottom:116px}
+.tpConversionThemeRuntime[data-hero-visual="off"] .tpStoreHero{grid-template-columns:1fr;max-width:1040px}.tpConversionThemeRuntime[data-hero-visual="off"] .tpStoreHeroCopy{max-width:900px;margin-inline:auto;text-align:center}.tpConversionThemeRuntime[data-hero-visual="off"] .tpStoreHeroCopy>p{margin-inline:auto}.tpConversionThemeRuntime[data-hero-visual="off"] .tpStoreHeroActions,.tpConversionThemeRuntime[data-hero-visual="off"] .tpStoreHeroProof{justify-content:center}.tpConversionThemeRuntime[data-hero-visual="off"] .tpStoreHeroVisual{display:none}
+
+html[data-theme="light"] .tpConversionThemeRuntime .tpStore{--conversion-page-bg:var(--conversion-page-bg);color:var(--conversion-text)}
+@media(max-width:760px){.tpConversionThemeRuntime[data-density="airy"] .tpStoreHero{min-height:auto;padding-top:72px;padding-bottom:52px}.tpConversionThemeRuntime[data-density="compact"] .tpStoreHero{min-height:auto}.tpConversionThemeRuntime[data-corners="round"] :is(.tpStorePlanCard,.tpStoreProtocolCard,.tpStoreBenefitsGrid article,.tpStoreAccountPanel,.tpStoreFaqList details){border-radius:20px}}
