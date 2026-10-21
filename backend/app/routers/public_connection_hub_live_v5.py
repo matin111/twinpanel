@@ -11,6 +11,8 @@ from ..database import get_db
 from .public_connection_hub_refine_v6 import refine_public_connection_hub_html
 from .public_connection_mobile_v7 import refine_public_connection_mobile_v7
 from .public_connection_hub_v8 import refine_public_connection_hub_v8
+from .public_connection_hub_v9 import refine_public_connection_hub_v9
+from .public_connection_files_v9 import router as public_connection_files_v9_router
 from .public_connection_multilink_v7 import router as public_connection_multilink_v7_router
 from .public_connection_hub_v5 import public_connection_hub_v5
 
@@ -20,6 +22,7 @@ router = APIRouter(
     tags=["public-connection-hub-live-v5"],
 )
 router.include_router(public_connection_multilink_v7_router)
+router.include_router(public_connection_files_v9_router)
 
 
 _LIVE_CSS = r"""
@@ -225,6 +228,7 @@ def public_connection_hub_live_v5(
     source = refine_public_connection_hub_html(source)
     source = refine_public_connection_mobile_v7(source, token)
     source = refine_public_connection_hub_v8(source)
+    source = refine_public_connection_hub_v9(source, token)
 
     return HTMLResponse(
         content=source,
