@@ -1,11 +1,9 @@
+html[data-store-template="conversion-2027"] .supportChatLauncher,html[data-store-template="editorial-grid-2027"] .supportChatLauncher{display:none}
 html[data-store-template="conversion-2027"] .supportChatLauncherIcon,html[data-store-template="conversion-2027"] .supportChatPrimary,html[data-store-template="conversion-2027"] .supportChatSend{background:var(--store-chat-accent,#7c3aed)}
 html[data-store-template="conversion-2027"] .supportChatStart input:focus,html[data-store-template="conversion-2027"] .supportChatStart textarea:focus,html[data-store-template="conversion-2027"] .supportChatComposer textarea:focus{border-color:color-mix(in srgb,var(--store-chat-accent,#7c3aed) 62%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--store-chat-accent,#7c3aed) 12%,transparent)}
 html[data-store-template="conversion-2027"] .supportChatMessage.own{background:color-mix(in srgb,var(--store-chat-accent,#7c3aed) 32%,#11131a)}
 
 html[data-store-template="editorial-grid-2027"] .supportChatRoot{inset-inline-end:22px;bottom:22px}
-html[data-store-template="editorial-grid-2027"] .supportChatLauncher{border-radius:999px;border:1px solid rgba(20,20,20,.14);background:#171717;color:#fff;padding:8px 12px;box-shadow:0 16px 42px rgba(28,24,20,.18)}
-html[data-store-template="editorial-grid-2027"] .supportChatLauncherIcon{width:34px;height:34px;border-radius:50%;background:var(--store-chat-accent,#8b5cf6)}
-html[data-store-template="editorial-grid-2027"] .supportChatLauncher small{color:#bbb5ad}
 html[data-store-template="editorial-grid-2027"] .supportChatWindow{width:min(390px,calc(100vw - 32px));background:#f7f3ec;border-color:#d9d1c6;border-radius:20px;box-shadow:0 28px 80px rgba(49,42,34,.2)}
 html[data-store-template="editorial-grid-2027"] .supportChatHeader{background:#efe9df;border-color:#d9d1c6}
 html[data-store-template="editorial-grid-2027"] .supportChatHeaderInfo b,html[data-store-template="editorial-grid-2027"] .supportChatStart h3{color:#171717}
@@ -21,8 +19,6 @@ html[data-store-template="editorial-grid-2027"] .supportChatMessage.own p,html[d
 html[data-store-template="editorial-grid-2027"] .supportChatMessage.admin{background:#fffdfa;border-color:#d9d1c6}
 html[data-store-template="editorial-grid-2027"] .supportChatComposer{background:#efe9df;border-color:#d9d1c6}
 html[data-store-template="editorial-grid-2027"] .supportChatImagePreview{background:#fffdfa;border-color:#d9d1c6}
-html[data-store-template="editorial-grid-2027"][data-theme="dark"] .supportChatLauncher{background:#f2ede5;color:#171717;border-color:#4a443c}
-html[data-store-template="editorial-grid-2027"][data-theme="dark"] .supportChatLauncher small{color:#645f58}
 html[data-store-template="editorial-grid-2027"][data-theme="dark"] .supportChatWindow{background:#141312;border-color:#393531}
 html[data-store-template="editorial-grid-2027"][data-theme="dark"] .supportChatHeader,html[data-store-template="editorial-grid-2027"][data-theme="dark"] .supportChatComposer{background:#1c1a18;border-color:#393531}
 html[data-store-template="editorial-grid-2027"][data-theme="dark"] .supportChatBody{background:#141312}
