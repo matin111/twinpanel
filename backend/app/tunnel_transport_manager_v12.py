@@ -16,7 +16,7 @@ from .exit_access_dataplane_stability_v144 import (
     apply_exit_access_dataplane_stability_v144,
 )
 from .legacy_ingress_reconciler import reconciler_loop as legacy_ingress_loop
-from .runtime_reconciler_v4 import reconciler_loop as runtime_reconciler_loop
+from .runtime_reconciler_v5 import reconciler_loop as runtime_reconciler_loop
 from .manager_runtime_v16 import install_manager_runtime_v16
 from .smart_transport_auto_v21 import install_smart_transport_auto_v21
 from .smart_auto_bootstrap_v24 import reconciler_loop as smart_bootstrap_loop
@@ -35,6 +35,7 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 # + ADAPTIVE TUNNEL PERFORMANCE V148
 # + ADAPTIVE MULTI-LANE V149
 # + TP27 MASQUE CONNECT-IP V151
+# + RUNTIME RECONCILER V5 (extends runtime_reconciler_v4)
 # ============================================================
 
 
@@ -59,7 +60,7 @@ async def main() -> None:
         "vpn_access_dataplane=v46 "
         "vpn_access_performance=v51 "
         "exit_access_stability=v144 "
-        "reconciler=v4 "
+        "reconciler=v5 "
         "active_candidates=tp27_fast,tp27_masque,tp27_tcp_direct "
         "udp_policy=quality-gated "
         "non_udp_fallback=tp27_tcp_direct "
@@ -100,7 +101,7 @@ async def main() -> None:
 
     runtime_task = asyncio.create_task(
         runtime_reconciler_loop(),
-        name="twinpanel-runtime-reconciler-v4",
+        name="twinpanel-runtime-reconciler-v5",
     )
 
     legacy_ingress_task = asyncio.create_task(
