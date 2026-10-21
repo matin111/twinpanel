@@ -6,6 +6,7 @@ import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
 import {Badge, PageHead, Shell} from "./ui";
+import {LegacyProtocolsStudio} from "./legacy-protocols-studio";
 import styles from "./modern-protocols-admin-v2.module.css";
 
 
@@ -384,21 +385,28 @@ export function ModernProtocolsAdminPage() {
     <Shell active="/admin/modern-protocols">
       <div className="page legacy-control-page">
         <PageHead
-          title={pick("استودیوی پروتکل‌ها", "Protocol Studio")}
+          title={pick("پروتکل‌ها", "Protocols")}
           sub={pick(
-            "Preset پیشنهادی، تنظیمات حرفه‌ای، Preview، Validation و Runtime امن برای پروتکل‌های مدرن",
-            "Recommended presets, advanced settings, preview, validation and safe runtimes for modern protocols",
+            "مدیریت یکپارچه پروتکل‌های کلاسیک و مدرن، Health، Repair، Runtime، Preset و TLS در یک صفحه",
+            "Unified management for classic and modern protocols, health, repair, runtimes, presets and TLS in one page",
           )}
         />
 
         <div className={styles.studio}>
+          <LegacyProtocolsStudio/>
+
+          <div className={styles.categoryHead}>
+            <h3>{pick("پروتکل‌های مدرن", "Modern protocols")}</h3>
+            <span>{pick("Preset، Validation، Preview و Runtime مدیریت‌شده", "Managed presets, validation, preview and runtimes")}</span>
+          </div>
+
           {error && <div className={styles.errorBox}>{error}</div>}
           {notice && <div className={styles.successBox}>{notice}</div>}
 
           <div className={styles.summaryGrid}>
-            <div className={styles.summaryCard}><small>{pick("نود خروجی", "Exit nodes")}</small><strong>{stats.nodes.toLocaleString("fa-IR")}</strong></div>
+            <div className={styles.summaryCard}><small>{pick("نود خروجی مدرن", "Modern exit nodes")}</small><strong>{stats.nodes.toLocaleString("fa-IR")}</strong></div>
             <div className={styles.summaryCard}><small>{pick("Runtime آماده نصب", "Installable runtimes")}</small><strong>{stats.ready.toLocaleString("fa-IR")}</strong></div>
-            <div className={styles.summaryCard}><small>{pick("Listener آنلاین", "Online listeners")}</small><strong>{stats.online.toLocaleString("fa-IR")}</strong></div>
+            <div className={styles.summaryCard}><small>{pick("Listener مدرن آنلاین", "Online modern listeners")}</small><strong>{stats.online.toLocaleString("fa-IR")}</strong></div>
             <div className={styles.summaryCard}><small>{pick("Adapter بعدی", "Upcoming adapters")}</small><strong>{stats.planned.toLocaleString("fa-IR")}</strong></div>
           </div>
 
