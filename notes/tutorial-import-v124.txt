@@ -1,0 +1,1 @@
+Legacy storefront tutorial images are being migrated from the provided backup into local repository assets. No external runtime dependency is intended.
