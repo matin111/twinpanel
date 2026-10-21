@@ -1,0 +1,86 @@
+name: Validate Clean Store Tutorial Assets
+
+on:
+  push:
+    branches:
+      - fix/store-tutorial-assets-clean-v124
+    paths:
+      - '.github/workflows/validate-clean-store-tutorial-assets.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  validate-clean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/store-tutorial-assets-clean-v124
+          fetch-depth: 0
+
+      - name: Require finished local tutorial assets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -d public/learning/screenshots
+          test "$(find public/learning/screenshots -type f -name '*.webp' | wc -l | tr -d ' ')" = 65
+          grep -Fq 'const LEGACY_STEP_IMAGE_BASE="/learning/screenshots";' lib/store-guide-content.ts
+          if grep -Fq 'https://movilineapp.com/learning/' lib/store-guide-content.ts; then
+            echo 'External legacy learning dependency still present' >&2
+            exit 42
+          fi
+
+      - name: Remove every temporary migration artifact
+        id: cleanup
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf .tutorial-import-v120 .tutorial-import-v121 .tutorial-import-v124
+          rm -f assets/legacy-learning-visual.csv
+          rm -f scripts/verify-legacy-tutorial-images.py
+          rm -f .github/workflows/store-tutorial-assets-v121-verified-import.yml
+          rm -f .github/workflows/reconstruct-local-tutorial-assets.yml
+          rm -f .github/workflows/recover-and-finish-tutorial-assets.yml
+          rm -f .github/workflows/force-finish-local-tutorial-assets.yml
+          rm -f .github/workflows/store-tutorial-local-assets-v124.yml
+          rm -f .github/workflows/finalize-local-tutorial-assets.yml
+          rm -f .github/workflows/validate-clean-store-tutorial-assets.yml
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m 'Clean temporary tutorial migration artifacts'
+          git push origin HEAD:fix/store-tutorial-assets-clean-v124
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+
+      - name: Merge cleanup only when it actually changed main
+        if: steps.cleanup.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          pr="$(gh pr list --head fix/store-tutorial-assets-clean-v124 --base main --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$pr" ]; then
+            url="$(gh pr create --base main --head fix/store-tutorial-assets-clean-v124 --title 'Clean temporary storefront tutorial migration artifacts' --body 'Keeps only the finished local tutorial assets and removes temporary migration chunks/workflows. The 65 local storefront screenshots are validated before cleanup.')"
+            pr="${url##*/}"
+          fi
+
+          for i in $(seq 1 90); do
+            checks="$(gh pr checks "$pr" --json name,state,bucket 2>/dev/null || true)"
+            if [ -z "$checks" ] || [ "$checks" = '[]' ]; then sleep 10; continue; fi
+            if echo "$checks" | jq -e 'any(.[]; (.bucket=="fail" or .bucket=="cancel"))' >/dev/null; then echo "$checks"; exit 50; fi
+            if echo "$checks" | jq -e 'all(.[]; (.bucket=="pass" or .bucket=="skipping"))' >/dev/null; then
+              gh pr merge "$pr" --squash --delete-branch
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 51
