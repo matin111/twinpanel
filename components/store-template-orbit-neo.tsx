@@ -6,6 +6,7 @@ import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {useBranding} from "../lib/branding";
 import {planProtocols,type StorePlan} from "../lib/store-runtime-api";
+import {STORE_PROTOCOL_CATALOG,storeProtocolMeta} from "../lib/store-protocol-catalog";
 import {storefrontText,type StorefrontSectionId} from "../lib/storefront-config";
 import {
   ORBIT_DEFAULTS,
@@ -189,7 +190,7 @@ export function OrbitNeo2027Template({themeOptions,settings,plans,loading,error,
     <main>
       <section className={styles.hero}>
         <div className={styles.heroCopy}><span className={styles.tag}>{copy("hero_kicker")}</span><h1>{copy("hero_title")}<strong>{copy("hero_highlight")}</strong></h1><p>{copy("hero_description")}</p><div className={styles.heroActions}><a href="#plans" className={styles.primaryButton}>{copy("hero_primary_button")} ↗</a><a href="#guides" className={styles.secondaryButton}>{copy("hero_secondary_button")}</a></div><div className={styles.proofs}>{[1,2,3].map(index=><span key={index}><i>✓</i>{copy(`hero_proof_${index}`)}</span>)}</div></div>
-        <div className={styles.heroMedia}>{media.hero?<img src={media.hero} alt={copy("hero_title")}/>:<div className={styles.heroGenerated}><div className={styles.heroOrbitRing}/><span>ORBIT</span><strong>{plans.length||"∞"}</strong><small>{pick("پلن / مسیر زنده","live plans / routes")}</small></div>}{showMediaLabels&&<div className={styles.mediaLabel}><span>LIVE STOREFRONT</span><b>{pick("تصویر Hero قابل آپلود","Uploadable hero media")}</b></div>}{booleanOption(themeOptions,"orbit_show_metrics",true)&&<div className={styles.metrics}><div><small>{pick("پروتکل","Protocols")}</small><b>15</b></div><div><small>{pick("پلن فعال","Live plans")}</small><b>{plans.length}</b></div><div><small>{pick("مدیریت","Control")}</small><b>24/7</b></div></div>}</div>
+        <div className={styles.heroMedia}>{media.hero?<img src={media.hero} alt={copy("hero_title")}/>:<div className={styles.heroGenerated}><div className={styles.heroOrbitRing}/><span>ORBIT</span><strong>{plans.length||"∞"}</strong><small>{pick("پلن / مسیر زنده","live plans / routes")}</small></div>}{showMediaLabels&&<div className={styles.mediaLabel}><span>LIVE STOREFRONT</span><b>{pick("تصویر Hero قابل آپلود","Uploadable hero media")}</b></div>}{booleanOption(themeOptions,"orbit_show_metrics",true)&&<div className={styles.metrics}><div><small>{pick("پروتکل","Protocols")}</small><b>{STORE_PROTOCOL_CATALOG.length}</b></div><div><small>{pick("پلن فعال","Live plans")}</small><b>{plans.length}</b></div><div><small>{pick("مدیریت","Control")}</small><b>24/7</b></div></div>}</div>
       </section>
 
       <div className={styles.marquee}><span>PRIVATE ACCESS</span><i/> <span>MULTI PROTOCOL</span><i/> <span>REAL PLANS</span><i/> <span>SETUP LAB</span><i/> <span>ACCOUNT CONTROL</span></div>
@@ -216,7 +217,7 @@ function PlanCard({plan,index,featured,buying,number,pick,copy,onBuy}:{plan:Stor
     <div className={styles.planPrice}><strong>{number(plan.price_toman)}</strong><span>{pick("تومان","Toman")}</span></div>
     <div className={styles.planFacts}><div><small>{pick("حجم","Traffic")}</small><b>{number(plan.traffic_gb,{maximumFractionDigits:2})} GB</b></div><div><small>{pick("مدت","Duration")}</small><b>{number(plan.duration_days)} {pick("روز","days")}</b></div><div><small>{pick("دستگاه","Devices")}</small><b>{number(plan.device_limit)}</b></div></div>
     <div className={styles.planBenefits}>{[1,2,3].map(item=><span key={item}>✓ {copy(`plan_feature_${item}`)}</span>)}</div>
-    <div className={styles.planProtocols}>{protocols.slice(0,6).map(protocol=><span key={protocol}>{PROTOCOLS[protocol]?.short||protocol}</span>)}</div>
+    <div className={styles.planProtocols}>{protocols.slice(0,6).map(protocol=><span key={protocol}>{storeProtocolMeta(protocol)?.short||PROTOCOLS[protocol]?.short||protocol}</span>)}</div>
     <button type="button" disabled={buying} onClick={onBuy}>{buying?pick("در حال ثبت سفارش...","Creating order..."):pick("خرید این پلن","Buy this plan")}<span>↗</span></button>
   </article>;
 }
