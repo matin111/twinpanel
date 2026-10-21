@@ -87,21 +87,23 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.26.0'
-          cache-dependency-path: source/tools/tp27-masque/go.mod
+          cache-dependency-path: source/tools/tp27-masque/go.sum
 
       - name: Build verified TP27 MASQUE carrier
         shell: bash
         run: |
           set -Eeuo pipefail
+          test -s source/tools/tp27-masque/go.sum
           BUILD_DIR="$(mktemp -d)"
           trap 'rm -rf "$BUILD_DIR"' EXIT
           cp source/tools/tp27-masque/go.mod "$BUILD_DIR/go.mod"
+          cp source/tools/tp27-masque/go.sum "$BUILD_DIR/go.sum"
           cp source/tools/tp27-masque/main.go "$BUILD_DIR/main.go"
           (
             cd "$BUILD_DIR"
-            GOWORK=off go vet -mod=mod ./...
+            GOWORK=off go vet -mod=readonly ./...
             CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOWORK=off \
-              go build -mod=mod -trimpath -ldflags='-s -w' \
+              go build -mod=readonly -trimpath -ldflags='-s -w' \
               -o tp27-masque-linux-x86_64 .
           )
           mkdir -p source/backend/artifacts
