@@ -4,7 +4,21 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-ProtocolName = Literal["openconnect", "openvpn", "wireguard", "l2tp", "xray"]
+# Protocol names reported by node-side quota collectors.
+#
+# Keep this list explicit/fail-closed. A protocol is added here only after the
+# server-side quota contract can represent it; this does NOT by itself claim
+# that production telemetry is available for that protocol.
+ProtocolName = Literal[
+    "openconnect",
+    "openvpn",
+    "wireguard",
+    "l2tp",
+    "xray",
+    "hysteria2",
+    "tuic",
+    "anytls",
+]
 
 
 class UsageEventIn(BaseModel):
