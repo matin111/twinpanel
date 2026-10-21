@@ -25,3 +25,169 @@
   --conversion-muted:#667085;
   color-scheme:light;
 }
+
+/* Conversion 2027 readability pass.
+   This stays inside the Conversion runtime so Editorial and other themes keep
+   their own typography. The original layout scale/headlines remain intact. */
+.themeBridge :global(.tpStore){
+  --store-muted:color-mix(in srgb,var(--conversion-muted) 90%,#ffffff);
+}
+
+.themeBridge :global(.tpStoreNavLinks){font-size:12.5px;line-height:1.55}
+.themeBridge :global(.tpStoreLogin),
+.themeBridge :global(.tpStoreHeaderBuy),
+.themeBridge :global(.tpStorePrimary),
+.themeBridge :global(.tpStoreSecondary){font-size:12.5px;line-height:1.45}
+.themeBridge :global(.tpStorePill){font-size:11.5px;line-height:1.45}
+.themeBridge :global(.tpStoreHeroCopy>p){font-size:14.5px;line-height:1.95}
+.themeBridge :global(.tpStoreHeroProof){font-size:11.5px;line-height:1.6}
+.themeBridge :global(.tpStoreOnlineToast b){font-size:11.5px}
+.themeBridge :global(.tpStoreOnlineToast small){font-size:10.5px;line-height:1.55}
+.themeBridge :global(.tpStoreTrustStrip b){font-size:12.5px;line-height:1.45}
+.themeBridge :global(.tpStoreTrustStrip small){font-size:11px;line-height:1.65}
+.themeBridge :global(.tpStoreSectionHead p){font-size:13.5px;line-height:1.85}
+
+.themeBridge :global(.tpStorePlanRibbon),
+.themeBridge :global(.tpStorePlanTop small),
+.themeBridge :global(.tpStorePlanStatus){font-size:10.5px;line-height:1.45}
+.themeBridge :global(.tpStorePlanDesc){font-size:12px;line-height:1.75}
+.themeBridge :global(.tpStorePlanPrice span){font-size:11.5px}
+.themeBridge :global(.tpStorePlanFacts b){font-size:12.5px}
+.themeBridge :global(.tpStorePlanFacts small){font-size:10.5px;line-height:1.5}
+.themeBridge :global(.tpStorePlanList li){font-size:12px;line-height:1.65}
+.themeBridge :global(.tpStorePlanProtocols span){font-size:10px;line-height:1.35}
+.themeBridge :global(.tpStoreBuyButton){font-size:12.5px;line-height:1.45}
+
+.themeBridge :global(.tpStoreProtocolCard p){font-size:12px;line-height:1.75}
+.themeBridge :global(.tpStoreAvailable){font-size:10.5px;line-height:1.4}
+.themeBridge :global(.tpStoreBenefitsGrid b){font-size:12.5px;line-height:1.45}
+.themeBridge :global(.tpStoreBenefitsGrid p){font-size:11.5px;line-height:1.75}
+.themeBridge :global(.tpStoreAccountPanel p){font-size:12.5px;line-height:1.8}
+.themeBridge :global(.tpStoreAccountMiniGrid b){font-size:11.5px}
+.themeBridge :global(.tpStoreAccountMiniGrid small){font-size:10.5px;line-height:1.5}
+.themeBridge :global(.tpStoreFaqList summary){font-size:12.5px;line-height:1.6}
+.themeBridge :global(.tpStoreFaqList details p){font-size:12px;line-height:1.85}
+.themeBridge :global(.tpStoreFinalCta p){font-size:12.5px;line-height:1.75}
+.themeBridge :global(.tpStoreSocialGrid b){font-size:12px}
+.themeBridge :global(.tpStoreSocialGrid small),
+.themeBridge :global(.tpStoreChatCard small){font-size:10.5px;line-height:1.55}
+.themeBridge :global(.tpStoreChatCard b){font-size:12.5px}
+.themeBridge :global(.tpStoreFooterBrand p){font-size:11.5px;line-height:1.8}
+.themeBridge :global(.tpStoreFooter>div>b){font-size:12px}
+.themeBridge :global(.tpStoreFooter a),
+.themeBridge :global(.tpStoreFooter button){font-size:11px;line-height:1.55}
+.themeBridge :global(.tpStoreFooterBottom){font-size:10px;line-height:1.55}
+
+/* Real guide copy used an especially dense 7-9px scale. */
+.themeBridge :global(.tpRealGuideTabs button),
+.themeBridge :global(.tpRealGuideOsTabs button){font-size:11.5px;line-height:1.45}
+.themeBridge :global(.tpRealGuideIntro small){font-size:10.5px;line-height:1.5}
+.themeBridge :global(.tpRealGuideIntro p){font-size:12px;line-height:1.8}
+.themeBridge :global(.tpRealGuideDownload),
+.themeBridge :global(.tpRealGuideNoDownload){font-size:11.5px;line-height:1.45}
+.themeBridge :global(.tpRealGuideWarning){font-size:11.5px;line-height:1.7}
+.themeBridge :global(.tpRealGuideRequirements small){font-size:10px;line-height:1.5}
+.themeBridge :global(.tpRealGuideRequirements b){font-size:11.5px;line-height:1.55}
+.themeBridge :global(.tpRealGuideSteps>header small),
+.themeBridge :global(.tpRealGuideHelp>header small){font-size:10px;line-height:1.5}
+.themeBridge :global(.tpRealGuideSteps>header em){font-size:10px}
+.themeBridge :global(.tpRealGuideStep b){font-size:12px;line-height:1.5}
+.themeBridge :global(.tpRealGuideStep p){font-size:11.5px;line-height:1.8}
+.themeBridge :global(.tpRealGuideScreenshot figcaption){font-size:10px;line-height:1.55}
+.themeBridge :global(.tpRealGuideHelp>p){font-size:11px;line-height:1.7}
+.themeBridge :global(.tpRealGuideHelpNote b){font-size:11px}
+.themeBridge :global(.tpRealGuideHelpNote small){font-size:10.5px;line-height:1.65}
+.themeBridge :global(.tpRealGuidePanelLink){font-size:11.5px;line-height:1.45}
+
+/* Explicit foregrounds prevent nested spans/icons and legacy color:inherit
+   rules from making CTA labels disappear. */
+.themeBridge :global(.tpStoreHeaderBuy),
+.themeBridge :global(.tpStorePrimary),
+.themeBridge :global(.tpStorePlanCard.featured .tpStoreBuyButton),
+.themeBridge :global(.tpStoreLoginPrimary){
+  color:var(--conversion-button-text,#ffffff);
+  text-shadow:0 1px 2px rgba(0,0,0,.22);
+}
+.themeBridge :global(.tpStoreHeaderBuy *),
+.themeBridge :global(.tpStorePrimary *),
+.themeBridge :global(.tpStoreBuyButton *),
+.themeBridge :global(.tpStoreLoginPrimary *){color:inherit}
+
+/* Non-featured and outline CTAs sit on the page/card background rather than a
+   solid button fill, so they use a contrast-safe accent foreground. */
+.themeBridge :global(.tpStorePlanCard:not(.featured) .tpStoreBuyButton),
+.themeBridge[data-buttons="outline"] :global(.tpStoreHeaderBuy),
+.themeBridge[data-buttons="outline"] :global(.tpStorePrimary),
+.themeBridge[data-buttons="outline"] :global(.tpStoreBuyButton){
+  color:color-mix(in srgb,var(--conversion-button-bg) 56%,#ffffff);
+  text-shadow:none;
+}
+.themeBridge :global(.tpStoreLogin),
+.themeBridge :global(.tpStoreSecondary){
+  color:var(--conversion-text,#f7f8ff);
+  background:color-mix(in srgb,var(--conversion-card-bg) 86%,transparent);
+  border-color:var(--conversion-card-border);
+}
+.themeBridge :global(.tpStoreLogin *),
+.themeBridge :global(.tpStoreSecondary *){color:inherit}
+
+.themeBridge :global(.tpStoreBuyButton:disabled),
+.themeBridge :global(.tpStoreHeaderBuy:disabled),
+.themeBridge :global(.tpStorePrimary:disabled),
+.themeBridge :global(.tpStoreSecondary:disabled){opacity:.68}
+.themeBridge :global(.tpStore button:focus-visible),
+.themeBridge :global(.tpStore a:focus-visible){outline:3px solid color-mix(in srgb,var(--conversion-accent) 72%,#ffffff);outline-offset:3px}
+
+.themeBridge :global(.tpRealGuideTabs button.active),
+.themeBridge :global(.tpRealGuideOsTabs button.active){color:#ffffff}
+.themeBridge :global(.tpRealGuideTabs button.active *),
+.themeBridge :global(.tpRealGuideOsTabs button.active *){color:inherit}
+.themeBridge :global(.tpStoreMobileBuy){color:#ffffff}
+.themeBridge :global(.tpStoreMobileBuy *){color:inherit}
+
+:global(html[data-theme="light"]) .themeBridge :global(.tpStore){
+  --store-muted:color-mix(in srgb,var(--conversion-muted) 86%,#111827);
+}
+:global(html[data-theme="light"]) .themeBridge :global(.tpStoreLogin),
+:global(html[data-theme="light"]) .themeBridge :global(.tpStoreSecondary){
+  color:#273244;
+  background:#ffffff;
+  border-color:color-mix(in srgb,var(--conversion-accent) 15%,#d7dee8);
+}
+:global(html[data-theme="light"]) .themeBridge :global(.tpStorePlanCard:not(.featured) .tpStoreBuyButton),
+:global(html[data-theme="light"]) .themeBridge[data-buttons="outline"] :global(.tpStoreHeaderBuy),
+:global(html[data-theme="light"]) .themeBridge[data-buttons="outline"] :global(.tpStorePrimary),
+:global(html[data-theme="light"]) .themeBridge[data-buttons="outline"] :global(.tpStoreBuyButton){
+  color:color-mix(in srgb,var(--conversion-button-bg) 70%,#111827);
+  border-color:color-mix(in srgb,var(--conversion-button-bg) 72%,#111827);
+  background:color-mix(in srgb,var(--conversion-button-bg) 7%,#ffffff);
+  text-shadow:none;
+}
+:global(html[data-theme="light"]) .themeBridge :global(.tpRealGuideTabs button.active),
+:global(html[data-theme="light"]) .themeBridge :global(.tpRealGuideOsTabs button.active){
+  color:#4c1d95;
+  background:color-mix(in srgb,var(--conversion-accent) 12%,#ffffff);
+}
+
+@media(max-width:700px){
+  .themeBridge :global(.tpStoreNavLinks){font-size:13px}
+  .themeBridge :global(.tpStoreHeaderBuy),
+  .themeBridge :global(.tpStorePrimary),
+  .themeBridge :global(.tpStoreSecondary),
+  .themeBridge :global(.tpStoreBuyButton){font-size:13px}
+  .themeBridge :global(.tpStoreHeroCopy>p){font-size:14px}
+  .themeBridge :global(.tpStoreSectionHead p){font-size:13px}
+  .themeBridge :global(.tpStorePlanDesc),
+  .themeBridge :global(.tpStorePlanList li),
+  .themeBridge :global(.tpStoreProtocolCard p),
+  .themeBridge :global(.tpStoreBenefitsGrid p),
+  .themeBridge :global(.tpStoreAccountPanel p),
+  .themeBridge :global(.tpStoreFaqList details p),
+  .themeBridge :global(.tpStoreFinalCta p),
+  .themeBridge :global(.tpRealGuideIntro p),
+  .themeBridge :global(.tpRealGuideStep p){font-size:12.5px}
+  .themeBridge :global(.tpRealGuideTabs button),
+  .themeBridge :global(.tpRealGuideOsTabs button),
+  .themeBridge :global(.tpRealGuideDownload),
+  .themeBridge :global(.tpRealGuidePanelLink){font-size:12px}
+}
