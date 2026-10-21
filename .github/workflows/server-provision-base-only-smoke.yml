@@ -1,0 +1,56 @@
+name: Server Provision Base Only Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/provision-runtime-xray-domain.tsx'
+      - 'components/ui.tsx'
+      - '.github/workflows/server-provision-base-only-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify server provisioning is protocol-free
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          provision = Path('components/provision-runtime-xray-domain.tsx').read_text()
+          ui = Path('components/ui.tsx').read_text()
+
+          for flag in (
+              'install_cisco: false',
+              'install_openvpn: false',
+              'install_wireguard: false',
+              'install_l2tp: false',
+              'install_v2ray: false',
+          ):
+              assert flag in provision, flag
+
+          # Submit must explicitly re-apply the base-only contract, not rely on
+          # initial React state that could become stale during future refactors.
+          assert '...BASE_ONLY_PROTOCOLS' in provision
+          assert 'const payload: ProvisionInstallPayload' in provision
+          assert 'parityApi.provisionInstall(payload)' in provision
+
+          # Protocol controls belong exclusively to Protocol Studio now.
+          assert 'protocol-toggle-grid' not in provision
+          assert 'provisionProtocolHealth' not in provision
+          assert 'provisionRepairSaved' not in provision
+          assert 'saveXrayDomain' not in provision
+          assert 'prepareXrayDomain' not in provision
+
+          # The hand-off to Protocol Studio is explicit and node-focused.
+          assert '/admin/modern-protocols' in provision
+          assert '?node=${lastNodeId}' in provision
+          assert 'مدیریت پروتکل‌ها' in provision
+
+          # Navigation reflects the simplified responsibility.
+          assert '["افزودن سرور","Add Server","/admin/provision"' in ui
+
+          print('SERVER_PROVISION_BASE_ONLY_SMOKE_OK')
+          PY
