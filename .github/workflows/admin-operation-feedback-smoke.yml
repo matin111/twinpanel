@@ -7,6 +7,7 @@ on:
       - 'components/routed-page-client.tsx'
       - 'components/admin-infra-runtime.tsx'
       - 'components/provision-runtime-xray-domain.tsx'
+      - 'components/legacy-protocols-studio.tsx'
       - 'components/legacy-nodes-exact.tsx'
       - 'components/tunnels-simple-runtime.tsx'
       - 'components/tunnels-unified-runtime-v39.tsx'
@@ -32,6 +33,7 @@ jobs:
           routed=Path('components/routed-page-client.tsx').read_text(encoding='utf-8')
           feedback=Path('components/admin-operation-feedback.tsx').read_text(encoding='utf-8')
           provision=Path('components/provision-runtime-xray-domain.tsx').read_text(encoding='utf-8')
+          protocols=Path('components/legacy-protocols-studio.tsx').read_text(encoding='utf-8')
           nodes=Path('components/legacy-nodes-exact.tsx').read_text(encoding='utf-8')
           tunnel_entry=Path('components/tunnels-simple-runtime.tsx').read_text(encoding='utf-8')
           tunnels=Path('components/tunnels-unified-runtime-v39.tsx').read_text(encoding='utf-8')
@@ -49,9 +51,23 @@ jobs:
           assert 'AdminSubscriptionLiveTable' in routed
           assert 'AdminManualSubscriptionCreate' in routed
 
-          assert 'parityApi.provisionInstall(installPayload)' in provision
-          assert 'saveXrayDomain(nodeId,domain)' in provision
-          assert 'prepareXrayDomain(nodeId)' in provision
+          # Add Server owns only infrastructure bootstrap now.
+          assert 'parityApi.provisionInstall(payload)' in provision
+          assert '...BASE_ONLY_PROTOCOLS' in provision
+          assert 'provisionProtocolHealth' not in provision
+          assert 'provisionRepairSaved' not in provision
+          assert 'saveXrayDomain' not in provision
+          assert 'prepareXrayDomain' not in provision
+
+          # Protocol Studio is the canonical owner of classic protocol and Xray actions.
+          assert 'legacyAdminApi.ensureClassicProtocol' in protocols
+          assert 'legacyAdminApi.protocolHealth(node.id, protocol)' in protocols
+          assert 'legacyAdminApi.restartProtocol(node.id, protocol)' in protocols
+          assert 'adminApi.xrayDomain(node.id)' in protocols
+          assert 'adminApi.saveXrayDomain(domainNodeId, domainDraft.trim())' in protocols
+          assert 'adminApi.prepareXrayDomain(domainNodeId, true)' in protocols
+
+          # Node management still exposes the existing dedicated Xray controls too.
           assert 'adminApi.xrayDomain(selected.id)' in nodes
           assert 'adminApi.saveXrayDomain(selected.id,xrayDomainDraft.trim())' in nodes
           assert 'adminApi.prepareXrayDomain(selected.id,true)' in nodes
