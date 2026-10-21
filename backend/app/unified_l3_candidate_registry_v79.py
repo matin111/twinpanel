@@ -3,6 +3,9 @@ from __future__ import annotations
 from . import unified_l3_agent_rollout_v49 as rollout
 from . import unified_l3_core_v49 as core
 from .active_l3_route_binding_v94 import apply_active_l3_route_binding_v94
+from .service_routing_stability_v139 import (
+    apply_service_routing_stability_v139,
+)
 from .transport_candidates import SPECS
 
 AGENT_MARKER = "TWINPANEL_UNIFIED_L3_CANDIDATE_REGISTRY_V79"
@@ -59,10 +62,16 @@ def apply_unified_l3_candidate_registry_v79() -> None:
     if missing or AGENT_MARKER not in core._AGENT_RECONCILE_V49:
         raise RuntimeError("Unified L3 V79 candidate registry validation failed: " + ",".join(missing))
 
+    # V139 patches the base Agent renderer after the candidate registry is
+    # finalized but before Unified L3 V49 captures make_agent. It also upgrades
+    # the rollout marker so existing nodes receive the stable service-routing
+    # renderer instead of keeping the older V79/V49 Agent indefinitely.
+    apply_service_routing_stability_v139()
+
     _runtime_applied = True
     print(
         "TWINPANEL_UNIFIED_L3_CANDIDATE_REGISTRY_V79_ACTIVE "
         "source=transport_candidates.SPECS "
-        f"candidates={','.join(sorted(SPECS))} route_binding=v94 agent_rollout_marker=v79",
+        f"candidates={','.join(sorted(SPECS))} route_binding=v94 agent_rollout_marker=v139",
         flush=True,
     )
