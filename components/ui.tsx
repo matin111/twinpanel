@@ -20,7 +20,7 @@ const menuGroups=[
     ["نودها","Nodes","/admin/nodes","▦"],
     ["تانل‌ها","Tunnels","/admin/tunnels","⤨"],
     ["مسیرهای هوشمند","Smart Transports","/admin/tunnel-transports","⇄"],
-    ["راه‌اندازی نود","Provision Node","/admin/provision","⚡"],
+    ["افزودن سرور","Add Server","/admin/provision","⚡"],
     ["پروتکل‌ها","Protocols","/admin/modern-protocols","◫"],
     ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"]
   ]},
