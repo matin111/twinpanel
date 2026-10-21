@@ -4,6 +4,7 @@ import type {CSSProperties,ReactNode} from "react";
 import {DEFAULT_STORE_TEMPLATE_ID,resolveStoreTemplateId} from "../lib/store-template-registry";
 import type {StoreTemplateOptionMap} from "../lib/store-template-options";
 import {ConversionPro2027Template} from "./store-template-conversion-pro";
+import {EditorialFooterSocial} from "./store-template-editorial-footer-social";
 import {EditorialPro2027Template} from "./store-template-editorial-pro";
 import editorialBridge from "./store-template-editorial-theme-bridge.module.css";
 import type {StoreTemplateProps} from "./store-template-renderer";
@@ -39,7 +40,7 @@ function editorialThemeStyle(options:StoreTemplateOptionMap){
 
 const STORE_TEMPLATE_RUNTIME_RENDERERS:Record<string,StoreTemplateRuntimeRenderer>={
   "conversion-2027":({templateId:_,themeOptions,...props})=><ConversionPro2027Template themeOptions={themeOptions} {...props}/>,
-  "editorial-grid-2027":({templateId:_,themeOptions,...props})=><div className={editorialBridge.themeBridge} style={editorialThemeStyle(themeOptions)}><EditorialPro2027Template themeOptions={themeOptions} {...props}/></div>,
+  "editorial-grid-2027":({templateId:_,themeOptions,...props})=><div className={editorialBridge.themeBridge} style={editorialThemeStyle(themeOptions)}><EditorialPro2027Template themeOptions={themeOptions} {...props}/><EditorialFooterSocial settings={props.settings}/></div>,
 };
 
 export function installedStoreTemplateRuntime(templateId:unknown){
