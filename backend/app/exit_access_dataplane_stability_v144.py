@@ -135,12 +135,14 @@ def _performance_stability_guard() -> str:
 
     check_block = "\n".join(checks)
     expected_rules = len(performance._PROTOCOL_SUBNETS) * 2
+    access_mtu = int(performance.ACCESS_MTU)
+    access_mss = int(performance.ACCESS_TCP_MSS)
 
     return f"""
 set -e
 
-ACCESS_MTU={int(performance.ACCESS_MTU)}
-ACCESS_MSS={int(performance.ACCESS_TCP_MSS)}
+ACCESS_MTU={access_mtu}
+ACCESS_MSS={access_mss}
 WAN="$(ip -o -4 route show default | awk '{{for(i=1;i<=NF;i++) if($i==\"dev\"){{print $(i+1); exit}}}}')"
 [ -n "$WAN" ]
 ip link show dev "$WAN" >/dev/null 2>&1
@@ -158,34 +160,43 @@ ipt -t mangle -C FORWARD -j TP_ACCESS_PERF 2>/dev/null || STABLE=0
 {check_block}
 
 if [ -f /etc/ocserv/ocserv.conf ]; then
-  grep -Eq '^[[:space:]]*mtu[[:space:]]*=[[:space:]]*1200[[:space:]]*$'     /etc/ocserv/ocserv.conf || STABLE=0
+  grep -Eq '^[[:space:]]*mtu[[:space:]]*=[[:space:]]*{access_mtu}[[:space:]]*$' \
+    /etc/ocserv/ocserv.conf || STABLE=0
 fi
 
 if [ -f /etc/openvpn/server/twinpanel.conf ]; then
-  grep -Eq '^[[:space:]]*tun-mtu[[:space:]]+1200[[:space:]]*$'     /etc/openvpn/server/twinpanel.conf || STABLE=0
-  grep -Eq '^[[:space:]]*mssfix[[:space:]]+1160[[:space:]]*$'     /etc/openvpn/server/twinpanel.conf || STABLE=0
+  grep -Eq '^[[:space:]]*tun-mtu[[:space:]]+{access_mtu}[[:space:]]*$' \
+    /etc/openvpn/server/twinpanel.conf || STABLE=0
+  grep -Eq '^[[:space:]]*mssfix[[:space:]]+{access_mss}[[:space:]]*$' \
+    /etc/openvpn/server/twinpanel.conf || STABLE=0
 fi
 
 if [ -f /etc/wireguard/wg-access0.conf ]; then
-  grep -Eq '^[[:space:]]*MTU[[:space:]]*=[[:space:]]*1200[[:space:]]*$'     /etc/wireguard/wg-access0.conf || STABLE=0
+  grep -Eq '^[[:space:]]*MTU[[:space:]]*=[[:space:]]*{access_mtu}[[:space:]]*$' \
+    /etc/wireguard/wg-access0.conf || STABLE=0
 fi
 
 if [ -f /etc/ppp/options.xl2tpd ]; then
-  grep -Eq '^[[:space:]]*mtu[[:space:]]+1200[[:space:]]*$'     /etc/ppp/options.xl2tpd || STABLE=0
-  grep -Eq '^[[:space:]]*mru[[:space:]]+1200[[:space:]]*$'     /etc/ppp/options.xl2tpd || STABLE=0
+  grep -Eq '^[[:space:]]*mtu[[:space:]]+{access_mtu}[[:space:]]*$' \
+    /etc/ppp/options.xl2tpd || STABLE=0
+  grep -Eq '^[[:space:]]*mru[[:space:]]+{access_mtu}[[:space:]]*$' \
+    /etc/ppp/options.xl2tpd || STABLE=0
 fi
 
 for IFACE in $(ls /sys/class/net 2>/dev/null | grep '^vpns' || true); do
-  [ "$(cat /sys/class/net/$IFACE/mtu 2>/dev/null || echo 0)" = "$ACCESS_MTU" ]     || STABLE=0
+  [ "$(cat /sys/class/net/$IFACE/mtu 2>/dev/null || echo 0)" = "$ACCESS_MTU" ] \
+    || STABLE=0
 done
 
 OVPN_IF="$(ip -o -4 addr show | awk 'index($4,\"10.92.0.1/\")==1 {{print $2; exit}}')"
 if [ -n "$OVPN_IF" ]; then
-  [ "$(cat /sys/class/net/$OVPN_IF/mtu 2>/dev/null || echo 0)" = "$ACCESS_MTU" ]     || STABLE=0
+  [ "$(cat /sys/class/net/$OVPN_IF/mtu 2>/dev/null || echo 0)" = "$ACCESS_MTU" ] \
+    || STABLE=0
 fi
 
 if ip link show wg-access0 >/dev/null 2>&1; then
-  [ "$(cat /sys/class/net/wg-access0/mtu 2>/dev/null || echo 0)" = "$ACCESS_MTU" ]     || STABLE=0
+  [ "$(cat /sys/class/net/wg-access0/mtu 2>/dev/null || echo 0)" = "$ACCESS_MTU" ] \
+    || STABLE=0
 fi
 
 if [ "$STABLE" -eq 1 ]; then

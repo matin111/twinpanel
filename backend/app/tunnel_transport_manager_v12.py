@@ -3,6 +3,9 @@ from __future__ import annotations
 import asyncio
 
 from . import tunnel_transport_manager_v10 as v10
+from .adaptive_tunnel_performance_v148 import (
+    apply_adaptive_tunnel_performance_v148,
+)
 from .exit_access_dataplane_stability_v144 import (
     apply_exit_access_dataplane_stability_v144,
 )
@@ -22,6 +25,7 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 
 # ============================================================
 # TWINPANEL TRANSPORT MANAGER V12 - TP27 FAST MIGRATION V91
+# + ADAPTIVE TUNNEL PERFORMANCE V148
 #
 # V91 keeps the proven controller/manager, VPN access dataplane and SmartAuto
 # scoring policy, but changes the active carrier product surface:
@@ -34,7 +38,12 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 #   * Cisco/OpenVPN/WireGuard are reconciled to TP27 preserve-port delivery so
 #     advertised protocol ports equal Iran public ingress ports.
 #
-# SmartAuto health/stability/benchmark/promotion thresholds are unchanged.
+# V148 keeps the proven TP27 carrier MTU=1400 and GRE/FoU behavior unchanged,
+# but raises routed VPN access from the old 1200/1160 nested-MTU contract to a
+# conservative 1300/1260 contract with 100 bytes of carrier headroom. It is
+# applied before V144 wraps V51 so the one-time real drift is repaired and all
+# later steady-state passes remain read-only.
+#
 # VPN Access V46/V51 remain the sole Exit client-egress and nested-MTU owners.
 # V144 wraps their publication paths so unchanged Desired State is read-only
 # instead of flushing live client-pool chains every 20/30 seconds.
@@ -46,6 +55,7 @@ async def main() -> None:
     install_manager_runtime_v16()
     install_smart_transport_auto_v21()
     activate_manager_candidate_policy_v91()
+    apply_adaptive_tunnel_performance_v148()
     apply_exit_access_dataplane_stability_v144()
 
     print(
@@ -54,6 +64,7 @@ async def main() -> None:
         "bootstrap=v24 "
         "candidate_bootstrap=v38 "
         "tp27_reference=v91 "
+        "adaptive_tunnel_performance=v148 "
         "vpn_access_dataplane=v46 "
         "vpn_access_performance=v51 "
         "exit_access_stability=v144 "
