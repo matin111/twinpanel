@@ -8,7 +8,10 @@ import {ConversionTemplateCustomizer} from "./store-template-conversion-customiz
 import {EditorialTemplateCustomizer} from "./store-template-editorial-customizer";
 import {OrbitTemplateCustomizerPolished} from "./store-template-orbit-customizer-polished";
 import {StoreTemplateCustomizer} from "./store-template-customizer";
+import {StorefrontAdvancedDesignLab} from "./storefront-advanced-design-lab";
 import {Card,Shell} from "./ui";
+
+const ADVANCED_THEMES=new Set(["conversion-2027","editorial-grid-2027","orbit-neo-2027"]);
 
 export function StoreTemplateCustomizerPage({templateId}:{templateId:string}){
   const {pick}=useI18n();
@@ -26,15 +29,16 @@ export function StoreTemplateCustomizerPage({templateId}:{templateId:string}){
   }
 
   const close=()=>router.push("/admin/store-settings");
+  const customizer=template.id==="editorial-grid-2027"
+    ?<EditorialTemplateCustomizer onClose={close}/>
+    :template.id==="conversion-2027"
+      ?<ConversionTemplateCustomizer onClose={close}/>
+      :template.id==="orbit-neo-2027"
+        ?<OrbitTemplateCustomizerPolished onClose={close}/>
+        :<StoreTemplateCustomizer templateId={template.id} onClose={close}/>;
 
   return <Shell active="/admin/store-settings"><div className="page storeAdminManager">
-    {template.id==="editorial-grid-2027"
-      ?<EditorialTemplateCustomizer onClose={close}/>
-      :template.id==="conversion-2027"
-        ?<ConversionTemplateCustomizer onClose={close}/>
-        :template.id==="orbit-neo-2027"
-          ?<OrbitTemplateCustomizerPolished onClose={close}/>
-          :<StoreTemplateCustomizer templateId={template.id} onClose={close}/>
-    }
+    {customizer}
+    {ADVANCED_THEMES.has(template.id)&&<StorefrontAdvancedDesignLab templateId={template.id}/>} 
   </div></Shell>;
 }
