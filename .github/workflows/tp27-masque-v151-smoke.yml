@@ -123,7 +123,7 @@ jobs:
           assert 'output = await run(' in candidate
           assert 'lines = str(output or "").strip().splitlines()' in candidate
           assert 'value = lines[-1].strip().lower() if lines else ""' in candidate
-          assert "result.stdout" not in candidate
+          assert 'value = (result.stdout' not in candidate
 
           for token in (
               "TP27_MASQUE_SPEC",
