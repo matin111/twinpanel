@@ -45,6 +45,29 @@ export type EnsureClassicProtocolPayload={
   port?:number;
   transport?:"udp"|"tcp";
 };
+export type ClassicProtocolInventoryRow={
+  protocol:ClassicProtocolKey;
+  enabled:boolean;
+  port:number|null;
+  port_text:string;
+  transport:string;
+  service?:string|null;
+  status:string;
+  last_error?:string|null;
+  checked_at?:string|null;
+};
+export type ClassicProtocolInventoryNode={
+  id:number;
+  name:string;
+  public_ip:string;
+  public_domain?:string|null;
+  status:string;
+  protocols:ClassicProtocolInventoryRow[];
+};
+export type ClassicProtocolInventoryResponse={
+  ok:boolean;
+  nodes:ClassicProtocolInventoryNode[];
+};
 
 export const legacyAdminApi={
   usersPage:(params:{limit:number;offset:number;q:string;status:"all"|"active"|"inactive"|"subscribed"})=>request<UsersPageResponse>(`/v1/admin/users-page?limit=${encodeURIComponent(String(params.limit))}&offset=${encodeURIComponent(String(params.offset))}&q=${encodeURIComponent(params.q)}&status=${encodeURIComponent(params.status)}`),
@@ -52,6 +75,7 @@ export const legacyAdminApi={
   extendSubscription:(id:number,payload:{add_traffic_gb?:number;add_days?:number})=>request<RuntimeRow>(`/v1/subscriptions/${id}/extend`,{method:"PATCH",body:JSON.stringify(payload)}),
   nodeAccess:(id:number)=>request<RuntimeRow>(`/v1/provision/node-access/${id}`),
   saveNodeAccess:(payload:{node_id:number;host:string;port:number;username:string;password:string})=>request<RuntimeRow>("/v1/provision/save-node-access",{method:"POST",body:JSON.stringify(payload)}),
+  classicProtocols:()=>request<ClassicProtocolInventoryResponse>("/v1/provision/classic-protocols"),
   protocolHealth:(nodeId:number,protocol?:ClassicProtocolKey)=>request<RuntimeRow>("/v1/provision/protocol-health",{method:"POST",body:JSON.stringify({node_id:nodeId,...(protocol?{protocol}:{})})}),
   ensureClassicProtocol:(payload:EnsureClassicProtocolPayload)=>request<RuntimeRow>("/v1/provision/ensure-classic-protocol",{method:"POST",body:JSON.stringify(payload)}),
   restartProtocol:(nodeId:number,protocol:string)=>request<RuntimeRow>("/v1/provision/restart-protocol",{method:"POST",body:JSON.stringify({node_id:nodeId,protocol})}),
