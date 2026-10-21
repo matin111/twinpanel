@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import require_admin
-from ..models import Node, NodeProtocolConfig, NodeType
+from ..models import Node, NodeProtocolConfig
 from ..modern_protocol_models import ModernProtocolSetting
 from ..modern_protocol_runtime import certificate_pin
 from ..modern_protocol_runtime_v2 import (
@@ -21,6 +21,11 @@ from ..modern_protocol_runtime_v2 import (
     redacted_preview,
     remove_profile,
 )
+from ..node_runtime_connection import (
+    connect_protocol_runtime,
+    is_protocol_runtime_node,
+    protocol_runtime_node_clause,
+)
 from ..protocol_catalog import (
     PROTOCOL_CATALOG,
     SCHEMA_VERSION,
@@ -28,7 +33,6 @@ from ..protocol_catalog import (
     resolve_settings,
     settings_hash,
 )
-from .provision import ssh_connect_saved
 
 
 router = APIRouter(
@@ -60,7 +64,7 @@ class ModernHealthV2In(BaseModel):
     protocols: list[str] | None = None
 
 
-def _exit_node(db: Session, node_id: int) -> Node:
+def _protocol_node(db: Session, node_id: int) -> Node:
     node = (
         db.query(Node)
         .filter(Node.id == int(node_id), Node.retired_at.is_(None))
@@ -68,10 +72,10 @@ def _exit_node(db: Session, node_id: int) -> Node:
     )
     if not node:
         raise HTTPException(status_code=404, detail="سرور پیدا نشد")
-    if node.node_type != NodeType.EXIT or node.agent_url == "local://core":
+    if not is_protocol_runtime_node(node):
         raise HTTPException(
             status_code=400,
-            detail="پروتکل‌های مدرن فقط روی نود خروجی Remote نصب می‌شوند",
+            detail="پروتکل‌های مدرن فقط روی نود خروجی یا TwinPanel Local Core نصب می‌شوند",
         )
     return node
 
@@ -235,7 +239,10 @@ def _port_for(key: str, supplied: dict[str, int]) -> int:
 def inventory(db: Session = Depends(get_db)):
     nodes = (
         db.query(Node)
-        .filter(Node.retired_at.is_(None), Node.node_type == NodeType.EXIT)
+        .filter(
+            Node.retired_at.is_(None),
+            protocol_runtime_node_clause(),
+        )
         .order_by(Node.id.asc())
         .all()
     )
@@ -268,7 +275,7 @@ def preview(
     payload: ModernPreviewIn,
     db: Session = Depends(get_db),
 ):
-    _exit_node(db, node_id)
+    _protocol_node(db, node_id)
     key = str(payload.protocol or "").strip().lower()
     if key not in PROTOCOL_CATALOG:
         raise HTTPException(status_code=422, detail="پروتکل معتبر نیست")
@@ -299,7 +306,7 @@ async def install(
     payload: ModernInstallV2In,
     db: Session = Depends(get_db),
 ):
-    node = _exit_node(db, node_id)
+    node = _protocol_node(db, node_id)
     protocols = _normalize_protocols(payload.protocols)
 
     unavailable = [
@@ -352,7 +359,7 @@ async def install(
             },
         )
 
-    conn = await ssh_connect_saved(node, db)
+    conn = await connect_protocol_runtime(node, db)
     try:
         try:
             result = await apply_profiles(conn, node, profiles)
@@ -386,6 +393,7 @@ async def install(
         return {
             "ok": not failed,
             "node_id": node.id,
+            "execution": "local" if getattr(node, "is_mother", False) else "ssh",
             "core": result.get("core", {}),
             "protocols": result["protocols"],
             "warnings": warning_map,
@@ -402,7 +410,7 @@ async def health(
     payload: ModernHealthV2In,
     db: Session = Depends(get_db),
 ):
-    node = _exit_node(db, node_id)
+    node = _protocol_node(db, node_id)
     rows = _status_rows(db, node.id)
     protocols = (
         _normalize_protocols(payload.protocols)
@@ -415,7 +423,7 @@ async def health(
     if unavailable:
         raise HTTPException(status_code=409, detail={"message": "Runtime adapter unavailable", "protocols": unavailable})
 
-    conn = await ssh_connect_saved(node, db)
+    conn = await connect_protocol_runtime(node, db)
     try:
         results: dict[str, Any] = {}
         for key in protocols:
@@ -439,6 +447,7 @@ async def health(
         return {
             "ok": all(item.get("ok") for item in results.values()),
             "node_id": node.id,
+            "execution": "local" if getattr(node, "is_mother", False) else "ssh",
             "certificate_public_key_sha256": pin,
             "protocols": results,
         }
@@ -453,14 +462,14 @@ async def remove(
     protocol: str,
     db: Session = Depends(get_db),
 ):
-    node = _exit_node(db, node_id)
+    node = _protocol_node(db, node_id)
     key = str(protocol or "").strip().lower()
     if key not in PROTOCOL_CATALOG:
         raise HTTPException(status_code=422, detail="پروتکل معتبر نیست")
     if key not in SINGBOX_PROTOCOLS:
         raise HTTPException(status_code=409, detail="Runtime adapter این پروتکل هنوز فعال نیست")
 
-    conn = await ssh_connect_saved(node, db)
+    conn = await connect_protocol_runtime(node, db)
     try:
         try:
             result = await remove_profile(conn, key)
@@ -482,7 +491,11 @@ async def remove(
             status.last_error = None
             status.checked_at = datetime.utcnow()
         db.commit()
-        return {**result, "node_id": node.id}
+        return {
+            **result,
+            "node_id": node.id,
+            "execution": "local" if getattr(node, "is_mother", False) else "ssh",
+        }
     finally:
         conn.close()
         await conn.wait_closed()
