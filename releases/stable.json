@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.149",
+  "version": "1.1.0-rc.150",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-21T19:04:54Z",
+  "released_at": "2026-10-21T19:40:34Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "74643d7aa5de420f501486ec08e89b0ca91341a9",
+  "source_sha": "b96bcbd08e864a7024e5b592b1cd0f5a585bac04",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.149/twinpanel-1.1.0-rc.149-linux-x86_64.tar.gz",
-    "sha256": "d32d462523f2c69cbf89b178e5142928acae0ae12d87e0b4b6396cb87fd56ff8",
-    "size_bytes": 13491531
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.150/twinpanel-1.1.0-rc.150-linux-x86_64.tar.gz",
+    "sha256": "0bdf1018de34d64df0f32dbd1193c5d0bb1de11036fd566fc5fdd0d2927d2535",
+    "size_bytes": 13566372
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.149 دو ارتقای مستقل و Merge‌شده را در یک Source ثابت منتشر می‌کند. در Protocol Studio یک Registry مرکزی و capability-aware برای پروتکل‌های Classic و Modern اضافه شده است؛ Cisco/OpenConnect، OpenVPN، WireGuard، L2TP/IPsec و V2Ray/Xray بدون Rewrite کردن Runtime سالم فعلی از Legacy Provision Adapter استفاده می‌کنند و قابلیت‌های واقعی Install/Health/Restart/Repair به‌صورت صریح اعلام می‌شوند. Presetهای Classic فقط روی فیلدهایی اعمال می‌شوند که Runtime فعلی واقعاً می‌تواند تغییر دهد و تنظیمات پیشرفته‌ای که هنوز Adapter واقعی ندارند صرفاً به‌عنوان managed_not_editable ثبت می‌شوند؛ Disable/Uninstall برای Classic همچنان fail-closed و false است و هیچ Remove ساختگی اضافه نشده است. هم‌زمان هسته Tunnel به معماری Multi-Lane مستقل ارتقا یافته است: TP27 Fast مسیر GRE-first باقی می‌ماند و TP27 Direct TCP به‌عنوان Carrier مستقل از Backhaul/FoU/QUIC/KCP/ARQ اضافه می‌شود؛ SmartAuto هر دو Lane را با Health، Packet Loss، Latency، Stability و Benchmark دوطرفه Throughput ارزیابی می‌کند و Jitter نیز به Telemetry اضافه شده است. قرارداد MTU/MSS rc.148 و حفاظت read-only steady-state V144 حفظ شده‌اند. این Release فروش/Account Delivery/Quota-ready بودن پروتکل‌های Modern را فعال نمی‌کند و برای Failover/سرعت Tunnel همچنان Production Acceptance روی سرور واقعی لازم است.",
-    "en": "TwinPanel 1.1.0-rc.149 publishes two independently merged upgrades from one locked source. Protocol Studio gains a centralized capability-aware registry for Classic and Modern protocols. Cisco/OpenConnect, OpenVPN, WireGuard, L2TP/IPsec and V2Ray/Xray continue to use the existing Legacy Provision Adapter without rewriting the proven runtime, while real Install/Health/Restart/Repair capabilities are declared explicitly. Classic presets affect only fields the current runtime can actually apply; advanced settings without a real adapter remain managed_not_editable metadata, and Classic Disable/Uninstall stays fail-closed and false with no fake Remove action. At the same time, the tunnel core moves to independent multi-lane carriers: TP27 Fast remains GRE-first while TP27 Direct TCP provides a carrier independent of Backhaul/FoU/QUIC/KCP/ARQ. SmartAuto evaluates both lanes using health, packet loss, latency, stability and bidirectional throughput benchmarks, with path jitter added to telemetry. The rc.148 MTU/MSS contract and V144 read-only steady-state protections remain intact. This release does not enable Modern protocol sales, Account Delivery, or claim Modern protocols are quota-ready; real-server production acceptance is still required for tunnel failover and speed."
+    "fa": "TwinPanel 1.1.0-rc.150 قالب سوم مستقل Orbit Neo 2027 و Media Studio واقعی فروشگاه را منتشر می‌کند. Orbit Neo یک Renderer مستقل با طراحی Spatial/Bento، هدر شناور، Hero تصویرمحور، نمایش متفاوت پلن‌ها، Constellation پروتکل‌ها، Setup Lab تعاملی، پنل کاربری، FAQ، CTA و Footer اختصاصی دارد و Dark/Light، RTL/LTR و Responsive را جداگانه پشتیبانی می‌کند. ویرایشگر اختصاصی قالب امکان تنظیم رنگ‌ها، چیدمان، متن فارسی/انگلیسی و آپلود PNG/JPG/WebP تا ۸ مگابایت برای بنر بالا، Hero، امکانات، پروتکل‌ها، آموزش، حساب کاربری، CTA و فوتر را فراهم می‌کند. قیمت، حجم، مدت، تعداد دستگاه، پروتکل‌ها، سفارش و خرید همچنان از Backend واقعی می‌آیند و Branding و دو قالب قبلی مستقل باقی می‌مانند. همین Source همچنین مدیریت Classic/Modern Protocol را روی TwinPanel Local Core با Executor محلی امن فعال می‌کند و اجرای SSH نودهای Exit را حفظ می‌کند. Release gate مربوط به Adaptive Multi-Lane V149 نیز از شماره نسخه Repository جدا شده تا Releaseهای بعد از rc.149 بدون تضعیف قرارداد Runtime قابل اعتبارسنجی باشند. تست بصری و آپلود واقعی تصاویر Orbit Neo روی سرور Production همچنان پس از Update لازم است.",
+    "en": "TwinPanel 1.1.0-rc.150 publishes the third independent storefront theme, Orbit Neo 2027, together with a real storefront Media Studio. Orbit Neo uses its own spatial/Bento renderer with a floating header, image-led hero, distinct plan presentation, protocol constellation, interactive setup lab, customer control deck, FAQ, final CTA and dedicated footer, with independent Dark/Light, RTL/LTR and responsive behavior. Its dedicated editor provides colors, layout, separate FA/EN copy, and real PNG/JPG/WebP uploads up to 8 MB for the top banner, hero, features, protocols, guides, account area, final CTA and footer artwork. Price, traffic, duration, device limits, protocols, orders and checkout remain live backend data, while Branding and the two existing themes remain isolated. The same locked source also enables Classic/Modern protocol management on TwinPanel Local Core through a safe local executor while preserving saved-SSH execution for Exit nodes. The Adaptive Multi-Lane V149 release gate is decoupled from the repository version so later releases can validate the V149 runtime contract without being pinned to rc.149. Real-server visual and media-upload acceptance for Orbit Neo is still required after update."
   }
 }
