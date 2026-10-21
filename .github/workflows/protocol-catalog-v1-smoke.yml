@@ -24,6 +24,16 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    env:
+      APP_NAME: TwinPanel-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: sqlite:////tmp/twinpanel-protocol-catalog-v3.db
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+
     steps:
       - uses: actions/checkout@v4
 
