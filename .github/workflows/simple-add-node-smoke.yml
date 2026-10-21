@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'components/provision-runtime-xray-domain.tsx'
+      - 'components/ui.tsx'
       - '.github/workflows/simple-add-node-smoke.yml'
   workflow_dispatch:
 
@@ -19,6 +20,7 @@ jobs:
           from pathlib import Path
 
           ui = Path('components/provision-runtime-xray-domain.tsx').read_text()
+          nav = Path('components/ui.tsx').read_text()
 
           for marker in (
               'install_cisco:false',
@@ -42,6 +44,9 @@ jobs:
               'prepareXrayDomain(',
           ):
               assert removed not in ui, removed
+
+          assert '["افزودن سرور","Add Server","/admin/provision","⚡"]' in nav
+          assert '["پروتکل‌ها","Protocols","/admin/modern-protocols","◫"]' in nav
 
           print('SIMPLE_ADD_NODE_SMOKE_OK')
           PY
