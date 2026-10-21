@@ -10,6 +10,7 @@ from .modern_protocol_runtime_v2 import (
     redacted_preview as _singbox_preview,
     remove_profile as _remove_singbox_profile,
 )
+from .singbox_service_runtime import ensure_singbox_service_unit
 from .standalone_protocol_runtime import (
     STANDALONE_PROTOCOLS,
     StandaloneProtocolError,
@@ -44,6 +45,11 @@ async def apply_profiles(conn, node, profiles: list[dict[str, Any]]) -> dict[str
 
     result: dict[str, Any] = {"core": {}, "protocols": {}}
     if singbox_profiles:
+        # V2/V3 applies profiles by restarting the managed service after a
+        # successful config check. Clean nodes (including Local Core) may have
+        # the sing-box package but no TwinPanel service unit yet, so converge
+        # the unit first without starting it before a valid config exists.
+        await ensure_singbox_service_unit(conn)
         singbox = await _apply_singbox_profiles(conn, node, singbox_profiles)
         result["core"]["sing-box"] = singbox.get("core", {})
         result["protocols"].update(singbox.get("protocols", {}))

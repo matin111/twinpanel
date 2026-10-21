@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
+from app import singbox_service_runtime
 from app.modern_protocol_dispatch import SINGBOX_PROTOCOLS, redacted_preview
 from app.protocol_catalog import PROTOCOL_CATALOG, catalog_payload, resolve_settings
 
@@ -16,6 +18,42 @@ EXPECTED_READY = {
     "snell",
     *STANDALONE,
 }
+
+
+def _assert_singbox_service_bootstrap() -> None:
+    captured: list[tuple[str, int]] = []
+
+    async def fake_cmd(_conn, command: str, *, timeout: int = 30, **_kwargs):
+        captured.append((command, timeout))
+        return ""
+
+    original = singbox_service_runtime.cmd
+    singbox_service_runtime.cmd = fake_cmd
+    try:
+        result = asyncio.run(singbox_service_runtime.ensure_singbox_service_unit(object()))
+    finally:
+        singbox_service_runtime.cmd = original
+
+    assert result["service"] == "twinpanel-sing-box"
+    assert result["unit"] == "/etc/systemd/system/twinpanel-sing-box.service"
+    assert len(captured) == 1
+    command, timeout = captured[0]
+    assert timeout == 120
+    assert "/etc/systemd/system/twinpanel-sing-box.service" in command
+    assert "systemctl daemon-reload" in command
+    assert "systemctl enable twinpanel-sing-box.service" in command
+    assert "systemctl restart" not in command
+    assert "systemctl start" not in command
+    assert "cmp -s" in command
+    assert "mv \"$tmp\" \"$target\"" in command
+
+    unit = singbox_service_runtime.SERVICE_UNIT
+    assert "Description=TwinPanel Modern VPN Core (sing-box)" in unit
+    assert (
+        "ExecStart=/usr/local/bin/twinpanel-sing-box run -c "
+        "/etc/twinpanel/sing-box/config.json"
+    ) in unit
+    assert "Restart=on-failure" in unit
 
 
 def main() -> None:
@@ -51,6 +89,15 @@ def main() -> None:
     assert legacy in main_py
     assert main_py.index(v3) < main_py.index(legacy)
 
+    dispatch_py = (root / "backend" / "app" / "modern_protocol_dispatch.py").read_text(
+        encoding="utf-8"
+    )
+    bootstrap_call = "await ensure_singbox_service_unit(conn)"
+    apply_call = "singbox = await _apply_singbox_profiles(conn, node, singbox_profiles)"
+    assert bootstrap_call in dispatch_py
+    assert apply_call in dispatch_py
+    assert dispatch_py.index(bootstrap_call) < dispatch_py.index(apply_call)
+
     runtime_py = (root / "backend" / "app" / "standalone_protocol_runtime.py").read_text(
         encoding="utf-8"
     )
@@ -62,6 +109,8 @@ def main() -> None:
         "a9ebfb7e359d7f667062400a098e117e4e2bed55c65aea099e949129953028d0",
     ):
         assert digest in runtime_py
+
+    _assert_singbox_service_bootstrap()
 
     print("MODERN_PROTOCOL_RUNTIME_V3_SMOKE_OK")
 
