@@ -4,7 +4,19 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-ProtocolName = Literal["openconnect", "openvpn", "wireguard", "l2tp", "xray"]
+ProtocolName = Literal[
+    "openconnect",
+    "openvpn",
+    "wireguard",
+    "l2tp",
+    "xray",
+    "hysteria2",
+    "tuic",
+    "anytls",
+    "naive",
+    "shadowtls",
+    "snell",
+]
 
 
 class UsageEventIn(BaseModel):
