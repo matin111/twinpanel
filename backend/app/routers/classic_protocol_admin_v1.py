@@ -31,6 +31,33 @@ ClassicProtocol = Literal[
     "v2ray",
 ]
 
+_CLASSIC_PROTOCOLS: tuple[str, ...] = (
+    "cisco",
+    "openvpn",
+    "wireguard",
+    "l2tp",
+    "v2ray",
+)
+
+_DEFAULT_PORTS: dict[str, int] = {
+    "cisco": 443,
+    "openvpn": 1194,
+    "wireguard": 51820,
+    "v2ray": 8443,
+}
+
+_DEFAULT_TRANSPORTS: dict[str, str] = {
+    "cisco": "tcp+udp",
+    "openvpn": "udp",
+    "wireguard": "udp",
+    "l2tp": "udp",
+    "v2ray": "tcp",
+}
+
+_DEFAULT_PORT_TEXT: dict[str, str] = {
+    "l2tp": "500/4500/1701",
+}
+
 
 class EnsureClassicProtocolIn(BaseModel):
     node_id: int = Field(gt=0)
@@ -45,14 +72,6 @@ class EnsureClassicProtocolIn(BaseModel):
         if self.protocol != "openvpn" and self.transport is not None:
             raise ValueError("transport override is only supported for OpenVPN")
         return self
-
-
-_DEFAULT_PORTS: dict[str, int] = {
-    "cisco": 443,
-    "openvpn": 1194,
-    "wireguard": 51820,
-    "v2ray": 8443,
-}
 
 
 def _existing_config(
@@ -121,6 +140,93 @@ def _settings_for(
         )
 
     return ProtocolSettings(**values)
+
+
+@router.get("/classic-protocols")
+def classic_protocol_inventory(
+    db: Session = Depends(get_db),
+):
+    nodes = (
+        db.query(Node)
+        .filter(
+            Node.retired_at.is_(None),
+            Node.node_type == NodeType.EXIT,
+        )
+        .order_by(Node.id.asc())
+        .all()
+    )
+
+    node_ids = [node.id for node in nodes]
+    configs = (
+        db.query(NodeProtocolConfig)
+        .filter(
+            NodeProtocolConfig.node_id.in_(node_ids),
+            NodeProtocolConfig.protocol.in_(_CLASSIC_PROTOCOLS),
+        )
+        .all()
+        if node_ids
+        else []
+    )
+    config_map = {
+        (row.node_id, row.protocol): row
+        for row in configs
+    }
+
+    payload_nodes = []
+    for node in nodes:
+        protocols = []
+        for protocol in _CLASSIC_PROTOCOLS:
+            row = config_map.get((node.id, protocol))
+            enabled = bool(getattr(node, f"enable_{protocol}", False))
+            port = (
+                int(row.port)
+                if row and row.port
+                else _DEFAULT_PORTS.get(protocol)
+            )
+            transport = (
+                str(row.transport or "").strip().lower()
+                if row
+                else ""
+            ) or _DEFAULT_TRANSPORTS[protocol]
+            port_text = (
+                str(row.port_text or "").strip()
+                if row
+                else ""
+            ) or _DEFAULT_PORT_TEXT.get(
+                protocol,
+                str(port) if port else "",
+            )
+            protocols.append(
+                {
+                    "protocol": protocol,
+                    "enabled": enabled,
+                    "port": port,
+                    "port_text": port_text,
+                    "transport": transport,
+                    "service": row.service_name if row else None,
+                    "status": row.status if row else (
+                        "enabled" if enabled else "not_installed"
+                    ),
+                    "last_error": row.last_error if row else None,
+                    "checked_at": row.checked_at if row else None,
+                }
+            )
+
+        payload_nodes.append(
+            {
+                "id": node.id,
+                "name": node.name,
+                "public_ip": node.public_ip,
+                "public_domain": node.public_domain,
+                "status": getattr(node.status, "value", node.status),
+                "protocols": protocols,
+            }
+        )
+
+    return {
+        "ok": True,
+        "nodes": payload_nodes,
+    }
 
 
 @router.post("/ensure-classic-protocol")
