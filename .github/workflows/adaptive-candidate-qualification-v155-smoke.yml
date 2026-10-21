@@ -1,0 +1,66 @@
+name: Adaptive Candidate Qualification V155 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/adaptive_candidate_qualification_v155.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - ".github/workflows/adaptive-candidate-qualification-v155-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile V155 runtime
+        run: |
+          python -m py_compile \
+            backend/app/adaptive_candidate_qualification_v155.py \
+            backend/app/tunnel_transport_manager_v12.py
+
+      - name: Verify V155 contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          policy = Path("backend/app/adaptive_candidate_qualification_v155.py").read_text()
+          manager = Path("backend/app/tunnel_transport_manager_v12.py").read_text()
+
+          required = [
+              'DIRECT = "tp27_tcp_direct"',
+              'MASQUE = "tp27_masque"',
+              'WARM_RETRY_SECONDS = 120.0',
+              '"qualification_basis": "peer_l3"',
+              '"qualification_basis": "peer_l3_then_throughput"',
+              'tp27_tcp_direct.probe = _direct_peer_l3_probe',
+              'smart.candidate_health_remote_v21 = _candidate_health_v155',
+              'smart._install_candidate_name = _install_candidate_name_v155',
+              'else smart.INSTALL_RETRY_SECONDS',
+              'masque_gate=strict-udp',
+              'tp27_fast=unchanged',
+          ]
+          for needle in required:
+              assert needle in policy, needle
+
+          # V155 deliberately must not relax MASQUE during current Iran UDP
+          # impairment; only Direct TCP receives the peer-L3 qualification hook.
+          forbidden = [
+              'tp27_masque.probe = _direct_peer_l3_probe',
+              'common.probe = _direct_peer_l3_probe',
+          ]
+          for needle in forbidden:
+              assert needle not in policy, needle
+
+          assert 'apply_adaptive_candidate_qualification_v155()' in manager
+          assert 'adaptive_candidate_qualification=v155' in manager
+          assert manager.index('apply_adaptive_multilane_v151()') < manager.index('apply_adaptive_candidate_qualification_v155()')
+          assert manager.index('apply_adaptive_candidate_qualification_v155()') < manager.index('apply_adaptive_tunnel_performance_v148()')
+
+          print("V155_CONTRACT_SMOKE=PASS")
+          PY
