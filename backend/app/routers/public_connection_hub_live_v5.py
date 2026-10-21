@@ -12,6 +12,7 @@ from .public_connection_hub_refine_v6 import refine_public_connection_hub_html
 from .public_connection_mobile_v7 import refine_public_connection_mobile_v7
 from .public_connection_hub_v8 import refine_public_connection_hub_v8
 from .public_connection_hub_v9 import refine_public_connection_hub_v9
+from .public_connection_manual_fields_v10 import refine_public_connection_manual_fields_v10
 from .public_connection_files_v9 import router as public_connection_files_v9_router
 from .public_connection_multilink_v7 import router as public_connection_multilink_v7_router
 from .public_connection_hub_v5 import public_connection_hub_v5
@@ -229,6 +230,7 @@ def public_connection_hub_live_v5(
     source = refine_public_connection_mobile_v7(source, token)
     source = refine_public_connection_hub_v8(source)
     source = refine_public_connection_hub_v9(source, token)
+    source = refine_public_connection_manual_fields_v10(source)
 
     return HTMLResponse(
         content=source,
