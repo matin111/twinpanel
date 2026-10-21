@@ -1,0 +1,47 @@
+name: Simple Add Node Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/provision-runtime-xray-domain.tsx'
+      - '.github/workflows/simple-add-node-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify add-node and protocol-studio separation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          ui = Path('components/provision-runtime-xray-domain.tsx').read_text()
+
+          for marker in (
+              'install_cisco:false',
+              'install_openvpn:false',
+              'install_wireguard:false',
+              'install_l2tp:false',
+              'install_v2ray:false',
+              'parityApi.provisionInstall',
+              '/admin/modern-protocols?node=${createdNodeId}',
+              'ثبت و آماده‌سازی سرور',
+              'تست SSH',
+          ):
+              assert marker in ui, marker
+
+          for removed in (
+              'Protocols & ports',
+              'پروتکل‌ها و پورت‌ها',
+              'function Toggle(',
+              'xray_domain:string',
+              'saveXrayDomain(',
+              'prepareXrayDomain(',
+          ):
+              assert removed not in ui, removed
+
+          print('SIMPLE_ADD_NODE_SMOKE_OK')
+          PY
