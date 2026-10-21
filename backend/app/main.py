@@ -38,6 +38,7 @@ from .routers.node_recovery import router as node_recovery_router
 from .routers.tunnel_managed import router as tunnel_managed_router
 from .routers.modern_transports import router as modern_transports_router
 from .routers.download_assets import admin_router as download_assets_admin_router, public_router as download_assets_public_router
+from .routers.public_connection_hub_live_v5 import router as public_connection_hub_live_v5_router
 from .routers.public_connection_live_v4 import router as public_connection_live_v4_router
 from .routers.public_connection_v3 import router as public_connection_v3_router
 from .routers.reseller_admin_v2 import router as reseller_admin_v2_router
@@ -336,8 +337,10 @@ app.include_router(quota_security.router)
 app.include_router(xray_modern_router)
 app.include_router(xray_modern_admin_router)
 app.include_router(account_delivery.router)
-# V4 keeps the V3 connection design but adds live first-use/session/usage state.
-# It must win before V3 and the legacy public router; legacy /usage and /qr stay.
+# Public Connection Hub V5 owns the exact /v1/connect/{token} page while the
+# existing V4 router continues to own /live telemetry. V3 and legacy stay as
+# compatibility fallbacks and rollback references.
+app.include_router(public_connection_hub_live_v5_router)
 app.include_router(public_connection_live_v4_router)
 app.include_router(public_connection_v3_router)
 app.include_router(account_delivery.public_router)
