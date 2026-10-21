@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.141",
+  "version": "1.1.0-rc.142",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-21T15:42:47Z",
+  "released_at": "2026-10-21T16:19:33Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "10176499789b9689d1b7108f1caa7d97254d18b6",
+  "source_sha": "1dab546181a0bb3a98e34d7f11c11a676df2357b",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.141/twinpanel-1.1.0-rc.141-linux-x86_64.tar.gz",
-    "sha256": "9353c78d0015b3c3de82d4907c8e8e20f24d8d672c005f1229a0486f03c13272",
-    "size_bytes": 13432540
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.142/twinpanel-1.1.0-rc.142-linux-x86_64.tar.gz",
+    "sha256": "e00777efff0541ef817875f16676e0e6e16ab87f7aaaf618b7ec45993ffbaca1",
+    "size_bytes": 13450982
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.141 خوانایی قالب اول فروشگاه، Conversion Pro 2027، و کنتراست دکمه‌های آن را به‌صورت Scope‌شده اصلاح می‌کند. متن‌های ثانویه‌ای که در Renderer جدید tpStore و راهنماهای واقعی هنوز روی مقیاس فشرده 7 تا 10 پیکسل بودند، در پلن‌ها، پروتکل‌ها، مزایا، حساب، FAQ، تماس، فوتر و آموزش‌ها به اندازه و line-height خواناتری ارتقا یافته‌اند، بدون تغییر مقیاس تیترهای اصلی و ساختار Conversion. برای CTAهای اصلی، دکمه‌های پلن Featured/Non-featured، حالت Outline، دکمه‌های Secondary/Login، تب‌های فعال راهنما و CTA موبایل foreground صریح و contrast-safe تعریف شده و عناصر داخلی دکمه‌ها نیز رنگ نهایی را به‌درستی inherit می‌کنند. Light/Dark، حالت disabled و focus-visible نیز Refine شده‌اند. تغییر فقط در Theme Bridge قالب Conversion انجام شده و Editorial Pro 2027، Backend، API، Auth، Payment، Provisioning، Quota، Tunnel و VPN business logic تغییر نکرده‌اند. PR #637 بعد از Build، Validate، Regression و API Build سبز Merge شده است. تأیید بصری نهایی همچنان نیازمند آپدیت سرور تست و بررسی واقعی مرورگر در Light/Dark و دسکتاپ/موبایل است.",
-    "en": "TwinPanel 1.1.0-rc.141 improves readability and button contrast in the first storefront theme, Conversion Pro 2027, using a theme-scoped refinement. Secondary copy that still used a dense 7–10px scale in the modern tpStore renderer and real guides is raised to a more readable size and line-height across plans, protocols, benefits, account, FAQ, contact, footer, and guides without changing the primary headline scale or Conversion layout. Primary CTAs, featured/non-featured plan buttons, outline mode, secondary/login actions, active guide tabs, and the mobile CTA now receive explicit contrast-safe foregrounds, while nested button elements correctly inherit the resolved label color. Light/Dark, disabled states, and focus-visible treatment are also refined. The change is isolated to the Conversion theme bridge; Editorial Pro 2027 and Backend/API/Auth/Payment/Provisioning/Quota/Tunnel/VPN business logic are unchanged. PR #637 was merged after Build, Validate, Regression, and API Build all passed. Final visual acceptance still requires updating the test server and checking the real browser in Light/Dark and desktop/mobile modes."
+    "fa": "TwinPanel 1.1.0-rc.142 کنتراست باقی‌مانده در راهنمای واقعی قالب Conversion Pro 2027 را مخصوصاً در Light Mode اصلاح می‌کند. توضیح زیر عنوان پروتکل و متن‌های helper/caption راهنما دیگر به رنگ muted خیلی کم‌رنگ متکی نیستند و foreground خواناتری دارند. دکمه نرم «دانلود رسمی» نیز رنگ متن، پس‌زمینه و Border صریح و contrast-safe دارد، عناصر داخلی آن رنگ نهایی را inherit می‌کنند و حالت enabled از disabled قابل تشخیص باقی می‌ماند. رنگ‌ها همچنان از Accent انتخابی قالب مشتق می‌شوند و Dark Mode نیز حفظ شده است. تغییر فقط در Theme Bridge قالب Conversion انجام شده و Layout، Editorial Pro 2027، Backend، API، Auth، Payment، Provisioning، Quota، Tunnel و VPN business logic تغییر نکرده‌اند. PR #640 بعد از Build، Validate، Regression و API Build سبز Merge شده است. تأیید بصری نهایی نیازمند آپدیت سرور تست و بررسی همان راهنمای WireGuard در Light/Dark است.",
+    "en": "TwinPanel 1.1.0-rc.142 fixes the remaining contrast issue in the Conversion Pro 2027 real guide, especially in Light Mode. Protocol explanatory copy and guide helper/caption text no longer rely on overly faint muted inheritance and now use an explicit readable foreground. The soft official-download CTA also receives explicit contrast-safe foreground, background and border colors, nested content inherits the resolved foreground, and enabled versus disabled states remain distinct. Colors continue to derive from the selected theme accent and Dark Mode is preserved. The change is isolated to the Conversion theme bridge; layout, Editorial Pro 2027, Backend, API, Auth, Payment, Provisioning, Quota, Tunnel and VPN business logic are unchanged. PR #640 was merged after Build, Validate, Regression and API Build all passed. Final visual acceptance requires updating the test server and checking the same WireGuard guide in Light/Dark mode."
   }
 }
