@@ -55,7 +55,11 @@ def main() -> None:
         tree,
         "sync_node_config",
     )
-    assert '"version": 3' in sync_source
+    # Schema v4 is an additive evolution of the node quota contract. It keeps
+    # the proven OpenVPN runtime identity behavior above and adds explicit
+    # fail-closed telemetry metadata for modern protocols.
+    assert '"version": 4' in sync_source
+    assert '"fail_closed": True' in sync_source
 
     print("OPENVPN_QUOTA_IDENTITY_V106_OK")
 
