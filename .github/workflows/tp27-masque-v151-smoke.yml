@@ -142,7 +142,18 @@ jobs:
           assert "tp27_masque" in reconciler
           assert "tp27_tcp_direct" in reconciler
           assert "apply_adaptive_multilane_v151()" in manager
-          assert "active_candidates=tp27_fast,tp27_masque,tp27_tcp_direct" in manager
+
+          # V151 owns the MASQUE candidate contract, but later adaptive layers may
+          # add independent SmartAuto candidates. Keep this regression additive.
+          active_match = re.search(r'active_candidates=([^"\s]+)', manager)
+          assert active_match, "active_candidates marker missing"
+          active_candidates = set(active_match.group(1).split(","))
+          assert {
+              "tp27_fast",
+              "tp27_masque",
+              "tp27_tcp_direct",
+          } <= active_candidates, active_candidates
+
           assert "reconciler=v5" in manager
           assert manager.index("apply_adaptive_multilane_v149()") < manager.index(
               "apply_adaptive_multilane_v151()"
