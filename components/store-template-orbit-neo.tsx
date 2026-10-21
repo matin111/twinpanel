@@ -34,13 +34,6 @@ const PROTOCOLS:Record<string,ProtocolMeta>={
   v2ray:{name:"V2Ray / Xray",short:"V2Ray",symbol:"V",fa:"انعطاف‌پذیر برای سناریوهای شبکه متنوع.",en:"Flexible for varied network scenarios."},
 };
 const GUIDE_ORDER:StoreGuideProtocol[]=["cisco","openvpn","wireguard","l2tp","v2ray"];
-const GUIDE_POSTER_COPY:Record<StoreGuideProtocol,{fa:string;en:string}>={
-  cisco:{fa:"افزودن سرور، ورود حساب و اتصال نهایی",en:"Add the server, sign in, and connect"},
-  openvpn:{fa:"دریافت فایل OVPN، افزودن پروفایل و اتصال نهایی",en:"Import the OVPN file, add the profile, and connect"},
-  wireguard:{fa:"دریافت کانفیگ، افزودن Tunnel و اتصال نهایی",en:"Import config, create tunnel, and connect"},
-  l2tp:{fa:"افزودن VPN، ورود اطلاعات حساب و اتصال نهایی",en:"Add the VPN, enter account details, and connect"},
-  v2ray:{fa:"دریافت اطلاعات اتصال، افزودن پروفایل و اتصال نهایی",en:"Import connection details, add the profile, and connect"},
-};
 
 function stringOption(options:StoreTemplateOptionMap,key:string,fallback:string){
   const value=options[key];
@@ -82,7 +75,6 @@ export function OrbitNeo2027Template({themeOptions,settings,plans,loading,error,
   const guide=storeGuideContent[activeGuideProtocol];
   const guideEntry=guide.systems[guidePlatform];
   const guideAppImage=storeGuideAppImage(guidePlatform,activeGuideProtocol);
-  const posterCopy=GUIDE_POSTER_COPY[activeGuideProtocol];
 
   const order=Array.isArray(themeOptions.section_order)
     ?themeOptions.section_order.map(String).filter(section=>["plans","protocols","services","guides","account","faq"].includes(section)) as StorefrontSectionId[]
@@ -149,7 +141,7 @@ export function OrbitNeo2027Template({themeOptions,settings,plans,loading,error,
   const guidesSection=<section className={styles.section} id="guides" key="guides">
     <SectionHeading index="04" tag={copy("guides_tag")} title={copy("guides_title")} description={copy("guides_description")}/>
     <div className={styles.guideShell}>
-      <aside className={styles.guideVisual}>{media.guides?<><img src={media.guides} alt={copy("guides_title")}/><div className={styles.guideVisualMeta}><small>{pick(selectedPlatform.fa,selectedPlatform.en)}</small><strong dir="ltr">{selectedProtocol.name}</strong><span>{guideEntry.client}</span></div></>:<div className={styles.guideFallback} role="img" aria-label={`${selectedProtocol.name} ${pick(selectedPlatform.fa,selectedPlatform.en)}`}><span>{pick(`آموزش اتصال ${selectedProtocol.name}`,`${selectedProtocol.name} Setup Guide`)}</span><strong>{pick(`برای ${selectedPlatform.fa}`,`for ${selectedPlatform.en}`)}</strong><small>{pick(posterCopy.fa,posterCopy.en)}</small></div>}</aside>
+      <aside className={styles.guideVisual}>{media.guides?<><img src={media.guides} alt={copy("guides_title")}/><div className={styles.guideVisualMeta}><small>{pick(selectedPlatform.fa,selectedPlatform.en)}</small><strong dir="ltr">{selectedProtocol.name}</strong><span>{guideEntry.client}</span></div></>:<div className={styles.guideFallback} role="img" aria-label={`${selectedProtocol.name} ${pick(selectedPlatform.fa,selectedPlatform.en)}`}/>}</aside>
       <div className={styles.guideContent}>
         <div className={styles.guideSelectors}><div>{guideProtocolIds.map(protocol=><button type="button" key={protocol} className={protocol===activeGuideProtocol?styles.activeChip:""} onClick={()=>setGuideProtocol(protocol)}>{PROTOCOLS[protocol]?.short||protocol}</button>)}</div><div>{storeGuidePlatforms.map(platform=><button type="button" key={platform.id} className={platform.id===guidePlatform?styles.activeChip:""} onClick={()=>setGuidePlatform(platform.id)}><span>{platform.icon}</span>{pick(platform.fa,platform.en)}</button>)}</div></div>
         <div className={styles.guideApp}><div className={styles.guideAppIcon}>{guideAppImage?<img src={guideAppImage} alt={guideEntry.client}/>:<span>{selectedPlatform.icon}</span>}</div><div><small>{pick("نرم‌افزار / روش پیشنهادی","Recommended client / method")}</small><h3>{guideEntry.client}</h3><p>{guide.summary}</p></div>{guideEntry.downloadUrl?<a href={guideEntry.downloadUrl} target="_blank" rel="noopener noreferrer">{guideEntry.downloadLabel} ↗</a>:<span className={styles.noDownload}>✓ {guideEntry.downloadLabel}</span>}</div>
