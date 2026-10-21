@@ -11,12 +11,20 @@ from ..quota_models import QuotaDevice
 from ..quota_security import public_key_b64
 
 
+# ProtocolCredential protocol name -> node quota protocol name.
+#
+# The first modern cohort is intentionally identity-preserving. Adding a
+# protocol here only makes its canonical QuotaDevice visible to node-side
+# collectors; telemetry readiness is validated separately and must fail closed.
 _PROTOCOL_TO_QUOTA = {
     "cisco": "openconnect",
     "openvpn": "openvpn",
     "wireguard": "wireguard",
     "l2tp": "l2tp",
     "v2ray": "xray",
+    "hysteria2": "hysteria2",
+    "tuic": "tuic",
+    "anytls": "anytls",
 }
 
 
@@ -79,6 +87,11 @@ def _runtime_identity(
     Central PKI uses the stable subscription-scoped mv-sub-<subscription> CN.
     Keeping this separate from ``identity`` preserves existing consumers while
     giving runtime telemetry an exact, non-guessing identity.
+
+    Modern sing-box protocols deliberately keep ``fallback_identity`` here.
+    Their per-user runtime identity is the credential username/name and will be
+    consumed by the dedicated modern quota collector in the next lifecycle
+    stage.
     """
 
     if protocol != "openvpn":
@@ -171,11 +184,17 @@ def sync_node_config(db: Session, node_id: int, api_base: str | None = None):
     path = Path(f"/tmp/twinpanel-node-{int(node_id)}.json")
 
     config = {
-        "version": 3,
+        "version": 4,
         "node_id": int(node_id),
         "api_base": str(api_base or "").rstrip("/"),
         "command_public_key_b64": public_key_b64(),
         "devices": devices,
+        "telemetry_policy": {
+            # Collectors must never convert an unavailable/unsupported source
+            # into a synthetic zero-usage sample. Missing telemetry is an
+            # explicit capability failure until a trustworthy source exists.
+            "fail_closed": True,
+        },
     }
 
     path.write_text(
