@@ -239,3 +239,8 @@ export function storeGuideTutorialImage(platform:StoreGuidePlatform,protocol:Sto
   if(platform!=="android"&&platform!=="ios"&&platform!=="windows")return "";
   return `/learning/screenshots/${platform}/${protocol}.webp`;
 }
+
+
+export function storeGuideScreenshot(platform:StoreGuidePlatform,protocol:StoreGuideProtocol,_index:number):string{
+  return storeGuideTutorialImage(platform,protocol);
+}
