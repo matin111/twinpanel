@@ -1,0 +1,99 @@
+name: Finalize Local Tutorial Assets
+
+on:
+  push:
+    branches:
+      - feat/store-tutorial-images-v121
+    paths:
+      - '.github/workflows/finalize-local-tutorial-assets.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/store-tutorial-images-v121
+          fetch-depth: 0
+
+      - name: Validate the final local storefront tutorial assets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -d public/learning/screenshots
+          count="$(find public/learning/screenshots -type f -name '*.webp' | wc -l | tr -d ' ')"
+          test "$count" = 65
+          grep -Fq 'const LEGACY_STEP_IMAGE_BASE="/learning/screenshots";' lib/store-guide-content.ts
+          if grep -Fq 'https://movilineapp.com/learning/' lib/store-guide-content.ts; then
+            echo 'External legacy learning dependency still present' >&2
+            exit 42
+          fi
+          echo "Validated $count local tutorial screenshots"
+
+      - name: Remove temporary import machinery from the PR
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf .tutorial-import-v120 .tutorial-import-v121 .tutorial-import-v124
+          rm -f assets/legacy-learning-visual.csv
+          rm -f scripts/verify-legacy-tutorial-images.py
+          rm -f .github/workflows/store-tutorial-assets-v121-verified-import.yml
+          rm -f .github/workflows/reconstruct-local-tutorial-assets.yml
+          rm -f .github/workflows/store-tutorial-local-assets-v124.yml
+          rm -f .github/workflows/finalize-local-tutorial-assets.yml
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m 'Clean temporary tutorial import machinery'
+            git push origin HEAD:feat/store-tutorial-images-v121
+          fi
+
+      - name: Ensure PR exists and wait for its CI
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          pr="$(gh pr list --head feat/store-tutorial-images-v121 --base main --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$pr" ]; then
+            url="$(gh pr create --base main --head feat/store-tutorial-images-v121 --title 'Bundle legacy storefront tutorial images locally' --body 'Imports the legacy storefront tutorial screenshots from the provided backup into TwinPanel itself and switches the guide to local /learning assets. No runtime dependency on the legacy domain or another server.')"
+            pr="${url##*/}"
+          fi
+          echo "number=$pr" >> "$GITHUB_OUTPUT"
+          echo "PR #$pr"
+
+          for i in $(seq 1 90); do
+            checks="$(gh pr checks "$pr" --json name,state,bucket 2>/dev/null || true)"
+            if [ -z "$checks" ] || [ "$checks" = '[]' ]; then
+              sleep 10
+              continue
+            fi
+            if echo "$checks" | jq -e 'any(.[]; (.bucket=="fail" or .bucket=="cancel"))' >/dev/null; then
+              echo "$checks"
+              exit 50
+            fi
+            if echo "$checks" | jq -e 'all(.[]; (.bucket=="pass" or .bucket=="skipping"))' >/dev/null; then
+              echo "$checks"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Timed out waiting for PR CI' >&2
+          exit 51
+
+      - name: Merge after green CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          gh pr merge "$PR_NUMBER" --squash --delete-branch
