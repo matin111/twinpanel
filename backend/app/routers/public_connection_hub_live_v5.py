@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from .public_connection_hub_refine_v6 import refine_public_connection_hub_html
+from .public_connection_mobile_v7 import refine_public_connection_mobile_v7
+from .public_connection_multilink_v7 import router as public_connection_multilink_v7_router
 from .public_connection_hub_v5 import public_connection_hub_v5
 
 
@@ -16,6 +18,7 @@ router = APIRouter(
     prefix="/v1/connect",
     tags=["public-connection-hub-live-v5"],
 )
+router.include_router(public_connection_multilink_v7_router)
 
 
 _LIVE_CSS = r"""
@@ -219,6 +222,7 @@ def public_connection_hub_live_v5(
         1,
     )
     source = refine_public_connection_hub_html(source)
+    source = refine_public_connection_mobile_v7(source, token)
 
     return HTMLResponse(
         content=source,

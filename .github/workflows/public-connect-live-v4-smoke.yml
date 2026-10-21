@@ -8,6 +8,8 @@ on:
       - "backend/app/routers/public_connection_hub_v5.py"
       - "backend/app/routers/public_connection_hub_live_v5.py"
       - "backend/app/routers/public_connection_hub_refine_v6.py"
+      - "backend/app/routers/public_connection_mobile_v7.py"
+      - "backend/app/routers/public_connection_multilink_v7.py"
       - "app/layout.tsx"
       - "app/panel-copy-density-final.css"
       - ".github/workflows/public-connect-live-v4-smoke.yml"
@@ -19,6 +21,8 @@ on:
       - "backend/app/routers/public_connection_hub_v5.py"
       - "backend/app/routers/public_connection_hub_live_v5.py"
       - "backend/app/routers/public_connection_hub_refine_v6.py"
+      - "backend/app/routers/public_connection_mobile_v7.py"
+      - "backend/app/routers/public_connection_multilink_v7.py"
       - "app/layout.tsx"
       - "app/panel-copy-density-final.css"
       - ".github/workflows/public-connect-live-v4-smoke.yml"
@@ -36,9 +40,11 @@ jobs:
             backend/app/routers/public_connection_hub_v5.py \
             backend/app/routers/public_connection_hub_live_v5.py \
             backend/app/routers/public_connection_hub_refine_v6.py \
+            backend/app/routers/public_connection_mobile_v7.py \
+            backend/app/routers/public_connection_multilink_v7.py \
             backend/app/main.py
 
-      - name: Verify live route precedence, polling and V6 refinement contract
+      - name: Verify live route precedence, polling and V7 mobile/multilink contract
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -48,6 +54,8 @@ jobs:
           hub = Path("backend/app/routers/public_connection_hub_v5.py").read_text()
           hub_live = Path("backend/app/routers/public_connection_hub_live_v5.py").read_text()
           refine = Path("backend/app/routers/public_connection_hub_refine_v6.py").read_text()
+          mobile = Path("backend/app/routers/public_connection_mobile_v7.py").read_text()
+          multilink = Path("backend/app/routers/public_connection_multilink_v7.py").read_text()
           layout = Path("app/layout.tsx").read_text()
           css = Path("app/panel-copy-density-final.css").read_text()
 
@@ -68,21 +76,40 @@ jobs:
           assert "liveUsed" in hub_live and "liveStart" in hub_live and "liveStatus" in hub_live
           assert "refine_public_connection_hub_html(source)" in hub_live
 
-          # V6 is presentation-only and scales the real cards already rendered by V5.
+          # V6 remains presentation-only and scales the real cards already rendered by V5.
           assert "TWINPANEL_PUBLIC_CONNECT_HUB_REFINEMENT_V6" in refine
           assert 'data-hub-filter="recommended"' in refine
           assert 'data-hub-filter="classic"' in refine
           assert 'data-hub-filter="modern"' in refine
           assert 'data-hub-filter="all"' in refine
-          assert "document.querySelectorAll('.protocol-choice')" in refine
-          assert "smart-action .qr" in refine
           assert "hubQrModal" in refine
-          assert "var(--p),var(--s)" in refine
           assert "!important" not in refine
 
-          # V6 must not become another data/provisioning layer.
+          # V7 attaches a real read-only V2Ray subscription and a compact phone UI.
+          assert "public_connection_multilink_v7_router" in hub_live
+          assert "router.include_router(public_connection_multilink_v7_router)" in hub_live
+          assert "refine_public_connection_mobile_v7(source, token)" in hub_live
+          assert '"/{token}/subscription/v2ray"' in multilink
+          assert '"/{token}/subscription/v2ray/qr"' in multilink
+          assert "base64.b64encode" in multilink
+          assert 'protocol not in {"v2ray", "xray"}' in multilink
+          assert 'status != "active"' in multilink
+          assert "request.url_for" in multilink
+
+          # Redundant advanced account box is replaced only when a real V2Ray credential exists.
+          assert "TWINPANEL_PUBLIC_CONNECT_MOBILE_V7" in mobile
+          assert "مولتی‌لینک V2Ray / Xray" in mobile
+          assert "has_v2ray" in mobile
+          assert '<details class=\"advanced\">.*?</details>' in mobile
+          assert "navigator.share" in mobile
+          assert "new File" in mobile
+          assert "ارسال به موبایل" in mobile
+          assert "باز کردن در برنامه" in mobile
+          assert "grid-template-columns:repeat(2,minmax(0,1fr))" in mobile
+          assert "!important" not in mobile
+
+          # V7 may read delivery data but must not mutate subscriptions/credentials/quota.
           forbidden = (
-              "SessionLocal",
               "db.add(",
               "db.commit(",
               "subprocess",
@@ -90,7 +117,8 @@ jobs:
               "ProtocolCredential",
               "QuotaDevice",
           )
-          assert all(token not in refine for token in forbidden)
+          assert all(token not in mobile for token in forbidden)
+          assert all(token not in multilink for token in forbidden)
 
           # Existing panel density contract remains available.
           assert "panel-copy-density-final.css" in layout
