@@ -1,0 +1,64 @@
+name: TwinPanel Store Tutorial Backup Sprites V126
+
+on:
+  push:
+    branches:
+      - feat/store-tutorial-backup-sprites-v126
+    paths:
+      - '.tutorial-bundle-v126/**'
+      - '.github/workflows/store-tutorial-backup-sprites-v126.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/store-tutorial-backup-sprites-v126
+          fetch-depth: 0
+
+      - name: Rebuild archive from backup chunks
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          cat .tutorial-bundle-v126/part-*.b64 > /tmp/tutorial-sprites.b64
+          base64 -d /tmp/tutorial-sprites.b64 > /tmp/tutorial-sprites.tar.gz
+          tar -tzf /tmp/tutorial-sprites.tar.gz > /tmp/tutorial-list.txt
+          cat /tmp/tutorial-list.txt
+          COUNT=$(grep -E '\.webp$' /tmp/tutorial-list.txt | wc -l | tr -d ' ')
+          echo "WEBP_COUNT=$COUNT"
+          test "$COUNT" -ge 15
+
+      - name: Extract local tutorial sprites
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf /tmp/tutorial-out
+          mkdir -p /tmp/tutorial-out
+          tar -xzf /tmp/tutorial-sprites.tar.gz -C /tmp/tutorial-out
+          SRC=$(find /tmp/tutorial-out -type d -name tutorial_sprites -print -quit)
+          if [ -z "$SRC" ]; then
+            SRC=$(find /tmp/tutorial-out -type d -path '*/learning/sprites' -print -quit)
+          fi
+          test -n "$SRC"
+          rm -rf public/learning/sprites
+          mkdir -p public/learning
+          cp -a "$SRC" public/learning/sprites
+          test "$(find public/learning/sprites -type f -name '*.webp' | wc -l | tr -d ' ')" -ge 15
+
+      - name: Commit restored backup sprites
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/learning/sprites
+          if git diff --cached --quiet; then
+            echo 'No asset changes'
+            exit 0
+          fi
+          git commit -m 'Restore storefront tutorial sprites from legacy backup'
+          git push origin HEAD:feat/store-tutorial-backup-sprites-v126
