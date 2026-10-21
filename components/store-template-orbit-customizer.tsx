@@ -19,6 +19,7 @@ import {
   saveStoreTemplateSettings,
   uploadStoreTemplateMedia,
 } from "../lib/store-template-settings-api";
+import {StorefrontAdvancedDesignControls} from "./storefront-advanced-design-lab";
 import styles from "./store-template-orbit-customizer.module.css";
 
 type Tab="design"|"media"|"hero"|"commerce"|"content"|"layout";
@@ -133,6 +134,8 @@ export function OrbitTemplateCustomizer({onClose}:{onClose:()=>void}){
   const textValue=(key:string)=>String(draft[localizedKey(key)]??draft[key]??"");
   const setText=(key:string,value:string)=>setDraft(current=>({...current,[localizedKey(key)]:value}));
   const setValue=(key:string,value:string|boolean|string[])=>setDraft(current=>({...current,[key]:value}));
+  const advancedValues=draft as unknown as Record<string,unknown>;
+  const advancedChange=(key:string,next:string)=>setValue(key,next);
 
   const save=async()=>{
     if(busy)return;
@@ -209,7 +212,7 @@ export function OrbitTemplateCustomizer({onClose}:{onClose:()=>void}){
       <aside className={styles.tabs}>{TABS.map(item=><button type="button" key={item.id} className={tab===item.id?styles.tabActive:""} onClick={()=>setTab(item.id)}><i>{item.icon}</i><span>{pick(item.fa,item.en)}</span></button>)}</aside>
       <main className={styles.panel}>
         {tab==="design"&&<>
-          <div className={styles.panelHead}><div><small>VISUAL SYSTEM</small><h2>{pick("هویت بصری مستقل","Independent visual system")}</h2><p>{pick("رنگ‌های Dark و Light جدا هستند تا هیچ حالتی قربانی حالت دیگر نشود.","Dark and Light palettes are independent so neither mode compromises the other.")}</p></div></div>
+          <div className={styles.panelHead}><div><h2>{pick("استایل و رنگ","Style & colors")}</h2></div></div>
           <div className={styles.choiceGrid}>
             <ChoiceField title={pick("نوع Header","Header style")} value={String(draft.orbit_header_style||"dock")} choices={HEADER_CHOICES} pick={pick} onChange={value=>setValue("orbit_header_style",value)}/>
             <ChoiceField title={pick("فرم کارت‌ها","Card geometry")} value={String(draft.orbit_card_shape||"round")} choices={SHAPE_CHOICES} pick={pick} onChange={value=>setValue("orbit_card_shape",value)}/>
@@ -217,22 +220,25 @@ export function OrbitTemplateCustomizer({onClose}:{onClose:()=>void}){
           </div>
           <div className={styles.toggleGrid}><Toggle checked={Boolean(draft.orbit_motion)} label={pick("Motion و حرکت‌های نرم","Motion & micro-interactions")} onChange={value=>setValue("orbit_motion",value)}/><Toggle checked={Boolean(draft.orbit_show_top_banner)} label={pick("بنر بالای Header","Top announcement banner")} onChange={value=>setValue("orbit_show_top_banner",value)}/><Toggle checked={Boolean(draft.orbit_show_metrics)} label={pick("Metricهای شناور Hero","Floating hero metrics")} onChange={value=>setValue("orbit_show_metrics",value)}/><Toggle checked={Boolean(draft.orbit_show_media_labels)} label={pick("Label روی تصاویر","Media labels")} onChange={value=>setValue("orbit_show_media_labels",value)}/></div>
           <div className={styles.colorGrid}>{COLORS.map(field=>{const raw=String(draft[field.key]||field.fallback);const color=/^#[0-9a-fA-F]{6}$/.test(raw)?raw:field.fallback;return <label className={styles.colorField} key={field.key}><div><b>{pick(field.fa,field.en)}</b><small>{pick(field.helpFa,field.helpEn)}</small></div><div className={styles.colorInput}><input type="color" value={color} onChange={event=>setValue(field.key,event.target.value)}/><input dir="ltr" value={raw} onChange={event=>setValue(field.key,event.target.value)}/></div></label>;})}</div>
+          <StorefrontAdvancedDesignControls templateId="orbit-neo-2027" values={advancedValues} onChange={advancedChange} section="colors"/>
+          <StorefrontAdvancedDesignControls templateId="orbit-neo-2027" values={advancedValues} onChange={advancedChange} section="style"/>
         </>}
 
         {tab==="media"&&<>
-          <div className={styles.panelHead}><div><small>MEDIA STUDIO</small><h2>{pick("آپلود واقعی تصویر برای تمام نقاط تصویری قالب","Real uploads for every image-led theme area")}</h2><p>{pick("PNG / JPG / WebP تا ۸ مگابایت. تصاویر با Slot ثابت ذخیره می‌شوند و با آپلود مجدد جایگزین می‌شوند.","PNG / JPG / WebP up to 8 MB. Assets use deterministic slots and are replaced on the next upload.")}</p></div></div>
+          <div className={styles.panelHead}><div><small>MEDIA STUDIO</small><h2>{pick("آپلود تصویر","Media uploads")}</h2></div></div>
           <div className={styles.mediaGrid}>{ORBIT_MEDIA_SLOTS.map(slot=>{const url=String(draft[slot.key]||"");return <article className={styles.mediaCard} key={slot.key}><div className={styles.mediaPreview}>{url?<img src={url} alt={pick(slot.fa,slot.en)}/>:<div><span>▧</span><b>{pick("هنوز تصویری آپلود نشده","No image uploaded")}</b></div>}</div><div className={styles.mediaMeta}><div><b>{pick(slot.fa,slot.en)}</b><small>{pick(slot.helpFa,slot.helpEn)}</small><em>{slot.aspect}</em></div><div className={styles.mediaActions}><label className={styles.uploadButton}>{uploading===slot.key?"…":pick(url?"جایگزینی":"آپلود تصویر",url?"Replace":"Upload image")}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={Boolean(uploading)} onChange={event=>{const file=event.target.files?.[0]||null;void upload(slot.key,file);event.currentTarget.value="";}}/></label>{url&&<button type="button" disabled={Boolean(uploading)} onClick={()=>void removeMedia(slot.key)}>{pick("حذف","Remove")}</button>}</div></div></article>;})}</div>
         </>}
 
-        {tab==="hero"&&<><div className={styles.panelHead}><div><small>OPENING SCENE</small><h2>{pick("بنر و Hero","Banner & Hero")}</h2><p>{pick("متن‌ها برای FA و EN جدا ذخیره می‌شوند.","FA and EN copy are stored independently.")}</p></div></div><div className={styles.formGrid}>{renderTextFields(HERO_FIELDS)}</div></>}
-        {tab==="commerce"&&<><div className={styles.panelHead}><div><small>COMMERCE LAYER</small><h2>{pick("فروش، پلن و پروتکل","Plans, commerce & protocols")}</h2><p>{pick("این متن‌ها فقط Presentation هستند؛ قیمت و مشخصات پلن از Backend می‌آیند.","These fields only control presentation; live plan facts remain backend-driven.")}</p></div></div><div className={styles.formGrid}>{renderTextFields(COMMERCE_FIELDS)}</div></>}
-        {tab==="content"&&<><div className={styles.panelHead}><div><small>STORY LAYER</small><h2>{pick("امکانات، آموزش، حساب، FAQ و CTA","Features, guides, account, FAQ & CTA")}</h2></div></div><div className={styles.formGrid}>{renderTextFields(CONTENT_FIELDS)}</div></>}
+        {tab==="hero"&&<><div className={styles.panelHead}><div><h2>{pick("بنر و Hero","Banner & Hero")}</h2></div></div><div className={styles.formGrid}>{renderTextFields(HERO_FIELDS)}</div></>}
+        {tab==="commerce"&&<><div className={styles.panelHead}><div><h2>{pick("فروش، پلن و پروتکل","Plans, commerce & protocols")}</h2></div></div><div className={styles.formGrid}>{renderTextFields(COMMERCE_FIELDS)}</div></>}
+        {tab==="content"&&<><div className={styles.panelHead}><div><h2>{pick("امکانات، آموزش، حساب، FAQ و CTA","Features, guides, account, FAQ & CTA")}</h2></div></div><div className={styles.formGrid}>{renderTextFields(CONTENT_FIELDS)}</div></>}
 
         {tab==="layout"&&<>
-          <div className={styles.panelHead}><div><small>PAGE COMPOSER</small><h2>{pick("نمایش و ترتیب بخش‌ها","Section visibility & ordering")}</h2><p>{pick("Orbit ترتیب خودش را مستقل از دو قالب دیگر ذخیره می‌کند.","Orbit stores its own section order independently of the other themes.")}</p></div></div>
+          <div className={styles.panelHead}><div><h2>{pick("نمایش و ترتیب بخش‌ها","Section visibility & ordering")}</h2></div></div>
           <div className={styles.toggleGrid}>{STOREFRONT_SECTION_IDS.map(section=><Toggle key={section} checked={Boolean(draft[`show_${section}`])} label={pick(`نمایش ${ORBIT_SECTION_LABELS[section].fa}`,`Show ${ORBIT_SECTION_LABELS[section].en}`)} onChange={value=>setValue(`show_${section}`,value)}/>)}</div>
           <div className={styles.orderList}>{order.map((section,index)=><div className={styles.orderRow} key={section}><span>{String(index+1).padStart(2,"0")}</span><b>{pick(ORBIT_SECTION_LABELS[section].fa,ORBIT_SECTION_LABELS[section].en)}</b><div><button type="button" disabled={index===0} onClick={()=>moveSection(index,-1)}>↑</button><button type="button" disabled={index===order.length-1} onClick={()=>moveSection(index,1)}>↓</button></div></div>)}</div>
           <div className={styles.toggleGrid}><Toggle checked={Boolean(draft.show_final_cta)} label={pick("نمایش CTA نهایی","Show final CTA")} onChange={value=>setValue("show_final_cta",value)}/><Toggle checked={Boolean(draft.show_contact)} label={pick("نمایش ارتباط و فوتر","Show contact & footer")} onChange={value=>setValue("show_contact",value)}/></div>
+          <StorefrontAdvancedDesignControls templateId="orbit-neo-2027" values={advancedValues} onChange={advancedChange} section="layout"/>
         </>}
       </main>
     </div>
