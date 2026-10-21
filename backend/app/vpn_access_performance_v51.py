@@ -30,6 +30,11 @@ from .routers.provision import ssh_connect_saved
 # sequences that the outer f-string can consume while rendering. Using chr(10)
 # keeps the generated remote Python syntactically stable and makes the payload
 # directly compilable in CI before a release can reach production.
+#
+# V148 compatibility: verification below follows ACCESS_MTU/ACCESS_TCP_MSS
+# rather than literal legacy values. This keeps V51 standalone defaults intact
+# while allowing a later manager-level performance contract to safely raise
+# nested MTU headroom without creating a permanent drift/repair loop.
 # ============================================================
 
 RECONCILE_INTERVAL_SECONDS = 20.0
@@ -132,7 +137,7 @@ ovpn_changed |= replace_or_append(
 ovpn_changed |= replace_or_append(
     ovpn,
     r"^[ \t]*mssfix[ \t]+.*$",
-    f"mssfix {{ACCESS_MSS}}",
+    f"mssfix {ACCESS_MSS}",
 )
 if ovpn_changed:
     Path("/run/twinpanel-v51-restart-openvpn").touch()
@@ -232,20 +237,22 @@ if [ -e /run/twinpanel-v51-restart-xl2tpd ]; then
 fi
 
 # Runtime verification. Missing services are acceptable on partial Exit nodes;
-# an installed service with a wrong value is not.
+# an installed service with a wrong value is not. Keep these checks driven by
+# the active constants so V148 can safely raise the access contract while V51
+# retains its standalone legacy defaults.
 if [ -f /etc/ocserv/ocserv.conf ]; then
-  grep -Eq '^[[:space:]]*mtu[[:space:]]*=[[:space:]]*1200[[:space:]]*$' /etc/ocserv/ocserv.conf
+  grep -Eq '^[[:space:]]*mtu[[:space:]]*=[[:space:]]*{ACCESS_MTU}[[:space:]]*$' /etc/ocserv/ocserv.conf
 fi
 if [ -f /etc/openvpn/server/twinpanel.conf ]; then
-  grep -Eq '^[[:space:]]*tun-mtu[[:space:]]+1200[[:space:]]*$' /etc/openvpn/server/twinpanel.conf
-  grep -Eq '^[[:space:]]*mssfix[[:space:]]+1160[[:space:]]*$' /etc/openvpn/server/twinpanel.conf
+  grep -Eq '^[[:space:]]*tun-mtu[[:space:]]+{ACCESS_MTU}[[:space:]]*$' /etc/openvpn/server/twinpanel.conf
+  grep -Eq '^[[:space:]]*mssfix[[:space:]]+{ACCESS_TCP_MSS}[[:space:]]*$' /etc/openvpn/server/twinpanel.conf
 fi
 if [ -f /etc/wireguard/wg-access0.conf ]; then
-  grep -Eq '^[[:space:]]*MTU[[:space:]]*=[[:space:]]*1200[[:space:]]*$' /etc/wireguard/wg-access0.conf
+  grep -Eq '^[[:space:]]*MTU[[:space:]]*=[[:space:]]*{ACCESS_MTU}[[:space:]]*$' /etc/wireguard/wg-access0.conf
 fi
 if [ -f /etc/ppp/options.xl2tpd ]; then
-  grep -Eq '^[[:space:]]*mtu[[:space:]]+1200[[:space:]]*$' /etc/ppp/options.xl2tpd
-  grep -Eq '^[[:space:]]*mru[[:space:]]+1200[[:space:]]*$' /etc/ppp/options.xl2tpd
+  grep -Eq '^[[:space:]]*mtu[[:space:]]+{ACCESS_MTU}[[:space:]]*$' /etc/ppp/options.xl2tpd
+  grep -Eq '^[[:space:]]*mru[[:space:]]+{ACCESS_MTU}[[:space:]]*$' /etc/ppp/options.xl2tpd
 fi
 
 for IFACE in $(ls /sys/class/net 2>/dev/null | grep '^vpns' || true); do
