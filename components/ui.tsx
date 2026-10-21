@@ -21,6 +21,7 @@ const menuGroups=[
     ["تانل‌ها","Tunnels","/admin/tunnels","⤨"],
     ["مسیرهای هوشمند","Smart Transports","/admin/tunnel-transports","⇄"],
     ["راه‌اندازی نود","Provision Node","/admin/provision","⚡"],
+    ["پروتکل‌های جدید","Modern Protocols","/admin/modern-protocols","◫"],
     ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"]
   ]},
   {fa:"فروش و مالی",en:"Sales & Finance",items:[
