@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.144",
+  "version": "1.1.0-rc.145",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-21T17:24:36Z",
+  "released_at": "2026-10-21T17:41:55Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "a95b1d2601585e5b80c0f038514ce9a0f1db2a69",
+  "source_sha": "91c78443e3ecea446b0da78172543a78f21ed8dd",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.144/twinpanel-1.1.0-rc.144-linux-x86_64.tar.gz",
-    "sha256": "0403c31821b88c4f3e087818905c9942f62f6e706cacaab4878a2f78dc71982f",
-    "size_bytes": 13524607
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.145/twinpanel-1.1.0-rc.145-linux-x86_64.tar.gz",
+    "sha256": "23305f0cfeb6f497b9ef59f0ee69ae95966975f1f259eeae5085b889d0d5a15c",
+    "size_bytes": 13543323
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.144 لایه Exit Access Dataplane Stability V144 را اضافه می‌کند. در وضعیت پایدار، زنجیره‌های TP_ACCESS_EGRESS، TP_ACCESS_FWD، TP_ACCESS_MSS و TP_ACCESS_PERF دیگر توسط reconcileهای دوره‌ای V46/V51 بدون تغییر Desired State بازسازی نمی‌شوند و مسیر steady-state به‌صورت read-only باقی می‌ماند؛ در صورت Drift واقعی، همان مسیرهای repair موجود V46/V51 اجرا می‌شوند تا رفتار NAT/FORWARD/MSS/MTU و پروتکل‌ها حفظ شود. این Release یک Route/Firewall churn تأییدشده روی Exit dataplane را اصلاح می‌کند، اما رفع کامل Incident سرعت فقط پس از Production Acceptance روی Tunnel #5 و تست واقعی OpenVPN/Cisco/WireGuard/L2TP اعلام خواهد شد. PR #646 پس از سبز شدن همه 16 Workflow شامل Exit Access Dataplane Stability V144 Smoke، VPN Access V46/V51، TP27، Preview و API Build Merge شده است.",
-    "en": "TwinPanel 1.1.0-rc.144 adds Exit Access Dataplane Stability V144. In steady state, TP_ACCESS_EGRESS, TP_ACCESS_FWD, TP_ACCESS_MSS and TP_ACCESS_PERF are no longer rebuilt by periodic V46/V51 reconciliation when Desired State is unchanged; steady-state checks are read-only, while real drift falls back to the existing V46/V51 repair paths so NAT/FORWARD/MSS/MTU and protocol behavior remain unchanged. This release fixes a confirmed Exit dataplane route/firewall churn defect, but the original VPN speed incident will only be declared fully resolved after production acceptance on Tunnel #5 and real OpenVPN/Cisco/WireGuard/L2TP testing. PR #646 merged after all 16 workflows passed, including the V144 smoke, VPN Access V46/V51, TP27, Preview and API Build."
+    "fa": "TwinPanel 1.1.0-rc.145 جریان «افزودن سرور» را پس از یکپارچه‌شدن Protocol Studio ساده و تک‌مسئولیتی می‌کند. صفحه Add Server اکنون فقط مشخصات نود، نقش، کشور، ظرفیت و دسترسی SSH را دریافت می‌کند و هنگام ثبت، هیچ Cisco/OpenConnect، OpenVPN، WireGuard، L2TP/IPsec یا V2Ray/Xray را به‌صورت خودکار نصب نمی‌کند. زیرساخت پایه موجود شامل ثبت Node، SSH key امن، Node Agent، Tunnel Fabric base، Quota bootstrap و sync عضویت اشتراک‌ها از همان مسیر Production حفظ شده است. پس از ثبت موفق، مدیریت و نصب تمام پروتکل‌های کلاسیک و مدرن مستقیماً به صفحه یکپارچه «پروتکل‌ها» همان نود تحویل داده می‌شود. Xray Domain/TLS و mutationهای پروتکل نیز در Protocol Studio باقی می‌مانند. PR #652 این Refine را Merge کرد و PR #654 قراردادهای Regression قدیمی Xray/Mutation را با مالکیت جدید هماهنگ کرد؛ هر دو پس از Build و Smokeهای مربوط تأیید شدند. Payment، Quota logic، Tunnel topology، Subscription accounting و installerهای پروتکل در این تغییر بازنویسی نشده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.145 simplifies Add Server after Protocol Studio became the unified protocol management surface. Add Server now collects only node identity, role, country, capacity and SSH access, and explicitly installs no Cisco/OpenConnect, OpenVPN, WireGuard, L2TP/IPsec or V2Ray/Xray protocol during registration. The existing production bootstrap path is preserved for Node registration, secure SSH key setup, Node Agent, Tunnel Fabric base, Quota bootstrap and subscription membership sync. After a successful registration, all classic and modern protocol installation and management is handed off directly to the unified Protocols page for that node. Xray Domain/TLS and protocol mutation actions remain owned by Protocol Studio. PR #652 merged the node-only flow and PR #654 aligned stale Xray/Mutation regression contracts with the new ownership model; both were validated by their relevant builds and smoke checks. Payment, quota logic, tunnel topology, subscription accounting and protocol installers were not rewritten by this change."
   }
 }
