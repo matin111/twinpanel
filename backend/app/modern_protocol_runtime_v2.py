@@ -34,12 +34,19 @@ class ModernRuntimeV2Error(RuntimeError):
     pass
 
 
-def _transport(protocol: str) -> str:
-    value = str(PROTOCOL_CATALOG[protocol].get("transport") or "tcp")
-    # Health/listener checks need one concrete socket family.
-    if value in {"udp", "tcp"}:
-        return value
-    return "tcp"
+def _transports(protocol: str, settings: dict[str, Any] | None = None) -> list[str]:
+    """Return every socket family that must be healthy for this profile."""
+
+    if protocol == "naive":
+        network = str((settings or {}).get("network") or "tcp").strip().lower()
+        if network == "udp":
+            return ["udp"]
+        if network == "both":
+            return ["tcp", "udp"]
+        return ["tcp"]
+
+    value = str(PROTOCOL_CATALOG[protocol].get("transport") or "tcp").strip().lower()
+    return [value] if value in {"tcp", "udp"} else ["tcp"]
 
 
 def _mutation_script(
@@ -260,9 +267,8 @@ def _remove_script(protocol: str) -> str:
 
 async def ensure_core(conn, node: Node) -> dict[str, str]:
     core = await _ensure_core_and_certificate(conn, node)
-    # Existing rc.130-era nodes may have an older sing-box.  Installing the
-    # package again is idempotent and upgrades when the SagerNet repository has
-    # a newer candidate (Snell needs current 1.14+ builds).
+    # Existing nodes may have an older sing-box. Installing again is
+    # idempotent and upgrades from the official SagerNet repository.
     await cmd(
         conn,
         "apt-get -o DPkg::Lock::Timeout=300 install -y sing-box >/dev/null",
@@ -324,19 +330,31 @@ async def apply_profiles(
     for item in desired:
         protocol = item["protocol"]
         port = int(item["port"])
-        await ufw_allow(conn, port, _transport(protocol))
-        results[protocol] = await profile_health(conn, protocol, port)
+        settings = dict(item.get("settings") or {})
+        for transport in _transports(protocol, settings):
+            await ufw_allow(conn, port, transport)
+        results[protocol] = await profile_health(conn, protocol, port, settings)
     return {"core": core, "protocols": results}
 
 
-async def profile_health(conn, protocol: str, port: int | None = None) -> dict[str, Any]:
+async def profile_health(
+    conn,
+    protocol: str,
+    port: int | None = None,
+    settings: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     protocol = str(protocol or "").strip().lower()
     if protocol not in SINGBOX_PROTOCOLS:
         raise ModernRuntimeV2Error(f"protocol runtime is not available: {protocol}")
+
     listen_port = int(port or PROTOCOL_CATALOG[protocol]["default_port"])
-    transport = _transport(protocol)
+    transports = _transports(protocol, settings)
     service_ok = await active(conn, SERVICE_NAME)
-    listen_ok = await listener(conn, listen_port, transport)
+    listeners: dict[str, bool] = {}
+    for transport in transports:
+        listeners[transport] = bool(await listener(conn, listen_port, transport))
+    listen_ok = all(listeners.values())
+
     return {
         "ok": bool(service_ok and listen_ok),
         "protocol": protocol,
@@ -344,8 +362,9 @@ async def profile_health(conn, protocol: str, port: int | None = None) -> dict[s
         "service": SERVICE_NAME,
         "service_active": bool(service_ok),
         "listener": bool(listen_ok),
+        "listeners": listeners,
         "port": listen_port,
-        "transport": transport,
+        "transport": "+".join(transports),
     }
 
 
