@@ -99,6 +99,34 @@
 .themeBridge :global(.tpRealGuideHelpNote small){font-size:10.5px;line-height:1.65}
 .themeBridge :global(.tpRealGuidePanelLink){font-size:11.5px;line-height:1.45}
 
+/* Real-guide contrast is independent from generic muted copy. This prevents
+   protocol instructions and the official-download CTA from fading into the
+   guide surface when the storefront is in light mode. */
+.themeBridge :global(.tpRealGuideIntro p),
+.themeBridge :global(.tpRealGuideRequirements small),
+.themeBridge :global(.tpRealGuideSteps>header small),
+.themeBridge :global(.tpRealGuideHelp>header small),
+.themeBridge :global(.tpRealGuideScreenshot figcaption),
+.themeBridge :global(.tpRealGuideHelp>p){
+  color:color-mix(in srgb,var(--conversion-text) 76%,var(--conversion-muted));
+  opacity:1;
+}
+.themeBridge :global(.tpRealGuideDownload){
+  color:color-mix(in srgb,var(--conversion-accent) 24%,#ffffff);
+  background:color-mix(in srgb,var(--conversion-accent) 16%,var(--conversion-card-bg));
+  border-color:color-mix(in srgb,var(--conversion-accent) 48%,var(--conversion-card-border));
+  opacity:1;
+  text-shadow:none;
+}
+.themeBridge :global(.tpRealGuideDownload *){color:inherit;opacity:1}
+.themeBridge :global(.tpRealGuideDownload:hover){
+  color:#ffffff;
+  background:color-mix(in srgb,var(--conversion-accent) 72%,var(--conversion-card-bg));
+  border-color:color-mix(in srgb,var(--conversion-accent) 78%,#ffffff);
+}
+.themeBridge :global(.tpRealGuideDownload[aria-disabled="true"]),
+.themeBridge :global(.tpRealGuideDownload:disabled){opacity:.58}
+
 /* Explicit foregrounds prevent nested spans/icons and legacy color:inherit
    rules from making CTA labels disappear. */
 .themeBridge :global(.tpStoreHeaderBuy),
@@ -167,6 +195,27 @@
 :global(html[data-theme="light"]) .themeBridge :global(.tpRealGuideOsTabs button.active){
   color:#4c1d95;
   background:color-mix(in srgb,var(--conversion-accent) 12%,#ffffff);
+}
+:global(html[data-theme="light"]) .themeBridge :global(.tpRealGuideIntro p),
+:global(html[data-theme="light"]) .themeBridge :global(.tpRealGuideRequirements small),
+:global(html[data-theme="light"]) .themeBridge :global(.tpRealGuideSteps>header small),
+:global(html[data-theme="light"]) .themeBridge :global(.tpRealGuideHelp>header small),
+:global(html[data-theme="light"]) .themeBridge :global(.tpRealGuideScreenshot figcaption),
+:global(html[data-theme="light"]) .themeBridge :global(.tpRealGuideHelp>p){
+  color:#475569;
+  opacity:1;
+}
+:global(html[data-theme="light"]) .themeBridge :global(.tpRealGuideDownload){
+  color:color-mix(in srgb,var(--conversion-accent-2) 68%,#111827);
+  background:color-mix(in srgb,var(--conversion-accent) 10%,#ffffff);
+  border-color:color-mix(in srgb,var(--conversion-accent) 38%,#cbd5e1);
+  opacity:1;
+  text-shadow:none;
+}
+:global(html[data-theme="light"]) .themeBridge :global(.tpRealGuideDownload:hover){
+  color:color-mix(in srgb,var(--conversion-accent-2) 78%,#0f172a);
+  background:color-mix(in srgb,var(--conversion-accent) 16%,#ffffff);
+  border-color:color-mix(in srgb,var(--conversion-accent) 56%,#94a3b8);
 }
 
 @media(max-width:700px){
