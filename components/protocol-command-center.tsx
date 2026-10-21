@@ -88,6 +88,11 @@ type ModernPreview={
   config_hash:string;
   runtime_status:string;
 };
+type ModernInstallResult={
+  ok:boolean;
+  protocols?:Record<string,{ok?:boolean;error?:string|null}>;
+  failed_protocols?:string[];
+};
 type ClassicRuntime={
   protocol?:string;
   name?:string;
@@ -419,6 +424,44 @@ export function ProtocolCommandCenter(){
     finally{setBusy("");}
   };
 
+  const modernSyncAll=async()=>{
+    const node=selectedNode?.modern;
+    if(!node||busy)return;
+    const rows=node.protocols.filter(row=>row.installable&&Boolean(catalogMap.get(row.protocol)?.installable));
+    if(!rows.length){
+      setError("");
+      setNotice(pick("هیچ پروتکل مدرن قابل همگام‌سازی روی این نود وجود ندارد.","There are no installable modern protocols to sync on this node."));
+      return;
+    }
+    const protocols=rows.map(row=>row.protocol);
+    const ports=Object.fromEntries(rows.map(row=>[row.protocol,row.port]));
+    const profiles=Object.fromEntries(rows.map(row=>[row.protocol,{preset:row.preset||"recommended",settings:{...(row.settings||{})}}]));
+    const busyKey=`modern-sync-all:${node.id}`;
+    setBusy(busyKey);setError("");setNotice("");
+    try{
+      const result=await modernRequest<ModernInstallResult>(`/v1/settings/vpn/modern-protocols/${node.id}/install`,{method:"POST",body:JSON.stringify({protocols,ports,profiles})});
+      await load(true);
+      const failed=new Set(result.failed_protocols||[]);
+      if(!result.ok){
+        for(const row of rows){
+          if(result.protocols?.[row.protocol]?.ok===false)failed.add(row.protocol);
+        }
+      }
+      if(failed.size||!result.ok){
+        const labels=[...failed].map(key=>rows.find(row=>row.protocol===key)?.name||key);
+        setError(labels.length
+          ?pick(`همگام‌سازی کامل نشد؛ پروتکل‌های ناموفق: ${labels.join("، ")}`,`Sync completed with failures: ${labels.join(", ")}`)
+          :pick("همگام‌سازی کامل نشد؛ وضعیت پروتکل‌ها را بررسی کنید.","Sync did not complete successfully; review protocol status."));
+        return;
+      }
+      setNotice(pick(`${rows.length.toLocaleString("fa-IR")} پروتکل مدرن روی ${node.name} همگام شدند.`,`${rows.length} modern protocols were synced on ${node.name}.`));
+    }catch(reason){
+      const message=reason instanceof Error?reason.message:String(reason);
+      await load(true).catch(()=>undefined);
+      setError(message);
+    }finally{setBusy("");}
+  };
+
   const modernHealth=async(row:UnifiedProtocol)=>{
     if(!selectedNode?.modern||row.kind!=="modern"||busy)return;
     setBusy(`modern-health:${selectedNode.id}`);setError("");
@@ -488,7 +531,10 @@ export function ProtocolCommandCenter(){
               <strong>{selectedNode?.name||pick("در حال بارگذاری…","Loading…")}</strong>
               <span dir="ltr">{selectedNode?.public_domain||selectedNode?.public_ip||"—"}</span>
             </div>
-            <button className={styles.refreshButton} disabled={loading||!!busy} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button>
+            <div className={styles.actionRow}>
+              {selectedNode?.modern?<button type="button" className={styles.primaryButton} disabled={loading||!!busy} onClick={()=>void modernSyncAll()}>{busy===`modern-sync-all:${selectedNode.id}`?"…":pick("همگام‌سازی همه پروتکل‌های مدرن","Sync all modern protocols")}</button>:null}
+              <button type="button" className={styles.refreshButton} disabled={loading||!!busy} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button>
+            </div>
           </div>
 
           <div className={styles.nodeRail} aria-label={pick("انتخاب سرور","Select server")}>
