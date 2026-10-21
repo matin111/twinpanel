@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import {useMemo,useState,type ReactNode} from "react";
+import {useState,type ReactNode} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {useBranding} from "../lib/branding";
 import {planProtocols,StorePlan} from "../lib/store-runtime-api";
+import {STORE_PROTOCOL_CATALOG,storeProtocolMeta} from "../lib/store-protocol-catalog";
 import {
   StorefrontSectionId,
   StorefrontSettings,
@@ -56,17 +57,8 @@ function Conversion2027Template({settings,plans,loading,error,message,buying,onB
   const number=(value:number,options?:Intl.NumberFormatOptions)=>Number(value||0).toLocaleString(locale,options);
   const openChat=()=>window.dispatchEvent(new Event("twinpanel:open-chat"));
 
-  const availableProtocols=useMemo(()=>{
-    const set=new Set<string>();
-    plans.forEach(plan=>planProtocols(plan).forEach(protocol=>set.add(protocol)));
-    const ordered=Object.keys(protocolMeta).filter(protocol=>set.size===0||set.has(protocol));
-    return ordered.length?ordered:Object.keys(protocolMeta);
-  },[plans]);
-
-  const guideProtocolIds=useMemo(()=>{
-    const visible=guideProtocolOrder.filter(protocol=>availableProtocols.includes(protocol));
-    return visible.length?visible:guideProtocolOrder;
-  },[availableProtocols]);
+  const availableProtocols=Object.keys(protocolMeta);
+  const guideProtocolIds=guideProtocolOrder;
 
   const activeGuideProtocol:StoreGuideProtocol=guideProtocolIds.includes(guideProtocol)
     ?guideProtocol
@@ -114,7 +106,7 @@ function Conversion2027Template({settings,plans,loading,error,message,buying,onB
           <li><i>✓</i>{content("plan_feature_2")}</li>
           <li><i>✓</i>{content("plan_feature_3")}</li>
         </ul>
-        <div className="tpStorePlanProtocols">{protocols.slice(0,5).map(protocol=><span key={protocol}>{protocolMeta[protocol]?.short||protocol}</span>)}</div>
+        <div className="tpStorePlanProtocols">{protocols.slice(0,5).map(protocol=><span key={protocol}>{storeProtocolMeta(protocol)?.short||protocolMeta[protocol]?.short||protocol}</span>)}</div>
         <button className="tpStoreBuyButton" disabled={buying===plan.id} onClick={()=>onBuy(plan)}>{buying===plan.id?pick("در حال ثبت سفارش...","Creating order..."):pick("خرید اشتراک","Buy subscription")}<span>←</span></button>
       </article>;
     })}</div>}
@@ -126,7 +118,7 @@ function Conversion2027Template({settings,plans,loading,error,message,buying,onB
       <h2>{content("protocols_title")}</h2>
       <p>{content("protocols_description")}</p>
     </div>
-    <div className="tpStoreProtocolGrid">{availableProtocols.map(id=>{const protocol=protocolMeta[id];return <article className={`tpStoreProtocolCard ${protocol.tone}`} key={id}><span className="tpStoreProtocolIcon">{protocol.icon}</span><div><h3>{protocol.name}</h3><p>{pick(protocol.fa,protocol.en)}</p></div><span className="tpStoreAvailable">{pick("قابل ارائه","Available")}</span></article>;})}</div>
+    <div className="tpStoreProtocolGrid">{availableProtocols.map(id=>{const protocol=protocolMeta[id];return <article className={`tpStoreProtocolCard ${protocol.tone}`} key={id}><span className="tpStoreProtocolIcon">{protocol.icon}</span><div><h3 dir="ltr">{protocol.name}</h3><p>{pick(protocol.fa,protocol.en)}</p></div><span className="tpStoreAvailable">{pick("قابل ارائه","Available")}</span></article>;})}</div>
   </section>;
 
   const guidesSection=<section className="tpStoreSection" id="guides" key="guides">
@@ -271,7 +263,7 @@ function Conversion2027Template({settings,plans,loading,error,message,buying,onB
         <article><span>⚡</span><div><b>{content("trust_speed_title")}</b><small>{content("trust_speed_description")}</small></div></article>
         <article><span>▥</span><div><b>{content("trust_uptime_value")}</b><small>{content("trust_uptime_description")}</small></div></article>
         <article><span>⌁</span><div><b>{content("trust_support_title")}</b><small>{content("trust_support_description")}</small></div></article>
-        <article><span>◎</span><div><b>{number(availableProtocols.length)}</b><small>{content("trust_protocols_description")}</small></div></article>
+        <article><span>◎</span><div><b>{number(STORE_PROTOCOL_CATALOG.length)}</b><small>{content("trust_protocols_description")}</small></div></article>
         <article><span>✓</span><div><b>{content("trust_payment_title")}</b><small>{content("trust_payment_description")}</small></div></article>
         <article><span>↗</span><div><b>{content("trust_activation_title")}</b><small>{content("trust_activation_description")}</small></div></article>
       </section>
