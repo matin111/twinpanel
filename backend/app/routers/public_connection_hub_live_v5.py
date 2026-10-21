@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from .public_connection_hub_refine_v6 import refine_public_connection_hub_html
 from .public_connection_hub_v5 import public_connection_hub_v5
 
 
@@ -217,6 +218,7 @@ def public_connection_hub_live_v5(
         script + "\n</body>",
         1,
     )
+    source = refine_public_connection_hub_html(source)
 
     return HTMLResponse(
         content=source,
