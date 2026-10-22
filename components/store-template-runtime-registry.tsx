@@ -28,16 +28,16 @@ function editorialThemeStyle(options:StoreTemplateOptionMap){
   return {
     "--ep-theme-primary":option(options,"theme_primary","#8b5cf6"),
     "--ep-theme-secondary":option(options,"theme_secondary","#6366f1"),
-    "--ep-theme-page":option(options,"editorial_page_bg","#0f1014"),
-    "--ep-theme-surface":option(options,"editorial_surface_bg","#15171c"),
-    "--ep-theme-surface-alt":option(options,"editorial_surface_alt","#1b1e24"),
-    "--ep-theme-border":option(options,"editorial_border","#30343b"),
-    "--ep-theme-header":option(options,"editorial_header_bg","#15171c"),
-    "--ep-theme-footer":option(options,"editorial_footer_bg","#0f1014"),
-    "--ep-theme-text":option(options,"editorial_text","#f7f3ec"),
-    "--ep-theme-muted":option(options,"editorial_muted","#a8a29a"),
-    "--ep-theme-button":option(options,"editorial_button_bg","#f7f3ec"),
-    "--ep-theme-button-text":option(options,"editorial_button_text","#0f1014"),
+    "--ep-theme-page":option(options,"editorial_page_bg","#0b0d12"),
+    "--ep-theme-surface":option(options,"editorial_surface_bg","#12151b"),
+    "--ep-theme-surface-alt":option(options,"editorial_surface_alt","#181c24"),
+    "--ep-theme-border":option(options,"editorial_border","#2a303b"),
+    "--ep-theme-header":option(options,"editorial_header_bg","#11141a"),
+    "--ep-theme-footer":option(options,"editorial_footer_bg","#0b0d12"),
+    "--ep-theme-text":option(options,"editorial_text","#f7f8fb"),
+    "--ep-theme-muted":option(options,"editorial_muted","#aeb5c2"),
+    "--ep-theme-button":option(options,"editorial_button_bg","#f7f8fb"),
+    "--ep-theme-button-text":option(options,"editorial_button_text","#0b0d12"),
   } as CSSProperties;
 }
 

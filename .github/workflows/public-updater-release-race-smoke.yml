@@ -26,16 +26,65 @@ jobs:
           assert spec.loader is not None
           spec.loader.exec_module(module)
 
+          def manifest(version):
+              return {
+                  'version': version,
+                  'installable': True,
+                  'published': True,
+              }
+
           assert module.resolve_requested_release('1.1.0-rc.10', '1.1.0-rc.10') == ('1.1.0-rc.10', False)
           assert module.resolve_requested_release('1.1.0-rc.9', '1.1.0-rc.10') == ('1.1.0-rc.10', True)
           assert module.resolve_requested_release('', '1.1.0-rc.10') == ('1.1.0-rc.10', False)
 
+          best = module._best_manifest([
+              manifest('1.1.0-rc.9'),
+              manifest('1.1.0-rc.10'),
+          ])
+          assert best['version'] == '1.1.0-rc.10'
+
+          calls = []
+          sequence = [manifest('1.1.0-rc.9'), manifest('1.1.0-rc.10')]
+
+          def transient_fetcher(_url):
+              calls.append(1)
+              return sequence.pop(0)
+
+          recovered = module.release_manifest_for_request(
+              'https://example.invalid/stable.json',
+              '1.1.0-rc.10',
+              attempts=2,
+              retry_delay=0,
+              fetcher=transient_fetcher,
+          )
+          assert recovered['version'] == '1.1.0-rc.10'
+          assert len(calls) == 2
+
+          stale_calls = []
+
+          def stale_fetcher(_url):
+              stale_calls.append(1)
+              return manifest('1.1.0-rc.9')
+
+          still_stale = module.release_manifest_for_request(
+              'https://example.invalid/stable.json',
+              '1.1.0-rc.10',
+              attempts=3,
+              retry_delay=0,
+              fetcher=stale_fetcher,
+          )
+          assert still_stale['version'] == '1.1.0-rc.9'
+          assert len(stale_calls) == 3
+
           try:
-              module.resolve_requested_release('1.1.0-rc.10', '1.1.0-rc.9')
+              module.resolve_requested_release(
+                  '1.1.0-rc.10',
+                  still_stale['version'],
+              )
           except RuntimeError as exc:
               assert str(exc) == 'REQUESTED_RELEASE_CHANGED'
           else:
-              raise AssertionError('downgrade/older manifest must remain blocked')
+              raise AssertionError('persistent older manifest must remain blocked')
 
           print('UPDATER_RELEASE_RACE_SMOKE_OK')
           PY
