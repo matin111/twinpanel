@@ -75,6 +75,11 @@ jobs:
         env:
           PYTHONPATH: .
         run: pytest -q tests/test_manual_authority_v193.py
+      - name: Prepare writable runtime paths for app import
+        run: |
+          sudo install -d -o "$USER" -g "$USER" -m 700 \
+            /var/lib/twinpanel-backups \
+            /etc/twinpanel
       - name: Verify canonical Agent report wins route order
         working-directory: backend
         env:
