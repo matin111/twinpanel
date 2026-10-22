@@ -68,24 +68,26 @@ state_badge(){
 
 brand_row(){
   printf '  '
-  printf '%b%-5s%b ' "$C_MAGENTA" "$1" "$C_RESET"
-  printf '%b%-5s%b ' "$C_PURPLE" "$2" "$C_RESET"
-  printf '%b%-5s%b ' "$C_BLUE" "$3" "$C_RESET"
-  printf '%b%-5s%b ' "$C_CYAN" "$4" "$C_RESET"
-  printf '%b%-5s%b ' "$C_CYAN" "$5" "$C_RESET"
-  printf '%b%-5s%b ' "$C_BLUE" "$6" "$C_RESET"
-  printf '%b%-5s%b ' "$C_PURPLE" "$7" "$C_RESET"
-  printf '%b%-5s%b ' "$C_MAGENTA" "$8" "$C_RESET"
+  printf '%b%-5s%b  ' "$C_MAGENTA" "$1" "$C_RESET"
+  printf '%b%-5s%b  ' "$C_PURPLE" "$2" "$C_RESET"
+  printf '%b%-5s%b  ' "$C_BLUE" "$3" "$C_RESET"
+  printf '%b%-5s%b  ' "$C_CYAN" "$4" "$C_RESET"
+  printf '%b%-5s%b  ' "$C_CYAN" "$5" "$C_RESET"
+  printf '%b%-5s%b  ' "$C_BLUE" "$6" "$C_RESET"
+  printf '%b%-5s%b  ' "$C_PURPLE" "$7" "$C_RESET"
+  printf '%b%-5s%b  ' "$C_MAGENTA" "$8" "$C_RESET"
   printf '%b%-5s%b\n' "$C_MAGENTA" "$9" "$C_RESET"
 }
 
 brand(){
   printf '\n'
-  brand_row '#####' '#   #' '#####' '#   #' '#### ' ' ### ' '#   #' '#####' '#    '
-  brand_row '  #  ' '#   #' '  #  ' '##  #' '#   #' '#   #' '##  #' '#    ' '#    '
-  brand_row '  #  ' '# # #' '  #  ' '# # #' '#### ' '#####' '# # #' '#### ' '#    '
-  brand_row '  #  ' '## ##' '  #  ' '#  ##' '#    ' '#   #' '#  ##' '#    ' '#    '
-  brand_row '  #  ' '#   #' '#####' '#   #' '#    ' '#   #' '#   #' '#####' '#####'
+  brand_row 'ooooo' 'o   o' 'ooooo' 'o   o' 'oooo ' ' ooo ' 'o   o' 'ooooo' 'o    '
+  brand_row '  o  ' 'o   o' '  o  ' 'oo  o' 'o   o' 'o   o' 'oo  o' 'o    ' 'o    '
+  brand_row '  o  ' 'o   o' '  o  ' 'oo  o' 'o   o' 'o   o' 'oo  o' 'o    ' 'o    '
+  brand_row '  o  ' 'o o o' '  o  ' 'o o o' 'oooo ' 'ooooo' 'o o o' 'oooo ' 'o    '
+  brand_row '  o  ' 'o o o' '  o  ' 'o  oo' 'o    ' 'o   o' 'o  oo' 'o    ' 'o    '
+  brand_row '  o  ' 'oo oo' '  o  ' 'o  oo' 'o    ' 'o   o' 'o  oo' 'o    ' 'o    '
+  brand_row '  o  ' 'o   o' 'ooooo' 'o   o' 'o    ' 'o   o' 'o   o' 'ooooo' 'ooooo'
   printf '\n'
 }
 
