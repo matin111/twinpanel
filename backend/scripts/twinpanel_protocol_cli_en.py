@@ -2,14 +2,43 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 
 from app.database import SessionLocal
+from app.models import NodeProtocolConfig
+from app.modern_protocol_models import ModernProtocolSetting
+from app.protocol_catalog import PROTOCOL_CATALOG
+from app.routers.modern_protocol_admin_v3 import (
+    ModernHealthV3In,
+    ModernInstallV3In,
+    ProtocolProfileIn,
+    health as modern_health,
+    install as modern_install,
+    remove as modern_remove,
+)
 
 try:
-    from .twinpanel_protocol_cli import PROTOCOL_NAMES, PROTOCOL_ORDER, _managed_nodes, _run
+    from .twinpanel_protocol_cli import (
+        PROTOCOL_NAMES as CLASSIC_PROTOCOL_NAMES,
+        PROTOCOL_ORDER as CLASSIC_PROTOCOL_ORDER,
+        _managed_nodes,
+        _run as _run_classic,
+    )
 except ImportError:
-    from twinpanel_protocol_cli import PROTOCOL_NAMES, PROTOCOL_ORDER, _managed_nodes, _run
+    from twinpanel_protocol_cli import (
+        PROTOCOL_NAMES as CLASSIC_PROTOCOL_NAMES,
+        PROTOCOL_ORDER as CLASSIC_PROTOCOL_ORDER,
+        _managed_nodes,
+        _run as _run_classic,
+    )
+
+MODERN_PROTOCOL_ORDER = list(PROTOCOL_CATALOG)
+PROTOCOL_ORDER = [*CLASSIC_PROTOCOL_ORDER, *MODERN_PROTOCOL_ORDER]
+PROTOCOL_NAMES = {
+    **CLASSIC_PROTOCOL_NAMES,
+    **{key: str(PROTOCOL_CATALOG[key]["title"]) for key in MODERN_PROTOCOL_ORDER},
+}
 
 
 def _ascii(value: object) -> str:
@@ -52,13 +81,27 @@ def _read_choice(prompt: str, maximum: int, *, allow_zero: bool = True) -> int:
         print("Invalid selection.")
 
 
+def _read_number(prompt: str, maximum: int, *, allow_zero: bool = True) -> int:
+    while True:
+        raw = input(prompt).strip()
+        if raw.isdigit():
+            value = int(raw)
+            if allow_zero and value == 0:
+                return 0
+            if 1 <= value <= maximum:
+                return value
+        print(f"Invalid selection. Use 0-{maximum}.")
+
+
 def _select_protocol() -> str:
     print("1/3  Protocol")
     for index, protocol in enumerate(PROTOCOL_ORDER, start=1):
-        print(f"  [{index}] {PROTOCOL_NAMES[protocol]}")
-    print("  [0] Back")
+        print(f"  [{index:>2}] {PROTOCOL_NAMES[protocol]}")
+    print("  [ 0] Back")
 
-    choice = _read_choice("Choose: ", len(PROTOCOL_ORDER))
+    # Protocol numbers reach 15, so this page intentionally accepts a complete
+    # numeric value followed by Enter. Server/action pages remain one-key.
+    choice = _read_number("Choose: ", len(PROTOCOL_ORDER))
     if choice == 0:
         raise RuntimeError("CANCELLED")
     return PROTOCOL_ORDER[choice - 1]
@@ -107,12 +150,134 @@ def _confirm_remove(protocol: str, node) -> bool:
     print("\nConfirm remove")
     print(f"  Target   : {target}")
     print(f"  Protocol : {PROTOCOL_NAMES[protocol]}")
-    print("  Backup   : automatic")
+    if protocol in CLASSIC_PROTOCOL_ORDER:
+        print("  Backup   : automatic")
     print()
     print("  [1] Remove")
     print("  [0] Cancel")
     print()
     return _read_choice("Choose: ", 1) == 1
+
+
+def _safe_saved_settings(row: ModernProtocolSetting | None) -> dict:
+    if row is None:
+        return {}
+    try:
+        value = json.loads(row.settings_json or "{}")
+    except Exception:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _modern_install_payload(db, node, protocol: str) -> ModernInstallV3In:
+    status = (
+        db.query(NodeProtocolConfig)
+        .filter(
+            NodeProtocolConfig.node_id == int(node.id),
+            NodeProtocolConfig.protocol == protocol,
+        )
+        .first()
+    )
+    setting = (
+        db.query(ModernProtocolSetting)
+        .filter(
+            ModernProtocolSetting.node_id == int(node.id),
+            ModernProtocolSetting.protocol == protocol,
+        )
+        .first()
+    )
+
+    port = int(
+        status.port
+        if status is not None and status.port
+        else PROTOCOL_CATALOG[protocol]["default_port"]
+    )
+    preset = str(setting.preset_name or "recommended") if setting is not None else "recommended"
+    profile = ProtocolProfileIn(
+        preset=preset,
+        settings=_safe_saved_settings(setting),
+    )
+    return ModernInstallV3In(
+        protocols=[protocol],
+        ports={protocol: port},
+        profiles={protocol: profile},
+    )
+
+
+def _modern_result(protocol: str, action: str, node, payload: dict) -> dict:
+    item = (payload.get("protocols") or {}).get(protocol) or {}
+    ok = bool(payload.get("ok"))
+    detail = item.get("error") or item.get("detail") or item.get("message")
+    if not detail and action in {"repair", "restart"} and ok:
+        detail = "saved profile reapplied"
+    return {
+        "ok": ok,
+        "action": action,
+        "protocol": protocol,
+        "target": "local" if getattr(node, "is_mother", False) else "remote",
+        "service": item.get("service"),
+        "detail": detail,
+        "result": payload,
+    }
+
+
+async def _run_modern(db, node, protocol: str, action: str) -> dict:
+    if action == "status":
+        result = await modern_health(
+            int(node.id),
+            ModernHealthV3In(protocols=[protocol]),
+            db,
+        )
+        return _modern_result(protocol, action, node, result)
+
+    if action == "remove":
+        result = await modern_remove(int(node.id), protocol, db)
+        return {
+            "ok": bool(result.get("ok", True)),
+            "action": action,
+            "protocol": protocol,
+            "target": "local" if getattr(node, "is_mother", False) else "remote",
+            "service": result.get("service"),
+            "detail": result.get("error") or result.get("message"),
+            "result": result,
+        }
+
+    if action in {"install", "repair", "restart"}:
+        if action == "install":
+            try:
+                current = await modern_health(
+                    int(node.id),
+                    ModernHealthV3In(protocols=[protocol]),
+                    db,
+                )
+                current_item = (current.get("protocols") or {}).get(protocol) or {}
+                if current_item.get("ok"):
+                    return {
+                        "ok": True,
+                        "action": action,
+                        "protocol": protocol,
+                        "target": "local" if getattr(node, "is_mother", False) else "remote",
+                        "skipped": True,
+                        "reason": "already_healthy",
+                        "service": current_item.get("service"),
+                        "result": current,
+                    }
+            except Exception:
+                db.rollback()
+
+        install_payload = _modern_install_payload(db, node, protocol)
+        result = await modern_install(int(node.id), install_payload, db)
+        return _modern_result(protocol, action, node, result)
+
+    raise RuntimeError("INVALID_ACTION")
+
+
+async def _run(db, node, protocol: str, action: str) -> dict:
+    if protocol in CLASSIC_PROTOCOL_ORDER:
+        return await _run_classic(db, node, protocol, action)
+    if protocol in MODERN_PROTOCOL_ORDER:
+        return await _run_modern(db, node, protocol, action)
+    raise RuntimeError("INVALID_PROTOCOL")
 
 
 def _friendly_error(exc: Exception) -> str:
@@ -124,6 +289,9 @@ def _friendly_error(exc: Exception) -> str:
     if "invalid transaction" in lowered or "rollback()" in lowered or "pendingrollback" in lowered:
         return "Database transaction was interrupted and rolled back. Retry the action."
 
+    detail = getattr(exc, "detail", None)
+    if detail is not None:
+        return f"ERROR={_ascii(detail)}"
     return f"ERROR={_ascii(exc)}"
 
 
@@ -173,6 +341,7 @@ def main() -> int:
         print("\nCancelled.")
         return 130
     except Exception as exc:
+        db.rollback()
         message = _friendly_error(exc)
         if message == "Cancelled.":
             print(message)
