@@ -37,21 +37,25 @@ jobs:
           smart = Path("backend/app/smart_transport_auto_v21.py").read_text()
 
           assert 'last_install_attempt_epoch' in guard
-          assert 'legacy_offline_rows=immediate_retry' in guard
+          assert 'last_install_attempt_release' in guard
+          assert 'last_install_completed_release' in guard
+          assert 'retry_scope=release_aware' in guard
+          assert 'legacy_or_old_release=immediate_retry' in guard
+          assert 'last_release != current_release' in guard
           assert 'smart._install_candidate_name = install_candidate_name_retry_guard_v169' in guard
           assert 'smart._install_candidate = install_candidate_retry_guard_v169' in guard
 
-          # V169 must never use health telemetry timestamps as its retry clock.
+          # Retry age must never use health telemetry timestamps.
           assert 'row.updated_at' not in guard
           assert 'getattr(row, "updated_at"' not in guard
 
-          # Lock the production root-cause assumption so a future refactor cannot
-          # silently remove the compatibility reason for this guard.
-          assert 'updated = getattr(row, "updated_at", None)' in smart
+          # Same-release attempts still retain the original cooldown.
+          assert 'age < float(smart.INSTALL_RETRY_SECONDS)' in guard
           assert 'INSTALL_RETRY_SECONDS = 1800.0' in smart
 
           # Ordering matters: V165 registers Mieru, V167 protects installing,
-          # then V169 replaces only retry scheduling before qualification loops.
+          # then V169 installs the persistent retry lifecycle before later
+          # qualification/fair-selection layers are applied.
           v165 = manager.index('apply_adaptive_multilane_v165()')
           v167 = manager.index('apply_smart_candidate_install_guard_v167()')
           v169 = manager.index('apply_smart_candidate_retry_guard_v169()')

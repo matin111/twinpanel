@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 
+from . import smart_candidate_retry_guard_v169 as retry_v169
 from . import smart_transport_auto_v21 as smart
 from .database import SessionLocal
 from .models import TunnelTransport
@@ -10,33 +11,13 @@ from .transport_candidates import tp27_mieru_tcp
 
 
 # ============================================================
-# TWINPANEL SMART CANDIDATE FAIR RETRY V171
+# TWINPANEL SMART CANDIDATE FAIR RETRY V171 / V179 CONTRACT
 #
-# Production root causes on Tunnel #5:
-#   * V169 moved reinstall cooldown away from TunnelTransport.updated_at,
-#     but install lifecycle metadata is stored inside config_text.
-#   * Candidate health probes run concurrently and may hold a stale ORM row
-#     loaded before an installer finishes. A later health commit can therefore
-#     write stale config_text and erase last_install_attempt_* fields.
-#   * AUTO_INSTALL_NAMES is ordered. When an earlier candidate loses its retry
-#     clock, it becomes immediately retryable again and can repeatedly win the
-#     selector, starving later candidates such as tp27_mieru_tcp.
-#   * The first real Mieru attempt reached package installation but APT could
-#     not create /tmp/apt.conf.* after dropping privileges to _apt. RC.170
-#     fixed this preflight for Modern Protocol Bulk Sync only; the independent
-#     TP27 Mieru installer still needs the same safe runtime contract.
-#
-# V171 closes all three failure modes without changing TP27 dataplane framing:
-#   * _set_smart_state preserves fresh install lifecycle fields from DB before
-#     every smart-state write, so stale health telemetry cannot erase them;
-#   * installer selection considers all eligible candidates and chooses an
-#     unattempted candidate first, then the oldest attempt;
-#   * original AUTO_INSTALL_NAMES order is only a deterministic tie-breaker;
-#   * Mieru package install runs the verified root-owned /tmp -> 1777 + _apt
-#     write-test preflight before apt-get; unsafe ownership/filesystem states
-#     remain fail-closed;
-#   * online/installing candidates and the V169 1800-second cooldown remain
-#     authoritative.
+# Keeps install lifecycle merge-safe and fair. Eligibility is release-aware:
+# stale failures from an older release count as unattempted for the current
+# release, while repeated failures within the current release retain the full
+# SmartAuto cooldown. This prevents a newly deployed tunnel fix from showing
+# only old panel errors for another 30 minutes.
 # ============================================================
 
 MARKER = "TWINPANEL_SMART_CANDIDATE_FAIR_RETRY_V171"
@@ -44,8 +25,10 @@ MARKER = "TWINPANEL_SMART_CANDIDATE_FAIR_RETRY_V171"
 _LIFECYCLE_KEYS = (
     "last_install_attempt_epoch",
     "last_install_attempt_at",
+    "last_install_attempt_release",
     "last_install_completed_epoch",
     "last_install_completed_at",
+    "last_install_completed_release",
     "last_install_outcome",
 )
 
@@ -70,12 +53,16 @@ def _attempt_epoch(row: TunnelTransport | None) -> float | None:
     return smart._safe_float(state.get("last_install_attempt_epoch"), None)
 
 
-def _fresh_lifecycle(row: TunnelTransport) -> dict:
-    """Read install lifecycle keys from a fresh DB session.
+def _attempt_release(row: TunnelTransport | None) -> str | None:
+    if row is None:
+        return None
+    value = smart._smart_state(row).get("last_install_attempt_release")
+    text = str(value or "").strip()
+    return text or None
 
-    The caller may hold an ORM row loaded before an installer completed. Never
-    trust that stale config_text when writing health/benchmark telemetry.
-    """
+
+def _fresh_lifecycle(row: TunnelTransport) -> dict:
+    """Read lifecycle keys from a fresh DB row before any telemetry write."""
 
     tunnel_id = int(row.tunnel_id)
     transport = _name(row.transport)
@@ -111,7 +98,6 @@ def set_smart_state_merge_safe_v171(
     preserved = _fresh_lifecycle(row)
     effective = dict(preserved)
 
-    # Explicit lifecycle writes from V169 must win over preserved values.
     if merge:
         effective.update(merge)
 
@@ -119,11 +105,12 @@ def set_smart_state_merge_safe_v171(
 
 
 def install_candidate_name_fair_v171(tunnel_id: int) -> str | None:
-    """Choose the fairest eligible candidate using the persistent retry clock."""
+    """Choose unattempted-in-this-release first, then the oldest retry."""
 
     db = SessionLocal()
     try:
         now_epoch = time.time()
+        current_release = retry_v169._current_release()
         eligible: list[tuple[int, float, int, str]] = []
 
         for order, raw_name in enumerate(smart.AUTO_INSTALL_NAMES):
@@ -148,16 +135,23 @@ def install_candidate_name_fair_v171(tunnel_id: int) -> str | None:
                 continue
 
             last_attempt = _attempt_epoch(row)
+            last_release = _attempt_release(row)
 
-            if last_attempt is not None:
-                age = max(0.0, now_epoch - float(last_attempt))
-                if age < float(smart.INSTALL_RETRY_SECONDS):
-                    continue
-
-                eligible.append((1, float(last_attempt), order, name))
+            # Missing row, legacy row, or an attempt made by an older release:
+            # give the current release one immediate validation attempt.
+            if (
+                last_attempt is None
+                or last_release is None
+                or last_release != current_release
+            ):
+                eligible.append((0, float("-inf"), order, name))
                 continue
 
-            eligible.append((0, float("-inf"), order, name))
+            age = max(0.0, now_epoch - float(last_attempt))
+            if age < float(smart.INSTALL_RETRY_SECONDS):
+                continue
+
+            eligible.append((1, float(last_attempt), order, name))
 
         if not eligible:
             return None
@@ -187,7 +181,7 @@ def apply_smart_candidate_fair_retry_v171() -> None:
 
     print(
         f"{MARKER}_ACTIVE "
-        "retry_selector=unattempted_then_oldest "
+        "retry_selector=unattempted_this_release_then_oldest "
         "lifecycle_merge=fresh_db_preserved "
         "mieru_tmp_preflight=root_owned_1777+apt_write "
         "static_order=tiebreak_only",
