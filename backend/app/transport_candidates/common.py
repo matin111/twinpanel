@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import ast
 import asyncio
 import hashlib
 import hmac
+import json
 import os
 import re
 import shlex
@@ -109,6 +111,67 @@ def tunnel_nodes(db: Session, tunnel_id: int) -> tuple[Tunnel, Node, Node]:
     return tunnel, iran, exit_node
 
 
+def _meta_dict(raw: str | None) -> dict[str, Any] | None:
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return {}
+    try:
+        value = json.loads(text)
+        if isinstance(value, dict):
+            return value
+    except Exception:
+        pass
+    try:
+        value = ast.literal_eval(text)
+        if isinstance(value, dict):
+            return value
+    except Exception:
+        pass
+    return None
+
+
+def merge_meta_preserving_smart_auto(existing_raw: str | None, incoming_raw: str) -> str:
+    """Preserve SmartAuto lifecycle state when an installer rewrites metadata.
+
+    Candidate installers own their transport-specific metadata and historically
+    replaced config_text wholesale via mark(..., meta=...). SmartAuto stores its
+    retry/qualification lifecycle under smart_auto_v21 in that same field. A
+    later installer mark could therefore erase last_install_attempt_epoch and
+    make a failed earlier candidate immediately retryable, starving later lanes.
+
+    Only the SmartAuto namespace is carried forward. Transport metadata remains
+    authoritative from the incoming installer payload. Explicit incoming
+    SmartAuto keys win if a future installer intentionally supplies them.
+    """
+
+    incoming = _meta_dict(incoming_raw)
+    existing = _meta_dict(existing_raw)
+
+    if incoming is None:
+        return incoming_raw
+    if not existing:
+        return incoming_raw
+
+    preserved = existing.get("smart_auto_v21")
+    if not isinstance(preserved, dict) or not preserved:
+        return incoming_raw
+
+    explicit = incoming.get("smart_auto_v21")
+    merged_state = dict(preserved)
+    if isinstance(explicit, dict):
+        merged_state.update(explicit)
+
+    incoming["smart_auto_v21"] = merged_state
+    return json.dumps(
+        incoming,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
 def mark(db: Session, tunnel_id: int, name: str, *, status: str, error: str | None = None, latency_ms: int | None = None, enabled: bool = True, meta: str | None = None) -> TunnelTransport:
     row = db.query(TunnelTransport).filter(TunnelTransport.tunnel_id == int(tunnel_id), TunnelTransport.transport == name).first()
     if row is None:
@@ -122,7 +185,7 @@ def mark(db: Session, tunnel_id: int, name: str, *, status: str, error: str | No
     row.latency_ms = latency_ms
     row.updated_at = datetime.utcnow()
     if meta is not None:
-        row.config_text = meta
+        row.config_text = merge_meta_preserving_smart_auto(row.config_text, meta)
     if status == "online":
         row.last_healthy_at = datetime.utcnow()
     db.commit(); db.refresh(row)
