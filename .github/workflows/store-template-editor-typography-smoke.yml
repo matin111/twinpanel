@@ -1,0 +1,72 @@
+name: TwinPanel Store Template Editor Typography Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/store-template-conversion-customizer.module.css'
+      - 'components/store-template-editorial-customizer.module.css'
+      - 'components/store-template-orbit-customizer.module.css'
+      - '.github/workflows/store-template-editor-typography-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'components/store-template-conversion-customizer.module.css'
+      - 'components/store-template-editorial-customizer.module.css'
+      - 'components/store-template-orbit-customizer.module.css'
+      - '.github/workflows/store-template-editor-typography-smoke.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify readable typography scale for template editors
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          checks = {
+              'components/store-template-conversion-customizer.module.css': [
+                  '.identity h1{margin:0;font-size:24px',
+                  '.identity p{margin:5px 0 0;color:var(--muted);font-size:13px',
+                  '.sidebar button{width:100%;min-height:48px',
+                  'font-size:13px;font-weight:750;cursor:pointer',
+                  '.panelHead h2{margin:0;font-size:22px',
+                  '.sectionHead b{font-size:15px',
+                  '.field>span{font-size:12px',
+                  '.fieldHint{display:block;min-height:36px;color:var(--muted);font-size:11px',
+                  'font:inherit;font-size:13px;line-height:1.55;outline:none',
+                  '.toggle span{font-size:13px',
+              ],
+              'components/store-template-editorial-customizer.module.css': [
+                  '.identity h1{margin:0;font-size:24px',
+                  '.identity p{margin:5px 0 0;color:var(--muted);font-size:13px',
+                  '.sidebar button{width:100%;min-height:48px',
+                  'font-size:13px;font-weight:750;cursor:pointer',
+                  '.panelHead h2{margin:0;font-size:22px',
+                  '.sectionHead b{display:block;font-size:15px',
+                  '.field>span{font-size:12px',
+                  '.fieldHint{display:block;min-height:36px;color:var(--muted);font-size:11px',
+                  'font:inherit;font-size:13px;line-height:1.55;outline:none',
+                  '.toggle span{font-size:13px',
+              ],
+          }
+
+          for filename, needles in checks.items():
+              text = Path(filename).read_text(encoding='utf-8')
+              missing = [needle for needle in needles if needle not in text]
+              if missing:
+                  raise SystemExit(f'{filename}: typography contract missing: {missing}')
+
+          orbit = Path('components/store-template-orbit-customizer.module.css').read_text(encoding='utf-8')
+          for needle in (
+              '.panelHead h2{margin:7px 0 6px;font-size:24px',
+              '.field>span{font-size:12px;font-weight:900',
+          ):
+              if needle not in orbit:
+                  raise SystemExit(f'Orbit reference typography changed unexpectedly: {needle}')
+
+          print('Template editor typography smoke passed.')
+          PY
