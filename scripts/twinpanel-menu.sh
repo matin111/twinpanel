@@ -68,26 +68,26 @@ state_badge(){
 
 brand_row(){
   printf '  '
-  printf '%b%-9s%b  ' "$C_MAGENTA" "$1" "$C_RESET"
-  printf '%b%-9s%b  ' "$C_PURPLE" "$2" "$C_RESET"
-  printf '%b%-9s%b  ' "$C_BLUE" "$3" "$C_RESET"
-  printf '%b%-9s%b  ' "$C_CYAN" "$4" "$C_RESET"
-  printf '%b%-9s%b  ' "$C_CYAN" "$5" "$C_RESET"
-  printf '%b%-9s%b  ' "$C_BLUE" "$6" "$C_RESET"
-  printf '%b%-9s%b  ' "$C_PURPLE" "$7" "$C_RESET"
-  printf '%b%-9s%b  ' "$C_MAGENTA" "$8" "$C_RESET"
-  printf '%b%-9s%b\n' "$C_MAGENTA" "$9" "$C_RESET"
+  printf '%b%-7s%b  ' "$C_MAGENTA" "$1" "$C_RESET"
+  printf '%b%-7s%b  ' "$C_PURPLE" "$2" "$C_RESET"
+  printf '%b%-7s%b  ' "$C_BLUE" "$3" "$C_RESET"
+  printf '%b%-7s%b  ' "$C_CYAN" "$4" "$C_RESET"
+  printf '%b%-7s%b  ' "$C_CYAN" "$5" "$C_RESET"
+  printf '%b%-7s%b  ' "$C_BLUE" "$6" "$C_RESET"
+  printf '%b%-7s%b  ' "$C_PURPLE" "$7" "$C_RESET"
+  printf '%b%-7s%b  ' "$C_MAGENTA" "$8" "$C_RESET"
+  printf '%b%-7s%b\n' "$C_MAGENTA" "$9" "$C_RESET"
 }
 
 brand(){
   printf '\n'
-  brand_row '* * * * *' '*       *' '* * * * *' '*       *' '* * * *  ' '  * * *  ' '*       *' '* * * * *' '*        '
-  brand_row '    *    ' '*       *' '    *    ' '* *     *' '*       *' '*       *' '* *     *' '*        ' '*        '
-  brand_row '    *    ' '*       *' '    *    ' '* *     *' '*       *' '*       *' '* *     *' '*        ' '*        '
-  brand_row '    *    ' '*   *   *' '    *    ' '*   *   *' '* * * *  ' '* * * * *' '*   *   *' '* * * *  ' '*        '
-  brand_row '    *    ' '*   *   *' '    *    ' '*     * *' '*        ' '*       *' '*     * *' '*        ' '*        '
-  brand_row '    *    ' '* *   * *' '    *    ' '*     * *' '*        ' '*       *' '*     * *' '*        ' '*        '
-  brand_row '    *    ' '*       *' '* * * * *' '*       *' '*        ' '*       *' '*       *' '* * * * *' '* * * * *'
+  brand_row '#######' '##   ##' '#######' '##   ##' '###### ' ' ##### ' '##   ##' '#######' '##     '
+  brand_row '  ###  ' '##   ##' '  ###  ' '###  ##' '##   ##' '##   ##' '###  ##' '##     ' '##     '
+  brand_row '  ###  ' '##   ##' '  ###  ' '#### ##' '##   ##' '##   ##' '#### ##' '##     ' '##     '
+  brand_row '  ###  ' '## # ##' '  ###  ' '## ####' '###### ' '#######' '## ####' '###### ' '##     '
+  brand_row '  ###  ' '#######' '  ###  ' '##  ###' '##     ' '##   ##' '##  ###' '##     ' '##     '
+  brand_row '  ###  ' '### ###' '  ###  ' '##   ##' '##     ' '##   ##' '##   ##' '##     ' '##     '
+  brand_row '  ###  ' '##   ##' '#######' '##   ##' '##     ' '##   ##' '##   ##' '#######' '#######'
   printf '\n'
 }
 
