@@ -23,23 +23,31 @@ jobs:
 
       - name: Validate candidate/source contract
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
         run: |
           set -Eeuo pipefail
           python3 - <<'PY'
           import json
+          import os
           import re
           import subprocess
           from pathlib import Path
 
-          candidate = json.loads(Path('releases/candidate.json').read_text(encoding='utf-8'))
-          version = str(candidate.get('version') or '').strip()
+          candidate_path = 'releases/candidate.json'
+          candidate = json.loads(Path(candidate_path).read_text(encoding='utf-8'))
+          candidate_version = str(candidate.get('version') or '').strip()
           source_sha = str(candidate.get('source_sha') or '').strip().lower()
           current_version = Path('VERSION').read_text(encoding='utf-8').strip()
           notes = candidate.get('notes') or {}
 
-          assert re.fullmatch(r'1\.1\.0-rc\.\d+', version), version
+          assert re.fullmatch(r'1\.1\.0-rc\.\d+', current_version), current_version
+          assert re.fullmatch(r'1\.1\.0-rc\.\d+', candidate_version), candidate_version
           assert re.fullmatch(r'[0-9a-f]{40}', source_sha), source_sha
-          assert version == current_version, (version, current_version)
           assert str(notes.get('fa') or '').strip(), 'missing fa release notes'
           assert str(notes.get('en') or '').strip(), 'missing en release notes'
 
@@ -48,7 +56,29 @@ jobs:
               ['git', 'show', f'{source_sha}:VERSION'],
               text=True,
           ).strip()
-          assert source_version == version, (source_version, version)
+          assert source_version == candidate_version, (source_version, candidate_version)
+
+          event_name = os.environ.get('EVENT_NAME', '').strip()
+          if event_name == 'pull_request':
+              base_sha = os.environ.get('PR_BASE_SHA', '').strip()
+              head_sha = os.environ.get('PR_HEAD_SHA', '').strip()
+          else:
+              base_sha = os.environ.get('PUSH_BEFORE_SHA', '').strip()
+              head_sha = os.environ.get('PUSH_HEAD_SHA', '').strip()
+
+          candidate_changed = True
+          if re.fullmatch(r'[0-9a-f]{40}', base_sha or '') and re.fullmatch(r'[0-9a-f]{40}', head_sha or '') and base_sha != '0' * 40:
+              changed = subprocess.check_output(
+                  ['git', 'diff', '--name-only', base_sha, head_sha],
+                  text=True,
+              ).splitlines()
+              candidate_changed = candidate_path in {item.strip() for item in changed}
+
+          if candidate_changed:
+              assert candidate_version == current_version, (candidate_version, current_version)
+              print('RELEASE_CANDIDATE_STAGE=CANDIDATE')
+          else:
+              print('RELEASE_CANDIDATE_STAGE=VERSION_ONLY_OR_WORKFLOW')
 
           print('RELEASE_CANDIDATE_MANIFEST_SMOKE_OK')
           PY
