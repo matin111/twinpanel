@@ -42,4 +42,6 @@ jobs:
             scripts/subscription_delivery_policy_v1_smoke.py
       - name: Run delivery policy smoke
         working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg2://twinpanel_smoke:twinpanel_smoke@127.0.0.1:1/twinpanel_smoke
         run: PYTHONPATH=. python ../scripts/subscription_delivery_policy_v1_smoke.py
