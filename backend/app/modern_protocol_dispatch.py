@@ -3,6 +3,12 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+from .modern_protocol_preflight import (
+    compact_occupancy,
+    ensure_runtime_environment,
+    find_available_port,
+    port_occupancy,
+)
 from .modern_protocol_runtime_v2 import (
     SINGBOX_PROTOCOLS as _SINGBOX_PROTOCOLS,
     ModernRuntimeV2Error,
@@ -11,6 +17,7 @@ from .modern_protocol_runtime_v2 import (
     redacted_preview as _singbox_preview,
     remove_profile as _remove_singbox_profile,
 )
+from .protocol_catalog import PROTOCOL_CATALOG
 from .singbox_service_runtime import ensure_singbox_service_unit
 from .standalone_protocol_runtime import (
     STANDALONE_PROTOCOLS,
@@ -93,6 +100,101 @@ async def _wait_for_standalone_health(
     }
 
 
+async def _preinstall_health(
+    conn,
+    protocol: str,
+    port: int,
+) -> dict[str, Any]:
+    try:
+        if protocol in _SINGBOX_PROTOCOLS:
+            return await _singbox_health(conn, protocol, port)
+        if protocol in STANDALONE_PROTOCOLS:
+            return await standalone_health(conn, protocol, port)
+    except Exception:
+        pass
+    return {"ok": False, "protocol": protocol, "port": port}
+
+
+def _occupancy_matches_managed_runtime(
+    protocol: str,
+    occupied: dict[str, str],
+) -> bool:
+    text = " ".join(occupied.values()).lower()
+    if protocol in _SINGBOX_PROTOCOLS:
+        return "twinpanel-sing" in text or "sing-box" in text
+    if protocol == "mieru":
+        return "mita" in text
+    if protocol == "trusttunnel":
+        return "trusttunnel" in text
+    if protocol == "sudoku":
+        return "twinpanel-sudok" in text or "sudoku" in text
+    # AmneziaWG is a kernel WireGuard-style listener and ss may not expose a
+    # users:(...) owner. Its service+listener health result is authoritative.
+    if protocol == "amneziawg":
+        return True
+    return False
+
+
+async def _reconcile_install_ports(
+    conn,
+    profiles: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Resolve real socket conflicts only for multi-protocol bulk apply.
+
+    Single-profile apply preserves the operator-selected port and fails with an
+    explicit conflict. Bulk Sync is an auto-reconcile operation, so an occupied
+    port owned by another runtime is moved to a deterministic free fallback.
+    TCP and UDP are checked independently; an Xray TCP listener on 8444 does
+    not block Hysteria2 UDP 8444.
+    """
+
+    auto_resolve = len(profiles) > 1
+    reserved = {
+        int(item["port"])
+        for item in profiles
+        if item.get("port") is not None
+    }
+    remaps: dict[str, dict[str, Any]] = {}
+
+    for profile in profiles:
+        protocol = str(profile.get("protocol") or "").strip().lower()
+        port = int(profile.get("port") or PROTOCOL_CATALOG[protocol]["default_port"])
+        transport = str(PROTOCOL_CATALOG[protocol]["transport"])
+        occupied = await port_occupancy(conn, port, transport)
+        if not occupied:
+            continue
+
+        current = await _preinstall_health(conn, protocol, port)
+        if bool(current.get("ok")) and _occupancy_matches_managed_runtime(
+            protocol,
+            occupied,
+        ):
+            continue
+
+        if not auto_resolve:
+            raise ModernRuntimeV2Error(
+                f"port_conflict:{protocol}:{port}:{compact_occupancy(occupied)}"
+            )
+
+        replacement = await find_available_port(
+            conn,
+            port,
+            transport,
+            reserved_ports=reserved,
+        )
+        profile["port"] = replacement
+        reserved.add(replacement)
+        remaps[protocol] = {
+            "from": port,
+            "to": replacement,
+            "transport": transport,
+            "reason": "listener_conflict",
+            "owner": compact_occupancy(occupied),
+        }
+
+    return remaps
+
+
 async def apply_profiles(conn, node, profiles: list[dict[str, Any]]) -> dict[str, Any]:
     singbox_profiles = [
         item for item in profiles
@@ -110,7 +212,16 @@ async def apply_profiles(conn, node, profiles: list[dict[str, Any]]) -> dict[str
         ]
         raise ModernRuntimeV2Error(f"protocol runtime is not available: {', '.join(unknown)}")
 
-    result: dict[str, Any] = {"core": {}, "protocols": {}}
+    environment = await ensure_runtime_environment(conn)
+    port_remaps = await _reconcile_install_ports(conn, profiles)
+
+    result: dict[str, Any] = {
+        "core": {
+            "preflight": environment,
+            "port_remaps": port_remaps,
+        },
+        "protocols": {},
+    }
     if singbox_profiles:
         await ensure_singbox_service_unit(conn)
         singbox = await _apply_singbox_profiles(conn, node, singbox_profiles)
