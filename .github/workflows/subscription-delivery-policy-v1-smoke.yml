@@ -9,6 +9,7 @@ on:
       - "backend/app/subscription_enforcement.py"
       - "backend/app/main.py"
       - "scripts/subscription_delivery_policy_v1_smoke.py"
+      - "scripts/subscription_delivery_policy_v1_smoke_runner.py"
       - ".github/workflows/subscription-delivery-policy-v1-smoke.yml"
   push:
     branches: [main]
@@ -19,6 +20,7 @@ on:
       - "backend/app/subscription_enforcement.py"
       - "backend/app/main.py"
       - "scripts/subscription_delivery_policy_v1_smoke.py"
+      - "scripts/subscription_delivery_policy_v1_smoke_runner.py"
       - ".github/workflows/subscription-delivery-policy-v1-smoke.yml"
 
 jobs:
@@ -39,9 +41,8 @@ jobs:
           python -m py_compile \
             backend/app/subscription_delivery_policy_v1.py \
             backend/app/routers/subscription_delivery_policy_v1.py \
-            scripts/subscription_delivery_policy_v1_smoke.py
+            scripts/subscription_delivery_policy_v1_smoke.py \
+            scripts/subscription_delivery_policy_v1_smoke_runner.py
       - name: Run delivery policy smoke
         working-directory: backend
-        env:
-          DATABASE_URL: postgresql+psycopg2://twinpanel_smoke:twinpanel_smoke@127.0.0.1:1/twinpanel_smoke
-        run: PYTHONPATH=. python ../scripts/subscription_delivery_policy_v1_smoke.py
+        run: PYTHONPATH=. python ../scripts/subscription_delivery_policy_v1_smoke_runner.py
