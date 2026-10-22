@@ -54,13 +54,54 @@ func TestIncidentICMPPreferredLanes(t *testing.T) {
 	}
 }
 
+func TestNewLaneRequiresHeartbeatPong(t *testing.T) {
+	conn := &fakeConn{}
+	lane := newLaneConn(1, conn)
+	if lane.healthy() {
+		t.Fatal("new lane must not carry payload before a real heartbeat pong")
+	}
+	if lane.expired(time.Now()) {
+		t.Fatal("new unverified lane must receive startup grace")
+	}
+	lane.markPong()
+	if !lane.healthy() {
+		t.Fatal("lane should become payload-eligible after heartbeat pong")
+	}
+}
+
+func TestForwardPacketSkipsUnverifiedPreferredLane(t *testing.T) {
+	packet := ipv4ICMP([4]byte{10, 254, 0, 21}, [4]byte{10, 254, 0, 22})
+	lanes := newLaneSet()
+	unverified := &fakeConn{}
+	fallback := &fakeConn{}
+
+	preferred := lanes.set(1, unverified)
+	good := lanes.set(2, fallback)
+	good.markPong()
+
+	if !forwardPacket(lanes, 8, packet) {
+		t.Fatal("packet was not sent on verified fallback lane")
+	}
+	if preferred.closed.Load() {
+		t.Fatal("unverified lane inside startup grace must not be closed by forwarding")
+	}
+	if unverified.buf.Len() != 0 {
+		t.Fatalf("unverified preferred lane received %d bytes", unverified.buf.Len())
+	}
+	if fallback.buf.Len() != 4+len(packet) {
+		t.Fatalf("verified fallback frame length=%d, want %d", fallback.buf.Len(), 4+len(packet))
+	}
+}
+
 func TestForwardPacketRetriesNextHealthyLane(t *testing.T) {
 	packet := ipv4ICMP([4]byte{10, 254, 0, 21}, [4]byte{10, 254, 0, 22})
 	lanes := newLaneSet()
 	bad := &fakeConn{fail: true}
 	good := &fakeConn{}
-	lanes.set(1, bad)
-	lanes.set(2, good)
+	badLane := lanes.set(1, bad)
+	goodLane := lanes.set(2, good)
+	badLane.markPong()
+	goodLane.markPong()
 
 	if !forwardPacket(lanes, 8, packet) {
 		t.Fatal("packet was not retried on fallback lane")

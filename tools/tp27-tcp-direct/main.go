@@ -26,16 +26,17 @@ const (
 	tunSetIFF = 0x400454ca
 	iffTun    = 0x0001
 	iffNoPI   = 0x1000
-	magic     = "TP27TCP2"
+	magic     = "TP27TCP3"
 	maxPacket = 65535
 
 	framePing uint32 = 0
 	framePong uint32 = ^uint32(0)
 
-	heartbeatInterval = 1 * time.Second
-	heartbeatTimeout  = 4 * time.Second
-	writeTimeout      = 1500 * time.Millisecond
-	tcpUserTimeoutMS  = 6000
+	heartbeatInterval       = 1 * time.Second
+	startupHeartbeatTimeout = 8 * time.Second
+	heartbeatTimeout        = 12 * time.Second
+	writeTimeout            = 2500 * time.Millisecond
+	tcpUserTimeoutMS        = 20000
 )
 
 type ifreqFlags struct {
@@ -45,17 +46,17 @@ type ifreqFlags struct {
 }
 
 type laneConn struct {
-	id       int
-	conn     net.Conn
-	writeMu  sync.Mutex
-	lastPong atomic.Int64
-	closed   atomic.Bool
+	id        int
+	conn      net.Conn
+	writeMu   sync.Mutex
+	createdAt time.Time
+	lastPong  atomic.Int64
+	verified  atomic.Bool
+	closed    atomic.Bool
 }
 
 func newLaneConn(id int, c net.Conn) *laneConn {
-	lane := &laneConn{id: id, conn: c}
-	lane.lastPong.Store(time.Now().UnixNano())
-	return lane
+	return &laneConn{id: id, conn: c, createdAt: time.Now()}
 }
 
 func (l *laneConn) close() {
@@ -68,7 +69,7 @@ func (l *laneConn) close() {
 }
 
 func (l *laneConn) healthy() bool {
-	if l == nil || l.conn == nil || l.closed.Load() {
+	if l == nil || l.conn == nil || l.closed.Load() || !l.verified.Load() {
 		return false
 	}
 	stamp := l.lastPong.Load()
@@ -78,8 +79,22 @@ func (l *laneConn) healthy() bool {
 	return time.Since(time.Unix(0, stamp)) <= heartbeatTimeout
 }
 
+func (l *laneConn) expired(now time.Time) bool {
+	if l == nil || l.conn == nil || l.closed.Load() {
+		return true
+	}
+	stamp := l.lastPong.Load()
+	if stamp <= 0 {
+		return now.Sub(l.createdAt) > startupHeartbeatTimeout
+	}
+	return now.Sub(time.Unix(0, stamp)) > heartbeatTimeout
+}
+
 func (l *laneConn) markPong() {
 	l.lastPong.Store(time.Now().UnixNano())
+	if l.verified.CompareAndSwap(false, true) {
+		log.Printf("lane verified=%d", l.id)
+	}
 }
 
 func writeFull(w io.Writer, data []byte) error {
@@ -173,6 +188,18 @@ func (s *laneSet) count() int {
 	s.mu.RLock()
 	n := len(s.lanes)
 	s.mu.RUnlock()
+	return n
+}
+
+func (s *laneSet) healthyCount() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	n := 0
+	for _, lane := range s.lanes {
+		if lane.healthy() {
+			n++
+		}
+	}
 	return n
 }
 
@@ -280,9 +307,6 @@ func setTCPOptions(c net.Conn) {
 	_ = tcp.SetReadBuffer(4 * 1024 * 1024)
 	_ = tcp.SetWriteBuffer(4 * 1024 * 1024)
 
-	// Linux TCP_USER_TIMEOUT (option 18) bounds how long unacknowledged data may
-	// remain outstanding. This is a backup to the end-to-end TP27 heartbeat and
-	// prevents an ESTABLISHED-but-dead lane from lingering for minute-scale RTOs.
 	if raw, err := tcp.SyscallConn(); err == nil {
 		_ = raw.Control(func(fd uintptr) {
 			_ = syscall.SetsockoptInt(int(fd), syscall.IPPROTO_TCP, 18, tcpUserTimeoutMS)
@@ -326,29 +350,41 @@ func receiveFrames(lane *laneConn, tun *os.File, tunWriteMu *sync.Mutex) error {
 }
 
 func heartbeatLoop(lane *laneConn) {
+	sendPing := func() bool {
+		if err := lane.writeControl(framePing); err != nil {
+			log.Printf("lane unhealthy=%d reason=heartbeat_write error=%v", lane.id, err)
+			lane.close()
+			return false
+		}
+		return true
+	}
+
+	if !sendPing() {
+		return
+	}
+
 	ticker := time.NewTicker(heartbeatInterval)
 	defer ticker.Stop()
 	for range ticker.C {
 		if lane.closed.Load() {
 			return
 		}
-		if !lane.healthy() {
-			log.Printf("lane unhealthy=%d reason=heartbeat_timeout", lane.id)
+		if lane.expired(time.Now()) {
+			reason := "heartbeat_timeout"
+			if !lane.verified.Load() {
+				reason = "heartbeat_startup_timeout"
+			}
+			log.Printf("lane unhealthy=%d reason=%s", lane.id, reason)
 			lane.close()
 			return
 		}
-		if err := lane.writeControl(framePing); err != nil {
-			log.Printf("lane unhealthy=%d reason=heartbeat_write error=%v", lane.id, err)
-			lane.close()
+		if !sendPing() {
 			return
 		}
 	}
 }
 
 func flowHash(packet []byte) uint32 {
-	// FNV-1a over stable IPv4/IPv6 flow fields. Packets remain on their preferred
-	// lane while it is healthy; a stalled lane is closed and the flow migrates
-	// atomically to the next healthy lane rather than being pinned to kernel RTO.
 	var data []byte
 	if len(packet) >= 20 && packet[0]>>4 == 4 {
 		ihl := int(packet[0]&0x0f) * 4
@@ -383,6 +419,7 @@ func flowHash(packet []byte) uint32 {
 
 func forwardPacket(lanes *laneSet, laneCount int, packet []byte) bool {
 	preferred := int(flowHash(packet) % uint32(laneCount))
+	now := time.Now()
 	for i := 0; i < laneCount; i++ {
 		id := (preferred + i) % laneCount
 		lane := lanes.get(id)
@@ -390,8 +427,10 @@ func forwardPacket(lanes *laneSet, laneCount int, packet []byte) bool {
 			continue
 		}
 		if !lane.healthy() {
-			lane.close()
-			lanes.remove(id, lane)
+			if lane.expired(now) {
+				lane.close()
+				lanes.remove(id, lane)
+			}
 			continue
 		}
 		if err := lane.writePacket(packet); err == nil {
@@ -408,6 +447,10 @@ func forwardPacket(lanes *laneSet, laneCount int, packet []byte) bool {
 func tunToNetwork(tun *os.File, lanes *laneSet, laneCount int) {
 	buf := make([]byte, maxPacket)
 	for {
+		for lanes.healthyCount() == 0 {
+			time.Sleep(25 * time.Millisecond)
+		}
+
 		n, err := tun.Read(buf)
 		if err != nil {
 			log.Fatalf("tun read: %v", err)
@@ -420,10 +463,7 @@ func tunToNetwork(tun *os.File, lanes *laneSet, laneCount int) {
 			continue
 		}
 
-		// Give reconnecting lanes a short bounded chance without blocking the TUN
-		// for the previous five-second per-lane deadline. Inner TCP can retransmit
-		// if no lane becomes healthy during this small grace period.
-		deadline := time.Now().Add(250 * time.Millisecond)
+		deadline := time.Now().Add(1500 * time.Millisecond)
 		for time.Now().Before(deadline) {
 			time.Sleep(10 * time.Millisecond)
 			if forwardPacket(lanes, laneCount, packet) {
@@ -503,9 +543,10 @@ func runClient(peer string, laneCount int, tokenHash []byte, tun *os.File) error
 		go clientLaneLoop(peer, lane, laneCount, tokenHash, tun, lanes, &tunWriteMu)
 	}
 	go tunToNetwork(tun, lanes, laneCount)
-	for lanes.count() == 0 {
-		time.Sleep(100 * time.Millisecond)
+	for lanes.healthyCount() == 0 {
+		time.Sleep(50 * time.Millisecond)
 	}
+	log.Printf("client ready verified_lanes=%d protocol=%s", lanes.healthyCount(), magic)
 	select {}
 }
 
