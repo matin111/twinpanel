@@ -21,6 +21,9 @@ from .adaptive_tunnel_performance_v148 import (
 from .candidate_dataplane_v175 import (
     apply_candidate_dataplane_v175,
 )
+from .direct_tcp_rpfilter_guard_v198 import (
+    apply_direct_tcp_rpfilter_guard_v198,
+)
 from .exit_access_dataplane_stability_v144 import (
     apply_exit_access_dataplane_stability_v144,
 )
@@ -59,6 +62,7 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 # + SMART CANDIDATE FAIR RETRY V171
 # + CANDIDATE DATAPLANE V175
 # + ADAPTIVE CANDIDATE QUALIFICATION V155
+# + DIRECT TCP RPFILTER SHADOW GUARD V198
 # + RUNTIME RECONCILER V5 (extends runtime_reconciler_v4)
 # ============================================================
 
@@ -75,6 +79,7 @@ async def main() -> None:
     apply_smart_candidate_fair_retry_v171()
     apply_candidate_dataplane_v175()
     apply_adaptive_candidate_qualification_v155()
+    apply_direct_tcp_rpfilter_guard_v198()
     apply_adaptive_tunnel_performance_v148()
     apply_exit_access_dataplane_stability_v144()
 
@@ -93,6 +98,7 @@ async def main() -> None:
         "smart_candidate_fair_retry=v171 "
         "candidate_dataplane=v175 "
         "adaptive_candidate_qualification=v155 "
+        "direct_tcp_rpfilter_guard=v198 "
         "vpn_access_dataplane=v46 "
         "vpn_access_performance=v51 "
         "exit_access_stability=v144 "
