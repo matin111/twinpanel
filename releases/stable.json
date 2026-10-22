@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.201",
+  "version": "1.1.0-rc.202",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-22T19:38:49Z",
+  "released_at": "2026-10-22T20:53:49Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7a22d3c1203bcacdbbb26d3b8c65a89baf7a1a10",
+  "source_sha": "27e1017e67e3c3b246a4c98795eafcf987ee3b3b",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.201/twinpanel-1.1.0-rc.201-linux-x86_64.tar.gz",
-    "sha256": "2890be4d161340ddfb20393b373aeeaf39650ef83b9200000b0176e78fe17261",
-    "size_bytes": 18213437
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.202/twinpanel-1.1.0-rc.202-linux-x86_64.tar.gz",
+    "sha256": "77f8480a7ea6dec3bc9cb3cfc1eeafdc507c1918608a179df2c9a705be5de38d",
+    "size_bytes": 20603697
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.201 اصلاح ترتیب Runtime برای Recovery نصب Candidateهای گیرکرده را منتشر می‌کند. در rc.200 خود V200 Load می‌شد و Marker ACTIVE چاپ می‌کرد، اما بعد از آن V155 همان smart._install_candidate_name را دوباره با selector خودش جایگزین می‌کرد؛ در نتیجه V200 عملاً از مسیر اجرا خارج می‌شد و Rowهای قدیمی در وضعیت installing بازیابی نمی‌شدند. در rc.201، V175 و سپس V155 و Guard V198 ابتدا Apply می‌شوند و V200 در پایان به‌عنوان final install-selector wrapper نصب می‌شود؛ بنابراین نصب‌های installing متعلق به Release قبلی می‌توانند فوراً به installer رسمی موجود برگردند، در حالی که selector نهایی V155 برای تمام Candidateهای غیر-stale به‌عنوان fallback حفظ می‌شود. منطق V198 برای اعمال rp_filter=2 روی TUN ایران و خارج قبل از peer-L3 qualification بدون تغییر باقی مانده است. هیچ Reset مستقیم DB، تغییر Route/NAT/Firewall، حذف Transport، تغییر TP27 Fast، Manual authority، Auth، Payment، Quota، Provisioning یا VPN در این نسخه انجام نشده است. پذیرش نهایی منوط به نصب رسمی روی 217.179.6.142 و مشاهده واقعی [StaleCandidateInstallV200] RECOVER و سپس نتیجه installer و peer-L3/dataplane است.",
-    "en": "TwinPanel 1.1.0-rc.201 publishes the runtime ordering fix for stale candidate-install recovery. In rc.200 V200 loaded and printed its ACTIVE marker, but V155 was applied afterwards and replaced the same smart._install_candidate_name selector, shadowing V200 from the runtime path so old installing rows were never recovered. In rc.201, V175, V155 and the V198 Direct TCP guard are applied first, then V200 is installed last as the final install-selector wrapper. Previous-release stale installing rows can therefore re-enter the existing official installer immediately, while V155's final selector remains the fallback authority for every non-stale candidate. V198 remains unchanged and still applies rp_filter=2 on both Iran and Exit Direct TCP TUNs before peer-L3 qualification. This release performs no direct DB reset, Route/NAT/Firewall change, transport removal, TP27 Fast change, Manual authority change, Auth, Payment, Quota, Provisioning or VPN change. Final acceptance still requires official installation on 217.179.6.142, an observed [StaleCandidateInstallV200] RECOVER event, and the resulting installer plus peer-L3/dataplane outcome."
+    "fa": "TwinPanel 1.1.0-rc.202 هسته Spoof Tunnel را به‌صورت Candidate جدید `spoof_wg` اضافه می‌کند. این مسیر از هسته pin‌شده ParsaKSH/spoof-tunnel v3.1.0-beta.0 به‌عنوان outer carrier و یک WireGuard /30 واقعی به‌عنوان L3 داخلی استفاده می‌کند؛ نصب فقط پس از ثبت صریح Spoof IPv4 برای هر دو نود ایران و خارج مجاز است و نسل اول عمداً از Raw Socket استفاده می‌کند و XDP غیرفعال است. قبل از انتخاب، مسیر باید full L3 probe فعلی TwinPanel را پاس کند. `tp27_fast` بدون تغییر مسیر تولید اصلی باقی می‌ماند و از حذف UI محافظت می‌شود. `tp27_masque`، `tp27_mieru_tcp` و `tp27_tcp_direct` از install/ranking/promotion فعال بازنشسته شده‌اند، اما runtime/uninstall handlerهای آن‌ها برای cleanup رسمی سرویس‌های قدیمی حفظ شده‌اند. Candidateهای تولیدی نهایی `tp27_fast` و `spoof_wg` هستند و Spoof بدون تنظیمات صریح auto-install نمی‌شود. هسته upstream با نسخه و SHA256 pin شده و همراه artifact TwinPanel بسته‌بندی می‌شود و attribution مجوز Apache-2.0 حفظ شده است. این نسخه هیچ ادعایی درباره موفقیت Production Spoof WG ندارد تا روی سرور واقعی 217.179.6.142 نصب، Preflight/Raw-Socket، WireGuard peer-L3 و full shared probe با موفقیت تأیید شوند.",
+    "en": "TwinPanel 1.1.0-rc.202 adds the Spoof Tunnel core as a new `spoof_wg` candidate. It uses the pinned ParsaKSH/spoof-tunnel v3.1.0-beta.0 core as the outer carrier around a real WireGuard /30 L3 link. Installation is fail-closed until explicit spoof IPv4 values are configured for both Iran and Exit nodes; the first generation deliberately uses the raw-socket path with XDP disabled. The candidate must pass TwinPanel's existing full L3 probe before selection. `tp27_fast` remains the unchanged production path and is protected from UI removal. `tp27_masque`, `tp27_mieru_tcp`, and `tp27_tcp_direct` are retired from active install/ranking/promotion, while their runtime/uninstall handlers remain available for official cleanup of legacy services. The final production candidate set is `tp27_fast` plus `spoof_wg`, and Spoof never auto-installs without explicit configuration. The upstream core is version/SHA256 pinned and packaged with the TwinPanel artifact with Apache-2.0 attribution preserved. This release does not claim Spoof WG production success until official installation on 217.179.6.142 verifies preflight/raw-socket capability, WireGuard peer-L3, and the full shared probe."
   }
 }
