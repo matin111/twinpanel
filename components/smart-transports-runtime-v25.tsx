@@ -5,7 +5,13 @@ import {useEffect,useMemo,useState} from "react";
 import {Badge,Card,Shell,Stat} from "./ui";
 import {legacyControlApi} from "../lib/legacy-control-api";
 import {tunnelTransportApi,type TunnelTransportRow,type TunnelTransportState} from "../lib/tunnel-transport-api";
-import {modernTransportApi,type SmartTransportCandidate,type SmartTransportName,type SmartTransportState} from "../lib/modern-transport-api";
+import {
+  modernTransportApi,
+  type SmartTransportCandidate,
+  type SmartTransportName,
+  type SmartTransportState,
+  type SpoofCompatibilityResult,
+} from "../lib/modern-transport-api";
 import {useI18n} from "../lib/i18n";
 
 const labels:Record<string,string>={
@@ -58,6 +64,7 @@ export function SmartTransportsRuntimeV25(){
   const [success,setSuccess]=useState("");
   const [iranSpoofIp,setIranSpoofIp]=useState("");
   const [exitSpoofIp,setExitSpoofIp]=useState("");
+  const [spoofCompatibility,setSpoofCompatibility]=useState<SpoofCompatibilityResult|null>(null);
 
   const loadTunnels=async()=>{
     const rows=await legacyControlApi.tunnels();
@@ -91,6 +98,7 @@ export function SmartTransportsRuntimeV25(){
   useEffect(()=>{void loadTunnels().catch(reason=>{setError(reason instanceof Error?reason.message:String(reason));setLoading(false);});},[]);
   useEffect(()=>{
     if(!selected)return;
+    setSpoofCompatibility(null);
     void loadState(selected);
     const timer=window.setInterval(()=>void loadState(selected,true),10000);
     return()=>window.clearInterval(timer);
@@ -152,11 +160,34 @@ export function SmartTransportsRuntimeV25(){
     void run("spoof-config",pick("تنظیمات Spoof Tunnel ذخیره شد.","Spoof Tunnel configuration saved."),()=>modernTransportApi.configureSpoof(selected,{iran_spoof_ip:iran,exit_spoof_ip:exit}));
   };
 
+  const checkSpoofCompatibility=async()=>{
+    if(!selected||busy)return;
+    setBusy("spoof-compatibility");
+    setError("");
+    setSuccess("");
+    try{
+      const result=await modernTransportApi.checkSpoofCompatibility(selected);
+      setSpoofCompatibility(result);
+      setSuccess(
+        result.compatible
+          ?pick("زیرساخت هر دو نود برای اجرای هسته Spoof/WireGuard آماده است.","Both nodes satisfy the Spoof/WireGuard host prerequisites.")
+          :pick("بررسی تمام شد؛ بعضی پیش‌نیازهای سرور نیاز به اصلاح دارند.","Check finished; some server prerequisites need attention.")
+      );
+    }catch(reason){
+      setSpoofCompatibility(null);
+      setError(reason instanceof Error?reason.message:String(reason));
+    }finally{
+      setBusy("");
+    }
+  };
+
   const setAuto=()=>{
     if(!window.confirm(pick("Smart Auto فقط بین مسیرهای تأییدشده TP27 Fast و Spoof Tunnel انتخاب می‌کند. فعال شود؟","Smart Auto will select only between qualified TP27 Fast and Spoof Tunnel paths. Enable it?")))return;
     void run("auto",pick("Smart Auto برای همین تانل فعال شد.","Smart Auto is enabled for this tunnel."),()=>modernTransportApi.setMode(selected,"auto"));
   };
   const setManual=(row:SmartTransportCandidate)=>void run(`manual-${row.transport}`,pick(`${label(row.transport)} به‌عنوان مسیر دستی Production اعمال شد.`,`${label(row.transport)} is now the manual production path.`),()=>modernTransportApi.setMode(selected,"manual",row.transport));
+
+  const checkText=(value:unknown)=>value?pick("آماده","Ready"):pick("نیاز به بررسی","Check");
 
   return <Shell active="/admin/tunnel-transports">
     <div className="page legacy-control-page">
@@ -228,6 +259,35 @@ export function SmartTransportsRuntimeV25(){
             </div>
 
             {isSpoof&&<div className="runtime-info-list">
+              <div className="card-head">
+                <div><b>{pick("بررسی سازگاری سرورها","Server compatibility check")}</b><small>{pick("این تست فقط پیش‌نیازهای امن و غیرتخریبی را بررسی می‌کند و مسیر فعال را تغییر نمی‌دهد.","This non-destructive check validates host prerequisites and never changes the active path.")}</small></div>
+                {spoofCompatibility&&<Badge tone={spoofCompatibility.compatible?"ok":"bad"}>{spoofCompatibility.compatible?pick("آماده","READY"):pick("نیاز به اصلاح","NEEDS FIX")}</Badge>}
+              </div>
+              <div className="action-row">
+                <button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>void checkSpoofCompatibility()}>
+                  {busy==="spoof-compatibility"?"…":pick("بررسی سازگاری Spoof","Check Spoof compatibility")}
+                </button>
+              </div>
+
+              {spoofCompatibility&&<>
+                <div><span>{pick("Core بسته‌بندی‌شده","Bundled core")}</span><b>{spoofCompatibility.core?.ok?pick("سالم","OK"):pick("خطا","Error")}</b></div>
+                <div><span>{pick("Iran · Raw Socket","Iran · Raw Socket")}</span><b>{checkText(spoofCompatibility.iran.raw_socket)}</b></div>
+                <div><span>{pick("Iran · WireGuard","Iran · WireGuard")}</span><b>{checkText(Boolean(spoofCompatibility.iran.wg_tools&&spoofCompatibility.iran.wireguard_kernel&&spoofCompatibility.iran.tun_device))}</b></div>
+                <div><span>{pick("Iran · Route به خارج","Iran · Route to Exit")}</span><b>{checkText(spoofCompatibility.iran.route_to_peer)}</b></div>
+                <div><span>{pick("Exit · Raw Socket","Exit · Raw Socket")}</span><b>{checkText(spoofCompatibility.exit.raw_socket)}</b></div>
+                <div><span>{pick("Exit · WireGuard","Exit · WireGuard")}</span><b>{checkText(Boolean(spoofCompatibility.exit.wg_tools&&spoofCompatibility.exit.wireguard_kernel&&spoofCompatibility.exit.tun_device))}</b></div>
+                <div><span>{pick("Exit · Route به ایران","Exit · Route to Iran")}</span><b>{checkText(spoofCompatibility.exit.route_to_peer)}</b></div>
+                <div><span>{pick("Ping عادی ایران → خارج","Normal ping Iran → Exit")}</span><b>{spoofCompatibility.iran.ping_peer?pick("پاس","Pass"):pick("پاس نشد (غیر بحرانی)","No reply (advisory)")}</b></div>
+                <div><span>{pick("Ping عادی خارج → ایران","Normal ping Exit → Iran")}</span><b>{spoofCompatibility.exit.ping_peer?pick("پاس","Pass"):pick("پاس نشد (غیر بحرانی)","No reply (advisory)")}</b></div>
+                {spoofCompatibility.blockers.length>0&&<div className="runtime-error compact" dir="ltr">{spoofCompatibility.blockers.join(" · ")}</div>}
+                <div className="runtime-warning compact">
+                  {pick(
+                    "این بررسی جعل Source IP انجام نمی‌دهد و پشتیبانی دیتاسنتر از Source Spoofing را تأیید نمی‌کند؛ IPهای Spoof باید جداگانه و معتبر تأیید شوند.",
+                    "This check does not forge source addresses and does not prove provider support for source-IP spoofing; spoof IPs must be validated separately."
+                  )}
+                </div>
+              </>}
+
               <label className="field"><span>{pick("IP اسپوف سمت ایران","Iran spoof source IP")}</span><input dir="ltr" value={iranSpoofIp} onChange={event=>setIranSpoofIp(event.target.value)} placeholder="IPv4" disabled={Boolean(busy)||normalized(row.status)==="online"}/></label>
               <label className="field"><span>{pick("IP اسپوف سمت خارج","Exit spoof source IP")}</span><input dir="ltr" value={exitSpoofIp} onChange={event=>setExitSpoofIp(event.target.value)} placeholder="IPv4" disabled={Boolean(busy)||normalized(row.status)==="online"}/></label>
               <div><span>{pick("هسته","Core")}</span><b dir="ltr">{row.upstream_version||"v3.1.0-beta.0"}</b></div>
