@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.178",
+  "version": "1.1.0-rc.179",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-22T01:55:16Z",
+  "released_at": "2026-10-22T02:13:36Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9c4b207012d3ab6b8e87bbc6c093511ceafdf5aa",
+  "source_sha": "752263063697cf69613413e774eb412c1a294143",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.178/twinpanel-1.1.0-rc.178-linux-x86_64.tar.gz",
-    "sha256": "01ccf9e48ffbbf6eb7ae2881341afaf708ae2f521c37ed16ce7e47db33f6f76a",
-    "size_bytes": 18131785
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.179/twinpanel-1.1.0-rc.179-linux-x86_64.tar.gz",
+    "sha256": "656d5fb97d3eca93e057c7481601fb0ee3ef42623a90f3e49612f0444592634e",
+    "size_bytes": 18132011
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.178 اصلاح نمایش Light Mode فروشگاه را منتشر می‌کند. چت مهمان فروشگاه اکنون مستقیماً با DOM واقعی SupportChatWidgetV2 استایل می‌شود تا پنل، پیام‌ها، ورودی، دکمه‌ها و پیام کاربر در حالت روشن کنتراست و خوانایی صحیح داشته باشند. دکمه ورود قالب Conversion نیز دیگر سفید روی هدر سفید نیست و با سطح بنفش ملایم، متن و Border واضح نمایش داده می‌شود. Dark Mode و رفتار Chat/Auth بدون تغییر مانده‌اند. Backend/API/Payment/Subscription/Quota/Tunnel/VPN تغییری نکرده‌اند.",
-    "en": "TwinPanel 1.1.0-rc.178 publishes the storefront Light Mode presentation fix. Guest chat now styles the actual SupportChatWidgetV2 DOM so the panel, messages, composer, controls and customer bubble have correct light-theme contrast and readability. The Conversion storefront Sign in control no longer disappears as white on a white header and now uses a subtle violet surface with clear text and border. Dark Mode and Chat/Auth behavior are unchanged. Backend/API/Payment/Subscription/Quota/Tunnel/VPN are unchanged."
+    "fa": "TwinPanel 1.1.0-rc.179 ظاهر منوی SSH را مطابق طرح تاییدشده بازطراحی می‌کند: لوگوتایپ خوانای Dot/Pixel برای TWINPANEL با رنگ‌های مجزای Magenta/Violet/Blue/Cyan، زیرعنوان Self-Hosted VPN Control Plane، ردیف فشرده وضعیت API/Web/Version و جداکننده چندرنگ. منوی اصلی همچنان ساده و کاملاً عددی است و عنوان اضافی Quick actions نمایش داده نمی‌شود. منطق Backend، Protocol Runtime، Tunnel، Payment، Quota، Update، Backup و Admin تغییری نکرده است.",
+    "en": "TwinPanel 1.1.0-rc.179 refreshes the SSH management menu to match the approved terminal design: a readable dot/pixel TWINPANEL wordmark with distinct Magenta/Violet/Blue/Cyan colors, a Self-Hosted VPN Control Plane subtitle, a compact API/Web/Version status row, and a multicolor divider. The main menu stays simple and numeric, with the redundant Quick actions title hidden. Backend, protocol runtime, tunnel, payment, quota, update, backup, and admin logic are unchanged."
   }
 }
