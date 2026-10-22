@@ -56,29 +56,29 @@ unit_state(){
 state_badge(){
   local state="$1"
   case "$state" in
-    active) printf '%b● ONLINE%b' "$C_GREEN" "$C_RESET" ;;
-    failed) printf '%b● FAILED%b' "$C_RED" "$C_RESET" ;;
-    inactive) printf '%b● OFFLINE%b' "$C_YELLOW" "$C_RESET" ;;
-    not-installed) printf '%b○ N/A%b' "$C_DIM" "$C_RESET" ;;
-    *) printf '%b● %s%b' "$C_YELLOW" "${state:-unknown}" "$C_RESET" ;;
+    active) printf '%b[ONLINE]%b' "$C_GREEN" "$C_RESET" ;;
+    failed) printf '%b[FAILED]%b' "$C_RED" "$C_RESET" ;;
+    inactive) printf '%b[OFFLINE]%b' "$C_YELLOW" "$C_RESET" ;;
+    not-installed) printf '%b[N/A]%b' "$C_DIM" "$C_RESET" ;;
+    *) printf '%b[%s]%b' "$C_YELLOW" "${state:-unknown}" "$C_RESET" ;;
   esac
 }
 
 brand(){
   printf '%b' "$C_PURPLE"
   cat <<'BANNER'
-  ████████╗██╗    ██╗██╗███╗   ██╗██████╗  █████╗ ███╗   ██╗███████╗██╗
-  ╚══██╔══╝██║    ██║██║████╗  ██║██╔══██╗██╔══██╗████╗  ██║██╔════╝██║
-     ██║   ██║ █╗ ██║██║██╔██╗ ██║██████╔╝███████║██╔██╗ ██║█████╗  ██║
-     ██║   ██║███╗██║██║██║╚██╗██║██╔═══╝ ██╔══██║██║╚██╗██║██╔══╝  ██║
-     ██║   ╚███╔███╔╝██║██║ ╚████║██║     ██║  ██║██║ ╚████║███████╗███████╗
-     ╚═╝    ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝
+
+  TTTTT  W   W  III  N   N  PPPP    A   N   N  EEEEE  L
+    T    W   W   I   NN  N  P   P  A A  NN  N  E      L
+    T    W W W   I   N N N  PPPP   AAAAA N N N  EEEE   L
+    T    WW WW   I   N  NN  P      A   A N  NN  E      L
+    T    W   W  III  N   N  P      A   A N   N  EEEEE  LLLLL
 BANNER
   printf '%b' "$C_RESET"
 }
 
 separator(){
-  printf '%b%s%b\n' "$C_DIM" '  ────────────────────────────────────────────────────────────────────────' "$C_RESET"
+  printf '%b%s%b\n' "$C_DIM" '  ------------------------------------------------------------------------' "$C_RESET"
 }
 
 header(){
@@ -90,7 +90,7 @@ header(){
   web_state="$(unit_state twinpanel-web.service)"
 
   brand
-  printf '  %bSelf-Hosted VPN Control Plane%b  %b•%b  v%s\n' "$C_CYAN" "$C_RESET" "$C_DIM" "$C_RESET" "$version"
+  printf '  %bSelf-Hosted VPN Control Plane%b | v%s\n' "$C_CYAN" "$C_RESET" "$version"
   printf '  API %s    Web %s\n' "$(state_badge "$api_state")" "$(state_badge "$web_state")"
   separator
   printf '  %b%s%b\n' "$C_WHITE" "$title" "$C_RESET"
@@ -109,8 +109,8 @@ menu_back(){
 
 pick(){
   CHOICE=""
-  printf '\n  %bSelect a number:%b ' "$C_DIM" "$C_RESET"
-  if ! IFS= read -r -n 1 CHOICE; then
+  printf '  '
+  if ! IFS= read -r -n 1 -p "Choose: " CHOICE; then
     echo
     return 1
   fi
@@ -225,9 +225,9 @@ restart_panel_now(){
 http_health(){
   local label="$1" url="$2"
   if curl -fsS --max-time 4 "$url" >/dev/null 2>&1; then
-    printf '  %-20s %b● OK%b\n' "$label" "$C_GREEN" "$C_RESET"
+    printf '  %-20s %b[OK]%b\n' "$label" "$C_GREEN" "$C_RESET"
   else
-    printf '  %-20s %b● UNREACHABLE%b\n' "$label" "$C_RED" "$C_RESET"
+    printf '  %-20s %b[UNREACHABLE]%b\n' "$label" "$C_RED" "$C_RESET"
   fi
 }
 
@@ -275,7 +275,7 @@ restart_menu(){
 
 services_menu(){
   while true; do
-    header "Services"
+    header "Service management"
     menu_item 1 "Restart TwinPanel"
     menu_item 2 "Restart API"
     menu_item 3 "Restart Web"
@@ -309,7 +309,7 @@ admin_account_info(){
 
 admin_edit_menu(){
   while true; do
-    header "Administrator • Edit account"
+    header "Administrator - Edit account"
     menu_item 1 "Change email"
     menu_item 2 "Change name"
     menu_item 3 "Set custom password"
@@ -352,11 +352,12 @@ admin_edit_menu(){
 admin_menu(){
   while true; do
     header "Administrator"
-    menu_item 1 "Account info"
-    menu_item 2 "Generate a new password"
-    menu_item 3 "Edit account"
-    menu_item 4 "Delete saved first-login file"
-    menu_back
+    echo "  [1] Account info"
+    echo "  [2] Reset password"
+    echo "  [3] Edit account"
+    echo "  [4] Delete saved first-login file"
+    echo
+    echo "  [0] Back"
     pick || return
     case "$CHOICE" in
       1) admin_account_info; pause ;;
@@ -393,7 +394,7 @@ admin_menu(){
 }
 
 protocol_menu(){
-  header "VPN protocols"
+  header "Protocol management"
   run_backend scripts/twinpanel_protocol_cli_en.py || true
   pause
 }
@@ -497,7 +498,7 @@ backup_menu(){
 
 logs_menu(){
   while true; do
-    header "Logs & diagnostics"
+    header "Logs and diagnostics"
     menu_item 1 "API"
     menu_item 2 "Web"
     menu_item 3 "Updater"
@@ -531,7 +532,7 @@ logs_menu(){
 }
 
 version_menu(){
-  header "Version & GitHub"
+  header "Version and GitHub"
   printf '  TwinPanel version : %s\n' "$(version_value)"
   printf '  Active release    : %s\n' "$(readlink -f "$ROOT" 2>/dev/null || echo "$ROOT")"
   printf '  GitHub            : https://github.com/matin111/twinpanel\n'
@@ -544,9 +545,9 @@ more_menu(){
     header "More tools"
     menu_item 1 "Administrator"
     menu_item 2 "Backup"
-    menu_item 3 "Services"
-    menu_item 4 "Logs & diagnostics"
-    menu_item 5 "Version & GitHub"
+    menu_item 3 "Service management"
+    menu_item 4 "Logs and diagnostics"
+    menu_item 5 "Version and GitHub"
     menu_back
     pick || return
     case "$CHOICE" in
@@ -566,7 +567,7 @@ main_menu(){
     header "Quick actions"
     menu_item 1 "Panel status"
     menu_item 2 "Restart TwinPanel"
-    menu_item 3 "VPN protocols"
+    menu_item 3 "Protocol management"
     menu_item 4 "Panel update"
     menu_item 5 "More tools"
     printf '\n'
