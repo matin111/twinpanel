@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.167",
+  "version": "1.1.0-rc.168",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-21T23:58:48Z",
+  "released_at": "2026-10-22T00:10:28Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b57abadeae5b8297af1355687c986e50ec669915",
+  "source_sha": "b2c010cc96da31a9437a1d37b16adf84776b06cf",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.167/twinpanel-1.1.0-rc.167-linux-x86_64.tar.gz",
-    "sha256": "2f7ca2287fc754a1eb74c19c378bbf345f735f01092999ea8d842bcd7014d56a",
-    "size_bytes": 18119996
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.168/twinpanel-1.1.0-rc.168-linux-x86_64.tar.gz",
+    "sha256": "e0d3923000bdc8680f2adaf17968eb4fc803ae5f493654301736a3d775c30151",
+    "size_bytes": 18112611
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.167 یک Race واقعی در چرخه نصب Candidateهای SmartAuto را اصلاح می‌کند. پیش از این، Health Probe می‌توانست در فاصله‌ای که Installer وضعیت Candidate را installing کرده بود اما فقط بخشی از سرویس‌های Iran/Exit بالا آمده بودند اجرا شود؛ در نتیجه وضعیت موقت مانند iran=False exit=True به‌اشتباه به candidate_service_inactive یا candidate_interface_missing تبدیل می‌شد و همان Candidate به offline و Quarantine 120 ثانیه‌ای می‌رفت. V167 وضعیت installing را یک Lifecycle موقت و معتبر می‌داند: Remote Health در این بازه defer می‌شود و مسیر عمومی write_overlay_rows نیز حق ندارد Row در حال نصب را بازنویسی کند؛ Installer تا پایان online/failed تنها Writer معتبر است و Probe عادی در Pass بعدی از سر گرفته می‌شود. TP27 Mieru TCP معرفی‌شده در rc.166، TP27 Fast، MASQUE و Direct TCP بدون تغییر باقی مانده‌اند. پذیرش Production نهایی نیازمند Update سرور تست به rc.167 و Qualification واقعی Tunnel #5 است: نصب بدون Quarantine کاذب، بالا آمدن tp27r5، Peer L3 دوطرفه، TCP/UDP Egress، حداقل 60 ثانیه پایداری و ثبت Benchmark مثبت.",
-    "en": "TwinPanel 1.1.0-rc.167 fixes a real SmartAuto candidate installation lifecycle race. Previously, the health probe could run after an installer had marked a candidate as installing but before both Iran and Exit services/interfaces had converged; an intentional transient state such as iran=False exit=True could therefore be persisted as candidate_service_inactive or candidate_interface_missing, forcing the candidate offline and into a 120-second quarantine. V167 treats installing as an explicit transient lifecycle state: remote health is deferred during that window and the generic write_overlay_rows path cannot overwrite an installing row. The installer remains the sole authoritative writer until it finishes online/failed, after which normal probing resumes on the next manager pass. TP27 Mieru TCP introduced in rc.166, TP27 Fast, MASQUE and Direct TCP remain unchanged. Final production acceptance requires updating the real test server to rc.167 and qualifying Tunnel #5 with no false install-time quarantine, tp27r5 online, bidirectional peer L3, TCP/UDP egress, at least 60 seconds stability and a positive throughput benchmark."
+    "fa": "TwinPanel 1.1.0-rc.168 تنظیمات طراحی عمیق فروشگاه را در هر سه قالب Conversion، Editorial و Orbit داخل همان Customizer اصلی ادغام می‌کند. پنل مستقل Advanced Design Lab، Save/Reset جداگانه، سوییچ اضافی Dark/Light و متن‌های توضیحی/تبلیغاتی آن حذف شده‌اند. کنترل‌های تکمیلی بدون تکرار تنظیمات قبلی، داخل تب‌های رنگ/ظاهر/چیدمان همان قالب قرار گرفته‌اند: رنگ اختصاصی کارت‌های پلن، پروتکل، خدمات، آموزش، حساب، FAQ و ارتباط؛ رنگ دکمه دوم؛ اندازه/فرم/مدل نمایش کارت و دکمه؛ و چیدمان پلن/پروتکل/خدمات. همان Save اصلی هر قالب همه این گزینه‌ها را ذخیره می‌کند. Runtime برای کلیدهای جدید یک override واحد را در هر دو Mode اعمال می‌کند و تنظیمات قدیمی ui_dark/ui_light را فقط به‌عنوان fallback سازگار نگه می‌دارد. Modern Protocolها و semantic DOM mapping حفظ شده‌اند. همچنین Release Candidate Manifest CI اصلاح شده تا فرآیند مستند VERSION-only سپس Candidate-only را بدون تضعیف اعتبارسنجی Source/Version پشتیبانی کند. Backend، API، Auth، Payment، Subscription، Quota، Tunnel و VPN تغییر نکرده‌اند. پذیرش نهایی Storefront نیازمند Update سرور تست و بررسی واقعی هر سه Customizer و اثر تنظیمات روی /store است.",
+    "en": "TwinPanel 1.1.0-rc.168 integrates the deep storefront design controls directly into the existing Conversion, Editorial and Orbit customizers. The standalone Advanced Design Lab block, separate save/reset state, extra Dark/Light switch and its explanatory/marketing copy are removed. Non-duplicated deep controls now live inside each theme's existing color/style/layout tabs: per-section card colors for plans, protocols, services, guides, account, FAQ and contact; secondary-button colors; card/button size, shape and presentation; and plan/protocol/service layouts. Each theme's existing Save action persists all of these options. Runtime applies the new unified explicit color override to both modes while keeping legacy ui_dark/ui_light values only as backward-compatible fallback. Modern Protocol wiring and semantic DOM mapping remain intact. Release Candidate Manifest CI is also corrected so the documented VERSION-only then Candidate-only flow remains valid without weakening source/version validation. Backend, API, Auth, Payment, Subscription, Quota, Tunnel and VPN behavior are unchanged. Final Storefront acceptance requires updating the real test server and verifying all three customizers and their actual /store effects."
   }
 }
