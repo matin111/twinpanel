@@ -170,7 +170,7 @@ export function SmartTransportsRuntimeV25(){
       setSpoofCompatibility(result);
       setSuccess(
         result.compatible
-          ?pick("زیرساخت هر دو نود برای اجرای هسته Spoof/WireGuard آماده است.","Both nodes satisfy the Spoof/WireGuard host prerequisites.")
+          ?pick("هر دو سرور برای نصب Spoof Tunnel آماده‌اند. حالا IPهای Spoof را وارد و ذخیره کنید.","Both servers are ready for Spoof Tunnel. Enter and save the Spoof IPs next.")
           :pick("بررسی تمام شد؛ بعضی پیش‌نیازهای سرور نیاز به اصلاح دارند.","Check finished; some server prerequisites need attention.")
       );
     }catch(reason){
@@ -213,7 +213,7 @@ PY`;
     try{
       await navigator.clipboard.writeText(command);
       setError("");
-      setSuccess(pick(`دستور تست Tunnel #${selected} کپی شد.`,`Tunnel #${selected} compatibility command copied.`));
+      setSuccess(pick(`دستور عیب‌یابی Tunnel #${selected} کپی شد.`,`Tunnel #${selected} diagnostic command copied.`));
     }catch{
       setError(pick("کپی خودکار دستور در این مرورگر در دسترس نیست.","Automatic command copy is not available in this browser."));
     }
@@ -281,7 +281,7 @@ PY`;
           const progress=Math.min(100,Math.round((Number(row.stable_seconds||0)/Math.max(1,Number(row.required_stable_seconds||60)))*100));
           const isSpoof=row.transport==="spoof_wg";
           const isActive=normalized(row.transport)===activeName;
-          const spoofReady=Boolean(spoofCompatibility?.compatible&&row.configured);
+          const spoofIpsEntered=Boolean(iranSpoofIp.trim()&&exitSpoofIp.trim());
           return <Card key={row.transport} className="transport-runtime-card">
             <div className="card-head">
               <div><b>{row.label||label(row.transport)}</b><small>{row.iran_profile||row.family||"Transport Candidate"}</small></div>
@@ -298,56 +298,73 @@ PY`;
             </div>
 
             {isSpoof&&<div className="runtime-info-list">
+              <details className="runtime-warning compact" open>
+                <summary><b>{pick("راهنمای راه‌اندازی Spoof Tunnel","Spoof Tunnel setup guide")}</b></summary>
+                <small>{pick("فقط این ۴ مرحله را به‌ترتیب انجام بده. تا مرحله قبلی کامل نشده، سراغ مرحله بعد نرو.","Follow these 4 steps in order. Finish each step before moving to the next one.")}</small>
+                <div className="runtime-info-list">
+                  <div><span>{pick("۱. بررسی سرورها","1. Check servers")}</span><b>{spoofCompatibility?(spoofCompatibility.compatible?pick("✅ آماده‌اند","✅ Ready"):pick("❌ نیاز به اصلاح","❌ Needs fix")):pick("⬅️ دکمه بررسی را بزن","⬅️ Run the check")}</b></div>
+                  <div><span>{pick("۲. وارد کردن IPهای Spoof","2. Enter Spoof IPs")}</span><b>{spoofIpsEntered?pick("✅ وارد شده","✅ Entered"):pick("⬅️ هر دو IP را وارد کن","⬅️ Enter both IPs")}</b></div>
+                  <div><span>{pick("۳. ذخیره IPها","3. Save IPs")}</span><b>{row.configured?pick("✅ ذخیره شده","✅ Saved"):spoofIpsEntered?pick("⬅️ دکمه ذخیره را بزن","⬅️ Save them"):pick("— بعد از مرحله ۲","— After step 2")}</b></div>
+                  <div><span>{pick("۴. نصب و تست تانل","4. Install & test tunnel")}</span><b>{row.qualified?pick("✅ نصب و تأیید شده","✅ Installed & qualified"):installed?pick("⚠️ نصب شده؛ هنوز تأیید نشده","⚠️ Installed, not qualified yet"):row.configured?pick("⬅️ دکمه نصب و تست را بزن","⬅️ Install & test"):pick("— بعد از مرحله ۳","— After step 3")}</b></div>
+                </div>
+                <div className="runtime-warning compact">
+                  {pick(
+                    "نکته: مرحله ۱ فقط آماده‌بودن دو سرور را بررسی می‌کند. IPهای Spoof که در مرحله ۲ وارد می‌کنی باید از قبل برای شبکه/دیتاسنتر خودت معتبر و مجاز باشند.",
+                    "Note: step 1 only checks whether both servers are ready. The Spoof IPs entered in step 2 must already be valid and authorized for your network/provider."
+                  )}
+                </div>
+              </details>
+
               <div className="card-head">
-                <div><b>{pick("بررسی سازگاری سرورها","Server compatibility check")}</b><small>{pick("این تست فقط پیش‌نیازهای امن و غیرتخریبی را بررسی می‌کند و مسیر فعال را تغییر نمی‌دهد.","This non-destructive check validates host prerequisites and never changes the active path.")}</small></div>
+                <div><b>{pick("مرحله ۱ — بررسی سرورها","Step 1 — Check servers")}</b><small>{pick("این تست چیزی را روی مسیر فعال تغییر نمی‌دهد.","This check does not change the active path.")}</small></div>
                 {spoofCompatibility&&<Badge tone={spoofCompatibility.compatible?"ok":"bad"}>{spoofCompatibility.compatible?pick("آماده","READY"):pick("نیاز به اصلاح","NEEDS FIX")}</Badge>}
               </div>
               <div className="action-row">
                 <button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>void checkSpoofCompatibility()}>
-                  {busy==="spoof-compatibility"?"…":pick("بررسی سازگاری Spoof","Check Spoof compatibility")}
+                  {busy==="spoof-compatibility"?"…":pick("مرحله ۱: بررسی سرورها","Step 1: Check servers")}
                 </button>
               </div>
 
               {spoofCompatibility&&<>
-                <div><span>{pick("Core بسته‌بندی‌شده","Bundled core")}</span><b>{spoofCompatibility.core?.ok?pick("سالم","OK"):pick("خطا","Error")}</b></div>
-                <div><span>{pick("Iran · Raw Socket","Iran · Raw Socket")}</span><b>{checkText(spoofCompatibility.iran.raw_socket)}</b></div>
-                <div><span>{pick("Iran · WireGuard","Iran · WireGuard")}</span><b>{checkText(Boolean(spoofCompatibility.iran.wg_tools&&spoofCompatibility.iran.wireguard_kernel&&spoofCompatibility.iran.tun_device))}</b></div>
-                <div><span>{pick("Iran · Route به خارج","Iran · Route to Exit")}</span><b>{checkText(spoofCompatibility.iran.route_to_peer)}</b></div>
-                <div><span>{pick("Exit · Raw Socket","Exit · Raw Socket")}</span><b>{checkText(spoofCompatibility.exit.raw_socket)}</b></div>
-                <div><span>{pick("Exit · WireGuard","Exit · WireGuard")}</span><b>{checkText(Boolean(spoofCompatibility.exit.wg_tools&&spoofCompatibility.exit.wireguard_kernel&&spoofCompatibility.exit.tun_device))}</b></div>
-                <div><span>{pick("Exit · Route به ایران","Exit · Route to Iran")}</span><b>{checkText(spoofCompatibility.exit.route_to_peer)}</b></div>
-                <div><span>{pick("Ping عادی ایران → خارج","Normal ping Iran → Exit")}</span><b>{spoofCompatibility.iran.ping_peer?pick("پاس","Pass"):pick("پاس نشد (غیر بحرانی)","No reply (advisory)")}</b></div>
-                <div><span>{pick("Ping عادی خارج → ایران","Normal ping Exit → Iran")}</span><b>{spoofCompatibility.exit.ping_peer?pick("پاس","Pass"):pick("پاس نشد (غیر بحرانی)","No reply (advisory)")}</b></div>
-                {spoofCompatibility.blockers.length>0&&<div className="runtime-error compact" dir="ltr">{spoofCompatibility.blockers.join(" · ")}</div>}
+                <div><span>{pick("نتیجه بررسی سرورها","Server check result")}</span><b>{spoofCompatibility.compatible?pick("✅ هر دو آماده‌اند","✅ Both ready"):pick("❌ نیاز به اصلاح","❌ Needs fix")}</b></div>
+                <details className="runtime-warning compact">
+                  <summary><b>{pick("جزئیات فنی تست","Technical test details")}</b></summary>
+                  <div className="runtime-info-list">
+                    <div><span>{pick("Core بسته‌بندی‌شده","Bundled core")}</span><b>{spoofCompatibility.core?.ok?pick("سالم","OK"):pick("خطا","Error")}</b></div>
+                    <div><span>{pick("Iran · Raw Socket","Iran · Raw Socket")}</span><b>{checkText(spoofCompatibility.iran.raw_socket)}</b></div>
+                    <div><span>{pick("Iran · WireGuard","Iran · WireGuard")}</span><b>{checkText(Boolean(spoofCompatibility.iran.wg_tools&&spoofCompatibility.iran.wireguard_kernel&&spoofCompatibility.iran.tun_device))}</b></div>
+                    <div><span>{pick("Iran · Route به خارج","Iran · Route to Exit")}</span><b>{checkText(spoofCompatibility.iran.route_to_peer)}</b></div>
+                    <div><span>{pick("Exit · Raw Socket","Exit · Raw Socket")}</span><b>{checkText(spoofCompatibility.exit.raw_socket)}</b></div>
+                    <div><span>{pick("Exit · WireGuard","Exit · WireGuard")}</span><b>{checkText(Boolean(spoofCompatibility.exit.wg_tools&&spoofCompatibility.exit.wireguard_kernel&&spoofCompatibility.exit.tun_device))}</b></div>
+                    <div><span>{pick("Exit · Route به ایران","Exit · Route to Iran")}</span><b>{checkText(spoofCompatibility.exit.route_to_peer)}</b></div>
+                    <div><span>{pick("Ping ایران → خارج","Ping Iran → Exit")}</span><b>{spoofCompatibility.iran.ping_peer?pick("پاس","Pass"):pick("پاس نشد (غیر بحرانی)","No reply (advisory)")}</b></div>
+                    <div><span>{pick("Ping خارج → ایران","Ping Exit → Iran")}</span><b>{spoofCompatibility.exit.ping_peer?pick("پاس","Pass"):pick("پاس نشد (غیر بحرانی)","No reply (advisory)")}</b></div>
+                  </div>
+                  {spoofCompatibility.blockers.length>0&&<div className="runtime-error compact" dir="ltr">{spoofCompatibility.blockers.join(" · ")}</div>}
+                </details>
                 <div className="runtime-warning compact">
                   {pick(
-                    "این بررسی جعل Source IP انجام نمی‌دهد و پشتیبانی دیتاسنتر از Source Spoofing را تأیید نمی‌کند؛ IPهای Spoof باید جداگانه و معتبر تأیید شوند.",
-                    "This check does not forge source addresses and does not prove provider support for source-IP spoofing; spoof IPs must be validated separately."
+                    "این نتیجه فقط می‌گوید دو سرور برای اجرای Spoof Tunnel آماده‌اند؛ معتبر بودن IPهای Spoof را تأیید نمی‌کند.",
+                    "This result only confirms that both servers are ready for Spoof Tunnel; it does not validate the Spoof IPs themselves."
                   )}
                 </div>
               </>}
 
+              <label className="field"><span>{pick("مرحله ۲ — IP Spoof سمت ایران","Step 2 — Iran Spoof IP")}</span><input dir="ltr" value={iranSpoofIp} onChange={event=>setIranSpoofIp(event.target.value)} placeholder="IPv4" disabled={Boolean(busy)||normalized(row.status)==="online"}/></label>
+              <label className="field"><span>{pick("مرحله ۲ — IP Spoof سمت خارج","Step 2 — Exit Spoof IP")}</span><input dir="ltr" value={exitSpoofIp} onChange={event=>setExitSpoofIp(event.target.value)} placeholder="IPv4" disabled={Boolean(busy)||normalized(row.status)==="online"}/></label>
+              <div className="action-row"><button type="button" className="ghost" disabled={Boolean(busy)||normalized(row.status)==="online"} onClick={saveSpoof}>{busy==="spoof-config"?"…":pick("مرحله ۳: ذخیره IPها","Step 3: Save IPs")}</button></div>
+
               <details className="runtime-warning compact">
-                <summary><b>{pick("راهنمای تست و آماده‌سازی","Test & setup guide")}</b></summary>
-                <small>{pick("برای کاربر عادی، دکمه بررسی سازگاری کافی است. دستور زیر فقط برای عیب‌یابی دستی همین Tunnel روی سرور TwinPanel است.","For normal use, the compatibility button is enough. The command below is only for manual diagnostics of this selected tunnel on the TwinPanel server.")}</small>
-                <div className="runtime-info-list">
-                  <div><span>{pick("سازگاری سرورها","Server compatibility")}</span><b>{spoofCompatibility?(spoofCompatibility.compatible?pick("✅ تأیید شد","✅ Ready"):pick("❌ نیاز به اصلاح","❌ Needs fix")):pick("◌ هنوز تست نشده","◌ Not tested")}</b></div>
-                  <div><span>{pick("Source Spoofing دیتاسنتر","Provider source spoofing")}</span><b>{spoofCompatibility?.source_spoofing_verified?pick("✅ تأیید شد","✅ Verified"):pick("⚠️ تأیید نشده","⚠️ Not verified")}</b></div>
-                  <div><span>{pick("IPهای Spoof","Spoof IPs")}</span><b>{row.configured?pick("✅ ثبت شده","✅ Saved"):pick("⚠️ تنظیم نشده","⚠️ Not configured")}</b></div>
-                  <div><span>{pick("آماده نصب","Ready to install")}</span><b>{spoofReady?pick("✅ بله","✅ Yes"):pick("❌ خیر","❌ No")}</b></div>
-                </div>
+                <summary><b>{pick("عیب‌یابی دستی (اختیاری)","Manual diagnostics (optional)")}</b></summary>
+                <small>{pick("فقط اگر دکمه «بررسی سرورها» خطا داد یا برای پشتیبانی خروجی کامل لازم داشتی، این دستور را روی سرور TwinPanel اجرا کن.","Use this only if the server check fails or support needs the full diagnostic output on the TwinPanel server.")}</small>
                 <div className="action-row">
-                  <button type="button" className="ghost" disabled={!selected} onClick={()=>void copySpoofGuideCommand()}>{pick(`کپی دستور تست Tunnel #${selected}`,`Copy Tunnel #${selected} test command`)}</button>
+                  <button type="button" className="ghost" disabled={!selected} onClick={()=>void copySpoofGuideCommand()}>{pick(`کپی دستور عیب‌یابی Tunnel #${selected}`,`Copy Tunnel #${selected} diagnostic command`)}</button>
                 </div>
-                <small>{pick("این دستور همان Compatibility Check غیرتخریبی را اجرا می‌کند؛ مسیر Production، Route، NAT و Firewall را تغییر نمی‌دهد.","This command runs the same non-destructive compatibility check; it does not change the production path, routes, NAT, or firewall.")}</small>
               </details>
 
-              <label className="field"><span>{pick("IP اسپوف سمت ایران","Iran spoof source IP")}</span><input dir="ltr" value={iranSpoofIp} onChange={event=>setIranSpoofIp(event.target.value)} placeholder="IPv4" disabled={Boolean(busy)||normalized(row.status)==="online"}/></label>
-              <label className="field"><span>{pick("IP اسپوف سمت خارج","Exit spoof source IP")}</span><input dir="ltr" value={exitSpoofIp} onChange={event=>setExitSpoofIp(event.target.value)} placeholder="IPv4" disabled={Boolean(busy)||normalized(row.status)==="online"}/></label>
               <div><span>{pick("هسته","Core")}</span><b dir="ltr">{row.upstream_version||"v3.1.0-beta.0"}</b></div>
               <div><span>XDP</span><b dir="ltr">OFF · raw socket</b></div>
-              <div className="action-row"><button type="button" className="ghost" disabled={Boolean(busy)||normalized(row.status)==="online"} onClick={saveSpoof}>{busy==="spoof-config"?"…":pick("ذخیره تنظیمات Spoof","Save Spoof settings")}</button></div>
-              {!row.configured&&<div className="runtime-warning compact">{pick("قبل از نصب، هر دو VPS باید امکان ارسال packet با Source IP تنظیم‌شده را داشته باشند. نصب بدون این دو IP شروع نمی‌شود.","Both VPSs must allow egress using the configured spoof source IPs. Installation is blocked until both addresses are saved.")}</div>}
+              {!row.configured&&<div className="runtime-warning compact">{pick("برای رفتن به مرحله ۴، هر دو IP را وارد کن و «مرحله ۳: ذخیره IPها» را بزن.","To continue to step 4, enter both IPs and click 'Step 3: Save IPs'.")}</div>}
             </div>}
 
             <div className="runtime-progress" aria-label={`${progress}%`}><span style={{width:`${progress}%`}}/></div>
@@ -357,7 +374,7 @@ PY`;
             {row.last_error&&<div className="runtime-error compact" dir="ltr">{String(row.last_error)}</div>}
 
             <div className="action-row">
-              <button type="button" className="primary-soft" disabled={Boolean(busy)||(isSpoof&&!row.configured)} onClick={()=>install(row)}>{busy===`install-${row.transport}`?"…":installed?pick("بازسازی و تست","Rebuild & test"):pick("نصب و تست","Install & test")}</button>
+              <button type="button" className="primary-soft" disabled={Boolean(busy)||(isSpoof&&!row.configured)} onClick={()=>install(row)}>{busy===`install-${row.transport}`?"…":isSpoof?(installed?pick("بازسازی و تست Spoof","Rebuild & test Spoof"):pick("مرحله ۴: نصب و تست Spoof","Step 4: Install & test Spoof")):installed?pick("بازسازی و تست","Rebuild & test"):pick("نصب و تست","Install & test")}</button>
               {row.selectable&&<button type="button" className="ghost" disabled={Boolean(busy)||isActive} onClick={()=>setManual(row)}>{busy===`manual-${row.transport}`?"…":isActive?pick("مسیر فعال","Active path"):pick("انتخاب دستی Production","Select production manual")}</button>}
               {installed&&<button type="button" className="danger" disabled={Boolean(busy)||isActive} onClick={()=>remove(row)}>{busy===`remove-${row.transport}`?"…":isActive?pick("مسیر فعال","Active path"):pick("حذف از این تانل","Remove")}</button>}
             </div>
