@@ -23,6 +23,7 @@ from . import storefront_settings_models  # TWINPANEL_STOREFRONT_CMS_V74
 from . import two_factor_models
 from . import runtime_settings_model
 from . import download_asset_models
+from . import subscription_delivery_policy_v1
 from .payment_crypto_schema import ensure_payment_crypto_schema
 from .wallet_crypto_schema import ensure_wallet_crypto_schema
 from .routers import admin, auth, nodes, plans, provision, subscriptions, tunnels, resellers, reseller_portal, domains, branding
@@ -51,7 +52,9 @@ from .routers.reseller_profile_v2 import router as reseller_profile_v2_router
 from .routers.reseller_subscription_volume_v2 import router as reseller_subscription_volume_v2_router
 from .routers.admin_user_isolation import router as admin_user_isolation_router
 from .routers.system_release import router as system_release_router
+from .routers.subscription_delivery_policy_v1 import router as subscription_delivery_policy_v1_router
 from .self_hosted_runtime import apply_self_hosted_runtime
+from .subscription_delivery_policy_v1 import install_account_delivery_hooks
 from .xray_modern_runtime import router as xray_modern_router
 from .xray_modern_admin import router as xray_modern_admin_router
 from .admin_notification_service import notification_watch_loop
@@ -105,6 +108,7 @@ _ = download_asset_models
 _ = reseller_bot_order_models
 _ = reseller_pool_models
 _ = reseller_owned_plan_models
+_ = subscription_delivery_policy_v1
 
 # TWINPANEL_ADMIN_PANEL_NOTIFICATION_REGISTER_V1
 from .admin_panel_notification_models import AdminPanelNotification
@@ -117,9 +121,15 @@ from . import reseller_notification_models
 
 Base.metadata.create_all(bind=engine)
 # Existing installations need idempotent ALTERs because create_all does not add
-# newly introduced columns to existing tables.
+# newly introduced columns to existing tables. Delivery policy V1 uses additive
+# tables only, so create_all is its backward-compatible and reversible migration.
 ensure_payment_crypto_schema()
 ensure_wallet_crypto_schema()
+
+# Explicit delivery policy is a compatibility layer over the existing Account
+# Delivery engine. Subscriptions without a policy-state row remain on the exact
+# legacy behavior.
+install_account_delivery_hooks()
 
 
 # TWINPANEL_TUNNEL_WATCHDOG_LIFESPAN_V1
@@ -307,6 +317,7 @@ app.include_router(nodes.router)
 app.include_router(node_recovery_router)
 app.include_router(subscriptions.router)
 app.include_router(subscription_admin_v2_router, prefix="/v1")
+app.include_router(subscription_delivery_policy_v1_router)
 app.include_router(tunnels.router)
 app.include_router(tunnel_managed_router)
 app.include_router(modern_transports_router)
