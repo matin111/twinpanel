@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.185",
+  "version": "1.1.0-rc.186",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-22T03:20:33Z",
+  "released_at": "2026-10-22T04:08:08Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b1f6bd3d67ccfc26d7bc47490a2e1493bc1d1b55",
+  "source_sha": "ad641f8b2bef561269e54dc38b3347eff1bf8194",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.185/twinpanel-1.1.0-rc.185-linux-x86_64.tar.gz",
-    "sha256": "fb950708973fedd0c0e67693d379f5b3ed04f9b08b30eaee728e46c1d41747fa",
-    "size_bytes": 18176958
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.186/twinpanel-1.1.0-rc.186-linux-x86_64.tar.gz",
+    "sha256": "7817f7119e8a22ce3afff5450735a9deae89073ef49fed6ada0e7b9ccf5e8b27",
+    "size_bytes": 18176219
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.185 دو تغییر Merge‌شده و CI-سبز را منتشر می‌کند. نخست، لوگوتایپ منوی SSH بر اساس بازخورد واقعی Bitvise بازطراحی شده است: TWINPANEL اکنون با Dot-Matrix پهن 5x7، پیکسل‌های فاصله‌دار ASCII، سلول‌های ثابت و رنگ‌های مجزای Magenta/Purple/Blue/Cyan نمایش داده می‌شود و خط صریح [TWINPANEL] Self-Hosted VPN Control Plane خوانایی برند را روی فونت‌های مختلف تضمین می‌کند؛ Status و منوهای عددی و مسیر ۱۵ پروتکل بدون تغییر مانده‌اند. دوم، Delivery Policy صریح برای هر اشتراک اضافه شده تا Protocolها، Exit Nodeها و مسیر Direct/Tunnel/Both/Disabled مستقل مدیریت شوند؛ Legacy بدون Policy رفتار قبلی را حفظ می‌کند، Tunnel-only به Direct fallback نمی‌کند، credential/share/quota history در reconcile حفظ می‌شود و Modern Account Delivery تا تکمیل چرخه identity/export/revoke/quota همچنان fail-closed است. تست واقعی سرور برای ظاهر جدید و Delivery Policy پس از انتشار انجام می‌شود.",
-    "en": "TwinPanel 1.1.0-rc.185 publishes two merged, CI-green changes. First, the SSH terminal wordmark is redesigned from real Bitvise feedback: TWINPANEL now uses a wide 5x7 dot-matrix with spaced ASCII pixels, fixed glyph cells, and per-letter Magenta/Purple/Blue/Cyan colors, plus an explicit [TWINPANEL] Self-Hosted VPN Control Plane identity line for reliable readability across terminal fonts; status, numeric menus, and the 15-protocol path are unchanged. Second, explicit per-subscription Delivery Policy adds independent protocol, Exit-node, and Direct/Tunnel/Both/Disabled route control; subscriptions without explicit policy preserve Legacy behavior, Tunnel-only never falls back to Direct, reconcile preserves credential/share/quota history, and Modern Account Delivery remains fail-closed until the identity/export/revoke/quota lifecycle is complete. Real-server acceptance for the new terminal appearance and Delivery Policy remains pending after publication."
+    "fa": "TwinPanel 1.1.0-rc.186 خطای واقعی OpenVPN در نودهای جدید را اصلاح می‌کند. Audit تولید روی Exit جدید نشان داد TLS و Certificate کاربر سالم هستند اما OpenVPN پس از handshake به‌دلیل شکست اجرای client-connect hook، پیام AUTH_FAILED می‌فرستد. Root Cause این بود که hook زیر /usr/local/sbin قرار داشت ولی parent directory روی سرور 0700 بود و OpenVPN پس از drop privilege به nobody/nogroup امکان traverse آن مسیر را نداشت. rc.186 hook مدیریت‌شده را به مسیر قابل‌دسترسی /etc/openvpn/twinpanel-hooks منتقل می‌کند، اجرای واقعی آن را با user nobody قبل از healthy اعلام‌شدن بررسی می‌کند، نصب‌های جدید را از ابتدا سالم می‌سازد و Repair را طوری اصلاح می‌کند که service+listener به‌تنهایی کافی نباشند و hook خراب نودهای موجود درجا ترمیم شود. Certificate، Credential، PKI و سایر پروتکل‌ها بدون تغییر می‌مانند.",
+    "en": "TwinPanel 1.1.0-rc.186 fixes the production OpenVPN failure observed on a newly added Exit node. Real-server audit proved the user TLS/certificate handshake succeeded, but OpenVPN returned AUTH_FAILED because its client-connect hook could not be executed. The hook file was executable, while its /usr/local/sbin parent directory was mode 0700; after OpenVPN dropped privileges to nobody/nogroup, the runtime user could not traverse that path. rc.186 moves the managed hook to the traversable /etc/openvpn/twinpanel-hooks path, validates execution as the real nobody runtime user before reporting healthy, makes fresh installs safe, and upgrades Repair so service+listener alone no longer hide a broken hook. User certificates, credentials, PKI, and other VPN protocols remain unchanged."
   }
 }
