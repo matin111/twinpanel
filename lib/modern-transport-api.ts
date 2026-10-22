@@ -32,6 +32,49 @@ export type SpoofWGConfiguration={
   configured?:boolean;
 };
 
+export type SpoofCompatibilityNode={
+  node_id?:number;
+  name?:string;
+  public_ip?:string;
+  raw_socket?:boolean;
+  raw_socket_error?:string;
+  tun_device?:boolean;
+  wg_tools?:boolean;
+  wireguard_kernel?:boolean;
+  route_to_peer?:boolean;
+  route_detail?:string;
+  ping_peer?:boolean;
+  ping_detail?:string;
+  rp_filter_all?:string;
+  ip_forward?:string;
+  input_policy?:string;
+  critical?:Record<string,boolean>;
+  compatible?:boolean;
+};
+
+export type SpoofCompatibilityResult={
+  ok?:boolean;
+  tunnel_id:number;
+  transport:"spoof_wg";
+  mode?:string;
+  active_transport?:string|null;
+  preferred_transport?:string|null;
+  production_path_unchanged?:boolean;
+  core?:{
+    ok?:boolean;
+    version?:string;
+    sha256?:string;
+  };
+  iran:SpoofCompatibilityNode;
+  exit:SpoofCompatibilityNode;
+  compatible:boolean;
+  configured:boolean;
+  ready_for_install:boolean;
+  blockers:string[];
+  source_spoofing_verified:false;
+  limitation:string;
+};
+
 export type SmartTransportCandidate={
   transport:SmartTransportName;
   label?:string;
@@ -112,6 +155,7 @@ export const modernTransportApi={
   install:(tunnelId:number,transport:SmartTransportName)=>request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/${encodeURIComponent(transport)}/install`,{method:"POST"}),
   remove:(tunnelId:number,transport:SmartTransportName)=>request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/${encodeURIComponent(transport)}`,{method:"DELETE"}),
   configureSpoof:(tunnelId:number,configuration:{iran_spoof_ip:string;exit_spoof_ip:string})=>request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/spoof_wg/config`,{method:"PUT",body:JSON.stringify(configuration)}),
+  checkSpoofCompatibility:(tunnelId:number)=>request<SpoofCompatibilityResult>(`/v1/tunnels/${tunnelId}/modern-transports/spoof_wg/compatibility-check`,{method:"POST"}),
   setMode:(tunnelId:number,mode:"auto"|"manual",transport?:string)=>{
     if(mode==="manual"&&transport){
       return request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/${encodeURIComponent(transport)}/select-manual`,{method:"POST"});
