@@ -21,6 +21,19 @@ from ..quota_models import QuotaDevice
 from ..routers.general_settings import build_subscription_username
 
 
+# Compatibility/safety gate. Keep this explicit literal until the Modern
+# account + telemetry + revoke lifecycle in this PR is complete. The quota
+# contract smoke intentionally reads this assignment and prevents accidental
+# sale of a runtime-only protocol.
+PROTOCOL_FIELDS = {
+    "cisco": "enable_cisco",
+    "openvpn": "enable_openvpn",
+    "wireguard": "enable_wireguard",
+    "l2tp": "enable_l2tp",
+    "v2ray": "enable_v2ray",
+}
+
+
 def generate_share_code(username: str | None):
     import re
 
@@ -74,6 +87,17 @@ def create_subscription_core(
             detail=str(exc),
         ) from exc
 
+    invalid = [
+        protocol
+        for protocol in requested_protocols
+        if protocol not in PROTOCOL_FIELDS
+    ]
+    if invalid:
+        raise HTTPException(
+            status_code=422,
+            detail="پروتکل هنوز چرخه کامل اکانت/سهمیه/لغو را ندارد",
+        )
+
     # TWINPANEL_GLOBAL_NODES_FOR_ALL_SUBSCRIPTIONS_V1
     # Node selection is infrastructure-wide.
     # Every subscription belongs to every Node.
@@ -87,12 +111,16 @@ def create_subscription_core(
     )
 
     if not requested_protocols and plan is not None:
-        requested_protocols = plan_protocols(db, plan)
+        requested_protocols = [
+            protocol
+            for protocol in plan_protocols(db, plan)
+            if protocol in PROTOCOL_FIELDS
+        ]
 
     if not requested_protocols:
         raise HTTPException(
             status_code=422,
-            detail="حداقل یک پروتکل برای اشتراک انتخاب کنید",
+            detail="حداقل یک پروتکل آماده برای اشتراک انتخاب کنید",
         )
 
     iran_node = next(
@@ -118,34 +146,21 @@ def create_subscription_core(
         user_id=user_id,
         plan_id=(plan.id if plan is not None else None),
         status=SubscriptionStatus.ACTIVE,
-        # FIRST USE
         starts_at=None,
         expires_at=None,
         activation_duration_days=duration_days,
         traffic_limit_bytes=traffic_bytes,
         traffic_used_bytes=0,
-        iran_node_id=(
-            iran_node.id
-            if iran_node
-            else None
-        ),
-        exit_node_id=(
-            exit_node.id
-            if exit_node
-            else None
-        ),
+        iran_node_id=(iran_node.id if iran_node else None),
+        exit_node_id=(exit_node.id if exit_node else None),
         account_username=username,
         account_password_encrypted=password,
-        share_code=generate_share_code(
-            username or user.email
-        ),
+        share_code=generate_share_code(username or user.email),
     )
 
     db.add(sub)
     db.flush()
 
-    # TWINPANEL_USERNAME_TEMPLATE_CENTRAL_V3
-    # Apply admin configured username pattern after subscription id exists.
     if not username:
         username = build_subscription_username(
             db,
@@ -169,29 +184,18 @@ def create_subscription_core(
                 protocol=protocol,
             )
         )
-
-        # QuotaDevice is the stable accounting identity. Runtime-specific
-        # provisioning replaces the pending public hash only after a real
-        # subscriber identity has been installed on the Exit node.
         db.add(
             QuotaDevice(
                 subscription_id=sub.id,
                 protocol=protocol,
-                device_key=(
-                    f"subscription:{sub.id}:{protocol}"
-                ),
-                credential_public_hash=(
-                    f"pending-{sub.id}-{protocol}"
-                ),
+                device_key=f"subscription:{sub.id}:{protocol}",
+                credential_public_hash=f"pending-{sub.id}-{protocol}",
                 status="active",
             )
         )
 
     db.flush()
 
-    # Classic delivery still consumes this shared account credential today.
-    # Modern runtime drivers are allowed to rotate/replace their own credential
-    # record later without changing the Subscription identity.
     for protocol in requested_protocols:
         db.add(
             ProtocolCredential(
