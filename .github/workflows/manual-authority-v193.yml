@@ -1,0 +1,92 @@
+name: Manual tunnel authority V193
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/manual_authority_v193.py"
+      - "backend/app/routers/__init__.py"
+      - "backend/tests/test_manual_authority_v193.py"
+      - ".github/workflows/manual-authority-v193.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/routers/manual_authority_v193.py"
+      - "backend/app/routers/__init__.py"
+      - "backend/tests/test_manual_authority_v193.py"
+      - ".github/workflows/manual-authority-v193.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    env:
+      APP_NAME: TwinPanel-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: twinpanel
+          POSTGRES_PASSWORD: twinpanel_test
+          POSTGRES_DB: twinpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U twinpanel -d twinpanel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt pytest
+      - name: Compile manual authority runtime
+        run: |
+          python -m py_compile \
+            backend/app/routers/manual_authority_v193.py \
+            backend/app/routers/__init__.py
+      - name: Run manual authority regression
+        working-directory: backend
+        run: pytest -q tests/test_manual_authority_v193.py
+      - name: Verify canonical Agent report wins route order
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from app.main import app
+
+          target = "/v1/tunnels/{tunnel_id}/node/{node_id}/report"
+          matches = [route for route in app.routes if getattr(route, "path", None) == target]
+          assert matches, target
+          first = matches[0]
+          endpoint = getattr(first, "endpoint", None)
+          assert getattr(endpoint, "__name__", "") == "report_tunnel_peer_v193", (
+              getattr(endpoint, "__name__", ""),
+              [getattr(getattr(route, "endpoint", None), "__name__", "") for route in matches],
+          )
+          print("MANUAL_AUTHORITY_ROUTE_ORDER_OK", len(matches))
+          PY
