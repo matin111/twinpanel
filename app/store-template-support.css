@@ -38,5 +38,101 @@ html[data-store-template="editorial-grid-2027"][data-theme="dark"] .supportChatM
 html[data-store-template="editorial-grid-2027"][data-theme="dark"] .supportChatMessage.admin p,html[data-store-template="editorial-grid-2027"][data-theme="dark"] .supportChatMessage.own p{color:#f7f3ec}
 html[data-store-template="editorial-grid-2027"][data-theme="dark"] .supportChatMessage.own{background:color-mix(in srgb,var(--store-chat-accent,#8b5cf6) 24%,#1a1716)}
 
+/* Current SupportChatWidgetV2 light palette. The V2 DOM uses Head/Msg/Input class names,
+   so keep this bridge beside the storefront chat theme instead of adding page overrides. */
+html[data-theme="light"][data-store-template] body .supportChatRoot{
+  background:#fff;
+  color:#111827;
+  border-color:#dce2ec;
+  box-shadow:0 28px 70px rgba(15,23,42,.16);
+}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatHead{
+  background:#fbfcff;
+  color:#111827;
+  border-bottom-color:#e2e7ef;
+}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatHead strong{color:#111827}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatHead small{color:#667085}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatHeadActions button{
+  background:#fff;
+  color:#475467;
+  border-color:#dce2ec;
+}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatHeadActions button:hover{
+  background:#f4efff;
+  color:#5b2fc2;
+  border-color:#cdbcf4;
+}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatBody{background:#f7f9fd}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatState{color:#667085}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatMsg{
+  background:#fff;
+  color:#111827;
+  border-color:#e2e7ef;
+  box-shadow:0 8px 22px rgba(15,23,42,.045);
+}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatMsg>div{color:#111827}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatMsg time{color:#7a8495}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatMsg a{color:#5b2fc2}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatMsg.supportChatMsgMine{
+  background:linear-gradient(135deg,#ece5ff,#f5f1ff);
+  color:#3f247f;
+  border-color:#d4c5f8;
+  box-shadow:0 8px 22px rgba(91,47,194,.08);
+}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatMsg.supportChatMsgMine>div{color:#3f247f}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatMsg.supportChatMsgMine time{color:#76639d}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatComposer{
+  background:#fbfcff;
+  border-top-color:#e2e7ef;
+}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatInput{
+  background:#fff;
+  color:#111827;
+  border-color:#d8dee9;
+}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatInput::placeholder{color:#98a2b3}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatInput:focus{
+  border-color:#a98ae9;
+  box-shadow:0 0 0 3px rgba(124,58,237,.10);
+  outline:0;
+}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatAttach,
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatReveal{
+  background:#fff;
+  color:#5b2fc2;
+  border-color:#d8dee9;
+}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatAttach:hover,
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatReveal:hover{
+  background:#f4efff;
+  border-color:#cdbcf4;
+}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatSend{
+  background:linear-gradient(135deg,#8b5cf6,#6d28d9);
+  color:#fff;
+  box-shadow:0 8px 20px rgba(109,40,217,.20);
+}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatSend:hover{filter:brightness(.98);transform:translateY(-1px)}
+html[data-theme="light"][data-store-template] body .supportChatRoot .supportChatError{color:#b42318}
+
+/* Conversion header: the former white-on-white login pill disappeared in light mode. */
+html[data-theme="light"][data-store-template="conversion-2027"] body .tpStore .tpStoreLogin.tpStoreLoginPrimary{
+  background:linear-gradient(180deg,#f7f3ff,#eee7ff);
+  color:#5b2fc2;
+  border-color:#cdbcf4;
+  box-shadow:0 6px 18px rgba(91,47,194,.09);
+}
+html[data-theme="light"][data-store-template="conversion-2027"] body .tpStore .tpStoreLogin.tpStoreLoginPrimary:hover{
+  background:#e9e0ff;
+  color:#4c1d95;
+  border-color:#b99eed;
+  box-shadow:0 9px 22px rgba(91,47,194,.13);
+}
+html[data-theme="light"][data-store-template="conversion-2027"] body .tpStore .tpStoreLogin.tpStoreLoginPrimary:focus-visible{
+  outline:3px solid rgba(124,58,237,.18);
+  outline-offset:2px;
+}
+
 @media(max-width:820px){html[data-store-template="conversion-2027"] .supportChatRoot{inset-inline-start:auto;inset-inline-end:16px;bottom:86px}}
 @media(max-width:720px){html[data-store-template="editorial-grid-2027"] .supportChatRoot{inset-inline-start:auto;inset-inline-end:12px;bottom:80px}html[data-store-template="editorial-grid-2027"] .supportChatWindow{border-radius:16px}}
