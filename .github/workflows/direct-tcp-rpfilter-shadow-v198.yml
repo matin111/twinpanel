@@ -18,6 +18,10 @@ jobs:
   regression:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      APP_SECRET_KEY: twinpanel-ci-direct-tcp-rpfilter-v198
+      DATABASE_URL: postgresql://twinpanel_ci:twinpanel_ci@127.0.0.1:5432/twinpanel_ci
+      NODE_AGENT_SHARED_SECRET: twinpanel-ci-node-agent-shared-secret
 
     steps:
       - name: Checkout
