@@ -176,8 +176,8 @@ def sync_node_config(db: Session, node_id: int, api_base: str | None = None):
         "node_id": int(node_id),
         "api_base": str(api_base or "").rstrip("/"),
         "command_public_key_b64": public_key_b64(),
-        # A collector must never convert an unavailable source into a synthetic
-        # zero-byte sample. Missing runtime telemetry is a capability failure.
+        # A collector must never convert an unavailable source into synthetic
+        # zero-byte usage. Missing runtime telemetry is a capability failure.
         "telemetry_policy": {
             "fail_closed": True,
         },
