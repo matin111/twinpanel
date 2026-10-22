@@ -1,0 +1,45 @@
+name: Subscription Delivery Policy V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/subscription_delivery_policy_v1.py"
+      - "backend/app/routers/subscription_delivery_policy_v1.py"
+      - "backend/app/routers/account_delivery.py"
+      - "backend/app/subscription_enforcement.py"
+      - "backend/app/main.py"
+      - "scripts/subscription_delivery_policy_v1_smoke.py"
+      - ".github/workflows/subscription-delivery-policy-v1-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/subscription_delivery_policy_v1.py"
+      - "backend/app/routers/subscription_delivery_policy_v1.py"
+      - "backend/app/routers/account_delivery.py"
+      - "backend/app/subscription_enforcement.py"
+      - "backend/app/main.py"
+      - "scripts/subscription_delivery_policy_v1_smoke.py"
+      - ".github/workflows/subscription-delivery-policy-v1-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Compile delivery policy modules
+        run: |
+          python -m py_compile \
+            backend/app/subscription_delivery_policy_v1.py \
+            backend/app/routers/subscription_delivery_policy_v1.py \
+            scripts/subscription_delivery_policy_v1_smoke.py
+      - name: Run delivery policy smoke
+        working-directory: backend
+        run: python ../scripts/subscription_delivery_policy_v1_smoke.py
