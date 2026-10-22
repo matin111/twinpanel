@@ -1,3 +1,11 @@
+# TWINPANEL_MODERN_ENFORCEMENT_V1
+# Install the controller-owned Modern enforcement bridge before routers that
+# import queue_subscription_enforcement. Classic commands remain Agent-owned;
+# Modern sing-box commands are made durable controller work items instead.
+from ..services.modern_enforcement_v1 import install_modern_enforcement_hooks
+
+install_modern_enforcement_hooks()
+
 # Register support live-chat extension routes before the shared routers are
 # included by app.main. Importing this module attaches the delta endpoint to
 # the existing support admin router without changing its public prefix.
@@ -40,6 +48,7 @@ from . import runtime_endpoints as _runtime_endpoints
 from .classic_protocol_admin_v1 import router as _classic_protocol_admin_v1_router
 from .storefront_theme_media import router as _storefront_theme_media_router
 from .modern_account_delivery_v1 import router as _modern_account_delivery_v1_router
+from .modern_enforcement_runtime_v1 import router as _modern_enforcement_runtime_v1_router
 
 # TWINPANEL_MANUAL_AUTHORITY_REGISTER_V193
 # Agent reports arrive on an exact route also retained in the legacy tunnels
@@ -53,6 +62,7 @@ from .manual_authority_v193 import router as _manual_authority_v193_router
 # endpoint on runtime_endpoints first, following the same precedence pattern as
 # Manual Authority. The implementation imports runtime drivers lazily, keeping
 # routers package initialization free of provision/runtime cycles.
+_runtime_endpoints.router.include_router(_modern_enforcement_runtime_v1_router)
 _runtime_endpoints.router.include_router(_modern_account_delivery_v1_router)
 _runtime_endpoints.router.include_router(_manual_authority_v193_router)
 _runtime_endpoints.router.include_router(_classic_protocol_admin_v1_router)
