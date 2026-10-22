@@ -68,26 +68,26 @@ state_badge(){
 
 brand_row(){
   printf '  '
-  printf '%b%-5s%b  ' "$C_MAGENTA" "$1" "$C_RESET"
-  printf '%b%-5s%b  ' "$C_PURPLE" "$2" "$C_RESET"
-  printf '%b%-5s%b  ' "$C_BLUE" "$3" "$C_RESET"
-  printf '%b%-5s%b  ' "$C_CYAN" "$4" "$C_RESET"
-  printf '%b%-5s%b  ' "$C_CYAN" "$5" "$C_RESET"
-  printf '%b%-5s%b  ' "$C_BLUE" "$6" "$C_RESET"
-  printf '%b%-5s%b  ' "$C_PURPLE" "$7" "$C_RESET"
-  printf '%b%-5s%b  ' "$C_MAGENTA" "$8" "$C_RESET"
-  printf '%b%-5s%b\n' "$C_MAGENTA" "$9" "$C_RESET"
+  printf '%b%-9s%b  ' "$C_MAGENTA" "$1" "$C_RESET"
+  printf '%b%-9s%b  ' "$C_PURPLE" "$2" "$C_RESET"
+  printf '%b%-9s%b  ' "$C_BLUE" "$3" "$C_RESET"
+  printf '%b%-9s%b  ' "$C_CYAN" "$4" "$C_RESET"
+  printf '%b%-9s%b  ' "$C_CYAN" "$5" "$C_RESET"
+  printf '%b%-9s%b  ' "$C_BLUE" "$6" "$C_RESET"
+  printf '%b%-9s%b  ' "$C_PURPLE" "$7" "$C_RESET"
+  printf '%b%-9s%b  ' "$C_MAGENTA" "$8" "$C_RESET"
+  printf '%b%-9s%b\n' "$C_MAGENTA" "$9" "$C_RESET"
 }
 
 brand(){
   printf '\n'
-  brand_row 'ooooo' 'o   o' 'ooooo' 'o   o' 'oooo ' ' ooo ' 'o   o' 'ooooo' 'o    '
-  brand_row '  o  ' 'o   o' '  o  ' 'oo  o' 'o   o' 'o   o' 'oo  o' 'o    ' 'o    '
-  brand_row '  o  ' 'o   o' '  o  ' 'oo  o' 'o   o' 'o   o' 'oo  o' 'o    ' 'o    '
-  brand_row '  o  ' 'o o o' '  o  ' 'o o o' 'oooo ' 'ooooo' 'o o o' 'oooo ' 'o    '
-  brand_row '  o  ' 'o o o' '  o  ' 'o  oo' 'o    ' 'o   o' 'o  oo' 'o    ' 'o    '
-  brand_row '  o  ' 'oo oo' '  o  ' 'o  oo' 'o    ' 'o   o' 'o  oo' 'o    ' 'o    '
-  brand_row '  o  ' 'o   o' 'ooooo' 'o   o' 'o    ' 'o   o' 'o   o' 'ooooo' 'ooooo'
+  brand_row '* * * * *' '*       *' '* * * * *' '*       *' '* * * *  ' '  * * *  ' '*       *' '* * * * *' '*        '
+  brand_row '    *    ' '*       *' '    *    ' '* *     *' '*       *' '*       *' '* *     *' '*        ' '*        '
+  brand_row '    *    ' '*       *' '    *    ' '* *     *' '*       *' '*       *' '* *     *' '*        ' '*        '
+  brand_row '    *    ' '*   *   *' '    *    ' '*   *   *' '* * * *  ' '* * * * *' '*   *   *' '* * * *  ' '*        '
+  brand_row '    *    ' '*   *   *' '    *    ' '*     * *' '*        ' '*       *' '*     * *' '*        ' '*        '
+  brand_row '    *    ' '* *   * *' '    *    ' '*     * *' '*        ' '*       *' '*     * *' '*        ' '*        '
+  brand_row '    *    ' '*       *' '* * * * *' '*       *' '*        ' '*       *' '*       *' '* * * * *' '* * * * *'
   printf '\n'
 }
 
@@ -106,8 +106,8 @@ header(){
   web_state="$(unit_state twinpanel-web.service)"
 
   brand
-  printf '  %b--------%b %bSelf-Hosted VPN Control Plane%b %b--------%b\n\n' \
-    "$C_PURPLE" "$C_RESET" "$C_CYAN" "$C_RESET" "$C_MAGENTA" "$C_RESET"
+  printf '  %b[TWINPANEL]%b  %bSelf-Hosted VPN Control Plane%b\n\n' \
+    "$C_MAGENTA" "$C_RESET" "$C_CYAN" "$C_RESET"
   printf '  %bo%b API %s   %b|%b   %bo%b WEB %s   %b|%b   %bv%s%b\n' \
     "$C_GREEN" "$C_RESET" "$(state_badge "$api_state")" \
     "$C_DIM" "$C_RESET" \
@@ -237,7 +237,6 @@ restart_nginx(){
   fi
   restart_unit nginx.service
 }
-
 restart_panel_now(){
   echo
   restart_unit twinpanel-api.service || true
