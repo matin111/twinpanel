@@ -12,9 +12,8 @@ from ..quota_security import public_key_b64
 
 
 # Panel/database protocol name -> canonical node quota protocol name.
-# Modern sing-box entries are deliberately explicit.  A credential is exported
-# only when it really exists, so adding a mapping here does not make an
-# unprovisioned protocol sellable or fabricate telemetry.
+# A credential is exported only when it really exists; mapping a protocol here
+# does not fabricate telemetry and the node contract remains fail-closed.
 _PROTOCOL_TO_QUOTA = {
     "cisco": "openconnect",
     "openvpn": "openvpn",
@@ -28,6 +27,10 @@ _PROTOCOL_TO_QUOTA = {
     "naiveproxy": "naive",
     "shadowtls": "shadowtls",
     "snell": "snell",
+    "mieru": "mieru",
+    "trusttunnel": "trusttunnel",
+    "amneziawg": "amneziawg",
+    "sudoku": "sudoku",
 }
 
 
@@ -35,16 +38,7 @@ def _quota_device_for_credential(
     db: Session,
     credential: ProtocolCredential,
 ) -> QuotaDevice | None:
-    """Return the canonical quota device for one protocol credential.
-
-    QuotaSession.device_id is a foreign key to quota_devices.id. Older node
-    config generation accidentally exported ProtocolCredential.id instead,
-    causing real session-open/usage events to fail device validation.
-
-    Existing installations may predate automatic QuotaDevice creation, so a
-    missing device is backfilled. An existing revoked/inactive device is never
-    reactivated here; that remains an enforcement decision.
-    """
+    """Return the canonical quota device for one protocol credential."""
 
     source_protocol = str(credential.protocol or "").strip().lower()
 
@@ -83,13 +77,11 @@ def _runtime_identity(
     fallback_identity: str,
     openvpn_central_pki_enabled: bool,
 ) -> str:
-    """Return the identity observed by the protocol runtime on this node.
+    """Return the exact identity expected from runtime telemetry.
 
-    The generic credential username is not the OpenVPN certificate Common
-    Name. Legacy per-node EasyRSA profiles use mv<subscription>n<node>, while
-    Central PKI uses the stable subscription-scoped mv-sub-<subscription> CN.
-    Keeping this separate from ``identity`` preserves existing consumers while
-    giving runtime telemetry an exact, non-guessing identity.
+    Modern account drivers persist their runtime-visible identity in
+    ProtocolCredential.username: user name for shared-user runtimes, peer public
+    key for AmneziaWG, and per-instance token+port for Sudoku.
     """
 
     if protocol != "openvpn":
@@ -149,8 +141,6 @@ def build_node_devices(db: Session, node_id: int):
 
         result.append(
             {
-                # IMPORTANT: quota sessions/events reference quota_devices.id,
-                # never protocol_credentials.id.
                 "device_id": int(device.id),
                 "subscription_id": subscription_id,
                 "protocol": protocol,
@@ -186,9 +176,8 @@ def sync_node_config(db: Session, node_id: int, api_base: str | None = None):
         "node_id": int(node_id),
         "api_base": str(api_base or "").rstrip("/"),
         "command_public_key_b64": public_key_b64(),
-        # Contract V4: a node must never turn missing/unsupported telemetry into
-        # synthetic zero-byte usage.  Unsupported collectors stay fail-closed
-        # until their real runtime counter source is available.
+        # A collector must never convert an unavailable source into a synthetic
+        # zero-byte sample. Missing runtime telemetry is a capability failure.
         "telemetry_policy": {
             "fail_closed": True,
         },
@@ -204,7 +193,6 @@ def sync_node_config(db: Session, node_id: int, api_base: str | None = None):
         encoding="utf-8",
     )
 
-    # Lazy-backfilled QuotaDevice rows must survive after this request.
     db.flush()
 
     return {
