@@ -114,7 +114,7 @@ def main() -> None:
 
     assert "HIDDEN_ROUTED_PROFILES" in xray_policy
     assert '"legacy"' in xray_policy
-    assert "if profile not in PUBLIC_PROFILE_IDS" in xray_policy
+    assert "if profile not in ADMIN_ROUTE_PROFILE_IDS" in xray_policy
 
     l2tp_routes = _function_source(
         policy,
