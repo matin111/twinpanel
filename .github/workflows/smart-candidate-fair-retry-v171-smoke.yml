@@ -1,0 +1,76 @@
+name: Smart Candidate Fair Retry V171 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/smart_candidate_fair_retry_v171.py'
+      - 'backend/app/tunnel_transport_manager_v12.py'
+      - 'backend/app/transport_candidates/tp27_mieru_tcp.py'
+      - 'backend/app/modern_protocol_preflight.py'
+      - '.github/workflows/smart-candidate-fair-retry-v171-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/smart_candidate_fair_retry_v171.py'
+      - 'backend/app/tunnel_transport_manager_v12.py'
+      - 'backend/app/transport_candidates/tp27_mieru_tcp.py'
+      - 'backend/app/modern_protocol_preflight.py'
+      - '.github/workflows/smart-candidate-fair-retry-v171-smoke.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile V171 runtime files
+        run: |
+          python -m py_compile \
+            backend/app/smart_candidate_fair_retry_v171.py \
+            backend/app/tunnel_transport_manager_v12.py \
+            backend/app/transport_candidates/tp27_mieru_tcp.py \
+            backend/app/modern_protocol_preflight.py
+
+      - name: Verify V171 retry and Mieru preflight contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          fair = Path('backend/app/smart_candidate_fair_retry_v171.py').read_text()
+          manager = Path('backend/app/tunnel_transport_manager_v12.py').read_text()
+          preflight = Path('backend/app/modern_protocol_preflight.py').read_text()
+
+          required_fair = [
+              'TWINPANEL_SMART_CANDIDATE_FAIR_RETRY_V171',
+              'last_install_attempt_epoch',
+              '_fresh_lifecycle',
+              'set_smart_state_merge_safe_v171',
+              'install_candidate_name_fair_v171',
+              'eligible.sort(key=lambda item: (item[0], item[1], item[2], item[3]))',
+              'ensure_runtime_environment(conn)',
+              'tp27_mieru_tcp._install_mieru_package = install_mieru_package_preflight_v171',
+          ]
+          for marker in required_fair:
+              assert marker in fair, marker
+
+          assert 'TMP_UNSAFE_OWNER' in preflight
+          assert 'chmod 1777 /tmp' in preflight
+          assert 'runuser -u _apt' in preflight
+
+          order = [
+              'apply_adaptive_multilane_v165()',
+              'apply_smart_candidate_install_guard_v167()',
+              'apply_smart_candidate_retry_guard_v169()',
+              'apply_smart_candidate_fair_retry_v171()',
+              'apply_adaptive_candidate_qualification_v155()',
+          ]
+          offsets = [manager.index(item) for item in order]
+          assert offsets == sorted(offsets), offsets
+
+          assert 'smart_candidate_fair_retry=v171' in manager
+          print('SMART_CANDIDATE_FAIR_RETRY_V171_SMOKE_OK')
+          PY
