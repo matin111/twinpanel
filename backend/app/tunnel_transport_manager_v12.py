@@ -24,6 +24,9 @@ from .exit_access_dataplane_stability_v144 import (
 from .legacy_ingress_reconciler import reconciler_loop as legacy_ingress_loop
 from .runtime_reconciler_v5 import reconciler_loop as runtime_reconciler_loop
 from .manager_runtime_v16 import install_manager_runtime_v16
+from .smart_candidate_fair_retry_v171 import (
+    apply_smart_candidate_fair_retry_v171,
+)
 from .smart_candidate_install_guard_v167 import (
     apply_smart_candidate_install_guard_v167,
 )
@@ -50,6 +53,7 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 # + TP27 MIERU TCP CARRIER V165
 # + SMART CANDIDATE INSTALL GUARD V167
 # + SMART CANDIDATE RETRY GUARD V169
+# + SMART CANDIDATE FAIR RETRY V171
 # + ADAPTIVE CANDIDATE QUALIFICATION V155
 # + RUNTIME RECONCILER V5 (extends runtime_reconciler_v4)
 # ============================================================
@@ -64,6 +68,7 @@ async def main() -> None:
     apply_adaptive_multilane_v165()
     apply_smart_candidate_install_guard_v167()
     apply_smart_candidate_retry_guard_v169()
+    apply_smart_candidate_fair_retry_v171()
     apply_adaptive_candidate_qualification_v155()
     apply_adaptive_tunnel_performance_v148()
     apply_exit_access_dataplane_stability_v144()
@@ -80,6 +85,7 @@ async def main() -> None:
         "adaptive_multilane=v165 "
         "smart_candidate_install_guard=v167 "
         "smart_candidate_retry_guard=v169 "
+        "smart_candidate_fair_retry=v171 "
         "adaptive_candidate_qualification=v155 "
         "vpn_access_dataplane=v46 "
         "vpn_access_performance=v51 "
