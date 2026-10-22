@@ -8,6 +8,7 @@ import {ConversionTemplateCustomizer} from "./store-template-conversion-customiz
 import {EditorialTemplateCustomizer} from "./store-template-editorial-customizer";
 import {OrbitTemplateCustomizerPolished} from "./store-template-orbit-customizer-polished";
 import {StoreTemplateCustomizer} from "./store-template-customizer";
+import {StoreTemplateSeoPanel} from "./store-template-seo-panel";
 import {Card,Shell} from "./ui";
 
 export function StoreTemplateCustomizerPage({templateId}:{templateId:string}){
@@ -34,5 +35,8 @@ export function StoreTemplateCustomizerPage({templateId}:{templateId:string}){
         ?<OrbitTemplateCustomizerPolished onClose={close}/>
         :<StoreTemplateCustomizer templateId={template.id} onClose={close}/>;
 
-  return <Shell active="/admin/store-settings"><div className="page storeAdminManager">{customizer}</div></Shell>;
+  return <Shell active="/admin/store-settings"><div className="page storeAdminManager">
+    {customizer}
+    <StoreTemplateSeoPanel templateId={template.id}/>
+  </div></Shell>;
 }
