@@ -67,7 +67,7 @@ def test_install_script_pins_verified_go_toolchain():
     assert GO_SHA256["amd64"] in script
     assert GO_SHA256["arm64"] in script
     assert "sha256sum -c -" in script
-    assert '"$GO_BIN" build' in script
+    assert 'CGO_ENABLED=0 GOTOOLCHAIN=local "$GO_BIN" build' in script
     assert "apt-get install -y --no-install-recommends ca-certificates curl git tar" in script
     assert "golang-go" not in script
 
