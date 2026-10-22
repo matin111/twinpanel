@@ -204,18 +204,42 @@ func (s *laneSet) healthyCount() int {
 }
 
 func openTun(name string) (*os.File, error) {
-	f, err := os.OpenFile("/dev/net/tun", os.O_RDWR, 0)
+	fd, err := syscall.Open("/dev/net/tun", syscall.O_RDWR|syscall.O_CLOEXEC, 0)
 	if err != nil {
 		return nil, err
 	}
+
+	closeFD := true
+	defer func() {
+		if closeFD {
+			_ = syscall.Close(fd)
+		}
+	}()
+
 	var req ifreqFlags
 	copy(req.Name[:], []byte(name))
 	req.Flags = iffTun | iffNoPI
-	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), uintptr(tunSetIFF), uintptr(unsafe.Pointer(&req)))
+
+	_, _, errno := syscall.Syscall(
+		syscall.SYS_IOCTL,
+		uintptr(fd),
+		uintptr(tunSetIFF),
+		uintptr(unsafe.Pointer(&req)),
+	)
 	if errno != 0 {
-		_ = f.Close()
 		return nil, errno
 	}
+
+	if err := syscall.SetNonblock(fd, true); err != nil {
+		return nil, fmt.Errorf("set tun nonblock: %w", err)
+	}
+
+	f := os.NewFile(uintptr(fd), "/dev/net/tun")
+	if f == nil {
+		return nil, errors.New("wrap tun fd")
+	}
+
+	closeFD = false
 	return f, nil
 }
 

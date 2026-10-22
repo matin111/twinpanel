@@ -1,0 +1,79 @@
+name: TP27 Direct TCP TUN FD Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'tools/tp27-tcp-direct/main.go'
+      - 'tools/tp27-tcp-direct/go.mod'
+      - '.github/workflows/tp27-direct-tun-fd-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/tp27-tcp-direct/main.go'
+      - 'tools/tp27-tcp-direct/go.mod'
+      - '.github/workflows/tp27-direct-tun-fd-smoke.yml'
+
+jobs:
+  carrier:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.0'
+
+      - name: Guard TUN fd lifecycle ordering
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('tools/tp27-tcp-direct/main.go').read_text(encoding='utf-8')
+          start = source.index('func openTun(')
+          end = source.index('\nfunc configureTun(', start)
+          body = source[start:end]
+
+          legacy = 'os.OpenFile("/dev/net/tun"'
+          raw_open = 'syscall.Open("/dev/net/tun", syscall.O_RDWR|syscall.O_CLOEXEC, 0)'
+          ioctl = 'syscall.SYS_IOCTL'
+          nonblock = 'syscall.SetNonblock(fd, true)'
+          wrap = 'os.NewFile(uintptr(fd), "/dev/net/tun")'
+          cleanup = 'syscall.Close(fd)'
+
+          assert legacy not in body, body
+          for marker in (raw_open, ioctl, nonblock, wrap, cleanup):
+              assert marker in body, marker
+
+          assert body.index(raw_open) < body.index(ioctl)
+          assert body.index(ioctl) < body.index(nonblock)
+          assert body.index(nonblock) < body.index(wrap)
+
+          print('TP27_DIRECT_TUN_FD_ORDER=PASS')
+          PY
+
+      - name: Verify gofmt
+        run: |
+          cp tools/tp27-tcp-direct/main.go /tmp/tp27-main.go.before
+          gofmt -w tools/tp27-tcp-direct/main.go
+          cmp /tmp/tp27-main.go.before tools/tp27-tcp-direct/main.go
+
+      - name: Vet carrier
+        working-directory: tools/tp27-tcp-direct
+        run: go vet ./...
+
+      - name: Build Linux x86_64 carrier
+        working-directory: tools/tp27-tcp-direct
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: amd64
+        run: go build -trimpath -ldflags='-s -w' -o /tmp/tp27-tcp-direct .
+
+      - name: Verify CLI contract
+        run: |
+          /tmp/tp27-tcp-direct -h > /tmp/tp27-help.txt 2>&1 || true
+          grep -F -- '-token-file' /tmp/tp27-help.txt
+          grep -F -- '-lanes' /tmp/tp27-help.txt
+          grep -F -- '-tun' /tmp/tp27-help.txt
