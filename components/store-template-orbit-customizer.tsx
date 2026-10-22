@@ -20,9 +20,10 @@ import {
   uploadStoreTemplateMedia,
 } from "../lib/store-template-settings-api";
 import {StorefrontAdvancedDesignControls} from "./storefront-advanced-design-lab";
+import {StoreTemplateSeoPanel} from "./store-template-seo-panel";
 import styles from "./store-template-orbit-customizer.module.css";
 
-type Tab="design"|"media"|"hero"|"commerce"|"content"|"layout";
+type Tab="design"|"media"|"hero"|"commerce"|"content"|"layout"|"seo";
 type TextField={key:string;fa:string;en:string;long?:boolean};
 type ColorField={key:string;fa:string;en:string;fallback:string;helpFa:string;helpEn:string};
 type Choice={value:string;fa:string;en:string;descFa:string;descEn:string};
@@ -34,6 +35,7 @@ const TABS:{id:Tab;fa:string;en:string;icon:string}[]=[
   {id:"commerce",fa:"فروش و پلن‌ها",en:"Commerce",icon:"02"},
   {id:"content",fa:"محتوای بخش‌ها",en:"Content",icon:"03"},
   {id:"layout",fa:"چیدمان",en:"Layout",icon:"04"},
+  {id:"seo",fa:"سئو",en:"SEO",icon:"05"},
 ];
 
 const COLORS:ColorField[]=[
@@ -201,10 +203,10 @@ export function OrbitTemplateCustomizer({onClose}:{onClose:()=>void}){
   return <section className={styles.root}>
     <header className={styles.header}>
       <div><span className={styles.eyebrow}>ORBIT NEO / 2027</span><h1>{pick("ویرایشگر قالب سوم — Orbit Neo","Third theme editor — Orbit Neo")}</h1><p>{pick("قالبی مستقل، تصویرمحور و Spatial با Media Studio داخلی. پلن، قیمت، سفارش و خرید همچنان از Backend واقعی می‌آیند.","An independent, image-led spatial storefront with a built-in Media Studio. Plans, pricing, orders and checkout remain backend-driven.")}</p></div>
-      <div className={styles.actions}><button type="button" onClick={onClose}>{pick("بازگشت","Back")}</button><button type="button" onClick={()=>void reset()} disabled={busy||!hasSaved}>{pick("بازنشانی","Reset")}</button><Link href="/store" target="_blank">{pick("مشاهده فروشگاه","Open storefront")} ↗</Link><button type="button" className={styles.primary} disabled={busy} onClick={()=>void save()}>{busy?"…":pick("ذخیره قالب","Save template")}</button></div>
+      <div className={styles.actions}><button type="button" onClick={onClose}>{pick("بازگشت","Back")}</button>{tab!=="seo"&&<button type="button" onClick={()=>void reset()} disabled={busy||!hasSaved}>{pick("بازنشانی","Reset")}</button>}<Link href="/store" target="_blank">{pick("مشاهده فروشگاه","Open storefront")} ↗</Link>{tab!=="seo"&&<button type="button" className={styles.primary} disabled={busy} onClick={()=>void save()}>{busy?"…":pick("ذخیره قالب","Save template")}</button>}</div>
     </header>
 
-    <div className={styles.statusBar}><span className={hasSaved?styles.saved:styles.inherit}>{hasSaved?pick("تنظیمات مستقل فعال","Independent settings active"):pick("تنظیمات پیش‌فرض Orbit Neo","Orbit Neo defaults")}</span><div className={styles.locale}><button type="button" className={locale==="fa"?styles.active:""} onClick={()=>setLocale("fa")}>FA</button><button type="button" className={locale==="en"?styles.active:""} onClick={()=>setLocale("en")}>EN</button></div></div>
+    <div className={styles.statusBar}><span className={hasSaved?styles.saved:styles.inherit}>{hasSaved?pick("تنظیمات مستقل فعال","Independent settings active"):pick("تنظیمات پیش‌فرض Orbit Neo","Orbit Neo defaults")}</span>{tab!=="seo"&&<div className={styles.locale}><button type="button" className={locale==="fa"?styles.active:""} onClick={()=>setLocale("fa")}>FA</button><button type="button" className={locale==="en"?styles.active:""} onClick={()=>setLocale("en")}>EN</button></div>}</div>
     {error&&<div className={styles.error}>{error}</div>}
     {ok&&<div className={styles.success}>{ok}</div>}
 
@@ -240,6 +242,7 @@ export function OrbitTemplateCustomizer({onClose}:{onClose:()=>void}){
           <div className={styles.toggleGrid}><Toggle checked={Boolean(draft.show_final_cta)} label={pick("نمایش CTA نهایی","Show final CTA")} onChange={value=>setValue("show_final_cta",value)}/><Toggle checked={Boolean(draft.show_contact)} label={pick("نمایش ارتباط و فوتر","Show contact & footer")} onChange={value=>setValue("show_contact",value)}/></div>
           <StorefrontAdvancedDesignControls templateId="orbit-neo-2027" values={advancedValues} onChange={advancedChange} section="layout"/>
         </>}
+        {tab==="seo"&&<StoreTemplateSeoPanel templateId="orbit-neo-2027"/>}
       </main>
     </div>
   </section>;

@@ -4,8 +4,11 @@ on:
   pull_request:
     paths:
       - "components/store-template-conversion-customizer.tsx"
+      - "components/store-template-editorial-customizer.tsx"
+      - "components/store-template-orbit-customizer.tsx"
       - "components/store-template-customizer-page.tsx"
       - "components/store-template-seo-panel.tsx"
+      - "lib/store-template-registry.ts"
       - ".github/workflows/store-template-seo-sidebar-smoke.yml"
   workflow_dispatch:
 
@@ -16,28 +19,46 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Verify Conversion SEO stays inside template navigation
+      - name: Verify every installed template owns its SEO navigation
         run: |
           python3 - <<'PY'
+          import re
           from pathlib import Path
 
           conversion = Path("components/store-template-conversion-customizer.tsx").read_text(encoding="utf-8")
+          editorial = Path("components/store-template-editorial-customizer.tsx").read_text(encoding="utf-8")
+          orbit = Path("components/store-template-orbit-customizer.tsx").read_text(encoding="utf-8")
           parent = Path("components/store-template-customizer-page.tsx").read_text(encoding="utf-8")
+          registry = Path("lib/store-template-registry.ts").read_text(encoding="utf-8")
           seo = Path("components/store-template-seo-panel.tsx").read_text(encoding="utf-8")
 
-          assert 'import {StoreTemplateSeoPanel} from "./store-template-seo-panel";' in conversion
-          assert '|"seo"' in conversion
-          assert '{id:"seo",fa:"سئو",en:"SEO",icon:"06"}' in conversion
-          assert 'tab==="seo"&&<StoreTemplateSeoPanel templateId="conversion-2027"/>' in conversion
+          expected = {
+              "conversion-2027": (conversion, 'icon:"06"'),
+              "editorial-grid-2027": (editorial, 'icon:"07"'),
+              "orbit-neo-2027": (orbit, 'icon:"05"'),
+          }
 
-          # Conversion owns its SEO panel inside the customizer. Other template
-          # editors keep the shared fallback until they receive their own tab.
-          assert '{template.id!=="conversion-2027"&&<StoreTemplateSeoPanel templateId={template.id}/>}' in parent
+          catalog_ids = set(re.findall(r'\bid:"([^"]+)"', registry))
+          assert catalog_ids == set(expected), (catalog_ids, set(expected))
+
+          for template_id, (source, icon) in expected.items():
+              assert 'import {StoreTemplateSeoPanel} from "./store-template-seo-panel";' in source
+              assert '|"seo"' in source
+              assert f'{{id:"seo",fa:"سئو",en:"SEO",{icon}}}' in source
+              assert f'tab==="seo"&&<StoreTemplateSeoPanel templateId="{template_id}"/>' in source
+              assert f'"{template_id}",' in parent
+
+          # Every currently installed template owns its SEO panel inside its
+          # customizer. The parent keeps a fallback only for a future template
+          # that has not yet received an integrated editor.
+          assert 'const INTEGRATED_SEO_TEMPLATE_IDS=new Set([' in parent
+          assert '!INTEGRATED_SEO_TEMPLATE_IDS.has(template.id)&&<StoreTemplateSeoPanel templateId={template.id}/>' in parent
           assert '\n    <StoreTemplateSeoPanel templateId={template.id}/>' not in parent
+          assert 'template.id!=="conversion-2027"&&<StoreTemplateSeoPanel' not in parent
 
-          # Save/reset contracts must remain on the existing SEO component.
+          # SEO persistence stays centralized and unchanged.
           assert 'saveStoreTemplateSeo' in seo
           assert 'resetStoreTemplateSeo' in seo
           assert 'STORE_TEMPLATE_SEO_KEYS' in seo
-          print("STORE_TEMPLATE_SEO_SIDEBAR_OK")
+          print("STORE_TEMPLATE_ALL_SEO_SIDEBARS_OK")
           PY
