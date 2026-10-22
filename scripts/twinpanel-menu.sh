@@ -13,9 +13,10 @@ BACKUP_ROOT="/var/lib/twinpanel-backups"
 UPDATE_STATE_FILE="/var/lib/twinpanel-license/update-state.json"
 
 if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+  C_MAGENTA='\033[1;95m'
   C_PURPLE='\033[1;35m'
-  C_CYAN='\033[1;36m'
   C_BLUE='\033[1;34m'
+  C_CYAN='\033[1;36m'
   C_GREEN='\033[1;32m'
   C_YELLOW='\033[1;33m'
   C_RED='\033[1;31m'
@@ -23,9 +24,10 @@ if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
   C_DIM='\033[2m'
   C_RESET='\033[0m'
 else
+  C_MAGENTA=''
   C_PURPLE=''
-  C_CYAN=''
   C_BLUE=''
+  C_CYAN=''
   C_GREEN=''
   C_YELLOW=''
   C_RED=''
@@ -64,21 +66,33 @@ state_badge(){
   esac
 }
 
-brand(){
-  printf '%b' "$C_PURPLE"
-  cat <<'BANNER'
+brand_row(){
+  printf '  '
+  printf '%b%-5s%b ' "$C_MAGENTA" "$1" "$C_RESET"
+  printf '%b%-5s%b ' "$C_PURPLE" "$2" "$C_RESET"
+  printf '%b%-5s%b ' "$C_BLUE" "$3" "$C_RESET"
+  printf '%b%-5s%b ' "$C_CYAN" "$4" "$C_RESET"
+  printf '%b%-5s%b ' "$C_CYAN" "$5" "$C_RESET"
+  printf '%b%-5s%b ' "$C_BLUE" "$6" "$C_RESET"
+  printf '%b%-5s%b ' "$C_PURPLE" "$7" "$C_RESET"
+  printf '%b%-5s%b ' "$C_MAGENTA" "$8" "$C_RESET"
+  printf '%b%-5s%b\n' "$C_MAGENTA" "$9" "$C_RESET"
+}
 
-  TTTTT  W   W  III  N   N  PPPP    A   N   N  EEEEE  L
-    T    W   W   I   NN  N  P   P  A A  NN  N  E      L
-    T    W W W   I   N N N  PPPP   AAAAA N N N  EEEE   L
-    T    WW WW   I   N  NN  P      A   A N  NN  E      L
-    T    W   W  III  N   N  P      A   A N   N  EEEEE  LLLLL
-BANNER
-  printf '%b' "$C_RESET"
+brand(){
+  printf '\n'
+  brand_row '#####' '#   #' '#####' '#   #' '#### ' ' ### ' '#   #' '#####' '#    '
+  brand_row '  #  ' '#   #' '  #  ' '##  #' '#   #' '#   #' '##  #' '#    ' '#    '
+  brand_row '  #  ' '# # #' '  #  ' '# # #' '#### ' '#####' '# # #' '#### ' '#    '
+  brand_row '  #  ' '## ##' '  #  ' '#  ##' '#    ' '#   #' '#  ##' '#    ' '#    '
+  brand_row '  #  ' '#   #' '#####' '#   #' '#    ' '#   #' '#   #' '#####' '#####'
+  printf '\n'
 }
 
 separator(){
-  printf '%b%s%b\n' "$C_DIM" '  ------------------------------------------------------------------------' "$C_RESET"
+  printf '  %b----------------%b%b----------------%b%b----------------%b%b----------------%b\n' \
+    "$C_MAGENTA" "$C_RESET" "$C_PURPLE" "$C_RESET" \
+    "$C_CYAN" "$C_RESET" "$C_BLUE" "$C_RESET"
 }
 
 header(){
@@ -90,16 +104,23 @@ header(){
   web_state="$(unit_state twinpanel-web.service)"
 
   brand
-  printf '  %bSelf-Hosted VPN Control Plane%b | v%s\n' "$C_CYAN" "$C_RESET" "$version"
-  printf '  API %s    Web %s\n' "$(state_badge "$api_state")" "$(state_badge "$web_state")"
+  printf '  %b--------%b %bSelf-Hosted VPN Control Plane%b %b--------%b\n\n' \
+    "$C_PURPLE" "$C_RESET" "$C_CYAN" "$C_RESET" "$C_MAGENTA" "$C_RESET"
+  printf '  %bo%b API %s   %b|%b   %bo%b WEB %s   %b|%b   %bv%s%b\n' \
+    "$C_GREEN" "$C_RESET" "$(state_badge "$api_state")" \
+    "$C_DIM" "$C_RESET" \
+    "$C_GREEN" "$C_RESET" "$(state_badge "$web_state")" \
+    "$C_DIM" "$C_RESET" "$C_BLUE" "$version" "$C_RESET"
   separator
-  printf '  %b%s%b\n' "$C_WHITE" "$title" "$C_RESET"
-  separator
+  if [[ "$title" != "Quick actions" ]]; then
+    printf '  %b%s%b\n' "$C_WHITE" "$title" "$C_RESET"
+    separator
+  fi
   printf '\n'
 }
 
 menu_item(){
-  printf '  %b[%s]%b  %s\n' "$C_PURPLE" "$1" "$C_RESET" "$2"
+  printf '  %b[%s]%b  %s\n' "$C_MAGENTA" "$1" "$C_RESET" "$2"
 }
 
 menu_back(){
