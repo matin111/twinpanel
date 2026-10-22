@@ -9,12 +9,46 @@ EXISTING_INSTALL=0
 PROTOCOL_SETUP_STATUS="skipped"
 [[ -f /etc/twinpanel/backend.env ]] && EXISTING_INSTALL=1
 
-say(){ printf '\n\033[1;35m%s\033[0m\n' "$*"; }
-info(){ printf '\033[1;34m%s\033[0m\n' "$*"; }
-warn(){ printf '\033[1;33mWARNING: %s\033[0m\n' "$*" >&2; }
+if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+  C_PURPLE='\033[1;35m'
+  C_BLUE='\033[1;36m'
+  C_GREEN='\033[1;32m'
+  C_YELLOW='\033[1;33m'
+  C_DIM='\033[2m'
+  C_RESET='\033[0m'
+else
+  C_PURPLE=''
+  C_BLUE=''
+  C_GREEN=''
+  C_YELLOW=''
+  C_DIM=''
+  C_RESET=''
+fi
+
+say(){ printf '\n%b%s%b\n' "$C_PURPLE" "$*" "$C_RESET"; }
+info(){ printf '%b%s%b\n' "$C_BLUE" "$*" "$C_RESET"; }
+warn(){ printf '%bWARNING: %s%b\n' "$C_YELLOW" "$*" "$C_RESET" >&2; }
 fail(){ printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 cleanup(){ [[ -n "${WORKDIR:-}" && -d "$WORKDIR" ]] && rm -rf "$WORKDIR" || true; }
 trap cleanup EXIT
+
+brand_splash(){
+  [[ -t 1 ]] && clear 2>/dev/null || true
+  printf '%b' "$C_PURPLE"
+  cat <<'BANNER'
+
+  ████████╗██╗    ██╗██╗███╗   ██╗██████╗  █████╗ ███╗   ██╗███████╗██╗
+  ╚══██╔══╝██║    ██║██║████╗  ██║██╔══██╗██╔══██╗████╗  ██║██╔════╝██║
+     ██║   ██║ █╗ ██║██║██╔██╗ ██║██████╔╝███████║██╔██╗ ██║█████╗  ██║
+     ██║   ██║███╗██║██║██║╚██╗██║██╔═══╝ ██╔══██║██║╚██╗██║██╔══╝  ██║
+     ██║   ╚███╔███╔╝██║██║ ╚████║██║     ██║  ██║██║ ╚████║███████╗███████╗
+     ╚═╝    ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝
+BANNER
+  printf '%b' "$C_RESET"
+  printf '\n  %bSelf-Hosted VPN Control Plane%b\n' "$C_BLUE" "$C_RESET"
+  printf '  %bControl • Connect • Operate%b\n\n' "$C_DIM" "$C_RESET"
+  printf '  %b●%b Official installer is starting...\n\n' "$C_GREEN" "$C_RESET"
+}
 
 normalize_protocol_selection(){
   local raw="${1:-}" token
@@ -93,9 +127,11 @@ setup_local_protocols(){
   else
     PROTOCOL_SETUP_STATUS="partial-or-failed:$selected"
     warn "TwinPanel itself is installed, but one or more VPN protocols need attention."
-    warn "Open 'twinpanel' -> Protocol management and use Status/Repair for the failed protocol."
+    warn "Open 'twinpanel', choose 3 (VPN protocols), then use Status/Repair for the failed protocol."
   fi
 }
+
+brand_splash
 
 [[ ${EUID:-$(id -u)} -eq 0 ]] || fail "Run as root / با دسترسی root اجرا کنید"
 
@@ -266,6 +302,7 @@ done
 PUBLIC_IP="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++)if($i=="src"){print $(i+1);exit}}')"
 
 say "TwinPanel installation complete"
+printf '%b%s%b\n' "$C_GREEN" "Installation finished successfully." "$C_RESET"
 echo "Version: $VERSION"
 echo "Source SHA: $SOURCE_SHA"
 echo "Panel: http://${PUBLIC_IP:-SERVER_IP}"
