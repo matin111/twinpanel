@@ -1,0 +1,30 @@
+name: Manual modern transport V192
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/modern_transports.py"
+      - "backend/app/transport_candidates/**"
+      - "lib/modern-transport-api.ts"
+      - "scripts/smoke-manual-modern-transport-v192.py"
+      - ".github/workflows/manual-modern-transport-v192.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/routers/modern_transports.py"
+      - "backend/app/transport_candidates/**"
+      - "lib/modern-transport-api.ts"
+      - "scripts/smoke-manual-modern-transport-v192.py"
+      - ".github/workflows/manual-modern-transport-v192.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify manual modern transport contract
+        run: python3 scripts/smoke-manual-modern-transport-v192.py

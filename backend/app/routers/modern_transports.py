@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import require_admin
-from ..models import Tunnel, TunnelTransport
+from ..models import Tunnel, TunnelStatus, TunnelTransport
 from ..smart_transport_auto_v21 import (
     CANDIDATE_STABLE_SECONDS,
     _smart_state,
@@ -130,7 +130,7 @@ def _candidate_view(
 def transport_catalog():
     return {
         "ok": True,
-        "production_default": "smart_auto",
+        "production_default": "manual",
         "promotion_policy": "health_then_speed",
         "download_weight": 0.70,
         "upload_weight": 0.30,
@@ -185,9 +185,80 @@ def list_modern_transports(
         "mode": tunnel.mode,
         "active_transport": tunnel.active_transport,
         "preferred_transport": tunnel.preferred_transport,
-        "production_default": "smart_auto",
+        "production_default": "manual",
         "promotion_policy": "health_then_speed",
         "transports": output,
+    }
+
+
+# TWINPANEL_MANUAL_MODERN_TRANSPORT_V192
+@router.post("/{tunnel_id}/modern-transports/{transport}/select-manual")
+def select_modern_transport_manual(
+    tunnel_id: int,
+    transport: str,
+    db: Session = Depends(get_db),
+):
+    name = str(transport or "").strip().lower()
+    if name not in ACTIVE_SPECS:
+        raise HTTPException(
+            status_code=404,
+            detail="Unknown or retired modern transport",
+        )
+
+    tunnel = db.get(Tunnel, tunnel_id)
+    if tunnel is None:
+        raise HTTPException(status_code=404, detail="Tunnel not found")
+
+    row = (
+        db.query(TunnelTransport)
+        .filter(
+            TunnelTransport.tunnel_id == tunnel_id,
+            TunnelTransport.transport == name,
+        )
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Transport not installed")
+
+    if not bool(row.enabled):
+        raise HTTPException(status_code=400, detail="Transport disabled")
+
+    view = _candidate_view(
+        name=name,
+        row=row,
+        tunnel_id=tunnel_id,
+    )
+    if not bool(view.get("selectable")):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Transport is not qualified for manual production selection",
+                "transport": name,
+                "status": view.get("status"),
+                "stable_seconds": view.get("stable_seconds"),
+                "required_stable_seconds": view.get("required_stable_seconds"),
+                "auto_block_reason": view.get("auto_block_reason"),
+            },
+        )
+
+    tunnel.mode = "manual"
+    tunnel.active_transport = name
+    tunnel.preferred_transport = name
+    tunnel.status = TunnelStatus.ONLINE
+    tunnel.latency_ms = row.latency_ms
+
+    db.commit()
+    db.refresh(tunnel)
+
+    return {
+        "ok": True,
+        "tunnel_id": int(tunnel.id),
+        "mode": tunnel.mode,
+        "active_transport": tunnel.active_transport,
+        "preferred_transport": tunnel.preferred_transport,
+        "status": _status(tunnel.status),
+        "latency_ms": tunnel.latency_ms,
+        "transport": name,
     }
 
 

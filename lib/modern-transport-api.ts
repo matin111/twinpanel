@@ -2,7 +2,14 @@
 
 import {getCustomerToken} from "./customer-api";
 
-export type SmartTransportName="kernel_gre"|"gost_tun"|"amneziawg"|"netrix";
+export type SmartTransportName=
+  |"tp27_fast"
+  |"tp27_masque"
+  |"tp27_tcp_direct"
+  |"kernel_gre"
+  |"gost_tun"
+  |"amneziawg"
+  |"netrix";
 
 export type SmartTransportBenchmark={
   measured_at_epoch?:number;
@@ -88,5 +95,10 @@ export const modernTransportApi={
   state:(tunnelId:number)=>request<SmartTransportState>(`/v1/tunnels/${tunnelId}/modern-transports`),
   install:(tunnelId:number,transport:SmartTransportName)=>request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/${encodeURIComponent(transport)}/install`,{method:"POST"}),
   remove:(tunnelId:number,transport:SmartTransportName)=>request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/${encodeURIComponent(transport)}`,{method:"DELETE"}),
-  setMode:(tunnelId:number,mode:"auto"|"manual",transport?:string)=>request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/transport-mode`,{method:"POST",body:JSON.stringify(transport?{mode,transport}:{mode})}),
+  setMode:(tunnelId:number,mode:"auto"|"manual",transport?:string)=>{
+    if(mode==="manual"&&transport){
+      return request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/${encodeURIComponent(transport)}/select-manual`,{method:"POST"});
+    }
+    return request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/transport-mode`,{method:"POST",body:JSON.stringify({mode})});
+  },
 };
