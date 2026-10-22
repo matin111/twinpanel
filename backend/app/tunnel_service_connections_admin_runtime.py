@@ -15,7 +15,7 @@ from .xray_modern_admin import _status_remote as _current_xray_status_remote
 _runtime_applied = False
 
 _XRAY_PROFILE_TITLES = {
-    "legacy": "VLESS Legacy",
+    "legacy": "V2Ray / Xray",
     "xhttp_reality": "XHTTP Reality",
     "grpc_reality": "gRPC Reality",
     "websocket_tls": "WebSocket TLS",
@@ -54,6 +54,14 @@ def _route_title(protocol: str, profile: str) -> str:
     if protocol == "v2ray":
         return _XRAY_PROFILE_TITLES.get(profile, profile or "V2Ray / Xray")
     return _PROTOCOL_TITLES.get(protocol, protocol or "Service")
+
+
+def _public_host(node: Node) -> str:
+    """Return the authoritative public ingress identity for the Iran hub."""
+    domain = str(getattr(node, "public_domain", None) or "").strip()
+    if domain:
+        return domain
+    return str(node.public_ip or "").strip()
 
 
 def _connection_health(
@@ -110,12 +118,11 @@ def _capabilities(
 
 
 async def _current_xray_health(conn, base_port: int) -> dict[str, Any]:
-    """Normalize the current rc.27 Xray runtime health to the admin contract.
+    """Normalize the current Xray runtime health to the admin route contract.
 
-    The old service-connections runtime used a helper removed from the current
-    release line. Reuse the current Xray admin probe instead of reviving stale
-    implementation details. The base legacy VLESS listener is probed explicitly
-    because the modern admin status reports only the additional modern profiles.
+    The service-connections inventory probes the base legacy VLESS listener
+    explicitly because the customer-safe Xray profile status intentionally
+    reports only public TLS profiles.
     """
     runtime = await _current_xray_status_remote(conn, int(base_port))
     profiles = runtime.get("profiles")
@@ -138,14 +145,20 @@ async def tunnel_service_connections_admin(
     tunnel_id: int,
     db: Session = Depends(get_db),
 ):
-    """Safe admin inventory of routed customer/service connections.
+    """Safe admin inventory of Desired Service Routes for a logical tunnel.
 
-    Physical tunnel members stay separate. No UUID, REALITY key, short ID,
-    path, password or other customer credential is returned.
+    Route metadata comes from the backend service-routing desired state. No
+    UUID, REALITY key, short ID, path, password or other customer credential is
+    returned. The UI must render these fields directly and must not derive
+    public or target ports on its own.
     """
     tunnel = db.get(Tunnel, int(tunnel_id))
     if tunnel is None:
         raise HTTPException(status_code=404, detail="تونل پیدا نشد")
+
+    iran_node = db.get(Node, int(tunnel.iran_node_id))
+    if iran_node is None:
+        raise HTTPException(status_code=409, detail="نود ایران تونل پیدا نشد")
 
     exit_node = db.get(Node, int(tunnel.exit_node_id))
     if exit_node is None:
@@ -210,6 +223,7 @@ async def tunnel_service_connections_admin(
                         pass
 
     connections: list[dict[str, Any]] = []
+    public_host = _public_host(iran_node)
 
     for raw in routes:
         if not isinstance(raw, dict):
@@ -235,9 +249,12 @@ async def tunnel_service_connections_admin(
                 "protocol": protocol,
                 "profile": profile,
                 "title": _route_title(protocol, profile),
+                "public_host": public_host,
                 "public_port": raw.get("public_port"),
+                "target_ip": raw.get("target_ip"),
                 "target_port": raw.get("target_port"),
                 "transport": str(raw.get("transport") or "").strip().lower(),
+                "route_source": "desired_service_route",
                 "available": available,
                 "healthy": healthy,
                 "health_reason": reason,
@@ -268,6 +285,8 @@ async def tunnel_service_connections_admin(
         "ok": True,
         "tunnel_id": int(tunnel.id),
         "iran_node_id": int(tunnel.iran_node_id),
+        "iran_node": str(iran_node.name),
+        "public_host": public_host,
         "exit_node_id": int(tunnel.exit_node_id),
         "exit_node": str(exit_node.name),
         "tunnel_status": status,
@@ -317,6 +336,6 @@ def apply_tunnel_service_connections_admin_runtime() -> None:
     _runtime_applied = True
     print(
         "TWINPANEL_TUNNEL_SERVICE_CONNECTIONS_ADMIN_RUNTIME_V28_ACTIVE "
-        "safe_routes=1 capabilities=1 secrets_exposed=0",
+        "safe_routes=1 route_native=1 capabilities=1 secrets_exposed=0",
         flush=True,
     )

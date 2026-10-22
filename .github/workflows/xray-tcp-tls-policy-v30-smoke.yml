@@ -39,7 +39,7 @@ jobs:
             backend/app/xray_customer_profile_policy_v30.py \
             backend/app/self_hosted_runtime.py
 
-      - name: Enforce final customer profile contract
+      - name: Enforce customer and admin route contracts
         run: |
           python - <<'PY'
           import ast
@@ -72,11 +72,21 @@ jobs:
                                   values=[elt.value for elt in arg.elts if isinstance(elt,ast.Constant)]
                           hidden=set(values)
 
+          # Customer delivery remains exactly the approved TLS-only contract.
           assert public_order == ('websocket_tls','httpupgrade_tls','PROFILE_TCP_TLS'), public_order
           assert hidden is not None
           assert {'legacy','xhttp_reality','grpc_reality','tcp_simple'} <= hidden
           assert 'VLESS TCP TLS' in policy_text
           assert 'grpc_reality=internal_only' in policy_text
+
+          # Admin Service Connections is a credential-free Desired Route
+          # inventory and must retain the real legacy V2Ray route.
+          assert 'ADMIN_ROUTE_PROFILE_ORDER' in policy_text
+          assert 'ADMIN_ROUTE_PROFILE_IDS' in policy_text
+          assert '"legacy",\n    *PUBLIC_PROFILE_ORDER' in policy_text
+          assert 'if profile not in ADMIN_ROUTE_PROFILE_IDS:' in policy_text
+          assert 'if profile == "legacy":' in policy_text
+          assert 'legacy=admin_route_only' in policy_text
 
           tcp=Path('backend/app/xray_tcp_tls_v39.py').read_text(encoding='utf-8')
           compat=Path('backend/app/xray_tcp_tls_compat_v44.py').read_text(encoding='utf-8')

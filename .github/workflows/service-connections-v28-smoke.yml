@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'backend/app/tunnel_service_connections_admin_runtime.py'
+      - 'backend/app/xray_customer_profile_policy_v30.py'
       - 'backend/app/xray_profile_reconcile_v36.py'
       - 'backend/app/tp2027_egress_v28.py'
       - 'backend/app/service_connections_jobs_v28.py'
@@ -30,6 +31,7 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/tunnel_service_connections_admin_runtime.py \
+            backend/app/xray_customer_profile_policy_v30.py \
             backend/app/xray_profile_reconcile_v36.py \
             backend/app/tp2027_egress_v28.py \
             backend/app/service_connections_jobs_v28.py \
@@ -42,6 +44,7 @@ jobs:
 
           runtime=Path('backend/app/self_hosted_runtime.py').read_text()
           inventory=Path('backend/app/tunnel_service_connections_admin_runtime.py').read_text()
+          policy=Path('backend/app/xray_customer_profile_policy_v30.py').read_text()
           egress=Path('backend/app/tp2027_egress_v28.py').read_text()
           jobs=Path('backend/app/service_connections_jobs_v28.py').read_text()
           ui=Path('components/tunnel-service-connections-panel.tsx').read_text()
@@ -59,6 +62,20 @@ jobs:
           assert 'repair_real_egress' in inventory
           assert 'xray_reconcile' in inventory
 
+          # Service Connections must expose the backend Desired Route itself.
+          assert '"public_host": public_host' in inventory
+          assert '"target_ip": raw.get("target_ip")' in inventory
+          assert '"route_source": "desired_service_route"' in inventory
+          assert '"iran_node": str(iran_node.name)' in inventory
+          assert '"public_host": public_host' in inventory
+
+          # The V2Ray legacy backstop is admin route metadata only. Customer
+          # TLS policy stays independent and no credentials are exposed here.
+          assert 'ADMIN_ROUTE_PROFILE_IDS' in policy
+          assert 'legacy=admin_route_only' in policy
+          for forbidden in ('uuid', 'password', 'private_key', 'short_id'):
+              assert f'"{forbidden}"' not in inventory
+
           assert '/{tunnel_id}/service-connections/repair-real-egress' in egress
           assert 'fallback_preserved' in egress
           assert 'original["active_transport"]' in egress
@@ -71,5 +88,9 @@ jobs:
           assert 'canRepairRealEgress' in ui
           assert 'canReconcileXray' in ui
           assert 'data && canRepairRealEgress' in ui
+          assert 'RouteNativeServiceConnection' in ui
+          assert 'routeItem.public_host' in ui
+          assert 'routeItem.target_ip' in ui
+          assert 'endpointText' in ui
           print('SERVICE_CONNECTIONS_V28_CONTRACT_OK')
           PY

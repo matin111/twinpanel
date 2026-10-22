@@ -25,18 +25,18 @@ from .xray_tcp_tls_v39 import (
 # ============================================================
 # TWINPANEL XRAY CUSTOMER PROFILE POLICY V30
 #
-# Final customer-facing policy previously validated in production:
+# Customer-facing delivery policy:
 #   1. WebSocket TLS
 #   2. HTTPUpgrade TLS
 #   3. VLESS TCP TLS
 #
-# gRPC Reality, XHTTP Reality and legacy/plain VLESS remain internal for
-# rollback/diagnostics. They are intentionally NOT returned to customer/admin
-# routed-service cards and are NOT required for subscription completeness.
+# The legacy/plain VLESS listener remains excluded from customer delivery, but
+# it is a real Desired Service Route and therefore belongs in the admin tunnel
+# route inventory. Admin inventory is metadata-only and never exposes UUIDs,
+# passwords, REALITY keys, paths or other customer credentials.
 #
-# This module is a compatibility layer for the current release lineage. It
-# composes with the restored V39/V44 TCP-TLS engine without replacing current
-# Xray repair/admin code wholesale.
+# gRPC Reality, XHTTP Reality and tcp_simple remain internal-only listeners and
+# are not returned by either customer delivery or ordinary admin route cards.
 # ============================================================
 
 _runtime_applied = False
@@ -47,6 +47,11 @@ PUBLIC_PROFILE_ORDER = (
     PROFILE_TCP_TLS,
 )
 PUBLIC_PROFILE_IDS = frozenset(PUBLIC_PROFILE_ORDER)
+ADMIN_ROUTE_PROFILE_ORDER = (
+    "legacy",
+    *PUBLIC_PROFILE_ORDER,
+)
+ADMIN_ROUTE_PROFILE_IDS = frozenset(ADMIN_ROUTE_PROFILE_ORDER)
 HIDDEN_ROUTED_PROFILES = frozenset(
     {
         "legacy",
@@ -99,8 +104,9 @@ def _admin_profile_rows_v30(node, base_port: int) -> list[dict[str, Any]]:
         "tunnel_public_port": _tcp_tls_public_port(int(node.id)),
     }
 
-    # The admin profile catalog should mirror the customer-safe policy. Hidden
-    # listeners are still observable through diagnostics, not ordinary cards.
+    # The Xray profile catalog mirrors customer-safe delivery. The separate
+    # tunnel Service Connections endpoint owns the admin Desired Route inventory
+    # and may include the credential-free legacy backstop route.
     return [
         by_id[profile]
         for profile in PUBLIC_PROFILE_ORDER
@@ -128,8 +134,8 @@ async def _admin_status_remote_v30(conn, base_port: int) -> dict[str, Any]:
         )
     )
 
-    # Keep raw internal listeners out of the normal admin/customer profile
-    # contract. Diagnostics can still inspect them separately.
+    # Keep raw internal listeners out of the normal Xray profile contract.
+    # Tunnel route inventory probes legacy independently when needed.
     state["profiles"] = {
         profile: bool(listeners.get(profile))
         for profile in PUBLIC_PROFILE_ORDER
@@ -163,11 +169,14 @@ async def _service_connections_v30(
         profile = str(row.get("profile") or "").strip().lower()
 
         if protocol == "v2ray":
-            if profile in HIDDEN_ROUTED_PROFILES:
+            # Customer delivery remains TLS-only. Admin Service Connections is
+            # a credential-free Desired Route inventory, so the real legacy
+            # V2Ray route must remain visible even when no TLS domain exists.
+            if profile not in ADMIN_ROUTE_PROFILE_IDS:
                 continue
-            if profile not in PUBLIC_PROFILE_IDS:
-                continue
-            if profile == PROFILE_TCP_TLS:
+            if profile == "legacy":
+                row["title"] = "V2Ray / Xray"
+            elif profile == PROFILE_TCP_TLS:
                 row["title"] = "VLESS TCP TLS"
 
         filtered.append(row)
@@ -177,9 +186,10 @@ async def _service_connections_v30(
         "openvpn": 20,
         "wireguard": 30,
         "l2tp": 40,
-        "websocket_tls": 50,
-        "httpupgrade_tls": 51,
-        PROFILE_TCP_TLS: 52,
+        "legacy": 50,
+        "websocket_tls": 51,
+        "httpupgrade_tls": 52,
+        PROFILE_TCP_TLS: 53,
     }
     filtered.sort(
         key=lambda row: (
@@ -215,7 +225,9 @@ def apply_xray_customer_profile_policy_v30() -> None:
     # of forcing retired XHTTP/gRPC profiles to exist.
     xray_profile_reconcile_v36._required_profiles = _required_profiles_v30
 
-    # Admin profile/status endpoints use current runtime APIs plus TCP TLS.
+    # Admin Xray profile/status endpoints use current runtime APIs plus TCP TLS.
+    # They intentionally remain customer-safe; tunnel route inventory is a
+    # separate contract and is rebound below.
     _original_admin_profile_rows = xray_modern_admin._profile_rows
     _original_admin_status_remote = xray_modern_admin._status_remote
     xray_modern_admin._profile_rows = _admin_profile_rows_v30
@@ -250,6 +262,6 @@ def apply_xray_customer_profile_policy_v30() -> None:
         "tcp_tls=public "
         "grpc_reality=internal_only "
         "xhttp_reality=internal_only "
-        "legacy=internal_only",
+        "legacy=admin_route_only",
         flush=True,
     )
