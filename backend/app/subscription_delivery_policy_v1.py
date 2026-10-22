@@ -181,6 +181,44 @@ def explicit_nodes(db: Session, sub: Subscription) -> list[Node]:
     return [by_id[node_id] for node_id in node_ids if node_id in by_id]
 
 
+class _LegacyAutosyncSession:
+    """Session facade which hides explicit subscriptions from legacy autosync.
+
+    Installed-node convergence predates per-subscription delivery policy and
+    begins by querying every Subscription. The facade changes only that single
+    query shape; every other Session operation is delegated untouched.
+    """
+
+    def __init__(self, db: Session, explicit_ids: set[int]):
+        self._db = db
+        self._explicit_ids = explicit_ids
+
+    def query(self, *entities: Any, **kwargs: Any):
+        query = self._db.query(*entities, **kwargs)
+        if (
+            len(entities) == 1
+            and entities[0] is Subscription
+            and self._explicit_ids
+        ):
+            query = query.filter(~Subscription.id.in_(self._explicit_ids))
+        return query
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._db, name)
+
+
+def autosync_legacy_only_session(db: Session) -> Session | _LegacyAutosyncSession:
+    explicit_ids = {
+        int(row[0])
+        for row in db.query(SubscriptionDeliveryPolicyState.subscription_id)
+        .filter(SubscriptionDeliveryPolicyState.mode == "explicit")
+        .all()
+    }
+    if not explicit_ids:
+        return db
+    return _LegacyAutosyncSession(db, explicit_ids)
+
+
 def _node_protocol_runtime_ready(db: Session, node: Node, protocol: str) -> bool:
     flag = CLASSIC_NODE_FLAGS.get(protocol)
     if not flag or not bool(getattr(node, flag, False)):
@@ -213,6 +251,29 @@ def _rewrite_filename(value: Any, mode: str) -> Any:
         stem, ext = text.rsplit(".", 1)
         return f"{stem}-{mode}.{ext}"
     return f"{text}-{mode}"
+
+
+def _delivery_file_selector(node_id: int, mode: str) -> int:
+    """Return an HTML-only selector which can distinguish Both-mode files.
+
+    Public JSON keeps the real positive Node ID. Only rendered download hrefs
+    receive a negative selector, avoiding collisions with real database IDs.
+    """
+
+    node_id = int(node_id)
+    if node_id <= 0 or mode not in {"direct", "tunnel"}:
+        return node_id
+    return -(node_id * 2 + (1 if mode == "tunnel" else 0))
+
+
+def _decode_delivery_file_selector(value: int) -> tuple[int, str] | None:
+    value = int(value)
+    if value >= 0:
+        return None
+    encoded = -value
+    if encoded % 2:
+        return (encoded - 1) // 2, "tunnel"
+    return encoded // 2, "direct"
 
 
 def _rewrite_item_endpoint(
@@ -406,6 +467,9 @@ def install_account_delivery_hooks() -> None:
 
     legacy_nodes = ad._nodes
     legacy_stored_info = ad._stored_info
+    legacy_credential_sections = ad._credential_sections
+    legacy_find_item = ad._find_item
+    legacy_installed_node_sync = ad.sync_installed_node_to_subscriptions
 
     def policy_nodes(db: Session, sub: Subscription) -> list[Node]:
         if not is_explicit_policy(db, sub.id):
@@ -417,6 +481,73 @@ def install_account_delivery_hooks() -> None:
             return legacy_stored_info(db, sub)
         return compile_explicit_stored_info(ad, db, sub)
 
+    def policy_credential_sections(payload: dict[str, Any], token: str) -> str:
+        if payload.get("delivery_policy") != "explicit":
+            return legacy_credential_sections(payload, token)
+
+        rendered = dict(payload)
+        rendered_credentials: list[dict[str, Any]] = []
+
+        for credential in payload.get("credentials", []):
+            current = dict(credential)
+            protocol = str(current.get("protocol") or "").strip().lower()
+            rendered_items: list[dict[str, Any]] = []
+
+            for item in current.get("items", []):
+                if not isinstance(item, dict):
+                    continue
+                rendered_item = dict(item)
+                mode = str(rendered_item.get("delivery_mode") or "").strip().lower()
+                if protocol in {"openvpn", "wireguard"} and mode in {"direct", "tunnel"}:
+                    try:
+                        source_node_id = int(rendered_item.get("node_id") or 0)
+                    except (TypeError, ValueError):
+                        source_node_id = 0
+                    rendered_item["node_id"] = _delivery_file_selector(source_node_id, mode)
+                rendered_items.append(rendered_item)
+
+            current["items"] = rendered_items
+            rendered_credentials.append(current)
+
+        rendered["credentials"] = rendered_credentials
+        return legacy_credential_sections(rendered, token)
+
+    def policy_find_item(
+        payload: dict[str, Any],
+        protocol: str,
+        node_id: int,
+    ) -> dict[str, Any]:
+        decoded = _decode_delivery_file_selector(node_id)
+        if payload.get("delivery_policy") != "explicit" or decoded is None:
+            return legacy_find_item(payload, protocol, node_id)
+
+        source_node_id, wanted_mode = decoded
+        for credential in payload.get("credentials", []):
+            if str(credential.get("protocol") or "").strip().lower() != str(protocol or "").strip().lower():
+                continue
+            for item in credential.get("items", []):
+                if not isinstance(item, dict):
+                    continue
+                try:
+                    item_node_id = int(item.get("node_id") or 0)
+                except (TypeError, ValueError):
+                    continue
+                if (
+                    item_node_id == source_node_id
+                    and str(item.get("delivery_mode") or "").strip().lower() == wanted_mode
+                ):
+                    return item
+        return legacy_find_item(payload, protocol, node_id)
+
+    async def policy_installed_node_sync(db: Session, node: Node) -> dict[str, Any]:
+        return await legacy_installed_node_sync(
+            autosync_legacy_only_session(db),
+            node,
+        )
+
     ad._nodes = policy_nodes
     ad._stored_info = policy_stored_info
+    ad._credential_sections = policy_credential_sections
+    ad._find_item = policy_find_item
+    ad.sync_installed_node_to_subscriptions = policy_installed_node_sync
     ad._subscription_delivery_policy_v1_installed = True
