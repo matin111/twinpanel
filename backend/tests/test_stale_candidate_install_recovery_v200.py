@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 from types import SimpleNamespace
 
+from app import adaptive_candidate_qualification_v155 as qualification_v155
 from app import smart_candidate_retry_guard_v169 as retry_v169
 from app import smart_transport_auto_v21 as smart
 from app import stale_candidate_install_recovery_v200 as recovery_v200
@@ -119,16 +120,15 @@ def test_old_release_stale_row_is_selected_for_official_retry() -> None:
     assert selected == ("tp27_tcp_direct", "previous_release")
 
 
-def test_apply_wraps_v171_selector_without_replacing_normal_fallback() -> None:
+def test_apply_wraps_final_v155_selector_without_replacing_normal_fallback() -> None:
     old_applied = recovery_v200._applied
     old_original = recovery_v200._original_selector
     old_selector = smart._install_candidate_name
 
-    def normal_selector(tunnel_id: int):
-        return "tp27_mieru_tcp"
-
     try:
-        smart._install_candidate_name = normal_selector
+        # Production rc.200 proved that V155 is the last layer which replaces
+        # the selector. V200 must therefore wrap that exact final authority.
+        smart._install_candidate_name = qualification_v155._install_candidate_name_v155
         recovery_v200._applied = False
         recovery_v200._original_selector = None
 
@@ -138,18 +138,23 @@ def test_apply_wraps_v171_selector_without_replacing_normal_fallback() -> None:
             smart._install_candidate_name
             is recovery_v200.install_candidate_name_stale_recovery_v200
         )
-        assert recovery_v200._original_selector is normal_selector
+        assert (
+            recovery_v200._original_selector
+            is qualification_v155._install_candidate_name_v155
+        )
     finally:
         recovery_v200._applied = old_applied
         recovery_v200._original_selector = old_original
         smart._install_candidate_name = old_selector
 
 
-def test_manager_applies_stale_recovery_after_v171_before_dataplane() -> None:
+def test_manager_applies_stale_recovery_after_all_selector_owners() -> None:
     source = inspect.getsource(manager_v12.main)
 
     v171_index = source.index("apply_smart_candidate_fair_retry_v171()")
-    recovery_index = source.index("apply_stale_candidate_install_recovery_v200()")
     v175_index = source.index("apply_candidate_dataplane_v175()")
+    v155_index = source.index("apply_adaptive_candidate_qualification_v155()")
+    v198_index = source.index("apply_direct_tcp_rpfilter_guard_v198()")
+    recovery_index = source.index("apply_stale_candidate_install_recovery_v200()")
 
-    assert v171_index < recovery_index < v175_index
+    assert v171_index < v175_index < v155_index < v198_index < recovery_index
