@@ -1,0 +1,52 @@
+<svg width="1400" height="420" viewBox="0 0 1400 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="90" y1="34" x2="1290" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1020"/>
+      <stop offset="0.46" stop-color="#17132D"/>
+      <stop offset="1" stop-color="#241044"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="170" y1="103" x2="382" y2="326" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A78BFA"/>
+      <stop offset="0.48" stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#4F46E5"/>
+    </linearGradient>
+    <linearGradient id="line" x1="472" y1="310" x2="1185" y2="310" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8B5CF6"/>
+      <stop offset="0.55" stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+    <filter id="glow" x="44" y="-60" width="1312" height="560" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="54"/>
+    </filter>
+  </defs>
+
+  <rect width="1400" height="420" rx="34" fill="url(#bg)"/>
+  <ellipse cx="1175" cy="95" rx="240" ry="130" fill="#7C3AED" fill-opacity="0.12" filter="url(#glow)"/>
+  <ellipse cx="205" cy="366" rx="190" ry="100" fill="#22D3EE" fill-opacity="0.08" filter="url(#glow)"/>
+
+  <g opacity="0.22">
+    <path d="M980 74H1286" stroke="#A78BFA"/>
+    <path d="M1018 104H1324" stroke="#A78BFA"/>
+    <path d="M1060 134H1366" stroke="#A78BFA"/>
+    <circle cx="1250" cy="74" r="5" fill="#22D3EE"/>
+    <circle cx="1194" cy="104" r="5" fill="#8B5CF6"/>
+    <circle cx="1308" cy="134" r="5" fill="#6366F1"/>
+  </g>
+
+  <g transform="translate(118 78)">
+    <rect width="270" height="270" rx="74" fill="url(#brand)"/>
+    <rect x="16" y="16" width="238" height="238" rx="62" stroke="white" stroke-opacity="0.12" stroke-width="2"/>
+    <path d="M61 89C61 76.85 70.85 67 83 67H143C155.15 67 165 76.85 165 89V104H141V94C141 91.79 139.21 90 137 90H89C86.79 90 85 91.79 85 94V138H61V89Z" fill="white"/>
+    <path d="M209 181C209 193.15 199.15 203 187 203H127C114.85 203 105 193.15 105 181V166H129V176C129 178.21 130.79 180 133 180H181C183.21 180 185 178.21 185 176V132H209V181Z" fill="#E9D5FF"/>
+    <path d="M76 134H193C206.807 134 218 145.193 218 159C218 172.807 206.807 184 193 184H151V160H192C193.657 160 195 158.657 195 157C195 155.343 193.657 154 192 154H76C74.343 154 73 155.343 73 157C73 158.657 74.343 160 76 160H120V184H76C62.193 184 51 172.807 51 159C51 145.193 62.193 134 76 134Z" fill="white"/>
+    <circle cx="210" cy="65" r="10" fill="#22D3EE"/>
+  </g>
+
+  <text x="468" y="166" fill="white" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="72" font-weight="800" letter-spacing="3">TWINPANEL</text>
+  <text x="472" y="220" fill="#C4B5FD" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="25" font-weight="600" letter-spacing="1.2">SELF-HOSTED VPN CONTROL PLANE</text>
+  <text x="472" y="270" fill="#CBD5E1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="22">One panel for users, protocols, nodes, tunnels, sales and operations.</text>
+  <rect x="472" y="308" width="714" height="3" rx="1.5" fill="url(#line)"/>
+  <text x="472" y="353" fill="#94A3B8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" letter-spacing="0.7">CONTROL • CONNECT • OPERATE</text>
+
+  <rect x="0.75" y="0.75" width="1398.5" height="418.5" rx="33.25" stroke="white" stroke-opacity="0.07" stroke-width="1.5"/>
+</svg>
