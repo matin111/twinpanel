@@ -1,0 +1,40 @@
+name: Direct TCP rp_filter Shadow Guard V198
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/direct_tcp_rpfilter_guard_v198.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/tests/test_direct_tcp_rpfilter_shadow_v198.py"
+      - ".github/workflows/direct-tcp-rpfilter-shadow-v198.yml"
+  push:
+    paths:
+      - "backend/app/direct_tcp_rpfilter_guard_v198.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/tests/test_direct_tcp_rpfilter_shadow_v198.py"
+      - ".github/workflows/direct-tcp-rpfilter-shadow-v198.yml"
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt
+
+      - name: Run Direct TCP rp_filter regression
+        env:
+          PYTHONPATH: backend
+        run: |
+          python -m pytest -q backend/tests/test_direct_tcp_rpfilter_shadow_v198.py
