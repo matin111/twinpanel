@@ -350,8 +350,8 @@ PY`;
                 </div>
               </>}
 
-              <label className="field"><span>{pick("مرحله ۲ — IP Spoof سمت ایران","Step 2 — Iran Spoof IP")}</span><input dir="ltr" value={iranSpoofIp} onChange={event=>setIranSpoofIp(event.target.value)} placeholder="IPv4" disabled={Boolean(busy)||normalized(row.status)==="online"}/></label>
-              <label className="field"><span>{pick("مرحله ۲ — IP Spoof سمت خارج","Step 2 — Exit Spoof IP")}</span><input dir="ltr" value={exitSpoofIp} onChange={event=>setExitSpoofIp(event.target.value)} placeholder="IPv4" disabled={Boolean(busy)||normalized(row.status)==="online"}/></label>
+              <label className="field"><span>{pick("مرحله ۲ — IP Spoof سمت ایران","Iran spoof source IP · Step 2")}</span><input dir="ltr" value={iranSpoofIp} onChange={event=>setIranSpoofIp(event.target.value)} placeholder="IPv4" disabled={Boolean(busy)||normalized(row.status)==="online"}/></label>
+              <label className="field"><span>{pick("مرحله ۲ — IP Spoof سمت خارج","Exit spoof source IP · Step 2")}</span><input dir="ltr" value={exitSpoofIp} onChange={event=>setExitSpoofIp(event.target.value)} placeholder="IPv4" disabled={Boolean(busy)||normalized(row.status)==="online"}/></label>
               <div className="action-row"><button type="button" className="ghost" disabled={Boolean(busy)||normalized(row.status)==="online"} onClick={saveSpoof}>{busy==="spoof-config"?"…":pick("مرحله ۳: ذخیره IPها","Step 3: Save IPs")}</button></div>
 
               <details className="runtime-warning compact">
