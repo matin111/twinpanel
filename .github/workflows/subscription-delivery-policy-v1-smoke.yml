@@ -42,4 +42,4 @@ jobs:
             scripts/subscription_delivery_policy_v1_smoke.py
       - name: Run delivery policy smoke
         working-directory: backend
-        run: python ../scripts/subscription_delivery_policy_v1_smoke.py
+        run: PYTHONPATH=. python ../scripts/subscription_delivery_policy_v1_smoke.py
