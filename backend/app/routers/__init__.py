@@ -40,6 +40,7 @@ from . import runtime_endpoints as _runtime_endpoints
 from .classic_protocol_admin_v1 import router as _classic_protocol_admin_v1_router
 from .storefront_theme_media import router as _storefront_theme_media_router
 from .dns_emergency import router as _dns_emergency_router
+from .dns_emergency_iran import router as _dns_emergency_iran_router
 
 # TWINPANEL_MANUAL_AUTHORITY_REGISTER_V193
 # Agent reports arrive on an exact route also retained in the legacy tunnels
@@ -52,3 +53,4 @@ _runtime_endpoints.router.include_router(_manual_authority_v193_router)
 _runtime_endpoints.router.include_router(_classic_protocol_admin_v1_router)
 _runtime_endpoints.router.include_router(_storefront_theme_media_router)
 _runtime_endpoints.router.include_router(_dns_emergency_router)
+_runtime_endpoints.router.include_router(_dns_emergency_iran_router)

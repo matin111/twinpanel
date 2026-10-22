@@ -1,0 +1,79 @@
+name: TwinPanel DNS Emergency Iran V207
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/dns_emergency_iran_models.py"
+      - "backend/app/routers/dns_emergency_iran.py"
+      - "backend/app/routers/__init__.py"
+      - "backend/tests/test_dns_emergency_iran_v207.py"
+      - "components/dns-emergency-iran-panel.tsx"
+      - "components/ui.tsx"
+      - "app/admin/dns-emergency-iran/page.tsx"
+      - ".github/workflows/dns-emergency-iran-v207.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/dns_emergency_iran_models.py"
+      - "backend/app/routers/dns_emergency_iran.py"
+      - "backend/app/routers/__init__.py"
+      - "backend/tests/test_dns_emergency_iran_v207.py"
+      - "components/dns-emergency-iran-panel.tsx"
+      - "components/ui.tsx"
+      - "app/admin/dns-emergency-iran/page.tsx"
+      - ".github/workflows/dns-emergency-iran-v207.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_ENV: test
+      APP_SECRET_KEY: dns-emergency-iran-ci-secret
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/twinpanel_dns_iran_ci
+      NODE_AGENT_SHARED_SECRET: dns-emergency-iran-ci-node-secret
+    steps:
+      - name: Checkout TwinPanel
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt pytest
+
+      - name: Run DNS Emergency Iran contract tests
+        env:
+          PYTHONPATH: backend
+        run: python -m pytest -q backend/tests/test_dns_emergency_iran_v207.py
+
+      - name: Setup pinned Go toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.12"
+          cache: false
+
+      - name: Build pinned DNSTT source
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          DNSTT_COMMIT="e1af37b31a778cab0166788fe2549169f345d742"
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          git -C "$work" init -q
+          git -C "$work" remote add origin https://github.com/OutlineFoundation/dnstt.git
+          git -C "$work" fetch -q --depth=1 origin "$DNSTT_COMMIT"
+          git -C "$work" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$work" rev-parse HEAD)" = "$DNSTT_COMMIT"
+          cd "$work"
+          CGO_ENABLED=0 GOTOOLCHAIN=local go build -trimpath -ldflags='-s -w' -o /tmp/dnstt-server ./dnstt-server
+          test -x /tmp/dnstt-server
