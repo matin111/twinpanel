@@ -56,42 +56,21 @@
 /* Conversion 2027 premium refinement: improve hierarchy and conversion without
    changing store data or bypassing the existing theme/customizer variables. */
 .tpConversionThemeRuntime .tpStoreSection{scroll-margin-top:92px}
-.tpConversionThemeRuntime .tpStoreHero{
-  gap:clamp(40px,5vw,84px);
-  align-items:center;
-}
+.tpConversionThemeRuntime .tpStoreHero{gap:clamp(40px,5vw,84px);align-items:center}
 .tpConversionThemeRuntime .tpStoreHeroCopy{max-inline-size:760px}
-.tpConversionThemeRuntime .tpStoreHeroCopy h1{
-  max-inline-size:15ch;
-  font-size:clamp(38px,5vw,68px);
-  line-height:1.12;
-  text-wrap:balance;
-}
-.tpConversionThemeRuntime .tpStoreHeroCopy>p{
-  max-inline-size:62ch;
-  margin-block-start:22px;
-}
+.tpConversionThemeRuntime .tpStoreHeroCopy h1{max-inline-size:15ch;font-size:clamp(38px,5vw,68px);line-height:1.12;text-wrap:balance}
+.tpConversionThemeRuntime .tpStoreHeroCopy>p{max-inline-size:62ch;margin-block-start:22px}
 .tpConversionThemeRuntime .tpStoreHeroActions{gap:12px;margin-block-start:28px}
 .tpConversionThemeRuntime .tpStoreHeroProof{margin-block-start:26px;gap:14px 22px}
 .tpConversionThemeRuntime .tpStoreSectionHead{max-inline-size:780px;margin-block-end:38px}
-.tpConversionThemeRuntime .tpStoreSectionHead h2{
-  max-inline-size:19ch;
-  font-size:clamp(28px,3vw,44px);
-  line-height:1.22;
-  text-wrap:balance;
-}
+.tpConversionThemeRuntime .tpStoreSectionHead h2{max-inline-size:19ch;font-size:clamp(28px,3vw,44px);line-height:1.22;text-wrap:balance}
 .tpConversionThemeRuntime .tpStoreSectionHead p{max-inline-size:68ch;margin-block-start:12px}
 
 .tpConversionThemeRuntime .tpStoreHeaderBuy,
 .tpConversionThemeRuntime .tpStorePrimary,
 .tpConversionThemeRuntime .tpStoreSecondary,
 .tpConversionThemeRuntime .tpStoreBuyButton,
-.tpConversionThemeRuntime .tpStoreLogin{
-  min-block-size:46px;
-  padding-inline:18px;
-  font-weight:750;
-  transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease,background-color .18s ease,color .18s ease;
-}
+.tpConversionThemeRuntime .tpStoreLogin{min-block-size:46px;padding-inline:18px;font-weight:750;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease,background-color .18s ease,color .18s ease}
 .tpConversionThemeRuntime .tpStoreBuyButton{min-block-size:48px}
 .tpConversionThemeRuntime .tpStoreHeaderBuy:active,
 .tpConversionThemeRuntime .tpStorePrimary:active,
@@ -99,81 +78,52 @@
 .tpConversionThemeRuntime .tpStoreBuyButton:active{transform:translateY(1px)}
 
 .tpConversionThemeRuntime .tpStorePlanGrid{align-items:stretch}
-.tpConversionThemeRuntime .tpStorePlanCard{
-  display:flex;
-  flex-direction:column;
-  min-block-size:100%;
-  box-shadow:0 18px 48px color-mix(in srgb,#000 24%,transparent);
-  transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease,background-color .22s ease;
-}
+.tpConversionThemeRuntime .tpStorePlanCard{display:flex;flex-direction:column;min-block-size:100%;box-shadow:0 18px 48px color-mix(in srgb,#000 24%,transparent);transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease,background-color .22s ease}
 .tpConversionThemeRuntime .tpStorePlanCard .tpStoreBuyButton{margin-block-start:auto}
-.tpConversionThemeRuntime .tpStorePlanDesc,
-.tpConversionThemeRuntime .tpStorePlanList li{font-size:13px;line-height:1.78}
-.tpConversionThemeRuntime .tpStorePlanFacts b{font-size:13.5px}
+.tpConversionThemeRuntime .tpStore .tpStorePlanDesc,
+.tpConversionThemeRuntime .tpStore .tpStorePlanList li{font-size:13px;line-height:1.78}
+.tpConversionThemeRuntime .tpStore .tpStorePlanFacts b{font-size:13.5px}
 .tpConversionThemeRuntime .tpStorePlanProtocols{margin-block:14px 18px}
-.tpConversionThemeRuntime .tpStorePlanProtocols span{
-  min-block-size:26px;
-  padding-inline:9px;
-  display:inline-flex;
-  align-items:center;
-  direction:ltr;
-  unicode-bidi:isolate;
-  font-size:10.5px;
-}
-.tpConversionThemeRuntime .tpStorePlanCard.featured{
-  box-shadow:0 0 0 1px color-mix(in srgb,var(--conversion-accent) 16%,transparent),0 28px 72px color-mix(in srgb,var(--conversion-accent) 16%,transparent);
-}
+.tpConversionThemeRuntime .tpStore .tpStorePlanProtocols span{min-block-size:26px;padding-inline:9px;display:inline-flex;align-items:center;direction:ltr;unicode-bidi:isolate;font-size:10.5px}
+.tpConversionThemeRuntime .tpStorePlanCard.featured{box-shadow:0 0 0 1px color-mix(in srgb,var(--conversion-accent) 16%,transparent),0 28px 72px color-mix(in srgb,var(--conversion-accent) 16%,transparent)}
 
 .tpConversionThemeRuntime .tpStoreProtocolCard,
 .tpConversionThemeRuntime .tpStoreBenefitsGrid article,
 .tpConversionThemeRuntime .tpStoreFaqList details,
 .tpConversionThemeRuntime .tpStoreSocialGrid a,
-.tpConversionThemeRuntime .tpStoreChatCard{
-  transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease,background-color .2s ease;
-}
+.tpConversionThemeRuntime .tpStoreChatCard{transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease,background-color .2s ease}
 .tpConversionThemeRuntime .tpStoreProtocolCard{min-block-size:148px}
-.tpConversionThemeRuntime .tpStoreProtocolCard p,
-.tpConversionThemeRuntime .tpStoreBenefitsGrid p,
-.tpConversionThemeRuntime .tpStoreFaqList details p,
-.tpConversionThemeRuntime .tpStoreAccountPanel p,
-.tpConversionThemeRuntime .tpStoreFinalCta p{font-size:13px;line-height:1.82}
-.tpConversionThemeRuntime .tpStoreBenefitsGrid b,
-.tpConversionThemeRuntime .tpStoreFaqList summary,
-.tpConversionThemeRuntime .tpStoreChatCard b{font-size:13.5px}
+.tpConversionThemeRuntime .tpStore .tpStoreProtocolCard p,
+.tpConversionThemeRuntime .tpStore .tpStoreBenefitsGrid p,
+.tpConversionThemeRuntime .tpStore .tpStoreFaqList details p,
+.tpConversionThemeRuntime .tpStore .tpStoreAccountPanel p,
+.tpConversionThemeRuntime .tpStore .tpStoreFinalCta p{font-size:13px;line-height:1.82}
+.tpConversionThemeRuntime .tpStore .tpStoreBenefitsGrid b,
+.tpConversionThemeRuntime .tpStore .tpStoreFaqList summary,
+.tpConversionThemeRuntime .tpStore .tpStoreChatCard b{font-size:13.5px}
 .tpConversionThemeRuntime .tpStoreFaqList summary{min-block-size:48px;display:flex;align-items:center}
-.tpConversionThemeRuntime .tpStoreFaqList details[open]{
-  border-color:color-mix(in srgb,var(--conversion-accent) 42%,var(--conversion-card-border));
-  box-shadow:0 16px 38px color-mix(in srgb,#000 16%,transparent);
-}
+.tpConversionThemeRuntime .tpStoreFaqList details[open]{border-color:color-mix(in srgb,var(--conversion-accent) 42%,var(--conversion-card-border));box-shadow:0 16px 38px color-mix(in srgb,#000 16%,transparent)}
 
 @media(hover:hover) and (pointer:fine){
   .tpConversionThemeRuntime .tpStorePlanCard:hover,
   .tpConversionThemeRuntime .tpStoreProtocolCard:hover,
   .tpConversionThemeRuntime .tpStoreBenefitsGrid article:hover,
   .tpConversionThemeRuntime .tpStoreSocialGrid a:hover,
-  .tpConversionThemeRuntime .tpStoreChatCard:hover{
-    transform:translateY(-4px);
-    border-color:color-mix(in srgb,var(--conversion-accent) 38%,var(--conversion-card-border));
-    box-shadow:0 22px 54px color-mix(in srgb,#000 24%,transparent);
-  }
+  .tpConversionThemeRuntime .tpStoreChatCard:hover{transform:translateY(-4px);border-color:color-mix(in srgb,var(--conversion-accent) 38%,var(--conversion-card-border));box-shadow:0 22px 54px color-mix(in srgb,#000 24%,transparent)}
   .tpConversionThemeRuntime .tpStorePlanCard.featured:hover{transform:translateY(-5px)}
   .tpConversionThemeRuntime .tpStoreHeaderBuy:hover,
   .tpConversionThemeRuntime .tpStorePrimary:hover,
   .tpConversionThemeRuntime .tpStoreBuyButton:hover{transform:translateY(-1px)}
 }
 
-:global(html[data-theme="light"]) .tpConversionThemeRuntime .tpStorePlanCard,
-:global(html[data-theme="light"]) .tpConversionThemeRuntime .tpStoreProtocolCard,
-:global(html[data-theme="light"]) .tpConversionThemeRuntime .tpStoreBenefitsGrid article,
-:global(html[data-theme="light"]) .tpConversionThemeRuntime .tpStoreAccountPanel,
-:global(html[data-theme="light"]) .tpConversionThemeRuntime .tpStoreFaqList details,
-:global(html[data-theme="light"]) .tpConversionThemeRuntime .tpStoreSocialGrid a,
-:global(html[data-theme="light"]) .tpConversionThemeRuntime .tpStoreChatCard{
-  box-shadow:0 12px 34px rgba(15,23,42,.07);
-}
-:global(html[data-theme="light"]) .tpConversionThemeRuntime .tpStorePlanCard.featured{
-  box-shadow:0 0 0 1px color-mix(in srgb,var(--conversion-accent) 12%,transparent),0 20px 52px color-mix(in srgb,var(--conversion-accent) 10%,transparent);
-}
+html[data-theme="light"] .tpConversionThemeRuntime .tpStorePlanCard,
+html[data-theme="light"] .tpConversionThemeRuntime .tpStoreProtocolCard,
+html[data-theme="light"] .tpConversionThemeRuntime .tpStoreBenefitsGrid article,
+html[data-theme="light"] .tpConversionThemeRuntime .tpStoreAccountPanel,
+html[data-theme="light"] .tpConversionThemeRuntime .tpStoreFaqList details,
+html[data-theme="light"] .tpConversionThemeRuntime .tpStoreSocialGrid a,
+html[data-theme="light"] .tpConversionThemeRuntime .tpStoreChatCard{box-shadow:0 12px 34px rgba(15,23,42,.07)}
+html[data-theme="light"] .tpConversionThemeRuntime .tpStorePlanCard.featured{box-shadow:0 0 0 1px color-mix(in srgb,var(--conversion-accent) 12%,transparent),0 20px 52px color-mix(in srgb,var(--conversion-accent) 10%,transparent)}
 
 @media(max-width:900px){
   .tpConversionThemeRuntime .tpStoreHero{gap:34px}
@@ -190,22 +140,17 @@
   .tpConversionThemeRuntime .tpStoreSectionHead{margin-block-end:24px}
   .tpConversionThemeRuntime .tpStoreSectionHead h2{font-size:clamp(26px,8vw,36px);max-inline-size:none}
   .tpConversionThemeRuntime .tpStorePlanCard{box-shadow:0 12px 34px color-mix(in srgb,#000 18%,transparent)}
-  .tpConversionThemeRuntime .tpStorePlanDesc,
-  .tpConversionThemeRuntime .tpStorePlanList li,
-  .tpConversionThemeRuntime .tpStoreProtocolCard p,
-  .tpConversionThemeRuntime .tpStoreBenefitsGrid p,
-  .tpConversionThemeRuntime .tpStoreFaqList details p,
-  .tpConversionThemeRuntime .tpStoreAccountPanel p,
-  .tpConversionThemeRuntime .tpStoreFinalCta p{font-size:13px}
+  .tpConversionThemeRuntime .tpStore .tpStorePlanDesc,
+  .tpConversionThemeRuntime .tpStore .tpStorePlanList li,
+  .tpConversionThemeRuntime .tpStore .tpStoreProtocolCard p,
+  .tpConversionThemeRuntime .tpStore .tpStoreBenefitsGrid p,
+  .tpConversionThemeRuntime .tpStore .tpStoreFaqList details p,
+  .tpConversionThemeRuntime .tpStore .tpStoreAccountPanel p,
+  .tpConversionThemeRuntime .tpStore .tpStoreFinalCta p{font-size:13px}
 }
 
 @media(prefers-reduced-motion:reduce){
   .tpConversionThemeRuntime .tpStore *,
   .tpConversionThemeRuntime .tpStore *::before,
-  .tpConversionThemeRuntime .tpStore *::after{
-    scroll-behavior:auto;
-    animation-duration:.01ms;
-    animation-iteration-count:1;
-    transition-duration:.01ms;
-  }
+  .tpConversionThemeRuntime .tpStore *::after{scroll-behavior:auto;animation-duration:.01ms;animation-iteration-count:1;transition-duration:.01ms}
 }
