@@ -7,6 +7,7 @@ on:
       - "tools/tp27-tcp-direct/**"
       - "backend/app/adaptive_multilane_v149.py"
       - "backend/app/adaptive_multilane_v151.py"
+      - "backend/app/spoof_candidate_policy_v202.py"
       - "backend/app/transport_candidates/__init__.py"
       - "backend/app/transport_candidates/common.py"
       - "backend/app/transport_candidates/tp27_tcp_direct.py"
@@ -21,6 +22,7 @@ on:
       - "tools/tp27-tcp-direct/**"
       - "backend/app/adaptive_multilane_v149.py"
       - "backend/app/adaptive_multilane_v151.py"
+      - "backend/app/spoof_candidate_policy_v202.py"
       - "backend/app/transport_candidates/__init__.py"
       - "backend/app/transport_candidates/common.py"
       - "backend/app/transport_candidates/tp27_tcp_direct.py"
@@ -45,6 +47,7 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/adaptive_multilane_v149.py \
+            backend/app/spoof_candidate_policy_v202.py \
             backend/app/transport_candidates/__init__.py \
             backend/app/transport_candidates/common.py \
             backend/app/transport_candidates/tp27_tcp_direct.py \
@@ -83,13 +86,14 @@ jobs:
           )
           test -z "$(git status --short -- tools/tp27-tcp-direct)"
 
-      - name: Verify V149/V152/V183 Direct TCP contracts
+      - name: Verify V149/V152/V183 compatibility and V202 retirement
         run: |
           python - <<'PY'
           from pathlib import Path
 
           version = Path("VERSION").read_text().strip()
           adaptive = Path("backend/app/adaptive_multilane_v149.py").read_text()
+          policy = Path("backend/app/spoof_candidate_policy_v202.py").read_text()
           registry = Path("backend/app/transport_candidates/__init__.py").read_text()
           common = Path("backend/app/transport_candidates/common.py").read_text()
           tcp = Path("backend/app/transport_candidates/tp27_tcp_direct.py").read_text()
@@ -102,6 +106,7 @@ jobs:
           assert version.startswith(prefix), version
           assert int(version[len(prefix):]) >= 149, version
 
+          # Historical V149 source remains buildable and cleanup-compatible.
           for token in (
               "TWINPANEL_ADAPTIVE_MULTILANE_V149",
               '"tp27_fast",',
@@ -114,11 +119,13 @@ jobs:
           for token in (
               "TP27_TCP_DIRECT_SPEC",
               '"tp27_tcp_direct": TP27_TCP_DIRECT_SPEC',
-              '"tp27_tcp_direct": tp27_tcp_direct.install',
-              "10.254.",
+              "octet=254",
               "30000 +",
           ):
               assert token in registry, token
+
+          installer_block = registry.split("INSTALLERS = {", 1)[1].split("}", 1)[0]
+          assert '"tp27_tcp_direct": tp27_tcp_direct.install' not in installer_block
 
           for token in (
               "TWINPANEL TP27 DIRECT TCP L3 V152",
@@ -174,15 +181,25 @@ jobs:
           assert '"exit_jitter_ms"' in common
 
           assert "apply_adaptive_multilane_v149()" in manager
-          assert "tp27_fast" in manager
-          assert "tp27_tcp_direct" in manager
           assert manager.index("activate_manager_candidate_policy_v91()") < manager.index(
               "apply_adaptive_multilane_v149()"
           )
+          assert manager.index("apply_adaptive_multilane_v149()") < manager.index(
+              "apply_spoof_candidate_policy_v202()"
+          )
 
+          # V202 is the final production authority: Direct TCP is retained only
+          # for scoped cleanup/rollback archaeology and cannot be auto-installed.
+          assert 'ACTIVE = frozenset({"tp27_fast", "spoof_wg"})' in policy
+          assert '"tp27_tcp_direct"' in policy
+          assert 'smart.AUTO_INSTALL_NAMES = ("tp27_fast",)' in policy
+          assert "active_candidates=tp27_fast,spoof_wg" in manager
+
+          # Publisher still proves the historical carrier builds so existing
+          # release cleanup/rollback remains reproducible.
           assert "Build verified TP27 Direct TCP carrier" in publisher
           assert "tp27-tcp-direct-linux-x86_64.sha256" in publisher
           assert "source/tools/tp27-tcp-direct/main.go" in publisher
 
-          print("ADAPTIVE_MULTILANE_V149_V152_V183_SMOKE_OK")
+          print("ADAPTIVE_MULTILANE_V149_V152_V183_V202_COMPAT_OK")
           PY
