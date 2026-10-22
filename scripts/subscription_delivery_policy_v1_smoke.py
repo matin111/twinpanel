@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import asyncio
 import os
+from datetime import datetime
 
 os.environ.setdefault("APP_SECRET_KEY", "subscription-delivery-policy-v1-smoke-secret")
 os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
 os.environ.setdefault("REDIS_URL", "redis://127.0.0.1:6379/15")
+os.environ.setdefault("NODE_AGENT_SHARED_SECRET", "subscription-delivery-policy-v1-node-secret")
 
 from fastapi import HTTPException
 from sqlalchemy import create_engine
@@ -26,6 +28,7 @@ from app.models import (
     Tunnel,
     TunnelStatus,
     User,
+    UserRole,
 )
 from app.quota_models import QuotaDevice
 from app.routers import account_delivery as ad
@@ -63,7 +66,7 @@ async def main() -> None:
             email="delivery-smoke@example.test",
             password_hash="x",
             full_name="Delivery Smoke",
-            role="USER",
+            role=UserRole.USER,
             is_active=True,
         )
         iran = Node(
@@ -346,6 +349,4 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    from datetime import datetime
-
     asyncio.run(main())
