@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.203",
+  "version": "1.1.0-rc.204",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-22T21:55:45Z",
+  "released_at": "2026-10-22T22:38:16Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "2ee2f7c94971a1668f0716fd8646f6daff8ed193",
+  "source_sha": "99b59ed205d03e5761b8fe7873eb4fee982cb71f",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.203/twinpanel-1.1.0-rc.203-linux-x86_64.tar.gz",
-    "sha256": "0c8eaf72092505c99c4e85307ebec27910df53ae66721c5cf1121e46fb528676",
-    "size_bytes": 20605461
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.204/twinpanel-1.1.0-rc.204-linux-x86_64.tar.gz",
+    "sha256": "3c4a13f0d9f20d33efa745ecd8795e9031b9db57d15fcd61c837c4dcd1498223",
+    "size_bytes": 20611419
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.203 یک بررسی سازگاری امن و غیرتخریبی برای Spoof Tunnel به پنل اضافه می‌کند. کاربر از داخل کارت Spoof Tunnel می‌تواند پیش‌نیازهای هر دو نود ایران و خارج شامل سلامت Core بسته‌بندی‌شده، دسترسی SSH، مجوز Raw Socket بدون ارسال packet جعلی، /dev/net/tun، ابزار و پشتیبانی Kernel WireGuard، Route عادی به Peer و telemetry مشورتی Ping/rp_filter/ip_forward/INPUT policy را بررسی کند. این تست هیچ Source IP جعلی تولید یا ارسال نمی‌کند، رنج IP را اسکن یا Spoof IP کشف نمی‌کند و پشتیبانی دیتاسنتر از Source-IP Spoofing را تأیید نمی‌کند. IPهای Spoof همچنان باید جداگانه تأیید و به‌صورت دستی ثبت شوند و نصب spoof_wg بدون آن‌ها Fail-Closed می‌ماند. TP27 Fast، Route/NAT/Firewall و active/preferred transport توسط این تست تغییر نمی‌کنند.",
-    "en": "TwinPanel 1.1.0-rc.203 adds a safe, non-destructive Spoof Tunnel compatibility check to the panel. From the Spoof Tunnel card, administrators can validate prerequisites on both Iran and Exit nodes including bundled-core integrity, SSH reachability, Raw Socket permission without sending forged packets, /dev/net/tun, WireGuard tools and kernel support, the normal route to the peer, and advisory Ping/rp_filter/ip_forward/INPUT-policy telemetry. The check does not generate or transmit forged source IPs, scan IP ranges, discover spoof IPs, or prove that the provider permits source-IP spoofing. Spoof IPs must still be validated separately and entered manually, and spoof_wg installation remains fail-closed without them. TP27 Fast, Route/NAT/Firewall, and active/preferred transport are not changed by this check."
+    "fa": "TwinPanel 1.1.0-rc.204 تجربه کاربری Spoof Tunnel را تکمیل می‌کند و داخل همان کارت، بخش بازشونده «راهنمای تست و آماده‌سازی» را اضافه می‌کند. این بخش چهار وضعیت روشن شامل سازگاری سرورها، تأیید Source Spoofing دیتاسنتر، ثبت IPهای Spoof و آماده‌بودن برای نصب را نمایش می‌دهد. همچنین دکمه «کپی دستور تست Tunnel #N» دستور رسمی Compatibility Check غیرتخریبی را با Tunnel ID انتخاب‌شده به‌صورت خودکار در Clipboard قرار می‌دهد تا عیب‌یابی دستی ساده‌تر شود. این تغییر فقط UI است و Backend/API، TP27 Fast، Route/NAT/Firewall، active/preferred transport و رفتار Fail-Closed نصب spoof_wg را تغییر نمی‌دهد. این راهنما Source IP جعلی تولید نمی‌کند، رنج IP را اسکن نمی‌کند و پشتیبانی دیتاسنتر از Source-IP Spoofing را تأیید نمی‌کند.",
+    "en": "TwinPanel 1.1.0-rc.204 completes the Spoof Tunnel user experience with an expandable Test & Setup Guide inside the existing card. It shows four explicit states: server compatibility, provider source-spoofing verification, Spoof IP configuration, and ready-to-install. A per-selected-tunnel 'Copy Tunnel #N test command' button copies the existing non-destructive Compatibility Check command with the selected Tunnel ID for simpler manual diagnostics. This is a UI-only change and does not modify Backend/API behavior, TP27 Fast, Route/NAT/Firewall, active/preferred transport, or the fail-closed spoof_wg installation policy. The guide does not generate forged source IPs, scan address ranges, or prove provider support for source-IP spoofing."
   }
 }
