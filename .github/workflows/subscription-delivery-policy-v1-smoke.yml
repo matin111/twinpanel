@@ -10,6 +10,7 @@ on:
       - "backend/app/main.py"
       - "scripts/subscription_delivery_policy_v1_smoke.py"
       - "scripts/subscription_delivery_policy_v1_smoke_runner.py"
+      - "scripts/subscription_delivery_policy_hooks_v1_smoke.py"
       - ".github/workflows/subscription-delivery-policy-v1-smoke.yml"
   push:
     branches: [main]
@@ -21,6 +22,7 @@ on:
       - "backend/app/main.py"
       - "scripts/subscription_delivery_policy_v1_smoke.py"
       - "scripts/subscription_delivery_policy_v1_smoke_runner.py"
+      - "scripts/subscription_delivery_policy_hooks_v1_smoke.py"
       - ".github/workflows/subscription-delivery-policy-v1-smoke.yml"
 
 jobs:
@@ -42,7 +44,11 @@ jobs:
             backend/app/subscription_delivery_policy_v1.py \
             backend/app/routers/subscription_delivery_policy_v1.py \
             scripts/subscription_delivery_policy_v1_smoke.py \
-            scripts/subscription_delivery_policy_v1_smoke_runner.py
+            scripts/subscription_delivery_policy_v1_smoke_runner.py \
+            scripts/subscription_delivery_policy_hooks_v1_smoke.py
       - name: Run delivery policy smoke
         working-directory: backend
         run: PYTHONPATH=. python ../scripts/subscription_delivery_policy_v1_smoke_runner.py
+      - name: Run delivery hook smoke
+        working-directory: backend
+        run: PYTHONPATH=. python ../scripts/subscription_delivery_policy_hooks_v1_smoke.py
