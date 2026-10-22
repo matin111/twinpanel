@@ -90,6 +90,7 @@ export function SmartTransportsRuntimeV25(){
   const online=candidates.filter(row=>normalized(row.status)==="online").length;
   const measured=candidates.filter(row=>Number(row.benchmark?.weighted_mbps||0)>0).length;
   const selectedTunnel=tunnels.find(row=>row.id===selected);
+  const currentMode=normalized(smart?.mode||allState?.mode||"manual");
 
   const run=async(key:string,message:string,action:()=>Promise<unknown>)=>{
     if(!selected||busy)return;
@@ -118,15 +119,18 @@ export function SmartTransportsRuntimeV25(){
     void run(`remove-${name}`,pick(`${label(name)} از همین تانل حذف شد.`,`${label(name)} was removed from this tunnel.`),()=>modernTransportApi.remove(selected,name));
   };
 
-  const setAuto=()=>void run("auto",pick("انتخاب بهترین مسیر به Smart Auto سپرده شد.","Best-path selection is now managed by Smart Auto."),()=>modernTransportApi.setMode(selected,"auto"));
-  const setManual=(row:SmartTransportCandidate)=>void run(`manual-${row.transport}`,pick(`${label(row.transport)} به‌عنوان مسیر دستی اعمال شد.`,`${label(row.transport)} was selected manually.`),()=>modernTransportApi.setMode(selected,"manual",row.transport));
+  const setAuto=()=>{
+    if(!window.confirm(pick("Smart Auto اختیاری است و می‌تواند مسیر فعال را بعد از Health/Benchmark تغییر دهد. فعال شود؟","Smart Auto is optional and may switch the active path after health/benchmark checks. Enable it?")))return;
+    void run("auto",pick("Smart Auto برای همین تانل فعال شد.","Smart Auto is enabled for this tunnel."),()=>modernTransportApi.setMode(selected,"auto"));
+  };
+  const setManual=(row:SmartTransportCandidate)=>void run(`manual-${row.transport}`,pick(`${label(row.transport)} به‌عنوان مسیر دستی Production اعمال شد.`,`${label(row.transport)} is now the manual production path.`),()=>modernTransportApi.setMode(selected,"manual",row.transport));
 
   return <Shell active="/admin/tunnel-transports">
     <div className="page legacy-control-page">
       <div className="page-head">
         <div>
-          <h1>{pick("مسیرهای هوشمند","Smart Transports")}</h1>
-          <small>{pick("نصب، سلامت، پایداری، تست سرعت و انتخاب خودکار مسیرهای ایران → خارج","Install, qualify, benchmark and automatically select Iran → Exit transports")}</small>
+          <h1>{pick("مسیرهای تانل","Tunnel Transports")}</h1>
+          <small>{pick("حالت دستی پیش‌فرض Production است؛ Smart Auto فقط با فعال‌سازی صریح مدیر وارد مدار می‌شود.","Manual mode is the production default; Smart Auto is opt-in and only activates explicitly.")}</small>
         </div>
         <button type="button" className="ghost" disabled={loading||Boolean(busy)} onClick={()=>{void loadTunnels();if(selected)void loadState(selected);}}>{loading?"…":pick("بروزرسانی","Refresh")}</button>
       </div>
@@ -155,15 +159,16 @@ export function SmartTransportsRuntimeV25(){
 
       <Card>
         <div className="card-head">
-          <div><b>Smart Auto</b><small>{pick("سلامت شرط اجباری است؛ سپس سرعت دانلود ۷۰٪ و آپلود ۳۰٪ در انتخاب اثر دارد.","Health is a hard gate; selection then weights download 70% and upload 30%.")}</small></div>
-          <Badge tone={normalized(smart?.mode||allState?.mode)==="auto"?"ok":"violet"}>{String(smart?.mode||allState?.mode||"—")}</Badge>
+          <div><b>{pick("حالت انتخاب مسیر","Path selection mode")}</b><small>{pick("Manual حالت پیش‌فرض Production است. Smart Auto فقط در حالت auto اجازه Promotion و جابه‌جایی مسیر دارد.","Manual is the production default. Smart Auto may promote or switch paths only while mode=auto.")}</small></div>
+          <Badge tone={currentMode==="auto"?"warn":"ok"}>{currentMode||"manual"}</Badge>
         </div>
         <div className="runtime-info-list">
+          <div><span>{pick("پیش‌فرض Production","Production default")}</span><b dir="ltr">manual</b></div>
           <div><span>{pick("فعال فعلی","Active")}</span><b dir="ltr">{label(smart?.active_transport||allState?.active_transport)}</b></div>
           <div><span>{pick("ترجیحی","Preferred")}</span><b dir="ltr">{label(smart?.preferred_transport||allState?.preferred_transport)}</b></div>
-          <div><span>{pick("سیاست","Policy")}</span><b dir="ltr">{smart?.promotion_policy||"health_then_speed"}</b></div>
+          <div><span>{pick("سیاست Auto","Auto policy")}</span><b dir="ltr">{smart?.promotion_policy||"health_then_speed"}</b></div>
         </div>
-        <div className="action-row"><button type="button" className="primary" disabled={!selected||Boolean(busy)} onClick={setAuto}>{busy==="auto"?"…":pick("فعال‌سازی Smart Auto","Enable Smart Auto")}</button></div>
+        <div className="action-row"><button type="button" className="ghost" disabled={!selected||Boolean(busy)||currentMode==="auto"} onClick={setAuto}>{busy==="auto"?"…":currentMode==="auto"?pick("Smart Auto فعال است","Smart Auto enabled"):pick("فعال‌سازی اختیاری Smart Auto","Enable optional Smart Auto")}</button></div>
       </Card>
 
       <div className="module-grid two">
@@ -174,7 +179,7 @@ export function SmartTransportsRuntimeV25(){
           const progress=Math.min(100,Math.round((Number(row.stable_seconds||0)/Math.max(1,Number(row.required_stable_seconds||60)))*100));
           return <Card key={row.transport} className="transport-runtime-card">
             <div className="card-head">
-              <div><b>{row.label||label(row.transport)}</b><small>{row.iran_profile||row.family||"Smart Auto Candidate"}</small></div>
+              <div><b>{row.label||label(row.transport)}</b><small>{row.iran_profile||row.family||"Transport Candidate"}</small></div>
               <Badge tone={row.qualified?"ok":tone(row.status)}>{row.qualified?pick("تأییدشده","QUALIFIED"):String(row.status||"not_installed")}</Badge>
             </div>
 
@@ -195,7 +200,7 @@ export function SmartTransportsRuntimeV25(){
 
             <div className="action-row">
               <button type="button" className="primary-soft" disabled={Boolean(busy)} onClick={()=>install(row)}>{busy===`install-${row.transport}`?"…":installed?pick("بازسازی و تست","Rebuild & test"):pick("نصب و تست","Install & test")}</button>
-              {row.selectable&&<button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>setManual(row)}>{busy===`manual-${row.transport}`?"…":pick("انتخاب دستی","Select manual")}</button>}
+              {row.selectable&&<button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>setManual(row)}>{busy===`manual-${row.transport}`?"…":pick("انتخاب دستی Production","Select production manual")}</button>}
               {installed&&<button type="button" className="danger" disabled={Boolean(busy)} onClick={()=>remove(row)}>{busy===`remove-${row.transport}`?"…":pick("حذف از این تانل","Remove")}</button>}
             </div>
           </Card>;
@@ -203,7 +208,7 @@ export function SmartTransportsRuntimeV25(){
       </div>
 
       <Card>
-        <div className="card-head"><div><b>{pick("همه مسیرهای ثبت‌شده","All registered paths")}</b><small>{pick("مسیرهای قدیمی فقط برای مشاهده و Rollback باقی می‌مانند؛ Smart Auto روی Candidateهای تأییدشده تصمیم می‌گیرد.","Legacy paths remain visible for rollback; Smart Auto selects only qualified candidates.")}</small></div></div>
+        <div className="card-head"><div><b>{pick("همه مسیرهای ثبت‌شده","All registered paths")}</b><small>{pick("مسیرهای قدیمی برای مشاهده و Rollback باقی می‌مانند؛ جابه‌جایی خودکار فقط وقتی mode=auto باشد مجاز است.","Legacy paths remain visible for rollback; automatic switching is allowed only while mode=auto.")}</small></div></div>
         {loading?<div className="runtime-loading">{pick("در حال دریافت…","Loading…")}</div>:allRows.length?<div className="table"><table><thead><tr><th>{pick("مسیر","Transport")}</th><th>{pick("وضعیت","Status")}</th><th>Latency</th><th>{pick("فعال","Enabled")}</th><th>{pick("آخرین سلامت","Last healthy")}</th></tr></thead><tbody>
           {allRows.map((row,index)=><tr key={String(row.id||`${row.transport}-${index}`)}><td dir="ltr"><b>{label(row.transport)}</b></td><td><Badge tone={tone(row.status)}>{String(row.status||"—")}</Badge></td><td dir="ltr">{row.latency_ms==null?"—":`${row.latency_ms} ms`}</td><td>{row.enabled===false?pick("خیر","No"):pick("بله","Yes")}</td><td>{row.last_healthy_at?new Date(String(row.last_healthy_at)).toLocaleString("fa-IR"):"—"}</td></tr>)}
         </tbody></table></div>:<div className="runtime-empty">{pick("هنوز مسیری ثبت نشده است.","No path is registered yet.")}</div>}
