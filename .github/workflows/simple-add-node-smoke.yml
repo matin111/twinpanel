@@ -5,6 +5,7 @@ on:
     paths:
       - 'components/provision-runtime-xray-domain.tsx'
       - 'components/ui.tsx'
+      - 'lib/legacy-admin-api.ts'
       - '.github/workflows/simple-add-node-smoke.yml'
   workflow_dispatch:
 
@@ -14,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify add-node and protocol-studio separation
+      - name: Verify base-only add-node with canonical Exit Xray convergence
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -22,6 +23,9 @@ jobs:
           ui = Path('components/provision-runtime-xray-domain.tsx').read_text()
           nav = Path('components/ui.tsx').read_text()
 
+          # Initial registration stays base-only. Protocol Studio remains the
+          # single installer/repair owner instead of reintroducing a second
+          # protocol installer in the Add Server request.
           for marker in (
               'install_cisco:false',
               'install_openvpn:false',
@@ -34,6 +38,23 @@ jobs:
               'تست SSH',
           ):
               assert marker in ui, marker
+
+          assert 'install_v2ray:true' not in ui
+
+          # Every newly registered Exit converges the required Xray baseline
+          # through the exact same canonical API used by Protocol Studio.
+          for marker in (
+              'legacyAdminApi.ensureClassicProtocol',
+              'requestedNodeType==="exit"',
+              'protocol:"v2ray"',
+              'port:NO_PROTOCOLS.xray_port',
+              'setBaselineV2ray("ready")',
+              'setBaselineV2ray("failed")',
+              'v2ray_baseline',
+          ):
+              assert marker in ui, marker
+
+          assert ui.index('parityApi.provisionInstall') < ui.index('legacyAdminApi.ensureClassicProtocol')
 
           for removed in (
               'Protocols & ports',
@@ -48,5 +69,5 @@ jobs:
           assert '["افزودن سرور","Add Server","/admin/provision","⚡"]' in nav
           assert '["پروتکل‌ها","Protocols","/admin/modern-protocols","◫"]' in nav
 
-          print('SIMPLE_ADD_NODE_SMOKE_OK')
+          print('SIMPLE_ADD_NODE_XRAY_CONVERGENCE_OK')
           PY
