@@ -16,6 +16,7 @@ import {
   type StoreTemplateOptionMap,
 } from "../lib/store-template-options";
 import {loadStoreTemplateSettings} from "../lib/store-template-settings-api";
+import {StorefrontSeoRuntime} from "./storefront-seo-runtime";
 import {StoreTemplateRuntime} from "./store-template-runtime-registry";
 
 export function StoreRuntime2027(){
@@ -117,6 +118,7 @@ export function StoreRuntime2027(){
   };
 
   return <div data-store-theme-engine="v1" data-store-template-active={templateId} data-store-template-customized={hasTemplateOptions?"true":"false"} style={themeStyle}>
+    <StorefrontSeoRuntime settings={effectiveSettings}/>
     <StoreTemplateRuntime templateId={templateId} themeOptions={effectiveOptions} {...templateProps}/>
   </div>;
 }
