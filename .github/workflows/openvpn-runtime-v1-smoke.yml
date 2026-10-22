@@ -1,0 +1,33 @@
+name: OpenVPN Runtime V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/openvpn_runtime_v1.py'
+      - 'backend/app/main.py'
+      - 'backend/scripts/openvpn_runtime_v1_smoke.py'
+      - '.github/workflows/openvpn-runtime-v1-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run OpenVPN runtime regression smoke
+        working-directory: backend
+        run: PYTHONPATH=. python scripts/openvpn_runtime_v1_smoke.py
+
+      - name: Compile touched Python modules
+        run: |
+          python -m py_compile \
+            backend/app/openvpn_runtime_v1.py \
+            backend/app/main.py \
+            backend/scripts/openvpn_runtime_v1_smoke.py
