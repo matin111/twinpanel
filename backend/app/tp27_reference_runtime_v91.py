@@ -89,13 +89,23 @@ def apply_tp27_reference_runtime_v91() -> None:
     if _applied:
         return
 
+    # transport_candidates imports and invokes V91 in every process that can
+    # install or canary a candidate, including FastAPI. Apply the core V179
+    # dataplane contract here so API canaries cannot fall back to the legacy
+    # raw probe while the transport-manager uses a newer process-local patch.
+    from .transport_candidates.core_candidate_runtime_v179 import (
+        apply_core_candidate_runtime_v179,
+    )
+
+    apply_core_candidate_runtime_v179()
     provision.provision_protocols = _provision_protocols_tp27
     _applied = True
 
     print(
         f"{MARKER}_ACTIVE "
         "preserve_ports=cisco,openvpn,wireguard "
-        "l2tp=already_preserved xray=unchanged",
+        "l2tp=already_preserved xray=unchanged "
+        "candidate_core=v179",
         flush=True,
     )
 
