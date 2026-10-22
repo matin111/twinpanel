@@ -1,0 +1,43 @@
+name: SmartAuto Metadata V174 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/transport_candidates/common.py"
+      - "backend/scripts/transport_mark_metadata_v174_smoke.py"
+      - ".github/workflows/smartauto-metadata-v174-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/transport_candidates/common.py"
+      - "backend/scripts/transport_mark_metadata_v174_smoke.py"
+      - ".github/workflows/smartauto-metadata-v174-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Compile touched runtime
+        working-directory: backend
+        run: |
+          python -m py_compile app/transport_candidates/common.py
+          python -m py_compile scripts/transport_mark_metadata_v174_smoke.py
+
+      - name: Verify installer metadata preserves SmartAuto lifecycle
+        working-directory: backend
+        env:
+          APP_SECRET_KEY: v174-smoke-secret
+          DATABASE_URL: sqlite:///./v174-smoke.db
+          NODE_AGENT_SHARED_SECRET: v174-smoke-node-secret
+        run: python scripts/transport_mark_metadata_v174_smoke.py
