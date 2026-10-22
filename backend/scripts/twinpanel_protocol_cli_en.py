@@ -93,14 +93,29 @@ def _read_number(prompt: str, maximum: int, *, allow_zero: bool = True) -> int:
         print(f"Invalid selection. Use 0-{maximum}.")
 
 
+def _menu_item(index: int, title: str) -> None:
+    print(f"  [{index:>2}] {title}")
+
+
 def _select_protocol() -> str:
     print("1/3  Protocol")
-    for index, protocol in enumerate(PROTOCOL_ORDER, start=1):
-        print(f"  [{index:>2}] {PROTOCOL_NAMES[protocol]}")
+    print()
+    print("  Classic")
+    for index, protocol in enumerate(CLASSIC_PROTOCOL_ORDER, start=1):
+        _menu_item(index, PROTOCOL_NAMES[protocol])
+
+    print()
+    print("  Modern")
+    modern_start = len(CLASSIC_PROTOCOL_ORDER) + 1
+    for index, protocol in enumerate(MODERN_PROTOCOL_ORDER, start=modern_start):
+        _menu_item(index, PROTOCOL_NAMES[protocol])
+
+    print()
     print("  [ 0] Back")
+    print()
 
     # Protocol numbers reach 15, so this page intentionally accepts a complete
-    # numeric value followed by Enter. Server/action pages remain one-key.
+    # numeric value followed by Enter. The shorter action page stays one-key.
     choice = _read_number("Choose: ", len(PROTOCOL_ORDER))
     if choice == 0:
         raise RuntimeError("CANCELLED")
@@ -111,15 +126,25 @@ def _select_node(db):
     nodes = _managed_nodes(db)
 
     print("\n2/3  Server")
+    print()
     for index, row in enumerate(nodes, start=1):
         if getattr(row, "is_mother", False):
             label = "This server"
         else:
-            label = f"{_ascii(row.name)} - {row.public_ip}"
-        print(f"  [{index}] {label}")
-    print("  [0] Back")
+            name = _ascii(row.name)
+            ip = _ascii(row.public_ip or "-")
+            label = f"{name:<18} {ip}"
+        _menu_item(index, label)
+    print()
+    print("  [ 0] Back")
+    print()
 
-    choice = _read_choice("Choose: ", len(nodes))
+    # Keep one-key navigation for normal small node sets, while still allowing
+    # complete numeric node selection if an installation grows beyond 9 nodes.
+    if len(nodes) <= 9:
+        choice = _read_choice("Choose: ", len(nodes))
+    else:
+        choice = _read_number("Choose: ", len(nodes))
     if choice == 0:
         raise RuntimeError("CANCELLED")
     return nodes[choice - 1]
@@ -135,9 +160,12 @@ def _select_action() -> str:
     ]
 
     print("\n3/3  Action")
+    print()
     for index, (_, title) in enumerate(actions, start=1):
-        print(f"  [{index}] {title}")
-    print("  [0] Back")
+        _menu_item(index, title)
+    print()
+    print("  [ 0] Back")
+    print()
 
     choice = _read_choice("Choose: ", len(actions))
     if choice == 0:
@@ -328,8 +356,7 @@ def main() -> int:
             return 0
 
         target = "This server" if getattr(node, "is_mother", False) else _ascii(node.name)
-        print(f"\n{PROTOCOL_NAMES[protocol]}  ->  {target}")
-        print(f"Action: {action}")
+        print(f"\n{PROTOCOL_NAMES[protocol]} > {target} > {action.title()}")
 
         result = asyncio.run(_run(db, node, protocol, action))
         _print_result(result)

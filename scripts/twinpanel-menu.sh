@@ -565,11 +565,11 @@ version_menu(){
 more_menu(){
   while true; do
     header "More tools"
-    menu_item 1 "Administrator"
+    menu_item 1 "Admin"
     menu_item 2 "Backup"
-    menu_item 3 "Service management"
-    menu_item 4 "Logs and diagnostics"
-    menu_item 5 "Version and GitHub"
+    menu_item 3 "Services"
+    menu_item 4 "Logs"
+    menu_item 5 "Version"
     menu_back
     pick || return
     case "$CHOICE" in
