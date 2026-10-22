@@ -5,13 +5,16 @@ on:
     paths:
       - "backend/app/plan_protocol_models.py"
       - "backend/app/protocol_account_registry.py"
+      - "backend/app/quota_schemas.py"
       - "backend/app/routers/plans.py"
       - "backend/app/routers/__init__.py"
       - "backend/app/routers/modern_account_delivery_v1.py"
       - "backend/app/routers/modern_enforcement_runtime_v1.py"
       - "backend/app/services/modern_enforcement_v1.py"
+      - "backend/app/services/quota_node_sync.py"
       - "backend/app/services/subscription_factory.py"
       - "backend/app/singbox_subscription_accounts.py"
+      - "backend/app/standalone_subscription_accounts.py"
       - "scripts/smoke-modern-account-lifecycle-v1.py"
       - ".github/workflows/modern-account-lifecycle-v1-smoke.yml"
   workflow_dispatch:
@@ -29,10 +32,13 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/protocol_account_registry.py \
+            backend/app/quota_schemas.py \
             backend/app/routers/modern_account_delivery_v1.py \
             backend/app/routers/modern_enforcement_runtime_v1.py \
             backend/app/services/modern_enforcement_v1.py \
+            backend/app/services/quota_node_sync.py \
             backend/app/services/subscription_factory.py \
-            backend/app/singbox_subscription_accounts.py
+            backend/app/singbox_subscription_accounts.py \
+            backend/app/standalone_subscription_accounts.py
       - name: Verify lifecycle contract
         run: python scripts/smoke-modern-account-lifecycle-v1.py
