@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.176",
+  "version": "1.1.0-rc.178",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-22T01:47:21Z",
+  "released_at": "2026-10-22T01:55:16Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "0eba506fb571a0b166b06e73fed7d5d009afb79a",
+  "source_sha": "9c4b207012d3ab6b8e87bbc6c093511ceafdf5aa",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.176/twinpanel-1.1.0-rc.176-linux-x86_64.tar.gz",
-    "sha256": "be4457b188802a575402ff604c74b22e5d1137e6acd30a99e1090568330da909",
-    "size_bytes": 18131185
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.178/twinpanel-1.1.0-rc.178-linux-x86_64.tar.gz",
+    "sha256": "01ccf9e48ffbbf6eb7ae2881341afaf708ae2f521c37ed16ce7e47db33f6f76a",
+    "size_bytes": 18131785
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.176 اصلاح نهایی مسیر Qualification برای Candidateهای Tunnel #5 است. خطای تکرارشونده tcp_egress_probe_failed دیگر به پاسخ دو سرویس HTTP عمومی وابسته نیست؛ سلامت TCP با socket واقعی و bind‌شده به IP تونل روی چند مقصد مستقل 443 سنجیده می‌شود و Public IP فقط telemetry است. برای مسیرهای policy-routed مقدار rp_filter روی TUN به حالت loose تنظیم می‌شود تا پاسخ‌های اینترنتی با source عمومی به‌اشتباه حذف نشوند. MASQUE نیز دیگر دو ثانیه بعد از start مستقیماً peer-ping نمی‌شود و باید ابتدا در همان process جاری TP27_MASQUE_CLIENT_READY و TP27_MASQUE_SESSION_UP را ثابت کند. ترتیب نصب خودکار نیز Fast → Mieru TCP → Direct TCP → MASQUE شده تا روی مسیر ایران که TCP در دسترس است fallbackهای TCP قبل از QUIC/UDP آزمایش شوند. Peer /30 ping و UDP DNS egress همچنان hard gate هستند. Backend/API/Auth/Payment/Subscription/Quota/Storefront/Classic VPN provisioning و TP27 framing/carrier binaries تغییری نکرده‌اند. پس از نصب روی سرور تست، فقط پذیرش Candidateها و سپس بهینه‌سازی سرعت VPN انجام می‌شود.",
-    "en": "TwinPanel 1.1.0-rc.176 finalizes Tunnel #5 candidate qualification. Repeated tcp_egress_probe_failed no longer depends on two public HTTP IP-check services; TCP health is proven with real source-bound socket connections to multiple independent port-443 targets while public-IP lookup is telemetry-only. Candidate TUN rp_filter is set to loose mode for policy-routed return traffic. MASQUE no longer starts peer ping two seconds after service start; the current client/server processes must first prove TP27_MASQUE_CLIENT_READY and TP27_MASQUE_SESSION_UP. Automatic install preference is now Fast → Mieru TCP → Direct TCP → MASQUE so TCP fallbacks are attempted before UDP/QUIC on the affected Iran path. Peer /30 ping and UDP DNS egress remain hard gates. Backend/API/Auth/Payment/Subscription/Quota/Storefront/Classic VPN provisioning and TP27 framing/carrier binaries are unchanged. Production acceptance is followed immediately by VPN throughput optimization."
+    "fa": "TwinPanel 1.1.0-rc.178 اصلاح نمایش Light Mode فروشگاه را منتشر می‌کند. چت مهمان فروشگاه اکنون مستقیماً با DOM واقعی SupportChatWidgetV2 استایل می‌شود تا پنل، پیام‌ها، ورودی، دکمه‌ها و پیام کاربر در حالت روشن کنتراست و خوانایی صحیح داشته باشند. دکمه ورود قالب Conversion نیز دیگر سفید روی هدر سفید نیست و با سطح بنفش ملایم، متن و Border واضح نمایش داده می‌شود. Dark Mode و رفتار Chat/Auth بدون تغییر مانده‌اند. Backend/API/Payment/Subscription/Quota/Tunnel/VPN تغییری نکرده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.178 publishes the storefront Light Mode presentation fix. Guest chat now styles the actual SupportChatWidgetV2 DOM so the panel, messages, composer, controls and customer bubble have correct light-theme contrast and readability. The Conversion storefront Sign in control no longer disappears as white on a white header and now uses a subtle violet surface with clear text and border. Dark Mode and Chat/Auth behavior are unchanged. Backend/API/Payment/Subscription/Quota/Tunnel/VPN are unchanged."
   }
 }
