@@ -33,12 +33,13 @@ from . import destructive_safety as _destructive_safety  # noqa: F401
 # runtime_endpoints is the first APIRouter included by app.main and has no
 # prefix of its own. Keep Classic Protocol Studio and Storefront compatibility
 # routes registered here. Modern Protocol Admin V3 is mounted explicitly by
-# app.main before the legacy vpn_settings router. Avoid importing a modern
-# protocol router from this package initializer: modern runtimes import
-# routers.provision, so hidden registration here creates a circular import.
+# app.main before the legacy vpn_settings router. Avoid importing protocol
+# runtime implementations from this package initializer: they import
+# routers.provision and would create a circular import.
 from . import runtime_endpoints as _runtime_endpoints
 from .classic_protocol_admin_v1 import router as _classic_protocol_admin_v1_router
 from .storefront_theme_media import router as _storefront_theme_media_router
+from .modern_account_delivery_v1 import router as _modern_account_delivery_v1_router
 
 # TWINPANEL_MANUAL_AUTHORITY_REGISTER_V193
 # Agent reports arrive on an exact route also retained in the legacy tunnels
@@ -47,6 +48,12 @@ from .storefront_theme_media import router as _storefront_theme_media_router
 # overwritten by a stale Agent selected_transport report.
 from .manual_authority_v193 import router as _manual_authority_v193_router
 
+# TWINPANEL_MODERN_ACCOUNT_DELIVERY_V1
+# Account Delivery retains a legacy exact route. Mount the canonical lifecycle
+# endpoint on runtime_endpoints first, following the same precedence pattern as
+# Manual Authority. The implementation imports runtime drivers lazily, keeping
+# routers package initialization free of provision/runtime cycles.
+_runtime_endpoints.router.include_router(_modern_account_delivery_v1_router)
 _runtime_endpoints.router.include_router(_manual_authority_v193_router)
 _runtime_endpoints.router.include_router(_classic_protocol_admin_v1_router)
 _runtime_endpoints.router.include_router(_storefront_theme_media_router)
