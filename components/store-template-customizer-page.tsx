@@ -37,6 +37,6 @@ export function StoreTemplateCustomizerPage({templateId}:{templateId:string}){
 
   return <Shell active="/admin/store-settings"><div className="page storeAdminManager">
     {customizer}
-    <StoreTemplateSeoPanel templateId={template.id}/>
+    {template.id!=="conversion-2027"&&<StoreTemplateSeoPanel templateId={template.id}/>}
   </div></Shell>;
 }
