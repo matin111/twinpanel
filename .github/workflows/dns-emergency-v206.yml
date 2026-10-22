@@ -32,6 +32,11 @@ jobs:
   contract:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      APP_ENV: test
+      APP_SECRET_KEY: dns-emergency-ci-secret
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/twinpanel_dns_ci
+      NODE_AGENT_SHARED_SECRET: dns-emergency-ci-node-secret
     steps:
       - name: Checkout TwinPanel
         uses: actions/checkout@v4
