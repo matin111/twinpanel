@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.192",
+  "version": "1.1.0-rc.194",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-22T15:28:37Z",
+  "released_at": "2026-10-22T17:02:38Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7e1cdfb1660390a620cc022dbc48f88f5a299576",
+  "source_sha": "66b5add978df7cbde7ccff967ec2bf5356175411",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.192/twinpanel-1.1.0-rc.192-linux-x86_64.tar.gz",
-    "sha256": "345e188ab284b4ea3d860b51f2cfc87fdb5a54aba52fdab1c3b31cffe4f3d328",
-    "size_bytes": 18183074
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.194/twinpanel-1.1.0-rc.194-linux-x86_64.tar.gz",
+    "sha256": "aa50d2100f297271362da57bbd1e1e1b0c5fd45eafb194499703a7dad2ce7a6c",
+    "size_bytes": 18184454
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.192 خطای Production نسخه rc.191 در انتخاب دستی Candidateهای TP27 را برطرف می‌کند. Root Cause این بود که رابط جدید Manual مسیرهایی مثل tp27_fast را به endpoint قدیمی transport-mode می‌فرستاد، اما Backend آن endpoint هنوز فقط allowlist قدیمی mtunnel/backhaul/ssh_tun را می‌پذیرفت و با Invalid transport درخواست را رد می‌کرد؛ در نتیجه Tunnel #6 با وجود فعال بودن tp27_fast روی mode=auto باقی می‌ماند. rc.192 برای Candidateهای مدرن endpoint اختصاصی Manual اضافه می‌کند که فقط نام‌های Registry فعال را می‌پذیرد، وجود Row همان Tunnel، enabled بودن و qualified بودن مسیر را بررسی می‌کند و سپس mode، active_transport و preferred_transport را به‌صورت اتمیک روی همان مسیر دستی قفل می‌کند. production_default API نیز به manual اصلاح شده و UI انتخاب Manual مدرن را از endpoint جدید انجام می‌دهد، در حالی که فعال‌سازی Smart Auto همچنان مسیر قبلی خود را حفظ می‌کند. Dataplane، TP27 carrierها، Route، NAT، Firewall، VPN، Payment، Quota و Provisioning تغییر نکرده‌اند. رفع کامل تا Update روی سرور واقعی، انتخاب دستی tp27_fast روی Tunnel #6 و Acceptance عملی پایداری ادعا نمی‌شود.",
-    "en": "TwinPanel 1.1.0-rc.192 fixes the rc.191 production failure when manually selecting TP27 candidates. The root cause was that the new Manual-first UI sent transports such as tp27_fast to the legacy transport-mode endpoint, while that backend endpoint still accepted only the old mtunnel/backhaul/ssh_tun allowlist and returned Invalid transport; Tunnel #6 therefore remained mode=auto even though tp27_fast was active. rc.192 adds a dedicated manual-selection endpoint for modern candidates that accepts only active-registry names, requires a transport row on the same tunnel, enforces enabled and qualified state, then atomically pins mode, active_transport and preferred_transport to the selected path. The API production_default metadata is also corrected to manual, and modern Manual selection now uses the new endpoint while Smart Auto activation keeps its existing path. Dataplane, TP27 carriers, routing, NAT, firewall, VPN, payment, quota and provisioning are unchanged. Full resolution is not claimed until updater deployment, manual tp27_fast selection on Tunnel #6 and real stability acceptance pass on the production test server."
+    "fa": "TwinPanel 1.1.0-rc.194 دو اصلاح Merge‌شده بعد از rc.192 را در یک Release قابل‌نصب منتشر می‌کند. در مدیریت دستی Tunnel، Root Cause برگشت مسیر به SSH TUN این بود که Agentهای نود هنوز selected_transport قدیمی را گزارش می‌کردند و endpoint گزارش Legacy در حالت non-auto همان telemetry را دوباره داخل Tunnel.active_transport می‌نوشت؛ بنابراین بعد از انتخاب دستی tp27_fast وضعیت دقیقاً به mode=manual + preferred_transport=tp27_fast + active_transport=ssh_tun تبدیل می‌شد. rc.194 گزارش Agent را برای Authority تجمیعی Tunnel فقط telemetry می‌کند و انتخاب Manual دیگر از این مسیر overwrite نمی‌شود، در حالی که TunnelPeerState و سلامت/Latency/Error مربوط به TunnelTransport و قرارداد MTunnel حفظ شده‌اند. این Release همچنین اصلاح Merge‌شده V2Ray/Xray Admin Service Connections را شامل می‌شود که Desired Route واقعی مدیریت را از policy تحویل TLS-only مشتری جدا می‌کند تا مسیر Legacy V2Ray در Inventory مدیریتی حذف نشود؛ Customer Xray delivery همچنان TLS-only باقی می‌ماند. rc.193 Candidate قبل از انتشار عمداً supersede شد چون Source آن قبل از Fix Manual Authority بود. TP27 carrierها، GRE، Route، NAT، Firewall، VPN، Auth، Payment، Quota، Provisioning، SmartAuto scoring و Transport Manager selection در این Release بازنویسی نشده‌اند. رفع Production تا نصب rc.194 روی سرور تست، انتخاب دستی tp27_fast روی Tunnel #6 و مشاهده حداقل 10 دقیقه پایداری بدون برگشت توسط Agent report ادعا نمی‌شود.",
+    "en": "TwinPanel 1.1.0-rc.194 publishes two fixes merged after rc.192 in one installable release. For manual tunnel selection, the proven root cause of the path reverting to SSH TUN was that node Agents continued reporting the old selected_transport and the legacy report endpoint, when mode was non-auto, wrote that telemetry back into Tunnel.active_transport. After manually selecting tp27_fast this produced the exact state mode=manual + preferred_transport=tp27_fast + active_transport=ssh_tun. rc.194 makes Agent reports telemetry-only for aggregate Tunnel authority, so Manual selection can no longer be overwritten through that report path, while preserving TunnelPeerState telemetry, TunnelTransport health/latency/error mirroring and the MTunnel controller-authority contract. This release also includes the merged V2Ray/Xray Admin Service Connections correction that separates the real admin Desired Route inventory from the TLS-only customer delivery policy so the legacy V2Ray route is not filtered out of admin inventory; customer Xray delivery remains TLS-only. The rc.193 candidate was intentionally superseded before publication because its source predated the Manual Authority fix. TP27 carriers, GRE, routing, NAT, firewall, VPN, auth, payment, quota, provisioning, SmartAuto scoring and Transport Manager selection are not rewritten in this release. Production resolution is not claimed until rc.194 is installed on the test server, tp27_fast is manually selected on Tunnel #6, and at least 10 minutes of stability confirms recurring Agent reports do not revert the selected path."
   }
 }
