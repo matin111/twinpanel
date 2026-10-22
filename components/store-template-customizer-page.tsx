@@ -11,6 +11,12 @@ import {StoreTemplateCustomizer} from "./store-template-customizer";
 import {StoreTemplateSeoPanel} from "./store-template-seo-panel";
 import {Card,Shell} from "./ui";
 
+const INTEGRATED_SEO_TEMPLATE_IDS=new Set([
+  "conversion-2027",
+  "editorial-grid-2027",
+  "orbit-neo-2027",
+]);
+
 export function StoreTemplateCustomizerPage({templateId}:{templateId:string}){
   const {pick}=useI18n();
   const router=useRouter();
@@ -37,6 +43,6 @@ export function StoreTemplateCustomizerPage({templateId}:{templateId:string}){
 
   return <Shell active="/admin/store-settings"><div className="page storeAdminManager">
     {customizer}
-    {template.id!=="conversion-2027"&&<StoreTemplateSeoPanel templateId={template.id}/>}
+    {!INTEGRATED_SEO_TEMPLATE_IDS.has(template.id)&&<StoreTemplateSeoPanel templateId={template.id}/>}
   </div></Shell>;
 }
