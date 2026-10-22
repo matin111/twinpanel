@@ -4,6 +4,7 @@ import type {CSSProperties} from "react";
 import type {StoreTemplateOptionMap} from "../lib/store-template-options";
 import {StoreTemplateRenderer,type StoreTemplateProps} from "./store-template-renderer";
 import bridge from "./store-template-conversion-theme-bridge.module.css";
+import composition from "./store-template-conversion-composition.module.css";
 
 type Props=StoreTemplateProps&{themeOptions:StoreTemplateOptionMap};
 
@@ -33,7 +34,7 @@ export function ConversionPro2027Template({themeOptions,...props}:Props){
   } as CSSProperties;
 
   return <div
-    className={`${bridge.themeBridge} tpConversionThemeRuntime`}
+    className={`${bridge.themeBridge} ${composition.composition} tpConversionThemeRuntime`}
     data-density={stringOption(themeOptions,"conversion_density","balanced")}
     data-header={stringOption(themeOptions,"conversion_header_style","glass")}
     data-buttons={stringOption(themeOptions,"conversion_button_style","gradient")}
