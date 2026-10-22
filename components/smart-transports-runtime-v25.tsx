@@ -181,6 +181,44 @@ export function SmartTransportsRuntimeV25(){
     }
   };
 
+  const copySpoofGuideCommand=async()=>{
+    if(!selected)return;
+    const command=`cd /opt/twinpanel/current/backend
+set -a
+source /etc/twinpanel/backend.env
+set +a
+export PYTHONPATH="$PWD"
+
+/opt/twinpanel/venv/bin/python3 - <<'PY'
+import asyncio
+import json
+
+from app.database import SessionLocal
+from app.routers.modern_transports import check_spoof_wg_compatibility
+
+TUNNEL_ID = ${selected}
+db = SessionLocal()
+
+try:
+    result = asyncio.run(
+        check_spoof_wg_compatibility(
+            tunnel_id=TUNNEL_ID,
+            db=db,
+        )
+    )
+    print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+finally:
+    db.close()
+PY`;
+    try{
+      await navigator.clipboard.writeText(command);
+      setError("");
+      setSuccess(pick(`دستور تست Tunnel #${selected} کپی شد.`,`Tunnel #${selected} compatibility command copied.`));
+    }catch{
+      setError(pick("کپی خودکار دستور در این مرورگر در دسترس نیست.","Automatic command copy is not available in this browser."));
+    }
+  };
+
   const setAuto=()=>{
     if(!window.confirm(pick("Smart Auto فقط بین مسیرهای تأییدشده TP27 Fast و Spoof Tunnel انتخاب می‌کند. فعال شود؟","Smart Auto will select only between qualified TP27 Fast and Spoof Tunnel paths. Enable it?")))return;
     void run("auto",pick("Smart Auto برای همین تانل فعال شد.","Smart Auto is enabled for this tunnel."),()=>modernTransportApi.setMode(selected,"auto"));
@@ -243,6 +281,7 @@ export function SmartTransportsRuntimeV25(){
           const progress=Math.min(100,Math.round((Number(row.stable_seconds||0)/Math.max(1,Number(row.required_stable_seconds||60)))*100));
           const isSpoof=row.transport==="spoof_wg";
           const isActive=normalized(row.transport)===activeName;
+          const spoofReady=Boolean(spoofCompatibility?.compatible&&row.configured);
           return <Card key={row.transport} className="transport-runtime-card">
             <div className="card-head">
               <div><b>{row.label||label(row.transport)}</b><small>{row.iran_profile||row.family||"Transport Candidate"}</small></div>
@@ -287,6 +326,21 @@ export function SmartTransportsRuntimeV25(){
                   )}
                 </div>
               </>}
+
+              <details className="runtime-warning compact">
+                <summary><b>{pick("راهنمای تست و آماده‌سازی","Test & setup guide")}</b></summary>
+                <small>{pick("برای کاربر عادی، دکمه بررسی سازگاری کافی است. دستور زیر فقط برای عیب‌یابی دستی همین Tunnel روی سرور TwinPanel است.","For normal use, the compatibility button is enough. The command below is only for manual diagnostics of this selected tunnel on the TwinPanel server.")}</small>
+                <div className="runtime-info-list">
+                  <div><span>{pick("سازگاری سرورها","Server compatibility")}</span><b>{spoofCompatibility?(spoofCompatibility.compatible?pick("✅ تأیید شد","✅ Ready"):pick("❌ نیاز به اصلاح","❌ Needs fix")):pick("◌ هنوز تست نشده","◌ Not tested")}</b></div>
+                  <div><span>{pick("Source Spoofing دیتاسنتر","Provider source spoofing")}</span><b>{spoofCompatibility?.source_spoofing_verified?pick("✅ تأیید شد","✅ Verified"):pick("⚠️ تأیید نشده","⚠️ Not verified")}</b></div>
+                  <div><span>{pick("IPهای Spoof","Spoof IPs")}</span><b>{row.configured?pick("✅ ثبت شده","✅ Saved"):pick("⚠️ تنظیم نشده","⚠️ Not configured")}</b></div>
+                  <div><span>{pick("آماده نصب","Ready to install")}</span><b>{spoofReady?pick("✅ بله","✅ Yes"):pick("❌ خیر","❌ No")}</b></div>
+                </div>
+                <div className="action-row">
+                  <button type="button" className="ghost" disabled={!selected} onClick={()=>void copySpoofGuideCommand()}>{pick(`کپی دستور تست Tunnel #${selected}`,`Copy Tunnel #${selected} test command`)}</button>
+                </div>
+                <small>{pick("این دستور همان Compatibility Check غیرتخریبی را اجرا می‌کند؛ مسیر Production، Route، NAT و Firewall را تغییر نمی‌دهد.","This command runs the same non-destructive compatibility check; it does not change the production path, routes, NAT, or firewall.")}</small>
+              </details>
 
               <label className="field"><span>{pick("IP اسپوف سمت ایران","Iran spoof source IP")}</span><input dir="ltr" value={iranSpoofIp} onChange={event=>setIranSpoofIp(event.target.value)} placeholder="IPv4" disabled={Boolean(busy)||normalized(row.status)==="online"}/></label>
               <label className="field"><span>{pick("IP اسپوف سمت خارج","Exit spoof source IP")}</span><input dir="ltr" value={exitSpoofIp} onChange={event=>setExitSpoofIp(event.target.value)} placeholder="IPv4" disabled={Boolean(busy)||normalized(row.status)==="online"}/></label>
