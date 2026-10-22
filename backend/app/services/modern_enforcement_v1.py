@@ -8,23 +8,20 @@ from typing import Any
 from sqlalchemy import and_, or_
 
 from ..database import SessionLocal
-from ..models import Node, ProtocolCredential
+from ..models import Node, NodeProtocolConfig, ProtocolCredential
 from ..quota_models import QuotaNodeCommand
 from .. import subscription_enforcement as enforcement
 
 
 logger = logging.getLogger(__name__)
 
-CONTROLLER_MODERN_PROTOCOLS = frozenset(
-    {
-        "hysteria2",
-        "tuic",
-        "anytls",
-        "naive",
-        "shadowtls",
-        "snell",
-    }
+SINGBOX_MODERN_PROTOCOLS = frozenset(
+    {"hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"}
 )
+STANDALONE_MODERN_PROTOCOLS = frozenset(
+    {"mieru", "trusttunnel", "amneziawg", "sudoku"}
+)
+CONTROLLER_MODERN_PROTOCOLS = SINGBOX_MODERN_PROTOCOLS | STANDALONE_MODERN_PROTOCOLS
 
 _EXECUTOR = "controller-modern-v1"
 _PROCESSING_TIMEOUT_SECONDS = 90
@@ -39,13 +36,7 @@ def _command_protocol(command: QuotaNodeCommand) -> str:
 
 
 def install_modern_enforcement_hooks() -> None:
-    """Route Modern account enforcement to the controller, not legacy Agents.
-
-    Existing node Agents continue to own Classic commands. Modern sing-box
-    accounts are mutated through the same saved-SSH control path used by
-    Account Delivery, so suspend/quota revoke and restore act on the actual
-    per-user runtime identity.
-    """
+    """Route all Modern account enforcement to the controller worker."""
 
     global _installed, _original_queue
     if _installed:
@@ -87,7 +78,6 @@ def install_modern_enforcement_hooks() -> None:
         if not command_ids:
             return result
 
-        # Flush only; transaction ownership remains with the caller.
         db.flush()
         rows = (
             db.query(QuotaNodeCommand)
@@ -101,15 +91,14 @@ def install_modern_enforcement_hooks() -> None:
             payload = dict(row.payload or {})
             payload["executor"] = _EXECUTOR
             row.payload = payload
-            # Agent pull only reads status="pending". This separate durable
-            # state prevents an old node Agent from racing the controller.
+            # Agent pull only consumes status=pending. Controller-owned Modern
+            # work is durable and cannot race a legacy node Agent.
             row.status = "controller_pending"
 
         return result
 
     enforcement.queue_subscription_enforcement = controller_aware_queue
     _installed = True
-
 
 
 def _claim_next_command() -> dict[str, Any] | None:
@@ -144,8 +133,6 @@ def _claim_next_command() -> dict[str, Any] | None:
             protocol not in CONTROLLER_MODERN_PROTOCOLS
             or payload.get("executor") != _EXECUTOR
         ):
-            # Never steal a Classic/Agent-owned command. A malformed
-            # controller state is rejected terminally instead of looping.
             row.status = "failed"
             row.result_code = "controller_protocol_mismatch"
             row.result_message = "command is not owned by Modern controller"
@@ -171,6 +158,24 @@ def _claim_next_command() -> dict[str, Any] | None:
         raise
     finally:
         db.close()
+
+
+def _decode_stored_secret(protocol: str, credential: ProtocolCredential):
+    from ..routers import account_delivery as account_delivery
+
+    decoded = account_delivery._dec(credential.secret_encrypted)
+    if not isinstance(decoded, dict):
+        raise RuntimeError("stored protocol credential is invalid")
+
+    if protocol in SINGBOX_MODERN_PROTOCOLS:
+        from ..singbox_subscription_accounts import secret_from_dict
+    else:
+        from ..standalone_subscription_accounts import secret_from_dict
+
+    secret = secret_from_dict(decoded)
+    if str(secret.protocol) != protocol:
+        raise RuntimeError("stored protocol credential protocol mismatch")
+    return secret
 
 
 async def _execute_command(command: dict[str, Any]) -> None:
@@ -200,38 +205,51 @@ async def _execute_command(command: dict[str, Any]) -> None:
             )
             .first()
         )
+        if credential is None or not credential.secret_encrypted:
+            raise RuntimeError("protocol credential is unavailable")
 
-        # Import runtime/routers lazily. The enforcement hooks are installed
-        # while routers package initialization is still in progress.
         from ..routers.provision import ssh_connect_saved
-        from ..singbox_subscription_accounts import (
-            apply_account,
-            remove_account,
-            secret_from_dict,
-        )
 
+        secret = _decode_stored_secret(protocol, credential)
         conn = await ssh_connect_saved(node, db)
 
-        if command_type == "revoke_subscription":
-            await remove_account(conn, protocol, subscription_id)
-            result_code = "controller_modern_revoked"
+        if protocol in SINGBOX_MODERN_PROTOCOLS:
+            from ..singbox_subscription_accounts import apply_account, remove_account
 
-        elif command_type == "restore_subscription":
-            if credential is None or not bool(credential.is_active):
-                raise RuntimeError("active protocol credential is unavailable")
-            from ..routers import account_delivery as account_delivery
-
-            decoded = account_delivery._dec(credential.secret_encrypted)
-            if not isinstance(decoded, dict):
-                raise RuntimeError("stored protocol credential is invalid")
-            secret = secret_from_dict(decoded)
-            if str(secret.protocol) != protocol:
-                raise RuntimeError("stored protocol credential protocol mismatch")
-            await apply_account(conn, node, secret)
-            result_code = "controller_modern_restored"
-
+            if command_type == "revoke_subscription":
+                await remove_account(conn, protocol, subscription_id)
+                result_code = "controller_modern_revoked"
+            elif command_type == "restore_subscription":
+                if not bool(credential.is_active):
+                    raise RuntimeError("active protocol credential is unavailable")
+                await apply_account(conn, node, secret)
+                result_code = "controller_modern_restored"
+            else:
+                raise RuntimeError(f"unsupported command type: {command_type}")
         else:
-            raise RuntimeError(f"unsupported command type: {command_type}")
+            from ..standalone_subscription_accounts import apply_account, remove_account
+
+            if command_type == "revoke_subscription":
+                await remove_account(conn, secret)
+                result_code = "controller_standalone_revoked"
+            elif command_type == "restore_subscription":
+                if not bool(credential.is_active):
+                    raise RuntimeError("active protocol credential is unavailable")
+                cfg = (
+                    db.query(NodeProtocolConfig)
+                    .filter(
+                        NodeProtocolConfig.node_id == node_id,
+                        NodeProtocolConfig.protocol == protocol,
+                        NodeProtocolConfig.status == "online",
+                    )
+                    .first()
+                )
+                if cfg is None or not cfg.port:
+                    raise RuntimeError("standalone runtime config is unavailable")
+                await apply_account(conn, node, secret, int(cfg.port))
+                result_code = "controller_standalone_restored"
+            else:
+                raise RuntimeError(f"unsupported command type: {command_type}")
 
     except Exception as exc:
         error = exc
@@ -292,7 +310,7 @@ async def process_modern_enforcement_once(*, limit: int = 20) -> int:
 
 
 async def modern_enforcement_loop() -> None:
-    """Durable controller-side worker for Modern revoke/restore commands."""
+    """Durable controller-side worker for all Modern revoke/restore commands."""
 
     install_modern_enforcement_hooks()
     while True:
