@@ -6,9 +6,11 @@ on:
       - "backend/app/standalone_protocol_runtime.py"
       - "backend/app/singbox_service_runtime.py"
       - "backend/app/modern_protocol_dispatch.py"
+      - "backend/app/modern_protocol_preflight.py"
       - "backend/app/routers/modern_protocol_admin_v3.py"
       - "backend/app/main.py"
       - "backend/scripts/modern_protocol_runtime_v3_smoke.py"
+      - "backend/scripts/modern_protocol_remote_preflight_smoke.py"
       - "backend/scripts/modern_protocol_bulk_sync_ui_smoke.py"
       - "backend/scripts/sudoku_keygen_v051_smoke.py"
       - "components/protocol-command-center.tsx"
@@ -48,9 +50,11 @@ jobs:
             backend/app/standalone_protocol_runtime.py \
             backend/app/singbox_service_runtime.py \
             backend/app/modern_protocol_dispatch.py \
+            backend/app/modern_protocol_preflight.py \
             backend/app/routers/modern_protocol_admin_v3.py \
             backend/app/main.py \
             backend/scripts/modern_protocol_runtime_v3_smoke.py \
+            backend/scripts/modern_protocol_remote_preflight_smoke.py \
             backend/scripts/modern_protocol_bulk_sync_ui_smoke.py \
             backend/scripts/sudoku_keygen_v051_smoke.py
 
@@ -58,6 +62,7 @@ jobs:
         working-directory: backend
         run: |
           PYTHONPATH=. python scripts/modern_protocol_runtime_v3_smoke.py
+          PYTHONPATH=. python scripts/modern_protocol_remote_preflight_smoke.py
           PYTHONPATH=. python scripts/sudoku_keygen_v051_smoke.py
 
       - name: Verify bulk sync UI contract
