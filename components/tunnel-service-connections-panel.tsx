@@ -17,6 +17,12 @@ type ServiceCapabilities={
   xray_reconcile?:boolean;
 };
 
+type RouteNativeServiceConnection=TunnelServiceConnection&{
+  public_host?:string|null;
+  target_ip?:string|null;
+  route_source?:string|null;
+};
+
 function reasonLabel(value: string | null | undefined, pick: (fa:string,en:string)=>string) {
   switch (String(value || "")) {
     case "tls_domain_unavailable":
@@ -52,6 +58,12 @@ function portText(value: number | null | undefined, transport?: string) {
     return String(transport || "").toLowerCase() === "esp" ? "ESP" : "—";
   }
   return String(value);
+}
+
+function endpointText(host:string|null|undefined,port:number|null|undefined,transport?:string){
+  const portValue=portText(port,transport);
+  const hostValue=String(host||"").trim();
+  return hostValue?`${hostValue}:${portValue}`:portValue;
 }
 
 export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
@@ -164,7 +176,7 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
     <div className="manage-card-section tunnel-service-connections-compact">
       <div className="tunnel-service-compact-head">
         <div>
-          <b>{pick("اتصال‌های عبوری", "Service connections")}</b>
+          <b>{pick("اتصال‌های عمومی", "Public service connections")}</b>
           <small>
             {connections.length.toLocaleString("fa-IR")} {pick("مسیر سرویس", "service routes")}
           </small>
@@ -220,16 +232,17 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
 
       {!error && !loading && connections.length === 0 && (
         <div className="runtime-empty">
-          {pick("اتصال عبوری فعالی برای این تانل ثبت نشده است.", "No routed service connections are registered for this tunnel.")}
+          {pick("اتصال عمومی فعالی برای این تانل ثبت نشده است.", "No public service connections are registered for this tunnel.")}
         </div>
       )}
 
       {connections.length > 0 && (
         <div className="tunnel-service-compact-grid">
           {connections.map((item,index) => {
+            const routeItem=item as RouteNativeServiceConnection;
             const reason = reasonLabel(item.health_reason,pick);
-            const ingress = portText(item.public_port,item.transport);
-            const target = portText(item.target_port,item.transport);
+            const ingress = endpointText(routeItem.public_host,item.public_port,item.transport);
+            const target = endpointText(routeItem.target_ip,item.target_port,item.transport);
             const transport = item.transport || "—";
 
             return (
@@ -253,7 +266,7 @@ export function TunnelServiceConnectionsPanel({tunnelId}:{tunnelId:number}) {
                   <span>→</span>
                   <strong>{target}</strong>
                   <span className="tunnel-service-route-separator">•</span>
-                  <span>{transport}</span>
+                  <span>{transport.toUpperCase()}</span>
                 </div>
 
                 {reason && (
