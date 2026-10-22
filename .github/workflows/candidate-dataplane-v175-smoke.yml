@@ -1,0 +1,38 @@
+name: Candidate Dataplane V175 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/candidate_dataplane_v175.py'
+      - 'backend/app/tunnel_transport_manager_v12.py'
+      - 'backend/scripts/candidate_dataplane_v175_smoke.py'
+      - '.github/workflows/candidate-dataplane-v175-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/candidate_dataplane_v175.py'
+      - 'backend/app/tunnel_transport_manager_v12.py'
+      - 'backend/scripts/candidate_dataplane_v175_smoke.py'
+      - '.github/workflows/candidate-dataplane-v175-smoke.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile V175 files
+        run: |
+          python3 -m py_compile \
+            backend/app/candidate_dataplane_v175.py \
+            backend/app/tunnel_transport_manager_v12.py \
+            backend/scripts/candidate_dataplane_v175_smoke.py
+
+      - name: Run V175 regression smoke
+        run: python3 backend/scripts/candidate_dataplane_v175_smoke.py

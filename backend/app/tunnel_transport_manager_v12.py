@@ -18,6 +18,9 @@ from .adaptive_multilane_v165 import (
 from .adaptive_tunnel_performance_v148 import (
     apply_adaptive_tunnel_performance_v148,
 )
+from .candidate_dataplane_v175 import (
+    apply_candidate_dataplane_v175,
+)
 from .exit_access_dataplane_stability_v144 import (
     apply_exit_access_dataplane_stability_v144,
 )
@@ -54,6 +57,7 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 # + SMART CANDIDATE INSTALL GUARD V167
 # + SMART CANDIDATE RETRY GUARD V169
 # + SMART CANDIDATE FAIR RETRY V171
+# + CANDIDATE DATAPLANE V175
 # + ADAPTIVE CANDIDATE QUALIFICATION V155
 # + RUNTIME RECONCILER V5 (extends runtime_reconciler_v4)
 # ============================================================
@@ -69,6 +73,7 @@ async def main() -> None:
     apply_smart_candidate_install_guard_v167()
     apply_smart_candidate_retry_guard_v169()
     apply_smart_candidate_fair_retry_v171()
+    apply_candidate_dataplane_v175()
     apply_adaptive_candidate_qualification_v155()
     apply_adaptive_tunnel_performance_v148()
     apply_exit_access_dataplane_stability_v144()
@@ -86,15 +91,17 @@ async def main() -> None:
         "smart_candidate_install_guard=v167 "
         "smart_candidate_retry_guard=v169 "
         "smart_candidate_fair_retry=v171 "
+        "candidate_dataplane=v175 "
         "adaptive_candidate_qualification=v155 "
         "vpn_access_dataplane=v46 "
         "vpn_access_performance=v51 "
         "exit_access_stability=v144 "
         "reconciler=v5 "
         "active_candidates=tp27_fast,tp27_masque,tp27_mieru_tcp,tp27_tcp_direct "
-        "direct_gate=peer-l3+throughput "
-        "udp_policy=quality-gated "
+        "direct_gate=peer-l3+tcp-socket+udp-dns+throughput "
+        "udp_policy=session-ready+quality-gated "
         "non_udp_fallback=tp27_mieru_tcp,tp27_tcp_direct "
+        "install_order=tp27_fast,tp27_mieru_tcp,tp27_tcp_direct,tp27_masque "
         "migration_fallback=kernel_gre "
         "retired=gost_tun,amneziawg,netrix",
         flush=True,
