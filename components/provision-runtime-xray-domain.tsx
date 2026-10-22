@@ -5,6 +5,7 @@ import {FormEvent,useEffect,useMemo,useState} from "react";
 import {Badge,Card,Shell} from "./ui";
 import {adminApi,type AdminNode} from "../lib/admin-api";
 import {parityApi,type AnyRow,type ProvisionInstallPayload} from "../lib/admin-parity-api";
+import {legacyAdminApi} from "../lib/legacy-admin-api";
 import {useI18n} from "../lib/i18n";
 
 
@@ -18,6 +19,8 @@ type NodeDraft={
   country_code:string;
   capacity_users:number;
 };
+
+type BaselineState="idle"|"ready"|"failed";
 
 const defaultDraft:NodeDraft={
   host:"",
@@ -70,6 +73,8 @@ export function ProvisionRuntimeXrayDomainPage(){
   const [draft,setDraft]=useState<NodeDraft>(defaultDraft);
   const [result,setResult]=useState<AnyRow|null>(null);
   const [createdNodeId,setCreatedNodeId]=useState(0);
+  const [createdNodeType,setCreatedNodeType]=useState<NodeDraft["node_type"]|null>(null);
+  const [baselineV2ray,setBaselineV2ray]=useState<BaselineState>("idle");
   const [busy,setBusy]=useState("");
   const [error,setError]=useState("");
   const [warning,setWarning]=useState("");
@@ -116,9 +121,12 @@ export function ProvisionRuntimeXrayDomainPage(){
   const submit=async(event:FormEvent)=>{
     event.preventDefault();
     if(busy)return;
+    const requestedNodeType=draft.node_type;
     setBusy("register");
     setError("");setWarning("");setOk("");
     setCreatedNodeId(0);
+    setCreatedNodeType(null);
+    setBaselineV2ray("idle");
     try{
       const output=await parityApi.provisionInstall(buildInstallPayload({
         ...draft,
@@ -128,21 +136,57 @@ export function ProvisionRuntimeXrayDomainPage(){
       })) as AnyRow;
       setResult(output);
       const nodeId=Number(output.node_id||0);
-      setCreatedNodeId(Number.isFinite(nodeId)?nodeId:0);
+      const validNodeId=Number.isFinite(nodeId)&&nodeId>0?nodeId:0;
+      setCreatedNodeId(validNodeId);
+      setCreatedNodeType(requestedNodeType);
 
       const failed=Array.isArray(output.failed_protocols)
         ? output.failed_protocols.map(String)
         : [];
+      const baseNeedsAttention=output.ok===false||failed.length>0;
+      let v2rayError="";
 
-      if(output.ok===false||failed.length){
+      if(requestedNodeType==="exit"){
+        if(validNodeId){
+          try{
+            const v2rayRuntime=await legacyAdminApi.ensureClassicProtocol({
+              node_id:validNodeId,
+              protocol:"v2ray",
+              port:NO_PROTOCOLS.xray_port,
+            }) as AnyRow;
+            setBaselineV2ray("ready");
+            setResult({...output,v2ray_baseline:v2rayRuntime} as AnyRow);
+          }catch(reason){
+            v2rayError=reason instanceof Error?reason.message:String(reason);
+            setBaselineV2ray("failed");
+            setResult({...output,v2ray_baseline:{ok:false,error:v2rayError}} as AnyRow);
+          }
+        }else{
+          v2rayError=pick("شناسه نود بعد از ثبت دریافت نشد.","The registered node id was not returned.");
+          setBaselineV2ray("failed");
+          setResult({...output,v2ray_baseline:{ok:false,error:v2rayError}} as AnyRow);
+        }
+      }
+
+      if(requestedNodeType==="exit"&&v2rayError){
         setWarning(pick(
-          `سرور ثبت شد، اما بخشی از زیرساخت پایه نیاز به بررسی دارد${failed.length?`: ${failed.join(", ")}`:""}. پروتکل‌ها هنوز نصب نشده‌اند.`,
-          `The server was registered, but part of the base infrastructure needs attention${failed.length?`: ${failed.join(", ")}`:""}. No VPN protocols were installed.`,
+          `سرور Exit ثبت شد، اما نصب/Health Check خودکار Xray کامل نشد: ${v2rayError}${baseNeedsAttention?" همچنین زیرساخت پایه نیاز به بررسی دارد.":""} از صفحه «پروتکل‌ها» Repair را اجرا کنید.`,
+          `Exit server registered, but automatic Xray install/health check did not complete: ${v2rayError}${baseNeedsAttention?" Base infrastructure also needs attention.":""} Run Repair from Protocol Studio.`,
+        ));
+      }else if(baseNeedsAttention){
+        setWarning(pick(
+          `سرور ثبت شد، اما بخشی از زیرساخت پایه نیاز به بررسی دارد${failed.length?`: ${failed.join(", ")}`:""}.${requestedNodeType==="exit"?" Xray با مسیر رسمی Protocol Studio نصب و Health Check شد.":""}`,
+          `The server was registered, but part of the base infrastructure needs attention${failed.length?`: ${failed.join(", ")}`:""}.${requestedNodeType==="exit"?" Xray was installed and health-checked through the canonical Protocol Studio path.":""}`,
+        ));
+      }else if(requestedNodeType==="exit"){
+        setOk(pick(
+          "سرور Exit ثبت شد، دسترسی امن و Agent آماده شدند و Xray با مسیر رسمی Protocol Studio نصب و Health Check شد. سایر پروتکل‌ها را از صفحه «پروتکل‌ها» مدیریت کنید.",
+          "Exit server registered with secure access and Agent ready; Xray was installed and health-checked through the canonical Protocol Studio path. Manage other protocols from Protocol Studio.",
         ));
       }else{
         setOk(pick(
-          "سرور ثبت شد، دسترسی امن و Agent آماده شدند. حالا پروتکل‌ها را از صفحه «پروتکل‌ها» نصب کنید.",
-          "Server registered with secure access and Agent ready. Install protocols from Protocol Studio.",
+          "سرور ایران ثبت شد و زیرساخت پایه آماده است. پروتکل‌های سرویس‌دهنده روی Exit از صفحه «پروتکل‌ها» مدیریت می‌شوند.",
+          "Iran server registered with base infrastructure ready. Service protocols on Exit nodes are managed from Protocol Studio.",
         ));
       }
 
@@ -161,8 +205,8 @@ export function ProvisionRuntimeXrayDomainPage(){
         <div>
           <h1>{pick("افزودن سرور","Add server")}</h1>
           <small>{pick(
-            "این صفحه فقط نود، SSH و زیرساخت پایه را آماده می‌کند. نصب و تنظیم تمام پروتکل‌ها در صفحه «پروتکل‌ها» انجام می‌شود.",
-            "This page only prepares the node, SSH access and base infrastructure. All protocol installation and settings live in Protocol Studio.",
+            "این صفحه نود، SSH و زیرساخت پایه را آماده می‌کند. برای Exit، Xray بعد از ثبت با همان مسیر رسمی Protocol Studio به‌صورت خودکار نصب و Health Check می‌شود؛ سایر پروتکل‌ها در صفحه «پروتکل‌ها» مدیریت می‌شوند.",
+            "This page prepares the node, SSH access and base infrastructure. For Exit nodes, Xray is automatically installed and health-checked through the same canonical Protocol Studio path; other protocols remain managed in Protocol Studio.",
           )}</small>
         </div>
         <div className="action-row">
@@ -176,10 +220,24 @@ export function ProvisionRuntimeXrayDomainPage(){
       {createdNodeId>0&&<Card>
         <div className="module-row">
           <div className="grow">
-            <b>{pick("سرور آماده مدیریت است","Server is ready for management")}</b>
-            <small>{pick("هیچ VPN/Proxy روی این مرحله نصب نشده است.","No VPN/proxy protocol was installed in this step.")}</small>
+            <b>{pick(
+              createdNodeType==="exit"&&baselineV2ray!=="ready"?"سرور ثبت شد؛ Xray نیاز به بررسی دارد":"سرور آماده مدیریت است",
+              createdNodeType==="exit"&&baselineV2ray!=="ready"?"Server registered; Xray needs attention":"Server is ready for management",
+            )}</b>
+            <small>{pick(
+              createdNodeType==="exit"
+                ? baselineV2ray==="ready"
+                  ? "Xray baseline با مسیر رسمی Protocol Studio نصب و Health Check شده است."
+                  : "ثبت پایه انجام شد، اما Convergence خودکار Xray کامل نشده است."
+                : "نود ایران به‌صورت زیرساخت پایه ثبت شده و پروتکل سرویس‌دهنده روی آن نصب نشده است.",
+              createdNodeType==="exit"
+                ? baselineV2ray==="ready"
+                  ? "The Xray baseline was installed and health-checked through the canonical Protocol Studio path."
+                  : "Base registration completed, but automatic Xray convergence did not complete."
+                : "The Iran node was registered as base infrastructure without service protocol installation.",
+            )}</small>
           </div>
-          <a className="primary" href={`/admin/modern-protocols?node=${createdNodeId}`}>{pick("انتخاب و نصب پروتکل‌ها","Choose & install protocols")}</a>
+          <a className="primary" href={`/admin/modern-protocols?node=${createdNodeId}`}>{pick("مدیریت پروتکل‌ها","Manage protocols")}</a>
         </div>
       </Card>}
 
@@ -208,8 +266,8 @@ export function ProvisionRuntimeXrayDomainPage(){
 
           <div className="runtime-warning">
             {pick(
-              "پروتکل‌ها عمداً از این فرم حذف شده‌اند تا یک منبع تنظیم واحد داشته باشیم. بعد از ثبت سرور، Cisco/OpenConnect، OpenVPN، WireGuard، L2TP، Xray و پروتکل‌های جدید را از Protocol Studio نصب کنید.",
-              "Protocols are intentionally removed from this form so the panel has one source of truth. After registration, install classic and modern protocols from Protocol Studio.",
+              "انتخاب و تنظیم پروتکل‌ها عمداً از این فرم حذف شده تا یک منبع تنظیم واحد داشته باشیم. برای Exit فقط Xray baseline پس از ثبت، با همان API رسمی Protocol Studio خودکار Converge می‌شود؛ Cisco/OpenConnect، OpenVPN، WireGuard، L2TP و پروتکل‌های جدید همچنان از Protocol Studio مدیریت می‌شوند.",
+              "Protocol selection and settings stay out of this form so the panel keeps one source of truth. For Exit nodes only, the Xray baseline automatically converges after registration through the canonical Protocol Studio API; Cisco/OpenConnect, OpenVPN, WireGuard, L2TP and modern protocols remain managed in Protocol Studio.",
             )}
           </div>
 
@@ -269,8 +327,8 @@ export function ProvisionRuntimeXrayDomainPage(){
           <div className="runtime-info-list">
             <div><span>1</span><b>{pick("ثبت سرور و SSH","Register server & SSH")}</b></div>
             <div><span>2</span><b>{pick("آماده‌سازی Agent و زیرساخت پایه","Prepare Agent & base infrastructure")}</b></div>
-            <div><span>3</span><b>{pick("نصب/تنظیم پروتکل‌ها در Protocol Studio","Install/configure protocols in Protocol Studio")}</b></div>
-            <div><span>4</span><b>{pick("Health / Repair از همان صفحه","Health / Repair from the same page")}</b></div>
+            <div><span>3</span><b>{pick("Converge خودکار Xray برای Exit","Automatic Xray convergence for Exit")}</b></div>
+            <div><span>4</span><b>{pick("سایر پروتکل‌ها + Health / Repair از Protocol Studio","Other protocols + Health / Repair in Protocol Studio")}</b></div>
           </div>
           <a className="primary" style={{display:"inline-block",marginTop:14}} href="/admin/modern-protocols">{pick("باز کردن صفحه پروتکل‌ها","Open Protocol Studio")}</a>
         </Card>
