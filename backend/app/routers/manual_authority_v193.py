@@ -3,8 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException
-from sqlalchemy import event, inspect as sa_inspect, select
-from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -16,44 +14,29 @@ from ..schemas import TunnelPeerReportIn
 # ============================================================
 # TWINPANEL MANUAL AUTHORITY V193
 #
-# Production root causes fixed here:
+# Production root cause:
+# The legacy Agent report endpoint rewrote Tunnel.active_transport whenever
+# mode != auto. After an administrator selected tp27_fast manually, Agents that
+# still reported selected_transport=ssh_tun therefore changed the aggregate
+# active path back to SSH TUN on every report. The exact observed state was:
 #
-# 1) The legacy Agent report endpoint used to rewrite
-#    Tunnel.active_transport whenever mode != auto. That means an old Agent
-#    report such as selected_transport=ssh_tun could overwrite an explicit
-#    admin Manual selection such as tp27_fast every reporting cycle.
+#   mode=manual
+#   active_transport=ssh_tun
+#   preferred_transport=tp27_fast
 #
-# 2) An Auto manager cycle can start while mode=auto, spend seconds probing,
-#    then commit a stale Tunnel ORM object after the admin has switched the row
-#    to Manual in another transaction. Manual authority must survive that
-#    in-flight stale transaction as well.
+# This canonical route is registered before the legacy tunnels router and
+# preserves the existing peer/member telemetry behavior while removing that
+# single illegal aggregate-authority write. Manual selection remains owned by
+# the admin endpoint; Auto selection remains owned by Transport Manager.
 #
-# This module is registered on runtime_endpoints BEFORE the legacy tunnels
-# router. It owns the exact Agent report path while preserving the existing
-# peer/transport telemetry behavior. The only authority behavior removed from
-# Agent reporting is the illegal aggregate active_transport assignment.
-#
-# Dataplane, TP27 carriers, route/NAT/firewall and Agent desired-state are not
-# changed here.
+# No TP27 carrier, dataplane, route, NAT, firewall, VPN, payment, quota,
+# provisioning, node-access, or manager selection logic is changed here.
 # ============================================================
 
 router = APIRouter(
     prefix="/v1/tunnels",
     tags=["tunnel-manual-authority-v193"],
 )
-
-_AUTHORITY_FIELDS = (
-    "mode",
-    "active_transport",
-    "preferred_transport",
-    "status",
-    "latency_ms",
-    "last_switch_at",
-)
-
-
-def _mode(value: object) -> str:
-    return str(value or "").strip().lower()
 
 
 def _status(value: object) -> str:
@@ -62,89 +45,14 @@ def _status(value: object) -> str:
 
 
 def _effective_transport(tunnel: Tunnel) -> str:
+    """Match the legacy tunnels router's effective-transport semantics."""
+
     return str(
         getattr(tunnel, "active_transport", None)
         or getattr(tunnel, "preferred_transport", None)
         or getattr(tunnel, "transport", None)
         or "ssh_tun"
     ).strip().lower()
-
-
-def should_preserve_manual_authority(
-    *,
-    database_mode: object,
-    target_mode: object,
-    explicit_manual_to_auto: bool,
-) -> bool:
-    """Return True when an ORM write is a stale Auto write over Manual.
-
-    An explicit admin Manual -> Auto transition remains legal. An object which
-    was loaded while Auto and merely still contains Auto has no mode history
-    transition and is treated as stale once the database row is Manual.
-    """
-
-    return bool(
-        _mode(database_mode) == "manual"
-        and _mode(target_mode) != "manual"
-        and not explicit_manual_to_auto
-    )
-
-
-def _explicit_manual_to_auto(target: Tunnel) -> bool:
-    state = sa_inspect(target)
-    history = state.attrs.mode.history
-
-    if not history.has_changes():
-        return False
-
-    return bool(
-        _mode(target.mode) == "auto"
-        and any(_mode(value) == "manual" for value in history.deleted)
-    )
-
-
-@event.listens_for(Tunnel, "before_update", propagate=True)
-def _preserve_manual_authority_before_update(
-    _mapper,
-    connection: Connection,
-    target: Tunnel,
-) -> None:
-    """Fail closed against stale Auto-manager aggregate writes.
-
-    The current database row is read on the same connection immediately before
-    SQLAlchemy emits UPDATE. If another transaction already changed the row to
-    Manual, a stale object which still believes it is Auto is not permitted to
-    overwrite aggregate authority fields.
-    """
-
-    if target.id is None:
-        return
-
-    current = connection.execute(
-        select(
-            Tunnel.mode,
-            Tunnel.active_transport,
-            Tunnel.preferred_transport,
-            Tunnel.status,
-            Tunnel.latency_ms,
-            Tunnel.last_switch_at,
-        ).where(Tunnel.id == int(target.id))
-    ).mappings().first()
-
-    if current is None:
-        return
-
-    if not should_preserve_manual_authority(
-        database_mode=current["mode"],
-        target_mode=target.mode,
-        explicit_manual_to_auto=_explicit_manual_to_auto(target),
-    ):
-        return
-
-    # Restore only aggregate authority. Other unrelated fields in the stale
-    # transaction may still be persisted normally.
-    for field in _AUTHORITY_FIELDS:
-        setattr(target, field, current[field])
 
 
 def _require_node_secret(x_node_secret: str | None) -> None:
@@ -162,8 +70,8 @@ def report_tunnel_peer_v193(
 ):
     """Canonical Agent report endpoint preserving Manual authority.
 
-    Existing peer-state and TunnelTransport telemetry semantics are preserved.
-    Agent reporting is never allowed to choose aggregate active_transport.
+    Existing TunnelPeerState and TunnelTransport telemetry semantics are kept.
+    Agent reports are telemetry and never choose aggregate active_transport.
     """
 
     _require_node_secret(x_node_secret)
@@ -273,10 +181,13 @@ def report_tunnel_peer_v193(
                 member.last_healthy_at = datetime.utcnow()
 
     # CRITICAL V193 CONTRACT:
-    # The legacy handler used to set tunnel.active_transport = selected_name
-    # here when mode != auto. That violated Manual authority and repeatedly
-    # reverted explicit admin selections such as tp27_fast back to ssh_tun.
-    # No aggregate Tunnel authority field is written by Agent reporting.
+    # Legacy code used to do this here when mode != auto:
+    #
+    #     tunnel.active_transport = selected_name
+    #
+    # That made periodic Agent telemetry an authority writer and repeatedly
+    # reverted explicit Manual selections. No aggregate Tunnel authority field
+    # is written by this endpoint anymore.
     db.commit()
 
     return {
