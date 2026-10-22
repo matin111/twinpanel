@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.196",
+  "version": "1.1.0-rc.197",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-22T17:52:42Z",
+  "released_at": "2026-10-22T18:10:57Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "58cc3a0df87f95c116bd1ce1819fef1bf249901b",
+  "source_sha": "293a7821de5a826cba8c6f72ec132017a48878fb",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.196/twinpanel-1.1.0-rc.196-linux-x86_64.tar.gz",
-    "sha256": "da6dda0e45ab861239d311ab3a650aa824f0a800433bd49eb9f15df229fe0090",
-    "size_bytes": 18204787
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.197/twinpanel-1.1.0-rc.197-linux-x86_64.tar.gz",
+    "sha256": "92d75bbe71d2798567ccecbf6167b90308fb0411b7156db7e4e41218bb8870e4",
+    "size_bytes": 18204837
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.196 روی rc.195 ساخته شده و مرز اختیار Manual Selection را در برابر Writerهای پس‌زمینه کامل می‌کند. Root Cause دوم ثابت‌شده این بود که Transport Manager می‌توانست Cycle را در حالت Auto شروع کند، طی Probe/Repair طولانی Admin تونل را Manual روی tp27_fast بگذارد، و سپس همان ORM Session قدیمی active_transport / preferred_transport / mode / last_switch_at را با انتخاب قبلی مانند ssh_tun overwrite کند. این نسخه یک Guard فقط در پروسه Transport Manager اضافه می‌کند که درست قبل از Flush، وضعیت فعلی Tunnel را با SELECT ... FOR UPDATE دوباره از PostgreSQL می‌خواند؛ اگر DB اکنون Manual باشد، Writer قدیمی حق تغییر mode، active_transport، preferred_transport و last_switch_at را ندارد، ولی status، latency و Health/Telemetry همچنان قابل Update هستند. Fix قبلی Agent report نیز حفظ شده است و گزارش selected_transport فقط Telemetry است و Aggregate Active Selection را در Manual تغییر نمی‌دهد. Regression واقعی Auto → Manual tp27_fast → Agent report=ssh_tun → پایان Cycle قدیمی Manager روی PostgreSQL پاس شده است. Transportهای سالم، TP27 dataplane، GRE/FoU، Route، NAT، Firewall، VPN، Auth، Payment، Quota و Provisioning تغییر نکرده‌اند. حذف Transport در این Release انجام نشده؛ Transportهای legacy که فقط برای cleanup نصب‌های قدیمی نگه داشته شده‌اند حذف نشده‌اند تا Lifecycle پاک‌سازی خراب نشود. پذیرش Production فقط بعد از نصب رسمی روی سرور تست، پایداری Manual، ادامه Telemetry و تست ping/TCP/UDP انجام می‌شود.",
-    "en": "TwinPanel 1.1.0-rc.196 builds on rc.195 and completes the Manual Selection authority boundary against background writers. The second confirmed root cause was a stale Transport Manager ORM cycle: a cycle could start while a tunnel was Auto, spend time in remote probe/repair awaits, then commit old mode/active_transport/preferred_transport/last_switch_at values after an administrator had already selected Manual tp27_fast. This release adds a manager-process-only flush guard that re-reads and locks the current Tunnel row with SELECT ... FOR UPDATE immediately before authority-changing flushes. If PostgreSQL now says Manual, stale manager writes to mode, active_transport, preferred_transport and last_switch_at are discarded, while status, latency and health/telemetry updates remain allowed. The earlier Agent-report protection is preserved: selected_transport reports remain telemetry and cannot choose the aggregate Active transport in Manual mode. A PostgreSQL regression reproducing Auto → Manual tp27_fast → Agent report=ssh_tun → stale manager completion passes. Healthy transports, TP27 dataplane, GRE/FoU, Route, NAT, Firewall, VPN, Auth, Payment, Quota and Provisioning are unchanged. No transport is deleted by this release; legacy cleanup-only definitions remain so historical runtime can still be removed safely. Production acceptance remains pending the official update on the test server, Manual stability observation, continuing telemetry, and peer/TCP/UDP dataplane tests."
+    "fa": "TwinPanel 1.1.0-rc.197 تنظیمات SEO قالب Conversion 2027 را از بلوک جداگانه انتهای صفحه به منوی کناری خود Template Editor منتقل می‌کند. یک تب جدید 06 سئو در کنار رنگ‌ها، استایل، Hero، محتوا، شبکه‌های اجتماعی، فوتر و چیدمان اضافه شده و همان StoreTemplateSeoPanel موجود با همان Save/Reset، کلیدها، fallback و API فعلی داخل workspace قالب نمایش داده می‌شود. برای جلوگیری از دو بار نمایش، SEO پایین صفحه فقط برای Conversion 2027 حذف شده و رفتار قالب‌های دیگر فعلاً بدون تغییر مانده است. Regression Smoke جدید نیز تضمین می‌کند SEO این قالب دوباره به پایین Editor برنگردد. Backend/API/Auth/DB/Payment/Quota/Provisioning/Tunnel/VPN و قرارداد ذخیره SEO تغییری نکرده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.197 moves Conversion 2027 template SEO from the standalone block below the editor into the template editor's own sidebar. A new 06 SEO tab sits alongside Colors, Style, Hero, Content, Social, Footer and Layout, reusing the existing StoreTemplateSeoPanel and its existing Save/Reset actions, keys, fallback behavior and API contract inside the template workspace. The duplicate bottom SEO render is removed only for Conversion 2027 while other template editors keep their existing behavior. A dedicated regression smoke prevents Conversion SEO from silently moving back below the editor. Backend/API/Auth/DB/Payment/Quota/Provisioning/Tunnel/VPN and SEO persistence contracts are unchanged."
   }
 }
