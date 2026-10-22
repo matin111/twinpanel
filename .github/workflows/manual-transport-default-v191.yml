@@ -1,0 +1,32 @@
+name: Manual transport production default
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/models.py"
+      - "backend/app/routers/tunnels.py"
+      - "backend/app/smart_transport_auto_v21.py"
+      - "components/smart-transports-runtime-v25.tsx"
+      - "scripts/smoke-manual-transport-default-v191.py"
+      - ".github/workflows/manual-transport-default-v191.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/models.py"
+      - "backend/app/routers/tunnels.py"
+      - "backend/app/smart_transport_auto_v21.py"
+      - "components/smart-transports-runtime-v25.tsx"
+      - "scripts/smoke-manual-transport-default-v191.py"
+      - ".github/workflows/manual-transport-default-v191.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  manual-transport-default:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify manual production default contract
+        run: python3 scripts/smoke-manual-transport-default-v191.py
