@@ -1,0 +1,102 @@
+.composition :global(.tpStoreHeroCopy h1){
+  max-inline-size:18ch;
+  line-height:1.08;
+  text-wrap:pretty;
+}
+
+.composition :global(.tpStoreSectionHead){
+  max-inline-size:none;
+}
+
+.composition :global(.tpStoreSectionHead h2){
+  max-inline-size:28ch;
+  line-height:1.16;
+  text-wrap:pretty;
+}
+
+/* Conversion sections should not all use the same centered title block.
+   Content-heavy sections read from the logical start edge, while decision and
+   support sections keep a compact centered composition. */
+.composition :global(#protocols .tpStoreSectionHead),
+.composition :global(#services .tpStoreSectionHead),
+.composition :global(#guides .tpStoreSectionHead){
+  inline-size:min(100%,920px);
+  margin-inline-start:0;
+  margin-inline-end:auto;
+  text-align:start;
+}
+
+.composition :global(#protocols .tpStoreSectionHead h2),
+.composition :global(#services .tpStoreSectionHead h2),
+.composition :global(#guides .tpStoreSectionHead h2){
+  margin-inline-start:0;
+  margin-inline-end:auto;
+}
+
+.composition :global(#protocols .tpStoreSectionHead p),
+.composition :global(#services .tpStoreSectionHead p),
+.composition :global(#guides .tpStoreSectionHead p){
+  margin-inline-start:0;
+  margin-inline-end:auto;
+}
+
+.composition :global(#protocols .tpStoreSectionHead h2){max-inline-size:24ch}
+.composition :global(#services .tpStoreSectionHead h2){max-inline-size:24ch}
+.composition :global(#guides .tpStoreSectionHead h2){max-inline-size:27ch}
+
+.composition :global(#plans .tpStoreSectionHead),
+.composition :global(#faq .tpStoreSectionHead),
+.composition :global(.tpStoreContact .tpStoreSectionHead){
+  inline-size:min(100%,900px);
+  margin-inline:auto;
+  text-align:center;
+}
+
+.composition :global(#plans .tpStoreSectionHead h2),
+.composition :global(#faq .tpStoreSectionHead h2),
+.composition :global(.tpStoreContact .tpStoreSectionHead h2),
+.composition :global(#plans .tpStoreSectionHead p),
+.composition :global(#faq .tpStoreSectionHead p),
+.composition :global(.tpStoreContact .tpStoreSectionHead p){
+  margin-inline:auto;
+}
+
+.composition :global(#plans .tpStoreSectionHead h2){max-inline-size:20ch}
+.composition :global(#faq .tpStoreSectionHead h2){max-inline-size:22ch}
+.composition :global(.tpStoreContact .tpStoreSectionHead h2){max-inline-size:24ch}
+
+.composition :global(.tpStoreAccountPanel>div:first-child){
+  text-align:start;
+}
+
+.composition :global(.tpStoreAccountPanel>div:first-child>h2){
+  max-inline-size:24ch;
+  line-height:1.16;
+  text-wrap:pretty;
+}
+
+.composition :global(.tpStoreFinalCta>div:not(.tpStoreCtaOrb)){
+  text-align:start;
+}
+
+.composition :global(.tpStoreFinalCta h2){
+  max-inline-size:30ch;
+  line-height:1.16;
+  text-wrap:pretty;
+}
+
+@media(max-width:760px){
+  .composition :global(.tpStoreHeroCopy h1),
+  .composition :global(.tpStoreSectionHead h2),
+  .composition :global(.tpStoreAccountPanel>div:first-child>h2),
+  .composition :global(.tpStoreFinalCta h2){
+    max-inline-size:none;
+    text-wrap:pretty;
+  }
+
+  .composition :global(#protocols .tpStoreSectionHead),
+  .composition :global(#services .tpStoreSectionHead),
+  .composition :global(#guides .tpStoreSectionHead){
+    inline-size:100%;
+  }
+}
