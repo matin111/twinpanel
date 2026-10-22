@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.191",
+  "version": "1.1.0-rc.192",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-22T14:58:08Z",
+  "released_at": "2026-10-22T15:28:37Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "0090c3e183e2152f7fc80d67ede5642f807a6caf",
+  "source_sha": "7e1cdfb1660390a620cc022dbc48f88f5a299576",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.191/twinpanel-1.1.0-rc.191-linux-x86_64.tar.gz",
-    "sha256": "2c39efa73f9b9ac63f4e01caa73f193ae3b6d0794f5af232114c61f5bbdafe47",
-    "size_bytes": 18181867
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.192/twinpanel-1.1.0-rc.192-linux-x86_64.tar.gz",
+    "sha256": "345e188ab284b4ea3d860b51f2cfc87fdb5a54aba52fdab1c3b31cffe4f3d328",
+    "size_bytes": 18183074
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.191 حالت دستی را به‌عنوان پیش‌فرض Production برای انتخاب مسیر تانل تثبیت می‌کند و Smart Auto را فقط با فعال‌سازی صریح مدیر وارد مدار می‌کند. رابط مسیرهای تانل اکنون وضعیت Manual را به‌عنوان پیش‌فرض نمایش می‌دهد، برای فعال‌سازی Smart Auto تأیید صریح می‌گیرد و انتخاب دستی Candidate را به‌عنوان مسیر Production مشخص می‌کند. Smart Auto فقط وقتی mode=auto باشد اجازه Promotion یا جابه‌جایی مسیر را دارد؛ مسیرهای قدیمی همچنان برای مشاهده و Rollback باقی می‌مانند. این Release منطق dataplane، Route، NAT، Firewall، VPN، Payment، Quota و Provisioning را تغییر نمی‌دهد. رفع کامل تا Update روی سرور واقعی و Acceptance عملی Manual/Smart Auto ادعا نمی‌شود.",
-    "en": "TwinPanel 1.1.0-rc.191 establishes Manual as the production default for tunnel path selection and keeps Smart Auto strictly opt-in through an explicit administrator action. The tunnel transports UI now presents Manual as the production default, requires confirmation before enabling Smart Auto, and labels manual candidate selection as the production path. Smart Auto may promote or switch paths only while mode=auto; legacy paths remain available for visibility and rollback. This release does not change dataplane, routing, NAT, firewall, VPN, payment, quota, or provisioning behavior. Full resolution is not claimed until updater deployment and real production acceptance of Manual/Smart Auto behavior pass."
+    "fa": "TwinPanel 1.1.0-rc.192 خطای Production نسخه rc.191 در انتخاب دستی Candidateهای TP27 را برطرف می‌کند. Root Cause این بود که رابط جدید Manual مسیرهایی مثل tp27_fast را به endpoint قدیمی transport-mode می‌فرستاد، اما Backend آن endpoint هنوز فقط allowlist قدیمی mtunnel/backhaul/ssh_tun را می‌پذیرفت و با Invalid transport درخواست را رد می‌کرد؛ در نتیجه Tunnel #6 با وجود فعال بودن tp27_fast روی mode=auto باقی می‌ماند. rc.192 برای Candidateهای مدرن endpoint اختصاصی Manual اضافه می‌کند که فقط نام‌های Registry فعال را می‌پذیرد، وجود Row همان Tunnel، enabled بودن و qualified بودن مسیر را بررسی می‌کند و سپس mode، active_transport و preferred_transport را به‌صورت اتمیک روی همان مسیر دستی قفل می‌کند. production_default API نیز به manual اصلاح شده و UI انتخاب Manual مدرن را از endpoint جدید انجام می‌دهد، در حالی که فعال‌سازی Smart Auto همچنان مسیر قبلی خود را حفظ می‌کند. Dataplane، TP27 carrierها، Route، NAT، Firewall، VPN، Payment، Quota و Provisioning تغییر نکرده‌اند. رفع کامل تا Update روی سرور واقعی، انتخاب دستی tp27_fast روی Tunnel #6 و Acceptance عملی پایداری ادعا نمی‌شود.",
+    "en": "TwinPanel 1.1.0-rc.192 fixes the rc.191 production failure when manually selecting TP27 candidates. The root cause was that the new Manual-first UI sent transports such as tp27_fast to the legacy transport-mode endpoint, while that backend endpoint still accepted only the old mtunnel/backhaul/ssh_tun allowlist and returned Invalid transport; Tunnel #6 therefore remained mode=auto even though tp27_fast was active. rc.192 adds a dedicated manual-selection endpoint for modern candidates that accepts only active-registry names, requires a transport row on the same tunnel, enforces enabled and qualified state, then atomically pins mode, active_transport and preferred_transport to the selected path. The API production_default metadata is also corrected to manual, and modern Manual selection now uses the new endpoint while Smart Auto activation keeps its existing path. Dataplane, TP27 carriers, routing, NAT, firewall, VPN, payment, quota and provisioning are unchanged. Full resolution is not claimed until updater deployment, manual tp27_fast selection on Tunnel #6 and real stability acceptance pass on the production test server."
   }
 }
