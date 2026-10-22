@@ -42,6 +42,9 @@ from .smart_candidate_retry_guard_v169 import (
 from .stale_candidate_install_recovery_v200 import (
     apply_stale_candidate_install_recovery_v200,
 )
+from .spoof_candidate_policy_v202 import (
+    apply_spoof_candidate_policy_v202,
+)
 from .smart_transport_auto_v21 import install_smart_transport_auto_v21
 from .smart_auto_bootstrap_v24 import reconciler_loop as smart_bootstrap_loop
 from .smart_candidate_bootstrap_v38 import reconciler_loop as candidate_bootstrap_loop
@@ -57,16 +60,13 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 # TWINPANEL TRANSPORT MANAGER V12
 # + TP27 REFERENCE V91
 # + ADAPTIVE TUNNEL PERFORMANCE V148
-# + ADAPTIVE MULTI-LANE V149
-# + TP27 MASQUE CONNECT-IP V151
-# + TP27 MIERU TCP CARRIER V165
-# + SMART CANDIDATE INSTALL GUARD V167
-# + SMART CANDIDATE RETRY GUARD V169
-# + SMART CANDIDATE FAIR RETRY V171
+# + LEGACY ADAPTIVE LAYERS V149/V151/V165 (cleanup compatibility)
+# + SMART CANDIDATE INSTALL/RETRY/FAIRNESS V167/V169/V171
 # + CANDIDATE DATAPLANE V175
 # + ADAPTIVE CANDIDATE QUALIFICATION V155
 # + DIRECT TCP RPFILTER SHADOW GUARD V198
 # + STALE CANDIDATE INSTALL RECOVERY V200 (FINAL SELECTOR WRAPPER)
+# + SPOOF CANDIDATE POLICY V202 (FINAL ACTIVE SET)
 # + RUNTIME RECONCILER V5 (extends runtime_reconciler_v4)
 # ============================================================
 
@@ -75,6 +75,10 @@ async def main() -> None:
     install_manager_runtime_v16()
     install_smart_transport_auto_v21()
     activate_manager_candidate_policy_v91()
+
+    # Keep the historical layers applied so their cleanup/runtime contracts are
+    # available for already-installed rows. V202 narrows the final production
+    # candidate set only after those compatibility hooks exist.
     apply_adaptive_multilane_v149()
     apply_adaptive_multilane_v151()
     apply_adaptive_multilane_v165()
@@ -84,10 +88,13 @@ async def main() -> None:
     apply_candidate_dataplane_v175()
     apply_adaptive_candidate_qualification_v155()
     apply_direct_tcp_rpfilter_guard_v198()
-    # V155 owns the final normal candidate selector. V200 must wrap only after
-    # every selector-replacing layer is applied, otherwise V155 shadows it and
-    # stale `installing` rows remain permanently ineligible for retry.
+
+    # V155 owns the final normal install selector. V200 must wrap after every
+    # selector-replacing layer. V202 then changes only the candidate sets and
+    # AUTO_INSTALL_NAMES; it does not replace the V200 selector wrapper.
     apply_stale_candidate_install_recovery_v200()
+    apply_spoof_candidate_policy_v202()
+
     apply_adaptive_tunnel_performance_v148()
     apply_exit_access_dataplane_stability_v144()
 
@@ -98,27 +105,24 @@ async def main() -> None:
         "candidate_bootstrap=v38 "
         "tp27_reference=v91 "
         "adaptive_tunnel_performance=v148 "
-        "adaptive_multilane=v149 "
-        "adaptive_multilane=v151 "
-        "adaptive_multilane=v165 "
+        "compat_multilane=v149,v151,v165 "
         "smart_candidate_install_guard=v167 "
         "smart_candidate_retry_guard=v169 "
         "smart_candidate_fair_retry=v171 "
         "candidate_dataplane=v175 "
         "adaptive_candidate_qualification=v155 "
-        "direct_tcp_rpfilter_guard=v198 "
+        "direct_tcp_rpfilter_guard=v198-cleanup-only "
         "stale_candidate_install_recovery=v200-final-selector-wrapper "
+        "spoof_candidate_policy=v202-final-active-set "
         "vpn_access_dataplane=v46 "
         "vpn_access_performance=v51 "
         "exit_access_stability=v144 "
         "reconciler=v5 "
-        "active_candidates=tp27_fast,tp27_masque,tp27_mieru_tcp,tp27_tcp_direct "
-        "direct_gate=peer-l3+tcp-socket+udp-dns+throughput "
-        "udp_policy=session-ready+quality-gated "
-        "non_udp_fallback=tp27_mieru_tcp,tp27_tcp_direct "
-        "install_order=tp27_fast,tp27_mieru_tcp,tp27_tcp_direct,tp27_masque "
-        "migration_fallback=kernel_gre "
-        "retired=gost_tun,amneziawg,netrix",
+        "active_candidates=tp27_fast,spoof_wg "
+        "auto_install=tp27_fast "
+        "spoof_install=explicit-config-only "
+        "spoof_dataplane=wireguard-over-mutual-ip-spoof "
+        "retired=tp27_masque,tp27_mieru_tcp,tp27_tcp_direct,kernel_gre,gost_tun,amneziawg,netrix",
         flush=True,
     )
 

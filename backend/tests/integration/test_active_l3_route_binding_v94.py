@@ -34,15 +34,30 @@ def main() -> None:
         "source = core._AGENT_RECONCILE_V49"
     )
 
+    # V202 factors candidate addressing through _l3_runtime while preserving
+    # V94's authoritative contract: runtime() still returns the interface,
+    # network and peer /30 addresses consumed by active_l3_route_binding_v94.
     for token in (
-        '"interface": f"tp27{tid}"[:15]',
-        '"network": f"10.253.{third}.{fourth}/30"',
+        '"interface": f"{interface_prefix}{tid}"[:15]',
+        '"network": f"10.{octet}.{third}.{fourth}/30"',
         '"iran_addr": f"{iran_ip}/30"',
         '"exit_addr": f"{exit_ip}/30"',
+        'transport="tp27_fast"',
+        'octet=253',
+        'interface_prefix="tp27"',
+        'transport="spoof_wg"',
+        'octet=250',
+        'interface_prefix="tpsp"',
     ):
         assert token in candidates, token
 
-    print("ACTIVE_L3_ROUTE_BINDING_V94_OK")
+    # Fast remains the established production runtime; Spoof WG is additive and
+    # receives a disjoint /30/interface so active_transport authority can bind
+    # either candidate without rewriting the V94 route-selection layer.
+    assert "table = 29000 + (int(tunnel_id) % 900)" in candidates
+    assert "table = 33000 + (int(tunnel_id) % 900)" in candidates
+
+    print("ACTIVE_L3_ROUTE_BINDING_V94_V202_OK")
 
 
 if __name__ == "__main__":

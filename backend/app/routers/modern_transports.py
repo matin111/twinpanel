@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import time
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -21,6 +23,7 @@ from ..transport_candidates import (
     runtime,
     uninstall_transport,
 )
+from ..transport_candidates import spoof_wg
 
 router = APIRouter(
     prefix="/v1/tunnels",
@@ -37,13 +40,25 @@ _PROFILE = {
             "fallback with fail-closed health and throughput qualification."
         ),
     },
-    # Legacy migration-only descriptions are retained for API compatibility if
-    # an old row is inspected directly. They are not returned by catalog().
+    "spoof_wg": {
+        "iran_profile": "mutual-ip-spoof + wireguard-l3",
+        "description": (
+            "Spoof Tunnel v3.1 core carries a private WireGuard /30. "
+            "Mutual spoof source addresses must be configured explicitly and "
+            "the path is accepted only after TwinPanel full-L3 qualification."
+        ),
+    },
+    # Legacy migration-only descriptions remain available for cleanup paths.
     "kernel_gre": {
         "iran_profile": "direct-gre-retired",
         "description": "Retired migration fallback; removed after TP27 Fast promotion.",
     },
 }
+
+
+class SpoofWGConfiguration(BaseModel):
+    iran_spoof_ip: str
+    exit_spoof_ip: str
 
 
 def _status(value: object) -> str:
@@ -96,6 +111,20 @@ def _candidate_view(
         and stable_seconds >= float(CANDIDATE_STABLE_SECONDS)
     )
 
+    extra: dict = {}
+    if name == "spoof_wg":
+        configuration = spoof_wg.configuration_for_view(
+            row.config_text if row is not None else None
+        )
+        extra = {
+            "configuration": configuration,
+            "configured": bool(configuration.get("configured")),
+            "configuration_required": not bool(configuration.get("configured")),
+            "auto_install": False,
+            "xdp": False,
+            "upstream_version": spoof_wg.UPSTREAM_VERSION,
+        }
+
     return {
         "runtime": runtime(name, tunnel_id),
         "enabled": bool(row.enabled) if row else False,
@@ -122,6 +151,7 @@ def _candidate_view(
             if benchmark_age is not None
             else None
         ),
+        **extra,
         **_PROFILE.get(name, {}),
     }
 
@@ -188,6 +218,74 @@ def list_modern_transports(
         "production_default": "manual",
         "promotion_policy": "health_then_speed",
         "transports": output,
+    }
+
+
+@router.put("/{tunnel_id}/modern-transports/spoof_wg/config")
+def configure_spoof_wg(
+    tunnel_id: int,
+    payload: SpoofWGConfiguration,
+    db: Session = Depends(get_db),
+):
+    tunnel = db.get(Tunnel, tunnel_id)
+    if tunnel is None:
+        raise HTTPException(status_code=404, detail="Tunnel not found")
+
+    try:
+        configuration = spoof_wg.validate_configuration(payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    row = (
+        db.query(TunnelTransport)
+        .filter(
+            TunnelTransport.tunnel_id == tunnel_id,
+            TunnelTransport.transport == "spoof_wg",
+        )
+        .first()
+    )
+
+    if row is not None and _status(row.status) == "installing":
+        raise HTTPException(
+            status_code=409,
+            detail="Spoof Tunnel installation is currently running",
+        )
+    if row is not None and bool(row.enabled) and _status(row.status) == "online":
+        raise HTTPException(
+            status_code=409,
+            detail="Remove the online Spoof Tunnel before changing its spoof addresses",
+        )
+
+    if row is None:
+        row = TunnelTransport(
+            tunnel_id=tunnel_id,
+            transport="spoof_wg",
+            priority=int(ACTIVE_SPECS["spoof_wg"]["priority"]),
+            enabled=False,
+            status="not_installed",
+        )
+        db.add(row)
+        db.flush()
+
+    row.priority = int(ACTIVE_SPECS["spoof_wg"]["priority"])
+    row.enabled = False
+    row.status = "not_installed"
+    row.latency_ms = None
+    row.last_error = None
+    row.config_text = spoof_wg.merge_configuration(
+        row.config_text,
+        configuration,
+    )
+    row.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(row)
+
+    return {
+        "ok": True,
+        "tunnel_id": tunnel_id,
+        "transport": "spoof_wg",
+        "configuration": spoof_wg.configuration_for_view(row.config_text),
+        "next": "install",
     }
 
 
@@ -271,6 +369,29 @@ async def install_modern_transport(
     name = str(transport or "").strip().lower()
     if name not in ACTIVE_SPECS:
         raise HTTPException(status_code=404, detail="Unknown or retired modern transport")
+
+    tunnel = db.get(Tunnel, tunnel_id)
+    if tunnel is None:
+        raise HTTPException(status_code=404, detail="Tunnel not found")
+
+    if name == "spoof_wg":
+        row = (
+            db.query(TunnelTransport)
+            .filter(
+                TunnelTransport.tunnel_id == tunnel_id,
+                TunnelTransport.transport == name,
+            )
+            .first()
+        )
+        if row is None or spoof_wg.configuration_from_text(row.config_text) is None:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "Spoof Tunnel requires Iran and Exit spoof IPv4 addresses before install",
+                    "transport": name,
+                    "configuration_required": True,
+                },
+            )
 
     try:
         return await install_transport(name, tunnel_id, db)
