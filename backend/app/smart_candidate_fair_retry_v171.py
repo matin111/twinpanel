@@ -5,12 +5,14 @@ import time
 from . import smart_transport_auto_v21 as smart
 from .database import SessionLocal
 from .models import TunnelTransport
+from .modern_protocol_preflight import ensure_runtime_environment
+from .transport_candidates import tp27_mieru_tcp
 
 
 # ============================================================
 # TWINPANEL SMART CANDIDATE FAIR RETRY V171
 #
-# Production root cause on Tunnel #5:
+# Production root causes on Tunnel #5:
 #   * V169 moved reinstall cooldown away from TunnelTransport.updated_at,
 #     but install lifecycle metadata is stored inside config_text.
 #   * Candidate health probes run concurrently and may hold a stale ORM row
@@ -19,13 +21,20 @@ from .models import TunnelTransport
 #   * AUTO_INSTALL_NAMES is ordered. When an earlier candidate loses its retry
 #     clock, it becomes immediately retryable again and can repeatedly win the
 #     selector, starving later candidates such as tp27_mieru_tcp.
+#   * The first real Mieru attempt reached package installation but APT could
+#     not create /tmp/apt.conf.* after dropping privileges to _apt. RC.170
+#     fixed this preflight for Modern Protocol Bulk Sync only; the independent
+#     TP27 Mieru installer still needs the same safe runtime contract.
 #
-# V171 closes both failure modes without changing dataplane implementations:
+# V171 closes all three failure modes without changing TP27 dataplane framing:
 #   * _set_smart_state preserves fresh install lifecycle fields from DB before
 #     every smart-state write, so stale health telemetry cannot erase them;
 #   * installer selection considers all eligible candidates and chooses an
-#     unattempted candidate first, then the oldest completed/started attempt;
+#     unattempted candidate first, then the oldest attempt;
 #   * original AUTO_INSTALL_NAMES order is only a deterministic tie-breaker;
+#   * Mieru package install runs the verified root-owned /tmp -> 1777 + _apt
+#     write-test preflight before apt-get; unsafe ownership/filesystem states
+#     remain fail-closed;
 #   * online/installing candidates and the V169 1800-second cooldown remain
 #     authoritative.
 # ============================================================
@@ -42,6 +51,7 @@ _LIFECYCLE_KEYS = (
 
 _applied = False
 _original_set_smart_state = smart._set_smart_state
+_original_install_mieru_package = tp27_mieru_tcp._install_mieru_package
 
 
 def _name(value: object) -> str:
@@ -61,7 +71,7 @@ def _attempt_epoch(row: TunnelTransport | None) -> float | None:
 
 
 def _fresh_lifecycle(row: TunnelTransport) -> dict:
-    """Read only the lifecycle keys from a fresh DB session.
+    """Read install lifecycle keys from a fresh DB session.
 
     The caller may hold an ORM row loaded before an installer completed. Never
     trust that stale config_text when writing health/benchmark telemetry.
@@ -161,6 +171,13 @@ def install_candidate_name_fair_v171(tunnel_id: int) -> str | None:
         db.close()
 
 
+async def install_mieru_package_preflight_v171(conn, *, server: bool) -> str:
+    # Reuse the RC.170 verified environment contract. It repairs only a
+    # root-owned /tmp directory and verifies both root and _apt can write.
+    await ensure_runtime_environment(conn)
+    return await _original_install_mieru_package(conn, server=server)
+
+
 def apply_smart_candidate_fair_retry_v171() -> None:
     global _applied
 
@@ -169,6 +186,7 @@ def apply_smart_candidate_fair_retry_v171() -> None:
 
     smart._set_smart_state = set_smart_state_merge_safe_v171
     smart._install_candidate_name = install_candidate_name_fair_v171
+    tp27_mieru_tcp._install_mieru_package = install_mieru_package_preflight_v171
 
     _applied = True
 
@@ -176,6 +194,7 @@ def apply_smart_candidate_fair_retry_v171() -> None:
         f"{MARKER}_ACTIVE "
         "retry_selector=unattempted_then_oldest "
         "lifecycle_merge=fresh_db_preserved "
+        "mieru_tmp_preflight=root_owned_1777+apt_write "
         "static_order=tiebreak_only",
         flush=True,
     )
