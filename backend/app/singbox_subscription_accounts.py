@@ -18,6 +18,9 @@ class SingBoxAccountError(RuntimeError):
     pass
 
 
+REVOCATION_SENTINEL = "__twinpanel_revoked__"
+
+
 @dataclass(frozen=True)
 class SingBoxAccountSecret:
     protocol: str
@@ -104,12 +107,15 @@ def _mutation_script(
     return f'''from __future__ import annotations
 import json
 import os
+import secrets
+import uuid
 
 CONFIG = {CONFIG_PATH!r}
 TAG = {tag!r}
 PROTOCOL = {protocol!r}
 USERNAME = {username!r}
 RECORD = json.loads({record_json!r})
+SENTINEL = {REVOCATION_SENTINEL!r}
 
 with open(CONFIG, "r", encoding="utf-8") as handle:
     doc = json.load(handle)
@@ -141,15 +147,42 @@ users = [
     item for item in users
     if not (
         isinstance(item, dict)
-        and str(item.get(key) or "") == USERNAME
+        and (
+            str(item.get(key) or "") == USERNAME
+            or str(item.get(key) or "").startswith(SENTINEL)
+        )
     )
 ]
 if RECORD is not None:
     users.append(RECORD)
 
-# Never turn a managed multi-user inbound into an unauthenticated service.
+# Revoking the last real subscriber must not make the shared inbound
+# unauthenticated and must not fail the revoke operation. Keep one random,
+# undisclosed sentinel credential which is removed automatically as soon as a
+# real subscriber is provisioned again.
 if not users:
-    raise SystemExit("refusing to leave managed inbound without users")
+    sentinel_password = secrets.token_urlsafe(48)
+    if PROTOCOL == "tuic":
+        users = [{
+            "name": SENTINEL,
+            "uuid": str(uuid.uuid4()),
+            "password": sentinel_password,
+        }]
+    elif PROTOCOL == "naive":
+        users = [{
+            "username": SENTINEL,
+            "password": sentinel_password,
+        }]
+    elif PROTOCOL == "snell":
+        users = [{
+            "name": SENTINEL,
+            "userkey": secrets.token_urlsafe(48),
+        }]
+    else:
+        users = [{
+            "name": SENTINEL,
+            "password": sentinel_password,
+        }]
 
 inbound["users"] = users
 with open(CONFIG + ".account-new", "w", encoding="utf-8") as handle:
