@@ -14,6 +14,21 @@ export type StoreTemplateMediaUpload={
   url:string;
 };
 
+export const STORE_TEMPLATE_SEO_KEYS=[
+  "seo_title",
+  "seo_description",
+  "seo_keywords",
+  "canonical_url",
+  "og_title",
+  "og_description",
+  "og_image",
+  "robots_index",
+  "robots_follow",
+] as const;
+
+export type StoreTemplateSeoKey=(typeof STORE_TEMPLATE_SEO_KEYS)[number];
+export type StoreTemplateSeoSettings=Partial<Record<StoreTemplateSeoKey,string|boolean>>;
+
 async function parseResponse<T>(response:Response):Promise<T>{
   if(response.ok)return response.json() as Promise<T>;
   let detail=`API error ${response.status}`;
@@ -25,12 +40,11 @@ async function parseResponse<T>(response:Response):Promise<T>{
   throw new Error(detail);
 }
 
-export async function loadStoreTemplateSettings():Promise<StoreTemplateSettingsEnvelope>{
-  const response=await fetch(`${API_BASE}/v1/storefront/settings/templates`,{cache:"no-store"});
-  return parseResponse<StoreTemplateSettingsEnvelope>(response);
+function hasOwn(source:Record<string,unknown>,key:string){
+  return Object.prototype.hasOwnProperty.call(source,key);
 }
 
-export async function saveStoreTemplateSettings(templateId:string,payload:Record<string,unknown>):Promise<Record<string,unknown>>{
+async function putStoreTemplateSettings(templateId:string,payload:Record<string,unknown>):Promise<Record<string,unknown>>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
   const response=await fetch(`${API_BASE}/v1/storefront/settings/templates/${encodeURIComponent(templateId)}`,{
@@ -43,6 +57,44 @@ export async function saveStoreTemplateSettings(templateId:string,payload:Record
     cache:"no-store",
   });
   return parseResponse<Record<string,unknown>>(response);
+}
+
+export async function loadStoreTemplateSettings():Promise<StoreTemplateSettingsEnvelope>{
+  const response=await fetch(`${API_BASE}/v1/storefront/settings/templates`,{cache:"no-store"});
+  return parseResponse<StoreTemplateSettingsEnvelope>(response);
+}
+
+export async function saveStoreTemplateSettings(templateId:string,payload:Record<string,unknown>):Promise<Record<string,unknown>>{
+  // Theme customizers save their complete draft. SEO is a separate logical
+  // subresource, so always preserve the freshest server-side SEO values.
+  const envelope=await loadStoreTemplateSettings();
+  const current=envelope.templates?.[templateId]||{};
+  const next={...payload};
+  for(const key of STORE_TEMPLATE_SEO_KEYS){
+    if(hasOwn(current,key))next[key]=current[key];
+    else delete next[key];
+  }
+  return putStoreTemplateSettings(templateId,next);
+}
+
+export async function saveStoreTemplateSeo(templateId:string,payload:StoreTemplateSeoSettings):Promise<Record<string,unknown>>{
+  // Merge SEO into the freshest complete template payload so SEO saves cannot
+  // erase visual/content settings changed by the template customizer.
+  const envelope=await loadStoreTemplateSettings();
+  const current=envelope.templates?.[templateId]||{};
+  const next={...current};
+  for(const key of STORE_TEMPLATE_SEO_KEYS){
+    if(hasOwn(payload as Record<string,unknown>,key))next[key]=(payload as Record<string,unknown>)[key];
+  }
+  return putStoreTemplateSettings(templateId,next);
+}
+
+export async function resetStoreTemplateSeo(templateId:string):Promise<Record<string,unknown>>{
+  const envelope=await loadStoreTemplateSettings();
+  const current=envelope.templates?.[templateId]||{};
+  const next={...current};
+  for(const key of STORE_TEMPLATE_SEO_KEYS)delete next[key];
+  return putStoreTemplateSettings(templateId,next);
 }
 
 export async function resetStoreTemplateSettings(templateId:string):Promise<Record<string,unknown>>{
