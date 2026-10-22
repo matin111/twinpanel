@@ -55,6 +55,7 @@ from .routers.system_release import router as system_release_router
 from .routers.subscription_delivery_policy_v1 import router as subscription_delivery_policy_v1_router
 from .self_hosted_runtime import apply_self_hosted_runtime
 from .subscription_delivery_policy_v1 import install_account_delivery_hooks
+from .openvpn_runtime_v1 import install_openvpn_runtime_hooks
 from .xray_modern_runtime import router as xray_modern_router
 from .xray_modern_admin import router as xray_modern_admin_router
 from .admin_notification_service import notification_watch_loop
@@ -93,6 +94,10 @@ from .routers.subscription_admin_v2 import router as subscription_admin_v2_route
 # Product/self-hosted compatibility must be applied before requests or
 # background workers can invoke migrated tunnel/node helpers.
 apply_self_hosted_runtime()
+
+# OpenVPN drops privileges before client-connect hooks run. Install the additive
+# runtime guard before any provisioning/repair request can use the legacy router.
+install_openvpn_runtime_hooks(provision)
 
 # TWINPANEL_PAYMENT_TABLE_BOOTSTRAP_V1
 # Payment/store/reseller-bot models must be registered before create_all.
