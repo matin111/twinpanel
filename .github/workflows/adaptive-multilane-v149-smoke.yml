@@ -83,7 +83,7 @@ jobs:
           )
           test -z "$(git status --short -- tools/tp27-tcp-direct)"
 
-      - name: Verify V149 independent-lane, V152 packaging and V158 health contracts
+      - name: Verify V149/V152/V183 Direct TCP contracts
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -145,13 +145,18 @@ jobs:
               assert forbidden not in tcp, forbidden
 
           for token in (
-              'magic     = "TP27TCP2"',
+              'magic     = "TP27TCP3"',
               'flag.String("token-file"',
               "subtle.ConstantTimeCompare",
               "flowHash(packet)",
               "heartbeatLoop",
+              "startupHeartbeatTimeout",
               "heartbeat_timeout",
+              "heartbeat_startup_timeout",
               "tcpUserTimeoutMS",
+              "verified  atomic.Bool",
+              "lane verified=%d",
+              "healthyCount",
               "forwardPacket",
               "retrying packet on healthy fallback",
               "SetNoDelay(true)",
@@ -160,6 +165,8 @@ jobs:
               assert token in tcp_go, token
 
           assert "TestIncidentICMPPreferredLanes" in tcp_test
+          assert "TestNewLaneRequiresHeartbeatPong" in tcp_test
+          assert "TestForwardPacketSkipsUnverifiedPreferredLane" in tcp_test
           assert "TestForwardPacketRetriesNextHealthyLane" in tcp_test
           assert "parse_ping_rtt" in common
           assert '"jitter_ms": jitter' in common
@@ -177,5 +184,5 @@ jobs:
           assert "tp27-tcp-direct-linux-x86_64.sha256" in publisher
           assert "source/tools/tp27-tcp-direct/main.go" in publisher
 
-          print("ADAPTIVE_MULTILANE_V149_V152_V158_SMOKE_OK")
+          print("ADAPTIVE_MULTILANE_V149_V152_V183_SMOKE_OK")
           PY
