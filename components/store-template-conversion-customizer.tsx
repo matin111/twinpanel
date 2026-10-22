@@ -7,11 +7,12 @@ import {parityApi} from "../lib/admin-parity-api";
 import {normalizeStorefrontSettings,STOREFRONT_SECTION_IDS,type StorefrontSectionId} from "../lib/storefront-config";
 import {loadStoreTemplateSettings,saveStoreTemplateSettings} from "../lib/store-template-settings-api";
 import {StorefrontAdvancedDesignControls} from "./storefront-advanced-design-lab";
+import {StoreTemplateSeoPanel} from "./store-template-seo-panel";
 import styles from "./store-template-conversion-customizer.module.css";
 
 type DraftValue=string|boolean|string[];
 type Draft=Record<string,DraftValue>;
-type Tab="colors"|"style"|"hero"|"content"|"social"|"footer"|"layout";
+type Tab="colors"|"style"|"hero"|"content"|"social"|"footer"|"layout"|"seo";
 type TextField={key:string;fa:string;en:string;long?:boolean};
 type ColorField={key:string;fa:string;en:string;helpFa:string;helpEn:string};
 
@@ -37,7 +38,7 @@ const PALETTES:Palette[]=[
 
 const TABS:{id:Tab;fa:string;en:string;icon:string}[]=[
   {id:"colors",fa:"رنگ‌ها",en:"Colors",icon:"◉"},{id:"style",fa:"استایل",en:"Style",icon:"◇"},{id:"hero",fa:"Hero",en:"Hero",icon:"01"},
-  {id:"content",fa:"محتوا",en:"Content",icon:"02"},{id:"social",fa:"شبکه‌های اجتماعی",en:"Social",icon:"03"},{id:"footer",fa:"فوتر",en:"Footer",icon:"04"},{id:"layout",fa:"چیدمان",en:"Layout",icon:"05"},
+  {id:"content",fa:"محتوا",en:"Content",icon:"02"},{id:"social",fa:"شبکه‌های اجتماعی",en:"Social",icon:"03"},{id:"footer",fa:"فوتر",en:"Footer",icon:"04"},{id:"layout",fa:"چیدمان",en:"Layout",icon:"05"},{id:"seo",fa:"سئو",en:"SEO",icon:"06"},
 ];
 
 const HERO_FIELDS:TextField[]=[
@@ -157,7 +158,7 @@ export function ConversionTemplateCustomizer({onClose}:{onClose:()=>void}){
   const advancedChange=(key:string,next:string)=>setValue(key,next);
 
   return <div className={styles.root}>
-    <div className={styles.topbar}><div className={styles.identity}><span className={styles.mark}>CV</span><div><h1>Conversion 2027</h1><p>{pick("ویرایش کامل رنگ، محتوا، شبکه‌های اجتماعی، فوتر و چیدمان","Complete colors, content, social, footer and layout editor")}</p></div></div><div className={styles.actions}><button type="button" onClick={onClose}>{pick("بازگشت","Back")}</button><Link href="/store" target="_blank">{pick("مشاهده فروشگاه","Open storefront")} ↗</Link><button type="button" onClick={restoreDesign}>{pick("بازنشانی ظاهر","Reset style")}</button><button type="button" className={styles.primary} onClick={()=>void save()} disabled={busy}>{busy?"…":pick("ذخیره تغییرات","Save changes")}</button></div></div>
+    <div className={styles.topbar}><div className={styles.identity}><span className={styles.mark}>CV</span><div><h1>Conversion 2027</h1><p>{pick("ویرایش کامل رنگ، محتوا، شبکه‌های اجتماعی، فوتر و چیدمان","Complete colors, content, social, footer and layout editor")}</p></div></div><div className={styles.actions}><button type="button" onClick={onClose}>{pick("بازگشت","Back")}</button><Link href="/store" target="_blank">{pick("مشاهده فروشگاه","Open storefront")} ↗</Link>{tab!=="seo"&&<><button type="button" onClick={restoreDesign}>{pick("بازنشانی ظاهر","Reset style")}</button><button type="button" className={styles.primary} onClick={()=>void save()} disabled={busy}>{busy?"…":pick("ذخیره تغییرات","Save changes")}</button></>}</div></div>
     {error&&<div className={styles.error}>{error}</div>}{ok&&<div className={styles.success}>{ok}</div>}
     {loading?<div className={styles.loading}>{pick("در حال دریافت تنظیمات...","Loading settings...")}</div>:<div className={styles.workspace}>
       <aside className={styles.sidebar}>{TABS.map(item=><button type="button" key={item.id} className={tab===item.id?styles.active:""} onClick={()=>setTab(item.id)}><span>{item.icon}</span>{pick(item.fa,item.en)}</button>)}</aside>
@@ -170,6 +171,7 @@ export function ConversionTemplateCustomizer({onClose}:{onClose:()=>void}){
           {tab==="social"&&<><div className={styles.section}><div className={styles.sectionHead}><b>{pick("نمایش شبکه‌ها و آدرس‌ها","Social visibility & URLs")}</b></div><div className={styles.toggles}><label className={styles.toggle}><span>Telegram</span><input type="checkbox" checked={Boolean(draft.show_telegram)} onChange={e=>setValue("show_telegram",e.target.checked)}/></label><label className={styles.toggle}><span>Instagram</span><input type="checkbox" checked={Boolean(draft.show_instagram)} onChange={e=>setValue("show_instagram",e.target.checked)}/></label><label className={styles.toggle}><span>WhatsApp</span><input type="checkbox" checked={Boolean(draft.show_whatsapp)} onChange={e=>setValue("show_whatsapp",e.target.checked)}/></label></div><div className={styles.grid2}><label className={styles.field}><span>{pick("لینک تلگرام","Telegram URL")}</span><input type="text" dir="ltr" value={String(draft.telegram_url||"")} onChange={e=>setValue("telegram_url",e.target.value)}/></label><label className={styles.field}><span>{pick("لینک اینستاگرام","Instagram URL")}</span><input type="text" dir="ltr" value={String(draft.instagram_url||"")} onChange={e=>setValue("instagram_url",e.target.value)}/></label><label className={styles.field}><span>{pick("لینک واتس‌اپ","WhatsApp URL")}</span><input type="text" dir="ltr" value={String(draft.whatsapp_url||"")} onChange={e=>setValue("whatsapp_url",e.target.value)}/></label></div></div>{contentSection("متن بخش ارتباط و چت","Contact & chat copy",CONTACT_FIELDS)}{contentSection("متن کارت‌های شبکه اجتماعی","Social cards copy",SOCIAL_FIELDS)}</>}
           {tab==="footer"&&<>{contentSection("فوتر کامل فروشگاه","Complete storefront footer",FOOTER_FIELDS)}<div className={styles.section}><div className={styles.sectionHead}><b>{pick("محتوای فوتر","Footer content")}</b></div><p className={styles.explainer}>{pick("فوتر شامل برند و توضیح کوتاه، لینک‌های سریع، پشتیبانی، شبکه‌های اجتماعی و متن حقوق است. نمایش هر شبکه از تب «شبکه‌های اجتماعی» کنترل می‌شود.","The footer includes brand copy, quick links, support, social links and rights text. Each social network is controlled from the Social tab.")}</p></div></>}
           {tab==="layout"&&<><div className={styles.section}><div className={styles.sectionHead}><b>{pick("نمایش بخش‌ها","Section visibility")}</b></div><div className={styles.toggles}>{STOREFRONT_SECTION_IDS.map(section=><label className={styles.toggle} key={section}><span>{pick(SECTION_LABELS[section].fa,SECTION_LABELS[section].en)}</span><input type="checkbox" checked={Boolean(draft[`show_${section}`])} onChange={e=>setValue(`show_${section}`,e.target.checked)}/></label>)}<label className={styles.toggle}><span>{pick("CTA نهایی","Final CTA")}</span><input type="checkbox" checked={Boolean(draft.show_final_cta)} onChange={e=>setValue("show_final_cta",e.target.checked)}/></label><label className={styles.toggle}><span>{pick("ارتباط و پشتیبانی","Contact")}</span><input type="checkbox" checked={Boolean(draft.show_contact)} onChange={e=>setValue("show_contact",e.target.checked)}/></label></div></div><div className={styles.section}><div className={styles.sectionHead}><b>{pick("ترتیب بخش‌ها","Section order")}</b></div><div className={styles.order}>{sectionOrder.map((section,index)=><div className={styles.orderRow} key={section}><span>{String(index+1).padStart(2,"0")}</span><b>{pick(SECTION_LABELS[section].fa,SECTION_LABELS[section].en)}</b><div><button type="button" disabled={index===0} onClick={()=>moveSection(index,-1)}>↑</button><button type="button" disabled={index===sectionOrder.length-1} onClick={()=>moveSection(index,1)}>↓</button></div></div>)}</div><StorefrontAdvancedDesignControls templateId="conversion-2027" values={advancedValues} onChange={advancedChange} section="layout"/></div></>}
+          {tab==="seo"&&<StoreTemplateSeoPanel templateId="conversion-2027"/>}
         </div>
       </section>
     </div>}

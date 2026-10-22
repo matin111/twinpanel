@@ -1,0 +1,43 @@
+name: TwinPanel Store Template SEO Sidebar Smoke
+
+on:
+  pull_request:
+    paths:
+      - "components/store-template-conversion-customizer.tsx"
+      - "components/store-template-customizer-page.tsx"
+      - "components/store-template-seo-panel.tsx"
+      - ".github/workflows/store-template-seo-sidebar-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Conversion SEO stays inside template navigation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          conversion = Path("components/store-template-conversion-customizer.tsx").read_text(encoding="utf-8")
+          parent = Path("components/store-template-customizer-page.tsx").read_text(encoding="utf-8")
+          seo = Path("components/store-template-seo-panel.tsx").read_text(encoding="utf-8")
+
+          assert 'import {StoreTemplateSeoPanel} from "./store-template-seo-panel";' in conversion
+          assert '|"seo"' in conversion
+          assert '{id:"seo",fa:"سئو",en:"SEO",icon:"06"}' in conversion
+          assert 'tab==="seo"&&<StoreTemplateSeoPanel templateId="conversion-2027"/>' in conversion
+
+          # Conversion owns its SEO panel inside the customizer. Other template
+          # editors keep the shared fallback until they receive their own tab.
+          assert '{template.id!=="conversion-2027"&&<StoreTemplateSeoPanel templateId={template.id}/>}' in parent
+          assert '\n    <StoreTemplateSeoPanel templateId={template.id}/>' not in parent
+
+          # Save/reset contracts must remain on the existing SEO component.
+          assert 'saveStoreTemplateSeo' in seo
+          assert 'resetStoreTemplateSeo' in seo
+          assert 'STORE_TEMPLATE_SEO_KEYS' in seo
+          print("STORE_TEMPLATE_SEO_SIDEBAR_OK")
+          PY
