@@ -72,9 +72,13 @@ jobs:
             backend/app/routers/__init__.py
       - name: Run manual authority regression
         working-directory: backend
+        env:
+          PYTHONPATH: .
         run: pytest -q tests/test_manual_authority_v193.py
       - name: Verify canonical Agent report wins route order
         working-directory: backend
+        env:
+          PYTHONPATH: .
         run: |
           python - <<'PY'
           from app.main import app
