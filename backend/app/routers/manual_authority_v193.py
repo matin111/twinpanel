@@ -29,9 +29,9 @@ from ..schemas import TunnelPeerReportIn
 #    in-flight stale transaction as well.
 #
 # This module is registered on runtime_endpoints BEFORE the legacy tunnels
-# router. It owns the exact Agent report path and keeps reports telemetry-only.
-# A mapper guard also prevents stale Auto ORM objects from changing aggregate
-# tunnel authority after the database row has become Manual.
+# router. It owns the exact Agent report path while preserving the existing
+# peer/transport telemetry behavior. The only authority behavior removed from
+# Agent reporting is the illegal aggregate active_transport assignment.
 #
 # Dataplane, TP27 carriers, route/NAT/firewall and Agent desired-state are not
 # changed here.
@@ -54,6 +54,20 @@ _AUTHORITY_FIELDS = (
 
 def _mode(value: object) -> str:
     return str(value or "").strip().lower()
+
+
+def _status(value: object) -> str:
+    raw = getattr(value, "value", value)
+    return str(raw or "").strip().lower()
+
+
+def _effective_transport(tunnel: Tunnel) -> str:
+    return str(
+        getattr(tunnel, "active_transport", None)
+        or getattr(tunnel, "preferred_transport", None)
+        or getattr(tunnel, "transport", None)
+        or "ssh_tun"
+    ).strip().lower()
 
 
 def should_preserve_manual_authority(
@@ -138,29 +152,6 @@ def _require_node_secret(x_node_secret: str | None) -> None:
         raise HTTPException(status_code=401, detail="Invalid node secret")
 
 
-def _status(value: object) -> str:
-    raw = getattr(value, "value", value)
-    return str(raw or "").strip().lower()
-
-
-def _latency_from_states(*states: TunnelPeerState | None) -> int | None:
-    values: list[int] = []
-
-    for state in states:
-        if state is None or state.latency_ms is None:
-            continue
-        try:
-            values.append(max(0, int(state.latency_ms)))
-        except (TypeError, ValueError):
-            pass
-
-    if not values:
-        return None
-
-    # Conservative pair latency: expose the slower reported side.
-    return max(values)
-
-
 @router.post("/{tunnel_id}/node/{node_id}/report")
 def report_tunnel_peer_v193(
     tunnel_id: int,
@@ -169,12 +160,10 @@ def report_tunnel_peer_v193(
     x_node_secret: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
-    """Canonical Agent report endpoint with telemetry-only authority.
+    """Canonical Agent report endpoint preserving Manual authority.
 
-    Agent reports are allowed to update TunnelPeerState and the matching legacy
-    TunnelTransport telemetry row. They NEVER select the aggregate production
-    transport. Manual selection belongs to the admin endpoint; Auto selection
-    belongs to Transport Manager.
+    Existing peer-state and TunnelTransport telemetry semantics are preserved.
+    Agent reporting is never allowed to choose aggregate active_transport.
     """
 
     _require_node_secret(x_node_secret)
@@ -188,6 +177,17 @@ def report_tunnel_peer_v193(
         int(tunnel.exit_node_id),
     }:
         raise HTTPException(status_code=403, detail="Node does not belong to tunnel")
+
+    # Preserve the legacy MTunnel controller-authority contract exactly.
+    if _effective_transport(tunnel) == "mtunnel":
+        return {
+            "ok": True,
+            "ignored": True,
+            "reason": "transport_manager_authoritative",
+            "status": _status(tunnel.status),
+            "active_transport": tunnel.active_transport,
+            "latency_ms": tunnel.latency_ms,
+        }
 
     state = (
         db.query(TunnelPeerState)
@@ -252,26 +252,11 @@ def report_tunnel_peer_v193(
         )
 
         if member is not None:
-            state_usable = bool(
-                state.tunnel_reachable and not state.last_error
-            )
-            peer_usable = bool(
-                peer_state
-                and peer_state.tunnel_reachable
-                and not peer_state.last_error
-            )
-
-            both_online = bool(state_usable and peer_usable)
-            one_online = bool(state_usable or peer_usable)
-
-            member.status = (
-                "online"
-                if both_online
-                else "degraded"
-                if one_online
-                else "offline"
-            )
-            member.latency_ms = _latency_from_states(state, peer_state)
+            # Preserve V53 report telemetry semantics exactly: Transport Manager
+            # owns aggregate status/latency; Agent reports mirror those values
+            # onto the selected transport member and attach peer errors.
+            member.status = _status(tunnel.status)
+            member.latency_ms = tunnel.latency_ms
 
             errors = [
                 value
@@ -284,12 +269,14 @@ def report_tunnel_peer_v193(
             member.last_error = "; ".join(errors) if errors else None
             member.updated_at = datetime.utcnow()
 
-            if both_online:
+            if tunnel.status == TunnelStatus.ONLINE:
                 member.last_healthy_at = datetime.utcnow()
 
     # CRITICAL V193 CONTRACT:
-    # Do not write tunnel.mode, active_transport, preferred_transport,
-    # aggregate status, latency or last_switch_at from an Agent report.
+    # The legacy handler used to set tunnel.active_transport = selected_name
+    # here when mode != auto. That violated Manual authority and repeatedly
+    # reverted explicit admin selections such as tp27_fast back to ssh_tun.
+    # No aggregate Tunnel authority field is written by Agent reporting.
     db.commit()
 
     return {
