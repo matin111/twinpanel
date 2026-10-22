@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime
+from pathlib import Path
 
 from . import smart_transport_auto_v21 as smart
 from .database import SessionLocal
@@ -9,21 +10,12 @@ from .models import TunnelTransport
 
 
 # ============================================================
-# TWINPANEL SMART CANDIDATE RETRY GUARD V169
+# TWINPANEL SMART CANDIDATE RETRY GUARD V169 / V179 CONTRACT
 #
-# Root cause:
-# SmartAuto V21 used TunnelTransport.updated_at as the 30-minute install retry
-# clock. Health persistence also refreshes updated_at on every probe, including
-# candidate_service_inactive / interface-missing failures. An offline candidate
-# therefore never became 30 minutes old and could be starved forever without a
-# new installer attempt.
-#
-# V169 separates lifecycle clocks:
-#   * install retry age comes only from smart_auto_v21.last_install_attempt_epoch
-#   * health/latency/error telemetry may update freely without postponing retry
-#   * legacy/offline rows without the new timestamp are immediately retryable
-#   * each real install attempt writes its own persistent timestamp afterward
-#   * the existing global install task and 20-second settle guard remain intact
+# Retry time is independent from health telemetry and is now release-aware:
+# a failed attempt from an older installed release cannot suppress the first
+# validation attempt after a new transport fix is deployed. Within the same
+# release the existing 1800-second cooldown remains authoritative.
 # ============================================================
 
 MARKER = "TWINPANEL_SMART_CANDIDATE_RETRY_GUARD_V169"
@@ -41,12 +33,28 @@ def _status(value: object) -> str:
     return str(raw or "").strip().lower()
 
 
+def _current_release() -> str:
+    try:
+        value = (
+            Path(__file__).resolve().parents[2] / "VERSION"
+        ).read_text(encoding="utf-8").strip()
+        return value or "unknown"
+    except Exception:
+        return "unknown"
+
+
 def _attempt_epoch(row: TunnelTransport) -> float | None:
     state = smart._smart_state(row)
     return smart._safe_float(
         state.get("last_install_attempt_epoch"),
         None,
     )
+
+
+def _attempt_release(row: TunnelTransport) -> str | None:
+    value = smart._smart_state(row).get("last_install_attempt_release")
+    text = str(value or "").strip()
+    return text or None
 
 
 def _record_attempt(
@@ -70,11 +78,13 @@ def _record_attempt(
         if row is None:
             return
 
+        release = _current_release()
         merge = {
             "last_install_attempt_epoch": float(attempt_epoch),
             "last_install_attempt_at": datetime.utcfromtimestamp(
                 float(attempt_epoch)
             ).isoformat(timespec="seconds") + "Z",
+            "last_install_attempt_release": release,
         }
 
         if completed_epoch is not None:
@@ -82,6 +92,7 @@ def _record_attempt(
             merge["last_install_completed_at"] = datetime.utcfromtimestamp(
                 float(completed_epoch)
             ).isoformat(timespec="seconds") + "Z"
+            merge["last_install_completed_release"] = release
 
         if outcome:
             merge["last_install_outcome"] = _name(outcome)
@@ -97,11 +108,12 @@ def _record_attempt(
 def install_candidate_name_retry_guard_v169(
     tunnel_id: int,
 ) -> str | None:
-    """Choose a candidate using the last *install attempt*, never health time."""
+    """Choose a candidate using install attempts from the current release."""
 
     db = SessionLocal()
     try:
         now_epoch = time.time()
+        current_release = _current_release()
 
         for name in smart.AUTO_INSTALL_NAMES:
             normalized = _name(name)
@@ -128,11 +140,11 @@ def install_candidate_name_retry_guard_v169(
                 continue
 
             last_attempt = _attempt_epoch(row)
+            last_release = _attempt_release(row)
 
-            # Rows created before V169 have no dedicated install-attempt clock.
-            # They must be retried immediately; updated_at may have been kept
-            # artificially fresh forever by health persistence.
-            if last_attempt is None:
+            # A new release must get one real validation attempt immediately.
+            # This is the critical difference from the old 30-minute stale UI.
+            if last_attempt is None or last_release != current_release:
                 return normalized
 
             age = max(0.0, now_epoch - float(last_attempt))
@@ -153,9 +165,6 @@ async def install_candidate_retry_guard_v169(
     normalized = _name(name)
     attempt_epoch = time.time()
 
-    # Persist before starting when a row already exists. The installer remains
-    # authoritative for status and may replace config metadata; we write the
-    # same timestamp again after it completes so it survives installer metadata.
     _record_attempt(
         int(tunnel_id),
         normalized,
@@ -205,7 +214,8 @@ def apply_smart_candidate_retry_guard_v169() -> None:
     print(
         f"{MARKER}_ACTIVE "
         "retry_clock=last_install_attempt_epoch "
+        "retry_scope=release_aware "
         "health_updated_at=ignored "
-        "legacy_offline_rows=immediate_retry",
+        "legacy_or_old_release=immediate_retry",
         flush=True,
     )
