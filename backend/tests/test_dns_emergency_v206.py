@@ -8,6 +8,9 @@ from app.routers.dns_emergency import (
     BINARY_PATH,
     DNSTT_COMMIT,
     DNSTT_REPOSITORY,
+    GO_ROOT,
+    GO_SHA256,
+    GO_VERSION,
     SERVICE_NAME,
     _install_script,
     _listen_addr,
@@ -53,6 +56,20 @@ def test_install_script_is_pinned_and_keeps_upstream_local():
     assert "-udp 203.0.113.8:53" in script
     assert "t.example.com 127.0.0.1:443" in script
     assert "systemctl restart twinpanel-dnstt.service" in script
+
+
+def test_install_script_pins_verified_go_toolchain():
+    node = SimpleNamespace(public_ip="203.0.113.8")
+    script = _install_script(node, "t.example.com", 443)
+    assert GO_VERSION == "1.23.12"
+    assert GO_ROOT in script
+    assert f"go{GO_VERSION}.linux-${{go_arch}}.tar.gz" in script
+    assert GO_SHA256["amd64"] in script
+    assert GO_SHA256["arm64"] in script
+    assert "sha256sum -c -" in script
+    assert '"$GO_BIN" build' in script
+    assert "apt-get install -y --no-install-recommends ca-certificates curl git tar" in script
+    assert "golang-go" not in script
 
 
 def test_router_exposes_inventory_install_health_and_remove():
