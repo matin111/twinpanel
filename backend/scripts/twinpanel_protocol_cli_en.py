@@ -53,11 +53,10 @@ def _read_choice(prompt: str, maximum: int, *, allow_zero: bool = True) -> int:
 
 
 def _select_protocol() -> str:
-    print("Protocols")
+    print("1/3  Protocol")
     for index, protocol in enumerate(PROTOCOL_ORDER, start=1):
         print(f"  [{index}] {PROTOCOL_NAMES[protocol]}")
     print("  [0] Back")
-    print()
 
     choice = _read_choice("Choose: ", len(PROTOCOL_ORDER))
     if choice == 0:
@@ -68,12 +67,14 @@ def _select_protocol() -> str:
 def _select_node(db):
     nodes = _managed_nodes(db)
 
-    print("\nTarget")
+    print("\n2/3  Server")
     for index, row in enumerate(nodes, start=1):
-        name = "This server" if getattr(row, "is_mother", False) else _ascii(row.name)
-        print(f"  [{index}] {name}  [{row.public_ip}]")
+        if getattr(row, "is_mother", False):
+            label = "This server"
+        else:
+            label = f"{_ascii(row.name)} - {row.public_ip}"
+        print(f"  [{index}] {label}")
     print("  [0] Back")
-    print()
 
     choice = _read_choice("Choose: ", len(nodes))
     if choice == 0:
@@ -90,11 +91,10 @@ def _select_action() -> str:
         ("remove", "Remove"),
     ]
 
-    print("\nAction")
+    print("\n3/3  Action")
     for index, (_, title) in enumerate(actions, start=1):
         print(f"  [{index}] {title}")
     print("  [0] Back")
-    print()
 
     choice = _read_choice("Choose: ", len(actions))
     if choice == 0:
