@@ -25,9 +25,15 @@ router = APIRouter(
 
 DNSTT_REPOSITORY = "https://github.com/OutlineFoundation/dnstt.git"
 DNSTT_COMMIT = "e1af37b31a778cab0166788fe2549169f345d742"
+GO_VERSION = "1.23.12"
+GO_SHA256 = {
+    "amd64": "d3847fef834e9db11bf64e3fb34db9c04db14e068eeb064f49af747010454f90",
+    "arm64": "52ce172f96e21da53b1ae9079808560d49b02ac86cecfa457217597f9bc28ab3",
+}
 SERVICE_NAME = "twinpanel-dnstt.service"
 BINARY_PATH = "/usr/local/bin/twinpanel-dnstt-server"
 STATE_DIR = "/etc/twinpanel/dnstt"
+GO_ROOT = f"/opt/twinpanel/toolchains/go{GO_VERSION}"
 DOMAIN_RE = re.compile(
     r"^(?=.{1,253}\.?$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.?$",
     re.IGNORECASE,
@@ -178,17 +184,62 @@ def _install_script(node: Node, domain: str, upstream_port: int) -> str:
     q_domain = shlex.quote(domain)
     q_listen = shlex.quote(listen_addr)
     q_upstream = shlex.quote(f"127.0.0.1:{int(upstream_port)}")
+    go_amd64_sha = GO_SHA256["amd64"]
+    go_arm64_sha = GO_SHA256["arm64"]
     return f"""set -Eeuo pipefail
 export DEBIAN_FRONTEND=noninteractive
 install -d -m 0700 {STATE_DIR}
 
-if ! command -v git >/dev/null 2>&1 || ! command -v go >/dev/null 2>&1; then
+if ! command -v git >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 || ! command -v tar >/dev/null 2>&1; then
   if ! command -v apt-get >/dev/null 2>&1; then
     echo "UNSUPPORTED_PACKAGE_MANAGER" >&2
     exit 31
   fi
   apt-get update -y
-  apt-get install -y --no-install-recommends ca-certificates git golang-go
+  apt-get install -y --no-install-recommends ca-certificates curl git tar
+fi
+
+GO_ROOT={shlex.quote(GO_ROOT)}
+GO_BIN="$GO_ROOT/bin/go"
+if [ ! -x "$GO_BIN" ] || [ "$("$GO_BIN" version 2>/dev/null | awk '{{print $3}}')" != "go{GO_VERSION}" ]; then
+  machine="$(uname -m)"
+  case "$machine" in
+    x86_64|amd64)
+      go_arch="amd64"
+      go_sha="{go_amd64_sha}"
+      ;;
+    aarch64|arm64)
+      go_arch="arm64"
+      go_sha="{go_arm64_sha}"
+      ;;
+    *)
+      echo "UNSUPPORTED_GO_ARCH=$machine" >&2
+      exit 32
+      ;;
+  esac
+  go_work="$(mktemp -d)"
+  cleanup_go() {{ rm -rf "$go_work"; }}
+  trap cleanup_go EXIT
+  go_tar="$go_work/go.tgz"
+  curl -fsSL --retry 3 --connect-timeout 10 \
+    "https://go.dev/dl/go{GO_VERSION}.linux-${{go_arch}}.tar.gz" \
+    -o "$go_tar"
+  printf '%s  %s\n' "$go_sha" "$go_tar" | sha256sum -c -
+  mkdir -p "$go_work/root"
+  tar -C "$go_work/root" -xzf "$go_tar"
+  test -x "$go_work/root/go/bin/go"
+  install -d -m 0755 "$(dirname "$GO_ROOT")"
+  rm -rf "$GO_ROOT.next"
+  mv "$go_work/root/go" "$GO_ROOT.next"
+  rm -rf "$GO_ROOT"
+  mv "$GO_ROOT.next" "$GO_ROOT"
+  trap - EXIT
+  cleanup_go
+fi
+
+if [ "$("$GO_BIN" version | awk '{{print $3}}')" != "go{GO_VERSION}" ]; then
+  echo "GO_TOOLCHAIN_VERSION_MISMATCH" >&2
+  exit 33
 fi
 
 current_commit=""
@@ -205,7 +256,7 @@ if [ ! -x {BINARY_PATH} ] || [ "$current_commit" != {q_commit} ]; then
   git -C "$work" checkout -q --detach FETCH_HEAD
   (
     cd "$work"
-    go build -trimpath -ldflags='-s -w' -o "$work/dnstt-server" ./dnstt-server
+    "$GO_BIN" build -trimpath -ldflags='-s -w' -o "$work/dnstt-server" ./dnstt-server
   )
   install -m 0755 "$work/dnstt-server" {BINARY_PATH}
   printf '%s\n' {q_commit} > {STATE_DIR}/source.commit
@@ -270,6 +321,7 @@ printf 'SERVICE=active\n'
 printf 'DOMAIN=%s\n' {q_domain}
 printf 'LISTEN=%s\n' {q_listen}
 printf 'UPSTREAM=%s\n' {q_upstream}
+printf 'GO_VERSION=%s\n' 'go{GO_VERSION}'
 """
 
 
@@ -332,7 +384,11 @@ def inventory(db: Session = Depends(get_db)):
     return {
         "ok": True,
         "engine": "dnstt",
-        "source": {"repository": DNSTT_REPOSITORY, "commit": DNSTT_COMMIT},
+        "source": {
+            "repository": DNSTT_REPOSITORY,
+            "commit": DNSTT_COMMIT,
+            "go_version": GO_VERSION,
+        },
         "nodes": [
             _setting_payload(node, _setting(db, node.id), _candidate_rows(db, node.id))
             for node in nodes
@@ -348,7 +404,12 @@ async def install(node_id: int, payload: DnsEmergencyInstallIn, db: Session = De
     upstream_port = int(payload.upstream_port)
 
     candidates = _candidate_rows(db, node.id)
-    if candidates and upstream_port not in {int(item["port"]) for item in candidates}:
+    if not candidates:
+        raise HTTPException(
+            status_code=409,
+            detail="هیچ سرویس TCP شناخته‌شده‌ای برای DNS Emergency روی این Exit آماده نیست",
+        )
+    if upstream_port not in {int(item["port"]) for item in candidates}:
         raise HTTPException(
             status_code=409,
             detail={
