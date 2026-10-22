@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.200",
+  "version": "1.1.0-rc.201",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-22T19:20:58Z",
+  "released_at": "2026-10-22T19:38:49Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "0d5b7db1730365f58403922d15a168c3ff151b06",
+  "source_sha": "7a22d3c1203bcacdbbb26d3b8c65a89baf7a1a10",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.200/twinpanel-1.1.0-rc.200-linux-x86_64.tar.gz",
-    "sha256": "6b84ceb64165ce4874dd7e2e9cbfa11763dbad9620b921070ab05d33cb4c3b19",
-    "size_bytes": 18212731
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.201/twinpanel-1.1.0-rc.201-linux-x86_64.tar.gz",
+    "sha256": "2890be4d161340ddfb20393b373aeeaf39650ef83b9200000b0176e78fe17261",
+    "size_bytes": 18213437
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.200 اصلاح Production-Ready چرخه نصب Candidateهای گیرکرده در وضعیت installing را منتشر می‌کند. Root Cause تأییدشده این بود که اگر updater یا restart، installer را پس از ثبت installing قطع کند، Guardهای V167/V169/V171 همان Row را برای همیشه از Health و Retry کنار می‌گذاشتند. V200 بدون Reset مستقیم DB و بدون دورزدن lifecycle رسمی، نصب‌های installing مربوط به Release قبلی را فوراً برای retry رسمی آزاد می‌کند؛ نصب تازه در همان Release همچنان تا پنجره موجود 1800 ثانیه محافظت می‌شود و فقط پس از آن stale محسوب می‌شود. انتخاب عادی V171، cleanup، service creation، probe و گذار نهایی online/failed همچنان در اختیار installer موجود می‌ماند. این نسخه همچنین Guard قبلی V198 برای TP27 Direct TCP را حفظ می‌کند تا پس از Recovery، rp_filter=2 روی TUN ایران و خارج قبل از peer-L3 qualification اعمال شود. TP27 Fast، Manual authority، Route/NAT/Firewall، Auth، Payment، Quota، Provisioning و VPN تغییری نکرده‌اند. پذیرش نهایی منوط به نصب رسمی روی 217.179.6.142 و مشاهده retry واقعی Tunnel #6 Direct TCP، اجرای V198 و نتیجه peer-L3/dataplane است.",
-    "en": "TwinPanel 1.1.0-rc.200 publishes the production fix for candidate installs permanently stuck in installing after an interrupted installer task. The confirmed root cause was that an updater or restart could terminate the installer after it persisted installing, while V167/V169/V171 then excluded that row indefinitely from health and retry. V200 performs no direct DB reset and does not bypass the official lifecycle: installing attempts recorded on a previous release become immediately eligible for the existing official installer, while a fresh same-release install remains protected for the existing 1800-second retry window and is considered stale only afterwards. Normal V171 selection, cleanup, service creation, probe and final online/failed transitions remain owned by the existing installer. The release also retains V198 for TP27 Direct TCP so recovered retries apply rp_filter=2 on both Iran and Exit candidate TUNs immediately before peer-L3 qualification. TP27 Fast, Manual authority, Route/NAT/Firewall, Auth, Payment, Quota, Provisioning and VPN are unchanged. Final acceptance still requires official installation on 217.179.6.142 and a real Tunnel #6 Direct TCP retry proving V198 reaches peer-L3/dataplane qualification."
+    "fa": "TwinPanel 1.1.0-rc.201 اصلاح ترتیب Runtime برای Recovery نصب Candidateهای گیرکرده را منتشر می‌کند. در rc.200 خود V200 Load می‌شد و Marker ACTIVE چاپ می‌کرد، اما بعد از آن V155 همان smart._install_candidate_name را دوباره با selector خودش جایگزین می‌کرد؛ در نتیجه V200 عملاً از مسیر اجرا خارج می‌شد و Rowهای قدیمی در وضعیت installing بازیابی نمی‌شدند. در rc.201، V175 و سپس V155 و Guard V198 ابتدا Apply می‌شوند و V200 در پایان به‌عنوان final install-selector wrapper نصب می‌شود؛ بنابراین نصب‌های installing متعلق به Release قبلی می‌توانند فوراً به installer رسمی موجود برگردند، در حالی که selector نهایی V155 برای تمام Candidateهای غیر-stale به‌عنوان fallback حفظ می‌شود. منطق V198 برای اعمال rp_filter=2 روی TUN ایران و خارج قبل از peer-L3 qualification بدون تغییر باقی مانده است. هیچ Reset مستقیم DB، تغییر Route/NAT/Firewall، حذف Transport، تغییر TP27 Fast، Manual authority، Auth، Payment، Quota، Provisioning یا VPN در این نسخه انجام نشده است. پذیرش نهایی منوط به نصب رسمی روی 217.179.6.142 و مشاهده واقعی [StaleCandidateInstallV200] RECOVER و سپس نتیجه installer و peer-L3/dataplane است.",
+    "en": "TwinPanel 1.1.0-rc.201 publishes the runtime ordering fix for stale candidate-install recovery. In rc.200 V200 loaded and printed its ACTIVE marker, but V155 was applied afterwards and replaced the same smart._install_candidate_name selector, shadowing V200 from the runtime path so old installing rows were never recovered. In rc.201, V175, V155 and the V198 Direct TCP guard are applied first, then V200 is installed last as the final install-selector wrapper. Previous-release stale installing rows can therefore re-enter the existing official installer immediately, while V155's final selector remains the fallback authority for every non-stale candidate. V198 remains unchanged and still applies rp_filter=2 on both Iran and Exit Direct TCP TUNs before peer-L3 qualification. This release performs no direct DB reset, Route/NAT/Firewall change, transport removal, TP27 Fast change, Manual authority change, Auth, Payment, Quota, Provisioning or VPN change. Final acceptance still requires official installation on 217.179.6.142, an observed [StaleCandidateInstallV200] RECOVER event, and the resulting installer plus peer-L3/dataplane outcome."
   }
 }
