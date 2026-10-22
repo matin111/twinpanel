@@ -1,0 +1,46 @@
+name: Core Candidate Runtime V179 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/transport_candidates/core_candidate_runtime_v179.py'
+      - 'backend/app/tp27_reference_runtime_v91.py'
+      - 'backend/app/smart_candidate_retry_guard_v169.py'
+      - 'backend/app/smart_candidate_fair_retry_v171.py'
+      - 'backend/app/transport_candidates/__init__.py'
+      - 'backend/scripts/core_candidate_runtime_v179_smoke.py'
+      - '.github/workflows/core-candidate-runtime-v179-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/transport_candidates/core_candidate_runtime_v179.py'
+      - 'backend/app/tp27_reference_runtime_v91.py'
+      - 'backend/app/smart_candidate_retry_guard_v169.py'
+      - 'backend/app/smart_candidate_fair_retry_v171.py'
+      - 'backend/app/transport_candidates/__init__.py'
+      - 'backend/scripts/core_candidate_runtime_v179_smoke.py'
+      - '.github/workflows/core-candidate-runtime-v179-smoke.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile changed Python
+        run: |
+          python3 -m py_compile \
+            backend/app/transport_candidates/core_candidate_runtime_v179.py \
+            backend/app/tp27_reference_runtime_v91.py \
+            backend/app/smart_candidate_retry_guard_v169.py \
+            backend/app/smart_candidate_fair_retry_v171.py \
+            backend/scripts/core_candidate_runtime_v179_smoke.py
+
+      - name: Run API-process regression smoke
+        run: python3 backend/scripts/core_candidate_runtime_v179_smoke.py
