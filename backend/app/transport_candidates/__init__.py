@@ -10,6 +10,7 @@ from . import (
     gost,
     gre,
     netrix,
+    spoof_wg,
     tp27_fast,
     tp27_masque,
     tp27_tcp_direct,
@@ -17,15 +18,15 @@ from . import (
 
 
 # ============================================================
-# TWINPANEL TP27 ACTIVE CANDIDATE REGISTRY V151
+# TWINPANEL ACTIVE CANDIDATE REGISTRY V202
 #
-# Active independent lanes:
-#   * tp27_fast       : keyed native GRE first; FoU only install fallback
-#   * tp27_masque     : RFC 9484 CONNECT-IP over HTTP/3 / QUIC datagrams
-#   * tp27_tcp_direct : independent direct-TCP L3 fallback
+# Production-active candidates are intentionally narrow:
+#   * tp27_fast : proven TP27 GRE/FoU path (must remain untouched)
+#   * spoof_wg  : pinned Spoof Tunnel core carrying a WireGuard /30
 #
-# Legacy experimental candidates remain understood only by scoped cleanup.
-# kernel_gre stays health-visible during migration but is not auto-installed.
+# MASQUE and Direct TCP stay registered only for scoped uninstall/cleanup of
+# existing rows and services. Mieru is registered by V165 as cleanup-only.
+# Legacy experimental candidates remain understood by the same cleanup path.
 # ============================================================
 
 _LEGACY_SPECS = dict(_common.SPECS)
@@ -34,6 +35,12 @@ TP27_SPEC = {
     "priority": 100,
     "label": "TP27 Fast",
     "family": "tp27-gre-l3",
+}
+
+SPOOF_WG_SPEC = {
+    "priority": 105,
+    "label": "Spoof Tunnel",
+    "family": "spoof-mutual-ip-wireguard-l3",
 }
 
 TP27_MASQUE_SPEC = {
@@ -49,108 +56,116 @@ TP27_TCP_DIRECT_SPEC = {
 }
 
 _common.SPECS["tp27_fast"] = TP27_SPEC
+_common.SPECS["spoof_wg"] = SPOOF_WG_SPEC
 _common.SPECS["tp27_masque"] = TP27_MASQUE_SPEC
 _common.SPECS["tp27_tcp_direct"] = TP27_TCP_DIRECT_SPEC
 
 SPECS = {
     "kernel_gre": _LEGACY_SPECS["kernel_gre"],
     "tp27_fast": TP27_SPEC,
+    "spoof_wg": SPOOF_WG_SPEC,
     "tp27_masque": TP27_MASQUE_SPEC,
     "tp27_tcp_direct": TP27_TCP_DIRECT_SPEC,
 }
 
+# Only these entries are installable/selectable through the modern API/UI.
 ACTIVE_SPECS = {
     "tp27_fast": TP27_SPEC,
-    "tp27_masque": TP27_MASQUE_SPEC,
-    "tp27_tcp_direct": TP27_TCP_DIRECT_SPEC,
+    "spoof_wg": SPOOF_WG_SPEC,
 }
 
 _legacy_runtime = _common.runtime
 _legacy_policy_ids = _common.policy_ids
 
 
-def _tp27_runtime(tunnel_id: int) -> dict:
-    """Preserve the production-proven V91 10.253/16 runtime contract."""
-
+def _l3_runtime(
+    *,
+    tunnel_id: int,
+    transport: str,
+    octet: int,
+    interface_prefix: str,
+    priority: int,
+    port: int | None,
+) -> dict:
     tid = max(int(tunnel_id), 1)
     slot = tid % 16384
     base = slot * 4
     third = (base // 256) & 0xFF
     fourth = base % 256
-    iran_ip = f"10.253.{third}.{fourth + 1}"
-    exit_ip = f"10.253.{third}.{fourth + 2}"
-
+    iran_ip = f"10.{octet}.{third}.{fourth + 1}"
+    exit_ip = f"10.{octet}.{third}.{fourth + 2}"
     return {
-        "transport": "tp27_fast",
-        "interface": f"tp27{tid}"[:15],
-        "network": f"10.253.{third}.{fourth}/30",
+        "transport": transport,
+        "interface": f"{interface_prefix}{tid}"[:15],
+        "network": f"10.{octet}.{third}.{fourth}/30",
         "iran_ip": iran_ip,
         "exit_ip": exit_ip,
         "iran_addr": f"{iran_ip}/30",
         "exit_addr": f"{exit_ip}/30",
-        "port": None,
-        "iran_service": f"twinpanel-tp27_fast-{tid}-iran.service",
-        "exit_service": f"twinpanel-tp27_fast-{tid}-exit.service",
-        "priority": int(TP27_SPEC["priority"]),
+        "port": port,
+        "iran_service": f"twinpanel-{transport}-{tid}-iran.service",
+        "exit_service": f"twinpanel-{transport}-{tid}-exit.service",
+        "priority": int(priority),
     }
+
+
+def _tp27_runtime(tunnel_id: int) -> dict:
+    """Preserve the production-proven V91 10.253/16 runtime contract."""
+    return _l3_runtime(
+        tunnel_id=tunnel_id,
+        transport="tp27_fast",
+        octet=253,
+        interface_prefix="tp27",
+        priority=int(TP27_SPEC["priority"]),
+        port=None,
+    )
+
+
+def _spoof_wg_runtime(tunnel_id: int) -> dict:
+    """Independent WireGuard /30 carried by the pinned Spoof Tunnel core."""
+    tid = max(int(tunnel_id), 1)
+    return _l3_runtime(
+        tunnel_id=tid,
+        transport="spoof_wg",
+        octet=250,
+        interface_prefix="tpsp",
+        priority=int(SPOOF_WG_SPEC["priority"]),
+        port=35000 + (tid % 500),
+    )
 
 
 def _tp27_tcp_direct_runtime(tunnel_id: int) -> dict:
-    """Independent /30 in 10.254.0.0/16 for the direct-TCP fallback lane."""
-
+    """Cleanup-compatible Direct TCP runtime; no longer production-active."""
     tid = max(int(tunnel_id), 1)
-    slot = tid % 16384
-    base = slot * 4
-    third = (base // 256) & 0xFF
-    fourth = base % 256
-    iran_ip = f"10.254.{third}.{fourth + 1}"
-    exit_ip = f"10.254.{third}.{fourth + 2}"
-
-    return {
-        "transport": "tp27_tcp_direct",
-        "interface": f"tp27t{tid}"[:15],
-        "network": f"10.254.{third}.{fourth}/30",
-        "iran_ip": iran_ip,
-        "exit_ip": exit_ip,
-        "iran_addr": f"{iran_ip}/30",
-        "exit_addr": f"{exit_ip}/30",
-        "port": 46200 + (tid % 500),
-        "iran_service": f"twinpanel-tp27_tcp_direct-{tid}-iran.service",
-        "exit_service": f"twinpanel-tp27_tcp_direct-{tid}-exit.service",
-        "priority": int(TP27_TCP_DIRECT_SPEC["priority"]),
-    }
+    return _l3_runtime(
+        tunnel_id=tid,
+        transport="tp27_tcp_direct",
+        octet=254,
+        interface_prefix="tp27t",
+        priority=int(TP27_TCP_DIRECT_SPEC["priority"]),
+        port=46200 + (tid % 500),
+    )
 
 
 def _tp27_masque_runtime(tunnel_id: int) -> dict:
-    """Independent /30 in 10.255.0.0/16 for CONNECT-IP over HTTP/3."""
-
+    """Cleanup-compatible MASQUE runtime; no longer production-active."""
     tid = max(int(tunnel_id), 1)
-    slot = tid % 16384
-    base = slot * 4
-    third = (base // 256) & 0xFF
-    fourth = base % 256
-    iran_ip = f"10.255.{third}.{fourth + 1}"
-    exit_ip = f"10.255.{third}.{fourth + 2}"
-
-    return {
-        "transport": "tp27_masque",
-        "interface": f"tp27m{tid}"[:15],
-        "network": f"10.255.{third}.{fourth}/30",
-        "iran_ip": iran_ip,
-        "exit_ip": exit_ip,
-        "iran_addr": f"{iran_ip}/30",
-        "exit_addr": f"{exit_ip}/30",
-        "port": 28400 + (tid % 500),
-        "iran_service": f"twinpanel-tp27_masque-{tid}-iran.service",
-        "exit_service": f"twinpanel-tp27_masque-{tid}-exit.service",
-        "priority": int(TP27_MASQUE_SPEC["priority"]),
-    }
+    return _l3_runtime(
+        tunnel_id=tid,
+        transport="tp27_masque",
+        octet=255,
+        interface_prefix="tp27m",
+        priority=int(TP27_MASQUE_SPEC["priority"]),
+        port=28400 + (tid % 500),
+    )
 
 
 def runtime(name: str, tunnel_id: int) -> dict:
     value = str(name or "").strip().lower()
     if value == "tp27_fast":
         return _tp27_runtime(tunnel_id)
+    if value == "spoof_wg":
+        return _spoof_wg_runtime(tunnel_id)
     if value == "tp27_masque":
         return _tp27_masque_runtime(tunnel_id)
     if value == "tp27_tcp_direct":
@@ -169,12 +184,16 @@ def policy_ids(name: str, tunnel_id: int) -> tuple[int, int]:
     if value == "tp27_masque":
         table = 31000 + (int(tunnel_id) % 900)
         return table, table
+    if value == "spoof_wg":
+        table = 33000 + (int(tunnel_id) % 900)
+        return table, table
     return _legacy_policy_ids(value, tunnel_id)
 
 
 _common.runtime = runtime
 _common.policy_ids = policy_ids
 tp27_fast.runtime = runtime
+spoof_wg.runtime = runtime
 tp27_masque.runtime = runtime
 tp27_tcp_direct.runtime = runtime
 
@@ -193,8 +212,7 @@ def catalog() -> list[dict]:
 
 INSTALLERS = {
     "tp27_fast": tp27_fast.install,
-    "tp27_masque": tp27_masque.install,
-    "tp27_tcp_direct": tp27_tcp_direct.install,
+    "spoof_wg": spoof_wg.install,
 }
 
 
@@ -215,11 +233,23 @@ async def uninstall_transport(name: str, tunnel_id: int, db: Session):
 
     _, iran, exit_node = _common.tunnel_nodes(db, tunnel_id)
     rt = runtime(name, tunnel_id)
+    rt["tunnel_id"] = int(tunnel_id)
     ci = ce = None
 
     try:
         ci, ce = await connect_pair(iran, exit_node, db)
         table, priority = policy_ids(name, tunnel_id)
+
+        spoof_cfg = None
+        if name == "spoof_wg":
+            row = (
+                db.query(__import__("app.models", fromlist=["TunnelTransport"]).TunnelTransport)
+                .filter_by(tunnel_id=int(tunnel_id), transport=name)
+                .first()
+            )
+            spoof_cfg = spoof_wg.configuration_from_text(
+                getattr(row, "config_text", None)
+            )
 
         for conn, service in (
             (ci, rt["iran_service"]),
@@ -244,6 +274,25 @@ true
             )
             await ce.run(
                 f"rm -f /usr/local/sbin/tp27-fast-{int(tunnel_id)}-exit; true",
+                check=False,
+            )
+
+        elif name == "spoof_wg":
+            await spoof_wg._remove_owned_firewall(
+                ci,
+                ce,
+                tunnel_id=int(tunnel_id),
+                rt=rt,
+                cfg=spoof_cfg,
+            )
+            await ci.run(
+                f"rm -f {shlex.quote(spoof_wg._helper_path(tunnel_id, 'iran'))} "
+                f"{shlex.quote(spoof_wg._key_path(tunnel_id, 'iran'))}; true",
+                check=False,
+            )
+            await ce.run(
+                f"rm -f {shlex.quote(spoof_wg._helper_path(tunnel_id, 'exit'))} "
+                f"{shlex.quote(spoof_wg._key_path(tunnel_id, 'exit'))}; true",
                 check=False,
             )
 
