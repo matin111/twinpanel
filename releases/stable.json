@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.179",
+  "version": "1.1.0-rc.180",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-22T02:13:36Z",
+  "released_at": "2026-10-22T02:20:16Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "752263063697cf69613413e774eb412c1a294143",
+  "source_sha": "2d209ffcb558c08ff076e37bee42aae93221b1d6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.179/twinpanel-1.1.0-rc.179-linux-x86_64.tar.gz",
-    "sha256": "656d5fb97d3eca93e057c7481601fb0ee3ef42623a90f3e49612f0444592634e",
-    "size_bytes": 18132011
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.180/twinpanel-1.1.0-rc.180-linux-x86_64.tar.gz",
+    "sha256": "ad1ceabf7b832d445cfb9f4271132deb55cfddba149deb952f56da2c60cebc42",
+    "size_bytes": 18136497
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.179 ظاهر منوی SSH را مطابق طرح تاییدشده بازطراحی می‌کند: لوگوتایپ خوانای Dot/Pixel برای TWINPANEL با رنگ‌های مجزای Magenta/Violet/Blue/Cyan، زیرعنوان Self-Hosted VPN Control Plane، ردیف فشرده وضعیت API/Web/Version و جداکننده چندرنگ. منوی اصلی همچنان ساده و کاملاً عددی است و عنوان اضافی Quick actions نمایش داده نمی‌شود. منطق Backend، Protocol Runtime، Tunnel، Payment، Quota، Update، Backup و Admin تغییری نکرده است.",
-    "en": "TwinPanel 1.1.0-rc.179 refreshes the SSH management menu to match the approved terminal design: a readable dot/pixel TWINPANEL wordmark with distinct Magenta/Violet/Blue/Cyan colors, a Self-Hosted VPN Control Plane subtitle, a compact API/Web/Version status row, and a multicolor divider. The main menu stays simple and numeric, with the redundant Quick actions title hidden. Backend, protocol runtime, tunnel, payment, quota, update, backup, and admin logic are unchanged."
+    "fa": "TwinPanel 1.1.0-rc.180 مسیر واقعی Canary پنل و SmartAuto را یکسان می‌کند. Root Cause این بود که اصلاحات Dataplane قبلی فقط داخل Process سرویس Transport Manager فعال می‌شدند و FastAPI/پنل همچنان Probe و MASQUE installer قدیمی را اجرا می‌کرد؛ به همین دلیل با وجود Marker جدید در Manager، پنل همان peer_ping_failed و tcp_egress_probe_failed قدیمی را نشان می‌داد. در rc.180 Core Candidate Runtime از bootstrap مشترک transport_candidates در API، Worker و Manager فعال می‌شود. سلامت TCP با socket واقعی bind شده به IP تونل روی چند مقصد مستقل 443 سنجیده می‌شود و سرویس‌های Public-IP فقط telemetry هستند؛ rp_filter روی TUN به loose mode می‌رود و NAT/FORWARD مالکیت‌دار اعمال می‌شود؛ MASQUE قبل از Peer Ping باید در Process جاری TP27_MASQUE_CLIENT_READY و TP27_MASQUE_SESSION_UP را ثابت کند؛ و retry نصب به Release وابسته شده تا خطای نسخه قبلی، Candidate را پس از Update تا 1800 ثانیه قفل نکند. Cooldown داخل همان Release حفظ شده است. Backend routes، Auth، Payment، Subscription، Quota، Storefront، Classic VPN provisioning و TP27 carrier framing/binaries تغییر نکرده‌اند. پس از پذیرش واقعی Tunnel #5، مرحله بعد مستقیم بهینه‌سازی سرعت VPN است.",
+    "en": "TwinPanel 1.1.0-rc.180 makes panel canaries and SmartAuto use the same candidate runtime. The root cause was that previous dataplane fixes were activated only inside the transport-manager process while FastAPI/panel canaries continued executing the legacy probe and MASQUE installer, so the panel kept reporting the old peer_ping_failed and tcp_egress_probe_failed errors despite new manager markers. rc.180 applies Core Candidate Runtime from the shared transport_candidates bootstrap used by API, workers and manager. TCP health is proven by source-bound sockets to multiple independent port-443 targets while public-IP services are telemetry only; candidate TUN rp_filter is loose with owned NAT/FORWARD rules; MASQUE must prove current-process TP27_MASQUE_CLIENT_READY and TP27_MASQUE_SESSION_UP before peer ping; and install retry is release-aware so a failure from an older release cannot block validation for another 1800 seconds after update. The same-release cooldown remains intact. Backend routes, Auth, Payment, Subscription, Quota, Storefront, classic VPN provisioning and TP27 carrier framing/binaries are unchanged. After real Tunnel #5 acceptance, work moves directly to VPN throughput optimization."
   }
 }
