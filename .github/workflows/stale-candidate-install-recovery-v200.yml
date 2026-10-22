@@ -1,0 +1,45 @@
+name: Stale Candidate Install Recovery V200
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/stale_candidate_install_recovery_v200.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/tests/test_stale_candidate_install_recovery_v200.py"
+      - ".github/workflows/stale-candidate-install-recovery-v200.yml"
+  push:
+    paths:
+      - "backend/app/stale_candidate_install_recovery_v200.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/tests/test_stale_candidate_install_recovery_v200.py"
+      - ".github/workflows/stale-candidate-install-recovery-v200.yml"
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      APP_SECRET_KEY: twinpanel-ci-stale-candidate-v200
+      DATABASE_URL: postgresql://twinpanel_ci:twinpanel_ci@127.0.0.1:5432/twinpanel_ci
+      NODE_AGENT_SHARED_SECRET: twinpanel-ci-node-agent-shared-secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt
+          python -m pip install pytest
+
+      - name: Run stale candidate recovery regression
+        env:
+          PYTHONPATH: backend
+        run: |
+          python -m pytest -q backend/tests/test_stale_candidate_install_recovery_v200.py
