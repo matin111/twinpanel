@@ -126,7 +126,6 @@ export function StoreProtocolCatalogLayer({templateId,themeOptions}:{templateId:
             </div>
             <div className={styles.meta} dir="ltr">
               <span>{protocol.transport}</span>
-              {protocol.defaultPort&&<span>Port {protocol.defaultPort}</span>}
             </div>
           </article>;
         })}
