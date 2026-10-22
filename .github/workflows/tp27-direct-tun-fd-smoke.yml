@@ -25,15 +25,18 @@ jobs:
         with:
           go-version: '1.26.0'
 
-      - name: Guard TUN fd lifecycle ordering
+      - name: Guard TUN fd lifecycle and bounded writes
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
           source = Path('tools/tp27-tcp-direct/main.go').read_text(encoding='utf-8')
-          start = source.index('func openTun(')
-          end = source.index('\nfunc configureTun(', start)
-          body = source[start:end]
+
+          open_start = source.index('func openTun(')
+          write_start = source.index('\nfunc writeTunPacket(', open_start)
+          configure_start = source.index('\nfunc configureTun(', write_start)
+          open_body = source[open_start:write_start]
+          write_body = source[write_start:configure_start]
 
           legacy = 'os.OpenFile("/dev/net/tun"'
           raw_open = 'syscall.Open("/dev/net/tun", syscall.O_RDWR|syscall.O_CLOEXEC, 0)'
@@ -42,15 +45,36 @@ jobs:
           wrap = 'os.NewFile(uintptr(fd), "/dev/net/tun")'
           cleanup = 'syscall.Close(fd)'
 
-          assert legacy not in body, body
+          assert legacy not in open_body, open_body
           for marker in (raw_open, ioctl, nonblock, wrap, cleanup):
-              assert marker in body, marker
+              assert marker in open_body, marker
 
-          assert body.index(raw_open) < body.index(ioctl)
-          assert body.index(ioctl) < body.index(nonblock)
-          assert body.index(nonblock) < body.index(wrap)
+          assert open_body.index(raw_open) < open_body.index(ioctl)
+          assert open_body.index(ioctl) < open_body.index(nonblock)
+          assert open_body.index(nonblock) < open_body.index(wrap)
+
+          for marker in (
+              'syscall.Write(fd, packet)',
+              'tunWriteTimeout',
+              'tunWriteRetryInterval',
+              'syscall.EAGAIN',
+              'syscall.EWOULDBLOCK',
+              'io.ErrShortWrite',
+          ):
+              assert marker in write_body, marker
+
+          receive_start = source.index('func receiveFrames(')
+          heartbeat_start = source.index('\nfunc heartbeatLoop(', receive_start)
+          receive_body = source[receive_start:heartbeat_start]
+
+          assert 'tunWriteMu' not in source
+          assert 'tun.Write(packet)' not in receive_body
+          assert 'writeTunPacket(tun, packet)' in receive_body
+          assert 'func receiveFrames(lane *laneConn, tun *os.File) error' in receive_body
 
           print('TP27_DIRECT_TUN_FD_ORDER=PASS')
+          print('TP27_DIRECT_TUN_WRITE_BOUND=PASS')
+          print('TP27_DIRECT_GLOBAL_TUN_WRITE_HOL=ABSENT')
           PY
 
       - name: Verify gofmt

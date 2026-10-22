@@ -36,6 +36,8 @@ const (
 	startupHeartbeatTimeout = 8 * time.Second
 	heartbeatTimeout        = 12 * time.Second
 	writeTimeout            = 2500 * time.Millisecond
+	tunWriteTimeout         = 500 * time.Millisecond
+	tunWriteRetryInterval   = 2 * time.Millisecond
 	tcpUserTimeoutMS        = 20000
 )
 
@@ -243,6 +245,37 @@ func openTun(name string) (*os.File, error) {
 	return f, nil
 }
 
+func writeTunPacket(tun *os.File, packet []byte) error {
+	if tun == nil {
+		return errors.New("tun unavailable")
+	}
+	if len(packet) == 0 || len(packet) > maxPacket {
+		return errors.New("invalid tun packet size")
+	}
+
+	fd := int(tun.Fd())
+	deadline := time.Now().Add(tunWriteTimeout)
+	for {
+		n, err := syscall.Write(fd, packet)
+		if err == nil {
+			if n != len(packet) {
+				return io.ErrShortWrite
+			}
+			return nil
+		}
+		if err == syscall.EINTR {
+			continue
+		}
+		if err != syscall.EAGAIN && err != syscall.EWOULDBLOCK {
+			return err
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("tun write timeout after %s", tunWriteTimeout)
+		}
+		time.Sleep(tunWriteRetryInterval)
+	}
+}
+
 func configureTun(name, local string, mtu int) error {
 	cmds := [][]string{
 		{"ip", "addr", "replace", local, "dev", name},
@@ -338,7 +371,7 @@ func setTCPOptions(c net.Conn) {
 	}
 }
 
-func receiveFrames(lane *laneConn, tun *os.File, tunWriteMu *sync.Mutex) error {
+func receiveFrames(lane *laneConn, tun *os.File) error {
 	r := bufio.NewReaderSize(lane.conn, 512*1024)
 	var hdr [4]byte
 	for {
@@ -364,11 +397,8 @@ func receiveFrames(lane *laneConn, tun *os.File, tunWriteMu *sync.Mutex) error {
 		if _, err := io.ReadFull(r, packet); err != nil {
 			return err
 		}
-		tunWriteMu.Lock()
-		_, err := tun.Write(packet)
-		tunWriteMu.Unlock()
-		if err != nil {
-			return err
+		if err := writeTunPacket(tun, packet); err != nil {
+			return fmt.Errorf("tun write: %w", err)
 		}
 	}
 }
@@ -504,7 +534,6 @@ func runServer(listen string, laneCount int, tokenHash []byte, tun *os.File) err
 	}
 	defer ln.Close()
 	lanes := newLaneSet()
-	var tunWriteMu sync.Mutex
 	go tunToNetwork(tun, lanes, laneCount)
 	log.Printf("server listening=%s lanes=%d protocol=%s", listen, laneCount, magic)
 	for {
@@ -522,7 +551,7 @@ func runServer(listen string, laneCount int, tokenHash []byte, tun *os.File) err
 			lane := lanes.set(laneID, conn)
 			log.Printf("lane online=%d remote=%s", laneID, conn.RemoteAddr())
 			go heartbeatLoop(lane)
-			err = receiveFrames(lane, tun, &tunWriteMu)
+			err = receiveFrames(lane, tun)
 			lanes.remove(laneID, lane)
 			lane.close()
 			log.Printf("lane offline=%d error=%v", laneID, err)
@@ -530,7 +559,7 @@ func runServer(listen string, laneCount int, tokenHash []byte, tun *os.File) err
 	}
 }
 
-func clientLaneLoop(peer string, laneID int, laneCount int, tokenHash []byte, tun *os.File, lanes *laneSet, tunWriteMu *sync.Mutex) {
+func clientLaneLoop(peer string, laneID int, laneCount int, tokenHash []byte, tun *os.File, lanes *laneSet) {
 	backoff := time.Second
 	for {
 		d := net.Dialer{Timeout: 5 * time.Second, KeepAlive: 10 * time.Second}
@@ -553,7 +582,7 @@ func clientLaneLoop(peer string, laneID int, laneCount int, tokenHash []byte, tu
 		lane := lanes.set(laneID, c)
 		log.Printf("lane online=%d peer=%s", laneID, peer)
 		go heartbeatLoop(lane)
-		err = receiveFrames(lane, tun, tunWriteMu)
+		err = receiveFrames(lane, tun)
 		lanes.remove(laneID, lane)
 		lane.close()
 		log.Printf("lane offline=%d error=%v", laneID, err)
@@ -562,9 +591,8 @@ func clientLaneLoop(peer string, laneID int, laneCount int, tokenHash []byte, tu
 
 func runClient(peer string, laneCount int, tokenHash []byte, tun *os.File) error {
 	lanes := newLaneSet()
-	var tunWriteMu sync.Mutex
 	for lane := 0; lane < laneCount; lane++ {
-		go clientLaneLoop(peer, lane, laneCount, tokenHash, tun, lanes, &tunWriteMu)
+		go clientLaneLoop(peer, lane, laneCount, tokenHash, tun, lanes)
 	}
 	go tunToNetwork(tun, lanes, laneCount)
 	for lanes.healthyCount() == 0 {
