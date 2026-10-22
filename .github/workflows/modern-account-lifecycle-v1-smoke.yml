@@ -1,0 +1,34 @@
+name: Modern Account Lifecycle V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/plan_protocol_models.py"
+      - "backend/app/protocol_account_registry.py"
+      - "backend/app/routers/plans.py"
+      - "backend/app/routers/__init__.py"
+      - "backend/app/routers/modern_account_delivery_v1.py"
+      - "backend/app/services/subscription_factory.py"
+      - "backend/app/singbox_subscription_accounts.py"
+      - "scripts/smoke-modern-account-lifecycle-v1.py"
+      - ".github/workflows/modern-account-lifecycle-v1-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile lifecycle modules
+        run: |
+          python -m py_compile \
+            backend/app/protocol_account_registry.py \
+            backend/app/routers/modern_account_delivery_v1.py \
+            backend/app/services/subscription_factory.py \
+            backend/app/singbox_subscription_accounts.py
+      - name: Verify lifecycle contract
+        run: python scripts/smoke-modern-account-lifecycle-v1.py
