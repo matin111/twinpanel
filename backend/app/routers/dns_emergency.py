@@ -256,7 +256,7 @@ if [ ! -x {BINARY_PATH} ] || [ "$current_commit" != {q_commit} ]; then
   git -C "$work" checkout -q --detach FETCH_HEAD
   (
     cd "$work"
-    "$GO_BIN" build -trimpath -ldflags='-s -w' -o "$work/dnstt-server" ./dnstt-server
+    CGO_ENABLED=0 GOTOOLCHAIN=local "$GO_BIN" build -trimpath -ldflags='-s -w' -o "$work/dnstt-server" ./dnstt-server
   )
   install -m 0755 "$work/dnstt-server" {BINARY_PATH}
   printf '%s\n' {q_commit} > {STATE_DIR}/source.commit
