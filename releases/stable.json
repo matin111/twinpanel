@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.181",
+  "version": "1.1.0-rc.182",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-22T02:26:06Z",
+  "released_at": "2026-10-22T02:33:06Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "3eb155bf3a3d666077f25c8ba4e2ae57588bfd47",
+  "source_sha": "650977bef56cd7f374ce487fdcff35de66cda7a8",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.181/twinpanel-1.1.0-rc.181-linux-x86_64.tar.gz",
-    "sha256": "335d704f1711a0f799e3bb87b12ad887cb90674442ca5eb111da24f4fb80c331",
-    "size_bytes": 18136512
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.182/twinpanel-1.1.0-rc.182-linux-x86_64.tar.gz",
+    "sha256": "91035725978ac611b4202720adca18f3b8371501ec07c7ae48c6c56a72c3e6ee",
+    "size_bytes": 18138615
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.181 ارتقای بصری قالب دوم فروشگاه (Editorial Pro 2027) را روی پایه rc.180 منتشر می‌کند. مقیاس تایپوگرافی بسیار ریز ۷ تا ۹ پیکسل به سلسله‌مراتب خوانای ۱۰ تا ۱۳ پیکسل اصلاح شده، اندازه Hero و Status Board متعادل شده، ارتفاع کارت‌های پلن جمع‌وجورتر شده و کنتراست و تفکیک سطوح در Light و Dark Mode بهبود یافته است. در Light Mode رنگ بنفش انتخابی فقط برای متن‌ها و Accentهای کوچک کمی تیره‌تر می‌شود تا خوانایی بهتر شود؛ RTL/LTR و چیدمان موبایل/دسکتاپ حفظ شده‌اند. این ارتقای Editorial منطق خرید، راهنما، پروتکل، Auth/API/Payment/Subscription/Quota/Tunnel/VPN را تغییر نمی‌دهد و تغییرات Core Canary منتشرشده در rc.180 را بدون بازنویسی حمل می‌کند.",
-    "en": "TwinPanel 1.1.0-rc.181 publishes the visual refinement of the second storefront template (Editorial Pro 2027) on top of rc.180. Pervasive 7–9px micro typography is replaced with a readable 10–13px hierarchy, Hero and Status Board scale is rebalanced, plan cards are more compact, and surface separation and contrast are improved in both Light and Dark Mode. In Light Mode, the selected violet hue is darkened slightly only for small accent text to improve readability; RTL/LTR and responsive mobile/desktop layouts are preserved. This Editorial refinement does not change purchase, guide, protocol, Auth/API/Payment/Subscription/Quota/Tunnel/VPN logic and carries forward the Core Canary changes already released in rc.180 without rewriting them."
+    "fa": "TwinPanel 1.1.0-rc.182 خوانایی لوگوتایپ منوی SSH را بر اساس تست واقعی Bitvise بهبود می‌دهد. عنوان TWINPANEL اکنون با Dot-Matrix هفت‌ردیفه ASCII، پیکسل‌های گرد o و فاصله بیشتر بین حروف نمایش داده می‌شود تا در نگاه اول واضح‌تر باشد؛ رنگ‌های مجزای Magenta/Violet/Blue/Cyan، زیرعنوان Self-Hosted VPN Control Plane، وضعیت API/Web/Version و منوی عددی حفظ شده‌اند. مسیر مدیریت ۱۵ پروتکل و منطق Backend/API/Provisioning/Tunnel/Payment/Quota/Updater/Protocol Runtime/VPN بدون تغییر است.",
+    "en": "TwinPanel 1.1.0-rc.182 improves SSH terminal wordmark readability based on real Bitvise testing. TWINPANEL now uses a clearer seven-row ASCII dot-matrix, round o pixels, and wider letter spacing for instant recognition while preserving the Magenta/Violet/Blue/Cyan per-letter palette, Self-Hosted VPN Control Plane subtitle, API/Web/Version status row, and numeric menus. The 15-protocol management path and Backend/API/Provisioning/Tunnel/Payment/Quota/Updater/Protocol Runtime/VPN behavior are unchanged."
   }
 }
