@@ -16,14 +16,6 @@ from ..models import (
     Subscription,
     User,
 )
-from ..modern_protocol_runtime_v2 import SINGBOX_PROTOCOLS
-from ..singbox_subscription_accounts import (
-    SingBoxAccountError,
-    apply_account,
-    new_account_secret,
-    secret_from_dict,
-    secret_to_dict,
-)
 
 
 router = APIRouter(dependencies=[Depends(require_admin)])
@@ -35,6 +27,16 @@ CLASSIC_NODE_FLAGS = {
     "l2tp": "enable_l2tp",
     "v2ray": "enable_v2ray",
 }
+SINGBOX_ACCOUNT_PROTOCOLS = frozenset(
+    {
+        "hysteria2",
+        "tuic",
+        "anytls",
+        "naive",
+        "shadowtls",
+        "snell",
+    }
+)
 
 
 def _status_value(value: Any) -> str:
@@ -46,7 +48,7 @@ def _modern_runtime_ready(
     node: Node,
     protocol: str,
 ) -> bool:
-    if protocol not in SINGBOX_PROTOCOLS:
+    if protocol not in SINGBOX_ACCOUNT_PROTOCOLS:
         return False
     cfg = (
         db.query(NodeProtocolConfig)
@@ -83,6 +85,12 @@ def _get_credential(
 
 
 def _modern_secret(ad: Any, cred: ProtocolCredential, protocol: str, subscription_id: int):
+    from ..singbox_subscription_accounts import (
+        SingBoxAccountError,
+        new_account_secret,
+        secret_from_dict,
+    )
+
     decoded = ad._dec(cred.secret_encrypted)
     if isinstance(decoded, dict):
         try:
@@ -101,6 +109,8 @@ async def _provision_modern_protocol(
     protocol: str,
     nodes: list[Node],
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+    from ..singbox_subscription_accounts import apply_account, secret_to_dict
+
     cred = _get_credential(db, sub.id, protocol)
     secret = _modern_secret(ad, cred, protocol, sub.id)
     items: list[dict[str, Any]] = []
@@ -231,7 +241,8 @@ async def provision_account_v1(
     unsupported = [
         protocol
         for protocol in protocols
-        if protocol not in CLASSIC_NODE_FLAGS and protocol not in SINGBOX_PROTOCOLS
+        if protocol not in CLASSIC_NODE_FLAGS
+        and protocol not in SINGBOX_ACCOUNT_PROTOCOLS
     ]
     if unsupported:
         raise HTTPException(
@@ -252,7 +263,7 @@ async def provision_account_v1(
     errors: list[dict[str, str]] = []
 
     for protocol in protocols:
-        if protocol in SINGBOX_PROTOCOLS:
+        if protocol in SINGBOX_ACCOUNT_PROTOCOLS:
             items, protocol_errors = await _provision_modern_protocol(
                 ad,
                 db,
