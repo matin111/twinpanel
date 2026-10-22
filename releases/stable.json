@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.186",
+  "version": "1.1.0-rc.187",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-22T04:08:08Z",
+  "released_at": "2026-10-22T04:19:59Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "ad641f8b2bef561269e54dc38b3347eff1bf8194",
+  "source_sha": "a0018b42a5e0283b63233a0140a33ea00f644140",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.186/twinpanel-1.1.0-rc.186-linux-x86_64.tar.gz",
-    "sha256": "7817f7119e8a22ce3afff5450735a9deae89073ef49fed6ada0e7b9ccf5e8b27",
-    "size_bytes": 18176219
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.187/twinpanel-1.1.0-rc.187-linux-x86_64.tar.gz",
+    "sha256": "eed4ccdf70ed5b25dd94cbf2badee6ff51b971be391dd31bfeb5c3900e18f6cb",
+    "size_bytes": 18176192
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.186 خطای واقعی OpenVPN در نودهای جدید را اصلاح می‌کند. Audit تولید روی Exit جدید نشان داد TLS و Certificate کاربر سالم هستند اما OpenVPN پس از handshake به‌دلیل شکست اجرای client-connect hook، پیام AUTH_FAILED می‌فرستد. Root Cause این بود که hook زیر /usr/local/sbin قرار داشت ولی parent directory روی سرور 0700 بود و OpenVPN پس از drop privilege به nobody/nogroup امکان traverse آن مسیر را نداشت. rc.186 hook مدیریت‌شده را به مسیر قابل‌دسترسی /etc/openvpn/twinpanel-hooks منتقل می‌کند، اجرای واقعی آن را با user nobody قبل از healthy اعلام‌شدن بررسی می‌کند، نصب‌های جدید را از ابتدا سالم می‌سازد و Repair را طوری اصلاح می‌کند که service+listener به‌تنهایی کافی نباشند و hook خراب نودهای موجود درجا ترمیم شود. Certificate، Credential، PKI و سایر پروتکل‌ها بدون تغییر می‌مانند.",
-    "en": "TwinPanel 1.1.0-rc.186 fixes the production OpenVPN failure observed on a newly added Exit node. Real-server audit proved the user TLS/certificate handshake succeeded, but OpenVPN returned AUTH_FAILED because its client-connect hook could not be executed. The hook file was executable, while its /usr/local/sbin parent directory was mode 0700; after OpenVPN dropped privileges to nobody/nogroup, the runtime user could not traverse that path. rc.186 moves the managed hook to the traversable /etc/openvpn/twinpanel-hooks path, validates execution as the real nobody runtime user before reporting healthy, makes fresh installs safe, and upgrades Repair so service+listener alone no longer hide a broken hook. User certificates, credentials, PKI, and other VPN protocols remain unchanged."
+    "fa": "TwinPanel 1.1.0-rc.187 لوگوتایپ منوی SSH/Bitvise را بر اساس بازخورد واقعی ترمینال نهایی‌تر می‌کند. Wordmark نقطه‌ای نازک با یک طرح Block ASCII ضخیم و فشرده جایگزین شده است: حروف TWINPANEL با سلول‌های ثابت 7 کاراکتری، خطوط ##/####### و رنگ‌های مجزای Magenta/Purple/Blue/Cyan نمایش داده می‌شوند تا روی فونت Bitvise واضح‌تر و نزدیک‌تر به نمونه‌ی تأییدشده باشند. خط صریح [TWINPANEL] Self-Hosted VPN Control Plane، وضعیت API/Web/Version، منوهای عددی، ورودی one-key و مسیر ۱۵ پروتکل بدون تغییر مانده‌اند. Backend/API/Auth/Payment/Quota/Provisioning/Tunnel/VPN/Updater/Protocol Runtime تغییری نکرده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.187 further refines the SSH/Bitvise terminal wordmark from real terminal feedback. The thin dotted mark is replaced by a denser bold ASCII block design: TWINPANEL uses fixed 7-character glyph cells, ##/####### strokes, and per-letter Magenta/Purple/Blue/Cyan colors for stronger readability across Bitvise fonts while staying close to the approved mockup. The explicit [TWINPANEL] Self-Hosted VPN Control Plane identity line, API/Web/version status, numeric menus, one-key input, and the 15-protocol path are unchanged. Backend/API/Auth/Payment/Quota/Provisioning/Tunnel/VPN/Updater/Protocol Runtime behavior is unchanged."
   }
 }
