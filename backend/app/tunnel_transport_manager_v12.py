@@ -63,10 +63,10 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 # + SMART CANDIDATE INSTALL GUARD V167
 # + SMART CANDIDATE RETRY GUARD V169
 # + SMART CANDIDATE FAIR RETRY V171
-# + STALE CANDIDATE INSTALL RECOVERY V200
 # + CANDIDATE DATAPLANE V175
 # + ADAPTIVE CANDIDATE QUALIFICATION V155
 # + DIRECT TCP RPFILTER SHADOW GUARD V198
+# + STALE CANDIDATE INSTALL RECOVERY V200 (FINAL SELECTOR WRAPPER)
 # + RUNTIME RECONCILER V5 (extends runtime_reconciler_v4)
 # ============================================================
 
@@ -81,10 +81,13 @@ async def main() -> None:
     apply_smart_candidate_install_guard_v167()
     apply_smart_candidate_retry_guard_v169()
     apply_smart_candidate_fair_retry_v171()
-    apply_stale_candidate_install_recovery_v200()
     apply_candidate_dataplane_v175()
     apply_adaptive_candidate_qualification_v155()
     apply_direct_tcp_rpfilter_guard_v198()
+    # V155 owns the final normal candidate selector. V200 must wrap only after
+    # every selector-replacing layer is applied, otherwise V155 shadows it and
+    # stale `installing` rows remain permanently ineligible for retry.
+    apply_stale_candidate_install_recovery_v200()
     apply_adaptive_tunnel_performance_v148()
     apply_exit_access_dataplane_stability_v144()
 
@@ -101,10 +104,10 @@ async def main() -> None:
         "smart_candidate_install_guard=v167 "
         "smart_candidate_retry_guard=v169 "
         "smart_candidate_fair_retry=v171 "
-        "stale_candidate_install_recovery=v200 "
         "candidate_dataplane=v175 "
         "adaptive_candidate_qualification=v155 "
         "direct_tcp_rpfilter_guard=v198 "
+        "stale_candidate_install_recovery=v200-final-selector-wrapper "
         "vpn_access_dataplane=v46 "
         "vpn_access_performance=v51 "
         "exit_access_stability=v144 "
