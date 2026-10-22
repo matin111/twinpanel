@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import os
@@ -13,8 +14,10 @@ import tarfile
 import tempfile
 import time
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 ROOT = Path('/var/lib/twinpanel-license')
 REQUEST = ROOT / 'update-request.json'
@@ -23,9 +26,13 @@ CURRENT = Path('/opt/twinpanel/current')
 RELEASES = Path('/opt/twinpanel/releases')
 VENV = Path('/opt/twinpanel/venv/bin/python3')
 DEFAULT_MANIFEST = 'https://raw.githubusercontent.com/matin111/twinpanel/main/releases/stable.json'
+GITHUB_API_MANIFEST = 'https://api.github.com/repos/matin111/twinpanel/contents/releases/stable.json?ref=main'
+LEGACY_MANIFEST = 'https://raw.githubusercontent.com/matin111/tp27-core/main/twinpanel/releases/stable.json'
 DEFAULT_REPOSITORY = 'https://github.com/matin111/twinpanel.git'
 ARTIFACT_FORMAT = 'twinpanel-prebuilt-v1'
 ALLOWED_ARTIFACT_PREFIX = 'https://github.com/matin111/twinpanel/releases/download/'
+MANIFEST_RETRY_ATTEMPTS = 3
+MANIFEST_RETRY_DELAY_SECONDS = 2.0
 STARTED_MONOTONIC = time.monotonic()
 STAGE_SECONDS: dict[str, float] = {}
 
@@ -99,13 +106,53 @@ def runtime_env() -> dict[str, str]:
     return out
 
 
-def get_json(url: str) -> dict:
-    req = urllib.request.Request(url, headers={'User-Agent': 'TwinPanel-Public-Updater/6'})
-    with urllib.request.urlopen(req, timeout=20) as res:
-        obj = json.loads(res.read().decode('utf-8'))
+def _cache_busted(url: str) -> str:
+    try:
+        parts = urlsplit(url)
+        if parts.scheme not in {'http', 'https'}:
+            return url
+        query = dict(parse_qsl(parts.query, keep_blank_values=True))
+        query['twinpanel_update'] = str(time.time_ns())
+        return urlunsplit(
+            (
+                parts.scheme,
+                parts.netloc,
+                parts.path,
+                urlencode(query),
+                parts.fragment,
+            )
+        )
+    except Exception:
+        return url
+
+
+def _decode_manifest_payload(obj: object) -> dict:
     if not isinstance(obj, dict):
         raise RuntimeError('INVALID_MANIFEST')
-    return obj
+    if obj.get('encoding') == 'base64' and isinstance(obj.get('content'), str):
+        try:
+            raw = str(obj['content']).replace('\n', '')
+            obj = json.loads(base64.b64decode(raw).decode('utf-8'))
+        except Exception as exc:
+            raise RuntimeError('INVALID_GITHUB_CONTENT_MANIFEST') from exc
+    if not isinstance(obj, dict):
+        raise RuntimeError('INVALID_MANIFEST')
+    return dict(obj)
+
+
+def get_json(url: str) -> dict:
+    req = urllib.request.Request(
+        _cache_busted(url),
+        headers={
+            'Accept': 'application/vnd.github+json, application/json',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'User-Agent': 'TwinPanel-Public-Updater/7',
+        },
+    )
+    with urllib.request.urlopen(req, timeout=20) as res:
+        obj = json.loads(res.read().decode('utf-8'))
+    return _decode_manifest_payload(obj)
 
 
 def _version_key(value: str) -> tuple[int, int, int, int, int]:
@@ -137,6 +184,73 @@ def resolve_requested_release(requested_version: str, live_version: str) -> tupl
     if _version_key(live) > _version_key(wanted):
         return live, True
     raise RuntimeError('REQUESTED_RELEASE_CHANGED')
+
+
+def _manifest_sources(primary_url: str) -> list[str]:
+    output: list[str] = []
+    for value in (primary_url, DEFAULT_MANIFEST, GITHUB_API_MANIFEST, LEGACY_MANIFEST):
+        source = str(value or '').strip()
+        if source and source not in output:
+            output.append(source)
+    return output
+
+
+def _best_manifest(manifests: list[dict]) -> dict:
+    valid = [item for item in manifests if str(item.get('version') or '').strip()]
+    if not valid:
+        raise RuntimeError('RELEASE_MANIFEST_VERSION_MISSING')
+    installable = [
+        item
+        for item in valid
+        if item.get('installable') is True and item.get('published') is True
+    ]
+    pool = installable or valid
+    return max(pool, key=lambda item: _version_key(str(item.get('version') or '')))
+
+
+def _fetch_manifest_once(primary_url: str) -> dict:
+    sources = _manifest_sources(primary_url)
+    results: list[dict] = []
+    errors: list[str] = []
+    with ThreadPoolExecutor(
+        max_workers=max(1, len(sources)),
+        thread_name_prefix='twinpanel-updater-manifest',
+    ) as executor:
+        futures = {executor.submit(get_json, source): source for source in sources}
+        for future in as_completed(futures):
+            source = futures[future]
+            try:
+                manifest = future.result()
+                manifest['_manifest_source'] = source
+                results.append(manifest)
+            except Exception as exc:
+                errors.append(f'{type(exc).__name__}@{source}')
+    if not results:
+        raise RuntimeError('RELEASE_MANIFEST_UNREACHABLE:' + ';'.join(errors))
+    return _best_manifest(results)
+
+
+def release_manifest_for_request(
+    primary_url: str,
+    requested_version: str,
+    *,
+    attempts: int = MANIFEST_RETRY_ATTEMPTS,
+    retry_delay: float = MANIFEST_RETRY_DELAY_SECONDS,
+    fetcher=None,
+) -> dict:
+    loader = fetcher or _fetch_manifest_once
+    wanted = str(requested_version or '').strip()
+    last: dict | None = None
+    for attempt in range(max(1, attempts)):
+        last = loader(primary_url)
+        live = str(last.get('version') or '').strip()
+        if not wanted or _version_key(live) >= _version_key(wanted):
+            return last
+        if attempt + 1 < max(1, attempts) and retry_delay > 0:
+            time.sleep(retry_delay)
+    if last is None:
+        raise RuntimeError('RELEASE_MANIFEST_UNREACHABLE')
+    return last
 
 
 def run(
@@ -466,10 +580,12 @@ def verify_activation(final: Path, version: str) -> None:
 
 def main() -> int:
     env = runtime_env()
+    requested = read_json(REQUEST)
+    wanted = str(requested.get('requested_version') or '').strip()
 
     started = stage_begin()
     manifest_url = env.get('TWINPANEL_RELEASE_MANIFEST_URL') or DEFAULT_MANIFEST
-    manifest = get_json(manifest_url)
+    manifest = release_manifest_for_request(manifest_url, wanted)
     stage_end('manifest', started)
     if manifest.get('installable') is not True or manifest.get('published') is not True:
         raise RuntimeError('RELEASE_NOT_INSTALLABLE')
@@ -482,8 +598,6 @@ def main() -> int:
     if len(source_sha) != 40 or any(ch not in '0123456789abcdef' for ch in source_sha):
         raise RuntimeError('RELEASE_SOURCE_SHA_INVALID')
 
-    requested = read_json(REQUEST)
-    wanted = str(requested.get('requested_version') or '').strip()
     version, retargeted = resolve_requested_release(wanted, version)
     current_version = (CURRENT / 'VERSION').read_text(encoding='utf-8').strip()
     if current_version == version:
