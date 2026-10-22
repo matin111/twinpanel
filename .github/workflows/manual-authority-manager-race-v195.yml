@@ -1,0 +1,78 @@
+name: Manual authority manager race V195
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/manual_authority_manager_guard_v195.py"
+      - "backend/app/manager_runtime_v16.py"
+      - "backend/tests/test_manual_authority_manager_race_v195.py"
+      - ".github/workflows/manual-authority-manager-race-v195.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/manual_authority_manager_guard_v195.py"
+      - "backend/app/manager_runtime_v16.py"
+      - "backend/tests/test_manual_authority_manager_race_v195.py"
+      - ".github/workflows/manual-authority-manager-race-v195.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    env:
+      APP_NAME: TwinPanel-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: twinpanel
+          POSTGRES_PASSWORD: twinpanel_test
+          POSTGRES_DB: twinpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U twinpanel -d twinpanel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt pytest
+      - name: Compile V195 authority guard
+        run: |
+          python -m py_compile \
+            backend/app/manual_authority_manager_guard_v195.py \
+            backend/app/manager_runtime_v16.py \
+            backend/tests/test_manual_authority_manager_race_v195.py
+      - name: Run stale manager race regression
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_manual_authority_manager_race_v195.py
