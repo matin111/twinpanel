@@ -42,8 +42,17 @@ export function StorefrontAdvancedDesignRuntime({templateId,themeOptions,childre
   const style:RuntimeStyle={} as RuntimeStyle;
   const attrs:Record<string,string>={"data-template":templateId};
 
-  for(const mode of ["dark","light"] as const){
-    for(const slot of ADVANCED_COLOR_SLOTS){
+  for(const slot of ADVANCED_COLOR_SLOTS){
+    const unified=advancedColor(themeOptions,`ui_${slot}`);
+    if(unified){
+      for(const mode of ["dark","light"] as const){
+        const cssName=`--ui-${mode}-${slot.replaceAll("_","-")}` as `--${string}`;
+        style[cssName]=unified;
+        attrs[`data-ui-${mode}-${slot.replaceAll("_","-")}`]="on";
+      }
+      continue;
+    }
+    for(const mode of ["dark","light"] as const){
       const key=`ui_${mode}_${slot}`;
       const color=advancedColor(themeOptions,key);
       if(!color)continue;
