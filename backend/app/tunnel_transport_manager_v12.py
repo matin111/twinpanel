@@ -39,6 +39,9 @@ from .smart_candidate_install_guard_v167 import (
 from .smart_candidate_retry_guard_v169 import (
     apply_smart_candidate_retry_guard_v169,
 )
+from .stale_candidate_install_recovery_v200 import (
+    apply_stale_candidate_install_recovery_v200,
+)
 from .smart_transport_auto_v21 import install_smart_transport_auto_v21
 from .smart_auto_bootstrap_v24 import reconciler_loop as smart_bootstrap_loop
 from .smart_candidate_bootstrap_v38 import reconciler_loop as candidate_bootstrap_loop
@@ -60,6 +63,7 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 # + SMART CANDIDATE INSTALL GUARD V167
 # + SMART CANDIDATE RETRY GUARD V169
 # + SMART CANDIDATE FAIR RETRY V171
+# + STALE CANDIDATE INSTALL RECOVERY V200
 # + CANDIDATE DATAPLANE V175
 # + ADAPTIVE CANDIDATE QUALIFICATION V155
 # + DIRECT TCP RPFILTER SHADOW GUARD V198
@@ -77,6 +81,7 @@ async def main() -> None:
     apply_smart_candidate_install_guard_v167()
     apply_smart_candidate_retry_guard_v169()
     apply_smart_candidate_fair_retry_v171()
+    apply_stale_candidate_install_recovery_v200()
     apply_candidate_dataplane_v175()
     apply_adaptive_candidate_qualification_v155()
     apply_direct_tcp_rpfilter_guard_v198()
@@ -96,6 +101,7 @@ async def main() -> None:
         "smart_candidate_install_guard=v167 "
         "smart_candidate_retry_guard=v169 "
         "smart_candidate_fair_retry=v171 "
+        "stale_candidate_install_recovery=v200 "
         "candidate_dataplane=v175 "
         "adaptive_candidate_qualification=v155 "
         "direct_tcp_rpfilter_guard=v198 "
