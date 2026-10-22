@@ -37,20 +37,29 @@ SINGBOX_ACCOUNT_PROTOCOLS = frozenset(
         "snell",
     }
 )
+STANDALONE_ACCOUNT_PROTOCOLS = frozenset(
+    {
+        "mieru",
+        "trusttunnel",
+        "amneziawg",
+        "sudoku",
+    }
+)
+MODERN_ACCOUNT_PROTOCOLS = SINGBOX_ACCOUNT_PROTOCOLS | STANDALONE_ACCOUNT_PROTOCOLS
 
 
 def _status_value(value: Any) -> str:
     return str(getattr(value, "value", value) or "").strip().lower()
 
 
-def _modern_runtime_ready(
+def _modern_runtime_config(
     db: Session,
     node: Node,
     protocol: str,
-) -> bool:
-    if protocol not in SINGBOX_ACCOUNT_PROTOCOLS:
-        return False
-    cfg = (
+) -> NodeProtocolConfig | None:
+    if protocol not in MODERN_ACCOUNT_PROTOCOLS:
+        return None
+    return (
         db.query(NodeProtocolConfig)
         .filter(
             NodeProtocolConfig.node_id == node.id,
@@ -58,6 +67,14 @@ def _modern_runtime_ready(
         )
         .first()
     )
+
+
+def _modern_runtime_ready(
+    db: Session,
+    node: Node,
+    protocol: str,
+) -> bool:
+    cfg = _modern_runtime_config(db, node, protocol)
     return bool(cfg and _status_value(cfg.status) == "online")
 
 
@@ -84,7 +101,7 @@ def _get_credential(
     return cred
 
 
-def _modern_secret(ad: Any, cred: ProtocolCredential, protocol: str, subscription_id: int):
+def _singbox_secret(ad: Any, cred: ProtocolCredential, protocol: str, subscription_id: int):
     from ..singbox_subscription_accounts import (
         SingBoxAccountError,
         new_account_secret,
@@ -102,6 +119,30 @@ def _modern_secret(ad: Any, cred: ProtocolCredential, protocol: str, subscriptio
     return new_account_secret(protocol, subscription_id)
 
 
+def _stored_standalone_secret(ad: Any, cred: ProtocolCredential, protocol: str):
+    from ..standalone_subscription_accounts import (
+        StandaloneAccountError,
+        secret_from_dict,
+    )
+
+    decoded = ad._dec(cred.secret_encrypted)
+    if not isinstance(decoded, dict):
+        return None
+    try:
+        secret = secret_from_dict(decoded)
+    except (StandaloneAccountError, TypeError, ValueError):
+        return None
+    return secret if secret.protocol == protocol else None
+
+
+def _credential_identity(protocol: str, secret: Any) -> str:
+    if protocol == "amneziawg" and getattr(secret, "client_public_key", None):
+        return str(secret.client_public_key)
+    if protocol == "sudoku" and getattr(secret, "sudoku_port", None):
+        return f"sudoku-sub-{int(secret.subscription_id)}:{int(secret.sudoku_port)}"
+    return str(getattr(secret, "username", "") or "")
+
+
 async def _provision_modern_protocol(
     ad: Any,
     db: Session,
@@ -109,20 +150,42 @@ async def _provision_modern_protocol(
     protocol: str,
     nodes: list[Node],
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
-    from ..singbox_subscription_accounts import apply_account, secret_to_dict
-
     cred = _get_credential(db, sub.id, protocol)
-    secret = _modern_secret(ad, cred, protocol, sub.id)
     items: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
 
+    if protocol in SINGBOX_ACCOUNT_PROTOCOLS:
+        from ..singbox_subscription_accounts import apply_account, secret_to_dict
+
+        secret = _singbox_secret(ad, cred, protocol, sub.id)
+        standalone = False
+    else:
+        from ..standalone_subscription_accounts import (
+            apply_account,
+            new_account_secret,
+            secret_to_dict,
+        )
+
+        secret = _stored_standalone_secret(ad, cred, protocol)
+        standalone = True
+
     for node in nodes:
-        if not _modern_runtime_ready(db, node, protocol):
+        cfg = _modern_runtime_config(db, node, protocol)
+        if cfg is None or _status_value(cfg.status) != "online":
             continue
+
         conn = None
         try:
             conn = await ad.ssh_connect_saved(node, db)
-            item = await apply_account(conn, node, secret)
+            if standalone:
+                if secret is None:
+                    secret = await new_account_secret(conn, protocol, sub.id)
+                port = int(cfg.port or 0)
+                if not 1 <= port <= 65535:
+                    raise RuntimeError(f"{protocol} runtime port is unavailable")
+                item = await apply_account(conn, node, secret, port)
+            else:
+                item = await apply_account(conn, node, secret)
             items.append(item)
         except Exception as exc:
             errors.append(
@@ -137,8 +200,8 @@ async def _provision_modern_protocol(
                 conn.close()
                 await conn.wait_closed()
 
-    if items:
-        cred.username = secret.username
+    if items and secret is not None:
+        cred.username = _credential_identity(protocol, secret)
         cred.secret_encrypted = ad._enc(secret_to_dict(secret))
         cred.config_text_encrypted = ad._enc(items)
         cred.is_active = True
@@ -204,15 +267,13 @@ async def provision_account_v1(
     subscription_id: int,
     db: Session = Depends(get_db),
 ):
-    """Canonical account provisioning bridge for Classic + sing-box Modern.
+    """Canonical account provisioning bridge for all 15 protocols.
 
-    This route is intentionally mounted on runtime_endpoints before the legacy
-    Account Delivery router. Classic behavior reuses the existing production
-    helpers; the first Modern cohort uses its real per-user runtime driver.
-    Unsupported Modern runtimes remain fail-closed and are never synthesized.
+    Classic behavior reuses the established production helpers. All ten Modern
+    protocols require a real online NodeProtocolConfig and a real account
+    driver; nothing is synthesized when a runtime is absent.
     """
 
-    # Import lazily to avoid routers package initialization cycles.
     from . import account_delivery as ad
 
     sub = db.get(Subscription, subscription_id)
@@ -242,13 +303,13 @@ async def provision_account_v1(
         protocol
         for protocol in protocols
         if protocol not in CLASSIC_NODE_FLAGS
-        and protocol not in SINGBOX_ACCOUNT_PROTOCOLS
+        and protocol not in MODERN_ACCOUNT_PROTOCOLS
     ]
     if unsupported:
         raise HTTPException(
             status_code=409,
             detail={
-                "message": "پروتکل هنوز Account Driver آماده ندارد",
+                "message": "پروتکل Account Driver معتبر ندارد",
                 "protocols": unsupported,
             },
         )
@@ -263,7 +324,7 @@ async def provision_account_v1(
     errors: list[dict[str, str]] = []
 
     for protocol in protocols:
-        if protocol in SINGBOX_ACCOUNT_PROTOCOLS:
+        if protocol in MODERN_ACCOUNT_PROTOCOLS:
             items, protocol_errors = await _provision_modern_protocol(
                 ad,
                 db,
@@ -325,7 +386,7 @@ async def provision_account_v1(
             "ok": len(errors) == 0,
             "errors": errors,
             "quota": quota_sync,
-            "modern_account_driver": 1,
+            "modern_account_driver": 2,
         }
     )
     return payload
