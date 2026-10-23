@@ -83,6 +83,40 @@ def _modern_runtime_online(
     return any(_status_value(row.status) == "online" for row in rows)
 
 
+def _resolve_traffic_limit_bytes(
+    sub: Subscription,
+    payload: dict[str, Any],
+) -> int:
+    """Resolve edit-time traffic limit without breaking unlimited subscriptions.
+
+    Missing/blank traffic_gb means the edit is unrelated to quota and preserves
+    the current limit. Explicit 0 means unlimited. Positive values set a finite
+    limit and still may not be lower than already-consumed traffic.
+    """
+
+    current_limit = int(sub.traffic_limit_bytes or 0)
+
+    if "traffic_gb" not in payload or payload.get("traffic_gb") in (None, ""):
+        return current_limit
+
+    try:
+        traffic_gb = float(payload.get("traffic_gb"))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="حجم نامعتبر است") from exc
+
+    if traffic_gb < 0:
+        raise HTTPException(status_code=422, detail="حجم نامعتبر است")
+
+    if traffic_gb == 0:
+        return 0
+
+    new_limit = int(traffic_gb * 1024**3)
+    if new_limit < int(sub.traffic_used_bytes or 0):
+        raise HTTPException(status_code=422, detail="حجم کل کمتر از مصرف فعلی است")
+
+    return new_limit
+
+
 async def _sync_shared_login(
     *,
     ad: Any,
@@ -199,13 +233,7 @@ async def admin_edit_subscription_protocol_lifecycle_v2(
     if plan is None:
         raise HTTPException(status_code=404, detail="پلن پیدا نشد")
 
-    traffic_gb = float(payload.get("traffic_gb", 0) or 0)
-    if traffic_gb <= 0:
-        raise HTTPException(status_code=422, detail="حجم نامعتبر است")
-
-    new_limit = int(traffic_gb * 1024**3)
-    if new_limit < int(sub.traffic_used_bytes or 0):
-        raise HTTPException(status_code=422, detail="حجم کل کمتر از مصرف فعلی است")
+    new_limit = _resolve_traffic_limit_bytes(sub, payload)
 
     try:
         protocols = normalize_protocols(payload.get("protocols", []))
