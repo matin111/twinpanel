@@ -1,11 +1,10 @@
 # TWINPANEL_ACCOUNT_ENFORCEMENT_V2
 # Install the durable controller-owned account enforcement bridge before routers
-# import queue_subscription_enforcement. All 15 canonical account protocols are
-# now controller-owned so Classic identities never depend on a node Agent command
-# payload which cannot safely carry/reconstruct stored credentials.
-from ..services.account_enforcement_v2 import install_account_enforcement_hooks
+# import queue_subscription_enforcement. The V1 symbol remains as a compatibility
+# alias, but it is provided by account_enforcement_v2 and owns all 15 protocols.
+from ..services.account_enforcement_v2 import install_modern_enforcement_hooks
 
-install_account_enforcement_hooks()
+install_modern_enforcement_hooks()
 
 # Register support live-chat extension routes before the shared routers are
 # included by app.main. Importing this module attaches the delta endpoint to
