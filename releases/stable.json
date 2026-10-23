@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.208",
+  "version": "1.1.0-rc.209",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-23T00:51:50Z",
+  "released_at": "2026-10-23T01:08:24Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "efcfa198e0dce008b5c00e3e8d38a6680cd157c3",
+  "source_sha": "563dab38524b287b257a5371c1b896d11bdaccad",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.208/twinpanel-1.1.0-rc.208-linux-x86_64.tar.gz",
-    "sha256": "258fcf0b29f4bf4a05f27718e931011b9bda59b5aeb67373b682e2c5f58fb42e",
-    "size_bytes": 23746729
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.209/twinpanel-1.1.0-rc.209-linux-x86_64.tar.gz",
+    "sha256": "e9ba2d265e55b563321919e77effd048c0ebe2823d5f091242caa3d1c5d66b88",
+    "size_bytes": 23748829
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.208 یک Hotfix تولیدی برای DNS اضطراری ایران است. Root Cause روی نود واقعی ایران 193.39.9.222 تأیید شد: Iran Relay برای Tunnel #6 به‌صورت مستقل آدرس قدیمی 10.64.0.26 را می‌ساخت، درحالی‌که مسیر L3 فعال واقعی روی tp276 برابر 10.253.0.25/30 و Peer خارج 10.253.0.26 بود؛ در نتیجه 10.64.0.26 از Gateway عمومی ens3 Route می‌شد و TCP Upstream Timeout می‌داد. در rc.208 آدرس Iran/Exit از SSOT همان Active L3 Runtime تونل گرفته و /30 به Host IP واقعی Normalize می‌شود. نصب DNSTT دیگر روی نود ایران به دانلود Go، GitHub یا build سورس وابسته نیست: باینری‌های pinned برای amd64 و arm64 داخل Release ساخته می‌شوند، SHA-256 آن‌ها بررسی می‌شود و از طریق SSH/SFTP با فایل موقت و atomic rename روی نود Stage می‌شوند. UI نیز detail.error واقعی Backend را نمایش می‌دهد تا خطای Runtime پشت پیام عمومی مخفی نشود. نصب همچنان Fail-Closed است و فقط زمانی Online می‌شود که Tunnel انتخاب‌شده فعال باشد، سرویس DNSTT و Listener UDP/53 بالا باشند و TCP از Iran Node به Exit Tunnel IP و پورت انتخابی واقعاً برقرار شود. Auth، Payment، Quota، VPN protocol provisioning و هسته سالم Tunnel در این Hotfix تغییر نکرده‌اند.",
-    "en": "TwinPanel 1.1.0-rc.208 is a production hotfix for DNS Emergency Iran Relay. The root cause was confirmed on the real Iran node 193.39.9.222: for Tunnel #6 the relay independently reconstructed the legacy 10.64.0.26 address while the actual active L3 runtime was tp276 with 10.253.0.25/30 and Exit peer 10.253.0.26. The legacy target therefore routed through the public ens3 gateway and the TCP upstream probe timed out. rc.208 resolves Iran/Exit addresses from the tunnel core's active-L3 runtime SSOT and normalizes /30 interface values to the actual host IPs. DNSTT installation on the Iran node no longer downloads Go, GitHub source, or builds code at runtime: pinned amd64 and arm64 binaries are built into the release, SHA-256 verified, then staged over authenticated SSH/SFTP using a temporary file and atomic rename. The admin UI now surfaces backend detail.error diagnostics instead of hiding the real runtime failure behind a generic message. Installation remains fail-closed: the selected tunnel must be active, DNSTT service and UDP/53 listener must be healthy, and TCP from the Iran node to the selected Exit tunnel IP and port must actually connect before the relay is considered online. Auth, Payment, Quota, VPN protocol provisioning, and healthy tunnel-core behavior are unchanged by this hotfix."
+    "fa": "TwinPanel 1.1.0-rc.209 هسته جدید TP6 Fast را به‌عنوان یک Carrier پرسرعت مبتنی بر IPv6 اضافه می‌کند. IPv6 فقط لایه بیرونی مسیر است و دیتاپلین داخلی TwinPanel روی یک شبکه خصوصی IPv4 /30 مستقل باقی می‌ماند تا پروتکل‌ها و مسیرهای فعلی بدون بازنویسی کار کنند. TP6 دو پروفایل کاملاً Kernel-Space دارد: IP6GRE کلیددار به‌عنوان مسیر اول و IPIP6 به‌عنوان fallback. آدرس IPv6 عمومی هر نود از Route واقعی همان سرور به‌صورت خودکار تشخیص داده می‌شود و برای این قابلیت Migration دیتابیس یا دانلود Binary در زمان اجرا وجود ندارد. نصب Fail-Closed است: Global IPv6 و Route به Peer باید معتبر باشند و Candidate فقط پس از عبور از Full-L3 qualification موجود TwinPanel شامل Ping دوطرفه، TCP egress و UDP egress Online می‌شود. TP6 برای اولین Qualification تولیدی Explicit-Install Only است؛ tp27_fast همچنان تنها Auto-Install باقی می‌ماند و نصب TP6 هیچ تغییری در active_transport یا preferred_transport ایجاد نمی‌کند. سازگاری واقعی IPv6 دیتاسنترها، نصب روی Pair واقعی و Benchmark سرعت هنوز بخشی از Production Acceptance پس از انتشار این Release است و در این مرحله ادعای عملکرد روی همه Providerها وجود ندارد.",
+    "en": "TwinPanel 1.1.0-rc.209 adds TP6 Fast, a new high-speed IPv6-native outer carrier. IPv6 is used only for the outer path while TwinPanel keeps an isolated private IPv4 /30 as the inner L3 dataplane so existing protocols and routing contracts do not require a rewrite. TP6 uses two kernel-space profiles: keyed IP6GRE first and IPIP6 as fallback. Each node's global IPv6 address is discovered automatically from its real route, with no Node database migration and no runtime binary download. Installation is fail-closed: global IPv6 and a peer route must be valid, and the candidate is marked online only after TwinPanel's existing full-L3 qualification passes bidirectional peer ping, TCP egress, and UDP egress. TP6 is explicit-install only for its first production qualification; tp27_fast remains the only automatic installer and installing TP6 does not change active_transport or preferred_transport. Real provider IPv6 compatibility, installation on a real pair, and throughput benchmarking remain production-acceptance steps after publication; this release does not claim support on every provider before those checks pass."
   }
 }
