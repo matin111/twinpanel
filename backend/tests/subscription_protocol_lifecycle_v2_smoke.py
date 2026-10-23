@@ -53,6 +53,21 @@ assert 'reason="protocol_reenabled_v2"' in lifecycle_text
 assert "restore_candidates" in lifecycle_text
 assert "sync_subscription_quota_nodes" in lifecycle_text
 
+# Protocol-only edits must not silently convert an unlimited subscription into
+# a finite one. Missing/blank traffic_gb preserves the current limit, explicit
+# zero remains the canonical unlimited value, and only negative values fail.
+for marker in (
+    "def _resolve_traffic_limit_bytes(",
+    '"traffic_gb" not in payload',
+    'payload.get("traffic_gb") in (None, "")',
+    "if traffic_gb < 0:",
+    "if traffic_gb == 0:",
+    "return 0",
+    "new_limit = _resolve_traffic_limit_bytes(sub, payload)",
+):
+    assert marker in lifecycle_text, marker
+assert "if traffic_gb <= 0:" not in lifecycle_text
+
 # Revoke must be queued while the old credential is still active. Otherwise
 # enforcement's provisioned-protocol resolver would drop the command.
 revoke_pos = lifecycle_text.index('reason="protocol_removed_v2"')
@@ -122,3 +137,4 @@ for path, text in (
 print("SUBSCRIPTION_PROTOCOL_LIFECYCLE_V2_SMOKE=PASS")
 print("PROTOCOLS=" + ",".join(all_protocols))
 print("ENFORCEMENT=controller-owned-all-15")
+print("TRAFFIC_EDIT=preserve-or-unlimited-safe")
