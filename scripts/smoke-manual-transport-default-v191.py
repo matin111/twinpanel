@@ -14,7 +14,10 @@ checks = {
     "auto_manager_respects_manual": 'if _name(tunnel.mode or "manual") != "auto":' in auto,
     "ui_declares_manual_default": 'Production default")}</span><b dir="ltr">manual</b>' in ui,
     "ui_auto_is_explicit_opt_in": 'Enable optional Smart Auto' in ui,
-    "ui_auto_confirmation": 'Smart Auto is optional and may switch the active path' in ui,
+    "ui_auto_confirmation": (
+        "window.confirm" in ui
+        and "Smart Auto will select only between qualified TP27 Fast and Spoof Tunnel paths." in ui
+    ),
 }
 
 failed = [name for name, ok in checks.items() if not ok]
@@ -24,4 +27,4 @@ for name, ok in checks.items():
 if failed:
     raise SystemExit("FAILED: " + ", ".join(failed))
 
-print("MANUAL_TRANSPORT_DEFAULT_V191=OK")
+print("MANUAL_TRANSPORT_DEFAULT_V191_V202=OK")

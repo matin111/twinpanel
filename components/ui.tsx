@@ -22,6 +22,8 @@ const menuGroups=[
     ["مسیرهای هوشمند","Smart Transports","/admin/tunnel-transports","⇄"],
     ["افزودن سرور","Add Server","/admin/provision","⚡"],
     ["پروتکل‌ها","Protocols","/admin/modern-protocols","◫"],
+    ["DNS اضطراری","DNS Emergency","/admin/dns-emergency","◉"],
+    ["DNS اضطراری ایران","DNS Emergency Iran","/admin/dns-emergency-iran","◎"],
     ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"]
   ]},
   {fa:"فروش و مالی",en:"Sales & Finance",items:[

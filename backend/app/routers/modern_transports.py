@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
 import time
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -21,6 +24,8 @@ from ..transport_candidates import (
     runtime,
     uninstall_transport,
 )
+from ..transport_candidates import spoof_wg
+from ..transport_candidates.common import close_pair, connect_pair, tunnel_nodes
 
 router = APIRouter(
     prefix="/v1/tunnels",
@@ -37,13 +42,24 @@ _PROFILE = {
             "fallback with fail-closed health and throughput qualification."
         ),
     },
-    # Legacy migration-only descriptions are retained for API compatibility if
-    # an old row is inspected directly. They are not returned by catalog().
+    "spoof_wg": {
+        "iran_profile": "mutual-ip-spoof + wireguard-l3",
+        "description": (
+            "Spoof Tunnel v3.1 core carries a private WireGuard /30. "
+            "Mutual spoof source addresses must be configured explicitly and "
+            "the path is accepted only after TwinPanel full-L3 qualification."
+        ),
+    },
     "kernel_gre": {
         "iran_profile": "direct-gre-retired",
         "description": "Retired migration fallback; removed after TP27 Fast promotion.",
     },
 }
+
+
+class SpoofWGConfiguration(BaseModel):
+    iran_spoof_ip: str
+    exit_spoof_ip: str
 
 
 def _status(value: object) -> str:
@@ -96,6 +112,20 @@ def _candidate_view(
         and stable_seconds >= float(CANDIDATE_STABLE_SECONDS)
     )
 
+    extra: dict = {}
+    if name == "spoof_wg":
+        configuration = spoof_wg.configuration_for_view(
+            row.config_text if row is not None else None
+        )
+        extra = {
+            "configuration": configuration,
+            "configured": bool(configuration.get("configured")),
+            "configuration_required": not bool(configuration.get("configured")),
+            "auto_install": False,
+            "xdp": False,
+            "upstream_version": spoof_wg.UPSTREAM_VERSION,
+        }
+
     return {
         "runtime": runtime(name, tunnel_id),
         "enabled": bool(row.enabled) if row else False,
@@ -122,8 +152,127 @@ def _candidate_view(
             if benchmark_age is not None
             else None
         ),
+        **extra,
         **_PROFILE.get(name, {}),
     }
+
+
+def _compatibility_script(peer_ip: str) -> str:
+    return f"""python3 - <<'PY'
+import json
+import os
+import shutil
+import socket
+import subprocess
+
+peer_ip = {peer_ip!r}
+
+
+def run(command):
+    try:
+        proc = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=8,
+            check=False,
+        )
+        return proc.returncode, (proc.stdout or "").strip(), (proc.stderr or "").strip()
+    except Exception as exc:
+        return 99, "", f"{{type(exc).__name__}}:{{exc}}"
+
+
+raw_socket = False
+raw_socket_error = ""
+try:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
+    sock.close()
+    raw_socket = True
+except Exception as exc:
+    raw_socket_error = f"{{type(exc).__name__}}:{{exc}}"
+
+route_rc, route_out, route_err = run(["ip", "-4", "route", "get", peer_ip])
+ping_rc, ping_out, ping_err = run(["ping", "-c", "2", "-W", "2", peer_ip])
+
+wg_tools = shutil.which("wg") is not None
+tun_device = os.path.exists("/dev/net/tun")
+wireguard_kernel = os.path.exists("/sys/module/wireguard")
+if not wireguard_kernel and shutil.which("modprobe"):
+    mod_rc, _, _ = run(["modprobe", "-n", "wireguard"])
+    wireguard_kernel = mod_rc == 0
+
+rp_filter_all = ""
+try:
+    rp_filter_all = open("/proc/sys/net/ipv4/conf/all/rp_filter", "r", encoding="utf-8").read().strip()
+except Exception:
+    pass
+
+ip_forward = ""
+try:
+    ip_forward = open("/proc/sys/net/ipv4/ip_forward", "r", encoding="utf-8").read().strip()
+except Exception:
+    pass
+
+input_policy = ""
+if shutil.which("iptables"):
+    _, out, _ = run(["iptables", "-S", "INPUT"])
+    input_policy = (out.splitlines() or [""])[0]
+
+payload = {{
+    "raw_socket": raw_socket,
+    "raw_socket_error": raw_socket_error,
+    "tun_device": tun_device,
+    "wg_tools": wg_tools,
+    "wireguard_kernel": wireguard_kernel,
+    "route_to_peer": route_rc == 0,
+    "route_detail": route_out or route_err,
+    "ping_peer": ping_rc == 0,
+    "ping_detail": ping_out or ping_err,
+    "rp_filter_all": rp_filter_all,
+    "ip_forward": ip_forward,
+    "input_policy": input_policy,
+}}
+
+print(json.dumps(payload, ensure_ascii=False))
+PY"""
+
+
+async def _node_compatibility(conn, peer_ip: str) -> dict:
+    result = await conn.run(
+        _compatibility_script(peer_ip),
+        check=False,
+        timeout=20,
+    )
+    if result.exit_status != 0:
+        detail = ((result.stdout or "") + "\n" + (result.stderr or "")).strip()
+        raise RuntimeError(f"compatibility_probe_failed:{detail[-2500:]}")
+
+    lines = [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
+    if not lines:
+        raise RuntimeError("compatibility_probe_empty")
+
+    try:
+        payload = json.loads(lines[-1])
+    except Exception as exc:
+        raise RuntimeError(
+            f"compatibility_probe_invalid_json:{lines[-1][-1200:]}"
+        ) from exc
+
+    if not isinstance(payload, dict):
+        raise RuntimeError("compatibility_probe_invalid_payload")
+
+    critical = {
+        "raw_socket": bool(payload.get("raw_socket")),
+        "tun_device": bool(payload.get("tun_device")),
+        "wg_tools": bool(payload.get("wg_tools")),
+        "wireguard_kernel": bool(payload.get("wireguard_kernel")),
+        "route_to_peer": bool(payload.get("route_to_peer")),
+    }
+
+    payload["critical"] = critical
+    payload["compatible"] = all(critical.values())
+    return payload
 
 
 @router.get("/transport-catalog")
@@ -188,6 +337,183 @@ def list_modern_transports(
         "production_default": "manual",
         "promotion_policy": "health_then_speed",
         "transports": output,
+    }
+
+
+@router.put("/{tunnel_id}/modern-transports/spoof_wg/config")
+def configure_spoof_wg(
+    tunnel_id: int,
+    payload: SpoofWGConfiguration,
+    db: Session = Depends(get_db),
+):
+    tunnel = db.get(Tunnel, tunnel_id)
+    if tunnel is None:
+        raise HTTPException(status_code=404, detail="Tunnel not found")
+
+    try:
+        configuration = spoof_wg.validate_configuration(payload.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    row = (
+        db.query(TunnelTransport)
+        .filter(
+            TunnelTransport.tunnel_id == tunnel_id,
+            TunnelTransport.transport == "spoof_wg",
+        )
+        .first()
+    )
+
+    if row is not None and _status(row.status) == "installing":
+        raise HTTPException(
+            status_code=409,
+            detail="Spoof Tunnel installation is currently running",
+        )
+    if row is not None and bool(row.enabled) and _status(row.status) == "online":
+        raise HTTPException(
+            status_code=409,
+            detail="Remove the online Spoof Tunnel before changing its spoof addresses",
+        )
+
+    if row is None:
+        row = TunnelTransport(
+            tunnel_id=tunnel_id,
+            transport="spoof_wg",
+            priority=int(ACTIVE_SPECS["spoof_wg"]["priority"]),
+            enabled=False,
+            status="not_installed",
+        )
+        db.add(row)
+        db.flush()
+
+    row.priority = int(ACTIVE_SPECS["spoof_wg"]["priority"])
+    row.enabled = False
+    row.status = "not_installed"
+    row.latency_ms = None
+    row.last_error = None
+    row.config_text = spoof_wg.merge_configuration(
+        row.config_text,
+        configuration,
+    )
+    row.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(row)
+
+    return {
+        "ok": True,
+        "tunnel_id": tunnel_id,
+        "transport": "spoof_wg",
+        "configuration": spoof_wg.configuration_for_view(row.config_text),
+        "next": "install",
+    }
+
+
+@router.post("/{tunnel_id}/modern-transports/spoof_wg/compatibility-check")
+async def check_spoof_wg_compatibility(
+    tunnel_id: int,
+    db: Session = Depends(get_db),
+):
+    tunnel = db.get(Tunnel, tunnel_id)
+    if tunnel is None:
+        raise HTTPException(status_code=404, detail="Tunnel not found")
+
+    try:
+        _, iran, exit_node = tunnel_nodes(db, tunnel_id)
+        _, core_sha256 = spoof_wg._artifact()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Spoof compatibility prerequisites are incomplete",
+                "error": str(exc)[:1200],
+            },
+        ) from exc
+
+    row = (
+        db.query(TunnelTransport)
+        .filter(
+            TunnelTransport.tunnel_id == tunnel_id,
+            TunnelTransport.transport == "spoof_wg",
+        )
+        .first()
+    )
+    configured = bool(
+        row is not None
+        and spoof_wg.configuration_from_text(row.config_text) is not None
+    )
+
+    ci = ce = None
+    try:
+        ci, ce = await connect_pair(iran, exit_node, db)
+        import asyncio
+        iran_result, exit_result = await asyncio.gather(
+            _node_compatibility(ci, str(exit_node.public_ip)),
+            _node_compatibility(ce, str(iran.public_ip)),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "Server compatibility check failed",
+                "error": str(exc)[:2500],
+            },
+        ) from exc
+    finally:
+        await close_pair(
+            *[
+                connection
+                for connection in (ci, ce)
+                if connection is not None
+            ]
+        )
+
+    compatible = bool(
+        iran_result.get("compatible")
+        and exit_result.get("compatible")
+    )
+
+    blockers: list[str] = []
+    for role, payload in (("iran", iran_result), ("exit", exit_result)):
+        critical = payload.get("critical") or {}
+        for key, passed in critical.items():
+            if not passed:
+                blockers.append(f"{role}:{key}")
+
+    return {
+        "ok": True,
+        "tunnel_id": int(tunnel.id),
+        "transport": "spoof_wg",
+        "mode": tunnel.mode,
+        "active_transport": tunnel.active_transport,
+        "preferred_transport": tunnel.preferred_transport,
+        "production_path_unchanged": True,
+        "core": {
+            "ok": True,
+            "version": spoof_wg.UPSTREAM_VERSION,
+            "sha256": core_sha256,
+        },
+        "iran": {
+            "node_id": int(iran.id),
+            "name": iran.name,
+            "public_ip": iran.public_ip,
+            **iran_result,
+        },
+        "exit": {
+            "node_id": int(exit_node.id),
+            "name": exit_node.name,
+            "public_ip": exit_node.public_ip,
+            **exit_result,
+        },
+        "compatible": compatible,
+        "configured": configured,
+        "ready_for_install": bool(compatible and configured),
+        "blockers": blockers,
+        "source_spoofing_verified": False,
+        "limitation": (
+            "This non-destructive check validates host/network prerequisites only. "
+            "It does not forge source addresses and does not prove that the provider "
+            "permits arbitrary source-IP spoofing."
+        ),
     }
 
 
@@ -271,6 +597,29 @@ async def install_modern_transport(
     name = str(transport or "").strip().lower()
     if name not in ACTIVE_SPECS:
         raise HTTPException(status_code=404, detail="Unknown or retired modern transport")
+
+    tunnel = db.get(Tunnel, tunnel_id)
+    if tunnel is None:
+        raise HTTPException(status_code=404, detail="Tunnel not found")
+
+    if name == "spoof_wg":
+        row = (
+            db.query(TunnelTransport)
+            .filter(
+                TunnelTransport.tunnel_id == tunnel_id,
+                TunnelTransport.transport == name,
+            )
+            .first()
+        )
+        if row is None or spoof_wg.configuration_from_text(row.config_text) is None:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "Spoof Tunnel requires Iran and Exit spoof IPv4 addresses before install",
+                    "transport": name,
+                    "configuration_required": True,
+                },
+            )
 
     try:
         return await install_transport(name, tunnel_id, db)

@@ -1,0 +1,108 @@
+name: Spoof WG V202 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/transport_candidates/spoof_wg.py"
+      - "backend/app/transport_candidates/__init__.py"
+      - "backend/app/spoof_candidate_policy_v202.py"
+      - "backend/app/routers/modern_transports.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/tests/test_spoof_wg_v202.py"
+      - "lib/modern-transport-api.ts"
+      - "components/smart-transports-runtime-v25.tsx"
+      - "third_party/spoof-tunnel/**"
+      - ".github/workflows/publish-prebuilt-release.yml"
+      - ".github/workflows/spoof-wg-v202.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/transport_candidates/spoof_wg.py"
+      - "backend/app/transport_candidates/__init__.py"
+      - "backend/app/spoof_candidate_policy_v202.py"
+      - "backend/app/routers/modern_transports.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/tests/test_spoof_wg_v202.py"
+      - "lib/modern-transport-api.ts"
+      - "components/smart-transports-runtime-v25.tsx"
+      - "third_party/spoof-tunnel/**"
+      - ".github/workflows/publish-prebuilt-release.yml"
+      - ".github/workflows/spoof-wg-v202.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile V202 backend surface
+        run: |
+          python -m py_compile \
+            backend/app/transport_candidates/spoof_wg.py \
+            backend/app/transport_candidates/__init__.py \
+            backend/app/spoof_candidate_policy_v202.py \
+            backend/app/routers/modern_transports.py \
+            backend/app/tunnel_transport_manager_v12.py \
+            backend/tests/test_spoof_wg_v202.py
+
+      - name: Run source-contract regression
+        run: |
+          python - <<'PY'
+          import runpy
+          ns = runpy.run_path("backend/tests/test_spoof_wg_v202.py")
+          tests = sorted(
+              (name, value)
+              for name, value in ns.items()
+              if name.startswith("test_") and callable(value)
+          )
+          if not tests:
+              raise SystemExit("no spoof v202 tests discovered")
+          for name, test in tests:
+              test()
+              print(f"PASS {name}")
+          print(f"SPOOF_WG_V202_SOURCE_CONTRACT_OK tests={len(tests)}")
+          PY
+
+      - name: Verify pinned upstream Spoof Tunnel artifact
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          VERSION='v3.1.0-beta.0'
+          EXPECTED='4ba5597568607e864fb6d5ba4f13bac91a50456da5696d99463d6375ce2a3697'
+          URL="https://github.com/ParsaKSH/spoof-tunnel/releases/download/${VERSION}/spoof-linux-amd64"
+          curl --fail --location --silent --show-error \
+            --retry 3 --retry-delay 2 \
+            "$URL" -o /tmp/spoof-linux-amd64
+          ACTUAL="$(sha256sum /tmp/spoof-linux-amd64 | awk '{print $1}')"
+          test "$ACTUAL" = "$EXPECTED"
+          chmod 0755 /tmp/spoof-linux-amd64
+          /tmp/spoof-linux-amd64 --help >/tmp/spoof-help.txt 2>&1 || true
+          grep -q 'local' /tmp/spoof-help.txt
+          grep -q 'remote' /tmp/spoof-help.txt
+          grep -q 'tester' /tmp/spoof-help.txt
+          echo "SPOOF_UPSTREAM_ARTIFACT_OK sha256=$ACTUAL"
+
+      - name: Verify retirement safety contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          policy = Path("backend/app/spoof_candidate_policy_v202.py").read_text()
+          manager = Path("backend/app/tunnel_transport_manager_v12.py").read_text()
+          registry = Path("backend/app/transport_candidates/__init__.py").read_text()
+
+          assert 'smart.AUTO_INSTALL_NAMES = ("tp27_fast",)' in policy
+          assert 'smart.ALL_AUTO_NAMES = ACTIVE' in policy
+          assert manager.index('apply_stale_candidate_install_recovery_v200()') < manager.index('apply_spoof_candidate_policy_v202()')
+          assert '"tp27_fast": tp27_fast.install' in registry
+          assert '"spoof_wg": spoof_wg.install' in registry
+          assert '"tp27_masque": tp27_masque.install' not in registry.split('INSTALLERS = {',1)[1].split('}',1)[0]
+          assert '"tp27_tcp_direct": tp27_tcp_direct.install' not in registry.split('INSTALLERS = {',1)[1].split('}',1)[0]
+          print('SPOOF_WG_V202_RETIREMENT_SAFETY_OK')
+          PY

@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.201",
+  "version": "1.1.0-rc.208",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-22T19:38:49Z",
+  "released_at": "2026-10-23T00:51:50Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7a22d3c1203bcacdbbb26d3b8c65a89baf7a1a10",
+  "source_sha": "efcfa198e0dce008b5c00e3e8d38a6680cd157c3",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.201/twinpanel-1.1.0-rc.201-linux-x86_64.tar.gz",
-    "sha256": "2890be4d161340ddfb20393b373aeeaf39650ef83b9200000b0176e78fe17261",
-    "size_bytes": 18213437
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.208/twinpanel-1.1.0-rc.208-linux-x86_64.tar.gz",
+    "sha256": "258fcf0b29f4bf4a05f27718e931011b9bda59b5aeb67373b682e2c5f58fb42e",
+    "size_bytes": 23746729
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.201 اصلاح ترتیب Runtime برای Recovery نصب Candidateهای گیرکرده را منتشر می‌کند. در rc.200 خود V200 Load می‌شد و Marker ACTIVE چاپ می‌کرد، اما بعد از آن V155 همان smart._install_candidate_name را دوباره با selector خودش جایگزین می‌کرد؛ در نتیجه V200 عملاً از مسیر اجرا خارج می‌شد و Rowهای قدیمی در وضعیت installing بازیابی نمی‌شدند. در rc.201، V175 و سپس V155 و Guard V198 ابتدا Apply می‌شوند و V200 در پایان به‌عنوان final install-selector wrapper نصب می‌شود؛ بنابراین نصب‌های installing متعلق به Release قبلی می‌توانند فوراً به installer رسمی موجود برگردند، در حالی که selector نهایی V155 برای تمام Candidateهای غیر-stale به‌عنوان fallback حفظ می‌شود. منطق V198 برای اعمال rp_filter=2 روی TUN ایران و خارج قبل از peer-L3 qualification بدون تغییر باقی مانده است. هیچ Reset مستقیم DB، تغییر Route/NAT/Firewall، حذف Transport، تغییر TP27 Fast، Manual authority، Auth، Payment، Quota، Provisioning یا VPN در این نسخه انجام نشده است. پذیرش نهایی منوط به نصب رسمی روی 217.179.6.142 و مشاهده واقعی [StaleCandidateInstallV200] RECOVER و سپس نتیجه installer و peer-L3/dataplane است.",
-    "en": "TwinPanel 1.1.0-rc.201 publishes the runtime ordering fix for stale candidate-install recovery. In rc.200 V200 loaded and printed its ACTIVE marker, but V155 was applied afterwards and replaced the same smart._install_candidate_name selector, shadowing V200 from the runtime path so old installing rows were never recovered. In rc.201, V175, V155 and the V198 Direct TCP guard are applied first, then V200 is installed last as the final install-selector wrapper. Previous-release stale installing rows can therefore re-enter the existing official installer immediately, while V155's final selector remains the fallback authority for every non-stale candidate. V198 remains unchanged and still applies rp_filter=2 on both Iran and Exit Direct TCP TUNs before peer-L3 qualification. This release performs no direct DB reset, Route/NAT/Firewall change, transport removal, TP27 Fast change, Manual authority change, Auth, Payment, Quota, Provisioning or VPN change. Final acceptance still requires official installation on 217.179.6.142, an observed [StaleCandidateInstallV200] RECOVER event, and the resulting installer plus peer-L3/dataplane outcome."
+    "fa": "TwinPanel 1.1.0-rc.208 یک Hotfix تولیدی برای DNS اضطراری ایران است. Root Cause روی نود واقعی ایران 193.39.9.222 تأیید شد: Iran Relay برای Tunnel #6 به‌صورت مستقل آدرس قدیمی 10.64.0.26 را می‌ساخت، درحالی‌که مسیر L3 فعال واقعی روی tp276 برابر 10.253.0.25/30 و Peer خارج 10.253.0.26 بود؛ در نتیجه 10.64.0.26 از Gateway عمومی ens3 Route می‌شد و TCP Upstream Timeout می‌داد. در rc.208 آدرس Iran/Exit از SSOT همان Active L3 Runtime تونل گرفته و /30 به Host IP واقعی Normalize می‌شود. نصب DNSTT دیگر روی نود ایران به دانلود Go، GitHub یا build سورس وابسته نیست: باینری‌های pinned برای amd64 و arm64 داخل Release ساخته می‌شوند، SHA-256 آن‌ها بررسی می‌شود و از طریق SSH/SFTP با فایل موقت و atomic rename روی نود Stage می‌شوند. UI نیز detail.error واقعی Backend را نمایش می‌دهد تا خطای Runtime پشت پیام عمومی مخفی نشود. نصب همچنان Fail-Closed است و فقط زمانی Online می‌شود که Tunnel انتخاب‌شده فعال باشد، سرویس DNSTT و Listener UDP/53 بالا باشند و TCP از Iran Node به Exit Tunnel IP و پورت انتخابی واقعاً برقرار شود. Auth، Payment، Quota، VPN protocol provisioning و هسته سالم Tunnel در این Hotfix تغییر نکرده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.208 is a production hotfix for DNS Emergency Iran Relay. The root cause was confirmed on the real Iran node 193.39.9.222: for Tunnel #6 the relay independently reconstructed the legacy 10.64.0.26 address while the actual active L3 runtime was tp276 with 10.253.0.25/30 and Exit peer 10.253.0.26. The legacy target therefore routed through the public ens3 gateway and the TCP upstream probe timed out. rc.208 resolves Iran/Exit addresses from the tunnel core's active-L3 runtime SSOT and normalizes /30 interface values to the actual host IPs. DNSTT installation on the Iran node no longer downloads Go, GitHub source, or builds code at runtime: pinned amd64 and arm64 binaries are built into the release, SHA-256 verified, then staged over authenticated SSH/SFTP using a temporary file and atomic rename. The admin UI now surfaces backend detail.error diagnostics instead of hiding the real runtime failure behind a generic message. Installation remains fail-closed: the selected tunnel must be active, DNSTT service and UDP/53 listener must be healthy, and TCP from the Iran node to the selected Exit tunnel IP and port must actually connect before the relay is considered online. Auth, Payment, Quota, VPN protocol provisioning, and healthy tunnel-core behavior are unchanged by this hotfix."
   }
 }
