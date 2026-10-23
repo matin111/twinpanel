@@ -94,11 +94,14 @@ for marker in (
 assert "wg pubkey" in enforcement_text
 assert "wg genkey" not in enforcement_text
 
-# Runtime and import-time queue hook both point at account_enforcement_v2.
+# External V1 symbols remain stable for older smoke/tests, but both imports come
+# from the V2 all-account service and therefore execute the 15-protocol worker.
 assert "services.account_enforcement_v2" in routers_init_text
-assert "install_account_enforcement_hooks()" in routers_init_text
+assert "install_modern_enforcement_hooks()" in routers_init_text
 assert "services.account_enforcement_v2" in runtime_text
-assert "account_enforcement_loop()" in runtime_text
+assert "modern_enforcement_loop()" in runtime_text
+assert "install_modern_enforcement_hooks = install_account_enforcement_hooks" in enforcement_text
+assert "modern_enforcement_loop = account_enforcement_loop" in enforcement_text
 
 # Route precedence is intentional: runtime_endpoints is mounted before the
 # legacy account_delivery router, and lifecycle V2 is included on it.
