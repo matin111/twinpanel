@@ -96,5 +96,9 @@ jobs:
           NEXT_PUBLIC_API_BASE: ''
         run: |
           set -Eeuo pipefail
-          npm ci --include=optional --no-audit --no-fund
+          if [[ -f package-lock.json ]]; then
+            npm ci --include=optional --no-audit --no-fund
+          else
+            npm install --include=optional --no-audit --no-fund
+          fi
           npm run build
