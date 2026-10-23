@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.209",
+  "version": "1.1.0-rc.210",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-23T01:08:24Z",
+  "released_at": "2026-10-23T10:06:08Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "563dab38524b287b257a5371c1b896d11bdaccad",
+  "source_sha": "eb0a4f17b97490a314bf71fd282fc89a6c36c3e0",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.209/twinpanel-1.1.0-rc.209-linux-x86_64.tar.gz",
-    "sha256": "e9ba2d265e55b563321919e77effd048c0ebe2823d5f091242caa3d1c5d66b88",
-    "size_bytes": 23748829
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.210/twinpanel-1.1.0-rc.210-linux-x86_64.tar.gz",
+    "sha256": "788ce94c994d6127c2fb2f89c0e59388878b354204dd940f950c586ed91c124a",
+    "size_bytes": 23779710
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.209 هسته جدید TP6 Fast را به‌عنوان یک Carrier پرسرعت مبتنی بر IPv6 اضافه می‌کند. IPv6 فقط لایه بیرونی مسیر است و دیتاپلین داخلی TwinPanel روی یک شبکه خصوصی IPv4 /30 مستقل باقی می‌ماند تا پروتکل‌ها و مسیرهای فعلی بدون بازنویسی کار کنند. TP6 دو پروفایل کاملاً Kernel-Space دارد: IP6GRE کلیددار به‌عنوان مسیر اول و IPIP6 به‌عنوان fallback. آدرس IPv6 عمومی هر نود از Route واقعی همان سرور به‌صورت خودکار تشخیص داده می‌شود و برای این قابلیت Migration دیتابیس یا دانلود Binary در زمان اجرا وجود ندارد. نصب Fail-Closed است: Global IPv6 و Route به Peer باید معتبر باشند و Candidate فقط پس از عبور از Full-L3 qualification موجود TwinPanel شامل Ping دوطرفه، TCP egress و UDP egress Online می‌شود. TP6 برای اولین Qualification تولیدی Explicit-Install Only است؛ tp27_fast همچنان تنها Auto-Install باقی می‌ماند و نصب TP6 هیچ تغییری در active_transport یا preferred_transport ایجاد نمی‌کند. سازگاری واقعی IPv6 دیتاسنترها، نصب روی Pair واقعی و Benchmark سرعت هنوز بخشی از Production Acceptance پس از انتشار این Release است و در این مرحله ادعای عملکرد روی همه Providerها وجود ندارد.",
-    "en": "TwinPanel 1.1.0-rc.209 adds TP6 Fast, a new high-speed IPv6-native outer carrier. IPv6 is used only for the outer path while TwinPanel keeps an isolated private IPv4 /30 as the inner L3 dataplane so existing protocols and routing contracts do not require a rewrite. TP6 uses two kernel-space profiles: keyed IP6GRE first and IPIP6 as fallback. Each node's global IPv6 address is discovered automatically from its real route, with no Node database migration and no runtime binary download. Installation is fail-closed: global IPv6 and a peer route must be valid, and the candidate is marked online only after TwinPanel's existing full-L3 qualification passes bidirectional peer ping, TCP egress, and UDP egress. TP6 is explicit-install only for its first production qualification; tp27_fast remains the only automatic installer and installing TP6 does not change active_transport or preferred_transport. Real provider IPv6 compatibility, installation on a real pair, and throughput benchmarking remain production-acceptance steps after publication; this release does not claim support on every provider before those checks pass."
+    "fa": "TwinPanel 1.1.0-rc.210 چرخه عمر حساب را برای هر ۱۵ پروتکل Canonical یکپارچه می‌کند. مسیر ویرایش اشتراک اکنون به‌جای محدود شدن به ۵ پروتکل Classic، از Registry مشترک ۵ Classic + ۱۰ Modern استفاده می‌کند و SubscriptionProtocol را به‌عنوان Desired State نهایی هر اشتراک نگه می‌دارد؛ Plan فقط Allowance/Default است. خاموش‌کردن پروتکل ابتدا همان Credential فعال را برای Revoke صف می‌کند و سپس آن را از Delivery و Quota خارج می‌کند. روشن‌کردن مجدد Credential موجود، همان Identity قبلی را Restore می‌کند و برای WireGuard/OpenVPN/Xray/Cisco/L2TP یا Modern secretها کلید، UUID، username یا secret جدید تولید نمی‌شود. Enforcement برای Classic و Modern به مسیر Controller-owned durable worker منتقل شده تا revoke/restore واقعاً روی Runtime اجرا شود و به Agent ناقص وابسته نباشد. Backward compatibility مربوط به Modern Lifecycle V1 حفظ شده و CI کامل شامل API Build، Lifecycle V1/V2، Protocol Catalog و Preview Validation سبز شده است. این Release هنوز قبل از ادعای Production-Ready به Acceptance روی سرور واقعی نیاز دارد: ON باید Runtime + Delivery + Quota را نشان دهد و OFF باید همان Identity را Revoke کرده و از Delivery حذف کند.",
+    "en": "TwinPanel 1.1.0-rc.210 completes a unified account lifecycle for all 15 canonical protocols. Subscription admin editing now uses the shared 5 Classic + 10 Modern registry instead of the legacy five-protocol field map, with SubscriptionProtocol remaining the final per-subscription desired state while Plan acts only as allowance/default. Turning a protocol OFF queues revoke against the still-active credential before removing it from delivery and quota eligibility. Re-enabling an existing credential restores the exact stored identity without rotating WireGuard/OpenVPN keys, Xray UUIDs, Cisco/L2TP usernames, or Modern secrets. Classic and Modern enforcement now use a durable controller-owned worker so revoke/restore is executed against runtime instead of depending on the incomplete legacy Agent command path. Modern Lifecycle V1 compatibility is preserved and the full CI set, including API Build, Lifecycle V1/V2, Protocol Catalog and Preview Validation, passed. Real-server acceptance is still required before claiming Production-Ready: ON must converge to Runtime + Delivery + Quota, while OFF must revoke the same identity and remove it from Delivery."
   }
 }
