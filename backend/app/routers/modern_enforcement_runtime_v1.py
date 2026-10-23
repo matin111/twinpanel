@@ -5,17 +5,20 @@ from contextlib import asynccontextmanager
 
 from fastapi import APIRouter
 
+# Compatibility names are intentionally imported from the V2 all-account
+# worker. Existing V1 contracts keep their stable symbols while execution now
+# covers Classic + Modern account lifecycle.
 from ..services.account_enforcement_v2 import (
-    account_enforcement_loop,
-    install_account_enforcement_hooks,
+    install_modern_enforcement_hooks,
+    modern_enforcement_loop,
 )
 
 
 @asynccontextmanager
 async def _lifespan(_app):
-    install_account_enforcement_hooks()
+    install_modern_enforcement_hooks()
     task = asyncio.create_task(
-        account_enforcement_loop(),
+        modern_enforcement_loop(),
         name="account-enforcement-v2",
     )
     try:
@@ -29,7 +32,6 @@ async def _lifespan(_app):
 
 
 # An included APIRouter lifespan is merged into FastAPI's application lifespan.
-# Keep the durable all-account worker here instead of widening app.main's startup
-# surface. The filename is retained for backward compatibility; runtime now owns
-# Classic + Modern revoke/restore for all 15 canonical account protocols.
+# The filename and V1 symbol names remain compatible; both aliases are provided
+# by account_enforcement_v2 and execute the all-15 durable controller worker.
 router = APIRouter(lifespan=_lifespan)
