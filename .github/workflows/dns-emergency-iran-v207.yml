@@ -1,8 +1,9 @@
-name: TwinPanel DNS Emergency Iran V207
+name: TwinPanel DNS Emergency Iran V208
 
 on:
   pull_request:
     paths:
+      - "backend/app/dnstt_artifact.py"
       - "backend/app/dns_emergency_iran_models.py"
       - "backend/app/routers/dns_emergency_iran.py"
       - "backend/app/routers/__init__.py"
@@ -11,9 +12,11 @@ on:
       - "components/ui.tsx"
       - "app/admin/dns-emergency-iran/page.tsx"
       - ".github/workflows/dns-emergency-iran-v207.yml"
+      - ".github/workflows/publish-prebuilt-release.yml"
   push:
     branches: [main]
     paths:
+      - "backend/app/dnstt_artifact.py"
       - "backend/app/dns_emergency_iran_models.py"
       - "backend/app/routers/dns_emergency_iran.py"
       - "backend/app/routers/__init__.py"
@@ -22,6 +25,7 @@ on:
       - "components/ui.tsx"
       - "app/admin/dns-emergency-iran/page.tsx"
       - ".github/workflows/dns-emergency-iran-v207.yml"
+      - ".github/workflows/publish-prebuilt-release.yml"
 
 permissions:
   contents: read
@@ -62,7 +66,7 @@ jobs:
           go-version: "1.23.12"
           cache: false
 
-      - name: Build pinned DNSTT source
+      - name: Build pinned DNSTT source for supported node architectures
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -75,5 +79,9 @@ jobs:
           git -C "$work" checkout -q --detach FETCH_HEAD
           test "$(git -C "$work" rev-parse HEAD)" = "$DNSTT_COMMIT"
           cd "$work"
-          CGO_ENABLED=0 GOTOOLCHAIN=local go build -trimpath -ldflags='-s -w' -o /tmp/dnstt-server ./dnstt-server
-          test -x /tmp/dnstt-server
+          for arch in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH="$arch" GOTOOLCHAIN=local \
+              go build -trimpath -ldflags='-s -w' \
+              -o "/tmp/dnstt-server-linux-${arch}" ./dnstt-server
+            test -x "/tmp/dnstt-server-linux-${arch}"
+          done
