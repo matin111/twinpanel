@@ -1,7 +1,9 @@
 from types import SimpleNamespace
 
+from app.dnstt_artifact import ARTIFACT_NAMES, _normalize_arch
 from app.dns_emergency_iran_models import DnsEmergencyIranSetting
-from app.routers.dns_emergency import DNSTT_COMMIT, DNSTT_REPOSITORY, GO_VERSION
+from app.routers import tunnels as tunnel_router
+from app.routers.dns_emergency import BINARY_PATH, DNSTT_COMMIT, DNSTT_REPOSITORY, GO_VERSION
 from app.routers.dns_emergency_iran import (
     SERVICE_NAME,
     STATE_DIR,
@@ -16,25 +18,59 @@ def test_dns_emergency_iran_uses_additive_table():
     assert DnsEmergencyIranSetting.__tablename__ == "dns_emergency_iran_settings"
 
 
-def test_tunnel_address_mapping_matches_twinpanel_core():
-    network, iran_ip, exit_ip = _tunnel_addresses(5)
-    assert network == "10.64.0.20/30"
-    assert iran_ip == "10.64.0.21"
-    assert exit_ip == "10.64.0.22"
+def test_tunnel_address_mapping_uses_active_l3_runtime(monkeypatch):
+    monkeypatch.setattr(
+        tunnel_router,
+        "_tunnel_addresses",
+        lambda _tunnel_id: (
+            "10.253.0.24/30",
+            "10.253.0.25/30",
+            "10.253.0.26/30",
+        ),
+    )
+
+    network, iran_ip, exit_ip = _tunnel_addresses(6)
+
+    assert network == "10.253.0.24/30"
+    assert iran_ip == "10.253.0.25"
+    assert exit_ip == "10.253.0.26"
 
 
-def test_iran_relay_installs_listener_on_iran_and_upstream_on_tunnel_ip():
+def test_iran_relay_installs_listener_on_iran_and_upstream_on_active_tunnel_ip():
     iran = SimpleNamespace(public_ip="203.0.113.10")
-    script = _install_script(iran, "ir-dns.example.com", "10.64.0.22", 443)
-    assert DNSTT_REPOSITORY in script
+    script = _install_script(iran, "ir-dns.example.com", "10.253.0.26", 443)
+
     assert DNSTT_COMMIT in script
-    assert GO_VERSION in script
     assert SERVICE_NAME in script
     assert STATE_DIR in script
+    assert BINARY_PATH in script
     assert "-udp 203.0.113.10:53" in script
-    assert "ir-dns.example.com 10.64.0.22:443" in script
+    assert "ir-dns.example.com 10.253.0.26:443" in script
     assert "ir-dns.example.com 127.0.0.1:443" not in script
     assert "systemctl restart twinpanel-dnstt-iran.service" in script
+
+
+def test_iran_relay_install_has_no_external_bootstrap_dependency():
+    iran = SimpleNamespace(public_ip="203.0.113.10")
+    script = _install_script(iran, "ir-dns.example.com", "10.253.0.26", 443)
+
+    assert "go.dev" not in script
+    assert "git fetch" not in script
+    assert "apt-get" not in script
+    assert "GOTOOLCHAIN" not in script
+    assert DNSTT_REPOSITORY not in script
+    assert f"test -x {BINARY_PATH}" in script
+
+
+def test_dnstt_release_artifacts_cover_supported_linux_architectures():
+    assert _normalize_arch("x86_64") == "amd64"
+    assert _normalize_arch("amd64") == "amd64"
+    assert _normalize_arch("aarch64") == "arm64"
+    assert _normalize_arch("arm64") == "arm64"
+    assert ARTIFACT_NAMES == {
+        "amd64": "dnstt-server-linux-amd64",
+        "arm64": "dnstt-server-linux-arm64",
+    }
 
 
 def test_iran_relay_client_defaults_to_operator_resolver_placeholder():

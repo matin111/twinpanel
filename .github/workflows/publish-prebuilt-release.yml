@@ -182,6 +182,45 @@ jobs:
           grep -q 'remote' /tmp/spoof-help.txt
           grep -q 'tester' /tmp/spoof-help.txt
 
+      - name: Setup pinned Go for DNSTT
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.12'
+          cache: false
+
+      - name: Build verified DNSTT relay artifacts
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          DNSTT_COMMIT='e1af37b31a778cab0166788fe2549169f345d742'
+          BUILD_DIR="$(mktemp -d)"
+          trap 'rm -rf "$BUILD_DIR"' EXIT
+
+          git -C "$BUILD_DIR" init -q
+          git -C "$BUILD_DIR" remote add origin https://github.com/OutlineFoundation/dnstt.git
+          git -C "$BUILD_DIR" fetch -q --depth=1 origin "$DNSTT_COMMIT"
+          git -C "$BUILD_DIR" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$BUILD_DIR" rev-parse HEAD)" = "$DNSTT_COMMIT"
+
+          mkdir -p source/backend/artifacts
+          for arch in amd64 arm64; do
+            name="dnstt-server-linux-${arch}"
+            (
+              cd "$BUILD_DIR"
+              CGO_ENABLED=0 GOOS=linux GOARCH="$arch" GOTOOLCHAIN=local \
+                go build -trimpath -ldflags='-s -w' \
+                -o "$name" ./dnstt-server
+            )
+            install -m 0755 "$BUILD_DIR/$name" "source/backend/artifacts/$name"
+            (
+              cd source/backend/artifacts
+              sha256sum "$name" > "$name.sha256"
+            )
+            test -x "source/backend/artifacts/$name"
+            grep -Eq "^[0-9a-f]{64}  ${name}$" \
+              "source/backend/artifacts/$name.sha256"
+          done
+
       - name: Build verified production package
         id: package
         shell: bash
@@ -200,6 +239,10 @@ jobs:
           test -s source/backend/artifacts/tp27-tcp-direct-linux-x86_64.sha256
           test -x source/backend/artifacts/spoof-tunnel-linux-x86_64
           test -s source/backend/artifacts/spoof-tunnel-linux-x86_64.sha256
+          test -x source/backend/artifacts/dnstt-server-linux-amd64
+          test -s source/backend/artifacts/dnstt-server-linux-amd64.sha256
+          test -x source/backend/artifacts/dnstt-server-linux-arm64
+          test -s source/backend/artifacts/dnstt-server-linux-arm64.sha256
           grep -q '^4ba5597568607e864fb6d5ba4f13bac91a50456da5696d99463d6375ce2a3697  spoof-tunnel-linux-x86_64$' \
             source/backend/artifacts/spoof-tunnel-linux-x86_64.sha256
 
@@ -257,7 +300,6 @@ jobs:
           ASSET="${{ steps.candidate.outputs.asset }}"
           SOURCE_SHA="${{ steps.candidate.outputs.source_sha }}"
           VERSION="${{ steps.candidate.outputs.version }}"
-
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release create "$TAG" \
               --repo "$GITHUB_REPOSITORY" \

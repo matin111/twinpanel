@@ -11,14 +11,13 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import require_admin
+from ..dnstt_artifact import stage_dnstt_binary
 from ..dns_emergency_iran_models import DnsEmergencyIranSetting
 from ..models import Node, NodeType, Tunnel, TunnelStatus
 from .dns_emergency import (
     BINARY_PATH,
     DNSTT_COMMIT,
     DNSTT_REPOSITORY,
-    GO_ROOT,
-    GO_SHA256,
     GO_VERSION,
     _candidate_rows,
     _connect,
@@ -73,15 +72,31 @@ def _setting(db: Session, iran_node_id: int) -> DnsEmergencyIranSetting | None:
     )
 
 
+def _host_address(value: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        raise RuntimeError("tunnel_runtime_address_missing")
+    try:
+        if "/" in raw:
+            return str(ipaddress.ip_interface(raw).ip)
+        return str(ipaddress.ip_address(raw))
+    except ValueError as exc:
+        raise RuntimeError(f"tunnel_runtime_address_invalid:{raw}") from exc
+
+
 def _tunnel_addresses(tunnel_id: int) -> tuple[str, str, str]:
-    value = max(int(tunnel_id), 1)
-    second = 64 + ((value // 16384) % 64)
-    third = (value // 64) % 256
-    block = (value % 64) * 4
-    network = f"10.{second}.{third}.{block}/30"
-    iran_ip = f"10.{second}.{third}.{block + 1}"
-    exit_ip = f"10.{second}.{third}.{block + 2}"
-    return network, iran_ip, exit_ip
+    """Use the same active-L3 runtime address source as the tunnel core.
+
+    The tunnels module is monkeypatched by active_l3_route_binding_v94 during
+    application startup. Resolving its helper at call time keeps DNS Emergency
+    aligned with the actually selected carrier (TP27 Fast, MASQUE, etc.) rather
+    than rebuilding the legacy 10.64.x.x subnet independently.
+    """
+
+    from . import tunnels as tunnel_router
+
+    network, iran_value, exit_value = tunnel_router._tunnel_addresses(int(tunnel_id))
+    return str(network), _host_address(str(iran_value)), _host_address(str(exit_value))
 
 
 def _require_online_pair(
@@ -187,89 +202,22 @@ def _install_script(
     exit_tunnel_ip: str,
     upstream_port: int,
 ) -> str:
+    """Install only runtime state; the verified binary is staged by the API.
+
+    Iran nodes deliberately do not download Go or clone GitHub here. The
+    production release carries a checksum-verified DNSTT binary and transfers it
+    over the already authenticated SSH connection before this script runs.
+    """
+
     listen_addr = _listen_addr(str(iran.public_ip))
-    q_repo = shlex.quote(DNSTT_REPOSITORY)
     q_commit = shlex.quote(DNSTT_COMMIT)
     q_domain = shlex.quote(domain)
     q_listen = shlex.quote(listen_addr)
     q_upstream = shlex.quote(f"{exit_tunnel_ip}:{int(upstream_port)}")
-    go_amd64_sha = GO_SHA256["amd64"]
-    go_arm64_sha = GO_SHA256["arm64"]
     return f"""set -Eeuo pipefail
-export DEBIAN_FRONTEND=noninteractive
 install -d -m 0700 {STATE_DIR}
-
-if ! command -v git >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 || ! command -v tar >/dev/null 2>&1; then
-  if ! command -v apt-get >/dev/null 2>&1; then
-    echo "UNSUPPORTED_PACKAGE_MANAGER" >&2
-    exit 31
-  fi
-  apt-get update -y
-  apt-get install -y --no-install-recommends ca-certificates curl git tar
-fi
-
-GO_ROOT={shlex.quote(GO_ROOT)}
-GO_BIN="$GO_ROOT/bin/go"
-if [ ! -x "$GO_BIN" ] || [ "$("$GO_BIN" version 2>/dev/null | awk '{{print $3}}')" != "go{GO_VERSION}" ]; then
-  machine="$(uname -m)"
-  case "$machine" in
-    x86_64|amd64)
-      go_arch="amd64"
-      go_sha="{go_amd64_sha}"
-      ;;
-    aarch64|arm64)
-      go_arch="arm64"
-      go_sha="{go_arm64_sha}"
-      ;;
-    *)
-      echo "UNSUPPORTED_GO_ARCH=$machine" >&2
-      exit 32
-      ;;
-  esac
-  go_work="$(mktemp -d)"
-  cleanup_go() {{ rm -rf "$go_work"; }}
-  trap cleanup_go EXIT
-  go_tar="$go_work/go.tgz"
-  curl -fsSL --retry 3 --connect-timeout 10 \
-    "https://go.dev/dl/go{GO_VERSION}.linux-${{go_arch}}.tar.gz" \
-    -o "$go_tar"
-  printf '%s  %s\n' "$go_sha" "$go_tar" | sha256sum -c -
-  mkdir -p "$go_work/root"
-  tar -C "$go_work/root" -xzf "$go_tar"
-  test -x "$go_work/root/go/bin/go"
-  install -d -m 0755 "$(dirname "$GO_ROOT")"
-  rm -rf "$GO_ROOT.next"
-  mv "$go_work/root/go" "$GO_ROOT.next"
-  rm -rf "$GO_ROOT"
-  mv "$GO_ROOT.next" "$GO_ROOT"
-  trap - EXIT
-  cleanup_go
-fi
-
-if [ "$("$GO_BIN" version | awk '{{print $3}}')" != "go{GO_VERSION}" ]; then
-  echo "GO_TOOLCHAIN_VERSION_MISMATCH" >&2
-  exit 33
-fi
-
-current_commit=""
-if [ -f {STATE_DIR}/source.commit ]; then
-  current_commit="$(cat {STATE_DIR}/source.commit 2>/dev/null || true)"
-fi
-if [ ! -x {BINARY_PATH} ] || [ "$current_commit" != {q_commit} ]; then
-  work="$(mktemp -d)"
-  cleanup() {{ rm -rf "$work"; }}
-  trap cleanup EXIT
-  git -C "$work" init -q
-  git -C "$work" remote add origin {q_repo}
-  git -C "$work" fetch -q --depth=1 origin {q_commit}
-  git -C "$work" checkout -q --detach FETCH_HEAD
-  (
-    cd "$work"
-    CGO_ENABLED=0 GOTOOLCHAIN=local "$GO_BIN" build -trimpath -ldflags='-s -w' -o "$work/dnstt-server" ./dnstt-server
-  )
-  install -m 0755 "$work/dnstt-server" {BINARY_PATH}
-  printf '%s\n' {q_commit} > {STATE_DIR}/source.commit
-fi
+test -x {BINARY_PATH} || {{ echo "DNSTT_ARTIFACT_MISSING" >&2; exit 34; }}
+printf '%s\n' {q_commit} > {STATE_DIR}/source.commit
 
 if [ ! -s {STATE_DIR}/server.key ] || [ ! -s {STATE_DIR}/server.pub ]; then
   umask 077
@@ -330,7 +278,7 @@ printf 'SERVICE=active\n'
 printf 'DOMAIN=%s\n' {q_domain}
 printf 'LISTEN=%s\n' {q_listen}
 printf 'UPSTREAM=%s\n' {q_upstream}
-printf 'GO_VERSION=%s\n' 'go{GO_VERSION}'
+printf 'DNSTT_COMMIT=%s\n' {q_commit}
 """
 
 
@@ -440,9 +388,11 @@ async def install(
     row.updated_at = datetime.utcnow()
     db.commit()
 
+    artifact_info: dict[str, str] = {}
     try:
         conn = await _connect(iran, db)
         try:
+            artifact_info = await stage_dnstt_binary(conn, BINARY_PATH)
             result = await _run_script(
                 conn,
                 _install_script(iran, domain, exit_tunnel_ip, upstream_port),
@@ -489,6 +439,7 @@ async def install(
         "runtime": {
             "exit_tunnel_ip": exit_tunnel_ip,
             "active_transport": str(tunnel.active_transport or ""),
+            "dnstt_artifact": artifact_info,
         },
         "dns_instructions": {
             "tunnel_domain": domain,
