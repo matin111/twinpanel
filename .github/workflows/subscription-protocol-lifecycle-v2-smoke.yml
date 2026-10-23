@@ -4,9 +4,12 @@ on:
   pull_request:
     paths:
       - "backend/app/routers/subscription_protocol_lifecycle_v2.py"
+      - "backend/app/routers/modern_enforcement_runtime_v1.py"
       - "backend/app/routers/__init__.py"
+      - "backend/app/services/account_enforcement_v2.py"
       - "backend/app/protocol_account_registry.py"
       - "backend/app/subscription_enforcement.py"
+      - "backend/app/twinpanel_agent.py.tpl"
       - "backend/tests/subscription_protocol_lifecycle_v2_smoke.py"
       - ".github/workflows/subscription-protocol-lifecycle-v2-smoke.yml"
   push:
@@ -14,9 +17,12 @@ on:
       - main
     paths:
       - "backend/app/routers/subscription_protocol_lifecycle_v2.py"
+      - "backend/app/routers/modern_enforcement_runtime_v1.py"
       - "backend/app/routers/__init__.py"
+      - "backend/app/services/account_enforcement_v2.py"
       - "backend/app/protocol_account_registry.py"
       - "backend/app/subscription_enforcement.py"
+      - "backend/app/twinpanel_agent.py.tpl"
       - "backend/tests/subscription_protocol_lifecycle_v2_smoke.py"
       - ".github/workflows/subscription-protocol-lifecycle-v2-smoke.yml"
 
@@ -31,9 +37,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Compile lifecycle override
+      - name: Compile lifecycle and enforcement
         run: |
           python -m py_compile backend/app/routers/subscription_protocol_lifecycle_v2.py
+          python -m py_compile backend/app/routers/modern_enforcement_runtime_v1.py
           python -m py_compile backend/app/routers/__init__.py
+          python -m py_compile backend/app/services/account_enforcement_v2.py
       - name: Verify all-15 lifecycle contract
         run: python backend/tests/subscription_protocol_lifecycle_v2_smoke.py
