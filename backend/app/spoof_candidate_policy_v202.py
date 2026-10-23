@@ -10,7 +10,8 @@ from . import transport_candidates as candidates
 #
 # Production policy after the rc.201 investigation:
 #   * keep the proven TP27 Fast path unchanged;
-#   * add Spoof WG as the only new candidate;
+#   * keep Spoof WG as an explicit-config candidate;
+#   * add TP6 Fast as an explicit-install IPv6 carrier candidate;
 #   * never auto-install Spoof WG because its mutual-spoof source addresses
 #     must be explicitly configured and verified by the administrator;
 #   * retire MASQUE, Mieru TCP and Direct TCP from install/health/promotion;
@@ -19,7 +20,7 @@ from . import transport_candidates as candidates
 # ============================================================
 
 MARKER = "TWINPANEL_SPOOF_CANDIDATE_POLICY_V202"
-ACTIVE = frozenset({"tp27_fast", "spoof_wg"})
+ACTIVE = frozenset({"tp27_fast", "tp6_fast", "spoof_wg"})
 RETIRED = (
     "tp27_masque",
     "tp27_mieru_tcp",
@@ -30,17 +31,18 @@ _applied = False
 
 
 def _apply_active_policy() -> None:
-    # TP27 Fast is the only automatic installer. Spoof WG becomes eligible for
-    # health/benchmark/promotion only after an explicit configured install.
+    # TP27 Fast remains the only automatic installer. Spoof WG and TP6 Fast
+    # become eligible for health/benchmark/promotion only after explicit install.
     smart.AUTO_INSTALL_NAMES = ("tp27_fast",)
     smart.CANDIDATE_NAMES = ACTIVE
     smart.ALL_AUTO_NAMES = ACTIVE
 
     print(
         f"{MARKER}_SMARTAUTO "
-        "active=tp27_fast,spoof_wg "
+        "active=tp27_fast,tp6_fast,spoof_wg "
         "auto_install=tp27_fast "
         "spoof_install=explicit-config-only "
+        "tp6_install=explicit-only "
         "retired=tp27_masque,tp27_mieru_tcp,tp27_tcp_direct",
         flush=True,
     )
@@ -62,6 +64,8 @@ def apply_spoof_candidate_policy_v202() -> None:
         raise RuntimeError("spoof_policy_tp27_fast_missing")
     if "spoof_wg" not in candidates.ACTIVE_SPECS:
         raise RuntimeError("spoof_policy_spoof_wg_missing")
+    if "tp6_fast" not in candidates.ACTIVE_SPECS:
+        raise RuntimeError("spoof_policy_tp6_fast_missing")
 
     _apply_active_policy()
 
@@ -82,7 +86,7 @@ def apply_spoof_candidate_policy_v202() -> None:
     _applied = True
     print(
         f"{MARKER}_ACTIVE "
-        "active_candidates=tp27_fast,spoof_wg "
+        "active_candidates=tp27_fast,tp6_fast,spoof_wg "
         "auto_install=tp27_fast "
         "retired_cleanup=official-v91-after-fast-online",
         flush=True,

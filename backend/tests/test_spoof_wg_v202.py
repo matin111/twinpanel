@@ -8,20 +8,31 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
+def registry_source() -> str:
+    # V207 keeps the immutable rc.206 registry as the base and adds TP6 through
+    # a small additive overlay in __init__.py. Validate the complete contract.
+    return (
+        read("backend/app/transport_candidates/registry_v206.py")
+        + "\n"
+        + read("backend/app/transport_candidates/__init__.py")
+    )
+
+
 def test_spoof_wg_registry_is_narrow_and_cleanup_compatible():
-    registry = read("backend/app/transport_candidates/__init__.py")
+    registry = registry_source()
+    base = read("backend/app/transport_candidates/registry_v206.py")
 
     assert '"spoof_wg": SPOOF_WG_SPEC' in registry
     assert '"tp27_fast": TP27_SPEC' in registry
     assert '"spoof_wg": spoof_wg.install' in registry
 
-    active_block = registry.split("ACTIVE_SPECS = {", 1)[1].split("}", 1)[0]
+    active_block = base.split("ACTIVE_SPECS = {", 1)[1].split("}", 1)[0]
     assert '"tp27_fast"' in active_block
     assert '"spoof_wg"' in active_block
     assert '"tp27_masque"' not in active_block
     assert '"tp27_tcp_direct"' not in active_block
 
-    installers = registry.split("INSTALLERS = {", 1)[1].split("}", 1)[0]
+    installers = base.split("INSTALLERS = {", 1)[1].split("}", 1)[0]
     assert '"tp27_fast"' in installers
     assert '"spoof_wg"' in installers
     assert '"tp27_masque"' not in installers
@@ -33,7 +44,7 @@ def test_spoof_wg_registry_is_narrow_and_cleanup_compatible():
 
 
 def test_spoof_wg_runtime_contract():
-    registry = read("backend/app/transport_candidates/__init__.py")
+    registry = registry_source()
     spoof = read("backend/app/transport_candidates/spoof_wg.py")
 
     assert 'octet=250' in registry
