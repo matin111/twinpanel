@@ -1,0 +1,57 @@
+name: TP6 Fast V208 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/tp6_candidate_registry_v208.py"
+      - "backend/app/spoof_candidate_policy_v202.py"
+      - "backend/app/unified_l3_candidate_registry_v79.py"
+      - "backend/app/transport_candidates/tp6_fast.py"
+      - "backend/app/transport_candidates/tp6_fast_contract.py"
+      - "backend/app/transport_candidates/tp6_fast_ipv6.py"
+      - "backend/app/transport_candidates/tp6_fast_kernel.py"
+      - "backend/tests/test_tp6_fast_v208.py"
+      - ".github/workflows/tp6-fast-v208-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile TP6 backend surface
+        run: |
+          python -W error::SyntaxWarning -m py_compile \
+            backend/app/tp6_candidate_registry_v208.py \
+            backend/app/spoof_candidate_policy_v202.py \
+            backend/app/unified_l3_candidate_registry_v79.py \
+            backend/app/transport_candidates/tp6_fast.py \
+            backend/app/transport_candidates/tp6_fast_contract.py \
+            backend/app/transport_candidates/tp6_fast_ipv6.py \
+            backend/app/transport_candidates/tp6_fast_kernel.py \
+            backend/tests/test_tp6_fast_v208.py
+
+      - name: Run TP6 V208 source-contract regression
+        run: |
+          python - <<'PY'
+          import runpy
+
+          ns = runpy.run_path("backend/tests/test_tp6_fast_v208.py")
+          tests = sorted(
+              (name, value)
+              for name, value in ns.items()
+              if name.startswith("test_") and callable(value)
+          )
+          if not tests:
+              raise SystemExit("no TP6 V208 tests discovered")
+          for name, test in tests:
+              test()
+              print(f"PASS {name}")
+          print(f"TP6_FAST_V208_SOURCE_CONTRACT_OK tests={len(tests)}")
+          PY
