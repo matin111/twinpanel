@@ -96,7 +96,10 @@ async function apiRequest<T>(path:string,init:RequestInit={}):Promise<T>{
       const detail=(payload as {detail?:unknown}).detail;
       if(typeof detail==="string")throw new Error(detail);
       if(detail&&typeof detail==="object"&&"message" in detail){
-        throw new Error(String((detail as {message?:unknown}).message||`API error ${response.status}`));
+        const info=detail as {message?:unknown;error?:unknown};
+        const message=String(info.message||`API error ${response.status}`);
+        const diagnostic=typeof info.error==="string"?info.error.trim():"";
+        throw new Error(diagnostic?`${message} · ${diagnostic}`:message);
       }
     }
     throw new Error(`API error ${response.status}`);
