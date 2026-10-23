@@ -52,6 +52,7 @@ from .modern_enforcement_runtime_v1 import router as _modern_enforcement_runtime
 from .subscription_protocol_lifecycle_v2 import router as _subscription_protocol_lifecycle_v2_router
 from .dns_emergency import router as _dns_emergency_router
 from .dns_emergency_iran import router as _dns_emergency_iran_router
+from .dns_emergency_masterdnsvpn import router as _dns_emergency_masterdnsvpn_router
 
 # TWINPANEL_MANUAL_AUTHORITY_REGISTER_V193
 # Agent reports arrive on an exact route also retained in the legacy tunnels
@@ -78,3 +79,4 @@ _runtime_endpoints.router.include_router(_classic_protocol_admin_v1_router)
 _runtime_endpoints.router.include_router(_storefront_theme_media_router)
 _runtime_endpoints.router.include_router(_dns_emergency_router)
 _runtime_endpoints.router.include_router(_dns_emergency_iran_router)
+_runtime_endpoints.router.include_router(_dns_emergency_masterdnsvpn_router)

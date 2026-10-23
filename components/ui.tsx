@@ -24,6 +24,7 @@ const menuGroups=[
     ["پروتکل‌ها","Protocols","/admin/modern-protocols","◫"],
     ["DNS اضطراری","DNS Emergency","/admin/dns-emergency","◉"],
     ["DNS اضطراری ایران","DNS Emergency Iran","/admin/dns-emergency-iran","◎"],
+    ["MasterDnsVPN","MasterDnsVPN","/admin/dns-emergency-masterdnsvpn","◍"],
     ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"]
   ]},
   {fa:"فروش و مالی",en:"Sales & Finance",items:[

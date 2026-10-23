@@ -221,6 +221,48 @@ jobs:
               "source/backend/artifacts/$name.sha256"
           done
 
+      - name: Setup pinned Go for MasterDnsVPN
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.0'
+          cache: false
+
+      - name: Build verified MasterDnsVPN server artifacts
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          MASTERDNSVPN_COMMIT='acbf1c61f90786f41b975d2e2f616afbce292b29'
+          BUILD_DIR="$(mktemp -d)"
+          trap 'rm -rf "$BUILD_DIR"' EXIT
+
+          git -C "$BUILD_DIR" init -q
+          git -C "$BUILD_DIR" remote add origin https://github.com/masterking32/MasterDnsVPN.git
+          git -C "$BUILD_DIR" fetch -q --depth=1 origin "$MASTERDNSVPN_COMMIT"
+          git -C "$BUILD_DIR" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$BUILD_DIR" rev-parse HEAD)" = "$MASTERDNSVPN_COMMIT"
+          grep -q '^go 1\.25\.0$' "$BUILD_DIR/go.mod"
+
+          mkdir -p source/backend/artifacts
+          for arch in amd64 arm64; do
+            name="masterdnsvpn-server-linux-${arch}"
+            (
+              cd "$BUILD_DIR"
+              CGO_ENABLED=0 GOOS=linux GOARCH="$arch" GOTOOLCHAIN=local \
+                go build -mod=readonly -trimpath -ldflags='-s -w' \
+                -o "$name" ./cmd/server
+            )
+            install -m 0755 "$BUILD_DIR/$name" "source/backend/artifacts/$name"
+            (
+              cd source/backend/artifacts
+              sha256sum "$name" > "$name.sha256"
+            )
+            test -x "source/backend/artifacts/$name"
+            grep -Eq "^[0-9a-f]{64}  ${name}$" \
+              "source/backend/artifacts/$name.sha256"
+          done
+          source/backend/artifacts/masterdnsvpn-server-linux-amd64 -version \
+            | grep -q 'MasterDnsVPN Server Version:'
+
       - name: Build verified production package
         id: package
         shell: bash
@@ -243,6 +285,10 @@ jobs:
           test -s source/backend/artifacts/dnstt-server-linux-amd64.sha256
           test -x source/backend/artifacts/dnstt-server-linux-arm64
           test -s source/backend/artifacts/dnstt-server-linux-arm64.sha256
+          test -x source/backend/artifacts/masterdnsvpn-server-linux-amd64
+          test -s source/backend/artifacts/masterdnsvpn-server-linux-amd64.sha256
+          test -x source/backend/artifacts/masterdnsvpn-server-linux-arm64
+          test -s source/backend/artifacts/masterdnsvpn-server-linux-arm64.sha256
           grep -q '^4ba5597568607e864fb6d5ba4f13bac91a50456da5696d99463d6375ce2a3697  spoof-tunnel-linux-x86_64$' \
             source/backend/artifacts/spoof-tunnel-linux-x86_64.sha256
 
