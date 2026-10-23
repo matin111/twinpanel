@@ -6,11 +6,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 APP = ROOT / "backend" / "app"
 ROUTERS = APP / "routers"
+SERVICES = APP / "services"
 
-registry_text = (APP / "protocol_account_registry.py").read_text(encoding="utf-8")
-lifecycle_text = (ROUTERS / "subscription_protocol_lifecycle_v2.py").read_text(encoding="utf-8")
-routers_init_text = (ROUTERS / "__init__.py").read_text(encoding="utf-8")
-main_text = (APP / "main.py").read_text(encoding="utf-8")
+registry_path = APP / "protocol_account_registry.py"
+lifecycle_path = ROUTERS / "subscription_protocol_lifecycle_v2.py"
+routers_init_path = ROUTERS / "__init__.py"
+runtime_path = ROUTERS / "modern_enforcement_runtime_v1.py"
+enforcement_path = SERVICES / "account_enforcement_v2.py"
+main_path = APP / "main.py"
+
+registry_text = registry_path.read_text(encoding="utf-8")
+lifecycle_text = lifecycle_path.read_text(encoding="utf-8")
+routers_init_text = routers_init_path.read_text(encoding="utf-8")
+runtime_text = runtime_path.read_text(encoding="utf-8")
+enforcement_text = enforcement_path.read_text(encoding="utf-8")
+main_text = main_path.read_text(encoding="utf-8")
 
 registry_tree = ast.parse(registry_text)
 values: dict[str, tuple[str, ...]] = {}
@@ -49,9 +59,46 @@ revoke_pos = lifecycle_text.index('reason="protocol_removed_v2"')
 deactivate_pos = lifecycle_text.index("ProtocolCredential.is_active: False")
 assert revoke_pos < deactivate_pos
 
-# Global protocol OFF/ON must update QuotaDevice state too, so lifecycle V2 must
-# not use node-scoped enforcement for these transitions.
+# Global protocol OFF/ON must update QuotaDevice state too.
 assert lifecycle_text.count("node_ids=None") >= 2
+
+# Every account command is controller-owned. The shipped Node Agent does not
+# receive account secrets or reconstruct identities from an incomplete payload.
+for marker in (
+    "CONTROLLER_CLASSIC_PROTOCOLS",
+    "CONTROLLER_MODERN_PROTOCOLS",
+    '"controller-classic-v2"',
+    '"controller-modern-v1"',
+    'row.status = "controller_pending"',
+):
+    assert marker in enforcement_text, marker
+
+# Five Classic runtime identities have explicit, identity-preserving handlers.
+for marker in (
+    '"openconnect": "cisco"',
+    '"openvpn": "openvpn"',
+    '"wireguard": "wireguard"',
+    '"l2tp": "l2tp"',
+    '"xray": "v2ray"',
+    "/etc/openvpn/twinpanel-disabled/",
+    "/run/twinpanel/l2tp-sessions",
+    "wg set wg-access0 peer",
+    "stored WireGuard identity",
+    "stored V2Ray UUID",
+    "ocpasswd -c /etc/ocserv/ocpasswd",
+):
+    assert marker in enforcement_text, marker
+
+# WireGuard restore derives the public key from the stored private key instead
+# of calling the legacy provisioning helper which generates a fresh keypair.
+assert "wg pubkey" in enforcement_text
+assert "wg genkey" not in enforcement_text
+
+# Runtime and import-time queue hook both point at account_enforcement_v2.
+assert "services.account_enforcement_v2" in routers_init_text
+assert "install_account_enforcement_hooks()" in routers_init_text
+assert "services.account_enforcement_v2" in runtime_text
+assert "account_enforcement_loop()" in runtime_text
 
 # Route precedence is intentional: runtime_endpoints is mounted before the
 # legacy account_delivery router, and lifecycle V2 is included on it.
@@ -61,8 +108,14 @@ assert main_text.index("app.include_router(runtime_endpoints_router)") < main_te
     "app.include_router(account_delivery.router)"
 )
 
-compile(lifecycle_text, str(ROUTERS / "subscription_protocol_lifecycle_v2.py"), "exec")
-compile(routers_init_text, str(ROUTERS / "__init__.py"), "exec")
+for path, text in (
+    (lifecycle_path, lifecycle_text),
+    (routers_init_path, routers_init_text),
+    (runtime_path, runtime_text),
+    (enforcement_path, enforcement_text),
+):
+    compile(text, str(path), "exec")
 
 print("SUBSCRIPTION_PROTOCOL_LIFECYCLE_V2_SMOKE=PASS")
 print("PROTOCOLS=" + ",".join(all_protocols))
+print("ENFORCEMENT=controller-owned-all-15")
