@@ -16,6 +16,10 @@ ProtocolName = Literal[
     "naive",
     "shadowtls",
     "snell",
+    "mieru",
+    "trusttunnel",
+    "amneziawg",
+    "sudoku",
 ]
 
 

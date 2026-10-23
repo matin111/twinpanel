@@ -1,31 +1,30 @@
-from datetime import datetime
+from __future__ import annotations
+
 import secrets
-import string
-import secrets
-import string
-import secrets
-import string
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from ..quota_models import QuotaDevice
-
-from ..routers.general_settings import build_subscription_username
 
 from ..models import (
     Node,
-    NodeStatus,
     NodeType,
     Plan,
+    ProtocolCredential,
     Subscription,
     SubscriptionNode,
     SubscriptionProtocol,
     SubscriptionStatus,
-    ProtocolCredential,
     User,
 )
+from ..protocol_account_registry import normalize_protocols, plan_protocols
+from ..quota_models import QuotaDevice
+from ..routers.general_settings import build_subscription_username
 
 
+# Compatibility/safety gate. Keep this explicit literal until the Modern
+# account + telemetry + revoke lifecycle in this PR is complete. The quota
+# contract smoke intentionally reads this assignment and prevents accidental
+# sale of a runtime-only protocol.
 PROTOCOL_FIELDS = {
     "cisco": "enable_cisco",
     "openvpn": "enable_openvpn",
@@ -36,7 +35,6 @@ PROTOCOL_FIELDS = {
 
 
 def generate_share_code(username: str | None):
-    import secrets
     import re
 
     base = (username or "user").lower()
@@ -48,34 +46,13 @@ def generate_share_code(username: str | None):
     return f"{base[:12]}-{secrets.token_hex(3)}"
 
 
-
-def generate_account_username(user_id: int):
-    import secrets
-    return f"mv{user_id}{secrets.token_hex(3)}"
-
-
 def generate_account_password():
-    import secrets
     return str(
         secrets.randbelow(90000000) + 10000000
     )
 
 
-
-def generate_username():
-    return "mv" + secrets.token_hex(5)
-
-
-def generate_password():
-    chars = string.ascii_letters + string.digits
-    return "".join(
-        secrets.choice(chars)
-        for _ in range(12)
-    )
-
-
 def create_subscription_core(
-
     db: Session,
     user_id: int,
     plan_id: int | None,
@@ -86,7 +63,6 @@ def create_subscription_core(
     username: str | None = None,
     password: str | None = None,
 ):
-
     user = db.get(User, user_id)
 
     if not user or not user.is_active:
@@ -103,55 +79,49 @@ def create_subscription_core(
             detail="پلن پیدا نشد",
         )
 
-
-    requested_protocols = list(
-        dict.fromkeys(
-            x.strip().lower()
-            for x in protocols
-            if x.strip()
-        )
-    )
-
+    try:
+        requested_protocols = normalize_protocols(protocols)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
 
     invalid = [
-        p for p in requested_protocols
-        if p not in PROTOCOL_FIELDS
+        protocol
+        for protocol in requested_protocols
+        if protocol not in PROTOCOL_FIELDS
     ]
-
     if invalid:
         raise HTTPException(
             status_code=422,
-            detail="پروتکل نامعتبر",
+            detail="پروتکل هنوز چرخه کامل اکانت/سهمیه/لغو را ندارد",
         )
 
-
     # TWINPANEL_GLOBAL_NODES_FOR_ALL_SUBSCRIPTIONS_V1
-    #
     # Node selection is infrastructure-wide.
     # Every subscription belongs to every Node.
     # node_ids from callers are kept only for API compatibility
     # and no longer restrict the subscription.
     nodes = (
-        db.query(Node).filter(Node.retired_at.is_(None))
+        db.query(Node)
+        .filter(Node.retired_at.is_(None))
         .order_by(Node.id.asc())
         .all()
     )
 
-
     if not requested_protocols and plan is not None:
-
         requested_protocols = [
-            p
-            for p, field in PROTOCOL_FIELDS.items()
-            if getattr(plan, field, False)
+            protocol
+            for protocol in plan_protocols(db, plan)
+            if protocol in PROTOCOL_FIELDS
         ]
 
     if not requested_protocols:
         raise HTTPException(
             status_code=422,
-            detail="حداقل یک پروتکل برای اشتراک انتخاب کنید",
+            detail="حداقل یک پروتکل آماده برای اشتراک انتخاب کنید",
         )
-
 
     iran_node = next(
         (
@@ -169,78 +139,34 @@ def create_subscription_core(
         None,
     )
 
-
-    # TWINPANEL_USERNAME_TEMPLATE_V1
-    # Username is generated after subscription id exists
-
     if not password:
         password = generate_account_password()
-
-
-    # TWINPANEL_USERNAME_TEMPLATE_CENTRAL_V1
-    # Username is generated after subscription id exists
-
-    if not password:
-        alphabet = (
-            string.ascii_letters
-            + string.digits
-        )
-        password = (
-            "Mv"
-            + ''.join(
-                secrets.choice(alphabet)
-                for _ in range(10)
-            )
-        )
 
     sub = Subscription(
         user_id=user_id,
         plan_id=(plan.id if plan is not None else None),
-
         status=SubscriptionStatus.ACTIVE,
-
-        # FIRST USE
         starts_at=None,
         expires_at=None,
-
         activation_duration_days=duration_days,
-
         traffic_limit_bytes=traffic_bytes,
         traffic_used_bytes=0,
-
-        iran_node_id=(
-            iran_node.id
-            if iran_node
-            else None
-        ),
-
-        exit_node_id=(
-            exit_node.id
-            if exit_node
-            else None
-        ),
-
+        iran_node_id=(iran_node.id if iran_node else None),
+        exit_node_id=(exit_node.id if exit_node else None),
         account_username=username,
         account_password_encrypted=password,
-
-        share_code=generate_share_code(
-            username or user.email
-        ),
+        share_code=generate_share_code(username or user.email),
     )
-
 
     db.add(sub)
     db.flush()
 
-    # TWINPANEL_USERNAME_TEMPLATE_CENTRAL_V3
-    # Apply admin configured username pattern after subscription id exists
     if not username:
         username = build_subscription_username(
             db,
             sub.id,
             user_id,
         )
-
         sub.account_username = username
 
     for node in nodes:
@@ -251,7 +177,6 @@ def create_subscription_core(
             )
         )
 
-
     for protocol in requested_protocols:
         db.add(
             SubscriptionProtocol(
@@ -259,34 +184,19 @@ def create_subscription_core(
                 protocol=protocol,
             )
         )
-
-        # TWINPANEL_QUOTA_DEVICE_CREATE_V1
-        # هر اشتراک باید Device قابل enforce داشته باشد.
-        from app.quota_models import QuotaDevice
-
         db.add(
             QuotaDevice(
                 subscription_id=sub.id,
                 protocol=protocol,
-                device_key=(
-                    f"subscription:{sub.id}:{protocol}"
-                ),
-                credential_public_hash=(
-                    f"pending-{sub.id}-{protocol}"
-                ),
+                device_key=f"subscription:{sub.id}:{protocol}",
+                credential_public_hash=f"pending-{sub.id}-{protocol}",
                 status="active",
             )
         )
 
-
-
-
     db.flush()
 
-
-    # CREATE PROTOCOL CREDENTIALS
     for protocol in requested_protocols:
-
         db.add(
             ProtocolCredential(
                 subscription_id=sub.id,
@@ -297,12 +207,8 @@ def create_subscription_core(
             )
         )
 
-
     sub.account_username = username
     sub.account_password_encrypted = password
 
-
     db.flush()
-
     return sub
-
