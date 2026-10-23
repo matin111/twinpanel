@@ -1,10 +1,11 @@
-# TWINPANEL_MODERN_ENFORCEMENT_V1
-# Install the controller-owned Modern enforcement bridge before routers that
-# import queue_subscription_enforcement. Classic commands remain Agent-owned;
-# Modern sing-box commands are made durable controller work items instead.
-from ..services.modern_enforcement_v1 import install_modern_enforcement_hooks
+# TWINPANEL_ACCOUNT_ENFORCEMENT_V2
+# Install the durable controller-owned account enforcement bridge before routers
+# import queue_subscription_enforcement. All 15 canonical account protocols are
+# now controller-owned so Classic identities never depend on a node Agent command
+# payload which cannot safely carry/reconstruct stored credentials.
+from ..services.account_enforcement_v2 import install_account_enforcement_hooks
 
-install_modern_enforcement_hooks()
+install_account_enforcement_hooks()
 
 # Register support live-chat extension routes before the shared routers are
 # included by app.main. Importing this module attaches the delta endpoint to
