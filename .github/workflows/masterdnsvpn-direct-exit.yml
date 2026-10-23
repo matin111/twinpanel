@@ -1,0 +1,100 @@
+name: TwinPanel MasterDnsVPN Direct Exit
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/masterdnsvpn_*.py'
+      - 'backend/app/routers/dns_emergency_masterdnsvpn.py'
+      - 'backend/app/routers/__init__.py'
+      - 'app/admin/dns-emergency-masterdnsvpn/**'
+      - 'components/masterdnsvpn-panel.*'
+      - 'components/ui.tsx'
+      - '.github/workflows/masterdnsvpn-direct-exit.yml'
+      - '.github/workflows/publish-prebuilt-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout TwinPanel
+        uses: actions/checkout@v4
+
+      - name: Verify Python syntax and security invariants
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile \
+            backend/app/masterdnsvpn_models.py \
+            backend/app/masterdnsvpn_artifact.py \
+            backend/app/routers/dns_emergency_masterdnsvpn.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          router=Path('backend/app/routers/dns_emergency_masterdnsvpn.py').read_text(encoding='utf-8')
+          artifact=Path('backend/app/masterdnsvpn_artifact.py').read_text(encoding='utf-8')
+          ui=Path('components/masterdnsvpn-panel.tsx').read_text(encoding='utf-8')
+          workflow=Path('.github/workflows/publish-prebuilt-release.yml').read_text(encoding='utf-8')
+          commit='acbf1c61f90786f41b975d2e2f616afbce292b29'
+
+          assert commit in router
+          assert commit in workflow
+          assert 'LOG_LEVEL = "ERROR"' in router
+          assert 'UDP53_CONFLICT' in router
+          assert 'kill -' not in router and 'pkill ' not in router and 'killall ' not in router
+          assert 'curl |' not in router and 'wget |' not in router
+          assert 'masterdnsvpn-server-linux-amd64' in artifact
+          assert 'masterdnsvpn-server-linux-arm64' in artifact
+          assert '/client-config' in router
+          assert 'secret_in_inventory' in router
+          assert 'MasterDnsVPN · Direct Exit' in ui
+          PY
+
+      - name: Setup pinned Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.0'
+          cache: false
+
+      - name: Build exact upstream MasterDnsVPN server
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          COMMIT='acbf1c61f90786f41b975d2e2f616afbce292b29'
+          BUILD_DIR="$(mktemp -d)"
+          trap 'rm -rf "$BUILD_DIR"' EXIT
+          git -C "$BUILD_DIR" init -q
+          git -C "$BUILD_DIR" remote add origin https://github.com/masterking32/MasterDnsVPN.git
+          git -C "$BUILD_DIR" fetch -q --depth=1 origin "$COMMIT"
+          git -C "$BUILD_DIR" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$BUILD_DIR" rev-parse HEAD)" = "$COMMIT"
+          grep -q '^go 1\.25\.0$' "$BUILD_DIR/go.mod"
+          (
+            cd "$BUILD_DIR"
+            GOWORK=off go test -mod=readonly ./...
+            for arch in amd64 arm64; do
+              CGO_ENABLED=0 GOOS=linux GOARCH="$arch" GOTOOLCHAIN=local \
+                go build -mod=readonly -trimpath -ldflags='-s -w' \
+                -o "masterdnsvpn-server-linux-${arch}" ./cmd/server
+              test -s "masterdnsvpn-server-linux-${arch}"
+            done
+            ./masterdnsvpn-server-linux-amd64 -version | grep -q 'MasterDnsVPN Server Version:'
+          )
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+
+      - name: Build TwinPanel frontend
+        shell: bash
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_API_BASE: ''
+        run: |
+          set -Eeuo pipefail
+          npm ci --include=optional --no-audit --no-fund
+          npm run build
