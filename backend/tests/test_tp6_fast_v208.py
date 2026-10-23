@@ -20,18 +20,32 @@ def tp6_source() -> str:
     )
 
 
-def test_tp6_fast_is_active_but_explicit_install_only():
+def test_tp6_fast_registry_extension_preserves_v202_source_contract():
     registry = read("backend/app/transport_candidates/__init__.py")
+    extension = read("backend/app/tp6_candidate_registry_v208.py")
     policy = read("backend/app/spoof_candidate_policy_v202.py")
+    unified = read("backend/app/unified_l3_candidate_registry_v79.py")
 
-    assert '"tp6_fast"] = TP6_FAST_SPEC' in registry
-    assert '"tp6_fast"] = tp6_fast.install' in registry
-    assert 'octet=249' in registry
-    assert 'interface_prefix="tp6"' in registry
-    assert 'table = 34000 +' in registry
+    assert '"tp27_fast": TP27_SPEC' in registry
+    assert '"spoof_wg": SPOOF_WG_SPEC' in registry
+    assert '"tp27_fast": tp27_fast.install' in registry
+    assert '"spoof_wg": spoof_wg.install' in registry
+    assert "registry_v206" not in registry
+
+    assert 'MARKER = "TWINPANEL_TP6_CANDIDATE_REGISTRY_V208"' in extension
+    assert 'candidates.ACTIVE_SPECS["tp6_fast"] = TP6_FAST_SPEC' in extension
+    assert 'candidates.INSTALLERS["tp6_fast"] = tp6_fast.install' in extension
+    assert 'transport="tp6_fast"' in extension
+    assert 'octet=249' in extension
+    assert 'interface_prefix="tp6"' in extension
+    assert 'table = 34000 +' in extension
+
+    assert "apply_tp6_candidate_registry_v208()" in unified
+    assert "apply_tp6_candidate_registry_v208()" in policy
+
     assert 'smart.AUTO_INSTALL_NAMES = ("tp27_fast",)' in policy
     assert '"tp6_fast"' in policy
-    assert 'tp6_install=explicit-only' in policy
+    assert "tp6_install=explicit-only" in policy
 
 
 def test_tp6_fast_is_ipv6_outer_and_kernel_only():
@@ -52,7 +66,6 @@ def test_tp6_fast_is_ipv6_outer_and_kernel_only():
     ):
         assert token in source, token
 
-    # No userspace carrier/download and no mutation of Node.public_ip.
     assert "curl -L" not in source
     assert "wget " not in source
     assert "public_ip =" not in source
@@ -61,17 +74,16 @@ def test_tp6_fast_is_ipv6_outer_and_kernel_only():
 def test_tp6_fast_preserves_existing_production_paths():
     source = tp6_source()
     registry = read("backend/app/transport_candidates/__init__.py")
-    base = read("backend/app/transport_candidates/registry_v206.py")
+    extension = read("backend/app/tp6_candidate_registry_v208.py")
 
-    # TP6 owns a distinct inner network/table; TP27 and Spoof base contracts remain intact.
-    assert 'octet=249' in registry
-    assert 'table = 34000 +' in registry
-    assert 'octet=253' in base
-    assert 'table = 29000 +' in base
-    assert 'octet=250' in base
-    assert 'table = 33000 +' in base
+    assert 'octet=249' in extension
+    assert 'table = 34000 +' in extension
 
-    # Installer only marks its own candidate; manager/API retains switching authority.
+    assert 'octet=253' in registry
+    assert 'table = 29000 +' in registry
+    assert 'octet=250' in registry
+    assert 'table = 33000 +' in registry
+
     assert "common.mark(" in source
     assert "active_transport" not in source
     assert "preferred_transport" not in source

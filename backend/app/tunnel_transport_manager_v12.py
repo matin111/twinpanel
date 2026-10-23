@@ -66,7 +66,7 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 # + ADAPTIVE CANDIDATE QUALIFICATION V155
 # + DIRECT TCP RPFILTER SHADOW GUARD V198
 # + STALE CANDIDATE INSTALL RECOVERY V200 (FINAL SELECTOR WRAPPER)
-# + SPOOF/TP6 CANDIDATE POLICY V202/V207 (FINAL ACTIVE SET)
+# + SPOOF CANDIDATE POLICY V202 (FINAL ACTIVE SET)
 # + RUNTIME RECONCILER V5 (extends runtime_reconciler_v4)
 # ============================================================
 
@@ -77,7 +77,7 @@ async def main() -> None:
     activate_manager_candidate_policy_v91()
 
     # Keep the historical layers applied so their cleanup/runtime contracts are
-    # available for already-installed rows. V202/V207 narrows the final production
+    # available for already-installed rows. V202 narrows the final production
     # candidate set only after those compatibility hooks exist.
     apply_adaptive_multilane_v149()
     apply_adaptive_multilane_v151()
@@ -90,7 +90,7 @@ async def main() -> None:
     apply_direct_tcp_rpfilter_guard_v198()
 
     # V155 owns the final normal install selector. V200 must wrap after every
-    # selector-replacing layer. V202/V207 then changes only candidate sets and
+    # selector-replacing layer. V202 then changes only the candidate sets and
     # AUTO_INSTALL_NAMES; it does not replace the V200 selector wrapper.
     apply_stale_candidate_install_recovery_v200()
     apply_spoof_candidate_policy_v202()
@@ -113,16 +113,14 @@ async def main() -> None:
         "adaptive_candidate_qualification=v155 "
         "direct_tcp_rpfilter_guard=v198-cleanup-only "
         "stale_candidate_install_recovery=v200-final-selector-wrapper "
-        "spoof_candidate_policy=v202-v207-final-active-set "
+        "spoof_candidate_policy=v202-final-active-set "
         "vpn_access_dataplane=v46 "
         "vpn_access_performance=v51 "
         "exit_access_stability=v144 "
         "reconciler=v5 "
-        "active_candidates=tp27_fast,tp6_fast,spoof_wg "
+        "active_candidates=tp27_fast,spoof_wg "
         "auto_install=tp27_fast "
         "spoof_install=explicit-config-only "
-        "tp6_install=explicit-only "
-        "tp6_carrier=ipv6-kernel-ip6gre-ipip6 "
         "spoof_dataplane=wireguard-over-mutual-ip-spoof "
         "retired=tp27_masque,tp27_mieru_tcp,tp27_tcp_direct,kernel_gre,gost_tun,amneziawg,netrix",
         flush=True,

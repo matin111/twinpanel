@@ -3,6 +3,7 @@ from __future__ import annotations
 from . import smart_transport_auto_v21 as smart
 from . import tp27_reference_runtime_v91 as reference_v91
 from . import transport_candidates as candidates
+from .tp6_candidate_registry_v208 import apply_tp6_candidate_registry_v208
 
 
 # ============================================================
@@ -52,6 +53,10 @@ def apply_spoof_candidate_policy_v202() -> None:
     global _applied
     if _applied:
         return
+
+    # TP6 is registered additively before the final active-set policy is
+    # validated. The historical transport_candidates/__init__.py stays intact.
+    apply_tp6_candidate_registry_v208()
 
     # V165 may have re-added Mieru into the process-local registry. Remove all
     # three failed experimental lanes from every production-facing registry,

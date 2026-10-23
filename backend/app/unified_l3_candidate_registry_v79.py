@@ -7,6 +7,7 @@ from .service_routing_stability_v139 import (
     apply_service_routing_stability_v139,
 )
 from .transport_candidates import SPECS
+from .tp6_candidate_registry_v208 import apply_tp6_candidate_registry_v208
 
 AGENT_MARKER = "TWINPANEL_UNIFIED_L3_CANDIDATE_REGISTRY_V79"
 _runtime_applied = False
@@ -22,6 +23,10 @@ def apply_unified_l3_candidate_registry_v79() -> None:
     if _runtime_applied:
         return
 
+    # Register TP6 additively before V79 snapshots the candidate literal.
+    # This preserves the historical transport registry source contract while
+    # allowing the existing Unified L3 Agent to understand TP6 as a managed lane.
+    apply_tp6_candidate_registry_v208()
     apply_active_l3_route_binding_v94()
 
     source = core._AGENT_RECONCILE_V49
