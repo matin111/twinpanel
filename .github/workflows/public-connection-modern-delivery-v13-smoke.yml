@@ -1,0 +1,29 @@
+name: Public Connection Modern Delivery V13 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/public_connection_hub_live_v5.py"
+      - "backend/app/routers/public_connection_modern_delivery_v13.py"
+      - "backend/app/singbox_subscription_accounts.py"
+      - "backend/app/standalone_subscription_accounts.py"
+      - "backend/tests/public_connection_modern_delivery_v13_smoke.py"
+      - ".github/workflows/public-connection-modern-delivery-v13-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile public delivery modules
+        run: |
+          python -m py_compile \
+            backend/app/routers/public_connection_hub_live_v5.py \
+            backend/app/routers/public_connection_modern_delivery_v13.py
+      - name: Verify modern delivery contract
+        run: python backend/tests/public_connection_modern_delivery_v13_smoke.py
