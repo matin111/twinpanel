@@ -232,8 +232,6 @@ def _modern_action(token: str, protocol: str, item: dict[str, Any]) -> str:
 
     return (
         f'<div class="v13-modern-action" data-v13-protocol="{_h(protocol)}">'
-        '<div class="v13-action-copy"><b>کانفیگ واقعی آماده است</b>'
-        '<small>برنامه مناسب همین دستگاه نمایش داده می‌شود.</small></div>'
         f'<div class="v13-action-buttons">{primary}'
         f'<a class="v13-secondary" href="{_h(config_path)}">دانلود فایل</a>'
         f'{_client_links(protocol)}</div></div>'
@@ -265,7 +263,6 @@ def _pending_card(protocol: str, reason: str, pane_id: str) -> tuple[str, str]:
         f'data-modern-protocol="{_h(protocol)}">'
         f'<div class="panel-head"><div><span>وضعیت پروتکل</span><h3>{_h(title)}</h3></div></div>'
         f'<div class="v13-pending-body"><b>هنوز قابل اتصال نیست</b><p>{_h(reason)}</p>'
-        '<small>به محض آماده‌شدن Provision/Runtime، کانفیگ واقعی همین‌جا ظاهر می‌شود.</small>'
         f'<div class="v13-pending-apps">{_client_links(protocol)}</div></div></section>'
     )
     return card, panel
@@ -319,7 +316,8 @@ def _mieru_karing_yaml(item: dict[str, Any]) -> str:
     if not host or port <= 0 or not username or not password:
         return ""
     q = lambda value: json.dumps(str(value), ensure_ascii=False)
-    return "\n".join([
+    return "\
+".join([
         "proxies:",
         f"  - name: {q('TwinPanel Mieru')}",
         "    type: mieru",
@@ -520,6 +518,8 @@ def refine_public_connection_modern_delivery_v13(source: str, token: str, db: Se
             1,
         )
 
-    source = source.replace("</style>", _CSS + "\n</style>", 1)
-    source = source.replace("</body>", _SCRIPT + "\n</body>", 1)
+    source = source.replace("</style>", _CSS + "\
+</style>", 1)
+    source = source.replace("</body>", _SCRIPT + "\
+</body>", 1)
     return source
