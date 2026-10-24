@@ -1,0 +1,29 @@
+name: Plan Protocol UI V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "components/legacy-plans-exact.tsx"
+      - "lib/plan-protocol-api.ts"
+      - "backend/app/protocol_account_registry.py"
+      - "backend/app/routers/plans.py"
+      - "backend/tests/plan_protocol_ui_v1_smoke.py"
+      - ".github/workflows/plan-protocol-ui-v1-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "components/legacy-plans-exact.tsx"
+      - "lib/plan-protocol-api.ts"
+      - "backend/app/protocol_account_registry.py"
+      - "backend/app/routers/plans.py"
+      - "backend/tests/plan_protocol_ui_v1_smoke.py"
+      - ".github/workflows/plan-protocol-ui-v1-smoke.yml"
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify canonical all-15 plan protocol UI contract
+        run: python3 backend/tests/plan_protocol_ui_v1_smoke.py
