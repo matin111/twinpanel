@@ -6,9 +6,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "backend/app/protocol_account_registry.py"
-PLANS_ROUTER = ROOT / "backend/app/routers/plans.py"
 PLAN_UI = ROOT / "components/legacy-plans-exact.tsx"
-PLAN_CLIENT = ROOT / "lib/plan-protocol-api.ts"
+PLAN_ROUTER = ROOT / "backend/app/routers/plans.py"
+SUBSCRIPTION_UI = ROOT / "components/admin-manual-subscription-create.tsx"
+SUBSCRIPTION_CLIENT = ROOT / "lib/subscription-protocol-api.ts"
+SUBSCRIPTION_ROUTER = ROOT / "backend/app/routers/subscription_admin_v2.py"
+SUBSCRIPTION_FACTORY = ROOT / "backend/app/services/subscription_factory.py"
 
 
 def _tuple_assignment(source: str, name: str) -> tuple[str, ...]:
@@ -36,33 +39,47 @@ def main() -> None:
     assert len(canonical) == 15, canonical
     assert len(set(canonical)) == 15, canonical
 
-    plans_router = PLANS_ROUTER.read_text(encoding="utf-8")
-    assert '"/protocol-catalog"' in plans_router
-    assert '"/{plan_id}/protocols"' in plans_router
-    assert "registry_payload()" in plans_router
-    assert "replace_plan_protocols(db, plan.id, protocols)" in plans_router
+    plan_ui = PLAN_UI.read_text(encoding="utf-8")
+    assert "planProtocolApi" not in plan_ui
+    assert "selectedProtocols" not in plan_ui
+    assert "classicCatalog" not in plan_ui
+    assert "modernCatalog" not in plan_ui
+    assert "پروتکل در پلن تعریف نمی‌شود" in plan_ui
+    assert "پروتکل‌ها هنگام ساخت هر اشتراک انتخاب می‌شوند" in plan_ui
 
-    client = PLAN_CLIENT.read_text(encoding="utf-8")
-    assert '"/v1/plans/protocol-catalog"' in client
-    assert "`/v1/plans/${planId}/protocols`" in client
-    assert 'method:"PUT"' in client
-    assert "JSON.stringify({protocols})" in client
+    plan_router = PLAN_ROUTER.read_text(encoding="utf-8")
+    assert "انتخاب پروتکل از پلن حذف شده است" in plan_router
+    assert "replace_plan_protocols" not in plan_router
+    assert "PlanProtocol" not in plan_router
 
-    ui = PLAN_UI.read_text(encoding="utf-8")
-    assert "planProtocolApi.catalog()" in ui
-    assert "planProtocolApi.get(id)" in ui
-    assert "planProtocolApi.set(planId,selectedProtocols)" in ui
+    client = SUBSCRIPTION_CLIENT.read_text(encoding="utf-8")
+    assert '"/v1/subscriptions/protocol-catalog"' in client
+
+    router = SUBSCRIPTION_ROUTER.read_text(encoding="utf-8")
+    assert '@router.get("/protocol-catalog")' in router
+    assert "registry_payload()" in router
+    assert "requested_protocols = _canonical_protocols(payload.protocols)" in router
+    assert "هنگام ساخت اشتراک حداقل یک پروتکل انتخاب کنید" in router
+
+    factory = SUBSCRIPTION_FACTORY.read_text(encoding="utf-8")
+    assert "requested_protocols = normalize_protocols(protocols)" in factory
+    assert "plan_protocols" not in factory
+    assert "protocol not in PROTOCOL_FIELDS" not in factory
+    assert "CLASSIC_PROTOCOL_KEYS" in factory
+    assert "if protocol not in CLASSIC_PROTOCOL_KEYS" in factory
+
+    ui = SUBSCRIPTION_UI.read_text(encoding="utf-8")
+    assert "subscriptionProtocolApi.catalog()" in ui
     assert 'item.family==="classic"' in ui
     assert 'item.family==="modern"' in ui
-    assert "classicCatalog.map" in ui
-    assert "modernCatalog.map" in ui
-    assert 'href="/admin/modern-protocols"' in ui
-    assert "catalog.length!==15" in ui
+    assert "selectAllProtocols" in ui
+    assert "clearProtocols" in ui
+    assert "انتخاب همه ۱۵ پروتکل" in ui
+    assert "لغو انتخاب همه" in ui
+    assert "protocols.length}/15" in ui
+    assert "plan_id:planId||null" in ui
 
-    legacy_literal = 'const protocolKeys=["cisco","openvpn","wireguard","l2tp","v2ray"]'
-    assert legacy_literal not in ui, "plan UI must not use the legacy five-protocol list as authority"
-
-    print("PLAN_PROTOCOL_UI_V1_OK")
+    print("SUBSCRIPTION_OWNED_PROTOCOL_SELECTION_OK")
     print("CLASSIC=" + ",".join(classic))
     print("MODERN=" + ",".join(modern))
     print("TOTAL=15")

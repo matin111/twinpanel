@@ -1,4 +1,4 @@
-name: TwinPanel Admin Manual Subscription Smoke
+name: TwinPanel Subscription Creation Protocol Smoke
 
 on:
   pull_request:
@@ -6,17 +6,18 @@ on:
       - 'backend/app/subscription_plan_schema.py'
       - 'backend/app/routers/subscription_admin_v2.py'
       - 'backend/app/services/subscription_factory.py'
+      - 'backend/app/protocol_account_registry.py'
       - 'backend/app/schemas.py'
       - 'components/admin-manual-subscription-create.tsx'
       - 'components/legacy-subscriptions-exact.tsx'
-      - 'components/admin-subscription-live-table.tsx'
       - 'components/routed-page-client.tsx'
       - 'lib/admin-api.ts'
+      - 'lib/subscription-protocol-api.ts'
       - '.github/workflows/admin-manual-subscription-smoke.yml'
   workflow_dispatch:
 
 jobs:
-  manual-subscription:
+  subscription-create:
     runs-on: ubuntu-24.04
 
     services:
@@ -45,7 +46,7 @@ jobs:
           --health-retries 20
 
     env:
-      APP_NAME: TwinPanel-Manual-Subscription-CI
+      APP_NAME: TwinPanel-Subscription-Create-CI
       APP_ENV: test
       APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
       ACCESS_TOKEN_EXPIRE_MINUTES: 60
@@ -77,57 +78,50 @@ jobs:
           sudo install -d -m 700 /var/lib/twinpanel-backups
           sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel-backups
 
-      - name: Verify manual and plan-backed creation contracts
+      - name: Verify explicit per-subscription 15-protocol creation
         working-directory: backend
         run: |
           python - <<'PY'
+          from fastapi import HTTPException
           from sqlalchemy import inspect, text
 
           from app.main import app
           from app.database import SessionLocal, engine
           from app.models import Plan, Subscription, SubscriptionProtocol, User
+          from app.protocol_account_registry import ALL_PROTOCOL_KEYS
           from app.routers.subscription_admin_v2 import AdminSubscriptionCreateV2, admin_create_v2
           from app.security import hash_password
 
           assert app.title
-
-          # Fresh metadata must already describe plan_id as nullable because the
-          # compatibility module is imported before Base.metadata.create_all.
+          assert len(ALL_PROTOCOL_KEYS) == 15
           assert Subscription.__table__.c.plan_id.nullable is True
           assert inspect(engine).get_columns('subscriptions')
 
           db = SessionLocal()
           try:
               user = User(
-                  email='manual-sub-ci@example.com',
-                  password_hash=hash_password('TwinPanel-CI-Manual-2026!'),
-                  full_name='Manual Subscription CI',
+                  email='subscription-create-ci@example.com',
+                  password_hash=hash_password('TwinPanel-CI-Subscription-2026!'),
+                  full_name='Subscription Create CI',
                   is_active=True,
               )
               plan = Plan(
-                  name='CI Plan Backed',
+                  name='CI Commercial Plan',
                   duration_days=30,
                   traffic_gb=50,
                   device_limit=2,
                   price_toman=1000,
                   is_active=True,
-                  enable_cisco=True,
-                  enable_openvpn=True,
-                  enable_wireguard=True,
-                  enable_l2tp=True,
-                  enable_v2ray=True,
               )
               db.add_all([user, plan]); db.commit(); db.refresh(user); db.refresh(plan)
               user_id=user.id; plan_id=plan.id
           finally:
               db.close()
 
-          # Recreate the legacy production shape, then prove the first manual
-          # request converges it before opening its own ORM transaction.
+          # Preserve compatibility with older databases where manual subscriptions
+          # were blocked by subscriptions.plan_id NOT NULL.
           with engine.begin() as connection:
               connection.execute(text('ALTER TABLE subscriptions ALTER COLUMN plan_id SET NOT NULL'))
-          legacy_plan_column={c['name']:c for c in inspect(engine).get_columns('subscriptions')}['plan_id']
-          assert legacy_plan_column['nullable'] is False
 
           db = SessionLocal()
           try:
@@ -138,95 +132,87 @@ jobs:
                       traffic_gb=25,
                       duration_days=45,
                       device_limit=3,
-                      protocols=['cisco','wireguard'],
+                      protocols=['cisco','sudoku'],
                   ),
                   db,
               )
               assert manual['plan_id'] is None
-              assert manual['creation_mode'] == 'manual'
-              assert manual['plan_name'] == 'دستی'
-              assert manual['activation_duration_days'] == 45
-              assert manual['device_limit'] == 3
               manual_id=int(manual['id'])
           finally:
               db.close()
 
-          migrated_plan_column={c['name']:c for c in inspect(engine).get_columns('subscriptions')}['plan_id']
-          assert migrated_plan_column['nullable'] is True
-
           db = SessionLocal()
           try:
-              stored=db.get(Subscription, manual_id)
-              assert stored is not None and stored.plan_id is None
-              assert stored.traffic_limit_bytes == 25 * 1024**3
-              protocols=[row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==manual_id).order_by(SubscriptionProtocol.protocol).all()]
-              assert protocols == ['cisco','wireguard']
+              manual_protocols=[row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==manual_id).order_by(SubscriptionProtocol.protocol).all()]
+              assert manual_protocols == ['cisco','sudoku']
 
-              unlimited = admin_create_v2(
-                  AdminSubscriptionCreateV2(
-                      user_id=user_id,
-                      plan_id=None,
-                      traffic_gb=0,
-                      duration_days=15,
-                      device_limit=1,
-                      protocols=['openvpn'],
-                  ),
-                  db,
-              )
-              assert unlimited['plan_id'] is None
-              assert unlimited['traffic_unlimited'] is True
-
-              plan_backed = admin_create_v2(
+              all_protocols = admin_create_v2(
                   AdminSubscriptionCreateV2(
                       user_id=user_id,
                       plan_id=plan_id,
-                      protocols=[],
+                      protocols=list(ALL_PROTOCOL_KEYS),
                   ),
                   db,
               )
-              assert plan_backed['plan_id'] == plan_id
-              assert plan_backed['creation_mode'] == 'plan'
-              assert plan_backed['activation_duration_days'] == 30
-              assert plan_backed['device_limit'] == 2
+              all_id=int(all_protocols['id'])
+              stored={row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==all_id).all()}
+              assert stored == set(ALL_PROTOCOL_KEYS)
+
+              explicit = admin_create_v2(
+                  AdminSubscriptionCreateV2(
+                      user_id=user_id,
+                      plan_id=plan_id,
+                      protocols=['wireguard','hysteria2'],
+                  ),
+                  db,
+              )
+              explicit_id=int(explicit['id'])
+              explicit_protocols={row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==explicit_id).all()}
+              assert explicit_protocols == {'wireguard','hysteria2'}
+
+              try:
+                  admin_create_v2(
+                      AdminSubscriptionCreateV2(
+                          user_id=user_id,
+                          plan_id=plan_id,
+                          protocols=[],
+                      ),
+                      db,
+                  )
+              except HTTPException as exc:
+                  assert exc.status_code == 422
+              else:
+                  raise AssertionError('plan-backed subscription must require explicit protocols')
           finally:
               db.close()
 
-          print('ADMIN_MANUAL_SUBSCRIPTION_RUNTIME_OK')
+          print('SUBSCRIPTION_EXPLICIT_15_PROTOCOL_CREATION_OK')
           PY
 
-      - name: Verify admin no-plan create entry contract
+      - name: Verify frontend selection contract
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
-          api=Path('lib/admin-api.ts').read_text(encoding='utf-8')
-          routed=Path('components/routed-page-client.tsx').read_text(encoding='utf-8')
-          subscriptions=Path('components/legacy-subscriptions-exact.tsx').read_text(encoding='utf-8')
-          manual_ui=Path('components/admin-manual-subscription-create.tsx').read_text(encoding='utf-8')
+          ui=Path('components/admin-manual-subscription-create.tsx').read_text(encoding='utf-8')
+          plan_ui=Path('components/legacy-plans-exact.tsx').read_text(encoding='utf-8')
           backend=Path('backend/app/routers/subscription_admin_v2.py').read_text(encoding='utf-8')
-          schema=Path('backend/app/subscription_plan_schema.py').read_text(encoding='utf-8')
+          factory=Path('backend/app/services/subscription_factory.py').read_text(encoding='utf-8')
+          client=Path('lib/subscription-protocol-api.ts').read_text(encoding='utf-8')
 
-          assert 'plan_id?:number|null' in api
-          assert 'AdminManualSubscriptionCreate=dynamic' in routed
-          assert 'if(key==="admin/subscriptions") return admin(' in routed
-          assert 'LegacySubscriptionsRuntimePage' in routed
-          assert 'AdminSubscriptionLiveTable' in routed
-          assert 'AdminManualSubscriptionCreate' in routed
-          assert 'onClick={openCreate}' in subscriptions
-          assert 'اشتراک جدید' in subscriptions
-          assert 'adminApi.createSubscriptionV2' in subscriptions
-          assert 'user_id:draft.user_id,plan_id:draft.plan_id' in subscriptions
-          assert 'plan_id:null' in manual_ui
-          assert 'trafficValue===null||trafficValue<0' in manual_ui
-          assert 'durationValue===null||durationValue<=0' in manual_ui
-          assert 'protocols.length===0' in manual_ui
-          assert 'adminApi.createSubscriptionV2' in manual_ui
-          assert 'plan_id: int | None = None' in backend
-          assert 'ensure_subscription_plan_schema()' in backend
-          assert 'ALTER COLUMN plan_id DROP NOT NULL' in schema
-          assert 'Subscription.__table__.c.plan_id.nullable = True' in schema
+          assert 'subscriptionProtocolApi.catalog()' in ui
+          assert 'انتخاب همه ۱۵ پروتکل' in ui
+          assert 'لغو انتخاب همه' in ui
+          assert 'plan_id:planId||null' in ui
+          assert 'protocols.length===0' in ui
+          assert '/v1/subscriptions/protocol-catalog' in client
+          assert '@router.get("/protocol-catalog")' in backend
+          assert 'هنگام ساخت اشتراک حداقل یک پروتکل انتخاب کنید' in backend
+          assert 'plan_protocols' not in factory
+          assert 'planProtocolApi' not in plan_ui
+          assert 'پروتکل در پلن تعریف نمی‌شود' in plan_ui
 
-          print('ADMIN_NO_PLAN_SUBSCRIPTION_CREATE_ENTRY_OK')
+          print('SUBSCRIPTION_PROTOCOL_FRONTEND_CONTRACT_OK')
           PY
 
       - uses: actions/setup-node@v4

@@ -1,12 +1,15 @@
-name: Plan Protocol UI V1 Smoke
+name: Subscription Protocol Selection V3 Smoke
 
 on:
   pull_request:
     paths:
       - "components/legacy-plans-exact.tsx"
-      - "lib/plan-protocol-api.ts"
+      - "components/admin-manual-subscription-create.tsx"
+      - "lib/subscription-protocol-api.ts"
       - "backend/app/protocol_account_registry.py"
+      - "backend/app/routers/subscription_admin_v2.py"
       - "backend/app/routers/plans.py"
+      - "backend/app/services/subscription_factory.py"
       - "backend/tests/plan_protocol_ui_v1_smoke.py"
       - ".github/workflows/plan-protocol-ui-v1-smoke.yml"
   push:
@@ -14,9 +17,12 @@ on:
       - main
     paths:
       - "components/legacy-plans-exact.tsx"
-      - "lib/plan-protocol-api.ts"
+      - "components/admin-manual-subscription-create.tsx"
+      - "lib/subscription-protocol-api.ts"
       - "backend/app/protocol_account_registry.py"
+      - "backend/app/routers/subscription_admin_v2.py"
       - "backend/app/routers/plans.py"
+      - "backend/app/services/subscription_factory.py"
       - "backend/tests/plan_protocol_ui_v1_smoke.py"
       - ".github/workflows/plan-protocol-ui-v1-smoke.yml"
 
@@ -25,5 +31,5 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Verify canonical all-15 plan protocol UI contract
+      - name: Verify subscription-owned all-15 protocol selection contract
         run: python3 backend/tests/plan_protocol_ui_v1_smoke.py

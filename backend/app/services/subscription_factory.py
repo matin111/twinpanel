@@ -16,15 +16,14 @@ from ..models import (
     SubscriptionStatus,
     User,
 )
-from ..protocol_account_registry import normalize_protocols, plan_protocols
+from ..protocol_account_registry import CLASSIC_PROTOCOL_KEYS, normalize_protocols
 from ..quota_models import QuotaDevice
 from ..routers.general_settings import build_subscription_username
 
 
-# Compatibility/safety gate. Keep this explicit literal until the Modern
-# account + telemetry + revoke lifecycle in this PR is complete. The quota
-# contract smoke intentionally reads this assignment and prevents accidental
-# sale of a runtime-only protocol.
+# Legacy compatibility map used by older store/reseller call sites. It is no
+# longer the authority for subscription creation; create_subscription_core
+# accepts every canonical protocol from protocol_account_registry.
 PROTOCOL_FIELDS = {
     "cisco": "enable_cisco",
     "openvpn": "enable_openvpn",
@@ -87,15 +86,13 @@ def create_subscription_core(
             detail=str(exc),
         ) from exc
 
-    invalid = [
-        protocol
-        for protocol in requested_protocols
-        if protocol not in PROTOCOL_FIELDS
-    ]
-    if invalid:
+    # Protocol desired-state belongs to the Subscription, never to the Plan.
+    # Every creation path must submit the exact protocols selected for this
+    # account. This also prevents later Plan edits from changing live accounts.
+    if not requested_protocols:
         raise HTTPException(
             status_code=422,
-            detail="پروتکل هنوز چرخه کامل اکانت/سهمیه/لغو را ندارد",
+            detail="حداقل یک پروتکل برای این اشتراک انتخاب کنید",
         )
 
     # TWINPANEL_GLOBAL_NODES_FOR_ALL_SUBSCRIPTIONS_V1
@@ -109,19 +106,6 @@ def create_subscription_core(
         .order_by(Node.id.asc())
         .all()
     )
-
-    if not requested_protocols and plan is not None:
-        requested_protocols = [
-            protocol
-            for protocol in plan_protocols(db, plan)
-            if protocol in PROTOCOL_FIELDS
-        ]
-
-    if not requested_protocols:
-        raise HTTPException(
-            status_code=422,
-            detail="حداقل یک پروتکل آماده برای اشتراک انتخاب کنید",
-        )
 
     iran_node = next(
         (
@@ -196,7 +180,12 @@ def create_subscription_core(
 
     db.flush()
 
+    # Classic drivers historically start from the subscription username/password
+    # and then replace config material during provisioning. Modern drivers own
+    # their secret/key formats and must create them inside their real provisioner.
     for protocol in requested_protocols:
+        if protocol not in CLASSIC_PROTOCOL_KEYS:
+            continue
         db.add(
             ProtocolCredential(
                 subscription_id=sub.id,

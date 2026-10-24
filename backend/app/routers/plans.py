@@ -4,13 +4,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..models import Plan
-from ..plan_protocol_models import PlanProtocol
-from ..protocol_account_registry import (
-    legacy_plan_protocols,
-    plan_protocols,
-    registry_payload,
-    replace_plan_protocols,
-)
+from ..protocol_account_registry import registry_payload
 from ..reseller_owned_plans import (
     INTERNAL_PLAN_PREFIX,
     is_internal_reseller_plan,
@@ -26,16 +20,15 @@ def _central_plans(db: Session):
     )
 
 
-def _plan_protocol_payload(db: Session, plan: Plan) -> dict:
-    return {
-        "plan_id": int(plan.id),
-        "protocols": plan_protocols(db, plan),
-    }
-
-
 @router.get("/protocol-catalog", dependencies=[Depends(require_admin)])
 def protocol_catalog():
-    return {"protocols": registry_payload()}
+    # Backward-compatible catalog URL for older clients. Protocol desired-state
+    # no longer belongs to a Plan; new UI uses /v1/subscriptions/protocol-catalog.
+    return {
+        "deprecated": True,
+        "selection_scope": "subscription",
+        "protocols": registry_payload(),
+    }
 
 
 @router.get("", response_model=list[PlanOut])
@@ -68,7 +61,13 @@ def get_plan_protocols(
     plan = db.get(Plan, plan_id)
     if not plan or is_internal_reseller_plan(plan):
         raise HTTPException(status_code=404, detail="پلن پیدا نشد")
-    return _plan_protocol_payload(db, plan)
+    return {
+        "plan_id": int(plan.id),
+        "protocols": [],
+        "deprecated": True,
+        "selection_scope": "subscription",
+        "message": "پروتکل‌ها هنگام ساخت هر اشتراک انتخاب می‌شوند",
+    }
 
 
 @router.put(
@@ -84,17 +83,15 @@ def set_plan_protocols(
     if not plan or is_internal_reseller_plan(plan):
         raise HTTPException(status_code=404, detail="پلن پیدا نشد")
 
-    try:
-        values = replace_plan_protocols(db, plan.id, protocols)
-    except ValueError as exc:
-        db.rollback()
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    db.commit()
-    return {
-        "plan_id": int(plan.id),
-        "protocols": values,
-    }
+    # Keep the route only to make old clients fail explicitly rather than
+    # silently persisting stale plan entitlements.
+    raise HTTPException(
+        status_code=409,
+        detail=(
+            "انتخاب پروتکل از پلن حذف شده است؛ "
+            "پروتکل‌ها را هنگام ساخت یا مدیریت خود اشتراک انتخاب کنید"
+        ),
+    )
 
 
 @router.post(
@@ -111,14 +108,6 @@ def create_plan(payload: PlanCreate, db: Session = Depends(get_db)):
 
     plan = Plan(**payload.model_dump())
     db.add(plan)
-    db.flush()
-
-    # New plans start with an explicit entitlement set matching the existing
-    # classic switches. Admin can then enable any of the 15 protocols through
-    # the canonical /protocols endpoint without a schema migration per protocol.
-    for protocol in legacy_plan_protocols(plan):
-        db.add(PlanProtocol(plan_id=plan.id, protocol=protocol))
-
     db.commit()
     db.refresh(plan)
     return plan
