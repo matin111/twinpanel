@@ -16,7 +16,7 @@ from ..models import (
     SubscriptionStatus,
     User,
 )
-from ..protocol_account_registry import normalize_protocols
+from ..protocol_account_registry import CLASSIC_PROTOCOL_KEYS, normalize_protocols
 from ..quota_models import QuotaDevice
 from ..routers.general_settings import build_subscription_username
 
@@ -180,7 +180,12 @@ def create_subscription_core(
 
     db.flush()
 
+    # Classic drivers historically start from the subscription username/password
+    # and then replace config material during provisioning. Modern drivers own
+    # their secret/key formats and must create them inside their real provisioner.
     for protocol in requested_protocols:
+        if protocol not in CLASSIC_PROTOCOL_KEYS:
+            continue
         db.add(
             ProtocolCredential(
                 subscription_id=sub.id,
