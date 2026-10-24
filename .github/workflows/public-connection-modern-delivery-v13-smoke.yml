@@ -5,9 +5,11 @@ on:
     paths:
       - "backend/app/routers/public_connection_hub_live_v5.py"
       - "backend/app/routers/public_connection_modern_delivery_v13.py"
+      - "backend/app/routers/public_connection_modern_names_v14.py"
       - "backend/app/singbox_subscription_accounts.py"
       - "backend/app/standalone_subscription_accounts.py"
       - "backend/tests/public_connection_modern_delivery_v13_smoke.py"
+      - "backend/tests/public_connection_modern_names_v14_smoke.py"
       - ".github/workflows/public-connection-modern-delivery-v13-smoke.yml"
   workflow_dispatch:
 
@@ -24,6 +26,9 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/routers/public_connection_hub_live_v5.py \
-            backend/app/routers/public_connection_modern_delivery_v13.py
+            backend/app/routers/public_connection_modern_delivery_v13.py \
+            backend/app/routers/public_connection_modern_names_v14.py
       - name: Verify modern delivery contract
-        run: python backend/tests/public_connection_modern_delivery_v13_smoke.py
+        run: |
+          python backend/tests/public_connection_modern_delivery_v13_smoke.py
+          python backend/tests/public_connection_modern_names_v14_smoke.py
