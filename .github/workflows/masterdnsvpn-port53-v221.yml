@@ -31,13 +31,13 @@ jobs:
 
           assert 'install_masterdnsvpn_port53_v221_hooks()' in init
           assert 'systemctl stop' in hook
-          assert 'os.path.realpath(f"/proc/{pid}/exe")' in hook
+          assert 'os.path.realpath(f"/proc/{{pid}}/exe")' in hook
           assert 'return config in args' in hook
           assert 'os.kill(pid, signal.SIGTERM)' in hook
           assert 'UDP53_EXACT_IP_CONFLICT' in hook
           assert 'UDP53_WILDCARD_PRESENT=' in hook
           assert 'if public_ip in hosts:' in hook
-          assert 'hosts.intersection({"0.0.0.0", "::", "*"})' in hook
+          assert 'hosts.intersection({{"0.0.0.0", "::", "*"}})' in hook
           assert 'MASTERDNSVPN_EXACT_UDP53_LISTENER_MISSING' in hook
 
           # V221 must never kill or stop unrelated DNS daemons.
