@@ -136,15 +136,16 @@ fixed_item = {
 }
 assert requires_repair(fixed_item) is False
 
-# Reconcile must classify only the bad complete Naive payload as a repair
-# candidate, re-check the state under the row lock, and include it in the
-# bounded background self-heal scan.
+# Reconcile must continue to classify the bad complete Naive payload as a
+# repair candidate even when other identity-preserving legacy repair states are
+# added to the shared bounded background scan.
 for marker in (
     "def _reconcile_credential_state(",
     'return "legacy_naive_client"',
     "protocol: _reconcile_credential_state(credentials.get(protocol))",
     "current_state = _reconcile_credential_state(current)",
-    '{"missing", "legacy_empty", "legacy_naive_client"}',
+    '"legacy_naive_client"',
+    "_LEGACY_REPAIR_STATES",
 ):
     assert marker in reconcile_source, marker
 
