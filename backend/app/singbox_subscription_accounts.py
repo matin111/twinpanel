@@ -187,7 +187,7 @@ if not users:
 inbound["users"] = users
 with open(CONFIG + ".account-new", "w", encoding="utf-8") as handle:
     json.dump(doc, handle, ensure_ascii=False, indent=2)
-    handle.write("\\n")
+    handle.write("\n")
 os.chmod(CONFIG + ".account-new", 0o600)
 print("account_users=" + str(len(users)))
 '''
@@ -298,6 +298,50 @@ def _client_tls(node: Node, inbound: dict[str, Any], *, server_name: str | None 
     }
 
 
+def naive_client_item_requires_repair(item: dict[str, Any]) -> bool:
+    """Detect legacy Naive client payloads rejected by sing-box.
+
+    Naive outbound has its own restricted TLS schema and rejects tls.insecure,
+    even though other TLS-capable sing-box outbounds accept that field. Older
+    TwinPanel releases stored both an `outbound` object and a serialized config,
+    so inspect both representations before deciding whether a complete
+    credential needs a non-rotating delivery refresh.
+    """
+
+    if not isinstance(item, dict):
+        return False
+
+    outbound = item.get("outbound")
+    if isinstance(outbound, dict) and str(outbound.get("type") or "").lower() == "naive":
+        tls = outbound.get("tls")
+        if isinstance(tls, dict) and "insecure" in tls:
+            return True
+
+    raw_config = str(item.get("config") or "").strip()
+    if not raw_config:
+        return False
+
+    try:
+        config = json.loads(raw_config)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return False
+
+    outbounds = config.get("outbounds") if isinstance(config, dict) else None
+    if not isinstance(outbounds, list):
+        return False
+
+    for candidate in outbounds:
+        if not isinstance(candidate, dict):
+            continue
+        if str(candidate.get("type") or "").lower() != "naive":
+            continue
+        tls = candidate.get("tls")
+        if isinstance(tls, dict) and "insecure" in tls:
+            return True
+
+    return False
+
+
 def client_outbound(
     node: Node,
     secret: SingBoxAccountSecret,
@@ -347,11 +391,15 @@ def client_outbound(
         })
 
     elif protocol == "naive":
+        tls = _client_tls(node, inbound)
+        # sing-box Naive outbound rejects tls.insecure. Preserve only the TLS
+        # fields supported by Naive while leaving other protocols unchanged.
+        tls.pop("insecure", None)
         out.update({
             "username": secret.username,
             "password": secret.password,
             "quic_congestion_control": str(inbound.get("quic_congestion_control") or "bbr"),
-            "tls": _client_tls(node, inbound),
+            "tls": tls,
         })
         if str(inbound.get("network") or "").lower() == "udp":
             out["quic"] = True
