@@ -1,5 +1,5 @@
-import {DnsEmergencyIranPanel} from "../../../components/dns-emergency-iran-panel";
+import {redirect} from "next/navigation";
 
 export default function Page(){
-  return <DnsEmergencyIranPanel/>;
+  redirect("/admin/dns-emergency");
 }

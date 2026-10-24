@@ -1,5 +1,5 @@
-import {MasterDnsVpnPanel} from "../../../components/masterdnsvpn-panel";
+import {redirect} from "next/navigation";
 
 export default function Page(){
-  return <MasterDnsVpnPanel/>;
+  redirect("/admin/dns-emergency");
 }
