@@ -18,6 +18,7 @@ compile(reconcile_source, str(RECONCILE_PATH), "exec")
 tree = ast.parse(singbox_source, filename=str(SINGBOX_PATH))
 wanted = {
     "_client_tls",
+    "_naive_tls_requires_repair",
     "naive_client_item_requires_repair",
     "client_outbound",
 }
@@ -68,6 +69,10 @@ naive_inbound = {
         "certificate_path": "/etc/twinpanel/sing-box/cert.pem",
     },
 }
+naive_certificate = """-----BEGIN CERTIFICATE-----
+VEVTVF9DRVJUSUZJQ0FURQ==
+-----END CERTIFICATE-----
+"""
 
 naive = client_outbound(
     node,
@@ -75,6 +80,7 @@ naive = client_outbound(
     naive_inbound,
     server="203.0.113.10",
     port=443,
+    tls_certificate=naive_certificate,
 )
 assert naive["type"] == "naive"
 assert naive["quic"] is True
@@ -82,6 +88,7 @@ assert naive["quic_congestion_control"] == "bbr"
 assert naive["tls"]["enabled"] is True
 assert naive["tls"]["server_name"] == "203.0.113.10"
 assert "insecure" not in naive["tls"]
+assert naive["tls"]["certificate"] == naive_certificate
 
 # The fix is protocol-specific. Existing TLS behavior for the other sing-box
 # client outbounds must remain unchanged.
@@ -126,9 +133,24 @@ legacy_item = {
 }
 assert requires_repair(legacy_item) is True
 
+# v218 removed tls.insecure but did not provide a replacement trust anchor.
+# That payload validates syntactically yet fails the real TLS handshake with
+# Chromium ERR_CERT_AUTHORITY_INVALID (-202), so it also needs self-healing.
+untrusted_v218 = dict(naive)
+untrusted_v218["tls"] = {
+    "enabled": True,
+    "server_name": "203.0.113.10",
+}
+untrusted_v218_item = {
+    "outbound": untrusted_v218,
+    "config": json.dumps({"outbounds": [untrusted_v218]}),
+}
+assert requires_repair(untrusted_v218_item) is True
+
 # Detect legacy payloads even if only the serialized config representation is
 # present, because older credentials may not retain the convenience outbound.
 assert requires_repair({"config": legacy_item["config"]}) is True
+assert requires_repair({"config": untrusted_v218_item["config"]}) is True
 
 fixed_item = {
     "outbound": naive,
@@ -136,9 +158,20 @@ fixed_item = {
 }
 assert requires_repair(fixed_item) is False
 
-# Reconcile must continue to classify the bad complete Naive payload as a
-# repair candidate even when other identity-preserving legacy repair states are
-# added to the shared bounded background scan.
+# The account provisioning path must read the server's actual configured
+# certificate and carry it into the Naive client item. This keeps verification
+# enabled without reintroducing the unsupported tls.insecure field.
+for marker in (
+    "async def _read_naive_tls_certificate(",
+    'if secret.protocol == "naive":',
+    "tls_certificate = await _read_naive_tls_certificate(conn, inbound)",
+    "tls_certificate=tls_certificate",
+    'tls["certificate"] = certificate + "\\n"',
+):
+    assert marker in singbox_source, marker
+
+# Reconcile must continue to classify bad complete Naive payloads as repair
+# candidates so existing credentials can refresh without rotating identity.
 for marker in (
     "def _reconcile_credential_state(",
     'return "legacy_naive_client"',
@@ -151,5 +184,6 @@ for marker in (
 
 print("NAIVE_CLIENT_TLS_V218_SMOKE=PASS")
 print("NAIVE_TLS_INSECURE=OMITTED")
+print("NAIVE_TLS_CERTIFICATE=EMBEDDED")
 print("OTHER_TLS_BEHAVIOR=PRESERVED")
 print("LEGACY_NAIVE_DELIVERY=SELF_HEAL_CANDIDATE")

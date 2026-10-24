@@ -242,6 +242,19 @@ async def read_inbound(conn, protocol: str) -> dict[str, Any]:
     return value
 
 
+async def _read_naive_tls_certificate(conn, inbound: dict[str, Any]) -> str:
+    server_tls = inbound.get("tls") if isinstance(inbound.get("tls"), dict) else {}
+    cert_path = str(server_tls.get("certificate_path") or "").strip()
+    if not cert_path:
+        raise SingBoxAccountError("Naive TLS certificate path is missing")
+
+    raw = await cmd(conn, f"cat -- {shlex.quote(cert_path)}")
+    certificate = str(raw or "").strip()
+    if "-----BEGIN CERTIFICATE-----" not in certificate or "-----END CERTIFICATE-----" not in certificate:
+        raise SingBoxAccountError("Naive TLS certificate is invalid")
+    return certificate + "\n"
+
+
 async def apply_account(
     conn,
     node: Node,
@@ -261,7 +274,15 @@ async def apply_account(
         ),
     )
     inbound = await read_inbound(conn, secret.protocol)
-    return client_item(node, secret, inbound)
+    tls_certificate = None
+    if secret.protocol == "naive":
+        tls_certificate = await _read_naive_tls_certificate(conn, inbound)
+    return client_item(
+        node,
+        secret,
+        inbound,
+        tls_certificate=tls_certificate,
+    )
 
 
 async def remove_account(
@@ -298,14 +319,22 @@ def _client_tls(node: Node, inbound: dict[str, Any], *, server_name: str | None 
     }
 
 
-def naive_client_item_requires_repair(item: dict[str, Any]) -> bool:
-    """Detect legacy Naive client payloads rejected by sing-box.
+def _naive_tls_requires_repair(tls: Any) -> bool:
+    if not isinstance(tls, dict):
+        return True
+    if "insecure" in tls:
+        return True
+    certificate = str(tls.get("certificate") or "").strip()
+    return not certificate
 
-    Naive outbound has its own restricted TLS schema and rejects tls.insecure,
-    even though other TLS-capable sing-box outbounds accept that field. Older
-    TwinPanel releases stored both an `outbound` object and a serialized config,
-    so inspect both representations before deciding whether a complete
-    credential needs a non-rotating delivery refresh.
+
+def naive_client_item_requires_repair(item: dict[str, Any]) -> bool:
+    """Detect Naive payloads that cannot authenticate the managed TLS endpoint.
+
+    Naive outbound has a restricted TLS schema and rejects tls.insecure. Modern
+    TwinPanel therefore carries the server certificate as explicit trust
+    material. Legacy payloads either contain the rejected insecure field or no
+    certificate at all, so both forms require a non-rotating delivery refresh.
     """
 
     if not isinstance(item, dict):
@@ -313,9 +342,7 @@ def naive_client_item_requires_repair(item: dict[str, Any]) -> bool:
 
     outbound = item.get("outbound")
     if isinstance(outbound, dict) and str(outbound.get("type") or "").lower() == "naive":
-        tls = outbound.get("tls")
-        if isinstance(tls, dict) and "insecure" in tls:
-            return True
+        return _naive_tls_requires_repair(outbound.get("tls"))
 
     raw_config = str(item.get("config") or "").strip()
     if not raw_config:
@@ -335,9 +362,7 @@ def naive_client_item_requires_repair(item: dict[str, Any]) -> bool:
             continue
         if str(candidate.get("type") or "").lower() != "naive":
             continue
-        tls = candidate.get("tls")
-        if isinstance(tls, dict) and "insecure" in tls:
-            return True
+        return _naive_tls_requires_repair(candidate.get("tls"))
 
     return False
 
@@ -349,6 +374,7 @@ def client_outbound(
     *,
     server: str | None = None,
     port: int | None = None,
+    tls_certificate: str | None = None,
 ) -> dict[str, Any]:
     protocol = secret.protocol
     host = str(server or _node_host(node)).strip()
@@ -392,9 +418,12 @@ def client_outbound(
 
     elif protocol == "naive":
         tls = _client_tls(node, inbound)
-        # sing-box Naive outbound rejects tls.insecure. Preserve only the TLS
-        # fields supported by Naive while leaving other protocols unchanged.
+        # Naive does not accept tls.insecure. Keep certificate verification on
+        # and provide the exact server chain as supported trust material.
         tls.pop("insecure", None)
+        certificate = str(tls_certificate or "").strip()
+        if certificate:
+            tls["certificate"] = certificate + "\n"
         out.update({
             "username": secret.username,
             "password": secret.password,
@@ -442,6 +471,7 @@ def client_item(
     *,
     server: str | None = None,
     port: int | None = None,
+    tls_certificate: str | None = None,
 ) -> dict[str, Any]:
     outbound = client_outbound(
         node,
@@ -449,6 +479,7 @@ def client_item(
         inbound,
         server=server,
         port=port,
+        tls_certificate=tls_certificate,
     )
     config = {
         "log": {"level": "warn"},
