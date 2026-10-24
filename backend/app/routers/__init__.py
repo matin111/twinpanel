@@ -48,6 +48,7 @@ from . import runtime_endpoints as _runtime_endpoints
 from .classic_protocol_admin_v1 import router as _classic_protocol_admin_v1_router
 from .storefront_theme_media import router as _storefront_theme_media_router
 from .modern_account_delivery_v1 import router as _modern_account_delivery_v1_router
+from .modern_legacy_reconcile_v1 import router as _modern_legacy_reconcile_v1_router
 from .modern_enforcement_runtime_v1 import router as _modern_enforcement_runtime_v1_router
 from .subscription_protocol_lifecycle_v2 import router as _subscription_protocol_lifecycle_v2_router
 from .dns_emergency import router as _dns_emergency_router
@@ -71,9 +72,15 @@ from .manual_authority_v193 import router as _manual_authority_v193_router
 # The exact admin-edit route is also mounted here before legacy Account Delivery
 # so SubscriptionProtocol can be the final desired-state authority for all 15
 # protocols without rewriting the legacy delivery module.
+#
+# TWINPANEL_MODERN_LEGACY_RECONCILE_V1
+# Old installations may retain empty Modern ProtocolCredential placeholders
+# created before Modern drivers owned their identity. Reconcile only missing or
+# fully empty selected Modern credentials; partial identities fail closed.
 _runtime_endpoints.router.include_router(_modern_enforcement_runtime_v1_router)
 _runtime_endpoints.router.include_router(_subscription_protocol_lifecycle_v2_router)
 _runtime_endpoints.router.include_router(_modern_account_delivery_v1_router)
+_runtime_endpoints.router.include_router(_modern_legacy_reconcile_v1_router)
 _runtime_endpoints.router.include_router(_manual_authority_v193_router)
 _runtime_endpoints.router.include_router(_classic_protocol_admin_v1_router)
 _runtime_endpoints.router.include_router(_storefront_theme_media_router)
