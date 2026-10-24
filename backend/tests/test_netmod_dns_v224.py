@@ -98,7 +98,8 @@ def test_install_runtime_is_private_ssh_plus_dnstt_plus_exact_udp53_redirect():
     assert f"203.0.113.8:{DNSTT_PORT}" in script
     assert "t.example.com" in script
     assert "--dport 53" in script
-    assert f"--to-ports {DNSTT_PORT}" in script
+    assert f"TO_PORT={DNSTT_PORT}" in script
+    assert '--to-ports "$TO_PORT"' in script
     assert "-d \"$IP\"" in script
     assert "TwinPanel-NetMod-DNS" in script
 
