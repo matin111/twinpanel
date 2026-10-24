@@ -55,6 +55,14 @@ from .dns_emergency import router as _dns_emergency_router
 from .dns_emergency_iran import router as _dns_emergency_iran_router
 from .dns_emergency_masterdnsvpn import router as _dns_emergency_masterdnsvpn_router
 
+# TWINPANEL_MASTERDNSVPN_PORT53_V221
+# rc.220 over-classified wildcard UDP/53 listeners as fatal and could not
+# recover a stale TwinPanel-owned MasterDnsVPN process outside systemd. Install
+# the narrow compatibility hook after the MasterDnsVPN module is fully loaded.
+from ..masterdnsvpn_port53_v221 import install_masterdnsvpn_port53_v221_hooks
+
+install_masterdnsvpn_port53_v221_hooks()
+
 # TWINPANEL_MANUAL_AUTHORITY_REGISTER_V193
 # Agent reports arrive on an exact route also retained in the legacy tunnels
 # router. Mount the corrected telemetry-only endpoint on runtime_endpoints,
