@@ -326,7 +326,7 @@ with open(state+".new","w",encoding="utf-8") as h: json.dump(accounts,h,separato
 os.chmod(state+".new",0o600); os.replace(state+".new",state)
 rows=[]
 for row in accounts.values(): rows += ["[[client]]","username = "+json.dumps(row["username"]),"password = "+json.dumps(row["password"]),"max_http2_conns = 4","max_http3_conns = 4",""]
-if not rows: rows=["[[client]]","username = "+json.dumps({REVOCATION_SENTINEL!r}),"password = "+json.dumps(secrets.token_urlsafe(48)),"max_http2_conns = 1","max_http3_conns = 1",""]
+if not rows: rows=["[[client]]","username = "+json.dumps({REVOCATION_SENTINEL!r}),"password = "+json.dumps(secrets.token_urlsafe(48)),"max_http2_conns = 1","max_http3_conns = 1,""]
 with open(out+".new","w",encoding="utf-8") as h: h.write("\\n".join(rows))
 os.chmod(out+".new",0o600); os.replace(out+".new",out)
 '''
@@ -363,7 +363,11 @@ os.chmod(config+".account-new",0o600); os.replace(config+".account-new",config)
 '''
     await _run_python(conn, script)
     await cmd(conn, "systemctl restart twinpanel-amneziawg.service && systemctl is-active --quiet twinpanel-amneziawg.service", timeout=180)
-    server_private = (await cmd(conn, f"awk -F'=' '/^PrivateKey/{{sub(/^[ \\t]+/,\"\",$2); print $2; exit}}' {config}", timeout=30)).strip()
+    server_private = (await cmd(
+        conn,
+        f"sed -nE 's/^[[:space:]]*PrivateKey[[:space:]]*=[[:space:]]*//p' {shlex.quote(config)} | head -n1",
+        timeout=30,
+    )).strip()
     if not server_private:
         raise StandaloneAccountError("AmneziaWG server private key unavailable")
     server_public = (await cmd(conn, f"printf '%s\\n' {shlex.quote(server_private)} | awg pubkey", timeout=30)).strip()
