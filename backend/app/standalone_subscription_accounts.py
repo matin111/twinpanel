@@ -363,7 +363,11 @@ os.chmod(config+".account-new",0o600); os.replace(config+".account-new",config)
 '''
     await _run_python(conn, script)
     await cmd(conn, "systemctl restart twinpanel-amneziawg.service && systemctl is-active --quiet twinpanel-amneziawg.service", timeout=180)
-    server_private = (await cmd(conn, f"awk -F'=' '/^PrivateKey/{{sub(/^[ \\t]+/,\"\",$2); print $2; exit}}' {config}", timeout=30)).strip()
+    server_private = (await cmd(
+        conn,
+        f"sed -nE 's/^[[:space:]]*PrivateKey[[:space:]]*=[[:space:]]*//p' {shlex.quote(config)} | head -n1",
+        timeout=30,
+    )).strip()
     if not server_private:
         raise StandaloneAccountError("AmneziaWG server private key unavailable")
     server_public = (await cmd(conn, f"printf '%s\\n' {shlex.quote(server_private)} | awg pubkey", timeout=30)).strip()
