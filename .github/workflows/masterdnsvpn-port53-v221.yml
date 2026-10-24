@@ -1,0 +1,85 @@
+name: TwinPanel MasterDnsVPN UDP53 V221
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/masterdnsvpn_port53_v221.py'
+      - 'backend/app/routers/__init__.py'
+      - '.github/workflows/masterdnsvpn-port53-v221.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout TwinPanel
+        uses: actions/checkout@v4
+
+      - name: Verify V221 syntax and safety contract
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 -m py_compile backend/app/masterdnsvpn_port53_v221.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          hook = Path('backend/app/masterdnsvpn_port53_v221.py').read_text(encoding='utf-8')
+          init = Path('backend/app/routers/__init__.py').read_text(encoding='utf-8')
+
+          assert 'install_masterdnsvpn_port53_v221_hooks()' in init
+          assert 'systemctl stop' in hook
+          assert 'os.path.realpath(f"/proc/{{pid}}/exe")' in hook
+          assert 'return config in args' in hook
+          assert 'os.kill(pid, signal.SIGTERM)' in hook
+          assert 'UDP53_EXACT_IP_CONFLICT' in hook
+          assert 'UDP53_WILDCARD_PRESENT=' in hook
+          assert 'if public_ip in hosts:' in hook
+          assert 'hosts.intersection({{"0.0.0.0", "::", "*"}})' in hook
+          assert 'MASTERDNSVPN_EXACT_UDP53_LISTENER_MISSING' in hook
+
+          # V221 must never kill or stop unrelated DNS daemons.
+          for forbidden in ('systemctl stop dnsmasq', 'systemctl disable dnsmasq',
+                            'systemctl stop systemd-resolved', 'pkill dnsmasq',
+                            'killall dnsmasq'):
+              assert forbidden not in hook
+          PY
+
+      - name: Verify exact-IP vs wildcard classification logic
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          public_ip = '204.10.192.96'
+          samples = [
+              'UNCONN 0 0 204.10.192.96:53 0.0.0.0:* users:(("foreign",pid=10,fd=3))',
+              'UNCONN 0 0 0.0.0.0:53 0.0.0.0:* users:(("dnsmasq",pid=20,fd=4))',
+              'UNCONN 0 0 [::]:53 [::]:* users:(("dnsmasq",pid=20,fd=6))',
+          ]
+
+          def host_from_endpoint(token: str):
+              token = token.strip()
+              if not token.endswith(':53'):
+                  return None
+              host = token[:-3]
+              if host.startswith('[') and host.endswith(']'):
+                  host = host[1:-1]
+              return host.split('%', 1)[0]
+
+          exact = []
+          wildcard = []
+          for line in samples:
+              endpoints = [host_from_endpoint(part) for part in line.split()]
+              hosts = {value for value in endpoints if value is not None}
+              if public_ip in hosts:
+                  exact.append(line)
+              elif hosts.intersection({'0.0.0.0', '::', '*'}):
+                  wildcard.append(line)
+
+          assert len(exact) == 1
+          assert 'foreign' in exact[0]
+          assert len(wildcard) == 2
+          assert all('dnsmasq' in line for line in wildcard)
+          PY
