@@ -253,6 +253,8 @@ async def _reconcile_subscription_modern_accounts(
                 nodes,
             )
 
+            if protocol_errors:
+                result["ok"] = False
             for item in protocol_errors:
                 result["errors"].append(dict(item))
 
