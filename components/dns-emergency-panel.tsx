@@ -8,56 +8,51 @@ import {useI18n} from "../lib/i18n";
 import {Badge, PageHead, Shell} from "./ui";
 import styles from "./dns-emergency-panel.module.css";
 
-type Candidate={
-  protocol:string;
-  port:number;
-  transport:string;
-  service:string;
-  status:string;
-  recommended:boolean;
-};
-
-type ClientInfo={
-  engine:string;
-  domain:string;
-  public_key:string;
-  local_listen:string;
-  command_example:string;
-  nm_dns:null;
-  nm_dns_reason:string;
-};
-
-type DnsNode={
+type NetModNode={
   node_id:number;
   node_name:string;
   public_ip:string;
   status:string;
   tunnel_domain?:string|null;
   nameserver_host?:string|null;
-  upstream_port?:number|null;
   public_key?:string|null;
   last_error?:string|null;
   checked_at?:string|null;
   last_applied_at?:string|null;
-  dnstt_commit:string;
-  upstream_candidates:Candidate[];
-  client?:ClientInfo|null;
+  client_ready:boolean;
 };
 
 type Inventory={
   ok:boolean;
   engine:string;
+  default_resolver:string;
+  resolver_examples:string[];
   source:{repository:string;commit:string};
-  nodes:DnsNode[];
+  nodes:NetModNode[];
 };
 
-type InstallResult=DnsNode&{
+type InstallResult=NetModNode&{
   ok:boolean;
   dns_instructions?:{
     tunnel_domain:string;
     nameserver_host?:string|null;
     exit_ip:string;
     records:Array<{type:string;name:string;value:string}>;
+  };
+};
+
+type NetModConfig={
+  ok:boolean;
+  node_id:number;
+  resolver:string;
+  nm_dns:string;
+  format:string;
+  parameters:{
+    name:string;
+    resolver:string;
+    domain:string;
+    public_key:string;
+    username:string;
   };
 };
 
@@ -75,8 +70,9 @@ async function apiRequest<T>(path:string,init:RequestInit={}):Promise<T>{
     if(payload&&typeof payload==="object"&&"detail" in payload){
       const detail=(payload as {detail?:unknown}).detail;
       if(typeof detail==="string")throw new Error(detail);
-      if(detail&&typeof detail==="object"&&"message" in detail){
-        throw new Error(String((detail as {message?:unknown}).message||`API error ${response.status}`));
+      if(detail&&typeof detail==="object"){
+        const value=detail as {message?:unknown;error?:unknown};
+        if(value.message)throw new Error(`${String(value.message)}${value.error?` · ${String(value.error)}`:""}`);
       }
     }
     throw new Error(`API error ${response.status}`);
@@ -98,18 +94,19 @@ export function DnsEmergencyPanel(){
   const [selectedNodeId,setSelectedNodeId]=useState(0);
   const [domain,setDomain]=useState("");
   const [nameserver,setNameserver]=useState("");
-  const [upstreamPort,setUpstreamPort]=useState(0);
+  const [resolver,setResolver]=useState("8.8.8.8");
   const [busy,setBusy]=useState("");
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
-  const [lastInstall,setLastInstall]=useState<InstallResult|null>(null);
+  const [netmod,setNetmod]=useState<NetModConfig|null>(null);
 
   const load=async(silent=false)=>{
     if(!silent)setBusy("load");
     setError("");
     try{
-      const data=await apiRequest<Inventory>("/v1/settings/vpn/dns-emergency");
+      const data=await apiRequest<Inventory>("/v1/settings/vpn/netmod-dns");
       setInventory(data);
+      setResolver(current=>current||data.default_resolver||"8.8.8.8");
       setSelectedNodeId(current=>data.nodes.some(node=>node.node_id===current)?current:(data.nodes[0]?.node_id||0));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{if(!silent)setBusy("");}
@@ -126,30 +123,35 @@ export function DnsEmergencyPanel(){
     if(!selected)return;
     setDomain(selected.tunnel_domain||"");
     setNameserver(selected.nameserver_host||"");
-    const preferred=selected.upstream_candidates.find(item=>item.recommended)||selected.upstream_candidates[0];
-    setUpstreamPort(Number(selected.upstream_port||preferred?.port||0));
-    setLastInstall(null);
+    setNetmod(null);
     setError("");
     setNotice("");
   },[selectedNodeId,selected?.node_id]);
 
+  const fetchConfig=async(nodeId=selected?.node_id)=>{
+    if(!nodeId||busy)return;
+    setBusy("config");setError("");setNotice("");
+    try{
+      const result=await apiRequest<NetModConfig>(`/v1/settings/vpn/netmod-dns/${nodeId}/config?resolver=${encodeURIComponent(resolver.trim())}`);
+      setNetmod(result);
+      setNotice(pick("لینک NetMod آماده است؛ کپی و داخل NetMod Import کنید.","NetMod link is ready; copy and import it into NetMod."));
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setBusy("");}
+  };
+
   const install=async()=>{
     if(!selected||busy)return;
-    if(!domain.trim()){setError(pick("دامنه Tunnel را وارد کنید.","Enter the tunnel domain."));return;}
-    if(!upstreamPort){setError(pick("سرویس TCP مقصد را انتخاب کنید.","Select a TCP upstream service."));return;}
-    setBusy("install");setError("");setNotice("");
+    if(!domain.trim()){setError(pick("Tunnel Domain را وارد کنید.","Enter the tunnel domain."));return;}
+    setBusy("install");setError("");setNotice("");setNetmod(null);
     try{
-      const result=await apiRequest<InstallResult>(`/v1/settings/vpn/dns-emergency/${selected.node_id}/install`,{
+      await apiRequest<InstallResult>(`/v1/settings/vpn/netmod-dns/${selected.node_id}/install`,{
         method:"POST",
-        body:JSON.stringify({
-          tunnel_domain:domain.trim(),
-          nameserver_host:nameserver.trim()||null,
-          upstream_port:Number(upstreamPort),
-        }),
+        body:JSON.stringify({tunnel_domain:domain.trim(),nameserver_host:nameserver.trim()||null}),
       });
-      setLastInstall(result);
-      setNotice(pick("DNS Emergency نصب شد و سرویس/Listener/Upstream سالم است.","DNS Emergency was installed and its service/listener/upstream are healthy."));
       await load(true);
+      const result=await apiRequest<NetModConfig>(`/v1/settings/vpn/netmod-dns/${selected.node_id}/config?resolver=${encodeURIComponent(resolver.trim())}`);
+      setNetmod(result);
+      setNotice(pick("NetMod DNS نصب و تست شد؛ لینک Import آماده است.","NetMod DNS was installed and tested; the import link is ready."));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy("");}
   };
@@ -158,8 +160,8 @@ export function DnsEmergencyPanel(){
     if(!selected||busy)return;
     setBusy("health");setError("");setNotice("");
     try{
-      const result=await apiRequest<DnsNode&{ok:boolean}>(`/v1/settings/vpn/dns-emergency/${selected.node_id}/health`,{method:"POST"});
-      setNotice(result.ok?pick("Health Check موفق بود.","Health check passed."):pick("Health Check ناموفق بود؛ جزئیات وضعیت را بررسی کنید.","Health check failed; review runtime status."));
+      const result=await apiRequest<NetModNode&{ok:boolean}>(`/v1/settings/vpn/netmod-dns/${selected.node_id}/health`,{method:"POST"});
+      setNotice(result.ok?pick("Health Check کامل NetMod DNS موفق بود.","NetMod DNS full health check passed."):pick("Health Check ناموفق بود.","Health check failed."));
       await load(true);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy("");}
@@ -167,10 +169,10 @@ export function DnsEmergencyPanel(){
 
   const remove=async()=>{
     if(!selected||busy)return;
-    setBusy("remove");setError("");setNotice("");
+    setBusy("remove");setError("");setNotice("");setNetmod(null);
     try{
-      await apiRequest(`/v1/settings/vpn/dns-emergency/${selected.node_id}`,{method:"DELETE"});
-      setNotice(pick("DNS Emergency متوقف و از Boot حذف شد؛ کلیدها برای نصب مجدد حفظ شدند.","DNS Emergency was stopped and disabled at boot; keys were preserved for reinstall."));
+      await apiRequest(`/v1/settings/vpn/netmod-dns/${selected.node_id}`,{method:"DELETE"});
+      setNotice(pick("NetMod DNS متوقف و از Boot حذف شد.","NetMod DNS was stopped and disabled at boot."));
       await load(true);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy("");}
@@ -181,17 +183,14 @@ export function DnsEmergencyPanel(){
     catch{setError(pick("کپی خودکار در این مرورگر در دسترس نیست.","Clipboard access is unavailable in this browser."));}
   };
 
-  const client=lastInstall?.client||selected?.client||null;
-  const dnsRecords=lastInstall?.dns_instructions?.records||[];
-
   return <Shell active="/admin/dns-emergency">
-    <PageHead title={pick("DNS اضطراری","DNS Emergency")}/>
+    <PageHead title="NetMod DNS"/>
     <div className={styles.page}>
       <section className={styles.hero}>
         <div>
-          <div className={styles.eyebrow}>DNSTT · Emergency TCP Transport</div>
-          <h2>{pick("مسیر اضطراری برای شرایطی که فقط DNS عبور می‌کند","Emergency path for DNS-only connectivity")}</h2>
-          <p>{pick("این لایه یک سرویس TCP موجود روی همان Exit را داخل DNS حمل می‌کند؛ احراز هویت و Quota پروتکل اصلی تغییر نمی‌کند.","This layer carries an existing TCP service on the same Exit through DNS; the original protocol authentication and quota remain unchanged.")}</p>
+          <div className={styles.eyebrow}>NetMod · DNSTT · Managed SSH</div>
+          <h2>{pick("یک مسیر DNS، یک لینک، Import مستقیم در NetMod","One DNS path, one link, direct NetMod import")}</h2>
+          <p>{pick("TwinPanel خودش DNSTT، SSH داخلی و مسیر UDP/53 را مدیریت می‌کند. کاربر فقط لینک nm-dns را داخل NetMod وارد می‌کند.","TwinPanel manages DNSTT, the internal SSH endpoint and UDP/53. The user only imports the nm-dns link into NetMod.")}</p>
         </div>
         <div className={styles.statusBox}>
           <span>{pick("وضعیت","Status")}</span>
@@ -205,8 +204,8 @@ export function DnsEmergencyPanel(){
       <section className={styles.card}>
         <div className={styles.cardHead}>
           <div>
-            <h3>{pick("۱. Exit و سرویس مقصد","1. Exit and upstream service")}</h3>
-            <p>{pick("DNSTT فقط TCP حمل می‌کند؛ یک سرویس TCP فعال روی همان Exit انتخاب کنید.","DNSTT carries TCP only; choose an active TCP service on the same Exit.")}</p>
+            <h3>{pick("۱. سرور و DNS","1. Server and DNS")}</h3>
+            <p>{pick("فقط Exit واقعی نمایش داده می‌شود؛ Local Core عمداً از این بخش حذف شده است.","Only real Exit nodes are shown; Local Core is intentionally excluded.")}</p>
           </div>
           <button className={styles.secondary} type="button" disabled={Boolean(busy)} onClick={()=>void load()}>{busy==="load"?pick("در حال دریافت...","Loading..."):pick("بازخوانی","Refresh")}</button>
         </div>
@@ -218,64 +217,51 @@ export function DnsEmergencyPanel(){
             </select>
           </label>
           <label>
-            <span>{pick("TCP مقصد","TCP upstream")}</span>
-            <select value={upstreamPort} onChange={event=>setUpstreamPort(Number(event.target.value))}>
-              {!selected?.upstream_candidates.length&&<option value={0}>{pick("سرویس TCP شناخته‌شده‌ای پیدا نشد","No known TCP service found")}</option>}
-              {(selected?.upstream_candidates||[]).map(item=><option key={`${item.protocol}:${item.port}`} value={item.port}>{item.protocol} · {item.port} · {item.transport}{item.recommended?" ✓":""}</option>)}
-            </select>
+            <span>DNS Resolver</span>
+            <input list="netmod-resolvers" value={resolver} onChange={event=>setResolver(event.target.value)} dir="ltr" placeholder="8.8.8.8"/>
+            <datalist id="netmod-resolvers">{(inventory?.resolver_examples||[]).map(value=><option value={value} key={value}/>)}</datalist>
           </label>
-        </div>
-      </section>
-
-      <section className={styles.card}>
-        <h3>{pick("۲. DNS Delegation","2. DNS delegation")}</h3>
-        <p>{pick("یک Subdomain را به Nameserverای که به IP همین Exit اشاره می‌کند Delegate کنید.","Delegate a subdomain to a nameserver pointing to this Exit IP.")}</p>
-        <div className={styles.grid}>
           <label>
             <span>Tunnel Domain</span>
             <input value={domain} onChange={event=>setDomain(event.target.value)} placeholder="t.example.com" dir="ltr"/>
           </label>
           <label>
-            <span>{pick("Nameserver Host (اختیاری)","Nameserver Host (optional)")}</span>
+            <span>{pick("Nameserver Host","Nameserver Host")}</span>
             <input value={nameserver} onChange={event=>setNameserver(event.target.value)} placeholder="dns.example.com" dir="ltr"/>
           </label>
         </div>
         <div className={styles.hint}>
-          <b>{pick("رکورد پیشنهادی","Suggested records")}</b>
-          <code>A/AAAA {nameserver||"dns.example.com"} → {selected?.public_ip||"EXIT_IP"}</code>
+          <b>{pick("رکوردهای DNS","DNS records")}</b>
+          <code>A {nameserver||"dns.example.com"} → {selected?.public_ip||"EXIT_IP"}</code>
           <code>NS {domain||"t.example.com"} → {nameserver||"dns.example.com"}</code>
         </div>
       </section>
 
       <section className={styles.actions}>
-        <button className={styles.primary} type="button" onClick={()=>void install()} disabled={Boolean(busy)||!selected}>{busy==="install"?pick("در حال نصب و تست...","Installing and testing..."):pick("نصب / Repair و Health Check","Install / Repair + Health Check")}</button>
+        <button className={styles.primary} type="button" onClick={()=>void install()} disabled={Boolean(busy)||!selected}>{busy==="install"?pick("در حال نصب و تست...","Installing and testing..."):pick("نصب / Repair","Install / Repair")}</button>
         <button className={styles.secondary} type="button" onClick={()=>void health()} disabled={Boolean(busy)||!selected||selected.status==="not_installed"}>{busy==="health"?pick("در حال تست...","Checking..."):"Health Check"}</button>
-        <button className={styles.danger} type="button" onClick={()=>void remove()} disabled={Boolean(busy)||!selected||selected.status==="not_installed"}>{busy==="remove"?pick("در حال حذف...","Removing..."):pick("توقف و حذف سرویس","Stop and remove service")}</button>
+        <button className={styles.secondary} type="button" onClick={()=>void fetchConfig()} disabled={Boolean(busy)||!selected?.client_ready}>{busy==="config"?pick("در حال ساخت لینک...","Building link..."):pick("دریافت لینک NetMod","Get NetMod link")}</button>
+        <button className={styles.danger} type="button" onClick={()=>void remove()} disabled={Boolean(busy)||!selected||selected.status==="not_installed"}>{busy==="remove"?pick("در حال حذف...","Removing..."):pick("توقف و حذف سرویس","Stop and remove")}</button>
       </section>
 
-      {dnsRecords.length>0&&<section className={styles.card}>
-        <h3>{pick("DNS آماده ثبت","DNS records ready to publish")}</h3>
-        <div className={styles.records}>{dnsRecords.map(record=><div key={`${record.type}:${record.name}`}><b>{record.type}</b><code>{record.name}</code><span>→</span><code>{record.value}</code></div>)}</div>
-      </section>}
-
-      {client&&<section className={styles.card}>
-        <h3>{pick("۳. اطلاعات کلاینت","3. Client parameters")}</h3>
-        <p>{pick("کلید عمومی و دستور استاندارد dnstt. کلید خصوصی فقط روی Exit نگه‌داری می‌شود.","Public key and standard dnstt command. The private key stays only on the Exit.")}</p>
+      {netmod&&<section className={styles.card}>
+        <h3>{pick("۲. لینک آماده NetMod","2. NetMod import link")}</h3>
+        <p>{pick("این لینک محرمانه است. آن را Copy کنید و در NetMod Import کنید؛ تنظیم دستی دیگری لازم نیست.","This link is secret. Copy it and import it into NetMod; no other manual setup is required.")}</p>
         <div className={styles.kv}>
-          <span>Domain</span><code>{client.domain}</code><button type="button" onClick={()=>void copy(client.domain)}>{pick("کپی","Copy")}</button>
-          <span>Public key</span><code>{client.public_key}</code><button type="button" onClick={()=>void copy(client.public_key)}>{pick("کپی","Copy")}</button>
-          <span>Client</span><code>{client.command_example}</code><button type="button" onClick={()=>void copy(client.command_example)}>{pick("کپی","Copy")}</button>
+          <span>nm-dns://</span><code>{netmod.nm_dns}</code><button type="button" onClick={()=>void copy(netmod.nm_dns)}>{pick("کپی لینک","Copy link")}</button>
+          <span>Resolver</span><code>{netmod.parameters.resolver}</code><button type="button" onClick={()=>void copy(netmod.parameters.resolver)}>{pick("کپی","Copy")}</button>
+          <span>Domain</span><code>{netmod.parameters.domain}</code><button type="button" onClick={()=>void copy(netmod.parameters.domain)}>{pick("کپی","Copy")}</button>
         </div>
         <div className={styles.warning}>
-          <b>nm-dns://</b>
-          <span>{pick("TwinPanel فعلاً لینک NetMod را جعل نمی‌کند؛ فرمت nm-dns رمزگذاری‌شده است و Schema عمومی قابل‌اتکایی برای تولید آن پیدا نشد.","TwinPanel does not fabricate NetMod links; nm-dns is opaque/encrypted and no reliable public generation schema was found.")}</span>
+          <b>{pick("محرمانه","Secret")}</b>
+          <span>{pick("لینک شامل دسترسی داخلی SSH است؛ آن را عمومی منتشر نکنید.","The link contains internal SSH access; do not publish it publicly.")}</span>
         </div>
       </section>}
 
       <section className={styles.footerNote}>
-        <span>Source: OutlineFoundation/dnstt</span>
+        <span>DNSTT: OutlineFoundation/dnstt</span>
         <code>{inventory?.source.commit||"—"}</code>
-        <span>{pick("Pinned؛ بدون @latest","Pinned; no @latest")}</span>
+        <span>{pick("خروجی: nm-dns://","Output: nm-dns://")}</span>
       </section>
     </div>
   </Shell>;
