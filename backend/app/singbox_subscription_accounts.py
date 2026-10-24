@@ -163,26 +163,26 @@ if RECORD is not None:
 if not users:
     sentinel_password = secrets.token_urlsafe(48)
     if PROTOCOL == "tuic":
-        users = [{
-            "name": SENTINEL,
-            "uuid": str(uuid.uuid4()),
-            "password": sentinel_password,
-        }]
+        users = [dict(
+            name=SENTINEL,
+            uuid=str(uuid.uuid4()),
+            password=sentinel_password,
+        )]
     elif PROTOCOL == "naive":
-        users = [{
-            "username": SENTINEL,
-            "password": sentinel_password,
-        }]
+        users = [dict(
+            username=SENTINEL,
+            password=sentinel_password,
+        )]
     elif PROTOCOL == "snell":
-        users = [{
-            "name": SENTINEL,
-            "userkey": secrets.token_urlsafe(48),
-        }]
+        users = [dict(
+            name=SENTINEL,
+            userkey=secrets.token_urlsafe(48),
+        )]
     else:
-        users = [{
-            "name": SENTINEL,
-            "password": sentinel_password,
-        }]
+        users = [dict(
+            name=SENTINEL,
+            password=sentinel_password,
+        )]
 
 inbound["users"] = users
 with open(CONFIG + ".account-new", "w", encoding="utf-8") as handle:

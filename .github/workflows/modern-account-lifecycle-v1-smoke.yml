@@ -15,6 +15,7 @@ on:
       - "backend/app/services/subscription_factory.py"
       - "backend/app/singbox_subscription_accounts.py"
       - "backend/app/standalone_subscription_accounts.py"
+      - "backend/tests/singbox_subscription_account_mutation_v217_smoke.py"
       - "scripts/smoke-modern-account-lifecycle-v1.py"
       - ".github/workflows/modern-account-lifecycle-v1-smoke.yml"
   workflow_dispatch:
@@ -39,6 +40,9 @@ jobs:
             backend/app/services/quota_node_sync.py \
             backend/app/services/subscription_factory.py \
             backend/app/singbox_subscription_accounts.py \
-            backend/app/standalone_subscription_accounts.py
+            backend/app/standalone_subscription_accounts.py \
+            backend/tests/singbox_subscription_account_mutation_v217_smoke.py
       - name: Verify lifecycle contract
         run: python scripts/smoke-modern-account-lifecycle-v1.py
+      - name: Verify generated sing-box account mutation scripts
+        run: python backend/tests/singbox_subscription_account_mutation_v217_smoke.py
