@@ -316,8 +316,7 @@ def _mieru_karing_yaml(item: dict[str, Any]) -> str:
     if not host or port <= 0 or not username or not password:
         return ""
     q = lambda value: json.dumps(str(value), ensure_ascii=False)
-    return "\
-".join([
+    return "\n".join([
         "proxies:",
         f"  - name: {q('TwinPanel Mieru')}",
         "    type: mieru",
@@ -518,8 +517,6 @@ def refine_public_connection_modern_delivery_v13(source: str, token: str, db: Se
             1,
         )
 
-    source = source.replace("</style>", _CSS + "\
-</style>", 1)
-    source = source.replace("</body>", _SCRIPT + "\
-</body>", 1)
+    source = source.replace("</style>", _CSS + "\n</style>", 1)
+    source = source.replace("</body>", _SCRIPT + "\n</body>", 1)
     return source
