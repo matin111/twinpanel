@@ -9,6 +9,7 @@ on:
       - "backend/app/routers/plans.py"
       - "backend/app/routers/__init__.py"
       - "backend/app/routers/modern_account_delivery_v1.py"
+      - "backend/app/routers/modern_legacy_reconcile_v1.py"
       - "backend/app/routers/modern_enforcement_runtime_v1.py"
       - "backend/app/services/modern_enforcement_v1.py"
       - "backend/app/services/quota_node_sync.py"
@@ -17,6 +18,7 @@ on:
       - "backend/app/standalone_subscription_accounts.py"
       - "backend/tests/singbox_subscription_account_mutation_v217_smoke.py"
       - "backend/tests/amneziawg_key_padding_v217_smoke.py"
+      - "backend/tests/naive_client_tls_v218_smoke.py"
       - "scripts/smoke-modern-account-lifecycle-v1.py"
       - ".github/workflows/modern-account-lifecycle-v1-smoke.yml"
   workflow_dispatch:
@@ -36,6 +38,7 @@ jobs:
             backend/app/protocol_account_registry.py \
             backend/app/quota_schemas.py \
             backend/app/routers/modern_account_delivery_v1.py \
+            backend/app/routers/modern_legacy_reconcile_v1.py \
             backend/app/routers/modern_enforcement_runtime_v1.py \
             backend/app/services/modern_enforcement_v1.py \
             backend/app/services/quota_node_sync.py \
@@ -43,10 +46,13 @@ jobs:
             backend/app/singbox_subscription_accounts.py \
             backend/app/standalone_subscription_accounts.py \
             backend/tests/singbox_subscription_account_mutation_v217_smoke.py \
-            backend/tests/amneziawg_key_padding_v217_smoke.py
+            backend/tests/amneziawg_key_padding_v217_smoke.py \
+            backend/tests/naive_client_tls_v218_smoke.py
       - name: Verify lifecycle contract
         run: python scripts/smoke-modern-account-lifecycle-v1.py
       - name: Verify generated sing-box account mutation scripts
         run: python backend/tests/singbox_subscription_account_mutation_v217_smoke.py
       - name: Verify AmneziaWG private-key padding extraction
         run: python backend/tests/amneziawg_key_padding_v217_smoke.py
+      - name: Verify Naive client TLS compatibility and legacy self-heal
+        run: python backend/tests/naive_client_tls_v218_smoke.py
