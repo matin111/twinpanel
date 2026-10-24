@@ -33,8 +33,9 @@ jobs:
           assert 'دامنه عمومی' in nodes
           assert 'دامنه Xray' in nodes
           assert '{selected&&<Card>' not in nodes
-          assert 'plan_id:null' in manual
+          assert 'plan_id:planId||null' in manual
           assert 'manual-subscription-modal' in manual
+          assert 'انتخاب همه ۱۵ پروتکل' in manual
 
           assert 'max-height:min(70dvh,620px)!important;' in css
           assert 'width:min(700px,calc(100vw - 28px))!important;' in css
