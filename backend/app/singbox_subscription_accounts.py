@@ -187,7 +187,7 @@ if not users:
 inbound["users"] = users
 with open(CONFIG + ".account-new", "w", encoding="utf-8") as handle:
     json.dump(doc, handle, ensure_ascii=False, indent=2)
-    handle.write("\n")
+    handle.write("\\n")
 os.chmod(CONFIG + ".account-new", 0o600)
 print("account_users=" + str(len(users)))
 '''
