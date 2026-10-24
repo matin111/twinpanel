@@ -9,11 +9,14 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 SINGBOX_PATH = ROOT / "backend" / "app" / "singbox_subscription_accounts.py"
 RECONCILE_PATH = ROOT / "backend" / "app" / "routers" / "modern_legacy_reconcile_v1.py"
+LIFECYCLE_PATH = ROOT / "backend" / "app" / "naive_tls_lifecycle_v224.py"
 
 singbox_source = SINGBOX_PATH.read_text(encoding="utf-8")
 reconcile_source = RECONCILE_PATH.read_text(encoding="utf-8")
+lifecycle_source = LIFECYCLE_PATH.read_text(encoding="utf-8")
 compile(singbox_source, str(SINGBOX_PATH), "exec")
 compile(reconcile_source, str(RECONCILE_PATH), "exec")
+compile(lifecycle_source, str(LIFECYCLE_PATH), "exec")
 
 tree = ast.parse(singbox_source, filename=str(SINGBOX_PATH))
 wanted = {
@@ -35,6 +38,8 @@ namespace = {
     "SingBoxAccountSecret": object,
     "SingBoxAccountError": RuntimeError,
     "CERT_PATH": "/etc/twinpanel/sing-box/cert.pem",
+    "MANAGED_NAIVE_TRUST_MODEL": "managed-ca-v1",
+    "CUSTOM_NAIVE_TRUST_MODEL": "custom-cert-v1",
     "json": json,
 }
 exec(
@@ -134,8 +139,6 @@ legacy_item = {
 assert requires_repair(legacy_item) is True
 
 # v218 removed tls.insecure but did not provide a replacement trust anchor.
-# That payload validates syntactically yet fails the real TLS handshake with
-# Chromium ERR_CERT_AUTHORITY_INVALID (-202), so it also needs self-healing.
 untrusted_v218 = dict(naive)
 untrusted_v218["tls"] = {
     "enabled": True,
@@ -147,28 +150,57 @@ untrusted_v218_item = {
 }
 assert requires_repair(untrusted_v218_item) is True
 
+# rc.223 embedded the self-signed server leaf. That fixed authority trust but
+# production proved Chromium then rejected the 3650-day certificate with
+# CERT_VALIDITY_TOO_LONG (-213). Missing trust-model metadata therefore marks
+# rc.223 payloads for one non-rotating refresh into the managed-CA model.
+rc223_leaf_pin = {
+    "outbound": naive,
+    "config": json.dumps({"outbounds": [naive]}),
+}
+assert requires_repair(rc223_leaf_pin) is True
+
 # Detect legacy payloads even if only the serialized config representation is
 # present, because older credentials may not retain the convenience outbound.
 assert requires_repair({"config": legacy_item["config"]}) is True
 assert requires_repair({"config": untrusted_v218_item["config"]}) is True
+assert requires_repair({"config": rc223_leaf_pin["config"]}) is True
 
 fixed_item = {
+    "tls_trust_model": "managed-ca-v1",
     "outbound": naive,
     "config": json.dumps({"outbounds": [naive]}),
 }
 assert requires_repair(fixed_item) is False
 
-# The account provisioning path must read the server's actual configured
-# certificate and carry it into the Naive client item. This keeps verification
-# enabled without reintroducing the unsupported tls.insecure field.
+custom_fixed_item = {
+    "tls_trust_model": "custom-cert-v1",
+    "outbound": naive,
+    "config": json.dumps({"outbounds": [naive]}),
+}
+assert requires_repair(custom_fixed_item) is False
+
+# Managed Naive provisioning must migrate the default server certificate,
+# deliver the stable CA rather than pinning the rotating leaf, and stamp the
+# trust model so future leaf renewals do not force credential refreshes.
 for marker in (
-    "async def _read_naive_tls_certificate(",
-    'if secret.protocol == "naive":',
-    "tls_certificate = await _read_naive_tls_certificate(conn, inbound)",
-    "tls_certificate=tls_certificate",
+    "async def _naive_tls_trust_material(",
+    "await ensure_managed_naive_tls(conn, node)",
+    "trust_path = MANAGED_CA_CERT_PATH",
+    "trust_model = MANAGED_NAIVE_TRUST_MODEL",
+    "tls_trust_model=tls_trust_model",
+    'item["tls_trust_model"] = str(tls_trust_model)',
     'tls["certificate"] = certificate + "\\n"',
 ):
     assert marker in singbox_source, marker
+
+for marker in (
+    'MANAGED_NAIVE_TRUST_MODEL = "managed-ca-v1"',
+    "LEAF_VALIDITY_DAYS = 180",
+    "MAX_CHROMIUM_LEAF_DAYS = 200",
+    "ensure_managed_naive_tls",
+):
+    assert marker in lifecycle_source, marker
 
 # Reconcile must continue to classify bad complete Naive payloads as repair
 # candidates so existing credentials can refresh without rotating identity.
@@ -182,8 +214,9 @@ for marker in (
 ):
     assert marker in reconcile_source, marker
 
-print("NAIVE_CLIENT_TLS_V218_SMOKE=PASS")
+print("NAIVE_CLIENT_TLS_V224_SMOKE=PASS")
 print("NAIVE_TLS_INSECURE=OMITTED")
-print("NAIVE_TLS_CERTIFICATE=EMBEDDED")
+print("NAIVE_TLS_TRUST=MANAGED_CA")
+print("RC223_LEAF_PIN=SELF_HEAL_CANDIDATE")
 print("OTHER_TLS_BEHAVIOR=PRESERVED")
 print("LEGACY_NAIVE_DELIVERY=SELF_HEAL_CANDIDATE")

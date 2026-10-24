@@ -11,6 +11,12 @@ from typing import Any
 from .models import Node
 from .modern_protocol_runtime import CERT_PATH, CONFIG_PATH, SERVICE_NAME
 from .modern_protocol_runtime_v2 import SINGBOX_PROTOCOLS, TAGS
+from .naive_tls_lifecycle_v224 import (
+    CUSTOM_NAIVE_TRUST_MODEL,
+    MANAGED_CA_CERT_PATH,
+    MANAGED_NAIVE_TRUST_MODEL,
+    ensure_managed_naive_tls,
+)
 from .routers.provision import cmd
 
 
@@ -242,17 +248,40 @@ async def read_inbound(conn, protocol: str) -> dict[str, Any]:
     return value
 
 
-async def _read_naive_tls_certificate(conn, inbound: dict[str, Any]) -> str:
+async def _read_certificate(conn, path: str, *, label: str) -> str:
+    raw = await cmd(conn, f"cat -- {shlex.quote(path)}")
+    certificate = str(raw or "").strip()
+    if "-----BEGIN CERTIFICATE-----" not in certificate or "-----END CERTIFICATE-----" not in certificate:
+        raise SingBoxAccountError(f"{label} certificate is invalid")
+    return certificate + "\n"
+
+
+async def _naive_tls_trust_material(
+    conn,
+    node: Node,
+    inbound: dict[str, Any],
+) -> tuple[str, str]:
     server_tls = inbound.get("tls") if isinstance(inbound.get("tls"), dict) else {}
     cert_path = str(server_tls.get("certificate_path") or "").strip()
     if not cert_path:
         raise SingBoxAccountError("Naive TLS certificate path is missing")
 
-    raw = await cmd(conn, f"cat -- {shlex.quote(cert_path)}")
-    certificate = str(raw or "").strip()
-    if "-----BEGIN CERTIFICATE-----" not in certificate or "-----END CERTIFICATE-----" not in certificate:
-        raise SingBoxAccountError("Naive TLS certificate is invalid")
-    return certificate + "\n"
+    if cert_path == CERT_PATH:
+        await ensure_managed_naive_tls(conn, node)
+        trust_path = MANAGED_CA_CERT_PATH
+        trust_model = MANAGED_NAIVE_TRUST_MODEL
+    else:
+        # Preserve existing custom-certificate behavior. Custom TLS material is
+        # operator-owned and is never rotated by the managed lifecycle.
+        trust_path = cert_path
+        trust_model = CUSTOM_NAIVE_TRUST_MODEL
+
+    certificate = await _read_certificate(
+        conn,
+        trust_path,
+        label="Naive TLS trust",
+    )
+    return certificate, trust_model
 
 
 async def apply_account(
@@ -275,13 +304,19 @@ async def apply_account(
     )
     inbound = await read_inbound(conn, secret.protocol)
     tls_certificate = None
+    tls_trust_model = None
     if secret.protocol == "naive":
-        tls_certificate = await _read_naive_tls_certificate(conn, inbound)
+        tls_certificate, tls_trust_model = await _naive_tls_trust_material(
+            conn,
+            node,
+            inbound,
+        )
     return client_item(
         node,
         secret,
         inbound,
         tls_certificate=tls_certificate,
+        tls_trust_model=tls_trust_model,
     )
 
 
@@ -319,30 +354,37 @@ def _client_tls(node: Node, inbound: dict[str, Any], *, server_name: str | None 
     }
 
 
-def _naive_tls_requires_repair(tls: Any) -> bool:
+def _naive_tls_requires_repair(tls: Any, trust_model: str) -> bool:
     if not isinstance(tls, dict):
         return True
     if "insecure" in tls:
         return True
     certificate = str(tls.get("certificate") or "").strip()
-    return not certificate
+    if not certificate:
+        return True
+    return trust_model not in {
+        MANAGED_NAIVE_TRUST_MODEL,
+        CUSTOM_NAIVE_TRUST_MODEL,
+    }
 
 
 def naive_client_item_requires_repair(item: dict[str, Any]) -> bool:
     """Detect Naive payloads that cannot authenticate the managed TLS endpoint.
 
-    Naive outbound has a restricted TLS schema and rejects tls.insecure. Modern
-    TwinPanel therefore carries the server certificate as explicit trust
-    material. Legacy payloads either contain the rejected insecure field or no
-    certificate at all, so both forms require a non-rotating delivery refresh.
+    Naive outbound has a restricted TLS schema and rejects tls.insecure. Managed
+    TwinPanel TLS therefore carries a stable local CA while the server uses a
+    short-lived CA-signed leaf. Legacy payloads with insecure, missing trust, or
+    the rc.223 leaf-pin model are refreshed without rotating account identity.
     """
 
     if not isinstance(item, dict):
         return False
 
+    trust_model = str(item.get("tls_trust_model") or "").strip()
+
     outbound = item.get("outbound")
     if isinstance(outbound, dict) and str(outbound.get("type") or "").lower() == "naive":
-        return _naive_tls_requires_repair(outbound.get("tls"))
+        return _naive_tls_requires_repair(outbound.get("tls"), trust_model)
 
     raw_config = str(item.get("config") or "").strip()
     if not raw_config:
@@ -362,7 +404,7 @@ def naive_client_item_requires_repair(item: dict[str, Any]) -> bool:
             continue
         if str(candidate.get("type") or "").lower() != "naive":
             continue
-        return _naive_tls_requires_repair(candidate.get("tls"))
+        return _naive_tls_requires_repair(candidate.get("tls"), trust_model)
 
     return False
 
@@ -419,7 +461,7 @@ def client_outbound(
     elif protocol == "naive":
         tls = _client_tls(node, inbound)
         # Naive does not accept tls.insecure. Keep certificate verification on
-        # and provide the exact server chain as supported trust material.
+        # and provide explicit trust material (managed CA or custom certificate).
         tls.pop("insecure", None)
         certificate = str(tls_certificate or "").strip()
         if certificate:
@@ -472,6 +514,7 @@ def client_item(
     server: str | None = None,
     port: int | None = None,
     tls_certificate: str | None = None,
+    tls_trust_model: str | None = None,
 ) -> dict[str, Any]:
     outbound = client_outbound(
         node,
@@ -494,7 +537,7 @@ def client_item(
         "outbounds": [outbound],
         "route": {"final": outbound["tag"]},
     }
-    return {
+    item = {
         "node_id": int(node.id),
         "node": str(node.name),
         "server": outbound["server"],
@@ -505,3 +548,6 @@ def client_item(
         "config": json.dumps(config, ensure_ascii=False, indent=2),
         "outbound": outbound,
     }
+    if secret.protocol == "naive" and tls_trust_model:
+        item["tls_trust_model"] = str(tls_trust_model)
+    return item

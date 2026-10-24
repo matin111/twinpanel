@@ -1,0 +1,47 @@
+name: Naive TLS Lifecycle V224 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/naive_tls_lifecycle_v224.py"
+      - "backend/app/singbox_subscription_accounts.py"
+      - "backend/app/routers/modern_legacy_reconcile_v1.py"
+      - "backend/tests/naive_client_tls_v218_smoke.py"
+      - "backend/tests/naive_tls_lifecycle_v224_smoke.py"
+      - ".github/workflows/naive-tls-lifecycle-v224-smoke.yml"
+  push:
+    branches:
+      - fix/naive-chromium-tls-lifecycle-v224
+    paths:
+      - "backend/app/naive_tls_lifecycle_v224.py"
+      - "backend/app/singbox_subscription_accounts.py"
+      - "backend/app/routers/modern_legacy_reconcile_v1.py"
+      - "backend/tests/naive_client_tls_v218_smoke.py"
+      - "backend/tests/naive_tls_lifecycle_v224_smoke.py"
+      - ".github/workflows/naive-tls-lifecycle-v224-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile touched Python modules
+        run: |
+          python -m py_compile \
+            backend/app/naive_tls_lifecycle_v224.py \
+            backend/app/singbox_subscription_accounts.py \
+            backend/tests/naive_client_tls_v218_smoke.py \
+            backend/tests/naive_tls_lifecycle_v224_smoke.py
+
+      - name: Run Naive delivery trust regression
+        run: python backend/tests/naive_client_tls_v218_smoke.py
+
+      - name: Run managed certificate lifecycle regression
+        run: python backend/tests/naive_tls_lifecycle_v224_smoke.py
