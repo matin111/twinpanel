@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ..amneziawg_live_telemetry_v221 import subscription_amneziawg_live
 from ..database import get_db
 from ..quota_models import QuotaSession, QuotaUsageEvent
 from ..wireguard_live_telemetry_v97 import subscription_wireguard_live
@@ -93,18 +94,20 @@ async def public_connection_live(token: str, db: Session = Depends(get_db)):
             online_protocols.add(protocol)
         last_counter_activity = _latest(last_counter_activity, reported_at)
 
-    # TWINPANEL_WIREGUARD_LIVE_TELEMETRY_V97
-    # WireGuard does not reliably create QuotaSession/QuotaUsageEvent rows even
-    # when the real peer has a fresh handshake and active byte counters. Read
-    # that native per-peer telemetry as an additional *display-only* signal.
-    # Billing/quota tables are intentionally not mutated here.
+    # Native peer telemetry is display-only. Billing/quota rows are never
+    # mutated by these checks.
     wireguard_online, wireguard_seen = await subscription_wireguard_live(db, sub)
     if wireguard_online:
         online_protocols.add("wireguard")
 
+    amneziawg_online, amneziawg_seen = await subscription_amneziawg_live(db, sub)
+    if amneziawg_online:
+        online_protocols.add("amneziawg")
+
     connection_online = bool(online_protocols)
     last_connection_seen = _latest(last_session_seen, last_counter_activity)
     last_connection_seen = _latest(last_connection_seen, wireguard_seen)
+    last_connection_seen = _latest(last_connection_seen, amneziawg_seen)
 
     status = str(getattr(sub.status, "value", sub.status)).lower()
     return {
@@ -169,9 +172,19 @@ _LIVE_SCRIPT = r"""
     const text=(card.querySelector('b')?.textContent||'').toLowerCase();
     if(text.includes('cisco')||text.includes('anyconnect')||text.includes('openconnect'))return 'cisco';
     if(text.includes('openvpn'))return 'openvpn';
+    if(text.includes('amneziawg'))return 'amneziawg';
     if(text.includes('wireguard'))return 'wireguard';
     if(text.includes('l2tp'))return 'l2tp';
     if(text.includes('v2ray')||text.includes('xray'))return 'xray';
+    if(text.includes('hysteria2'))return 'hysteria2';
+    if(text.includes('tuic'))return 'tuic';
+    if(text.includes('anytls'))return 'anytls';
+    if(text.includes('naive'))return 'naive';
+    if(text.includes('shadowtls'))return 'shadowtls';
+    if(text.includes('snell'))return 'snell';
+    if(text.includes('mieru'))return 'mieru';
+    if(text.includes('trusttunnel'))return 'trusttunnel';
+    if(text.includes('sudoku'))return 'sudoku';
     return '';
   }
   function paintProtocols(protocols){
