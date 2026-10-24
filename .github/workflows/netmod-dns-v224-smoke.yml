@@ -54,4 +54,4 @@ jobs:
             backend/tests/test_netmod_dns_v224.py
       - name: Run NetMod DNS V224 regression
         working-directory: backend
-        run: pytest -q tests/test_netmod_dns_v224.py
+        run: python -m pytest -q tests/test_netmod_dns_v224.py
