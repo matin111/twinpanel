@@ -1,0 +1,43 @@
+name: Modern Legacy Account Reconcile V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/modern_legacy_reconcile_v1.py"
+      - "backend/app/routers/modern_account_delivery_v1.py"
+      - "backend/app/routers/__init__.py"
+      - "backend/app/services/subscription_factory.py"
+      - "scripts/smoke-modern-legacy-account-reconcile-v1.py"
+      - ".github/workflows/modern-legacy-account-reconcile-v1-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/routers/modern_legacy_reconcile_v1.py"
+      - "backend/app/routers/modern_account_delivery_v1.py"
+      - "backend/app/routers/__init__.py"
+      - "backend/app/services/subscription_factory.py"
+      - "scripts/smoke-modern-legacy-account-reconcile-v1.py"
+      - ".github/workflows/modern-legacy-account-reconcile-v1-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Modern Legacy Account Reconcile V1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python syntax
+        run: |
+          python3 -m py_compile \
+            backend/app/routers/modern_legacy_reconcile_v1.py \
+            scripts/smoke-modern-legacy-account-reconcile-v1.py
+
+      - name: Contract smoke
+        run: python3 scripts/smoke-modern-legacy-account-reconcile-v1.py
