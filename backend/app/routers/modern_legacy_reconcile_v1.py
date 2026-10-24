@@ -27,6 +27,14 @@ _BACKGROUND_IDLE_SECONDS = 30.0
 _BACKGROUND_BUSY_SECONDS = 5.0
 _BACKGROUND_SCAN_LIMIT = 100
 _BACKGROUND_MAX_PROTOCOLS = 2
+_LEGACY_REPAIR_STATES = frozenset(
+    {
+        "missing",
+        "legacy_empty",
+        "legacy_naive_client",
+        "legacy_amneziawg_egress",
+    }
+)
 
 _reconcile_lock = asyncio.Lock()
 _scan_cursor = 0
@@ -56,12 +64,11 @@ def _reconcile_credential_state(credential: ProtocolCredential | None) -> str:
         return state
 
     protocol = str(credential.protocol or "").strip().lower()
-    if protocol != "naive":
+    if protocol not in {"naive", "amneziawg"}:
         return state
 
     try:
         from . import account_delivery as ad
-        from ..singbox_subscription_accounts import naive_client_item_requires_repair
 
         payload = ad._dec(credential.config_text_encrypted)
     except Exception:
@@ -81,8 +88,21 @@ def _reconcile_credential_state(credential: ProtocolCredential | None) -> str:
     else:
         items = []
 
-    if any(naive_client_item_requires_repair(item) for item in items):
-        return "legacy_naive_client"
+    if protocol == "naive":
+        try:
+            from ..singbox_subscription_accounts import naive_client_item_requires_repair
+        except Exception:
+            return state
+        if any(naive_client_item_requires_repair(item) for item in items):
+            return "legacy_naive_client"
+
+    if protocol == "amneziawg" and items:
+        try:
+            from ..amneziawg_egress_v221 import EGRESS_CONTRACT
+        except Exception:
+            return state
+        if any(int(item.get("egress_contract") or 0) < EGRESS_CONTRACT for item in items):
+            return "legacy_amneziawg_egress"
 
     return state
 
@@ -172,7 +192,7 @@ async def _reconcile_subscription_modern_accounts(
     candidates = [
         protocol
         for protocol in selected
-        if states.get(protocol) in {"missing", "legacy_empty", "legacy_naive_client"}
+        if states.get(protocol) in _LEGACY_REPAIR_STATES
     ]
 
     if max_protocols is not None:
@@ -446,7 +466,7 @@ async def reconcile_legacy_modern_once() -> dict[str, Any] | None:
                 continue
             states = dict(snapshot["states"])
             if not any(
-                state in {"missing", "legacy_empty", "legacy_naive_client"}
+                state in _LEGACY_REPAIR_STATES
                 for state in states.values()
             ):
                 continue
