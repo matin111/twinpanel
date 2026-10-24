@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..models import Plan, Subscription
+from ..protocol_account_registry import normalize_protocols, registry_payload
 from ..services.subscription_factory import create_subscription_core
 from ..subscription_override_models import (
     SubscriptionRuntimeOverride,
@@ -34,9 +35,9 @@ class AdminSubscriptionCreateV2(BaseModel):
     protocols: list[str] = Field(default_factory=list)
     delivery_policy: DeliveryPolicyIn | None = None
 
-    # Plan mode: missing values inherit the selected plan.
-    # Manual mode: traffic_gb + duration_days are required explicitly. A value
-    # of 0 GB is an explicit unlimited-traffic choice, matching legacy behavior.
+    # A Plan supplies commercial/runtime limits only. Protocol desired-state is
+    # always chosen explicitly for this Subscription at creation time.
+    # Manual mode requires traffic + duration directly. Zero GB means unlimited.
     traffic_gb: float | None = Field(default=None, ge=0, le=100000)
     duration_days: int | None = Field(default=None, ge=1, le=3650)
     device_limit: int | None = Field(default=None, ge=1, le=1000)
@@ -45,14 +46,11 @@ class AdminSubscriptionCreateV2(BaseModel):
     password: str | None = Field(default=None, min_length=4, max_length=256)
 
 
-def _normalize_protocols(values: list[str]) -> list[str]:
-    return list(
-        dict.fromkeys(
-            str(value).strip().lower()
-            for value in values
-            if str(value).strip()
-        )
-    )
+def _canonical_protocols(values: list[str]) -> list[str]:
+    try:
+        return normalize_protocols(values)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 def _enriched_payload(db: Session, sub: Subscription) -> dict:
@@ -86,6 +84,11 @@ def _enriched_payload(db: Session, sub: Subscription) -> dict:
     return payload
 
 
+@router.get("/protocol-catalog")
+def subscription_protocol_catalog():
+    return {"protocols": registry_payload()}
+
+
 @router.get("/admin-list-v2")
 def admin_list_v2(db: Session = Depends(get_db)):
     rows = (
@@ -103,10 +106,6 @@ def admin_create_v2(
 ):
     manual = payload.plan_id is None
 
-    # Existing installations before manual-mode support have plan_id NOT NULL.
-    # This must run before the request Session performs any query: PostgreSQL
-    # ALTER TABLE needs an exclusive lock, so opening the Session transaction
-    # first could make the migration wait on the same request's own lock.
     if manual:
         ensure_subscription_plan_schema()
 
@@ -118,20 +117,21 @@ def admin_create_v2(
     if payload.plan_id is not None and (not plan or not plan.is_active):
         raise HTTPException(status_code=404, detail="پلن پیدا نشد")
 
-    requested_protocols = _normalize_protocols(payload.protocols)
+    requested_protocols = _canonical_protocols(payload.protocols)
     if payload.delivery_policy is not None:
-        policy_protocols = _normalize_protocols(payload.delivery_policy.protocols)
+        policy_protocols = _canonical_protocols(payload.delivery_policy.protocols)
         if requested_protocols and requested_protocols != policy_protocols:
             raise HTTPException(
                 status_code=422,
                 detail="پروتکل‌های ساخت اشتراک و Delivery Policy باید یکسان باشند",
             )
         requested_protocols = policy_protocols
-        if not requested_protocols:
-            raise HTTPException(
-                status_code=422,
-                detail="برای Delivery Policy صریح حداقل یک پروتکل انتخاب کنید",
-            )
+
+    if not requested_protocols:
+        raise HTTPException(
+            status_code=422,
+            detail="هنگام ساخت اشتراک حداقل یک پروتکل انتخاب کنید",
+        )
 
     if manual:
         if payload.traffic_gb is None:
@@ -143,11 +143,6 @@ def admin_create_v2(
             raise HTTPException(
                 status_code=422,
                 detail="برای اشتراک دستی مدت را وارد کنید",
-            )
-        if not requested_protocols:
-            raise HTTPException(
-                status_code=422,
-                detail="برای اشتراک دستی حداقل یک پروتکل انتخاب کنید",
             )
 
     traffic_gb = (
@@ -206,17 +201,12 @@ def admin_create_v2(
     db.flush()
 
     if payload.delivery_policy is not None:
-        # put_delivery_policy commits the entire pending Session, including the
-        # new Subscription + runtime override + explicit delivery state. This
-        # prevents a newly-created explicit account from becoming visible in an
-        # intermediate Legacy/global-delivery state.
         put_delivery_policy(
             subscription_id=sub.id,
             payload=payload.delivery_policy,
             db=db,
         )
     else:
-        # Old callers remain byte-for-byte Legacy: no policy-state row exists.
         db.commit()
 
     db.refresh(sub)
