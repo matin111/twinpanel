@@ -1,0 +1,43 @@
+name: AmneziaWG Egress Live V221 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/amneziawg_egress_v221.py"
+      - "backend/app/amneziawg_live_telemetry_v221.py"
+      - "backend/app/routers/modern_account_delivery_v1.py"
+      - "backend/app/routers/modern_legacy_reconcile_v1.py"
+      - "backend/app/routers/public_connection_live_v4.py"
+      - "backend/tests/amneziawg_egress_live_v221_smoke.py"
+      - ".github/workflows/amneziawg-egress-live-v221-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/amneziawg_egress_v221.py"
+      - "backend/app/amneziawg_live_telemetry_v221.py"
+      - "backend/app/routers/modern_account_delivery_v1.py"
+      - "backend/app/routers/modern_legacy_reconcile_v1.py"
+      - "backend/app/routers/public_connection_live_v4.py"
+      - "backend/tests/amneziawg_egress_live_v221_smoke.py"
+      - ".github/workflows/amneziawg-egress-live-v221-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile changed Python
+        run: |
+          python -m py_compile \
+            backend/app/amneziawg_egress_v221.py \
+            backend/app/amneziawg_live_telemetry_v221.py \
+            backend/app/routers/modern_account_delivery_v1.py \
+            backend/app/routers/modern_legacy_reconcile_v1.py \
+            backend/app/routers/public_connection_live_v4.py \
+            backend/tests/amneziawg_egress_live_v221_smoke.py
+      - name: Run AmneziaWG egress/live smoke
+        run: python backend/tests/amneziawg_egress_live_v221_smoke.py
