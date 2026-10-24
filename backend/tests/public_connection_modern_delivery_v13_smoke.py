@@ -58,9 +58,19 @@ for marker in (
     "v13-pending",
     "در انتظار ساخت کانفیگ",
     "Credential ساخته شده؛ مسیر Runtime هنوز آماده تحویل نیست",
-    "به محض آماده‌شدن Provision/Runtime",
+    "هنوز قابل اتصال نیست",
 ):
     assert marker in v13, marker
+
+# Ready cards are action-only. Do not bring back redundant claims that a config
+# is "real" or generic prose that repeats what the buttons already communicate.
+for stale_copy in (
+    "کانفیگ واقعی آماده است",
+    "برنامه مناسب همین دستگاه نمایش داده می‌شود.",
+    "کانفیگ واقعی همین‌جا ظاهر می‌شود.",
+):
+    assert stale_copy not in v13, stale_copy
+assert '<div class="v13-action-buttons">{primary}' in v13
 
 # Public configuration retrieval is allowed only for an active subscription and
 # only for a protocol that is still selected on that subscription.
@@ -143,3 +153,4 @@ print("PUBLIC_CONNECTION_MODERN_DELIVERY_V13_SMOKE=PASS")
 print("PROTOCOLS=" + ",".join(classic + modern))
 print("DELIVERY=desired-visible-ready-importable")
 print("DEVICE_UI=windows-android-ios-macos")
+print("REDUNDANT_READY_COPY=REMOVED")
