@@ -187,7 +187,8 @@ async def _provision_modern_protocol(
                 if protocol == "amneziawg":
                     from ..amneziawg_egress_v221 import ensure_amneziawg_egress
 
-                    await ensure_amneziawg_egress(conn)
+                    egress = await ensure_amneziawg_egress(conn)
+                    item["egress_contract"] = int(egress["contract"])
             else:
                 item = await apply_account(conn, node, secret)
             items.append(item)
