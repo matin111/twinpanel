@@ -10,26 +10,19 @@ permissions:
 
 jobs:
   apply-fix:
-    if: github.event.head_commit.message == 'ci: run focused modern runtime patch helper'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: fix/modern-real-runtime-provisioning-v2
           fetch-depth: 0
-
-      - name: Apply focused patch
-        run: python3 scripts/one_shot_modern_runtime_fix_v2.py
-
-      - name: Verify focused regression
-        run: |
+      - run: python3 scripts/one_shot_modern_runtime_fix_v2.py
+      - run: |
           python3 -m py_compile backend/app/singbox_subscription_accounts.py
           python3 -m py_compile backend/app/standalone_subscription_accounts.py
           python3 -m py_compile backend/tests/modern_real_runtime_provisioning_v2_smoke.py
           python3 backend/tests/modern_real_runtime_provisioning_v2_smoke.py
-
-      - name: Commit focused fix
-        run: |
+      - run: |
           git config user.name "TwinPanel Release Bot"
           git config user.email "actions@users.noreply.github.com"
           git add -A
