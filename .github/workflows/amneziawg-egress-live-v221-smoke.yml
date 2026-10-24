@@ -6,6 +6,7 @@ on:
       - "backend/app/amneziawg_egress_v221.py"
       - "backend/app/amneziawg_live_telemetry_v221.py"
       - "backend/app/routers/modern_account_delivery_v1.py"
+      - "backend/app/routers/modern_legacy_reconcile_v1.py"
       - "backend/app/routers/public_connection_live_v4.py"
       - "backend/tests/amneziawg_egress_live_v221_smoke.py"
       - ".github/workflows/amneziawg-egress-live-v221-smoke.yml"
@@ -16,6 +17,7 @@ on:
       - "backend/app/amneziawg_egress_v221.py"
       - "backend/app/amneziawg_live_telemetry_v221.py"
       - "backend/app/routers/modern_account_delivery_v1.py"
+      - "backend/app/routers/modern_legacy_reconcile_v1.py"
       - "backend/app/routers/public_connection_live_v4.py"
       - "backend/tests/amneziawg_egress_live_v221_smoke.py"
       - ".github/workflows/amneziawg-egress-live-v221-smoke.yml"
@@ -34,6 +36,7 @@ jobs:
             backend/app/amneziawg_egress_v221.py \
             backend/app/amneziawg_live_telemetry_v221.py \
             backend/app/routers/modern_account_delivery_v1.py \
+            backend/app/routers/modern_legacy_reconcile_v1.py \
             backend/app/routers/public_connection_live_v4.py \
             backend/tests/amneziawg_egress_live_v221_smoke.py
       - name: Run AmneziaWG egress/live smoke
