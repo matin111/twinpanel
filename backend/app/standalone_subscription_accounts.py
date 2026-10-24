@@ -326,7 +326,7 @@ with open(state+".new","w",encoding="utf-8") as h: json.dump(accounts,h,separato
 os.chmod(state+".new",0o600); os.replace(state+".new",state)
 rows=[]
 for row in accounts.values(): rows += ["[[client]]","username = "+json.dumps(row["username"]),"password = "+json.dumps(row["password"]),"max_http2_conns = 4","max_http3_conns = 4",""]
-if not rows: rows=["[[client]]","username = "+json.dumps({REVOCATION_SENTINEL!r}),"password = "+json.dumps(secrets.token_urlsafe(48)),"max_http2_conns = 1","max_http3_conns = 1,""]
+if not rows: rows=["[[client]]","username = "+json.dumps({REVOCATION_SENTINEL!r}),"password = "+json.dumps(secrets.token_urlsafe(48)),"max_http2_conns = 1","max_http3_conns = 1",""]
 with open(out+".new","w",encoding="utf-8") as h: h.write("\\n".join(rows))
 os.chmod(out+".new",0o600); os.replace(out+".new",out)
 '''
