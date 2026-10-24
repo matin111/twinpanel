@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 REGISTRY = ROOT / "backend/app/protocol_account_registry.py"
 PLAN_UI = ROOT / "components/legacy-plans-exact.tsx"
+PLAN_ROUTER = ROOT / "backend/app/routers/plans.py"
 SUBSCRIPTION_UI = ROOT / "components/admin-manual-subscription-create.tsx"
 SUBSCRIPTION_CLIENT = ROOT / "lib/subscription-protocol-api.ts"
 SUBSCRIPTION_ROUTER = ROOT / "backend/app/routers/subscription_admin_v2.py"
@@ -46,6 +47,11 @@ def main() -> None:
     assert "پروتکل در پلن تعریف نمی‌شود" in plan_ui
     assert "پروتکل‌ها هنگام ساخت هر اشتراک انتخاب می‌شوند" in plan_ui
 
+    plan_router = PLAN_ROUTER.read_text(encoding="utf-8")
+    assert "انتخاب پروتکل از پلن حذف شده است" in plan_router
+    assert "replace_plan_protocols" not in plan_router
+    assert "PlanProtocol" not in plan_router
+
     client = SUBSCRIPTION_CLIENT.read_text(encoding="utf-8")
     assert '"/v1/subscriptions/protocol-catalog"' in client
 
@@ -59,6 +65,8 @@ def main() -> None:
     assert "requested_protocols = normalize_protocols(protocols)" in factory
     assert "plan_protocols" not in factory
     assert "protocol not in PROTOCOL_FIELDS" not in factory
+    assert "CLASSIC_PROTOCOL_KEYS" in factory
+    assert "if protocol not in CLASSIC_PROTOCOL_KEYS" in factory
 
     ui = SUBSCRIPTION_UI.read_text(encoding="utf-8")
     assert "subscriptionProtocolApi.catalog()" in ui
@@ -67,6 +75,7 @@ def main() -> None:
     assert "selectAllProtocols" in ui
     assert "clearProtocols" in ui
     assert "انتخاب همه ۱۵ پروتکل" in ui
+    assert "لغو انتخاب همه" in ui
     assert "protocols.length}/15" in ui
     assert "plan_id:planId||null" in ui
 
