@@ -69,7 +69,13 @@ naive_inbound = {
     },
 }
 
-naive = client_outbound(node, naive_secret, naive_inbound)
+naive = client_outbound(
+    node,
+    naive_secret,
+    naive_inbound,
+    server="203.0.113.10",
+    port=443,
+)
 assert naive["type"] == "naive"
 assert naive["quic"] is True
 assert naive["quic_congestion_control"] == "bbr"
@@ -92,7 +98,13 @@ hysteria_inbound = {
         "certificate_path": "/etc/twinpanel/sing-box/cert.pem",
     },
 }
-hysteria = client_outbound(node, hysteria_secret, hysteria_inbound)
+hysteria = client_outbound(
+    node,
+    hysteria_secret,
+    hysteria_inbound,
+    server="203.0.113.10",
+    port=443,
+)
 assert hysteria["tls"]["insecure"] is True
 
 legacy_outbound = {
