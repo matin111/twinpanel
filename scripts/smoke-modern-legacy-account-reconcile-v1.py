@@ -38,6 +38,13 @@ def main() -> None:
     assert "runtime_not_ready" in reconcile
     assert "credential_not_complete" in reconcile
 
+    # Partial node success must remain observable as an incomplete reconcile;
+    # deliverable items may be committed, but node errors cannot report ok=true.
+    partial_error_guard = (
+        'if protocol_errors:\n                result["ok"] = False'
+    )
+    assert partial_error_guard in reconcile
+
     # Background self-heal is bounded and reuses the same guarded code path.
     assert "_BACKGROUND_MAX_PROTOCOLS = 2" in reconcile
     assert "modern_legacy_reconcile_loop" in reconcile
@@ -60,6 +67,7 @@ def main() -> None:
     print("MODERN_LEGACY_ACCOUNT_RECONCILE_V1_OK")
     print("auto_reconcile=active_selected_modern_only")
     print("identity_policy=complete_preserved_partial_fail_closed")
+    print("partial_node_errors=reported_not_ok")
     print("background_batch=2_protocols")
     print("admin_trigger=enabled")
 
