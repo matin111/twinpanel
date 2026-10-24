@@ -10,13 +10,14 @@ AMNEZIAWG_INTERFACE = "tpawg0"
 EGRESS_SERVICE = "twinpanel-amneziawg-egress.service"
 EGRESS_SCRIPT = "/usr/local/lib/twinpanel/amneziawg-egress"
 RULE_COMMENT = "TwinPanel-AmneziaWG-Egress"
+EGRESS_CONTRACT = 221
 
 
 def _b64(text: str) -> str:
     return base64.b64encode(text.encode("utf-8")).decode("ascii")
 
 
-async def ensure_amneziawg_egress(conn: Any) -> dict[str, str]:
+async def ensure_amneziawg_egress(conn: Any) -> dict[str, str | int]:
     """Install and activate persistent IPv4 egress for the AmneziaWG pool.
 
     The rules are independent from status telemetry and are owned by one exact
@@ -32,17 +33,21 @@ COMMENT={shlex.quote(RULE_COMMENT)}
 EGRESS="$(ip -4 route show default | awk 'NR==1 {{print $5}}')"
 [ -n "$EGRESS" ]
 
+ipt() {{
+    iptables -w 10 "$@"
+}}
+
 add_rule() {{
     table="$1"; shift
-    if ! iptables -t "$table" -C "$@" 2>/dev/null; then
-        iptables -t "$table" -A "$@"
+    if ! ipt -t "$table" -C "$@" 2>/dev/null; then
+        ipt -t "$table" -A "$@"
     fi
 }}
 
 del_rule() {{
     table="$1"; shift
-    while iptables -t "$table" -C "$@" 2>/dev/null; do
-        iptables -t "$table" -D "$@"
+    while ipt -t "$table" -C "$@" 2>/dev/null; do
+        ipt -t "$table" -D "$@"
     done
 }}
 
@@ -93,7 +98,7 @@ WantedBy=multi-user.target
         f"systemctl enable {EGRESS_SERVICE} >/dev/null; "
         f"systemctl restart {EGRESS_SERVICE}; "
         f"systemctl is-active --quiet {EGRESS_SERVICE}; "
-        f"iptables -t nat -C POSTROUTING -s {shlex.quote(AMNEZIAWG_SUBNET)} "
+        f"iptables -w 10 -t nat -C POSTROUTING -s {shlex.quote(AMNEZIAWG_SUBNET)} "
         "-o \"$(ip -4 route show default | awk 'NR==1 {print $5}')\" "
         f"-m comment --comment {shlex.quote(RULE_COMMENT)} -j MASQUERADE"
     )
@@ -106,12 +111,14 @@ WantedBy=multi-user.target
         "service": EGRESS_SERVICE,
         "subnet": AMNEZIAWG_SUBNET,
         "interface": AMNEZIAWG_INTERFACE,
+        "contract": EGRESS_CONTRACT,
     }
 
 
 __all__ = [
     "AMNEZIAWG_INTERFACE",
     "AMNEZIAWG_SUBNET",
+    "EGRESS_CONTRACT",
     "EGRESS_SERVICE",
     "RULE_COMMENT",
     "ensure_amneziawg_egress",
