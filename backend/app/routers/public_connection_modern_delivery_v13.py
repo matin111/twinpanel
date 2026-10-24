@@ -232,8 +232,6 @@ def _modern_action(token: str, protocol: str, item: dict[str, Any]) -> str:
 
     return (
         f'<div class="v13-modern-action" data-v13-protocol="{_h(protocol)}">'
-        '<div class="v13-action-copy"><b>کانفیگ واقعی آماده است</b>'
-        '<small>برنامه مناسب همین دستگاه نمایش داده می‌شود.</small></div>'
         f'<div class="v13-action-buttons">{primary}'
         f'<a class="v13-secondary" href="{_h(config_path)}">دانلود فایل</a>'
         f'{_client_links(protocol)}</div></div>'
@@ -265,7 +263,6 @@ def _pending_card(protocol: str, reason: str, pane_id: str) -> tuple[str, str]:
         f'data-modern-protocol="{_h(protocol)}">'
         f'<div class="panel-head"><div><span>وضعیت پروتکل</span><h3>{_h(title)}</h3></div></div>'
         f'<div class="v13-pending-body"><b>هنوز قابل اتصال نیست</b><p>{_h(reason)}</p>'
-        '<small>به محض آماده‌شدن Provision/Runtime، کانفیگ واقعی همین‌جا ظاهر می‌شود.</small>'
         f'<div class="v13-pending-apps">{_client_links(protocol)}</div></div></section>'
     )
     return card, panel
