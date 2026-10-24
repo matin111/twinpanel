@@ -32,7 +32,6 @@ MODERN_PROTOCOLS = (
     "sudoku",
 )
 CANONICAL_PROTOCOLS = CLASSIC_PROTOCOLS + MODERN_PROTOCOLS
-SINGBOX_PROTOCOLS = frozenset({"hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"})
 
 PROTOCOL_META: dict[str, tuple[str, str, str]] = {
     "cisco": ("Cisco / OpenConnect", "C", "#17b6d8"),
@@ -52,8 +51,15 @@ PROTOCOL_META: dict[str, tuple[str, str, str]] = {
     "sudoku": ("Sudoku", "SU", "#9333ea"),
 }
 
-# Stable project/install pages are used instead of version-pinned binaries so
-# the Connect page does not become stale after upstream client releases.
+_PLATFORMS = ("windows", "android", "ios", "macos")
+_KARING = {p: ("Karing", "https://karing.app/en/quickstart") for p in _PLATFORMS}
+_HIDDIFY = {
+    p: ("Hiddify", "https://hiddify.com/app/How-to-install-Hiddify-app/")
+    for p in _PLATFORMS
+}
+
+# Stable official/project pages are intentionally preferred to version-pinned
+# binary URLs so customer pages do not go stale when upstream clients release.
 CLIENTS: dict[str, dict[str, tuple[str, str]]] = {
     "cisco": {
         "windows": ("OpenConnect / Cisco Client", "https://www.infradead.org/openconnect/"),
@@ -61,28 +67,33 @@ CLIENTS: dict[str, dict[str, tuple[str, str]]] = {
         "ios": ("Cisco Secure Client", "https://www.cisco.com/site/us/en/products/security/secure-client/index.html"),
         "macos": ("OpenConnect / Cisco Client", "https://www.infradead.org/openconnect/"),
     },
-    "openvpn": {p: ("OpenVPN Connect", "https://openvpn.net/client/") for p in ("windows", "android", "ios", "macos")},
-    "wireguard": {p: ("WireGuard", "https://www.wireguard.com/install/") for p in ("windows", "android", "ios", "macos")},
-    "v2ray": {p: ("Hiddify", "https://hiddify.com/app/How-to-install-Hiddify-app/") for p in ("windows", "android", "ios", "macos")},
-    "hysteria2": {p: ("Karing", "https://karing.app/en/quickstart") for p in ("windows", "android", "ios", "macos")},
-    "tuic": {p: ("Karing", "https://karing.app/en/quickstart") for p in ("windows", "android", "ios", "macos")},
-    "anytls": {p: ("Karing", "https://karing.app/en/quickstart") for p in ("windows", "android", "ios", "macos")},
-    "naive": {p: ("Karing", "https://karing.app/en/quickstart") for p in ("windows", "android", "ios", "macos")},
-    "shadowtls": {p: ("Karing", "https://karing.app/en/quickstart") for p in ("windows", "android", "ios", "macos")},
+    "openvpn": {p: ("OpenVPN Connect", "https://openvpn.net/client/") for p in _PLATFORMS},
+    "wireguard": {p: ("WireGuard", "https://www.wireguard.com/install/") for p in _PLATFORMS},
+    "v2ray": _HIDDIFY,
+    "hysteria2": _KARING,
+    "tuic": _KARING,
+    "anytls": _KARING,
+    "naive": _KARING,
+    "shadowtls": _KARING,
     "snell": {
         "windows": ("sing-box Desktop", "https://github.com/SagerNet/sing-box-for-desktop/releases/latest"),
-        "android": ("sing-box for Android", "https://github.com/SagerNet/sing-box/releases/latest"),
-        "ios": ("sing-box for Apple", "https://github.com/SagerNet/sing-box-for-apple"),
-        "macos": ("sing-box for Apple", "https://github.com/SagerNet/sing-box-for-apple"),
+        "android": ("sing-box", "https://github.com/SagerNet/sing-box/releases/latest"),
+        "ios": ("sing-box", "https://github.com/SagerNet/sing-box-for-apple"),
+        "macos": ("sing-box", "https://github.com/SagerNet/sing-box-for-apple"),
     },
-    "mieru": {p: ("Karing", "https://karing.app/en/quickstart") for p in ("windows", "android", "ios", "macos")},
+    "mieru": _KARING,
     "trusttunnel": {
         "windows": ("TrustTunnel GUI", "https://github.com/blazuryk/TrustTunnel-GUI-Client/releases/latest"),
         "android": ("TrustTunnel", "https://github.com/TrustTunnel/TrustTunnel"),
         "ios": ("TrustTunnel", "https://github.com/TrustTunnel/TrustTunnel"),
         "macos": ("TrustTunnel", "https://github.com/TrustTunnel/TrustTunnel"),
     },
-    "amneziawg": {p: ("AmneziaWG", "https://github.com/amnezia-vpn/amneziawg-windows-client") for p in ("windows", "android", "ios", "macos")},
+    "amneziawg": {
+        "windows": ("AmneziaWG", "https://github.com/amnezia-vpn/amneziawg-windows-client/releases/latest"),
+        "android": ("AmneziaWG", "https://play.google.com/store/apps/details?id=org.amnezia.awg"),
+        "ios": ("AmneziaWG", "https://apps.apple.com/app/amneziawg/id6478942365"),
+        "macos": ("AmneziaWG", "https://apps.apple.com/app/amneziawg/id6478942365"),
+    },
     "sudoku": {
         "windows": ("Sudoku Desktop", "https://github.com/SUDOKU-ASCII/sudoku-desktop/releases/latest"),
         "android": ("Sudodroid", "https://github.com/SUDOKU-ASCII/sudoku-android/releases/latest"),
@@ -94,6 +105,11 @@ CLIENTS: dict[str, dict[str, tuple[str, str]]] = {
 
 def _h(value: Any) -> str:
     return html.escape(str(value if value is not None else ""), quote=True)
+
+
+def _status_value(sub: Any) -> str:
+    status = getattr(sub, "status", "")
+    return str(getattr(status, "value", status) or "").strip().lower()
 
 
 def _items(cred: dict[str, Any]) -> list[dict[str, Any]]:
@@ -114,10 +130,12 @@ def _desired_protocols(db: Session, subscription_id: int) -> list[str]:
             .all()
         )
     }
-    return [protocol for protocol in CANONICAL_PROTOCOLS if protocol in selected]
+    return [p for p in CANONICAL_PROTOCOLS if p in selected]
 
 
-def _credential_state(db: Session, subscription_id: int, protocol: str) -> str:
+def _credential_state(db: Session, subscription_id: int, protocol: str, *, active: bool) -> str:
+    if not active:
+        return "اشتراک غیرفعال است"
     cred = (
         db.query(ProtocolCredential)
         .filter(
@@ -131,7 +149,7 @@ def _credential_state(db: Session, subscription_id: int, protocol: str) -> str:
         return "در انتظار ساخت کانفیگ"
     if not bool(getattr(cred, "is_active", False)):
         return "پروتکل برای این اشتراک غیرفعال است"
-    return "کانفیگ ساخته شده؛ مسیر Runtime هنوز آماده تحویل نیست"
+    return "Credential ساخته شده؛ مسیر Runtime هنوز آماده تحویل نیست"
 
 
 def _sudoku_uri(item: dict[str, Any]) -> str:
@@ -167,18 +185,15 @@ def _sudoku_uri(item: dict[str, Any]) -> str:
     if cfg.get("enable_pure_downlink") is False:
         payload["x"] = True
     raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    encoded = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
-    return "sudoku://" + encoded
+    return "sudoku://" + base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 
 
 def _client_links(protocol: str) -> str:
     if protocol == "l2tp":
         return '<span class="v13-native-client">برنامه جدا لازم نیست؛ از VPN داخلی سیستم استفاده کنید.</span>'
     rows = CLIENTS.get(protocol) or {}
-    if not rows:
-        return ""
-    links = []
-    for platform in ("windows", "android", "ios", "macos"):
+    links: list[str] = []
+    for platform in _PLATFORMS:
         if platform not in rows:
             continue
         name, url = rows[platform]
@@ -195,12 +210,14 @@ def _modern_action(token: str, protocol: str, item: dict[str, Any]) -> str:
     uri = str(item.get("uri") or "").strip()
     if protocol == "sudoku" and not uri:
         uri = _sudoku_uri(item)
-    config_path = f"/v1/connect/{quote(str(token), safe='')}/modern-config/{quote(protocol, safe='')}/{node_id}"
+    config_path = (
+        f"/v1/connect/{quote(str(token), safe='')}/modern-config/"
+        f"{quote(protocol, safe='')}/{node_id}"
+    )
 
-    primary = ""
     if uri:
         primary = f'<a class="primary-btn v13-open-uri" href="{_h(uri)}">باز کردن در برنامه</a>'
-    elif config_format == "sing-box":
+    elif config_format == "sing-box" and protocol != "snell":
         primary = (
             f'<button class="primary-btn v13-karing-import" type="button" '
             f'data-config-path="{_h(config_path)}">افزودن مستقیم به Karing</button>'
@@ -244,23 +261,34 @@ def _pending_card(protocol: str, reason: str, pane_id: str) -> tuple[str, str]:
         '<em>در انتظار</em></button>'
     )
     panel = (
-        f'<section id="{_h(pane_id)}" class="protocol-panel v13-pending-panel" data-modern-protocol="{_h(protocol)}">'
+        f'<section id="{_h(pane_id)}" class="protocol-panel v13-pending-panel" '
+        f'data-modern-protocol="{_h(protocol)}">'
         f'<div class="panel-head"><div><span>وضعیت پروتکل</span><h3>{_h(title)}</h3></div></div>'
         f'<div class="v13-pending-body"><b>هنوز قابل اتصال نیست</b><p>{_h(reason)}</p>'
-        '<small>به محض اینکه Provision/Runtime آماده شود، کانفیگ واقعی همین‌جا ظاهر می‌شود.</small>'
+        '<small>به محض آماده‌شدن Provision/Runtime، کانفیگ واقعی همین‌جا ظاهر می‌شود.</small>'
         f'<div class="v13-pending-apps">{_client_links(protocol)}</div></div></section>'
     )
     return card, panel
 
 
-def _insert_before_panel_end(source: str, pane_id: str, fragment: str, protocol: str) -> str:
+def _insert_before_panel_end(
+    source: str,
+    pane_id: str,
+    fragment: str,
+    *,
+    modern_protocol: str | None = None,
+) -> str:
     marker = f'<section id="{pane_id}"'
     start = source.find(marker)
     if start < 0:
         return source
     tag_end = source.find(">", start)
-    if tag_end > start and "data-modern-protocol=" not in source[start:tag_end]:
-        source = source[:tag_end] + f' data-modern-protocol="{_h(protocol)}"' + source[tag_end:]
+    if tag_end < 0:
+        return source
+    if modern_protocol and "data-modern-protocol=" not in source[start:tag_end]:
+        attr = f' data-modern-protocol="{_h(modern_protocol)}"'
+        source = source[:tag_end] + attr + source[tag_end:]
+        tag_end += len(attr)
     end = source.find("</section>", tag_end)
     if end < 0:
         return source
@@ -280,21 +308,20 @@ def _mieru_karing_yaml(item: dict[str, Any]) -> str:
     servers = profile.get("servers") if isinstance(profile.get("servers"), list) else []
     server = servers[0] if servers and isinstance(servers[0], dict) else {}
     bindings = server.get("portBindings") if isinstance(server.get("portBindings"), list) else []
-    first = bindings[0] if bindings and isinstance(bindings[0], dict) else {}
+    binding = bindings[0] if bindings and isinstance(bindings[0], dict) else {}
     host = str(server.get("domainName") or server.get("ipAddress") or item.get("server") or "").strip()
     try:
-        port = int(first.get("port") or item.get("port") or 0)
+        port = int(binding.get("port") or item.get("port") or 0)
     except (TypeError, ValueError):
         port = 0
     username = str(user.get("name") or "").strip()
     password = str(user.get("password") or "").strip()
     if not host or port <= 0 or not username or not password:
         return ""
-    name = "TwinPanel Mieru"
     q = lambda value: json.dumps(str(value), ensure_ascii=False)
     return "\n".join([
         "proxies:",
-        f"  - name: {q(name)}",
+        f"  - name: {q('TwinPanel Mieru')}",
         "    type: mieru",
         f"    server: {q(host)}",
         f"    port: {port}",
@@ -307,7 +334,7 @@ def _mieru_karing_yaml(item: dict[str, Any]) -> str:
         f"  - name: {q('PROXY')}",
         "    type: select",
         "    proxies:",
-        f"      - {q(name)}",
+        f"      - {q('TwinPanel Mieru')}",
         "rules:",
         "  - MATCH,PROXY",
         "",
@@ -316,10 +343,16 @@ def _mieru_karing_yaml(item: dict[str, Any]) -> str:
 
 def _ready_modern_item(token: str, protocol: str, node_id: int, db: Session) -> dict[str, Any]:
     sub = _subscription_from_share_token(token, db)
+    if _status_value(sub) != "active":
+        raise HTTPException(status_code=403, detail="اشتراک فعال نیست")
+    if protocol not in _desired_protocols(db, int(sub.id)):
+        raise HTTPException(status_code=404, detail="پروتکل برای این اشتراک فعال نیست")
     payload = _public_payload(db, sub)
     credentials = payload.get("credentials") if isinstance(payload, dict) else []
     for cred in credentials if isinstance(credentials, list) else []:
-        if not isinstance(cred, dict) or str(cred.get("protocol") or "").strip().lower() != protocol:
+        if not isinstance(cred, dict):
+            continue
+        if str(cred.get("protocol") or "").strip().lower() != protocol:
             continue
         for item in _items(cred):
             try:
@@ -378,16 +411,14 @@ def public_modern_config_v13(
 
 _CSS = r"""
 /* TWINPANEL_PUBLIC_MODERN_DELIVERY_V13 */
-.protocol-choice.v13-pending{opacity:.82;border-style:dashed}
-.protocol-choice.v13-pending em{color:var(--muted);border-color:var(--line)}
+.protocol-choice.v13-pending{opacity:.82;border-style:dashed}.protocol-choice.v13-pending em{color:var(--muted);border-color:var(--line)}
 .protocol-panel[data-modern-protocol] .server-view>.facts{display:none}
 .v13-modern-action,.v13-client-only,.v13-pending-body{margin:14px;padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--surface2)}
 .v13-modern-action{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .v13-action-copy b,.v13-pending-body b{display:block;font-size:10px}.v13-action-copy small,.v13-pending-body small,.v13-pending-body p{display:block;margin-top:5px;color:var(--muted);font-size:8px;line-height:1.8}
 .v13-action-buttons,.v13-client-only>div,.v13-pending-apps{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .v13-app,.v13-secondary{display:none;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:8px;font-weight:900}
-.v13-native-client{font-size:8px;color:var(--muted)}
-.v13-client-only{display:flex;align-items:center;justify-content:space-between;gap:10px}.v13-client-only>span{font-size:8px;color:var(--muted)}
+.v13-native-client{font-size:8px;color:var(--muted)}.v13-client-only{display:flex;align-items:center;justify-content:space-between;gap:10px}.v13-client-only>span{font-size:8px;color:var(--muted)}
 .v13-pending-apps{margin-top:12px}.v13-pending-panel{border-style:dashed}
 @media(max-width:760px){.v13-modern-action,.v13-client-only{align-items:stretch;flex-direction:column}.v13-action-buttons,.v13-client-only>div{width:100%}.v13-action-buttons>*{flex:1;text-align:center}}
 """
@@ -424,18 +455,15 @@ _SCRIPT = r"""
 """
 
 
-def refine_public_connection_modern_delivery_v13(
-    source: str,
-    token: str,
-    db: Session,
-) -> str:
-    """Expose desired Modern state and canonical import actions on the public Connect hub."""
+def refine_public_connection_modern_delivery_v13(source: str, token: str, db: Session) -> str:
+    """Expose all desired protocols and real device-aware Modern import actions."""
     if "TWINPANEL_PUBLIC_MODERN_DELIVERY_V13" in source:
         return source
 
     sub = _subscription_from_share_token(token, db)
+    active = _status_value(sub) == "active"
     desired = _desired_protocols(db, int(sub.id))
-    payload = _public_payload(db, sub)
+    payload = _public_payload(db, sub) if active else {"credentials": []}
     credentials = payload.get("credentials") if isinstance(payload, dict) else []
     ready: dict[str, list[dict[str, Any]]] = {}
     for cred in credentials if isinstance(credentials, list) else []:
@@ -448,28 +476,31 @@ def refine_public_connection_modern_delivery_v13(
 
     pane_by_protocol: dict[str, str] = {}
     for match in re.finditer(
-        r'data-protocol="([^"]+)"[^>]*data-protocol-key="([^"]+)"',
-        source,
+        r'data-protocol="([^"]+)"[^>]*data-protocol-key="([^"]+)"', source
     ):
         pane_by_protocol[str(match.group(2)).strip().lower()] = str(match.group(1))
 
-    # Add a device-specific client button to every ready protocol panel.
     for protocol, pane_id in list(pane_by_protocol.items()):
         if protocol in MODERN_PROTOCOLS and protocol in ready:
-            fragments = [_modern_action(token, protocol, item) for item in ready[protocol]]
-            source = _insert_before_panel_end(source, pane_id, "".join(fragments), protocol)
+            source = _insert_before_panel_end(
+                source,
+                pane_id,
+                "".join(_modern_action(token, protocol, item) for item in ready[protocol]),
+                modern_protocol=protocol,
+            )
         elif protocol in CLASSIC_PROTOCOLS:
-            source = _insert_before_panel_end(source, pane_id, _classic_client_action(protocol), protocol)
+            source = _insert_before_panel_end(
+                source,
+                pane_id,
+                _classic_client_action(protocol),
+            )
 
-    # Desired protocols must never silently disappear. If provisioning/runtime
-    # is not deliverable yet, keep a visible pending card instead of faking a
-    # connection-ready credential.
     missing_cards: list[str] = []
     missing_panels: list[str] = []
     for protocol in desired:
         if protocol in pane_by_protocol:
             continue
-        reason = _credential_state(db, int(sub.id), protocol)
+        reason = _credential_state(db, int(sub.id), protocol, active=active)
         pane_id = f"hub-v13-pending-{protocol}"
         card, panel = _pending_card(protocol, reason, pane_id)
         missing_cards.append(card)
