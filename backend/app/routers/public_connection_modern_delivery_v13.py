@@ -4,6 +4,7 @@ import base64
 import html
 import json
 import re
+import secrets
 from typing import Any
 from urllib.parse import quote
 
@@ -112,6 +113,32 @@ def _status_value(sub: Any) -> str:
     return str(getattr(status, "value", status) or "").strip().lower()
 
 
+def _account_config_name(sub: Any) -> str:
+    raw = str(getattr(sub, "account_username", None) or "").strip()
+    safe = re.sub(r"[^A-Za-z0-9_=+.-]+", "-", raw).strip("-._=+")
+    if safe:
+        return safe
+    subscription_id = int(getattr(sub, "id", 0) or 0)
+    return f"user-{subscription_id}" if subscription_id > 0 else "user"
+
+
+def _download_stem(sub: Any, protocol: str, node_id: int) -> str:
+    username = _account_config_name(sub)
+    protocol = str(protocol or "").strip().lower()
+    if protocol == "amneziawg":
+        # AmneziaWG/WireGuard for Windows derives the tunnel name from the
+        # filename and rejects spaces/parentheses. A short random suffix also
+        # prevents browsers from creating an invalid " (1)" duplicate name.
+        suffix = f"-awg-{int(node_id)}-{secrets.token_hex(2)}"
+        limit = 32
+    else:
+        suffix = f"-{protocol}-{int(node_id)}"
+        limit = 96
+    room = max(1, limit - len(suffix))
+    prefix = username[:room].rstrip("-._=+") or "u"
+    return f"{prefix}{suffix}"
+
+
 def _items(cred: dict[str, Any]) -> list[dict[str, Any]]:
     raw = cred.get("items") or []
     if isinstance(raw, dict):
@@ -152,7 +179,7 @@ def _credential_state(db: Session, subscription_id: int, protocol: str, *, activ
     return "Credential ساخته شده؛ مسیر Runtime هنوز آماده تحویل نیست"
 
 
-def _sudoku_uri(item: dict[str, Any]) -> str:
+def _sudoku_uri(item: dict[str, Any], config_name: str) -> str:
     try:
         cfg = json.loads(str(item.get("config") or ""))
     except Exception:
@@ -173,7 +200,7 @@ def _sudoku_uri(item: dict[str, Any]) -> str:
     elif ascii_mode == "prefer_entropy":
         ascii_mode = "entropy"
     payload: dict[str, Any] = {
-        "n": "TwinPanel Sudoku",
+        "n": str(config_name or "user"),
         "h": host,
         "p": port,
         "k": key,
@@ -204,12 +231,12 @@ def _client_links(protocol: str) -> str:
     return "".join(links)
 
 
-def _modern_action(token: str, protocol: str, item: dict[str, Any]) -> str:
+def _modern_action(token: str, protocol: str, item: dict[str, Any], config_name: str) -> str:
     node_id = int(item.get("node_id") or 0)
     config_format = str(item.get("config_format") or "").strip().lower()
     uri = str(item.get("uri") or "").strip()
     if protocol == "sudoku" and not uri:
-        uri = _sudoku_uri(item)
+        uri = _sudoku_uri(item, config_name)
     config_path = (
         f"/v1/connect/{quote(str(token), safe='')}/modern-config/"
         f"{quote(protocol, safe='')}/{node_id}"
@@ -220,12 +247,14 @@ def _modern_action(token: str, protocol: str, item: dict[str, Any]) -> str:
     elif config_format == "sing-box" and protocol != "snell":
         primary = (
             f'<button class="primary-btn v13-karing-import" type="button" '
-            f'data-config-path="{_h(config_path)}">افزودن مستقیم به Karing</button>'
+            f'data-config-path="{_h(config_path)}" data-config-name="{_h(config_name)}">'
+            'افزودن مستقیم به Karing</button>'
         )
     elif protocol == "mieru":
         primary = (
             f'<button class="primary-btn v13-karing-import" type="button" '
-            f'data-config-path="{_h(config_path)}?profile=karing">افزودن مستقیم به Karing</button>'
+            f'data-config-path="{_h(config_path)}?profile=karing" data-config-name="{_h(config_name)}">'
+            'افزودن مستقیم به Karing</button>'
         )
     else:
         primary = f'<a class="primary-btn" href="{_h(config_path)}">دانلود کانفیگ</a>'
@@ -292,7 +321,7 @@ def _insert_before_panel_end(
     return source[:end] + fragment + source[end:]
 
 
-def _mieru_karing_yaml(item: dict[str, Any]) -> str:
+def _mieru_karing_yaml(item: dict[str, Any], config_name: str) -> str:
     try:
         cfg = json.loads(str(item.get("config") or ""))
     except Exception:
@@ -315,10 +344,11 @@ def _mieru_karing_yaml(item: dict[str, Any]) -> str:
     password = str(user.get("password") or "").strip()
     if not host or port <= 0 or not username or not password:
         return ""
+    proxy_name = f"{str(config_name or 'user')}-mieru"
     q = lambda value: json.dumps(str(value), ensure_ascii=False)
     return "\n".join([
         "proxies:",
-        f"  - name: {q('TwinPanel Mieru')}",
+        f"  - name: {q(proxy_name)}",
         "    type: mieru",
         f"    server: {q(host)}",
         f"    port: {port}",
@@ -331,7 +361,7 @@ def _mieru_karing_yaml(item: dict[str, Any]) -> str:
         f"  - name: {q('PROXY')}",
         "    type: select",
         "    proxies:",
-        f"      - {q('TwinPanel Mieru')}",
+        f"      - {q(proxy_name)}",
         "rules:",
         "  - MATCH,PROXY",
         "",
@@ -372,27 +402,30 @@ def public_modern_config_v13(
     protocol = str(protocol or "").strip().lower()
     if protocol not in MODERN_PROTOCOLS:
         raise HTTPException(status_code=404, detail="پروتکل پشتیبانی نمی‌شود")
+    sub = _subscription_from_share_token(token, db)
+    config_name = _account_config_name(sub)
     item = _ready_modern_item(token, protocol, node_id, db)
     config = str(item.get("config") or "").strip()
     if not config:
         raise HTTPException(status_code=404, detail="کانفیگ آماده نیست")
+    stem = _download_stem(sub, protocol, node_id)
 
     if protocol == "mieru" and str(profile or "").strip().lower() == "karing":
-        content = _mieru_karing_yaml(item)
+        content = _mieru_karing_yaml(item, config_name)
         if not content:
             raise HTTPException(status_code=404, detail="پروفایل Karing آماده نیست")
-        filename = f"twinpanel-{protocol}-{node_id}.yaml"
+        filename = f"{stem}.yaml"
         media_type = "text/yaml"
     else:
         config_format = str(item.get("config_format") or "").strip().lower()
         if config_format in {"sing-box", "mieru-json", "sudoku-json"}:
-            filename = f"twinpanel-{protocol}-{node_id}.json"
+            filename = f"{stem}.json"
             media_type = "application/json"
         elif protocol == "amneziawg" or config_format in {"amneziawg", "amneziawg-conf"}:
-            filename = f"twinpanel-{protocol}-{node_id}.conf"
+            filename = f"{stem}.conf"
             media_type = "text/plain"
         else:
-            filename = f"twinpanel-{protocol}-{node_id}.txt"
+            filename = f"{stem}.txt"
             media_type = "text/plain"
         content = config
 
@@ -444,7 +477,8 @@ _SCRIPT = r"""
       const path=button.dataset.configPath||'';
       if(!path)return;
       const url=location.origin+path;
-      location.href='karing://install-config?url='+encodeURIComponent(url)+'&name='+encodeURIComponent('TwinPanel');
+      const name=button.dataset.configName||'user';
+      location.href='karing://install-config?url='+encodeURIComponent(url)+'&name='+encodeURIComponent(name);
     });
   });
 })();
@@ -459,6 +493,7 @@ def refine_public_connection_modern_delivery_v13(source: str, token: str, db: Se
 
     sub = _subscription_from_share_token(token, db)
     active = _status_value(sub) == "active"
+    config_name = _account_config_name(sub)
     desired = _desired_protocols(db, int(sub.id))
     payload = _public_payload(db, sub) if active else {"credentials": []}
     credentials = payload.get("credentials") if isinstance(payload, dict) else []
@@ -482,7 +517,10 @@ def refine_public_connection_modern_delivery_v13(source: str, token: str, db: Se
             source = _insert_before_panel_end(
                 source,
                 pane_id,
-                "".join(_modern_action(token, protocol, item) for item in ready[protocol]),
+                "".join(
+                    _modern_action(token, protocol, item, config_name)
+                    for item in ready[protocol]
+                ),
                 modern_protocol=protocol,
             )
         elif protocol in CLASSIC_PROTOCOLS:
