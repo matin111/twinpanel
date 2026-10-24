@@ -48,6 +48,45 @@ def credential_state(credential: ProtocolCredential | None) -> str:
     return "partial"
 
 
+def _reconcile_credential_state(credential: ProtocolCredential | None) -> str:
+    """Extend storage state with safe, identity-preserving legacy repairs."""
+
+    state = credential_state(credential)
+    if state != "complete" or credential is None:
+        return state
+
+    protocol = str(credential.protocol or "").strip().lower()
+    if protocol != "naive":
+        return state
+
+    try:
+        from . import account_delivery as ad
+        from ..singbox_subscription_accounts import naive_client_item_requires_repair
+
+        payload = ad._dec(credential.config_text_encrypted)
+    except Exception:
+        # Never rotate or rewrite a complete credential merely because an
+        # inspection path failed. Normal delivery/error handling remains the
+        # authority when encrypted material cannot be decoded safely.
+        return state
+
+    if isinstance(payload, list):
+        items = [item for item in payload if isinstance(item, dict)]
+    elif isinstance(payload, dict):
+        nested = payload.get("items")
+        if isinstance(nested, list):
+            items = [item for item in nested if isinstance(item, dict)]
+        else:
+            items = [payload] if payload else []
+    else:
+        items = []
+
+    if any(naive_client_item_requires_repair(item) for item in items):
+        return "legacy_naive_client"
+
+    return state
+
+
 def _selected_modern_protocols(db: Session, subscription_id: int) -> list[str]:
     selected = {
         str(row[0]).strip().lower()
@@ -88,7 +127,7 @@ def _subscription_snapshot(subscription_id: int) -> dict[str, Any] | None:
         selected = _selected_modern_protocols(db, sub.id)
         credentials = _credential_map(db, sub.id, selected)
         states = {
-            protocol: credential_state(credentials.get(protocol))
+            protocol: _reconcile_credential_state(credentials.get(protocol))
             for protocol in selected
         }
         return {
@@ -133,7 +172,7 @@ async def _reconcile_subscription_modern_accounts(
     candidates = [
         protocol
         for protocol in selected
-        if states.get(protocol) in {"missing", "legacy_empty"}
+        if states.get(protocol) in {"missing", "legacy_empty", "legacy_naive_client"}
     ]
 
     if max_protocols is not None:
@@ -207,7 +246,7 @@ async def _reconcile_subscription_modern_accounts(
                 )
                 .first()
             )
-            current_state = credential_state(current)
+            current_state = _reconcile_credential_state(current)
 
             if current_state == "complete":
                 db.rollback()
@@ -407,7 +446,7 @@ async def reconcile_legacy_modern_once() -> dict[str, Any] | None:
                 continue
             states = dict(snapshot["states"])
             if not any(
-                state in {"missing", "legacy_empty"}
+                state in {"missing", "legacy_empty", "legacy_naive_client"}
                 for state in states.values()
             ):
                 continue
