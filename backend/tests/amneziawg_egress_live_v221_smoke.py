@@ -21,10 +21,15 @@ def load_telemetry():
 def main() -> None:
     egress = (APP / "amneziawg_egress_v221.py").read_text(encoding="utf-8")
     delivery = (APP / "routers" / "modern_account_delivery_v1.py").read_text(encoding="utf-8")
+    reconcile = (APP / "routers" / "modern_legacy_reconcile_v1.py").read_text(encoding="utf-8")
     live = (APP / "routers" / "public_connection_live_v4.py").read_text(encoding="utf-8")
 
+    # Data-plane contract: managed egress must be durable, idempotent and scoped
+    # only to the standalone AmneziaWG client pool.
     assert 'AMNEZIAWG_SUBNET = "10.254.0.0/16"' in egress
     assert 'AMNEZIAWG_INTERFACE = "tpawg0"' in egress
+    assert "EGRESS_CONTRACT = 221" in egress
+    assert "iptables -w 10" in egress
     assert "MASQUERADE" in egress
     assert 'FORWARD -i "$IFACE" -o "$EGRESS"' in egress
     assert 'FORWARD -i "$EGRESS" -o "$IFACE"' in egress
@@ -33,9 +38,22 @@ def main() -> None:
     assert "twinpanel-amneziawg-egress.service" in egress
     assert "systemctl enable" in egress and "systemctl restart" in egress
 
+    # Every successful account apply installs egress before persisting the item
+    # and stamps the durable contract marker used by legacy self-heal.
     assert "ensure_amneziawg_egress" in delivery
     assert 'if protocol == "amneziawg"' in delivery
+    assert 'item["egress_contract"] = int(egress["contract"])' in delivery
 
+    # Existing complete credentials from rc.220 must be repaired once without
+    # regenerating their stored standalone identity.
+    assert '"legacy_amneziawg_egress"' in reconcile
+    assert 'protocol not in {"naive", "amneziawg"}' in reconcile
+    assert 'item.get("egress_contract")' in reconcile
+    assert "EGRESS_CONTRACT" in reconcile
+    assert "_LEGACY_REPAIR_STATES" in reconcile
+
+    # Public Sublink telemetry must consume native AmneziaWG handshake/counters
+    # and map the protocol card instead of relying only on Quota tables.
     assert "subscription_amneziawg_live" in live
     assert 'online_protocols.add("amneziawg")' in live
     assert "text.includes('amneziawg')" in live
@@ -67,6 +85,7 @@ def main() -> None:
     assert telemetry._client_ip("[Interface]\nAddress = 10.254.0.18/32\n") == "10.254.0.18"
 
     print("AMNEZIAWG_EGRESS=PASS")
+    print("AMNEZIAWG_LEGACY_SELF_HEAL=PASS")
     print("AMNEZIAWG_NATIVE_LIVE=PASS")
     print("AMNEZIAWG_UI_MAPPING=PASS")
 
