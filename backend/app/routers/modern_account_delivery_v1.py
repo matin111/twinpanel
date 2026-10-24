@@ -184,6 +184,11 @@ async def _provision_modern_protocol(
                 if not 1 <= port <= 65535:
                     raise RuntimeError(f"{protocol} runtime port is unavailable")
                 item = await apply_account(conn, node, secret, port)
+                if protocol == "amneziawg":
+                    from ..amneziawg_egress_v221 import ensure_amneziawg_egress
+
+                    egress = await ensure_amneziawg_egress(conn)
+                    item["egress_contract"] = int(egress["contract"])
             else:
                 item = await apply_account(conn, node, secret)
             items.append(item)
