@@ -121,6 +121,19 @@ assert '"server_address": endpoint' in standalone
 assert '"server_port": port' not in standalone
 assert '"config_format": "sudoku-json"' in standalone
 assert '"uri": sudoku_uri' in standalone
+# Sudoku provisioning is not ready merely because systemd reports the
+# process active. The account driver must wait for the per-user TCP
+# listener to bind, otherwise an immediate client can race startup.
+for marker in (
+    'ready=0; ',
+    'for i in $(seq 1 100); do ',
+    'ss -H -lnt',
+    'sleep 0.2; ',
+    'if [ ${ready:-0} -ne 1 ]; then ',
+    "Sudoku listener readiness timeout on :{port}",
+    'journalctl -u {service}.service -n 30 --no-pager',
+):
+    assert marker in standalone, marker
 assert '"config_format": "amneziawg"' in standalone
 assert '"config_format": "mieru-json"' in standalone
 assert '"config_format": "sing-box"' in singbox
