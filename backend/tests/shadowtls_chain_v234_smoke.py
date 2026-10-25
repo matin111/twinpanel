@@ -138,7 +138,10 @@ with tempfile.TemporaryDirectory(prefix="twinpanel-shadowtls-v234-") as temp_dir
     healed = json.loads(config_path.read_text(encoding="utf-8"))
     outer = next(item for item in healed["inbounds"] if item.get("tag") == "twinpanel-shadowtls-in")
     inner = next(item for item in healed["inbounds"] if item.get("tag") == "twinpanel-shadowtls-inner")
-    assert outer["users"] == [record]
+    users = outer["users"]
+    assert record in users
+    assert any(item.get("name") == "twinpanel-bootstrap" for item in users)
+    assert not any(str(item.get("name") or "").startswith("__twinpanel_revoked__") for item in users)
     assert outer["detour"] == "twinpanel-shadowtls-inner"
     assert inner["password"] != subscriber_password
 
