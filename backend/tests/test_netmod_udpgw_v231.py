@@ -19,6 +19,7 @@ from app.netmod_udpgw import (
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+BUILD_SCRIPT = REPO_ROOT / "scripts/build-netmod-udpgw.sh"
 
 
 class _FakeSftp:
@@ -75,6 +76,18 @@ def test_udpgw_service_is_loopback_only_self_healing_and_bounds_clients():
     assert "10-performance.conf" in script
 
 
+def test_udpgw_remote_repair_requires_real_resolver_before_success():
+    script = udpgw_artifact._service_install_script()
+    assert "--listen-addr 127.0.0.1:17301" in script
+    assert "--logger stdout" in script
+    assert "--loglevel info" in script
+    assert "no name servers available" in script
+    assert "using DNS server" in script
+    assert "NETMOD_UDPGW_DNS_RESOLVER_UNAVAILABLE" in script
+    assert "NETMOD_UDPGW_DNS_RESOLVER_NOT_CONFIRMED" in script
+    assert "UDPGW_DNS_RESOLVER=yes" in script
+
+
 def test_stage_udpgw_verifies_binary_then_installs_managed_service():
     with tempfile.TemporaryDirectory() as temp:
         fake_binary = Path(temp) / "badvpn-udpgw-linux-amd64"
@@ -90,12 +103,14 @@ def test_stage_udpgw_verifies_binary_then_installs_managed_service():
     assert result["arch"] == "amd64"
     assert result["service"] == NETMOD_UDPGW_SERVICE
     assert result["listen"] == NETMOD_UDPGW_LISTEN
+    assert result["dns_resolver"] == "verified"
     assert conn.puts == [(str(fake_binary), NETMOD_UDPGW_BINARY + ".tmp")]
     joined = "\n".join(conn.commands)
     assert "sha256sum" in joined
     assert NETMOD_UDPGW_BINARY in joined
     assert "systemctl restart" in joined
     assert NETMOD_UDPGW_LISTEN in joined
+    assert "using DNS server" in joined
 
 
 def test_netmod_dnstt_stages_udpgw_companion_only_for_netmod():
@@ -113,6 +128,7 @@ def test_netmod_dnstt_stages_udpgw_companion_only_for_netmod():
                 "remote_path": NETMOD_UDPGW_BINARY,
                 "service": NETMOD_UDPGW_SERVICE,
                 "listen": NETMOD_UDPGW_LISTEN,
+                "dns_resolver": "verified",
             }
 
         with patch.object(
@@ -142,15 +158,34 @@ def test_netmod_dnstt_stages_udpgw_companion_only_for_netmod():
             assert "udpgw_service" not in result2
 
 
-def test_release_pipeline_bundles_verified_udpgw_and_license():
+def test_resolver_aware_build_script_uses_glibc_static_and_rejects_dns_blind_binary():
+    script = BUILD_SCRIPT.read_text(encoding="utf-8")
+    assert BADVPN_COMMIT in script
+    assert "CC=gcc cmake" in script
+    assert "-DCMAKE_EXE_LINKER_FLAGS='-static'" in script
+    assert "musl-gcc" not in script
+    assert "statically linked" in script
+    assert "using DNS server" in script
+    assert "no name servers available" in script
+    assert "NETMOD_UDPGW_RESOLVER_UNAVAILABLE" in script
+
+
+def test_release_pipeline_uses_shared_resolver_aware_builder_and_license():
     workflow = (REPO_ROOT / ".github/workflows/publish-prebuilt-release.yml").read_text(encoding="utf-8")
     assert "Build verified NetMod UDPGW artifact" in workflow
-    assert BADVPN_COMMIT in workflow
+    assert "scripts/build-netmod-udpgw.sh" in workflow
     assert "badvpn-udpgw-linux-amd64" in workflow
     assert "badvpn-udpgw-linux-amd64.sha256" in workflow
     assert "badvpn-COPYING" in workflow
-    assert "CC=musl-gcc" in workflow
-    assert "statically linked" in workflow
+    assert "musl-gcc" not in workflow
+
+
+def test_ci_workflows_use_shared_resolver_aware_builder():
+    dedicated = (REPO_ROOT / ".github/workflows/netmod-udpgw-v231-smoke.yml").read_text(encoding="utf-8")
+    api = (REPO_ROOT / ".github/workflows/api-build.yml").read_text(encoding="utf-8")
+    for workflow in (dedicated, api):
+        assert "scripts/build-netmod-udpgw.sh" in workflow
+        assert "musl-gcc" not in workflow
 
 
 def test_admin_ui_does_not_offer_mtu_above_verified_requester_size():
@@ -164,11 +199,14 @@ def test_admin_ui_does_not_offer_mtu_above_verified_requester_size():
 def main() -> int:
     test_udpgw_runtime_contract_is_private_and_pinned()
     test_udpgw_service_is_loopback_only_self_healing_and_bounds_clients()
+    test_udpgw_remote_repair_requires_real_resolver_before_success()
     test_stage_udpgw_verifies_binary_then_installs_managed_service()
     test_netmod_dnstt_stages_udpgw_companion_only_for_netmod()
-    test_release_pipeline_bundles_verified_udpgw_and_license()
+    test_resolver_aware_build_script_uses_glibc_static_and_rejects_dns_blind_binary()
+    test_release_pipeline_uses_shared_resolver_aware_builder_and_license()
+    test_ci_workflows_use_shared_resolver_aware_builder()
     test_admin_ui_does_not_offer_mtu_above_verified_requester_size()
-    print("NETMOD_UDPGW_V231_OK")
+    print("NETMOD_UDPGW_V233_OK")
     return 0
 
 
