@@ -1,4 +1,4 @@
-name: NetMod UDPGW Resolver V233 Smoke
+name: NetMod UDPGW Resolver V234 Smoke
 
 on:
   pull_request:
@@ -8,6 +8,7 @@ on:
       - 'backend/app/dnstt_artifact.py'
       - 'backend/tests/test_netmod_udpgw_v231.py'
       - 'scripts/build-netmod-udpgw.sh'
+      - 'scripts/patches/badvpn-udpgw-resolvconf-fallback.patch'
       - '.github/workflows/netmod-udpgw-v231-smoke.yml'
   workflow_dispatch:
 
@@ -30,13 +31,13 @@ jobs:
           python -m pip install --disable-pip-version-check --quiet pytest
           PYTHONPATH=backend python -m pytest -q backend/tests/test_netmod_udpgw_v231.py
 
-      - name: Build and verify pinned BadVPN UDPGW resolver
+      - name: Build and verify pinned BadVPN UDPGW resolver fallback
         id: udpgw_build
         shell: bash
         run: |
           set -u
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends cmake file libc6-dev
+          sudo apt-get install -y --no-install-recommends cmake file musl-tools iproute2
 
           OUT="$(mktemp)"
           LICENSE="$(mktemp)"
@@ -59,6 +60,10 @@ jobs:
             file "$OUT" | grep -q 'statically linked'
             grep -Eq "^[0-9a-f]{64}  ${OUT}$" "$OUT.sha256"
             test -s "$LICENSE"
+            grep -Fq 'NETMOD_UDPGW_RESOLVER=fallback-verified' /tmp/netmod-udpgw-build.log
+            grep -Fq 'loaded DNS server from /etc/resolv.conf fallback' /tmp/netmod-udpgw-build.log
+            grep -Fq 'using DNS server' /tmp/netmod-udpgw-build.log
+            ! grep -Fq 'no name servers available' /tmp/netmod-udpgw-build.log
           fi
 
       - name: Upload UDPGW build diagnostics
