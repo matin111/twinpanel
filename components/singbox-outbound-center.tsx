@@ -18,6 +18,7 @@ type OutboundRow={
   password?:string;
   has_password?:boolean;
   managed?:boolean;
+  imported?:boolean;
 };
 
 type OutboundNode={
@@ -35,28 +36,25 @@ type OutboundNode={
 type Inventory={
   ok:boolean;
   supported_types:string[];
+  supported_import_types?:string[];
   nodes:OutboundNode[];
 };
 
-type Draft={
+type ImportResult={
+  ok:boolean;
+  node_id:number;
   tag:string;
-  type:"direct"|"socks"|"http";
-  server:string;
-  port:string;
-  username:string;
-  password:string;
+  type:string;
+  label:string;
+  set_default:boolean;
+};
+
+type Draft={
+  config:string;
   setDefault:boolean;
 };
 
-const EMPTY:Draft={
-  tag:"",
-  type:"socks",
-  server:"",
-  port:"1080",
-  username:"",
-  password:"",
-  setDefault:false,
-};
+const EMPTY:Draft={config:"",setDefault:true};
 
 async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   const token=getCustomerToken();
@@ -89,12 +87,23 @@ function errorText(value:unknown):string{
   try{return JSON.stringify(value);}catch{return String(value);}
 }
 
+function protocolTitle(value:string):string{
+  const key=String(value||"").toLowerCase();
+  if(key==="vless")return "VLESS";
+  if(key==="vmess")return "VMess";
+  if(key==="trojan")return "Trojan";
+  if(key==="shadowsocks")return "Shadowsocks";
+  if(key==="direct")return "DIRECT";
+  if(key==="socks")return "SOCKS5";
+  if(key==="http")return "HTTP";
+  return key.toUpperCase();
+}
+
 export function SingboxOutboundCenter(){
   const {pick}=useI18n();
   const [inventory,setInventory]=useState<Inventory|null>(null);
   const [nodeId,setNodeId]=useState(0);
   const [draft,setDraft]=useState<Draft>(EMPTY);
-  const [editingTag,setEditingTag]=useState("");
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState("");
   const [error,setError]=useState("");
@@ -117,47 +126,27 @@ export function SingboxOutboundCenter(){
   useEffect(()=>{void load();},[]);
 
   const node=useMemo(()=>inventory?.nodes.find(item=>item.id===nodeId)||null,[inventory,nodeId]);
+  const supported=inventory?.supported_import_types||["vless","vmess","trojan","shadowsocks"];
 
-  const reset=()=>{
-    setEditingTag("");
-    setDraft(EMPTY);
-  };
-
-  const edit=(row:OutboundRow)=>{
-    if(!row.managed)return;
-    setEditingTag(row.tag);
-    setDraft({
-      tag:row.tag,
-      type:(row.type==="direct"||row.type==="http"?row.type:"socks"),
-      server:row.server||"",
-      port:row.server_port?String(row.server_port):(row.type==="http"?"8080":"1080"),
-      username:row.username||"",
-      password:"",
-      setDefault:node?.default_tag===row.tag,
-    });
-  };
-
-  const save=async()=>{
+  const importConfig=async()=>{
     if(!node)return;
-    const tag=draft.tag.trim();
-    if(!tag){setError(pick("Tag الزامی است.","Tag is required."));return;}
-    if(editingTag&&editingTag!==tag){setError(pick("برای تغییر Tag، Outbound جدید بسازید و قبلی را حذف کنید.","Create a new outbound to change its tag, then remove the old one."));return;}
-    if(draft.type!=="direct"&&(!draft.server.trim()||!Number(draft.port))){setError(pick("آدرس و پورت Proxy الزامی است.","Proxy server and port are required."));return;}
-    setBusy("save");setError("");setNotice("");
+    const config=draft.config.trim();
+    if(!config){
+      setError(pick("کانفیگ را Paste کنید.","Paste a config first."));
+      return;
+    }
+    setBusy("import");setError("");setNotice("");
     try{
-      await request(`/v1/settings/vpn/outbounds/${node.id}/${encodeURIComponent(tag)}`,{
-        method:"PUT",
-        body:JSON.stringify({
-          type:draft.type,
-          server:draft.type==="direct"?null:draft.server.trim(),
-          server_port:draft.type==="direct"?null:Number(draft.port),
-          username:draft.type==="direct"?null:(draft.username||null),
-          password:draft.type==="direct"?null:(draft.password||null),
-          set_default:draft.setDefault,
-        }),
+      const result=await request<ImportResult>(`/v1/settings/vpn/outbounds/${node.id}/import`,{
+        method:"POST",
+        body:JSON.stringify({config,set_default:draft.setDefault}),
       });
-      setNotice(pick("Outbound پس از اعتبارسنجی Sing-box اعمال شد.","Outbound was applied after Sing-box validation."));
-      reset();
+      setDraft(EMPTY);
+      setNotice(
+        draft.setDefault
+          ?pick(`کانفیگ ${protocolTitle(result.type)} بررسی، ذخیره و به خروجی پیش‌فرض تبدیل شد.`,`The ${protocolTitle(result.type)} config was validated, saved, and activated as the default egress.`)
+          :pick(`کانفیگ ${protocolTitle(result.type)} بررسی و ذخیره شد.`,`The ${protocolTitle(result.type)} config was validated and saved.`),
+      );
       await load(true);
     }catch(exc){setError(exc instanceof Error?exc.message:String(exc));}
     finally{setBusy("");}
@@ -192,7 +181,6 @@ export function SingboxOutboundCenter(){
     try{
       await request(`/v1/settings/vpn/outbounds/${node.id}/${encodeURIComponent(tag)}`,{method:"DELETE"});
       setNotice(pick("Outbound حذف شد.","Outbound deleted."));
-      if(editingTag===tag)reset();
       await load(true);
     }catch(exc){setError(exc instanceof Error?exc.message:String(exc));}
     finally{setBusy("");}
@@ -204,8 +192,8 @@ export function SingboxOutboundCenter(){
 
       <section className={styles.hero}>
         <div>
-          <b>{pick("خروجی Sing-box","Sing-box egress")}</b>
-          <p>{pick("مسیر خروج Core را بدون دست‌کاری تونل‌ها مدیریت کنید. هر تغییر ابتدا validate می‌شود و در خطای restart به config قبلی برمی‌گردد.","Manage core egress without changing tunnel routing. Every change is validated first and rolls back if restart fails.")}</p>
+          <b>{pick("خروجی با کانفیگ V2Ray","Config-based egress")}</b>
+          <p>{pick("کانفیگ VLESS، VMess، Trojan یا Shadowsocks را Paste کنید. TwinPanel آن را به Outbound واقعی Sing-box تبدیل می‌کند، قبل از اعمال اعتبارسنجی می‌کند و در خطا به config قبلی برمی‌گردد.","Paste a VLESS, VMess, Trojan, or Shadowsocks config. TwinPanel converts it to a real Sing-box outbound, validates it before activation, and rolls back on failure.")}</p>
         </div>
         <button onClick={()=>void load()} disabled={loading||Boolean(busy)}>{pick("به‌روزرسانی","Refresh")}</button>
       </section>
@@ -215,7 +203,7 @@ export function SingboxOutboundCenter(){
 
       <section className={styles.toolbar}>
         <label>{pick("نود","Node")}
-          <select value={nodeId} onChange={event=>{setNodeId(Number(event.target.value));reset();}} disabled={loading}>
+          <select value={nodeId} onChange={event=>{setNodeId(Number(event.target.value));setDraft(EMPTY);}} disabled={loading}>
             {(inventory?.nodes||[]).map(item=><option key={item.id} value={item.id}>{item.name} · {item.public_ip}</option>)}
           </select>
         </label>
@@ -237,8 +225,12 @@ export function SingboxOutboundCenter(){
             const isDefault=node.default_tag===row.tag;
             return <article className={styles.card} key={row.tag}>
               <div className={styles.cardHead}>
-                <div><strong>{row.tag}</strong><small>{row.type.toUpperCase()}</small></div>
-                <div className={styles.badges}>{isDefault?<Badge tone="violet">{pick("پیش‌فرض","Default")}</Badge>:null}{!row.managed?<Badge tone="warn">{pick("فقط خواندنی","Read only")}</Badge>:null}</div>
+                <div><strong>{row.tag}</strong><small>{protocolTitle(row.type)}</small></div>
+                <div className={styles.badges}>
+                  {isDefault?<Badge tone="violet">{pick("فعال / پیش‌فرض","Active / Default")}</Badge>:null}
+                  {row.imported?<Badge tone="ok">{pick("کانفیگ واردشده","Imported config")}</Badge>:null}
+                  {!row.managed?<Badge tone="warn">{pick("فقط خواندنی","Read only")}</Badge>:null}
+                </div>
               </div>
               <div className={styles.meta}>
                 {row.server?<span>{row.server}:{row.server_port||"—"}</span>:<span>{pick("خروج مستقیم اینترنت","Direct Internet")}</span>}
@@ -246,8 +238,7 @@ export function SingboxOutboundCenter(){
                 {row.has_password?<span>{pick("رمز: ذخیره شده","Password: saved")}</span>:null}
               </div>
               <div className={styles.actions}>
-                {!isDefault?<button onClick={()=>void makeDefault(row.tag)} disabled={Boolean(busy)}>{pick("پیش‌فرض کن","Set default")}</button>:null}
-                {row.managed?<button onClick={()=>edit(row)} disabled={Boolean(busy)}>{pick("ویرایش","Edit")}</button>:null}
+                {!isDefault?<button onClick={()=>void makeDefault(row.tag)} disabled={Boolean(busy)}>{pick("استفاده به‌عنوان خروجی","Use as egress")}</button>:null}
                 {row.managed&&row.tag!=="direct"?<button className={styles.danger} onClick={()=>void remove(row.tag)} disabled={Boolean(busy)}>{pick("حذف","Delete")}</button>:null}
               </div>
             </article>;
@@ -256,25 +247,31 @@ export function SingboxOutboundCenter(){
         </section>
 
         <section className={styles.editor}>
-          <div className={styles.sectionTitle}><b>{editingTag?pick("ویرایش Outbound","Edit outbound"):pick("Outbound جدید","New outbound")}</b></div>
-          <label>Tag<input value={draft.tag} disabled={Boolean(editingTag)} placeholder="proxy-de" onChange={event=>setDraft({...draft,tag:event.target.value})}/></label>
-          <label>{pick("نوع","Type")}
-            <select value={draft.type} disabled={draft.tag==="direct"} onChange={event=>{
-              const type=event.target.value as Draft["type"];
-              setDraft({...draft,type,port:type==="http"?"8080":type==="socks"?"1080":""});
-            }}>
-              <option value="socks">SOCKS5</option><option value="http">HTTP Proxy</option><option value="direct">Direct</option>
-            </select>
+          <div className={styles.sectionTitle}><b>{pick("افزودن Outbound با کانفیگ","Add outbound from config")}</b></div>
+          <p className={styles.intro}>{pick("فقط کانفیگ را Paste کن؛ Tag، پروتکل، سرور، پورت، TLS و Transport به‌صورت خودکار استخراج می‌شوند.","Just paste the config; tag, protocol, server, port, TLS, and transport are detected automatically.")}</p>
+          <div className={styles.protocols}>
+            {supported.map(item=><span key={item}>{protocolTitle(item)}</span>)}
+          </div>
+          <label>{pick("کانفیگ V2Ray / Sing-box","V2Ray / Sing-box config")}
+            <textarea
+              dir="ltr"
+              value={draft.config}
+              placeholder={"vless://...\nvmess://...\ntrojan://...\nss://...\n\nیا یک Outbound JSON از Sing-box"}
+              spellCheck={false}
+              onChange={event=>setDraft({...draft,config:event.target.value})}
+            />
           </label>
-          {draft.type!=="direct"?<>
-            <label>{pick("آدرس Proxy","Proxy server")}<input value={draft.server} placeholder="proxy.example.com" onChange={event=>setDraft({...draft,server:event.target.value})}/></label>
-            <label>{pick("پورت","Port")}<input type="number" min="1" max="65535" value={draft.port} onChange={event=>setDraft({...draft,port:event.target.value})}/></label>
-            <label>{pick("نام کاربری (اختیاری)","Username (optional)")}<input value={draft.username} onChange={event=>setDraft({...draft,username:event.target.value})}/></label>
-            <label>{pick(editingTag?"رمز جدید؛ خالی = حفظ قبلی":"رمز (اختیاری)",editingTag?"New password; blank = keep existing":"Password (optional)")}<input type="password" value={draft.password} onChange={event=>setDraft({...draft,password:event.target.value})}/></label>
-          </>:null}
-          <label className={styles.check}><input type="checkbox" checked={draft.setDefault} onChange={event=>setDraft({...draft,setDefault:event.target.checked})}/><span>{pick("بعد از ذخیره خروجی پیش‌فرض شود","Set as default after save")}</span></label>
-          <div className={styles.editorActions}><button className={styles.primary} onClick={()=>void save()} disabled={Boolean(busy)||Boolean(node.error)}>{busy==="save"?pick("در حال اعمال...","Applying..."):pick("ذخیره و اعمال امن","Validate & apply")}</button>{editingTag?<button onClick={reset}>{pick("انصراف","Cancel")}</button>:null}</div>
-          <p className={styles.hint}>{pick("ساخت Outbound به‌تنهایی مسیر کاربران را عوض نمی‌کند؛ فقط با «پیش‌فرض کن» یا گزینه بالا route.final تغییر می‌کند.","Creating an outbound alone does not change user routing; route.final changes only when you explicitly select it as default.")}</p>
+          <label className={styles.check}>
+            <input type="checkbox" checked={draft.setDefault} onChange={event=>setDraft({...draft,setDefault:event.target.checked})}/>
+            <span>{pick("بعد از بررسی و ذخیره، همین کانفیگ خروجی فعال شود","After validation, make this config the active egress")}</span>
+          </label>
+          <div className={styles.editorActions}>
+            <button className={styles.primary} onClick={()=>void importConfig()} disabled={Boolean(busy)||Boolean(node.error)||!draft.config.trim()}>
+              {busy==="import"?pick("در حال بررسی و اعمال...","Validating and applying..."):pick("بررسی، ذخیره و فعال‌سازی","Validate, save & activate")}
+            </button>
+            {draft.config?<button onClick={()=>setDraft(EMPTY)} disabled={Boolean(busy)}>{pick("پاک کردن","Clear")}</button>:null}
+          </div>
+          <p className={styles.hint}>{pick("قبل از جایگزینی config، Sing-box check اجرا و نسخه قبلی Backup می‌شود. اگر restart یا health سرویس شکست بخورد، rollback خودکار انجام می‌شود.","Before replacement, Sing-box validates the config and TwinPanel backs up the previous version. Restart/service failures trigger automatic rollback.")}</p>
         </section>
       </div>:null}
     </div>
