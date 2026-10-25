@@ -23,6 +23,9 @@ from .public_connection_modern_names_v14 import (
     refine_public_connection_modern_names_v14,
     router as public_connection_modern_names_v14_router,
 )
+from .public_connection_modern_import_v15 import (
+    refine_public_connection_modern_import_v15,
+)
 from .public_connection_files_v9 import router as public_connection_files_v9_router
 from .public_connection_multilink_v7 import router as public_connection_multilink_v7_router
 from .public_connection_hub_v5 import public_connection_hub_v5
@@ -247,6 +250,7 @@ def public_connection_hub_live_v5(
     source = refine_public_connection_windows_v12(source)
     source = refine_public_connection_modern_delivery_v13(source, token, db)
     source = refine_public_connection_modern_names_v14(source, token, db)
+    source = refine_public_connection_modern_import_v15(source, token, db)
 
     return HTMLResponse(
         content=source,
