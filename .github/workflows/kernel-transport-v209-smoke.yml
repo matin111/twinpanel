@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "backend/app/kernel_transport_registry_v209.py"
+      - "backend/app/transport_candidates/kernel_cleanup_v210.py"
       - "backend/app/transport_candidates/kernel_ipip.py"
       - "backend/app/transport_candidates/kernel_vxlan.py"
       - "backend/app/tunnel_transport_manager_v12.py"
@@ -43,6 +44,7 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/kernel_transport_registry_v209.py \
+            backend/app/transport_candidates/kernel_cleanup_v210.py \
             backend/app/transport_candidates/kernel_ipip.py \
             backend/app/transport_candidates/kernel_vxlan.py \
             backend/app/tunnel_transport_manager_v12.py \
