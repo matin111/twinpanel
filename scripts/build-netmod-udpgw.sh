@@ -80,7 +80,14 @@ if ! ss -H -ltn | grep -F "127.0.0.1:${TEST_PORT} " >/dev/null; then
   exit 33
 fi
 
+# BadVPN uses stdio for stdout. When stdout is redirected to a file, INFO/NOTICE
+# records can remain block-buffered while the process is alive. Terminate the
+# short-lived probe cleanly first so resolver logs are flushed before reading.
 sleep 0.2
+kill "$PID" >/dev/null 2>&1 || true
+wait "$PID" >/dev/null 2>&1 || true
+PID=""
+
 if grep -Fq 'no name servers available' "$LOG"; then
   cat "$LOG" >&2
   echo "NETMOD_UDPGW_RESOLVER_UNAVAILABLE" >&2
@@ -91,10 +98,6 @@ if ! grep -Fq 'using DNS server' "$LOG"; then
   echo "NETMOD_UDPGW_RESOLVER_NOT_CONFIRMED" >&2
   exit 35
 fi
-
-kill "$PID" >/dev/null 2>&1 || true
-wait "$PID" >/dev/null 2>&1 || true
-PID=""
 
 install -D -m 0755 "$BIN" "$OUTPUT_PATH"
 install -D -m 0644 "$SRC/COPYING" "$LICENSE_PATH"
