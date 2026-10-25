@@ -5,6 +5,8 @@ on:
     paths:
       - "backend/app/singbox_outbound_import.py"
       - "backend/app/routers/singbox_outbounds.py"
+      - "backend/app/routers/singbox_outbound_ops_v2.py"
+      - "backend/app/routers/__init__.py"
       - "backend/tests/singbox_outbound_config_import_v1_smoke.py"
       - "components/singbox-outbound-center.tsx"
       - "components/singbox-outbound-center.module.css"
@@ -14,6 +16,8 @@ on:
     paths:
       - "backend/app/singbox_outbound_import.py"
       - "backend/app/routers/singbox_outbounds.py"
+      - "backend/app/routers/singbox_outbound_ops_v2.py"
+      - "backend/app/routers/__init__.py"
       - "backend/tests/singbox_outbound_config_import_v1_smoke.py"
       - "components/singbox-outbound-center.tsx"
       - "components/singbox-outbound-center.module.css"
@@ -38,6 +42,8 @@ jobs:
           python -m py_compile \
             backend/app/singbox_outbound_import.py \
             backend/app/routers/singbox_outbounds.py \
+            backend/app/routers/singbox_outbound_ops_v2.py \
+            backend/app/routers/__init__.py \
             backend/tests/singbox_outbound_config_import_v1_smoke.py
 
       - name: Config parser smoke
