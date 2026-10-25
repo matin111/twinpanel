@@ -6,17 +6,17 @@ LICENSE_PATH="${2:-$(dirname "$OUTPUT_PATH")/badvpn-COPYING}"
 BADVPN_COMMIT='07268f02706e78e282e19641b5d1d41e8e89bf31'
 TEST_PORT="${NETMOD_UDPGW_TEST_PORT:-17300}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-PATCH_PATH="$SCRIPT_DIR/patches/badvpn-udpgw-resolvconf-fallback.patch"
+PATCHER="$SCRIPT_DIR/patch-badvpn-udpgw-resolver.py"
 
-for cmd in git cmake gcc file ss sha256sum; do
+for cmd in git cmake gcc file ss sha256sum python3; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "NETMOD_UDPGW_BUILD_MISSING_TOOL=$cmd" >&2
     exit 31
   }
 done
 
-test -s "$PATCH_PATH" || {
-  echo "NETMOD_UDPGW_PATCH_MISSING=$PATCH_PATH" >&2
+test -s "$PATCHER" || {
+  echo "NETMOD_UDPGW_PATCHER_MISSING=$PATCHER" >&2
   exit 30
 }
 
@@ -40,15 +40,18 @@ git -C "$SRC" fetch -q --depth=1 origin "$BADVPN_COMMIT"
 git -C "$SRC" checkout -q --detach FETCH_HEAD
 test "$(git -C "$SRC" rev-parse HEAD)" = "$BADVPN_COMMIT"
 
-git -C "$SRC" apply --check "$PATCH_PATH"
-git -C "$SRC" apply "$PATCH_PATH"
+# Transform only exact snippets from the immutable upstream source. The patcher
+# requires exactly one match for each target and fails closed if upstream ever
+# differs, avoiding fragile line-number based unified patches.
+python3 "$PATCHER" "$SRC/udpgw/udpgw.c"
 git -C "$SRC" diff --check
 grep -Fq 'loaded DNS server from /etc/resolv.conf fallback' "$SRC/udpgw/udpgw.c"
+grep -Fq 'res_init() == 0 && _res.nscount > 0' "$SRC/udpgw/udpgw.c"
 
 # Keep the rc.233 self-contained glibc-static artifact model, but patch the
 # exact production failure: upstream BadVPN only trusts res_init/_res. The
-# pinned patch preserves that path first and reads the first valid IPv4
-# nameserver from /etc/resolv.conf only when libc exposes no resolver.
+# deterministic transformer preserves that path first and reads the first valid
+# IPv4 nameserver from /etc/resolv.conf only when libc exposes no resolver.
 CC=gcc cmake -S "$SRC" -B "$BUILD" \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_NOTHING_BY_DEFAULT=1 \
