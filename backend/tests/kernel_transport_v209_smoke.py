@@ -5,8 +5,21 @@ from pathlib import Path
 from app import smart_transport_auto_v21 as smart
 from app import transport_candidates as candidates
 from app import tp27_reference_runtime_v91 as reference_v91
-from app.kernel_transport_registry_v209 import apply_kernel_transport_registry_v209
+from app.kernel_transport_registry_v209 import (
+    KERNEL_IPIP_RULE_BASE,
+    KERNEL_IPIP_TABLE_BASE,
+    KERNEL_POLICY_SPAN,
+    KERNEL_VXLAN_RULE_BASE,
+    KERNEL_VXLAN_TABLE_BASE,
+    LINUX_MAIN_RULE_PRIORITY,
+    apply_kernel_transport_registry_v209,
+)
 from app.spoof_candidate_policy_v202 import apply_spoof_candidate_policy_v202
+from app.tp6_candidate_registry_v208 import (
+    TP6_POLICY_RULE_BASE,
+    TP6_POLICY_SPAN,
+    TP6_POLICY_TABLE_BASE,
+)
 
 
 def _source(relative: str) -> str:
@@ -55,12 +68,41 @@ def main() -> None:
     assert ipip["port"] is None
     assert 37000 <= int(vxlan["port"]) <= 37999
 
-    policy_ids = {
-        candidates.policy_ids("tp6_fast", 77)[0],
-        candidates.policy_ids("kernel_ipip", 77)[0],
-        candidates.policy_ids("kernel_vxlan", 77)[0],
-    }
-    assert len(policy_ids) == 3
+    # V211 regression: route-table IDs remain stable, while source-policy rule
+    # priorities move ahead of Linux's built-in `main` rule at priority 32766.
+    # The real Tunnel #6 VXLAN canary proved that the previous 36006 rule was
+    # too late: `ip route get ... from 10.243.0.25` selected ens3 instead of
+    # tpvx6, leaving the candidate NAT counter at zero.
+    assert candidates.policy_ids("tp6_fast", 6) == (34006, 30006)
+    assert candidates.policy_ids("kernel_ipip", 6) == (35006, 30906)
+    assert candidates.policy_ids("kernel_vxlan", 6) == (36006, 31806)
+
+    assert TP6_POLICY_SPAN == KERNEL_POLICY_SPAN == 900
+    assert TP6_POLICY_TABLE_BASE == 34000
+    assert KERNEL_IPIP_TABLE_BASE == 35000
+    assert KERNEL_VXLAN_TABLE_BASE == 36000
+
+    assert TP6_POLICY_RULE_BASE + TP6_POLICY_SPAN - 1 < KERNEL_IPIP_RULE_BASE
+    assert KERNEL_IPIP_RULE_BASE + KERNEL_POLICY_SPAN - 1 < KERNEL_VXLAN_RULE_BASE
+    assert KERNEL_VXLAN_RULE_BASE + KERNEL_POLICY_SPAN - 1 < LINUX_MAIN_RULE_PRIORITY
+
+    for tunnel_id in (1, 6, 77, 899, 900, 1799):
+        tp6_table, tp6_priority = candidates.policy_ids("tp6_fast", tunnel_id)
+        ipip_table, ipip_priority = candidates.policy_ids("kernel_ipip", tunnel_id)
+        vxlan_table, vxlan_priority = candidates.policy_ids("kernel_vxlan", tunnel_id)
+
+        assert TP6_POLICY_TABLE_BASE <= tp6_table < TP6_POLICY_TABLE_BASE + 900
+        assert KERNEL_IPIP_TABLE_BASE <= ipip_table < KERNEL_IPIP_TABLE_BASE + 900
+        assert KERNEL_VXLAN_TABLE_BASE <= vxlan_table < KERNEL_VXLAN_TABLE_BASE + 900
+
+        assert TP6_POLICY_RULE_BASE <= tp6_priority < TP6_POLICY_RULE_BASE + 900
+        assert KERNEL_IPIP_RULE_BASE <= ipip_priority < KERNEL_IPIP_RULE_BASE + 900
+        assert KERNEL_VXLAN_RULE_BASE <= vxlan_priority < KERNEL_VXLAN_RULE_BASE + 900
+
+        assert tp6_priority < LINUX_MAIN_RULE_PRIORITY
+        assert ipip_priority < LINUX_MAIN_RULE_PRIORITY
+        assert vxlan_priority < LINUX_MAIN_RULE_PRIORITY
+        assert len({tp6_priority, ipip_priority, vxlan_priority}) == 3
 
     # V210 regression: a failed kernel canary must remove both probe-owned
     # Iran policy state and Exit MASQUERADE state, then verify absence.
@@ -101,10 +143,12 @@ def main() -> None:
     assert expected.issubset(api_names)
 
     print(
-        "KERNEL_TRANSPORT_V210_OK",
+        "KERNEL_TRANSPORT_V211_OK",
         "active=" + ",".join(sorted(expected)),
         "auto_install=" + ",".join(smart.AUTO_INSTALL_NAMES),
         "failure_cleanup=policy,nat,service,helper,unit",
+        "policy_rules=tp6:300xx,ipip:309xx,vxlan:318xx",
+        f"linux_main={LINUX_MAIN_RULE_PRIORITY}",
     )
 
 
