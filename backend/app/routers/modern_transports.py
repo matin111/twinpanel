@@ -16,6 +16,13 @@ from ..smart_transport_auto_v21 import (
     _smart_state,
     auto_block_reason,
 )
+from ..kernel_transport_registry_v209 import apply_kernel_transport_registry_v209
+
+# API workers must expose the same additive candidate registry as the standalone
+# transport-manager process. This fixes TP6 visibility and registers the V209
+# IPIP/VXLAN lanes before catalog/state/install requests are served.
+apply_kernel_transport_registry_v209()
+
 from ..transport_candidates import (
     ACTIVE_SPECS,
     SPECS,
@@ -48,6 +55,27 @@ _PROFILE = {
             "Spoof Tunnel v3.1 core carries a private WireGuard /30. "
             "Mutual spoof source addresses must be configured explicitly and "
             "the path is accepted only after TwinPanel full-L3 qualification."
+        ),
+    },
+    "tp6_fast": {
+        "iran_profile": "ipv6-carrier + private-ipv4-l3",
+        "description": (
+            "TP6 Fast uses real IPv6 as the outer carrier with keyed IP6GRE "
+            "first and IPIP6 fallback. Explicit install only; no encryption."
+        ),
+    },
+    "kernel_ipip": {
+        "iran_profile": "native-ipip + private-ipv4-l3",
+        "description": (
+            "Linux kernel IPIP point-to-point L3 candidate. Low overhead and "
+            "explicit install only; transport itself is not encrypted."
+        ),
+    },
+    "kernel_vxlan": {
+        "iran_profile": "native-vxlan-udp + private-ipv4-l3",
+        "description": (
+            "Linux kernel VXLAN over UDP point-to-point candidate with a "
+            "dedicated VNI/port. Explicit install only; transport is unencrypted."
         ),
     },
     "kernel_gre": {
@@ -124,6 +152,12 @@ def _candidate_view(
             "auto_install": False,
             "xdp": False,
             "upstream_version": spoof_wg.UPSTREAM_VERSION,
+        }
+    elif name in {"tp6_fast", "kernel_ipip", "kernel_vxlan"}:
+        extra = {
+            "auto_install": False,
+            "configuration_required": False,
+            "encrypted": False,
         }
 
     return {
