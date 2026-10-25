@@ -19,6 +19,17 @@ KERNEL_VXLAN_SPEC = {
     "family": "kernel-vxlan-udp-l3",
 }
 
+# Keep the historical route-table namespaces stable, but move the RPDB source
+# rules ahead of Linux's built-in `main` rule (priority 32766). A real VXLAN
+# canary proved that the old 360xx rule was evaluated too late, so traffic from
+# the candidate source address followed the Iran node's normal default route.
+KERNEL_POLICY_SPAN = 900
+KERNEL_IPIP_TABLE_BASE = 35000
+KERNEL_IPIP_RULE_BASE = 30900
+KERNEL_VXLAN_TABLE_BASE = 36000
+KERNEL_VXLAN_RULE_BASE = 31800
+LINUX_MAIN_RULE_PRIORITY = 32766
+
 _applied = False
 
 
@@ -86,12 +97,15 @@ def apply_kernel_transport_registry_v209() -> None:
 
     def legacy_policy_ids(name: str, tunnel_id: int) -> tuple[int, int]:
         value = str(name or "").strip().lower()
+        offset = int(tunnel_id) % KERNEL_POLICY_SPAN
         if value == "kernel_ipip":
-            table = 35000 + (int(tunnel_id) % 900)
-            return table, table
+            table = KERNEL_IPIP_TABLE_BASE + offset
+            priority = KERNEL_IPIP_RULE_BASE + offset
+            return table, priority
         if value == "kernel_vxlan":
-            table = 36000 + (int(tunnel_id) % 900)
-            return table, table
+            table = KERNEL_VXLAN_TABLE_BASE + offset
+            priority = KERNEL_VXLAN_RULE_BASE + offset
+            return table, priority
         return base_legacy_policy_ids(value, tunnel_id)
 
     for name, spec, installer in (

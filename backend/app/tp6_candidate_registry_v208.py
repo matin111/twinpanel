@@ -11,6 +11,14 @@ TP6_FAST_SPEC = {
     "family": "ipv6-kernel-l3",
 }
 
+# Linux evaluates lower RPDB priorities first. Keep the historical route-table
+# namespace unchanged, but place the source-policy rule before the built-in
+# `main` rule at priority 32766. The 900-slot range stays disjoint from TP27.
+TP6_POLICY_TABLE_BASE = 34000
+TP6_POLICY_RULE_BASE = 30000
+TP6_POLICY_SPAN = 900
+LINUX_MAIN_RULE_PRIORITY = 32766
+
 _applied = False
 
 
@@ -43,8 +51,10 @@ def apply_tp6_candidate_registry_v208() -> None:
     def legacy_policy_ids(name: str, tunnel_id: int) -> tuple[int, int]:
         value = str(name or "").strip().lower()
         if value == "tp6_fast":
-            table = 34000 + (int(tunnel_id) % 900)
-            return table, table
+            offset = int(tunnel_id) % TP6_POLICY_SPAN
+            table = TP6_POLICY_TABLE_BASE + offset
+            priority = TP6_POLICY_RULE_BASE + offset
+            return table, priority
         return base_legacy_policy_ids(value, tunnel_id)
 
     candidates._common.SPECS["tp6_fast"] = TP6_FAST_SPEC
@@ -52,7 +62,7 @@ def apply_tp6_candidate_registry_v208() -> None:
     candidates.ACTIVE_SPECS["tp6_fast"] = TP6_FAST_SPEC
     candidates.INSTALLERS["tp6_fast"] = tp6_fast.install
 
-    # Keep the original runtime()/policy_ids() function objects intact because
+    # Keep the original public runtime()/policy_ids() function objects intact because
     # API modules import them directly. Their fallback globals are replaced
     # in-place, so previously imported references gain TP6 support safely.
     candidates._legacy_runtime = legacy_runtime
