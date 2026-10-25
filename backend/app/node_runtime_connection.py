@@ -28,7 +28,33 @@ class LocalRuntimeConnection:
     of requiring the server to SSH into itself.
     """
 
-    async def run(self, command: str, check: bool = False) -> LocalRunResult:
+    @staticmethod
+    def _signal_process_group(
+        process: asyncio.subprocess.Process,
+        sig: signal.Signals,
+    ) -> None:
+        try:
+            os.killpg(process.pid, sig)
+        except ProcessLookupError:
+            return
+        except Exception:
+            try:
+                process.send_signal(sig)
+            except ProcessLookupError:
+                return
+
+    async def run(
+        self,
+        command: str,
+        check: bool = False,
+        timeout: float | None = None,
+    ) -> LocalRunResult:
+        timeout_value: float | None = None
+        if timeout is not None:
+            timeout_value = float(timeout)
+            if timeout_value <= 0:
+                raise ValueError("timeout must be greater than zero")
+
         process = await asyncio.create_subprocess_shell(
             command,
             executable="/bin/bash",
@@ -36,28 +62,72 @@ class LocalRuntimeConnection:
             stderr=asyncio.subprocess.PIPE,
             start_new_session=True,
         )
+        communicate_task = asyncio.create_task(process.communicate())
+        timed_out = False
+
         try:
-            stdout_bytes, stderr_bytes = await process.communicate()
-        except asyncio.CancelledError:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            except Exception:
+            if timeout_value is None:
+                stdout_bytes, stderr_bytes = await communicate_task
+            else:
                 try:
-                    process.kill()
-                except ProcessLookupError:
-                    pass
+                    stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                        asyncio.shield(communicate_task),
+                        timeout=timeout_value,
+                    )
+                except asyncio.TimeoutError:
+                    timed_out = True
+                    self._signal_process_group(process, signal.SIGTERM)
+                    try:
+                        await asyncio.wait_for(process.wait(), timeout=1.0)
+                    except asyncio.TimeoutError:
+                        self._signal_process_group(process, signal.SIGKILL)
+                        try:
+                            await asyncio.wait_for(process.wait(), timeout=1.0)
+                        except asyncio.TimeoutError:
+                            pass
+
+                    try:
+                        stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                            asyncio.shield(communicate_task),
+                            timeout=1.0,
+                        )
+                    except asyncio.TimeoutError:
+                        communicate_task.cancel()
+                        try:
+                            await communicate_task
+                        except (asyncio.CancelledError, Exception):
+                            pass
+                        stdout_bytes, stderr_bytes = b"", b""
+        except asyncio.CancelledError:
+            self._signal_process_group(process, signal.SIGKILL)
             try:
-                await process.wait()
+                await asyncio.wait_for(process.wait(), timeout=1.0)
             except Exception:
+                pass
+            if not communicate_task.done():
+                communicate_task.cancel()
+            try:
+                await communicate_task
+            except (asyncio.CancelledError, Exception):
                 pass
             raise
 
+        stdout_text = stdout_bytes.decode("utf-8", errors="replace")
+        stderr_text = stderr_bytes.decode("utf-8", errors="replace")
+        exit_status = int(process.returncode or 0)
+        if timed_out:
+            exit_status = 124
+            timeout_message = f"local command timed out after {timeout_value:g}s"
+            stderr_text = (
+                f"{stderr_text.rstrip()}\n{timeout_message}".lstrip()
+                if stderr_text
+                else timeout_message
+            )
+
         result = LocalRunResult(
-            exit_status=int(process.returncode or 0),
-            stdout=stdout_bytes.decode("utf-8", errors="replace"),
-            stderr=stderr_bytes.decode("utf-8", errors="replace"),
+            exit_status=exit_status,
+            stdout=stdout_text,
+            stderr=stderr_text,
         )
         if check and result.exit_status != 0:
             message = (result.stderr or result.stdout or "local command failed").strip()
