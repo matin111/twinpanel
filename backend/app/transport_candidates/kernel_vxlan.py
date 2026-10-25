@@ -21,6 +21,24 @@ def _vni(tunnel_id: int) -> int:
     return 10000 + (int(tunnel_id) % 60000)
 
 
+async def _best_effort_stop(conn, *, service: str, interface: str) -> None:
+    if conn is None:
+        return
+    try:
+        await conn.run(
+            f"""
+set +e
+systemctl disable --now {shlex.quote(service)} >/dev/null 2>&1 || true
+ip link del {shlex.quote(interface)} >/dev/null 2>&1 || true
+true
+""",
+            check=False,
+            timeout=30,
+        )
+    except Exception:
+        pass
+
+
 async def _install_peer(
     conn,
     *,
@@ -245,6 +263,18 @@ async def install(tunnel_id: int, db: Session) -> dict:
         }
 
     except Exception as exc:
+        await asyncio.gather(
+            _best_effort_stop(
+                ci,
+                service=rt["iran_service"],
+                interface=rt["interface"],
+            ),
+            _best_effort_stop(
+                ce,
+                service=rt["exit_service"],
+                interface=rt["interface"],
+            ),
+        )
         iran_diag = (
             await common.diag(ci, rt["iran_service"], rt["interface"])
             if ci
