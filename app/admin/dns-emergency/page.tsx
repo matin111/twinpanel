@@ -1,5 +1,5 @@
-import {DnsEmergencyPanel} from "../../../components/dns-emergency-panel";
+import {DnsEmergencyClipboardBridge} from "../../../components/dns-emergency-clipboard-bridge";
 
 export default function Page(){
-  return <DnsEmergencyPanel/>;
+  return <DnsEmergencyClipboardBridge/>;
 }
