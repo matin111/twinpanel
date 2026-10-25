@@ -6,11 +6,14 @@ import shlex
 from pathlib import Path
 from typing import Any
 
+from .netmod_udpgw_artifact import stage_netmod_udpgw
+
 
 ARTIFACT_NAMES = {
     "amd64": "dnstt-server-linux-amd64",
     "arm64": "dnstt-server-linux-arm64",
 }
+NETMOD_DNSTT_REMOTE_NAME = "twinpanel-netmod-dnstt-server"
 
 
 def _normalize_arch(value: str) -> str:
@@ -89,9 +92,27 @@ async def stage_dnstt_binary(conn: Any, remote_path: str) -> dict[str, str]:
         detail = str(install.stderr or install.stdout or "binary install failed").strip()
         raise RuntimeError(f"dnstt_remote_artifact_install_failed:{detail[-1200:]}")
 
-    return {
+    result = {
         "arch": arch,
         "sha256": expected,
         "artifact": artifact.name,
         "remote_path": remote,
     }
+
+    # NetMod VPN mode depends on a BadVPN-compatible UDP gateway reached via
+    # an SSH direct-tcpip channel to 127.0.0.1:7300. Stage that companion only
+    # for the NetMod DNSTT runtime; legacy/generic DNSTT installs stay unchanged.
+    if Path(remote).name == NETMOD_DNSTT_REMOTE_NAME:
+        udpgw = await stage_netmod_udpgw(conn)
+        result.update(
+            {
+                "udpgw_arch": udpgw["arch"],
+                "udpgw_sha256": udpgw["sha256"],
+                "udpgw_artifact": udpgw["artifact"],
+                "udpgw_remote_path": udpgw["remote_path"],
+                "udpgw_service": udpgw["service"],
+                "udpgw_listen": udpgw["listen"],
+            }
+        )
+
+    return result
