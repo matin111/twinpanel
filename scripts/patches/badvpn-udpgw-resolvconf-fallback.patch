@@ -1,25 +1,23 @@
 diff --git a/udpgw/udpgw.c b/udpgw/udpgw.c
-index 9c6a341..0000000 100644
 --- a/udpgw/udpgw.c
 +++ b/udpgw/udpgw.c
-@@ -43,6 +43,7 @@
+@@ -61,5 +61,6 @@
  #ifndef BADVPN_USE_WINAPI
  #include <base/BLog_syslog.h>
 +#include <arpa/inet.h>
  #include <arpa/nameser.h>
  #include <resolv.h>
  #endif
-@@ -160,6 +161,7 @@ static void connection_udp_recv_if_handler_send (struct connection *con, uint8_t
- static struct connection * find_connection (struct client *client, uint16_t conid);
+@@ -203,2 +204,3 @@
  static int uint16_comparator (void *unused, uint16_t *v1, uint16_t *v2);
 +static int read_resolv_conf_dns (BAddr *out);
  static void maybe_update_dns (void);
- 
- int main (int argc, char **argv)
-@@ -1428,6 +1430,34 @@ int uint16_comparator (void *unused, uint16_t *v1, uint16_t *v2)
+@@ -1433,6 +1435,35 @@
+ int uint16_comparator (void *unused, uint16_t *v1, uint16_t *v2)
+ {
      return B_COMPARE(*v1, *v2);
- }
- 
++}
++
 +static int read_resolv_conf_dns (BAddr *out)
 +{
 +#ifndef BADVPN_USE_WINAPI
@@ -47,22 +45,15 @@ index 9c6a341..0000000 100644
 +    fclose(f);
 +#endif
 +    return 0;
-+}
-+
+ }
+ 
  void maybe_update_dns (void)
- {
- #ifndef BADVPN_USE_WINAPI
-@@ -1438,18 +1468,24 @@ void maybe_update_dns (void)
+@@ -1445,18 +1476,24 @@
      last_dns_update_time = now;
      BLog(BLOG_DEBUG, "update dns");
-     
+ 
 -    if (res_init() != 0) {
 -        BLog(BLOG_ERROR, "res_init failed");
--        goto fail;
--    }
--    
--    if (_res.nscount == 0) {
--        BLog(BLOG_ERROR, "no name servers available");
 -        goto fail;
 +    BAddr addr;
 +    int resolver_ready = 0;
@@ -77,13 +68,15 @@ index 9c6a341..0000000 100644
 +            resolver_ready = 1;
 +        }
      }
-     
+ 
+-    if (_res.nscount == 0) {
++    if (!resolver_ready) {
+         BLog(BLOG_ERROR, "no name servers available");
+         goto fail;
+     }
+-
 -    BAddr addr;
 -    BAddr_InitIPv4(&addr, _res.nsaddr_list[0].sin_addr.s_addr, hton16(53));
-+    if (!resolver_ready) {
-+        BLog(BLOG_ERROR, "no name servers available");
-+        goto fail;
-+    }
-     
+ 
      if (!BAddr_Compare(&addr, &dns_addr)) {
          char str[BADDR_MAX_PRINT_LEN];
