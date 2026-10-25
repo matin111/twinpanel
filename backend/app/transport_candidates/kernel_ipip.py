@@ -7,6 +7,7 @@ import shlex
 from sqlalchemy.orm import Session
 
 from . import common
+from .kernel_cleanup_v210 import cleanup_probe_state
 
 
 NAME = "kernel_ipip"
@@ -17,15 +18,27 @@ def _helper_path(tunnel_id: int, role: str) -> str:
     return f"/usr/local/sbin/twinpanel-kernel-ipip-{int(tunnel_id)}-{role}"
 
 
-async def _best_effort_stop(conn, *, service: str, interface: str) -> None:
+async def _best_effort_stop(
+    conn,
+    *,
+    service: str,
+    interface: str,
+    helper: str,
+) -> None:
     if conn is None:
         return
     try:
+        unit_path = f"/etc/systemd/system/{service}"
         await conn.run(
             f"""
 set +e
 systemctl disable --now {shlex.quote(service)} >/dev/null 2>&1 || true
+if [ -x {shlex.quote(helper)} ]; then
+  {shlex.quote(helper)} stop >/dev/null 2>&1 || true
+fi
 ip link del {shlex.quote(interface)} >/dev/null 2>&1 || true
+rm -f {shlex.quote(unit_path)} {shlex.quote(helper)}
+systemctl daemon-reload >/dev/null 2>&1 || true
 true
 """,
             check=False,
@@ -227,18 +240,6 @@ async def install(tunnel_id: int, db: Session) -> dict:
         }
 
     except Exception as exc:
-        await asyncio.gather(
-            _best_effort_stop(
-                ci,
-                service=rt["iran_service"],
-                interface=rt["interface"],
-            ),
-            _best_effort_stop(
-                ce,
-                service=rt["exit_service"],
-                interface=rt["interface"],
-            ),
-        )
         iran_diag = (
             await common.diag(ci, rt["iran_service"], rt["interface"])
             if ci
@@ -249,9 +250,35 @@ async def install(tunnel_id: int, db: Session) -> dict:
             if ce
             else ""
         )
+
+        await asyncio.gather(
+            _best_effort_stop(
+                ci,
+                service=rt["iran_service"],
+                interface=rt["interface"],
+                helper=_helper_path(tunnel_id, "iran"),
+            ),
+            _best_effort_stop(
+                ce,
+                service=rt["exit_service"],
+                interface=rt["interface"],
+                helper=_helper_path(tunnel_id, "exit"),
+            ),
+        )
+
+        cleanup_errors = await cleanup_probe_state(
+            ci,
+            ce,
+            name=NAME,
+            tunnel_id=tunnel_id,
+            rt=rt,
+        )
+        cleanup_detail = "ok" if not cleanup_errors else ";".join(cleanup_errors)
+
         message = (
             f"{type(exc).__name__}: {exc} | "
-            f"iran={iran_diag[-1800:]} | exit={exit_diag[-1800:]}"
+            f"iran={iran_diag[-1800:]} | exit={exit_diag[-1800:]} | "
+            f"cleanup={cleanup_detail}"
         )
         common.mark(db, tunnel_id, NAME, status="failed", error=message)
         raise RuntimeError(message) from exc

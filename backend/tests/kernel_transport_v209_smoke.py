@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from app import smart_transport_auto_v21 as smart
 from app import transport_candidates as candidates
 from app import tp27_reference_runtime_v91 as reference_v91
 from app.kernel_transport_registry_v209 import apply_kernel_transport_registry_v209
 from app.spoof_candidate_policy_v202 import apply_spoof_candidate_policy_v202
+
+
+def _source(relative: str) -> str:
+    backend = Path(__file__).resolve().parents[1]
+    return (backend / relative).read_text(encoding="utf-8")
 
 
 def main() -> None:
@@ -55,6 +62,28 @@ def main() -> None:
     }
     assert len(policy_ids) == 3
 
+    # V210 regression: a failed kernel canary must remove both probe-owned
+    # Iran policy state and Exit MASQUERADE state, then verify absence.
+    cleanup = _source("app/transport_candidates/kernel_cleanup_v210.py")
+    assert "while ip rule del priority" in cleanup
+    assert "ip route flush table" in cleanup
+    assert "iptables -t nat -D POSTROUTING" in cleanup
+    assert "policy_rule_cleanup_failed" in cleanup
+    assert "policy_table_cleanup_failed" in cleanup
+    assert "canary_nat_cleanup_failed" in cleanup
+
+    for relative in (
+        "app/transport_candidates/kernel_ipip.py",
+        "app/transport_candidates/kernel_vxlan.py",
+    ):
+        source = _source(relative)
+        assert "from .kernel_cleanup_v210 import cleanup_probe_state" in source
+        assert "cleanup_errors = await cleanup_probe_state(" in source
+        assert 'cleanup_detail = "ok" if not cleanup_errors' in source
+        assert "rm -f" in source
+        assert "systemctl daemon-reload" in source
+        assert "helper=_helper_path(tunnel_id" in source
+
     # V91 reapplies the V202 policy at reconciler startup. V209 must survive
     # that late refresh rather than disappearing after initial registration.
     reference_v91.activate_manager_candidate_policy_v91()
@@ -72,9 +101,10 @@ def main() -> None:
     assert expected.issubset(api_names)
 
     print(
-        "KERNEL_TRANSPORT_V209_OK",
+        "KERNEL_TRANSPORT_V210_OK",
         "active=" + ",".join(sorted(expected)),
         "auto_install=" + ",".join(smart.AUTO_INSTALL_NAMES),
+        "failure_cleanup=policy,nat,service,helper,unit",
     )
 
 
