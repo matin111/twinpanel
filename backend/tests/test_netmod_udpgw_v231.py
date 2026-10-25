@@ -18,6 +18,9 @@ from app.netmod_udpgw import (
 )
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
 class _FakeSftp:
     def __init__(self, puts: list[tuple[str, str]]):
         self.puts = puts
@@ -139,11 +142,32 @@ def test_netmod_dnstt_stages_udpgw_companion_only_for_netmod():
             assert "udpgw_service" not in result2
 
 
+def test_release_pipeline_bundles_verified_udpgw_and_license():
+    workflow = (REPO_ROOT / ".github/workflows/publish-prebuilt-release.yml").read_text(encoding="utf-8")
+    assert "Build verified NetMod UDPGW artifact" in workflow
+    assert BADVPN_COMMIT in workflow
+    assert "badvpn-udpgw-linux-amd64" in workflow
+    assert "badvpn-udpgw-linux-amd64.sha256" in workflow
+    assert "badvpn-COPYING" in workflow
+    assert "CC=musl-gcc" in workflow
+    assert "statically linked" in workflow
+
+
+def test_admin_ui_does_not_offer_mtu_above_verified_requester_size():
+    panel = (REPO_ROOT / "components/dns-emergency-panel.tsx").read_text(encoding="utf-8")
+    assert '<option value={1232}>1232 · Verified default</option>' in panel
+    assert '<option value={512}>512 · Compatibility</option>' in panel
+    assert "<option value={1400}>" not in panel
+    assert "<option value={1452}>" not in panel
+
+
 def main() -> int:
     test_udpgw_runtime_contract_is_private_and_pinned()
     test_udpgw_service_is_loopback_only_self_healing_and_bounds_clients()
     test_stage_udpgw_verifies_binary_then_installs_managed_service()
     test_netmod_dnstt_stages_udpgw_companion_only_for_netmod()
+    test_release_pipeline_bundles_verified_udpgw_and_license()
+    test_admin_ui_does_not_offer_mtu_above_verified_requester_size()
     print("NETMOD_UDPGW_V231_OK")
     return 0
 
