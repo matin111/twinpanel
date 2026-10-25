@@ -96,7 +96,14 @@ if ! ss -H -ltn 2>/dev/null | grep -F '127.0.0.1:17301 ' >/dev/null; then
   echo NETMOD_UDPGW_PROBE_LISTENER_MISSING >&2
   exit 38
 fi
+
+# stdout is block-buffered when redirected. Stop the short-lived probe first so
+# BadVPN flushes its resolver INFO/ERROR messages before we inspect the log.
 sleep 0.2
+kill "$probe_pid" >/dev/null 2>&1 || true
+wait "$probe_pid" >/dev/null 2>&1 || true
+probe_pid=""
+
 if grep -Fq 'no name servers available' "$probe_log"; then
   cat "$probe_log" >&2 || true
   echo NETMOD_UDPGW_DNS_RESOLVER_UNAVAILABLE >&2
@@ -107,9 +114,6 @@ if ! grep -Fq 'using DNS server' "$probe_log"; then
   echo NETMOD_UDPGW_DNS_RESOLVER_NOT_CONFIRMED >&2
   exit 40
 fi
-kill "$probe_pid" >/dev/null 2>&1 || true
-wait "$probe_pid" >/dev/null 2>&1 || true
-probe_pid=""
 rm -f "$probe_log"
 trap - EXIT
 
