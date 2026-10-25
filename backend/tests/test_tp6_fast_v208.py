@@ -43,7 +43,9 @@ def test_tp6_fast_registry_extension_preserves_v202_source_contract():
     assert 'transport="tp6_fast"' in extension
     assert 'octet=249' in extension
     assert 'interface_prefix="tp6"' in extension
-    assert 'table = 34000 +' in extension
+    assert "TP6_POLICY_TABLE_BASE = 34000" in extension
+    assert "TP6_POLICY_RULE_BASE = 30000" in extension
+    assert "priority = TP6_POLICY_RULE_BASE + offset" in extension
     assert "apply_tp6_candidate_registry_v208()" in unified
     assert "apply_tp6_candidate_registry_v208()" in policy
     assert 'smart.CANDIDATE_NAMES = frozenset((*smart.CANDIDATE_NAMES, "tp6_fast"))' in policy
@@ -80,7 +82,8 @@ def test_tp6_fast_preserves_existing_production_paths():
     extension = read("backend/app/tp6_candidate_registry_v208.py")
 
     assert 'octet=249' in extension
-    assert 'table = 34000 +' in extension
+    assert "TP6_POLICY_TABLE_BASE = 34000" in extension
+    assert "TP6_POLICY_RULE_BASE = 30000" in extension
 
     assert 'octet=253' in registry
     assert 'table = 29000 +' in registry
