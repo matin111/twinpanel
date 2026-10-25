@@ -31,21 +31,53 @@ jobs:
           PYTHONPATH=backend python -m pytest -q backend/tests/test_netmod_udpgw_v231.py
 
       - name: Build and verify pinned BadVPN UDPGW resolver
+        id: udpgw_build
         shell: bash
         run: |
-          set -Eeuo pipefail
+          set -u
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends cmake file libc6-dev
 
           OUT="$(mktemp)"
           LICENSE="$(mktemp)"
-          trap 'rm -f "$OUT" "$OUT.sha256" "$LICENSE"' EXIT
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+          echo "LICENSE=$LICENSE" >> "$GITHUB_ENV"
 
+          set +e
           NETMOD_UDPGW_TEST_PORT=17300 \
-            bash scripts/build-netmod-udpgw.sh "$OUT" "$LICENSE"
+            bash scripts/build-netmod-udpgw.sh "$OUT" "$LICENSE" \
+            > /tmp/netmod-udpgw-build.log 2>&1
+          status=$?
+          set -e
 
-          test -x "$OUT"
-          "$OUT" --version | grep -q 'BadVPN udpgw'
-          file "$OUT" | grep -q 'statically linked'
-          grep -Eq "^[0-9a-f]{64}  ${OUT}$" "$OUT.sha256"
-          test -s "$LICENSE"
+          cat /tmp/netmod-udpgw-build.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+          if [ "$status" -eq 0 ]; then
+            test -x "$OUT"
+            "$OUT" --version | grep -q 'BadVPN udpgw'
+            file "$OUT" | grep -q 'statically linked'
+            grep -Eq "^[0-9a-f]{64}  ${OUT}$" "$OUT.sha256"
+            test -s "$LICENSE"
+          fi
+
+      - name: Upload UDPGW build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: netmod-udpgw-build-diagnostics
+          path: /tmp/netmod-udpgw-build.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce UDPGW build success
+        if: always()
+        shell: bash
+        run: |
+          test "${{ steps.udpgw_build.outputs.status }}" = "0"
+
+      - name: Cleanup temporary UDPGW outputs
+        if: always()
+        shell: bash
+        run: |
+          rm -f "${OUT:-}" "${OUT:-}.sha256" "${LICENSE:-}" /tmp/netmod-udpgw-build.log
