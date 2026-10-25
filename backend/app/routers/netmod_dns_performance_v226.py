@@ -98,7 +98,7 @@ effective="$(journalctl -u {q_service} -n 120 --no-pager 2>/dev/null | sed -n 's
 formerr=no
 journalctl -u {q_service} -n 120 --no-pager 2>/dev/null | grep -F 'FORMERR: requester payload size' >/dev/null 2>&1 && formerr=yes || true
 printf 'MTU=%s\\n' "$mtu"
-printf 'EFFECTIVE_MTU=%s\\n' "${effective:-unknown}"
+printf 'EFFECTIVE_MTU=%s\\n' "${{effective:-unknown}}"
 printf 'SERVICE=%s\\n' "$service"
 printf 'LISTENER=%s\\n' "$listener"
 printf 'FORMERR_RECENT=%s\\n' "$formerr"
@@ -175,7 +175,7 @@ formerr=no
 journalctl -u {q_service} -n 80 --no-pager 2>/dev/null | grep -F 'FORMERR: requester payload size' >/dev/null 2>&1 && formerr=yes || true
 rm -f "$BACKUP"
 printf 'MTU={safe_mtu}\\n'
-printf 'EFFECTIVE_MTU=%s\\n' "${effective:-unknown}"
+printf 'EFFECTIVE_MTU=%s\\n' "${{effective:-unknown}}"
 printf 'SERVICE=active\\n'
 printf 'LISTENER=yes\\n'
 printf 'FORMERR_RECENT=%s\\n' "$formerr"
