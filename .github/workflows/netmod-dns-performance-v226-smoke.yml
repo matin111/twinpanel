@@ -8,6 +8,7 @@ on:
       - "backend/app/routers/__init__.py"
       - "backend/tests/test_netmod_dns_v224.py"
       - "backend/tests/test_netmod_dns_performance_v226.py"
+      - "backend/tests/test_netmod_dns_profile_ascii_v228.py"
       - "components/dns-emergency-panel.tsx"
       - "components/dns-emergency-panel.module.css"
       - ".github/workflows/netmod-dns-performance-v226-smoke.yml"
@@ -20,6 +21,7 @@ on:
       - "backend/app/routers/__init__.py"
       - "backend/tests/test_netmod_dns_v224.py"
       - "backend/tests/test_netmod_dns_performance_v226.py"
+      - "backend/tests/test_netmod_dns_profile_ascii_v228.py"
       - "components/dns-emergency-panel.tsx"
       - "components/dns-emergency-panel.module.css"
       - ".github/workflows/netmod-dns-performance-v226-smoke.yml"
@@ -54,13 +56,15 @@ jobs:
             backend/app/routers/netmod_dns_performance_v226.py \
             backend/app/routers/__init__.py \
             backend/tests/test_netmod_dns_v224.py \
-            backend/tests/test_netmod_dns_performance_v226.py
+            backend/tests/test_netmod_dns_performance_v226.py \
+            backend/tests/test_netmod_dns_profile_ascii_v228.py
       - name: Run NetMod DNS regression
         working-directory: backend
         run: |
           python -m pytest -q \
             tests/test_netmod_dns_v224.py \
-            tests/test_netmod_dns_performance_v226.py
+            tests/test_netmod_dns_performance_v226.py \
+            tests/test_netmod_dns_profile_ascii_v228.py
 
   frontend:
     runs-on: ubuntu-24.04

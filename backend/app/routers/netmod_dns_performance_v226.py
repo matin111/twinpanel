@@ -69,7 +69,7 @@ def _profile_payload(*, node: Any, setting: Any, resolver: str, password: str) -
     if not setting.tunnel_domain or not setting.public_key:
         raise HTTPException(status_code=409, detail="NetMod DNS هنوز آماده ساخت پروفایل تست نیست")
     return {
-        "ps": f"TwinPanel {node.name} · {resolver_ip}",
+        "ps": f"TwinPanel-{int(node.id)}-{resolver_ip}",
         "addr": resolver_ip,
         "ns": str(setting.tunnel_domain),
         "pubkey": str(setting.public_key),
