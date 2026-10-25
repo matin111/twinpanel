@@ -20,7 +20,7 @@ index 9c6a341..0000000 100644
      return B_COMPARE(*v1, *v2);
  }
  
-+int read_resolv_conf_dns (BAddr *out)
++static int read_resolv_conf_dns (BAddr *out)
 +{
 +#ifndef BADVPN_USE_WINAPI
 +    FILE *f = fopen("/etc/resolv.conf", "r");
