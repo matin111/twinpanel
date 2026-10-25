@@ -78,6 +78,7 @@ type PolicyInventory={
 };
 
 type PolicyDraft={mode:PolicyMode;outboundTag:string};
+type EditDraft={server:string;serverPort:string;host:string;path:string;sni:string};
 type Tab="routing"|"pool"|"add";
 
 async function api<T>(path:string,init:RequestInit={}):Promise<T>{
@@ -151,6 +152,8 @@ export function OutboundPolicyCenter(){
   const [drafts,setDrafts]=useState<Record<string,PolicyDraft>>({});
   const [config,setConfig]=useState("");
   const [setDefaultOnImport,setSetDefaultOnImport]=useState(false);
+  const [editingTag,setEditingTag]=useState("");
+  const [editDraft,setEditDraft]=useState<EditDraft|null>(null);
 
   const node=useMemo(()=>inventory?.nodes.find(item=>item.id===nodeId)??null,[inventory,nodeId]);
   const nodeOutbounds=node?.outbounds??[];
@@ -187,6 +190,8 @@ export function OutboundPolicyCenter(){
   useEffect(()=>{
     if(!nodeId)return;
     setTests({});
+    setEditingTag("");
+    setEditDraft(null);
     void loadPolicy(nodeId);
   },[nodeId]);
 
@@ -279,6 +284,45 @@ export function OutboundPolicyCenter(){
     finally{setBusy("");}
   };
 
+  const openEdit=(row:OutboundRow)=>{
+    setEditingTag(row.tag);
+    setEditDraft({
+      server:row.server||"",
+      serverPort:row.server_port?String(row.server_port):"",
+      host:headerValue(row.transport?.headers,"Host"),
+      path:row.transport?.path||"",
+      sni:row.tls?.server_name||"",
+    });
+    setError("");setNotice("");
+  };
+
+  const saveEdit=async()=>{
+    if(!node||!editingTag||!editDraft)return;
+    const port=Number(editDraft.serverPort);
+    if(!editDraft.server.trim()||!Number.isInteger(port)||port<1||port>65535){
+      setError(pick("آدرس/IP و پورت معتبر وارد کنید.","Enter a valid address/IP and port."));
+      return;
+    }
+    setBusy(`edit:${editingTag}`);setError("");setNotice("");
+    try{
+      await api<unknown>(`/v1/settings/vpn/outbounds/${node.id}/${encodeURIComponent(editingTag)}`,{
+        method:"PATCH",
+        body:JSON.stringify({
+          server:editDraft.server.trim(),
+          server_port:port,
+          host:editDraft.host.trim(),
+          path:editDraft.path.trim(),
+          ...(editDraft.sni.trim()?{sni:editDraft.sni.trim()}:{}),
+        }),
+      });
+      setTests(current=>{const next={...current};delete next[editingTag];return next;});
+      setNotice(pick("Outbound ویرایش، اعتبارسنجی و اعمال شد؛ برای تأیید مسیر، تست واقعی را اجرا کنید.","Outbound was edited, validated and applied; run a real test to verify the path."));
+      setEditingTag("");setEditDraft(null);
+      await loadInventory(true);await loadPolicy(node.id,true);
+    }catch(exc){setError(exc instanceof Error?exc.message:String(exc));}
+    finally{setBusy("");}
+  };
+
   const removeOutbound=async(tag:string)=>{
     if(!node||tag==="direct")return;
     if(!window.confirm(pick(`Outbound «${tag}» حذف شود؟`,`Delete outbound “${tag}”?`)))return;
@@ -286,6 +330,7 @@ export function OutboundPolicyCenter(){
     try{
       await api<unknown>(`/v1/settings/vpn/outbounds/${node.id}/${encodeURIComponent(tag)}`,{method:"DELETE"});
       setTests(current=>{const next={...current};delete next[tag];return next;});
+      if(editingTag===tag){setEditingTag("");setEditDraft(null);}
       await loadInventory(true);await loadPolicy(node.id,true);
       setNotice(pick("Outbound حذف شد.","Outbound deleted."));
     }catch(exc){setError(exc instanceof Error?exc.message:String(exc));}
@@ -367,12 +412,23 @@ export function OutboundPolicyCenter(){
           const test=tests[row.tag];
           const isDefault=defaultTag===row.tag;
           const editable=Boolean(row.imported&&row.managed);
+          const isEditing=editingTag===row.tag&&editDraft;
           return <article className={`${styles.outboundCard} ${isDefault?styles.outboundCardDefault:""}`} key={row.tag}>
             <div className={styles.cardTop}><div><span className={styles.typeBadge}>{protocolTitle(row.type)}</span>{isDefault?<span className={styles.defaultBadge}>{pick("پیش‌فرض","DEFAULT")}</span>:null}</div><span className={row.type==="direct"?styles.healthNeutral:(test?.ok?styles.healthOk:styles.healthIdle)}>{row.type==="direct"?"DIRECT":test?.ok?pick("سالم","HEALTHY"):pick("تست نشده","NOT TESTED")}</span></div>
             <h3 className={styles.mono}>{row.tag}</h3><div className={styles.endpoint}>{endpoint(row)}</div>
             <div className={styles.metaGrid}><div><span>Transport</span><b>{transportLabel(row)}</b></div><div><span>Host / SNI</span><b>{headerValue(row.transport?.headers,"Host")||row.tls?.server_name||"—"}</b></div><div><span>Path</span><b>{row.transport?.path||row.transport?.service_name||"—"}</b></div><div><span>{pick("مدیریت","Managed")}</span><b>{row.managed?pick("بله","Yes"):pick("سیستمی","System")}</b></div></div>
             {test?<div className={test.ok?styles.testSuccess:styles.testError}><div><span>Exit IP</span><b className={styles.mono}>{test.exit_ip||"—"}</b></div><div><span>Latency</span><b>{test.latency_ms!=null?`${test.latency_ms.toFixed(1)} ms`:"—"}</b></div><div><span>TCP</span><b>{test.tcp_ok?`PASS${test.tcp_ms!=null?` · ${test.tcp_ms.toFixed(1)} ms`:""}`:"FAIL"}</b></div><div><span>HTTP</span><b>{test.http_code||"—"}</b></div>{!test.ok&&test.error?<p>{test.error}</p>:null}</div>:null}
-            <div className={styles.cardActions}>{row.type!=="direct"&&editable?<button onClick={()=>void testOutbound(row.tag)} disabled={Boolean(busy)}>{busy===`test:${row.tag}`?pick("تست...","Testing..."):pick("تست واقعی","Real test")}</button>:null}{!isDefault?<button onClick={()=>void makeDefault(row.tag)} disabled={Boolean(busy)}>{pick("مسیر پیش‌فرض","Set default")}</button>:null}{editable?<button className={styles.dangerButton} onClick={()=>void removeOutbound(row.tag)} disabled={Boolean(busy)}>{pick("حذف","Delete")}</button>:null}</div>
+            {isEditing?<div className={styles.editBox}>
+              <div className={styles.editGrid}>
+                <label><span>Address / IP</span><input value={editDraft.server} onChange={event=>setEditDraft({...editDraft,server:event.target.value})}/></label>
+                <label><span>Port</span><input inputMode="numeric" value={editDraft.serverPort} onChange={event=>setEditDraft({...editDraft,serverPort:event.target.value})}/></label>
+                <label><span>Host</span><input value={editDraft.host} onChange={event=>setEditDraft({...editDraft,host:event.target.value})}/></label>
+                <label><span>Path</span><input value={editDraft.path} onChange={event=>setEditDraft({...editDraft,path:event.target.value})}/></label>
+                <label className={styles.editWide}><span>SNI</span><input value={editDraft.sni} onChange={event=>setEditDraft({...editDraft,sni:event.target.value})}/></label>
+              </div>
+              <div className={styles.inlineActions}><button className={styles.primaryButton} onClick={()=>void saveEdit()} disabled={Boolean(busy)}>{busy===`edit:${row.tag}`?pick("ذخیره...","Saving..."):pick("ذخیره امن","Save safely")}</button><button className={styles.ghostButton} onClick={()=>{setEditingTag("");setEditDraft(null);}} disabled={Boolean(busy)}>{pick("لغو","Cancel")}</button></div>
+            </div>:null}
+            <div className={styles.cardActions}>{row.type!=="direct"&&editable?<button onClick={()=>void testOutbound(row.tag)} disabled={Boolean(busy)}>{busy===`test:${row.tag}`?pick("تست...","Testing..."):pick("تست واقعی","Real test")}</button>:null}{editable?<button onClick={()=>openEdit(row)} disabled={Boolean(busy)}>{pick("ویرایش","Edit")}</button>:null}{!isDefault?<button onClick={()=>void makeDefault(row.tag)} disabled={Boolean(busy)}>{pick("مسیر پیش‌فرض","Set default")}</button>:null}{editable?<button className={styles.dangerButton} onClick={()=>void removeOutbound(row.tag)} disabled={Boolean(busy)}>{pick("حذف","Delete")}</button>:null}</div>
           </article>;
         })}</div>
       </section>:null}
