@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.230",
+  "version": "1.1.0-rc.231",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-25T01:42:31Z",
+  "released_at": "2026-10-25T03:03:14Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "2793c10150152226598b7a794e48f6a56b079f50",
+  "source_sha": "8c31b315a11622cbd137b060e81f98b48587b5ce",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.230/twinpanel-1.1.0-rc.230-linux-x86_64.tar.gz",
-    "sha256": "0ad146c7312014054ea089524aa2a3928996de4311a59a603de647e1a7cc7715",
-    "size_bytes": 27481369
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.231/twinpanel-1.1.0-rc.231-linux-x86_64.tar.gz",
+    "sha256": "46302e185307befa126a058056d52e79119fc1906d0c54f6a0def4ed619fc18a",
+    "size_bytes": 27580362
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.230 دو اصلاح تحویل کانفیگ را یکجا منتشر می‌کند. PR #939 کپی و Import عمومی کانفیگ‌ها را در صفحه اتصال اصلاح می‌کند و PR #940 مشکل دکمه‌های Copy در صفحه ادمین NetMod DNS روی HTTP/Not secure را برطرف می‌کند. برای NetMod DNS، HTTPS همچنان از Clipboard API استاندارد استفاده می‌کند؛ روی HTTP fallback واقعی copy اجرا می‌شود و همان مقدار کامل در یک کادر قابل انتخاب نمایش داده می‌شود تا لینک‌های آزمایشی Performance Lab حتی در صورت محدودیت مرورگر با Ctrl+C دستی قابل برداشت باشند. هیچ تغییری در credential/key، DNSTT/SSH/NAT، Resolver، MTU، Subscription، Quota، Payment، Auth یا Tunnel انجام نشده است. Candidate به source SHA غیرقابل‌تغییر 2793c10150152226598b7a794e48f6a56b079f50 قفل است. پذیرش نهایی Production نیازمند نصب rc.230 روی 217.179.6.142 و Import واقعی لینک Google Performance Lab در همان NetMod Windows client است.",
-    "en": "TwinPanel 1.1.0-rc.230 combines two configuration-delivery fixes. PR #939 repairs public config copy/app import delivery, while PR #940 fixes NetMod DNS admin copy behavior on plain HTTP/insecure contexts. HTTPS keeps the native Clipboard API; HTTP gets a real copy fallback plus a selectable manual-copy panel showing the exact value, so Performance Lab nm-dns links remain recoverable with Ctrl+C even when browser clipboard policy blocks programmatic copy. No credential/key, DNSTT/SSH/NAT, resolver, MTU, Subscription, Quota, Payment, Auth or Tunnel behavior changes. The candidate is pinned to immutable source SHA 2793c10150152226598b7a794e48f6a56b079f50. Final production acceptance requires installing rc.230 on 217.179.6.142 and successfully importing a Google Performance Lab link in the same Windows NetMod client."
+    "fa": "TwinPanel 1.1.0-rc.231 مسیر UDP/DNS حالت VPN در NetMod DNS را بر اساس شواهد واقعی Production تکمیل می‌کند. تست Windows ثابت کرد HTTPS از مسیر DNSTT/SSH با IP مقصد ثابت برای Google، Instagram و YouTube پایدار است، اما DNS عادی NetMod برای دامنه‌های فیلترشده IP sinkhole برابر 10.10.34.35 برمی‌گرداند. لاگ Exit هم تلاش‌های مکرر SSH به 10.10.34.35:443 و 127.0.0.1:7300 را نشان داد، در حالی که Audit واقعی ثابت کرد هیچ UDPGW روی 7300 وجود ندارد. این نسخه یک BadVPN-compatible UDPGW مدیریت‌شده و loopback-only روی 127.0.0.1:7300 اضافه می‌کند، source upstream را به commit ثابت 07268f02706e78e282e19641b5d1d41e8e89bf31 قفل می‌کند، binary static را در Release pipeline رسمی TwinPanel می‌سازد، SHA256 را بررسی می‌کند و Notice مجوز upstream را نگه می‌دارد. SSH به UDPGW Require/BindTo می‌شود تا Health سبز کاذب نماند. همچنین MTU امن DNSTT به سقف 1232 محدود می‌شود؛ presetهای 1400/1452 حذف شده‌اند و Install/Repair override قدیمی بالاتر از 1232 را پاک می‌کند، چون Production صریحاً FORMERR برای requester payload 1232 در برابر server MTU 1400 ثبت کرده بود. هیچ credential/key، Payment، Auth، Quota یا Tunnel تغییر نکرده است. Candidate به source SHA غیرقابل‌تغییر 8c31b315a11622cbd137b060e81f98b48587b5ce قفل است. پذیرش نهایی فقط بعد از نصب rc.231 روی 217.179.6.142، اجرای Install/Repair برای Exit #6، مشاهده listener روی 127.0.0.1:7300، حذف MTU 1400، رفع 10.10.34.35 در DNS عادی Windows، باز شدن HTTPS بدون --resolve و Upload غیرصفر انجام می‌شود.",
+    "en": "TwinPanel 1.1.0-rc.231 completes the NetMod DNS VPN-mode UDP/DNS path based on real production evidence. Windows testing proved HTTPS over DNSTT/SSH is reliable when destination IPs are pinned for Google, Instagram and YouTube, while normal NetMod DNS returns the filtered sinkhole 10.10.34.35. Exit SSH logs also showed repeated attempts to 10.10.34.35:443 and 127.0.0.1:7300, while a real Exit audit confirmed no UDPGW listener existed on 7300. This release adds a managed BadVPN-compatible loopback-only UDPGW on 127.0.0.1:7300, pins upstream source to immutable commit 07268f02706e78e282e19641b5d1d41e8e89bf31, builds a static binary in the verified TwinPanel release pipeline, verifies SHA256 and preserves the upstream license notice. NetMod SSH Requires/BindsTo UDPGW so health cannot stay falsely green. DNSTT MTU is also capped at the verified requester ceiling of 1232; unsafe 1400/1452 presets are removed and Install/Repair clears persisted overrides above 1232 because production explicitly logged FORMERR for requester payload 1232 against server MTU 1400. No credential/key, Payment, Auth, Quota or Tunnel behavior changes. The candidate is pinned to immutable source SHA 8c31b315a11622cbd137b060e81f98b48587b5ce. Final acceptance requires installing rc.231 on 217.179.6.142, running Install/Repair for Exit #6, verifying a 127.0.0.1:7300 listener, removing MTU 1400, eliminating 10.10.34.35 from normal Windows DNS, restoring HTTPS without --resolve, and observing non-zero upload traffic."
   }
 }
