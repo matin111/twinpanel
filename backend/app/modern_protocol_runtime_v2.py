@@ -34,6 +34,8 @@ SINGBOX_PROTOCOLS = {
 }
 
 TAGS = {key: f"twinpanel-{key}-in" for key in SINGBOX_PROTOCOLS}
+SHADOWTLS_INNER_TAG = "twinpanel-shadowtls-inner"
+SHADOWTLS_INNER_METHOD = "aes-256-gcm"
 
 
 class ModernRuntimeV2Error(RuntimeError):
@@ -72,6 +74,8 @@ STATE = {STATE_PATH!r}
 CERT = {CERT_PATH!r}
 KEY = {KEY_PATH!r}
 DESIRED = json.loads({payload!r})
+SHADOWTLS_INNER_TAG = {SHADOWTLS_INNER_TAG!r}
+SHADOWTLS_INNER_METHOD = {SHADOWTLS_INNER_METHOD!r}
 
 
 def load_json(path, default):
@@ -103,6 +107,10 @@ def seed_for(name):
         seed.setdefault("userkey", token(32))
     if name == "hysteria2":
         seed.setdefault("obfs_password", token(24))
+    if name == "shadowtls":
+        # The inner proxy credential is node runtime state, not a subscriber
+        # credential. Keep it distinct from all ShadowTLS v3 user passwords.
+        seed.setdefault("inner_password", token(32))
     state[name] = seed
     return seed
 
@@ -199,6 +207,10 @@ def render(item):
         wildcard = str(settings.get("wildcard_sni") or "off")
         if wildcard != "off":
             base["wildcard_sni"] = wildcard
+        # ShadowTLS is a TLS camouflage transport, not the payload proxy.
+        # Forward authenticated connections into the managed inner
+        # Shadowsocks inbound.
+        base["detour"] = SHADOWTLS_INNER_TAG
 
     elif name == "snell":
         version = int(settings.get("version") or 6)
@@ -245,6 +257,23 @@ for item in DESIRED:
         inbounds.append(fresh)
         by_tag[item["tag"]] = fresh
 
+if any(item.get("protocol") == "shadowtls" for item in DESIRED):
+    shadowtls_seed = seed_for("shadowtls")
+    fresh_inner = {{
+        "type": "shadowsocks",
+        "tag": SHADOWTLS_INNER_TAG,
+        "listen": "127.0.0.1",
+        "method": SHADOWTLS_INNER_METHOD,
+        "password": shadowtls_seed["inner_password"],
+    }}
+    existing_inner = by_tag.get(SHADOWTLS_INNER_TAG)
+    if isinstance(existing_inner, dict) and existing_inner.get("type") == "shadowsocks":
+        existing_inner.clear()
+        existing_inner.update(fresh_inner)
+    else:
+        inbounds.append(fresh_inner)
+        by_tag[SHADOWTLS_INNER_TAG] = fresh_inner
+
 outbounds = doc.get("outbounds")
 if not isinstance(outbounds, list):
     outbounds = []
@@ -269,7 +298,10 @@ os.chmod(STATE, 0o600)
 
 def _remove_script(protocol: str) -> str:
     tag = TAGS[protocol]
-    return f'''import json\np={CONFIG_PATH!r}\ntag={tag!r}\nwith open(p, "r", encoding="utf-8") as h:\n    doc=json.load(h)\ninbounds=doc.get("inbounds")\nif not isinstance(inbounds, list):\n    raise SystemExit("invalid sing-box config")\ndoc["inbounds"]=[x for x in inbounds if not (isinstance(x, dict) and x.get("tag")==tag)]\nwith open(p+".new", "w", encoding="utf-8") as h:\n    json.dump(doc,h,ensure_ascii=False,indent=2)\n    h.write("\\n")\nprint("remaining_inbounds="+str(len(doc["inbounds"])))\n'''
+    tags = [tag]
+    if protocol == "shadowtls":
+        tags.append(SHADOWTLS_INNER_TAG)
+    return f'''import json\np={CONFIG_PATH!r}\ntags={tags!r}\nwith open(p, "r", encoding="utf-8") as h:\n    doc=json.load(h)\ninbounds=doc.get("inbounds")\nif not isinstance(inbounds, list):\n    raise SystemExit("invalid sing-box config")\ndoc["inbounds"]=[x for x in inbounds if not (isinstance(x, dict) and x.get("tag") in tags)]\nwith open(p+".new", "w", encoding="utf-8") as h:\n    json.dump(doc,h,ensure_ascii=False,indent=2)\n    h.write("\\n")\nprint("remaining_inbounds="+str(len(doc["inbounds"])))\n'''
 
 
 async def ensure_core(conn, node: Node) -> dict[str, str]:

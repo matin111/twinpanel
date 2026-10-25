@@ -32,7 +32,10 @@ namespace = {
     "json": json,
     "TAGS": tags,
     "CONFIG_PATH": "",
+    "STATE_PATH": "",
     "REVOCATION_SENTINEL": "__twinpanel_revoked__",
+    "SHADOWTLS_INNER_TAG": "twinpanel-shadowtls-inner",
+    "SHADOWTLS_INNER_METHOD": "aes-256-gcm",
 }
 exec(
     compile(
@@ -73,7 +76,9 @@ with tempfile.TemporaryDirectory(prefix="twinpanel-singbox-account-") as temp_di
 
     for protocol in protocols:
         config_path = root / f"{protocol}.json"
+        state_path = root / f"{protocol}-state.json"
         namespace["CONFIG_PATH"] = str(config_path)
+        namespace["STATE_PATH"] = str(state_path)
         config_path.write_text(
             json.dumps(
                 {
@@ -103,6 +108,19 @@ with tempfile.TemporaryDirectory(prefix="twinpanel-singbox-account-") as temp_di
         key = "username" if protocol == "naive" else "name"
         assert users[0][key] == "__twinpanel_revoked__", protocol
 
+        if protocol == "shadowtls":
+            outer = staged["inbounds"][0]
+            inner = next(
+                item
+                for item in staged["inbounds"]
+                if item.get("tag") == "twinpanel-shadowtls-inner"
+            )
+            assert outer["detour"] == "twinpanel-shadowtls-inner"
+            assert inner["type"] == "shadowsocks"
+            assert inner["method"] == "aes-256-gcm"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            assert state["shadowtls"]["inner_password"] == inner["password"]
+
         # Emulate the real commit step and then provision the subscriber again.
         staged_path.replace(config_path)
         record = real_record(protocol)
@@ -118,3 +136,4 @@ print("SINGBOX_SUBSCRIPTION_ACCOUNT_MUTATION_V217_SMOKE=PASS")
 print("PROTOCOLS=" + ",".join(protocols))
 print("REVOCATION_SENTINEL=AUTHENTICATED")
 print("REAL_ACCOUNT_RESTORE=PASS")
+print("SHADOWTLS_CHAIN_STATE=PASS")
