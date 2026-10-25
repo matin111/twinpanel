@@ -59,12 +59,13 @@ def test_resolver_presets_are_unique_ipv4_client_variants():
     assert len(names) == len(set(names))
 
 
-def test_mtu_validation_is_bounded_and_keeps_dnstt_default():
+def test_mtu_validation_is_bounded_to_verified_netmod_requester():
     assert DEFAULT_DNSTT_MTU == 1232
+    assert MAX_DNSTT_MTU == 1232
     assert _validated_mtu(MIN_DNSTT_MTU) == 512
     assert _validated_mtu(DEFAULT_DNSTT_MTU) == 1232
-    assert _validated_mtu(MAX_DNSTT_MTU) == 1452
-    for value in (MIN_DNSTT_MTU - 1, MAX_DNSTT_MTU + 1):
+    assert _validated_mtu(MAX_DNSTT_MTU) == 1232
+    for value in (MIN_DNSTT_MTU - 1, 1233, 1400, 1452):
         try:
             _validated_mtu(value)
         except Exception as exc:
@@ -74,22 +75,22 @@ def test_mtu_validation_is_bounded_and_keeps_dnstt_default():
 
 
 def test_mtu_override_is_rollback_safe_and_default_removes_override():
-    performance = _mtu_apply_script(
+    compatibility = _mtu_apply_script(
         public_ip="203.0.113.8",
         domain="t.example.com",
-        mtu=1400,
+        mtu=512,
     )
-    assert PERFORMANCE_DROPIN_PATH in performance
-    assert "ExecStart=" in performance
-    assert "-mtu 1400" in performance
-    assert "203.0.113.8:5353" in performance
-    assert "t.example.com 127.0.0.1:2222" in performance
-    assert "rollback()" in performance
-    assert "MTU_APPLY_RESTART_FAILED" in performance
-    assert "MTU_APPLY_SERVICE_INACTIVE" in performance
-    assert "MTU_APPLY_LISTENER_MISSING" in performance
-    assert "effective MTU" in performance
-    assert "FORMERR: requester payload size" in performance
+    assert PERFORMANCE_DROPIN_PATH in compatibility
+    assert "ExecStart=" in compatibility
+    assert "-mtu 512" in compatibility
+    assert "203.0.113.8:5353" in compatibility
+    assert "t.example.com 127.0.0.1:2222" in compatibility
+    assert "rollback()" in compatibility
+    assert "MTU_APPLY_RESTART_FAILED" in compatibility
+    assert "MTU_APPLY_SERVICE_INACTIVE" in compatibility
+    assert "MTU_APPLY_LISTENER_MISSING" in compatibility
+    assert "effective MTU" in compatibility
+    assert "FORMERR: requester payload size" in compatibility
 
     default = _mtu_apply_script(
         public_ip="203.0.113.8",
@@ -97,7 +98,7 @@ def test_mtu_override_is_rollback_safe_and_default_removes_override():
         mtu=DEFAULT_DNSTT_MTU,
     )
     assert "rm -f \"$DROPIN\"" in default
-    assert "-mtu 1232" in default  # rollback-safe candidate command remains deterministic
+    assert "-mtu 1232" in default
 
 
 def test_performance_status_reports_real_dnstt_signals():

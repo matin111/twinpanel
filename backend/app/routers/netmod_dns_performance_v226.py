@@ -36,7 +36,9 @@ PERFORMANCE_DROPIN_DIR = f"/etc/systemd/system/{DNSTT_SERVICE}.d"
 PERFORMANCE_DROPIN_PATH = f"{PERFORMANCE_DROPIN_DIR}/10-performance.conf"
 DEFAULT_DNSTT_MTU = 1232
 MIN_DNSTT_MTU = 512
-MAX_DNSTT_MTU = 1452
+# Real NetMod production requester evidence advertises 1232. Values above this
+# make DNSTT reject the request with FORMERR, so do not expose unsafe tuning.
+MAX_DNSTT_MTU = 1232
 RESOLVER_PRESETS: tuple[tuple[str, str], ...] = (
     ("Google", "8.8.8.8"),
     ("Cloudflare", "1.1.1.1"),
