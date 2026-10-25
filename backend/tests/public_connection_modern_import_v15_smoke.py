@@ -50,12 +50,15 @@ assert live.index("refine_public_connection_modern_names_v14(source, token, db)"
 # Execute pure helpers without importing the application stack.
 tree = ast.parse(v15)
 helper_names = {
+    "_h",
     "_host_for_uri",
     "_outbound",
     "_tls_params",
     "standard_share_uri",
     "_copy_content",
     "karing_inline_uri",
+    "_replace_remote_karing_button",
+    "_insert_modern_copy_button",
 }
 helper_nodes = [
     node
@@ -77,7 +80,9 @@ def fake_sudoku(item: dict[str, Any]) -> str:
 namespace: dict[str, Any] = {
     "Any": Any,
     "copy": copy,
+    "html": __import__("html"),
     "json": json,
+    "re": __import__("re"),
     "quote": quote,
     "urlencode": urlencode,
     "_mieru_karing_yaml": fake_mieru,
@@ -101,6 +106,55 @@ exec(compile(module, str(v15_path), "exec"), namespace)
 karing_inline_uri = namespace["karing_inline_uri"]
 standard_share_uri = namespace["standard_share_uri"]
 copy_content = namespace["_copy_content"]
+
+replace_remote_karing_button = namespace["_replace_remote_karing_button"]
+insert_modern_copy_button = namespace["_insert_modern_copy_button"]
+
+# Two servers of the same protocol must each receive their own copy control.
+sample_actions = (
+    '<div class="v13-modern-action" data-v13-protocol="hysteria2">'
+    '<div class="v13-action-buttons">'
+    '<button class="primary-btn v13-karing-import" type="button" '
+    'data-config-path="/v1/connect/t/modern-config-v14/hysteria2/6">'
+    'افزودن مستقیم به Karing</button></div></div>'
+    '<div class="v13-modern-action" data-v13-protocol="hysteria2">'
+    '<div class="v13-action-buttons">'
+    '<button class="primary-btn v13-karing-import" type="button" '
+    'data-config-path="/v1/connect/t/modern-config-v14/hysteria2/7">'
+    'افزودن مستقیم به Karing</button></div></div>'
+)
+sample_actions = insert_modern_copy_button(
+    sample_actions,
+    protocol="hysteria2",
+    copy_target="copy-6",
+    requires_karing_126=False,
+)
+sample_actions = insert_modern_copy_button(
+    sample_actions,
+    protocol="hysteria2",
+    copy_target="copy-7",
+    requires_karing_126=False,
+)
+assert sample_actions.count("tp-v15-copy-config") == 2
+assert 'data-tp-copy-target="copy-6"' in sample_actions
+assert 'data-tp-copy-target="copy-7"' in sample_actions
+
+sample_actions = replace_remote_karing_button(
+    sample_actions,
+    config_path="/v1/connect/t/modern-config-v14/hysteria2/6",
+    karing_uri="karing://install-config?url=hysteria2%3A%2F%2Fone",
+    copy_target="copy-6",
+    standard_uri="hysteria2://one",
+)
+sample_actions = replace_remote_karing_button(
+    sample_actions,
+    config_path="/v1/connect/t/modern-config-v14/hysteria2/7",
+    karing_uri="karing://install-config?url=hysteria2%3A%2F%2Ftwo",
+    copy_target="copy-7",
+    standard_uri="hysteria2://two",
+)
+assert sample_actions.count("v15-karing-inline") == 2
+assert "v13-karing-import" not in sample_actions
 
 hysteria_item = {
     "outbound": {
