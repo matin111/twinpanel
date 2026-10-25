@@ -466,7 +466,23 @@ async def _apply_sudoku(conn, node: Node, secret: StandaloneAccountSecret, _base
         f"printf '%s' {shlex.quote(unit64)} | base64 -d > /etc/systemd/system/{service}.service; "
         "systemctl daemon-reload; "
         f"systemctl enable {service}.service >/dev/null; systemctl restart {service}.service; "
-        f"systemctl is-active --quiet {service}.service",
+        f"systemctl is-active --quiet {service}.service; "
+        "ready=0; "
+        "for i in $(seq 1 100); do "
+        f"  if ss -H -lnt | awk '$4 ~ /:{port}$/ {{found=1}} END {{exit found?0:1}}'; then ready=1; break; fi; "
+        f"  if ! systemctl is-active --quiet {service}.service; then "
+        f"    systemctl status {service}.service --no-pager >&2 || true; "
+        f"    journalctl -u {service}.service -n 30 --no-pager >&2 || true; "
+        "    exit 1; "
+        "  fi; "
+        "  sleep 0.2; "
+        "done; "
+        "if [ ${ready:-0} -ne 1 ]; then "
+        f"  echo 'Sudoku listener readiness timeout on :{port}' >&2; "
+        f"  systemctl status {service}.service --no-pager >&2 || true; "
+        f"  journalctl -u {service}.service -n 30 --no-pager >&2 || true; "
+        "  exit 1; "
+        "fi",
         timeout=120,
     )
     await ufw_allow(conn, port, "tcp")
