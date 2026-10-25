@@ -148,7 +148,7 @@ export function DnsEmergencyPanel(){
     try{
       const result=await apiRequest<PerformanceStatus>(`/v1/settings/vpn/netmod-dns/${nodeId}/performance`);
       setPerformance(result);
-      setMtu(result.mtu||1232);
+      setMtu(result.mtu<=1232?result.mtu:1232);
     }catch(reason){
       if(!silent)setError(reason instanceof Error?reason.message:String(reason));
     }finally{if(!silent)setBusy("");}
@@ -236,7 +236,7 @@ export function DnsEmergencyPanel(){
       });
       await loadPerformance(selected.node_id,true);
       setNotice(result.formerr_recent
-        ? pick("MTU اعمال شد، اما FORMERR در لاگ اخیر دیده شده؛ اگر اتصال افت کرد به 1232 یا 512 برگردید.","MTU applied, but a recent FORMERR was detected; revert to 1232 or 512 if connectivity degrades.")
+        ? pick("MTU اعمال شد، اما FORMERR در لاگ اخیر دیده شده؛ برای پایداری 1232 را نگه دارید.","MTU applied, but a recent FORMERR was detected; keep 1232 for stability.")
         : pick("MTU اعمال شد و DNSTT/Listener سالم بالا آمد. حالا با همان پروفایل Speedtest واقعی بگیرید.","MTU applied and DNSTT/listener restarted cleanly. Run a real Speedtest with the same profile now."));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy("");}
@@ -357,13 +357,11 @@ export function DnsEmergencyPanel(){
           </div>
           <div>
             <h4>DNSTT MTU</h4>
-            <p>{pick("1232 پیش‌فرض رسمی DNSTT است. 512 برای سازگاری و 1400/1452 فقط برای تست Performance هستند؛ اگر Restart یا Listener خراب شود TwinPanel خودکار rollback می‌کند.","1232 is DNSTT's official default. 512 is for compatibility; 1400/1452 are performance experiments. TwinPanel automatically rolls back if restart or listener validation fails.")}</p>
+            <p>{pick("1232 مقدار امن تأییدشده برای requester فعلی NetMod است. 512 فقط برای سازگاری مسیرهای محدودتر باقی مانده؛ مقادیر بالاتر از 1232 به‌دلیل FORMERR عمداً غیرفعال شده‌اند.","1232 is the verified safe value for the current NetMod requester. 512 remains for stricter-path compatibility; values above 1232 are intentionally disabled because they cause FORMERR.")}</p>
             <div className={styles.mtuControl}>
               <select value={mtu} onChange={event=>setMtu(Number(event.target.value))}>
                 <option value={512}>512 · Compatibility</option>
-                <option value={1232}>1232 · Default</option>
-                <option value={1400}>1400 · Performance test</option>
-                <option value={1452}>1452 · Experimental max</option>
+                <option value={1232}>1232 · Verified default</option>
               </select>
               <button className={styles.primary} type="button" onClick={()=>void applyMtu()} disabled={Boolean(busy)}>{busy==="mtu"?pick("در حال اعمال...","Applying..."):pick("اعمال MTU","Apply MTU")}</button>
             </div>
@@ -378,7 +376,7 @@ export function DnsEmergencyPanel(){
         </div>}
 
         {performance?.formerr_recent&&<div className={styles.formerr}>
-          {pick("DNSTT در لاگ اخیر محدودیت اندازه پاسخ DNS را گزارش کرده است. برای پایداری ابتدا 1232 و در صورت ادامه خطا 512 را تست کنید.","DNSTT recently reported a DNS response-size limit. Test 1232 first, then 512 if the error persists.")}
+          {pick("DNSTT در لاگ اخیر محدودیت اندازه پاسخ DNS را گزارش کرده است. مقدار 1232 را اعمال کنید؛ فقط اگر مسیر خاص شما نیاز داشت 512 را تست کنید.","DNSTT recently reported a DNS response-size limit. Apply 1232; only test 512 if your specific path requires it.")}
         </div>}
       </section>}
 
