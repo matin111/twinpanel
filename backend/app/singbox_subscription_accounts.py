@@ -9,8 +9,13 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from .models import Node
-from .modern_protocol_runtime import CERT_PATH, CONFIG_PATH, SERVICE_NAME
-from .modern_protocol_runtime_v2 import SINGBOX_PROTOCOLS, TAGS
+from .modern_protocol_runtime import CERT_PATH, CONFIG_PATH, SERVICE_NAME, STATE_PATH
+from .modern_protocol_runtime_v2 import (
+    SHADOWTLS_INNER_METHOD,
+    SHADOWTLS_INNER_TAG,
+    SINGBOX_PROTOCOLS,
+    TAGS,
+)
 from .naive_tls_lifecycle_v224 import (
     CUSTOM_NAIVE_TRUST_MODEL,
     MANAGED_CA_CERT_PATH,
@@ -117,11 +122,23 @@ import secrets
 import uuid
 
 CONFIG = {CONFIG_PATH!r}
+STATE = {STATE_PATH!r}
 TAG = {tag!r}
 PROTOCOL = {protocol!r}
 USERNAME = {username!r}
 RECORD = json.loads({record_json!r})
 SENTINEL = {REVOCATION_SENTINEL!r}
+SHADOWTLS_INNER_TAG = {SHADOWTLS_INNER_TAG!r}
+SHADOWTLS_INNER_METHOD = {SHADOWTLS_INNER_METHOD!r}
+
+
+def load_json(path, default):
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except FileNotFoundError:
+        return default
+
 
 with open(CONFIG, "r", encoding="utf-8") as handle:
     doc = json.load(handle)
@@ -191,6 +208,49 @@ if not users:
         )]
 
 inbound["users"] = users
+
+if PROTOCOL == "shadowtls":
+    state = load_json(STATE, {{}})
+    if not isinstance(state, dict):
+        state = {{}}
+    seed = state.get("shadowtls")
+    if not isinstance(seed, dict):
+        seed = {{}}
+    # Inner proxy auth is node runtime state. It is intentionally separate from
+    # the per-subscription ShadowTLS v3 password and therefore never rotates a
+    # customer's credential during reconcile/self-heal.
+    seed.setdefault("inner_password", secrets.token_urlsafe(32))
+    state["shadowtls"] = seed
+
+    inbound["detour"] = SHADOWTLS_INNER_TAG
+    fresh_inner = dict(
+        type="shadowsocks",
+        tag=SHADOWTLS_INNER_TAG,
+        listen="127.0.0.1",
+        method=SHADOWTLS_INNER_METHOD,
+        password=seed["inner_password"],
+    )
+    inner = next(
+        (
+            item for item in inbounds
+            if isinstance(item, dict)
+            and item.get("tag") == SHADOWTLS_INNER_TAG
+        ),
+        None,
+    )
+    if isinstance(inner, dict):
+        inner.clear()
+        inner.update(fresh_inner)
+    else:
+        inbounds.append(fresh_inner)
+
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    with open(STATE + ".account-new", "w", encoding="utf-8") as handle:
+        json.dump(state, handle, ensure_ascii=False, indent=2)
+        handle.write("\\n")
+    os.replace(STATE + ".account-new", STATE)
+    os.chmod(STATE, 0o600)
+
 with open(CONFIG + ".account-new", "w", encoding="utf-8") as handle:
     json.dump(doc, handle, ensure_ascii=False, indent=2)
     handle.write("\\n")
@@ -204,11 +264,19 @@ def _snapshot_script(protocol: str) -> str:
     return f'''import json
 p={CONFIG_PATH!r}
 tag={tag!r}
+protocol={protocol!r}
+inner_tag={SHADOWTLS_INNER_TAG!r}
 with open(p, "r", encoding="utf-8") as h:
     d=json.load(h)
 row=next((x for x in d.get("inbounds",[]) if isinstance(x,dict) and x.get("tag")==tag),None)
 if not isinstance(row,dict):
     raise SystemExit("managed inbound not found")
+if protocol == "shadowtls":
+    inner=next((x for x in d.get("inbounds",[]) if isinstance(x,dict) and x.get("tag")==inner_tag and x.get("type")=="shadowsocks"),None)
+    if not isinstance(inner,dict) or not inner.get("method") or not inner.get("password"):
+        raise SystemExit("managed ShadowTLS inner inbound not found")
+    row=dict(row)
+    row["_twinpanel_shadowtls_inner"]={{"method":inner["method"],"password":inner["password"]}}
 print(json.dumps(row,separators=(",",":")))
 '''
 
@@ -524,6 +592,37 @@ def client_item(
         port=port,
         tls_certificate=tls_certificate,
     )
+
+    endpoint_server = str(outbound["server"])
+    endpoint_port = int(outbound["server_port"])
+    config_outbounds = [outbound]
+    route_final = outbound["tag"]
+
+    if secret.protocol == "shadowtls":
+        inner = inbound.get("_twinpanel_shadowtls_inner")
+        if not isinstance(inner, dict):
+            raise SingBoxAccountError("ShadowTLS inner proxy snapshot is missing")
+        method = str(inner.get("method") or "").strip()
+        password = str(inner.get("password") or "")
+        if not method or not password:
+            raise SingBoxAccountError("ShadowTLS inner proxy credential is incomplete")
+
+        transport = dict(outbound)
+        transport["tag"] = "twinpanel-shadowtls-transport"
+        proxy = {
+            "type": "shadowsocks",
+            "tag": "twinpanel-shadowtls",
+            "method": method,
+            "password": password,
+            "detour": transport["tag"],
+            "udp_over_tcp": {"enabled": True, "version": 2},
+        }
+        config_outbounds = [proxy, transport]
+        route_final = proxy["tag"]
+        # Preserve the public protocol metadata as ShadowTLS. Consumers that
+        # import raw sing-box JSON receive the complete two-stage chain.
+        outbound = transport
+
     config = {
         "log": {"level": "warn"},
         "inbounds": [
@@ -534,15 +633,15 @@ def client_item(
                 "listen_port": 2080,
             }
         ],
-        "outbounds": [outbound],
-        "route": {"final": outbound["tag"]},
+        "outbounds": config_outbounds,
+        "route": {"final": route_final},
     }
     item = {
         "node_id": int(node.id),
         "node": str(node.name),
-        "server": outbound["server"],
-        "server_ip": outbound["server"],
-        "port": int(outbound["server_port"]),
+        "server": endpoint_server,
+        "server_ip": endpoint_server,
+        "port": endpoint_port,
         "username": secret.username,
         "config_format": "sing-box",
         "config": json.dumps(config, ensure_ascii=False, indent=2),
