@@ -13,12 +13,14 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..models import Node
-from ..modern_protocol_runtime import CONFIG_PATH, SERVICE_NAME
 from ..node_runtime_connection import (
     connect_protocol_runtime,
     protocol_runtime_node_clause,
 )
 
+
+CONFIG_PATH = "/etc/twinpanel/sing-box/config.json"
+SERVICE_NAME = "twinpanel-sing-box"
 
 router = APIRouter(
     prefix="/v1/settings/vpn/outbounds",
@@ -101,17 +103,10 @@ def _inventory_from_document(doc: dict[str, Any]) -> dict[str, Any]:
 
     route = doc.get("route") if isinstance(doc.get("route"), dict) else {}
     final = str(route.get("final") or "").strip() or None
-    if final is None:
-        # sing-box uses the first matching/default route when final is absent;
-        # TwinPanel deliberately reports that as implicit instead of guessing.
-        final_mode = "implicit"
-    else:
-        final_mode = "explicit"
-
     return {
         "outbounds": rows,
         "default_tag": final,
-        "default_mode": final_mode,
+        "default_mode": "explicit" if final else "implicit",
     }
 
 
@@ -406,26 +401,6 @@ async def upsert_outbound(
         await conn.wait_closed()
 
 
-@router.delete("/{node_id}/{tag}")
-async def delete_outbound(
-    node_id: int,
-    tag: str,
-    db: Session = Depends(get_db),
-):
-    node = _node(db, node_id)
-    clean_tag = _valid_tag(tag)
-    if clean_tag == "direct":
-        raise HTTPException(status_code=409, detail="Outbound پایه direct قابل حذف نیست")
-    conn = await connect_protocol_runtime(node, db)
-    try:
-        await _apply(conn, action="delete", tag=clean_tag)
-        doc = await _read_document(conn)
-        return {"ok": True, "node_id": node.id, **_inventory_from_document(doc)}
-    finally:
-        conn.close()
-        await conn.wait_closed()
-
-
 @router.post("/{node_id}/default")
 async def set_default_outbound(
     node_id: int,
@@ -444,7 +419,7 @@ async def set_default_outbound(
         await conn.wait_closed()
 
 
-@router.delete("/{node_id}/default")
+@router.post("/{node_id}/default/clear")
 async def clear_default_outbound(
     node_id: int,
     db: Session = Depends(get_db),
@@ -453,6 +428,26 @@ async def clear_default_outbound(
     conn = await connect_protocol_runtime(node, db)
     try:
         await _apply(conn, action="clear_default", tag="direct")
+        doc = await _read_document(conn)
+        return {"ok": True, "node_id": node.id, **_inventory_from_document(doc)}
+    finally:
+        conn.close()
+        await conn.wait_closed()
+
+
+@router.delete("/{node_id}/{tag}")
+async def delete_outbound(
+    node_id: int,
+    tag: str,
+    db: Session = Depends(get_db),
+):
+    node = _node(db, node_id)
+    clean_tag = _valid_tag(tag)
+    if clean_tag == "direct":
+        raise HTTPException(status_code=409, detail="Outbound پایه direct قابل حذف نیست")
+    conn = await connect_protocol_runtime(node, db)
+    try:
+        await _apply(conn, action="delete", tag=clean_tag)
         doc = await _read_document(conn)
         return {"ok": True, "node_id": node.id, **_inventory_from_document(doc)}
     finally:
