@@ -8,7 +8,7 @@ on:
       - 'backend/app/dnstt_artifact.py'
       - 'backend/tests/test_netmod_udpgw_v231.py'
       - 'scripts/build-netmod-udpgw.sh'
-      - 'scripts/patches/badvpn-udpgw-resolvconf-fallback.patch'
+      - 'scripts/patch-badvpn-udpgw-resolver.py'
       - '.github/workflows/netmod-udpgw-v231-smoke.yml'
   workflow_dispatch:
 
