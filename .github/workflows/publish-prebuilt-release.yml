@@ -225,41 +225,15 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          BADVPN_COMMIT='07268f02706e78e282e19641b5d1d41e8e89bf31'
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends cmake musl-tools file
-          SRC="$(mktemp -d)"
-          BUILD="$(mktemp -d)"
-          trap 'rm -rf "$SRC" "$BUILD"' EXIT
-
-          git -C "$SRC" init -q
-          git -C "$SRC" remote add origin https://github.com/ambrop72/badvpn.git
-          git -C "$SRC" fetch -q --depth=1 origin "$BADVPN_COMMIT"
-          git -C "$SRC" checkout -q --detach FETCH_HEAD
-          test "$(git -C "$SRC" rev-parse HEAD)" = "$BADVPN_COMMIT"
-
-          CC=musl-gcc cmake -S "$SRC" -B "$BUILD" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_NOTHING_BY_DEFAULT=1 \
-            -DBUILD_UDPGW=1 \
-            -DCMAKE_EXE_LINKER_FLAGS='-static'
-          cmake --build "$BUILD" --target badvpn-udpgw --parallel 2
-
-          NAME='badvpn-udpgw-linux-amd64'
-          BIN="$BUILD/udpgw/badvpn-udpgw"
-          test -x "$BIN"
-          "$BIN" --version | grep -q 'BadVPN udpgw'
-          file "$BIN" | grep -q 'statically linked'
-
+          sudo apt-get install -y --no-install-recommends cmake file libc6-dev
           mkdir -p source/backend/artifacts
-          install -m 0755 "$BIN" "source/backend/artifacts/$NAME"
-          (
-            cd source/backend/artifacts
-            sha256sum "$NAME" > "$NAME.sha256"
-          )
-          install -m 0644 "$SRC/COPYING" source/backend/artifacts/badvpn-COPYING
-          grep -Eq "^[0-9a-f]{64}  ${NAME}$" \
-            "source/backend/artifacts/$NAME.sha256"
+          NETMOD_UDPGW_TEST_PORT=17300 \
+            bash source/scripts/build-netmod-udpgw.sh \
+              source/backend/artifacts/badvpn-udpgw-linux-amd64 \
+              source/backend/artifacts/badvpn-COPYING
+          grep -Eq '^[0-9a-f]{64}  source/backend/artifacts/badvpn-udpgw-linux-amd64$' \
+            source/backend/artifacts/badvpn-udpgw-linux-amd64.sha256
           test -s source/backend/artifacts/badvpn-COPYING
 
       - name: Setup pinned Go for MasterDnsVPN

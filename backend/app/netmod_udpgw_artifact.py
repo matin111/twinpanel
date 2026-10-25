@@ -64,6 +64,59 @@ def _service_install_script() -> str:
     q_perf = shlex.quote(NETMOD_DNSTT_PERFORMANCE_DROPIN)
     return f"""set -Eeuo pipefail
 
+# A listener alone is not sufficient for NetMod VPN mode. BadVPN's DNS path
+# calls res_init() and requires at least one resolver. Production proved the old
+# musl-static artifact could listen while reporting 'no name servers available'.
+# Probe the exact staged binary on the real Exit before accepting the repair.
+probe_log="$(mktemp)"
+probe_pid=""
+cleanup_probe() {{
+  if [ -n "$probe_pid" ]; then
+    kill "$probe_pid" >/dev/null 2>&1 || true
+    wait "$probe_pid" >/dev/null 2>&1 || true
+  fi
+  rm -f "$probe_log"
+}}
+trap cleanup_probe EXIT
+{q_binary} --logger stdout --loglevel info --listen-addr 127.0.0.1:17301 --max-clients 4 --max-connections-for-client 8 >"$probe_log" 2>&1 &
+probe_pid=$!
+for _ in $(seq 1 30); do
+  if ss -H -ltn 2>/dev/null | grep -F '127.0.0.1:17301 ' >/dev/null; then
+    break
+  fi
+  if ! kill -0 "$probe_pid" >/dev/null 2>&1; then
+    cat "$probe_log" >&2 || true
+    echo NETMOD_UDPGW_PROBE_EXITED_EARLY >&2
+    exit 37
+  fi
+  sleep 0.1
+done
+if ! ss -H -ltn 2>/dev/null | grep -F '127.0.0.1:17301 ' >/dev/null; then
+  cat "$probe_log" >&2 || true
+  echo NETMOD_UDPGW_PROBE_LISTENER_MISSING >&2
+  exit 38
+fi
+
+# stdout is block-buffered when redirected. Stop the short-lived probe first so
+# BadVPN flushes its resolver INFO/ERROR messages before we inspect the log.
+sleep 0.2
+kill "$probe_pid" >/dev/null 2>&1 || true
+wait "$probe_pid" >/dev/null 2>&1 || true
+probe_pid=""
+
+if grep -Fq 'no name servers available' "$probe_log"; then
+  cat "$probe_log" >&2 || true
+  echo NETMOD_UDPGW_DNS_RESOLVER_UNAVAILABLE >&2
+  exit 39
+fi
+if ! grep -Fq 'using DNS server' "$probe_log"; then
+  cat "$probe_log" >&2 || true
+  echo NETMOD_UDPGW_DNS_RESOLVER_NOT_CONFIRMED >&2
+  exit 40
+fi
+rm -f "$probe_log"
+trap - EXIT
+
 # NetMod's VPN-mode UDP path reaches the remote UDP gateway through an SSH
 # direct-tcpip channel to loopback:7300. Keep the gateway private to loopback.
 cat > /etc/systemd/system/{NETMOD_UDPGW_SERVICE} <<'UNIT'
@@ -123,6 +176,7 @@ systemctl is-active --quiet {q_service}
 ss -H -ltnp 2>/dev/null | grep -F '{NETMOD_UDPGW_LISTEN} ' >/dev/null
 printf 'UDPGW_SERVICE=active\\n'
 printf 'UDPGW_LISTENER=yes\\n'
+printf 'UDPGW_DNS_RESOLVER=yes\\n'
 printf 'UDPGW_LISTEN={NETMOD_UDPGW_LISTEN}\\n'
 """
 
@@ -177,4 +231,5 @@ async def stage_netmod_udpgw(conn: Any) -> dict[str, str]:
         "remote_path": remote,
         "service": NETMOD_UDPGW_SERVICE,
         "listen": NETMOD_UDPGW_LISTEN,
+        "dns_resolver": "verified",
     }

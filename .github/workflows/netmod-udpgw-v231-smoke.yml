@@ -1,4 +1,4 @@
-name: NetMod UDPGW V231 Smoke
+name: NetMod UDPGW Resolver V233 Smoke
 
 on:
   pull_request:
@@ -7,6 +7,7 @@ on:
       - 'backend/app/netmod_udpgw_artifact.py'
       - 'backend/app/dnstt_artifact.py'
       - 'backend/tests/test_netmod_udpgw_v231.py'
+      - 'scripts/build-netmod-udpgw.sh'
       - '.github/workflows/netmod-udpgw-v231-smoke.yml'
   workflow_dispatch:
 
@@ -22,55 +23,61 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Run NetMod UDPGW regression
+      - name: Run NetMod UDPGW resolver regression
         shell: bash
         run: |
           set -Eeuo pipefail
           python -m pip install --disable-pip-version-check --quiet pytest
           PYTHONPATH=backend python -m pytest -q backend/tests/test_netmod_udpgw_v231.py
 
-      - name: Build pinned BadVPN UDPGW statically
+      - name: Build and verify pinned BadVPN UDPGW resolver
+        id: udpgw_build
         shell: bash
         run: |
-          set -Eeuo pipefail
-          BADVPN_COMMIT='07268f02706e78e282e19641b5d1d41e8e89bf31'
+          set -u
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends cmake musl-tools
+          sudo apt-get install -y --no-install-recommends cmake file libc6-dev
 
-          SRC="$(mktemp -d)"
-          BUILD="$(mktemp -d)"
-          trap 'rm -rf "$SRC" "$BUILD"' EXIT
+          OUT="$(mktemp)"
+          LICENSE="$(mktemp)"
+          echo "OUT=$OUT" >> "$GITHUB_ENV"
+          echo "LICENSE=$LICENSE" >> "$GITHUB_ENV"
 
-          git -C "$SRC" init -q
-          git -C "$SRC" remote add origin https://github.com/ambrop72/badvpn.git
-          git -C "$SRC" fetch -q --depth=1 origin "$BADVPN_COMMIT"
-          git -C "$SRC" checkout -q --detach FETCH_HEAD
-          test "$(git -C "$SRC" rev-parse HEAD)" = "$BADVPN_COMMIT"
+          set +e
+          NETMOD_UDPGW_TEST_PORT=17300 \
+            bash scripts/build-netmod-udpgw.sh "$OUT" "$LICENSE" \
+            > /tmp/netmod-udpgw-build.log 2>&1
+          status=$?
+          set -e
 
-          CC=musl-gcc cmake -S "$SRC" -B "$BUILD" \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_NOTHING_BY_DEFAULT=1 \
-            -DBUILD_UDPGW=1 \
-            -DCMAKE_EXE_LINKER_FLAGS='-static'
-          cmake --build "$BUILD" --target badvpn-udpgw --parallel 2
+          cat /tmp/netmod-udpgw-build.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
 
-          BIN="$BUILD/udpgw/badvpn-udpgw"
-          test -x "$BIN"
-          "$BIN" --version | grep -q 'BadVPN udpgw'
-          file "$BIN" | grep -q 'statically linked'
-          sha256sum "$BIN"
+          if [ "$status" -eq 0 ]; then
+            test -x "$OUT"
+            "$OUT" --version | grep -q 'BadVPN udpgw'
+            file "$OUT" | grep -q 'statically linked'
+            grep -Eq "^[0-9a-f]{64}  ${OUT}$" "$OUT.sha256"
+            test -s "$LICENSE"
+          fi
 
-          "$BIN" --loglevel warning --listen-addr 127.0.0.1:17300 \
-            --max-clients 8 --max-connections-for-client 32 \
-            >/tmp/netmod-udpgw-smoke.log 2>&1 &
-          PID=$!
-          trap 'kill "$PID" >/dev/null 2>&1 || true; rm -rf "$SRC" "$BUILD"' EXIT
-          for _ in $(seq 1 30); do
-            if ss -H -ltn | grep -F '127.0.0.1:17300 ' >/dev/null; then
-              break
-            fi
-            sleep 0.1
-          done
-          ss -H -ltn | grep -F '127.0.0.1:17300 '
-          kill "$PID"
-          wait "$PID" || true
+      - name: Upload UDPGW build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: netmod-udpgw-build-diagnostics
+          path: /tmp/netmod-udpgw-build.log
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Enforce UDPGW build success
+        if: always()
+        shell: bash
+        run: |
+          test "${{ steps.udpgw_build.outputs.status }}" = "0"
+
+      - name: Cleanup temporary UDPGW outputs
+        if: always()
+        shell: bash
+        run: |
+          rm -f "${OUT:-}" "${OUT:-}.sha256" "${LICENSE:-}" /tmp/netmod-udpgw-build.log
