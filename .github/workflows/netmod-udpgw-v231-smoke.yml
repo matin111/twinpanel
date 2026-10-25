@@ -37,7 +37,7 @@ jobs:
         run: |
           set -u
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends cmake file musl-tools iproute2
+          sudo apt-get install -y --no-install-recommends cmake file libc6-dev iproute2
 
           OUT="$(mktemp)"
           LICENSE="$(mktemp)"
@@ -60,8 +60,7 @@ jobs:
             file "$OUT" | grep -q 'statically linked'
             grep -Eq "^[0-9a-f]{64}  ${OUT}$" "$OUT.sha256"
             test -s "$LICENSE"
-            grep -Fq 'NETMOD_UDPGW_RESOLVER=fallback-verified' /tmp/netmod-udpgw-build.log
-            grep -Fq 'loaded DNS server from /etc/resolv.conf fallback' /tmp/netmod-udpgw-build.log
+            grep -Fq 'NETMOD_UDPGW_RESOLVER=verified' /tmp/netmod-udpgw-build.log
             grep -Fq 'using DNS server' /tmp/netmod-udpgw-build.log
             ! grep -Fq 'no name servers available' /tmp/netmod-udpgw-build.log
           fi
