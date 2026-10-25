@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import copy
 import html
 import json
@@ -11,20 +10,32 @@ from urllib.parse import quote, urlencode
 from sqlalchemy.orm import Session
 
 from .account_delivery import _public_payload, _subscription_from_share_token
-from .public_connection_modern_delivery_v13 import MODERN_PROTOCOLS, _items, _status_value
+from .public_connection_modern_delivery_v13 import (
+    MODERN_PROTOCOLS,
+    _items,
+    _mieru_karing_yaml,
+    _status_value,
+    _sudoku_uri,
+)
 from .public_connection_modern_names_v14 import _profile_name
 
 
-# Karing's own share surface can embed a JSON list of sing-box outbounds in the
-# custom ulink:// scheme. This avoids a second HTTP fetch from inside Karing,
-# which is especially important when TwinPanel itself is reached through an IP
-# or a path that the client cannot fetch while changing network state.
-KARING_INLINE_PROTOCOLS = {
+# Karing 1.2.25 supports the first cohort below. Newer 1.2.26 builds also add
+# sing-box JSON import for Snell, Sudoku and TrustTunnel, but TwinPanel must not
+# advertise those as one-click imports to older installed clients.
+KARING_DIRECT_PROTOCOLS = {
     "hysteria2",
     "tuic",
     "anytls",
     "naive",
     "shadowtls",
+    "mieru",
+}
+
+KARING_126_PROTOCOLS = {
+    "snell",
+    "sudoku",
+    "trusttunnel",
 }
 
 STANDARD_SHARE_PROTOCOLS = {
@@ -73,36 +84,6 @@ def _outbound(item: dict[str, Any]) -> dict[str, Any] | None:
             return dict(row)
 
     return None
-
-
-def karing_inline_uri(protocol: str, item: dict[str, Any], profile_name: str) -> str:
-    protocol = str(protocol or "").strip().lower()
-    if protocol not in KARING_INLINE_PROTOCOLS:
-        return ""
-
-    outbound = _outbound(item)
-    if not isinstance(outbound, dict):
-        return ""
-    if str(outbound.get("type") or "").strip().lower() != protocol:
-        return ""
-
-    node = copy.deepcopy(outbound)
-    node["tag"] = str(profile_name or "TwinPanel").strip() or "TwinPanel"
-
-    raw = json.dumps(
-        [node],
-        ensure_ascii=False,
-        separators=(",", ":"),
-    ).encode("utf-8")
-
-    encoded = base64.b64encode(raw).decode("ascii")
-    fragment = quote(str(profile_name or "TwinPanel"), safe="")
-    return (
-        "ulink://install/?content="
-        + quote(encoded, safe="")
-        + "&format=json#"
-        + fragment
-    )
 
 
 def _tls_params(outbound: dict[str, Any]) -> list[tuple[str, str]]:
@@ -223,11 +204,73 @@ def standard_share_uri(protocol: str, item: dict[str, Any], profile_name: str) -
     return ""
 
 
+def _copy_content(protocol: str, item: dict[str, Any], profile_name: str) -> str:
+    protocol = str(protocol or "").strip().lower()
+
+    standard = standard_share_uri(protocol, item, profile_name)
+    if standard:
+        return standard
+
+    if protocol == "mieru":
+        content = _mieru_karing_yaml(item)
+        if content:
+            old = json.dumps("TwinPanel Mieru", ensure_ascii=False)
+            new = json.dumps(profile_name, ensure_ascii=False)
+            return content.replace(old, new)
+
+    uri = str(item.get("uri") or "").strip()
+    if protocol == "sudoku" and not uri:
+        uri = _sudoku_uri(item)
+    if uri:
+        return uri
+
+    config = str(item.get("config") or "").strip()
+    if config:
+        return config
+
+    outbound = _outbound(item)
+    if isinstance(outbound, dict):
+        node = copy.deepcopy(outbound)
+        node["tag"] = str(profile_name or "TwinPanel").strip() or "TwinPanel"
+        return json.dumps(
+            {"outbounds": [node]},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+
+    return ""
+
+
+def karing_inline_uri(protocol: str, item: dict[str, Any], profile_name: str) -> str:
+    """Return Karing's registered system scheme with config content inline.
+
+    Karing's scheme handler names the argument ``url`` for historical reasons,
+    but passes it to the Add Profile screen as ``urlOrContent``. It can therefore
+    carry a proxy/share URI or raw configuration content directly and avoids a
+    second HTTP fetch back to TwinPanel.
+    """
+    protocol = str(protocol or "").strip().lower()
+    if protocol not in KARING_DIRECT_PROTOCOLS:
+        return ""
+
+    content = _copy_content(protocol, item, profile_name)
+    if not content:
+        return ""
+
+    return (
+        "karing://install-config?url="
+        + quote(content, safe="")
+        + "&name="
+        + quote(str(profile_name or "TwinPanel"), safe="")
+    )
+
+
 def _replace_remote_karing_button(
     source: str,
     *,
     config_path: str,
     karing_uri: str,
+    copy_target: str,
     standard_uri: str,
 ) -> str:
     escaped_path = _h(config_path)
@@ -242,8 +285,9 @@ def _replace_remote_karing_button(
         return source
 
     controls = (
-        '<a class="primary-btn v15-karing-inline" '
-        f'href="{_h(karing_uri)}">افزودن مستقیم به Karing</a>'
+        '<a class="primary-btn v15-karing-inline tp-v15-app-launch" '
+        f'href="{_h(karing_uri)}" data-tp-copy-target="{_h(copy_target)}">'
+        'افزودن مستقیم به Karing</a>'
     )
     if standard_uri:
         controls += (
@@ -255,12 +299,158 @@ def _replace_remote_karing_button(
     return pattern.sub(controls, source, count=1)
 
 
+def _insert_modern_copy_button(
+    source: str,
+    *,
+    protocol: str,
+    copy_target: str,
+    requires_karing_126: bool,
+) -> str:
+    marker = (
+        f'<div class="v13-modern-action" data-v13-protocol="{_h(protocol)}">'
+    )
+    replacement = (
+        f'<div class="v13-modern-action" data-v13-protocol="{_h(protocol)}" '
+        'data-v15-delivery="1">'
+    )
+    anchor = source.find(marker)
+    if anchor < 0:
+        return source
+
+    source = source[:anchor] + replacement + source[anchor + len(marker):]
+    actions = source.find('<div class="v13-action-buttons">', anchor)
+    if actions < 0:
+        return source
+
+    insert_at = actions + len('<div class="v13-action-buttons">')
+    copy_button = (
+        '<button class="v13-secondary copy-btn tp-v15-copy-config" '
+        f'type="button" data-tp-copy-target="{_h(copy_target)}">'
+        'کپی کانفیگ</button>'
+    )
+    if requires_karing_126:
+        copy_button += (
+            '<span class="tp-v15-client-note">'
+            'Import مستقیم این پروتکل در Karing به نسخه 1.2.26+ نیاز دارد.'
+            '</span>'
+        )
+
+    return source[:insert_at] + copy_button + source[insert_at:]
+
+
+_V15_SCRIPT = r"""
+<script id="twinpanelPublicModernImportV15">
+(function(){
+  const toast=document.getElementById('toast');
+
+  function notify(text){
+    if(!toast)return;
+    toast.textContent=text;
+    toast.classList.add('show');
+    clearTimeout(window.__tpV15Toast);
+    window.__tpV15Toast=setTimeout(()=>toast.classList.remove('show'),1800);
+  }
+
+  function fallbackCopy(value){
+    const area=document.createElement('textarea');
+    area.value=String(value||'');
+    area.setAttribute('readonly','');
+    area.style.position='fixed';
+    area.style.left='-9999px';
+    area.style.top='0';
+    document.body.appendChild(area);
+    area.focus();
+    area.select();
+    area.setSelectionRange(0,area.value.length);
+    let ok=false;
+    try{ok=document.execCommand('copy')}catch(_error){}
+    area.remove();
+    return ok;
+  }
+
+  async function copy(value){
+    const text=String(value||'');
+    if(!text)return false;
+    if(navigator.clipboard&&window.isSecureContext){
+      try{await navigator.clipboard.writeText(text);return true}catch(_error){}
+    }
+    return fallbackCopy(text);
+  }
+
+  function valueFromTarget(id){
+    const el=document.getElementById(String(id||''));
+    if(!el)return'';
+    return String('value' in el?el.value:el.textContent||'');
+  }
+
+  document.addEventListener('click',async function(event){
+    const targetButton=event.target.closest('[data-tp-copy-target]');
+    if(targetButton&&!targetButton.classList.contains('tp-v15-app-launch')){
+      event.preventDefault();
+      const value=valueFromTarget(targetButton.dataset.tpCopyTarget);
+      notify(await copy(value)?'کانفیگ کپی شد ✓':'کپی انجام نشد');
+      return;
+    }
+
+    const launch=event.target.closest('a.tp-v15-app-launch');
+    if(launch){
+      event.preventDefault();
+      const value=valueFromTarget(launch.dataset.tpCopyTarget);
+      const ok=await copy(value);
+      notify(ok?'کانفیگ کپی شد؛ در حال باز کردن برنامه…':'در حال باز کردن برنامه…');
+      window.location.href=launch.getAttribute('href')||'';
+      return;
+    }
+
+    const openUri=event.target.closest('a.v13-open-uri[href]');
+    if(openUri){
+      const value=openUri.getAttribute('href')||'';
+      await copy(value);
+      notify('لینک کپی شد؛ در حال باز کردن برنامه…');
+    }
+  },true);
+
+  document.querySelectorAll('.download-config[data-target]').forEach(function(download){
+    const row=download.closest('.action-row')||download.parentElement;
+    if(!row||row.querySelector('.tp-v15-classic-copy'))return;
+    const button=document.createElement('button');
+    button.type='button';
+    button.className='copy-btn tp-v15-classic-copy';
+    button.dataset.tpCopyTarget=download.dataset.target||'';
+    button.textContent='کپی کانفیگ';
+    download.insertAdjacentElement('beforebegin',button);
+  });
+
+  document.querySelectorAll('.action-row .copy-btn[data-copy]').forEach(function(copyButton){
+    const content=String(copyButton.dataset.copy||'').trim();
+    if(!/^(vmess|vless|trojan|ss|hysteria2|hy2|tuic):/i.test(content))return;
+    const actions=copyButton.closest('.action-buttons');
+    if(!actions||actions.querySelector('.tp-v15-karing-classic'))return;
+    const link=document.createElement('a');
+    link.className='primary-btn tp-v15-karing-classic tp-v15-app-launch';
+    link.href='karing://install-config?url='+encodeURIComponent(content)+'&name='+encodeURIComponent('TwinPanel');
+    link.textContent='افزودن به Karing';
+    const source=document.createElement('textarea');
+    const id='tp-v15-classic-'+Math.random().toString(36).slice(2);
+    source.id=id;
+    source.className='hidden-source';
+    source.readOnly=true;
+    source.value=content;
+    document.body.appendChild(source);
+    link.dataset.tpCopyTarget=id;
+    actions.appendChild(link);
+  });
+})();
+</script>
+"""
+
+
 def refine_public_connection_modern_import_v15(
     source: str,
     token: str,
     db: Session,
 ) -> str:
-    """Prefer embedded/direct Modern imports over client-side remote fetches."""
+    """Make every delivered protocol copyable and use registered app schemes."""
     if "TWINPANEL_PUBLIC_MODERN_IMPORT_V15" in source:
         return source
 
@@ -270,6 +460,7 @@ def refine_public_connection_modern_import_v15(
 
     payload = _public_payload(db, sub)
     credentials = payload.get("credentials") if isinstance(payload, dict) else []
+    hidden_sources: list[str] = []
 
     for cred in credentials if isinstance(credentials, list) else []:
         if not isinstance(cred, dict):
@@ -287,6 +478,23 @@ def refine_public_connection_modern_import_v15(
                 continue
 
             profile_name = _profile_name(sub, protocol, item)
+            copy_content = _copy_content(protocol, item, profile_name)
+            if not copy_content:
+                continue
+
+            copy_target = f"tp-v15-copy-{protocol}-{node_id}-{len(hidden_sources)}"
+            hidden_sources.append(
+                f'<textarea id="{_h(copy_target)}" class="hidden-source" '
+                f'readonly>{_h(copy_content)}</textarea>'
+            )
+
+            source = _insert_modern_copy_button(
+                source,
+                protocol=protocol,
+                copy_target=copy_target,
+                requires_karing_126=protocol in KARING_126_PROTOCOLS,
+            )
+
             karing_uri = karing_inline_uri(protocol, item, profile_name)
             if not karing_uri:
                 continue
@@ -296,10 +504,14 @@ def refine_public_connection_modern_import_v15(
                 f"/v1/connect/{quote(str(token), safe='')}/modern-config-v14/"
                 f"{quote(protocol, safe='')}/{node_id}"
             )
+            if protocol == "mieru":
+                config_path += "?profile=karing"
+
             source = _replace_remote_karing_button(
                 source,
                 config_path=config_path,
                 karing_uri=karing_uri,
+                copy_target=copy_target,
                 standard_uri=standard_uri,
             )
 
@@ -308,13 +520,24 @@ def refine_public_connection_modern_import_v15(
         """
 /* TWINPANEL_PUBLIC_MODERN_IMPORT_V15 */
 .v15-karing-inline{white-space:nowrap}
-.v15-standard-link{display:inline-flex!important;align-items:center;justify-content:center}
+.v15-standard-link{display:inline-flex;align-items:center;justify-content:center}
+.tp-v15-copy-config,.tp-v15-classic-copy{white-space:nowrap}
+.tp-v15-client-note{color:var(--muted);font-size:8px;line-height:1.7;max-width:250px}
 """ + "\n</style>",
         1,
     )
+
+    if hidden_sources:
+        source = source.replace(
+            "</body>",
+            "".join(hidden_sources) + "\n</body>",
+            1,
+        )
+
     source = source.replace(
         "</body>",
-        "<!-- TWINPANEL_PUBLIC_MODERN_IMPORT_V15 -->\n</body>",
+        _V15_SCRIPT
+        + "\n<!-- TWINPANEL_PUBLIC_MODERN_IMPORT_V15 -->\n</body>",
         1,
     )
     return source

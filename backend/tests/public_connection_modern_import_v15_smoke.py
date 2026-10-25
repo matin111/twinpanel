@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import ast
-import base64
 import copy
 import json
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, quote, unquote, urlencode, urlsplit
+from urllib.parse import parse_qs, quote, urlencode, urlsplit
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -23,35 +22,43 @@ compile(live, str(live_path), "exec")
 
 for marker in (
     "TWINPANEL_PUBLIC_MODERN_IMPORT_V15",
-    "ulink://install/?content=",
-    "&format=json#",
+    "karing://install-config?url=",
+    "data-tp-copy-target",
+    "tp-v15-app-launch",
+    "tp-v15-classic-copy",
+    "کپی کانفیگ",
     '"hysteria2"',
     '"tuic"',
     '"anytls"',
     '"naive"',
     '"shadowtls"',
+    '"mieru"',
     "def karing_inline_uri(",
     "def standard_share_uri(",
-    "v15-karing-inline",
-    "کپی لینک استاندارد",
+    "def _copy_content(",
 ):
     assert marker in v15, marker
 
-# V15 is additive and must refine V14's named download paths, not replace the
-# already accepted V13/V14 delivery layers.
+assert "ulink://install/?content=" not in v15
+
+# V15 remains the final delivery refinement after accepted V13/V14.
 assert "refine_public_connection_modern_import_v15" in live
 assert live.index("refine_public_connection_modern_names_v14(source, token, db)") < live.index(
     "refine_public_connection_modern_import_v15(source, token, db)"
 )
 
-# Execute only pure link helpers without importing the application stack.
+# Execute pure helpers without importing the application stack.
 tree = ast.parse(v15)
 helper_names = {
+    "_h",
     "_host_for_uri",
     "_outbound",
-    "karing_inline_uri",
     "_tls_params",
     "standard_share_uri",
+    "_copy_content",
+    "karing_inline_uri",
+    "_replace_remote_karing_button",
+    "_insert_modern_copy_button",
 }
 helper_nodes = [
     node
@@ -60,19 +67,33 @@ helper_nodes = [
 ]
 module = ast.Module(body=helper_nodes, type_ignores=[])
 ast.fix_missing_locations(module)
+
+
+def fake_mieru(item: dict[str, Any]) -> str:
+    return "proxies:\n  - name: \"TwinPanel Mieru\"\n    type: mieru\n"
+
+
+def fake_sudoku(item: dict[str, Any]) -> str:
+    return "sudoku://TEST"
+
+
 namespace: dict[str, Any] = {
     "Any": Any,
-    "base64": base64,
     "copy": copy,
+    "html": __import__("html"),
     "json": json,
+    "re": __import__("re"),
     "quote": quote,
     "urlencode": urlencode,
-    "KARING_INLINE_PROTOCOLS": {
+    "_mieru_karing_yaml": fake_mieru,
+    "_sudoku_uri": fake_sudoku,
+    "KARING_DIRECT_PROTOCOLS": {
         "hysteria2",
         "tuic",
         "anytls",
         "naive",
         "shadowtls",
+        "mieru",
     },
     "STANDARD_SHARE_PROTOCOLS": {
         "hysteria2",
@@ -84,6 +105,56 @@ exec(compile(module, str(v15_path), "exec"), namespace)
 
 karing_inline_uri = namespace["karing_inline_uri"]
 standard_share_uri = namespace["standard_share_uri"]
+copy_content = namespace["_copy_content"]
+
+replace_remote_karing_button = namespace["_replace_remote_karing_button"]
+insert_modern_copy_button = namespace["_insert_modern_copy_button"]
+
+# Two servers of the same protocol must each receive their own copy control.
+sample_actions = (
+    '<div class="v13-modern-action" data-v13-protocol="hysteria2">'
+    '<div class="v13-action-buttons">'
+    '<button class="primary-btn v13-karing-import" type="button" '
+    'data-config-path="/v1/connect/t/modern-config-v14/hysteria2/6">'
+    'افزودن مستقیم به Karing</button></div></div>'
+    '<div class="v13-modern-action" data-v13-protocol="hysteria2">'
+    '<div class="v13-action-buttons">'
+    '<button class="primary-btn v13-karing-import" type="button" '
+    'data-config-path="/v1/connect/t/modern-config-v14/hysteria2/7">'
+    'افزودن مستقیم به Karing</button></div></div>'
+)
+sample_actions = insert_modern_copy_button(
+    sample_actions,
+    protocol="hysteria2",
+    copy_target="copy-6",
+    requires_karing_126=False,
+)
+sample_actions = insert_modern_copy_button(
+    sample_actions,
+    protocol="hysteria2",
+    copy_target="copy-7",
+    requires_karing_126=False,
+)
+assert sample_actions.count("tp-v15-copy-config") == 2
+assert 'data-tp-copy-target="copy-6"' in sample_actions
+assert 'data-tp-copy-target="copy-7"' in sample_actions
+
+sample_actions = replace_remote_karing_button(
+    sample_actions,
+    config_path="/v1/connect/t/modern-config-v14/hysteria2/6",
+    karing_uri="karing://install-config?url=hysteria2%3A%2F%2Fone",
+    copy_target="copy-6",
+    standard_uri="hysteria2://one",
+)
+sample_actions = replace_remote_karing_button(
+    sample_actions,
+    config_path="/v1/connect/t/modern-config-v14/hysteria2/7",
+    karing_uri="karing://install-config?url=hysteria2%3A%2F%2Ftwo",
+    copy_target="copy-7",
+    standard_uri="hysteria2://two",
+)
+assert sample_actions.count("v15-karing-inline") == 2
+assert "v13-karing-import" not in sample_actions
 
 hysteria_item = {
     "outbound": {
@@ -101,39 +172,33 @@ hysteria_item = {
     }
 }
 
-karing = karing_inline_uri(
+hy2_share = standard_share_uri(
     "hysteria2",
     hysteria_item,
     "MV17-14-tr-hysteria2-6",
 )
-assert karing.startswith("ulink://install/?content=")
-assert "http://" not in karing and "https://" not in karing
-parts = urlsplit(karing)
-params = parse_qs(parts.query)
-assert params.get("format") == ["json"]
-raw = base64.b64decode(params["content"][0]).decode("utf-8")
-nodes = json.loads(raw)
-assert isinstance(nodes, list) and len(nodes) == 1
-assert nodes[0]["type"] == "hysteria2"
-assert nodes[0]["tag"] == "MV17-14-tr-hysteria2-6"
-assert nodes[0]["password"] == "hy2 pass+/="
-assert nodes[0]["tls"]["insecure"] is True
+assert hy2_share.startswith("hysteria2://")
+assert "insecure=1" in hy2_share
+assert "obfs=salamander" in hy2_share
+assert "obfs-password=obfs+secret" in hy2_share
 
-hysteria_link = standard_share_uri(
+hy2_karing = karing_inline_uri(
     "hysteria2",
     hysteria_item,
     "MV17-14-tr-hysteria2-6",
 )
-assert hysteria_link.startswith("hysteria2://")
-assert "insecure=1" in hysteria_link
-assert "obfs=salamander" in hysteria_link
-assert "obfs-password=obfs+secret" in hysteria_link
+assert hy2_karing.startswith("karing://install-config?url=")
+parts = urlsplit(hy2_karing)
+params = parse_qs(parts.query)
+assert params["name"] == ["MV17-14-tr-hysteria2-6"]
+assert params["url"] == [hy2_share]
+assert "http://217." not in hy2_karing
+assert "/modern-config" not in hy2_karing
 
 
 tuic_item = {
     "outbound": {
         "type": "tuic",
-        "tag": "twinpanel-tuic",
         "server": "204.10.192.96",
         "server_port": 8445,
         "uuid": "11111111-2222-3333-4444-555555555555",
@@ -147,18 +212,17 @@ tuic_item = {
         },
     }
 }
-tuic_link = standard_share_uri("tuic", tuic_item, "MV17-14-tr-tuic-6")
-assert tuic_link.startswith("tuic://11111111-2222-3333-4444-555555555555:")
-assert "congestion_control=cubic" in tuic_link
-assert "udp_relay_mode=native" in tuic_link
-assert "allow_insecure=1" in tuic_link
-assert "reduce_rtt=1" in tuic_link
+tuic = standard_share_uri("tuic", tuic_item, "MV17-14-tr-tuic-6")
+assert tuic.startswith("tuic://11111111-2222-3333-4444-555555555555:")
+assert "allow_insecure=1" in tuic
+assert karing_inline_uri("tuic", tuic_item, "MV17-14-tr-tuic-6").startswith(
+    "karing://install-config?url="
+)
 
 
 anytls_item = {
     "outbound": {
         "type": "anytls",
-        "tag": "twinpanel-anytls",
         "server": "204.10.192.96",
         "server_port": 8446,
         "password": "anytls-pass",
@@ -169,53 +233,75 @@ anytls_item = {
         },
     }
 }
-anytls_link = standard_share_uri(
-    "anytls",
-    anytls_item,
-    "MV17-14-tr-anytls-6",
+anytls = standard_share_uri("anytls", anytls_item, "MV17-14-tr-anytls-6")
+assert anytls.startswith("anytls://anytls-pass@204.10.192.96:8446/")
+assert "security=tls" in anytls
+assert karing_inline_uri("anytls", anytls_item, "MV17-14-tr-anytls-6").startswith(
+    "karing://install-config?url="
 )
-assert anytls_link.startswith("anytls://anytls-pass@204.10.192.96:8446/")
-assert "security=tls" in anytls_link
-assert "sni=204.10.192.96" in anytls_link
-assert "insecure=1" in anytls_link
 
 
-# Naive must keep the complete TLS certificate inside Karing's embedded JSON.
-# A compact share URI is deliberately not emitted because the managed CA trust
-# material cannot be represented safely by the common naive+https URI subset.
-naive_item = {
-    "outbound": {
-        "type": "naive",
-        "tag": "twinpanel-naive",
-        "server": "204.10.192.96",
-        "server_port": 8447,
-        "username": "tp-sub-17",
-        "password": "naive-secret",
-        "tls": {
-            "enabled": True,
-            "server_name": "204.10.192.96",
-            "certificate": "-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n",
-        },
-    }
+# Naive must preserve the full managed CA content. It intentionally does not
+# use a lossy compact share URI.
+naive_config = {
+    "outbounds": [
+        {
+            "type": "naive",
+            "tag": "twinpanel-naive",
+            "server": "204.10.192.96",
+            "server_port": 8447,
+            "username": "tp-sub-17",
+            "password": "naive-secret",
+            "tls": {
+                "enabled": True,
+                "server_name": "204.10.192.96",
+                "certificate": "-----BEGIN CERTIFICATE-----\nTEST\n-----END CERTIFICATE-----\n",
+            },
+        }
+    ]
 }
-naive_ulink = karing_inline_uri("naive", naive_item, "MV17-14-tr-naive-6")
-naive_params = parse_qs(urlsplit(naive_ulink).query)
-naive_nodes = json.loads(base64.b64decode(naive_params["content"][0]).decode("utf-8"))
-assert "BEGIN CERTIFICATE" in naive_nodes[0]["tls"]["certificate"]
+naive_item = {
+    "config": json.dumps(naive_config),
+    "config_format": "sing-box",
+    "outbound": naive_config["outbounds"][0],
+}
+naive_content = copy_content("naive", naive_item, "MV17-14-tr-naive-6")
+assert "BEGIN CERTIFICATE" in naive_content
+naive_karing = karing_inline_uri("naive", naive_item, "MV17-14-tr-naive-6")
+naive_params = parse_qs(urlsplit(naive_karing).query)
+assert "BEGIN CERTIFICATE" in naive_params["url"][0]
 assert standard_share_uri("naive", naive_item, "MV17-14-tr-naive-6") == ""
 
-# Unsupported Karing-inline protocols continue using their existing native/file
-# delivery instead of being falsely advertised as one-click Karing imports.
-snell_item = {
-    "outbound": {
-        "type": "snell",
-        "server": "204.10.192.96",
-        "server_port": 8448,
-    }
-}
-assert karing_inline_uri("snell", snell_item, "snell") == ""
+
+# Mieru gets its Karing-compatible YAML inline, not an HTTP profile URL.
+mieru_item = {"config": '{"profiles":[]}', "config_format": "mieru-json"}
+mieru_content = copy_content("mieru", mieru_item, "MV17-14-tr-mieru-6")
+assert "MV17-14-tr-mieru-6" in mieru_content
+mieru_karing = karing_inline_uri("mieru", mieru_item, "MV17-14-tr-mieru-6")
+assert mieru_karing.startswith("karing://install-config?url=")
+assert "http://" not in mieru_karing and "https://" not in mieru_karing
+
+
+# Karing 1.2.25 must not be falsely advertised for protocols whose direct JSON
+# import arrives in Karing 1.2.26+.
+for protocol in ("snell", "sudoku", "trusttunnel"):
+    assert karing_inline_uri(protocol, {"config": "{}"}, protocol) == ""
+
+
+# Universal copy compatibility is injected for classic file actions and app
+# launches, and uses an HTTP-safe execCommand fallback.
+for marker in (
+    "document.querySelectorAll('.download-config[data-target]')",
+    "document.execCommand('copy')",
+    "window.isSecureContext",
+    "a.v13-open-uri[href]",
+    "tp-v15-karing-classic",
+):
+    assert marker in v15, marker
 
 print("PUBLIC_CONNECTION_MODERN_IMPORT_V15_SMOKE=PASS")
-print("KARING_IMPORT=embedded-ulink-no-remote-fetch")
-print("STANDARD_LINKS=hysteria2,tuic,anytls")
-print("NAIVE_TRUST=embedded-ca-preserved")
+print("KARING_IMPORT=registered-karing-scheme-inline-content")
+print("CLASSIC_COPY=openvpn-wireguard-hidden-source")
+print("MODERN_COPY=all-ready-modern-items")
+print("APP_FALLBACK=copy-before-launch")
+print("NAIVE_TRUST=full-managed-ca-preserved")
