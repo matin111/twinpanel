@@ -18,6 +18,7 @@ singbox = singbox_path.read_text(encoding="utf-8")
 
 compile(v13, str(v13_path), "exec")
 compile(live, str(live_path), "exec")
+compile(standalone, str(standalone_path), "exec")
 
 # Canonical customer delivery must cover every protocol that can be selected on
 # a Subscription: five Classic + ten Modern.
@@ -102,8 +103,8 @@ assert '"snell": {' in v13
 assert "sing-box Desktop" in v13
 
 # Mieru receives a generated Karing-compatible profile while TrustTunnel keeps
-# its real tt:// URI from provisioning. Sudoku gets the upstream-defined
-# sudoku:// base64url short-link form and AmneziaWG remains a native .conf.
+# its real tt:// URI from provisioning. Sudoku gets both an upstream-compatible
+# raw JSON endpoint and a canonical sudoku:// share URI.
 for marker in (
     "def _mieru_karing_yaml(",
     '?profile=karing',
@@ -114,7 +115,12 @@ for marker in (
     assert marker in v13, marker
 assert '"config_format": "trusttunnel-deeplink"' in standalone
 assert '"uri": deeplink' in standalone
+assert 'def _sudoku_endpoint(host: str, port: int) -> str:' in standalone
+assert 'def _sudoku_share_uri(host: str, port: int, key: str, name: str) -> str:' in standalone
+assert '"server_address": endpoint' in standalone
+assert '"server_port": port' not in standalone
 assert '"config_format": "sudoku-json"' in standalone
+assert '"uri": sudoku_uri' in standalone
 assert '"config_format": "amneziawg"' in standalone
 assert '"config_format": "mieru-json"' in standalone
 assert '"config_format": "sing-box"' in singbox
@@ -152,5 +158,7 @@ assert live.index("refine_public_connection_windows_v12(source)") < live.index(
 print("PUBLIC_CONNECTION_MODERN_DELIVERY_V13_SMOKE=PASS")
 print("PROTOCOLS=" + ",".join(classic + modern))
 print("DELIVERY=desired-visible-ready-importable")
+print("SUDOKU_ENDPOINT=host-port")
+print("SUDOKU_SHARE_URI=canonical")
 print("DEVICE_UI=windows-android-ios-macos")
 print("REDUNDANT_READY_COPY=REMOVED")
