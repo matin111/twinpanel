@@ -13,13 +13,16 @@ async def cleanup_probe_state(
     tunnel_id: int,
     rt: dict,
 ) -> list[str]:
-    """Remove probe-owned policy/NAT state after a failed kernel canary.
+    """Remove probe-owned policy/firewall state after a failed kernel canary.
 
     The common L3 probe intentionally creates a source policy rule/table on the
-    Iran node and a narrowly scoped MASQUERADE rule on the Exit node. Kernel
-    IPIP/VXLAN installers are explicit canaries, so a failed install must leave
-    neither artifact behind. Cleanup is idempotent and verifies absence before
-    returning; callers keep the candidate failed if any cleanup verification
+    Iran node and a narrowly scoped MASQUERADE rule on the Exit node. Older
+    kernel canaries also created candidate-owned FORWARD rules. Cleanup remains
+    backward-compatible with those legacy residues so an explicit IPIP/VXLAN
+    canary cannot leave stale candidate firewall state behind. All Exit cleanup
+    matches both the candidate network and its exact TwinPanel comment, keeping
+    unrelated VPN/protocol rules out of scope. Cleanup is idempotent and verifies
+    absence before returning; callers keep the candidate failed if verification
     fails.
     """
 
@@ -81,11 +84,28 @@ if command -v iptables >/dev/null 2>&1; then
     iptables -t nat -D POSTROUTING "$RULE_NO" >/dev/null 2>&1 || break
   done
 
+  while true; do
+    RULE_NO="$(
+      iptables -L FORWARD --line-numbers -n 2>/dev/null \
+      | awk -v net="$NETWORK" -v c="$COMMENT" \
+          'index($0, net) && index($0, c) {{print $1; exit}}'
+    )"
+    [ -n "$RULE_NO" ] || break
+    iptables -D FORWARD "$RULE_NO" >/dev/null 2>&1 || break
+  done
+
   if iptables -t nat -L POSTROUTING --line-numbers -n 2>/dev/null \
       | awk -v src="$NETWORK" -v c="$COMMENT" \
           'index($0, src) && index($0, c) {{found=1}} END {{exit found ? 0 : 1}}'; then
     echo 'canary_nat_cleanup_failed' >&2
     exit 43
+  fi
+
+  if iptables -L FORWARD --line-numbers -n 2>/dev/null \
+      | awk -v net="$NETWORK" -v c="$COMMENT" \
+          'index($0, net) && index($0, c) {{found=1}} END {{exit found ? 0 : 1}}'; then
+    echo 'canary_forward_cleanup_failed' >&2
+    exit 44
   fi
 fi
 
@@ -97,11 +117,11 @@ exit 0
             if result.exit_status != 0:
                 detail = ((result.stdout or "") + "\n" + (result.stderr or "")).strip()
                 errors.append(
-                    f"exit_nat_cleanup_rc={result.exit_status}:{detail[-800:]}"
+                    f"exit_firewall_cleanup_rc={result.exit_status}:{detail[-800:]}"
                 )
         except Exception as exc:
             errors.append(
-                f"exit_nat_cleanup_exception={type(exc).__name__}:{exc}"
+                f"exit_firewall_cleanup_exception={type(exc).__name__}:{exc}"
             )
 
     return errors

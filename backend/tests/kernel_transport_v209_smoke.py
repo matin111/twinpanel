@@ -104,15 +104,24 @@ def main() -> None:
         assert vxlan_priority < LINUX_MAIN_RULE_PRIORITY
         assert len({tp6_priority, ipip_priority, vxlan_priority}) == 3
 
-    # V210 regression: a failed kernel canary must remove both probe-owned
-    # Iran policy state and Exit MASQUERADE state, then verify absence.
+    # V210/V212 regression: a failed kernel canary must remove probe-owned
+    # Iran policy state, Exit MASQUERADE state, and candidate-owned legacy
+    # FORWARD residue, then verify all of those artifacts are absent. The
+    # Tunnel #6 production audit found two historical VXLAN FORWARD rules after
+    # interface/service/NAT cleanup; matching by exact candidate network and
+    # exact TwinPanel comment keeps unrelated VPN protocol rules out of scope.
     cleanup = _source("app/transport_candidates/kernel_cleanup_v210.py")
     assert "while ip rule del priority" in cleanup
     assert "ip route flush table" in cleanup
     assert "iptables -t nat -D POSTROUTING" in cleanup
+    assert "iptables -L FORWARD --line-numbers -n" in cleanup
+    assert 'iptables -D FORWARD "$RULE_NO"' in cleanup
+    assert 'awk -v net="$NETWORK" -v c="$COMMENT"' in cleanup
     assert "policy_rule_cleanup_failed" in cleanup
     assert "policy_table_cleanup_failed" in cleanup
     assert "canary_nat_cleanup_failed" in cleanup
+    assert "canary_forward_cleanup_failed" in cleanup
+    assert "exit_firewall_cleanup_rc=" in cleanup
 
     for relative in (
         "app/transport_candidates/kernel_ipip.py",
@@ -143,10 +152,10 @@ def main() -> None:
     assert expected.issubset(api_names)
 
     print(
-        "KERNEL_TRANSPORT_V211_OK",
+        "KERNEL_TRANSPORT_V212_OK",
         "active=" + ",".join(sorted(expected)),
         "auto_install=" + ",".join(smart.AUTO_INSTALL_NAMES),
-        "failure_cleanup=policy,nat,service,helper,unit",
+        "failure_cleanup=policy,nat,legacy-forward,service,helper,unit",
         "policy_rules=tp6:300xx,ipip:309xx,vxlan:318xx",
         f"linux_main={LINUX_MAIN_RULE_PRIORITY}",
     )
