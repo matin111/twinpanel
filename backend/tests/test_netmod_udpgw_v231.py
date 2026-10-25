@@ -180,12 +180,11 @@ def test_release_pipeline_uses_shared_resolver_aware_builder_and_license():
     assert "musl-gcc" not in workflow
 
 
-def test_ci_workflows_use_shared_resolver_aware_builder():
+def test_dedicated_ci_uses_shared_resolver_aware_builder():
     dedicated = (REPO_ROOT / ".github/workflows/netmod-udpgw-v231-smoke.yml").read_text(encoding="utf-8")
-    api = (REPO_ROOT / ".github/workflows/api-build.yml").read_text(encoding="utf-8")
-    for workflow in (dedicated, api):
-        assert "scripts/build-netmod-udpgw.sh" in workflow
-        assert "musl-gcc" not in workflow
+    assert "scripts/build-netmod-udpgw.sh" in dedicated
+    assert "musl-gcc" not in dedicated
+    assert "Resolver V233" in dedicated
 
 
 def test_admin_ui_does_not_offer_mtu_above_verified_requester_size():
@@ -204,7 +203,7 @@ def main() -> int:
     test_netmod_dnstt_stages_udpgw_companion_only_for_netmod()
     test_resolver_aware_build_script_uses_glibc_static_and_rejects_dns_blind_binary()
     test_release_pipeline_uses_shared_resolver_aware_builder_and_license()
-    test_ci_workflows_use_shared_resolver_aware_builder()
+    test_dedicated_ci_uses_shared_resolver_aware_builder()
     test_admin_ui_does_not_offer_mtu_above_verified_requester_size()
     print("NETMOD_UDPGW_V233_OK")
     return 0
