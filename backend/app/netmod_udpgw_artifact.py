@@ -97,6 +97,7 @@ install -d -m 0755 "$(dirname {q_dropin})"
 cat > {q_dropin} <<'UNIT'
 [Unit]
 Requires=twinpanel-netmod-udpgw.service
+BindsTo=twinpanel-netmod-udpgw.service
 After=twinpanel-netmod-udpgw.service
 UNIT
 
