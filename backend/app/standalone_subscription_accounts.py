@@ -111,6 +111,32 @@ def _sudoku_port(subscription_id: int) -> int:
     return 30000 + ((int(subscription_id) - 1) % 30000)
 
 
+def _sudoku_endpoint(host: str, port: int) -> str:
+    value = str(host or "").strip()
+    listen_port = int(port)
+    if not value or not 1 <= listen_port <= 65535:
+        raise StandaloneAccountError("Sudoku server endpoint is invalid")
+    if ":" in value and not value.startswith("["):
+        value = f"[{value}]"
+    return f"{value}:{listen_port}"
+
+
+def _sudoku_share_uri(host: str, port: int, key: str, name: str) -> str:
+    payload = {
+        "n": str(name or "TwinPanel Sudoku").strip() or "TwinPanel Sudoku",
+        "h": str(host or "").strip(),
+        "p": int(port),
+        "k": str(key or "").strip(),
+        "e": "chacha20-poly1305",
+        "m": 1080,
+        "a": "entropy",
+    }
+    if not payload["h"] or not payload["k"] or not 1 <= payload["p"] <= 65535:
+        raise StandaloneAccountError("Sudoku share URI is incomplete")
+    raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return "sudoku://" + base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
 async def _new_awg_secret(conn, subscription_id: int) -> StandaloneAccountSecret:
     raw = await cmd(
         conn,
@@ -445,18 +471,22 @@ async def _apply_sudoku(conn, node: Node, secret: StandaloneAccountSecret, _base
     )
     await ufw_allow(conn, port, "tcp")
     host = _node_host(node)
+    endpoint = _sudoku_endpoint(host, port)
+    profile_name = f"{secret.username}-{str(node.name).strip() or f'node-{int(node.id)}'}-sudoku-{int(node.id)}"
     client = {
-        "mode": "client", "transport": "tcp", "server_address": host,
-        "server_port": port, "local_address": "127.0.0.1", "local_port": 1080,
+        "mode": "client", "transport": "tcp", "server_address": endpoint,
+        "local_address": "127.0.0.1", "local_port": 1080,
         "key": secret.sudoku_client_key, "aead": "chacha20-poly1305",
         "padding_min": 5, "padding_max": 15, "ascii": "prefer_entropy",
         "enable_pure_downlink": True, "multiplex": "off",
     }
+    sudoku_uri = _sudoku_share_uri(host, port, secret.sudoku_client_key, profile_name)
     return {
         "node_id": int(node.id), "node": str(node.name), "server": host,
         "server_ip": host, "port": port, "username": secret.username,
         "telemetry_identity": f"sudoku-sub-{int(secret.subscription_id)}:{port}",
         "config_format": "sudoku-json", "config": json.dumps(client, ensure_ascii=False, indent=2),
+        "uri": sudoku_uri,
     }
 
 
