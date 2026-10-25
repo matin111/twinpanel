@@ -5,6 +5,9 @@ import {getCustomerToken} from "./customer-api";
 export type SmartTransportName=
   |"tp27_fast"
   |"spoof_wg"
+  |"tp6_fast"
+  |"kernel_ipip"
+  |"kernel_vxlan"
   |"tp27_masque"
   |"tp27_tcp_direct"
   |"kernel_gre"
@@ -101,6 +104,7 @@ export type SmartTransportCandidate={
   configured?:boolean;
   configuration_required?:boolean;
   auto_install?:boolean;
+  encrypted?:boolean;
   upstream_version?:string;
   xdp?:boolean;
   [key:string]:unknown;

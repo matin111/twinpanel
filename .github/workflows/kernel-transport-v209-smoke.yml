@@ -1,0 +1,53 @@
+name: Kernel Transport V209 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/kernel_transport_registry_v209.py"
+      - "backend/app/transport_candidates/kernel_ipip.py"
+      - "backend/app/transport_candidates/kernel_vxlan.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/app/routers/modern_transports.py"
+      - "backend/tests/kernel_transport_v209_smoke.py"
+      - "lib/modern-transport-api.ts"
+      - ".github/workflows/kernel-transport-v209-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    env:
+      APP_NAME: TwinPanel-V209-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Compile V209 runtime
+        run: |
+          python -m py_compile \
+            backend/app/kernel_transport_registry_v209.py \
+            backend/app/transport_candidates/kernel_ipip.py \
+            backend/app/transport_candidates/kernel_vxlan.py \
+            backend/app/tunnel_transport_manager_v12.py \
+            backend/app/routers/modern_transports.py
+
+      - name: Verify additive registry and auto-install guard
+        working-directory: backend
+        run: PYTHONPATH=. python tests/kernel_transport_v209_smoke.py

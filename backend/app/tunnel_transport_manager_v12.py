@@ -27,6 +27,9 @@ from .direct_tcp_rpfilter_guard_v198 import (
 from .exit_access_dataplane_stability_v144 import (
     apply_exit_access_dataplane_stability_v144,
 )
+from .kernel_transport_registry_v209 import (
+    apply_kernel_transport_registry_v209,
+)
 from .legacy_ingress_reconciler import reconciler_loop as legacy_ingress_loop
 from .runtime_reconciler_v5 import reconciler_loop as runtime_reconciler_loop
 from .manager_runtime_v16 import install_manager_runtime_v16
@@ -67,6 +70,7 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 # + DIRECT TCP RPFILTER SHADOW GUARD V198
 # + STALE CANDIDATE INSTALL RECOVERY V200 (FINAL SELECTOR WRAPPER)
 # + SPOOF CANDIDATE POLICY V202 (FINAL ACTIVE SET)
+# + KERNEL TRANSPORT REGISTRY V209 (TP6 API + IPIP/VXLAN explicit lanes)
 # + RUNTIME RECONCILER V5 (extends runtime_reconciler_v4)
 # ============================================================
 
@@ -95,6 +99,11 @@ async def main() -> None:
     apply_stale_candidate_install_recovery_v200()
     apply_spoof_candidate_policy_v202()
 
+    # V209 is deliberately applied after V202 because V202 owns the baseline
+    # policy reset. V209 only adds explicit-install TP6/IPIP/VXLAN membership;
+    # it never expands AUTO_INSTALL_NAMES or changes the active tunnel itself.
+    apply_kernel_transport_registry_v209()
+
     apply_adaptive_tunnel_performance_v148()
     apply_exit_access_dataplane_stability_v144()
 
@@ -114,13 +123,14 @@ async def main() -> None:
         "direct_tcp_rpfilter_guard=v198-cleanup-only "
         "stale_candidate_install_recovery=v200-final-selector-wrapper "
         "spoof_candidate_policy=v202-final-active-set "
+        "kernel_transport_registry=v209 "
         "vpn_access_dataplane=v46 "
         "vpn_access_performance=v51 "
         "exit_access_stability=v144 "
         "reconciler=v5 "
-        "active_candidates=tp27_fast,spoof_wg "
+        "active_candidates=tp27_fast,spoof_wg,tp6_fast,kernel_ipip,kernel_vxlan "
         "auto_install=tp27_fast "
-        "spoof_install=explicit-config-only "
+        "explicit_install=spoof_wg,tp6_fast,kernel_ipip,kernel_vxlan "
         "spoof_dataplane=wireguard-over-mutual-ip-spoof "
         "retired=tp27_masque,tp27_mieru_tcp,tp27_tcp_direct,kernel_gre,gost_tun,amneziawg,netrix",
         flush=True,
