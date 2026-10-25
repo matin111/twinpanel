@@ -46,6 +46,10 @@ jobs:
         run: python -m pip install -r backend/requirements.txt
 
       - name: Policy engine smoke
+        env:
+          APP_SECRET_KEY: "ci-outbound-policy-center-only"
+          DATABASE_URL: "sqlite:////tmp/twinpanel-outbound-policy-ci.db"
+          NODE_AGENT_SHARED_SECRET: "ci-outbound-policy-agent-only"
         run: PYTHONPATH=backend python backend/tests/outbound_policy_center_v1_smoke.py
 
       - uses: actions/setup-node@v4
