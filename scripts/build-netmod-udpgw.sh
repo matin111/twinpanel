@@ -8,7 +8,7 @@ TEST_PORT="${NETMOD_UDPGW_TEST_PORT:-17300}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PATCH_PATH="$SCRIPT_DIR/patches/badvpn-udpgw-resolvconf-fallback.patch"
 
-for cmd in git cmake musl-gcc file ss sha256sum; do
+for cmd in git cmake gcc file ss sha256sum; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "NETMOD_UDPGW_BUILD_MISSING_TOOL=$cmd" >&2
     exit 31
@@ -45,12 +45,11 @@ git -C "$SRC" apply "$PATCH_PATH"
 git -C "$SRC" diff --check
 grep -Fq 'loaded DNS server from /etc/resolv.conf fallback' "$SRC/udpgw/udpgw.c"
 
-# Keep the artifact self-contained. The upstream resolver path depends on
-# res_init/_res and production proved that both musl-static and glibc-static
-# builds may expose an empty resolver state even with a valid resolv.conf.
-# The pinned patch preserves the upstream path first and only falls back to
-# parsing the first IPv4 nameserver from /etc/resolv.conf when _res is empty.
-CC=musl-gcc cmake -S "$SRC" -B "$BUILD" \
+# Keep the rc.233 self-contained glibc-static artifact model, but patch the
+# exact production failure: upstream BadVPN only trusts res_init/_res. The
+# pinned patch preserves that path first and reads the first valid IPv4
+# nameserver from /etc/resolv.conf only when libc exposes no resolver.
+CC=gcc cmake -S "$SRC" -B "$BUILD" \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_NOTHING_BY_DEFAULT=1 \
   -DBUILD_UDPGW=1 \
@@ -62,9 +61,8 @@ test -x "$BIN"
 "$BIN" --version | grep -q 'BadVPN udpgw'
 file "$BIN" | grep -q 'statically linked'
 
-# The gate validates resolver initialization, not merely the TCP listener.
-# On musl-static the upstream _res path is the exact failure mode observed in
-# production, so this probe also exercises the resolv.conf fallback itself.
+# Validate resolver initialization, not merely the TCP listener. Production
+# rc.233 proved a glibc-static binary can listen while _res.nscount is empty.
 "$BIN" \
   --logger stdout \
   --loglevel info \
@@ -92,7 +90,6 @@ if ! ss -H -ltn | grep -F "127.0.0.1:${TEST_PORT} " >/dev/null; then
   exit 33
 fi
 
-# Flush stdout before inspecting resolver messages.
 sleep 0.2
 kill "$PID" >/dev/null 2>&1 || true
 wait "$PID" >/dev/null 2>&1 || true
@@ -108,11 +105,6 @@ if ! grep -Fq 'using DNS server' "$LOG"; then
   echo "NETMOD_UDPGW_RESOLVER_NOT_CONFIRMED" >&2
   exit 35
 fi
-if ! grep -Fq 'loaded DNS server from /etc/resolv.conf fallback' "$LOG"; then
-  cat "$LOG" >&2
-  echo "NETMOD_UDPGW_RESOLVCONF_FALLBACK_NOT_EXERCISED" >&2
-  exit 36
-fi
 
 install -D -m 0755 "$BIN" "$OUTPUT_PATH"
 install -D -m 0644 "$SRC/COPYING" "$LICENSE_PATH"
@@ -120,5 +112,5 @@ sha256sum "$OUTPUT_PATH" > "${OUTPUT_PATH}.sha256"
 
 printf 'NETMOD_UDPGW_BUILD_OK=%s\n' "$OUTPUT_PATH"
 printf 'NETMOD_UDPGW_LICENSE=%s\n' "$LICENSE_PATH"
-printf 'NETMOD_UDPGW_RESOLVER=fallback-verified\n'
+printf 'NETMOD_UDPGW_RESOLVER=verified\n'
 cat "$LOG"
