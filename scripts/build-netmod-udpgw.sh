@@ -5,13 +5,20 @@ OUTPUT_PATH="${1:?usage: build-netmod-udpgw.sh OUTPUT_PATH [LICENSE_PATH]}"
 LICENSE_PATH="${2:-$(dirname "$OUTPUT_PATH")/badvpn-COPYING}"
 BADVPN_COMMIT='07268f02706e78e282e19641b5d1d41e8e89bf31'
 TEST_PORT="${NETMOD_UDPGW_TEST_PORT:-17300}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PATCHER="$SCRIPT_DIR/patch-badvpn-udpgw-resolver.py"
 
-for cmd in git cmake gcc file ss sha256sum; do
+for cmd in git cmake gcc file ss sha256sum python3; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "NETMOD_UDPGW_BUILD_MISSING_TOOL=$cmd" >&2
     exit 31
   }
 done
+
+test -s "$PATCHER" || {
+  echo "NETMOD_UDPGW_PATCHER_MISSING=$PATCHER" >&2
+  exit 30
+}
 
 SRC="$(mktemp -d)"
 BUILD="$(mktemp -d)"
@@ -33,11 +40,18 @@ git -C "$SRC" fetch -q --depth=1 origin "$BADVPN_COMMIT"
 git -C "$SRC" checkout -q --detach FETCH_HEAD
 test "$(git -C "$SRC" rev-parse HEAD)" = "$BADVPN_COMMIT"
 
-# BadVPN's resolver code reads glibc's resolver state (_res). Production proved
-# that a musl-static build listens successfully but reports _res.nscount == 0
-# even when /etc/resolv.conf contains valid nameservers. Keep a self-contained
-# artifact, but link it statically with glibc so res_init/_res semantics match
-# the upstream source used by udpgw.
+# Transform only exact snippets from the immutable upstream source. The patcher
+# requires exactly one match for each target and fails closed if upstream ever
+# differs, avoiding fragile line-number based unified patches.
+python3 "$PATCHER" "$SRC/udpgw/udpgw.c"
+git -C "$SRC" diff --check
+grep -Fq 'loaded DNS server from /etc/resolv.conf fallback' "$SRC/udpgw/udpgw.c"
+grep -Fq 'res_init() == 0 && _res.nscount > 0' "$SRC/udpgw/udpgw.c"
+
+# Keep the self-contained glibc-static artifact model, but patch the exact
+# production failure: upstream BadVPN only trusts res_init/_res. The
+# deterministic transformer preserves that path first and reads the first valid
+# IPv4 nameserver from /etc/resolv.conf only when libc exposes no resolver.
 CC=gcc cmake -S "$SRC" -B "$BUILD" \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_NOTHING_BY_DEFAULT=1 \
@@ -50,9 +64,8 @@ test -x "$BIN"
 "$BIN" --version | grep -q 'BadVPN udpgw'
 file "$BIN" | grep -q 'statically linked'
 
-# Do not accept a binary merely because it can bind a TCP listener. The real
-# NetMod UDP path needs BadVPN's DNS forwarding, which requires res_init() to
-# expose at least one nameserver. Validate the exact binary before packaging.
+# Validate resolver initialization, not merely the TCP listener. Production
+# proved a glibc-static binary can listen while _res.nscount is empty.
 "$BIN" \
   --logger stdout \
   --loglevel info \
@@ -80,9 +93,6 @@ if ! ss -H -ltn | grep -F "127.0.0.1:${TEST_PORT} " >/dev/null; then
   exit 33
 fi
 
-# BadVPN uses stdio for stdout. When stdout is redirected to a file, INFO/NOTICE
-# records can remain block-buffered while the process is alive. Terminate the
-# short-lived probe cleanly first so resolver logs are flushed before reading.
 sleep 0.2
 kill "$PID" >/dev/null 2>&1 || true
 wait "$PID" >/dev/null 2>&1 || true
@@ -105,4 +115,5 @@ sha256sum "$OUTPUT_PATH" > "${OUTPUT_PATH}.sha256"
 
 printf 'NETMOD_UDPGW_BUILD_OK=%s\n' "$OUTPUT_PATH"
 printf 'NETMOD_UDPGW_LICENSE=%s\n' "$LICENSE_PATH"
+printf 'NETMOD_UDPGW_RESOLVER=verified\n'
 cat "$LOG"

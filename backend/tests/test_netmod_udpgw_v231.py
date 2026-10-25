@@ -20,6 +20,7 @@ from app.netmod_udpgw import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BUILD_SCRIPT = REPO_ROOT / "scripts/build-netmod-udpgw.sh"
+PATCHER = REPO_ROOT / "scripts/patch-badvpn-udpgw-resolver.py"
 
 
 class _FakeSftp:
@@ -158,16 +159,31 @@ def test_netmod_dnstt_stages_udpgw_companion_only_for_netmod():
             assert "udpgw_service" not in result2
 
 
-def test_resolver_aware_build_script_uses_glibc_static_and_rejects_dns_blind_binary():
+def test_resolver_transformer_preserves_upstream_first_and_adds_ipv4_fallback():
+    patcher = PATCHER.read_text(encoding="utf-8")
+    assert "/etc/resolv.conf" in patcher
+    assert "res_init() == 0 && _res.nscount > 0" in patcher
+    assert "inet_pton(AF_INET, value, &ipv4)" in patcher
+    assert 'strcmp(key, \\"nameserver\\")' in patcher
+    assert "BAddr_InitIPv4(out, ipv4.s_addr, hton16(53))" in patcher
+    assert "loaded DNS server from /etc/resolv.conf fallback" in patcher
+    assert "no name servers available" in patcher
+    assert "BADVPN_PATCH_" in patcher
+    assert "count != 1" in patcher
+
+
+def test_resolver_aware_build_script_uses_deterministic_glibc_static_transformer():
     script = BUILD_SCRIPT.read_text(encoding="utf-8")
     assert BADVPN_COMMIT in script
+    assert "patch-badvpn-udpgw-resolver.py" in script
+    assert 'python3 "$PATCHER" "$SRC/udpgw/udpgw.c"' in script
     assert "CC=gcc cmake" in script
     assert "-DCMAKE_EXE_LINKER_FLAGS='-static'" in script
-    assert "musl-gcc" not in script
     assert "statically linked" in script
     assert "using DNS server" in script
     assert "no name servers available" in script
     assert "NETMOD_UDPGW_RESOLVER_UNAVAILABLE" in script
+    assert "NETMOD_UDPGW_RESOLVER=verified" in script
 
 
 def test_release_pipeline_uses_shared_resolver_aware_builder_and_license():
@@ -177,14 +193,17 @@ def test_release_pipeline_uses_shared_resolver_aware_builder_and_license():
     assert "badvpn-udpgw-linux-amd64" in workflow
     assert "badvpn-udpgw-linux-amd64.sha256" in workflow
     assert "badvpn-COPYING" in workflow
-    assert "musl-gcc" not in workflow
+    assert "libc6-dev" in workflow
 
 
-def test_dedicated_ci_uses_shared_resolver_aware_builder():
+def test_dedicated_ci_uses_shared_v235_transformer_builder():
     dedicated = (REPO_ROOT / ".github/workflows/netmod-udpgw-v231-smoke.yml").read_text(encoding="utf-8")
     assert "scripts/build-netmod-udpgw.sh" in dedicated
-    assert "musl-gcc" not in dedicated
-    assert "Resolver V233" in dedicated
+    assert "scripts/patch-badvpn-udpgw-resolver.py" in dedicated
+    assert "libc6-dev" in dedicated
+    assert "Resolver V235" in dedicated
+    assert "NETMOD_UDPGW_RESOLVER=verified" in dedicated
+    assert "using DNS server" in dedicated
 
 
 def test_admin_ui_does_not_offer_mtu_above_verified_requester_size():
@@ -201,11 +220,12 @@ def main() -> int:
     test_udpgw_remote_repair_requires_real_resolver_before_success()
     test_stage_udpgw_verifies_binary_then_installs_managed_service()
     test_netmod_dnstt_stages_udpgw_companion_only_for_netmod()
-    test_resolver_aware_build_script_uses_glibc_static_and_rejects_dns_blind_binary()
+    test_resolver_transformer_preserves_upstream_first_and_adds_ipv4_fallback()
+    test_resolver_aware_build_script_uses_deterministic_glibc_static_transformer()
     test_release_pipeline_uses_shared_resolver_aware_builder_and_license()
-    test_dedicated_ci_uses_shared_resolver_aware_builder()
+    test_dedicated_ci_uses_shared_v235_transformer_builder()
     test_admin_ui_does_not_offer_mtu_above_verified_requester_size()
-    print("NETMOD_UDPGW_V233_OK")
+    print("NETMOD_UDPGW_V235_OK")
     return 0
 
 
