@@ -1,0 +1,70 @@
+name: Outbound Policy Center v1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/outbound_policy_center_v1.py"
+      - "backend/app/routers/__init__.py"
+      - "backend/tests/outbound_policy_center_v1_smoke.py"
+      - "components/outbound-policy-center.tsx"
+      - "components/outbound-policy-center.module.css"
+      - "app/admin/outbounds/page.tsx"
+      - ".github/workflows/outbound-policy-center-v1-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/routers/outbound_policy_center_v1.py"
+      - "backend/app/routers/__init__.py"
+      - "backend/tests/outbound_policy_center_v1_smoke.py"
+      - "components/outbound-policy-center.tsx"
+      - "components/outbound-policy-center.module.css"
+      - "app/admin/outbounds/page.tsx"
+      - ".github/workflows/outbound-policy-center-v1-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  policy-and-admin-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python syntax
+        run: |
+          python -m py_compile \
+            backend/app/routers/outbound_policy_center_v1.py \
+            backend/app/routers/__init__.py \
+            backend/tests/outbound_policy_center_v1_smoke.py
+
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Policy engine smoke
+        env:
+          APP_SECRET_KEY: "ci-outbound-policy-center-only"
+          DATABASE_URL: "sqlite:////tmp/twinpanel-outbound-policy-ci.db"
+          NODE_AGENT_SHARED_SECRET: "ci-outbound-policy-agent-only"
+        run: PYTHONPATH=backend python backend/tests/outbound_policy_center_v1_smoke.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional --no-audit --no-fund
+          else
+            npm install --include=optional --no-audit --no-fund
+          fi
+
+      - name: Build admin frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: npm run build

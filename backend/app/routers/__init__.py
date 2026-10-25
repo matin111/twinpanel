@@ -58,6 +58,7 @@ from .netmod_dns import router as _netmod_dns_router
 from .netmod_dns_performance_v226 import router as _netmod_dns_performance_v226_router
 from .singbox_outbounds import router as _singbox_outbounds_router
 from .singbox_outbound_ops_v2 import router as _singbox_outbound_ops_v2_router
+from .outbound_policy_center_v1 import router as _outbound_policy_center_v1_router
 
 # TWINPANEL_MASTERDNSVPN_PORT53_V221
 # rc.220 over-classified wildcard UDP/53 listeners as fatal and could not
@@ -101,6 +102,7 @@ _runtime_endpoints.router.include_router(_dns_emergency_iran_router)
 _runtime_endpoints.router.include_router(_dns_emergency_masterdnsvpn_router)
 _runtime_endpoints.router.include_router(_singbox_outbounds_router)
 _runtime_endpoints.router.include_router(_singbox_outbound_ops_v2_router)
+_runtime_endpoints.router.include_router(_outbound_policy_center_v1_router)
 
 # TWINPANEL_NETMOD_DNS_UNIFIED_V224
 # Canonical DNS emergency UX. Legacy DNS engines stay API-compatible for

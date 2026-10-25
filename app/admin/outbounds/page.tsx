@@ -1,5 +1,5 @@
-import {SingboxOutboundCenter} from "../../../components/singbox-outbound-center";
+import {OutboundPolicyCenter} from "../../../components/outbound-policy-center";
 
 export default function Page(){
-  return <SingboxOutboundCenter/>;
+  return <OutboundPolicyCenter/>;
 }
