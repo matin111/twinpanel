@@ -69,7 +69,7 @@ def _profile_payload(*, node: Any, setting: Any, resolver: str, password: str) -
     if not setting.tunnel_domain or not setting.public_key:
         raise HTTPException(status_code=409, detail="NetMod DNS هنوز آماده ساخت پروفایل تست نیست")
     return {
-        "ps": f"TwinPanel {node.name} · {resolver_ip}",
+        "ps": f"TwinPanel-{int(node.id)}-{resolver_ip}",
         "addr": resolver_ip,
         "ns": str(setting.tunnel_domain),
         "pubkey": str(setting.public_key),
@@ -98,7 +98,7 @@ effective="$(journalctl -u {q_service} -n 120 --no-pager 2>/dev/null | sed -n 's
 formerr=no
 journalctl -u {q_service} -n 120 --no-pager 2>/dev/null | grep -F 'FORMERR: requester payload size' >/dev/null 2>&1 && formerr=yes || true
 printf 'MTU=%s\\n' "$mtu"
-printf 'EFFECTIVE_MTU=%s\\n' "${{effective:-unknown}}"
+printf 'EFFECTIVE_MTU=%s\\n' "${effective:-unknown}"
 printf 'SERVICE=%s\\n' "$service"
 printf 'LISTENER=%s\\n' "$listener"
 printf 'FORMERR_RECENT=%s\\n' "$formerr"
@@ -175,7 +175,7 @@ formerr=no
 journalctl -u {q_service} -n 80 --no-pager 2>/dev/null | grep -F 'FORMERR: requester payload size' >/dev/null 2>&1 && formerr=yes || true
 rm -f "$BACKUP"
 printf 'MTU={safe_mtu}\\n'
-printf 'EFFECTIVE_MTU=%s\\n' "${{effective:-unknown}}"
+printf 'EFFECTIVE_MTU=%s\\n' "${effective:-unknown}"
 printf 'SERVICE=active\\n'
 printf 'LISTENER=yes\\n'
 printf 'FORMERR_RECENT=%s\\n' "$formerr"
