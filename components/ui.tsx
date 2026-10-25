@@ -22,6 +22,7 @@ const menuGroups=[
     ["مسیرهای هوشمند","Smart Transports","/admin/tunnel-transports","⇄"],
     ["افزودن سرور","Add Server","/admin/provision","⚡"],
     ["پروتکل‌ها","Protocols","/admin/modern-protocols","◫"],
+    ["Outbound","Outbound","/admin/outbounds","↗"],
     ["NetMod DNS","NetMod DNS","/admin/dns-emergency","◉"],
     ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"]
   ]},
