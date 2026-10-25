@@ -3,6 +3,7 @@ name: Kernel Transport V209 Smoke
 on:
   pull_request:
     paths:
+      - "backend/app/tp6_candidate_registry_v208.py"
       - "backend/app/kernel_transport_registry_v209.py"
       - "backend/app/transport_candidates/kernel_cleanup_v210.py"
       - "backend/app/transport_candidates/kernel_ipip.py"
@@ -40,9 +41,10 @@ jobs:
       - name: Install backend dependencies
         run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
 
-      - name: Compile V209 runtime
+      - name: Compile V209/V211 runtime
         run: |
           python -m py_compile \
+            backend/app/tp6_candidate_registry_v208.py \
             backend/app/kernel_transport_registry_v209.py \
             backend/app/transport_candidates/kernel_cleanup_v210.py \
             backend/app/transport_candidates/kernel_ipip.py \
@@ -50,6 +52,6 @@ jobs:
             backend/app/tunnel_transport_manager_v12.py \
             backend/app/routers/modern_transports.py
 
-      - name: Verify additive registry and auto-install guard
+      - name: Verify additive registry, RPDB ordering and auto-install guard
         working-directory: backend
         run: PYTHONPATH=. python tests/kernel_transport_v209_smoke.py
