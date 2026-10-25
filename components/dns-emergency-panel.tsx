@@ -56,6 +56,33 @@ type NetModConfig={
   };
 };
 
+type PerformanceStatus={
+  ok:boolean;
+  node_id:number;
+  mtu:number;
+  effective_mtu:string;
+  formerr_recent:boolean;
+  resolver_presets?:Array<{label:string;resolver:string}>;
+  measurement_scope?:string;
+  note?:string;
+};
+
+type ResolverProfile={
+  label:string;
+  resolver:string;
+  name:string;
+  nm_dns:string;
+};
+
+type ResolverBundle={
+  ok:boolean;
+  node_id:number;
+  secret:boolean;
+  mode:string;
+  profiles:ResolverProfile[];
+  instructions:string;
+};
+
 async function apiRequest<T>(path:string,init:RequestInit={}):Promise<T>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
@@ -99,6 +126,9 @@ export function DnsEmergencyPanel(){
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const [netmod,setNetmod]=useState<NetModConfig|null>(null);
+  const [performance,setPerformance]=useState<PerformanceStatus|null>(null);
+  const [profiles,setProfiles]=useState<ResolverProfile[]>([]);
+  const [mtu,setMtu]=useState(1232);
 
   const load=async(silent=false)=>{
     if(!silent)setBusy("load");
@@ -110,6 +140,18 @@ export function DnsEmergencyPanel(){
       setSelectedNodeId(current=>data.nodes.some(node=>node.node_id===current)?current:(data.nodes[0]?.node_id||0));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{if(!silent)setBusy("");}
+  };
+
+  const loadPerformance=async(nodeId:number,silent=false)=>{
+    if(!nodeId)return;
+    if(!silent)setBusy("performance");
+    try{
+      const result=await apiRequest<PerformanceStatus>(`/v1/settings/vpn/netmod-dns/${nodeId}/performance`);
+      setPerformance(result);
+      setMtu(result.mtu||1232);
+    }catch(reason){
+      if(!silent)setError(reason instanceof Error?reason.message:String(reason));
+    }finally{if(!silent)setBusy("");}
   };
 
   useEffect(()=>{void load();},[]);
@@ -124,9 +166,13 @@ export function DnsEmergencyPanel(){
     setDomain(selected.tunnel_domain||"");
     setNameserver(selected.nameserver_host||"");
     setNetmod(null);
+    setProfiles([]);
+    setPerformance(null);
+    setMtu(1232);
     setError("");
     setNotice("");
-  },[selectedNodeId,selected?.node_id]);
+    if(selected.client_ready)void loadPerformance(selected.node_id,true);
+  },[selectedNodeId,selected?.node_id,selected?.client_ready]);
 
   const fetchConfig=async(nodeId=selected?.node_id)=>{
     if(!nodeId||busy)return;
@@ -142,7 +188,7 @@ export function DnsEmergencyPanel(){
   const install=async()=>{
     if(!selected||busy)return;
     if(!domain.trim()){setError(pick("Tunnel Domain را وارد کنید.","Enter the tunnel domain."));return;}
-    setBusy("install");setError("");setNotice("");setNetmod(null);
+    setBusy("install");setError("");setNotice("");setNetmod(null);setProfiles([]);
     try{
       await apiRequest<InstallResult>(`/v1/settings/vpn/netmod-dns/${selected.node_id}/install`,{
         method:"POST",
@@ -151,6 +197,7 @@ export function DnsEmergencyPanel(){
       await load(true);
       const result=await apiRequest<NetModConfig>(`/v1/settings/vpn/netmod-dns/${selected.node_id}/config?resolver=${encodeURIComponent(resolver.trim())}`);
       setNetmod(result);
+      await loadPerformance(selected.node_id,true);
       setNotice(pick("NetMod DNS نصب و تست شد؛ لینک Import آماده است.","NetMod DNS was installed and tested; the import link is ready."));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy("");}
@@ -163,13 +210,41 @@ export function DnsEmergencyPanel(){
       const result=await apiRequest<NetModNode&{ok:boolean}>(`/v1/settings/vpn/netmod-dns/${selected.node_id}/health`,{method:"POST"});
       setNotice(result.ok?pick("Health Check کامل NetMod DNS موفق بود.","NetMod DNS full health check passed."):pick("Health Check ناموفق بود.","Health check failed."));
       await load(true);
+      if(result.ok)await loadPerformance(selected.node_id,true);
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setBusy("");}
+  };
+
+  const fetchProfiles=async()=>{
+    if(!selected?.client_ready||busy)return;
+    setBusy("profiles");setError("");setNotice("");
+    try{
+      const result=await apiRequest<ResolverBundle>(`/v1/settings/vpn/netmod-dns/${selected.node_id}/performance/profiles`);
+      setProfiles(result.profiles);
+      setNotice(pick("چهار پروفایل Resolver ساخته شد؛ هر بار فقط یکی را در NetMod با VPN Mode تست کنید.","Four resolver profiles are ready; test one at a time in NetMod VPN mode."));
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setBusy("");}
+  };
+
+  const applyMtu=async()=>{
+    if(!selected?.client_ready||busy)return;
+    setBusy("mtu");setError("");setNotice("");
+    try{
+      const result=await apiRequest<PerformanceStatus>(`/v1/settings/vpn/netmod-dns/${selected.node_id}/performance/mtu`,{
+        method:"POST",
+        body:JSON.stringify({mtu}),
+      });
+      await loadPerformance(selected.node_id,true);
+      setNotice(result.formerr_recent
+        ? pick("MTU اعمال شد، اما FORMERR در لاگ اخیر دیده شده؛ اگر اتصال افت کرد به 1232 یا 512 برگردید.","MTU applied, but a recent FORMERR was detected; revert to 1232 or 512 if connectivity degrades.")
+        : pick("MTU اعمال شد و DNSTT/Listener سالم بالا آمد. حالا با همان پروفایل Speedtest واقعی بگیرید.","MTU applied and DNSTT/listener restarted cleanly. Run a real Speedtest with the same profile now."));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy("");}
   };
 
   const remove=async()=>{
     if(!selected||busy)return;
-    setBusy("remove");setError("");setNotice("");setNetmod(null);
+    setBusy("remove");setError("");setNotice("");setNetmod(null);setProfiles([]);setPerformance(null);
     try{
       await apiRequest(`/v1/settings/vpn/netmod-dns/${selected.node_id}`,{method:"DELETE"});
       setNotice(pick("NetMod DNS متوقف و از Boot حذف شد.","NetMod DNS was stopped and disabled at boot."));
@@ -256,6 +331,55 @@ export function DnsEmergencyPanel(){
           <b>{pick("محرمانه","Secret")}</b>
           <span>{pick("لینک شامل دسترسی داخلی SSH است؛ آن را عمومی منتشر نکنید.","The link contains internal SSH access; do not publish it publicly.")}</span>
         </div>
+      </section>}
+
+      {selected?.client_ready&&<section className={styles.card}>
+        <div className={styles.cardHead}>
+          <div>
+            <h3>{pick("۳. آزمایشگاه سرعت NetMod DNS","3. NetMod DNS Performance Lab")}</h3>
+            <p>{pick("کیفیت Resolver باید از مسیر واقعی NetMod روی دستگاه کاربر سنجیده شود؛ TwinPanel عمداً از روی Exit رتبه‌بندی جعلی نمی‌سازد.","Resolver quality must be measured on the real NetMod client path; TwinPanel intentionally does not fabricate an Exit-side ranking.")}</p>
+          </div>
+          <button className={styles.secondary} type="button" disabled={Boolean(busy)} onClick={()=>selected&&void loadPerformance(selected.node_id)}>{busy==="performance"?pick("در حال دریافت...","Loading..."):pick("وضعیت Performance","Performance status")}</button>
+        </div>
+
+        <div className={styles.performanceGrid}>
+          <div className={styles.metric}><span>Configured MTU</span><strong>{performance?.mtu??"—"}</strong></div>
+          <div className={styles.metric}><span>Effective MTU</span><strong>{performance?.effective_mtu??"—"}</strong></div>
+          <div className={styles.metric}><span>Resolver Test</span><strong>{profiles.length?`${profiles.length} profiles`:"—"}</strong></div>
+          <div className={styles.metric}><span>FORMERR</span><strong>{performance?.formerr_recent?pick("دیده شده","Detected"):pick("ندیده شده","Clear")}</strong></div>
+        </div>
+
+        <div className={styles.performanceControls}>
+          <div>
+            <h4>{pick("Resolverهای تست","Resolver test profiles")}</h4>
+            <p>{pick("۴ لینک با credential یکسان و نام جدا ساخته می‌شود. هر بار یکی را Import کنید، NetMod را روی VPN Mode بگذارید و Ping/Download/Upload را مقایسه کنید.","Four links are generated with the same credential and distinct names. Import one at a time, use NetMod VPN mode, and compare ping/download/upload.")}</p>
+            <button className={styles.secondary} type="button" onClick={()=>void fetchProfiles()} disabled={Boolean(busy)}>{busy==="profiles"?pick("در حال ساخت...","Building..."):pick("ساخت ۴ پروفایل Resolver","Build 4 resolver profiles")}</button>
+          </div>
+          <div>
+            <h4>DNSTT MTU</h4>
+            <p>{pick("1232 پیش‌فرض رسمی DNSTT است. 512 برای سازگاری و 1400/1452 فقط برای تست Performance هستند؛ اگر Restart یا Listener خراب شود TwinPanel خودکار rollback می‌کند.","1232 is DNSTT's official default. 512 is for compatibility; 1400/1452 are performance experiments. TwinPanel automatically rolls back if restart or listener validation fails.")}</p>
+            <div className={styles.mtuControl}>
+              <select value={mtu} onChange={event=>setMtu(Number(event.target.value))}>
+                <option value={512}>512 · Compatibility</option>
+                <option value={1232}>1232 · Default</option>
+                <option value={1400}>1400 · Performance test</option>
+                <option value={1452}>1452 · Experimental max</option>
+              </select>
+              <button className={styles.primary} type="button" onClick={()=>void applyMtu()} disabled={Boolean(busy)}>{busy==="mtu"?pick("در حال اعمال...","Applying..."):pick("اعمال MTU","Apply MTU")}</button>
+            </div>
+          </div>
+        </div>
+
+        {profiles.length>0&&<div className={styles.profileList}>
+          {profiles.map(profile=><div className={styles.profileRow} key={profile.resolver}>
+            <div><b>{profile.label}</b><code>{profile.resolver}</code><span>{profile.name}</span></div>
+            <button className={styles.secondary} type="button" onClick={()=>void copy(profile.nm_dns)}>{pick("کپی لینک تست","Copy test link")}</button>
+          </div>)}
+        </div>}
+
+        {performance?.formerr_recent&&<div className={styles.formerr}>
+          {pick("DNSTT در لاگ اخیر محدودیت اندازه پاسخ DNS را گزارش کرده است. برای پایداری ابتدا 1232 و در صورت ادامه خطا 512 را تست کنید.","DNSTT recently reported a DNS response-size limit. Test 1232 first, then 512 if the error persists.")}
+        </div>}
       </section>}
 
       <section className={styles.footerNote}>

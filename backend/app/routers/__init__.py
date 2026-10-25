@@ -55,6 +55,7 @@ from .dns_emergency import router as _dns_emergency_router
 from .dns_emergency_iran import router as _dns_emergency_iran_router
 from .dns_emergency_masterdnsvpn import router as _dns_emergency_masterdnsvpn_router
 from .netmod_dns import router as _netmod_dns_router
+from .netmod_dns_performance_v226 import router as _netmod_dns_performance_v226_router
 
 # TWINPANEL_MASTERDNSVPN_PORT53_V221
 # rc.220 over-classified wildcard UDP/53 listeners as fatal and could not
@@ -102,3 +103,8 @@ _runtime_endpoints.router.include_router(_dns_emergency_masterdnsvpn_router)
 # rollback, but the admin UI exposes only this DNSTT -> internal SSH -> NetMod
 # path after production acceptance.
 _runtime_endpoints.router.include_router(_netmod_dns_router)
+
+# TWINPANEL_NETMOD_DNS_PERFORMANCE_V226
+# Additive performance lab: client-side resolver profile bundle plus rollback-
+# safe DNSTT MTU tuning. It never fabricates resolver ranking from the Exit.
+_runtime_endpoints.router.include_router(_netmod_dns_performance_v226_router)

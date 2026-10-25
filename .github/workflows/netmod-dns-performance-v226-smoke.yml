@@ -1,0 +1,80 @@
+name: NetMod DNS Performance V226 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/netmod_dns.py"
+      - "backend/app/routers/netmod_dns_performance_v226.py"
+      - "backend/app/routers/__init__.py"
+      - "backend/tests/test_netmod_dns_v224.py"
+      - "backend/tests/test_netmod_dns_performance_v226.py"
+      - "components/dns-emergency-panel.tsx"
+      - "components/dns-emergency-panel.module.css"
+      - ".github/workflows/netmod-dns-performance-v226-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/routers/netmod_dns.py"
+      - "backend/app/routers/netmod_dns_performance_v226.py"
+      - "backend/app/routers/__init__.py"
+      - "backend/tests/test_netmod_dns_v224.py"
+      - "backend/tests/test_netmod_dns_performance_v226.py"
+      - "components/dns-emergency-panel.tsx"
+      - "components/dns-emergency-panel.module.css"
+      - ".github/workflows/netmod-dns-performance-v226-smoke.yml"
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    env:
+      APP_NAME: TwinPanel-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: sqlite:////tmp/twinpanel-netmod-performance-ci.db
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt pytest
+      - name: Compile NetMod DNS performance runtime
+        run: |
+          python -m py_compile \
+            backend/app/routers/netmod_dns.py \
+            backend/app/routers/netmod_dns_performance_v226.py \
+            backend/app/routers/__init__.py \
+            backend/tests/test_netmod_dns_v224.py \
+            backend/tests/test_netmod_dns_performance_v226.py
+      - name: Run NetMod DNS regression
+        working-directory: backend
+        run: |
+          python -m pytest -q \
+            tests/test_netmod_dns_v224.py \
+            tests/test_netmod_dns_performance_v226.py
+
+  frontend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.0"
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional
+          else
+            npm install --include=optional --no-audit --no-fund
+          fi
+      - name: Build production frontend
+        run: npm run build
