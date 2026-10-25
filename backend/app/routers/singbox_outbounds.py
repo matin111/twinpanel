@@ -17,6 +17,11 @@ from ..node_runtime_connection import (
     connect_protocol_runtime,
     protocol_runtime_node_clause,
 )
+from ..singbox_outbound_import import (
+    IMPORTABLE_TYPES,
+    OutboundImportError,
+    parse_outbound_config,
+)
 
 
 CONFIG_PATH = "/etc/twinpanel/sing-box/config.json"
@@ -29,7 +34,7 @@ router = APIRouter(
 )
 
 _TAG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$")
-_SUPPORTED = {"direct", "socks", "http"}
+_MANUAL_TYPES = {"direct", "socks", "http"}
 _REDACTED = "********"
 
 
@@ -40,6 +45,11 @@ class OutboundUpsertIn(BaseModel):
     username: str | None = Field(default=None, max_length=255)
     password: str | None = Field(default=None, max_length=1024)
     set_default: bool = False
+
+
+class OutboundImportIn(BaseModel):
+    config: str = Field(min_length=1, max_length=32768)
+    set_default: bool = True
 
 
 class OutboundDefaultIn(BaseModel):
@@ -79,9 +89,15 @@ def _node(db: Session, node_id: int) -> Node:
 
 def _redact(item: dict[str, Any]) -> dict[str, Any]:
     row = dict(item)
-    secret = row.pop("password", None)
-    row["has_password"] = bool(secret)
-    if secret:
+    password = row.pop("password", None)
+    uuid = row.pop("uuid", None)
+    private_key = row.pop("private_key", None)
+    pre_shared_key = row.pop("pre_shared_key", None)
+    row["has_password"] = bool(password)
+    row["has_uuid"] = bool(uuid)
+    row["has_private_key"] = bool(private_key)
+    row["has_pre_shared_key"] = bool(pre_shared_key)
+    if password:
         row["password"] = _REDACTED
     return row
 
@@ -98,7 +114,9 @@ def _inventory_from_document(doc: dict[str, Any]) -> dict[str, Any]:
         if not tag:
             continue
         row = _redact(item)
-        row["managed"] = kind in _SUPPORTED
+        imported = kind in IMPORTABLE_TYPES and tag.startswith("ext-")
+        row["imported"] = imported
+        row["managed"] = kind in _MANUAL_TYPES or imported
         rows.append(row)
 
     route = doc.get("route") if isinstance(doc.get("route"), dict) else {}
@@ -132,6 +150,32 @@ async def _read_document(conn) -> dict[str, Any]:
     return doc
 
 
+def _slug(value: str) -> str:
+    raw = str(value or "").strip().lower()
+    raw = re.sub(r"[^a-z0-9._-]+", "-", raw)
+    return raw.strip("-._")[:34]
+
+
+def _next_import_tag(doc: dict[str, Any], kind: str, label: str, server: str) -> str:
+    existing = {
+        str(item.get("tag") or "").strip()
+        for item in (doc.get("outbounds") if isinstance(doc.get("outbounds"), list) else [])
+        if isinstance(item, dict)
+    }
+    suffix = _slug(label) or _slug(server) or kind
+    prefix = f"ext-{kind}-"
+    base = (prefix + suffix)[:55].rstrip("-._")
+    if not base:
+        base = f"ext-{kind}"
+    if base not in existing:
+        return base
+    for number in range(2, 1000):
+        candidate = f"{base[:57]}-{number}"
+        if candidate not in existing:
+            return candidate
+    raise HTTPException(status_code=409, detail="برای Outbound جدید Tag آزاد پیدا نشد")
+
+
 def _mutation_script(
     *,
     action: str,
@@ -141,6 +185,7 @@ def _mutation_script(
     encoded = base64.b64encode(
         json.dumps(payload or {}, ensure_ascii=False).encode("utf-8")
     ).decode("ascii")
+    importable_types = sorted(IMPORTABLE_TYPES)
     return f'''from __future__ import annotations
 import base64
 import json
@@ -150,6 +195,7 @@ CONFIG = {CONFIG_PATH!r}
 ACTION = {action!r}
 TAG = {tag!r}
 PAYLOAD = json.loads(base64.b64decode({encoded!r}).decode("utf-8"))
+IMPORTABLE_TYPES = set({importable_types!r})
 
 with open(CONFIG, "r", encoding="utf-8") as handle:
     doc = json.load(handle)
@@ -201,6 +247,26 @@ if ACTION == "upsert":
     else:
         outbounds[index] = fresh
 
+    if bool(PAYLOAD.get("set_default")):
+        route = doc.get("route")
+        if not isinstance(route, dict):
+            route = {{}}
+        route["final"] = TAG
+        doc["route"] = route
+
+elif ACTION == "import":
+    if index is not None:
+        raise SystemExit("import_tag_already_exists")
+    fresh = PAYLOAD.get("outbound")
+    if not isinstance(fresh, dict):
+        raise SystemExit("import_outbound_missing")
+    fresh = dict(fresh)
+    kind = str(fresh.get("type") or "").strip().lower()
+    if kind not in IMPORTABLE_TYPES:
+        raise SystemExit("import_type_unsupported")
+    fresh["type"] = kind
+    fresh["tag"] = TAG
+    outbounds.append(fresh)
     if bool(PAYLOAD.get("set_default")):
         route = doc.get("route")
         if not isinstance(route, dict):
@@ -358,9 +424,58 @@ async def inventory(db: Session = Depends(get_db)):
                     pass
     return {
         "ok": True,
-        "supported_types": ["direct", "socks", "http"],
+        "supported_types": sorted(_MANUAL_TYPES),
+        "supported_import_types": sorted(IMPORTABLE_TYPES),
         "nodes": payload,
     }
+
+
+@router.post("/{node_id}/import")
+async def import_outbound(
+    node_id: int,
+    payload: OutboundImportIn,
+    db: Session = Depends(get_db),
+):
+    node = _node(db, node_id)
+    try:
+        parsed = parse_outbound_config(payload.config)
+    except OutboundImportError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"کانفیگ قابل تبدیل به Outbound نیست: {exc}",
+        ) from exc
+
+    conn = await connect_protocol_runtime(node, db)
+    try:
+        doc = await _read_document(conn)
+        tag = _next_import_tag(
+            doc,
+            parsed.source_type,
+            parsed.label,
+            str(parsed.outbound.get("server") or ""),
+        )
+        await _apply(
+            conn,
+            action="import",
+            tag=tag,
+            payload={
+                "outbound": parsed.outbound,
+                "set_default": bool(payload.set_default),
+            },
+        )
+        fresh = await _read_document(conn)
+        return {
+            "ok": True,
+            "node_id": node.id,
+            "tag": tag,
+            "type": parsed.source_type,
+            "label": parsed.label,
+            "set_default": bool(payload.set_default),
+            **_inventory_from_document(fresh),
+        }
+    finally:
+        conn.close()
+        await conn.wait_closed()
 
 
 @router.put("/{node_id}/{tag}")
@@ -370,6 +485,7 @@ async def upsert_outbound(
     payload: OutboundUpsertIn,
     db: Session = Depends(get_db),
 ):
+    """Legacy Direct/SOCKS/HTTP endpoint kept for API compatibility."""
     node = _node(db, node_id)
     clean_tag = _valid_tag(tag)
     kind = str(payload.type).lower()
@@ -447,9 +563,24 @@ async def delete_outbound(
         raise HTTPException(status_code=409, detail="Outbound پایه direct قابل حذف نیست")
     conn = await connect_protocol_runtime(node, db)
     try:
-        await _apply(conn, action="delete", tag=clean_tag)
         doc = await _read_document(conn)
-        return {"ok": True, "node_id": node.id, **_inventory_from_document(doc)}
+        target = next(
+            (
+                item for item in (doc.get("outbounds") if isinstance(doc.get("outbounds"), list) else [])
+                if isinstance(item, dict) and str(item.get("tag") or "") == clean_tag
+            ),
+            None,
+        )
+        if target is None:
+            raise HTTPException(status_code=404, detail="Outbound پیدا نشد")
+        kind = str(target.get("type") or "").strip().lower()
+        imported = kind in IMPORTABLE_TYPES and clean_tag.startswith("ext-")
+        if kind not in _MANUAL_TYPES and not imported:
+            raise HTTPException(status_code=409, detail="این Outbound توسط TwinPanel مدیریت نمی‌شود")
+
+        await _apply(conn, action="delete", tag=clean_tag)
+        fresh = await _read_document(conn)
+        return {"ok": True, "node_id": node.id, **_inventory_from_document(fresh)}
     finally:
         conn.close()
         await conn.wait_closed()
