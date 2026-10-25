@@ -1,0 +1,57 @@
+name: Sing-box Outbound Config Import v1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/singbox_outbound_import.py"
+      - "backend/app/routers/singbox_outbounds.py"
+      - "backend/tests/singbox_outbound_config_import_v1_smoke.py"
+      - "components/singbox-outbound-center.tsx"
+      - "components/singbox-outbound-center.module.css"
+      - ".github/workflows/singbox-outbound-config-import-v1-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/singbox_outbound_import.py"
+      - "backend/app/routers/singbox_outbounds.py"
+      - "backend/tests/singbox_outbound_config_import_v1_smoke.py"
+      - "components/singbox-outbound-center.tsx"
+      - "components/singbox-outbound-center.module.css"
+      - ".github/workflows/singbox-outbound-config-import-v1-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  parser-and-admin-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python syntax
+        run: |
+          python -m py_compile \
+            backend/app/singbox_outbound_import.py \
+            backend/app/routers/singbox_outbounds.py \
+            backend/tests/singbox_outbound_config_import_v1_smoke.py
+
+      - name: Config parser smoke
+        run: PYTHONPATH=backend python backend/tests/singbox_outbound_config_import_v1_smoke.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci --include=optional --no-audit --no-fund
+
+      - name: Build admin frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: npm run build
