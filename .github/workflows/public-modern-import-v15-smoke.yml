@@ -1,0 +1,28 @@
+name: Public Modern Import V15 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/public_connection_hub_live_v5.py"
+      - "backend/app/routers/public_connection_modern_import_v15.py"
+      - "backend/tests/public_connection_modern_import_v15_smoke.py"
+      - ".github/workflows/public-modern-import-v15-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile direct import modules
+        run: |
+          python -m py_compile \
+            backend/app/routers/public_connection_hub_live_v5.py \
+            backend/app/routers/public_connection_modern_import_v15.py
+      - name: Verify direct modern import contract
+        run: |
+          python backend/tests/public_connection_modern_import_v15_smoke.py
