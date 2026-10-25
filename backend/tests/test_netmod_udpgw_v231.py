@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import app.dnstt_artifact as dnstt_artifact
 import app.netmod_udpgw_artifact as udpgw_artifact
@@ -70,16 +72,17 @@ def test_udpgw_service_is_loopback_only_self_healing_and_bounds_clients():
     assert "10-performance.conf" in script
 
 
-def test_stage_udpgw_verifies_binary_then_installs_managed_service(monkeypatch, tmp_path):
-    fake_binary = tmp_path / "badvpn-udpgw-linux-amd64"
-    fake_binary.write_bytes(b"verified-test-binary")
-    monkeypatch.setattr(
-        udpgw_artifact,
-        "artifact_for_machine",
-        lambda machine: (fake_binary, "a" * 64, "amd64"),
-    )
-    conn = _FakeConn()
-    result = asyncio.run(udpgw_artifact.stage_netmod_udpgw(conn))
+def test_stage_udpgw_verifies_binary_then_installs_managed_service():
+    with tempfile.TemporaryDirectory() as temp:
+        fake_binary = Path(temp) / "badvpn-udpgw-linux-amd64"
+        fake_binary.write_bytes(b"verified-test-binary")
+        with patch.object(
+            udpgw_artifact,
+            "artifact_for_machine",
+            return_value=(fake_binary, "a" * 64, "amd64"),
+        ):
+            conn = _FakeConn()
+            result = asyncio.run(udpgw_artifact.stage_netmod_udpgw(conn))
 
     assert result["arch"] == "amd64"
     assert result["service"] == NETMOD_UDPGW_SERVICE
@@ -92,46 +95,58 @@ def test_stage_udpgw_verifies_binary_then_installs_managed_service(monkeypatch, 
     assert NETMOD_UDPGW_LISTEN in joined
 
 
-def test_netmod_dnstt_stages_udpgw_companion_only_for_netmod(monkeypatch, tmp_path):
-    fake_dnstt = tmp_path / "dnstt-server-linux-amd64"
-    fake_dnstt.write_bytes(b"verified-dnstt")
-    monkeypatch.setattr(
-        dnstt_artifact,
-        "artifact_for_machine",
-        lambda machine: (fake_dnstt, "b" * 64, "amd64"),
-    )
-    calls: list[bool] = []
+def test_netmod_dnstt_stages_udpgw_companion_only_for_netmod():
+    with tempfile.TemporaryDirectory() as temp:
+        fake_dnstt = Path(temp) / "dnstt-server-linux-amd64"
+        fake_dnstt.write_bytes(b"verified-dnstt")
+        calls: list[bool] = []
 
-    async def fake_stage_udpgw(conn):
-        calls.append(True)
-        return {
-            "arch": "amd64",
-            "sha256": "c" * 64,
-            "artifact": "badvpn-udpgw-linux-amd64",
-            "remote_path": NETMOD_UDPGW_BINARY,
-            "service": NETMOD_UDPGW_SERVICE,
-            "listen": NETMOD_UDPGW_LISTEN,
-        }
+        async def fake_stage_udpgw(conn):
+            calls.append(True)
+            return {
+                "arch": "amd64",
+                "sha256": "c" * 64,
+                "artifact": "badvpn-udpgw-linux-amd64",
+                "remote_path": NETMOD_UDPGW_BINARY,
+                "service": NETMOD_UDPGW_SERVICE,
+                "listen": NETMOD_UDPGW_LISTEN,
+            }
 
-    monkeypatch.setattr(dnstt_artifact, "stage_netmod_udpgw", fake_stage_udpgw)
+        with patch.object(
+            dnstt_artifact,
+            "artifact_for_machine",
+            return_value=(fake_dnstt, "b" * 64, "amd64"),
+        ), patch.object(dnstt_artifact, "stage_netmod_udpgw", fake_stage_udpgw):
+            conn = _FakeConn()
+            result = asyncio.run(
+                dnstt_artifact.stage_dnstt_binary(
+                    conn,
+                    "/usr/local/bin/twinpanel-netmod-dnstt-server",
+                )
+            )
+            assert calls == [True]
+            assert result["udpgw_service"] == NETMOD_UDPGW_SERVICE
 
-    conn = _FakeConn()
-    result = asyncio.run(
-        dnstt_artifact.stage_dnstt_binary(
-            conn,
-            "/usr/local/bin/twinpanel-netmod-dnstt-server",
-        )
-    )
-    assert calls == [True]
-    assert result["udpgw_service"] == NETMOD_UDPGW_SERVICE
+            calls.clear()
+            conn2 = _FakeConn()
+            result2 = asyncio.run(
+                dnstt_artifact.stage_dnstt_binary(
+                    conn2,
+                    "/usr/local/bin/twinpanel-dnstt-server",
+                )
+            )
+            assert calls == []
+            assert "udpgw_service" not in result2
 
-    calls.clear()
-    conn2 = _FakeConn()
-    result2 = asyncio.run(
-        dnstt_artifact.stage_dnstt_binary(
-            conn2,
-            "/usr/local/bin/twinpanel-dnstt-server",
-        )
-    )
-    assert calls == []
-    assert "udpgw_service" not in result2
+
+def main() -> int:
+    test_udpgw_runtime_contract_is_private_and_pinned()
+    test_udpgw_service_is_loopback_only_self_healing_and_bounds_clients()
+    test_stage_udpgw_verifies_binary_then_installs_managed_service()
+    test_netmod_dnstt_stages_udpgw_companion_only_for_netmod()
+    print("NETMOD_UDPGW_V231_OK")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
