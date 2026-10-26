@@ -9,7 +9,7 @@ from .service_routing_stability_v139 import (
 from .transport_candidates import SPECS
 from .tp6_candidate_registry_v208 import apply_tp6_candidate_registry_v208
 
-AGENT_MARKER = "TWINPANEL_ACTIVE_TRANSPORT_AUTHORITY_V257"
+AGENT_MARKER = "TWINPANEL_ACTIVE_TRANSPORT_AUTHORITY_V258"
 _runtime_applied = False
 
 
@@ -102,6 +102,6 @@ def apply_unified_l3_candidate_registry_v79() -> None:
         "TWINPANEL_UNIFIED_L3_CANDIDATE_REGISTRY_V79_ACTIVE "
         "source=transport_candidates.SPECS "
         f"candidates={','.join(sorted(SPECS))} route_binding=v94 "
-        "active_transport_authority=v257 agent_rollout_marker=v257",
+        "active_transport_authority=v258 agent_rollout_marker=v258",
         flush=True,
     )
