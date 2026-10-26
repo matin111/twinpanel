@@ -87,7 +87,7 @@ def _assert_certificate_migration_command_contract() -> None:
     assert "-checkhost" not in command
     assert "openssl x509" in command
     assert "-ext subjectAltName" in command
-    assert "tr ',' '\\n'" in command
+    assert "tr ','" in command
     assert "grep -Fqx DNS:tt-node-6.twinpanel.invalid" in command
     assert "subjectAltName=DNS:tt-node-6.twinpanel.invalid,IP:204.10.192.96" in command
     assert "server.crt.new" in command
