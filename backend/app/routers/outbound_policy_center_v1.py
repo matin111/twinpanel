@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..node_runtime_connection import connect_protocol_runtime
+from ..outbound_policy_native_adapters_v255 import NATIVE_POLICY_INBOUND_TAGS
 from ..protocol_account_registry import ALL_PROTOCOL_KEYS, PROTOCOL_TITLES
 from ..protocol_adapter_registry import CLASSIC_PROTOCOL_REGISTRY
 from ..protocol_catalog import PROTOCOL_CATALOG
@@ -40,20 +41,22 @@ router = APIRouter(
 # whose traffic is already an audited, identifiable Sing-box inbound are
 # writable. Everything else is visible but fail-closed until a dedicated
 # egress adapter is implemented and verified.
-_NATIVE_POLICY_PROTOCOLS: dict[str, str] = {
-    "hysteria2": "twinpanel-hysteria2-in",
-    "tuic": "twinpanel-tuic-in",
-    "anytls": "twinpanel-anytls-in",
-}
+_NATIVE_POLICY_PROTOCOLS: dict[str, str] = dict(NATIVE_POLICY_INBOUND_TAGS)
+_NATIVE_POLICY_ORDER: tuple[str, ...] = (
+    "hysteria2",
+    "tuic",
+    "anytls",
+    "naive",
+    "shadowtls",
+    "snell",
+)
 
 _POLICY_ALIASES = {
     "xray": "v2ray",
 }
 
 _PROTOCOL_ORDER: tuple[str, ...] = (
-    "hysteria2",
-    "tuic",
-    "anytls",
+    *_NATIVE_POLICY_ORDER,
     *(key for key in ALL_PROTOCOL_KEYS if key not in _NATIVE_POLICY_PROTOCOLS),
 )
 
