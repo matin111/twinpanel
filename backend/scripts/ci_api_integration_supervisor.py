@@ -6,6 +6,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -16,6 +17,9 @@ import uvicorn
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
+
+from app.main import app
+
 
 BASE_URL = "http://127.0.0.1:8095"
 REQUIRED_ROUTES = (
@@ -62,6 +66,7 @@ SMOKE_COMMANDS = (
     (sys.executable, "-m", "scripts.transport_policy_v16_smoke"),
     (sys.executable, "scripts/api_core_smoke.py"),
 )
+SERVER_ERRORS: list[str] = []
 
 
 def _get_json(path: str, timeout: float = 3.0) -> dict:
@@ -70,12 +75,24 @@ def _get_json(path: str, timeout: float = 3.0) -> dict:
         return json.loads(response.read().decode("utf-8"))
 
 
-def _wait_for_ready(server: uvicorn.Server, *, timeout_seconds: float = 60.0) -> dict:
+def _serve(server: uvicorn.Server) -> None:
+    try:
+        server.run()
+    except BaseException:
+        SERVER_ERRORS.append(traceback.format_exc())
+
+
+def _wait_for_ready(server: uvicorn.Server, server_thread: threading.Thread, *, timeout_seconds: float = 60.0) -> dict:
     deadline = time.monotonic() + timeout_seconds
     last_error = "not attempted"
     while time.monotonic() < deadline:
         if not server_thread.is_alive():
-            raise RuntimeError("uvicorn server thread exited before readiness")
+            details = SERVER_ERRORS[-1] if SERVER_ERRORS else "no Python exception captured"
+            raise RuntimeError(
+                "uvicorn server thread exited before readiness; "
+                f"started={server.started} should_exit={server.should_exit} force_exit={server.force_exit}\n"
+                + details
+            )
         try:
             payload = _get_json("/health/ready")
             if payload.get("ok") is True:
@@ -114,22 +131,24 @@ def _run_smokes() -> None:
 
 if __name__ == "__main__":
     config = uvicorn.Config(
-        "app.main:app",
+        app,
         host="127.0.0.1",
         port=8095,
+        loop="asyncio",
         log_level="info",
         access_log=False,
     )
     server = uvicorn.Server(config)
     server_thread = threading.Thread(
-        target=server.run,
+        target=_serve,
+        args=(server,),
         name="twinpanel-ci-api",
         daemon=False,
     )
     server_thread.start()
 
     try:
-        ready = _wait_for_ready(server)
+        ready = _wait_for_ready(server, server_thread)
         checks = ready.get("checks") or {}
         if checks.get("database") is not True or checks.get("redis") is not True:
             raise RuntimeError(f"readiness dependency check failed: {ready!r}")
@@ -145,3 +164,5 @@ if __name__ == "__main__":
             server_thread.join(timeout=5.0)
         if server_thread.is_alive():
             raise RuntimeError("uvicorn server thread did not stop cleanly")
+        if SERVER_ERRORS:
+            print("UVICORN_SERVER_ERROR", SERVER_ERRORS[-1], file=sys.stderr)
