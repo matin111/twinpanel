@@ -294,6 +294,7 @@ async def _ensure_trusttunnel_cert(conn, node: Node) -> tuple[str, str, str]:
         else:
             sans.append(f"IP:{domain}")
     san = ",".join(sans)
+    required_dns_san = f"DNS:{name}"
 
     await cmd(
         conn,
@@ -302,7 +303,9 @@ async def _ensure_trusttunnel_cert(conn, node: Node) -> tuple[str, str, str]:
         "command -v openssl >/dev/null 2>&1 || "
         "apt-get -o DPkg::Lock::Timeout=300 install -y openssl >/dev/null; "
         f"if [ ! -s {shlex.quote(cert)} ] || [ ! -s {shlex.quote(key)} ] || "
-        f"! openssl x509 -in {shlex.quote(cert)} -noout -checkhost {shlex.quote(name)} >/dev/null 2>&1; then "
+        f"! openssl x509 -in {shlex.quote(cert)} -noout -ext subjectAltName 2>/dev/null "
+        "| tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' "
+        f"| grep -Fqx {shlex.quote(required_dns_san)}; then "
         f"rm -f {shlex.quote(cert + '.new')} {shlex.quote(key + '.new')}; "
         "openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -sha256 -nodes -days 3650 "
         f"-subj {shlex.quote('/CN=' + name)} -addext {shlex.quote('subjectAltName=' + san)} "
