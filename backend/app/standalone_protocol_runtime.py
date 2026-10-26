@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import ipaddress
 import json
 import re
 import shlex
@@ -88,6 +89,50 @@ def _node_identity(node: Node) -> tuple[str, str]:
     domain = re.sub(r"^https?://", "", domain).split("/", 1)[0].split(":", 1)[0]
     ip = str(getattr(node, "public_ip", None) or "").strip()
     return domain, ip
+
+
+def _is_dns_hostname(value: str) -> bool:
+    hostname = str(value or "").strip().lower().rstrip(".")
+    if not hostname or len(hostname) > 253:
+        return False
+    try:
+        ipaddress.ip_address(hostname)
+        return False
+    except ValueError:
+        pass
+    labels = hostname.split(".")
+    return all(
+        1 <= len(label) <= 63
+        and re.fullmatch(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", label) is not None
+        for label in labels
+    )
+
+
+def _trusttunnel_tls_hostname(node: Node) -> str:
+    """Return a DNS-shaped TLS identity independent from the transport address.
+
+    TrustTunnel's official client omits SNI when endpoint.hostname is an IP.
+    The endpoint then drops the TLS connection before the handshake completes.
+    Use a configured public DNS name when available; otherwise use a stable,
+    reserved .invalid identity. Client delivery still carries the Exit IP in
+    endpoint.addresses, so the synthetic identity never needs DNS resolution.
+    """
+
+    domain, ip = _node_identity(node)
+    if _is_dns_hostname(domain):
+        return domain.rstrip(".")
+
+    node_id = int(getattr(node, "id", 0) or 0)
+    if node_id > 0:
+        return f"tt-node-{node_id}.twinpanel.invalid"
+
+    address = ip or domain
+    if address:
+        token = re.sub(r"[^a-z0-9]+", "-", address.lower()).strip("-")[:48]
+        if token:
+            return f"tt-{token}.twinpanel.invalid"
+
+    raise StandaloneProtocolError("TrustTunnel requires a public domain or IP")
 
 
 async def _ensure_bootstrap_secret(conn, protocol: str) -> dict[str, str]:
@@ -234,25 +279,38 @@ async def _ensure_trusttunnel_cert(conn, node: Node) -> tuple[str, str, str]:
     cert = f"{directory}/server.crt"
     key = f"{directory}/server.key"
     domain, ip = _node_identity(node)
-    name = domain or ip
-    if not name:
+    if not domain and not ip:
         raise StandaloneProtocolError("TrustTunnel requires a public domain or IP")
-    sans = []
-    if domain:
-        sans.append(f"DNS:{domain}")
+
+    name = _trusttunnel_tls_hostname(node)
+    sans = [f"DNS:{name}"]
     if ip:
         sans.append(f"IP:{ip}")
-    san = ",".join(sans) or f"DNS:{name}"
+    elif domain:
+        try:
+            ipaddress.ip_address(domain)
+        except ValueError:
+            pass
+        else:
+            sans.append(f"IP:{domain}")
+    san = ",".join(sans)
+
     await cmd(
         conn,
         "set -eu; "
         f"install -d -m 700 {shlex.quote(directory)}; "
         "command -v openssl >/dev/null 2>&1 || "
         "apt-get -o DPkg::Lock::Timeout=300 install -y openssl >/dev/null; "
-        f"if [ ! -s {shlex.quote(cert)} ] || [ ! -s {shlex.quote(key)} ]; then "
+        f"if [ ! -s {shlex.quote(cert)} ] || [ ! -s {shlex.quote(key)} ] || "
+        f"! openssl x509 -in {shlex.quote(cert)} -noout -checkhost {shlex.quote(name)} >/dev/null 2>&1; then "
+        f"rm -f {shlex.quote(cert + '.new')} {shlex.quote(key + '.new')}; "
         "openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -sha256 -nodes -days 3650 "
         f"-subj {shlex.quote('/CN=' + name)} -addext {shlex.quote('subjectAltName=' + san)} "
-        f"-keyout {shlex.quote(key)} -out {shlex.quote(cert)} >/dev/null 2>&1; fi; "
+        f"-keyout {shlex.quote(key + '.new')} -out {shlex.quote(cert + '.new')} >/dev/null 2>&1; "
+        f"chmod 600 {shlex.quote(key + '.new')}; chmod 644 {shlex.quote(cert + '.new')}; "
+        f"mv {shlex.quote(key + '.new')} {shlex.quote(key)}; "
+        f"mv {shlex.quote(cert + '.new')} {shlex.quote(cert)}; "
+        "fi; "
         f"chmod 600 {shlex.quote(key)}; chmod 644 {shlex.quote(cert)}",
         timeout=120,
     )
@@ -331,6 +389,7 @@ WantedBy=multi-user.target
         await ufw_allow(conn, int(port), "udp")
     result = await standalone_health(conn, "trusttunnel", int(port))
     result["core"] = core
+    result["tls_hostname"] = hostname
     return result
 
 
