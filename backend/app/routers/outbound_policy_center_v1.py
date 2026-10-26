@@ -12,6 +12,9 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..node_runtime_connection import connect_protocol_runtime
+from ..protocol_account_registry import ALL_PROTOCOL_KEYS, PROTOCOL_TITLES
+from ..protocol_adapter_registry import CLASSIC_PROTOCOL_REGISTRY
+from ..protocol_catalog import PROTOCOL_CATALOG
 from .singbox_outbounds import (
     CONFIG_PATH,
     SERVICE_NAME,
@@ -31,71 +34,70 @@ router = APIRouter(
 )
 
 
-# Only protocols whose traffic is already an identifiable Sing-box inbound are
-# writable in V1. Classic kernel VPNs and the separate Xray core are reported
-# in the same control surface, but fail closed until their dedicated egress
-# adapters are installed. This prevents a UI-only policy from pretending that
-# packets were routed through an imported outbound when the kernel still sends
-# them directly to WAN.
-_PROTOCOLS: tuple[dict[str, Any], ...] = (
-    {
-        "key": "hysteria2",
-        "title": "Hysteria2",
-        "plane": "singbox",
-        "inbound_tag": "twinpanel-hysteria2-in",
-        "policy_supported": True,
-    },
-    {
-        "key": "tuic",
-        "title": "TUIC v5",
-        "plane": "singbox",
-        "inbound_tag": "twinpanel-tuic-in",
-        "policy_supported": True,
-    },
-    {
-        "key": "anytls",
-        "title": "AnyTLS",
-        "plane": "singbox",
-        "inbound_tag": "twinpanel-anytls-in",
-        "policy_supported": True,
-    },
-    {
-        "key": "openvpn",
-        "title": "OpenVPN",
-        "plane": "kernel",
-        "policy_supported": False,
-        "reason": "egress_adapter_required",
-    },
-    {
-        "key": "wireguard",
-        "title": "WireGuard",
-        "plane": "kernel",
-        "policy_supported": False,
-        "reason": "egress_adapter_required",
-    },
-    {
-        "key": "cisco",
-        "title": "Cisco / OpenConnect",
-        "plane": "kernel",
-        "policy_supported": False,
-        "reason": "egress_adapter_required",
-    },
-    {
-        "key": "l2tp",
-        "title": "L2TP / IPsec",
-        "plane": "kernel",
-        "policy_supported": False,
-        "reason": "egress_adapter_required",
-    },
-    {
-        "key": "xray",
-        "title": "Xray / V2Ray",
-        "plane": "xray",
-        "policy_supported": False,
-        "reason": "separate_core_adapter_required",
-    },
+# Inventory comes from TwinPanel's canonical protocol registry so the routing
+# surface cannot silently drift behind the protocols offered elsewhere in the
+# product. Routing capability remains deliberately narrower: only protocols
+# whose traffic is already an audited, identifiable Sing-box inbound are
+# writable. Everything else is visible but fail-closed until a dedicated
+# egress adapter is implemented and verified.
+_NATIVE_POLICY_PROTOCOLS: dict[str, str] = {
+    "hysteria2": "twinpanel-hysteria2-in",
+    "tuic": "twinpanel-tuic-in",
+    "anytls": "twinpanel-anytls-in",
+}
+
+_POLICY_ALIASES = {
+    "xray": "v2ray",
+}
+
+_PROTOCOL_ORDER: tuple[str, ...] = (
+    "hysteria2",
+    "tuic",
+    "anytls",
+    *(key for key in ALL_PROTOCOL_KEYS if key not in _NATIVE_POLICY_PROTOCOLS),
 )
 
+
+def _protocol_spec(key: str) -> dict[str, Any]:
+    if key in CLASSIC_PROTOCOL_REGISTRY:
+        definition = CLASSIC_PROTOCOL_REGISTRY[key]
+        plane = "xray" if key == "v2ray" else "kernel"
+        reason = "separate_core_adapter_required" if key == "v2ray" else "egress_adapter_required"
+        core = str(definition.get("core") or PROTOCOL_TITLES[key])
+        runtime_status = str(definition.get("runtime_status") or "unknown")
+        title = str(definition.get("title") or PROTOCOL_TITLES[key])
+        family = "classic"
+    else:
+        definition = PROTOCOL_CATALOG.get(key, {})
+        core = str(definition.get("core") or "standalone")
+        plane = "singbox" if core == "sing-box" else "standalone"
+        reason = (
+            "singbox_policy_adapter_required"
+            if core == "sing-box"
+            else "protocol_egress_adapter_required"
+        )
+        runtime_status = str(definition.get("runtime_status") or "unknown")
+        title = str(definition.get("title") or PROTOCOL_TITLES[key])
+        family = "modern"
+
+    inbound_tag = _NATIVE_POLICY_PROTOCOLS.get(key)
+    supported = inbound_tag is not None
+    return {
+        "key": key,
+        "title": title,
+        "family": family,
+        "plane": plane,
+        "core": core,
+        "runtime_status": runtime_status,
+        "inbound_tag": inbound_tag,
+        "policy_supported": supported,
+        "reason": None if supported else reason,
+    }
+
+
+_PROTOCOLS: tuple[dict[str, Any], ...] = tuple(
+    _protocol_spec(key) for key in _PROTOCOL_ORDER
+)
 _PROTOCOL_BY_KEY = {str(item["key"]): item for item in _PROTOCOLS}
 PolicyMode = Literal["inherit", "direct", "outbound", "block"]
 
@@ -166,6 +168,10 @@ def _outbound_tags(doc: dict[str, Any]) -> set[str]:
 def _policy_record(state: dict[str, Any], protocol: str) -> dict[str, Any]:
     raw = state.get("policies") if isinstance(state.get("policies"), dict) else {}
     item = raw.get(protocol) if isinstance(raw, dict) else None
+    # Preserve compatibility with any early V1 state that used the UI label
+    # "xray" before the canonical account-registry key "v2ray" was adopted.
+    if not isinstance(item, dict) and protocol == "v2ray" and isinstance(raw, dict):
+        item = raw.get("xray")
     if not isinstance(item, dict):
         return {"mode": "inherit", "outbound_tag": None}
     mode = str(item.get("mode") or "inherit").strip().lower()
@@ -178,6 +184,7 @@ def _policy_record(state: dict[str, Any], protocol: str) -> dict[str, Any]:
 
 
 def _generated_rule(protocol: str, policy: dict[str, Any]) -> dict[str, Any] | None:
+    protocol = _POLICY_ALIASES.get(protocol, protocol)
     spec = _PROTOCOL_BY_KEY.get(protocol)
     if not spec or not spec.get("policy_supported"):
         return None
@@ -297,7 +304,10 @@ def _protocol_payload(
         rows.append({
             "key": key,
             "title": spec["title"],
+            "family": spec.get("family"),
             "plane": spec["plane"],
+            "core": spec.get("core"),
+            "runtime_status": spec.get("runtime_status"),
             "inbound_tag": inbound_tag,
             "policy_supported": supported,
             "installed": installed,
@@ -402,6 +412,7 @@ async def _inventory_for_node(node, db: Session) -> dict[str, Any]:
                 default_tag=inventory.get("default_tag"),
             ),
             "capabilities": {
+                "protocol_inventory_count": len(_PROTOCOLS),
                 "native_protocol_policy": True,
                 "classic_egress_adapter": False,
                 "xray_egress_adapter": False,
@@ -430,6 +441,7 @@ async def update_protocol_policy(
     db: Session = Depends(get_db),
 ):
     key = str(protocol or "").strip().lower()
+    key = _POLICY_ALIASES.get(key, key)
     spec = _PROTOCOL_BY_KEY.get(key)
     if not spec:
         raise HTTPException(status_code=404, detail="پروتکل در Policy Center شناخته نشد")

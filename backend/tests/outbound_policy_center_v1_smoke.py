@@ -1,11 +1,60 @@
 from __future__ import annotations
 
+from app.protocol_account_registry import ALL_PROTOCOL_KEYS
 from app.routers.outbound_policy_center_v1 import (
+    _PROTOCOLS,
     _apply_state_to_document,
     _clean_state,
     _generated_rule,
+    _protocol_payload,
     _strip_previous_generated_rules,
 )
+
+
+ROUTE_READY = {"hysteria2", "tuic", "anytls"}
+
+
+def test_full_canonical_protocol_inventory() -> None:
+    keys = [str(item["key"]) for item in _PROTOCOLS]
+    assert len(keys) == 15
+    assert len(set(keys)) == 15
+    assert set(keys) == set(ALL_PROTOCOL_KEYS)
+    assert keys[:3] == ["hysteria2", "tuic", "anytls"]
+    assert {str(item["key"]) for item in _PROTOCOLS if item.get("policy_supported")} == ROUTE_READY
+
+    by_key = {str(item["key"]): item for item in _PROTOCOLS}
+    assert by_key["v2ray"]["plane"] == "xray"
+    assert by_key["v2ray"]["core"] == "Xray"
+    assert by_key["naive"]["plane"] == "singbox"
+    assert by_key["naive"]["policy_supported"] is False
+    assert by_key["mieru"]["plane"] == "standalone"
+    assert by_key["trusttunnel"]["plane"] == "standalone"
+    assert by_key["amneziawg"]["plane"] == "standalone"
+    assert by_key["sudoku"]["plane"] == "standalone"
+
+
+def test_protocol_payload_keeps_full_inventory_fail_closed() -> None:
+    doc = {
+        "inbounds": [
+            {"type": "hysteria2", "tag": "twinpanel-hysteria2-in"},
+            {"type": "tuic", "tag": "twinpanel-tuic-in"},
+            {"type": "anytls", "tag": "twinpanel-anytls-in"},
+        ],
+        "outbounds": [
+            {"type": "direct", "tag": "direct"},
+            {"type": "vless", "tag": "ext-vless-primary"},
+        ],
+        "route": {"final": "ext-vless-primary", "rules": []},
+    }
+    rows = _protocol_payload(doc=doc, state=_clean_state({}), default_tag="ext-vless-primary")
+    assert len(rows) == 15
+    by_key = {row["key"]: row for row in rows}
+    assert all(by_key[key]["installed"] is True for key in ROUTE_READY)
+    assert all(by_key[key]["policy_supported"] is True for key in ROUTE_READY)
+    assert by_key["naive"]["policy_supported"] is False
+    assert by_key["naive"]["reason"] == "singbox_policy_adapter_required"
+    assert by_key["v2ray"]["reason"] == "separate_core_adapter_required"
+    assert by_key["mieru"]["reason"] == "protocol_egress_adapter_required"
 
 
 def test_native_route_modes() -> None:
@@ -30,12 +79,18 @@ def test_native_route_modes() -> None:
     }
 
 
-def test_classic_protocols_fail_closed() -> None:
-    for protocol in ("openvpn", "wireguard", "cisco", "l2tp", "xray"):
+def test_non_audited_protocols_fail_closed() -> None:
+    unsupported = set(ALL_PROTOCOL_KEYS) - ROUTE_READY
+    for protocol in unsupported:
         assert _generated_rule(
             protocol,
             {"mode": "outbound", "outbound_tag": "ext-vless-primary"},
         ) is None
+    # Preserve the early UI alias without making Xray writable.
+    assert _generated_rule(
+        "xray",
+        {"mode": "outbound", "outbound_tag": "ext-vless-primary"},
+    ) is None
 
 
 def test_only_previous_generated_rules_are_removed() -> None:
@@ -111,8 +166,10 @@ def test_apply_preserves_final_and_unrelated_rules() -> None:
 
 def main() -> None:
     tests = [
+        test_full_canonical_protocol_inventory,
+        test_protocol_payload_keeps_full_inventory_fail_closed,
         test_native_route_modes,
-        test_classic_protocols_fail_closed,
+        test_non_audited_protocols_fail_closed,
         test_only_previous_generated_rules_are_removed,
         test_apply_preserves_final_and_unrelated_rules,
     ]
