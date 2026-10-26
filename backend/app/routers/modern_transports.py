@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from datetime import datetime
@@ -8,9 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from .. import smart_transport_auto_v21 as smart
 from ..database import get_db
 from ..deps import require_admin
-from ..models import Tunnel, TunnelStatus, TunnelTransport
+from ..models import Tunnel, TunnelPeerState, TunnelStatus, TunnelTransport
 from ..smart_transport_auto_v21 import (
     CANDIDATE_STABLE_SECONDS,
     _smart_state,
@@ -309,6 +311,174 @@ async def _node_compatibility(conn, peer_ip: str) -> dict:
     return payload
 
 
+async def _fresh_manual_candidate_health_v257(
+    tunnel_id: int,
+    name: str,
+) -> dict:
+    """Run the full candidate probe without accepting SmartAuto's 20s cache."""
+
+    key = (int(tunnel_id), str(name).strip().lower())
+
+    # The cache lookup in candidate_health_remote_v21 happens synchronously
+    # before its first await. Removing this exact key immediately before calling
+    # the active probe therefore guarantees that this cutover gate performs a
+    # new service/interface + bidirectional L3 + egress probe.
+    smart._candidate_health_cache.pop(key, None)
+
+    probed_name, health = await smart.candidate_health_remote_v21(
+        int(tunnel_id),
+        str(name).strip().lower(),
+        {},
+    )
+
+    if str(probed_name).strip().lower() != key[1]:
+        return {
+            "ok": False,
+            "error": "manual_cutover_probe_transport_mismatch",
+            "probed_transport": str(probed_name),
+        }
+
+    return dict(health or {})
+
+
+def _peer_cutover_snapshot_v257(
+    state: TunnelPeerState | None,
+    *,
+    node_id: int,
+    started_at: datetime,
+    name: str,
+) -> dict:
+    if state is None:
+        return {
+            "node_id": int(node_id),
+            "fresh": False,
+            "selected_transport": None,
+            "endpoint_reachable": False,
+            "tunnel_reachable": False,
+            "last_error": "missing_report",
+            "updated_at": None,
+            "accepted": False,
+        }
+
+    updated_at = state.updated_at
+    fresh = bool(updated_at is not None and updated_at >= started_at)
+    selected = str(state.selected_transport or "").strip().lower()
+    last_error = str(state.last_error or "").strip()
+
+    accepted = bool(
+        fresh
+        and selected == name
+        and bool(state.endpoint_reachable)
+        and bool(state.tunnel_reachable)
+        and not last_error
+    )
+
+    return {
+        "node_id": int(node_id),
+        "fresh": fresh,
+        "selected_transport": selected or None,
+        "endpoint_reachable": bool(state.endpoint_reachable),
+        "tunnel_reachable": bool(state.tunnel_reachable),
+        "last_error": last_error or None,
+        "updated_at": updated_at.isoformat() if updated_at else None,
+        "accepted": accepted,
+    }
+
+
+async def _wait_manual_cutover_acceptance_v257(
+    db: Session,
+    tunnel: Tunnel,
+    *,
+    name: str,
+    started_at: datetime,
+    timeout_seconds: float = 30.0,
+) -> tuple[bool, list[dict], str | None]:
+    """Wait for post-reconcile Agent reports from both tunnel peers.
+
+    Unified L3 V49 publishes service routes before it reports peer telemetry.
+    Therefore two fresh healthy reports for the newly selected transport are the
+    controller-side acknowledgement that both peer Agent convergence passes
+    completed after this cutover, rather than stale pre-switch telemetry.
+    """
+
+    node_ids = (
+        int(tunnel.iran_node_id),
+        int(tunnel.exit_node_id),
+    )
+    deadline = asyncio.get_running_loop().time() + float(timeout_seconds)
+    last_snapshot: list[dict] = []
+
+    while True:
+        db.expire_all()
+        rows = {
+            int(item.node_id): item
+            for item in (
+                db.query(TunnelPeerState)
+                .filter(
+                    TunnelPeerState.tunnel_id == int(tunnel.id),
+                    TunnelPeerState.node_id.in_(node_ids),
+                )
+                .all()
+            )
+        }
+
+        last_snapshot = [
+            _peer_cutover_snapshot_v257(
+                rows.get(node_id),
+                node_id=node_id,
+                started_at=started_at,
+                name=name,
+            )
+            for node_id in node_ids
+        ]
+
+        if all(item["accepted"] for item in last_snapshot):
+            return True, last_snapshot, None
+
+        # A fresh report from the selected transport is authoritative negative
+        # evidence. Do not wait out the whole timeout after an Agent has already
+        # proved that the candidate carrier or service-route reconcile failed.
+        for item in last_snapshot:
+            if (
+                item["fresh"]
+                and item["selected_transport"] == name
+                and not item["accepted"]
+            ):
+                reason = (
+                    item.get("last_error")
+                    or "manual_cutover_peer_not_reachable"
+                )
+                return False, last_snapshot, str(reason)[:900]
+
+        if asyncio.get_running_loop().time() >= deadline:
+            return False, last_snapshot, "manual_cutover_agent_confirmation_timeout"
+
+        await asyncio.sleep(1.0)
+
+
+def _rollback_manual_cutover_v257(
+    db: Session,
+    tunnel_id: int,
+    previous: dict,
+) -> Tunnel:
+    db.rollback()
+    db.expire_all()
+
+    tunnel = db.get(Tunnel, int(tunnel_id))
+    if tunnel is None:
+        raise RuntimeError("manual_cutover_rollback_tunnel_missing")
+
+    tunnel.mode = previous["mode"]
+    tunnel.active_transport = previous["active_transport"]
+    tunnel.preferred_transport = previous["preferred_transport"]
+    tunnel.status = previous["status"]
+    tunnel.latency_ms = previous["latency_ms"]
+    tunnel.last_switch_at = previous["last_switch_at"]
+    db.commit()
+    db.refresh(tunnel)
+    return tunnel
+
+
 @router.get("/transport-catalog")
 def transport_catalog():
     return {
@@ -479,7 +649,6 @@ async def check_spoof_wg_compatibility(
     ci = ce = None
     try:
         ci, ce = await connect_pair(iran, exit_node, db)
-        import asyncio
         iran_result, exit_result = await asyncio.gather(
             _node_compatibility(ci, str(exit_node.public_ip)),
             _node_compatibility(ce, str(iran.public_ip)),
@@ -552,8 +721,9 @@ async def check_spoof_wg_compatibility(
 
 
 # TWINPANEL_MANUAL_MODERN_TRANSPORT_V192
+# TWINPANEL_MANUAL_CUTOVER_ACCEPTANCE_V257
 @router.post("/{tunnel_id}/modern-transports/{transport}/select-manual")
-def select_modern_transport_manual(
+async def select_modern_transport_manual(
     tunnel_id: int,
     transport: str,
     db: Session = Depends(get_db),
@@ -583,6 +753,9 @@ def select_modern_transport_manual(
     if not bool(row.enabled):
         raise HTTPException(status_code=400, detail="Transport disabled")
 
+    # Fast UI qualification remains useful, but it is never sufficient for a
+    # production cutover. V257 always performs a brand-new full candidate probe
+    # immediately before changing aggregate authority.
     view = _candidate_view(
         name=name,
         row=row,
@@ -598,17 +771,113 @@ def select_modern_transport_manual(
                 "stable_seconds": view.get("stable_seconds"),
                 "required_stable_seconds": view.get("required_stable_seconds"),
                 "auto_block_reason": view.get("auto_block_reason"),
+                "authority_unchanged": True,
             },
         )
 
+    fresh_health = await _fresh_manual_candidate_health_v257(
+        tunnel_id,
+        name,
+    )
+
+    # candidate_health_remote_v21 writes authoritative member telemetry using
+    # its own SessionLocal. Refresh this request session before evaluating the
+    # just-probed row and before copying latency into aggregate state.
+    db.expire_all()
+    tunnel = db.get(Tunnel, tunnel_id)
+    row = (
+        db.query(TunnelTransport)
+        .filter(
+            TunnelTransport.tunnel_id == tunnel_id,
+            TunnelTransport.transport == name,
+        )
+        .first()
+    )
+    if tunnel is None or row is None:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Tunnel or transport changed during manual cutover preflight",
+                "transport": name,
+                "authority_unchanged": True,
+            },
+        )
+
+    fresh_view = _candidate_view(
+        name=name,
+        row=row,
+        tunnel_id=tunnel_id,
+    )
+    if (
+        not bool(fresh_health.get("ok"))
+        or not bool(fresh_view.get("selectable"))
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Fresh cutover probe rejected the transport; production authority was not changed",
+                "transport": name,
+                "authority_unchanged": True,
+                "fresh_health": fresh_health,
+                "status": fresh_view.get("status"),
+                "stable_seconds": fresh_view.get("stable_seconds"),
+                "required_stable_seconds": fresh_view.get("required_stable_seconds"),
+                "auto_block_reason": fresh_view.get("auto_block_reason"),
+            },
+        )
+
+    previous = {
+        "mode": tunnel.mode,
+        "active_transport": tunnel.active_transport,
+        "preferred_transport": tunnel.preferred_transport,
+        "status": tunnel.status,
+        "latency_ms": tunnel.latency_ms,
+        "last_switch_at": tunnel.last_switch_at,
+    }
+
+    cutover_started_at = datetime.utcnow()
     tunnel.mode = "manual"
     tunnel.active_transport = name
     tunnel.preferred_transport = name
     tunnel.status = TunnelStatus.ONLINE
     tunnel.latency_ms = row.latency_ms
+    tunnel.last_switch_at = cutover_started_at
 
     db.commit()
     db.refresh(tunnel)
+
+    accepted, peer_acceptance, acceptance_error = (
+        await _wait_manual_cutover_acceptance_v257(
+            db,
+            tunnel,
+            name=name,
+            started_at=cutover_started_at,
+        )
+    )
+
+    if not accepted:
+        rolled_back = _rollback_manual_cutover_v257(
+            db,
+            tunnel_id,
+            previous,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Manual transport cutover failed post-switch Data Plane acceptance and was rolled back",
+                "transport": name,
+                "rolled_back": True,
+                "rollback_active_transport": rolled_back.active_transport,
+                "rollback_preferred_transport": rolled_back.preferred_transport,
+                "fresh_health": fresh_health,
+                "peer_acceptance": peer_acceptance,
+                "acceptance_error": acceptance_error,
+            },
+        )
+
+    db.expire_all()
+    tunnel = db.get(Tunnel, tunnel_id)
+    assert tunnel is not None
 
     return {
         "ok": True,
@@ -619,6 +888,10 @@ def select_modern_transport_manual(
         "status": _status(tunnel.status),
         "latency_ms": tunnel.latency_ms,
         "transport": name,
+        "fresh_probe": True,
+        "dataplane_reconciled": True,
+        "fresh_health": fresh_health,
+        "peer_acceptance": peer_acceptance,
     }
 
 
