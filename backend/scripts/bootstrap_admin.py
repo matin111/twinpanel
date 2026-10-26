@@ -11,7 +11,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.database import SessionLocal
+from app.database import Base, SessionLocal, engine
 from app.models import User, UserRole
 from app.security import hash_password
 
@@ -47,6 +47,12 @@ def main() -> int:
 
     if len(password) < 10:
         raise SystemExit("TWINPANEL_ADMIN_PASSWORD must be at least 10 characters")
+
+    # Bootstrap must be safe on a brand-new database as well as on upgrades.
+    # app.models is imported above, so the core metadata (including users) is
+    # registered. create_all is idempotent and never drops or rewrites existing
+    # tables; it only creates missing core tables before the first admin query.
+    Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
     try:

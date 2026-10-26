@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import shlex
 from typing import Any
 
 from .modern_protocol_preflight import (
@@ -17,6 +18,7 @@ from .modern_protocol_runtime_v2 import (
     redacted_preview as _singbox_preview,
     remove_profile as _remove_singbox_profile,
 )
+from .outbound_policy_standalone_adapters_v257 import RECONCILE_PATH
 from .protocol_catalog import PROTOCOL_CATALOG
 from .singbox_service_runtime import ensure_singbox_service_unit
 from .standalone_protocol_runtime import (
@@ -58,14 +60,12 @@ async def _wait_for_singbox_health(
 ) -> dict[str, Any]:
     tries = max(1, int(attempts))
     last: dict[str, Any] | None = None
-
     for index in range(tries):
         last = await _singbox_health(conn, protocol, port)
         if bool(last.get("ok")):
             return last
         if index + 1 < tries and delay_seconds > 0:
             await asyncio.sleep(delay_seconds)
-
     return last or {
         "ok": False,
         "protocol": protocol,
@@ -84,14 +84,12 @@ async def _wait_for_standalone_health(
 ) -> dict[str, Any]:
     tries = max(1, int(attempts))
     last: dict[str, Any] | None = None
-
     for index in range(tries):
         last = await standalone_health(conn, protocol, port)
         if bool(last.get("ok")):
             return last
         if index + 1 < tries and delay_seconds > 0:
             await asyncio.sleep(delay_seconds)
-
     return last or {
         "ok": False,
         "protocol": protocol,
@@ -100,11 +98,26 @@ async def _wait_for_standalone_health(
     }
 
 
-async def _preinstall_health(
-    conn,
-    protocol: str,
-    port: int,
-) -> dict[str, Any]:
+async def _reconcile_standalone_policy(conn) -> None:
+    """Re-assert an already-installed policy after a runtime reinstall/update.
+
+    The helper is installed transactionally by Outbound Policy Center v3. A
+    node that has never used standalone policy has no helper and remains a
+    no-op. Once present, a failed reconcile is fatal so runtime apply cannot
+    silently reset Mieru/TrustTunnel/Sudoku to direct egress.
+    """
+
+    command = (
+        f"if [ -x {shlex.quote(RECONCILE_PATH)} ]; then "
+        f"{shlex.quote(RECONCILE_PATH)}; fi"
+    )
+    result = await conn.run(command, check=False)
+    if result.exit_status != 0:
+        detail = str(result.stderr or result.stdout or "standalone policy reconcile failed").strip()
+        raise ModernRuntimeV2Error(f"standalone_policy_reconcile_failed:{detail[-800:]}")
+
+
+async def _preinstall_health(conn, protocol: str, port: int) -> dict[str, Any]:
     try:
         if protocol in _SINGBOX_PROTOCOLS:
             return await _singbox_health(conn, protocol, port)
@@ -115,10 +128,7 @@ async def _preinstall_health(
     return {"ok": False, "protocol": protocol, "port": port}
 
 
-def _occupancy_matches_managed_runtime(
-    protocol: str,
-    occupied: dict[str, str],
-) -> bool:
+def _occupancy_matches_managed_runtime(protocol: str, occupied: dict[str, str]) -> bool:
     text = " ".join(occupied.values()).lower()
     if protocol in _SINGBOX_PROTOCOLS:
         return "twinpanel-sing" in text or "sing-box" in text
@@ -135,27 +145,12 @@ def _occupancy_matches_managed_runtime(
     return False
 
 
-async def _reconcile_install_ports(
-    conn,
-    profiles: list[dict[str, Any]],
-) -> dict[str, dict[str, Any]]:
-    """Resolve real socket conflicts only for multi-protocol bulk apply.
-
-    Single-profile apply preserves the operator-selected port and fails with an
-    explicit conflict. Bulk Sync is an auto-reconcile operation, so an occupied
-    port owned by another runtime is moved to a deterministic free fallback.
-    TCP and UDP are checked independently; an Xray TCP listener on 8444 does
-    not block Hysteria2 UDP 8444.
-    """
+async def _reconcile_install_ports(conn, profiles: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Resolve real socket conflicts only for multi-protocol bulk apply."""
 
     auto_resolve = len(profiles) > 1
-    reserved = {
-        int(item["port"])
-        for item in profiles
-        if item.get("port") is not None
-    }
+    reserved = {int(item["port"]) for item in profiles if item.get("port") is not None}
     remaps: dict[str, dict[str, Any]] = {}
-
     for profile in profiles:
         protocol = str(profile.get("protocol") or "").strip().lower()
         port = int(profile.get("port") or PROTOCOL_CATALOG[protocol]["default_port"])
@@ -163,19 +158,13 @@ async def _reconcile_install_ports(
         occupied = await port_occupancy(conn, port, transport)
         if not occupied:
             continue
-
         current = await _preinstall_health(conn, protocol, port)
-        if bool(current.get("ok")) and _occupancy_matches_managed_runtime(
-            protocol,
-            occupied,
-        ):
+        if bool(current.get("ok")) and _occupancy_matches_managed_runtime(protocol, occupied):
             continue
-
         if not auto_resolve:
             raise ModernRuntimeV2Error(
                 f"port_conflict:{protocol}:{port}:{compact_occupancy(occupied)}"
             )
-
         replacement = await find_available_port(
             conn,
             port,
@@ -191,7 +180,6 @@ async def _reconcile_install_ports(
             "reason": "listener_conflict",
             "owner": compact_occupancy(occupied),
         }
-
     return remaps
 
 
@@ -214,18 +202,14 @@ async def apply_profiles(conn, node, profiles: list[dict[str, Any]]) -> dict[str
 
     environment = await ensure_runtime_environment(conn)
     port_remaps = await _reconcile_install_ports(conn, profiles)
-
     result: dict[str, Any] = {
-        "core": {
-            "preflight": environment,
-            "port_remaps": port_remaps,
-        },
+        "core": {"preflight": environment, "port_remaps": port_remaps},
         "protocols": {},
     }
+
     if singbox_profiles:
         await ensure_singbox_service_unit(conn)
         singbox = await _apply_singbox_profiles(conn, node, singbox_profiles)
-
         singbox_results = singbox.setdefault("protocols", {})
         for profile in singbox_profiles:
             protocol = str(profile.get("protocol") or "").strip().lower()
@@ -234,12 +218,7 @@ async def apply_profiles(conn, node, profiles: list[dict[str, Any]]) -> dict[str
                 continue
             raw_port = profile.get("port")
             port = int(raw_port) if raw_port is not None else None
-            singbox_results[protocol] = await _wait_for_singbox_health(
-                conn,
-                protocol,
-                port,
-            )
-
+            singbox_results[protocol] = await _wait_for_singbox_health(conn, protocol, port)
         result["core"]["sing-box"] = singbox.get("core", {})
         result["protocols"].update(singbox_results)
 
@@ -247,17 +226,18 @@ async def apply_profiles(conn, node, profiles: list[dict[str, Any]]) -> dict[str
         protocol = str(profile.get("protocol") or "").strip().lower()
         standalone = await apply_standalone_profile(conn, node, profile)
         core = standalone.pop("core", {})
-        if not bool(standalone.get("ok")):
-            raw_port = profile.get("port")
-            port = int(raw_port) if raw_port is not None else None
-            readiness = await _wait_for_standalone_health(
-                conn,
-                protocol,
-                port,
-            )
-            for key, value in standalone.items():
-                readiness.setdefault(key, value)
-            standalone = readiness
+
+        # apply_standalone_profile writes the protocol's canonical runtime
+        # config. Reconcile the active Outbound Policy immediately afterwards
+        # so reinstall/sync cannot silently return the runtime to direct egress.
+        await _reconcile_standalone_policy(conn)
+        raw_port = profile.get("port")
+        port = int(raw_port) if raw_port is not None else None
+        readiness = await _wait_for_standalone_health(conn, protocol, port)
+        for key, value in standalone.items():
+            readiness.setdefault(key, value)
+        standalone = readiness
+
         result["core"][protocol] = core
         result["protocols"][protocol] = standalone
 
@@ -278,7 +258,9 @@ async def remove_profile(conn, protocol: str) -> dict[str, Any]:
     if key in _SINGBOX_PROTOCOLS:
         return await _remove_singbox_profile(conn, key)
     if key in STANDALONE_PROTOCOLS:
-        return await remove_standalone(conn, key)
+        result = await remove_standalone(conn, key)
+        await _reconcile_standalone_policy(conn)
+        return result
     raise ModernRuntimeV2Error(f"protocol runtime is not available: {key}")
 
 
