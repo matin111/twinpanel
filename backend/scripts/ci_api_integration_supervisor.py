@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -131,9 +132,15 @@ def _verify_routes() -> None:
 
 
 def _run_smokes() -> None:
+    smoke_env = os.environ.copy()
+    existing_pythonpath = smoke_env.get("PYTHONPATH", "").strip()
+    backend_path = str(BACKEND_DIR)
+    smoke_env["PYTHONPATH"] = (
+        backend_path if not existing_pythonpath else f"{backend_path}{os.pathsep}{existing_pythonpath}"
+    )
     for command in SMOKE_COMMANDS:
         print("API_SMOKE_RUN", " ".join(command), flush=True)
-        subprocess.run(command, cwd=BACKEND_DIR, check=True)
+        subprocess.run(command, cwd=BACKEND_DIR, check=True, env=smoke_env)
 
 
 if __name__ == "__main__":
