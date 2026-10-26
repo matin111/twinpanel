@@ -1,0 +1,22 @@
+.fullWidth :global(section > div:has(> aside)){
+  grid-template-columns:minmax(0,1fr);
+}
+
+.fullWidth :global(section > div:has(> aside) > div:first-child){
+  border-inline-end:0;
+  border-bottom:1px solid var(--opc-border);
+}
+
+.fullWidth :global(section > div:has(> aside) > aside){
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  padding:16px 20px 20px;
+  border-top:0;
+}
+
+@media(max-width:900px){
+  .fullWidth :global(section > div:has(> aside) > aside){
+    grid-template-columns:1fr;
+  }
+}
