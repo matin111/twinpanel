@@ -315,6 +315,16 @@ def apply_protocol_dataplane_desired_state_v87() -> None:
         _enabled_access_protocols_v87
     )
 
+    # V251 extends the final V87 service-route authority additively with the
+    # ten modern protocols and live Iran-ingress delivery. It must execute here
+    # (after V87 owns the route builder) and before Unified L3 V49 captures the
+    # composite builder in self_hosted_runtime.
+    from .modern_protocol_tunnel_binding_v251 import (
+        apply_modern_protocol_tunnel_binding_v251,
+    )
+
+    apply_modern_protocol_tunnel_binding_v251()
+
     _RUNTIME_APPLIED = True
 
     print(
@@ -324,6 +334,7 @@ def apply_protocol_dataplane_desired_state_v87() -> None:
         "telemetry_status_authority=0 "
         "xray_public_profiles=restored_v109 "
         "l2tp_ppp_convergence=v111 "
+        "modern_tunnel_binding=v251 "
         "protocols=cisco,openvpn,wireguard,l2tp,v2ray",
         flush=True,
     )
