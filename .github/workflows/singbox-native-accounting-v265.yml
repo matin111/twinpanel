@@ -1,0 +1,102 @@
+name: TwinPanel Sing-box Native Accounting V265
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/services/singbox_native_accounting_v265.py"
+      - "backend/app/services/modern_quota_runtime_v257.py"
+      - "backend/app/routers/modern_accounting_runtime_v257.py"
+      - "backend/app/routers/public_connection_live_v4.py"
+      - "backend/tests/singbox_native_accounting_v265_smoke.py"
+      - "backend/tests/modern_accounting_v257_smoke.py"
+      - ".github/workflows/singbox-native-accounting-v265.yml"
+  workflow_dispatch:
+
+jobs:
+  singbox-native-accounting:
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: twinpanel
+          POSTGRES_PASSWORD: twinpanel_test
+          POSTGRES_DB: twinpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U twinpanel -d twinpanel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      APP_NAME: TwinPanel-Singbox-Native-Accounting-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Prepare runtime directories
+        run: |
+          sudo install -d -m 700 /etc/twinpanel
+          sudo install -d -m 700 /var/lib/twinpanel-backups
+          sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel-backups
+
+      - name: Compile native accounting paths
+        run: |
+          python -m py_compile \
+            backend/app/services/singbox_native_accounting_v265.py \
+            backend/app/services/modern_quota_runtime_v257.py \
+            backend/app/routers/modern_accounting_runtime_v257.py \
+            backend/app/routers/public_connection_live_v4.py \
+            backend/tests/singbox_native_accounting_v265_smoke.py \
+            backend/tests/modern_accounting_v257_smoke.py
+
+      - name: Run native sing-box accounting safety smoke
+        working-directory: backend
+        run: PYTHONPATH=. python tests/singbox_native_accounting_v265_smoke.py
+
+      - name: Run canonical modern accounting regression smoke
+        working-directory: backend
+        run: PYTHONPATH=. python tests/modern_accounting_v257_smoke.py
+
+      - name: Verify application import and collector lifecycle
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from app.main import app
+          from app.routers.modern_accounting_runtime_v257 import modern_accounting_lifespan
+          from app.services.singbox_native_accounting_v265 import (
+              SINGBOX_ACCOUNTING_PROTOCOLS,
+              activate_singbox_capabilities,
+              singbox_native_accounting_loop,
+          )
+
+          assert app.title
+          assert callable(modern_accounting_lifespan)
+          assert callable(activate_singbox_capabilities)
+          assert callable(singbox_native_accounting_loop)
+          assert SINGBOX_ACCOUNTING_PROTOCOLS == {
+              "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"
+          }
+          print("SINGBOX_NATIVE_ACCOUNTING_APP_IMPORT=PASS")
+          PY
