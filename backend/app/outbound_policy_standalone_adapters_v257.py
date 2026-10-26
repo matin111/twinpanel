@@ -31,12 +31,14 @@ RECONCILE_PATH = "/usr/local/lib/twinpanel/outbound-policy-standalone-v257"
 
 # Runs on the managed node as root. Mieru and TrustTunnel use their native
 # SOCKS5 upstream support. Sudoku has no server-side upstream proxy setting, so
-# only its dedicated service UID is transparently sent into a Sing-box TProxy
-# inbound. The listener source port is excluded to keep client replies outside
-# the transparent path.
+# its services are isolated behind one dedicated UID and transparently sent
+# into a Sing-box TProxy inbound. A systemd generator applies the UID to both
+# the bootstrap service and future per-subscription services at daemon-reload,
+# before those new services start.
 STANDALONE_RECONCILE_SCRIPT = r'''#!/usr/bin/env python3
 from __future__ import annotations
 
+import glob
 import json
 import os
 import pathlib
@@ -53,10 +55,10 @@ TRUST_PORT = 19084
 SUDOKU_PORT = 19085
 SUDOKU_USER = "twinpanel-sudoku"
 MARK = "0x52a/0xfff"
-MARK_VALUE = "0x52a"
 TABLE = "10960"
 PRIORITY = "10960"
 CHAIN = "TP_SUDOKU_EGRESS"
+GENERATOR = pathlib.Path("/usr/lib/systemd/system-generators/twinpanel-sudoku-outbound-policy")
 
 
 def run(argv, *, check=True, capture=False):
@@ -143,7 +145,6 @@ def configure_mieru(mode):
                 "protocol": "SOCKS5_PROXY_PROTOCOL",
                 "host": "127.0.0.1",
                 "port": MIERU_PORT,
-                "socks5UDPAssociate": True,
             }],
             "rules": [{
                 "ipRanges": ["*"],
@@ -205,24 +206,80 @@ def configure_trusttunnel(mode):
         baseline.unlink(missing_ok=True)
 
 
+def sudoku_generator_text():
+    # Generator output is recreated on every systemctl daemon-reload. Therefore
+    # disabling the policy removes the drop-ins automatically without editing
+    # TwinPanel's canonical unit files.
+    return r'''#!/usr/bin/env python3
+import glob, json, os, pathlib, sys
+state = pathlib.Path("/etc/twinpanel/sing-box/outbound-policy.json")
+try:
+    doc = json.loads(state.read_text(encoding="utf-8"))
+except Exception:
+    raise SystemExit(0)
+policies = doc.get("policies") if isinstance(doc, dict) else {}
+item = policies.get("sudoku") if isinstance(policies, dict) else None
+mode = str(item.get("mode") or "inherit").strip().lower() if isinstance(item, dict) else "inherit"
+if mode == "inherit":
+    raise SystemExit(0)
+out = pathlib.Path(sys.argv[1])
+for path in glob.glob("/etc/systemd/system/twinpanel-sudoku*.service"):
+    name = os.path.basename(path)
+    dropin = out / (name + ".d") / "90-twinpanel-outbound-policy.conf"
+    dropin.parent.mkdir(parents=True, exist_ok=True)
+    dropin.write_text(
+        "[Service]\n"
+        "User=twinpanel-sudoku\n"
+        "AmbientCapabilities=CAP_NET_BIND_SERVICE\n"
+        "CapabilityBoundingSet=CAP_NET_BIND_SERVICE\n"
+        "ExecStartPre=+/bin/chown -R twinpanel-sudoku:twinpanel-sudoku /etc/twinpanel/standalone/sudoku\n",
+        encoding="utf-8",
+    )
+'''
+
+
 def ensure_sudoku_user():
     if run(["id", "-u", SUDOKU_USER], check=False).returncode != 0:
         run(["useradd", "--system", "--home", "/nonexistent", "--shell", "/usr/sbin/nologin", SUDOKU_USER])
-    directory = BASE / "sudoku"
-    if directory.exists():
-        run(["chown", "-R", f"{SUDOKU_USER}:{SUDOKU_USER}", str(directory)])
-        run(["chmod", "700", str(directory)])
-    unit = pathlib.Path("/etc/systemd/system/twinpanel-sudoku.service")
-    if unit.exists():
-        text = unit.read_text(encoding="utf-8")
-        updated = re.sub(r"(?m)^User=.*$", f"User={SUDOKU_USER}", text, count=1)
-        if updated == text and "User=" not in text:
-            updated = text.replace("[Service]\n", f"[Service]\nUser={SUDOKU_USER}\n", 1)
-        if updated != text:
-            atomic_text(unit, updated, 0o644)
-            run(["systemctl", "daemon-reload"])
-            run(["systemctl", "restart", "twinpanel-sudoku.service"])
     return run(["id", "-u", SUDOKU_USER], capture=True).stdout.strip()
+
+
+def install_sudoku_generator():
+    atomic_text(GENERATOR, sudoku_generator_text(), 0o755)
+
+
+def active_sudoku_units():
+    result = run(
+        ["systemctl", "list-units", "--type=service", "--state=active", "--no-legend", "--plain", "twinpanel-sudoku*.service"],
+        check=False,
+        capture=True,
+    )
+    units = []
+    for line in (result.stdout or "").splitlines():
+        name = line.split(None, 1)[0].strip() if line.strip() else ""
+        if name.startswith("twinpanel-sudoku") and name.endswith(".service"):
+            units.append(name)
+    return sorted(set(units))
+
+
+def restart_active_sudoku_units():
+    for unit in active_sudoku_units():
+        run(["systemctl", "restart", unit])
+        run(["systemctl", "is-active", "--quiet", unit])
+
+
+def sudoku_listener_ports():
+    paths = [str(BASE / "sudoku" / "server.config.json")]
+    paths.extend(glob.glob(str(BASE / "sudoku" / "subscriptions" / "*" / "server.config.json")))
+    output = set()
+    for path in paths:
+        try:
+            value = int(json.loads(pathlib.Path(path).read_text(encoding="utf-8")).get("local_port"))
+        except Exception:
+            continue
+        if 1 <= value <= 65535:
+            output.add(value)
+    return sorted(output)
 
 
 def ipt(*args, check=True):
@@ -234,9 +291,13 @@ def clear_sudoku(uid):
         while ipt("-t", "mangle", "-C", "OUTPUT", "-m", "owner", "--uid-owner", uid, "-j", CHAIN, check=False).returncode == 0:
             ipt("-t", "mangle", "-D", "OUTPUT", "-m", "owner", "--uid-owner", uid, "-j", CHAIN)
     for proto in ("tcp", "udp"):
-        rule = ("-t", "mangle", "PREROUTING", "-m", "mark", "--mark", MARK, "-p", proto, "-j", "TPROXY", "--on-ip", "127.0.0.1", "--on-port", str(SUDOKU_PORT), "--tproxy-mark", MARK)
-        while ipt("-C", *rule, check=False).returncode == 0:
-            ipt("-D", *rule)
+        args = (
+            "-t", "mangle", "PREROUTING", "-m", "mark", "--mark", MARK,
+            "-p", proto, "-j", "TPROXY", "--on-ip", "127.0.0.1",
+            "--on-port", str(SUDOKU_PORT), "--tproxy-mark", MARK,
+        )
+        while ipt("-t", "mangle", "-C", *args[2:], check=False).returncode == 0:
+            ipt("-t", "mangle", "-D", *args[2:])
     ipt("-t", "mangle", "-F", CHAIN, check=False)
     ipt("-t", "mangle", "-X", CHAIN, check=False)
     while run(["ip", "-4", "rule", "del", "priority", PRIORITY], check=False).returncode == 0:
@@ -245,32 +306,35 @@ def clear_sudoku(uid):
 
 
 def configure_sudoku(mode):
-    config = BASE / "sudoku" / "server.config.json"
-    unit = pathlib.Path("/etc/systemd/system/twinpanel-sudoku.service")
-    if not config.exists() or not unit.exists():
-        return
-    uid = ensure_sudoku_user()
+    install_sudoku_generator()
+    uid_probe = run(["id", "-u", SUDOKU_USER], check=False, capture=True)
+    uid = (uid_probe.stdout or "").strip() if uid_probe.returncode == 0 else ""
     clear_sudoku(uid)
+
     if mode == "inherit":
+        run(["systemctl", "daemon-reload"])
+        restart_active_sudoku_units()
         return
-    try:
-        port = int(json.loads(config.read_text(encoding="utf-8")).get("local_port"))
-    except Exception as exc:
-        raise RuntimeError("Sudoku local_port is unavailable") from exc
-    if not 1 <= port <= 65535:
-        raise RuntimeError("Sudoku local_port is invalid")
+
+    uid = ensure_sudoku_user()
+    run(["systemctl", "daemon-reload"])
+    restart_active_sudoku_units()
 
     ipt("-t", "mangle", "-N", CHAIN, check=False)
-    for cidr in ("127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16"):
-        ipt("-t", "mangle", "-A", CHAIN, "-d", cidr, "-j", "RETURN")
-    ipt("-t", "mangle", "-A", CHAIN, "-p", "tcp", "--sport", str(port), "-j", "RETURN")
+    ipt("-t", "mangle", "-A", CHAIN, "-d", "127.0.0.0/8", "-j", "RETURN")
+    ipt("-t", "mangle", "-A", CHAIN, "-d", "169.254.0.0/16", "-j", "RETURN")
+    for port in sudoku_listener_ports():
+        ipt("-t", "mangle", "-A", CHAIN, "-p", "tcp", "--sport", str(port), "-j", "RETURN")
     ipt("-t", "mangle", "-A", CHAIN, "-j", "MARK", "--set-xmark", MARK)
     ipt("-t", "mangle", "-A", "OUTPUT", "-m", "owner", "--uid-owner", uid, "-j", CHAIN)
     run(["ip", "-4", "route", "replace", "local", "0.0.0.0/0", "dev", "lo", "table", TABLE])
     run(["ip", "-4", "rule", "add", "priority", PRIORITY, "fwmark", MARK, "lookup", TABLE])
     for proto in ("tcp", "udp"):
-        ipt("-t", "mangle", "-A", "PREROUTING", "-m", "mark", "--mark", MARK, "-p", proto, "-j", "TPROXY", "--on-ip", "127.0.0.1", "--on-port", str(SUDOKU_PORT), "--tproxy-mark", MARK)
-    run(["systemctl", "is-active", "--quiet", "twinpanel-sudoku.service"])
+        ipt(
+            "-t", "mangle", "-A", "PREROUTING", "-m", "mark", "--mark", MARK,
+            "-p", proto, "-j", "TPROXY", "--on-ip", "127.0.0.1",
+            "--on-port", str(SUDOKU_PORT), "--tproxy-mark", MARK,
+        )
 
 
 def main():
