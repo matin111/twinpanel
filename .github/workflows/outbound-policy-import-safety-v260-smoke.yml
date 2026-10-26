@@ -1,0 +1,17 @@
+name: Outbound Policy Import Safety V260 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/outbound_policy_standalone_adapters_v257.py'
+      - 'backend/tests/outbound_policy_import_safety_v260_smoke.py'
+      - '.github/workflows/outbound-policy-import-safety-v260-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify import safety and embedded reconcile script
+        run: python3 backend/tests/outbound_policy_import_safety_v260_smoke.py
