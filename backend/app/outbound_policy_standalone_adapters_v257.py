@@ -264,20 +264,6 @@ def restart_active_sudoku_units():
         run(["systemctl", "is-active", "--quiet", unit])
 
 
-def sudoku_listener_ports():
-    paths = [str(BASE / "sudoku" / "server.config.json")]
-    paths.extend(glob.glob(str(BASE / "sudoku" / "subscriptions" / "*" / "server.config.json")))
-    output = set()
-    for path in paths:
-        try:
-            value = int(json.loads(pathlib.Path(path).read_text(encoding="utf-8")).get("local_port"))
-        except Exception:
-            continue
-        if 1 <= value <= 65535:
-            output.add(value)
-    return sorted(output)
-
-
 def ipt(*args, check=True):
     return run(["iptables", "-w", "10", *args], check=check)
 
@@ -316,12 +302,18 @@ def configure_sudoku(mode):
     run(["systemctl", "daemon-reload"])
     restart_active_sudoku_units()
 
+    # Mark only connections initiated by Sudoku. Replies on client-initiated
+    # listener sessions are ESTABLISHED with no connmark and therefore stay on
+    # the normal server route. This also means future per-subscription listener
+    # ports require no firewall rewrite.
     ipt("-t", "mangle", "-N", CHAIN, check=False)
+    ipt("-t", "mangle", "-A", CHAIN, "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "CONNMARK", "--restore-mark")
+    ipt("-t", "mangle", "-A", CHAIN, "-m", "mark", "!", "--mark", "0", "-j", "RETURN")
+    ipt("-t", "mangle", "-A", CHAIN, "-m", "conntrack", "!", "--ctstate", "NEW", "-j", "RETURN")
     ipt("-t", "mangle", "-A", CHAIN, "-d", "127.0.0.0/8", "-j", "RETURN")
     ipt("-t", "mangle", "-A", CHAIN, "-d", "169.254.0.0/16", "-j", "RETURN")
-    for port in sudoku_listener_ports():
-        ipt("-t", "mangle", "-A", CHAIN, "-p", "tcp", "--sport", str(port), "-j", "RETURN")
     ipt("-t", "mangle", "-A", CHAIN, "-j", "MARK", "--set-xmark", MARK)
+    ipt("-t", "mangle", "-A", CHAIN, "-j", "CONNMARK", "--save-mark")
     ipt("-t", "mangle", "-A", "OUTPUT", "-m", "owner", "--uid-owner", uid, "-j", CHAIN)
     run(["ip", "-4", "route", "replace", "local", "0.0.0.0/0", "dev", "lo", "table", TABLE])
     run(["ip", "-4", "rule", "add", "priority", PRIORITY, "fwmark", MARK, "lookup", TABLE])
