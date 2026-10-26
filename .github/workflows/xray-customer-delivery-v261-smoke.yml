@@ -1,0 +1,44 @@
+name: Xray Customer Delivery V261 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/xray_customer_profile_policy_v30.py'
+      - 'backend/app/xray_modern_runtime.py'
+      - 'backend/app/xray_tcp_tls_v39.py'
+      - 'backend/app/subscription_delivery_policy_v1.py'
+      - 'backend/tests/xray_customer_delivery_v261_smoke.py'
+      - '.github/workflows/xray-customer-delivery-v261-smoke.yml'
+  push:
+    branches:
+      - fix/xray-customer-delivery-v261
+
+permissions:
+  contents: read
+
+jobs:
+  xray-customer-delivery-v261:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+
+      - name: Compile changed runtime and smoke
+        run: |
+          python -m py_compile \
+            backend/app/xray_customer_profile_policy_v30.py \
+            backend/tests/xray_customer_delivery_v261_smoke.py
+
+      - name: Run Xray customer delivery V261 smoke
+        env:
+          PYTHONPATH: backend
+        run: python backend/tests/xray_customer_delivery_v261_smoke.py
