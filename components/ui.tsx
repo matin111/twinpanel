@@ -58,6 +58,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
   const [mobileOpen,setMobileOpen]=useState(false);
   const [openGroup,setOpenGroup]=useState<string|null>(null);
   const attention=useAdminNavAttention(active);
+  const clickOnlyTopnav=active==="/admin/outbounds";
   const navCenterStyle:React.CSSProperties=mobileOpen
     ? {position:"static",maxWidth:"none"}
     : {position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",maxWidth:"calc(100% - 320px)"};
@@ -90,7 +91,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
                 {groupAttention&&<span className="nav-attention-dot" aria-hidden="true"/>}
                 <span className="topnav-chevron" aria-hidden="true">⌄</span>
               </summary>
-              <div className="topnav-menu">
+              {(!clickOnlyTopnav||groupOpen)&&<div className="topnav-menu">
                 <div className="topnav-menu-head">{pick(group.fa,group.en)}</div>
                 <div className="topnav-menu-grid">
                   {group.items.map(([fa,en,h,i])=>{
@@ -105,7 +106,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
                   })}
                 </div>
                 {group.en==="System & Maintenance"&&<div className={`topnav-release ${attention.updateAvailable?"has-attention":""}`}><SystemReleaseFooter/></div>}
-              </div>
+              </div>}
             </details>;
           })}</nav>
         </div>
