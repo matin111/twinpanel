@@ -1,0 +1,50 @@
+name: Modern Protocol Tunnel Binding V251 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/modern_protocol_tunnel_binding_v251.py"
+      - "backend/app/protocol_dataplane_desired_state_v87.py"
+      - "backend/app/routers/account_delivery.py"
+      - "backend/app/standalone_subscription_accounts.py"
+      - "backend/app/singbox_subscription_accounts.py"
+      - "backend/tests/modern_protocol_tunnel_binding_v251_smoke.py"
+      - ".github/workflows/modern-protocol-tunnel-binding-v251-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    env:
+      APP_NAME: TwinPanel-V251-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Compile modern tunnel binding
+        run: |
+          python -m py_compile \
+            backend/app/modern_protocol_tunnel_binding_v251.py \
+            backend/app/protocol_dataplane_desired_state_v87.py \
+            backend/tests/modern_protocol_tunnel_binding_v251_smoke.py
+
+      - name: Verify ten modern protocols and preserve legacy five
+        working-directory: backend
+        run: PYTHONPATH=. python tests/modern_protocol_tunnel_binding_v251_smoke.py
