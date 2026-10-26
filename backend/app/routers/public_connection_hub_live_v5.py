@@ -8,6 +8,9 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from .modern_accounting_runtime_v257 import (
+    router as modern_accounting_runtime_v257_router,
+)
 from .public_connection_hub_refine_v6 import refine_public_connection_hub_html
 from .public_connection_mobile_v7 import refine_public_connection_mobile_v7
 from .public_connection_hub_v8 import refine_public_connection_hub_v8
@@ -39,6 +42,10 @@ router = APIRouter(
     prefix="/v1/connect",
     tags=["public-connection-hub-live-v5"],
 )
+# No HTTP routes are added by the accounting router. Including it here merges
+# its lifespan with the API lifespan, so the collector is deployed by the
+# existing twinpanel-api service and does not depend on a second systemd unit.
+router.include_router(modern_accounting_runtime_v257_router)
 router.include_router(public_connection_multilink_v7_router)
 router.include_router(public_connection_files_v9_router)
 router.include_router(public_connection_modern_delivery_v13_router)
