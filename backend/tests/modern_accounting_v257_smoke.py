@@ -205,8 +205,12 @@ def main() -> None:
     assert '"telemetry_identity"' in node_sync
     assert '"protocol_stats"' in live
     assert "traffic_accounting_available" in live
-    assert "مصرف ثبت‌شده" in hub
-    assert "در دسترس نیست" in hub
+    assert "protocol-live-meta" not in hub
+    assert "مصرف ثبت‌شده" not in hub
+    assert "آخرین فعالیت" not in hub
+    assert "badge.textContent='آنلاین'" in hub
+    assert "badge.textContent='آفلاین'" in hub
+    assert "badge.textContent='آماده'" in hub
     assert "modern_accounting_runtime_v257_router" in hub
     assert "modern_quota_runtime_loop" in lifespan
 
