@@ -10,6 +10,7 @@ from app.routers.outbound_policy_center_v1 import (
     _protocol_payload,
     _strip_previous_generated_rules,
 )
+from app.modern_protocol_runtime_v2 import SHADOWTLS_INNER_TAG, TAGS
 
 
 ROUTE_READY = {
@@ -20,6 +21,15 @@ ROUTE_READY = {
     "shadowtls",
     "snell",
 }
+
+
+def test_adapter_map_matches_runtime_tags() -> None:
+    expected = {
+        key: TAGS[key]
+        for key in ("hysteria2", "tuic", "anytls", "naive", "snell")
+    }
+    expected["shadowtls"] = SHADOWTLS_INNER_TAG
+    assert NATIVE_POLICY_INBOUND_TAGS == expected
 
 
 def test_full_canonical_protocol_inventory() -> None:
@@ -225,6 +235,7 @@ def test_apply_preserves_final_and_unrelated_rules() -> None:
 
 def main() -> None:
     tests = [
+        test_adapter_map_matches_runtime_tags,
         test_full_canonical_protocol_inventory,
         test_protocol_payload_keeps_full_inventory_fail_closed,
         test_native_route_modes,
