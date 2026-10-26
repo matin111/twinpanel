@@ -696,6 +696,8 @@ def apply_singbox_snapshot(
     ]
     closed_retained = sum(1 for row in rows if _safe_int(row.get("closed_at_ms")) > 0)
     retention_saturated = closed_retained >= SINGBOX_CLOSED_RETENTION_LIMIT
+    if retention_saturated:
+        raise RuntimeError("singbox_closed_retention_saturated")
 
     opened = closed = online_count = matched_connections = 0
     baselined = usage_events = accepted_bytes = full_charged = pruned = 0
