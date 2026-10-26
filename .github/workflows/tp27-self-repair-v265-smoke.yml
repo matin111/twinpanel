@@ -1,0 +1,40 @@
+name: TP27 Self Repair V265 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/tp27_self_repair_v265.py"
+      - "backend/app/tp27_repair_api_v265.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/app/self_hosted_runtime.py"
+      - "backend/tests/tp27_self_repair_v265_smoke.py"
+      - "components/tunnel-transport-runtime.tsx"
+      - "lib/tunnel-transport-api.ts"
+      - ".github/workflows/tp27-self-repair-v265-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/tp27_self_repair_v265.py"
+      - "backend/app/tp27_repair_api_v265.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/app/self_hosted_runtime.py"
+      - "backend/tests/tp27_self_repair_v265_smoke.py"
+      - "components/tunnel-transport-runtime.tsx"
+      - "lib/tunnel-transport-api.ts"
+      - ".github/workflows/tp27-self-repair-v265-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run TP27 self-repair contract smoke
+        run: python backend/tests/tp27_self_repair_v265_smoke.py
