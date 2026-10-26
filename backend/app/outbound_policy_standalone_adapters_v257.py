@@ -59,6 +59,8 @@ TABLE = "10960"
 PRIORITY = "10960"
 CHAIN = "TP_SUDOKU_EGRESS"
 GENERATOR = pathlib.Path("/usr/lib/systemd/system-generators/twinpanel-sudoku-outbound-policy")
+MIERU_BASELINE = BASE / "mieru" / "policy-base-egress.json"
+TRUST_BASELINE = BASE / "trusttunnel" / "policy-base-forward.txt"
 
 
 def run(argv, *, check=True, capture=False):
@@ -126,19 +128,18 @@ def configure_mieru(mode):
     if not isinstance(doc, dict):
         raise RuntimeError("Mieru live config is not an object")
 
-    baseline = BASE / "mieru" / "policy-base-egress.json"
     changed = False
     if mode == "inherit":
-        if baseline.exists():
-            saved = json.loads(baseline.read_text(encoding="utf-8"))
+        if MIERU_BASELINE.exists():
+            saved = json.loads(MIERU_BASELINE.read_text(encoding="utf-8"))
             if bool(saved.get("present")):
                 doc["egress"] = saved.get("value")
             else:
                 doc.pop("egress", None)
             changed = True
     else:
-        if not baseline.exists():
-            atomic_json(baseline, {"present": "egress" in doc, "value": doc.get("egress")})
+        if not MIERU_BASELINE.exists():
+            atomic_json(MIERU_BASELINE, {"present": "egress" in doc, "value": doc.get("egress")})
         managed = {
             "proxies": [{
                 "name": "twinpanel-outbound-policy",
@@ -169,8 +170,6 @@ def configure_mieru(mode):
         verify = run(["mita", "status"], capture=True)
         if "RUNNING" not in (verify.stdout or "").upper():
             raise RuntimeError("Mieru did not return to RUNNING after policy reconcile")
-        if mode == "inherit":
-            baseline.unlink(missing_ok=True)
 
 
 FORWARD_RE = re.compile(r"(?ms)^\[forward_protocol(?:\.socks5)?\]\n.*?(?=^\[|\Z)")
@@ -184,14 +183,13 @@ def configure_trusttunnel(mode):
     match = FORWARD_RE.search(text)
     if match is None:
         raise RuntimeError("TrustTunnel forward_protocol block is missing")
-    baseline = BASE / "trusttunnel" / "policy-base-forward.txt"
     if mode == "inherit":
-        if not baseline.exists():
+        if not TRUST_BASELINE.exists():
             return
-        replacement = baseline.read_text(encoding="utf-8")
+        replacement = TRUST_BASELINE.read_text(encoding="utf-8")
     else:
-        if not baseline.exists():
-            atomic_text(baseline, match.group(0))
+        if not TRUST_BASELINE.exists():
+            atomic_text(TRUST_BASELINE, match.group(0))
         replacement = (
             "[forward_protocol.socks5]\n"
             f'address = "127.0.0.1:{TRUST_PORT}"\n'
@@ -202,8 +200,6 @@ def configure_trusttunnel(mode):
         atomic_text(vpn, updated)
         run(["systemctl", "restart", "twinpanel-trusttunnel.service"])
         run(["systemctl", "is-active", "--quiet", "twinpanel-trusttunnel.service"])
-    if mode == "inherit":
-        baseline.unlink(missing_ok=True)
 
 
 def sudoku_generator_text():
@@ -291,13 +287,13 @@ def clear_sudoku(uid):
         while ipt("-t", "mangle", "-C", "OUTPUT", "-m", "owner", "--uid-owner", uid, "-j", CHAIN, check=False).returncode == 0:
             ipt("-t", "mangle", "-D", "OUTPUT", "-m", "owner", "--uid-owner", uid, "-j", CHAIN)
     for proto in ("tcp", "udp"):
-        args = (
-            "-t", "mangle", "PREROUTING", "-m", "mark", "--mark", MARK,
-            "-p", proto, "-j", "TPROXY", "--on-ip", "127.0.0.1",
-            "--on-port", str(SUDOKU_PORT), "--tproxy-mark", MARK,
+        rest = (
+            "PREROUTING", "-m", "mark", "--mark", MARK, "-p", proto,
+            "-j", "TPROXY", "--on-ip", "127.0.0.1", "--on-port",
+            str(SUDOKU_PORT), "--tproxy-mark", MARK,
         )
-        while ipt("-t", "mangle", "-C", *args[2:], check=False).returncode == 0:
-            ipt("-t", "mangle", "-D", *args[2:])
+        while ipt("-t", "mangle", "-C", *rest, check=False).returncode == 0:
+            ipt("-t", "mangle", "-D", *rest)
     ipt("-t", "mangle", "-F", CHAIN, check=False)
     ipt("-t", "mangle", "-X", CHAIN, check=False)
     while run(["ip", "-4", "rule", "del", "priority", PRIORITY], check=False).returncode == 0:
@@ -339,9 +335,23 @@ def configure_sudoku(mode):
 
 def main():
     doc = load_state()
-    configure_mieru(policy_mode(doc, "mieru"))
-    configure_trusttunnel(policy_mode(doc, "trusttunnel"))
-    configure_sudoku(policy_mode(doc, "sudoku"))
+    mieru_mode = policy_mode(doc, "mieru")
+    trust_mode = policy_mode(doc, "trusttunnel")
+    sudoku_mode = policy_mode(doc, "sudoku")
+
+    # Baseline files are intentionally kept until every adapter reconciles.
+    # If a later adapter fails, the caller restores the previous policy state
+    # and invokes this helper again; the preserved baselines make that rollback
+    # lossless. Only after the whole reconcile succeeds may inherit cleanup
+    # remove the snapshots.
+    configure_mieru(mieru_mode)
+    configure_trusttunnel(trust_mode)
+    configure_sudoku(sudoku_mode)
+
+    if mieru_mode == "inherit":
+        MIERU_BASELINE.unlink(missing_ok=True)
+    if trust_mode == "inherit":
+        TRUST_BASELINE.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":
