@@ -1,0 +1,47 @@
+name: TwinPanel Modern Server Country Scope V263
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/public_connection_modern_delivery_v16.py"
+      - "backend/tests/modern_server_country_scope_v263_smoke.py"
+      - ".github/workflows/modern-server-country-scope-v263-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  modern-server-country-scope:
+    runs-on: ubuntu-24.04
+
+    env:
+      APP_NAME: TwinPanel-Modern-Server-Country-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: sqlite:////tmp/twinpanel-modern-country-ci.db
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Compile country-scoped delivery paths
+        run: |
+          python -m py_compile \
+            backend/app/routers/public_connection_modern_delivery_v16.py \
+            backend/tests/modern_server_country_scope_v263_smoke.py
+
+      - name: Run Modern server country scope regression
+        working-directory: backend
+        run: PYTHONPATH=. python tests/modern_server_country_scope_v263_smoke.py
