@@ -47,6 +47,7 @@ def main() -> None:
     )
 
     assert "is_openvpn_central_pki_enabled(db)" in build_source
+    assert '"credential_id": int(credential.id)' in build_source
     assert '"identity": identity' in build_source
     assert '"telemetry_identity": _runtime_identity(' in build_source
 
@@ -55,10 +56,10 @@ def main() -> None:
         tree,
         "sync_node_config",
     )
-    # Schema v4 is an additive evolution of the node quota contract. It keeps
-    # the proven OpenVPN runtime identity behavior above and adds explicit
-    # fail-closed telemetry metadata for modern protocols.
-    assert '"version": 4' in sync_source
+    # Schema v5 is an additive evolution of the quota node contract. It keeps
+    # the proven OpenVPN runtime-CN behavior and v4 fail-closed telemetry while
+    # adding authoritative per-credential node membership/identity metadata.
+    assert '"version": 5' in sync_source
     assert '"fail_closed": True' in sync_source
 
     print("OPENVPN_QUOTA_IDENTITY_V106_OK")
