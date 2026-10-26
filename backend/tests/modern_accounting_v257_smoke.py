@@ -205,8 +205,14 @@ def main() -> None:
     assert '"telemetry_identity"' in node_sync
     assert '"protocol_stats"' in live
     assert "traffic_accounting_available" in live
-    assert "مصرف ثبت‌شده" in hub
-    assert "در دسترس نیست" in hub
+    # Protocol cards intentionally stay compact. Detailed quota/date/accounting
+    # facts belong to the page-level traffic summary and the canonical /live API,
+    # not repeated inside every protocol selector card.
+    assert "مصرف ثبت‌شده" not in hub
+    assert "آخرین فعالیت" not in hub
+    assert "آمار اتصال هنوز ثبت نشده است" not in hub
+    assert "protocol-live-meta" not in hub
+    assert "badge.textContent='آماده'" in hub
     assert "modern_accounting_runtime_v257_router" in hub
     assert "modern_quota_runtime_loop" in lifespan
 
