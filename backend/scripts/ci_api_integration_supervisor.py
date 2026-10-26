@@ -14,6 +14,9 @@ import uvicorn
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
 BASE_URL = "http://127.0.0.1:8095"
 REQUIRED_ROUTES = (
     "/v1/runtime/endpoints",
