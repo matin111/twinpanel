@@ -194,47 +194,19 @@ jobs:
         run: python scripts/bootstrap_admin.py
 
       - name: Start API
+        id: api-server
         working-directory: backend
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          : > /tmp/twinpanel-api-ci.log
-          nohup python -u -m uvicorn app.main:app --host 127.0.0.1 --port 8095 \
-            > /tmp/twinpanel-api-ci.log 2>&1 < /dev/null &
-          API_PID=$!
-          echo "$API_PID" > /tmp/twinpanel-api-ci.pid
-
-          for _ in $(seq 1 20); do
-            if ! kill -0 "$API_PID" 2>/dev/null; then
-              echo "API process exited before binding port 8095"
-              cat /tmp/twinpanel-api-ci.log
-              exit 1
-            fi
-            if curl -fsS http://127.0.0.1:8095/health >/dev/null 2>&1; then
-              exit 0
-            fi
-            sleep 0.5
-          done
-
-          echo "API process stayed alive but did not bind port 8095"
-          cat /tmp/twinpanel-api-ci.log
-          exit 1
+        run: python -u -m uvicorn app.main:app --host 127.0.0.1 --port 8095
+        background: true
 
       - name: Wait for readiness
         run: |
-          API_PID="$(cat /tmp/twinpanel-api-ci.pid)"
           for i in $(seq 1 30); do
-            if ! kill -0 "$API_PID" 2>/dev/null; then
-              echo "API process exited before readiness"
-              cat /tmp/twinpanel-api-ci.log
-              exit 1
-            fi
             if curl -fsS http://127.0.0.1:8095/health/ready; then
               exit 0
             fi
             sleep 2
           done
-          cat /tmp/twinpanel-api-ci.log
           exit 1
 
       - name: Verify required routes
@@ -294,6 +266,9 @@ jobs:
         working-directory: backend
         run: python scripts/api_core_smoke.py
 
+      - name: Stop API
+        cancel: api-server
+
       - name: Setup Node for admin UI verification
         uses: actions/setup-node@v4
         with:
@@ -309,7 +284,3 @@ jobs:
 
       - name: Build admin UI
         run: npm run build
-
-      - name: Show API log on failure
-        if: failure()
-        run: cat /tmp/twinpanel-api-ci.log 2>/dev/null || true
