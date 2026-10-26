@@ -3,7 +3,7 @@
 import {API_BASE} from "./api";
 import {getCustomerToken} from "./customer-api";
 
-export type TunnelTransportName="quic_2027"|"arq_2027"|"kcp_2027"|"tcp_2027"|"kernel_gre"|"ssh_tun"|"backhaul"|"mtunnel"|"gost_tun"|"ssh_relay";
+export type TunnelTransportName="quic_2027"|"arq_2027"|"kcp_2027"|"tcp_2027"|"tp27_fast"|"kernel_gre"|"ssh_tun"|"backhaul"|"mtunnel"|"gost_tun"|"ssh_relay";
 export type TunnelTransportMode="auto"|"manual";
 export type TunnelTransportRow={id?:number;tunnel_id?:number;transport?:string;priority?:number;enabled?:boolean;status?:string;latency_ms?:number|null;last_error?:string|null;last_healthy_at?:string|null;[key:string]:unknown};
 export type TunnelTransportState={tunnel_id:number;iran_node_id?:number;exit_node_id?:number;mode?:string;preferred_transport?:string|null;active_transport?:string|null;last_switch_at?:string|null;transports?:TunnelTransportRow[];[key:string]:unknown};
@@ -179,6 +179,9 @@ export const tunnelTransportApi={
   managedDeepDiagnose:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/managed-deep-diagnose`),
   managedDeepRepair:(id:number)=>managedDeepRepairJob(id),
   installDeepDiagnosticsAgent:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/managed-deep-agent-install`,{method:"POST"}),
+  tp27Diagnose:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/tp27/diagnose`),
+  tp27Repair:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/tp27/repair`,{method:"POST"}),
+  tp27Rebuild:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/tp27/rebuild`,{method:"POST"}),
   installSsh:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/ssh/install`,{method:"POST"}),
   installBackhaul:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/backhaul/install`,{method:"POST"}),
   backhaulStatus:(id:number)=>request<Record<string,unknown>>(`/v1/tunnels/${id}/backhaul/status`),

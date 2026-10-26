@@ -72,6 +72,7 @@ from .tp2027_egress_v28 import (
 from .service_connections_jobs_v28 import (
     apply_service_connections_jobs_v28,
 )
+from .tp27_repair_api_v265 import apply_tp27_repair_api_v265
 
 
 _original_install_or_upgrade_agent = provision._install_or_upgrade_agent
@@ -148,6 +149,14 @@ def apply_self_hosted_runtime(
 
     if manage_transport_service:
         ensure_transport_manager_service_v12()
+
+    # ------------------------------------------------------------
+    # TP27 repair controls V265
+    # ------------------------------------------------------------
+    # Attach read-only diagnose plus bounded repair/rebuild controls to the
+    # already-loaded modern transport router before FastAPI includes it.
+
+    apply_tp27_repair_api_v265()
 
     # ------------------------------------------------------------
     # Mother subscription delivery policy V108
