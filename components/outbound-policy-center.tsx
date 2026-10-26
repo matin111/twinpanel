@@ -5,6 +5,7 @@ import {useEffect, useMemo, useState} from "react";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
+import {OutboundPerformanceInline} from "./outbound-performance-inline";
 import {Badge, PageHead, Shell} from "./ui";
 import styles from "./outbound-policy-center.module.css";
 
@@ -82,7 +83,7 @@ type PolicyInventory={
 
 type PolicyDraft={mode:PolicyMode;outboundTag:string};
 type EditDraft={server:string;serverPort:string;host:string;path:string;sni:string};
-type Tab="routing"|"pool"|"add";
+type Tab="routing"|"pool"|"performance"|"add";
 
 async function api<T>(path:string,init:RequestInit={}):Promise<T>{
   const token=getCustomerToken();
@@ -378,6 +379,7 @@ export function OutboundPolicyCenter(){
         <div className={styles.tabs}>
           <button className={tab==="routing"?styles.tabActive:""} onClick={()=>setTab("routing")}>{pick("مسیریابی پروتکل‌ها","Protocol routing")}</button>
           <button className={tab==="pool"?styles.tabActive:""} onClick={()=>setTab("pool")}>{pick("استخر Outbound","Outbound pool")} <span>{imported.length}</span></button>
+          <button className={tab==="performance"?styles.tabActive:""} onClick={()=>setTab("performance")}>{pick("سرعت و بهینه‌سازی","Speed & optimization")}</button>
           <button className={tab==="add"?styles.tabActive:""} onClick={()=>setTab("add")}>+ {pick("افزودن Outbound","Add outbound")}</button>
         </div>
         <div className={styles.defaultRoute}><span>Default:</span><b className={styles.mono}>{defaultTag}</b>{defaultTag!=="direct"?<button onClick={()=>void clearDefault()} disabled={Boolean(busy)}>{pick("بازگشت به Direct","Return to Direct")}</button>:null}</div>
@@ -412,7 +414,7 @@ export function OutboundPolicyCenter(){
             </div>;
           })}
         </div>:null}
-        <div className={styles.architectureNote}><div><b>{pick("چرا بعضی پروتکل‌ها قفل‌اند؟","Why are some protocols locked?")}</b><p>{pick("TwinPanel همه پروتکل‌های Registry را نشان می‌دهد، اما فقط Hysteria2، TUIC و AnyTLS فعلاً Rule مسیریابی Audit‌شده دارند. پروتکل‌های Kernel، Xray و Coreهای مستقل تا ساخت Egress Adapter محدود و rollback-safe قفل می‌مانند تا UI مسیر جعلی نمایش ندهد.","TwinPanel shows every registry protocol, but only Hysteria2, TUIC and AnyTLS currently have audited routing rules. Kernel, Xray and standalone cores stay locked until bounded rollback-safe egress adapters exist, so the UI never pretends a route is active.")}</p></div><div className={styles.safetyChips}><span>15 Protocols</span><span>Fail-closed UI</span><span>Config validation</span><span>Rule preservation</span><span>Rollback</span></div></div>
+        <div className={styles.architectureNote}><div><b>{pick("وضعیت Adapterهای مسیریابی","Routing adapter status")}</b><p>{pick("لایه Outbound Policy برای ۱۵ پروتکل Registry پیاده‌سازی شده است. نصب و سلامت Runtime هر پروتکل جداگانه و واقعی گزارش می‌شود؛ اگر Runtime نصب نباشد یا Data Plane آماده نباشد، اعمال Policy همان مورد fail-closed می‌ماند.","Outbound Policy adapters are implemented for all 15 registry protocols. Runtime installation and health remain truthful per protocol; if a runtime is absent or its data plane is not ready, that policy path stays fail-closed.")}</p></div><div className={styles.safetyChips}><span>15/15 Adapters</span><span>Fail-closed</span><span>Config validation</span><span>Rule preservation</span><span>Rollback</span></div></div>
       </section>:null}
 
       {tab==="pool"?<section className={styles.panel}>
@@ -442,6 +444,8 @@ export function OutboundPolicyCenter(){
           </article>;
         })}</div>
       </section>:null}
+
+      {tab==="performance"?<OutboundPerformanceInline nodeId={nodeId}/>:null}
 
       {tab==="add"?<section className={styles.panel}><div className={styles.addLayout}>
         <div className={styles.addMain}><span className={styles.sectionKicker}>IMPORT OUTBOUND</span><h2>{pick("افزودن خروجی جدید","Add a new outbound")}</h2><p>{pick("کانفیگ را Paste کنید؛ TwinPanel آن را Parse می‌کند، به فرمت Sing-box تبدیل می‌کند و فقط بعد از Config Check ذخیره می‌کند.","Paste a config. TwinPanel parses it, converts it to Sing-box format, and saves only after config validation.")}</p><div className={styles.protocolChips}>{supported.map(item=><span key={item}>{protocolTitle(item)}</span>)}</div><textarea className={styles.configArea} value={config} onChange={event=>setConfig(event.target.value)} placeholder={"vless://...\nvmess://...\ntrojan://...\nss://..."} spellCheck={false}/><label className={styles.checkRow}><input type="checkbox" checked={setDefaultOnImport} onChange={event=>setSetDefaultOnImport(event.target.checked)}/><span>{pick("بعد از ذخیره، این Outbound مسیر پیش‌فرض کل نود شود","Also make this outbound the node-wide default")}</span></label><div className={styles.addActions}><button className={styles.primaryButton} onClick={()=>void importConfig()} disabled={Boolean(busy)||!config.trim()}>{busy==="import"?pick("در حال بررسی و ذخیره...","Validating and saving..."):pick("بررسی، ذخیره و افزودن به Pool","Validate & add to pool")}</button><button className={styles.ghostButton} onClick={()=>setConfig("")} disabled={Boolean(busy)}>{pick("پاک کردن","Clear")}</button></div></div>
