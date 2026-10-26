@@ -1,0 +1,84 @@
+name: TwinPanel Modern Accounting V257
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/services/modern_quota_runtime_v257.py"
+      - "backend/app/services/quota_node_sync.py"
+      - "backend/app/routers/modern_accounting_runtime_v257.py"
+      - "backend/app/routers/public_connection_live_v4.py"
+      - "backend/app/routers/public_connection_hub_live_v5.py"
+      - "backend/tests/modern_accounting_v257_smoke.py"
+      - ".github/workflows/modern-accounting-v257.yml"
+  workflow_dispatch:
+
+jobs:
+  modern-accounting:
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: twinpanel
+          POSTGRES_PASSWORD: twinpanel_test
+          POSTGRES_DB: twinpanel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U twinpanel -d twinpanel"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      APP_NAME: TwinPanel-Modern-Accounting-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Compile accounting paths
+        run: |
+          python -m py_compile \
+            backend/app/services/modern_quota_runtime_v257.py \
+            backend/app/services/quota_node_sync.py \
+            backend/app/routers/modern_accounting_runtime_v257.py \
+            backend/app/routers/public_connection_live_v4.py \
+            backend/app/routers/public_connection_hub_live_v5.py \
+            backend/tests/modern_accounting_v257_smoke.py
+
+      - name: Run modern accounting regression smoke
+        working-directory: backend
+        run: python tests/modern_accounting_v257_smoke.py
+
+      - name: Verify application import with merged lifespan
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from app.main import app
+          from app.routers.modern_accounting_runtime_v257 import modern_accounting_lifespan
+          from app.services.modern_quota_runtime_v257 import modern_quota_runtime_loop
+
+          assert app.title
+          assert callable(modern_accounting_lifespan)
+          assert callable(modern_quota_runtime_loop)
+          print("MODERN_ACCOUNTING_APP_IMPORT=PASS")
+          PY
