@@ -44,21 +44,75 @@ _NATIVE_POLICY_PROTOCOLS: dict[str, str] = {
     "hysteria2": "twinpanel-hysteria2-in",
     "tuic": "twinpanel-tuic-in",
     "anytls": "twinpanel-anytls-in",
+    "naive": "twinpanel-naive-in",
+    # ShadowTLS is a camouflage/authentication layer. Customer payload enters
+    # the internal Shadowsocks inbound after ShadowTLS succeeds, so policy must
+    # attach to the inner inbound rather than the outer TLS listener.
+    "shadowtls": "twinpanel-shadowtls-inner",
+    "snell": "twinpanel-snell-in",
+}
+
+# Xray currently exposes real customer VLESS profiles, but its data plane is a
+# separate core. Keep those profiles visible as independent routing rows so the
+# admin sees the actual product surface, while fail-closing writes until an
+# audited Xray egress adapter exists.
+_XRAY_PROFILE_PROTOCOLS: dict[str, dict[str, str]] = {
+    "vless_ws_tls": {"title": "VLESS · WebSocket TLS", "profile": "websocket_tls"},
+    "vless_httpupgrade_tls": {"title": "VLESS · HTTPUpgrade TLS", "profile": "httpupgrade_tls"},
+    "vless_tcp_tls": {"title": "VLESS · TCP TLS", "profile": "tcp_tls"},
+    "vless_xhttp_reality": {"title": "VLESS · XHTTP Reality", "profile": "xhttp_reality"},
+    "vless_grpc_reality": {"title": "VLESS · gRPC Reality", "profile": "grpc_reality"},
+    "vless_tcp_simple": {"title": "VLESS · TCP Simple", "profile": "tcp_simple"},
+    "vless_legacy": {"title": "VLESS · Legacy / Admin", "profile": "legacy"},
 }
 
 _POLICY_ALIASES = {
     "xray": "v2ray",
 }
 
-_PROTOCOL_ORDER: tuple[str, ...] = (
+_NATIVE_ORDER: tuple[str, ...] = (
     "hysteria2",
     "tuic",
     "anytls",
-    *(key for key in ALL_PROTOCOL_KEYS if key not in _NATIVE_POLICY_PROTOCOLS),
+    "naive",
+    "shadowtls",
+    "snell",
+)
+_CLASSIC_ORDER: tuple[str, ...] = (
+    "cisco",
+    "openvpn",
+    "wireguard",
+    "l2tp",
+    "v2ray",
+)
+_PROTOCOL_ORDER: tuple[str, ...] = (
+    *_NATIVE_ORDER,
+    *_CLASSIC_ORDER,
+    *_XRAY_PROFILE_PROTOCOLS.keys(),
+    *(
+        key
+        for key in ALL_PROTOCOL_KEYS
+        if key not in set(_NATIVE_ORDER) | set(_CLASSIC_ORDER)
+    ),
 )
 
 
 def _protocol_spec(key: str) -> dict[str, Any]:
+    xray_profile = _XRAY_PROFILE_PROTOCOLS.get(key)
+    if xray_profile is not None:
+        return {
+            "key": key,
+            "title": xray_profile["title"],
+            "family": "xray_profile",
+            "plane": "xray",
+            "core": "xray",
+            "runtime_status": "profile",
+            "profile": xray_profile["profile"],
+            "inbound_tag": None,
+            "policy_supported": False,
+            "reason": "separate_core_adapter_required",
+        }
+
     if key in CLASSIC_PROTOCOL_REGISTRY:
         definition = CLASSIC_PROTOCOL_REGISTRY[key]
         plane = "xray" if key == "v2ray" else "kernel"
@@ -308,6 +362,7 @@ def _protocol_payload(
             "plane": spec["plane"],
             "core": spec.get("core"),
             "runtime_status": spec.get("runtime_status"),
+            "profile": spec.get("profile"),
             "inbound_tag": inbound_tag,
             "policy_supported": supported,
             "installed": installed,
