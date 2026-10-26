@@ -1,10 +1,18 @@
 .wrap{
+  --op4-border:color-mix(in srgb,var(--border,#263049) 86%,transparent);
+  --op4-panel:color-mix(in srgb,var(--panel,#0f1422) 95%,transparent);
+  --op4-soft:color-mix(in srgb,var(--panel-2,#151b2d) 92%,transparent);
+  --op4-text:var(--text,#eef2ff);
+  --op4-muted:var(--muted,#8f9ab5);
+  --op4-violet:#7c3aed;
+  --op4-violet2:#9f67ff;
   margin-top:24px;
   padding:24px;
-  border:1px solid var(--line,rgba(148,163,184,.18));
+  border:1px solid var(--op4-border);
   border-radius:24px;
-  background:var(--surface,rgba(15,23,42,.72));
-  box-shadow:var(--shadow-lg,0 20px 60px rgba(2,6,23,.12));
+  background:var(--op4-panel);
+  box-shadow:0 20px 60px rgba(2,6,23,.10);
+  color:var(--op4-text);
 }
 .head{
   display:flex;
@@ -16,16 +24,16 @@
 .head span,.abBox span{
   display:block;
   margin-bottom:8px;
-  color:var(--purple,#8b5cf6);
+  color:var(--op4-violet2);
   font-size:12px;
   font-weight:800;
   letter-spacing:.08em;
 }
-.head h2,.abBox h3{margin:0;color:var(--text,#f8fafc)}
+.head h2,.abBox h3{margin:0;color:var(--op4-text)}
 .head h2{font-size:24px;line-height:1.35}
 .head p,.abBox p{
   margin:8px 0 0;
-  color:var(--muted,#94a3b8);
+  color:var(--op4-muted);
   line-height:1.8;
 }
 .controls,.actions,.abControls{
@@ -38,17 +46,17 @@
   min-width:180px;
   height:42px;
   padding:0 12px;
-  border:1px solid var(--line,rgba(148,163,184,.22));
+  border:1px solid var(--op4-border);
   border-radius:12px;
-  background:var(--surface-2,var(--surface,#0f172a));
-  color:var(--text,#f8fafc);
+  background:var(--op4-soft);
+  color:var(--op4-text);
 }
 .controls button,.actions button,.abControls button{
   min-height:42px;
   padding:0 16px;
-  border:0;
+  border:1px solid transparent;
   border-radius:12px;
-  background:var(--purple,#8b5cf6);
+  background:linear-gradient(135deg,var(--op4-violet),#6742d3);
   color:#fff;
   font:inherit;
   font-weight:800;
@@ -61,9 +69,9 @@
 }
 .controls button:disabled,.actions button:disabled,.abControls button:disabled{opacity:.45;cursor:not-allowed}
 .actions .secondary{
-  background:var(--surface-2,var(--surface,#111827));
-  color:var(--text,#f8fafc);
-  border:1px solid var(--line,rgba(148,163,184,.22));
+  background:rgba(255,255,255,.025);
+  color:var(--op4-text);
+  border-color:var(--op4-border);
 }
 .grid,.resultGrid{
   display:grid;
@@ -73,26 +81,26 @@
 }
 .card,.resultGrid article{
   padding:18px;
-  border:1px solid var(--line,rgba(148,163,184,.18));
+  border:1px solid var(--op4-border);
   border-radius:18px;
-  background:var(--surface-2,rgba(30,41,59,.42));
+  background:var(--op4-soft);
 }
 .card small,.resultGrid span{
   display:block;
-  color:var(--muted,#94a3b8);
+  color:var(--op4-muted);
   font-size:12px;
 }
 .card strong,.resultGrid b{
   display:block;
   margin-top:8px;
-  color:var(--text,#f8fafc);
+  color:var(--op4-text);
   font-size:18px;
   overflow-wrap:anywhere;
 }
 .card em,.resultGrid small{
   display:block;
   margin-top:8px;
-  color:var(--muted,#94a3b8);
+  color:var(--op4-muted);
   font-size:12px;
   font-style:normal;
   line-height:1.6;
@@ -105,9 +113,9 @@
   gap:24px;
   margin-top:22px;
   padding:20px;
-  border:1px solid color-mix(in srgb,var(--purple,#8b5cf6) 30%,transparent);
+  border:1px solid color-mix(in srgb,var(--op4-violet) 30%,transparent);
   border-radius:20px;
-  background:color-mix(in srgb,var(--purple,#8b5cf6) 7%,var(--surface,#0f172a));
+  background:color-mix(in srgb,var(--op4-violet) 7%,var(--op4-panel));
 }
 .abBox>div:first-child{max-width:720px}
 .error,.notice{
@@ -120,18 +128,18 @@
 .error{
   border:1px solid rgba(239,68,68,.25);
   background:rgba(239,68,68,.08);
-  color:var(--danger,#f87171);
+  color:#ff8f9f;
 }
 .notice{
-  border:1px solid rgba(34,197,94,.24);
-  background:rgba(34,197,94,.08);
-  color:var(--success,#4ade80);
+  border:1px solid rgba(49,196,141,.25);
+  background:rgba(49,196,141,.07);
+  color:#7fddb9;
 }
 .foot{
   margin-top:18px;
   padding-top:16px;
-  border-top:1px solid var(--line,rgba(148,163,184,.16));
-  color:var(--muted,#94a3b8);
+  border-top:1px solid var(--op4-border);
+  color:var(--op4-muted);
   font-size:12px;
   line-height:1.8;
 }
