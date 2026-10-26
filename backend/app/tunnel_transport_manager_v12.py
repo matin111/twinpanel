@@ -55,6 +55,7 @@ from .tp27_reference_runtime_v91 import (
     activate_manager_candidate_policy_v91,
     reconciler_loop as tp27_reference_loop,
 )
+from .tp27_self_repair_v265 import reconciler_loop as tp27_self_repair_loop
 from .vpn_access_dataplane_v46 import reconciler_loop as vpn_access_dataplane_loop
 from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performance_loop
 
@@ -62,6 +63,7 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 # ============================================================
 # TWINPANEL TRANSPORT MANAGER V12
 # + TP27 REFERENCE V91
+# + TP27 SELF REPAIR V265
 # + ADAPTIVE TUNNEL PERFORMANCE V148
 # + LEGACY ADAPTIVE LAYERS V149/V151/V165 (cleanup compatibility)
 # + SMART CANDIDATE INSTALL/RETRY/FAIRNESS V167/V169/V171
@@ -113,6 +115,7 @@ async def main() -> None:
         "bootstrap=v24 "
         "candidate_bootstrap=v38 "
         "tp27_reference=v91 "
+        "tp27_self_repair=v265 "
         "adaptive_tunnel_performance=v148 "
         "compat_multilane=v149,v151,v165 "
         "smart_candidate_install_guard=v167 "
@@ -151,6 +154,11 @@ async def main() -> None:
         name="twinpanel-tp27-reference-v91",
     )
 
+    tp27_self_repair_task = asyncio.create_task(
+        tp27_self_repair_loop(),
+        name="twinpanel-tp27-self-repair-v265",
+    )
+
     vpn_access_task = asyncio.create_task(
         vpn_access_dataplane_loop(),
         name="twinpanel-vpn-access-dataplane-v46",
@@ -180,6 +188,7 @@ async def main() -> None:
         bootstrap_task,
         candidate_bootstrap_task,
         tp27_reference_task,
+        tp27_self_repair_task,
         vpn_access_task,
         vpn_access_performance_task,
         manager_task,

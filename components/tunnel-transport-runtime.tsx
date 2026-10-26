@@ -7,6 +7,7 @@ import {TunnelTransportName,TunnelTransportRow,TunnelTransportState,tunnelTransp
 import {useI18n} from "../lib/i18n";
 
 const transportLabels:Record<string,string>={
+  tp27_fast:"TP27 Fast",
   kcp_2027:"KCP 2027",
   arq_2027:"ARQ 2027",
   quic_2027:"QUIC 2027",
@@ -68,6 +69,7 @@ export function TunnelTransportRuntimePage(){
 
   const selectedTunnel=tunnels.find(row=>row.id===selected);
   const transports=useMemo(()=>asRows(state),[state]);
+  const hasTp27=transports.some(row=>String(row.transport||"").toLowerCase()==="tp27_fast");
   const onlineCount=transports.filter(row=>healthy(row.status)).length;
   const enabledCount=transports.filter(row=>Boolean(row.enabled)).length;
   const modernOnline=transports.filter(row=>String(row.transport||"").endsWith("_2027")&&healthy(row.status)).length;
@@ -77,7 +79,7 @@ export function TunnelTransportRuntimePage(){
     setBusy(key);setError("");setOk("");
     try{
       const result=await fn();
-      if(key==="diagnose")setDiagnosis(result as Record<string,unknown>);
+      if(key==="diagnose"||key==="tp27-diagnose")setDiagnosis(result as Record<string,unknown>);
       if(key==="health")setHealth(result as Record<string,unknown>);
       setOk(label);
       if(refresh)await loadSelected(selected,false);
@@ -119,10 +121,19 @@ export function TunnelTransportRuntimePage(){
       <div className="card-head"><div><b>{pick("وضعیت ترانسپورت‌ها","Transport status")}</b><small>{pick("KCP / ARQ / QUIC / TCP مسیرهای مدرن اصلی هستند؛ موارد Legacy فقط در صورت وجود نمایش داده می‌شوند.","KCP / ARQ / QUIC / TCP are primary modern paths; legacy rows are shown only when present.")}</small></div></div>
       {loading?<div className="runtime-loading">{pick("در حال دریافت…","Loading…")}</div>:transports.length?<div className="module-grid three">{transports.map((row,index)=>{
         const name=String(row.transport||`transport-${index}`);
-        const isModern=name.endsWith("_2027");
+        const isModern=name.endsWith("_2027")||name==="tp27_fast";
         return <div className="card transport-runtime-card" key={String(row.id||name)}><div className="card-head"><div><b>{transportLabels[name]||name}</b><small>{isModern?pick("مسیر مدرن","Modern path"):pick("Legacy / fallback","Legacy / fallback")} · Priority {text(row.priority)}</small></div><Badge tone={statusTone(row.status)}>{text(row.status)}</Badge></div><div className="runtime-info-list"><div><span>{pick("فعال","Enabled")}</span><b>{row.enabled?pick("بله","Yes"):pick("خیر","No")}</b></div><div><span>Latency</span><b>{row.latency_ms==null?"—":`${row.latency_ms} ms`}</b></div><div><span>{pick("آخرین سلامت","Last healthy")}</span><b>{row.last_healthy_at?new Date(String(row.last_healthy_at)).toLocaleString("fa-IR"):"—"}</b></div></div>{row.last_error&&<div className="runtime-error compact" dir="ltr">{String(row.last_error)}</div>}</div>;
       })}</div>:<div className="runtime-empty">{pick("برای این تانل هنوز ترانسپورتی ثبت نشده است.","No transports are registered for this tunnel yet.")}</div>}
     </Card>
+
+    {hasTp27&&<Card>
+      <div className="card-head"><div><b>{pick("تعمیرات TP27 Fast","TP27 Fast repair")}</b><small>{pick("تشخیص فقط وضعیت واقعی Carrier را می‌خواند. تعمیر، در صورت خرابی Carrier را بازیابی می‌کند؛ بازسازی Carrier عملیات اجباری است و Transport منطقی را تغییر نمی‌دهد.","Diagnosis is read-only. Repair recovers a failed carrier; Rebuild Carrier forces a TP27 carrier rebuild without changing the logical transport.")}</small></div><Badge tone="violet">Self‑Repair V265</Badge></div>
+      <div className="action-grid">
+        <button className="ghost" disabled={!selected||Boolean(busy)} onClick={()=>void run("tp27-diagnose",pick("تشخیص TP27 دریافت شد","TP27 diagnosis loaded"),()=>tunnelTransportApi.tp27Diagnose(selected),false)}>{busy==="tp27-diagnose"?"…":pick("تشخیص TP27","Diagnose TP27")}</button>
+        <button className="primary-soft" disabled={!selected||Boolean(busy)} onClick={()=>void run("tp27-repair",pick("تعمیر TP27 انجام شد","TP27 repair finished"),()=>tunnelTransportApi.tp27Repair(selected))}>{busy==="tp27-repair"?"…":pick("تعمیر TP27","Repair TP27")}</button>
+        <button className="ghost" disabled={!selected||Boolean(busy)} onClick={()=>void run("tp27-rebuild",pick("Carrier TP27 بازسازی شد","TP27 carrier rebuilt"),()=>tunnelTransportApi.tp27Rebuild(selected))}>{busy==="tp27-rebuild"?"…":pick("بازسازی Carrier","Rebuild Carrier")}</button>
+      </div>
+    </Card>}
 
     <div className="module-grid two">
       <Card><div className="card-head"><div><b>{pick("عیب‌یابی و تعمیر","Diagnostics & repair")}</b><small>{pick("تعمیر مدیریت‌شده فقط مسیرهای مدرن لازم را بازسازی می‌کند و به تانل‌های دیگر همان ایران دست نمی‌زند.","Managed repair rebuilds only the required modern path for this tunnel and does not touch sibling Exit tunnels.")}</small></div></div><div className="action-grid"><button className="primary-soft" disabled={!selected||Boolean(busy)} onClick={()=>void run("repair",pick("تعمیر مدیریت‌شده انجام شد","Managed repair finished"),()=>tunnelTransportApi.managedRepair(selected))}>{busy==="repair"?"…":pick("تعمیر خودکار","Auto repair")}</button><button className="ghost" disabled={!selected||Boolean(busy)} onClick={()=>void run("diagnose",pick("تشخیص دریافت شد","Diagnosis loaded"),()=>tunnelTransportApi.managedDiagnose(selected),false)}>{busy==="diagnose"?"…":pick("تشخیص","Diagnose")}</button><button className="ghost" disabled={!selected||Boolean(busy)} onClick={()=>void run("health",pick("Health دریافت شد","Health loaded"),()=>tunnelTransportApi.health(selected),false)}>{busy==="health"?"…":"Tunnel Health"}</button></div></Card>
