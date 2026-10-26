@@ -142,6 +142,10 @@ jobs:
         working-directory: backend
         run: python -c 'from app.main import app; print("API_IMPORT_OK", app.title)'
 
+      - name: Run Outbound Performance v265 analytics smoke
+        working-directory: backend
+        run: PYTHONPATH=. python tests/outbound_performance_v265_smoke.py
+
       - name: Verify reseller owned plan schema and routes
         working-directory: backend
         run: |
