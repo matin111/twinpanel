@@ -183,7 +183,7 @@ def test_standalone_helper_matches_upstream_runtime_contracts() -> None:
 
     # TrustTunnel uses its documented global SOCKS5 forward protocol.
     assert "[forward_protocol.socks5]" in STANDALONE_RECONCILE_SCRIPT
-    assert 'address = \\"127.0.0.1:{TRUST_PORT}\\"' in STANDALONE_RECONCILE_SCRIPT
+    assert 'address = "127.0.0.1:{TRUST_PORT}"' in STANDALONE_RECONCILE_SCRIPT
 
     # Sudoku future per-subscription services are covered before start by the
     # generator and only process-initiated connections are marked for TPROXY.
