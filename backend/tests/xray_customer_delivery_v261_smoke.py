@@ -48,6 +48,9 @@ def vless(profile: str, port: int) -> dict:
 
 
 def main() -> None:
+    # Mirror the real self_hosted_runtime composition order: V39 registers the
+    # TCP TLS profile in PROFILE_META before V30/V261 isolates target ports.
+    xray_tcp_tls_v39.apply_xray_tcp_tls_v39()
     policy._apply_tls_target_isolation_v261()
 
     assert (
