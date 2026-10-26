@@ -54,6 +54,11 @@ REQUIRED_ROUTES = (
     "/v1/admin/wallet/topups/{topup_id}/approve",
     "/v1/admin/telegram-bot",
     "/v1/admin/telegram-bot/test",
+    "/v1/settings/vpn/outbound-performance/{node_id}/{tag}/advanced-test",
+    "/v1/settings/vpn/outbound-performance/{node_id}/tuning",
+    "/v1/settings/vpn/outbound-performance/{node_id}/tuning/apply",
+    "/v1/settings/vpn/outbound-performance/{node_id}/tuning/rollback",
+    "/v1/settings/vpn/outbound-performance/{node_id}/advanced-state",
 )
 REQUIRED_ROUTE_PREFIXES = (
     "/v1/xray-modern",
@@ -64,6 +69,8 @@ SMOKE_COMMANDS = (
     (sys.executable, "-m", "scripts.managed_relay_recovery_v20_smoke"),
     (sys.executable, "-m", "scripts.public_direct_tuning_v19_smoke"),
     (sys.executable, "-m", "scripts.transport_policy_v16_smoke"),
+    (sys.executable, "tests/outbound_performance_v261_smoke.py"),
+    (sys.executable, "tests/outbound_performance_v262_smoke.py"),
     (sys.executable, "scripts/api_core_smoke.py"),
 )
 SERVER_ERRORS: list[str] = []
