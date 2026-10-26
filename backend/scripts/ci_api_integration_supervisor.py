@@ -164,5 +164,3 @@ if __name__ == "__main__":
             server_thread.join(timeout=5.0)
         if server_thread.is_alive():
             raise RuntimeError("uvicorn server thread did not stop cleanly")
-        if SERVER_ERRORS:
-            print("UVICORN_SERVER_ERROR", SERVER_ERRORS[-1], file=sys.stderr)
