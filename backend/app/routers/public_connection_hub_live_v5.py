@@ -76,36 +76,8 @@ _LIVE_CSS = r"""
   border-color:color-mix(in srgb,var(--ok) 32%,transparent);
   background:color-mix(in srgb,var(--ok) 8%,transparent);
 }
-.protocol-live-meta{
-  grid-column:1/-1;
-  width:100%;
-  display:grid;
-  grid-template-columns:1fr;
-  gap:3px;
-  margin-top:3px;
-  padding-top:7px;
-  border-top:1px solid color-mix(in srgb,var(--line) 75%,transparent);
-  font-size:10px;
-  line-height:1.5;
-  color:var(--muted);
-  text-align:right;
-}
-.protocol-live-meta b{
-  font-size:10px!important;
-  font-weight:700;
-  color:var(--text);
-}
-.protocol-live-meta .live-state{
-  font-weight:800;
-}
-.protocol-choice.live-online .protocol-live-meta .live-state{color:var(--ok)}
-.protocol-live-meta .unavailable{opacity:.78}
 .live-flash{animation:hubLiveFlash .4s ease}
 @keyframes hubLiveFlash{0%{opacity:.55}100%{opacity:1}}
-@media(max-width:760px){
-  .protocol-live-meta{font-size:9px;gap:2px;padding-top:5px}
-  .protocol-live-meta b{font-size:9px!important}
-}
 """
 
 
@@ -137,14 +109,6 @@ _LIVE_SCRIPT = r"""
     const p=v=>String(v).padStart(2,'0');
     return d.getUTCFullYear()+'/'+p(d.getUTCMonth()+1)+'/'+p(d.getUTCDate());
   }
-  function dateTime(value){
-    if(!value)return '—';
-    const d=new Date(value);
-    if(Number.isNaN(d.getTime()))return '—';
-    const p=v=>String(v).padStart(2,'0');
-    return d.getUTCFullYear()+'/'+p(d.getUTCMonth()+1)+'/'+p(d.getUTCDate())+
-      ' '+p(d.getUTCHours())+':'+p(d.getUTCMinutes());
-  }
   function flash(el){
     if(!el)return;
     el.classList.remove('live-flash');
@@ -163,15 +127,6 @@ _LIVE_SCRIPT = r"""
     if(p==='naiveproxy')return'naive';
     return p;
   }
-  function ensureMeta(card){
-    let meta=card.querySelector('.protocol-live-meta');
-    if(meta)return meta;
-    meta=document.createElement('div');
-    meta.className='protocol-live-meta';
-    meta.setAttribute('aria-live','polite');
-    card.appendChild(meta);
-    return meta;
-  }
   function paintProtocols(protocols,stats){
     const live=new Set((Array.isArray(protocols)?protocols:[]).map(normalizeProtocol));
     const map=stats&&typeof stats==='object'?stats:{};
@@ -183,28 +138,10 @@ _LIVE_SCRIPT = r"""
       card.classList.toggle('live-online',online);
 
       const badge=card.querySelector('em');
-      if(badge){
-        if(online)badge.textContent='آنلاین';
-        else if(item&&item.presence_available)badge.textContent='آفلاین';
-        else badge.textContent='آمار ناموجود';
-      }
-
-      const meta=ensureMeta(card);
-      if(!item){
-        meta.innerHTML='<span class="unavailable">آمار اتصال هنوز ثبت نشده است</span>';
-        return;
-      }
-
-      const usage=item.traffic_accounting_available
-        ? bytes(item.used_bytes)
-        : 'در دسترس نیست';
-      const usageClass=item.traffic_accounting_available?'':' unavailable';
-      meta.innerHTML=
-        '<span class="live-state">'+(online?'● آنلاین':'○ آفلاین')+
-          (Number(item.active_sessions||0)>0?' · '+nf.format(Number(item.active_sessions))+' نشست':'')+
-        '</span>'+
-        '<b class="'+usageClass+'">مصرف ثبت‌شده: '+usage+'</b>'+
-        '<span>شروع: '+date(item.first_connected_at)+' · آخرین فعالیت: '+dateTime(item.last_activity_at)+'</span>';
+      if(!badge)return;
+      if(online)badge.textContent='آنلاین';
+      else if(item&&item.presence_available)badge.textContent='آفلاین';
+      else badge.textContent='آماده';
     });
   }
   function apply(payload){
@@ -230,10 +167,7 @@ _LIVE_SCRIPT = r"""
       .map(([key,item])=>[
         key,
         item?.online,
-        item?.active_sessions,
-        item?.used_bytes,
-        item?.first_connected_at,
-        item?.last_activity_at,
+        item?.presence_available,
       ].join(':'))
       .sort()
       .join(',');
@@ -273,7 +207,7 @@ def public_connection_hub_live_v5(
     token: str,
     db: Session = Depends(get_db),
 ):
-    """Render the V5 public hub and attach canonical live protocol statistics."""
+    """Render the V5 public hub and attach canonical live protocol status."""
     base = public_connection_hub_v5(token, db)
     source = base.body.decode(getattr(base, "charset", None) or "utf-8")
 
