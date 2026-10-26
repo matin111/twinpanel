@@ -9,12 +9,10 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..amneziawg_live_telemetry_v221 import subscription_amneziawg_live
 from ..database import get_db
 from ..models import SubscriptionProtocol
 from ..quota_models import QuotaCursor, QuotaSession, QuotaUsageEvent
 from ..services.modern_quota_runtime_v257 import capability_payload
-from ..wireguard_live_telemetry_v97 import subscription_wireguard_live
 from .account_delivery import _subscription_from_share_token, _usage_payload
 from .public_connection_v3 import public_connection_page_v3
 
@@ -206,7 +204,14 @@ def _protocol_stats(
 
 @router.get("/{token}/live")
 async def public_connection_live(token: str, db: Session = Depends(get_db)):
-    """Public canonical live state and per-protocol accounting summary."""
+    """Public canonical live state and per-protocol accounting summary.
+
+    This request path is deliberately DB-only. Runtime I/O (including WG/AWG
+    peer snapshots) belongs to the Modern Accounting collector, which writes
+    canonical QuotaSession/QuotaUsageEvent state in the background. Keeping
+    SSH/runtime probes out of the 3-second browser poll prevents request piles,
+    lock contention and long-held DB sessions without changing billing data.
+    """
 
     sub = _subscription_from_share_token(token, db)
     usage = _usage_payload(db, sub)
@@ -254,20 +259,8 @@ async def public_connection_live(token: str, db: Session = Depends(get_db)):
             online_protocols.add(protocol)
         last_counter_activity = _latest(last_counter_activity, reported_at)
 
-    # Native peer telemetry remains a display fallback. Canonical billing comes
-    # only from QuotaCursor/QuotaUsageEvent and is never mutated by these checks.
-    wireguard_online, wireguard_seen = await subscription_wireguard_live(db, sub)
-    if wireguard_online:
-        online_protocols.add("wireguard")
-
-    amneziawg_online, amneziawg_seen = await subscription_amneziawg_live(db, sub)
-    if amneziawg_online:
-        online_protocols.add("amneziawg")
-
     connection_online = bool(online_protocols)
     last_connection_seen = _latest(last_session_seen, last_counter_activity)
-    last_connection_seen = _latest(last_connection_seen, wireguard_seen)
-    last_connection_seen = _latest(last_connection_seen, amneziawg_seen)
 
     protocol_stats = _protocol_stats(
         db,
@@ -275,28 +268,6 @@ async def public_connection_live(token: str, db: Session = Depends(get_db)):
         online_protocols=online_protocols,
         activity_cutoff=activity_cutoff,
     )
-    if "wireguard" in protocol_stats:
-        protocol_stats["wireguard"]["last_activity_at"] = _iso_utc(
-            _latest(
-                wireguard_seen,
-                datetime.fromisoformat(
-                    protocol_stats["wireguard"]["last_activity_at"].removesuffix("Z")
-                )
-                if protocol_stats["wireguard"]["last_activity_at"]
-                else None,
-            )
-        )
-    if "amneziawg" in protocol_stats:
-        protocol_stats["amneziawg"]["last_activity_at"] = _iso_utc(
-            _latest(
-                amneziawg_seen,
-                datetime.fromisoformat(
-                    protocol_stats["amneziawg"]["last_activity_at"].removesuffix("Z")
-                )
-                if protocol_stats["amneziawg"]["last_activity_at"]
-                else None,
-            )
-        )
 
     status = str(getattr(sub.status, "value", sub.status)).lower()
     return {
