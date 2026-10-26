@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.253",
+  "version": "1.1.0-rc.254",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-26T13:36:47Z",
+  "released_at": "2026-10-26T14:16:22Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "1afb16a136666976f253542cf5ca867cd71b60ef",
+  "source_sha": "193b045e48ee1c4925e719aca700b47877bac7dd",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.253/twinpanel-1.1.0-rc.253-linux-x86_64.tar.gz",
-    "sha256": "164603cd9cc9f12606b81f66f417af0111fcc0831ae3436c200a2893ee74aa10",
-    "size_bytes": 28184262
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.254/twinpanel-1.1.0-rc.254-linux-x86_64.tar.gz",
+    "sha256": "440740ce6d862dccbe2718dd46219605145d12f1a305dbe2ef63b0c33c37f7f9",
+    "size_bytes": 28184384
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.253 ایراد واقعی چیدمان صفحه /admin/outbounds را که پس از نصب rc.252 در Production دوباره با اسکرین‌شات تأیید شد اصلاح می‌کند. بررسی مستقیم OutboundPolicyCenter نشان داد ستون سمت راست مربوط به منوی بالای Admin نبود؛ خود workflow افزودن Outbound یک addAside شامل کارت‌های Safe Apply، Rollback و Isolated Test داشت و CSS دسکتاپ addLayout را عمداً به دو ستون 1fr + 300px تقسیم می‌کرد. PR #1015 فقط Route /admin/outbounds را اصلاح کرد: فرم افزودن Outbound تمام‌عرض شده، ستون 300px کناری حذف شده و همان اطلاعات ایمنی به‌صورت ردیف افقی سه‌ستونه زیر فرم قرار می‌گیرد و زیر 900px یک‌ستونه می‌شود. هیچ Backend/API/Auth/Quota/Tunnel/Policy/Runtime تغییر نکرده و هیچ !important اضافه نشده است. Outbound Policy Center Smoke، Preview Validation و Full API/Admin Build سبز شدند. Source این Candidate روی SHA immutable 1afb16a136666976f253542cf5ca867cd71b60ef قفل است. Production validation فقط بعد از نصب rc.253 روی Controller 217.179.6.142 و تأیید نبود ستون کناری در Add Outbound انجام می‌شود.",
-    "en": "TwinPanel 1.1.0-rc.253 fixes the actual /admin/outbounds layout defect confirmed again by the production screenshot after rc.252 was installed. Direct audit of OutboundPolicyCenter proved the right-side rail was not the admin top navigation: the Add Outbound workflow itself rendered an addAside containing Safe Apply, Rollback and Isolated Test cards, while desktop CSS explicitly split addLayout into 1fr + 300px columns. PR #1015 scopes the correction to /admin/outbounds: the Add Outbound form is now full width, the 300px side rail is removed, and the same safety information is preserved as a three-column horizontal row below the form, collapsing to one column below 900px. No Backend/API/Auth/Quota/Tunnel/Policy/Runtime behavior changed and no !important rule was added. Outbound Policy Center Smoke, Preview Validation and the full API/Admin build passed. This candidate is pinned to immutable source SHA 1afb16a136666976f253542cf5ca867cd71b60ef. Production validation remains pending installation of rc.253 on Controller 217.179.6.142 and visual confirmation that Add Outbound no longer has a right-side column."
+    "fa": "TwinPanel 1.1.0-rc.254 باگ باقی‌مانده ستون شیشه‌ای صفحه /admin/outbounds را اصلاح می‌کند. پس از rc.253 مشخص شد ستون 300px حذف شده بود اما عنصر safety aside هنوز تحت استایل عمومی Admin به شکل Rail شفاف/شناور در سمت راست باقی می‌ماند. PR #1018 فقط CSS همان Route را اصلاح کرد و position/inset/width/height/z-index/transform/backdrop/background/shadow inherited روی aside را خنثی کرد تا کارت‌های Safe Apply، Rollback و Isolated Test در جریان عادی صفحه و به‌صورت ردیف تمام‌عرض زیر فرم بمانند. هیچ Backend/API/Auth/Quota/Tunnel/Policy/Runtime تغییر نکرده و هیچ !important اضافه نشده است. Preview Validation، Tunnel UI Smoke و Full API/Admin Build سبز شدند. Source این Candidate روی SHA immutable 193b045e48ee1c4925e719aca700b47877bac7dd قفل است. Production validation فقط بعد از نصب rc.254 روی Controller 217.179.6.142 و تأیید حذف کامل ستون شیشه‌ای انجام می‌شود.",
+    "en": "TwinPanel 1.1.0-rc.254 fixes the remaining translucent glass rail on /admin/outbounds. After rc.253, the 300px grid column was gone, but the safety aside was still affected by generic admin styling and remained as a transparent floating/sticky rail on the right. PR #1018 changes only the route CSS, neutralizing inherited position/inset/size/z-index/transform/backdrop/background/shadow behavior so the Safe Apply, Rollback and Isolated Test cards stay in normal full-width document flow below the form. No Backend/API/Auth/Quota/Tunnel/Policy/Runtime behavior changed and no !important rule was added. Preview Validation, Tunnel UI Smoke and the full API/Admin build passed. This candidate is pinned to immutable source SHA 193b045e48ee1c4925e719aca700b47877bac7dd. Production validation remains pending installation of rc.254 on Controller 217.179.6.142 and visual confirmation that the glass rail is completely gone."
   }
 }
