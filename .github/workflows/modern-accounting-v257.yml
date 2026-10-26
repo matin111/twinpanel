@@ -67,7 +67,7 @@ jobs:
 
       - name: Run modern accounting regression smoke
         working-directory: backend
-        run: python tests/modern_accounting_v257_smoke.py
+        run: PYTHONPATH=. python tests/modern_accounting_v257_smoke.py
 
       - name: Verify application import with merged lifespan
         working-directory: backend
