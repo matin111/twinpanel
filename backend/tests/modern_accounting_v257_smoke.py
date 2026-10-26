@@ -205,6 +205,16 @@ def main() -> None:
     assert '"telemetry_identity"' in node_sync
     assert '"protocol_stats"' in live
     assert "traffic_accounting_available" in live
+
+    # Public polling must remain a DB-only read path. Runtime I/O belongs to the
+    # background Modern Accounting collector; putting WG/AWG SSH probes back in
+    # this 3-second route recreates request queues and long-held DB sessions.
+    assert "subscription_wireguard_live" not in live
+    assert "subscription_amneziawg_live" not in live
+    assert "ssh_connect_saved" not in live
+    assert "connect_protocol_runtime" not in live
+    assert "deliberately DB-only" in live
+
     # Protocol cards intentionally stay compact. Detailed quota/date/accounting
     # facts belong to the page-level traffic summary and the canonical /live API,
     # not repeated inside every protocol selector card.
@@ -222,6 +232,7 @@ def main() -> None:
     print("MODERN_ACCOUNTING_MAPPING=PASS")
     print("MODERN_ACCOUNTING_COUNTER_SAFETY=PASS")
     print("MODERN_ACCOUNTING_PARSERS=PASS")
+    print("MODERN_ACCOUNTING_PUBLIC_LIVE_DB_ONLY=PASS")
     print("MODERN_ACCOUNTING_UI=PASS")
     print("MODERN_ACCOUNTING_LIFECYCLE=PASS")
 
