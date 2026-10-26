@@ -193,24 +193,53 @@ jobs:
         working-directory: backend
         run: python scripts/bootstrap_admin.py
 
-      - name: Start API
-        id: api-server
-        working-directory: backend
-        run: python -u -m uvicorn app.main:app --host 127.0.0.1 --port 8095
-        background: true
-
-      - name: Wait for readiness
+      # Keep the API process and every network-dependent assertion in one shell
+      # lifecycle. GitHub-hosted runner steps may clean up shell-spawned children
+      # between steps, so cross-step localhost process persistence is not used.
+      - name: Run API integration smoke
+        shell: bash
         run: |
-          for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:8095/health/ready; then
-              exit 0
+          set -Eeuo pipefail
+          cd backend
+          : > /tmp/twinpanel-api-ci.log
+
+          python -u -m uvicorn app.main:app --host 127.0.0.1 --port 8095 \
+            > /tmp/twinpanel-api-ci.log 2>&1 &
+          API_PID=$!
+
+          cleanup() {
+            rc=$?
+            if [ "$rc" -ne 0 ]; then
+              echo "===== API LOG ====="
+              cat /tmp/twinpanel-api-ci.log || true
+              echo "===== LAST READINESS RESPONSE ====="
+              cat /tmp/twinpanel-ready.json 2>/dev/null || true
+            fi
+            kill "$API_PID" >/dev/null 2>&1 || true
+            wait "$API_PID" >/dev/null 2>&1 || true
+            exit "$rc"
+          }
+          trap cleanup EXIT
+
+          ready=0
+          for _ in $(seq 1 30); do
+            if ! kill -0 "$API_PID" 2>/dev/null; then
+              echo "API process exited before readiness"
+              exit 1
+            fi
+            code="$(curl -sS -o /tmp/twinpanel-ready.json -w '%{http_code}' http://127.0.0.1:8095/health/ready || true)"
+            if [ "$code" = "200" ]; then
+              ready=1
+              cat /tmp/twinpanel-ready.json
+              break
             fi
             sleep 2
           done
-          exit 1
+          if [ "$ready" -ne 1 ]; then
+            echo "API did not become ready"
+            exit 1
+          fi
 
-      - name: Verify required routes
-        run: |
           curl -fsS http://127.0.0.1:8095/openapi.json > /tmp/openapi.json
           grep -q '"/v1/runtime/endpoints"' /tmp/openapi.json
           grep -q '"/v1/auth/login"' /tmp/openapi.json
@@ -246,28 +275,11 @@ jobs:
           grep -q '"/v1/xray-modern' /tmp/openapi.json
           grep -q '"/v1/xray-modern-admin' /tmp/openapi.json
 
-      - name: Run managed tunnel orchestration smoke
-        working-directory: backend
-        run: python -m scripts.tunnel_managed_smoke
-
-      - name: Run V20 managed relay recovery smoke
-        working-directory: backend
-        run: python -m scripts.managed_relay_recovery_v20_smoke
-
-      - name: Run V19 public direct tuning smoke
-        working-directory: backend
-        run: python -m scripts.public_direct_tuning_v19_smoke
-
-      - name: Run V16 transport policy smoke
-        working-directory: backend
-        run: python -m scripts.transport_policy_v16_smoke
-
-      - name: Run standalone API core smoke
-        working-directory: backend
-        run: python scripts/api_core_smoke.py
-
-      - name: Stop API
-        cancel: api-server
+          python -m scripts.tunnel_managed_smoke
+          python -m scripts.managed_relay_recovery_v20_smoke
+          python -m scripts.public_direct_tuning_v19_smoke
+          python -m scripts.transport_policy_v16_smoke
+          python scripts/api_core_smoke.py
 
       - name: Setup Node for admin UI verification
         uses: actions/setup-node@v4
