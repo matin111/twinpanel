@@ -52,10 +52,13 @@ def main() -> None:
     assert "EGRESS_CONTRACT" in reconcile
     assert "_LEGACY_REPAIR_STATES" in reconcile
 
-    # Public Sublink telemetry must consume native AmneziaWG handshake/counters
-    # and map the protocol card instead of relying only on Quota tables.
-    assert "subscription_amneziawg_live" in live
-    assert 'online_protocols.add("amneziawg")' in live
+    # Native AWG parsing remains a runtime-collector primitive, but the public
+    # 3-second Sublink poll must consume canonical DB state only. Request-time
+    # SSH telemetry here caused queued /live requests under real Controller load.
+    assert "subscription_amneziawg_live" not in live
+    assert 'online_protocols.add("amneziawg")' not in live
+    assert "QuotaSession" in live
+    assert "QuotaUsageEvent" in live
     assert "text.includes('amneziawg')" in live
 
     telemetry = load_telemetry()
@@ -87,6 +90,7 @@ def main() -> None:
     print("AMNEZIAWG_EGRESS=PASS")
     print("AMNEZIAWG_LEGACY_SELF_HEAL=PASS")
     print("AMNEZIAWG_NATIVE_LIVE=PASS")
+    print("AMNEZIAWG_PUBLIC_LIVE_DB_ONLY=PASS")
     print("AMNEZIAWG_UI_MAPPING=PASS")
 
 
