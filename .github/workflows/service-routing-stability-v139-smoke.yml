@@ -191,11 +191,19 @@ jobs:
           assert '--to-destination 10.253.0.22:8448' in restore_script
           assert restore_script.count('COMMIT\n') == 3
 
-          # V79 is intentionally the activation point: it runs before V49
-          # captures make_agent, and V139 then becomes the rollout marker so
-          # already-installed nodes are upgraded too.
+          # V79 remains the activation point and V139 routing hardening remains
+          # mandatory. A newer Agent rollout marker may supersede V139 only
+          # after V139 has patched the renderer, so existing nodes receive both
+          # the stable routing block and the newer active-transport authority.
           assert 'apply_service_routing_stability_v139' in registry_text
-          assert 'agent_rollout_marker=v139' in registry_text
+          v139_at = registry_text.index('apply_service_routing_stability_v139()')
+          rollout_at = registry_text.index(
+              'rollout._AGENT_MARKER = AGENT_MARKER',
+              v139_at,
+          )
+          assert v139_at < rollout_at
+          assert 'TWINPANEL_ACTIVE_TRANSPORT_AUTHORITY_V258' in registry_text
+          assert 'agent_rollout_marker=v258' in registry_text
 
           print('SERVICE_ROUTING_STABILITY_V139_SMOKE=PASS')
           print('STEADY_STATE_RESTORE_CALLS=0_AFTER_FIRST_CONVERGENCE')
