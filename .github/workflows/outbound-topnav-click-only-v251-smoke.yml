@@ -1,0 +1,21 @@
+name: Outbound Topnav Click-Only V251 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/ui.tsx'
+      - 'scripts/outbound_topnav_click_only_v251_smoke.py'
+      - '.github/workflows/outbound-topnav-click-only-v251-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Outbound topnav interaction contract
+        run: python scripts/outbound_topnav_click_only_v251_smoke.py
