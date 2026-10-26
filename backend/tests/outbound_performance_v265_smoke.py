@@ -8,6 +8,7 @@ from app.routers.outbound_performance_v265 import (
     _recommendations,
     _stability_score,
 )
+from outbound_performance_v268_smoke import main as v268_main
 
 
 def sample(tag: str, *, score: float, latency: float, download: float, upload: float, jitter: float = 2.0, loss: float = 0.0):
@@ -82,7 +83,8 @@ def main() -> None:
     assert failed["score"] == 0.0
     assert failed["quality"] == "failed"
 
-    print("outbound performance v265 smoke: ok")
+    v268_main()
+    print("outbound performance v265+v268 smoke: ok")
 
 
 if __name__ == "__main__":
