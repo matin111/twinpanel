@@ -79,8 +79,16 @@ def main() -> None:
     )
 
     sync_text = SYNC.read_text(encoding="utf-8")
-    assert '"version": 4' in sync_text, (
-        "quota node config schema was not bumped to v4"
+    # Schema v5 preserves the v4 fail-closed contract and adds authoritative
+    # per-credential node membership plus runtime telemetry identity metadata.
+    assert '"version": 5' in sync_text, (
+        "quota node config schema was not bumped to v5"
+    )
+    assert '"credential_id"' in sync_text, (
+        "quota node config v5 must expose the canonical credential identity"
+    )
+    assert '"telemetry_identity"' in sync_text, (
+        "quota node config v5 must expose runtime telemetry identity"
     )
     assert '"fail_closed": True' in sync_text, (
         "modern telemetry must fail closed"
@@ -100,6 +108,7 @@ def main() -> None:
 
     print("MODERN_QUOTA_CONTRACT_V2_OK")
     print("protocols=", ",".join(sorted(MODERN)))
+    print("schema=v5")
     print("fail_closed=true")
     print("sales_gate=closed")
 
