@@ -1,4 +1,4 @@
-name: Outbound Performance v261 Smoke
+name: Outbound Performance v261-v265 Smoke
 
 on:
   pull_request:
@@ -6,10 +6,11 @@ on:
       - "backend/app/routers/outbound_performance_v261.py"
       - "backend/app/routers/outbound_performance_v262.py"
       - "backend/app/routers/outbound_performance_v262_runtime.py"
+      - "backend/app/routers/outbound_performance_v265.py"
       - "backend/app/routers/__init__.py"
       - "backend/tests/outbound_performance_v261_smoke.py"
       - "backend/tests/outbound_performance_v262_smoke.py"
-      - "components/outbound-performance-lab.tsx"
+      - "backend/tests/outbound_performance_v265_smoke.py"
       - "components/outbound-performance-inline.tsx"
       - "components/outbound-performance-lab.module.css"
       - "components/ui.tsx"
@@ -22,10 +23,11 @@ on:
       - "backend/app/routers/outbound_performance_v261.py"
       - "backend/app/routers/outbound_performance_v262.py"
       - "backend/app/routers/outbound_performance_v262_runtime.py"
+      - "backend/app/routers/outbound_performance_v265.py"
       - "backend/app/routers/__init__.py"
       - "backend/tests/outbound_performance_v261_smoke.py"
       - "backend/tests/outbound_performance_v262_smoke.py"
-      - "components/outbound-performance-lab.tsx"
+      - "backend/tests/outbound_performance_v265_smoke.py"
       - "components/outbound-performance-inline.tsx"
       - "components/outbound-performance-lab.module.css"
       - "components/ui.tsx"
@@ -53,9 +55,11 @@ jobs:
             backend/app/routers/outbound_performance_v261.py \
             backend/app/routers/outbound_performance_v262.py \
             backend/app/routers/outbound_performance_v262_runtime.py \
+            backend/app/routers/outbound_performance_v265.py \
             backend/app/routers/__init__.py \
             backend/tests/outbound_performance_v261_smoke.py \
-            backend/tests/outbound_performance_v262_smoke.py
+            backend/tests/outbound_performance_v262_smoke.py \
+            backend/tests/outbound_performance_v265_smoke.py
 
       - name: Install backend dependencies
         run: python -m pip install -r backend/requirements.txt
@@ -74,11 +78,18 @@ jobs:
           NODE_AGENT_SHARED_SECRET: "ci-outbound-performance-agent-v262"
         run: PYTHONPATH=backend python backend/tests/outbound_performance_v262_smoke.py
 
+      - name: Performance analytics v3 smoke
+        env:
+          APP_SECRET_KEY: "ci-outbound-performance-v265"
+          DATABASE_URL: "sqlite:////tmp/twinpanel-outbound-performance-v265.db"
+          NODE_AGENT_SHARED_SECRET: "ci-outbound-performance-agent-v265"
+        run: PYTHONPATH=backend python backend/tests/outbound_performance_v265_smoke.py
+
       - name: Import application
         env:
-          APP_SECRET_KEY: "ci-outbound-performance-v262-import"
-          DATABASE_URL: "sqlite:////tmp/twinpanel-outbound-performance-v262-import.db"
-          NODE_AGENT_SHARED_SECRET: "ci-outbound-performance-agent-v262-import"
+          APP_SECRET_KEY: "ci-outbound-performance-v265-import"
+          DATABASE_URL: "sqlite:////tmp/twinpanel-outbound-performance-v265-import.db"
+          NODE_AGENT_SHARED_SECRET: "ci-outbound-performance-agent-v265-import"
         run: PYTHONPATH=backend python -c 'import app.main; print("app import: ok")'
 
       - uses: actions/setup-node@v4
