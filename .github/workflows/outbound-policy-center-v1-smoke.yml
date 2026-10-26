@@ -1,10 +1,11 @@
-name: Outbound Policy Center v1 Smoke
+name: Outbound Policy Center v2 Smoke
 
 on:
   pull_request:
     paths:
       - "backend/app/routers/outbound_policy_center_v1.py"
-      - "backend/app/routers/__init__.py"
+      - "backend/app/routers/outbound_policy_center_v2.py"
+      - "backend/app/outbound_policy_native_adapters_v255.py"
       - "backend/tests/outbound_policy_center_v1_smoke.py"
       - "components/outbound-policy-center.tsx"
       - "components/outbound-policy-center.module.css"
@@ -14,7 +15,8 @@ on:
     branches: [main]
     paths:
       - "backend/app/routers/outbound_policy_center_v1.py"
-      - "backend/app/routers/__init__.py"
+      - "backend/app/routers/outbound_policy_center_v2.py"
+      - "backend/app/outbound_policy_native_adapters_v255.py"
       - "backend/tests/outbound_policy_center_v1_smoke.py"
       - "components/outbound-policy-center.tsx"
       - "components/outbound-policy-center.module.css"
@@ -39,7 +41,7 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/routers/outbound_policy_center_v1.py \
-            backend/app/routers/__init__.py \
+            backend/app/routers/outbound_policy_center_v2.py \
             backend/tests/outbound_policy_center_v1_smoke.py
 
       - name: Install backend dependencies
@@ -47,9 +49,9 @@ jobs:
 
       - name: Policy engine smoke
         env:
-          APP_SECRET_KEY: "ci-outbound-policy-center-only"
+          APP_SECRET_KEY: "ci-outbound-policy-center-v2"
           DATABASE_URL: "sqlite:////tmp/twinpanel-outbound-policy-ci.db"
-          NODE_AGENT_SHARED_SECRET: "ci-outbound-policy-agent-only"
+          NODE_AGENT_SHARED_SECRET: "ci-outbound-policy-agent-v2"
         run: PYTHONPATH=backend python backend/tests/outbound_policy_center_v1_smoke.py
 
       - uses: actions/setup-node@v4
