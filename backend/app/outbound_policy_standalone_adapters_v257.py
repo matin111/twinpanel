@@ -214,7 +214,7 @@ def sudoku_generator_text():
     # Generator output is recreated on every systemctl daemon-reload. Therefore
     # disabling the policy removes the drop-ins automatically without editing
     # TwinPanel's canonical unit files.
-    return r'''#!/usr/bin/env python3
+    return r"""#!/usr/bin/env python3
 import glob, json, os, pathlib, sys
 state = pathlib.Path("/etc/twinpanel/sing-box/outbound-policy.json")
 try:
@@ -239,7 +239,7 @@ for path in glob.glob("/etc/systemd/system/twinpanel-sudoku*.service"):
         "ExecStartPre=+/bin/chown -R twinpanel-sudoku:twinpanel-sudoku /etc/twinpanel/standalone/sudoku\n",
         encoding="utf-8",
     )
-'''
+"""
 
 
 def ensure_sudoku_user():
