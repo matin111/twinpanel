@@ -225,7 +225,7 @@ def _l2tp_routes_for_exit_v87(
         for port in tunnels._L2TP_PUBLIC_PORTS
     ]
 
-    # IPsec ESP = IP protocol 50. Port fields are intentionally unused by the
+    # IPsec ESP = IP protocol 50. Port fields intentionally unused by the
     # Node Agent; UDP/1701 remains inside the protected L2TP/IPsec session.
     output.append({
         "protocol": "l2tp",
@@ -325,6 +325,17 @@ def apply_protocol_dataplane_desired_state_v87() -> None:
 
     apply_modern_protocol_tunnel_binding_v251()
 
+    # V255 keeps V251's desired service routes intact so the Node Agents can
+    # converge, but prevents live modern-protocol delivery from switching ahead
+    # of the real data plane. Both tunnel peers must freshly report the same
+    # active transport as reachable; otherwise clients retain the direct Exit
+    # endpoint and remain usable during a broken/partial tunnel switch.
+    from .modern_protocol_tunnel_delivery_failsafe_v255 import (
+        apply_modern_protocol_tunnel_delivery_failsafe_v255,
+    )
+
+    apply_modern_protocol_tunnel_delivery_failsafe_v255()
+
     _RUNTIME_APPLIED = True
 
     print(
@@ -335,6 +346,7 @@ def apply_protocol_dataplane_desired_state_v87() -> None:
         "xray_public_profiles=restored_v109 "
         "l2tp_ppp_convergence=v111 "
         "modern_tunnel_binding=v251 "
+        "modern_delivery_failsafe=v255 "
         "protocols=cisco,openvpn,wireguard,l2tp,v2ray",
         flush=True,
     )
