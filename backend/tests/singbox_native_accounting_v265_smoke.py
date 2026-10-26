@@ -134,6 +134,9 @@ def main() -> None:
     assert "retention_saturated" in source
     assert "_prune_missing_connection_cursors" in source
     assert "singbox_closed_retention_saturated" in source
+    guard_index = source.index("if retention_saturated:")
+    presence_index = source.index("presence = canonical._mark_presence")
+    assert guard_index < presence_index
     assert "singbox_native_accounting_loop" in lifespan
     assert "activate_singbox_capabilities" in lifespan
 
