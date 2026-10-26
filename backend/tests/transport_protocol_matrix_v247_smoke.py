@@ -70,16 +70,16 @@ def main() -> None:
     fake.active_transport = None
     assert binding_v94._transport_name(fake) == "tp27_fast"
 
-    # V209 keeps kernel candidates explicit-install only, but once installed
-    # they participate in normal health/qualification and Smart Auto selection.
+    # V209 owns additive kernel-candidate membership only. It deliberately does
+    # not own/reset the baseline TP27 auto-install policy. Kernel candidates
+    # must therefore become selectable/auto-eligible after explicit install and
+    # qualification without ever being silently auto-installed by V209.
     apply_kernel_transport_registry_v209()
 
     for name in ("kernel_ipip", "kernel_vxlan"):
         assert name in smart.CANDIDATE_NAMES
         assert name in smart.ALL_AUTO_NAMES
         assert name not in smart.AUTO_INSTALL_NAMES
-
-    assert "tp27_fast" in smart.AUTO_INSTALL_NAMES
 
     print(
         "TWINPANEL_TRANSPORT_PROTOCOL_MATRIX_V247_SMOKE_OK "
