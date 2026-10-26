@@ -2,191 +2,37 @@ from __future__ import annotations
 
 from app.outbound_policy_native_adapters_v255 import NATIVE_POLICY_INBOUND_TAGS
 from app.protocol_account_registry import ALL_PROTOCOL_KEYS
-from app.routers.outbound_policy_center_v1 import (
+from app.routers.outbound_policy_center_v2 import (
+    KERNEL_POLICY_SPECS,
+    KERNEL_TUN_NAME,
+    KERNEL_TUN_TAG,
+    POLICY_SCHEMA,
+    XRAY_BLOCK_OUTBOUND_TAG,
+    XRAY_BRIDGE_INBOUND_TAG,
+    XRAY_BRIDGE_OUTBOUND_TAG,
     _PROTOCOLS,
     _apply_state_to_document,
+    _apply_xray_policy_to_document,
     _clean_state,
+    _effective_outbound,
     _generated_rule,
+    _kernel_reconcile_script,
+    _policy_record,
     _protocol_payload,
     _strip_previous_generated_rules,
 )
-from app.modern_protocol_runtime_v2 import SHADOWTLS_INNER_TAG, TAGS
-
 
 ROUTE_READY = {
-    "hysteria2",
-    "tuic",
-    "anytls",
-    "naive",
-    "shadowtls",
-    "snell",
+    "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell",
+    "cisco", "openvpn", "wireguard", "l2tp", "v2ray",
 }
+PENDING = {"mieru", "trusttunnel", "amneziawg", "sudoku"}
 
 
-def test_adapter_map_matches_runtime_tags() -> None:
-    expected = {
-        key: TAGS[key]
-        for key in ("hysteria2", "tuic", "anytls", "naive", "snell")
-    }
-    expected["shadowtls"] = SHADOWTLS_INNER_TAG
-    assert NATIVE_POLICY_INBOUND_TAGS == expected
-
-
-def test_full_canonical_protocol_inventory() -> None:
-    keys = [str(item["key"]) for item in _PROTOCOLS]
-    assert len(keys) == 15
-    assert len(set(keys)) == 15
-    assert set(keys) == set(ALL_PROTOCOL_KEYS)
-    assert keys[:6] == ["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"]
-    assert {str(item["key"]) for item in _PROTOCOLS if item.get("policy_supported")} == ROUTE_READY
-    assert set(NATIVE_POLICY_INBOUND_TAGS) == ROUTE_READY
-
-    by_key = {str(item["key"]): item for item in _PROTOCOLS}
-    assert by_key["v2ray"]["plane"] == "xray"
-    assert by_key["v2ray"]["core"] == "Xray"
-    assert by_key["naive"]["plane"] == "singbox"
-    assert by_key["naive"]["policy_supported"] is True
-    assert by_key["naive"]["inbound_tag"] == "twinpanel-naive-in"
-    assert by_key["shadowtls"]["inbound_tag"] == "twinpanel-shadowtls-inner"
-    assert by_key["snell"]["inbound_tag"] == "twinpanel-snell-in"
-    assert by_key["mieru"]["plane"] == "standalone"
-    assert by_key["trusttunnel"]["plane"] == "standalone"
-    assert by_key["amneziawg"]["plane"] == "standalone"
-    assert by_key["sudoku"]["plane"] == "standalone"
-
-
-def test_protocol_payload_keeps_full_inventory_fail_closed() -> None:
-    doc = {
+def base_doc() -> dict:
+    return {
         "inbounds": [
-            {"type": "hysteria2", "tag": "twinpanel-hysteria2-in"},
-            {"type": "tuic", "tag": "twinpanel-tuic-in"},
-            {"type": "anytls", "tag": "twinpanel-anytls-in"},
-            {"type": "naive", "tag": "twinpanel-naive-in"},
-            {
-                "type": "shadowtls",
-                "tag": "twinpanel-shadowtls-in",
-                "detour": "twinpanel-shadowtls-inner",
-            },
-            {"type": "shadowsocks", "tag": "twinpanel-shadowtls-inner"},
-            {"type": "snell", "tag": "twinpanel-snell-in"},
-        ],
-        "outbounds": [
-            {"type": "direct", "tag": "direct"},
-            {"type": "vless", "tag": "ext-vless-primary"},
-        ],
-        "route": {"final": "ext-vless-primary", "rules": []},
-    }
-    rows = _protocol_payload(doc=doc, state=_clean_state({}), default_tag="ext-vless-primary")
-    assert len(rows) == 15
-    by_key = {row["key"]: row for row in rows}
-    assert all(by_key[key]["installed"] is True for key in ROUTE_READY)
-    assert all(by_key[key]["policy_supported"] is True for key in ROUTE_READY)
-    assert by_key["v2ray"]["reason"] == "separate_core_adapter_required"
-    assert by_key["mieru"]["reason"] == "protocol_egress_adapter_required"
-    assert by_key["cisco"]["policy_supported"] is False
-    assert by_key["cisco"]["reason"] == "egress_adapter_required"
-
-
-def test_native_route_modes() -> None:
-    assert _generated_rule("hysteria2", {"mode": "inherit"}) is None
-    assert _generated_rule("hysteria2", {"mode": "direct"}) == {
-        "inbound": ["twinpanel-hysteria2-in"],
-        "action": "route",
-        "outbound": "direct",
-    }
-    assert _generated_rule(
-        "tuic",
-        {"mode": "outbound", "outbound_tag": "ext-vless-primary"},
-    ) == {
-        "inbound": ["twinpanel-tuic-in"],
-        "action": "route",
-        "outbound": "ext-vless-primary",
-    }
-    assert _generated_rule("anytls", {"mode": "block"}) == {
-        "inbound": ["twinpanel-anytls-in"],
-        "action": "reject",
-        "method": "default",
-    }
-    assert _generated_rule(
-        "naive",
-        {"mode": "outbound", "outbound_tag": "ext-vless-primary"},
-    ) == {
-        "inbound": ["twinpanel-naive-in"],
-        "action": "route",
-        "outbound": "ext-vless-primary",
-    }
-    assert _generated_rule("shadowtls", {"mode": "direct"}) == {
-        "inbound": ["twinpanel-shadowtls-inner"],
-        "action": "route",
-        "outbound": "direct",
-    }
-    assert _generated_rule("snell", {"mode": "block"}) == {
-        "inbound": ["twinpanel-snell-in"],
-        "action": "reject",
-        "method": "default",
-    }
-
-
-def test_non_audited_protocols_fail_closed() -> None:
-    unsupported = set(ALL_PROTOCOL_KEYS) - ROUTE_READY
-    for protocol in unsupported:
-        assert _generated_rule(
-            protocol,
-            {"mode": "outbound", "outbound_tag": "ext-vless-primary"},
-        ) is None
-    # Preserve the early UI alias without making Xray writable.
-    assert _generated_rule(
-        "xray",
-        {"mode": "outbound", "outbound_tag": "ext-vless-primary"},
-    ) is None
-
-
-def test_missing_payload_inbound_stays_uninstalled() -> None:
-    doc = {
-        "inbounds": [
-            {"type": "shadowtls", "tag": "twinpanel-shadowtls-in"},
-        ],
-        "outbounds": [{"type": "direct", "tag": "direct"}],
-        "route": {"rules": []},
-    }
-    rows = _protocol_payload(doc=doc, state=_clean_state({}), default_tag="direct")
-    by_key = {row["key"]: row for row in rows}
-    assert by_key["shadowtls"]["policy_supported"] is True
-    assert by_key["shadowtls"]["installed"] is False
-
-
-def test_only_previous_generated_rules_are_removed() -> None:
-    old_generated = {
-        "inbound": ["twinpanel-hysteria2-in"],
-        "action": "route",
-        "outbound": "ext-old",
-    }
-    unrelated_same_inbound = {
-        "inbound": ["twinpanel-hysteria2-in"],
-        "domain_suffix": ["example.com"],
-        "action": "route",
-        "outbound": "direct",
-    }
-    other = {"protocol": "dns", "action": "hijack-dns"}
-    result = _strip_previous_generated_rules(
-        [old_generated, unrelated_same_inbound, other],
-        [old_generated],
-    )
-    assert result == [unrelated_same_inbound, other]
-
-
-def test_apply_preserves_final_and_unrelated_rules() -> None:
-    old_generated = {
-        "inbound": ["twinpanel-hysteria2-in"],
-        "action": "route",
-        "outbound": "ext-old",
-    }
-    unrelated = {"protocol": "dns", "action": "hijack-dns"}
-    doc = {
-        "inbounds": [
-            {"type": "hysteria2", "tag": "twinpanel-hysteria2-in"},
-            {"type": "tuic", "tag": "twinpanel-tuic-in"},
-            {"type": "naive", "tag": "twinpanel-naive-in"},
+            *[{"type": "test", "tag": tag} for tag in NATIVE_POLICY_INBOUND_TAGS.values()],
         ],
         "outbounds": [
             {"type": "direct", "tag": "direct"},
@@ -194,55 +40,254 @@ def test_apply_preserves_final_and_unrelated_rules() -> None:
         ],
         "route": {
             "final": "ext-vless-primary",
-            "rules": [old_generated, unrelated],
+            "rules": [{"protocol": "dns", "action": "hijack-dns"}],
         },
     }
+
+
+def xray_doc() -> dict:
+    return {
+        "inbounds": [
+            {"tag": "vless-in", "protocol": "vless", "settings": {"clients": []}},
+            {"tag": "api", "protocol": "dokodemo-door", "settings": {}},
+        ],
+        "outbounds": [{"protocol": "freedom", "tag": "direct"}],
+        "routing": {
+            "rules": [
+                {"type": "field", "inboundTag": ["api"], "outboundTag": "api"}
+            ]
+        },
+    }
+
+
+def test_inventory_is_full_and_truthful() -> None:
+    keys = [str(item["key"]) for item in _PROTOCOLS]
+    assert len(keys) == 15
+    assert len(set(keys)) == 15
+    assert set(keys) == set(ALL_PROTOCOL_KEYS)
+    assert {str(x["key"]) for x in _PROTOCOLS if x.get("policy_supported")} == ROUTE_READY
+
+    by_key = {str(item["key"]): item for item in _PROTOCOLS}
+    for key in ("cisco", "openvpn", "wireguard", "l2tp"):
+        assert by_key[key]["adapter_kind"] == "kernel-tun"
+        assert by_key[key]["plane"] == "kernel"
+    assert by_key["v2ray"]["adapter_kind"] == "xray-bridge"
+    assert by_key["v2ray"]["plane"] == "xray"
+    for key in PENDING:
+        assert by_key[key]["policy_supported"] is False
+        assert by_key[key]["reason"] == "runtime_core_pending"
+
+
+def test_state_v1_migrates_without_losing_policies() -> None:
     state = _clean_state(
         {
-            "policies": {
-                "hysteria2": {"mode": "direct"},
-                "tuic": {"mode": "block"},
-                "naive": {"mode": "outbound", "outbound_tag": "ext-vless-primary"},
-            },
-            "generated_rules": [old_generated],
+            "schema": 1,
+            "policies": {"hysteria2": {"mode": "direct"}},
+            "generated_rules": [{"inbound": ["x"], "action": "route", "outbound": "direct"}],
         }
     )
-    fresh_doc, fresh_state = _apply_state_to_document(
-        doc,
-        state,
-        [old_generated],
-    )
+    assert state["schema"] == POLICY_SCHEMA
+    assert _policy_record(state, "hysteria2")["mode"] == "direct"
+    assert state["xray_generated_rules"] == []
+    assert state["xray_generated_outbounds"] == []
 
-    assert fresh_doc["route"]["final"] == "ext-vless-primary"
-    assert fresh_doc["route"]["rules"][-1] == unrelated
-    assert fresh_doc["route"]["rules"][0] == {
-        "inbound": ["twinpanel-hysteria2-in"],
+
+def test_kernel_rule_matches_real_vpn_source_subnets() -> None:
+    assert _generated_rule("cisco", {"mode": "direct"}) == {
+        "source_ip_cidr": ["10.91.0.0/24"],
         "action": "route",
         "outbound": "direct",
     }
-    assert fresh_doc["route"]["rules"][1] == {
-        "inbound": ["twinpanel-tuic-in"],
-        "action": "reject",
-        "method": "default",
-    }
-    assert fresh_doc["route"]["rules"][2] == {
-        "inbound": ["twinpanel-naive-in"],
+    assert _generated_rule(
+        "openvpn", {"mode": "outbound", "outbound_tag": "ext-vless-primary"}
+    ) == {
+        "source_ip_cidr": ["10.92.0.0/24"],
         "action": "route",
         "outbound": "ext-vless-primary",
     }
-    assert fresh_state["generated_rules"] == fresh_doc["route"]["rules"][:3]
+    assert _generated_rule("wireguard", {"mode": "block"}) == {
+        "source_ip_cidr": ["10.93.0.0/24"],
+        "action": "reject",
+        "method": "default",
+    }
+    assert _generated_rule("l2tp", {"mode": "inherit"}) is None
+
+
+def test_xray_bridge_rule_exists_only_for_external_outbound() -> None:
+    assert _generated_rule("v2ray", {"mode": "inherit"}) is None
+    assert _generated_rule("v2ray", {"mode": "direct"}) is None
+    assert _generated_rule("v2ray", {"mode": "block"}) is None
+    assert _generated_rule(
+        "v2ray", {"mode": "outbound", "outbound_tag": "ext-vless-primary"}
+    ) == {
+        "inbound": [XRAY_BRIDGE_INBOUND_TAG],
+        "action": "route",
+        "outbound": "ext-vless-primary",
+    }
+
+
+def test_singbox_managed_inbounds_are_bounded_and_removed_on_inherit() -> None:
+    doc = base_doc()
+    state = _clean_state(
+        {
+            "policies": {
+                "openvpn": {"mode": "outbound", "outbound_tag": "ext-vless-primary"},
+                "v2ray": {"mode": "outbound", "outbound_tag": "ext-vless-primary"},
+            }
+        }
+    )
+    fresh, fresh_state = _apply_state_to_document(doc, state, [])
+    by_tag = {
+        item.get("tag"): item for item in fresh["inbounds"] if isinstance(item, dict)
+    }
+    assert by_tag[KERNEL_TUN_TAG]["type"] == "tun"
+    assert by_tag[KERNEL_TUN_TAG]["interface_name"] == KERNEL_TUN_NAME
+    assert by_tag[KERNEL_TUN_TAG]["auto_route"] is False
+    assert by_tag[XRAY_BRIDGE_INBOUND_TAG]["type"] == "socks"
+    assert by_tag[XRAY_BRIDGE_INBOUND_TAG]["listen"] == "127.0.0.1"
+
+    rules = fresh["route"]["rules"]
+    assert rules[0] == {
+        "source_ip_cidr": ["10.92.0.0/24"],
+        "action": "route",
+        "outbound": "ext-vless-primary",
+    }
+    assert rules[1] == {
+        "inbound": [XRAY_BRIDGE_INBOUND_TAG],
+        "action": "route",
+        "outbound": "ext-vless-primary",
+    }
+    assert rules[-1] == {"protocol": "dns", "action": "hijack-dns"}
+
+    inherit = _clean_state(fresh_state)
+    inherit["policies"]["openvpn"] = {"mode": "inherit", "outbound_tag": None}
+    inherit["policies"]["v2ray"] = {"mode": "inherit", "outbound_tag": None}
+    restored, _ = _apply_state_to_document(
+        fresh, inherit, list(fresh_state["generated_rules"])
+    )
+    restored_tags = {
+        item.get("tag") for item in restored["inbounds"] if isinstance(item, dict)
+    }
+    assert KERNEL_TUN_TAG not in restored_tags
+    assert XRAY_BRIDGE_INBOUND_TAG not in restored_tags
+    assert restored["route"]["rules"] == [{"protocol": "dns", "action": "hijack-dns"}]
+
+
+def test_xray_direct_block_and_bridge_preserve_unrelated_config() -> None:
+    base = xray_doc()
+
+    direct_state = _clean_state({"policies": {"v2ray": {"mode": "direct"}}})
+    direct_doc, direct_state = _apply_xray_policy_to_document(base, direct_state)
+    assert direct_doc["routing"]["rules"][0] == {
+        "type": "field",
+        "inboundTag": ["vless-in"],
+        "outboundTag": "direct",
+    }
+    assert direct_doc["routing"]["rules"][-1]["inboundTag"] == ["api"]
+
+    block_state = _clean_state(direct_state)
+    block_state["policies"]["v2ray"] = {"mode": "block"}
+    block_doc, block_state = _apply_xray_policy_to_document(direct_doc, block_state)
+    assert block_doc["routing"]["rules"][0]["outboundTag"] == XRAY_BLOCK_OUTBOUND_TAG
+    assert block_doc["outbounds"][0] == {
+        "protocol": "blackhole",
+        "tag": XRAY_BLOCK_OUTBOUND_TAG,
+        "settings": {},
+    }
+    assert any(x.get("tag") == "direct" for x in block_doc["outbounds"])
+
+    bridge_state = _clean_state(block_state)
+    bridge_state["policies"]["v2ray"] = {
+        "mode": "outbound",
+        "outbound_tag": "ext-vless-primary",
+    }
+    bridge_doc, bridge_state = _apply_xray_policy_to_document(block_doc, bridge_state)
+    assert bridge_doc["routing"]["rules"][0]["outboundTag"] == XRAY_BRIDGE_OUTBOUND_TAG
+    assert bridge_doc["outbounds"][0] == {
+        "protocol": "socks",
+        "tag": XRAY_BRIDGE_OUTBOUND_TAG,
+        "settings": {"address": "127.0.0.1", "port": 19081},
+    }
+    assert all(x.get("tag") != XRAY_BLOCK_OUTBOUND_TAG for x in bridge_doc["outbounds"])
+
+    inherit_state = _clean_state(bridge_state)
+    inherit_state["policies"]["v2ray"] = {"mode": "inherit"}
+    inherit_doc, inherit_state = _apply_xray_policy_to_document(bridge_doc, inherit_state)
+    assert inherit_doc == base
+    assert inherit_state["xray_generated_rules"] == []
+    assert inherit_state["xray_generated_outbounds"] == []
+
+
+def test_kernel_script_is_idempotent_and_private_safe() -> None:
+    state = _clean_state(
+        {"policies": {"cisco": {"mode": "direct"}, "wireguard": {"mode": "block"}}}
+    )
+    script = _kernel_reconcile_script(state)
+    for spec in KERNEL_POLICY_SPECS.values():
+        assert f"ip -4 route flush table {spec['table']}" in script
+        assert f"priority {spec['priority']}" in script
+    assert "from 10.91.0.0/24 lookup 10910" in script
+    assert "from 10.93.0.0/24 lookup 10930" in script
+    assert "from 10.92.0.0/24 lookup 10920" not in script
+    assert "throw 10.0.0.0/8 table 10910" in script
+    assert f"default dev {KERNEL_TUN_NAME} table 10930" in script
+
+
+def test_effective_path_does_not_lie_for_unmanaged_classic_inherit() -> None:
+    assert _effective_outbound(
+        protocol="openvpn", policy={"mode": "inherit"}, default_tag="ext-vless-primary"
+    ) == "direct"
+    assert _effective_outbound(
+        protocol="v2ray", policy={"mode": "inherit"}, default_tag="ext-vless-primary"
+    ) == "direct"
+    assert _effective_outbound(
+        protocol="hysteria2", policy={"mode": "inherit"}, default_tag="ext-vless-primary"
+    ) == "ext-vless-primary"
+
+
+def test_payload_reports_eleven_supported_without_faking_pending_cores() -> None:
+    installed = {key: True for key in ROUTE_READY}
+    rows = _protocol_payload(
+        doc=base_doc(),
+        state=_clean_state({}),
+        default_tag="direct",
+        installed_map=installed,
+    )
+    by_key = {row["key"]: row for row in rows}
+    assert len(rows) == 15
+    assert sum(1 for row in rows if row["policy_supported"]) == 11
+    assert all(by_key[key]["installed"] is True for key in ROUTE_READY)
+    assert all(by_key[key]["installed"] is None for key in PENDING)
+    assert all(by_key[key]["reason"] == "runtime_core_pending" for key in PENDING)
+
+
+def test_exact_rule_removal_still_preserves_user_rules() -> None:
+    generated = {
+        "source_ip_cidr": ["10.91.0.0/24"],
+        "action": "route",
+        "outbound": "direct",
+    }
+    unrelated = {
+        "source_ip_cidr": ["10.91.0.0/24"],
+        "domain_suffix": ["example.com"],
+        "action": "route",
+        "outbound": "direct",
+    }
+    assert _strip_previous_generated_rules([generated, unrelated], [generated]) == [unrelated]
 
 
 def main() -> None:
     tests = [
-        test_adapter_map_matches_runtime_tags,
-        test_full_canonical_protocol_inventory,
-        test_protocol_payload_keeps_full_inventory_fail_closed,
-        test_native_route_modes,
-        test_non_audited_protocols_fail_closed,
-        test_missing_payload_inbound_stays_uninstalled,
-        test_only_previous_generated_rules_are_removed,
-        test_apply_preserves_final_and_unrelated_rules,
+        test_inventory_is_full_and_truthful,
+        test_state_v1_migrates_without_losing_policies,
+        test_kernel_rule_matches_real_vpn_source_subnets,
+        test_xray_bridge_rule_exists_only_for_external_outbound,
+        test_singbox_managed_inbounds_are_bounded_and_removed_on_inherit,
+        test_xray_direct_block_and_bridge_preserve_unrelated_config,
+        test_kernel_script_is_idempotent_and_private_safe,
+        test_effective_path_does_not_lie_for_unmanaged_classic_inherit,
+        test_payload_reports_eleven_supported_without_faking_pending_cores,
+        test_exact_rule_removal_still_preserves_user_rules,
     ]
     for test in tests:
         test()
