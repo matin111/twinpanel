@@ -1,5 +1,5 @@
-import {OutboundPerformanceLab} from "../../../components/outbound-performance-lab";
+import {redirect} from "next/navigation";
 
 export default function Page(){
-  return <OutboundPerformanceLab/>;
+  redirect("/admin/outbounds");
 }
