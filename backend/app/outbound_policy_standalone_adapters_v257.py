@@ -158,6 +158,14 @@ def configure_mieru(mode):
             doc["egress"] = managed
             changed = True
 
+    # Account provisioning edits the canonical server.json and then replaces
+    # mita's live config from it. Keep the policy egress in that canonical file
+    # too, otherwise adding/removing a Mieru subscription would silently reset
+    # an active Outbound Policy back to direct.
+    canonical = BASE / "mieru" / "server.json"
+    if canonical.exists():
+        atomic_json(canonical, doc)
+
     if changed:
         target = BASE / "mieru" / "policy-live.json"
         atomic_json(target, doc)
