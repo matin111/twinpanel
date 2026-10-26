@@ -1,0 +1,56 @@
+name: Transport Protocol Matrix V247 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/active_l3_route_binding_v94.py"
+      - "backend/app/protocol_dataplane_desired_state_v87.py"
+      - "backend/app/unified_l3_core_v49.py"
+      - "backend/app/kernel_transport_registry_v209.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/tests/transport_protocol_matrix_v247_smoke.py"
+      - "components/smart-transports-runtime-v26.tsx"
+      - "components/routed-page-client-v2.tsx"
+      - "app/tunnel-transports-2027.css"
+      - "app/layout.tsx"
+      - ".github/workflows/transport-protocol-matrix-v247-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    env:
+      APP_NAME: TwinPanel-V247-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Compile transport protocol contract
+        run: |
+          python -m py_compile \
+            backend/app/active_l3_route_binding_v94.py \
+            backend/app/protocol_dataplane_desired_state_v87.py \
+            backend/app/unified_l3_core_v49.py \
+            backend/app/kernel_transport_registry_v209.py \
+            backend/tests/transport_protocol_matrix_v247_smoke.py
+
+      - name: Verify five-protocol Unified L3 binding and qualified standby
+        working-directory: backend
+        run: PYTHONPATH=. python tests/transport_protocol_matrix_v247_smoke.py
