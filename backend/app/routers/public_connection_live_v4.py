@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session
 
 from ..amneziawg_live_telemetry_v221 import subscription_amneziawg_live
 from ..database import get_db
-from ..quota_models import QuotaSession, QuotaUsageEvent
+from ..models import SubscriptionProtocol
+from ..quota_models import QuotaCursor, QuotaSession, QuotaUsageEvent
+from ..services.modern_quota_runtime_v257 import capability_payload
 from ..wireguard_live_telemetry_v97 import subscription_wireguard_live
 from .account_delivery import _subscription_from_share_token, _usage_payload
 from .public_connection_v3 import public_connection_page_v3
@@ -34,49 +36,207 @@ def _latest(value_a: datetime | None, value_b: datetime | None) -> datetime | No
     return max(values) if values else None
 
 
+def _earliest(value_a: datetime | None, value_b: datetime | None) -> datetime | None:
+    values = [value for value in (value_a, value_b) if value is not None]
+    return min(values) if values else None
+
+
 def _normalized_protocol(value: str | None) -> str:
     protocol = str(value or "").strip().lower()
     if protocol == "v2ray":
         return "xray"
     if protocol in {"openconnect", "ocserv", "anyconnect"}:
         return "cisco"
+    if protocol == "naiveproxy":
+        return "naive"
     return protocol
 
 
-@router.get("/{token}/live")
-async def public_connection_live(token: str, db: Session = Depends(get_db)):
-    """Small public live-state payload used by the connection delivery page."""
-    sub = _subscription_from_share_token(token, db)
-    usage = _usage_payload(db, sub)
+def _protocol_stats(
+    db: Session,
+    *,
+    subscription_id: int,
+    online_protocols: set[str],
+    activity_cutoff: datetime,
+) -> dict[str, dict]:
+    selected = {
+        _normalized_protocol(row[0])
+        for row in (
+            db.query(SubscriptionProtocol.protocol)
+            .filter(SubscriptionProtocol.subscription_id == int(subscription_id))
+            .all()
+        )
+        if _normalized_protocol(row[0])
+    }
 
-    active_session_rows = (
-        db.query(QuotaSession.protocol, func.max(QuotaSession.last_seen_at))
+    session_rows = (
+        db.query(
+            QuotaSession.protocol,
+            func.min(QuotaSession.started_at),
+            func.max(QuotaSession.last_seen_at),
+        )
+        .filter(QuotaSession.subscription_id == int(subscription_id))
+        .group_by(QuotaSession.protocol)
+        .all()
+    )
+    session_meta: dict[str, dict] = {}
+    for raw_protocol, first_seen, last_seen in session_rows:
+        key = _normalized_protocol(raw_protocol)
+        if not key:
+            continue
+        item = session_meta.setdefault(
+            key,
+            {"first": None, "last": None},
+        )
+        item["first"] = _earliest(item["first"], first_seen)
+        item["last"] = _latest(item["last"], last_seen)
+        selected.add(key)
+
+    active_rows = (
+        db.query(
+            QuotaSession.protocol,
+            func.count(QuotaSession.id),
+            func.max(QuotaSession.last_seen_at),
+        )
         .filter(
-            QuotaSession.subscription_id == sub.id,
+            QuotaSession.subscription_id == int(subscription_id),
             QuotaSession.status == "active",
+            QuotaSession.last_seen_at >= activity_cutoff,
         )
         .group_by(QuotaSession.protocol)
         .all()
     )
-    active_sessions = int(
-        db.query(func.count(QuotaSession.id))
+    active_meta: dict[str, dict] = {}
+    for raw_protocol, count, last_seen in active_rows:
+        key = _normalized_protocol(raw_protocol)
+        if not key:
+            continue
+        bucket = active_meta.setdefault(key, {"count": 0, "last": None})
+        bucket["count"] += int(count or 0)
+        bucket["last"] = _latest(bucket["last"], last_seen)
+        selected.add(key)
+
+    usage_rows = (
+        db.query(
+            QuotaUsageEvent.protocol,
+            func.coalesce(func.sum(QuotaUsageEvent.accepted_bytes), 0),
+            func.min(QuotaUsageEvent.reported_at),
+            func.max(QuotaUsageEvent.reported_at),
+            func.count(QuotaUsageEvent.id),
+        )
+        .filter(
+            QuotaUsageEvent.subscription_id == int(subscription_id),
+            QuotaUsageEvent.accepted_bytes > 0,
+        )
+        .group_by(QuotaUsageEvent.protocol)
+        .all()
+    )
+    usage_meta: dict[str, dict] = {}
+    for raw_protocol, used, first_seen, last_seen, event_count in usage_rows:
+        key = _normalized_protocol(raw_protocol)
+        if not key:
+            continue
+        bucket = usage_meta.setdefault(
+            key,
+            {"used": 0, "first": None, "last": None, "events": 0},
+        )
+        bucket["used"] += int(used or 0)
+        bucket["first"] = _earliest(bucket["first"], first_seen)
+        bucket["last"] = _latest(bucket["last"], last_seen)
+        bucket["events"] += int(event_count or 0)
+        selected.add(key)
+
+    cursor_rows = (
+        db.query(
+            QuotaCursor.protocol,
+            func.min(QuotaCursor.updated_at),
+        )
+        .filter(QuotaCursor.subscription_id == int(subscription_id))
+        .group_by(QuotaCursor.protocol)
+        .all()
+    )
+    cursor_meta: dict[str, datetime | None] = {}
+    for raw_protocol, started_at in cursor_rows:
+        key = _normalized_protocol(raw_protocol)
+        if not key:
+            continue
+        cursor_meta[key] = _earliest(cursor_meta.get(key), started_at)
+        selected.add(key)
+
+    capabilities = capability_payload()
+    stats: dict[str, dict] = {}
+    for key in sorted(selected):
+        session = session_meta.get(key, {})
+        active = active_meta.get(key, {})
+        usage = usage_meta.get(key, {})
+        capability = capabilities.get(key, {})
+
+        has_usage_events = int(usage.get("events") or 0) > 0
+        traffic_supported = bool(capability.get("traffic")) or has_usage_events
+        presence_supported = (
+            bool(capability.get("presence"))
+            or key in session_meta
+            or has_usage_events
+        )
+
+        first_connected = _earliest(
+            session.get("first"),
+            usage.get("first"),
+        )
+        last_activity = _latest(
+            session.get("last"),
+            usage.get("last"),
+        )
+        last_activity = _latest(last_activity, active.get("last"))
+
+        stats[key] = {
+            "protocol": key,
+            "online": key in online_protocols,
+            "active_sessions": int(active.get("count") or 0),
+            "presence_available": presence_supported,
+            "traffic_accounting_available": traffic_supported,
+            "used_bytes": int(usage.get("used") or 0) if traffic_supported else None,
+            "first_connected_at": _iso_utc(first_connected),
+            "last_activity_at": _iso_utc(last_activity),
+            "accounting_since": _iso_utc(cursor_meta.get(key)),
+        }
+
+    return stats
+
+
+@router.get("/{token}/live")
+async def public_connection_live(token: str, db: Session = Depends(get_db)):
+    """Public canonical live state and per-protocol accounting summary."""
+
+    sub = _subscription_from_share_token(token, db)
+    usage = _usage_payload(db, sub)
+    activity_cutoff = datetime.utcnow() - timedelta(seconds=_LIVE_ACTIVITY_SECONDS)
+
+    active_session_rows = (
+        db.query(
+            QuotaSession.protocol,
+            func.max(QuotaSession.last_seen_at),
+            func.count(QuotaSession.id),
+        )
         .filter(
             QuotaSession.subscription_id == sub.id,
             QuotaSession.status == "active",
+            QuotaSession.last_seen_at >= activity_cutoff,
         )
-        .scalar()
-        or 0
+        .group_by(QuotaSession.protocol)
+        .all()
     )
 
     online_protocols: set[str] = set()
     last_session_seen: datetime | None = None
-    for raw_protocol, seen_at in active_session_rows:
+    active_sessions = 0
+    for raw_protocol, seen_at, count in active_session_rows:
         protocol = _normalized_protocol(raw_protocol)
         if protocol:
             online_protocols.add(protocol)
         last_session_seen = _latest(last_session_seen, seen_at)
+        active_sessions += int(count or 0)
 
-    activity_cutoff = datetime.utcnow() - timedelta(seconds=_LIVE_ACTIVITY_SECONDS)
     recent_activity_rows = (
         db.query(QuotaUsageEvent.protocol, func.max(QuotaUsageEvent.reported_at))
         .filter(
@@ -94,8 +254,8 @@ async def public_connection_live(token: str, db: Session = Depends(get_db)):
             online_protocols.add(protocol)
         last_counter_activity = _latest(last_counter_activity, reported_at)
 
-    # Native peer telemetry is display-only. Billing/quota rows are never
-    # mutated by these checks.
+    # Native peer telemetry remains a display fallback. Canonical billing comes
+    # only from QuotaCursor/QuotaUsageEvent and is never mutated by these checks.
     wireguard_online, wireguard_seen = await subscription_wireguard_live(db, sub)
     if wireguard_online:
         online_protocols.add("wireguard")
@@ -109,6 +269,35 @@ async def public_connection_live(token: str, db: Session = Depends(get_db)):
     last_connection_seen = _latest(last_connection_seen, wireguard_seen)
     last_connection_seen = _latest(last_connection_seen, amneziawg_seen)
 
+    protocol_stats = _protocol_stats(
+        db,
+        subscription_id=int(sub.id),
+        online_protocols=online_protocols,
+        activity_cutoff=activity_cutoff,
+    )
+    if "wireguard" in protocol_stats:
+        protocol_stats["wireguard"]["last_activity_at"] = _iso_utc(
+            _latest(
+                wireguard_seen,
+                datetime.fromisoformat(
+                    protocol_stats["wireguard"]["last_activity_at"].removesuffix("Z")
+                )
+                if protocol_stats["wireguard"]["last_activity_at"]
+                else None,
+            )
+        )
+    if "amneziawg" in protocol_stats:
+        protocol_stats["amneziawg"]["last_activity_at"] = _iso_utc(
+            _latest(
+                amneziawg_seen,
+                datetime.fromisoformat(
+                    protocol_stats["amneziawg"]["last_activity_at"].removesuffix("Z")
+                )
+                if protocol_stats["amneziawg"]["last_activity_at"]
+                else None,
+            )
+        )
+
     status = str(getattr(sub.status, "value", sub.status)).lower()
     return {
         **usage,
@@ -119,6 +308,7 @@ async def public_connection_live(token: str, db: Session = Depends(get_db)):
         "connection_online": connection_online,
         "online_protocols": sorted(online_protocols),
         "last_session_seen_at": _iso_utc(last_connection_seen),
+        "protocol_stats": protocol_stats,
     }
 
 

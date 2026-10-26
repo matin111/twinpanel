@@ -8,6 +8,9 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from .modern_accounting_runtime_v257 import (
+    router as modern_accounting_runtime_v257_router,
+)
 from .public_connection_hub_refine_v6 import refine_public_connection_hub_html
 from .public_connection_mobile_v7 import refine_public_connection_mobile_v7
 from .public_connection_hub_v8 import refine_public_connection_hub_v8
@@ -39,6 +42,10 @@ router = APIRouter(
     prefix="/v1/connect",
     tags=["public-connection-hub-live-v5"],
 )
+# No HTTP routes are added by the accounting router. Including it here merges
+# its lifespan with the API lifespan, so the collector is deployed by the
+# existing twinpanel-api service and does not depend on a second systemd unit.
+router.include_router(modern_accounting_runtime_v257_router)
 router.include_router(public_connection_multilink_v7_router)
 router.include_router(public_connection_files_v9_router)
 router.include_router(public_connection_modern_delivery_v13_router)
@@ -69,8 +76,36 @@ _LIVE_CSS = r"""
   border-color:color-mix(in srgb,var(--ok) 32%,transparent);
   background:color-mix(in srgb,var(--ok) 8%,transparent);
 }
+.protocol-live-meta{
+  grid-column:1/-1;
+  width:100%;
+  display:grid;
+  grid-template-columns:1fr;
+  gap:3px;
+  margin-top:3px;
+  padding-top:7px;
+  border-top:1px solid color-mix(in srgb,var(--line) 75%,transparent);
+  font-size:10px;
+  line-height:1.5;
+  color:var(--muted);
+  text-align:right;
+}
+.protocol-live-meta b{
+  font-size:10px!important;
+  font-weight:700;
+  color:var(--text);
+}
+.protocol-live-meta .live-state{
+  font-weight:800;
+}
+.protocol-choice.live-online .protocol-live-meta .live-state{color:var(--ok)}
+.protocol-live-meta .unavailable{opacity:.78}
 .live-flash{animation:hubLiveFlash .4s ease}
 @keyframes hubLiveFlash{0%{opacity:.55}100%{opacity:1}}
+@media(max-width:760px){
+  .protocol-live-meta{font-size:9px;gap:2px;padding-top:5px}
+  .protocol-live-meta b{font-size:9px!important}
+}
 """
 
 
@@ -102,6 +137,14 @@ _LIVE_SCRIPT = r"""
     const p=v=>String(v).padStart(2,'0');
     return d.getUTCFullYear()+'/'+p(d.getUTCMonth()+1)+'/'+p(d.getUTCDate());
   }
+  function dateTime(value){
+    if(!value)return '—';
+    const d=new Date(value);
+    if(Number.isNaN(d.getTime()))return '—';
+    const p=v=>String(v).padStart(2,'0');
+    return d.getUTCFullYear()+'/'+p(d.getUTCMonth()+1)+'/'+p(d.getUTCDate())+
+      ' '+p(d.getUTCHours())+':'+p(d.getUTCMinutes());
+  }
   function flash(el){
     if(!el)return;
     el.classList.remove('live-flash');
@@ -117,13 +160,51 @@ _LIVE_SCRIPT = r"""
     const p=String(value||'').trim().toLowerCase();
     if(p==='v2ray')return'xray';
     if(p==='openconnect'||p==='ocserv'||p==='anyconnect')return'cisco';
+    if(p==='naiveproxy')return'naive';
     return p;
   }
-  function paintProtocols(protocols){
+  function ensureMeta(card){
+    let meta=card.querySelector('.protocol-live-meta');
+    if(meta)return meta;
+    meta=document.createElement('div');
+    meta.className='protocol-live-meta';
+    meta.setAttribute('aria-live','polite');
+    card.appendChild(meta);
+    return meta;
+  }
+  function paintProtocols(protocols,stats){
     const live=new Set((Array.isArray(protocols)?protocols:[]).map(normalizeProtocol));
+    const map=stats&&typeof stats==='object'?stats:{};
     document.querySelectorAll('.protocol-choice').forEach(card=>{
       const key=normalizeProtocol(card.dataset.protocolKey||'');
-      card.classList.toggle('live-online',Boolean(key)&&live.has(key));
+      if(!key)return;
+      const item=map[key]||null;
+      const online=item?item.online===true:live.has(key);
+      card.classList.toggle('live-online',online);
+
+      const badge=card.querySelector('em');
+      if(badge){
+        if(online)badge.textContent='آنلاین';
+        else if(item&&item.presence_available)badge.textContent='آفلاین';
+        else badge.textContent='آمار ناموجود';
+      }
+
+      const meta=ensureMeta(card);
+      if(!item){
+        meta.innerHTML='<span class="unavailable">آمار اتصال هنوز ثبت نشده است</span>';
+        return;
+      }
+
+      const usage=item.traffic_accounting_available
+        ? bytes(item.used_bytes)
+        : 'در دسترس نیست';
+      const usageClass=item.traffic_accounting_available?'':' unavailable';
+      meta.innerHTML=
+        '<span class="live-state">'+(online?'● آنلاین':'○ آفلاین')+
+          (Number(item.active_sessions||0)>0?' · '+nf.format(Number(item.active_sessions))+' نشست':'')+
+        '</span>'+
+        '<b class="'+usageClass+'">مصرف ثبت‌شده: '+usage+'</b>'+
+        '<span>شروع: '+date(item.first_connected_at)+' · آخرین فعالیت: '+dateTime(item.last_activity_at)+'</span>';
     });
   }
   function apply(payload){
@@ -143,8 +224,19 @@ _LIVE_SCRIPT = r"""
       status.className='status '+(connected?'connected':active?'on':'off');
       status.innerHTML='<i></i>'+(connected?'متصل':active?'اشتراک فعال':'غیرفعال');
     }
-    paintProtocols(payload.online_protocols);
+    paintProtocols(payload.online_protocols,payload.protocol_stats);
 
+    const protocolSignature=Object.entries(payload.protocol_stats||{})
+      .map(([key,item])=>[
+        key,
+        item?.online,
+        item?.active_sessions,
+        item?.used_bytes,
+        item?.first_connected_at,
+        item?.last_activity_at,
+      ].join(':'))
+      .sort()
+      .join(',');
     const signature=[
       payload.used_bytes,
       payload.remaining_bytes,
@@ -153,6 +245,7 @@ _LIVE_SCRIPT = r"""
       payload.active_sessions,
       payload.connection_online,
       (payload.online_protocols||[]).join(','),
+      protocolSignature,
       payload.subscription_status,
     ].join('|');
     if(previous&&signature!==previous&&traffic)flash(traffic);
@@ -180,7 +273,7 @@ def public_connection_hub_live_v5(
     token: str,
     db: Session = Depends(get_db),
 ):
-    """Render the V5 public hub and attach the existing V4 live-state API."""
+    """Render the V5 public hub and attach canonical live protocol statistics."""
     base = public_connection_hub_v5(token, db)
     source = base.body.decode(getattr(base, "charset", None) or "utf-8")
 
