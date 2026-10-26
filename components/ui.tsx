@@ -23,7 +23,6 @@ const menuGroups=[
     ["افزودن سرور","Add Server","/admin/provision","⚡"],
     ["پروتکل‌ها","Protocols","/admin/modern-protocols","◫"],
     ["Outbound","Outbound","/admin/outbounds","↗"],
-    ["تست سرعت Outbound","Outbound Performance","/admin/outbound-performance","◉"],
     ["NetMod DNS","NetMod DNS","/admin/dns-emergency","◉"],
     ["دامنه و SSL","Domains & SSL","/admin/domains","⌘"]
   ]},
