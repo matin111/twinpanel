@@ -1,0 +1,23 @@
+name: Outbound Policy Protocol Inventory V250 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/outbound_policy_center_v1.py'
+      - 'scripts/outbound_policy_protocol_inventory_v250_smoke.py'
+      - '.github/workflows/outbound-policy-protocol-inventory-v250-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile policy router
+        run: python -m py_compile backend/app/routers/outbound_policy_center_v1.py
+      - name: Verify expanded protocol inventory
+        run: python scripts/outbound_policy_protocol_inventory_v250_smoke.py
