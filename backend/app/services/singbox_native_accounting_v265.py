@@ -35,13 +35,7 @@ SINGBOX_CLOSED_RETENTION_LIMIT = 1000
 
 
 def activate_singbox_capabilities() -> None:
-    """Expose only capabilities backed by the native collector.
-
-    public_connection_live_v4 imports canonical.capability_payload as a function;
-    that function resolves these module globals at call time. Updating the two
-    immutable sets during application startup therefore keeps the public route
-    DB-only while accurately advertising the newly installed collector.
-    """
+    """Advertise only capabilities backed by this native collector."""
 
     canonical.PRESENCE_ACCOUNTING_PROTOCOLS = frozenset(
         set(canonical.PRESENCE_ACCOUNTING_PROTOCOLS) | set(SINGBOX_ACCOUNTING_PROTOCOLS)
@@ -84,12 +78,7 @@ async def _run_node_command(
 
 
 def _api_mutation_script() -> str:
-    """Return an idempotent node-local config mutation.
-
-    The API is loopback-only and authenticated.  The secret is node runtime
-    state, never a subscriber credential. Existing top-level sing-box config is
-    preserved and only TwinPanel's tagged API service is owned here.
-    """
+    """Build the idempotent node-local loopback API mutation."""
 
     return f'''from __future__ import annotations
 import json
@@ -106,8 +95,7 @@ PORT = {SINGBOX_API_PORT!r}
 def load(path, default):
     try:
         with open(path, "r", encoding="utf-8") as handle:
-            value = json.load(handle)
-        return value
+            return json.load(handle)
     except FileNotFoundError:
         return default
 
@@ -124,7 +112,6 @@ if not isinstance(state, dict):
 services = doc.get("services")
 if not isinstance(services, list):
     services = []
-
 existing = next(
     (
         item for item in services
@@ -136,7 +123,6 @@ existing = next(
 api_state = state.get("accounting_api")
 if not isinstance(api_state, dict):
     api_state = {{}}
-
 secret = str(api_state.get("secret") or "").strip()
 if not secret and isinstance(existing, dict):
     secret = str(existing.get("secret") or "").strip()
@@ -150,7 +136,6 @@ desired = {{
     "listen_port": PORT,
     "secret": secret,
 }}
-
 config_changed = existing != desired
 if isinstance(existing, dict):
     if config_changed:
@@ -159,7 +144,6 @@ if isinstance(existing, dict):
 else:
     services.append(desired)
     config_changed = True
-
 doc["services"] = services
 
 new_api_state = {{
@@ -176,7 +160,6 @@ if config_changed:
         json.dump(doc, handle, ensure_ascii=False, indent=2)
         handle.write("\\n")
     os.chmod(CONFIG + ".accounting-api-new", 0o600)
-
 if config_changed or state_changed:
     with open(STATE + ".accounting-api-new", "w", encoding="utf-8") as handle:
         json.dump(state, handle, ensure_ascii=False, indent=2)
@@ -230,23 +213,16 @@ elif [ "$state_changed" = 1 ]; then
   mv {shlex.quote(STATE_PATH + '.accounting-api-new')} {shlex.quote(STATE_PATH)}
   chmod 600 {shlex.quote(STATE_PATH)}
 fi
-
 systemctl is-active --quiet {shlex.quote(SERVICE_NAME)}.service
 '''
     ok, output = await _run_node_command(conn, script, timeout=30)
     if not ok:
         return False, False, output[-900:] or "singbox_accounting_api_setup_failed"
-    changed = "CONFIG_CHANGED=1" in output
-    return True, changed, None
+    return True, "CONFIG_CHANGED=1" in output, None
 
 
 def _snapshot_script() -> str:
-    """Node-local exact protobuf reader for the first gRPC-Web snapshot.
-
-    No human-formatted CLI byte output is used. The script reads exact int64
-    fields from daemon.Connection and exits immediately after the initial reset
-    snapshot (active plus retained closed connections).
-    """
+    """Build a node-local exact protobuf reader for the initial gRPC-Web frame."""
 
     return f'''from __future__ import annotations
 import http.client
@@ -293,7 +269,7 @@ def fields(data):
             offset += 8
         elif wire == 2:
             size, offset = read_varint(data, offset)
-            if size < 0 or offset + size > len(data):
+            if offset + size > len(data):
                 raise ValueError("truncated bytes")
             value = data[offset:offset + size]
             offset += size
@@ -444,7 +420,6 @@ connection.close()
 reset, rows = parse_events(payload)
 if not reset:
     raise RuntimeError("sing-box API initial snapshot missing reset marker")
-
 print(json.dumps({{
     "epoch": runtime_epoch(),
     "snapshot_ms": int(time.time() * 1000),
@@ -471,9 +446,9 @@ async def collect_singbox_snapshot(
         payload = json.loads(line)
     except Exception as exc:
         return False, None, f"singbox_snapshot_json_failed:{exc}:{line[-600:]}"
-
     if not isinstance(payload, dict) or payload.get("reset") is not True:
         return False, None, "singbox_snapshot_not_authoritative"
+
     epoch = str(payload.get("epoch") or "").strip()
     rows = payload.get("rows")
     snapshot_ms = _safe_int(payload.get("snapshot_ms"))
@@ -495,15 +470,10 @@ async def collect_singbox_snapshot(
             "uplink_total": _safe_int(raw.get("uplink_total")),
             "downlink_total": _safe_int(raw.get("downlink_total")),
         }
-        if not row["id"]:
-            continue
-        normalized.append(row)
+        if row["id"]:
+            normalized.append(row)
 
-    return True, {
-        "epoch": epoch,
-        "snapshot_ms": snapshot_ms,
-        "rows": normalized,
-    }, None
+    return True, {"epoch": epoch, "snapshot_ms": snapshot_ms, "rows": normalized}, None
 
 
 def _source_ip(value: Any) -> str | None:
@@ -515,7 +485,6 @@ def _source_ip(value: Any) -> str | None:
     if text.count(":") == 1:
         return text.rsplit(":", 1)[0][:64] or None
     if ":" in text:
-        # Unbracketed IPv6 sources are retained without guessing a port split.
         return text[:64]
     return text[:64]
 
@@ -567,6 +536,7 @@ def _set_connection_baseline(
     observed_at: datetime,
 ) -> QuotaCursor:
     cursor = _cursor_for_source(db, node_id=node_id, source_key=source_key)
+    normalized_epoch = canonical._short_epoch(epoch, fallback=f"singbox:{node_id}")
     if cursor is None:
         cursor = QuotaCursor(
             node_id=int(node_id),
@@ -575,7 +545,7 @@ def _set_connection_baseline(
             protocol=protocol,
             source_key=source_key,
             counter_mode="cumulative",
-            counter_epoch=canonical._short_epoch(epoch, fallback=f"singbox:{node_id}"),
+            counter_epoch=normalized_epoch,
             last_sequence=max(int(snapshot_ms), 1),
             last_uplink_value=max(int(uplink), 0),
             last_downlink_value=max(int(downlink), 0),
@@ -585,7 +555,7 @@ def _set_connection_baseline(
     else:
         _assert_cursor_identity(cursor, device=device, protocol=protocol)
         cursor.counter_mode = "cumulative"
-        cursor.counter_epoch = canonical._short_epoch(epoch, fallback=f"singbox:{node_id}")
+        cursor.counter_epoch = normalized_epoch
         cursor.last_sequence = max(int(snapshot_ms), 1)
         cursor.last_uplink_value = max(int(uplink), 0)
         cursor.last_downlink_value = max(int(downlink), 0)
@@ -602,15 +572,11 @@ def _observation_mode(
     previous_snapshot_ms: int | None,
     created_at_ms: int,
 ) -> str:
-    """Return baseline, delta or full for one exact connection observation."""
-
     normalized_epoch = canonical._short_epoch(epoch, fallback="singbox")
     if watermark_epoch != normalized_epoch:
         return "baseline"
     if cursor is not None:
-        if str(cursor.counter_epoch) == normalized_epoch:
-            return "delta"
-        return "baseline"
+        return "delta" if str(cursor.counter_epoch) == normalized_epoch else "baseline"
     if previous_snapshot_ms is not None and int(created_at_ms) > int(previous_snapshot_ms):
         return "full"
     return "baseline"
@@ -620,7 +586,6 @@ def _watermark(
     db,
     *,
     node_id: int,
-    device: dict[str, Any],
     protocol: str,
     identity: str,
 ) -> QuotaCursor | None:
@@ -693,10 +658,9 @@ def _prune_missing_connection_cursors(
     )
     removed = 0
     for cursor in rows:
-        if str(cursor.source_key) in current_source_keys:
-            continue
-        db.delete(cursor)
-        removed += 1
+        if str(cursor.source_key) not in current_source_keys:
+            db.delete(cursor)
+            removed += 1
     return removed
 
 
@@ -746,7 +710,8 @@ def apply_singbox_snapshot(
         matching = [row for row in protocol_rows if str(row.get("user") or "") == identity]
         active_rows = [row for row in matching if _safe_int(row.get("closed_at_ms")) == 0]
         online = bool(active_rows)
-        client_ip = _source_ip((active_rows or matching or [{{}}])[0].get("source"))
+        representative = (active_rows or matching or [{}])[0]
+        client_ip = _source_ip(representative.get("source"))
 
         presence = canonical._mark_presence(
             db,
@@ -774,7 +739,6 @@ def apply_singbox_snapshot(
         watermark = _watermark(
             db,
             node_id=int(node.id),
-            device=device,
             protocol=protocol,
             identity=identity,
         )
@@ -798,6 +762,7 @@ def apply_singbox_snapshot(
             downlink = _safe_int(row.get("downlink_total"))
             source_key = _connection_source_key(protocol, connection_id)
             current_source_keys.add(source_key)
+
             cursor = _cursor_for_source(
                 db,
                 node_id=int(node.id),
@@ -813,7 +778,6 @@ def apply_singbox_snapshot(
                 previous_snapshot_ms=previous_snapshot_ms,
                 created_at_ms=created_at_ms,
             )
-
             if mode == "baseline":
                 _set_connection_baseline(
                     db,
@@ -902,9 +866,8 @@ def _devices_by_protocol(db, node_id: int) -> dict[str, list[dict[str, Any]]]:
     grouped: dict[str, list[dict[str, Any]]] = {}
     for item in build_node_devices(db, int(node_id)):
         protocol = str(item.get("protocol") or "").strip().lower()
-        if protocol not in SINGBOX_ACCOUNTING_PROTOCOLS:
-            continue
-        grouped.setdefault(protocol, []).append(dict(item))
+        if protocol in SINGBOX_ACCOUNTING_PROTOCOLS:
+            grouped.setdefault(protocol, []).append(dict(item))
     return grouped
 
 
@@ -916,10 +879,7 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
             db.query(Node)
             .filter(
                 Node.retired_at.is_(None),
-                or_(
-                    Node.node_type == NodeType.EXIT,
-                    Node.agent_url == "local://core",
-                ),
+                or_(Node.node_type == NodeType.EXIT, Node.agent_url == "local://core"),
             )
             .order_by(Node.id.asc())
             .all()
@@ -992,7 +952,6 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
                             "node_id": int(node.id),
                             "error": f"{type(exc).__name__}:{str(exc)[:500]}",
                         })
-
             except HTTPException as exc:
                 db.rollback()
                 results.append({
@@ -1033,10 +992,7 @@ async def singbox_native_accounting_loop() -> None:
         while True:
             if not owns_lock:
                 try:
-                    fcntl.flock(
-                        lock_handle.fileno(),
-                        fcntl.LOCK_EX | fcntl.LOCK_NB,
-                    )
+                    fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                     owns_lock = True
                 except BlockingIOError:
                     await asyncio.sleep(SINGBOX_ACCOUNTING_INTERVAL_SECONDS)
