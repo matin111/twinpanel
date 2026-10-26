@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.outbound_policy_standalone_adapters_v257 import (
     AMNEZIAWG_POLICY,
+    RECONCILE_PATH,
     STANDALONE_POLICY_SPECS,
     STANDALONE_RECONCILE_SCRIPT,
 )
@@ -166,6 +167,10 @@ def test_amneziawg_kernel_route_is_source_scoped_and_idempotent() -> None:
 
 
 def test_standalone_helper_matches_upstream_runtime_contracts() -> None:
+    # The dispatcher and policy center must agree on one stable managed-node
+    # helper path so reinstall/sync can re-assert an already active policy.
+    assert RECONCILE_PATH == "/usr/local/lib/twinpanel/outbound-policy-standalone-v257"
+
     # Compile the exact helper shipped to managed nodes, not a copy.
     compile(STANDALONE_RECONCILE_SCRIPT, "<standalone-policy-reconcile>", "exec")
 
