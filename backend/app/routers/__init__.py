@@ -62,6 +62,7 @@ from .outbound_policy_center_v1 import router as _outbound_policy_center_v1_rout
 from .outbound_performance_v261 import router as _outbound_performance_v261_router
 from .outbound_performance_v262_runtime import router as _outbound_performance_v262_router
 from .outbound_performance_v265 import router as _outbound_performance_v265_router
+from .outbound_performance_v268 import router as _outbound_performance_v268_router
 
 # TWINPANEL_MASTERDNSVPN_PORT53_V221
 # rc.220 over-classified wildcard UDP/53 listeners as fatal and could not
@@ -109,6 +110,7 @@ _runtime_endpoints.router.include_router(_outbound_policy_center_v1_router)
 _runtime_endpoints.router.include_router(_outbound_performance_v261_router)
 _runtime_endpoints.router.include_router(_outbound_performance_v262_router)
 _runtime_endpoints.router.include_router(_outbound_performance_v265_router)
+_runtime_endpoints.router.include_router(_outbound_performance_v268_router)
 
 # TWINPANEL_NETMOD_DNS_UNIFIED_V224
 # Canonical DNS emergency UX. Legacy DNS engines stay API-compatible for
