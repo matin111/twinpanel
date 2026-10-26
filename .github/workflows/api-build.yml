@@ -93,10 +93,10 @@ jobs:
       - name: Compile backend
         run: python -m compileall -q backend/app backend/scripts
 
-      # Keep the fast resolver regression in the generic API gate. The pinned
-      # static BadVPN build is intentionally owned by netmod-udpgw-v231-smoke
-      # and the prebuilt release workflow, so unrelated backend PRs do not
-      # depend on a live clone of an external repository.
+      # The generic API gate keeps the fast resolver regression only. The pinned
+      # static BadVPN build is owned by the dedicated NetMod workflow and by the
+      # release publisher so unrelated backend PRs do not depend on a live clone
+      # of an external repository.
       - name: Run NetMod UDPGW V231 regression
         working-directory: backend
         run: PYTHONPATH=. python tests/test_netmod_udpgw_v231.py
@@ -155,26 +155,69 @@ jobs:
 
           db = SessionLocal()
           try:
-              user = User(email="reseller-owned-ci@example.com", password_hash=hash_password("TwinPanel-CI-Reseller-2026!"), full_name="CI Reseller", is_active=True)
-              db.add(user); db.flush()
-              reseller = Reseller(owner_user_id=user.id, code="ci-owned-plan", name="CI Owned Plans", traffic_balance_bytes=10 * 1024**3, traffic_credit_bytes=0, is_active=True)
-              db.add(reseller); db.flush()
+              user = User(
+                  email="reseller-owned-ci@example.com",
+                  password_hash=hash_password("TwinPanel-CI-Reseller-2026!"),
+                  full_name="CI Reseller",
+                  is_active=True,
+              )
+              db.add(user)
+              db.flush()
+              reseller = Reseller(
+                  owner_user_id=user.id,
+                  code="ci-owned-plan",
+                  name="CI Owned Plans",
+                  traffic_balance_bytes=10 * 1024**3,
+                  traffic_credit_bytes=0,
+                  is_active=True,
+              )
+              db.add(reseller)
+              db.flush()
               before = int(reseller.traffic_balance_bytes or 0)
-              row = create_owned_plan(db, reseller=reseller, title="50 GB / 30 Days", traffic_gb=50, duration_days=30, device_limit=2, sell_price_toman=100000, enable_cisco=True, enable_openvpn=True, enable_wireguard=True, enable_l2tp=True, enable_v2ray=True, sort_order=10, is_active=True)
+              row = create_owned_plan(
+                  db,
+                  reseller=reseller,
+                  title="50 GB / 30 Days",
+                  traffic_gb=50,
+                  duration_days=30,
+                  device_limit=2,
+                  sell_price_toman=100000,
+                  enable_cisco=True,
+                  enable_openvpn=True,
+                  enable_wireguard=True,
+                  enable_l2tp=True,
+                  enable_v2ray=True,
+                  sort_order=10,
+                  is_active=True,
+              )
               db.flush()
               out = plan_out(row)
               assert out["reseller_plan_id"] == row.id
               assert out["plan_id"] == row.backing_plan_id
               assert out["traffic_reserved_on_sale"] is False
               assert int(reseller.traffic_balance_bytes or 0) == before
-              price = db.query(ResellerPlanPrice).filter(ResellerPlanPrice.reseller_id == reseller.id, ResellerPlanPrice.plan_id == row.backing_plan_id).one()
-              assert price.buy_price_toman == 0 and price.sell_price_toman == 100000
+              price = (
+                  db.query(ResellerPlanPrice)
+                  .filter(
+                      ResellerPlanPrice.reseller_id == reseller.id,
+                      ResellerPlanPrice.plan_id == row.backing_plan_id,
+                  )
+                  .one()
+              )
+              assert price.buy_price_toman == 0
+              assert price.sell_price_toman == 100000
               assert row.backing_plan_id > 0
               assert INTERNAL_PLAN_PREFIX.startswith("__tp_")
-              assert db.query(ResellerBotPlan).filter(ResellerBotPlan.reseller_id == reseller.id).count() == 1
+              assert (
+                  db.query(ResellerBotPlan)
+                  .filter(ResellerBotPlan.reseller_id == reseller.id)
+                  .count()
+                  == 1
+              )
               print("RESELLER_OWNED_PLAN_SCHEMA_OK")
           finally:
-              db.rollback(); db.close()
+              db.rollback()
+              db.close()
           PY
 
       - name: Verify self-hosted runtime hooks
@@ -193,93 +236,13 @@ jobs:
         working-directory: backend
         run: python scripts/bootstrap_admin.py
 
-      # Keep the API process and every network-dependent assertion in one shell
-      # lifecycle. GitHub-hosted runner steps may clean up shell-spawned children
-      # between steps, so cross-step localhost process persistence is not used.
+      # Uvicorn is owned by the Python supervisor in a non-daemon thread. This
+      # avoids GitHub runner cleanup of shell-background children while still
+      # exercising a real localhost HTTP server, readiness, OpenAPI and API
+      # core smoke tests.
       - name: Run API integration smoke
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          cd backend
-          : > /tmp/twinpanel-api-ci.log
-
-          python -u -m uvicorn app.main:app --host 127.0.0.1 --port 8095 \
-            > /tmp/twinpanel-api-ci.log 2>&1 &
-          API_PID=$!
-
-          cleanup() {
-            rc=$?
-            if [ "$rc" -ne 0 ]; then
-              echo "===== API LOG ====="
-              cat /tmp/twinpanel-api-ci.log || true
-              echo "===== LAST READINESS RESPONSE ====="
-              cat /tmp/twinpanel-ready.json 2>/dev/null || true
-            fi
-            kill "$API_PID" >/dev/null 2>&1 || true
-            wait "$API_PID" >/dev/null 2>&1 || true
-            exit "$rc"
-          }
-          trap cleanup EXIT
-
-          ready=0
-          for _ in $(seq 1 30); do
-            if ! kill -0 "$API_PID" 2>/dev/null; then
-              echo "API process exited before readiness"
-              exit 1
-            fi
-            code="$(curl -sS -o /tmp/twinpanel-ready.json -w '%{http_code}' http://127.0.0.1:8095/health/ready || true)"
-            if [ "$code" = "200" ]; then
-              ready=1
-              cat /tmp/twinpanel-ready.json
-              break
-            fi
-            sleep 2
-          done
-          if [ "$ready" -ne 1 ]; then
-            echo "API did not become ready"
-            exit 1
-          fi
-
-          curl -fsS http://127.0.0.1:8095/openapi.json > /tmp/openapi.json
-          grep -q '"/v1/runtime/endpoints"' /tmp/openapi.json
-          grep -q '"/v1/auth/login"' /tmp/openapi.json
-          grep -q '"/v1/auth/me"' /tmp/openapi.json
-          grep -q '"/v1/admin/users"' /tmp/openapi.json
-          grep -q '"/v1/plans"' /tmp/openapi.json
-          grep -q '"/v1/nodes"' /tmp/openapi.json
-          grep -q '"/v1/tunnels"' /tmp/openapi.json
-          grep -q '"/v1/subscriptions"' /tmp/openapi.json
-          grep -q '"/v1/reseller/plans"' /tmp/openapi.json
-          grep -q '"/v1/reseller/subscriptions/create"' /tmp/openapi.json
-          grep -q '"/v1/reseller/traffic/buy"' /tmp/openapi.json
-          grep -q '"/v1/reseller/bot-commerce/orders/{order_id}/approve"' /tmp/openapi.json
-          grep -q '"/v1/tunnels/register"' /tmp/openapi.json
-          grep -q '"/v1/tunnels/create-managed"' /tmp/openapi.json
-          grep -q '"/v1/tunnels/{tunnel_id}/transports"' /tmp/openapi.json
-          grep -q '"/v1/tunnels/{tunnel_id}/transport-mode"' /tmp/openapi.json
-          grep -q '"/v1/tunnels/{tunnel_id}/mtunnel/install"' /tmp/openapi.json
-          grep -q '"/v1/tunnels/{tunnel_id}/backhaul/install"' /tmp/openapi.json
-          grep -q '"/v1/tunnels/{tunnel_id}/ssh/install"' /tmp/openapi.json
-          grep -q '"/v1/payments/methods"' /tmp/openapi.json
-          grep -q '"/v1/payments/intents"' /tmp/openapi.json
-          grep -q '"/v1/payments/intents/{intent_id}/receipt-upload"' /tmp/openapi.json
-          grep -q '"/v1/payments/admin/crypto-discount"' /tmp/openapi.json
-          grep -q '"/v1/wallet/methods"' /tmp/openapi.json
-          grep -q '"/v1/wallet/topups"' /tmp/openapi.json
-          grep -q '"/v1/wallet/topups/{topup_id}/submit"' /tmp/openapi.json
-          grep -q '"/v1/admin/wallet/wallets"' /tmp/openapi.json
-          grep -q '"/v1/admin/wallet/topups"' /tmp/openapi.json
-          grep -q '"/v1/admin/wallet/topups/{topup_id}/approve"' /tmp/openapi.json
-          grep -q '"/v1/admin/telegram-bot"' /tmp/openapi.json
-          grep -q '"/v1/admin/telegram-bot/test"' /tmp/openapi.json
-          grep -q '"/v1/xray-modern' /tmp/openapi.json
-          grep -q '"/v1/xray-modern-admin' /tmp/openapi.json
-
-          python -m scripts.tunnel_managed_smoke
-          python -m scripts.managed_relay_recovery_v20_smoke
-          python -m scripts.public_direct_tuning_v19_smoke
-          python -m scripts.transport_policy_v16_smoke
-          python scripts/api_core_smoke.py
+        working-directory: backend
+        run: python scripts/ci_api_integration_supervisor.py
 
       - name: Setup Node for admin UI verification
         uses: actions/setup-node@v4
