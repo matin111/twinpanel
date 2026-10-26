@@ -58,7 +58,10 @@ type PolicyMode="inherit"|"direct"|"outbound"|"block";
 type PolicyRow={
   key:string;
   title:string;
+  family?:string|null;
   plane:string;
+  core?:string|null;
+  runtime_status?:string|null;
   inbound_tag?:string|null;
   policy_supported:boolean;
   installed?:boolean|null;
@@ -368,7 +371,7 @@ export function OutboundPolicyCenter(){
         <article className={styles.statCard}><div className={styles.statTop}><span>{pick("هسته خروجی","Egress core")}</span><i className={node?.service_active?styles.dotOk:styles.dotBad}/></div><strong>{node?.service_active?pick("آنلاین","Online"):pick("آفلاین","Offline")}</strong><small>{node?.name||"—"} · {node?.public_ip||"—"}</small></article>
         <article className={styles.statCard}><div className={styles.statTop}><span>{pick("مسیر پیش‌فرض","Default route")}</span><i className={styles.dotViolet}/></div><strong className={styles.mono}>{defaultTag}</strong><small>{pick("Fallback پروتکل‌های بدون Policy","Fallback for protocols without a policy")}</small></article>
         <article className={styles.statCard}><div className={styles.statTop}><span>{pick("Outboundهای مدیریت‌شده","Managed outbounds")}</span><i className={styles.dotBlue}/></div><strong>{imported.length}</strong><small>{healthyTests} {pick("مسیر با تست موفق","routes passed")}</small></article>
-        <article className={styles.statCard}><div className={styles.statTop}><span>{pick("Policy فعال","Active policies")}</span><i className={styles.dotAmber}/></div><strong>{activePolicies}</strong><small>{pick("Rule مستقل از route.final","Rules independent from route.final")}</small></article>
+        <article className={styles.statCard}><div className={styles.statTop}><span>{pick("Policy فعال","Active policies")}</span><i className={styles.dotAmber}/></div><strong>{activePolicies}</strong><small>{policy?.protocols.length||0} {pick("پروتکل در Registry","protocols in registry")}</small></article>
       </section>
 
       <section className={styles.controlBar}>
@@ -382,7 +385,7 @@ export function OutboundPolicyCenter(){
 
       {tab==="routing"?<section className={styles.panel}>
         <div className={styles.sectionHead}>
-          <div><span className={styles.sectionKicker}>ROUTING MATRIX</span><h2>{pick("مسیر خروج هر پروتکل","Egress path per protocol")}</h2><p>{pick("اولویت اجرا: Policy پروتکل ← مسیر پیش‌فرض نود. گزینه‌های بدون Data Plane واقعی عمداً قفل هستند.","Precedence: protocol policy → node default. Controls without a real data plane are intentionally locked.")}</p></div>
+          <div><span className={styles.sectionKicker}>ROUTING MATRIX</span><h2>{pick("مسیر خروج هر پروتکل","Egress path per protocol")}</h2><p>{pick("تمام پروتکل‌های Registry نمایش داده می‌شوند. فقط مسیرهایی که Data Plane آن‌ها واقعاً Audit شده قابل اعمال‌اند.","All registry protocols are visible. Only paths with an audited real data plane are writable.")}</p></div>
           <div className={styles.legend}><span><i className={styles.dotOk}/>{pick("قابل اعمال","Writable")}</span><span><i className={styles.dotMuted}/>{pick("نیازمند Adapter","Adapter required")}</span></div>
         </div>
         {policyLoading?<div className={styles.loadingBox}>{pick("در حال خواندن Policyهای واقعی نود...","Reading node policies...")}</div>:null}
@@ -391,18 +394,25 @@ export function OutboundPolicyCenter(){
           {policy.protocols.map(row=>{
             const draft=drafts[row.key]||{mode:row.mode,outboundTag:row.outbound_tag||""};
             const writable=row.policy_supported&&row.installed!==false;
-            const plane=row.plane==="kernel"?"Kernel VPN":row.plane==="xray"?"Xray Core":"Sing-box";
+            const plane=row.core|| (row.plane==="kernel"?"Kernel VPN":row.plane==="xray"?"Xray Core":row.plane==="standalone"?"Standalone":"Sing-box");
+            const lockReason=row.reason==="separate_core_adapter_required"
+              ?pick("نیازمند اتصال Policy به Xray Core","Needs Xray policy adapter")
+              :row.reason==="singbox_policy_adapter_required"
+                ?pick("نیازمند Policy Adapter اختصاصی Sing-box","Needs a dedicated Sing-box policy adapter")
+                :row.reason==="protocol_egress_adapter_required"
+                  ?pick("نیازمند Egress Adapter اختصاصی این Core","Needs a dedicated egress adapter for this core")
+                  :pick("نیازمند Egress Adapter واقعی","Needs a real egress adapter");
             return <div className={`${styles.matrixRow} ${!row.policy_supported?styles.matrixRowLocked:""}`} key={row.key}>
-              <div className={styles.protocolCell}><div className={styles.protocolIcon}>{row.title.slice(0,2).toUpperCase()}</div><div><b>{row.title}</b><small>{row.inbound_tag||row.key}</small></div></div>
-              <div className={styles.stackCell}><span>{plane}</span>{row.policy_supported?<Badge tone={row.installed===false?"warn":"ok"}>{row.installed===false?pick("نصب نیست","Not installed"):pick("Route-ready","Route-ready")}</Badge>:<Badge tone="warn">{pick("Adapter لازم","Adapter required")}</Badge>}</div>
-              <div>{row.policy_supported?<select className={styles.routeSelect} value={draft.mode} onChange={event=>updateDraft(row.key,{mode:event.target.value as PolicyMode})} disabled={!writable||Boolean(busy)}><option value="inherit">{pick("پیش‌فرض نود","Inherit default")}</option><option value="direct">Direct</option><option value="outbound">{pick("Outbound مشخص","Specific outbound")}</option><option value="block">{pick("مسدود","Block")}</option></select>:<span className={styles.lockText}>{pick(row.reason==="separate_core_adapter_required"?"نیازمند اتصال Policy به Xray Core":"نیازمند Egress Adapter واقعی",row.reason==="separate_core_adapter_required"?"Needs Xray policy adapter":"Needs a real egress adapter")}</span>}</div>
-              <div>{row.policy_supported&&draft.mode==="outbound"?<select className={styles.routeSelect} value={draft.outboundTag} onChange={event=>updateDraft(row.key,{outboundTag:event.target.value})} disabled={!writable||Boolean(busy)}><option value="">{pick("انتخاب Outbound...","Choose outbound...")}</option>{imported.map(item=><option value={item.tag} key={item.tag}>{item.tag}</option>)}</select>:<span className={styles.mutedValue}>{draft.mode==="direct"?"direct":draft.mode==="block"?"reject":pick("از Default ارث می‌برد","Inherited")}</span>}</div>
-              <div className={styles.effectiveCell}><span className={styles.routePill}>{row.effective_outbound}</span><small>{row.mode!=="inherit"?pick("Policy اختصاصی","Explicit policy"):"Inherited"}</small></div>
-              <div className={styles.actionCell}>{row.policy_supported?<button className={changed(row)?styles.primaryButton:styles.ghostButton} disabled={!writable||Boolean(busy)||!changed(row)} onClick={()=>void applyPolicy(row)}>{busy===`policy:${row.key}`?pick("اعمال...","Applying..."):pick("اعمال Policy","Apply")}</button>:<span className={styles.lockBadge}>LOCKED</span>}</div>
+              <div className={styles.protocolCell}><div className={styles.protocolIcon}>{row.title.slice(0,2).toUpperCase()}</div><div><b>{row.title}</b><small>{row.inbound_tag||row.key}{row.family?` · ${row.family}`:""}</small></div></div>
+              <div className={styles.stackCell} data-label="Data Plane"><span>{plane}</span><small className={styles.runtimeMeta}>{row.runtime_status||"—"}</small>{row.policy_supported?<Badge tone={row.installed===false?"warn":"ok"}>{row.installed===false?pick("نصب نیست","Not installed"):pick("Route-ready","Route-ready")}</Badge>:<Badge tone="warn">{pick("Adapter لازم","Adapter required")}</Badge>}</div>
+              <div data-label={pick("حالت مسیر","Route mode")}>{row.policy_supported?<select className={styles.routeSelect} value={draft.mode} onChange={event=>updateDraft(row.key,{mode:event.target.value as PolicyMode})} disabled={!writable||Boolean(busy)}><option value="inherit">{pick("پیش‌فرض نود","Inherit default")}</option><option value="direct">Direct</option><option value="outbound">{pick("Outbound مشخص","Specific outbound")}</option><option value="block">{pick("مسدود","Block")}</option></select>:<span className={styles.lockText}>{lockReason}</span>}</div>
+              <div data-label={pick("Outbound مقصد","Target outbound")}>{row.policy_supported&&draft.mode==="outbound"?<select className={styles.routeSelect} value={draft.outboundTag} onChange={event=>updateDraft(row.key,{outboundTag:event.target.value})} disabled={!writable||Boolean(busy)}><option value="">{pick("انتخاب Outbound...","Choose outbound...")}</option>{imported.map(item=><option value={item.tag} key={item.tag}>{item.tag}</option>)}</select>:<span className={styles.mutedValue}>{draft.mode==="direct"?"direct":draft.mode==="block"?"reject":pick("از Default ارث می‌برد","Inherited")}</span>}</div>
+              <div className={styles.effectiveCell} data-label={pick("مسیر مؤثر","Effective path")}><span className={styles.routePill}>{row.effective_outbound}</span><small>{row.mode!=="inherit"?pick("Policy اختصاصی","Explicit policy"):"Inherited"}</small></div>
+              <div className={styles.actionCell} data-label={pick("عملیات","Action")}>{row.policy_supported?<button className={changed(row)?styles.primaryButton:styles.ghostButton} disabled={!writable||Boolean(busy)||!changed(row)} onClick={()=>void applyPolicy(row)}>{busy===`policy:${row.key}`?pick("اعمال...","Applying..."):pick("اعمال Policy","Apply")}</button>:<span className={styles.lockBadge}>LOCKED</span>}</div>
             </div>;
           })}
         </div>:null}
-        <div className={styles.architectureNote}><div><b>{pick("چرا بعضی پروتکل‌ها قفل‌اند؟","Why are some protocols locked?")}</b><p>{pick("OpenVPN، WireGuard، Cisco و L2TP در Kernel Data Plane مستقیماً NAT می‌شوند. تا Egress Adapter محدود و rollback-safe برای subnet آن‌ها ساخته نشود، انتخاب Outbound در UI روی بسته واقعی اثر ندارد؛ بنابراین TwinPanel گزینه نمایشی فعال نمی‌کند.","OpenVPN, WireGuard, Cisco and L2TP currently NAT directly in the kernel data plane. Until a bounded rollback-safe adapter exists for their subnets, TwinPanel will not expose a fake routing control.")}</p></div><div className={styles.safetyChips}><span>Fail-closed UI</span><span>Config validation</span><span>Rule preservation</span><span>Rollback</span></div></div>
+        <div className={styles.architectureNote}><div><b>{pick("چرا بعضی پروتکل‌ها قفل‌اند؟","Why are some protocols locked?")}</b><p>{pick("TwinPanel همه پروتکل‌های Registry را نشان می‌دهد، اما فقط Hysteria2، TUIC و AnyTLS فعلاً Rule مسیریابی Audit‌شده دارند. پروتکل‌های Kernel، Xray و Coreهای مستقل تا ساخت Egress Adapter محدود و rollback-safe قفل می‌مانند تا UI مسیر جعلی نمایش ندهد.","TwinPanel shows every registry protocol, but only Hysteria2, TUIC and AnyTLS currently have audited routing rules. Kernel, Xray and standalone cores stay locked until bounded rollback-safe egress adapters exist, so the UI never pretends a route is active.")}</p></div><div className={styles.safetyChips}><span>15 Protocols</span><span>Fail-closed UI</span><span>Config validation</span><span>Rule preservation</span><span>Rollback</span></div></div>
       </section>:null}
 
       {tab==="pool"?<section className={styles.panel}>

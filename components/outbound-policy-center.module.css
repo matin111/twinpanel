@@ -188,6 +188,7 @@
 .defaultRoute button{padding:7px 9px;border:1px solid var(--opc-border);border-radius:9px;background:transparent;color:var(--opc-text);font-size:10px}
 
 .panel{
+  container-type:inline-size;
   overflow:hidden;
   border:1px solid var(--opc-border);
   border-radius:18px;
@@ -225,7 +226,8 @@
 .protocolCell>div:last-child{display:grid;gap:3px;min-width:0}
 .protocolCell b{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .protocolCell small{font-size:9px;color:var(--opc-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.stackCell{display:grid;gap:5px;justify-items:start;font-size:10px;color:var(--opc-muted)}
+.stackCell{display:grid;gap:5px;justify-items:start;font-size:10px;color:var(--opc-muted);min-width:0}
+.runtimeMeta{max-width:100%;font:700 8px ui-monospace,SFMono-Regular,Menlo,monospace;color:#6f7d99;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .routeSelect{min-height:36px;font-size:11px;padding-inline:9px}
 .lockText{display:block;max-width:210px;color:#8994aa;font-size:10px;line-height:1.55}
 .mutedValue{font-size:10px;color:var(--opc-muted)}
@@ -308,7 +310,7 @@
 .architectureNote>div:first-child{max-width:850px}
 .architectureNote b{font-size:12px;color:#f3d99f}
 .architectureNote p{margin-top:5px;font-size:11px}
-.safetyChips{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;max-width:320px}
+.safetyChips{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;max-width:360px}
 .safetyChips span{font-size:9px}
 
 .poolGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:18px}
@@ -381,10 +383,73 @@
 
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;direction:ltr;unicode-bidi:plaintext}
 
+@container (max-width:1180px){
+  .matrix{
+    display:grid;
+    gap:12px;
+    padding:14px;
+    background:color-mix(in srgb,var(--opc-panel) 92%,black 8%);
+  }
+  .matrixHeader{display:none}
+  .matrixRow{
+    min-width:0;
+    min-height:0;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:14px 16px;
+    align-items:stretch;
+    padding:16px;
+    border:1px solid color-mix(in srgb,var(--opc-border) 88%,transparent);
+    border-radius:15px;
+    background:linear-gradient(155deg,color-mix(in srgb,var(--opc-soft) 72%,transparent),rgba(255,255,255,.008));
+  }
+  .matrixRow:last-child{border-bottom:1px solid color-mix(in srgb,var(--opc-border) 88%,transparent)}
+  .matrixRow:hover{background:linear-gradient(155deg,color-mix(in srgb,var(--opc-soft) 82%,transparent),rgba(255,255,255,.018))}
+  .matrixRowLocked{opacity:.92}
+  .protocolCell{
+    grid-column:1/-1;
+    padding-bottom:12px;
+    border-bottom:1px solid color-mix(in srgb,var(--opc-border) 72%,transparent);
+  }
+  .matrixRow>[data-label]{
+    position:relative;
+    display:grid;
+    min-width:0;
+    align-content:start;
+    gap:7px;
+    padding-top:18px;
+  }
+  .matrixRow>[data-label]::before{
+    content:attr(data-label);
+    position:absolute;
+    inset-inline-start:0;
+    top:0;
+    color:#6f7d99;
+    font-size:8px;
+    font-weight:900;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+  }
+  .stackCell{justify-items:start}
+  .lockText{max-width:none;min-height:36px}
+  .effectiveCell{grid-column:span 2;justify-items:stretch}
+  .routePill{width:100%}
+  .actionCell{display:grid;justify-content:stretch;align-content:end}
+  .actionCell button,.actionCell .lockBadge{width:100%;min-height:38px;text-align:center}
+  .panel:has(.matrixRow .actionCell .primaryButton)::before{margin:14px 14px 0}
+}
+
+@container (max-width:720px){
+  .matrix{padding:10px;gap:10px}
+  .matrixRow{grid-template-columns:1fr;padding:14px;gap:11px}
+  .protocolCell,.effectiveCell{grid-column:auto}
+  .matrixRow>[data-label]{padding-top:17px}
+  .protocolCell b{white-space:normal}
+  .protocolCell small{white-space:normal;overflow-wrap:anywhere}
+  .routeSelect{min-height:42px}
+}
+
 @media(max-width:1180px){
   .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .matrix{overflow-x:auto}
-  .matrixHeader,.matrixRow{min-width:1060px}
   .poolGrid{grid-template-columns:1fr}
 }
 
