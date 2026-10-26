@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -54,6 +55,11 @@ REQUIRED_ROUTES = (
     "/v1/admin/wallet/topups/{topup_id}/approve",
     "/v1/admin/telegram-bot",
     "/v1/admin/telegram-bot/test",
+    "/v1/settings/vpn/outbound-performance/{node_id}/{tag}/advanced-test",
+    "/v1/settings/vpn/outbound-performance/{node_id}/tuning",
+    "/v1/settings/vpn/outbound-performance/{node_id}/tuning/apply",
+    "/v1/settings/vpn/outbound-performance/{node_id}/tuning/rollback",
+    "/v1/settings/vpn/outbound-performance/{node_id}/advanced-state",
 )
 REQUIRED_ROUTE_PREFIXES = (
     "/v1/xray-modern",
@@ -64,6 +70,8 @@ SMOKE_COMMANDS = (
     (sys.executable, "-m", "scripts.managed_relay_recovery_v20_smoke"),
     (sys.executable, "-m", "scripts.public_direct_tuning_v19_smoke"),
     (sys.executable, "-m", "scripts.transport_policy_v16_smoke"),
+    (sys.executable, "tests/outbound_performance_v261_smoke.py"),
+    (sys.executable, "tests/outbound_performance_v262_smoke.py"),
     (sys.executable, "scripts/api_core_smoke.py"),
 )
 SERVER_ERRORS: list[str] = []
@@ -124,9 +132,15 @@ def _verify_routes() -> None:
 
 
 def _run_smokes() -> None:
+    smoke_env = os.environ.copy()
+    existing_pythonpath = smoke_env.get("PYTHONPATH", "").strip()
+    backend_path = str(BACKEND_DIR)
+    smoke_env["PYTHONPATH"] = (
+        backend_path if not existing_pythonpath else f"{backend_path}{os.pathsep}{existing_pythonpath}"
+    )
     for command in SMOKE_COMMANDS:
         print("API_SMOKE_RUN", " ".join(command), flush=True)
-        subprocess.run(command, cwd=BACKEND_DIR, check=True)
+        subprocess.run(command, cwd=BACKEND_DIR, check=True, env=smoke_env)
 
 
 if __name__ == "__main__":

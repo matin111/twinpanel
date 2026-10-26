@@ -4,22 +4,32 @@ on:
   pull_request:
     paths:
       - "backend/app/routers/outbound_performance_v261.py"
+      - "backend/app/routers/outbound_performance_v262.py"
+      - "backend/app/routers/outbound_performance_v262_runtime.py"
       - "backend/app/routers/__init__.py"
       - "backend/tests/outbound_performance_v261_smoke.py"
+      - "backend/tests/outbound_performance_v262_smoke.py"
       - "components/outbound-performance-lab.tsx"
+      - "components/outbound-performance-inline.tsx"
       - "components/outbound-performance-lab.module.css"
       - "components/ui.tsx"
+      - "app/admin/outbounds/page.tsx"
       - "app/admin/outbound-performance/page.tsx"
       - ".github/workflows/outbound-performance-v261-smoke.yml"
   push:
     branches: [main]
     paths:
       - "backend/app/routers/outbound_performance_v261.py"
+      - "backend/app/routers/outbound_performance_v262.py"
+      - "backend/app/routers/outbound_performance_v262_runtime.py"
       - "backend/app/routers/__init__.py"
       - "backend/tests/outbound_performance_v261_smoke.py"
+      - "backend/tests/outbound_performance_v262_smoke.py"
       - "components/outbound-performance-lab.tsx"
+      - "components/outbound-performance-inline.tsx"
       - "components/outbound-performance-lab.module.css"
       - "components/ui.tsx"
+      - "app/admin/outbounds/page.tsx"
       - "app/admin/outbound-performance/page.tsx"
       - ".github/workflows/outbound-performance-v261-smoke.yml"
 
@@ -29,7 +39,7 @@ permissions:
 jobs:
   performance-and-admin-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -41,8 +51,11 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/routers/outbound_performance_v261.py \
+            backend/app/routers/outbound_performance_v262.py \
+            backend/app/routers/outbound_performance_v262_runtime.py \
             backend/app/routers/__init__.py \
-            backend/tests/outbound_performance_v261_smoke.py
+            backend/tests/outbound_performance_v261_smoke.py \
+            backend/tests/outbound_performance_v262_smoke.py
 
       - name: Install backend dependencies
         run: python -m pip install -r backend/requirements.txt
@@ -53,6 +66,20 @@ jobs:
           DATABASE_URL: "sqlite:////tmp/twinpanel-outbound-performance-ci.db"
           NODE_AGENT_SHARED_SECRET: "ci-outbound-performance-agent-v261"
         run: PYTHONPATH=backend python backend/tests/outbound_performance_v261_smoke.py
+
+      - name: Advanced benchmark and tuning safety smoke
+        env:
+          APP_SECRET_KEY: "ci-outbound-performance-v262"
+          DATABASE_URL: "sqlite:////tmp/twinpanel-outbound-performance-v262.db"
+          NODE_AGENT_SHARED_SECRET: "ci-outbound-performance-agent-v262"
+        run: PYTHONPATH=backend python backend/tests/outbound_performance_v262_smoke.py
+
+      - name: Import application
+        env:
+          APP_SECRET_KEY: "ci-outbound-performance-v262-import"
+          DATABASE_URL: "sqlite:////tmp/twinpanel-outbound-performance-v262-import.db"
+          NODE_AGENT_SHARED_SECRET: "ci-outbound-performance-agent-v262-import"
+        run: PYTHONPATH=backend python -c 'import app.main; print("app import: ok")'
 
       - uses: actions/setup-node@v4
         with:
