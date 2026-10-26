@@ -60,10 +60,10 @@
   box-shadow:0 10px 26px rgba(124,58,237,.22);
 }
 .controls button:disabled,.actions button:disabled,.abControls button:disabled{opacity:.45;cursor:not-allowed}
-.secondary{
-  background:var(--surface-2,var(--surface,#111827)) !important;
-  color:var(--text,#f8fafc) !important;
-  border:1px solid var(--line,rgba(148,163,184,.22)) !important;
+.actions .secondary{
+  background:var(--surface-2,var(--surface,#111827));
+  color:var(--text,#f8fafc);
+  border:1px solid var(--line,rgba(148,163,184,.22));
 }
 .grid,.resultGrid{
   display:grid;
