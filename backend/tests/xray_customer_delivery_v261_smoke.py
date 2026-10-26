@@ -1,6 +1,23 @@
 from __future__ import annotations
 
+import os
 from types import SimpleNamespace
+
+# Match the public CI-only settings already used by api-build.yml. The smoke
+# never connects to the database; these values only allow normal application
+# modules to import through Settings/database initialization.
+os.environ.setdefault(
+    "APP_SECRET_KEY",
+    "ci-only-secret-key-ci-only-secret-key-ci-only-secret-key",
+)
+os.environ.setdefault(
+    "DATABASE_URL",
+    "postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel",
+)
+os.environ.setdefault(
+    "NODE_AGENT_SHARED_SECRET",
+    "ci-node-agent-secret-ci-node-agent-secret",
+)
 
 from app import xray_customer_profile_policy_v30 as policy
 from app import xray_modern_runtime
