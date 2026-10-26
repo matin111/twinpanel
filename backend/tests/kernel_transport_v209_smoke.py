@@ -151,12 +151,38 @@ def main() -> None:
     }
     assert expected.issubset(api_names)
 
+    # V257 regression: manual production selection is no longer a DB-only
+    # control-plane write. The endpoint must force a fresh full candidate probe,
+    # wait for post-reconcile Agent reports from both peers, and roll aggregate
+    # authority back if the new carrier/data plane is not accepted. Unified L3
+    # remains the only service-route publisher; the API must not add direct
+    # iptables/route mutation to the cutover path.
+    modern = _source("app/routers/modern_transports.py")
+    assert "TWINPANEL_MANUAL_CUTOVER_ACCEPTANCE_V257" in modern
+    assert "async def select_modern_transport_manual(" in modern
+    assert "smart._candidate_health_cache.pop(key, None)" in modern
+    assert "await smart.candidate_health_remote_v21(" in modern
+    assert "_wait_manual_cutover_acceptance_v257(" in modern
+    assert "TunnelPeerState.node_id.in_(node_ids)" in modern
+    assert 'item["fresh"]' in modern
+    assert 'item["selected_transport"] == name' in modern
+    assert "_rollback_manual_cutover_v257(" in modern
+    assert '"rolled_back": True' in modern
+    assert '"dataplane_reconciled": True' in modern
+    assert "tunnel.last_switch_at = cutover_started_at" in modern
+
+    cutover_start = modern.index("# TWINPANEL_MANUAL_CUTOVER_ACCEPTANCE_V257")
+    cutover_source = modern[cutover_start:]
+    assert "iptables " not in cutover_source
+    assert "ip route " not in cutover_source
+
     print(
-        "KERNEL_TRANSPORT_V212_OK",
+        "KERNEL_TRANSPORT_V257_OK",
         "active=" + ",".join(sorted(expected)),
         "auto_install=" + ",".join(smart.AUTO_INSTALL_NAMES),
         "failure_cleanup=policy,nat,legacy-forward,service,helper,unit",
         "policy_rules=tp6:300xx,ipip:309xx,vxlan:318xx",
+        "manual_cutover=fresh-probe+dual-agent-acceptance+rollback",
         f"linux_main={LINUX_MAIN_RULE_PRIORITY}",
     )
 
