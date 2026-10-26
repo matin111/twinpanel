@@ -62,6 +62,7 @@ from .outbound_policy_center_v1 import router as _outbound_policy_center_v1_rout
 from .outbound_performance_v261 import router as _outbound_performance_v261_router
 from .outbound_performance_v262_runtime import router as _outbound_performance_v262_router
 from .outbound_performance_v265 import router as _outbound_performance_v265_router
+from .outbound_performance_v268_guard import router as _outbound_performance_v268_guard_router
 from .outbound_performance_v268 import router as _outbound_performance_v268_router
 
 # TWINPANEL_MASTERDNSVPN_PORT53_V221
@@ -110,6 +111,10 @@ _runtime_endpoints.router.include_router(_outbound_policy_center_v1_router)
 _runtime_endpoints.router.include_router(_outbound_performance_v261_router)
 _runtime_endpoints.router.include_router(_outbound_performance_v262_router)
 _runtime_endpoints.router.include_router(_outbound_performance_v265_router)
+# V268 fail-closed overlay owns the overlapping GET/smart-route/A-B paths.
+# Mount it before the additive base router so FastAPI resolves the guarded
+# handlers first; tuning apply/rollback remains owned by the base router.
+_runtime_endpoints.router.include_router(_outbound_performance_v268_guard_router)
 _runtime_endpoints.router.include_router(_outbound_performance_v268_router)
 
 # TWINPANEL_NETMOD_DNS_UNIFIED_V224
