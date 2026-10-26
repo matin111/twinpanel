@@ -27,6 +27,18 @@ router = APIRouter(tags=["public-connection-modern-delivery-v16"])
 
 
 _V16_MARKER = "TWINPANEL_PUBLIC_MODERN_DELIVERY_V16"
+_MODERN_PANEL_RE = re.compile(
+    r'(<section id="[^"]+" class="protocol-panel[^"]*" '
+    r'data-modern-protocol="[^"]+">)(.*?)(</section>)',
+    re.S,
+)
+_MODERN_ACTION_RE = re.compile(
+    r'<div class="v13-modern-action"[^>]*>.*?</div></div>',
+    re.S,
+)
+_SERVER_VIEW_OPEN_RE = re.compile(
+    r'(<div id="[^"]+-server-\d+" class="server-view[^"]*">)'
+)
 
 
 def _h(value: Any) -> str:
@@ -103,6 +115,42 @@ def _replace_unsupported_karing_button(
     return pattern.sub(replacement, source, count=1)
 
 
+def _scope_modern_actions_to_server_views(source: str) -> str:
+    """Keep each Modern server action inside its own server/country view.
+
+    V5 already renders one ``server-view`` per credential item and its matching
+    server tab. V13 later appended all Modern actions to the protocol panel,
+    outside those views, so actions from every country stayed visible together.
+    Preserve the canonical item order and move exactly one action into each
+    corresponding view. If cardinality ever differs, keep the original panel
+    unchanged rather than guessing a mapping.
+    """
+
+    def scope_panel(match: re.Match[str]) -> str:
+        body = match.group(2)
+        actions = _MODERN_ACTION_RE.findall(body)
+        if not actions:
+            return match.group(0)
+
+        cleaned = _MODERN_ACTION_RE.sub("", body)
+        server_views = list(_SERVER_VIEW_OPEN_RE.finditer(cleaned))
+        if len(server_views) != len(actions):
+            return match.group(0)
+
+        action_index = 0
+
+        def inject(server_match: re.Match[str]) -> str:
+            nonlocal action_index
+            action = actions[action_index]
+            action_index += 1
+            return server_match.group(1) + action
+
+        scoped = _SERVER_VIEW_OPEN_RE.sub(inject, cleaned)
+        return match.group(1) + scoped + match.group(3)
+
+    return _MODERN_PANEL_RE.sub(scope_panel, source)
+
+
 @router.get("/{token}/modern-config-v16/{protocol}/{node_id}")
 def public_modern_config_v16(
     token: str,
@@ -143,7 +191,7 @@ def refine_public_connection_modern_delivery_v16(
     token: str,
     db: Session,
 ) -> str:
-    """Repair only broken Modern download actions after V15 refinement."""
+    """Repair Modern delivery actions and keep each one scoped to its server."""
     if _V16_MARKER in source:
         return source
 
@@ -200,6 +248,7 @@ def refine_public_connection_modern_delivery_v16(
                 config_path=current_path,
             )
 
+    source = _scope_modern_actions_to_server_views(source)
     source = source.replace(
         "</body>",
         f"<!-- {_V16_MARKER} -->\n</body>",
