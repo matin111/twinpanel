@@ -4,6 +4,7 @@ import {type FormEvent,useEffect,useMemo,useState} from "react";
 
 import {Badge,Shell} from "./ui";
 import styles from "./tunnel-control-center-v1.module.css";
+import {TunnelServerPairSelectorV293} from "./tunnel-server-pair-selector-v293";
 import type {AdminNode,AdminTunnel} from "../lib/admin-api";
 import {legacyControlApi} from "../lib/legacy-control-api";
 import {modernTransportApi,type SmartTransportCandidate,type SmartTransportName,type SmartTransportState} from "../lib/modern-transport-api";
@@ -12,9 +13,11 @@ import {useI18n} from "../lib/i18n";
 
 // TWINPANEL_TUNNEL_CONTROL_CENTER_V1
 // TWINPANEL_MANUAL_CUTOVER_ELIGIBILITY_UI_V289
+// TWINPANEL_SERVER_PAIR_SELECTION_NO_INSTALL_V293
 // One data-driven control surface for every logical tunnel. Tunnel IDs are data,
 // never UI feature flags. Manual cutover is health-based; SmartAuto qualification
-// keeps its independent stability gate.
+// keeps its independent stability gate. Server selection is a logical-only action
+// and never invokes create-managed or any transport installer.
 
 type Draft={iran_node_id:number;exit_node_id:number;priority:number};
 type Notice={tone:"ok"|"bad"|"warn";text:string}|null;
@@ -146,6 +149,14 @@ export function TunnelControlCenterV1(){
     }catch(reason){setNotice({tone:"bad",text:reason instanceof Error?reason.message:String(reason)});}finally{setBusy("");}
   };
 
+  const onServerPairSelected=(tunnel:AdminTunnel)=>{
+    const id=Number(tunnel.id||0);
+    if(!id)return;
+    setSelectedId(id);
+    void loadBase(true,id);
+    setNotice({tone:"ok",text:pick(`سرورها انتخاب شدند و Pair #${id} باز شد؛ هیچ Tunnel/Transport نصب یا بازسازی نشد.`,`Servers selected and pair #${id} opened; no tunnel or transport was installed or rebuilt.`)});
+  };
+
   const setAuto=()=>{if(selectedId)void run(`auto-${selectedId}`,pick("Smart Auto برای همین Tunnel فعال شد.","Smart Auto enabled for this tunnel."),()=>modernTransportApi.setMode(selectedId,"auto"));};
 
   const setManual=(row:SmartTransportCandidate)=>{
@@ -197,7 +208,7 @@ export function TunnelControlCenterV1(){
     <div className={styles.page}>
       <header className={styles.hero}>
         <div><div className={styles.eyebrow}>TwinPanel · Network Fabric</div><h1>{pick("مرکز کنترل تانل‌ها","Tunnel Control Center")}</h1><p>{pick("یک UI و یک قرارداد برای ساخت، تست، انتخاب مسیر و تعمیر همه Tunnelها. شماره Tunnel هیچ قابلیت ویژه‌ای ایجاد نمی‌کند.","One control surface and one contract for creating, testing, selecting and repairing every tunnel. Tunnel IDs never unlock special UI behavior.")}</p></div>
-        <div className={styles.heroActions}><button type="button" className={styles.secondaryButton} disabled={loading||Boolean(busy)} onClick={()=>void loadBase()}>{loading?"…":pick("بروزرسانی","Refresh")}</button><button type="button" className={styles.primaryButton} onClick={openCreate}>＋ {pick("Tunnel جدید","New tunnel")}</button></div>
+        <div className={styles.heroActions}><button type="button" className={styles.secondaryButton} disabled={loading||Boolean(busy)} onClick={()=>void loadBase()}>{loading?"…":pick("بروزرسانی","Refresh")}</button><TunnelServerPairSelectorV293 disabled={loading||Boolean(busy)} onSelected={onServerPairSelected}/><button type="button" className={styles.primaryButton} onClick={openCreate}>＋ {pick("Tunnel جدید","New tunnel")}</button></div>
       </header>
 
       {notice&&<div className={`${styles.notice} ${notice.tone==="bad"?styles.noticeBad:notice.tone==="warn"?styles.noticeWarn:styles.noticeOk}`}>{notice.text}</div>}
@@ -210,7 +221,7 @@ export function TunnelControlCenterV1(){
           <input className={styles.search} value={search} onChange={event=>setSearch(event.target.value)} placeholder={pick("نام، IP یا ID...","Name, IP or ID...")}/>
           <div className={styles.tunnelList}>
             {loading&&<div className={styles.empty}>{pick("در حال دریافت...","Loading...")}</div>}
-            {!loading&&filteredTunnels.length===0&&<div className={styles.empty}>{pick("Tunnel ثبت نشده. یک Pair جدید بساز.","No tunnel registered. Create a new pair.")}</div>}
+            {!loading&&filteredTunnels.length===0&&<div className={styles.empty}>{pick("Tunnel ثبت نشده. از «انتخاب سرور» Pair را بدون نصب ثبت کن یا Tunnel جدید بساز.","No tunnel registered. Use Select servers to register a pair without install, or create a new tunnel.")}</div>}
             {filteredTunnels.map(tunnel=>{
               const iran=nodeMap.get(tunnel.iran_node_id);const exit=nodeMap.get(tunnel.exit_node_id);const active=selectedId===tunnel.id;
               return <button key={tunnel.id} type="button" className={`${styles.tunnelItem} ${active?styles.tunnelItemActive:""}`} onClick={()=>setSelectedId(tunnel.id)}>
@@ -224,7 +235,7 @@ export function TunnelControlCenterV1(){
         </aside>
 
         <main className={styles.main}>
-          {!selectedTunnel&&<div className={styles.zeroState}><div className={styles.zeroIcon}>⇄</div><h2>{pick("یک Tunnel را انتخاب کن","Select a tunnel")}</h2><p>{pick("یا از دکمه Tunnel جدید یک Pair تازه بساز.","Or create a fresh pair from New tunnel.")}</p></div>}
+          {!selectedTunnel&&<div className={styles.zeroState}><div className={styles.zeroIcon}>⇄</div><h2>{pick("یک Tunnel را انتخاب کن","Select a tunnel")}</h2><p>{pick("برای Pair موجود از «انتخاب سرور» استفاده کن؛ این کار نصب مجدد ندارد. برای Provision کامل از Tunnel جدید استفاده کن.","Use Select servers for an existing/logical pair without reinstall. Use New tunnel only for full provisioning.")}</p></div>}
           {selectedTunnel&&<>
             <section className={styles.topologyCard}>
               <div className={styles.topologyHead}><div><span>{pick("Pair انتخاب‌شده","Selected pair")}</span><h2>Tunnel #{selectedTunnel.id}</h2></div><div className={styles.topologyActions}><Badge tone={statusTone(selectedTunnel.status)}>{String(selectedTunnel.status||"—")}</Badge><button type="button" className={styles.dangerButton} disabled={Boolean(busy)} onClick={deleteTunnel}>{pick("حذف Tunnel","Delete")}</button></div></div>
