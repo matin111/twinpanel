@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.295",
+  "version": "1.1.0-rc.296",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-27T22:55:40Z",
+  "released_at": "2026-10-27T22:59:21Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "87454b2c9765a42364d2dec4a39d1fc550b31a1b",
+  "source_sha": "2780a081ce6315bbbcb2e27cf20209f813bb7b70",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.295/twinpanel-1.1.0-rc.295-linux-x86_64.tar.gz",
-    "sha256": "bf6d422aeebaef84e973a80257000e9cf1eec8bb0d2188602e51e68b0bfc7e0c",
-    "size_bytes": 28406452
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.296/twinpanel-1.1.0-rc.296-linux-x86_64.tar.gz",
+    "sha256": "331340785adad9156edbd06c07ecad9600b8cc91a784006b1f0ce888fade1504",
+    "size_bytes": 28406350
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.295 برخورد قطعی پورت بین Spoof WG و Kernel VXLAN را برطرف می‌کند. در Tunnel #8، Kernel VXLAN به‌درستی UDP/37008 را در اختیار داشت اما Spoof WG V203 همان پورت را برای Listener داخلی WireGuard سمت Exit استفاده می‌کرد و ExecStartPre با خطای Address already in use متوقف می‌شد. Spoof WG V204 فقط Listener داخلی WireGuard را به رنج جداگانه 38000+slot منتقل می‌کند؛ برای Tunnel #8 پورت 38008 استفاده می‌شود. TP27 Fast، Kernel VXLAN dataplane، SSH Relay، SmartAuto/election، مسیر Production، پورت‌های Raw/Public Spoof و fallback محدود 443→44443 بدون تغییر باقی مانده‌اند. Candidate روی SHA immutable 87454b2c9765a42364d2dec4a39d1fc550b31a1b قفل شده است. Production Acceptance تا نصب همین Release روی Controller و تست واقعی Spoof WG #8 باز می‌ماند.",
-    "en": "TwinPanel 1.1.0-rc.295 fixes the production-proven deterministic port collision between Spoof WG and Kernel VXLAN. On Tunnel #8, Kernel VXLAN correctly owned UDP/37008 while Spoof WG V203 attempted to use the same port for its private Exit WireGuard listener, causing ExecStartPre to fail with Address already in use. Spoof WG V204 moves only that private WireGuard listener to an isolated 38000+slot range; Tunnel #8 therefore uses 38008. TP27 Fast, Kernel VXLAN dataplane, SSH Relay, SmartAuto/election, the active Production route, Spoof raw/public ports and the bounded 443→44443 source-port fallback remain unchanged. Candidate is pinned to immutable SHA 87454b2c9765a42364d2dec4a39d1fc550b31a1b. Production acceptance remains pending installation on the Controller and a real Spoof WG #8 test."
+    "fa": "TwinPanel 1.1.0-rc.296 خطای TypeError در Dynamic Subscription Delivery را که روی Controller واقعی مشاهده شد برطرف می‌کند. Root Cause در grace-age مربوط به NodeAccess بود: مسیر قبلی datetime.utcnow() بدون timezone را از created_at دارای timezone کم می‌کرد و قبل از شروع sync هر Node با TypeError متوقف می‌شد. محاسبه age اکنون هم datetimeهای naive و هم timezone-aware را بدون تغییر سیاست grace 180 ثانیه پشتیبانی می‌کند. همگرایی topology-aware نسخه V294، تحویل Classic/Modern، فیلترهای eligibility، identity و credentialهای موجود حفظ شده‌اند. لاگ outer-loop فقط stage امن خطا را اضافه می‌کند تا topology_signature، reconcile و post_reconcile_signature قابل تفکیک باشند بدون افشای secret. تست regression حالت‌های naive، UTC-aware و +03:30-aware را اجرا می‌کند. TP27/VXLAN/Spoof dataplane، Accounting، Mobile V17/V18 و provisioningهای سالم بدون تغییر باقی مانده‌اند. Candidate روی SHA immutable 2780a081ce6315bbbcb2e27cf20209f813bb7b70 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.296 fixes the production-observed TypeError in Dynamic Subscription Delivery. The root cause was the NodeAccess grace-age path: the previous code subtracted timezone-naive datetime.utcnow() from a timezone-aware created_at value and failed before per-node synchronization began. Age calculation now safely supports both naive and timezone-aware datetimes without changing the 180-second grace policy. V294 topology-aware convergence, Classic/Modern delivery, eligibility filters, existing identities and credentials are preserved. Outer-loop logging now adds only a safe stage name so topology_signature, reconcile and post_reconcile_signature failures can be distinguished without exposing secrets. Regression coverage executes naive, UTC-aware and +03:30-aware timestamps. TP27/VXLAN/Spoof dataplanes, Accounting, Mobile V17/V18 and healthy provisioning remain unchanged. Candidate is pinned to immutable SHA 2780a081ce6315bbbcb2e27cf20209f813bb7b70."
   }
 }
