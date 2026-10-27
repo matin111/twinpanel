@@ -12,8 +12,8 @@ from .public_connection_protocol_actions_v20 import (
 from .public_connection_protocol_uri_details_v21 import (
     refine_public_connection_protocol_uri_details_v21,
 )
-from .public_connection_protocol_action_authority_v22 import (
-    refine_public_connection_protocol_action_authority_v22,
+from .public_connection_device_data_authority_v23 import (
+    refine_public_connection_device_data_authority_v23,
 )
 
 
@@ -144,4 +144,4 @@ def refine_public_connection_device_actions_v11(source: str) -> str:
     source = refine_public_connection_mobile_server_inventory_v18(source)
     source = refine_public_connection_protocol_actions_v20(source)
     source = refine_public_connection_protocol_uri_details_v21(source)
-    return refine_public_connection_protocol_action_authority_v22(source)
+    return refine_public_connection_device_data_authority_v23(source)
