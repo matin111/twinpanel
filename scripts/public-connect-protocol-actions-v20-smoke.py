@@ -1,0 +1,63 @@
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+V11 = ROOT / "backend/app/routers/public_connection_device_actions_v11.py"
+V20 = ROOT / "backend/app/routers/public_connection_protocol_actions_v20.py"
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise AssertionError(message)
+
+
+def main() -> None:
+    v11 = V11.read_text(encoding="utf-8")
+    v20 = V20.read_text(encoding="utf-8")
+
+    require("public_connection_protocol_actions_v20" in v11, "V20 import missing")
+    require("refine_public_connection_protocol_actions_v20(source)" in v11, "V20 chain missing")
+
+    # Never expose fake public server rows or internal pending provisioning cards.
+    require("document.querySelectorAll('.v18-not-ready').forEach(row=>row.remove())" in v20, "fake server cleanup missing")
+    require("protocol-choice.v13-pending" in v20 and "tp-v20-hidden-pending" in v20, "pending protocol cleanup missing")
+    require("realRows.length+' سرور'" in v20, "real server count missing")
+
+    # Manual protocols must stay manual; do not invent downloadable config files.
+    require("key==='cisco'||key==='l2tp'" in v20, "Cisco/L2TP manual policy missing")
+    require("کپی اطلاعات" in v20, "manual connection copy missing")
+    require("stripInvalidClassicDownloads" in v20, "invalid classic config cleanup missing")
+
+    # File/link based protocol families keep their canonical delivery actions.
+    require("['openvpn','wireguard','amneziawg']" in v20, "file-based protocol policy missing")
+    require("key==='xray'" in v20, "Xray URI policy missing")
+    for protocol in (
+        "hysteria2", "tuic", "anytls", "naive", "shadowtls",
+        "snell", "mieru", "trusttunnel", "sudoku",
+    ):
+        require(protocol in v20, f"modern protocol policy missing: {protocol}")
+
+    # Protocol-specific detail schemas.
+    require("line('UUID',out?.uuid)" in v20, "TUIC UUID detail missing")
+    require("line('Username',out?.username)" in v20, "Naive username detail missing")
+    require("line('User Key',out?.userkey)" in v20, "Snell user key detail missing")
+    require("line('Handshake / SNI',tlsSni(out))" in v20, "ShadowTLS SNI detail missing")
+    require("profile?.user?.name" in v20 and "profile?.user?.password" in v20, "Mieru identity detail missing")
+    require("Server Public Key" in v20, "AmneziaWG endpoint detail missing")
+    require("Server Address" in v20 and "AEAD" in v20, "Sudoku detail missing")
+
+    # Direct-IP HTTP pages still need usable clipboard actions.
+    require("document.execCommand('copy')" in v20, "clipboard fallback missing")
+
+    # Readability regression: reject the old 6.5/7px mobile scale.
+    require(".v17-title b{font-size:15px" in v20, "mobile title readability missing")
+    require(".v17-action{min-height:38px" in v20, "mobile action readability missing")
+    require(".v17-details{padding:10px;font-size:12px" in v20, "mobile details readability missing")
+    require(".fact strong{font-size:14px" in v20, "desktop fact readability missing")
+
+    require("TWINPANEL_PUBLIC_CONNECT_PROTOCOL_ACTIONS_V20" in v20, "V20 marker missing")
+
+    print("PUBLIC_CONNECT_PROTOCOL_ACTIONS_V20=PASS")
+
+
+if __name__ == "__main__":
+    main()
