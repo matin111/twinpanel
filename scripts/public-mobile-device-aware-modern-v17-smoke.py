@@ -45,12 +45,18 @@ def main() -> None:
     require("max-width:720px" in direct, "V17 must remain mobile-only")
     require(v17.refine_public_connection_mobile_protocols_v17(direct) == direct, "V17 is not idempotent")
 
-    # V11 remains the single device detector and chains the additive V17 renderer.
+    # V11 remains the single device detector and must execute V17 before any
+    # additive refinement (currently V18). Do not require V17 to be the final
+    # return value because later refinements are intentionally chained after it.
     require("navigator.userAgentData" in v11_source, "Client Hints/User-Agent detection regressed")
     require("maxTouchPoints" in v11_source, "iPadOS detection regressed")
     require("body.dataset.tpPlatform=platform" in v11_source, "device platform authority missing")
     require("from .public_connection_mobile_protocols_v17 import" in v11_source, "V11 does not import V17")
-    require("return refine_public_connection_mobile_protocols_v17(source)" in v11_source, "V11 does not chain V17")
+    require(
+        "source = refine_public_connection_mobile_protocols_v17(source)" in v11_source
+        or "return refine_public_connection_mobile_protocols_v17(source)" in v11_source,
+        "V11 does not execute V17",
+    )
 
     script = v17._MOBILE_PROTOCOLS_V17_SCRIPT.lower()
     for protocol in sorted(MODERN):
