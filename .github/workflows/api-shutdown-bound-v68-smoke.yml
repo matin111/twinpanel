@@ -30,9 +30,15 @@ jobs:
           timeout_stop = int(match.group(1))
           assert timeout_stop <= 10, f'API shutdown bound regressed to {timeout_stop}s'
 
-          assert 'twinpanel_runtime_unit_reconcile.py --restart --verify' in web_unit
+          # The updater owns release-time API restart. Web verifies convergence
+          # and must not trigger a second restart while that job is in flight.
+          assert 'twinpanel_runtime_unit_reconcile.py --verify' in web_unit
+          assert 'twinpanel_runtime_unit_reconcile.py --restart --verify' not in web_unit
+
+          # The helper keeps its bounded blocking restart path for explicit
+          # recovery callers outside the Web pre-start release transaction.
           assert '[ctl, "restart", "twinpanel-api.service"]' in reconcile
           assert 'timeout=20' in reconcile
 
-          print(f'API_SHUTDOWN_BOUND_V68_OK timeout_stop={timeout_stop}s')
+          print(f'API_SHUTDOWN_BOUND_V68_OK timeout_stop={timeout_stop}s single_owner=updater')
           PY

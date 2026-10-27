@@ -85,14 +85,21 @@ jobs:
           web=Path('deploy/systemd/twinpanel-web.service.tpl').read_text(encoding='utf-8')
           assert 'User=www-data' in web
           assert 'NoNewPrivileges=true' in web
-          assert 'ExecStartPre=+/opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_runtime_unit_reconcile.py --restart --verify' in web
+          # The updater is the release-time restart owner. Web only verifies
+          # that the API process has converged before its own process starts.
+          assert 'ExecStartPre=+/opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_runtime_unit_reconcile.py --verify' in web
+          assert 'twinpanel_runtime_unit_reconcile.py --restart --verify' not in web
+
+          # Explicit recovery callers still retain the helper's restart path.
+          assert '[ctl, "restart", "twinpanel-api.service"]' in path.read_text(encoding='utf-8')
 
           updater=Path('backend/scripts/twinpanel_public_updater.py').read_text(encoding='utf-8')
           install_pos=updater.index('install_web_unit(final, web_port)')
           switch_pos=updater.index('previous = atomic_switch(final)')
           assert install_pos < switch_pos
+          assert "['systemctl', '--no-block', 'restart', *units]" in updater
 
-          print('RUNTIME_API_UNIT_CONVERGENCE_OK')
+          print('RUNTIME_API_UNIT_CONVERGENCE_OK single_owner=updater')
           PY
 
       - name: Verify admin mutation route contracts
