@@ -105,12 +105,20 @@ jobs:
           NODE_AGENT_SHARED_SECRET: "ci-outbound-performance-agent-v268"
         run: PYTHONPATH=backend python backend/tests/outbound_performance_v268_smoke.py
 
-      - name: Import application
+      - name: Import Outbound Performance routers
         env:
           APP_SECRET_KEY: "ci-outbound-performance-v268-import"
           DATABASE_URL: "sqlite:////tmp/twinpanel-outbound-performance-v268-import.db"
           NODE_AGENT_SHARED_SECRET: "ci-outbound-performance-agent-v268-import"
-        run: PYTHONPATH=backend python -c 'import app.main; print("app import: ok")'
+        run: |
+          PYTHONPATH=backend python - <<'PY'
+          from app.routers.outbound_performance_v268 import router as v4_router
+          from app.routers.outbound_performance_v268_guard import router as guard_router
+
+          assert v4_router.routes
+          assert guard_router.routes
+          print("OUTBOUND_PERFORMANCE_V4_IMPORT_OK")
+          PY
 
       - uses: actions/setup-node@v4
         with:
