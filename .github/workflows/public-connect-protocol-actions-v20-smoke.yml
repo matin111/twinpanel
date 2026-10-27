@@ -5,6 +5,7 @@ on:
     paths:
       - 'backend/app/routers/public_connection_device_actions_v11.py'
       - 'backend/app/routers/public_connection_protocol_actions_v20.py'
+      - 'backend/app/routers/public_connection_protocol_uri_details_v21.py'
       - 'scripts/public-connect-protocol-actions-v20-smoke.py'
       - '.github/workflows/public-connect-protocol-actions-v20-smoke.yml'
   push:
@@ -12,6 +13,7 @@ on:
     paths:
       - 'backend/app/routers/public_connection_device_actions_v11.py'
       - 'backend/app/routers/public_connection_protocol_actions_v20.py'
+      - 'backend/app/routers/public_connection_protocol_uri_details_v21.py'
       - 'scripts/public-connect-protocol-actions-v20-smoke.py'
       - '.github/workflows/public-connect-protocol-actions-v20-smoke.yml'
 
@@ -28,6 +30,7 @@ jobs:
           python -m py_compile \
             backend/app/routers/public_connection_device_actions_v11.py \
             backend/app/routers/public_connection_protocol_actions_v20.py \
+            backend/app/routers/public_connection_protocol_uri_details_v21.py \
             scripts/public-connect-protocol-actions-v20-smoke.py
-      - name: Run V20 smoke
+      - name: Run V20/V21 smoke
         run: python scripts/public-connect-protocol-actions-v20-smoke.py
