@@ -16,7 +16,13 @@ WorkingDirectory=/opt/twinpanel/current/backend
 Environment=PYTHONUNBUFFERED=1
 EnvironmentFile=/etc/twinpanel/backend.env
 EnvironmentFile=-/etc/twinpanel/install.env
-ExecStart=/opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_public_updater.py
+# Canonical updater authority remains backend/scripts/twinpanel_public_updater.py.
+# V69 is a narrow bootstrap/health wrapper that imports and delegates to that
+# core instead of duplicating artifact verification, manifest, activation or
+# rollback logic.
+# V69 replaces the single shared 45s health deadline with staged API -> Web
+# health windows so bounded shutdown + Python startup cannot cause false rollback.
+ExecStart=/opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_public_updater_v69.py
 TimeoutStartSec=3600
 Nice=5
 IOSchedulingClass=best-effort

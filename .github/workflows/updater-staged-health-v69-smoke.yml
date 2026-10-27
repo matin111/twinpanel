@@ -1,0 +1,60 @@
+name: TwinPanel Updater Staged Health V69 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/scripts/twinpanel_public_updater_v69.py'
+      - 'backend/scripts/twinpanel_updater_unit_reconcile_v69.py'
+      - 'backend/scripts/twinpanel_api_update_handoff_v69.py'
+      - 'deploy/systemd/twinpanel-updater.service.tpl'
+      - 'deploy/systemd/twinpanel-web.service.tpl'
+      - '.github/workflows/updater-staged-health-v69-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify staged updater health and bootstrap handoff
+        run: |
+          python3 -m py_compile \
+            backend/scripts/twinpanel_public_updater_v69.py \
+            backend/scripts/twinpanel_updater_unit_reconcile_v69.py \
+            backend/scripts/twinpanel_api_update_handoff_v69.py
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          wrapper = Path('backend/scripts/twinpanel_public_updater_v69.py').read_text(encoding='utf-8')
+          unit_reconcile = Path('backend/scripts/twinpanel_updater_unit_reconcile_v69.py').read_text(encoding='utf-8')
+          handoff = Path('backend/scripts/twinpanel_api_update_handoff_v69.py').read_text(encoding='utf-8')
+          updater_unit = Path('deploy/systemd/twinpanel-updater.service.tpl').read_text(encoding='utf-8')
+          web_unit = Path('deploy/systemd/twinpanel-web.service.tpl').read_text(encoding='utf-8')
+
+          assert 'API_HEALTH_SECONDS = 75' in wrapper
+          assert 'WEB_HEALTH_SECONDS = 45' in wrapper
+          assert 'core.wait_for_healthy' in wrapper
+          assert 'for preferred in ("api", "web")' in wrapper
+          assert 'health_{name}' in wrapper
+
+          assert 'twinpanel_public_updater_v69.py' in updater_unit
+          assert 'twinpanel_updater_unit_reconcile_v69.py' in web_unit
+          assert 'twinpanel_api_update_handoff_v69.py' in web_unit
+          assert web_unit.index('twinpanel_api_update_handoff_v69.py') < web_unit.index('twinpanel_runtime_unit_reconcile.py --verify')
+          assert '--restart --verify' not in web_unit
+
+          assert 'state.get("state")' in handoff
+          assert 'target_version != active_version' in handoff
+          assert 'cwd.relative_to(releases)' in handoff
+          assert 'first_pid and pid != first_pid' in handoff
+          assert 'os.kill(pid, signal.SIGKILL)' in handoff
+          assert 'pkill' not in handoff
+          assert 'killall' not in handoff
+
+          assert 'twinpanel_public_updater_v69.py' in unit_reconcile
+          assert '["systemctl", "daemon-reload"]' in unit_reconcile
+
+          print('UPDATER_STAGED_HEALTH_V69_OK staged=api_then_web exact_pid_handoff=1 bootstrap=web_prestart')
+          PY
