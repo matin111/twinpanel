@@ -1,0 +1,33 @@
+name: Public Connect Protocol Actions V20 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/public_connection_device_actions_v11.py'
+      - 'backend/app/routers/public_connection_protocol_actions_v20.py'
+      - 'scripts/public-connect-protocol-actions-v20-smoke.py'
+      - '.github/workflows/public-connect-protocol-actions-v20-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/routers/public_connection_device_actions_v11.py'
+      - 'backend/app/routers/public_connection_protocol_actions_v20.py'
+      - 'scripts/public-connect-protocol-actions-v20-smoke.py'
+      - '.github/workflows/public-connect-protocol-actions-v20-smoke.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile public connection refinements
+        run: |
+          python -m py_compile \
+            backend/app/routers/public_connection_device_actions_v11.py \
+            backend/app/routers/public_connection_protocol_actions_v20.py \
+            scripts/public-connect-protocol-actions-v20-smoke.py
+      - name: Run V20 smoke
+        run: python scripts/public-connect-protocol-actions-v20-smoke.py
