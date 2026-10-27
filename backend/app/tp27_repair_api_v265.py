@@ -7,6 +7,7 @@ from . import smart_transport_auto_v21 as smart
 from .database import get_db
 from .deps import require_admin
 from .models import Tunnel, TunnelTransport
+from .routers import tunnel_managed
 from .routers.modern_transports import router
 from .tp27_self_repair_v265 import diagnose_tp27, repair_tp27
 from .transport_candidates import ACTIVE_SPECS
@@ -14,6 +15,7 @@ from .transport_candidates import ACTIVE_SPECS
 
 MARKER = "TWINPANEL_TP27_REPAIR_API_V265"
 _applied = False
+_original_legacy_managed_repair = tunnel_managed.repair_managed_tunnel
 
 
 def _status(value: object) -> str:
@@ -30,6 +32,47 @@ def _http_error(exc: Exception) -> HTTPException:
     if value == "tp27_disabled":
         return HTTPException(status_code=409, detail="TP27 Fast is disabled")
     return HTTPException(status_code=502, detail=value[:1800] or type(exc).__name__)
+
+
+def _tp27_owns_repair(db: Session, tunnel_id: int) -> bool:
+    return (
+        db.query(TunnelTransport.id)
+        .filter(
+            TunnelTransport.tunnel_id == int(tunnel_id),
+            TunnelTransport.transport == "tp27_fast",
+            TunnelTransport.enabled.is_(True),
+        )
+        .first()
+        is not None
+    )
+
+
+async def _legacy_managed_repair_owner_guard(
+    tunnel_id: int,
+    db: Session,
+):
+    """Reject the legacy managed-repair API when TP27 owns recovery.
+
+    The historical endpoint repairs TP2027/legacy/SSH-relay state and has a
+    different lock domain from TP27's carrier flock. Redirecting it would hide
+    semantics, while letting it run would create two repair owners. Return a
+    clear conflict instead; callers can use /tp27/repair or /tp27/rebuild.
+    """
+
+    if _tp27_owns_repair(db, int(tunnel_id)):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "TP27 Fast owns repair for this tunnel",
+                "repair_owner": "tp27_self_repair_v265",
+                "use": [
+                    f"/v1/tunnels/{int(tunnel_id)}/tp27/repair",
+                    f"/v1/tunnels/{int(tunnel_id)}/tp27/rebuild",
+                ],
+            },
+        )
+
+    return await _original_legacy_managed_repair(int(tunnel_id), db)
 
 
 async def _fresh_transport_probe(
@@ -142,6 +185,11 @@ def apply_tp27_repair_api_v265() -> None:
     if _applied:
         return
 
+    # The historical managed-repair endpoint imports its repair callable into
+    # the router module. Replace that module-global binding in API workers so a
+    # TP27-owned tunnel cannot concurrently enter the legacy repair lock domain.
+    tunnel_managed.repair_managed_tunnel = _legacy_managed_repair_owner_guard
+
     @router.post(
         "/{tunnel_id}/modern-transports/{transport}/probe",
         dependencies=[Depends(require_admin)],
@@ -208,6 +256,6 @@ def apply_tp27_repair_api_v265() -> None:
 
     _applied = True
     print(
-        f"{MARKER}_ACTIVE endpoints=transport-probe,tp27-diagnose,tp27-repair,tp27-rebuild",
+        f"{MARKER}_ACTIVE endpoints=transport-probe,tp27-diagnose,tp27-repair,tp27-rebuild legacy-managed-repair-fenced=1",
         flush=True,
     )
