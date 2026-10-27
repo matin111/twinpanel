@@ -26,6 +26,7 @@ from .routers import provision
 
 MARKER = "TWINPANEL_NODE_SUBSCRIPTION_CONVERGENCE_V114"
 DYNAMIC_MARKER = "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_V294"
+TIMEZONE_FIX_MARKER = "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_TIMEZONE_V295"
 _NEW_ACCESS_GRACE_SECONDS = 180
 _RETRY_INTERVAL_SECONDS = 60
 _INITIAL_DELAY_SECONDS = 20
@@ -39,10 +40,18 @@ def _enum_value(value: Any) -> str:
     return str(getattr(value, "value", value) or "").strip().lower()
 
 
+def _age_seconds(value: datetime) -> float:
+    """Return age for either naive or timezone-aware database datetimes."""
+    if value.tzinfo is not None and value.utcoffset() is not None:
+        now = datetime.now(value.tzinfo)
+    else:
+        now = datetime.utcnow()
+    return (now - value).total_seconds()
+
+
 def _eligible_exit_node_ids() -> list[int]:
     db = SessionLocal()
     try:
-        now = datetime.utcnow()
         rows = (
             db.query(Node.id, NodeAccess.created_at)
             .join(NodeAccess, NodeAccess.node_id == Node.id)
@@ -58,7 +67,7 @@ def _eligible_exit_node_ids() -> list[int]:
         result: list[int] = []
         for node_id, access_created_at in rows:
             if access_created_at is not None:
-                age = (now - access_created_at).total_seconds()
+                age = _age_seconds(access_created_at)
                 if age < _NEW_ACCESS_GRACE_SECONDS:
                     continue
             result.append(int(node_id))
@@ -422,9 +431,11 @@ async def _convergence_loop() -> None:
     await asyncio.sleep(_INITIAL_DELAY_SECONDS)
 
     while True:
+        stage = "topology_signature"
         try:
             signature = _topology_signature()
             if signature != _last_topology_signature:
+                stage = "reconcile"
                 result = await reconcile_installed_exit_nodes_once()
                 changed = [
                     item
@@ -438,11 +449,17 @@ async def _convergence_loop() -> None:
                 if changed:
                     print(DYNAMIC_MARKER, changed, flush=True)
                 if result.get("ok"):
+                    stage = "post_reconcile_signature"
                     _last_topology_signature = _topology_signature()
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            print(f"{DYNAMIC_MARKER}_FAILED", type(exc).__name__, flush=True)
+            print(
+                f"{DYNAMIC_MARKER}_FAILED",
+                f"stage={stage}",
+                type(exc).__name__,
+                flush=True,
+            )
 
         await asyncio.sleep(_RETRY_INTERVAL_SECONDS)
 
@@ -453,7 +470,7 @@ async def _startup() -> None:
         return
     _task = asyncio.create_task(
         _convergence_loop(),
-        name="node-subscription-convergence-v294",
+        name="node-subscription-convergence-v295",
     )
 
 
@@ -481,11 +498,13 @@ def apply_node_subscription_convergence_v114() -> None:
     print(
         f"{MARKER}_ACTIVE "
         f"{DYNAMIC_MARKER}=enabled "
+        f"{TIMEZONE_FIX_MARKER}=enabled "
         "scope=visible_online_exit_nodes "
         "trigger=topology_or_entitlement_change "
         "membership=all_subscriptions "
         "credentials=active_subscriptions "
         "protocols=classic+modern "
+        "datetime=naive+aware-safe "
         "retry=failures_only",
         flush=True,
     )
