@@ -70,6 +70,7 @@ const duration=(value:unknown)=>{
   if(n>=60)return `${Math.floor(n/60)}m ${Math.round(n%60)}s`;
   return `${Math.round(n)}s`;
 };
+const asObject=(value:unknown):Record<string,unknown>=>value&&typeof value==="object"&&!Array.isArray(value)?value as Record<string,unknown>:{};
 
 export function SmartTransportsRuntimeV26(){
   const {pick}=useI18n();
@@ -86,6 +87,7 @@ export function SmartTransportsRuntimeV26(){
   const [iranSpoofIp,setIranSpoofIp]=useState("");
   const [exitSpoofIp,setExitSpoofIp]=useState("");
   const [spoofCompatibility,setSpoofCompatibility]=useState<SpoofCompatibilityResult|null>(null);
+  const [tp27Diagnosis,setTp27Diagnosis]=useState<Record<string,unknown>|null>(null);
 
   const loadTunnels=async()=>{
     const rows=await legacyControlApi.tunnels();
@@ -129,6 +131,7 @@ export function SmartTransportsRuntimeV26(){
   useEffect(()=>{
     if(!selected)return;
     setSpoofCompatibility(null);
+    setTp27Diagnosis(null);
     void loadState(selected);
     const timer=window.setInterval(()=>void loadState(selected,true),10000);
     return()=>window.clearInterval(timer);
@@ -179,14 +182,49 @@ export function SmartTransportsRuntimeV26(){
     }
   };
 
-  const install=(row:SmartTransportCandidate)=>{
+  const installOrRepair=(row:SmartTransportCandidate)=>{
     const name=row.transport as SmartTransportName;
+    const installed=normalized(row.status)!=="not_installed";
     if(name==="spoof_wg"&&!row.configured){
       setError(pick("ابتدا IP اسپوف ایران و خارج را ذخیره کنید.","Save the Iran and Exit spoof IPs first."));
       return;
     }
-    if(!window.confirm(pick(`نصب/بازسازی و Qualification مسیر ${label(name)} انجام شود؟`,`Install/rebuild and qualify ${label(name)}?`)))return;
-    void run(`install-${name}`,pick(`${label(name)} نصب و ارزیابی شد.`,`${label(name)} installation and qualification finished.`),()=>modernTransportApi.install(selected,name));
+    const confirmText=installed
+      ?pick(`تعمیر و Qualification مسیر ${label(name)} انجام شود؟ مسیر منطقی انتخاب‌شده تغییر نمی‌کند.`,`Repair and qualify ${label(name)}? The selected logical path will not be changed.`)
+      :pick(`نصب و Qualification مسیر ${label(name)} انجام شود؟`,`Install and qualify ${label(name)}?`);
+    if(!window.confirm(confirmText))return;
+    const key=installed?`repair-${name}`:`install-${name}`;
+    const message=installed
+      ?pick(`${label(name)} تعمیر و دوباره ارزیابی شد.`,`${label(name)} was repaired and requalified.`)
+      :pick(`${label(name)} نصب و ارزیابی شد.`,`${label(name)} installation and qualification finished.`);
+    const action=installed&&name==="tp27_fast"
+      ?()=>tunnelTransportApi.tp27Repair(selected)
+      :()=>modernTransportApi.install(selected,name);
+    void run(key,message,action);
+  };
+
+  const diagnoseTp27=async()=>{
+    if(!selected||busy)return;
+    setBusy("diagnose-tp27");setError("");setSuccess("");
+    try{
+      const result=await tunnelTransportApi.tp27Diagnose(selected);
+      setTp27Diagnosis(result);
+      setSuccess(pick("تشخیص TP27 داخل همین کارت بروزرسانی شد.","TP27 diagnosis was refreshed inside this card."));
+      await loadState(selected,true);
+    }catch(reason){
+      setError(reason instanceof Error?reason.message:String(reason));
+    }finally{
+      setBusy("");
+    }
+  };
+
+  const rebuildTp27=()=>{
+    if(!selected||busy)return;
+    if(!window.confirm(pick(
+      "Carrier داخلی TP27 از نو ساخته شود؟ ممکن است همین تانل برای چند ثانیه قطع شود، اما Manual/Auto و Active Transport تغییر نمی‌کند.",
+      "Rebuild the internal TP27 carrier? This tunnel may pause for a few seconds, but Manual/Auto and Active Transport remain unchanged."
+    )))return;
+    void run("rebuild-tp27",pick("Carrier TP27 بازسازی و ارزیابی شد.","TP27 carrier was rebuilt and validated."),()=>tunnelTransportApi.tp27Rebuild(selected));
   };
 
   const remove=(row:SmartTransportCandidate)=>{
@@ -294,8 +332,12 @@ export function SmartTransportsRuntimeV26(){
           const isActive=normalized(row.transport)===activeName;
           const isPreferred=normalized(row.transport)===preferredName;
           const isSpoof=row.transport==="spoof_wg";
+          const isTp27=row.transport==="tp27_fast";
           const progress=Math.min(100,Math.round((Number(row.stable_seconds||0)/Math.max(1,Number(row.required_stable_seconds||60)))*100));
           const standbyReady=Boolean(row.qualified&&!isActive);
+          const tp27Carrier=asObject(tp27Diagnosis?.carrier);
+          const tp27Iran=asObject(tp27Carrier.iran);
+          const tp27Exit=asObject(tp27Carrier.exit);
           return <Card key={row.transport} className={`tp-transport-card ${isActive?"is-active":""} ${standbyReady?"is-standby":""}`}>
             <div className="tp-card-top">
               <div>
@@ -324,6 +366,22 @@ export function SmartTransportsRuntimeV26(){
             {row.auto_block_reason&&<div className="runtime-warning compact" dir="ltr">{String(row.auto_block_reason)}</div>}
             {row.last_error&&<div className="runtime-error compact" dir="ltr">{String(row.last_error)}</div>}
 
+            {isTp27&&installed&&<details className="tp-spoof-panel">
+              <summary>{pick("تعمیرات تخصصی TP27","TP27 advanced repair")}</summary>
+              <div className="tp-spoof-content">
+                <div className="tp-card-actions">
+                  <button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>void diagnoseTp27()}>{busy==="diagnose-tp27"?"…":pick("تشخیص TP27","Diagnose TP27")}</button>
+                  <button type="button" className="danger" disabled={Boolean(busy)} onClick={rebuildTp27}>{busy==="rebuild-tp27"?"…":pick("بازسازی Carrier","Rebuild Carrier")}</button>
+                </div>
+                {tp27Diagnosis&&<div className="runtime-info-list">
+                  <div><span>{pick("سلامت دوطرفه","Bidirectional health")}</span><Badge tone={tp27Diagnosis.healthy===true?"ok":tp27Diagnosis.healthy===false?"bad":"warn"}>{tp27Diagnosis.healthy===true?pick("سالم","Healthy"):tp27Diagnosis.healthy===false?pick("ناسالم","Unhealthy"):"—"}</Badge></div>
+                  <div><span>Iran → Exit</span><b>{tp27Iran.peer_reachable===true?"✓":tp27Iran.peer_reachable===false?"✕":"—"}</b></div>
+                  <div><span>Exit → Iran</span><b>{tp27Exit.peer_reachable===true?"✓":tp27Exit.peer_reachable===false?"✕":"—"}</b></div>
+                  <div><span>Carrier</span><b dir="ltr">{String(tp27Diagnosis.selected_profile||"—")}</b></div>
+                </div>}
+              </div>
+            </details>}
+
             {isSpoof&&<details className="tp-spoof-panel">
               <summary>{pick("تنظیمات Spoof Tunnel","Spoof Tunnel setup")}</summary>
               <div className="tp-spoof-content">
@@ -341,7 +399,7 @@ export function SmartTransportsRuntimeV26(){
             </details>}
 
             <div className="tp-card-actions">
-              <button type="button" className="primary-soft" disabled={Boolean(busy)||(isSpoof&&!row.configured)} onClick={()=>install(row)}>{busy===`install-${row.transport}`?"…":installed?pick("بازسنجی و تست","Requalify & test"):pick("نصب و تست","Install & test")}</button>
+              <button type="button" className="primary-soft" disabled={Boolean(busy)||(isSpoof&&!row.configured)} onClick={()=>installOrRepair(row)}>{busy===`install-${row.transport}`||busy===`repair-${row.transport}`?"…":installed?pick("تعمیر و تست","Repair & test"):pick("نصب و تست","Install & test")}</button>
               {row.selectable&&<button type="button" className="ghost" disabled={Boolean(busy)||isActive} onClick={()=>setManual(row)}>{busy===`manual-${row.transport}`?"…":isActive?pick("مسیر فعال","Active path"):pick("انتخاب به‌عنوان Production","Use as production")}</button>}
               {installed&&!isActive&&<button type="button" className="danger" disabled={Boolean(busy)} onClick={()=>remove(row)}>{busy===`remove-${row.transport}`?"…":pick("حذف","Remove")}</button>}
             </div>
