@@ -36,6 +36,24 @@ _CSS = r"""
     white-space:nowrap;
   }
   .v18-copy-action{border-color:color-mix(in srgb,var(--p) 34%,var(--line))}
+  .v17-protocol-card.v18-live-online{
+    border-color:color-mix(in srgb,var(--ok) 78%,var(--line));
+    box-shadow:
+      0 0 0 1px color-mix(in srgb,var(--ok) 20%,transparent),
+      0 8px 24px rgba(0,0,0,.08);
+  }
+  .v17-protocol-card.v18-live-online .v17-mark{
+    box-shadow:0 0 0 2px color-mix(in srgb,var(--ok) 40%,transparent);
+  }
+  .v17-protocol-card.v18-live-online .v17-title small{
+    color:var(--ok);
+    font-weight:900;
+  }
+  .v17-protocol-card.v18-live-online .v17-count{
+    color:var(--ok);
+    border-color:color-mix(in srgb,var(--ok) 46%,var(--line));
+    background:color-mix(in srgb,var(--ok) 9%,var(--surface));
+  }
 }
 """
 
@@ -46,6 +64,7 @@ _SCRIPT = r"""
   function normalize(value){
     const key=String(value||'').trim().toLowerCase();
     if(key==='naiveproxy')return'naive';
+    if(key==='v2ray')return'xray';
     if(key==='openconnect'||key==='ocserv'||key==='anyconnect')return'cisco';
     return key;
   }
@@ -218,7 +237,34 @@ _SCRIPT = r"""
     if(count)count.textContent=readyCount>=total?total+' سرور':readyCount+' آماده از '+total+' سرور';
     if(subtitle){
       subtitle.textContent=readyCount>=total?'آماده اتصال':readyCount?'بخشی از سرورها آماده‌اند':'در حال آماده‌سازی';
+      card.dataset.v18BaseSubtitle=subtitle.textContent;
     }
+  }
+  function liveSourceFor(key){
+    return [...document.querySelectorAll('.protocol-choice')]
+      .find(choice=>normalize(choice.dataset.protocolKey||'')===key)||null;
+  }
+  function syncLiveState(){
+    document.querySelectorAll('.v17-protocol-card[data-protocol-key]').forEach(card=>{
+      const key=normalize(card.dataset.protocolKey||'');
+      const source=liveSourceFor(key);
+      const online=Boolean(source?.classList.contains('live-online'));
+      const subtitle=card.querySelector('.v17-title small');
+      if(subtitle&&!card.dataset.v18BaseSubtitle){
+        card.dataset.v18BaseSubtitle=subtitle.textContent||'آماده اتصال';
+      }
+      card.classList.toggle('v18-live-online',online);
+      if(subtitle){
+        subtitle.textContent=online?'آنلاین · آماده اتصال':(card.dataset.v18BaseSubtitle||'آماده اتصال');
+      }
+    });
+  }
+  function bindLiveSync(){
+    const sources=[...document.querySelectorAll('.protocol-choice')];
+    const observer=new MutationObserver(syncLiveState);
+    sources.forEach(source=>observer.observe(source,{attributes:true,attributeFilter:['class']}));
+    syncLiveState();
+    window.addEventListener('pagehide',()=>observer.disconnect(),{once:true});
   }
   function patch(inventory){
     if(!window.matchMedia('(max-width:720px)').matches)return;
@@ -242,7 +288,10 @@ _SCRIPT = r"""
         ensureDetails(view,row);
       });
       if(inventory.modern_protocols?.includes(key))appendMissingModernServers(card,key,inventory);
+      const subtitle=card.querySelector('.v17-title small');
+      if(subtitle&&!card.dataset.v18BaseSubtitle)card.dataset.v18BaseSubtitle=subtitle.textContent||'آماده اتصال';
     });
+    bindLiveSync();
     document.body.dataset.tpMobileV18='ready';
   }
   async function inventory(){
@@ -355,7 +404,7 @@ _modern_delivery_v16_router.include_router(_inventory_router)
 
 
 def refine_public_connection_mobile_server_inventory_v18(source: str) -> str:
-    """Patch V17 phone cards with copy/details and truthful all-Exit readiness."""
+    """Patch V17 phone cards with copy/details, all-Exit readiness and live state."""
     if _MARKER in source:
         return source
     source = source.replace("</style>", _CSS + "\n</style>", 1)
