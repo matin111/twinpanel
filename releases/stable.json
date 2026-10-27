@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.279",
+  "version": "1.1.0-rc.280",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-27T16:56:28Z",
+  "released_at": "2026-10-27T17:23:23Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d1ff2022d6c335bcfa07a620d96473fadba5ce8f",
+  "source_sha": "a3fe5ed0aaf1386c5a8ebdaea20faf0300a2ee2f",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.279/twinpanel-1.1.0-rc.279-linux-x86_64.tar.gz",
-    "sha256": "a7217735122d791e8bce62303de80a486a7b2d14e590d1318c7785954888c113",
-    "size_bytes": 28361407
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.280/twinpanel-1.1.0-rc.280-linux-x86_64.tar.gz",
+    "sha256": "bf732700e250a9b7cd0329bd36e6083b44b01651ec666520a4936d7c0803f4ed",
+    "size_bytes": 28367339
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.279 دو اصلاح Production را منتشر می‌کند. PR #1102 جریان افزودن نود ایران را resumable و idempotent می‌کند: اگر Provision پس از ساخت رکورد نیمه‌کاره شکست بخورد، تلاش بعدی همان نود با نام/IP یکسان را ادامه می‌دهد، دسترسی SSH مدیریتی قبل از Agent ذخیره می‌شود، Agent در صورت سالم بودن محیط موجود بدون وابستگی غیرضروری به PyPI reuse می‌شود، pip به‌صورت اجباری upgrade نمی‌شود و خطای جزئی با stage/node_id/resumable به‌صورت شفاف برمی‌گردد. PR #1103 مالکیت restart هنگام بروزرسانی را تک‌مالک می‌کند: Updater مالک restart API است و Web فقط همگرایی API با release فعال را verify می‌کند؛ health/version gate موجود بدون افزایش timeout حفظ شده است. Exit provisioning، TP27، VXLAN و Transportهای سالم بدون تغییر می‌مانند. Candidate روی SHA immutable d1ff2022d6c335bcfa07a620d96473fadba5ce8f قفل شده است. Production Acceptance تا نصب رسمی روی Controller، تأیید عدم rollback/mixed-runtime و Resume واقعی نود irs با IP 94.183.231.158 باز می‌ماند.",
-    "en": "TwinPanel 1.1.0-rc.279 ships two production fixes. PR #1102 makes Iran-node provisioning resumable and idempotent: when provisioning fails after a partial Node row is created, a retry with the same name/IP resumes that Node, managed SSH access is saved before Agent work, healthy existing Agent dependencies are reused without unnecessary PyPI access, pip is not forcibly self-upgraded, and partial failures return structured stage/node_id/resumable details. PR #1103 makes release-time API restart ownership single-owner: the updater owns the API restart while Web only verifies that the API converged to the active release; the existing strict health/version gate is preserved without increasing timeouts. Exit provisioning, TP27, VXLAN, and healthy transports remain unchanged. The candidate is pinned to immutable source SHA d1ff2022d6c335bcfa07a620d96473fadba5ce8f. Production acceptance remains pending until the official release is installed on the Controller, rollback/mixed-runtime is absent, and the real irs node at 94.183.231.158 resumes successfully."
+    "fa": "TwinPanel 1.1.0-rc.280 اصلاحات صفحه عمومی اتصال را منتشر می‌کند. PR #1104 نمایش و اکشن هر پروتکل را بر اساس قرارداد واقعی همان پروتکل اصلاح می‌کند: سرورهای بدون کانفیگ واقعی دیگر به‌عنوان سرور قابل استفاده نمایش داده نمی‌شوند؛ Cisco/OpenConnect فقط Server/Port/Username/Password و کپی اطلاعات/جزئیات دارد و دانلود کانفیگ جعلی ندارد؛ L2TP اطلاعات Server/Username/Password/IPsec Secret را نشان می‌دهد؛ OpenVPN/WireGuard/AmneziaWG کانفیگ واقعی را Copy/Download می‌کنند؛ V2Ray/Xray لینک واقعی را Copy/Open می‌کند؛ و پروتکل‌های Modern جزئیات مخصوص schema خودشان را از canonical delivery استخراج می‌کنند. اندازه فونت، جزئیات و دکمه‌ها در موبایل و دسکتاپ خواناتر شده است و Device-Aware app selection و Live state حفظ شده‌اند. TP27/VXLAN، Accounting، Credential generation و Runtime پروتکل‌ها بدون تغییر باقی مانده‌اند. Candidate روی SHA immutable a3fe5ed0aaf1386c5a8ebdaea20faf0300a2ee2f قفل شده است. Production Acceptance تا نصب رسمی روی Controller و تست واقعی Subscription 17 روی موبایل/دسکتاپ باز می‌ماند.",
+    "en": "TwinPanel 1.1.0-rc.280 ships public connection-page corrections. PR #1104 makes each protocol use its real customer contract: nodes without a real deliverable config are no longer shown as usable servers; Cisco/OpenConnect exposes Server/Port/Username/Password with Copy Information/Details and no fake config download; L2TP exposes Server/Username/Password/IPsec Secret; OpenVPN/WireGuard/AmneziaWG copy/download real configuration; V2Ray/Xray copies/opens the canonical link; and Modern protocols derive schema-specific details from canonical delivery. Typography, details and actions are more readable on phones and desktop while device-aware app selection and live state remain intact. TP27/VXLAN, Accounting, credential generation and protocol runtimes are unchanged. Candidate is pinned to immutable SHA a3fe5ed0aaf1386c5a8ebdaea20faf0300a2ee2f. Production acceptance remains pending until the official release is installed on the Controller and Subscription 17 is verified on a real phone/desktop."
   }
 }
