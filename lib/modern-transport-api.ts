@@ -121,6 +121,39 @@ export type SmartTransportState={
   transports:SmartTransportCandidate[];
 };
 
+export type ModernProtocolInventoryItem={
+  protocol:string;
+  name?:string;
+  category?:string;
+  core?:string;
+  adapter?:string;
+  runtime_status?:string;
+  installable?:boolean;
+  port?:number;
+  transport?:string;
+  service?:string;
+  status?:string;
+  last_error?:string|null;
+  checked_at?:string|null;
+  [key:string]:unknown;
+};
+
+export type ModernProtocolInventoryNode={
+  id:number;
+  name?:string;
+  public_ip?:string;
+  public_domain?:string|null;
+  status?:string;
+  protocols?:ModernProtocolInventoryItem[];
+};
+
+export type ModernProtocolInventory={
+  ok?:boolean;
+  schema_version?:number;
+  catalog?:unknown;
+  nodes?:ModernProtocolInventoryNode[];
+};
+
 function requestBase(){
   if(typeof window!=="undefined")return window.location.origin;
   return "";
@@ -156,6 +189,7 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
 
 export const modernTransportApi={
   state:(tunnelId:number)=>request<SmartTransportState>(`/v1/tunnels/${tunnelId}/modern-transports`),
+  protocolInventory:()=>request<ModernProtocolInventory>("/v1/settings/vpn/modern-protocols"),
   install:(tunnelId:number,transport:SmartTransportName)=>request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/${encodeURIComponent(transport)}/install`,{method:"POST"}),
   remove:(tunnelId:number,transport:SmartTransportName)=>request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/${encodeURIComponent(transport)}`,{method:"DELETE"}),
   configureSpoof:(tunnelId:number,configuration:{iran_spoof_ip:string;exit_spoof_ip:string})=>request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/spoof_wg/config`,{method:"PUT",body:JSON.stringify(configuration)}),
