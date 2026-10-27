@@ -1,0 +1,76 @@
+name: TwinPanel Public Mobile Composition V22 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/public_connection_hub_live_v5.py'
+      - 'backend/app/routers/public_connection_mobile_protocols_v17.py'
+      - 'backend/app/routers/public_connection_mobile_server_inventory_v18.py'
+      - 'backend/app/routers/public_connection_protocol_actions_v20.py'
+      - 'backend/app/routers/public_connection_protocol_uri_details_v21.py'
+      - '.github/workflows/public-connection-mobile-composition-v22-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile public connection refinements
+        run: |
+          python -m py_compile \
+            backend/app/routers/public_connection_hub_live_v5.py \
+            backend/app/routers/public_connection_mobile_protocols_v17.py \
+            backend/app/routers/public_connection_mobile_server_inventory_v18.py \
+            backend/app/routers/public_connection_protocol_actions_v20.py \
+            backend/app/routers/public_connection_protocol_uri_details_v21.py
+
+      - name: Verify V16 through V21 composition order
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          hub = Path('backend/app/routers/public_connection_hub_live_v5.py').read_text(encoding='utf-8')
+
+          required_imports = [
+              'refine_public_connection_mobile_protocols_v17',
+              'refine_public_connection_mobile_server_inventory_v18',
+              'refine_public_connection_protocol_actions_v20',
+              'refine_public_connection_protocol_uri_details_v21',
+          ]
+          for symbol in required_imports:
+              assert symbol in hub, f'missing import/composition symbol: {symbol}'
+
+          include_v16 = 'router.include_router(public_connection_modern_delivery_v16_router)'
+          import_v18 = 'from .public_connection_mobile_server_inventory_v18 import ('
+          assert hub.index(import_v18) < hub.index(include_v16), 'V18 must import before V16 router include'
+
+          chain = [
+              'source = refine_public_connection_modern_delivery_v16(source, token, db)',
+              'source = refine_public_connection_mobile_protocols_v17(source)',
+              'source = refine_public_connection_mobile_server_inventory_v18(source)',
+              'source = refine_public_connection_protocol_actions_v20(source)',
+              'source = refine_public_connection_protocol_uri_details_v21(source)',
+          ]
+          positions = [hub.index(item) for item in chain]
+          assert positions == sorted(positions), f'bad refinement order: {positions}'
+
+          marker_files = {
+              'backend/app/routers/public_connection_mobile_protocols_v17.py': 'TWINPANEL_PUBLIC_CONNECT_MOBILE_PROTOCOLS_V17',
+              'backend/app/routers/public_connection_mobile_server_inventory_v18.py': 'TWINPANEL_PUBLIC_CONNECT_MOBILE_SERVER_INVENTORY_V18',
+              'backend/app/routers/public_connection_protocol_actions_v20.py': 'TWINPANEL_PUBLIC_CONNECT_PROTOCOL_ACTIONS_V20',
+              'backend/app/routers/public_connection_protocol_uri_details_v21.py': 'TWINPANEL_PUBLIC_CONNECT_PROTOCOL_URI_DETAILS_V21',
+          }
+          for path, marker in marker_files.items():
+              text = Path(path).read_text(encoding='utf-8')
+              assert marker in text, f'missing runtime marker {marker}'
+
+          print('PUBLIC_MOBILE_COMPOSITION_V22=PASS')
+          PY

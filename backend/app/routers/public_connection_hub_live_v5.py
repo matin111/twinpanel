@@ -33,6 +33,21 @@ from .public_connection_modern_delivery_v16 import (
     refine_public_connection_modern_delivery_v16,
     router as public_connection_modern_delivery_v16_router,
 )
+from .public_connection_mobile_protocols_v17 import (
+    refine_public_connection_mobile_protocols_v17,
+)
+# Import V18 before the V16 router is included below. V18 mounts its read-only
+# mobile inventory endpoint into the V16 router at import time, so FastAPI sees
+# the endpoint when include_router copies the V16 routes into this public hub.
+from .public_connection_mobile_server_inventory_v18 import (
+    refine_public_connection_mobile_server_inventory_v18,
+)
+from .public_connection_protocol_actions_v20 import (
+    refine_public_connection_protocol_actions_v20,
+)
+from .public_connection_protocol_uri_details_v21 import (
+    refine_public_connection_protocol_uri_details_v21,
+)
 from .public_connection_files_v9 import router as public_connection_files_v9_router
 from .public_connection_multilink_v7 import router as public_connection_multilink_v7_router
 from .public_connection_hub_v5 import public_connection_hub_v5
@@ -284,6 +299,10 @@ def public_connection_hub_live_v5(
     source = refine_public_connection_modern_names_v14(source, token, db)
     source = refine_public_connection_modern_import_v15(source, token, db)
     source = refine_public_connection_modern_delivery_v16(source, token, db)
+    source = refine_public_connection_mobile_protocols_v17(source)
+    source = refine_public_connection_mobile_server_inventory_v18(source)
+    source = refine_public_connection_protocol_actions_v20(source)
+    source = refine_public_connection_protocol_uri_details_v21(source)
 
     return HTMLResponse(
         content=source,
