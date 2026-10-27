@@ -1,0 +1,30 @@
+name: Public Mobile Device-Aware Modern V17 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/public_connection_device_actions_v11.py'
+      - 'backend/app/routers/public_connection_mobile_protocols_v17.py'
+      - 'scripts/public-mobile-device-aware-modern-v17-smoke.py'
+      - '.github/workflows/public-mobile-device-aware-modern-v17-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile refinements
+        run: |
+          python -m py_compile \
+            backend/app/routers/public_connection_device_actions_v11.py \
+            backend/app/routers/public_connection_mobile_protocols_v17.py \
+            scripts/public-mobile-device-aware-modern-v17-smoke.py
+      - name: Run V17 smoke
+        run: python scripts/public-mobile-device-aware-modern-v17-smoke.py

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from .public_connection_mobile_protocols_v17 import (
+    refine_public_connection_mobile_protocols_v17,
+)
+
 
 _V11_CSS = r"""
 /* TWINPANEL_PUBLIC_CONNECT_DEVICE_ACTIONS_V11 */
@@ -121,8 +125,7 @@ _V11_SCRIPT = r"""
 
 def refine_public_connection_device_actions_v11(source: str) -> str:
     """Use one OS detector for platform apps and phone-only actions across the public connection page."""
-    if "TWINPANEL_PUBLIC_CONNECT_DEVICE_ACTIONS_V11" in source:
-        return source
-    source = source.replace("</style>", _V11_CSS + "\n</style>", 1)
-    source = source.replace("</body>", _V11_SCRIPT + "\n</body>", 1)
-    return source
+    if "TWINPANEL_PUBLIC_CONNECT_DEVICE_ACTIONS_V11" not in source:
+        source = source.replace("</style>", _V11_CSS + "\n</style>", 1)
+        source = source.replace("</body>", _V11_SCRIPT + "\n</body>", 1)
+    return refine_public_connection_mobile_protocols_v17(source)
