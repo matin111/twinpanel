@@ -41,6 +41,12 @@ def main() -> None:
     require("کانفیگ این سرور هنوز آماده نشده" in v18, "online-without-config state missing")
     require("پروتکل روی این سرور هنوز آماده نشده" in v18, "missing-runtime state missing")
 
+    require("v18-live-online" in v18, "mobile live-online visual state missing")
+    require("classList.contains('live-online')" in v18, "canonical live state is not consumed")
+    require("MutationObserver(syncLiveState)" in v18, "mobile live state observer missing")
+    require("آنلاین · آماده اتصال" in v18, "mobile online label missing")
+    require("attributeFilter:['class']" in v18, "live sync must observe canonical class changes")
+
     require("@media(max-width:720px)" in v18, "V18 visual changes must stay mobile-scoped")
     require("TWINPANEL_PUBLIC_CONNECT_MOBILE_SERVER_INVENTORY_V18" in v18, "V18 marker missing")
 
