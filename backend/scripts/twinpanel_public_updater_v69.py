@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import importlib.util
+import os
+import sys
 import time
 from pathlib import Path
 
@@ -52,6 +54,46 @@ def _staged_wait_for_healthy(core, urls: dict[str, str], expected_version: str, 
     return True, []
 
 
+def _restore_updater_unit(previous: Path) -> bool:
+    template = previous / "deploy/systemd/twinpanel-updater.service.tpl"
+    if not template.is_file():
+        return False
+    path = Path("/etc/systemd/system/twinpanel-updater.service")
+    tmp = path.with_suffix(".service.tmp")
+    tmp.write_text(template.read_text(encoding="utf-8"), encoding="utf-8")
+    os.chmod(tmp, 0o644)
+    tmp.replace(path)
+    return True
+
+
+def _install_rollback_unit_restore(core) -> None:
+    original_rollback = core.rollback
+
+    def rollback_with_unit_restore(previous: Path | None) -> None:
+        if previous and previous.exists():
+            try:
+                env = core.runtime_env()
+                web_port = int(env.get("TWINPANEL_WEB_PORT", "3000") or 3000)
+                core.install_web_unit(previous, web_port)
+                restored_updater = _restore_updater_unit(previous)
+                print(
+                    f"UPDATER_ROLLBACK_UNIT_RESTORE_V70 previous={previous} "
+                    f"web=true updater={str(restored_updater).lower()}",
+                    flush=True,
+                )
+            except Exception as exc:
+                # Unit restoration is best-effort and must never prevent the
+                # canonical symlink rollback/restart path from running.
+                print(
+                    f"UPDATER_ROLLBACK_UNIT_RESTORE_V70_WARNING {type(exc).__name__}:{exc}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+        original_rollback(previous)
+
+    core.rollback = rollback_with_unit_restore
+
+
 def main() -> int:
     core = _load_core()
     core.wait_for_healthy = lambda urls, expected_version, seconds=45: _staged_wait_for_healthy(
@@ -60,6 +102,7 @@ def main() -> int:
         expected_version,
         seconds,
     )
+    _install_rollback_unit_restore(core)
     try:
         return int(core.main())
     except Exception as exc:
