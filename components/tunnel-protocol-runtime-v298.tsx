@@ -22,11 +22,13 @@ import {Badge,Card,Shell,Stat} from "./ui";
 import {TunnelServerPairSelectorV293} from "./tunnel-server-pair-selector-v293";
 import {TunnelServiceConnectionsPanel} from "./tunnel-service-connections-panel";
 
-// TWINPANEL_TUNNEL_PROTOCOL_MANAGEMENT_V298
+// TWINPANEL_TUNNEL_PROTOCOL_MANAGEMENT_V299
 // /admin/tunnels owns logical pair + service protocol management.
+// Dense fleet UX: one selected tunnel, searchable protocol inventory and collapsed service connections.
 // Transport installation, manual cutover and failover remain on /admin/tunnel-transports.
 
 type Draft={iran_node_id:number;exit_node_id:number;priority:number};
+type ProtocolScope="installed"|"all"|"issues";
 type ModernRow=ModernProtocolInventoryItem&{
   preset?:string;
   settings?:Record<string,unknown>;
@@ -53,10 +55,12 @@ const CLASSIC_LABELS:Record<ClassicProtocolKey,string>={
   v2ray:"V2Ray / Xray",
 };
 
+const HEALTHY_STATUSES=new Set(["online","active","healthy","ok","ready","enabled"]);
 const normalize=(value:unknown)=>String(value??"").trim().toLowerCase();
+const isHealthyStatus=(value:unknown)=>HEALTHY_STATUSES.has(normalize(value));
 const tone=(value:unknown):"ok"|"warn"|"bad"|"violet"=>{
   const status=normalize(value);
-  if(["online","active","healthy","ok","ready","enabled"].includes(status))return "ok";
+  if(HEALTHY_STATUSES.has(status))return "ok";
   if(["offline","failed","error","down"].includes(status))return "bad";
   if(["not_installed","disabled","planned"].includes(status))return "warn";
   return "violet";
@@ -106,6 +110,9 @@ export function TunnelProtocolRuntimeV298(){
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const [search,setSearch]=useState("");
+  const [protocolSearch,setProtocolSearch]=useState("");
+  const [protocolScope,setProtocolScope]=useState<ProtocolScope>("installed");
+  const [connectionsOpen,setConnectionsOpen]=useState(false);
   const [createOpen,setCreateOpen]=useState(false);
   const [draft,setDraft]=useState<Draft>({iran_node_id:0,exit_node_id:0,priority:100});
 
@@ -164,7 +171,17 @@ export function TunnelProtocolRuntimeV298(){
   },[selectedTunnel,classicNodes,modernInventory]);
 
   const activeProtocols=protocols.filter(row=>row.installed).length;
-  const healthyProtocols=protocols.filter(row=>["online","active","healthy","ok","enabled"].includes(normalize(row.status))).length;
+  const healthyProtocols=protocols.filter(row=>row.installed&&isHealthyStatus(row.status)).length;
+  const issueProtocols=protocols.filter(row=>row.installed&&!isHealthyStatus(row.status)).length;
+  const visibleProtocols=useMemo(()=>{
+    const q=protocolSearch.trim().toLowerCase();
+    return protocols.filter(row=>{
+      if(protocolScope==="installed"&&!row.installed)return false;
+      if(protocolScope==="issues"&&(!row.installed||isHealthyStatus(row.status)))return false;
+      if(!q)return true;
+      return `${row.name} ${row.protocol} ${row.status} ${row.portText} ${row.transport}`.toLowerCase().includes(q);
+    });
+  },[protocols,protocolSearch,protocolScope]);
 
   const load=async(silent=false,preferredId?:number)=>{
     if(!silent)setLoading(true);
@@ -187,11 +204,12 @@ export function TunnelProtocolRuntimeV298(){
     if(classicResult.status==="fulfilled")setClassicNodes(classicResult.value.nodes||[]);
     if(modernResult.status==="fulfilled")setModernInventory(modernResult.value);
     const failures=[tunnelResult,nodeResult,classicResult,modernResult].filter(result=>result.status==="rejected") as PromiseRejectedResult[];
-    if(failures.length&& !silent)setError(failures.map(item=>item.reason instanceof Error?item.reason.message:String(item.reason)).join(" · "));
+    if(failures.length&&!silent)setError(failures.map(item=>item.reason instanceof Error?item.reason.message:String(item.reason)).join(" · "));
     if(!silent)setLoading(false);
   };
 
   useEffect(()=>{void load();const timer=window.setInterval(()=>void load(true),15000);return()=>window.clearInterval(timer);},[]);
+  useEffect(()=>{setProtocolSearch("");setProtocolScope("installed");setConnectionsOpen(false);},[selectedId]);
 
   const run=async(key:string,message:string,action:()=>Promise<unknown>)=>{
     if(busy)return;
@@ -256,7 +274,7 @@ export function TunnelProtocolRuntimeV298(){
   return <Shell active="/admin/tunnels">
     <div className="page legacy-control-page">
       <div className="page-head">
-        <div><h1>{pick("تانل‌ها و پروتکل‌ها","Tunnels & Protocols")}</h1><small>{pick("Tunnel برای Pair و پروتکل‌های سرویس است؛ Transport و Failover در مسیرهای هوشمند مدیریت می‌شود.","Tunnel owns the logical pair and service protocols; transport/failover are managed in Smart Transports.")}</small></div>
+        <div><h1>{pick("تانل‌ها و پروتکل‌ها","Tunnels & Protocols")}</h1><small>{pick("یک Tunnel را انتخاب کنید؛ فقط پروتکل‌های همان Exit مدیریت می‌شوند. Transport و Failover در مسیرهای هوشمند باقی می‌ماند.","Select one tunnel; only that Exit's protocols are managed here. Transport/failover remain in Smart Transports.")}</small></div>
         <div className="action-row">
           <button type="button" className="ghost" disabled={loading||Boolean(busy)} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button>
           <TunnelServerPairSelectorV293 disabled={loading||Boolean(busy)} onSelected={tunnel=>{setSelectedId(tunnel.id);void load(true,tunnel.id);}}/>
@@ -270,19 +288,20 @@ export function TunnelProtocolRuntimeV298(){
 
       <div className="stats dashboard-stats">
         <Stat label={pick("کل Tunnelها","Total tunnels")} value={tunnels.length.toLocaleString("fa-IR")} icon="⇄"/>
-        <Stat label={pick("پروتکل‌های این Tunnel","Protocols")} value={protocols.length.toLocaleString("fa-IR")} icon="◫"/>
-        <Stat label={pick("نصب‌شده","Installed")} value={activeProtocols.toLocaleString("fa-IR")} icon="✓"/>
+        <Stat label={pick("نصب‌شده روی Exit انتخابی","Installed on selected Exit")} value={activeProtocols.toLocaleString("fa-IR")} icon="✓"/>
         <Stat label={pick("سالم","Healthy")} value={healthyProtocols.toLocaleString("fa-IR")} icon="●"/>
+        <Stat label={pick("نیازمند بررسی","Needs attention")} value={issueProtocols.toLocaleString("fa-IR")} icon="!"/>
       </div>
 
       <div className="runtime-split-grid">
         <Card>
-          <div className="card-head"><div><b>{pick("Tunnelها","Tunnels")}</b><small>Iran → Exit</small></div></div>
+          <div className="card-head"><div><b>{pick("Tunnelها","Tunnels")}</b><small>{pick("برای ناوگان بزرگ جستجو کنید و فقط یک Pair را مدیریت کنید.","Search large fleets and manage one pair at a time.")}</small></div></div>
           <div className="runtime-toolbar"><label>⌕ <input value={search} onChange={event=>setSearch(event.target.value)} placeholder={pick("نام، IP یا ID...","Name, IP or ID...")}/></label></div>
-          <div className="table"><table><thead><tr><th>ID</th><th>{pick("مسیر","Pair")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("انتخاب","Select")}</th></tr></thead><tbody>
+          <div className="table" style={{maxHeight:"430px",overflow:"auto"}}><table><thead><tr><th>ID</th><th>{pick("مسیر","Pair")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("انتخاب","Select")}</th></tr></thead><tbody>
             {filteredTunnels.map(tunnel=>{const iran=nodeMap.get(tunnel.iran_node_id);const exit=nodeMap.get(tunnel.exit_node_id);return <tr key={tunnel.id}>
               <td>#{tunnel.id}</td><td><div className="user-cell"><b>{iran?.name||`Iran #${tunnel.iran_node_id}`} → {exit?.name||`Exit #${tunnel.exit_node_id}`}</b><small dir="ltr">{iran?.public_ip||"—"} → {exit?.public_ip||"—"}</small></div></td><td><Badge tone={tone(tunnel.status)}>{String(tunnel.status||"—")}</Badge></td><td><button type="button" className={selectedId===tunnel.id?"primary":"primary-soft"} onClick={()=>setSelectedId(tunnel.id)}>{selectedId===tunnel.id?pick("انتخاب‌شده","Selected"):pick("مدیریت","Manage")}</button></td>
             </tr>;})}
+            {!loading&&filteredTunnels.length===0&&<tr><td colSpan={4}><div className="runtime-empty">{pick("Tunnel مطابق جستجو پیدا نشد.","No tunnel matches the search.")}</div></td></tr>}
           </tbody></table></div>
         </Card>
 
@@ -302,14 +321,33 @@ export function TunnelProtocolRuntimeV298(){
 
       {selectedTunnel&&<>
         <Card>
-          <div className="card-head"><div><b>{pick("پروتکل‌های این Tunnel","Protocols on this tunnel")}</b><small>{pick(`Inventory واقعی Exit ${selectedExit?.name||`#${selectedTunnel.exit_node_id}`}`,`Live inventory from Exit ${selectedExit?.name||`#${selectedTunnel.exit_node_id}`}`)}</small></div><div className="action-row"><button type="button" className="primary-soft" onClick={openFullProtocolManager}>{pick("مدیریت کامل پروتکل‌ها","Full protocol manager")}</button></div></div>
-          <div className="table"><table><thead><tr><th>{pick("پروتکل","Protocol")}</th><th>{pick("نوع","Type")}</th><th>{pick("پورت","Port")}</th><th>Transport</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>
-            {protocols.map(row=><tr key={row.id}><td><b>{row.name}</b><small style={{display:"block"}} dir="ltr">{row.protocol}</small></td><td>{row.kind==="classic"?pick("کلاسیک","Classic"):pick("مدرن","Modern")}</td><td dir="ltr">{row.portText}</td><td dir="ltr">{row.transport}</td><td><Badge tone={tone(row.status)}>{row.status}</Badge></td><td><div className="action-row">{row.kind==="classic"?<button type="button" className="primary-soft" disabled={Boolean(busy)} onClick={()=>installClassic(row)}>{busy===`classic-${row.protocol}`?"…":row.installed?pick("Repair / Health","Repair / Health"):pick("نصب","Install")}</button>:<><button type="button" className="primary-soft" disabled={Boolean(busy)||!row.installable} onClick={()=>installModern(row)}>{busy===`modern-install-${row.protocol}`?"…":row.installed?pick("اعمال / Repair","Apply / Repair"):pick("افزودن","Add")}</button>{row.installed&&row.installable&&<button type="button" className="danger" disabled={Boolean(busy)} onClick={()=>removeModern(row)}>{pick("حذف","Remove")}</button>}</>}</div></td></tr>)}
-            {!loading&&protocols.length===0&&<tr><td colSpan={6}><div className="runtime-empty">{pick("Inventory پروتکل برای Exit این Tunnel خالی است.","Protocol inventory for this tunnel Exit is empty.")}</div></td></tr>}
+          <div className="card-head">
+            <div><b>{pick("پروتکل‌های Tunnel انتخاب‌شده","Selected tunnel protocols")}</b><small>{pick(`Exit ${selectedExit?.name||`#${selectedTunnel.exit_node_id}`} · ${activeProtocols} نصب‌شده از ${protocols.length}`,`Exit ${selectedExit?.name||`#${selectedTunnel.exit_node_id}`} · ${activeProtocols} installed of ${protocols.length}`)}</small></div>
+            <div className="action-row"><button type="button" className="primary-soft" onClick={openFullProtocolManager}>{pick("مدیریت کامل","Full manager")}</button></div>
+          </div>
+
+          <div className="runtime-toolbar" style={{display:"flex",gap:"10px",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap"}}>
+            <label style={{minWidth:"240px",flex:"1 1 280px"}}>⌕ <input value={protocolSearch} onChange={event=>setProtocolSearch(event.target.value)} placeholder={pick("جستجوی پروتکل، پورت یا وضعیت...","Search protocol, port or status...")}/></label>
+            <div className="action-row">
+              <button type="button" className={protocolScope==="installed"?"primary":"ghost"} onClick={()=>setProtocolScope("installed")}>{pick("نصب‌شده","Installed")} · {activeProtocols}</button>
+              <button type="button" className={protocolScope==="issues"?"primary":"ghost"} onClick={()=>setProtocolScope("issues")}>{pick("مشکل‌دار","Issues")} · {issueProtocols}</button>
+              <button type="button" className={protocolScope==="all"?"primary":"ghost"} onClick={()=>setProtocolScope("all")}>{pick("همه","All")} · {protocols.length}</button>
+            </div>
+          </div>
+
+          <div className="table" style={{maxHeight:"520px",overflow:"auto"}}><table><thead><tr><th>{pick("پروتکل","Protocol")}</th><th>{pick("نوع","Type")}</th><th>{pick("پورت","Port")}</th><th>Transport</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>
+            {visibleProtocols.map(row=><tr key={row.id}><td><b>{row.name}</b><small style={{display:"block"}} dir="ltr">{row.protocol}</small></td><td>{row.kind==="classic"?pick("کلاسیک","Classic"):pick("مدرن","Modern")}</td><td dir="ltr">{row.portText}</td><td dir="ltr">{row.transport}</td><td><Badge tone={tone(row.status)}>{row.status}</Badge></td><td><div className="action-row">{row.kind==="classic"?<button type="button" className="primary-soft" disabled={Boolean(busy)} onClick={()=>installClassic(row)}>{busy===`classic-${row.protocol}`?"…":row.installed?pick("Repair / Health","Repair / Health"):pick("نصب","Install")}</button>:<><button type="button" className="primary-soft" disabled={Boolean(busy)||!row.installable} onClick={()=>installModern(row)}>{busy===`modern-install-${row.protocol}`?"…":row.installed?pick("اعمال / Repair","Apply / Repair"):pick("افزودن","Add")}</button>{row.installed&&row.installable&&<button type="button" className="danger" disabled={Boolean(busy)} onClick={()=>removeModern(row)}>{pick("حذف","Remove")}</button>}</>}</div></td></tr>)}
+            {!loading&&visibleProtocols.length===0&&<tr><td colSpan={6}><div className="runtime-empty">{protocolScope==="issues"?pick("پروتکل نصب‌شده‌ی مشکل‌دار ندارید.","No installed protocol needs attention."):pick("پروتکلی مطابق فیلتر پیدا نشد.","No protocol matches this filter.")}</div></td></tr>}
           </tbody></table></div>
         </Card>
 
-        <Card><TunnelServiceConnectionsPanel tunnelId={selectedTunnel.id}/></Card>
+        <Card>
+          <div className="card-head">
+            <div><b>{pick("اتصال‌های عمومی","Service connections")}</b><small>{pick("برای جلوگیری از شلوغی، فقط هنگام نیاز باز می‌شود.","Collapsed by default to keep large fleets manageable.")}</small></div>
+            <button type="button" className={connectionsOpen?"ghost":"primary-soft"} onClick={()=>setConnectionsOpen(value=>!value)}>{connectionsOpen?pick("بستن","Close"):pick("نمایش اتصال‌ها","Show connections")}</button>
+          </div>
+          {connectionsOpen?<TunnelServiceConnectionsPanel tunnelId={selectedTunnel.id}/>:<div className="runtime-empty">{pick("اتصال‌های این Tunnel مخفی هستند. برای مشاهده روی «نمایش اتصال‌ها» بزنید.","Connections are hidden. Use Show connections when you need them.")}</div>}
+        </Card>
       </>}
 
       {createOpen&&<Modal title={pick("Tunnel جدید","New tunnel")} onClose={()=>!busy&&setCreateOpen(false)}><form className="runtime-form" onSubmit={createTunnel}><label>{pick("نود ایران","Iran node")}<select value={draft.iran_node_id} onChange={event=>setDraft(value=>({...value,iran_node_id:Number(event.target.value)}))}>{iranNodes.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}</select></label><label>{pick("نود خارج","Exit node")}<select value={draft.exit_node_id} onChange={event=>setDraft(value=>({...value,exit_node_id:Number(event.target.value)}))}>{exitNodes.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}</select></label><label>{pick("اولویت","Priority")}<input type="number" value={draft.priority} onChange={event=>setDraft(value=>({...value,priority:Number(event.target.value)||100}))}/></label><div className="action-row"><button type="submit" className="primary" disabled={Boolean(busy)||!draft.iran_node_id||!draft.exit_node_id}>{busy==="create"?"…":pick("ساخت و آماده‌سازی","Create & provision")}</button></div></form></Modal>}
