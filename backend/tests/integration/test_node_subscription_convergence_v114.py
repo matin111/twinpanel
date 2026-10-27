@@ -90,7 +90,7 @@ def test_legacy_nullable_plan_id_is_safe_for_signature_and_modern_delivery():
     # Production had at least one historical Subscription.plan_id=NULL. It must
     # stay visible to the topology fingerprint without crashing int(None).
     assert "_optional_int(row.plan_id)" in runtime
-    assert "int(row.plan_id)" not in runtime
+    assert "(int(row.id), int(row.plan_id), _enum_value(row.status))" not in runtime
 
     # A NULL plan has no entitlement boundary, so Modern provisioning skips
     # secret creation for that orphaned legacy row but does not fail the worker.
