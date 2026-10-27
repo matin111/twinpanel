@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.296",
+  "version": "1.1.0-rc.297",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-27T22:59:21Z",
+  "released_at": "2026-10-27T23:25:55Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "2780a081ce6315bbbcb2e27cf20209f813bb7b70",
+  "source_sha": "d12181c60b986603aa09b881723fb20adad69793",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.296/twinpanel-1.1.0-rc.296-linux-x86_64.tar.gz",
-    "sha256": "331340785adad9156edbd06c07ecad9600b8cc91a784006b1f0ce888fade1504",
-    "size_bytes": 28406350
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.297/twinpanel-1.1.0-rc.297-linux-x86_64.tar.gz",
+    "sha256": "c2692ed722c7947ba41e0c1dc1c4066b9b019103460efa4f60551e55bfe6804a",
+    "size_bytes": 28406057
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.296 خطای TypeError در Dynamic Subscription Delivery را که روی Controller واقعی مشاهده شد برطرف می‌کند. Root Cause در grace-age مربوط به NodeAccess بود: مسیر قبلی datetime.utcnow() بدون timezone را از created_at دارای timezone کم می‌کرد و قبل از شروع sync هر Node با TypeError متوقف می‌شد. محاسبه age اکنون هم datetimeهای naive و هم timezone-aware را بدون تغییر سیاست grace 180 ثانیه پشتیبانی می‌کند. همگرایی topology-aware نسخه V294، تحویل Classic/Modern، فیلترهای eligibility، identity و credentialهای موجود حفظ شده‌اند. لاگ outer-loop فقط stage امن خطا را اضافه می‌کند تا topology_signature، reconcile و post_reconcile_signature قابل تفکیک باشند بدون افشای secret. تست regression حالت‌های naive، UTC-aware و +03:30-aware را اجرا می‌کند. TP27/VXLAN/Spoof dataplane، Accounting، Mobile V17/V18 و provisioningهای سالم بدون تغییر باقی مانده‌اند. Candidate روی SHA immutable 2780a081ce6315bbbcb2e27cf20209f813bb7b70 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.296 fixes the production-observed TypeError in Dynamic Subscription Delivery. The root cause was the NodeAccess grace-age path: the previous code subtracted timezone-naive datetime.utcnow() from a timezone-aware created_at value and failed before per-node synchronization began. Age calculation now safely supports both naive and timezone-aware datetimes without changing the 180-second grace policy. V294 topology-aware convergence, Classic/Modern delivery, eligibility filters, existing identities and credentials are preserved. Outer-loop logging now adds only a safe stage name so topology_signature, reconcile and post_reconcile_signature failures can be distinguished without exposing secrets. Regression coverage executes naive, UTC-aware and +03:30-aware timestamps. TP27/VXLAN/Spoof dataplanes, Accounting, Mobile V17/V18 and healthy provisioning remain unchanged. Candidate is pinned to immutable SHA 2780a081ce6315bbbcb2e27cf20209f813bb7b70."
+    "fa": "TwinPanel 1.1.0-rc.297 دومین blocker واقعی Dynamic Subscription Delivery را که روی Controller واقعی دیده شد برطرف می‌کند. در rc.296 محاسبه NodeAccess timezone-safe شد، اما topology signature روی Subscriptionهای قدیمی با plan_id=NULL در int(None) متوقف می‌شد. در rc.297 plan_id nullable به‌صورت امن در fingerprint حفظ می‌شود و Subscription فعال بدون Plan برای ساخت credential جدید Modern ایمن skip می‌شود، چون entitlement معتبر برای صدور secret جدید وجود ندارد؛ سایر اشتراک‌ها بدون توقف پردازش می‌شوند. شمارنده skipped_missing_plan فقط summary است و هیچ secret یا credential در لاگ ثبت نمی‌شود. V294 topology-aware convergence، Classic/Modern delivery، eligibility filters، Mobile V17/V18، Accounting، TP27/VXLAN/Spoof و credentialهای موجود بدون تغییر باقی مانده‌اند. Candidate روی SHA immutable d12181c60b986603aa09b881723fb20adad69793 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.297 fixes the second production-proven blocker in Dynamic Subscription Delivery. rc.296 made NodeAccess grace-age handling timezone-safe, but the topology signature still crashed on legacy Subscription rows with plan_id=NULL via int(None). rc.297 preserves nullable plan_id values safely in the fingerprint and safely skips new Modern credential provisioning for active NULL-plan subscriptions because no valid entitlement boundary exists for issuing new secrets; all other subscriptions continue processing. skipped_missing_plan is summary-only and no secrets or credentials are logged. V294 topology-aware convergence, Classic/Modern delivery, eligibility filters, Mobile V17/V18, Accounting, TP27/VXLAN/Spoof and existing credentials remain unchanged. Candidate is pinned to immutable SHA d12181c60b986603aa09b881723fb20adad69793."
   }
 }
