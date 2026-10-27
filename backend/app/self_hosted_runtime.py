@@ -73,6 +73,7 @@ from .service_connections_jobs_v28 import (
     apply_service_connections_jobs_v28,
 )
 from .tp27_repair_api_v265 import apply_tp27_repair_api_v265
+from .provision_resilience_v278 import apply_provision_resilience_v278
 
 
 _original_install_or_upgrade_agent = provision._install_or_upgrade_agent
@@ -171,6 +172,14 @@ def apply_self_hosted_runtime(
     # V114 adds a fail-safe retry worker for any partial historical-user sync.
 
     apply_node_subscription_convergence_v114()
+
+    # ------------------------------------------------------------
+    # Iran Provision Resilience V278
+    # ------------------------------------------------------------
+    # Exact-name/IP partial Iran installs resume in place, save managed SSH
+    # access before Agent work, and avoid unnecessary PyPI dependency refresh.
+
+    apply_provision_resilience_v278()
 
     # ------------------------------------------------------------
     # Node Agent
