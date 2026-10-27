@@ -27,7 +27,6 @@ def test_spoof_wg_registry_is_narrow_and_cleanup_compatible():
     assert '"tp27_masque"' not in installers
     assert '"tp27_tcp_direct"' not in installers
 
-    # Retired source handlers remain present for scoped uninstall/cleanup.
     assert 'elif name == "tp27_masque"' in registry
     assert 'elif name == "tp27_tcp_direct"' in registry
 
@@ -75,10 +74,11 @@ def test_spoof_policy_is_final_and_never_auto_installs_spoof():
         assert f'"{retired}"' in policy
 
 
-def test_spoof_configuration_is_backend_authoritative():
+def test_spoof_configuration_is_backend_authoritative_and_unified_ui_safe():
     router = read("backend/app/routers/modern_transports.py")
     api = read("lib/modern-transport-api.ts")
-    ui = read("components/smart-transports-runtime-v25.tsx")
+    ui = read("components/tunnel-control-center-v1.tsx")
+    wrapper = read("components/smart-transports-runtime-v25.tsx")
 
     assert '@router.put("/{tunnel_id}/modern-transports/spoof_wg/config")' in router
     assert "spoof_wg_configuration_required" in read(
@@ -86,11 +86,16 @@ def test_spoof_configuration_is_backend_authoritative():
     )
     assert 'configuration_required": True' in router
     assert "configureSpoof" in api
+    assert "checkSpoofCompatibility" in api
     assert 'spoof_wg' in api
+    assert 'TWINPANEL_TUNNEL_CONTROL_CENTER_V1' in ui
+    assert 'TunnelControlCenterV1' in wrapper
     assert "saveSpoof" in ui
-    assert "Iran spoof source IP" in ui
-    assert "Exit spoof source IP" in ui
-    assert "The active production path cannot be removed here." in ui
+    assert 'Iran IP' in ui
+    assert 'Exit IP' in ui
+    assert 'name==="spoof_wg"&&!row.configured' in ui
+    assert 'The active production path cannot be removed.' in ui
+    assert 'modernTransportApi.remove(selectedId,name)' in ui
 
 
 def test_publisher_pins_upstream_core_and_license_is_present():

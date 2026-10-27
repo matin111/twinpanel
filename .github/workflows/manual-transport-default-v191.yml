@@ -6,7 +6,10 @@ on:
       - "backend/app/models.py"
       - "backend/app/routers/tunnels.py"
       - "backend/app/smart_transport_auto_v21.py"
+      - "components/tunnel-control-center-v1.tsx"
       - "components/smart-transports-runtime-v25.tsx"
+      - "components/tunnels-simple-runtime.tsx"
+      - "lib/modern-transport-api.ts"
       - "scripts/smoke-manual-transport-default-v191.py"
       - ".github/workflows/manual-transport-default-v191.yml"
   push:
@@ -16,7 +19,10 @@ on:
       - "backend/app/models.py"
       - "backend/app/routers/tunnels.py"
       - "backend/app/smart_transport_auto_v21.py"
+      - "components/tunnel-control-center-v1.tsx"
       - "components/smart-transports-runtime-v25.tsx"
+      - "components/tunnels-simple-runtime.tsx"
+      - "lib/modern-transport-api.ts"
       - "scripts/smoke-manual-transport-default-v191.py"
       - ".github/workflows/manual-transport-default-v191.yml"
 

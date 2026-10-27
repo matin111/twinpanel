@@ -1,0 +1,30 @@
+name: Tunnel Control Center V1 Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'components/tunnel-control-center-v1.tsx'
+      - 'components/tunnel-control-center-v1.module.css'
+      - 'components/tunnels-simple-runtime.tsx'
+      - 'components/smart-transports-runtime-v25.tsx'
+      - 'scripts/tunnel-control-center-v1-smoke.py'
+      - '.github/workflows/tunnel-control-center-v1-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'components/tunnel-control-center-v1.tsx'
+      - 'components/tunnel-control-center-v1.module.css'
+      - 'components/tunnels-simple-runtime.tsx'
+      - 'components/smart-transports-runtime-v25.tsx'
+      - 'scripts/tunnel-control-center-v1-smoke.py'
+      - '.github/workflows/tunnel-control-center-v1-smoke.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run unified tunnel control contract smoke
+        run: python scripts/tunnel-control-center-v1-smoke.py

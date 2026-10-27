@@ -3,7 +3,10 @@ name: Smart Transport UI V25 Smoke
 on:
   pull_request:
     paths:
+      - 'components/tunnel-control-center-v1.tsx'
+      - 'components/tunnel-control-center-v1.module.css'
       - 'components/smart-transports-runtime-v25.tsx'
+      - 'components/tunnels-simple-runtime.tsx'
       - 'components/routed-page-client.tsx'
       - 'components/ui.tsx'
       - 'lib/modern-transport-api.ts'
@@ -14,7 +17,10 @@ on:
     branches:
       - fix/restore-smart-transport-ui-update-check
     paths:
+      - 'components/tunnel-control-center-v1.tsx'
+      - 'components/tunnel-control-center-v1.module.css'
       - 'components/smart-transports-runtime-v25.tsx'
+      - 'components/tunnels-simple-runtime.tsx'
       - 'components/routed-page-client.tsx'
       - 'components/ui.tsx'
       - 'lib/modern-transport-api.ts'
@@ -47,37 +53,39 @@ jobs:
 
           route=Path('components/routed-page-client.tsx').read_text()
           nav=Path('components/ui.tsx').read_text()
-          page=Path('components/smart-transports-runtime-v25.tsx').read_text()
+          wrapper=Path('components/smart-transports-runtime-v25.tsx').read_text()
+          simple=Path('components/tunnels-simple-runtime.tsx').read_text()
+          page=Path('components/tunnel-control-center-v1.tsx').read_text()
           api=Path('lib/modern-transport-api.ts').read_text()
           resolver=Path('backend/app/release_manifest_v25.py').read_text()
           router=Path('backend/app/routers/system_release.py').read_text()
 
           assert 'admin/tunnel-transports") return admin(<SmartTransportsRuntimeV25/>)' in route
           assert '["مسیرهای هوشمند","Smart Transports","/admin/tunnel-transports"' in nav
+          assert 'TunnelControlCenterV1' in wrapper
+          assert 'TunnelControlCenterV1' in simple
+          assert 'TWINPANEL_TUNNEL_CONTROL_CENTER_V1' in page
+
           for name in ('kernel_gre','gost_tun','amneziawg','netrix'):
               assert name in page
               assert name in api
-          for field in ('stable_seconds','qualified','benchmark','weighted_mbps'):
+          for field in ('stable_seconds','qualified','manual_selectable','manual_block_reason'):
               assert field in page
           assert '/modern-transports' in api
 
-          # V287/V289: every selected logical tunnel exposes one identical manual
-          # control surface. Manual readiness is intentionally separate from the
-          # 60-second SmartAuto qualification gate. The action is always rendered,
-          # uses manual_selectable for readiness, and tells the operator that a
-          # fresh dataplane probe + peer-Agent acceptance protects the cutover.
-          assert 'TWINPANEL_UNIFIED_MANUAL_TRANSPORT_CONTROL_V287' in page
+          # One authority for every logical tunnel. Manual readiness is separate
+          # from the SmartAuto stability/qualification gate and the action is
+          # always visible, disabled with a reason until health permits cutover.
           assert 'TWINPANEL_MANUAL_CUTOVER_ELIGIBILITY_UI_V289' in page
-          assert '{row.selectable&&<button' not in page
           assert 'const manualSelectable=Boolean(row.manual_selectable);' in page
           assert 'disabled={Boolean(busy)||isActive||!manualSelectable}' in page
-          assert '!row.selectable' not in page
-          assert 'آماده انتخاب دستی' in page
+          assert 'row.selectable&&<button' not in page
+          assert 'manual_block_reason' in page
           assert 'Manual ready' in page
-          assert 'تأیید Auto' in page
           assert 'Auto qualified' in page
           assert 'شرط ۶۰ ثانیه فقط برای Smart Auto است' in page
-          assert 'fresh full health probe and both-Agent acceptance' in page
+          assert 'fresh full health probe' in page
+          assert 'both-Agent acceptance' in page
 
           for field in (
               'manual_selectable?:boolean;',
@@ -85,6 +93,10 @@ jobs:
               'manual_selection_requires_fresh_probe?:boolean;',
           ):
               assert field in api
+
+          # No tunnel ID may unlock a different control surface.
+          for token in ('selectedId===5','selectedId===6','selectedId===8','tunnel.id===5','tunnel.id===6','tunnel.id===8'):
+              assert token not in page, token
 
           assert 'PRIMARY_MANIFEST_URL' in resolver
           assert 'LEGACY_MANIFEST_URL' in resolver
