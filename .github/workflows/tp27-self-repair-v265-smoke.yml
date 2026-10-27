@@ -7,7 +7,9 @@ on:
       - "backend/app/tp27_repair_api_v265.py"
       - "backend/app/tunnel_transport_manager_v12.py"
       - "backend/app/self_hosted_runtime.py"
+      - "backend/app/transport_candidates/tp27_fast.py"
       - "backend/tests/tp27_self_repair_v265_smoke.py"
+      - "backend/tests/tp27_self_repair_metadata_v270_smoke.py"
       - "components/tunnel-transport-runtime.tsx"
       - "lib/tunnel-transport-api.ts"
       - ".github/workflows/tp27-self-repair-v265-smoke.yml"
@@ -19,7 +21,9 @@ on:
       - "backend/app/tp27_repair_api_v265.py"
       - "backend/app/tunnel_transport_manager_v12.py"
       - "backend/app/self_hosted_runtime.py"
+      - "backend/app/transport_candidates/tp27_fast.py"
       - "backend/tests/tp27_self_repair_v265_smoke.py"
+      - "backend/tests/tp27_self_repair_metadata_v270_smoke.py"
       - "components/tunnel-transport-runtime.tsx"
       - "lib/tunnel-transport-api.ts"
       - ".github/workflows/tp27-self-repair-v265-smoke.yml"
@@ -38,3 +42,6 @@ jobs:
 
       - name: Run TP27 self-repair contract smoke
         run: python backend/tests/tp27_self_repair_v265_smoke.py
+
+      - name: Run TP27 self-repair metadata persistence smoke
+        run: python backend/tests/tp27_self_repair_metadata_v270_smoke.py
