@@ -225,10 +225,11 @@ PY`;
   };
 
   // TWINPANEL_UNIFIED_MANUAL_TRANSPORT_CONTROL_V287
-  // Manual authority is one control surface for every logical tunnel. Safety
-  // qualification still comes from the backend; an unqualified candidate stays
-  // visible but disabled instead of disappearing and making tunnels look like
-  // they have different UIs.
+  // TWINPANEL_MANUAL_CUTOVER_ELIGIBILITY_UI_V289
+  // Manual authority is one control surface for every logical tunnel. Auto's
+  // 60-second stability qualification is shown separately and no longer blocks
+  // manual preflight. Backend V289 still performs a fresh full dataplane probe,
+  // post-switch Agent confirmation, and rollback before authority is accepted.
   const setManual=(row:SmartTransportCandidate)=>void run(`manual-${row.transport}`,pick(`${label(row.transport)} به‌عنوان مسیر دستی Production اعمال شد.`,`${label(row.transport)} is now the manual production path.`),()=>modernTransportApi.setMode(selected,"manual",row.transport));
 
   const checkText=(value:unknown)=>value?pick("آماده","Ready"):pick("نیاز به بررسی","Check");
@@ -260,7 +261,7 @@ PY`;
       <div className="stats dashboard-stats">
         <Stat label={pick("Candidateها","Candidates")} value={String(candidates.length)} icon="⇄"/>
         <Stat label={pick("آنلاین","Online")} value={String(online)} icon="✓"/>
-        <Stat label={pick("تأییدشده","Qualified")} value={String(qualified)} icon="◉"/>
+        <Stat label={pick("تأیید Auto","Auto qualified")} value={String(qualified)} icon="◉"/>
         <Stat label={pick("تست سرعت‌شده","Benchmarked")} value={String(measured)} icon="↯"/>
         <Stat label={pick("مسیر فعال","Active path")} value={label(smart?.active_transport||allState?.active_transport)} icon="→"/>
       </div>
@@ -287,20 +288,22 @@ PY`;
           const progress=Math.min(100,Math.round((Number(row.stable_seconds||0)/Math.max(1,Number(row.required_stable_seconds||60)))*100));
           const isSpoof=row.transport==="spoof_wg";
           const isActive=normalized(row.transport)===activeName;
+          const manualSelectable=Boolean(row.manual_selectable);
           const spoofIpsEntered=Boolean(iranSpoofIp.trim()&&exitSpoofIp.trim());
           return <Card key={row.transport} className="transport-runtime-card">
             <div className="card-head">
               <div><b>{row.label||label(row.transport)}</b><small>{row.iran_profile||row.family||"Transport Candidate"}</small></div>
-              <Badge tone={row.qualified?"ok":tone(row.status)}>{row.qualified?pick("تأییدشده","QUALIFIED"):String(row.status||"not_installed")}</Badge>
+              <Badge tone={row.qualified?"ok":tone(row.status)}>{row.qualified?pick("تأیید Auto","AUTO QUALIFIED"):String(row.status||"not_installed")}</Badge>
             </div>
 
             <div className="runtime-info-list">
               <div><span>Latency</span><b>{row.latency_ms==null?"—":`${row.latency_ms} ms`}</b></div>
-              <div><span>{pick("پایداری","Stability")}</span><b dir="ltr">{seconds(row.stable_seconds)} / {seconds(row.required_stable_seconds||60)}</b></div>
+              <div><span>{pick("پایداری Auto","Auto stability")}</span><b dir="ltr">{seconds(row.stable_seconds)} / {seconds(row.required_stable_seconds||60)}</b></div>
               <div><span>{pick("دانلود","Download")}</span><b dir="ltr">{mbps(benchmark.download_mbps)}</b></div>
               <div><span>{pick("آپلود","Upload")}</span><b dir="ltr">{mbps(benchmark.upload_mbps)}</b></div>
               <div><span>{pick("امتیاز سرعت","Weighted speed")}</span><b dir="ltr">{mbps(benchmark.weighted_mbps)}</b></div>
-              <div><span>{pick("قابل انتخاب","Selectable")}</span><b>{row.selectable?pick("بله","Yes"):pick("خیر","No")}</b></div>
+              <div><span>{pick("آماده انتخاب دستی","Manual ready")}</span><b>{manualSelectable?pick("بله","Yes"):pick("خیر","No")}</b></div>
+              <div><span>{pick("تأیید Auto","Auto qualified")}</span><b>{row.qualified?pick("بله","Yes"):pick("خیر","No")}</b></div>
             </div>
 
             {isSpoof&&<div className="runtime-info-list">
@@ -384,11 +387,19 @@ PY`;
               <button
                 type="button"
                 className="ghost"
-                disabled={Boolean(busy)||isActive||!row.selectable}
-                title={!row.selectable?pick("این مسیر باید ابتدا نصب، آنلاین و تأیید شود؛ بعد انتخاب دستی فعال می‌شود.","This path must be installed, online and qualified before manual selection is enabled."):undefined}
+                disabled={Boolean(busy)||isActive||!manualSelectable}
+                title={!manualSelectable
+                  ?pick(
+                    "برای انتخاب دستی، مسیر باید نصب، Enabled و Online باشد. شرط ۶۰ ثانیه فقط برای Smart Auto است.",
+                    "Manual selection requires an installed, enabled and online path. The 60-second stability gate is only for Smart Auto."
+                  )
+                  :pick(
+                    "قبل از تغییر Production، تست سلامت لحظه‌ای و تأیید هر دو Agent اجرا می‌شود؛ در صورت شکست مسیر قبلی Rollback می‌شود.",
+                    "Before production changes, TwinPanel runs a fresh full health probe and both-Agent acceptance; failure rolls back to the previous path."
+                  )}
                 onClick={()=>setManual(row)}
               >
-                {busy===`manual-${row.transport}`?"…":isActive?pick("مسیر فعال","Active path"):row.selectable?pick("انتخاب دستی Production","Select production manual"):pick("انتخاب دستی — هنوز آماده نیست","Manual selection — not ready")}
+                {busy===`manual-${row.transport}`?"…":isActive?pick("مسیر فعال","Active path"):manualSelectable?pick("انتخاب دستی Production","Select production manual"):pick("انتخاب دستی — مسیر آماده نیست","Manual selection — path not ready")}
               </button>
               {installed&&<button type="button" className="danger" disabled={Boolean(busy)||isActive} onClick={()=>remove(row)}>{busy===`remove-${row.transport}`?"…":isActive?pick("مسیر فعال","Active path"):pick("حذف از این تانل","Remove")}</button>}
             </div>
