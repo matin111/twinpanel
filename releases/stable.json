@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.281",
+  "version": "1.1.0-rc.282",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-27T17:33:00Z",
+  "released_at": "2026-10-27T18:10:29Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "4d39b99e5abdad2df76a1bdb9637dadf7867cb3c",
+  "source_sha": "fbc7a46883f2ac4426e046cd80bf1bd8c4275f02",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.281/twinpanel-1.1.0-rc.281-linux-x86_64.tar.gz",
-    "sha256": "75b3b61f126d67b14fa06b4e95e39c9b73f32db7f493e24432866c28c7cf2f2c",
-    "size_bytes": 28371625
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.282/twinpanel-1.1.0-rc.282-linux-x86_64.tar.gz",
+    "sha256": "e195d379c411cedbf9f39890f5806ec7ad62d588a4b71c17666e60539e03ef79",
+    "size_bytes": 28375518
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.281 پروفایل XHTTP Reality را به خروجی واقعی مشتری V2Ray/Xray برمی‌گرداند و سه روش اتصال مشتری را روی WebSocket TLS، XHTTP Reality و VLESS TCP TLS تثبیت می‌کند. Root Cause حذف XHTTP، برخورد target قدیمی base+1 با بازه مشترک پروتکل‌های Modern بود. V46 فقط target سمت Exit برای XHTTP را به بازه خصوصی Xray با offset=1004 منتقل می‌کند و public port ایران، UUID کاربر، Reality identity، short-id و path را حفظ می‌کند. قبل از reconcile حساب‌ها listener جدید بررسی می‌شود و در صورت نیاز با builder معتبر Xray بازسازی و verify می‌شود. HTTPUpgrade و gRPC در Runtime داخلی باقی می‌مانند ولی در خروجی مشتری نمایش داده نمی‌شوند. TP27/VXLAN و پروتکل‌های غیر Xray بدون تغییر هستند. Candidate روی SHA immutable 4d39b99e5abdad2df76a1bdb9637dadf7867cb3c قفل شده است. Production Acceptance تا نصب رسمی روی Controller و بررسی listener/route واقعی و لینک‌های Subscription 17 باز می‌ماند.",
-    "en": "TwinPanel 1.1.0-rc.281 restores XHTTP Reality to real customer V2Ray/Xray delivery and standardizes the customer profile set as WebSocket TLS, XHTTP Reality, and VLESS TCP TLS. The root cause of XHTTP removal was the historical base+1 target colliding with the shared Modern protocol listener range. V46 moves only the Exit-side XHTTP target into the Xray-private range with offset=1004 while preserving the Iran public port, customer UUID, Reality identity, short-id, and path. The new target listener is checked before credential reconcile and, when needed, rebuilt and verified through the existing validated Xray builder. HTTPUpgrade and gRPC remain installed for internal use but are hidden from customer delivery. TP27/VXLAN and non-Xray protocols are unchanged. The candidate is pinned to immutable SHA 4d39b99e5abdad2df76a1bdb9637dadf7867cb3c. Production acceptance remains pending until the official release is installed on the Controller and the real listener/route plus Subscription 17 links are verified."
+    "fa": "TwinPanel 1.1.0-rc.282 خطای rollback کاذب آپدیتر را که روی Controller واقعی هنگام نصب rc.281 مشاهده شد اصلاح می‌کند. لاگ Production ثابت کرد rc.281 و XHTTP V46 سالم بالا می‌آمدند، Application startup کامل می‌شد و /health محلی 200 می‌داد؛ اما updater قدیمی بلافاصله پس از systemctl --no-block restart یک deadline مشترک 45 ثانیه‌ای برای API و Web شروع می‌کرد. shutdown محدودشده API قبلی و import/startup نسخه جدید تقریباً تمام این window را مصرف می‌کرد و چون Web health به API proxy وابسته است، updater با وجود Runtime سالم false-negative می‌گرفت و rollback می‌کرد. V69 health را dependency-aware می‌کند: ابتدا API با window مستقل تا 75 ثانیه تأیید می‌شود و سپس Web با window مستقل تا 45 ثانیه. برای bootstrap اولین نصب این Fix، Web pre-start فقط در حالت update-state=restarting و پس از تطبیق target version، PID و cwd دقیق Runtime قدیمی را دوباره تأیید می‌کند و در صورت stale بودن فقط همان PID مدیریت‌شده را terminate می‌کند؛ هیچ pkill/killall یا kill عمومی استفاده نمی‌شود. updater unit نیز به wrapper جدید converge می‌شود تا آپدیت‌های بعدی از staged health استفاده کنند. TimeoutStopSec=10 و منطق artifact verification/rollback اصلی حفظ شده‌اند. TP27/VXLAN، Xray/XHTTP، پروتکل‌ها، credentialها و Accounting در این نسخه تغییر نکرده‌اند. Candidate روی SHA immutable fbc7a46883f2ac4426e046cd80bf1bd8c4275f02 قفل شده است. Production Acceptance تا نصب رسمی rc.282 روی Controller 217.179.6.142 و اثبات عدم rollback کاذب باز می‌ماند.",
+    "en": "TwinPanel 1.1.0-rc.282 fixes the false updater rollback reproduced on the real Controller while installing rc.281. Production logs proved rc.281 and XHTTP V46 were healthy: application startup completed and local /health returned HTTP 200. The legacy updater nevertheless started one shared 45-second deadline immediately after systemctl --no-block restart and required both API and Web to report the new version inside that same window. The bounded old-API shutdown plus Python import/startup consumed nearly the whole window, and because Web health proxies the API, the updater produced a false negative and rolled back a healthy release. V69 makes health dependency-aware: API receives an independent window of up to 75 seconds, followed by an independent Web window of up to 45 seconds. To bootstrap the first installation of this fix, Web pre-start acts only while update-state=restarting and the target version matches the active release; it re-verifies the exact systemd MainPID and /proc/<pid>/cwd and, only if that managed runtime is stale, terminates that exact PID. No broad pkill, killall, or cgroup kill is used. The updater unit is also converged to the new wrapper so subsequent updates use staged health. The existing TimeoutStopSec=10 shutdown bound and the core artifact verification/rollback behavior are preserved. TP27/VXLAN, Xray/XHTTP, protocol runtimes, credentials, and Accounting are unchanged in this release. The candidate is pinned to immutable SHA fbc7a46883f2ac4426e046cd80bf1bd8c4275f02. Production acceptance remains pending until the official rc.282 release installs on Controller 217.179.6.142 without a false rollback."
   }
 }
