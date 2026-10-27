@@ -325,6 +325,16 @@ def apply_protocol_dataplane_desired_state_v87() -> None:
 
     apply_modern_protocol_tunnel_binding_v251()
 
+    # V274 refines only Naive's tunneled TLS origin semantics. Cronet resolves
+    # tls.server_name as the dial origin, so managed-CA Naive must align that
+    # identity with the Iran ingress while the managed leaf covers both Exit
+    # and Iran SANs. Other protocols and custom Naive certificates are unchanged.
+    from .naive_tunnel_tls_origin_v274 import (
+        apply_naive_tunnel_tls_origin_v274,
+    )
+
+    apply_naive_tunnel_tls_origin_v274()
+
     _RUNTIME_APPLIED = True
 
     print(
@@ -335,6 +345,7 @@ def apply_protocol_dataplane_desired_state_v87() -> None:
         "xray_public_profiles=restored_v109 "
         "l2tp_ppp_convergence=v111 "
         "modern_tunnel_binding=v251 "
+        "naive_tunnel_tls_origin=v274 "
         "protocols=cisco,openvpn,wireguard,l2tp,v2ray",
         flush=True,
     )

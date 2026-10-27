@@ -1,0 +1,32 @@
+name: Naive Tunnel TLS Origin V274 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/naive_tunnel_tls_origin_v274.py"
+      - "backend/app/protocol_dataplane_desired_state_v87.py"
+      - "scripts/smoke_naive_tunnel_tls_origin_v274.py"
+      - ".github/workflows/naive-tunnel-tls-origin-v274.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/naive_tunnel_tls_origin_v274.py"
+      - "backend/app/protocol_dataplane_desired_state_v87.py"
+      - "scripts/smoke_naive_tunnel_tls_origin_v274.py"
+      - ".github/workflows/naive-tunnel-tls-origin-v274.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run Naive tunnel TLS origin smoke
+        run: python3 scripts/smoke_naive_tunnel_tls_origin_v274.py
