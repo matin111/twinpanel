@@ -26,7 +26,7 @@ from .common import (
 
 
 # ============================================================
-# TWINPANEL SPOOF + WIREGUARD L3 V203
+# TWINPANEL SPOOF + WIREGUARD L3 V204
 #
 # Spoof Tunnel is an outer packet carrier, not a TUN device. TwinPanel keeps a
 # real WireGuard /30 as the authoritative L3 dataplane and feeds WireGuard's
@@ -35,13 +35,17 @@ from .common import (
 #   Iran WG -> local Spoof relay -> spoofed outer packet -> Exit Spoof relay
 #           -> Exit WG -> real /30 peer L3
 #
-# Reverse traffic follows the symmetric relay path. XDP stays disabled in V203
+# Reverse traffic follows the symmetric relay path. XDP stays disabled in V204
 # so the first production qualification depends only on the upstream raw-socket
 # path and does not add kernel/NIC-driver requirements.
 #
 # V203 keeps source port 443 as the default but performs one bounded retry on
 # 44443 only when the shared-L3 probe fails at peer ping. The last successful
 # source port is persisted in transport metadata and preferred on later installs.
+#
+# V204 separates the private Exit WireGuard listener from the Kernel VXLAN
+# 37000+slot UDP range. Production Tunnel #8 proved VXLAN already owns 37008,
+# which made Spoof WG fail in ExecStartPre before the relay could start.
 #
 # Upstream: https://github.com/ParsaKSH/spoof-tunnel
 # License : Apache-2.0
@@ -60,6 +64,7 @@ RECV_TRANSPORT = "udp"
 SPOOF_SOURCE_PORT = 443
 SPOOF_SOURCE_PORT_CANDIDATES = (SPOOF_SOURCE_PORT, 44443)
 SPOOF_SOURCE_PORT_META_KEY = "spoof_source_port"
+EXIT_WIREGUARD_PORT_BASE = 38000
 
 
 def _artifact() -> tuple[Path, str]:
@@ -193,7 +198,7 @@ def _ports(tunnel_id: int, spoof_source_port: int | None = None) -> dict[str, in
         "iran_local_relay_port": 34000 + slot,
         "exit_raw_receive_port": 35000 + slot,
         "iran_raw_receive_port": 36000 + slot,
-        "exit_wireguard_port": 37000 + slot,
+        "exit_wireguard_port": EXIT_WIREGUARD_PORT_BASE + slot,
         "spoof_source_port": source_port,
     }
 
@@ -525,7 +530,7 @@ async def install(tunnel_id: int, db: Session) -> dict:
     artifact_path, artifact_sha = _artifact()
     meta = {
         **rt,
-        "generation": 203,
+        "generation": 204,
         "carrier_class": "spoof-mutual-ip-wireguard-l3",
         "depends_on": "wireguard",
         "mtu": MTU,
