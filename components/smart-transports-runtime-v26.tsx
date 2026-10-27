@@ -45,6 +45,15 @@ type ProtocolCoverageItem={
   source:"classic"|"modern";
 };
 
+type TransportProbeResult={
+  ok?:boolean;
+  latency_ms?:number|null;
+  production_path_unchanged?:boolean;
+  last_error?:string|null;
+  health?:{error?:string|null;[key:string]:unknown};
+  [key:string]:unknown;
+};
+
 const classicProtocols:ProtocolCoverageItem[]=[
   {key:"cisco",fa:"Cisco / OpenConnect",en:"Cisco / OpenConnect",source:"classic"},
   {key:"openvpn",fa:"OpenVPN",en:"OpenVPN",source:"classic"},
@@ -88,7 +97,7 @@ export function SmartTransportsRuntimeV26(){
   const [exitSpoofIp,setExitSpoofIp]=useState("");
   const [spoofCompatibility,setSpoofCompatibility]=useState<SpoofCompatibilityResult|null>(null);
   const [tp27Diagnosis,setTp27Diagnosis]=useState<Record<string,unknown>|null>(null);
-  const [transportProbes,setTransportProbes]=useState<Record<string,Record<string,unknown>>>({});
+  const [transportProbes,setTransportProbes]=useState<Record<string,TransportProbeResult>>({});
 
   const loadTunnels=async()=>{
     const rows=await legacyControlApi.tunnels();
@@ -210,7 +219,7 @@ export function SmartTransportsRuntimeV26(){
     const name=row.transport as SmartTransportName;
     setBusy(`probe-${name}`);setError("");setSuccess("");
     try{
-      const result=await modernTransportApi.probe(selected,name);
+      const result=await modernTransportApi.probe(selected,name) as TransportProbeResult;
       setTransportProbes(current=>({...current,[name]:result}));
       setSuccess(pick(`تست سلامت ${label(name)} انجام شد.`,`Fresh health test finished for ${label(name)}.`));
       await loadState(selected,true);
@@ -354,7 +363,7 @@ export function SmartTransportsRuntimeV26(){
           const progress=Math.min(100,Math.round((Number(row.stable_seconds||0)/Math.max(1,Number(row.required_stable_seconds||60)))*100));
           const standbyReady=Boolean(row.qualified&&!isActive);
           const probeResult=transportProbes[String(row.transport)];
-          const probeHealth=asObject(probeResult?.health);
+          const probeHealth=probeResult?.health||{};
           const tp27Carrier=asObject(tp27Diagnosis?.carrier);
           const tp27Iran=asObject(tp27Carrier.iran);
           const tp27Exit=asObject(tp27Carrier.exit);
@@ -390,8 +399,8 @@ export function SmartTransportsRuntimeV26(){
               <div><span>{pick("آخرین تست سلامت","Latest health test")}</span><Badge tone={probeResult.ok===true?"ok":"bad"}>{probeResult.ok===true?pick("سالم","Healthy"):pick("ناموفق","Failed")}</Badge></div>
               <div><span>Latency</span><b dir="ltr">{probeResult.latency_ms==null?"—":`${String(probeResult.latency_ms)} ms`}</b></div>
               <div><span>{pick("Production","Production")}</span><b>{probeResult.production_path_unchanged===true?pick("بدون تغییر","Unchanged"):"—"}</b></div>
-              {probeResult.last_error&&<div><span>{pick("خطا","Error")}</span><b dir="ltr">{String(probeResult.last_error)}</b></div>}
-              {!probeResult.last_error&&probeHealth.error&&<div><span>{pick("خطا","Error")}</span><b dir="ltr">{String(probeHealth.error)}</b></div>}
+              {Boolean(probeResult.last_error)&&<div><span>{pick("خطا","Error")}</span><b dir="ltr">{String(probeResult.last_error)}</b></div>}
+              {!probeResult.last_error&&Boolean(probeHealth.error)&&<div><span>{pick("خطا","Error")}</span><b dir="ltr">{String(probeHealth.error)}</b></div>}
             </div>}
 
             {isTp27&&installed&&<details className="tp-spoof-panel">
