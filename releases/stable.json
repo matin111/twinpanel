@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.267",
+  "version": "1.1.0-rc.268",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-26T23:41:37Z",
+  "released_at": "2026-10-27T00:12:38Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "295a54e921c6c9c7ff44c0fe3e07df4069e33245",
+  "source_sha": "61b8d6ab2195c684a33653fe45c2a4d5410ceac0",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.267/twinpanel-1.1.0-rc.267-linux-x86_64.tar.gz",
-    "sha256": "057dafde8c1b6b9caa67a2fae889c32baa80b7b2f5949e9bc2e866f238a67e2c",
-    "size_bytes": 28296838
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.268/twinpanel-1.1.0-rc.268-linux-x86_64.tar.gz",
+    "sha256": "9861330e258dfc6d98fc50bef193a0f24dd3e4edf2daa0eda216ec97c1f1432e",
+    "size_bytes": 28321536
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.267 قابلیت Self-Repair اختصاصی TP27 Fast را برای خرابی Carrier پس از نصب اضافه می‌کند. Health فیزیکی هر دو سمت TP27 با Service/Interface/Address و دسترسی دوطرفه Peer بررسی می‌شود و تعمیر خودکار فقط پس از 3 Failure متوالی انجام می‌شود. Cooldown سه‌دقیقه‌ای و قفل Cross-Process از Repair Storm و اجرای همزمان تعمیر جلوگیری می‌کنند. اگر GRE Native قبلاً Qualification را پاس کرده اما بعداً Unreachable شود، Repair ابتدا GRE/FoU را امتحان می‌کند و تنها Carrier داخلی TP27 را بازسازی می‌کند؛ mode، active_transport و preferred_transport حفظ می‌شوند و هیچ سوییچ خودکار به VXLAN یا Transport منطقی دیگر انجام نمی‌شود. Carrier جدید فقط پس از Full TP27 Probe شامل Bidirectional L3، TCP Egress و UDP Egress پذیرفته می‌شود. پنل مدیریت نیز ابزارهای Read-Only Diagnose، Repair و Rebuild Carrier را اضافه می‌کند. PR #1065 و Release PR #1066 با CI سبز Merge شده‌اند و Candidate روی SHA immutable 295a54e921c6c9c7ff44c0fe3e07df4069e33245 قفل است. Production acceptance تا نصب rc.267 روی Controller 217.179.6.142 (CLY984318) و اجرای تست واقعی چنددقیقه‌ای Recovery برای Tunnel #6 باز می‌ماند.",
-    "en": "TwinPanel 1.1.0-rc.267 adds dedicated TP27 Fast self-repair for carrier failures that occur after installation. Physical TP27 health is checked on both peers using service/interface/address state plus bidirectional peer reachability, and automatic repair is triggered only after 3 consecutive failed cycles. A three-minute cooldown and cross-process lock prevent repair storms and concurrent mutations. If Native GRE previously qualified but later becomes unreachable, repair tries GRE/FoU first and rebuilds only the internal TP27 carrier; mode, active_transport and preferred_transport are preserved and there is no automatic switch to VXLAN or another logical transport. A rebuilt carrier is accepted only after the full TP27 probe passes, including bidirectional L3, TCP egress and UDP egress. The admin panel also adds read-only Diagnose, Repair and Rebuild Carrier tools. PR #1065 and release PR #1066 merged with green CI, and this candidate is pinned to immutable source SHA 295a54e921c6c9c7ff44c0fe3e07df4069e33245. Production acceptance remains pending installation of rc.267 on Controller 217.179.6.142 (CLY984318) and a real multi-minute recovery test for Tunnel #6."
+    "fa": "TwinPanel 1.1.0-rc.268 بخش Outbound Performance را بدون Rewrite به V4 ارتقا می‌دهد. تست واقعی مسیر انتخاب‌شده شامل Download/Upload سری و موازی، Latency و Loaded Latency، Jitter، Application Probe Loss، TLS/TTFB، P50/P95 و Bufferbloat حفظ و تکمیل شده است. امتیازهای کاربردی برای Balanced، Realtime، Streaming، Bulk Download و Upload/Backup اضافه شده‌اند. Smart Route Guard فقط با نتیجه Fresh/Recent، Confidence کافی، Score حداقلی و Hysteresis مسیر بهتر را پیشنهاد می‌دهد و هیچ سوییچ خودکار پس‌زمینه‌ای انجام نمی‌دهد. پروفایل امن BBR + FQ + tcp_mtu_probing=1 با Backup/Rollback دقیق اضافه شده و live qdisc، TP27/VXLAN، Firewall و MTU را دست‌کاری نمی‌کند. A/B Optimizer قبل و بعد از Tuning را روی مسیر واقعی Benchmark می‌کند و اگر Score/Throughput بهبود امن نداشته باشد یا Loaded Latency/Loss بدتر شود، خودکار Rollback می‌کند. قابلیت‌های TCP Fast Open، MPTCP و UDP Fragment در Sing-box شناسایی شده‌اند اما بدون A/B کنترل‌شده کورکورانه فعال نمی‌شوند؛ HTTP/3 نیز از روی SOCKS ادعا نمی‌شود. PR #1068 و Release PR #1069 با CI سبز Merge شده‌اند و Candidate روی SHA immutable 61b8d6ab2195c684a33653fe45c2a4d5410ceac0 قفل است. Production acceptance تا نصب rc.268 روی Controller 217.179.6.142 (CLY984318) و اجرای Speed Test/A-B واقعی باز می‌ماند.",
+    "en": "TwinPanel 1.1.0-rc.268 upgrades Outbound Performance to V4 without rewriting the existing stack. Real selected-route benchmarking keeps and extends serial/parallel download and upload throughput, idle and loaded latency, jitter, application-probe loss, TLS/TTFB, P50/P95 and bufferbloat. Use-case scores are added for balanced, realtime, streaming, bulk download and upload/backup workloads. Smart Route Guard only recommends a better route when measurements are fresh/recent, confidence and minimum score thresholds pass, and hysteresis is cleared; there is no silent background route switching. Safe BBR + FQ + tcp_mtu_probing=1 tuning includes exact backup/rollback and does not mutate the live qdisc, TP27/VXLAN, firewall or MTU. The A/B optimizer benchmarks baseline and tuned states on the real route and automatically rolls back when score/throughput does not improve safely or loaded latency/loss regresses. Sing-box TCP Fast Open, MPTCP and UDP fragmentation capabilities are recognized but are not blindly enabled without a controlled A/B path; HTTP/3 is not falsely claimed through SOCKS. PR #1068 and release PR #1069 merged with green CI, and this candidate is pinned to immutable source SHA 61b8d6ab2195c684a33653fe45c2a4d5410ceac0. Production acceptance remains pending installation on Controller 217.179.6.142 (CLY984318) and real Speed Test/A-B validation."
   }
 }
