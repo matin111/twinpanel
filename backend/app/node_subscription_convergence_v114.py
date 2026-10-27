@@ -27,6 +27,7 @@ from .routers import provision
 MARKER = "TWINPANEL_NODE_SUBSCRIPTION_CONVERGENCE_V114"
 DYNAMIC_MARKER = "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_V294"
 TIMEZONE_FIX_MARKER = "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_TIMEZONE_V295"
+NULL_PLAN_FIX_MARKER = "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_NULL_PLAN_V297"
 _NEW_ACCESS_GRACE_SECONDS = 180
 _RETRY_INTERVAL_SECONDS = 60
 _INITIAL_DELAY_SECONDS = 20
@@ -38,6 +39,11 @@ _last_topology_signature: str | None = None
 
 def _enum_value(value: Any) -> str:
     return str(getattr(value, "value", value) or "").strip().lower()
+
+
+def _optional_int(value: Any) -> int | None:
+    """Convert nullable legacy foreign keys without turning NULL into a crash."""
+    return None if value is None else int(value)
 
 
 def _age_seconds(value: datetime) -> float:
@@ -132,7 +138,7 @@ def _topology_signature() -> str:
             for row in db.query(Tunnel).order_by(Tunnel.id.asc()).all()
         ]
         subscription_rows = [
-            (int(row.id), int(row.plan_id), _enum_value(row.status))
+            (int(row.id), _optional_int(row.plan_id), _enum_value(row.status))
             for row in db.query(Subscription).order_by(Subscription.id.asc()).all()
         ]
         selected_rows = [
@@ -242,7 +248,14 @@ async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
         if _enum_value(row.status) == "online"
     }
     if not online_protocols:
-        return {"ok": True, "node_id": int(node.id), "provisioned_pairs": 0, "reused_pairs": 0, "failed": []}
+        return {
+            "ok": True,
+            "node_id": int(node.id),
+            "provisioned_pairs": 0,
+            "reused_pairs": 0,
+            "skipped_missing_plan": 0,
+            "failed": [],
+        }
 
     eligible_protocols = {
         protocol
@@ -250,7 +263,14 @@ async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
         if ad._delivery_item_is_usable(db, protocol, {"node_id": int(node.id)})
     }
     if not eligible_protocols:
-        return {"ok": True, "node_id": int(node.id), "provisioned_pairs": 0, "reused_pairs": 0, "failed": []}
+        return {
+            "ok": True,
+            "node_id": int(node.id),
+            "provisioned_pairs": 0,
+            "reused_pairs": 0,
+            "skipped_missing_plan": 0,
+            "failed": [],
+        }
 
     active_subscriptions = (
         db.query(Subscription)
@@ -260,10 +280,18 @@ async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
     )
     provisioned_pairs = 0
     reused_pairs = 0
+    skipped_missing_plan = 0
     failed: list[dict[str, Any]] = []
 
     for sub in active_subscriptions:
-        plan = db.get(Plan, int(sub.plan_id))
+        plan_id = _optional_int(sub.plan_id)
+        if plan_id is None:
+            # Legacy/orphaned rows have no entitlement boundary. Keep them in
+            # the topology fingerprint, but never provision new Modern secrets.
+            skipped_missing_plan += 1
+            continue
+
+        plan = db.get(Plan, plan_id)
         if plan is None:
             failed.append({"subscription_id": int(sub.id), "node_id": int(node.id), "error": "plan_not_found"})
             continue
@@ -365,6 +393,7 @@ async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
         "node_id": int(node.id),
         "provisioned_pairs": provisioned_pairs,
         "reused_pairs": reused_pairs,
+        "skipped_missing_plan": skipped_missing_plan,
         "failed": failed,
     }
 
@@ -402,6 +431,7 @@ async def reconcile_installed_exit_nodes_once() -> dict:
                     "active_subscriptions": int(classic.get("active_subscriptions") or 0),
                     "provisioned_pairs": int(classic.get("provisioned_pairs") or 0) + int(modern.get("provisioned_pairs") or 0),
                     "reused_pairs": int(classic.get("reused_pairs") or 0) + int(modern.get("reused_pairs") or 0),
+                    "skipped_missing_plan": int(modern.get("skipped_missing_plan") or 0),
                     "failed_count": len(classic_failed) + len(modern_failed),
                 }
             )
@@ -443,6 +473,7 @@ async def _convergence_loop() -> None:
                     if (
                         item.get("membership_added")
                         or item.get("provisioned_pairs")
+                        or item.get("skipped_missing_plan")
                         or item.get("failed_count")
                     )
                 ]
@@ -470,7 +501,7 @@ async def _startup() -> None:
         return
     _task = asyncio.create_task(
         _convergence_loop(),
-        name="node-subscription-convergence-v295",
+        name="node-subscription-convergence-v297",
     )
 
 
@@ -499,12 +530,14 @@ def apply_node_subscription_convergence_v114() -> None:
         f"{MARKER}_ACTIVE "
         f"{DYNAMIC_MARKER}=enabled "
         f"{TIMEZONE_FIX_MARKER}=enabled "
+        f"{NULL_PLAN_FIX_MARKER}=enabled "
         "scope=visible_online_exit_nodes "
         "trigger=topology_or_entitlement_change "
         "membership=all_subscriptions "
         "credentials=active_subscriptions "
         "protocols=classic+modern "
         "datetime=naive+aware-safe "
+        "legacy_null_plan=safe_skip_modern_credentials "
         "retry=failures_only",
         flush=True,
     )
