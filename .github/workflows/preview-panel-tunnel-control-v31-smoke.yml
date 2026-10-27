@@ -19,14 +19,18 @@ jobs:
           else
             npm install --no-audit --no-fund
           fi
-      - name: Verify unified V39 tunnel and node controls
+      - name: Verify unified tunnel and node controls
         run: |
-          grep -q 'TunnelsUnifiedRuntimeV39' components/tunnels-simple-runtime.tsx
-          grep -q 'TunnelServiceConnectionsPanel' components/tunnels-unified-runtime-v39.tsx
-          grep -q 'managedDeepDiagnose' components/tunnels-unified-runtime-v39.tsx
-          grep -q 'managedDeepRepair' components/tunnels-unified-runtime-v39.tsx
-          grep -q 'setMode' components/tunnels-unified-runtime-v39.tsx
-          grep -q 'installDeepDiagnosticsAgent' components/tunnels-unified-runtime-v39.tsx
+          grep -q 'TunnelControlCenterV1' components/tunnels-simple-runtime.tsx
+          grep -q 'TunnelControlCenterV1' components/smart-transports-runtime-v25.tsx
+          grep -q 'TWINPANEL_TUNNEL_CONTROL_CENTER_V1' components/tunnel-control-center-v1.tsx
+          grep -q 'legacyControlApi.createManagedTunnel' components/tunnel-control-center-v1.tsx
+          grep -q 'managedDeepRepair' components/tunnel-control-center-v1.tsx
+          grep -q 'setMode(selectedId,"auto")' components/tunnel-control-center-v1.tsx
+          grep -q 'setMode(selectedId,"manual",name)' components/tunnel-control-center-v1.tsx
+          grep -q 'manual_selectable' components/tunnel-control-center-v1.tsx
+          ! grep -q 'selectedId===6' components/tunnel-control-center-v1.tsx
+          ! grep -q 'tunnel.id===6' components/tunnel-control-center-v1.tsx
           ! grep -q 'repairProtocolsSaved' components/legacy-nodes-exact.tsx
           ! grep -q 'upgradeAgent' components/legacy-nodes-exact.tsx
           ! grep -q 'installTunnelFabric' components/legacy-nodes-exact.tsx
