@@ -1,0 +1,31 @@
+name: Tunnel Protocol Page V298 Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'components/tunnel-protocol-runtime-v298.tsx'
+      - 'components/routed-page-client-v2.tsx'
+      - 'components/smart-transports-runtime-v27.tsx'
+      - 'scripts/test_tunnel_protocol_page_separation_v298.py'
+      - '.github/workflows/tunnel-protocol-page-v298-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'components/tunnel-protocol-runtime-v298.tsx'
+      - 'components/routed-page-client-v2.tsx'
+      - 'components/smart-transports-runtime-v27.tsx'
+      - 'scripts/test_tunnel_protocol_page_separation_v298.py'
+      - '.github/workflows/tunnel-protocol-page-v298-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify tunnel/protocol route separation
+        run: python scripts/test_tunnel_protocol_page_separation_v298.py
