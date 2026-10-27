@@ -92,6 +92,9 @@ export type SmartTransportCandidate={
   auto_managed?:boolean;
   qualified?:boolean;
   selectable?:boolean;
+  manual_selectable?:boolean;
+  manual_block_reason?:string|null;
+  manual_selection_requires_fresh_probe?:boolean;
   stable_seconds?:number;
   required_stable_seconds?:number;
   auto_block_reason?:string|null;
