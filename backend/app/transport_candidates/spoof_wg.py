@@ -26,7 +26,7 @@ from .common import (
 
 
 # ============================================================
-# TWINPANEL SPOOF + WIREGUARD L3 V202
+# TWINPANEL SPOOF + WIREGUARD L3 V203
 #
 # Spoof Tunnel is an outer packet carrier, not a TUN device. TwinPanel keeps a
 # real WireGuard /30 as the authoritative L3 dataplane and feeds WireGuard's
@@ -35,9 +35,13 @@ from .common import (
 #   Iran WG -> local Spoof relay -> spoofed outer packet -> Exit Spoof relay
 #           -> Exit WG -> real /30 peer L3
 #
-# Reverse traffic follows the symmetric relay path. XDP stays disabled in V202
+# Reverse traffic follows the symmetric relay path. XDP stays disabled in V203
 # so the first production qualification depends only on the upstream raw-socket
 # path and does not add kernel/NIC-driver requirements.
+#
+# V203 keeps source port 443 as the default but performs one bounded retry on
+# 44443 only when the shared-L3 probe fails at peer ping. The last successful
+# source port is persisted in transport metadata and preferred on later installs.
 #
 # Upstream: https://github.com/ParsaKSH/spoof-tunnel
 # License : Apache-2.0
@@ -54,6 +58,8 @@ UPSTREAM_ARTIFACT_SHA256 = "4ba5597568607e864fb6d5ba4f13bac91a50456da5696d99463d
 SEND_TRANSPORT = "tcp"
 RECV_TRANSPORT = "udp"
 SPOOF_SOURCE_PORT = 443
+SPOOF_SOURCE_PORT_CANDIDATES = (SPOOF_SOURCE_PORT, 44443)
+SPOOF_SOURCE_PORT_META_KEY = "spoof_source_port"
 
 
 def _artifact() -> tuple[Path, str]:
@@ -159,14 +165,36 @@ def merge_configuration(raw: str | None, configuration: dict) -> str:
     return json.dumps(meta, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
 
-def _ports(tunnel_id: int) -> dict[str, int]:
+def _persisted_source_port(raw: str | None) -> int | None:
+    value = _meta_dict(raw).get(SPOOF_SOURCE_PORT_META_KEY)
+    try:
+        port = int(value)
+    except (TypeError, ValueError):
+        return None
+    if port not in SPOOF_SOURCE_PORT_CANDIDATES:
+        return None
+    return port
+
+
+def _source_port_candidates(raw: str | None) -> tuple[int, ...]:
+    persisted = _persisted_source_port(raw)
+    if persisted is None:
+        return SPOOF_SOURCE_PORT_CANDIDATES
+    remaining = tuple(port for port in SPOOF_SOURCE_PORT_CANDIDATES if port != persisted)
+    return (persisted, *remaining)
+
+
+def _ports(tunnel_id: int, spoof_source_port: int | None = None) -> dict[str, int]:
     slot = int(tunnel_id) % 500
+    source_port = SPOOF_SOURCE_PORT if spoof_source_port is None else int(spoof_source_port)
+    if source_port not in SPOOF_SOURCE_PORT_CANDIDATES:
+        raise ValueError("spoof_wg_source_port_unsupported")
     return {
         "iran_local_relay_port": 34000 + slot,
         "exit_raw_receive_port": 35000 + slot,
         "iran_raw_receive_port": 36000 + slot,
         "exit_wireguard_port": 37000 + slot,
-        "spoof_source_port": SPOOF_SOURCE_PORT,
+        "spoof_source_port": source_port,
     }
 
 
@@ -364,8 +392,9 @@ async def _write_peer_runtime(
     cfg: dict,
     iran_public: str,
     exit_public: str,
+    spoof_source_port: int,
 ) -> None:
-    ports = _ports(tunnel_id)
+    ports = _ports(tunnel_id, spoof_source_port)
     helper = _helper_path(tunnel_id, role)
     iface = rt["interface"]
 
@@ -486,24 +515,30 @@ async def install(tunnel_id: int, db: Session) -> dict:
         .filter_by(tunnel_id=int(tunnel_id), transport=NAME)
         .first()
     )
-    cfg = configuration_from_text(getattr(row, "config_text", None))
+    raw_config = getattr(row, "config_text", None)
+    cfg = configuration_from_text(raw_config)
     if cfg is None:
         raise RuntimeError("spoof_wg_configuration_required")
 
+    source_port_candidates = _source_port_candidates(raw_config)
+    persisted_source_port = _persisted_source_port(raw_config)
     artifact_path, artifact_sha = _artifact()
     meta = {
         **rt,
-        "generation": 202,
+        "generation": 203,
         "carrier_class": "spoof-mutual-ip-wireguard-l3",
         "depends_on": "wireguard",
         "mtu": MTU,
-        "ports": _ports(tunnel_id),
+        "ports": _ports(tunnel_id, source_port_candidates[0]),
         "spoof_config": cfg,
+        "spoof_source_port_candidates": list(SPOOF_SOURCE_PORT_CANDIDATES),
         "upstream_version": UPSTREAM_VERSION,
         "upstream_source_sha": UPSTREAM_SOURCE_SHA,
         "artifact_sha256": artifact_sha,
         "xdp": False,
     }
+    if persisted_source_port is not None:
+        meta[SPOOF_SOURCE_PORT_META_KEY] = persisted_source_port
     mark(db, tunnel_id, NAME, status="installing", meta=json.dumps(meta, separators=(",", ":"), sort_keys=True))
 
     ci = ce = None
@@ -524,53 +559,76 @@ async def install(tunnel_id: int, db: Session) -> dict:
         )
         _ = iran_private, exit_private
 
-        await _reset_pair(ci, ce, rt, cfg)
+        health = None
+        selected_source_port = None
+        source_port_attempts: list[int] = []
 
-        # Exit must be able to receive the first spoofed WireGuard handshake
-        # before the Iran relay starts emitting it.
-        await _write_peer_runtime(
-            ce,
-            role="exit",
-            tunnel_id=int(tunnel_id),
-            rt=rt,
-            private_key_path=exit_key_path,
-            peer_public_key=iran_public_key,
-            cfg=cfg,
-            iran_public=str(iran.public_ip),
-            exit_public=str(exit_node.public_ip),
-        )
-        await asyncio.sleep(1.0)
-        await _write_peer_runtime(
-            ci,
-            role="iran",
-            tunnel_id=int(tunnel_id),
-            rt=rt,
-            private_key_path=iran_key_path,
-            peer_public_key=exit_public_key,
-            cfg=cfg,
-            iran_public=str(iran.public_ip),
-            exit_public=str(exit_node.public_ip),
-        )
-        await _install_firewall(
-            ci,
-            ce,
-            tunnel_id=int(tunnel_id),
-            rt=rt,
-            cfg=cfg,
-        )
+        for index, source_port in enumerate(source_port_candidates):
+            source_port_attempts.append(source_port)
+            await _reset_pair(ci, ce, rt, cfg)
 
-        await asyncio.sleep(5.0)
-        health = await probe(
-            ci,
-            ce,
-            name=NAME,
-            tunnel_id=int(tunnel_id),
-            rt=rt,
-        )
+            # Exit must be able to receive the first spoofed WireGuard handshake
+            # before the Iran relay starts emitting it.
+            await _write_peer_runtime(
+                ce,
+                role="exit",
+                tunnel_id=int(tunnel_id),
+                rt=rt,
+                private_key_path=exit_key_path,
+                peer_public_key=iran_public_key,
+                cfg=cfg,
+                iran_public=str(iran.public_ip),
+                exit_public=str(exit_node.public_ip),
+                spoof_source_port=source_port,
+            )
+            await asyncio.sleep(1.0)
+            await _write_peer_runtime(
+                ci,
+                role="iran",
+                tunnel_id=int(tunnel_id),
+                rt=rt,
+                private_key_path=iran_key_path,
+                peer_public_key=exit_public_key,
+                cfg=cfg,
+                iran_public=str(iran.public_ip),
+                exit_public=str(exit_node.public_ip),
+                spoof_source_port=source_port,
+            )
+            await _install_firewall(
+                ci,
+                ce,
+                tunnel_id=int(tunnel_id),
+                rt=rt,
+                cfg=cfg,
+            )
+
+            await asyncio.sleep(5.0)
+            try:
+                health = await probe(
+                    ci,
+                    ce,
+                    name=NAME,
+                    tunnel_id=int(tunnel_id),
+                    rt=rt,
+                )
+            except RuntimeError as exc:
+                has_fallback = index + 1 < len(source_port_candidates)
+                if not str(exc).startswith("peer_ping_failed:") or not has_fallback:
+                    raise
+                continue
+
+            selected_source_port = source_port
+            break
+
+        if health is None or selected_source_port is None:
+            raise RuntimeError("spoof_wg_source_port_qualification_failed")
 
         final_meta = {
             **meta,
             **health,
+            "ports": _ports(tunnel_id, selected_source_port),
+            SPOOF_SOURCE_PORT_META_KEY: selected_source_port,
+            "spoof_source_port_attempts": source_port_attempts,
             "wireguard": True,
             "qualification": "full-shared-l3-probe",
         }
@@ -587,6 +645,8 @@ async def install(tunnel_id: int, db: Session) -> dict:
             "transport": NAME,
             "runtime": rt,
             "probe": health,
+            "spoof_source_port": selected_source_port,
+            "source_port_attempts": source_port_attempts,
             "upstream_version": UPSTREAM_VERSION,
             "xdp": False,
         }
