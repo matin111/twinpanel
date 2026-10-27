@@ -1,6 +1,7 @@
 import ast
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -19,7 +20,8 @@ def _load_helper(name: str, namespace: dict | None = None):
         if isinstance(node, ast.FunctionDef) and node.name == name
     )
     module = ast.Module(body=[helper], type_ignores=[])
-    scope = dict(namespace or {})
+    scope = {"Any": Any}
+    scope.update(namespace or {})
     exec(compile(module, "node_subscription_convergence_v114.py", "exec"), scope)
     return scope[name]
 
