@@ -5,6 +5,7 @@ on:
     paths:
       - 'backend/app/routers/public_connection_device_actions_v11.py'
       - 'backend/app/routers/public_connection_mobile_server_inventory_v18.py'
+      - 'backend/app/routers/public_connection_mobile_live_v19.py'
       - 'scripts/public-mobile-copy-details-server-inventory-v18-smoke.py'
       - '.github/workflows/public-mobile-copy-details-server-inventory-v18-smoke.yml'
   push:
@@ -12,6 +13,7 @@ on:
     paths:
       - 'backend/app/routers/public_connection_device_actions_v11.py'
       - 'backend/app/routers/public_connection_mobile_server_inventory_v18.py'
+      - 'backend/app/routers/public_connection_mobile_live_v19.py'
       - 'scripts/public-mobile-copy-details-server-inventory-v18-smoke.py'
       - '.github/workflows/public-mobile-copy-details-server-inventory-v18-smoke.yml'
 
@@ -28,6 +30,7 @@ jobs:
           python -m py_compile \
             backend/app/routers/public_connection_device_actions_v11.py \
             backend/app/routers/public_connection_mobile_server_inventory_v18.py \
+            backend/app/routers/public_connection_mobile_live_v19.py \
             scripts/public-mobile-copy-details-server-inventory-v18-smoke.py
-      - name: Run V18 smoke
+      - name: Run V18 and V19 smoke
         run: python scripts/public-mobile-copy-details-server-inventory-v18-smoke.py
