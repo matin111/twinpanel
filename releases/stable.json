@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.270",
+  "version": "1.1.0-rc.271",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-27T01:29:27Z",
+  "released_at": "2026-10-27T01:59:42Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "f6b3ef86ff26ae66f192d5ca7b622a7644a19d52",
+  "source_sha": "c819d75ad2ab1d955489ca81ebeea19ca8baaa0d",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.270/twinpanel-1.1.0-rc.270-linux-x86_64.tar.gz",
-    "sha256": "3a223cbf02fd6b1dca75f7f2bfbbc9ab453a6ab6c40ae0645e52692e9c9f70ba",
-    "size_bytes": 28324128
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.271/twinpanel-1.1.0-rc.271-linux-x86_64.tar.gz",
+    "sha256": "7e176bf9c2d8144738707688cb976a3ee64892495496d281b2afbdd25403582f",
+    "size_bytes": 28334151
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.270 قابلیت Self-Repair واقعی TP27 Fast را تکمیل و پایدار می‌کند. هسته TP27 اکنون خرابی Carrier را با Probe دوطرفه تشخیص می‌دهد، پس از سه Failure متوالی با Cooldown سه‌دقیقه‌ای Repair را اجرا می‌کند، Repair دستی و خودکار را با قفل cross-process سریال می‌کند، در خرابی runtime مسیر GRE Native ابتدا FoU را امتحان می‌کند و پس از هر rebuild با Probe کامل L3 نتیجه را fail-closed تأیید می‌کند. حالت Manual/Auto و active/preferred transport تغییر نمی‌کنند و فقط Carrier داخلی TP27 تعمیر می‌شود. پنل نیز ابزارهای «تشخیص TP27»، «تعمیر TP27» و «بازسازی Carrier» دارد. PR #1075 یک Guard تکمیلی اضافه می‌کند تا metadata مربوط به tp27_self_repair_v265 شامل cooldown و آخرین نتیجه تعمیر در reinstall/reconcile عادی پاک نشود. هیچ تغییر مستقیمی در VXLAN، service routes، credentialها یا DB schema انجام نشده است. Candidate روی SHA immutable f6b3ef86ff26ae66f192d5ca7b622a7644a19d52 قفل است. Production acceptance تا نصب rc.270 روی Controller و مشاهده Recovery واقعی Tunnel #6 باز می‌ماند.",
-    "en": "TwinPanel 1.1.0-rc.270 completes and hardens TP27 Fast self-repair. TP27 now detects carrier failure with bidirectional probes, repairs only after three consecutive failures with a three-minute cooldown, serializes manual and automatic repair with a cross-process lock, prefers FoU after a native-GRE runtime failure, and fail-closed verifies each rebuild with a full L3 probe. Manual/Auto mode and active/preferred transport remain unchanged; only the internal TP27 carrier is repaired. The panel exposes TP27 Diagnose, TP27 Repair and Carrier Rebuild controls. PR #1075 adds a persistence guard so tp27_self_repair_v265 lifecycle metadata, including cooldown and last repair result, survives normal reinstall/reconcile. No direct changes are made to VXLAN, service routes, credentials or DB schema. The candidate is pinned to immutable source SHA f6b3ef86ff26ae66f192d5ca7b622a7644a19d52. Production acceptance remains pending installation on the Controller and observation of real Tunnel #6 recovery."
+    "fa": "TwinPanel 1.1.0-rc.271 ابزارهای تعمیر TP27 Fast را در صفحه اصلی Smart Transports در دسترس مستقیم قرار می‌دهد. قابلیت Self-Repair V265 نسخه rc.270 بدون تغییر باقی مانده و پنل اکنون یک Repair Dock واضح برای «تشخیص TP27»، «تعمیر TP27» و «بازسازی Carrier» دارد؛ همچنین Carrier فعال (GRE Native یا GRE/FoU)، پورت FoU، سلامت دوطرفه Iran→Exit و Exit→Iran و آخرین نتیجه تعمیر را نمایش می‌دهد. Repair فقط در صورت نیاز Carrier داخلی TP27 را ترمیم می‌کند و Rebuild با تأیید صریح Carrier را بازسازی می‌کند. Manual/Auto، active/preferred transport، VXLAN، service routes و پروتکل‌های VPN تغییر نمی‌کنند. این انتشار شامل PR #1078 است و Candidate روی SHA immutable c819d75ad2ab1d955489ca81ebeea19ca8baaa0d قفل شده است. سلامت فعلی Tunnel #6 روی rc.270 با GRE/FoU و UDP/2053 تأیید شده؛ مشاهده یک رخداد واقعی خرابی و Recovery خودکار همچنان معیار نهایی اثبات چرخه Self-Repair است و به‌صورت مصنوعی ایجاد نمی‌شود.",
+    "en": "TwinPanel 1.1.0-rc.271 makes TP27 Fast repair controls directly accessible from the primary Smart Transports page. The V265 self-repair engine from rc.270 remains unchanged, while the UI now provides a clear Repair Dock for TP27 Diagnose, bounded TP27 Repair and explicit Carrier Rebuild, plus visibility into the active carrier profile (native GRE or GRE/FoU), FoU port, bidirectional Iran-to-Exit and Exit-to-Iran health, and the last repair result. Repair mutates only the internal TP27 carrier when needed; Rebuild requires explicit confirmation and recreates only that carrier. Manual/Auto mode, active/preferred transport, VXLAN, service routes and VPN protocols are unchanged. This release includes PR #1078 and is pinned to immutable source SHA c819d75ad2ab1d955489ca81ebeea19ca8baaa0d. Tunnel #6 is currently healthy on rc.270 using GRE/FoU over UDP/2053; a naturally occurring failure-and-recovery event remains the final proof of autonomous self-repair and is not induced artificially."
   }
 }
