@@ -17,7 +17,12 @@ def main() -> None:
     assert 'routeKey==="admin/tunnel-transports"' in routed
     assert '<SmartTransportsRuntimeV27/>' in routed
 
-    assert "TWINPANEL_TUNNEL_PROTOCOL_MANAGEMENT_V298" in tunnel
+    # V299 is a density/scalability refine of the V298 protocol-management page,
+    # not a route-authority rewrite. Accept either marker for historical branches.
+    assert (
+        "TWINPANEL_TUNNEL_PROTOCOL_MANAGEMENT_V298" in tunnel
+        or "TWINPANEL_TUNNEL_PROTOCOL_MANAGEMENT_V299" in tunnel
+    )
     assert "legacyAdminApi.classicProtocols()" in tunnel
     assert "modernTransportApi.protocolInventory()" in tunnel
     assert "ensureClassicProtocol" in tunnel
@@ -29,7 +34,7 @@ def main() -> None:
     # Tunnel and Smart Transports must remain separate route authorities.
     assert "TunnelProtocolRuntimeV298" not in smart
 
-    print("tunnel protocol page separation v298: ok")
+    print("tunnel protocol page separation v298/v299: ok")
 
 
 if __name__ == "__main__":
