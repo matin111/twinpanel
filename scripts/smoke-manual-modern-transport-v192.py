@@ -13,7 +13,20 @@ checks = {
     "registry_gate": "if name not in ACTIVE_SPECS:" in router,
     "same_tunnel_row_gate": "TunnelTransport.tunnel_id == tunnel_id" in router and "TunnelTransport.transport == name" in router,
     "enabled_gate": "if not bool(row.enabled):" in router,
-    "qualified_gate": 'if not bool(view.get("selectable")):' in router,
+    # V289: the 60s gate remains an Auto promotion contract, while explicit
+    # manual cutover uses a separate online/no-policy-block eligibility signal.
+    "auto_qualification_gate": (
+        '"selectable": qualified' in router
+        and "stable_seconds >= float(CANDIDATE_STABLE_SECONDS)" in router
+    ),
+    "manual_eligibility_gate": (
+        'if not bool(view.get("manual_selectable")):' in router
+        and 'not bool(fresh_view.get("manual_selectable"))' in router
+        and '"manual_selection_requires_fresh_probe": True' in router
+    ),
+    "manual_fresh_probe_gate": "await _fresh_manual_candidate_health_v257(" in router,
+    "manual_agent_acceptance_gate": "await _wait_manual_cutover_acceptance_v257(" in router,
+    "manual_rollback_gate": "_rollback_manual_cutover_v257(" in router,
     "manual_authority": all(token in router for token in (
         'tunnel.mode = "manual"',
         "tunnel.active_transport = name",
@@ -24,6 +37,11 @@ checks = {
     "registry_tp27_tcp_direct": '"tp27_tcp_direct": TP27_TCP_DIRECT_SPEC' in registry,
     "ui_manual_uses_modern_endpoint": 'mode==="manual"&&transport' in ui_api and '/select-manual`' in ui_api,
     "ui_auto_keeps_legacy_endpoint": '/transport-mode`' in ui_api and 'JSON.stringify({mode})' in ui_api,
+    "ui_manual_contract_fields": all(token in ui_api for token in (
+        "manual_selectable?:boolean;",
+        "manual_block_reason?:string|null;",
+        "manual_selection_requires_fresh_probe?:boolean;",
+    )),
     "ui_type_tp27_fast": '|"tp27_fast"' in ui_api,
     "ui_type_tp27_masque": '|"tp27_masque"' in ui_api,
     "ui_type_tp27_tcp_direct": '|"tp27_tcp_direct"' in ui_api,

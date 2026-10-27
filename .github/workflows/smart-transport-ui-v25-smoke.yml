@@ -61,14 +61,30 @@ jobs:
               assert field in page
           assert '/modern-transports' in api
 
-          # V287: every selected logical tunnel must expose the same manual
-          # transport control surface. Qualification controls whether the action
-          # is enabled; it must never make the button disappear from the UI.
+          # V287/V289: every selected logical tunnel exposes one identical manual
+          # control surface. Manual readiness is intentionally separate from the
+          # 60-second SmartAuto qualification gate. The action is always rendered,
+          # uses manual_selectable for readiness, and tells the operator that a
+          # fresh dataplane probe + peer-Agent acceptance protects the cutover.
           assert 'TWINPANEL_UNIFIED_MANUAL_TRANSPORT_CONTROL_V287' in page
+          assert 'TWINPANEL_MANUAL_CUTOVER_ELIGIBILITY_UI_V289' in page
           assert '{row.selectable&&<button' not in page
-          assert 'disabled={Boolean(busy)||isActive||!row.selectable}' in page
-          assert 'انتخاب دستی — هنوز آماده نیست' in page
-          assert 'Manual selection — not ready' in page
+          assert 'const manualSelectable=Boolean(row.manual_selectable);' in page
+          assert 'disabled={Boolean(busy)||isActive||!manualSelectable}' in page
+          assert '!row.selectable' not in page
+          assert 'آماده انتخاب دستی' in page
+          assert 'Manual ready' in page
+          assert 'تأیید Auto' in page
+          assert 'Auto qualified' in page
+          assert 'شرط ۶۰ ثانیه فقط برای Smart Auto است' in page
+          assert 'fresh full health probe and both-Agent acceptance' in page
+
+          for field in (
+              'manual_selectable?:boolean;',
+              'manual_block_reason?:string|null;',
+              'manual_selection_requires_fresh_probe?:boolean;',
+          ):
+              assert field in api
 
           assert 'PRIMARY_MANIFEST_URL' in resolver
           assert 'LEGACY_MANIFEST_URL' in resolver

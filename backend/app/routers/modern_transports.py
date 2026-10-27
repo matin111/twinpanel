@@ -136,6 +136,29 @@ def _candidate_view(
         and _status(row.status) == "online"
     )
 
+    # TWINPANEL_MANUAL_CUTOVER_ELIGIBILITY_V289
+    # Auto promotion and explicit manual authority are different safety lanes.
+    # Auto still requires the 60s stability gate. Manual selection is allowed to
+    # enter the existing V257 fresh-probe + post-switch Agent acceptance lane as
+    # soon as the installed candidate is enabled, online and not policy-blocked.
+    manual_selectable = bool(
+        online
+        and not block
+    )
+
+    manual_block_reason = None
+    if not manual_selectable:
+        if row is None:
+            manual_block_reason = "transport_not_installed"
+        elif not bool(row.enabled):
+            manual_block_reason = "transport_disabled"
+        elif _status(row.status) != "online":
+            manual_block_reason = f"transport_not_online:{_status(row.status)}"
+        elif block:
+            manual_block_reason = str(block)
+        else:
+            manual_block_reason = "manual_preflight_unavailable"
+
     qualified = bool(
         online
         and not block
@@ -176,7 +199,12 @@ def _candidate_view(
         "canary": True,
         "auto_managed": True,
         "qualified": qualified,
+        # Backward-compatible field: selectable remains the Auto qualification
+        # signal used by existing clients. Manual UI uses manual_selectable.
         "selectable": qualified,
+        "manual_selectable": manual_selectable,
+        "manual_block_reason": manual_block_reason,
+        "manual_selection_requires_fresh_probe": True,
         "stable_seconds": round(stable_seconds, 1),
         "required_stable_seconds": int(CANDIDATE_STABLE_SECONDS),
         "auto_block_reason": block,
@@ -722,6 +750,7 @@ async def check_spoof_wg_compatibility(
 
 # TWINPANEL_MANUAL_MODERN_TRANSPORT_V192
 # TWINPANEL_MANUAL_CUTOVER_ACCEPTANCE_V257
+# TWINPANEL_MANUAL_CUTOVER_ELIGIBILITY_V289
 @router.post("/{tunnel_id}/modern-transports/{transport}/select-manual")
 async def select_modern_transport_manual(
     tunnel_id: int,
@@ -753,21 +782,24 @@ async def select_modern_transport_manual(
     if not bool(row.enabled):
         raise HTTPException(status_code=400, detail="Transport disabled")
 
-    # Fast UI qualification remains useful, but it is never sufficient for a
-    # production cutover. V257 always performs a brand-new full candidate probe
-    # immediately before changing aggregate authority.
+    # Auto qualification remains useful for SmartAuto promotion, but it cannot
+    # gate manual authority because manual-mode tunnels are intentionally absent
+    # from SmartAuto's background stability loop. Manual V289 starts from the
+    # lighter online/no-policy-block preflight and then relies on the existing
+    # V257 fresh full dataplane probe + post-switch Agent acceptance + rollback.
     view = _candidate_view(
         name=name,
         row=row,
         tunnel_id=tunnel_id,
     )
-    if not bool(view.get("selectable")):
+    if not bool(view.get("manual_selectable")):
         raise HTTPException(
             status_code=409,
             detail={
-                "message": "Transport is not qualified for manual production selection",
+                "message": "Transport is not eligible for manual production preflight",
                 "transport": name,
                 "status": view.get("status"),
+                "manual_block_reason": view.get("manual_block_reason"),
                 "stable_seconds": view.get("stable_seconds"),
                 "required_stable_seconds": view.get("required_stable_seconds"),
                 "auto_block_reason": view.get("auto_block_reason"),
@@ -810,7 +842,7 @@ async def select_modern_transport_manual(
     )
     if (
         not bool(fresh_health.get("ok"))
-        or not bool(fresh_view.get("selectable"))
+        or not bool(fresh_view.get("manual_selectable"))
     ):
         raise HTTPException(
             status_code=409,
@@ -820,6 +852,7 @@ async def select_modern_transport_manual(
                 "authority_unchanged": True,
                 "fresh_health": fresh_health,
                 "status": fresh_view.get("status"),
+                "manual_block_reason": fresh_view.get("manual_block_reason"),
                 "stable_seconds": fresh_view.get("stable_seconds"),
                 "required_stable_seconds": fresh_view.get("required_stable_seconds"),
                 "auto_block_reason": fresh_view.get("auto_block_reason"),
@@ -890,6 +923,8 @@ async def select_modern_transport_manual(
         "transport": name,
         "fresh_probe": True,
         "dataplane_reconciled": True,
+        "manual_stability_gate_bypassed": True,
+        "manual_acceptance": "fresh_probe_plus_agent_confirmation",
         "fresh_health": fresh_health,
         "peer_acceptance": peer_acceptance,
     }
