@@ -6,6 +6,9 @@ from .public_connection_mobile_protocols_v17 import (
 from .public_connection_mobile_server_inventory_v18 import (
     refine_public_connection_mobile_server_inventory_v18,
 )
+from .public_connection_mobile_live_v19 import (
+    refine_public_connection_mobile_live_v19,
+)
 
 
 _V11_CSS = r"""
@@ -132,4 +135,5 @@ def refine_public_connection_device_actions_v11(source: str) -> str:
         source = source.replace("</style>", _V11_CSS + "\n</style>", 1)
         source = source.replace("</body>", _V11_SCRIPT + "\n</body>", 1)
     source = refine_public_connection_mobile_protocols_v17(source)
-    return refine_public_connection_mobile_server_inventory_v18(source)
+    source = refine_public_connection_mobile_server_inventory_v18(source)
+    return refine_public_connection_mobile_live_v19(source)
