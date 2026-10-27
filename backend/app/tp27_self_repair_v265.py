@@ -34,13 +34,17 @@ from .transport_candidates.common import (
 # systemd being active is not sufficient proof that the L3 peer is reachable.
 #
 # V265 owns *carrier* repair only:
+#   * discover every active tunnel with enabled TP27, regardless of Node IDs;
 #   * observe the real TP27 /30 in both directions;
 #   * require consecutive failures before autonomous mutation;
+#   * publish degraded health truth immediately while repair stays debounced;
 #   * serialize API/manual and background repair across processes;
 #   * preserve manual-vs-auto transport policy;
 #   * never switch the logical transport to another candidate;
 #   * when native GRE becomes unstable after installation, prefer FoU during
 #     repair instead of repeatedly selecting the briefly-working native path;
+#   * when an active FoU port becomes unstable, rotate to a different FoU port
+#     before retrying the failed port;
 #   * verify every rebuilt profile with the full TP27 dataplane probe;
 #   * persist repair telemetry inside TunnelTransport.config_text.
 # ============================================================
@@ -232,12 +236,14 @@ async def diagnose_tp27(tunnel_id: int, db: Session) -> dict:
 
 
 def _attempt_order(cfg: dict[str, Any]) -> list[tuple[str, int | None]]:
-    """Prefer a different carrier family after a runtime failure.
+    """Prefer a different carrier after a runtime failure.
 
     Initial install remains native-first in tp27_fast.install(). Repair is
     intentionally different: if native GRE passed installation but later
     became unreachable, try FoU first so a transient protocol-47 success does
-    not create an endless native-GRE failure loop.
+    not create an endless native-GRE failure loop. If a FoU port itself later
+    becomes unhealthy, rotate to the other managed FoU ports before retrying
+    that same port.
     """
 
     current = str(cfg.get("selected_profile") or "").strip().lower()
@@ -249,7 +255,7 @@ def _attempt_order(cfg: dict[str, Any]) -> list[tuple[str, int | None]]:
 
     ports = [int(value) for value in tp27_fast.FOU_PORT_CANDIDATES]
     if current == "gre-fou" and current_port in ports:
-        ports = [current_port] + [value for value in ports if value != current_port]
+        ports = [value for value in ports if value != current_port] + [current_port]
 
     fou = [("gre-fou", value) for value in ports]
     if current == "gre-native":
@@ -581,6 +587,34 @@ def _cooldown_remaining(row: TunnelTransport | None) -> int:
     return max(0, int(REPAIR_COOLDOWN_SECONDS - elapsed))
 
 
+def _diagnosis_error(diagnosis: dict[str, Any]) -> str:
+    explicit = str(diagnosis.get("error") or "").strip()
+    if explicit:
+        return f"tp27_diagnose_error:{explicit}"[:1800]
+
+    carrier = diagnosis.get("carrier")
+    if not isinstance(carrier, dict):
+        return "tp27_carrier_unhealthy"
+
+    problems: list[str] = []
+    for role in ("iran", "exit"):
+        side = carrier.get(role)
+        if not isinstance(side, dict):
+            problems.append(f"{role}.snapshot_missing")
+            continue
+        for key in (
+            "service_active",
+            "interface_present",
+            "address_present",
+            "peer_reachable",
+        ):
+            if not bool(side.get(key)):
+                problems.append(f"{role}.{key}=false")
+
+    suffix = ",".join(problems) if problems else "bidirectional_probe_failed"
+    return f"tp27_carrier_unhealthy:{suffix}"[:1800]
+
+
 async def reconcile_once() -> dict:
     checked: list[int] = []
     repaired: list[int] = []
@@ -596,21 +630,14 @@ async def reconcile_once() -> dict:
                 _failure_cycles.pop(int(tunnel_id), None)
                 continue
 
-            # Do not rebuild a healthy standby TP27 lane merely because some
-            # other logical transport is currently selected. We still observe
-            # it so a preferred/manual TP27 carrier can recover automatically.
+            # Candidate discovery is tunnel-centric: every active Tunnel with
+            # enabled TP27 is observed, including warm standby lanes in Auto.
+            # Repair owns only the TP27 carrier and preserves active/preferred
+            # transport authority, so keeping a standby carrier healthy cannot
+            # switch the logical tunnel candidate.
             selected = str(tunnel.active_transport or "").strip().lower()
             preferred = str(tunnel.preferred_transport or "").strip().lower()
             mode = str(tunnel.mode or "manual").strip().lower()
-            relevant = bool(
-                selected == "tp27_fast"
-                or preferred == "tp27_fast"
-                or _status(row.status) in {"offline", "failed", "degraded"}
-                or mode == "manual"
-            )
-            if not relevant:
-                _failure_cycles.pop(int(tunnel_id), None)
-                continue
 
             try:
                 diagnosis = await diagnose_tp27(int(tunnel_id), db)
@@ -622,7 +649,7 @@ async def reconcile_once() -> dict:
 
             if bool(diagnosis.get("healthy")):
                 _failure_cycles[int(tunnel_id)] = 0
-                if _status(row.status) != "online":
+                if _status(row.status) != "online" or row.last_error:
                     row.status = "online"
                     row.last_error = None
                     row.last_healthy_at = datetime.utcnow()
@@ -632,6 +659,18 @@ async def reconcile_once() -> dict:
 
             count = _failure_cycles.get(int(tunnel_id), 0) + 1
             _failure_cycles[int(tunnel_id)] = count
+            health_error = _diagnosis_error(diagnosis)
+
+            # Health truth is immediate even though mutation is debounced.
+            # A single failed carrier probe must never leave the row falsely
+            # ONLINE; mark it DEGRADED, then require the normal threshold before
+            # any rebuild is attempted.
+            if _status(row.status) != "degraded" or row.last_error != health_error:
+                row.status = "degraded"
+                row.last_error = health_error
+                row.updated_at = datetime.utcnow()
+                db.commit()
+
             print(
                 f"{MARKER}_UNREACHABLE tunnel={int(tunnel_id)} "
                 f"count={count}/{FAILURE_THRESHOLD} "
