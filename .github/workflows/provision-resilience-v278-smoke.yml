@@ -1,0 +1,30 @@
+name: Provision Resilience V278 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/provision_resilience_v278.py"
+      - "backend/app/self_hosted_runtime.py"
+      - "backend/app/routers/provision.py"
+      - "backend/tests/provision_resilience_v278_smoke.py"
+      - ".github/workflows/provision-resilience-v278-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  provision-resilience-v278:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Python syntax
+        run: |
+          python -m py_compile \
+            backend/app/provision_resilience_v278.py \
+            backend/app/self_hosted_runtime.py \
+            backend/tests/provision_resilience_v278_smoke.py
+
+      - name: Validate resumable Iran provisioning contract
+        run: python backend/tests/provision_resilience_v278_smoke.py
