@@ -48,13 +48,15 @@ def main() -> None:
     ):
         assert flag in source
 
-    # Existing healthy Agent environments must not touch PyPI at all.
+    # Existing healthy Agent environments must not touch PyPI at all. The V278
+    # fallback may use pip only when dependencies are actually missing, but it
+    # must never perform the production-failing pip self-upgrade first.
     assert "existing_venv" in source
     assert "python3-httpx python3-psutil" in source
     assert "--system-site-packages" in source
     assert "--disable-pip-version-check install --retries 2 --timeout 15" in source
-    assert "pip install --upgrade pip" not in source
-    assert "pip install --upgrade pip" in legacy
+    assert "pip install --upgrade pip >/dev/null" not in source
+    assert "pip install --upgrade pip >/dev/null" in legacy
 
     # Exit authority is preserved by delegation to the V70-captured base paths.
     assert "if payload.node_type != NodeType.IRAN:" in source
