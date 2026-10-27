@@ -6,7 +6,9 @@ import shlex
 
 from sqlalchemy.orm import Session
 
+from ..models import TunnelTransport
 from .common import (
+    _meta_dict,
     close_pair,
     connect_pair,
     diag,
@@ -43,6 +45,34 @@ def _gre_key(tunnel_id: int, iran_public: str, exit_public: str) -> int:
     ).digest()
     value = int.from_bytes(raw[:4], "big")
     return value or 1
+
+
+def _existing_repair_state(db: Session, tunnel_id: int) -> dict | None:
+    """Carry durable TP27 repair telemetry across normal reinstall/reconcile."""
+
+    row = (
+        db.query(TunnelTransport)
+        .filter(
+            TunnelTransport.tunnel_id == int(tunnel_id),
+            TunnelTransport.transport == NAME,
+        )
+        .first()
+    )
+    if row is None:
+        return None
+
+    meta = _meta_dict(row.config_text) or {}
+    state = meta.get("tp27_self_repair_v265")
+    if not isinstance(state, dict) or not state:
+        return None
+    return dict(state)
+
+
+def _with_repair_state(meta: dict, repair_state: dict | None) -> dict:
+    out = dict(meta)
+    if repair_state:
+        out["tp27_self_repair_v265"] = dict(repair_state)
+    return out
 
 
 async def _reset_pair(ci, ce, rt: dict) -> None:
@@ -243,6 +273,7 @@ async def install(tunnel_id: int, db: Session) -> dict:
         str(iran.public_ip),
         str(exit_node.public_ip),
     )
+    repair_state = _existing_repair_state(db, tunnel_id)
 
     mark(
         db,
@@ -250,13 +281,16 @@ async def install(tunnel_id: int, db: Session) -> dict:
         NAME,
         status="installing",
         meta=str(
-            {
-                **rt,
-                "source": "matin111/tp27-core",
-                "profile_order": ["gre-native", "gre-fou"],
-                "mtu": MTU,
-                "gre_key": gre_key,
-            }
+            _with_repair_state(
+                {
+                    **rt,
+                    "source": "matin111/tp27-core",
+                    "profile_order": ["gre-native", "gre-fou"],
+                    "mtu": MTU,
+                    "gre_key": gre_key,
+                },
+                repair_state,
+            )
         ),
     )
 
@@ -288,15 +322,18 @@ async def install(tunnel_id: int, db: Session) -> dict:
             )
             attempts.append({"profile": "gre-native", "result": "online"})
 
-            meta = {
-                **rt,
-                **health,
-                "source": "matin111/tp27-core",
-                "selected_profile": "gre-native",
-                "gre_key": gre_key,
-                "mtu": MTU,
-                "attempts": attempts,
-            }
+            meta = _with_repair_state(
+                {
+                    **rt,
+                    **health,
+                    "source": "matin111/tp27-core",
+                    "selected_profile": "gre-native",
+                    "gre_key": gre_key,
+                    "mtu": MTU,
+                    "attempts": attempts,
+                },
+                repair_state,
+            )
             mark(
                 db,
                 tunnel_id,
@@ -350,16 +387,19 @@ async def install(tunnel_id: int, db: Session) -> dict:
                         "result": "online",
                     }
                 )
-                meta = {
-                    **rt,
-                    **health,
-                    "source": "matin111/tp27-core",
-                    "selected_profile": "gre-fou",
-                    "fou_port": fou_port,
-                    "gre_key": gre_key,
-                    "mtu": MTU,
-                    "attempts": attempts,
-                }
+                meta = _with_repair_state(
+                    {
+                        **rt,
+                        **health,
+                        "source": "matin111/tp27-core",
+                        "selected_profile": "gre-fou",
+                        "fou_port": fou_port,
+                        "gre_key": gre_key,
+                        "mtu": MTU,
+                        "attempts": attempts,
+                    },
+                    repair_state,
+                )
                 mark(
                     db,
                     tunnel_id,
