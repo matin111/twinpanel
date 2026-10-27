@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.271",
+  "version": "1.1.0-rc.272",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-27T01:59:42Z",
+  "released_at": "2026-10-27T02:19:31Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "c819d75ad2ab1d955489ca81ebeea19ca8baaa0d",
+  "source_sha": "a1428f215e4980b589b99c74b264a2a83db58e4f",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.271/twinpanel-1.1.0-rc.271-linux-x86_64.tar.gz",
-    "sha256": "7e176bf9c2d8144738707688cb976a3ee64892495496d281b2afbdd25403582f",
-    "size_bytes": 28334151
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.272/twinpanel-1.1.0-rc.272-linux-x86_64.tar.gz",
+    "sha256": "176b145d8f975045b3967235bcaac718af3d97d483248fc5606ad64648d42488",
+    "size_bytes": 28330133
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.271 ابزارهای تعمیر TP27 Fast را در صفحه اصلی Smart Transports در دسترس مستقیم قرار می‌دهد. قابلیت Self-Repair V265 نسخه rc.270 بدون تغییر باقی مانده و پنل اکنون یک Repair Dock واضح برای «تشخیص TP27»، «تعمیر TP27» و «بازسازی Carrier» دارد؛ همچنین Carrier فعال (GRE Native یا GRE/FoU)، پورت FoU، سلامت دوطرفه Iran→Exit و Exit→Iran و آخرین نتیجه تعمیر را نمایش می‌دهد. Repair فقط در صورت نیاز Carrier داخلی TP27 را ترمیم می‌کند و Rebuild با تأیید صریح Carrier را بازسازی می‌کند. Manual/Auto، active/preferred transport، VXLAN، service routes و پروتکل‌های VPN تغییر نمی‌کنند. این انتشار شامل PR #1078 است و Candidate روی SHA immutable c819d75ad2ab1d955489ca81ebeea19ca8baaa0d قفل شده است. سلامت فعلی Tunnel #6 روی rc.270 با GRE/FoU و UDP/2053 تأیید شده؛ مشاهده یک رخداد واقعی خرابی و Recovery خودکار همچنان معیار نهایی اثبات چرخه Self-Repair است و به‌صورت مصنوعی ایجاد نمی‌شود.",
-    "en": "TwinPanel 1.1.0-rc.271 makes TP27 Fast repair controls directly accessible from the primary Smart Transports page. The V265 self-repair engine from rc.270 remains unchanged, while the UI now provides a clear Repair Dock for TP27 Diagnose, bounded TP27 Repair and explicit Carrier Rebuild, plus visibility into the active carrier profile (native GRE or GRE/FoU), FoU port, bidirectional Iran-to-Exit and Exit-to-Iran health, and the last repair result. Repair mutates only the internal TP27 carrier when needed; Rebuild requires explicit confirmation and recreates only that carrier. Manual/Auto mode, active/preferred transport, VXLAN, service routes and VPN protocols are unchanged. This release includes PR #1078 and is pinned to immutable source SHA c819d75ad2ab1d955489ca81ebeea19ca8baaa0d. Tunnel #6 is currently healthy on rc.270 using GRE/FoU over UDP/2053; a naturally occurring failure-and-recovery event remains the final proof of autonomous self-repair and is not induced artificially."
+    "fa": "TwinPanel 1.1.0-rc.272 چیدمان ابزارهای تعمیر Transport را اصلاح می‌کند. Repair Dock شناور TP27 از بیرون کارت‌ها حذف شده و عملیات تعمیر داخل خود کارت هر Transport قرار گرفته است. همه Transportهای نصب‌شده اکنون دکمه «تعمیر و تست» داخل کارت خود دارند و از مسیر نصب/Qualification همان Candidate استفاده می‌کنند. TP27 Fast علاوه بر «تعمیر و تست»، داخل همان کارت خودش «تشخیص TP27» و «بازسازی Carrier» تخصصی را نگه می‌دارد. این تغییر فقط UI و dispatch موجود را مرتب می‌کند و Manual/Auto، active/preferred transport، routing، firewall، agent، دیتابیس، پروتکل‌های VPN و منطق Self-Repair TP27 را تغییر نمی‌دهد. این انتشار شامل PR #1081 است و Candidate روی SHA immutable a1428f215e4980b589b99c74b264a2a83db58e4f قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.272 fixes transport-repair control placement. The floating TP27 Repair Dock is removed from outside the transport cards, and repair actions now live inside each transport's own card. Every installed transport exposes an in-card Repair & test action using that candidate's existing install/qualification path. TP27 Fast additionally keeps its specialized Diagnose TP27 and Rebuild Carrier controls inside the TP27 card itself. This is a UI and existing-action dispatch refinement only; Manual/Auto mode, active/preferred transport, routing, firewall, agents, database schema, VPN protocols and the TP27 self-repair engine are unchanged. This release includes PR #1081 and is pinned to immutable source SHA a1428f215e4980b589b99c74b264a2a83db58e4f."
   }
 }
