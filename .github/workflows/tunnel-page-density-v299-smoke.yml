@@ -1,0 +1,29 @@
+name: Tunnel Page Density V299 Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'components/tunnel-protocol-runtime-v298.tsx'
+      - 'components/routed-page-client-v2.tsx'
+      - 'scripts/test_tunnel_page_density_v299.py'
+      - '.github/workflows/tunnel-page-density-v299-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'components/tunnel-protocol-runtime-v298.tsx'
+      - 'components/routed-page-client-v2.tsx'
+      - 'scripts/test_tunnel_page_density_v299.py'
+      - '.github/workflows/tunnel-page-density-v299-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify scalable tunnel page density contract
+        run: python scripts/test_tunnel_page_density_v299.py
