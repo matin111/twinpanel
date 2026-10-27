@@ -9,6 +9,7 @@ V13 = ROOT / "backend/app/routers/public_connection_modern_delivery_v13.py"
 V20 = ROOT / "backend/app/routers/public_connection_protocol_actions_v20.py"
 V21 = ROOT / "backend/app/routers/public_connection_protocol_uri_details_v21.py"
 V23 = ROOT / "backend/app/routers/public_connection_device_data_authority_v23.py"
+V24 = ROOT / "backend/app/routers/public_connection_canonical_presentation_v24.py"
 
 
 def require(condition: bool, message: str) -> None:
@@ -16,9 +17,9 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-def load_v23():
+def load_legacy_v23():
     spec = importlib.util.spec_from_file_location("public_connection_device_data_authority_v23", V23)
-    require(spec is not None and spec.loader is not None, "V23 import spec missing")
+    require(spec is not None and spec.loader is not None, "legacy V23 import spec missing")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -30,52 +31,38 @@ def main() -> None:
     v20 = V20.read_text(encoding="utf-8")
     v21 = V21.read_text(encoding="utf-8")
     v23 = V23.read_text(encoding="utf-8")
-    authority = load_v23()
+    v24 = V24.read_text(encoding="utf-8")
+    legacy_authority = load_legacy_v23()
 
-    require("public_connection_protocol_actions_v20" in v11, "V20 import missing")
-    require("refine_public_connection_protocol_actions_v20(source)" in v11, "V20 chain missing")
-    require("public_connection_protocol_uri_details_v21" in v11, "V21 import missing")
-    require("refine_public_connection_protocol_uri_details_v21(source)" in v11, "V21 chain missing")
-    require("public_connection_device_data_authority_v23" in v11, "V23 import missing")
-    require("refine_public_connection_device_data_authority_v23(source)" in v11, "V23 chain missing")
-    require("public_connection_protocol_action_authority_v22" not in v11, "legacy V22 authority must not stay in execution chain")
+    # V24 is the sole active device presentation adapter.
+    require("public_connection_canonical_presentation_v24" in v11, "V24 import missing")
+    require("refine_public_connection_canonical_presentation_v24(source)" in v11, "V24 chain missing")
+    for retired in (
+        "public_connection_mobile_protocols_v17",
+        "refine_public_connection_mobile_protocols_v17",
+        "public_connection_mobile_server_inventory_v18",
+        "refine_public_connection_mobile_server_inventory_v18",
+        "public_connection_protocol_actions_v20",
+        "refine_public_connection_protocol_actions_v20",
+        "public_connection_protocol_uri_details_v21",
+        "refine_public_connection_protocol_uri_details_v21",
+        "public_connection_protocol_action_authority_v22",
+        "refine_public_connection_protocol_action_authority_v22",
+        "public_connection_device_data_authority_v23",
+        "refine_public_connection_device_data_authority_v23",
+    ):
+        require(retired not in v11, f"retired device-specific data mutation re-entered V11: {retired}")
 
-    # Never expose fake public server rows or internal pending provisioning cards.
-    require("document.querySelectorAll('.v18-not-ready').forEach(row=>row.remove())" in v20, "fake server cleanup missing")
-    require("protocol-choice.v13-pending" in v20 and "tp-v20-hidden-pending" in v20, "pending protocol cleanup missing")
-    require("realRows.length+' سرور'" in v20, "real server count missing")
+    # Legacy modules remain testable for rollback/history, but they are not active.
+    require("document.querySelectorAll('.v18-not-ready').forEach(row=>row.remove())" in v20, "legacy fake-server cleanup missing")
+    require("key==='cisco'||key==='l2tp'" in v20, "legacy Cisco/L2TP manual policy missing")
+    require("stripInvalidClassicDownloads" in v20, "legacy invalid classic config cleanup missing")
+    require("new URL(String(raw||''))" in v21, "legacy URI parser missing")
+    require("TWINPANEL_PUBLIC_CONNECT_DEVICE_DATA_AUTHORITY_V23" in v23, "legacy V23 marker missing")
 
-    # Manual protocols stay manual; no invented downloadable files.
-    require("key==='cisco'||key==='l2tp'" in v20, "Cisco/L2TP manual policy missing")
-    require("کپی اطلاعات" in v20, "manual connection copy missing")
-    require("stripInvalidClassicDownloads" in v20, "invalid classic config cleanup missing")
-
-    # V23 is the final device-data authority and must remain device-neutral.
-    require("TWINPANEL_PUBLIC_CONNECT_DEVICE_DATA_AUTHORITY_V23" in v23, "V23 marker missing")
-    require("MutationObserver" in v23 and "reconnectObserver" in v23, "V23 rebuild observer missing")
-    require("actions.replaceChildren()" in v23, "V23 action dedupe missing")
-    require("row.appendChild(detail)" in v23, "V23 detail DOM attachment missing")
-    require("key==='cisco'||key==='l2tp'" in v23, "V23 manual protocol authority missing")
-    require("v23-manual-invalid" in v23, "invalid manual server suppression missing")
-    require("کپی اطلاعات" in v23 and "جزئیات" in v23, "manual actions missing")
-    require("کپی کانفیگ" in v23, "config protocols copy action missing")
-    require("دانلود کانفیگ" in v23, "file protocol download action missing")
-    require("tpPlatform" not in v23 and "navigator.userAgent" not in v23, "connection-data authority must not branch by device")
-
-    # Server rows bind to the canonical source view by stable source id/name, not array index.
-    require("data-source-view-id" in v23, "stable source-view binding missing")
-    require(".server-tab[data-server]" in v23, "canonical server-tab source mapping missing")
-    require("rowName(row)" in v23, "server identity mapping missing")
-    require("views[index]" not in v23, "positional source-view mapping reintroduced")
-
-    # Exact field roles are mutually exclusive. Never infer Server and Port from the same label.
-    require('"server & port": "endpoint"' in v23, "composite Cisco endpoint role missing")
-    require("t.includes('port')" not in v23 and 't.includes("port")' not in v23, "fuzzy port matching reintroduced")
-    require(authority.canonical_role("Server & Port") == "endpoint", "Server & Port must be one endpoint fact")
-    require(authority.canonical_role("Server") == "server", "Server role broken")
-    require(authority.canonical_role("Port") == "port", "Port role broken")
-
-    cisco = authority.canonical_manual_projection(
+    # Preserve the useful pure semantic regression helper from legacy V23.
+    require(legacy_authority.canonical_role("Server & Port") == "endpoint", "Server & Port semantic role broken")
+    projection = legacy_authority.canonical_manual_projection(
         [
             ("Server & Port", "193.39.9.222:20005"),
             ("Username", "example-user"),
@@ -83,99 +70,50 @@ def main() -> None:
         ],
         "cisco",
     )
-    require(cisco["valid"] is True, "Cisco canonical facts should be valid")
-    require(cisco["endpoint"] == "193.39.9.222:20005", "Cisco endpoint was rewritten or duplicated")
-    cisco_rows = cisco["rows"]
-    require(isinstance(cisco_rows, list), "Cisco rows missing")
-    require(sum(1 for row in cisco_rows if row["label"] == "Server & Port") == 1, "Cisco endpoint fact duplicated")
-    require(all(row["value"] != "193.39.9.222:20005:193.39.9.222:20005" for row in cisco_rows), "duplicated Cisco endpoint regression")
+    require(projection["valid"] is True, "legacy canonical manual projection broken")
+    require(projection["endpoint"] == "193.39.9.222:20005", "legacy endpoint projection duplicated or rewritten")
 
-    separate = authority.canonical_manual_projection(
-        [
-            ("Server", "vpn.example.test"),
-            ("Port", "443"),
-            ("Username", "example-user"),
-            ("Password", "example-pass"),
-        ],
-        "cisco",
-    )
-    require(separate["endpoint"] == "vpn.example.test:443", "separate Server + Port projection broken")
+    # Active V24 reuses the canonical HTML/DOM and does not reconstruct data/actions.
+    require(".protocol-panel" in v24 and ".server-view" in v24, "V24 canonical DOM authority missing")
+    require(".server-tab" in v24, "V24 canonical server labels missing")
+    for forbidden in (
+        "fetch(",
+        "JSON.parse",
+        "mobile-server-inventory-v18",
+        "appendMissingModernServers",
+        "actions.replaceChildren",
+        "createElement('button')",
+        'createElement("button")',
+        "createElement('a')",
+        'createElement("a")',
+    ):
+        require(forbidden not in v24, f"V24 reconstructed device-specific data/action path: {forbidden}")
 
-    already_joined = authority.canonical_manual_projection(
-        [
-            ("Server", "vpn.example.test:443"),
-            ("Port", "443"),
-            ("Username", "example-user"),
-            ("Password", "example-pass"),
-        ],
-        "cisco",
-    )
-    require(already_joined["endpoint"] == "vpn.example.test:443", "endpoint port was appended twice")
-
-    l2tp = authority.canonical_manual_projection(
-        [
-            ("Server", "203.0.113.10"),
-            ("Username", "example-user"),
-            ("Password", "example-pass"),
-            ("PSK", "example-psk"),
-        ],
-        "l2tp",
-    )
-    require(l2tp["valid"] is True and l2tp["endpoint"] == "203.0.113.10", "L2TP projection broken")
-    require(sum(1 for row in l2tp["rows"] if row["role"] == "secret") == 1, "L2TP PSK missing or duplicated")
-
-    # Device detection may only select UI/apps. Connection facts live in V23 and are platform-independent.
+    # Device detection selects apps/UI only. Canonical connection facts do not branch by platform.
     for platform in ("windows", "macos", "android", "ios", "linux"):
-        require(f"{platform}:" in v11 or f"'{platform}'" in v11, f"device detection missing: {platform}")
-    require("sourceAppLinks" in v11 and "platform-group[data-platform=" in v11, "platform app filtering missing")
+        require(f"'{platform}'" in v11 or f"{platform}:" in v11, f"device detection missing: {platform}")
+    require("sourceAppLinks" in v11 and "platform-group[data-platform=" in v11, "global platform app filtering missing")
+    require("data-v13-platform" in v24 and "data-tp-platform" in v24, "protocol app presentation filter missing")
     require('"cisco": {' in v13, "Cisco app recommendations missing")
     require('"android": ("OpenConnect"' in v13, "Cisco Android app recommendation missing")
     require('"ios": ("Cisco Secure Client"' in v13, "Cisco iOS app recommendation missing")
     require('"openvpn": {p: ("OpenVPN Connect"' in v13, "OpenVPN client recommendation missing")
     require('"wireguard": {p: ("WireGuard"' in v13, "WireGuard client recommendation missing")
 
-    # File/link based protocol families keep their canonical delivery actions.
-    require("['openvpn','wireguard','amneziawg']" in v20, "file-based protocol policy missing")
-    require("key==='xray'" in v20, "Xray URI policy missing")
-    for protocol in (
-        "hysteria2", "tuic", "anytls", "naive", "shadowtls",
-        "snell", "mieru", "trusttunnel", "sudoku",
-    ):
-        require(protocol in v20, f"modern protocol policy missing: {protocol}")
-        require(protocol in v23, f"V23 modern protocol policy missing: {protocol}")
+    # Canonical live state is mirrored visually without a second poller/API.
+    require("classList.contains('live-online')" in v24, "canonical live-online state not consumed")
+    require("MutationObserver" in v24, "canonical live state observer missing")
 
-    # JSON/config detail schemas handled directly by V20/V21 remain unchanged.
-    require("line('Username',out?.username)" in v20, "Naive username detail missing")
-    require("line('User Key',out?.userkey)" in v20, "Snell user key detail missing")
-    require("line('Handshake / SNI',tlsSni(out))" in v20, "ShadowTLS SNI detail missing")
-    require("profile?.user?.name" in v20 and "profile?.user?.password" in v20, "Mieru identity detail missing")
-    require("Server Public Key" in v20, "AmneziaWG endpoint detail missing")
-    require("new URL(String(raw||''))" in v21, "standard URI parser missing")
-    require("key==='hysteria2'" in v21 and "Password" in v21, "Hysteria2 URI details missing")
-    require("key==='tuic'" in v21 and "UUID" in v21, "TUIC URI details missing")
-    require("key==='anytls'" in v21 and "SNI" in v21, "AnyTLS URI details missing")
-    require("startsWith('sudoku://')" in v21, "Sudoku deeplink parser missing")
-    require("TextDecoder" in v21 and "AEAD" in v21, "Sudoku decoded details missing")
+    # Readability belongs to V24 presentation; reject historical 6-9px mobile text.
+    require("font-size:12px!important" in v24, "V24 readable fact/action text missing")
+    require("font-size:13px" in v24, "V24 readable server text missing")
+    require("font-size:16px!important" in v24, "V24 readable protocol title missing")
+    for tiny in ("font-size:6px", "font-size:6.5px", "font-size:7px", "font-size:8px", "font-size:9px"):
+        require(tiny not in v24, f"tiny V24 mobile scale reintroduced: {tiny}")
 
-    # Direct-IP HTTP pages still need usable clipboard actions.
-    require("document.execCommand('copy')" in v20, "clipboard fallback missing")
-    require("document.execCommand('copy')" in v23, "V23 clipboard fallback missing")
-
-    # Readability regression guard.
-    require(".v17-title b{font-size:15px" in v20, "mobile title readability missing")
-    require(".v17-action{min-height:38px" in v20, "mobile action readability missing")
-    require(".v17-details{padding:10px;font-size:12px" in v20, "mobile details readability missing")
-    require(".fact strong{font-size:14px" in v20, "desktop fact readability missing")
-    require(".v17-action{font-size:12px;min-height:40px" in v23, "V23 mobile action readability missing")
-
-    require("TWINPANEL_PUBLIC_CONNECT_PROTOCOL_ACTIONS_V20" in v20, "V20 marker missing")
-    require("TWINPANEL_PUBLIC_CONNECT_PROTOCOL_URI_DETAILS_V21" in v21, "V21 marker missing")
-
-    print("PUBLIC_CONNECT_PROTOCOL_ACTIONS_V20=PASS")
-    print("PUBLIC_CONNECT_PROTOCOL_URI_DETAILS_V21=PASS")
-    print("PUBLIC_CONNECT_DEVICE_DATA_AUTHORITY_V23=PASS")
-    print("DEVICE_NEUTRAL_CONNECTION_FACTS=PASS")
-    print("CISCO_COMPOSITE_ENDPOINT=PASS")
+    print("PUBLIC_CONNECT_V20_V21_V23_LEGACY=PASS")
+    print("PUBLIC_CONNECT_CANONICAL_PRESENTATION_V24=PASS")
+    print("DEVICE_NEUTRAL_CONNECTION_DATA=PASS")
 
 
 if __name__ == "__main__":

@@ -1,19 +1,7 @@
 from __future__ import annotations
 
-from .public_connection_mobile_protocols_v17 import (
-    refine_public_connection_mobile_protocols_v17,
-)
-from .public_connection_mobile_server_inventory_v18 import (
-    refine_public_connection_mobile_server_inventory_v18,
-)
-from .public_connection_protocol_actions_v20 import (
-    refine_public_connection_protocol_actions_v20,
-)
-from .public_connection_protocol_uri_details_v21 import (
-    refine_public_connection_protocol_uri_details_v21,
-)
-from .public_connection_device_data_authority_v23 import (
-    refine_public_connection_device_data_authority_v23,
+from .public_connection_canonical_presentation_v24 import (
+    refine_public_connection_canonical_presentation_v24,
 )
 
 
@@ -136,12 +124,8 @@ _V11_SCRIPT = r"""
 
 
 def refine_public_connection_device_actions_v11(source: str) -> str:
-    """Use one OS detector for platform apps and phone-only actions across the public connection page."""
+    """Detect the device once; keep connection data canonical and change presentation/apps only."""
     if "TWINPANEL_PUBLIC_CONNECT_DEVICE_ACTIONS_V11" not in source:
         source = source.replace("</style>", _V11_CSS + "\n</style>", 1)
         source = source.replace("</body>", _V11_SCRIPT + "\n</body>", 1)
-    source = refine_public_connection_mobile_protocols_v17(source)
-    source = refine_public_connection_mobile_server_inventory_v18(source)
-    source = refine_public_connection_protocol_actions_v20(source)
-    source = refine_public_connection_protocol_uri_details_v21(source)
-    return refine_public_connection_device_data_authority_v23(source)
+    return refine_public_connection_canonical_presentation_v24(source)
