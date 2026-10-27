@@ -223,6 +223,12 @@ PY`;
     if(!window.confirm(pick("Smart Auto فقط بین مسیرهای تأییدشده TP27 Fast و Spoof Tunnel انتخاب می‌کند. فعال شود؟","Smart Auto will select only between qualified TP27 Fast and Spoof Tunnel paths. Enable it?")))return;
     void run("auto",pick("Smart Auto برای همین تانل فعال شد.","Smart Auto is enabled for this tunnel."),()=>modernTransportApi.setMode(selected,"auto"));
   };
+
+  // TWINPANEL_UNIFIED_MANUAL_TRANSPORT_CONTROL_V287
+  // Manual authority is one control surface for every logical tunnel. Safety
+  // qualification still comes from the backend; an unqualified candidate stays
+  // visible but disabled instead of disappearing and making tunnels look like
+  // they have different UIs.
   const setManual=(row:SmartTransportCandidate)=>void run(`manual-${row.transport}`,pick(`${label(row.transport)} به‌عنوان مسیر دستی Production اعمال شد.`,`${label(row.transport)} is now the manual production path.`),()=>modernTransportApi.setMode(selected,"manual",row.transport));
 
   const checkText=(value:unknown)=>value?pick("آماده","Ready"):pick("نیاز به بررسی","Check");
@@ -375,7 +381,15 @@ PY`;
 
             <div className="action-row">
               <button type="button" className="primary-soft" disabled={Boolean(busy)||(isSpoof&&!row.configured)} onClick={()=>install(row)}>{busy===`install-${row.transport}`?"…":isSpoof?(installed?pick("بازسازی و تست Spoof","Rebuild & test Spoof"):pick("مرحله ۴: نصب و تست Spoof","Step 4: Install & test Spoof")):installed?pick("بازسازی و تست","Rebuild & test"):pick("نصب و تست","Install & test")}</button>
-              {row.selectable&&<button type="button" className="ghost" disabled={Boolean(busy)||isActive} onClick={()=>setManual(row)}>{busy===`manual-${row.transport}`?"…":isActive?pick("مسیر فعال","Active path"):pick("انتخاب دستی Production","Select production manual")}</button>}
+              <button
+                type="button"
+                className="ghost"
+                disabled={Boolean(busy)||isActive||!row.selectable}
+                title={!row.selectable?pick("این مسیر باید ابتدا نصب، آنلاین و تأیید شود؛ بعد انتخاب دستی فعال می‌شود.","This path must be installed, online and qualified before manual selection is enabled."):undefined}
+                onClick={()=>setManual(row)}
+              >
+                {busy===`manual-${row.transport}`?"…":isActive?pick("مسیر فعال","Active path"):row.selectable?pick("انتخاب دستی Production","Select production manual"):pick("انتخاب دستی — هنوز آماده نیست","Manual selection — not ready")}
+              </button>
               {installed&&<button type="button" className="danger" disabled={Boolean(busy)||isActive} onClick={()=>remove(row)}>{busy===`remove-${row.transport}`?"…":isActive?pick("مسیر فعال","Active path"):pick("حذف از این تانل","Remove")}</button>}
             </div>
           </Card>;

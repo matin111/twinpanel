@@ -60,6 +60,16 @@ jobs:
           for field in ('stable_seconds','qualified','benchmark','weighted_mbps'):
               assert field in page
           assert '/modern-transports' in api
+
+          # V287: every selected logical tunnel must expose the same manual
+          # transport control surface. Qualification controls whether the action
+          # is enabled; it must never make the button disappear from the UI.
+          assert 'TWINPANEL_UNIFIED_MANUAL_TRANSPORT_CONTROL_V287' in page
+          assert '{row.selectable&&<button' not in page
+          assert 'disabled={Boolean(busy)||isActive||!row.selectable}' in page
+          assert 'انتخاب دستی — هنوز آماده نیست' in page
+          assert 'Manual selection — not ready' in page
+
           assert 'PRIMARY_MANIFEST_URL' in resolver
           assert 'LEGACY_MANIFEST_URL' in resolver
           assert 'GITHUB_API_MANIFEST_URL' in resolver
