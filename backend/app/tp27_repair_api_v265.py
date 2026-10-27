@@ -35,15 +35,32 @@ def _http_error(exc: Exception) -> HTTPException:
 
 
 def _tp27_owns_repair(db: Session, tunnel_id: int) -> bool:
-    return (
-        db.query(TunnelTransport.id)
+    tunnel = db.get(Tunnel, int(tunnel_id))
+    if tunnel is None or not bool(tunnel.is_active):
+        return False
+
+    row = (
+        db.query(TunnelTransport)
         .filter(
             TunnelTransport.tunnel_id == int(tunnel_id),
             TunnelTransport.transport == "tp27_fast",
             TunnelTransport.enabled.is_(True),
         )
         .first()
-        is not None
+    )
+    if row is None:
+        return False
+
+    mode = str(tunnel.mode or "manual").strip().lower()
+    active = str(tunnel.active_transport or "").strip().lower()
+    preferred = str(tunnel.preferred_transport or "").strip().lower()
+    tp27_state = _status(row.status)
+
+    return bool(
+        mode == "manual"
+        or active == "tp27_fast"
+        or preferred == "tp27_fast"
+        or tp27_state in {"offline", "failed", "degraded"}
     )
 
 
@@ -51,12 +68,13 @@ async def _legacy_managed_repair_owner_guard(
     tunnel_id: int,
     db: Session,
 ):
-    """Reject the legacy managed-repair API when TP27 owns recovery.
+    """Reject legacy managed repair only while TP27 owns recovery.
 
     The historical endpoint repairs TP2027/legacy/SSH-relay state and has a
     different lock domain from TP27's carrier flock. Redirecting it would hide
-    semantics, while letting it run would create two repair owners. Return a
-    clear conflict instead; callers can use /tp27/repair or /tp27/rebuild.
+    semantics, while letting it run during TP27 recovery would create two
+    repair owners. A healthy TP27 standby in AUTO mode does not claim this
+    ownership, so unrelated legacy recovery remains available.
     """
 
     if _tp27_owns_repair(db, int(tunnel_id)):
