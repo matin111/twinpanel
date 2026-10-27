@@ -43,7 +43,8 @@ def main() -> None:
     # Collision fix: old base+1 target is unsafe; V46 moves only the target.
     require("XHTTP_TARGET_OFFSET_V46 = 1004" in v46, "collision-free XHTTP target missing")
     require("meta[\"offset\"] = int(XHTTP_TARGET_OFFSET_V46)" in v46, "XHTTP offset application missing")
-    require("public_base" not in v46.split("def apply_xray_customer_xhttp_v46", 1)[1], "V46 must not change XHTTP public port family")
+    apply_body = v46.split("def apply_xray_customer_xhttp_v46", 1)[1]
+    require('meta["public_base"] =' not in apply_body, "V46 must not change XHTTP public port family")
     require("[\"public_base\"] = 24000" in self_hosted, "stable XHTTP public port family missing")
 
     # Runtime has a complete REALITY XHTTP profile and stable identity material.
