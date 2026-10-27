@@ -9,19 +9,32 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def test_spoof_wg_v203_source_port_fallback_is_bounded_and_syntax_valid():
+def test_spoof_wg_v204_source_port_fallback_is_bounded_and_syntax_valid():
     spoof = read("backend/app/transport_candidates/spoof_wg.py")
 
     ast.parse(spoof)
 
-    assert "TWINPANEL SPOOF + WIREGUARD L3 V203" in spoof
+    assert "TWINPANEL SPOOF + WIREGUARD L3 V204" in spoof
     assert "SPOOF_SOURCE_PORT = 443" in spoof
     assert "SPOOF_SOURCE_PORT_CANDIDATES = (SPOOF_SOURCE_PORT, 44443)" in spoof
     assert 'SPOOF_SOURCE_PORT_META_KEY = "spoof_source_port"' in spoof
-    assert '"generation": 203' in spoof
+    assert '"generation": 204' in spoof
 
 
-def test_spoof_wg_v203_prefers_last_successful_source_port():
+def test_spoof_wg_v204_exit_wireguard_port_does_not_overlap_kernel_vxlan():
+    spoof = read("backend/app/transport_candidates/spoof_wg.py")
+
+    assert "EXIT_WIREGUARD_PORT_BASE = 38000" in spoof
+    assert '"exit_wireguard_port": EXIT_WIREGUARD_PORT_BASE + slot' in spoof
+    assert '"exit_wireguard_port": 37000 + slot' not in spoof
+
+    # Production Tunnel #8 Kernel VXLAN owns UDP/37008. Spoof WG must keep its
+    # loopback-only WireGuard listener on a separate deterministic range.
+    assert 38000 + (8 % 500) == 38008
+    assert 38008 != 37008
+
+
+def test_spoof_wg_v204_prefers_last_successful_source_port():
     spoof = read("backend/app/transport_candidates/spoof_wg.py")
 
     assert "def _persisted_source_port(raw: str | None) -> int | None:" in spoof
@@ -32,7 +45,7 @@ def test_spoof_wg_v203_prefers_last_successful_source_port():
     assert "source_port_candidates = _source_port_candidates(raw_config)" in spoof
 
 
-def test_spoof_wg_v203_retries_only_peer_ping_failures():
+def test_spoof_wg_v204_retries_only_peer_ping_failures():
     spoof = read("backend/app/transport_candidates/spoof_wg.py")
 
     assert "for index, source_port in enumerate(source_port_candidates):" in spoof
@@ -47,7 +60,7 @@ def test_spoof_wg_v203_retries_only_peer_ping_failures():
     assert 'startswith("udp_egress_probe_failed")' not in spoof
 
 
-def test_spoof_wg_v203_persists_only_the_qualified_port():
+def test_spoof_wg_v204_persists_only_the_qualified_port():
     spoof = read("backend/app/transport_candidates/spoof_wg.py")
 
     assert "selected_source_port = source_port" in spoof
@@ -58,7 +71,7 @@ def test_spoof_wg_v203_persists_only_the_qualified_port():
     assert '"ports": _ports(tunnel_id, selected_source_port)' in spoof
 
 
-def test_spoof_wg_v203_threads_one_candidate_into_both_peer_services():
+def test_spoof_wg_v204_threads_one_candidate_into_both_peer_services():
     spoof = read("backend/app/transport_candidates/spoof_wg.py")
 
     assert "spoof_source_port: int," in spoof
