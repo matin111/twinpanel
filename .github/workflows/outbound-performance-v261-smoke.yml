@@ -110,7 +110,8 @@ jobs:
           APP_SECRET_KEY: "ci-outbound-performance-v268-import"
           DATABASE_URL: "sqlite:////tmp/twinpanel-outbound-performance-v268-import.db"
           NODE_AGENT_SHARED_SECRET: "ci-outbound-performance-agent-v268-import"
-        run: PYTHONPATH=backend python -c 'import app.main; print("app import: ok")'
+        run: |
+          PYTHONPATH=backend python -c 'import app.main; print("app import: ok")'
 
       - uses: actions/setup-node@v4
         with:
