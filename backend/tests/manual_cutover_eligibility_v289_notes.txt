@@ -1,1 +1,0 @@
-V289 regression: manual cutover eligibility is distinct from SmartAuto stability qualification.
