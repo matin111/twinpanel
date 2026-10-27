@@ -131,13 +131,14 @@ def _safe_smart_route_decision(
     if current_freshness not in {"fresh", "recent"}:
         response["reason"] = "current_stale_retest"
         return response
-    if current_confidence < min_confidence:
-        response["reason"] = "current_low_confidence_retest"
-        return response
     if not bool(current.get("ok")):
         response["should_switch"] = True
         response["reason"] = "current_failed"
-    elif gain >= min_score_gain:
+        return response
+    if current_confidence < min_confidence:
+        response["reason"] = "current_low_confidence_retest"
+        return response
+    if gain >= min_score_gain:
         response["should_switch"] = True
         response["reason"] = "candidate_clears_hysteresis"
     else:
