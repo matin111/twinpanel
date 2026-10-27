@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.290",
+  "version": "1.1.0-rc.292",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-27T20:48:30Z",
+  "released_at": "2026-10-27T21:50:41Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "2a9529d0a4ba8b95e58251d83abd2ad55f59a0af",
+  "source_sha": "2a1841003689bad5b83dbd43168ac6828c7e19e1",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.290/twinpanel-1.1.0-rc.290-linux-x86_64.tar.gz",
-    "sha256": "8fb2f50d1aac4266e843a9c6a7170756ffbe59eaf2a71e4797819e0a0ffff4b5",
-    "size_bytes": 28401660
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.292/twinpanel-1.1.0-rc.292-linux-x86_64.tar.gz",
+    "sha256": "2c090bd584f478dfbd95dca7bbbef4892040bbdfaa574cd5ff5381f0af482bd8",
+    "size_bytes": 28400110
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.290 معماری صفحه عمومی اتصال را اصلاح می‌کند تا اطلاعات اتصال در همه دستگاه‌ها دقیقاً از یک منبع canonical مشترک نمایش داده شود. Server، Port، Username، Password، PSK، URI، فایل کانفیگ و اکشن‌های واقعی هر پروتکل بین Android، iOS، Windows، macOS، Linux و دسکتاپ یکسان می‌مانند؛ تفاوت دستگاه فقط به چیدمان و UI گرافیکی، برنامه پیشنهادی همان سیستم‌عامل و نمایش اکشن مناسب محدود است. Root Cause نسخه‌های قبلی وجود چند مسیر مستقل موبایل بود: V17 ردیف‌های موبایل را بازسازی می‌کرد، V18 inventory جدا برای موبایل می‌گرفت و سرورهای placeholder اضافه می‌کرد، V20/V21 داده را دوباره parse می‌کردند و V23 نیز همچنان mobile rows/actions را بازسازی می‌کرد. V24 این زنجیره را از active V11 حذف می‌کند و همان protocol-panel/server-view canonical دسکتاپ را روی موبایل با presentation متفاوت نمایش می‌دهد؛ هیچ fetch جدا، JSON.parse کانفیگ، placeholder server یا بازسازی Username/Password/URI در مسیر دستگاه وجود ندارد. وضعیت Online نیز از همان live-online canonical mirror می‌شود و متن/دکمه‌های موبایل به مقیاس خوانای 12 تا 16px ارتقا یافته‌اند. V17/V18/V20/V21/V22/V23 برای history/rollback در source باقی مانده‌اند اما دیگر در active device presentation chain اجرا نمی‌شوند. TP27/VXLAN، Runtime پروتکل‌ها، Provisioning، Credential generation، Node configuration و Accounting در این نسخه تغییر نکرده‌اند. Candidate روی SHA immutable 2a9529d0a4ba8b95e58251d83abd2ad55f59a0af قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.290 fixes the public connection page architecture so every device renders connection information from one shared canonical source. Server, port, username, password, PSK, URI, configuration files and protocol-native actions remain identical across Android, iOS, Windows, macOS, Linux and desktop; device differences are limited to graphical layout, the recommended application for that operating system, and presentation of the appropriate action. The root cause in prior releases was multiple independent mobile paths: V17 rebuilt mobile rows, V18 fetched a separate mobile inventory and appended placeholder servers, V20/V21 reparsed data, and V23 still rebuilt mobile rows/actions. V24 removes that chain from active V11 execution and presents the exact canonical desktop protocol-panel/server-view DOM on mobile with a different layout. There is no device-specific fetch, config JSON parsing, placeholder server generation, or reconstruction of username/password/URI. Online state mirrors the same canonical live-online authority and mobile typography/actions are raised to a readable 12–16px scale. V17/V18/V20/V21/V22/V23 remain in source for history/rollback but are no longer executed in the active device presentation chain. TP27/VXLAN, protocol runtimes, provisioning, credential generation, node configuration and accounting are unchanged. The candidate is pinned to immutable source SHA 2a9529d0a4ba8b95e58251d83abd2ad55f59a0af."
+    "fa": "TwinPanel 1.1.0-rc.292 معماری مدیریت Tunnel را یکپارچه می‌کند. مسیرهای /admin/tunnels و /admin/tunnel-transports اکنون هر دو به یک Tunnel Control Center واحد می‌رسند و ساخت Pair جدید، نمایش توپولوژی Iran → Active Transport → Exit، نصب/تعمیر Candidateها، Health Probe، انتخاب Manual، Smart Auto، حذف Candidate غیرفعال، Deep Repair و Registry در همان سطح داده‌محور برای همه Tunnel IDها انجام می‌شود. هیچ قابلیت UI بر اساس Tunnel #5/#6/#8 یا ID خاص فعال نمی‌شود. ساخت Tunnel همچنان از backend رسمی create-managed استفاده می‌کند و منطق SSH/systemd/firewall در UI تکرار نشده است. انتخاب دستی از manual_selectable و سلامت واقعی مسیر استفاده می‌کند و به شرط ۶۰ ثانیه SmartAuto وابسته نیست؛ cutover همچنان توسط fresh full health probe و تأیید هر دو Agent محافظت می‌شود. دکمه Manual برای همه Candidateها همیشه دیده می‌شود و تا آماده‌شدن با دلیل روشن غیرفعال است. TP27/VXLAN/Spoof dataplane، runtime پروتکل‌ها، Provisioning، Accounting و credentialها در این نسخه بازنویسی نشده‌اند. Candidate روی SHA immutable 2a1841003689bad5b83dbd43168ac6828c7e19e1 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.292 unifies tunnel management under one data-driven Tunnel Control Center. Both /admin/tunnels and /admin/tunnel-transports now resolve to the same runtime, with new-pair creation, graphical Iran → Active Transport → Exit topology, candidate install/repair, fresh health probes, manual selection, Smart Auto, inactive-candidate removal, deep repair, and registry visibility exposed consistently for every tunnel ID. No UI feature is unlocked by Tunnel #5/#6/#8 or any other specific ID. Tunnel creation continues to use the authoritative create-managed backend, so SSH/systemd/firewall provisioning is not duplicated in the UI. Manual selection uses manual_selectable and real transport health rather than SmartAuto's 60-second qualification gate; cutover remains protected by a fresh full health probe and both-Agent acceptance. The Manual action is always visible and disabled with a concrete reason until ready. TP27/VXLAN/Spoof dataplanes, protocol runtimes, provisioning, accounting, and credentials are not rewritten in this release. Candidate is pinned to immutable SHA 2a1841003689bad5b83dbd43168ac6828c7e19e1."
   }
 }
