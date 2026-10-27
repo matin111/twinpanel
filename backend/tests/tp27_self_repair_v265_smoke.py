@@ -64,6 +64,10 @@ def main() -> None:
     assert 'current == "gre-native"' in attempt_order
     assert 'return fou + [("gre-native", None)]' in attempt_order
     assert 'current == "gre-fou"' in attempt_order
+    assert (
+        "ports = [value for value in ports if value != current_port] + [current_port]"
+        in attempt_order
+    )
 
     repair = _function_source(repair_source, "_repair_tp27_locked")
     assert 'if bool(before["healthy"]) and not force_rebuild' in repair
@@ -78,11 +82,26 @@ def main() -> None:
     assert "/tmp/twinpanel-tp27-repair-" in lock
     assert "fcntl.LOCK_EX" in lock
 
+    candidates = _function_source(repair_source, "_candidate_tunnel_ids")
+    assert "Tunnel.is_active.is_(True)" in candidates
+    assert 'TunnelTransport.transport == "tp27_fast"' in candidates
+    assert "TunnelTransport.enabled.is_(True)" in candidates
+
+    diagnosis_error = _function_source(repair_source, "_diagnosis_error")
+    assert "iran.peer_reachable=false" not in diagnosis_error
+    assert 'for role in ("iran", "exit")' in diagnosis_error
+    assert '"peer_reachable"' in diagnosis_error
+    assert "tp27_carrier_unhealthy" in diagnosis_error
+
     reconcile = _function_source(repair_source, "reconcile_once")
     assert "count < FAILURE_THRESHOLD" in reconcile
     assert "_cooldown_remaining(row)" in reconcile
     assert 'source="manager"' in reconcile
     assert "force_rebuild=True" in reconcile
+    assert "row.status = \"degraded\"" in reconcile
+    assert "row.last_error = health_error" in reconcile
+    assert "_diagnosis_error(diagnosis)" in reconcile
+    assert "if not relevant" not in reconcile
 
     # Transport Manager owns the background loop; API runtime exposes only
     # explicit admin diagnose/repair/rebuild actions.
