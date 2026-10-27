@@ -1,0 +1,56 @@
+name: Transport Card Repair V266 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/tp27_repair_api_v265.py"
+      - "backend/tests/transport_card_probe_v266_smoke.py"
+      - "components/smart-transports-runtime-v26.tsx"
+      - "lib/modern-transport-api.ts"
+      - ".github/workflows/transport-card-repair-v266-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    env:
+      APP_NAME: TwinPanel-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: sqlite:////tmp/twinpanel-v266.db
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+
+      - name: Compile changed backend
+        run: python -m compileall -q backend/app/tp27_repair_api_v265.py backend/tests/transport_card_probe_v266_smoke.py
+
+      - name: Run authority-preservation smoke
+        working-directory: backend
+        run: PYTHONPATH=. python tests/transport_card_probe_v266_smoke.py
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22.13.0"
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build admin UI
+        run: npm run build
