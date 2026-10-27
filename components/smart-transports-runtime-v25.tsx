@@ -2,12 +2,9 @@
 
 import {TunnelControlCenterV1} from "./tunnel-control-center-v1";
 
-// TWINPANEL_SINGLE_TUNNEL_UI_AUTHORITY_V1
-// TWINPANEL_UNIFIED_MANUAL_TRANSPORT_CONTROL_V287
-// Historical contract retained for regression traceability:
-// disabled={Boolean(busy)||isActive||!row.selectable}
-// The actual always-visible manual control now lives in TunnelControlCenterV1.
-// There is intentionally no row.selectable&&<button conditional rendering.
+// TWINPANEL_SINGLE_TUNNEL_UI_AUTHORITY_V293
+// Kept only as a route-compatible adapter. /admin/tunnel-transports and
+// /admin/tunnels must render the same data-driven control surface.
 export function SmartTransportsRuntimeV25(){
   return <TunnelControlCenterV1/>;
 }
