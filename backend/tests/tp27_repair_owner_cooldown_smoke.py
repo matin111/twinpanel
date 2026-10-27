@@ -39,12 +39,22 @@ def main() -> None:
         compile(source, str(path), "exec")
 
     # Dedicated TP27 owner must fence both normal scheduling and a stale worker
-    # that was queued immediately before TP27 became enabled.
-    owner_apply = _function_source(owner_source, "apply_tp27_repair_owner_guard")
+    # that was queued immediately before TP27 entered the repair domain.
+    owner_check = _function_source(owner_source, "_owned_in_session")
+    for token in (
+        'mode == "manual"',
+        'active == "tp27_fast"',
+        'preferred == "tp27_fast"',
+        '{"offline", "failed", "degraded"}',
+    ):
+        assert token in owner_check
     assert 'TunnelTransport.transport == "tp27_fast"' in owner_source
     assert "TunnelTransport.enabled.is_(True)" in owner_source
+
+    owner_apply = _function_source(owner_source, "apply_tp27_repair_owner_guard")
     assert "managed_tunnel_ids_without_tp27" in owner_apply
     assert "run_self_heal_without_tp27" in owner_apply
+    assert "_owned_in_session" in owner_apply
     assert "tp27_repair_owns_tunnel" in owner_apply
     assert "v8._managed_tunnel_ids = managed_tunnel_ids_without_tp27" in owner_apply
     assert "v9._run_self_heal_authoritative = run_self_heal_without_tp27" in owner_apply
@@ -54,7 +64,17 @@ def main() -> None:
     assert "tp27_repair_owner_guard=active" in manager_source
 
     # The historical managed-repair API uses a separate lock domain and must
-    # fail closed instead of racing TP27 repair or silently redirecting it.
+    # fail closed only while TP27 owns repair; a healthy AUTO standby must not
+    # globally disable independent legacy recovery.
+    api_owner = _function_source(api_source, "_tp27_owns_repair")
+    for token in (
+        'mode == "manual"',
+        'active == "tp27_fast"',
+        'preferred == "tp27_fast"',
+        '{"offline", "failed", "degraded"}',
+    ):
+        assert token in api_owner
+
     api_guard = _function_source(api_source, "_legacy_managed_repair_owner_guard")
     assert "_tp27_owns_repair" in api_guard
     assert "status_code=409" in api_guard
