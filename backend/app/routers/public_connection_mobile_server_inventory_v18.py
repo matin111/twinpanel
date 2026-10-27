@@ -1,16 +1,21 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from ..database import get_db
 from ..models import Node, NodeProtocolConfig, NodeType, SubscriptionProtocol
 from .account_delivery import _public_payload, _subscription_from_share_token
 from .public_connection_modern_delivery_v13 import MODERN_PROTOCOLS, _items, _status_value
+from .public_connection_modern_delivery_v16 import router as _modern_delivery_v16_router
 
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_MOBILE_SERVER_INVENTORY_V18"
+
+
+_inventory_router = APIRouter(tags=["public-connection-mobile-server-inventory-v18"])
 
 
 _CSS = r"""
@@ -38,8 +43,6 @@ _CSS = r"""
 _SCRIPT = r"""
 <script id="twinpanelPublicConnectMobileServerInventoryV18">
 (function(){
-  const inventory=__INVENTORY__;
-
   function normalize(value){
     const key=String(value||'').trim().toLowerCase();
     if(key==='naiveproxy')return'naive';
@@ -178,7 +181,7 @@ _SCRIPT = r"""
     if(value)return'این سرور فعلاً آماده اتصال نیست';
     return'پروتکل روی این سرور هنوز آماده نشده';
   }
-  function appendMissingModernServers(card,key){
+  function appendMissingModernServers(card,key,inventory){
     const protocol=inventory.protocols?.[key];
     const nodes=Array.isArray(inventory.nodes)?inventory.nodes:[];
     if(!protocol||!nodes.length)return;
@@ -202,8 +205,7 @@ _SCRIPT = r"""
       row.className='v17-server-row v18-not-ready';row.dataset.nodeId=id;
       const copyBox=document.createElement('div');copyBox.className='v17-server-copy';
       const name=document.createElement('b');name.textContent=String(node.name||('Server '+(index+1)));
-      const note=document.createElement('small');
-      note.textContent=pendingMessage(protocol.node_status?.[id]);
+      const note=document.createElement('small');note.textContent=pendingMessage(protocol.node_status?.[id]);
       copyBox.append(name,note);
       const state=document.createElement('span');state.className='v18-state';state.textContent='آماده‌سازی';
       row.append(copyBox,state);list.appendChild(row);
@@ -218,7 +220,7 @@ _SCRIPT = r"""
       subtitle.textContent=readyCount>=total?'آماده اتصال':readyCount?'بخشی از سرورها آماده‌اند':'در حال آماده‌سازی';
     }
   }
-  function patch(){
+  function patch(inventory){
     if(!window.matchMedia('(max-width:720px)').matches)return;
     const cards=[...document.querySelectorAll('.v17-protocol-card')];
     if(!cards.length)return;
@@ -239,12 +241,25 @@ _SCRIPT = r"""
         ensureCopy(view,row);
         ensureDetails(view,row);
       });
-      if(inventory.modern_protocols?.includes(key))appendMissingModernServers(card,key);
+      if(inventory.modern_protocols?.includes(key))appendMissingModernServers(card,key,inventory);
     });
     document.body.dataset.tpMobileV18='ready';
   }
+  async function inventory(){
+    const segment=String(location.pathname.split('/')[3]||'');
+    if(!segment)return{nodes:[],modern_protocols:[],protocols:{}};
+    try{
+      const response=await fetch('/v1/connect/'+segment+'/mobile-server-inventory-v18',{
+        cache:'no-store',headers:{Accept:'application/json'}
+      });
+      if(!response.ok)throw new Error('inventory');
+      return await response.json();
+    }catch(_error){
+      return{nodes:[],modern_protocols:[],protocols:{}};
+    }
+  }
 
-  window.setTimeout(patch,20);
+  window.setTimeout(async()=>patch(await inventory()),20);
 })();
 </script>
 """
@@ -310,10 +325,7 @@ def _inventory(token: str, db: Session) -> dict[str, Any]:
 
     return {
         "nodes": [
-            {
-                "id": int(node.id),
-                "name": str(node.name or f"Server {node.id}"),
-            }
+            {"id": int(node.id), "name": str(node.name or f"Server {node.id}")}
             for node in nodes
         ],
         "modern_protocols": wanted,
@@ -327,25 +339,25 @@ def _inventory(token: str, db: Session) -> dict[str, Any]:
     }
 
 
-def _script_json(value: Any) -> str:
-    raw = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-    return (
-        raw.replace("&", "\\u0026")
-        .replace("<", "\\u003c")
-        .replace(">", "\\u003e")
-    )
-
-
-def refine_public_connection_mobile_server_inventory_v18(
-    source: str,
+@_inventory_router.get("/{token}/mobile-server-inventory-v18")
+def public_mobile_server_inventory_v18(
     token: str,
-    db: Session,
-) -> str:
-    """Patch the V17 phone stack with copy/details and truthful all-Exit readiness."""
+    db: Session = Depends(get_db),
+):
+    """Return non-secret all-Exit readiness for the public phone connection page."""
+    return _inventory(token, db)
+
+
+# V16's router is already included by public_connection_hub_live_v5. Registering
+# this read-only refinement route here keeps V18 additive and avoids a second
+# public router include in the hub.
+_modern_delivery_v16_router.include_router(_inventory_router)
+
+
+def refine_public_connection_mobile_server_inventory_v18(source: str) -> str:
+    """Patch V17 phone cards with copy/details and truthful all-Exit readiness."""
     if _MARKER in source:
         return source
-    inventory = _inventory(token, db)
-    script = _SCRIPT.replace("__INVENTORY__", _script_json(inventory))
     source = source.replace("</style>", _CSS + "\n</style>", 1)
-    source = source.replace("</body>", script + f"\n<!-- {_MARKER} -->\n</body>", 1)
+    source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
     return source
