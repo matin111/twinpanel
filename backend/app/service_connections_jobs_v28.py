@@ -7,6 +7,7 @@ from .database import get_db
 from .deps import require_admin
 from .models import Tunnel
 from .routers import tunnels
+from .xray_customer_xhttp_v46 import apply_xray_customer_xhttp_v46
 from .xray_profile_reconcile_v36 import (
     get_xray_reconcile_job,
     start_xray_reconcile_job,
@@ -41,6 +42,13 @@ def apply_service_connections_jobs_v28() -> None:
     global _runtime_applied
     if _runtime_applied:
         return
+
+    # self_hosted_runtime invokes this after the final V30 customer profile
+    # policy and after the V41 infrastructure wrapper are installed. Activate
+    # V46 here so the Xray reconcile endpoints capture the final customer
+    # contract: WebSocket TLS -> XHTTP Reality -> TCP TLS. V46 extends the
+    # existing V41/V36 reconcile chain; it does not replace it.
+    apply_xray_customer_xhttp_v46()
 
     definitions = [
         (
@@ -79,6 +87,7 @@ def apply_service_connections_jobs_v28() -> None:
 
     _runtime_applied = True
     print(
-        "TWINPANEL_SERVICE_CONNECTIONS_JOBS_V28_ACTIVE xray_job=1",
+        "TWINPANEL_SERVICE_CONNECTIONS_JOBS_V28_ACTIVE "
+        "xray_job=1 xhttp_customer_policy_v46=1",
         flush=True,
     )
