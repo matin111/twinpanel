@@ -1,0 +1,37 @@
+name: Xray Adaptive Three Profiles V47 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/xray_adaptive_three_profiles_v47.py'
+      - 'backend/app/xray_customer_xhttp_v46.py'
+      - 'backend/app/xray_customer_profile_policy_v30.py'
+      - 'backend/app/self_hosted_runtime.py'
+      - 'scripts/xray-adaptive-three-profiles-v47-smoke.py'
+      - '.github/workflows/xray-adaptive-three-profiles-v47-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/xray_adaptive_three_profiles_v47.py'
+      - 'backend/app/xray_customer_xhttp_v46.py'
+      - 'backend/app/xray_customer_profile_policy_v30.py'
+      - 'backend/app/self_hosted_runtime.py'
+      - 'scripts/xray-adaptive-three-profiles-v47-smoke.py'
+      - '.github/workflows/xray-adaptive-three-profiles-v47-smoke.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile V47 runtime
+        run: |
+          python -m py_compile \
+            backend/app/xray_adaptive_three_profiles_v47.py \
+            backend/app/self_hosted_runtime.py \
+            scripts/xray-adaptive-three-profiles-v47-smoke.py
+      - name: Run V47 smoke
+        run: python scripts/xray-adaptive-three-profiles-v47-smoke.py

@@ -63,6 +63,9 @@ from .xray_reconcile_infra_v41 import (
 from .xray_customer_profile_policy_v30 import (
     apply_xray_customer_profile_policy_v30,
 )
+from .xray_adaptive_three_profiles_v47 import (
+    apply_xray_adaptive_three_profiles_v47,
+)
 from .tunnel_service_connections_admin_runtime import (
     apply_tunnel_service_connections_admin_runtime,
 )
@@ -272,13 +275,13 @@ def apply_self_hosted_runtime(
     # ------------------------------------------------------------
     # Xray production composition
     #
-    # Keep the old Reality listeners internally for diagnostics/rollback, but
-    # restore the validated customer policy:
-    #   WebSocket TLS -> HTTPUpgrade TLS -> VLESS TCP TLS
+    # Customer policy converges to exactly three real profiles per Exit:
+    #   TLS-ready: WebSocket TLS -> XHTTP Reality -> VLESS TCP TLS
+    #   no TLS identity: XHTTP Reality -> gRPC Reality -> VLESS TCP Reality
     #
-    # The dedicated Xray domain remains independent from the general Node
-    # domain. V44 keeps TCP TLS config validation compatible with Xray 26.3.x.
-    # V45 does the same for the base Modern candidate config.
+    # V47 restores V46 XHTTP target isolation (+1004) and adds collision-free
+    # TCP Reality (+1005) only for domainless Exits. UUIDs and REALITY identity
+    # are preserved; no fake TLS profile is generated.
     # ------------------------------------------------------------
 
     apply_xray_modern_repair_runtime()
@@ -289,13 +292,14 @@ def apply_self_hosted_runtime(
     apply_xray_tcp_tls_compat_v44()
     apply_xray_reconcile_infra_v41()
     apply_xray_customer_profile_policy_v30()
+    apply_xray_adaptive_three_profiles_v47()
 
     # ------------------------------------------------------------
     # Service Connections V30
     #
     # Register the route only after the final Xray policy has wrapped the
-    # endpoint. This prevents Legacy/XHTTP/gRPC from leaking back into the
-    # normal customer/admin service cards while preserving them internally.
+    # endpoint. V47 keeps the admin/customer inventory aligned with the exact
+    # three usable profiles for each Exit capability set.
     # ------------------------------------------------------------
 
     apply_tunnel_service_connections_admin_runtime()
