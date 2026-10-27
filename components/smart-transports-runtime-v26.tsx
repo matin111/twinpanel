@@ -7,6 +7,7 @@ import {legacyControlApi} from "../lib/legacy-control-api";
 import {tunnelTransportApi,type TunnelTransportRow,type TunnelTransportState} from "../lib/tunnel-transport-api";
 import {
   modernTransportApi,
+  type ModernProtocolInventory,
   type SmartTransportCandidate,
   type SmartTransportName,
   type SmartTransportState,
@@ -37,13 +38,20 @@ const labels:Record<string,string>={
   ssh_relay:"SSH Relay",
 };
 
-const protocols=[
-  {key:"cisco",fa:"Cisco / OpenConnect",en:"Cisco / OpenConnect"},
-  {key:"openvpn",fa:"OpenVPN",en:"OpenVPN"},
-  {key:"wireguard",fa:"WireGuard",en:"WireGuard"},
-  {key:"l2tp",fa:"L2TP / IPsec",en:"L2TP / IPsec"},
-  {key:"xray",fa:"Xray / V2Ray",en:"Xray / V2Ray"},
-] as const;
+type ProtocolCoverageItem={
+  key:string;
+  fa:string;
+  en:string;
+  source:"classic"|"modern";
+};
+
+const classicProtocols:ProtocolCoverageItem[]=[
+  {key:"cisco",fa:"Cisco / OpenConnect",en:"Cisco / OpenConnect",source:"classic"},
+  {key:"openvpn",fa:"OpenVPN",en:"OpenVPN",source:"classic"},
+  {key:"wireguard",fa:"WireGuard",en:"WireGuard",source:"classic"},
+  {key:"l2tp",fa:"L2TP / IPsec",en:"L2TP / IPsec",source:"classic"},
+  {key:"v2ray",fa:"Xray / V2Ray",en:"Xray / V2Ray",source:"classic"},
+];
 
 const normalized=(value:unknown)=>String(value??"").trim().toLowerCase();
 const label=(value:unknown)=>labels[String(value??"").trim()]||String(value??"—");
@@ -69,6 +77,8 @@ export function SmartTransportsRuntimeV26(){
   const [selected,setSelected]=useState(0);
   const [smart,setSmart]=useState<SmartTransportState|null>(null);
   const [allState,setAllState]=useState<TunnelTransportState|null>(null);
+  const [protocolInventory,setProtocolInventory]=useState<ModernProtocolInventory|null>(null);
+  const [protocolInventoryError,setProtocolInventoryError]=useState("");
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState("");
   const [error,setError]=useState("");
@@ -84,15 +94,25 @@ export function SmartTransportsRuntimeV26(){
   };
 
   const loadState=async(id:number,silent=false)=>{
-    if(!id){setSmart(null);setAllState(null);setLoading(false);return;}
+    if(!id){setSmart(null);setAllState(null);setProtocolInventory(null);setProtocolInventoryError("");setLoading(false);return;}
     if(!silent){setLoading(true);setError("");}
     try{
-      const [modern,all]=await Promise.all([
+      const inventoryPromise=modernTransportApi.protocolInventory()
+        .then(value=>({ok:true as const,value}))
+        .catch(reason=>({ok:false as const,reason}));
+      const [modern,all,inventoryResult]=await Promise.all([
         modernTransportApi.state(id),
         tunnelTransportApi.transports(id),
+        inventoryPromise,
       ]);
       setSmart(modern);
       setAllState(all);
+      if(inventoryResult.ok){
+        setProtocolInventory(inventoryResult.value);
+        setProtocolInventoryError("");
+      }else{
+        setProtocolInventoryError(inventoryResult.reason instanceof Error?inventoryResult.reason.message:String(inventoryResult.reason));
+      }
       if(!silent){
         const spoof=(modern.transports||[]).find(row=>row.transport==="spoof_wg");
         setIranSpoofIp(String(spoof?.configuration?.iran_spoof_ip||""));
@@ -126,6 +146,23 @@ export function SmartTransportsRuntimeV26(){
   const qualified=candidates.filter(row=>row.qualified);
   const failoverReady=qualified.filter(row=>normalized(row.transport)!==activeName);
   const activeCandidate=candidates.find(row=>normalized(row.transport)===activeName);
+  const exitProtocolNode=useMemo(()=>{
+    const exitId=Number(selectedTunnel?.exit_node_id||0);
+    if(!exitId)return undefined;
+    return (protocolInventory?.nodes||[]).find(node=>Number(node.id)===exitId);
+  },[protocolInventory,selectedTunnel?.exit_node_id]);
+  const protocolCoverage=useMemo<ProtocolCoverageItem[]>(()=>{
+    const rows:ProtocolCoverageItem[]=[...classicProtocols];
+    const seen=new Set(rows.map(row=>normalized(row.key)));
+    for(const item of exitProtocolNode?.protocols||[]){
+      const key=normalized(item.protocol);
+      if(!key||seen.has(key)||normalized(item.status)==="not_installed")continue;
+      const title=String(item.name||item.protocol||key).trim()||key;
+      rows.push({key,fa:title,en:title,source:"modern"});
+      seen.add(key);
+    }
+    return rows;
+  },[exitProtocolNode]);
 
   const run=async(key:string,message:string,action:()=>Promise<unknown>)=>{
     if(!selected||busy)return;
@@ -201,8 +238,8 @@ export function SmartTransportsRuntimeV26(){
           <div className="tp-eyebrow">{pick("Transport Control Plane","Transport Control Plane")}</div>
           <h1>{pick("مسیرهای تانل و Failover","Tunnel Transports & Failover")}</h1>
           <p>{pick(
-            "Cisco، OpenVPN، WireGuard، L2TP و Xray روی یک لایه L3 مشترک قرار دارند و همیشه از Active Transport همان تانل تبعیت می‌کنند. مسیر Standby فقط بعد از Qualification وارد Failover می‌شود.",
-            "Cisco, OpenVPN, WireGuard, L2TP and Xray share one L3 service plane and always follow the tunnel active transport. A standby path joins failover only after qualification."
+            "پروتکل‌های کلاسیک و مدرن نصب‌شده روی Exit در Service Plane همین تانل قرار دارند و از Active Transport آن تبعیت می‌کنند. مسیر Standby فقط بعد از Qualification وارد Failover می‌شود.",
+            "Installed classic and modern protocols on the Exit share this tunnel service plane and follow its Active Transport. A standby path joins failover only after qualification."
           )}</p>
         </div>
         <div className="tp-hero-actions">
@@ -238,14 +275,15 @@ export function SmartTransportsRuntimeV26(){
       <section className="tp-service-plane">
         <div className="tp-section-head">
           <div><span className="tp-eyebrow">{pick("Unified L3 Service Plane","Unified L3 Service Plane")}</span><h2>{pick("پوشش پروتکل‌ها","Protocol coverage")}</h2></div>
-          <Badge tone="ok">{pick("متصل به Active Transport","BOUND TO ACTIVE")}</Badge>
+          <Badge tone={protocolInventoryError?"warn":"ok"}>{protocolInventoryError?pick("Inventory مدرن در دسترس نیست","MODERN INVENTORY UNAVAILABLE"):pick(`${protocolCoverage.length} پروتکل متصل`,`${protocolCoverage.length} PROTOCOLS BOUND`)}</Badge>
         </div>
         <div className="tp-protocol-row">
-          {protocols.map(protocol=><div className="tp-protocol-chip" key={protocol.key}><span className="tp-protocol-dot"/><b>{pick(protocol.fa,protocol.en)}</b><small>{pick("Active + Failover","Active + Failover")}</small></div>)}
+          {protocolCoverage.map(protocol=><div className="tp-protocol-chip" key={protocol.key}><span className="tp-protocol-dot"/><b>{pick(protocol.fa,protocol.en)}</b><small>{protocol.source==="modern"?pick("Modern · Active + Failover","Modern · Active + Failover"):pick("Active + Failover","Active + Failover")}</small></div>)}
         </div>
+        {protocolInventoryError&&<div className="runtime-warning compact">{pick("Inventory پروتکل‌های مدرن از Exit انتخاب‌شده خوانده نشد؛ پنج مسیر کلاسیک همچنان نمایش داده می‌شوند.","Modern protocol inventory could not be read from the selected Exit; the five classic paths remain visible.")}</div>}
         <p className="tp-section-note">{pick(
-          "این وضعیت به معنی اجرای هم‌زمان دو Transport نیست؛ فقط یک مسیر Active ترافیک را حمل می‌کند و Candidateهای Qualified برای Failover آماده می‌مانند.",
-          "This does not mean two transports carry traffic simultaneously; one path is active while qualified candidates remain ready for failover."
+          "پوشش مدرن از Inventory واقعی Exit انتخاب‌شده خوانده می‌شود. این وضعیت به معنی اجرای هم‌زمان دو Transport نیست؛ فقط یک مسیر Active ترافیک را حمل می‌کند و Candidateهای Qualified برای Failover آماده می‌مانند.",
+          "Modern coverage is read from the selected Exit's real inventory. This does not mean two transports carry traffic simultaneously; one path is active while qualified candidates remain ready for failover."
         )}</p>
       </section>
 
@@ -279,7 +317,7 @@ export function SmartTransportsRuntimeV26(){
             <div className="tp-progress"><span style={{width:`${progress}%`}}/></div>
 
             <div className="tp-card-protocols">
-              {protocols.map(protocol=><span key={protocol.key}>{pick(protocol.fa,protocol.en)}</span>)}
+              {protocolCoverage.map(protocol=><span key={protocol.key}>{pick(protocol.fa,protocol.en)}</span>)}
             </div>
 
             {row.description&&<p className="tp-description">{row.description}</p>}
