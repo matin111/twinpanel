@@ -1,0 +1,32 @@
+name: Tunnel Protocol Coverage Authority V1
+
+on:
+  pull_request:
+    paths:
+      - "components/smart-transports-runtime-v26.tsx"
+      - "lib/modern-transport-api.ts"
+      - "backend/app/modern_protocol_tunnel_binding_v251.py"
+      - "backend/app/routers/modern_protocol_admin_v3.py"
+      - "scripts/test_tunnel_protocol_coverage_authority_v1.py"
+      - ".github/workflows/tunnel-protocol-coverage-authority-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-coverage-authority:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run protocol coverage authority smoke
+        run: python scripts/test_tunnel_protocol_coverage_authority_v1.py
