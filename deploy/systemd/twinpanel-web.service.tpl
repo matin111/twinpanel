@@ -15,14 +15,19 @@ EnvironmentFile=/etc/twinpanel/frontend.env
 # root-owned verified helpers before Web starts so legacy installs receive safe
 # control-plane/runtime migrations during the very first update to this release.
 #
-# The updater owns the API restart transaction. Web must only verify that the
-# already-dispatched API restart converged to /opt/twinpanel/current. Previously
-# --restart --verify allowed Web ExecStartPre to issue a second blocking API
-# restart while the updater's no-block restart was still in flight, reproducing
-# POST_UPDATE_HEALTH_VERSION_FAILED and transient 502/mixed-runtime windows.
+# V69 first converges the updater unit so every later update uses staged health.
+# During the one bootstrap update still running the legacy updater process, the
+# exact-PID API handoff is allowed only while update-state says restarting and
+# only when MainPID still belongs to a previous managed release. This shortens
+# the stale graceful-stop tail without any broad pkill/cgroup kill.
+#
+# The updater owns the API restart transaction. Web verifies convergence and
+# must not queue a second API restart while the updater transaction is active.
 # The '+' systemd prefix intentionally applies only to these pre-start helpers;
 # the long-running Web process remains www-data + hardened below.
 ExecStartPre=+/opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_nginx_reconcile.py --reload
+ExecStartPre=+/opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_updater_unit_reconcile_v69.py
+ExecStartPre=+/opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_api_update_handoff_v69.py
 ExecStartPre=+/opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_runtime_unit_reconcile.py --verify
 ExecStart=/bin/bash -lc 'if [ -f /opt/twinpanel/current/.next/standalone/server.js ]; then cd /opt/twinpanel/current/.next/standalone && exec env HOSTNAME=127.0.0.1 PORT=__WEB_PORT__ /usr/bin/node server.js; else cd /opt/twinpanel/current && exec /usr/bin/node /opt/twinpanel/current/node_modules/next/dist/bin/next start -H 127.0.0.1 -p __WEB_PORT__; fi'
 Restart=always
