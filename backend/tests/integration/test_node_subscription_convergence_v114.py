@@ -45,25 +45,53 @@ def test_fresh_exit_install_keeps_historical_subscription_autosync():
     assert "cred.config_text_encrypted = (\n                _enc(items)" in delivery
 
 
-def test_failed_or_partial_exit_sync_gets_safe_background_retry():
+def test_topology_changes_reconverge_classic_and_modern_delivery():
     runtime = _text("backend/app/node_subscription_convergence_v114.py")
     composition = _text("backend/app/self_hosted_runtime.py")
 
     assert "TWINPANEL_NODE_SUBSCRIPTION_CONVERGENCE_V114" in runtime
+    assert "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_V294" in runtime
+    assert "_topology_signature" in runtime
     assert "Node.retired_at.is_(None)" in runtime
     assert "Node.node_type == NodeType.EXIT" in runtime
+    assert "Node.status == NodeStatus.ONLINE" in runtime
+    assert "Node.show_to_users.is_(True)" in runtime
     assert "NodeAccess.created_at" in runtime
     assert "_NEW_ACCESS_GRACE_SECONDS = 180" in runtime
+
+    # A successful node is not permanently cached anymore. Any material change
+    # to nodes, tunnels, runtime configs, selected protocols, plan entitlements,
+    # subscription state or credential readiness changes the signature and
+    # triggers another idempotent convergence pass.
+    assert "_last_topology_signature" in runtime
+    assert "signature != _last_topology_signature" in runtime
+    assert "_last_topology_signature = _topology_signature()" in runtime
+    assert "_converged_node_ids" not in runtime
+
+    # Classic protocols keep the established idempotent autosync path.
     assert "sync_installed_node_to_subscriptions" in runtime
-    assert 'if ok:' in runtime
-    assert "_converged_node_ids.add" in runtime
+    assert "await sync_installed_node_to_subscriptions(db, node)" in runtime
+
+    # Modern protocols are additive, entitlement-aware and only use real online
+    # NodeProtocolConfig runtimes. Existing usable items are merged back after
+    # the canonical modern provisioner creates a missing node item.
+    assert "MODERN_PROTOCOL_KEYS" in runtime
+    assert "plan_protocols" in runtime
+    assert "selected & allowed & eligible_protocols" in runtime
+    assert "_provision_modern_protocol" in runtime
+    assert "[node]" in runtime
+    assert "kept_items + list(new_items)" in runtime
+    assert "_delivery_item_is_usable" in runtime
+
+    # Failure does not advance the signature, so the same topology is retried.
+    assert "if result.get(\"ok\")" in runtime
     assert "await asyncio.sleep(_RETRY_INTERVAL_SECONDS)" in runtime
     assert 'add_event_handler("startup", _startup)' in runtime
     assert 'add_event_handler("shutdown", _shutdown)' in runtime
 
-    # Logging is deliberately summary-only; credential/SSH payloads are never
-    # emitted by the convergence worker.
-    assert '"failed_count": failed_count' in runtime
+    # Logging remains summary-only; SSH details and decrypted credential payloads
+    # are not emitted by the convergence worker.
+    assert '"failed_count": len(classic_failed) + len(modern_failed)' in runtime
     assert '"error_type": type(exc).__name__' in runtime
     assert 'str(exc)' not in runtime
 
