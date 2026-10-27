@@ -1,4 +1,4 @@
-name: Outbound Performance v261-v265 Smoke
+name: Outbound Performance v261-v268 Smoke
 
 on:
   pull_request:
@@ -7,11 +7,16 @@ on:
       - "backend/app/routers/outbound_performance_v262.py"
       - "backend/app/routers/outbound_performance_v262_runtime.py"
       - "backend/app/routers/outbound_performance_v265.py"
+      - "backend/app/routers/outbound_performance_v268.py"
+      - "backend/app/routers/outbound_performance_v268_guard.py"
       - "backend/app/routers/__init__.py"
       - "backend/tests/outbound_performance_v261_smoke.py"
       - "backend/tests/outbound_performance_v262_smoke.py"
       - "backend/tests/outbound_performance_v265_smoke.py"
+      - "backend/tests/outbound_performance_v268_smoke.py"
       - "components/outbound-performance-inline.tsx"
+      - "components/outbound-performance-v4.tsx"
+      - "components/outbound-performance-v4.module.css"
       - "components/outbound-performance-lab.module.css"
       - "components/ui.tsx"
       - "app/admin/outbounds/page.tsx"
@@ -24,11 +29,16 @@ on:
       - "backend/app/routers/outbound_performance_v262.py"
       - "backend/app/routers/outbound_performance_v262_runtime.py"
       - "backend/app/routers/outbound_performance_v265.py"
+      - "backend/app/routers/outbound_performance_v268.py"
+      - "backend/app/routers/outbound_performance_v268_guard.py"
       - "backend/app/routers/__init__.py"
       - "backend/tests/outbound_performance_v261_smoke.py"
       - "backend/tests/outbound_performance_v262_smoke.py"
       - "backend/tests/outbound_performance_v265_smoke.py"
+      - "backend/tests/outbound_performance_v268_smoke.py"
       - "components/outbound-performance-inline.tsx"
+      - "components/outbound-performance-v4.tsx"
+      - "components/outbound-performance-v4.module.css"
       - "components/outbound-performance-lab.module.css"
       - "components/ui.tsx"
       - "app/admin/outbounds/page.tsx"
@@ -41,7 +51,7 @@ permissions:
 jobs:
   performance-and-admin-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
 
@@ -56,10 +66,13 @@ jobs:
             backend/app/routers/outbound_performance_v262.py \
             backend/app/routers/outbound_performance_v262_runtime.py \
             backend/app/routers/outbound_performance_v265.py \
+            backend/app/routers/outbound_performance_v268.py \
+            backend/app/routers/outbound_performance_v268_guard.py \
             backend/app/routers/__init__.py \
             backend/tests/outbound_performance_v261_smoke.py \
             backend/tests/outbound_performance_v262_smoke.py \
-            backend/tests/outbound_performance_v265_smoke.py
+            backend/tests/outbound_performance_v265_smoke.py \
+            backend/tests/outbound_performance_v268_smoke.py
 
       - name: Install backend dependencies
         run: python -m pip install -r backend/requirements.txt
@@ -78,18 +91,25 @@ jobs:
           NODE_AGENT_SHARED_SECRET: "ci-outbound-performance-agent-v262"
         run: PYTHONPATH=backend python backend/tests/outbound_performance_v262_smoke.py
 
-      - name: Performance analytics v3 smoke
+      - name: Performance analytics v3 plus v4 guard smoke
         env:
           APP_SECRET_KEY: "ci-outbound-performance-v265"
           DATABASE_URL: "sqlite:////tmp/twinpanel-outbound-performance-v265.db"
           NODE_AGENT_SHARED_SECRET: "ci-outbound-performance-agent-v265"
         run: PYTHONPATH=backend python backend/tests/outbound_performance_v265_smoke.py
 
+      - name: Performance v4 optimizer safety smoke
+        env:
+          APP_SECRET_KEY: "ci-outbound-performance-v268"
+          DATABASE_URL: "sqlite:////tmp/twinpanel-outbound-performance-v268.db"
+          NODE_AGENT_SHARED_SECRET: "ci-outbound-performance-agent-v268"
+        run: PYTHONPATH=backend python backend/tests/outbound_performance_v268_smoke.py
+
       - name: Import application
         env:
-          APP_SECRET_KEY: "ci-outbound-performance-v265-import"
-          DATABASE_URL: "sqlite:////tmp/twinpanel-outbound-performance-v265-import.db"
-          NODE_AGENT_SHARED_SECRET: "ci-outbound-performance-agent-v265-import"
+          APP_SECRET_KEY: "ci-outbound-performance-v268-import"
+          DATABASE_URL: "sqlite:////tmp/twinpanel-outbound-performance-v268-import.db"
+          NODE_AGENT_SHARED_SECRET: "ci-outbound-performance-agent-v268-import"
         run: PYTHONPATH=backend python -c 'import app.main; print("app import: ok")'
 
       - uses: actions/setup-node@v4

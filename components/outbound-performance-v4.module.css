@@ -1,0 +1,156 @@
+.wrap{
+  --op4-border:color-mix(in srgb,var(--border,#263049) 86%,transparent);
+  --op4-panel:color-mix(in srgb,var(--panel,#0f1422) 95%,transparent);
+  --op4-soft:color-mix(in srgb,var(--panel-2,#151b2d) 92%,transparent);
+  --op4-text:var(--text,#eef2ff);
+  --op4-muted:var(--muted,#8f9ab5);
+  --op4-violet:#7c3aed;
+  --op4-violet2:#9f67ff;
+  margin-top:24px;
+  padding:24px;
+  border:1px solid var(--op4-border);
+  border-radius:24px;
+  background:var(--op4-panel);
+  box-shadow:0 20px 60px rgba(2,6,23,.10);
+  color:var(--op4-text);
+}
+.head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:24px;
+}
+.head>div:first-child{max-width:820px}
+.head span,.abBox span{
+  display:block;
+  margin-bottom:8px;
+  color:var(--op4-violet2);
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.08em;
+}
+.head h2,.abBox h3{margin:0;color:var(--op4-text)}
+.head h2{font-size:24px;line-height:1.35}
+.head p,.abBox p{
+  margin:8px 0 0;
+  color:var(--op4-muted);
+  line-height:1.8;
+}
+.controls,.actions,.abControls{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.controls select,.abControls select{
+  min-width:180px;
+  height:42px;
+  padding:0 12px;
+  border:1px solid var(--op4-border);
+  border-radius:12px;
+  background:var(--op4-soft);
+  color:var(--op4-text);
+}
+.controls button,.actions button,.abControls button{
+  min-height:42px;
+  padding:0 16px;
+  border:1px solid transparent;
+  border-radius:12px;
+  background:linear-gradient(135deg,var(--op4-violet),#6742d3);
+  color:#fff;
+  font:inherit;
+  font-weight:800;
+  cursor:pointer;
+  transition:transform .16s ease,opacity .16s ease,box-shadow .16s ease;
+}
+.controls button:hover:not(:disabled),.actions button:hover:not(:disabled),.abControls button:hover:not(:disabled){
+  transform:translateY(-1px);
+  box-shadow:0 10px 26px rgba(124,58,237,.22);
+}
+.controls button:disabled,.actions button:disabled,.abControls button:disabled{opacity:.45;cursor:not-allowed}
+.actions .secondary{
+  background:rgba(255,255,255,.025);
+  color:var(--op4-text);
+  border-color:var(--op4-border);
+}
+.grid,.resultGrid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:14px;
+  margin-top:20px;
+}
+.card,.resultGrid article{
+  padding:18px;
+  border:1px solid var(--op4-border);
+  border-radius:18px;
+  background:var(--op4-soft);
+}
+.card small,.resultGrid span{
+  display:block;
+  color:var(--op4-muted);
+  font-size:12px;
+}
+.card strong,.resultGrid b{
+  display:block;
+  margin-top:8px;
+  color:var(--op4-text);
+  font-size:18px;
+  overflow-wrap:anywhere;
+}
+.card em,.resultGrid small{
+  display:block;
+  margin-top:8px;
+  color:var(--op4-muted);
+  font-size:12px;
+  font-style:normal;
+  line-height:1.6;
+}
+.actions{margin-top:16px}
+.abBox{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:24px;
+  margin-top:22px;
+  padding:20px;
+  border:1px solid color-mix(in srgb,var(--op4-violet) 30%,transparent);
+  border-radius:20px;
+  background:color-mix(in srgb,var(--op4-violet) 7%,var(--op4-panel));
+}
+.abBox>div:first-child{max-width:720px}
+.error,.notice{
+  margin-top:16px;
+  padding:12px 14px;
+  border-radius:12px;
+  font-size:13px;
+  line-height:1.7;
+}
+.error{
+  border:1px solid rgba(239,68,68,.25);
+  background:rgba(239,68,68,.08);
+  color:#ff8f9f;
+}
+.notice{
+  border:1px solid rgba(49,196,141,.25);
+  background:rgba(49,196,141,.07);
+  color:#7fddb9;
+}
+.foot{
+  margin-top:18px;
+  padding-top:16px;
+  border-top:1px solid var(--op4-border);
+  color:var(--op4-muted);
+  font-size:12px;
+  line-height:1.8;
+}
+@media(max-width:1000px){
+  .head,.abBox{align-items:stretch;flex-direction:column}
+  .grid,.resultGrid{grid-template-columns:1fr}
+  .controls,.abControls{width:100%}
+  .controls select,.abControls select{flex:1 1 180px}
+}
+@media(max-width:640px){
+  .wrap{padding:16px;border-radius:18px}
+  .actions button,.controls button,.abControls button{width:100%}
+  .controls select,.abControls select{width:100%}
+}
