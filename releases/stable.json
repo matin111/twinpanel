@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.285",
+  "version": "1.1.0-rc.286",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-27T19:18:46Z",
+  "released_at": "2026-10-27T19:43:49Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "a670f8595a722a47c996205f40444acf6d0833eb",
+  "source_sha": "ebe90f8394b16141c74bc363ec05af28c44af4cd",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.285/twinpanel-1.1.0-rc.285-linux-x86_64.tar.gz",
-    "sha256": "49e866a104ff8ab15f9cb8cbf633756e236222c55dfa62b89704c4dec19b0496",
-    "size_bytes": 28379671
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.286/twinpanel-1.1.0-rc.286-linux-x86_64.tar.gz",
+    "sha256": "ff473b39f12721fea8b6e5f4b308fc91731ebc2e78630765e09648a0a8b56068",
+    "size_bytes": 28384892
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.285 اصلاح محدود Spoof WG V203 را منتشر می‌کند. شواهد Production نشان داد مسیر بیرونی Spoof با source-port ثابت 443 در جهت Exit→Iran فیلتر می‌شود، در حالی که source-port 44443 عبور می‌کند. V203 همچنان 443 را گزینه پیش‌فرض نگه می‌دارد، فقط در صورت peer_ping_failed یک بار به 44443 fallback می‌کند، پورت موفق را در metadata ذخیره می‌کند و در نصب‌های بعدی همان پورت موفق را در اولویت قرار می‌دهد. خطاهای service/dependency/TCP-egress/UDP-egress fallback نمی‌شوند و fail-closed باقی می‌مانند. TP27/VXLAN، Xray، provisioning، credentialها، Accounting و سایر transportها تغییری نکرده‌اند. Candidate روی SHA immutable a670f8595a722a47c996205f40444acf6d0833eb قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.285 publishes the scoped Spoof WG V203 fix. Production packet evidence showed that the Spoof outer path using fixed source port 443 was filtered on Exit-to-Iran while source port 44443 passed. V203 keeps 443 as the default candidate, retries exactly once with 44443 only when qualification fails with peer_ping_failed, persists the qualified port in transport metadata, and prefers that successful port on later installs. Service, dependency, TCP-egress, and UDP-egress failures do not trigger the fallback and remain fail-closed. TP27/VXLAN, Xray, provisioning, credentials, Accounting, and unrelated transports are unchanged. Candidate is pinned to immutable SHA a670f8595a722a47c996205f40444acf6d0833eb."
+    "fa": "TwinPanel 1.1.0-rc.286 اصلاح Xray Adaptive Three Profiles V47 را منتشر می‌کند. شواهد Subscription 17 نشان داد فقط Exit دارای دامنه/TLS سه پروفایل WebSocket/XHTTP/TCP-TLS داشت و Exitهای بدون TLS-domain فقط XHTTP/gRPC داشتند. V47 قرارداد مشتری را capability-aware و دقیقاً سه‌پروفایلی می‌کند: روی Exit دارای TLS معتبر، WebSocket TLS + XHTTP Reality + TCP TLS؛ و روی Exit بدون TLS identity، XHTTP Reality + gRPC Reality + TCP Reality. V46 دوباره در composition نهایی فعال می‌شود تا XHTTP روی target بدون تداخل +1004 بماند. TCP Reality جدید روی target خصوصی +1005 و public range 38000..38999 قرار می‌گیرد و با TUIC/Modern/Sudoku تداخل ندارد. UUID و Reality identity موجود حفظ می‌شوند، TLS جعلی یا tcp_simple plaintext ساخته نمی‌شود و delivery تا آماده‌شدن هر سه پروفایل fail-closed است. TP27/VXLAN، پروتکل‌های غیر-Xray، Accounting و credential secrets تغییر نکرده‌اند. Candidate روی SHA immutable ebe90f8394b16141c74bc363ec05af28c44af4cd قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.286 publishes Xray Adaptive Three Profiles V47. Subscription 17 production evidence showed that only the TLS-domain-ready Exit had the intended WebSocket/XHTTP/TCP-TLS set, while domainless Exits only had XHTTP/gRPC. V47 makes customer delivery capability-aware and exactly three-profile: TLS-ready Exits expose WebSocket TLS + XHTTP Reality + TCP TLS; Exits without a TLS identity expose XHTTP Reality + gRPC Reality + TCP Reality. V46 is restored in the final composition so XHTTP stays on its collision-free +1004 target. New TCP Reality uses Xray-private target +1005 and public range 38000..38999, avoiding TUIC/Modern/Sudoku ranges. Existing UUID and REALITY identity are preserved, no fake TLS or plaintext tcp_simple customer fallback is generated, and delivery fails closed until all three real profiles are materialized. TP27/VXLAN, non-Xray protocols, accounting and credential secrets are unchanged. Candidate is pinned to immutable SHA ebe90f8394b16141c74bc363ec05af28c44af4cd."
   }
 }
