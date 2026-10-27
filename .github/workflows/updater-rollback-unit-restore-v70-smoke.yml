@@ -1,0 +1,42 @@
+name: TwinPanel Updater Rollback Unit Restore V70 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/scripts/twinpanel_public_updater_v69.py'
+      - 'deploy/systemd/twinpanel-web.service.tpl'
+      - 'deploy/systemd/twinpanel-updater.service.tpl'
+      - '.github/workflows/updater-rollback-unit-restore-v70-smoke.yml'
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate rollback compatibility
+        run: |
+          python3 -m py_compile backend/scripts/twinpanel_public_updater_v69.py
+          python3 - <<'PY'
+          from pathlib import Path
+
+          wrapper = Path('backend/scripts/twinpanel_public_updater_v69.py').read_text()
+          web = Path('deploy/systemd/twinpanel-web.service.tpl').read_text()
+          updater = Path('deploy/systemd/twinpanel-updater.service.tpl').read_text()
+
+          assert '_install_rollback_unit_restore' in wrapper
+          assert 'core.install_web_unit(previous, web_port)' in wrapper
+          assert '_restore_updater_unit(previous)' in wrapper
+          assert 'original_rollback(previous)' in wrapper
+
+          assert "test ! -f /opt/twinpanel/current/backend/scripts/twinpanel_updater_unit_reconcile_v69.py ||" in web
+          assert "test ! -f /opt/twinpanel/current/backend/scripts/twinpanel_api_update_handoff_v69.py ||" in web
+
+          assert 'twinpanel_public_updater_v69.py' in updater
+          assert 'twinpanel_public_updater.py' in updater
+          assert 'if [ -f /opt/twinpanel/current/backend/scripts/twinpanel_public_updater_v69.py ]' in updater
+
+          for bad in ('pkill', 'killall'):
+              assert bad not in wrapper
+
+          print('UPDATER_ROLLBACK_UNIT_RESTORE_V70_SMOKE=PASS')
+          PY
