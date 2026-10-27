@@ -3,6 +3,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 V11 = ROOT / "backend/app/routers/public_connection_device_actions_v11.py"
 V20 = ROOT / "backend/app/routers/public_connection_protocol_actions_v20.py"
+V21 = ROOT / "backend/app/routers/public_connection_protocol_uri_details_v21.py"
 
 
 def require(condition: bool, message: str) -> None:
@@ -13,9 +14,12 @@ def require(condition: bool, message: str) -> None:
 def main() -> None:
     v11 = V11.read_text(encoding="utf-8")
     v20 = V20.read_text(encoding="utf-8")
+    v21 = V21.read_text(encoding="utf-8")
 
     require("public_connection_protocol_actions_v20" in v11, "V20 import missing")
     require("refine_public_connection_protocol_actions_v20(source)" in v11, "V20 chain missing")
+    require("public_connection_protocol_uri_details_v21" in v11, "V21 import missing")
+    require("refine_public_connection_protocol_uri_details_v21(source)" in v11, "V21 chain missing")
 
     # Never expose fake public server rows or internal pending provisioning cards.
     require("document.querySelectorAll('.v18-not-ready').forEach(row=>row.remove())" in v20, "fake server cleanup missing")
@@ -36,14 +40,20 @@ def main() -> None:
     ):
         require(protocol in v20, f"modern protocol policy missing: {protocol}")
 
-    # Protocol-specific detail schemas.
-    require("line('UUID',out?.uuid)" in v20, "TUIC UUID detail missing")
+    # JSON/config detail schemas handled directly by V20.
     require("line('Username',out?.username)" in v20, "Naive username detail missing")
     require("line('User Key',out?.userkey)" in v20, "Snell user key detail missing")
     require("line('Handshake / SNI',tlsSni(out))" in v20, "ShadowTLS SNI detail missing")
     require("profile?.user?.name" in v20 and "profile?.user?.password" in v20, "Mieru identity detail missing")
     require("Server Public Key" in v20, "AmneziaWG endpoint detail missing")
-    require("Server Address" in v20 and "AEAD" in v20, "Sudoku detail missing")
+
+    # Standard URI/deeplink schemas are parsed from their canonical payloads in V21.
+    require("new URL(String(raw||''))" in v21, "standard URI parser missing")
+    require("key==='hysteria2'" in v21 and "Password" in v21, "Hysteria2 URI details missing")
+    require("key==='tuic'" in v21 and "UUID" in v21, "TUIC URI details missing")
+    require("key==='anytls'" in v21 and "SNI" in v21, "AnyTLS URI details missing")
+    require("startsWith('sudoku://')" in v21, "Sudoku deeplink parser missing")
+    require("TextDecoder" in v21 and "AEAD" in v21, "Sudoku decoded details missing")
 
     # Direct-IP HTTP pages still need usable clipboard actions.
     require("document.execCommand('copy')" in v20, "clipboard fallback missing")
@@ -55,8 +65,10 @@ def main() -> None:
     require(".fact strong{font-size:14px" in v20, "desktop fact readability missing")
 
     require("TWINPANEL_PUBLIC_CONNECT_PROTOCOL_ACTIONS_V20" in v20, "V20 marker missing")
+    require("TWINPANEL_PUBLIC_CONNECT_PROTOCOL_URI_DETAILS_V21" in v21, "V21 marker missing")
 
     print("PUBLIC_CONNECT_PROTOCOL_ACTIONS_V20=PASS")
+    print("PUBLIC_CONNECT_PROTOCOL_URI_DETAILS_V21=PASS")
 
 
 if __name__ == "__main__":
