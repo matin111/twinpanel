@@ -1,6 +1,7 @@
 import ast
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -10,18 +11,23 @@ def _text(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def _load_age_seconds():
+def _load_helper(name: str, namespace: dict | None = None):
     source = _text("backend/app/node_subscription_convergence_v114.py")
     tree = ast.parse(source)
     helper = next(
         node
         for node in tree.body
-        if isinstance(node, ast.FunctionDef) and node.name == "_age_seconds"
+        if isinstance(node, ast.FunctionDef) and node.name == name
     )
     module = ast.Module(body=[helper], type_ignores=[])
-    namespace = {"datetime": datetime}
-    exec(compile(module, "node_subscription_convergence_v114.py", "exec"), namespace)
-    return namespace["_age_seconds"]
+    scope = {"Any": Any}
+    scope.update(namespace or {})
+    exec(compile(module, "node_subscription_convergence_v114.py", "exec"), scope)
+    return scope[name]
+
+
+def _load_age_seconds():
+    return _load_helper("_age_seconds", {"datetime": datetime})
 
 
 def test_fresh_exit_install_keeps_historical_subscription_autosync():
@@ -73,6 +79,28 @@ def test_node_access_grace_age_supports_naive_and_timezone_aware_datetimes():
         assert 230 <= age <= 250
 
 
+def test_legacy_nullable_plan_id_is_safe_for_signature_and_modern_delivery():
+    optional_int = _load_helper("_optional_int")
+    runtime = _text("backend/app/node_subscription_convergence_v114.py")
+
+    assert optional_int(None) is None
+    assert optional_int(17) == 17
+    assert optional_int("23") == 23
+
+    # Production had at least one historical Subscription.plan_id=NULL. It must
+    # stay visible to the topology fingerprint without crashing int(None).
+    assert "_optional_int(row.plan_id)" in runtime
+    assert "(int(row.id), int(row.plan_id), _enum_value(row.status))" not in runtime
+
+    # A NULL plan has no entitlement boundary, so Modern provisioning skips
+    # secret creation for that orphaned legacy row but does not fail the worker.
+    assert "plan_id = _optional_int(sub.plan_id)" in runtime
+    assert "if plan_id is None:" in runtime
+    assert "skipped_missing_plan += 1" in runtime
+    assert '"skipped_missing_plan": skipped_missing_plan' in runtime
+    assert "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_NULL_PLAN_V297" in runtime
+
+
 def test_topology_changes_reconverge_classic_and_modern_delivery():
     runtime = _text("backend/app/node_subscription_convergence_v114.py")
     composition = _text("backend/app/self_hosted_runtime.py")
@@ -80,6 +108,7 @@ def test_topology_changes_reconverge_classic_and_modern_delivery():
     assert "TWINPANEL_NODE_SUBSCRIPTION_CONVERGENCE_V114" in runtime
     assert "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_V294" in runtime
     assert "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_TIMEZONE_V295" in runtime
+    assert "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_NULL_PLAN_V297" in runtime
     assert "_topology_signature" in runtime
     assert "Node.retired_at.is_(None)" in runtime
     assert "Node.node_type == NodeType.EXIT" in runtime
