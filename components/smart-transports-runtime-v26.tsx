@@ -45,6 +45,15 @@ type ProtocolCoverageItem={
   source:"classic"|"modern";
 };
 
+type TransportProbeResult={
+  ok?:boolean;
+  latency_ms?:number|null;
+  production_path_unchanged?:boolean;
+  last_error?:string|null;
+  health?:{error?:string|null;[key:string]:unknown};
+  [key:string]:unknown;
+};
+
 const classicProtocols:ProtocolCoverageItem[]=[
   {key:"cisco",fa:"Cisco / OpenConnect",en:"Cisco / OpenConnect",source:"classic"},
   {key:"openvpn",fa:"OpenVPN",en:"OpenVPN",source:"classic"},
@@ -88,6 +97,7 @@ export function SmartTransportsRuntimeV26(){
   const [exitSpoofIp,setExitSpoofIp]=useState("");
   const [spoofCompatibility,setSpoofCompatibility]=useState<SpoofCompatibilityResult|null>(null);
   const [tp27Diagnosis,setTp27Diagnosis]=useState<Record<string,unknown>|null>(null);
+  const [transportProbes,setTransportProbes]=useState<Record<string,TransportProbeResult>>({});
 
   const loadTunnels=async()=>{
     const rows=await legacyControlApi.tunnels();
@@ -132,6 +142,7 @@ export function SmartTransportsRuntimeV26(){
     if(!selected)return;
     setSpoofCompatibility(null);
     setTp27Diagnosis(null);
+    setTransportProbes({});
     void loadState(selected);
     const timer=window.setInterval(()=>void loadState(selected,true),10000);
     return()=>window.clearInterval(timer);
@@ -203,13 +214,29 @@ export function SmartTransportsRuntimeV26(){
     void run(key,message,action);
   };
 
+  const probeTransport=async(row:SmartTransportCandidate)=>{
+    if(!selected||busy)return;
+    const name=row.transport as SmartTransportName;
+    setBusy(`probe-${name}`);setError("");setSuccess("");
+    try{
+      const result=await modernTransportApi.probe(selected,name) as TransportProbeResult;
+      setTransportProbes(current=>({...current,[name]:result}));
+      setSuccess(pick(`تست سلامت ${label(name)} انجام شد.`,`Fresh health test finished for ${label(name)}.`));
+      await loadState(selected,true);
+    }catch(reason){
+      setError(reason instanceof Error?reason.message:String(reason));
+    }finally{
+      setBusy("");
+    }
+  };
+
   const diagnoseTp27=async()=>{
     if(!selected||busy)return;
     setBusy("diagnose-tp27");setError("");setSuccess("");
     try{
       const result=await tunnelTransportApi.tp27Diagnose(selected);
       setTp27Diagnosis(result);
-      setSuccess(pick("تشخیص TP27 داخل همین کارت بروزرسانی شد.","TP27 diagnosis was refreshed inside this card."));
+      setSuccess(pick("تشخیص عمیق TP27 داخل همین کارت بروزرسانی شد.","Deep TP27 diagnosis was refreshed inside this card."));
       await loadState(selected,true);
     }catch(reason){
       setError(reason instanceof Error?reason.message:String(reason));
@@ -335,6 +362,8 @@ export function SmartTransportsRuntimeV26(){
           const isTp27=row.transport==="tp27_fast";
           const progress=Math.min(100,Math.round((Number(row.stable_seconds||0)/Math.max(1,Number(row.required_stable_seconds||60)))*100));
           const standbyReady=Boolean(row.qualified&&!isActive);
+          const probeResult=transportProbes[String(row.transport)];
+          const probeHealth=probeResult?.health||{};
           const tp27Carrier=asObject(tp27Diagnosis?.carrier);
           const tp27Iran=asObject(tp27Carrier.iran);
           const tp27Exit=asObject(tp27Carrier.exit);
@@ -366,11 +395,19 @@ export function SmartTransportsRuntimeV26(){
             {row.auto_block_reason&&<div className="runtime-warning compact" dir="ltr">{String(row.auto_block_reason)}</div>}
             {row.last_error&&<div className="runtime-error compact" dir="ltr">{String(row.last_error)}</div>}
 
+            {probeResult&&<div className="runtime-info-list">
+              <div><span>{pick("آخرین تست سلامت","Latest health test")}</span><Badge tone={probeResult.ok===true?"ok":"bad"}>{probeResult.ok===true?pick("سالم","Healthy"):pick("ناموفق","Failed")}</Badge></div>
+              <div><span>Latency</span><b dir="ltr">{probeResult.latency_ms==null?"—":`${String(probeResult.latency_ms)} ms`}</b></div>
+              <div><span>{pick("Production","Production")}</span><b>{probeResult.production_path_unchanged===true?pick("بدون تغییر","Unchanged"):"—"}</b></div>
+              {Boolean(probeResult.last_error)&&<div><span>{pick("خطا","Error")}</span><b dir="ltr">{String(probeResult.last_error)}</b></div>}
+              {!probeResult.last_error&&Boolean(probeHealth.error)&&<div><span>{pick("خطا","Error")}</span><b dir="ltr">{String(probeHealth.error)}</b></div>}
+            </div>}
+
             {isTp27&&installed&&<details className="tp-spoof-panel">
               <summary>{pick("تعمیرات تخصصی TP27","TP27 advanced repair")}</summary>
               <div className="tp-spoof-content">
                 <div className="tp-card-actions">
-                  <button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>void diagnoseTp27()}>{busy==="diagnose-tp27"?"…":pick("تشخیص TP27","Diagnose TP27")}</button>
+                  <button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>void diagnoseTp27()}>{busy==="diagnose-tp27"?"…":pick("تشخیص عمیق TP27","Deep TP27 diagnose")}</button>
                   <button type="button" className="danger" disabled={Boolean(busy)} onClick={rebuildTp27}>{busy==="rebuild-tp27"?"…":pick("بازسازی Carrier","Rebuild Carrier")}</button>
                 </div>
                 {tp27Diagnosis&&<div className="runtime-info-list">
@@ -399,6 +436,7 @@ export function SmartTransportsRuntimeV26(){
             </details>}
 
             <div className="tp-card-actions">
+              {installed&&<button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>void probeTransport(row)}>{busy===`probe-${row.transport}`?"…":pick("تست سلامت","Health test")}</button>}
               <button type="button" className="primary-soft" disabled={Boolean(busy)||(isSpoof&&!row.configured)} onClick={()=>installOrRepair(row)}>{busy===`install-${row.transport}`||busy===`repair-${row.transport}`?"…":installed?pick("تعمیر و تست","Repair & test"):pick("نصب و تست","Install & test")}</button>
               {row.selectable&&<button type="button" className="ghost" disabled={Boolean(busy)||isActive} onClick={()=>setManual(row)}>{busy===`manual-${row.transport}`?"…":isActive?pick("مسیر فعال","Active path"):pick("انتخاب به‌عنوان Production","Use as production")}</button>}
               {installed&&!isActive&&<button type="button" className="danger" disabled={Boolean(busy)} onClick={()=>remove(row)}>{busy===`remove-${row.transport}`?"…":pick("حذف","Remove")}</button>}
