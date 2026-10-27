@@ -1,0 +1,30 @@
+name: Updater Single API Restart V279 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "deploy/systemd/twinpanel-web.service.tpl"
+      - "backend/scripts/twinpanel_public_updater.py"
+      - "backend/scripts/twinpanel_runtime_unit_reconcile.py"
+      - "backend/tests/updater_single_api_restart_v279_smoke.py"
+      - ".github/workflows/updater-single-api-restart-v279-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  updater-single-api-restart-v279:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Python syntax
+        run: |
+          python -m py_compile \
+            backend/scripts/twinpanel_public_updater.py \
+            backend/scripts/twinpanel_runtime_unit_reconcile.py \
+            backend/tests/updater_single_api_restart_v279_smoke.py
+
+      - name: Validate single API restart ownership contract
+        run: python backend/tests/updater_single_api_restart_v279_smoke.py
