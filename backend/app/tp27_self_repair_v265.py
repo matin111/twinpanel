@@ -191,6 +191,16 @@ async def diagnose_tp27(tunnel_id: int, db: Session) -> dict:
 
     rt = runtime("tp27_fast", int(tunnel_id))
     cfg = _meta(row.config_text)
+    repair_state = cfg.get("tp27_self_repair_v265")
+    if not isinstance(repair_state, dict):
+        repair_state = {}
+
+    repair_attempts = repair_state.get("attempts")
+    if not isinstance(repair_attempts, list):
+        repair_attempts = cfg.get("repair_attempts")
+    if not isinstance(repair_attempts, list):
+        repair_attempts = []
+
     ci = ce = None
 
     try:
@@ -207,7 +217,13 @@ async def diagnose_tp27(tunnel_id: int, db: Session) -> dict:
             "last_error": row.last_error,
             "selected_profile": cfg.get("selected_profile"),
             "fou_port": cfg.get("fou_port"),
-            "repair_state": cfg.get("tp27_self_repair_v265") or {},
+            "repair_state": repair_state,
+            "repair_attempts": repair_attempts[-8:],
+            "last_repair_at": repair_state.get("last_repair_at"),
+            "last_repair_result": repair_state.get("last_result"),
+            "last_repair_error": repair_state.get("last_error"),
+            "repaired_profile": repair_state.get("selected_profile"),
+            "cooldown_remaining_seconds": _cooldown_remaining(row),
             "carrier": carrier,
             "healthy": bool(carrier["healthy"]),
         }
@@ -251,6 +267,7 @@ def _repair_meta(
     fou_port: int | None,
     health: dict[str, Any],
     attempts: list[dict[str, Any]],
+    source: str,
 ) -> dict[str, Any]:
     now = datetime.utcnow()
     out = dict(existing)
@@ -262,14 +279,17 @@ def _repair_meta(
             "selected_profile": profile,
             "gre_key": existing.get("gre_key"),
             "mtu": tp27_fast.MTU,
-            "repair_attempts": attempts,
+            "repair_attempts": attempts[-8:],
             "tp27_self_repair_v265": {
                 "version": 265,
                 "last_repair_at": now.isoformat() + "Z",
                 "last_repair_epoch": now.timestamp(),
                 "last_result": "online",
+                "source": source,
                 "selected_profile": profile,
                 "fou_port": fou_port,
+                "attempts": attempts[-8:],
+                "last_error": None,
             },
         }
     )
@@ -277,6 +297,34 @@ def _repair_meta(
         out.pop("fou_port", None)
     else:
         out["fou_port"] = int(fou_port)
+    return out
+
+
+def _failed_repair_meta(
+    existing: dict[str, Any],
+    *,
+    source: str,
+    attempts: list[dict[str, Any]],
+    error: str,
+) -> dict[str, Any]:
+    """Persist cooldown/error truth for every failed repair attempt."""
+
+    now = datetime.utcnow()
+    out = dict(existing)
+    previous = out.get("tp27_self_repair_v265")
+    state = dict(previous) if isinstance(previous, dict) else {}
+    state.update(
+        {
+            "version": 265,
+            "last_repair_at": now.isoformat() + "Z",
+            "last_repair_epoch": now.timestamp(),
+            "last_result": "failed",
+            "source": source,
+            "attempts": attempts[-8:],
+            "last_error": str(error or "tp27_repair_failed")[:1800],
+        }
+    )
+    out["tp27_self_repair_v265"] = state
     return out
 
 
@@ -306,6 +354,7 @@ async def _repair_tp27_locked(
     )
     ci = ce = None
     attempts: list[dict[str, Any]] = []
+    failure_recorded = False
 
     try:
         ci, ce = await connect_pair(iran, exit_node, db)
@@ -356,6 +405,13 @@ async def _repair_tp27_locked(
                     tunnel_id=int(tunnel_id),
                     rt=rt,
                 )
+
+                # Do not publish ONLINE until both the full dataplane probe and
+                # the final carrier snapshot agree on bidirectional health.
+                after = await _diagnose_with_connections(ci, ce, rt)
+                if not bool(after["healthy"]):
+                    raise RuntimeError("post_repair_carrier_probe_failed")
+
                 attempt["result"] = "online"
                 attempts.append(attempt)
 
@@ -366,6 +422,7 @@ async def _repair_tp27_locked(
                     fou_port=fou_port,
                     health=health,
                     attempts=attempts,
+                    source=source,
                 )
                 mark(
                     db,
@@ -384,10 +441,6 @@ async def _repair_tp27_locked(
                     live.active_transport = original_active
                     live.preferred_transport = original_preferred
                     db.commit()
-
-                after = await _diagnose_with_connections(ci, ce, rt)
-                if not bool(after["healthy"]):
-                    raise RuntimeError("post_repair_carrier_probe_failed")
 
                 return {
                     "ok": True,
@@ -416,15 +469,12 @@ async def _repair_tp27_locked(
             ensure_ascii=False,
             separators=(",", ":"),
         )
-        failed_meta = dict(cfg)
-        failed_meta["tp27_self_repair_v265"] = {
-            "version": 265,
-            "last_repair_at": datetime.utcnow().isoformat() + "Z",
-            "last_repair_epoch": datetime.utcnow().timestamp(),
-            "last_result": "failed",
-            "source": source,
-            "attempts": attempts[-8:],
-        }
+        failed_meta = _failed_repair_meta(
+            cfg,
+            source=source,
+            attempts=attempts,
+            error=message,
+        )
         mark(
             db,
             int(tunnel_id),
@@ -433,7 +483,35 @@ async def _repair_tp27_locked(
             error=message,
             meta=json.dumps(failed_meta, ensure_ascii=False, separators=(",", ":")),
         )
+        failure_recorded = True
         raise RuntimeError(message)
+
+    except Exception as exc:
+        if not failure_recorded:
+            message = f"tp27_repair_exception:{type(exc).__name__}:{exc}"[:6500]
+            try:
+                failed_meta = _failed_repair_meta(
+                    cfg,
+                    source=source,
+                    attempts=attempts,
+                    error=message,
+                )
+                mark(
+                    db,
+                    int(tunnel_id),
+                    "tp27_fast",
+                    status="failed",
+                    error=message,
+                    meta=json.dumps(
+                        failed_meta,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ),
+                )
+                failure_recorded = True
+            except Exception:
+                db.rollback()
+        raise
 
     finally:
         # Explicitly preserve the logical policy even if a future helper starts

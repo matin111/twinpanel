@@ -55,6 +55,7 @@ from .tp27_reference_runtime_v91 import (
     activate_manager_candidate_policy_v91,
     reconciler_loop as tp27_reference_loop,
 )
+from .tp27_repair_owner_guard import apply_tp27_repair_owner_guard
 from .tp27_self_repair_v265 import reconciler_loop as tp27_self_repair_loop
 from .vpn_access_dataplane_v46 import reconciler_loop as vpn_access_dataplane_loop
 from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performance_loop
@@ -64,6 +65,7 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 # TWINPANEL TRANSPORT MANAGER V12
 # + TP27 REFERENCE V91
 # + TP27 SELF REPAIR V265
+# + TP27 REPAIR OWNER GUARD
 # + ADAPTIVE TUNNEL PERFORMANCE V148
 # + LEGACY ADAPTIVE LAYERS V149/V151/V165 (cleanup compatibility)
 # + SMART CANDIDATE INSTALL/RETRY/FAIRNESS V167/V169/V171
@@ -81,6 +83,11 @@ async def main() -> None:
     install_manager_runtime_v16()
     install_smart_transport_auto_v21()
     activate_manager_candidate_policy_v91()
+
+    # TP27 has a dedicated carrier repair owner. Fence the historical V8/V9
+    # managed-repair scheduler before V10 starts so TP27 repair cannot race
+    # legacy/TP2027/SSH-relay mutations on the same logical tunnel.
+    apply_tp27_repair_owner_guard()
 
     # Keep the historical layers applied so their cleanup/runtime contracts are
     # available for already-installed rows. V202 narrows the final production
@@ -116,6 +123,7 @@ async def main() -> None:
         "candidate_bootstrap=v38 "
         "tp27_reference=v91 "
         "tp27_self_repair=v265 "
+        "tp27_repair_owner_guard=active "
         "adaptive_tunnel_performance=v148 "
         "compat_multilane=v149,v151,v165 "
         "smart_candidate_install_guard=v167 "
