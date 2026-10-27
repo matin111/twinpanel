@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.269",
+  "version": "1.1.0-rc.270",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-27T00:25:12Z",
+  "released_at": "2026-10-27T01:29:27Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "f7306bc41e93486af4db139a6dc0e2485bc5ea3c",
+  "source_sha": "f6b3ef86ff26ae66f192d5ca7b622a7644a19d52",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.269/twinpanel-1.1.0-rc.269-linux-x86_64.tar.gz",
-    "sha256": "89216809cce2ed97e2fa6e37b5e353da794d033f6cc2b05988d06afbac47c10f",
-    "size_bytes": 28324816
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.270/twinpanel-1.1.0-rc.270-linux-x86_64.tar.gz",
+    "sha256": "3a223cbf02fd6b1dca75f7f2bfbbc9ab453a6ab6c40ae0645e52692e9c9f70ba",
+    "size_bytes": 28324128
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.269 نمایش پوشش پروتکل‌های صفحه مسیرهای تانل را با Authority واقعی هماهنگ می‌کند. UI دیگر فقط قرارداد قدیمی پنج‌پروتکلی Cisco/OpenConnect، OpenVPN، WireGuard، L2TP/IPsec و Xray/V2Ray را نمایش نمی‌دهد؛ Inventory واقعی پروتکل‌های مدرن نصب‌شده روی Exit انتخاب‌شده از API موجود /v1/settings/vpn/modern-protocols خوانده می‌شود، با پنج پروتکل کلاسیک ادغام و dedupe می‌شود و همان لیست در Unified L3 Service Plane و کارت هر Transport نمایش داده می‌شود. پروتکل‌های not_installed نمایش داده نمی‌شوند و خطای موقت Inventory باعث خرابی صفحه نمی‌شود. هیچ Routing، TP27/VXLAN، Service Route، Credential یا DB schema تغییر نکرده و V251 همچنان Authority مسیر پروتکل‌های مدرن است. PR #1072 و Release PR #1073 با CI سبز Merge شده‌اند. Candidate روی SHA immutable f7306bc41e93486af4db139a6dc0e2485bc5ea3c قفل است. Production acceptance تا نصب rc.269 روی Controller 217.179.6.142 (CLY984318) و تأیید نمایش واقعی 15 پروتکل Tunnel #6 باز می‌ماند.",
-    "en": "TwinPanel 1.1.0-rc.269 aligns the tunnel-transports protocol coverage UI with real runtime authority. The page no longer presents only the historical five-protocol Cisco/OpenConnect, OpenVPN, WireGuard, L2TP/IPsec and Xray/V2Ray matrix. It reads the existing /v1/settings/vpn/modern-protocols inventory for the selected Exit, merges and deduplicates installed modern protocols with the five classic protocols, and renders the same dynamic coverage in the Unified L3 Service Plane and on every transport card. not_installed modern protocols are omitted and temporary inventory failures degrade gracefully instead of breaking the page. No routing, TP27/VXLAN, service-route, credential or database-schema behavior changes; V251 remains the modern service-route authority. PR #1072 and release PR #1073 merged with green CI. The candidate is pinned to immutable source SHA f7306bc41e93486af4db139a6dc0e2485bc5ea3c. Production acceptance remains pending installation on Controller 217.179.6.142 (CLY984318) and verification that Tunnel #6 displays its real 15-protocol coverage."
+    "fa": "TwinPanel 1.1.0-rc.270 قابلیت Self-Repair واقعی TP27 Fast را تکمیل و پایدار می‌کند. هسته TP27 اکنون خرابی Carrier را با Probe دوطرفه تشخیص می‌دهد، پس از سه Failure متوالی با Cooldown سه‌دقیقه‌ای Repair را اجرا می‌کند، Repair دستی و خودکار را با قفل cross-process سریال می‌کند، در خرابی runtime مسیر GRE Native ابتدا FoU را امتحان می‌کند و پس از هر rebuild با Probe کامل L3 نتیجه را fail-closed تأیید می‌کند. حالت Manual/Auto و active/preferred transport تغییر نمی‌کنند و فقط Carrier داخلی TP27 تعمیر می‌شود. پنل نیز ابزارهای «تشخیص TP27»، «تعمیر TP27» و «بازسازی Carrier» دارد. PR #1075 یک Guard تکمیلی اضافه می‌کند تا metadata مربوط به tp27_self_repair_v265 شامل cooldown و آخرین نتیجه تعمیر در reinstall/reconcile عادی پاک نشود. هیچ تغییر مستقیمی در VXLAN، service routes، credentialها یا DB schema انجام نشده است. Candidate روی SHA immutable f6b3ef86ff26ae66f192d5ca7b622a7644a19d52 قفل است. Production acceptance تا نصب rc.270 روی Controller و مشاهده Recovery واقعی Tunnel #6 باز می‌ماند.",
+    "en": "TwinPanel 1.1.0-rc.270 completes and hardens TP27 Fast self-repair. TP27 now detects carrier failure with bidirectional probes, repairs only after three consecutive failures with a three-minute cooldown, serializes manual and automatic repair with a cross-process lock, prefers FoU after a native-GRE runtime failure, and fail-closed verifies each rebuild with a full L3 probe. Manual/Auto mode and active/preferred transport remain unchanged; only the internal TP27 carrier is repaired. The panel exposes TP27 Diagnose, TP27 Repair and Carrier Rebuild controls. PR #1075 adds a persistence guard so tp27_self_repair_v265 lifecycle metadata, including cooldown and last repair result, survives normal reinstall/reconcile. No direct changes are made to VXLAN, service routes, credentials or DB schema. The candidate is pinned to immutable source SHA f6b3ef86ff26ae66f192d5ca7b622a7644a19d52. Production acceptance remains pending installation on the Controller and observation of real Tunnel #6 recovery."
   }
 }
