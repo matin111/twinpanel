@@ -1,0 +1,33 @@
+name: TwinPanel Public Connection Device Presentation V23 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/public_connection_device_actions_v11.py"
+      - "backend/app/routers/public_connection_device_presentation_v23.py"
+      - "backend/tests/smoke_public_connection_device_presentation_v23.py"
+      - ".github/workflows/public-connection-device-presentation-v23-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/routers/public_connection_device_actions_v11.py"
+      - "backend/app/routers/public_connection_device_presentation_v23.py"
+      - "backend/tests/smoke_public_connection_device_presentation_v23.py"
+      - ".github/workflows/public-connection-device-presentation-v23-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile V11/V23
+        run: |
+          python -m py_compile \
+            backend/app/routers/public_connection_device_actions_v11.py \
+            backend/app/routers/public_connection_device_presentation_v23.py
+      - name: Verify canonical device presentation contract
+        run: python backend/tests/smoke_public_connection_device_presentation_v23.py
