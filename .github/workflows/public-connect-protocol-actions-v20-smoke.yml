@@ -1,21 +1,23 @@
-name: Public Connect Protocol Actions V20 Smoke
+name: Public Connect Canonical Device Data V23 Smoke
 
 on:
   pull_request:
     paths:
       - 'backend/app/routers/public_connection_device_actions_v11.py'
+      - 'backend/app/routers/public_connection_modern_delivery_v13.py'
       - 'backend/app/routers/public_connection_protocol_actions_v20.py'
       - 'backend/app/routers/public_connection_protocol_uri_details_v21.py'
-      - 'backend/app/routers/public_connection_protocol_action_authority_v22.py'
+      - 'backend/app/routers/public_connection_device_data_authority_v23.py'
       - 'scripts/public-connect-protocol-actions-v20-smoke.py'
       - '.github/workflows/public-connect-protocol-actions-v20-smoke.yml'
   push:
     branches: [main]
     paths:
       - 'backend/app/routers/public_connection_device_actions_v11.py'
+      - 'backend/app/routers/public_connection_modern_delivery_v13.py'
       - 'backend/app/routers/public_connection_protocol_actions_v20.py'
       - 'backend/app/routers/public_connection_protocol_uri_details_v21.py'
-      - 'backend/app/routers/public_connection_protocol_action_authority_v22.py'
+      - 'backend/app/routers/public_connection_device_data_authority_v23.py'
       - 'scripts/public-connect-protocol-actions-v20-smoke.py'
       - '.github/workflows/public-connect-protocol-actions-v20-smoke.yml'
 
@@ -31,9 +33,10 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/routers/public_connection_device_actions_v11.py \
+            backend/app/routers/public_connection_modern_delivery_v13.py \
             backend/app/routers/public_connection_protocol_actions_v20.py \
             backend/app/routers/public_connection_protocol_uri_details_v21.py \
-            backend/app/routers/public_connection_protocol_action_authority_v22.py \
+            backend/app/routers/public_connection_device_data_authority_v23.py \
             scripts/public-connect-protocol-actions-v20-smoke.py
-      - name: Run V20/V21/V22 smoke
+      - name: Run V20/V21/V23 canonical device-data smoke
         run: python scripts/public-connect-protocol-actions-v20-smoke.py
