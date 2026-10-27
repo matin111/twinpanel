@@ -16,7 +16,11 @@ WorkingDirectory=/opt/twinpanel/current/backend
 Environment=PYTHONUNBUFFERED=1
 EnvironmentFile=/etc/twinpanel/backend.env
 EnvironmentFile=-/etc/twinpanel/install.env
-ExecStart=/opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_public_updater.py
+# V69 preserves the proven updater core but replaces the single shared 45s
+# health deadline with staged API -> Web health windows. This avoids false
+# rollback when a bounded API shutdown plus Python import/startup consumes most
+# of the legacy shared deadline.
+ExecStart=/opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_public_updater_v69.py
 TimeoutStartSec=3600
 Nice=5
 IOSchedulingClass=best-effort
