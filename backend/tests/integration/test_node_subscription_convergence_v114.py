@@ -1,3 +1,5 @@
+import ast
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
@@ -6,6 +8,20 @@ ROOT = Path(__file__).resolve().parents[3]
 
 def _text(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
+
+
+def _load_age_seconds():
+    source = _text("backend/app/node_subscription_convergence_v114.py")
+    tree = ast.parse(source)
+    helper = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_age_seconds"
+    )
+    module = ast.Module(body=[helper], type_ignores=[])
+    namespace = {"datetime": datetime}
+    exec(compile(module, "node_subscription_convergence_v114.py", "exec"), namespace)
+    return namespace["_age_seconds"]
 
 
 def test_fresh_exit_install_keeps_historical_subscription_autosync():
@@ -45,12 +61,25 @@ def test_fresh_exit_install_keeps_historical_subscription_autosync():
     assert "cred.config_text_encrypted = (\n                _enc(items)" in delivery
 
 
+def test_node_access_grace_age_supports_naive_and_timezone_aware_datetimes():
+    age_seconds = _load_age_seconds()
+
+    naive = datetime.utcnow() - timedelta(seconds=240)
+    aware_utc = datetime.now(timezone.utc) - timedelta(seconds=240)
+    aware_offset = datetime.now(timezone(timedelta(hours=3, minutes=30))) - timedelta(seconds=240)
+
+    for value in (naive, aware_utc, aware_offset):
+        age = age_seconds(value)
+        assert 230 <= age <= 250
+
+
 def test_topology_changes_reconverge_classic_and_modern_delivery():
     runtime = _text("backend/app/node_subscription_convergence_v114.py")
     composition = _text("backend/app/self_hosted_runtime.py")
 
     assert "TWINPANEL_NODE_SUBSCRIPTION_CONVERGENCE_V114" in runtime
     assert "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_V294" in runtime
+    assert "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_TIMEZONE_V295" in runtime
     assert "_topology_signature" in runtime
     assert "Node.retired_at.is_(None)" in runtime
     assert "Node.node_type == NodeType.EXIT" in runtime
@@ -58,6 +87,7 @@ def test_topology_changes_reconverge_classic_and_modern_delivery():
     assert "Node.show_to_users.is_(True)" in runtime
     assert "NodeAccess.created_at" in runtime
     assert "_NEW_ACCESS_GRACE_SECONDS = 180" in runtime
+    assert "age = _age_seconds(access_created_at)" in runtime
 
     # A successful node is not permanently cached anymore. Any material change
     # to nodes, tunnels, runtime configs, selected protocols, plan entitlements,
@@ -88,6 +118,12 @@ def test_topology_changes_reconverge_classic_and_modern_delivery():
     assert "await asyncio.sleep(_RETRY_INTERVAL_SECONDS)" in runtime
     assert 'add_event_handler("startup", _startup)' in runtime
     assert 'add_event_handler("shutdown", _shutdown)' in runtime
+
+    # Outer-loop failures identify the failing stage without logging secrets.
+    assert 'stage = "topology_signature"' in runtime
+    assert 'stage = "reconcile"' in runtime
+    assert 'stage = "post_reconcile_signature"' in runtime
+    assert 'f"stage={stage}"' in runtime
 
     # Logging remains summary-only; SSH details and decrypted credential payloads
     # are not emitted by the convergence worker.
