@@ -79,26 +79,45 @@ def test_node_access_grace_age_supports_naive_and_timezone_aware_datetimes():
         assert 230 <= age <= 250
 
 
-def test_legacy_nullable_plan_id_is_safe_for_signature_and_modern_delivery():
+def test_nullable_plan_id_remains_signature_safe_but_is_not_delivery_authority():
     optional_int = _load_helper("_optional_int")
+    wanted_protocols = _load_helper("_wanted_modern_protocols")
     runtime = _text("backend/app/node_subscription_convergence_v114.py")
+    factory = _text("backend/app/services/subscription_factory.py")
 
     assert optional_int(None) is None
     assert optional_int(17) == 17
     assert optional_int("23") == 23
 
-    # Production had at least one historical Subscription.plan_id=NULL. It must
-    # stay visible to the topology fingerprint without crashing int(None).
+    # Historical/manual Subscription.plan_id=NULL remains safe to fingerprint.
     assert "_optional_int(row.plan_id)" in runtime
     assert "(int(row.id), int(row.plan_id), _enum_value(row.status))" not in runtime
 
-    # A NULL plan has no entitlement boundary, so Modern provisioning skips
-    # secret creation for that orphaned legacy row but does not fail the worker.
-    assert "plan_id = _optional_int(sub.plan_id)" in runtime
-    assert "if plan_id is None:" in runtime
-    assert "skipped_missing_plan += 1" in runtime
-    assert '"skipped_missing_plan": skipped_missing_plan' in runtime
-    assert "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_NULL_PLAN_V297" in runtime
+    # PR #891 intentionally moved protocol desired-state out of Plan and into
+    # SubscriptionProtocol. Manual NULL-plan accounts are valid first-class
+    # subscriptions and must receive newly eligible Modern nodes too.
+    assert "Protocol desired-state belongs to the Subscription, never to the Plan." in factory
+    assert wanted_protocols(
+        {"hysteria2", "tuic", "cisco"},
+        {"tuic", "anytls"},
+    ) == ["tuic"]
+
+    sync_source = ast.get_source_segment(
+        runtime,
+        next(
+            node
+            for node in ast.parse(runtime).body
+            if isinstance(node, ast.AsyncFunctionDef) and node.name == "_sync_modern_node"
+        ),
+    )
+    assert sync_source is not None
+    assert "db.get(Plan" not in sync_source
+    assert "plan_protocols" not in sync_source
+    assert "if plan_id is None" not in sync_source
+    assert "_wanted_modern_protocols(selected, eligible_protocols)" in sync_source
+    assert '"skipped_missing_plan": 0' in sync_source
+    assert "TWINPANEL_DYNAMIC_SUBSCRIPTION_PROTOCOL_AUTHORITY_V299" in runtime
+    assert "manual_null_plan=modern_delivery_enabled" in runtime
 
 
 def test_topology_changes_reconverge_classic_and_modern_delivery():
@@ -109,6 +128,7 @@ def test_topology_changes_reconverge_classic_and_modern_delivery():
     assert "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_V294" in runtime
     assert "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_TIMEZONE_V295" in runtime
     assert "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_NULL_PLAN_V297" in runtime
+    assert "TWINPANEL_DYNAMIC_SUBSCRIPTION_PROTOCOL_AUTHORITY_V299" in runtime
     assert "_topology_signature" in runtime
     assert "Node.retired_at.is_(None)" in runtime
     assert "Node.node_type == NodeType.EXIT" in runtime
@@ -119,31 +139,31 @@ def test_topology_changes_reconverge_classic_and_modern_delivery():
     assert "age = _age_seconds(access_created_at)" in runtime
 
     # A successful node is not permanently cached anymore. Any material change
-    # to nodes, tunnels, runtime configs, selected protocols, plan entitlements,
-    # subscription state or credential readiness changes the signature and
-    # triggers another idempotent convergence pass.
+    # to nodes, tunnels, runtime configs, selected protocols, subscription state
+    # or credential readiness changes the signature and triggers another
+    # idempotent convergence pass.
     assert "_last_topology_signature" in runtime
     assert "signature != _last_topology_signature" in runtime
     assert "_last_topology_signature = _topology_signature()" in runtime
     assert "_converged_node_ids" not in runtime
 
-    # Classic protocols keep the established idempotent autosync path.
+    # Classic protocols keep the established idempotent selected-protocol path.
     assert "sync_installed_node_to_subscriptions" in runtime
     assert "await sync_installed_node_to_subscriptions(db, node)" in runtime
 
-    # Modern protocols are additive, entitlement-aware and only use real online
-    # NodeProtocolConfig runtimes. Existing usable items are merged back after
-    # the canonical modern provisioner creates a missing node item.
+    # Modern delivery follows the same SubscriptionProtocol authority established
+    # by PR #891. Runtime readiness + delivery guard still gate each target.
     assert "MODERN_PROTOCOL_KEYS" in runtime
-    assert "plan_protocols" in runtime
-    assert "selected & allowed & eligible_protocols" in runtime
+    assert "_wanted_modern_protocols(selected, eligible_protocols)" in runtime
+    assert "selected & eligible_protocols" in runtime
+    assert "selected & allowed & eligible_protocols" not in runtime
     assert "_provision_modern_protocol" in runtime
     assert "[node]" in runtime
     assert "kept_items + list(new_items)" in runtime
     assert "_delivery_item_is_usable" in runtime
 
     # Failure does not advance the signature, so the same topology is retried.
-    assert "if result.get(\"ok\")" in runtime
+    assert 'if result.get("ok")' in runtime
     assert "await asyncio.sleep(_RETRY_INTERVAL_SECONDS)" in runtime
     assert 'add_event_handler("startup", _startup)' in runtime
     assert 'add_event_handler("shutdown", _shutdown)' in runtime

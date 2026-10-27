@@ -12,7 +12,6 @@ from .models import (
     NodeProtocolConfig,
     NodeStatus,
     NodeType,
-    Plan,
     ProtocolCredential,
     Subscription,
     SubscriptionProtocol,
@@ -20,7 +19,7 @@ from .models import (
     Tunnel,
 )
 from .plan_protocol_models import PlanProtocol
-from .protocol_account_registry import MODERN_PROTOCOL_KEYS, plan_protocols
+from .protocol_account_registry import MODERN_PROTOCOL_KEYS
 from .routers import provision
 
 
@@ -28,6 +27,7 @@ MARKER = "TWINPANEL_NODE_SUBSCRIPTION_CONVERGENCE_V114"
 DYNAMIC_MARKER = "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_V294"
 TIMEZONE_FIX_MARKER = "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_TIMEZONE_V295"
 NULL_PLAN_FIX_MARKER = "TWINPANEL_DYNAMIC_SUBSCRIPTION_DELIVERY_NULL_PLAN_V297"
+SUBSCRIPTION_AUTHORITY_MARKER = "TWINPANEL_DYNAMIC_SUBSCRIPTION_PROTOCOL_AUTHORITY_V299"
 _NEW_ACCESS_GRACE_SECONDS = 180
 _RETRY_INTERVAL_SECONDS = 60
 _INITIAL_DELAY_SECONDS = 20
@@ -83,7 +83,12 @@ def _eligible_exit_node_ids() -> list[int]:
 
 
 def _topology_signature() -> str:
-    """Fingerprint delivery-affecting state without secrets."""
+    """Fingerprint delivery-affecting state without secrets.
+
+    Plan protocol rows are retained as compatibility fingerprint input only.
+    Since PR #891, SubscriptionProtocol is the desired-state authority and plan
+    protocol compatibility data never gates account delivery.
+    """
     db = SessionLocal()
     try:
         nodes = (
@@ -212,6 +217,19 @@ def _item_node_id(ad: Any, item: dict[str, Any]) -> int:
     return ad._autosync_item_node_id(item)
 
 
+def _wanted_modern_protocols(
+    selected: set[str],
+    eligible_protocols: set[str],
+) -> list[str]:
+    """Return the selected Modern protocols that are live-delivery eligible.
+
+    PR #891 moved protocol desired-state out of Plan and into
+    SubscriptionProtocol. A Plan (or the absence of one) must therefore never
+    suppress a selected protocol during topology convergence.
+    """
+    return sorted(selected & eligible_protocols)
+
+
 def _modern_item_is_usable(ad: Any, db, protocol: str, item: dict[str, Any]) -> bool:
     if not ad._delivery_item_is_usable(db, protocol, item):
         return False
@@ -230,7 +248,7 @@ def _modern_item_is_usable(ad: Any, db, protocol: str, item: dict[str, Any]) -> 
 
 
 async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
-    """Add only missing Modern credentials for one newly eligible Exit."""
+    """Add only missing selected Modern credentials for one eligible Exit."""
     from .routers import account_delivery as ad
     from .routers.modern_account_delivery_v1 import _provision_modern_protocol
 
@@ -280,21 +298,9 @@ async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
     )
     provisioned_pairs = 0
     reused_pairs = 0
-    skipped_missing_plan = 0
     failed: list[dict[str, Any]] = []
 
     for sub in active_subscriptions:
-        plan_id = _optional_int(sub.plan_id)
-        if plan_id is None:
-            # Legacy/orphaned rows have no entitlement boundary. Keep them in
-            # the topology fingerprint, but never provision new Modern secrets.
-            skipped_missing_plan += 1
-            continue
-
-        plan = db.get(Plan, plan_id)
-        if plan is None:
-            failed.append({"subscription_id": int(sub.id), "node_id": int(node.id), "error": "plan_not_found"})
-            continue
         selected = {
             str(protocol or "").strip().lower()
             for (protocol,) in (
@@ -303,8 +309,7 @@ async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
                 .all()
             )
         }
-        allowed = set(plan_protocols(db, plan))
-        wanted = sorted(selected & allowed & eligible_protocols)
+        wanted = _wanted_modern_protocols(selected, eligible_protocols)
 
         for protocol in wanted:
             cred = (
@@ -393,7 +398,9 @@ async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
         "node_id": int(node.id),
         "provisioned_pairs": provisioned_pairs,
         "reused_pairs": reused_pairs,
-        "skipped_missing_plan": skipped_missing_plan,
+        # Kept for log-shape compatibility with rc.297. Under the subscription-
+        # owned protocol model, missing Plan is valid and is never skipped.
+        "skipped_missing_plan": 0,
         "failed": failed,
     }
 
@@ -501,7 +508,7 @@ async def _startup() -> None:
         return
     _task = asyncio.create_task(
         _convergence_loop(),
-        name="node-subscription-convergence-v297",
+        name="node-subscription-convergence-v299",
     )
 
 
@@ -530,14 +537,16 @@ def apply_node_subscription_convergence_v114() -> None:
         f"{MARKER}_ACTIVE "
         f"{DYNAMIC_MARKER}=enabled "
         f"{TIMEZONE_FIX_MARKER}=enabled "
-        f"{NULL_PLAN_FIX_MARKER}=enabled "
+        f"{NULL_PLAN_FIX_MARKER}=compatibility "
+        f"{SUBSCRIPTION_AUTHORITY_MARKER}=enabled "
         "scope=visible_online_exit_nodes "
-        "trigger=topology_or_entitlement_change "
+        "trigger=topology_or_subscription_protocol_change "
         "membership=all_subscriptions "
         "credentials=active_subscriptions "
         "protocols=classic+modern "
+        "protocol_authority=SubscriptionProtocol "
+        "manual_null_plan=modern_delivery_enabled "
         "datetime=naive+aware-safe "
-        "legacy_null_plan=safe_skip_modern_credentials "
         "retry=failures_only",
         flush=True,
     )
