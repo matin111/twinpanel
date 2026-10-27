@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 REPAIR = ROOT / "backend" / "app" / "tp27_self_repair_v265.py"
 OWNER = ROOT / "backend" / "app" / "tp27_repair_owner_guard.py"
+API = ROOT / "backend" / "app" / "tp27_repair_api_v265.py"
 MANAGER = ROOT / "backend" / "app" / "tunnel_transport_manager_v12.py"
 UI = ROOT / "components" / "smart-transports-runtime-v26.tsx"
 
@@ -25,12 +26,14 @@ def _function_source(source: str, name: str) -> str:
 def main() -> None:
     repair_source = REPAIR.read_text(encoding="utf-8")
     owner_source = OWNER.read_text(encoding="utf-8")
+    api_source = API.read_text(encoding="utf-8")
     manager_source = MANAGER.read_text(encoding="utf-8")
     ui_source = UI.read_text(encoding="utf-8")
 
     for path, source in (
         (REPAIR, repair_source),
         (OWNER, owner_source),
+        (API, api_source),
         (MANAGER, manager_source),
     ):
         compile(source, str(path), "exec")
@@ -49,6 +52,21 @@ def main() -> None:
 
     assert "apply_tp27_repair_owner_guard()" in manager_source
     assert "tp27_repair_owner_guard=active" in manager_source
+
+    # The historical managed-repair API uses a separate lock domain and must
+    # fail closed instead of racing TP27 repair or silently redirecting it.
+    api_guard = _function_source(api_source, "_legacy_managed_repair_owner_guard")
+    assert "_tp27_owns_repair" in api_guard
+    assert "status_code=409" in api_guard
+    assert '"repair_owner": "tp27_self_repair_v265"' in api_guard
+    assert "/tp27/repair" in api_guard
+    assert "/tp27/rebuild" in api_guard
+    apply_api = _function_source(api_source, "apply_tp27_repair_api_v265")
+    assert (
+        "tunnel_managed.repair_managed_tunnel = "
+        "_legacy_managed_repair_owner_guard"
+    ) in apply_api
+    assert "legacy-managed-repair-fenced=1" in apply_api
 
     # Every repair failure, including SSH/prerequisite failures that happen
     # before profile iteration, must create durable cooldown/error telemetry.
