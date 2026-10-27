@@ -245,6 +245,15 @@ export function SmartTransportsRuntimeV26(){
     }
   };
 
+  const repairTp27=()=>{
+    if(!selected||busy)return;
+    void run(
+      "repair-tp27",
+      pick("تعمیر TP27 انجام و دوباره ارزیابی شد.","TP27 repair and validation finished."),
+      ()=>tunnelTransportApi.tp27Repair(selected),
+    );
+  };
+
   const rebuildTp27=()=>{
     if(!selected||busy)return;
     if(!window.confirm(pick(
@@ -367,6 +376,9 @@ export function SmartTransportsRuntimeV26(){
           const tp27Carrier=asObject(tp27Diagnosis?.carrier);
           const tp27Iran=asObject(tp27Carrier.iran);
           const tp27Exit=asObject(tp27Carrier.exit);
+          const tp27RepairState=asObject(tp27Diagnosis?.repair_state);
+          const tp27RepairAttempts=Array.isArray(tp27Diagnosis?.repair_attempts)?tp27Diagnosis!.repair_attempts as unknown[]:[];
+          const tp27Cooldown=Math.max(0,Number(tp27Diagnosis?.cooldown_remaining_seconds)||0);
           return <Card key={row.transport} className={`tp-transport-card ${isActive?"is-active":""} ${standbyReady?"is-standby":""}`}>
             <div className="tp-card-top">
               <div>
@@ -407,14 +419,27 @@ export function SmartTransportsRuntimeV26(){
               <summary>{pick("تعمیرات تخصصی TP27","TP27 advanced repair")}</summary>
               <div className="tp-spoof-content">
                 <div className="tp-card-actions">
-                  <button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>void diagnoseTp27()}>{busy==="diagnose-tp27"?"…":pick("تشخیص عمیق TP27","Deep TP27 diagnose")}</button>
+                  <button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>void diagnoseTp27()}>{busy==="diagnose-tp27"?"…":pick("تشخیص TP27","Diagnose TP27")}</button>
+                  <button type="button" className="primary-soft" disabled={Boolean(busy)} onClick={repairTp27}>{busy==="repair-tp27"?"…":pick("تعمیر TP27","Repair TP27")}</button>
                   <button type="button" className="danger" disabled={Boolean(busy)} onClick={rebuildTp27}>{busy==="rebuild-tp27"?"…":pick("بازسازی Carrier","Rebuild Carrier")}</button>
                 </div>
                 {tp27Diagnosis&&<div className="runtime-info-list">
                   <div><span>{pick("سلامت دوطرفه","Bidirectional health")}</span><Badge tone={tp27Diagnosis.healthy===true?"ok":tp27Diagnosis.healthy===false?"bad":"warn"}>{tp27Diagnosis.healthy===true?pick("سالم","Healthy"):tp27Diagnosis.healthy===false?pick("ناسالم","Unhealthy"):"—"}</Badge></div>
                   <div><span>Iran → Exit</span><b>{tp27Iran.peer_reachable===true?"✓":tp27Iran.peer_reachable===false?"✕":"—"}</b></div>
                   <div><span>Exit → Iran</span><b>{tp27Exit.peer_reachable===true?"✓":tp27Exit.peer_reachable===false?"✕":"—"}</b></div>
-                  <div><span>Carrier</span><b dir="ltr">{String(tp27Diagnosis.selected_profile||"—")}</b></div>
+                  <div><span>{pick("سرویس ایران","Iran service")}</span><b dir="ltr">{String(tp27Iran.service_state||"—")}</b></div>
+                  <div><span>{pick("سرویس خارج","Exit service")}</span><b dir="ltr">{String(tp27Exit.service_state||"—")}</b></div>
+                  <div><span>{pick("Interface ایران","Iran interface")}</span><b>{tp27Iran.interface_present===true?"✓":tp27Iran.interface_present===false?"✕":"—"}</b></div>
+                  <div><span>{pick("Interface خارج","Exit interface")}</span><b>{tp27Exit.interface_present===true?"✓":tp27Exit.interface_present===false?"✕":"—"}</b></div>
+                  <div><span>{pick("Address ایران","Iran address")}</span><b>{tp27Iran.address_present===true?"✓":tp27Iran.address_present===false?"✕":"—"}</b></div>
+                  <div><span>{pick("Address خارج","Exit address")}</span><b>{tp27Exit.address_present===true?"✓":tp27Exit.address_present===false?"✕":"—"}</b></div>
+                  <div><span>Carrier</span><b dir="ltr">{String(tp27Diagnosis.selected_profile||"—")}{tp27Diagnosis.fou_port?` · UDP ${String(tp27Diagnosis.fou_port)}`:""}</b></div>
+                  <div><span>{pick("آخرین Repair","Last repair")}</span><b>{tp27Diagnosis.last_repair_at?new Date(String(tp27Diagnosis.last_repair_at)).toLocaleString("fa-IR"):"—"}</b></div>
+                  <div><span>{pick("نتیجه Repair","Repair result")}</span><Badge tone={normalized(tp27Diagnosis.last_repair_result)==="online"?"ok":normalized(tp27Diagnosis.last_repair_result)==="failed"?"bad":"warn"}>{String(tp27Diagnosis.last_repair_result||"—")}</Badge></div>
+                  <div><span>{pick("پروفایل Repair","Repaired profile")}</span><b dir="ltr">{String(tp27Diagnosis.repaired_profile||tp27RepairState.selected_profile||"—")}</b></div>
+                  <div><span>{pick("تلاش‌های Repair","Repair attempts")}</span><b>{tp27RepairAttempts.length}</b></div>
+                  <div><span>Cooldown</span><b dir="ltr">{tp27Cooldown>0?`${Math.ceil(tp27Cooldown)}s`:pick("آزاد","Ready")}</b></div>
+                  {Boolean(tp27Diagnosis.last_repair_error)&&<div><span>{pick("آخرین خطای Repair","Last repair error")}</span><b dir="ltr">{String(tp27Diagnosis.last_repair_error)}</b></div>}
                 </div>}
               </div>
             </details>}
@@ -437,7 +462,7 @@ export function SmartTransportsRuntimeV26(){
 
             <div className="tp-card-actions">
               {installed&&<button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>void probeTransport(row)}>{busy===`probe-${row.transport}`?"…":pick("تست سلامت","Health test")}</button>}
-              <button type="button" className="primary-soft" disabled={Boolean(busy)||(isSpoof&&!row.configured)} onClick={()=>installOrRepair(row)}>{busy===`install-${row.transport}`||busy===`repair-${row.transport}`?"…":installed?pick("تعمیر و تست","Repair & test"):pick("نصب و تست","Install & test")}</button>
+              {(!isTp27||!installed)&&<button type="button" className="primary-soft" disabled={Boolean(busy)||(isSpoof&&!row.configured)} onClick={()=>installOrRepair(row)}>{busy===`install-${row.transport}`||busy===`repair-${row.transport}`?"…":installed?pick("تعمیر و تست","Repair & test"):pick("نصب و تست","Install & test")}</button>}
               {row.selectable&&<button type="button" className="ghost" disabled={Boolean(busy)||isActive} onClick={()=>setManual(row)}>{busy===`manual-${row.transport}`?"…":isActive?pick("مسیر فعال","Active path"):pick("انتخاب به‌عنوان Production","Use as production")}</button>}
               {installed&&!isActive&&<button type="button" className="danger" disabled={Boolean(busy)} onClick={()=>remove(row)}>{busy===`remove-${row.transport}`?"…":pick("حذف","Remove")}</button>}
             </div>
