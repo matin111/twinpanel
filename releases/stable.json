@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.297",
+  "version": "1.1.0-rc.298",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-27T23:25:55Z",
+  "released_at": "2026-10-27T23:43:01Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d12181c60b986603aa09b881723fb20adad69793",
+  "source_sha": "a3d14ca4761499d82260eb07eedf36a5e3917db0",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.297/twinpanel-1.1.0-rc.297-linux-x86_64.tar.gz",
-    "sha256": "c2692ed722c7947ba41e0c1dc1c4066b9b019103460efa4f60551e55bfe6804a",
-    "size_bytes": 28406057
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.298/twinpanel-1.1.0-rc.298-linux-x86_64.tar.gz",
+    "sha256": "2c97d7774167f677a46fe9328a79c5fe13f44a4fd4f7e80386f590fd7f442ed3",
+    "size_bytes": 28430177
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.297 دومین blocker واقعی Dynamic Subscription Delivery را که روی Controller واقعی دیده شد برطرف می‌کند. در rc.296 محاسبه NodeAccess timezone-safe شد، اما topology signature روی Subscriptionهای قدیمی با plan_id=NULL در int(None) متوقف می‌شد. در rc.297 plan_id nullable به‌صورت امن در fingerprint حفظ می‌شود و Subscription فعال بدون Plan برای ساخت credential جدید Modern ایمن skip می‌شود، چون entitlement معتبر برای صدور secret جدید وجود ندارد؛ سایر اشتراک‌ها بدون توقف پردازش می‌شوند. شمارنده skipped_missing_plan فقط summary است و هیچ secret یا credential در لاگ ثبت نمی‌شود. V294 topology-aware convergence، Classic/Modern delivery، eligibility filters، Mobile V17/V18، Accounting، TP27/VXLAN/Spoof و credentialهای موجود بدون تغییر باقی مانده‌اند. Candidate روی SHA immutable d12181c60b986603aa09b881723fb20adad69793 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.297 fixes the second production-proven blocker in Dynamic Subscription Delivery. rc.296 made NodeAccess grace-age handling timezone-safe, but the topology signature still crashed on legacy Subscription rows with plan_id=NULL via int(None). rc.297 preserves nullable plan_id values safely in the fingerprint and safely skips new Modern credential provisioning for active NULL-plan subscriptions because no valid entitlement boundary exists for issuing new secrets; all other subscriptions continue processing. skipped_missing_plan is summary-only and no secrets or credentials are logged. V294 topology-aware convergence, Classic/Modern delivery, eligibility filters, Mobile V17/V18, Accounting, TP27/VXLAN/Spoof and existing credentials remain unchanged. Candidate is pinned to immutable SHA d12181c60b986603aa09b881723fb20adad69793."
+    "fa": "TwinPanel 1.1.0-rc.298 Regression صفحه Tunnel را برطرف می‌کند. /admin/tunnels دوباره صفحه مستقل مدیریت Pair و پروتکل‌های سرویس است و Inventory واقعی پروتکل‌های کلاسیک و مدرن را از Exit همان Tunnel نمایش می‌دهد. برای پروتکل‌های کلاسیک Install/Repair/Health و برای پروتکل‌های مدرن Add/Apply/Repair/Remove در دسترس است؛ Service Connections، انتخاب منطقی Pair بدون نصب و ساخت Managed Tunnel نیز حفظ شده‌اند. /admin/tunnel-transports همچنان مرجع مستقل Transport/Failover و Smart Auto باقی می‌ماند. هیچ پیاده‌سازی dataplane مربوط به TP27 Fast، Kernel VXLAN، Spoof WG یا SSH Relay و هیچ مسیر فعال Production تغییر نکرده است. Candidate روی SHA immutable a3d14ca4761499d82260eb07eedf36a5e3917db0 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.298 fixes the Tunnel page regression. /admin/tunnels is again a dedicated logical-pair and service-protocol management surface and shows the selected Tunnel Exit's real classic and modern protocol inventory. Classic Install/Repair/Health and modern Add/Apply/Repair/Remove actions are available; Service Connections, no-install logical pair selection, and managed Tunnel creation are preserved. /admin/tunnel-transports remains the separate Transport/Failover and Smart Auto authority. No TP27 Fast, Kernel VXLAN, Spoof WG, SSH Relay dataplane implementation or active production route is changed. Candidate is pinned to immutable SHA a3d14ca4761499d82260eb07eedf36a5e3917db0."
   }
 }
