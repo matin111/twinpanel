@@ -9,6 +9,9 @@ from .public_connection_mobile_server_inventory_v18 import (
 from .public_connection_protocol_actions_v20 import (
     refine_public_connection_protocol_actions_v20,
 )
+from .public_connection_protocol_uri_details_v21 import (
+    refine_public_connection_protocol_uri_details_v21,
+)
 
 
 _V11_CSS = r"""
@@ -136,4 +139,5 @@ def refine_public_connection_device_actions_v11(source: str) -> str:
         source = source.replace("</body>", _V11_SCRIPT + "\n</body>", 1)
     source = refine_public_connection_mobile_protocols_v17(source)
     source = refine_public_connection_mobile_server_inventory_v18(source)
-    return refine_public_connection_protocol_actions_v20(source)
+    source = refine_public_connection_protocol_actions_v20(source)
+    return refine_public_connection_protocol_uri_details_v21(source)
