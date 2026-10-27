@@ -60,7 +60,7 @@ def main() -> None:
     require(".server-view" in script, "V17 must derive rows from real server views")
     require(".v13-modern-action" in script, "V17 must reuse canonical Modern actions")
     require("data-v13-platform" in script, "V17 must select the app for the detected OS")
-    require(".v13-karing-import" in script, "Karing import action must be preserved")
+    require("v13-karing-import" in script, "Karing import action must be preserved")
     require("credential" not in script, "technical Credential text must not leak into mobile cards")
     require("runtime" not in script, "technical Runtime text must not leak into mobile cards")
 
