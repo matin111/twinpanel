@@ -8,6 +8,7 @@ on:
       - "backend/app/routers/outbound_performance_v262_runtime.py"
       - "backend/app/routers/outbound_performance_v265.py"
       - "backend/app/routers/outbound_performance_v268.py"
+      - "backend/app/routers/outbound_performance_v268_guard.py"
       - "backend/app/routers/__init__.py"
       - "backend/tests/outbound_performance_v261_smoke.py"
       - "backend/tests/outbound_performance_v262_smoke.py"
@@ -29,6 +30,7 @@ on:
       - "backend/app/routers/outbound_performance_v262_runtime.py"
       - "backend/app/routers/outbound_performance_v265.py"
       - "backend/app/routers/outbound_performance_v268.py"
+      - "backend/app/routers/outbound_performance_v268_guard.py"
       - "backend/app/routers/__init__.py"
       - "backend/tests/outbound_performance_v261_smoke.py"
       - "backend/tests/outbound_performance_v262_smoke.py"
@@ -65,6 +67,7 @@ jobs:
             backend/app/routers/outbound_performance_v262_runtime.py \
             backend/app/routers/outbound_performance_v265.py \
             backend/app/routers/outbound_performance_v268.py \
+            backend/app/routers/outbound_performance_v268_guard.py \
             backend/app/routers/__init__.py \
             backend/tests/outbound_performance_v261_smoke.py \
             backend/tests/outbound_performance_v262_smoke.py \
@@ -88,7 +91,7 @@ jobs:
           NODE_AGENT_SHARED_SECRET: "ci-outbound-performance-agent-v262"
         run: PYTHONPATH=backend python backend/tests/outbound_performance_v262_smoke.py
 
-      - name: Performance analytics v3 smoke
+      - name: Performance analytics v3 plus v4 guard smoke
         env:
           APP_SECRET_KEY: "ci-outbound-performance-v265"
           DATABASE_URL: "sqlite:////tmp/twinpanel-outbound-performance-v265.db"
