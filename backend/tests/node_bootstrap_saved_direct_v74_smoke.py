@@ -139,13 +139,15 @@ def _source_guards() -> None:
     assert "provision.ssh_connect_saved = ssh_connect_saved_v74" in source
     assert "provision.ssh_connect =" not in source
 
-    # The active V74 layer must never reintroduce the local V61 fanout machinery.
+    # Guard executable fanout machinery rather than prose comments which
+    # deliberately document the production `ssh -> Iran -> nc` root cause.
     for forbidden in (
         "_relay_candidates(",
         "_race_connections(",
         "proxy_command=",
         "ServerAliveCountMax=1",
-        " nc ",
+        "asyncio.create_subprocess_exec(\"ssh\"",
+        "asyncio.create_subprocess_shell(\"ssh ",
     ):
         assert forbidden not in source, forbidden
 
