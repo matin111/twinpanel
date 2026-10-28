@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.308",
+  "version": "1.1.0-rc.309",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-28T18:32:57Z",
+  "released_at": "2026-10-28T18:51:33Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "f8f532af0c06903210d2ddb5388af0748c7515a1",
+  "source_sha": "f7a63c15dfa5a77538b35e92a72cc6c1982e21ce",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.308/twinpanel-1.1.0-rc.308-linux-x86_64.tar.gz",
-    "sha256": "9f385ad522b1b2dbb7adc11eac6a0264c6a94161aea88256155bd547731166fd",
-    "size_bytes": 28487719
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.309/twinpanel-1.1.0-rc.309-linux-x86_64.tar.gz",
+    "sha256": "deacef4db607fd3498ea9b887a9e3dc08fc87269f5474a63ba4a9fe71c98ae01",
+    "size_bytes": 28488476
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.308 اجرای Modern Accounting را از event loop سرویس HTTP/Uvicorn جدا می‌کند. Audit و py-spy نشان دادند حتی پس از حذف SSH child fanout، چرخه modern_quota_runtime_loop همراه با SQLAlchemy/accounting همگام می‌تواند request-serving event loop را دوره‌ای متوقف کند. در این نسخه collector در سرویس systemd مستقل twinpanel-modern-accounting اجرا می‌شود، lifecycle نصب/آپدیت/rollback آن با release فعال همگرا و PID/CWD آن verify می‌شود، و Public Connect /live که DB همگام دارد به sync endpoint تبدیل شده تا FastAPI آن را در threadpool اجرا کند. مسیر live همچنان DB-only است و runtime probe به polling عمومی برنگشته است. این نسخه هیچ تغییری در Cisco/OpenConnect، TP27، VXLAN، Tunnel، Spoof یا پورت پروتکل‌ها ایجاد نمی‌کند. Source candidate روی SHA immutable f8f532af0c06903210d2ddb5388af0748c7515a1 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.308 isolates Modern Accounting from the request-serving Uvicorn event loop. Production audit and py-spy showed that even after SSH child fanout was removed, modern_quota_runtime_loop could periodically starve HTTP while executing synchronous SQLAlchemy/accounting work. This release moves the collector into a dedicated twinpanel-modern-accounting systemd service, converges and verifies that worker against the active release across install/update/rollback, and changes the synchronous-DB Public Connect /live route to a sync endpoint so FastAPI runs it in its threadpool. The public live path remains DB-only and does not reintroduce runtime probes into browser polling. This release does not change Cisco/OpenConnect, TP27, VXLAN, Tunnel, Spoof, or protocol ports. The candidate source is pinned to immutable SHA f8f532af0c06903210d2ddb5388af0748c7515a1."
+    "fa": "TwinPanel 1.1.0-rc.309 دامنه اختصاصی Xray/V2Ray را در مسیر Direct TLS با خروجی واقعی کاربر همگرا می‌کند. پیش از این xray_domain برای آماده‌سازی Certificate و SNI روی Exit استفاده می‌شد، اما authority لینک VLESS در Direct delivery هنوز می‌توانست از public_domain عمومی Node یا IP خروجی استفاده کند. در این نسخه فقط پروفایل‌های TLS مستقیم، در صورت ثبت xray_domain، همان دامنه اختصاصی را به‌عنوان server/authority تحویل می‌دهند. مسیر Iran Tunnel عمداً همان Iran endpoint را حفظ می‌کند تا دامنه Exit باعث bypass شدن Tunnel نشود؛ پروفایل‌های REALITY/non-TLS و fallback قدیمی public_domain/IP نیز بدون تغییر باقی می‌مانند. این نسخه هیچ تغییری در TP27، VXLAN، Spoof، Tunnel Transport یا پروتکل‌های غیر Xray ایجاد نمی‌کند. Source candidate روی SHA immutable f7a63c15dfa5a77538b35e92a72cc6c1982e21ce قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.309 converges the dedicated Xray/V2Ray domain with real direct TLS customer delivery. Previously xray_domain was used for Exit-side certificate and SNI preparation, while a direct VLESS authority could still publish the Node's generic public_domain or Exit IP. This release makes only direct TLS profiles publish the explicit per-node xray_domain when configured. Iran-tunnel delivery intentionally preserves the Iran ingress authority so the Exit domain cannot bypass the tunnel; REALITY/non-TLS profiles and the legacy public_domain/IP fallback remain unchanged. This release does not change TP27, VXLAN, Spoof, tunnel transports, or non-Xray protocols. The candidate source is pinned to immutable SHA f7a63c15dfa5a77538b35e92a72cc6c1982e21ce."
   }
 }
