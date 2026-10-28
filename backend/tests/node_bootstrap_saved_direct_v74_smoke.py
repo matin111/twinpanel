@@ -49,8 +49,6 @@ class _NativeFallback:
 
 
 async def _exercise_runtime() -> None:
-    assert v74._DIRECT_SAVED_CONNECT is v74.v61._ORIGINAL_SSH_CONNECT_SAVED
-
     exit_node = SimpleNamespace(
         id=5,
         node_type=NodeType.EXIT,
@@ -62,7 +60,7 @@ async def _exercise_runtime() -> None:
         public_ip="198.51.100.2",
     )
 
-    old_direct = v74._DIRECT_SAVED_CONNECT
+    old_direct = v74._direct_saved_connect
     old_access = v74.v63._access
     old_first_iran = v74.v72._first_management_iran
     old_native = v74.v72.NativeIranExitConnection
@@ -76,14 +74,14 @@ async def _exercise_runtime() -> None:
             calls.append(int(node.id))
             return "direct-ok"
 
-        v74._DIRECT_SAVED_CONNECT = direct_ok
+        v74._direct_saved_connect = direct_ok
         result = await v74.ssh_connect_saved_v74(exit_node, object())
         assert result == "direct-ok"
         assert calls == [5]
 
         # When direct Exit SSH fails, V74 must open exactly one Iran management
-        # connection using the direct connector and then delegate to the hardened
-        # V72/V73 native transport. No local ProxyCommand race is involved.
+        # connection using the same direct primitive and then delegate to the
+        # hardened V72/V73 native transport. No local ProxyCommand race exists.
         with TemporaryDirectory() as tmp:
             key_path = Path(tmp) / "exit.key"
             key_path.write_text("TEST-PRIVATE-KEY", encoding="utf-8")
@@ -102,7 +100,7 @@ async def _exercise_runtime() -> None:
                 assert int(node.id) == 2
                 return iran_conn
 
-            v74._DIRECT_SAVED_CONNECT = direct_then_iran
+            v74._direct_saved_connect = direct_then_iran
             v74.v63._access = lambda _db, _node_id: access
             v74.v72._first_management_iran = lambda _db, _node: iran_node
             v74.v72.NativeIranExitConnection = _NativeFallback
@@ -121,7 +119,7 @@ async def _exercise_runtime() -> None:
             assert iran_conn.closed is False
 
     finally:
-        v74._DIRECT_SAVED_CONNECT = old_direct
+        v74._direct_saved_connect = old_direct
         v74.v63._access = old_access
         v74.v72._first_management_iran = old_first_iran
         v74.v72.NativeIranExitConnection = old_native
@@ -135,9 +133,12 @@ def _source_guards() -> None:
         encoding="utf-8"
     )
 
-    assert "_DIRECT_SAVED_CONNECT = v61._ORIGINAL_SSH_CONNECT_SAVED" in source
+    assert "async def _direct_saved_connect" in source
+    assert "asyncssh.connect(" in source
+    assert "_DIRECT_TIMEOUT_SECONDS = 12" in source
     assert "provision.ssh_connect_saved = ssh_connect_saved_v74" in source
     assert "provision.ssh_connect =" not in source
+    assert "from . import ssh_management_fallback_v61" not in source
 
     # Guard executable fanout machinery rather than prose comments which
     # deliberately document the production `ssh -> Iran -> nc` root cause.
@@ -164,7 +165,7 @@ def _source_guards() -> None:
 async def main() -> None:
     _source_guards()
     await _exercise_runtime()
-    print("V74_DIRECT_CONNECTOR_IDENTITY=PASS")
+    print("V74_DIRECT_BOUNDED_ASYNCSSH=PASS")
     print("V74_DIRECT_SINGLE_ATTEMPT=PASS")
     print("V74_NATIVE_IRAN_SEQUENTIAL_FALLBACK=PASS")
     print("V74_NO_LOCAL_PROXY_FANOUT=PASS")
