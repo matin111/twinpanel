@@ -1,0 +1,33 @@
+name: Node Xray Domain UI V311 Smoke
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'components/legacy-nodes-runtime-v2.tsx'
+      - 'components/routed-page-client-v2.tsx'
+      - 'lib/admin-api.ts'
+      - 'backend/app/xray_node_domain_runtime.py'
+      - 'scripts/test_node_xray_domain_ui_v311.py'
+      - '.github/workflows/node-xray-domain-ui-v311-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'components/legacy-nodes-runtime-v2.tsx'
+      - 'components/routed-page-client-v2.tsx'
+      - 'lib/admin-api.ts'
+      - 'backend/app/xray_node_domain_runtime.py'
+      - 'scripts/test_node_xray_domain_ui_v311.py'
+      - '.github/workflows/node-xray-domain-ui-v311-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify public and dedicated Xray domains remain separate
+        run: python scripts/test_node_xray_domain_ui_v311.py
