@@ -1,0 +1,37 @@
+name: TP27 FoU Quarantine V303 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/tp27_fou_quarantine_v303.py"
+      - "backend/app/tp27_self_repair_v265.py"
+      - "backend/app/tp27_repair_api_v265.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/app/transport_candidates/tp27_fast.py"
+      - "scripts/tp27_fou_quarantine_v303_smoke.py"
+      - ".github/workflows/tp27-fou-quarantine-v303-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/app/tp27_fou_quarantine_v303.py"
+      - "backend/app/tp27_self_repair_v265.py"
+      - "backend/app/tp27_repair_api_v265.py"
+      - "backend/app/tunnel_transport_manager_v12.py"
+      - "backend/app/transport_candidates/tp27_fast.py"
+      - "scripts/tp27_fou_quarantine_v303_smoke.py"
+      - ".github/workflows/tp27-fou-quarantine-v303-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate TP27 FoU quarantine contract
+        run: python scripts/tp27_fou_quarantine_v303_smoke.py
