@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.317",
+  "version": "1.1.0-rc.318",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-28T22:32:52Z",
+  "released_at": "2026-10-28T22:56:19Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "385750e02b5dc8788433dbf2936ea97c47c4810b",
+  "source_sha": "9d19b7ca7b88c45eed79a20c707e7a278f9e7e4b",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.317/twinpanel-1.1.0-rc.317-linux-x86_64.tar.gz",
-    "sha256": "2a950933056b9b794a87b4d92ded02b18f1dbfcd9253283847e5fe26e0be92b4",
-    "size_bytes": 28502925
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.318/twinpanel-1.1.0-rc.318-linux-x86_64.tar.gz",
+    "sha256": "fa0bb8ea47afa7d5faad52d37be374e7a44d0ab939b3a885eb3ea901508b3f86",
+    "size_bytes": 28506807
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.317 هنگ صفحه Public Connect موبایل را برطرف می‌کند. V24 برای حذف rendererهای قدیمی یک MutationObserver روی کل subtree صفحه داشت و callback همان observer دوباره DOM را تغییر می‌داد؛ این چرخه می‌توانست main thread مرورگر موبایل را قفل کند. V25 observer بازگشتی را از خروجی نهایی حذف و آن را با یک cleanup یک‌باره و deferred جایگزین می‌کند. داده اتصال موبایل همچنان از همان canonical protocol/server view ویندوز می‌آید، نمایش موبایل مینیمال می‌ماند، متن‌های آموزشی مخفی هستند و لینک‌های مستقیم نصب برنامه‌ها حفظ می‌شوند. هیچ تغییری در Accounting، provisioning، TP27 Fast، VXLAN، Spoof WG یا dataplane پروتکل‌ها انجام نشده است. Source candidate روی SHA immutable 385750e02b5dc8788433dbf2936ea97c47c4810b قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.317 fixes the Public Connect mobile page hang. V24 used a body-wide subtree MutationObserver to retire legacy mobile renderers while its own callback also mutated that subtree, allowing a self-triggering browser main-thread loop. V25 removes that recursive observer from the final HTML and replaces it with a single deferred cleanup pass. Mobile connection data still comes from the same canonical protocol/server views as desktop, the mobile presentation remains minimal, tutorial prose stays hidden, and direct app install/download destinations are preserved. Accounting, provisioning, TP27 Fast, VXLAN, Spoof WG and protocol dataplanes are unchanged. The candidate source is pinned to immutable SHA 385750e02b5dc8788433dbf2936ea97c47c4810b."
+    "fa": "TwinPanel 1.1.0-rc.318 تشخیص و Fail-Closed شدن Spoof WG را برای مسیرهای underlay ناسازگار دقیق می‌کند. Audit واقعی Tunnel #8 ثابت کرد مسیر رفت Spoof تا Exit سالم است و Exit برای مسیر برگشت bytes واقعی تولید می‌کند، اما counter ورودی اختصاصی Spoof روی Iran صفر می‌ماند؛ در همان زمان TP27 Fast و Kernel VXLAN سالم و مسیر اصلی باقی می‌مانند. V206 فقط وقتی سه شاهد مستقل peer_ping_failed، reverse bytes غیرصفر در Exit و reverse-ingress صفر روی Iran هم‌زمان وجود داشته باشند خطا را با دلیل underlay_incompatible:reverse_carrier_not_reaching_iran طبقه‌بندی می‌کند، evidence ساختاریافته را ذخیره می‌کند و candidate را ۲۴ ساعت quarantine می‌کند تا انتخاب اشتباه fail-closed بماند. Spoof همچنان explicit-install-only است و AUTO_INSTALL فقط TP27 Fast باقی می‌ماند. این نسخه framing یا payload را تغییر نمی‌دهد، فیلترینگ provider را دور نمی‌زند و هیچ تغییری در پورت‌ها، routing، firewall dataplane، TP27 Fast یا VXLAN ایجاد نمی‌کند. این Release ادعا نمی‌کند Spoof روی underlay فعلی Tunnel #8 قابل‌استفاده شده است؛ فقط failure را دقیق، پایدار و امن مدیریت می‌کند. Source candidate روی SHA immutable 9d19b7ca7b88c45eed79a20c707e7a278f9e7e4b قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.318 makes Spoof WG failure handling explicit and fail-closed on incompatible underlays. Production audit on Tunnel #8 proved that the Spoof forward path reaches Exit and Exit produces real reverse carrier bytes while the Spoof-owned reverse-ingress counter on Iran remains zero; TP27 Fast and Kernel VXLAN stay healthy and authoritative at the same time. V206 classifies the failure as underlay_incompatible:reverse_carrier_not_reaching_iran only when three independent signals are present together: peer_ping_failed, non-zero reverse bytes on Exit, and zero Spoof reverse-ingress packets on Iran. It persists structured evidence and quarantines the failed candidate for 24 hours so selection stays fail-closed. Spoof remains explicit-install-only and AUTO_INSTALL remains TP27 Fast only. This release does not change framing or payloads, does not bypass provider filtering, and does not modify ports, routing, firewall dataplane, TP27 Fast, or VXLAN. It does not claim that the Spoof dataplane is usable on Tunnel #8's current underlay; it makes that incompatibility explicit, persistent, and safe. The candidate source is pinned to immutable SHA 9d19b7ca7b88c45eed79a20c707e7a278f9e7e4b."
   }
 }
