@@ -199,6 +199,10 @@ def main() -> None:
     live = (ROOT / "app" / "routers" / "public_connection_live_v4.py").read_text(encoding="utf-8")
     hub = (ROOT / "app" / "routers" / "public_connection_hub_live_v5.py").read_text(encoding="utf-8")
     lifespan = (ROOT / "app" / "routers" / "modern_accounting_runtime_v257.py").read_text(encoding="utf-8")
+    worker = (ROOT / "scripts" / "twinpanel_modern_accounting_worker.py").read_text(encoding="utf-8")
+    reconcile = (ROOT / "scripts" / "twinpanel_accounting_unit_reconcile.py").read_text(encoding="utf-8")
+    web_unit = (ROOT.parent / "deploy" / "systemd" / "twinpanel-web.service.tpl").read_text(encoding="utf-8")
+    accounting_unit = (ROOT.parent / "deploy" / "systemd" / "twinpanel-modern-accounting.service.tpl").read_text(encoding="utf-8")
 
     assert "_credential_node_ids" in node_sync
     assert "_legacy_subscription_node_ids" in node_sync
@@ -214,6 +218,8 @@ def main() -> None:
     assert "ssh_connect_saved" not in live
     assert "connect_protocol_runtime" not in live
     assert "deliberately DB-only" in live
+    assert "def public_connection_live(" in live
+    assert "async def public_connection_live(" not in live
 
     # Protocol cards intentionally stay compact. Detailed quota/date/accounting
     # facts belong to the page-level traffic summary and the canonical /live API,
@@ -223,11 +229,24 @@ def main() -> None:
     assert "آمار اتصال هنوز ثبت نشده است" not in hub
     assert "protocol-live-meta" not in hub
     assert "badge.textContent='آماده'" in hub
-    assert "modern_accounting_runtime_v257_router" in hub
+
+    # The compatibility lifespan module remains in source for rollback/reference,
+    # but it must not be mounted into the request-serving public hub anymore.
+    assert "modern_accounting_runtime_v257_router" not in hub
     assert "modern_quota_runtime_loop" in lifespan
 
-    assert not (ROOT / "scripts" / "modern_quota_worker_v257.py").exists()
-    assert not (ROOT.parent / "deploy" / "systemd" / "twinpanel-modern-quota.service.tpl").exists()
+    # The collector now owns a dedicated process. Web startup is the existing
+    # release-convergence bridge: it stops the worker before rollback to an old
+    # release, verifies the API first, then converges the worker for new releases.
+    assert "modern_quota_runtime_loop" in worker
+    assert "asyncio.run(_serve())" in worker
+    assert "twinpanel-modern-accounting.service" in reconcile
+    assert "process_matches_release" in reconcile
+    assert "systemctl disable --now twinpanel-modern-accounting.service" in web_unit
+    assert "twinpanel_accounting_unit_reconcile.py --verify" in web_unit
+    assert "WorkingDirectory=/opt/twinpanel/current/backend" in accounting_unit
+    assert "twinpanel_modern_accounting_worker.py" in accounting_unit
+    assert "Restart=always" in accounting_unit
 
     print("MODERN_ACCOUNTING_MAPPING=PASS")
     print("MODERN_ACCOUNTING_COUNTER_SAFETY=PASS")

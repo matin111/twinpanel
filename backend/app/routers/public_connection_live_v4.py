@@ -203,7 +203,7 @@ def _protocol_stats(
 
 
 @router.get("/{token}/live")
-async def public_connection_live(token: str, db: Session = Depends(get_db)):
+def public_connection_live(token: str, db: Session = Depends(get_db)):
     """Public canonical live state and per-protocol accounting summary.
 
     This request path is deliberately DB-only. Runtime I/O (including WG/AWG
