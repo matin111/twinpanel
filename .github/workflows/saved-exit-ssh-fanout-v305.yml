@@ -1,0 +1,76 @@
+name: TwinPanel Saved Exit SSH Fanout V305
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/ssh_management_fallback_v61.py"
+      - "backend/app/node_bootstrap_control_v72.py"
+      - "backend/app/node_bootstrap_control_v73.py"
+      - "backend/app/node_bootstrap_control_v74.py"
+      - "backend/app/routers/__init__.py"
+      - "backend/app/services/modern_quota_runtime_v257.py"
+      - "backend/app/services/singbox_native_accounting_v265.py"
+      - "backend/tests/node_bootstrap_saved_direct_v74_smoke.py"
+      - ".github/workflows/saved-exit-ssh-fanout-v305.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  saved-exit-ssh-fanout:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    env:
+      APP_NAME: TwinPanel-V305-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Compile control-plane regression paths
+        run: |
+          python -m py_compile \
+            backend/app/node_bootstrap_control_v74.py \
+            backend/tests/node_bootstrap_saved_direct_v74_smoke.py
+
+      - name: Run V74 saved Exit direct-first regression
+        working-directory: backend
+        run: PYTHONPATH=. python tests/node_bootstrap_saved_direct_v74_smoke.py
+
+      - name: Preserve Modern accounting regression contracts
+        working-directory: backend
+        run: |
+          PYTHONPATH=. python tests/modern_accounting_v257_smoke.py
+          PYTHONPATH=. python tests/singbox_native_accounting_v265_smoke.py
+
+      - name: Verify active saved connector after router composition
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          from app.routers import provision
+          from app.node_bootstrap_control_v74 import ssh_connect_saved_v74
+
+          assert provision.ssh_connect_saved is ssh_connect_saved_v74
+          print("V74_ACTIVE_SAVED_CONNECTOR=PASS")
+          PY
