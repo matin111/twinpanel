@@ -40,8 +40,11 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
-      - name: Install backend dependencies
-        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
+      - name: Install backend test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest==8.3.5
 
       - name: Compile public URL runtime
         run: python -m compileall -q backend/app/config.py backend/app/services/public_urls.py
