@@ -13,6 +13,7 @@ def main() -> None:
     api = read("lib/admin-api.ts")
     runtime = read("backend/app/xray_node_domain_runtime.py")
 
+    # TWINPANEL_NODE_XRAY_DOMAIN_UI_V311_REVALIDATED
     # /admin/nodes must continue to use the active Node management runtime.
     assert 'routeKey==="admin/nodes"||routeKey==="admin/network"' in routed
     assert '<LegacyNodesRuntimePage/>' in routed
@@ -29,11 +30,16 @@ def main() -> None:
     assert 'legacyAdminApi.updateNodeDomain(selected.id,domainDraft.trim())' in nodes
     assert '/v1/xray-modern-admin/nodes/${id}/xray-domain' in api
     assert 'TWINPANEL_XRAY_NODE_DOMAIN_RUNTIME_V2' in runtime
+    assert 'TWINPANEL_XRAY_NODE_DOMAIN_RUNTIME_V3' in runtime
     assert 'ADD COLUMN IF NOT EXISTS xray_domain' in runtime
-    assert 'or xray_modern_admin._clean_domain(' in runtime
+    assert 'node.xray_domain = domain or None' in runtime
     assert 'getattr(node, "public_domain", None)' in runtime
 
-    print("node xray domain v300: ok")
+    # The UI must never route the dedicated field through the generic-domain API.
+    assert 'updateNodeDomain(selected.id,xrayDomainDraft' not in nodes
+    assert 'saveXrayDomain(selected.id,domainDraft' not in nodes
+
+    print("node xray domain v311 revalidation: ok")
 
 
 if __name__ == "__main__":
