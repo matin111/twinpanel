@@ -18,20 +18,40 @@ def read(path: Path) -> str:
     return text
 
 
+def literal_assignment(source: str, name: str):
+    tree = ast.parse(source)
+    for node in tree.body:
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for target in targets:
+                if isinstance(target, ast.Name) and target.id == name:
+                    if node.value is None:
+                        raise AssertionError(f"assignment has no value: {name}")
+                    return ast.literal_eval(node.value)
+    raise AssertionError(f"assignment not found: {name}")
+
+
 q = read(QUARANTINE)
 manager = read(MANAGER)
 api = read(API)
 v265 = read(V265)
 tp27_fast = read(TP27_FAST)
 
-# Root-cause fixture: rc.302 candidate order starts with 443 and then 8443.
+# Candidate universe stays bounded and V303 continues to reorder that universe.
 assert "FOU_PORT_CANDIDATES = (443, 8443, 2053, 2083, 10443)" in tp27_fast
-
-# Existing V265 safety policy remains unchanged.
-assert "FAILURE_THRESHOLD = 3" in v265
-assert "REPAIR_COOLDOWN_SECONDS = 180" in v265
 assert "ports = [int(value) for value in tp27_fast.FOU_PORT_CANDIDATES]" in v265
 assert "ports = [value for value in ports if value != current_port] + [current_port]" in v265
+
+# V304 now owns the anti-flap thresholds. V303 must consume V265/V304 helpers
+# without overriding those policy constants itself.
+assert literal_assignment(v265, "STABILITY_REVISION") == 304
+assert literal_assignment(v265, "STRUCTURAL_FAILURE_THRESHOLD") == 2
+assert literal_assignment(v265, "PATH_FAILURE_THRESHOLD") == 8
+assert literal_assignment(v265, "REPAIR_COOLDOWN_SECONDS") == 900
+assert "FAILURE_THRESHOLD =" not in q
+assert "STRUCTURAL_FAILURE_THRESHOLD =" not in q
+assert "PATH_FAILURE_THRESHOLD =" not in q
+assert "REPAIR_COOLDOWN_SECONDS =" not in q
 
 # V303 is soft quarantine, not candidate removal.
 assert 'MARKER = "TWINPANEL_TP27_FOU_QUARANTINE_V303"' in q
@@ -69,4 +89,4 @@ assert api.index("apply_tp27_fou_quarantine_v303()") < api.index(
     '@router.get(\n        "/{tunnel_id}/tp27/diagnose"'
 )
 
-print("TP27 FOU QUARANTINE V303 SMOKE PASS")
+print("TP27 FOU QUARANTINE V303 + V304 COMPAT SMOKE PASS")

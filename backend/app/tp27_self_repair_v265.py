@@ -18,6 +18,7 @@ from .transport_candidates.common import (
     close_pair,
     connect_pair,
     mark,
+    parse_packet_loss_pct,
     prerequisites,
     probe,
     runtime,
@@ -26,35 +27,35 @@ from .transport_candidates.common import (
 
 
 # ============================================================
-# TWINPANEL TP27 SELF REPAIR V265
+# TWINPANEL TP27 SELF REPAIR V265 + PATH STABILITY V304
 #
 # TP27 Fast is a logical SmartAuto/manual transport whose carrier is a Linux
 # keyed-GRE interface (native protocol 47) with GRE-in-UDP/FoU fallback.
 # The carrier service is intentionally oneshot/RemainAfterExit, therefore
 # systemd being active is not sufficient proof that the L3 peer is reachable.
 #
-# V265 owns *carrier* repair only:
-#   * discover every active tunnel with enabled TP27, regardless of Node IDs;
-#   * observe the real TP27 /30 in both directions;
-#   * require consecutive failures before autonomous mutation;
-#   * publish degraded health truth immediately while repair stays debounced;
-#   * serialize API/manual and background repair across processes;
-#   * preserve manual-vs-auto transport policy;
-#   * never switch the logical transport to another candidate;
-#   * when native GRE becomes unstable after installation, prefer FoU during
-#     repair instead of repeatedly selecting the briefly-working native path;
-#   * when an active FoU port becomes unstable, rotate to a different FoU port
-#     before retrying the failed port;
-#   * verify every rebuilt profile with the full TP27 dataplane probe;
-#   * persist repair telemetry inside TunnelTransport.config_text.
+# V304 refines V265 without changing TP27 transport authority:
+#   * distinguish structural carrier faults from path/dataplane instability;
+#   * structural faults repair quickly, while path loss gets longer hysteresis;
+#   * require stable healthy observations before clearing DEGRADED after a flap;
+#   * measure packet loss instead of treating any partial ping reply as healthy;
+#   * rate-limit destructive rebuilds with a longer repair cooldown;
+#   * keep manual/API repair behavior and all logical transport policy intact;
+#   * preserve V303 FoU soft-quarantine hooks and repair metadata contracts.
 # ============================================================
 
 MARKER = "TWINPANEL_TP27_SELF_REPAIR_V265"
+STABILITY_REVISION = 304
 LOOP_SECONDS = 30
-FAILURE_THRESHOLD = 3
-REPAIR_COOLDOWN_SECONDS = 180
+FAILURE_THRESHOLD = 8
+STRUCTURAL_FAILURE_THRESHOLD = 2
+PATH_FAILURE_THRESHOLD = 8
+RECOVERY_THRESHOLD = 2
+REPAIR_COOLDOWN_SECONDS = 900
+MAX_HEALTHY_PACKET_LOSS_PCT = 20.0
 
 _failure_cycles: dict[int, int] = {}
+_healthy_cycles: dict[int, int] = {}
 
 
 def _status(value: object) -> str:
@@ -126,7 +127,7 @@ async def _peer_snapshot(conn, *, service: str, interface: str, peer_ip: str) ->
             timeout=15,
         ),
         conn.run(
-            f"LC_ALL=C ping -I {interface} -c 3 -W 2 {peer_ip}",
+            f"LC_ALL=C ping -I {interface} -c 5 -i 0.2 -W 1 {peer_ip}",
             check=False,
             timeout=15,
         ),
@@ -136,13 +137,21 @@ async def _peer_snapshot(conn, *, service: str, interface: str, peer_ip: str) ->
     link_text = str(link_result.stdout or "").strip()
     addr_text = str(addr_result.stdout or "").strip()
     ping_text = str(ping_result.stdout or "").strip()
+    packet_loss = parse_packet_loss_pct(ping_text)
+    peer_reachable = bool(
+        ping_result.exit_status == 0
+        and packet_loss is not None
+        and float(packet_loss) <= MAX_HEALTHY_PACKET_LOSS_PCT
+    )
 
     return {
         "service_active": service_result.exit_status == 0 and service_state == "active",
         "service_state": service_state or "unknown",
         "interface_present": link_result.exit_status == 0 and bool(link_text),
         "address_present": addr_result.exit_status == 0 and bool(addr_text),
-        "peer_reachable": ping_result.exit_status == 0,
+        "peer_reachable": peer_reachable,
+        "peer_ping_exit_status": int(ping_result.exit_status),
+        "packet_loss_pct": packet_loss,
         "ping_summary": ping_text.splitlines()[-1] if ping_text else "",
     }
 
@@ -213,6 +222,7 @@ async def diagnose_tp27(tunnel_id: int, db: Session) -> dict:
         return {
             "ok": True,
             "marker": MARKER,
+            "stability_revision": STABILITY_REVISION,
             "tunnel_id": int(tunnel.id),
             "mode": str(tunnel.mode or "manual"),
             "active_transport": tunnel.active_transport,
@@ -236,15 +246,7 @@ async def diagnose_tp27(tunnel_id: int, db: Session) -> dict:
 
 
 def _attempt_order(cfg: dict[str, Any]) -> list[tuple[str, int | None]]:
-    """Prefer a different carrier after a runtime failure.
-
-    Initial install remains native-first in tp27_fast.install(). Repair is
-    intentionally different: if native GRE passed installation but later
-    became unreachable, try FoU first so a transient protocol-47 success does
-    not create an endless native-GRE failure loop. If a FoU port itself later
-    becomes unhealthy, rotate to the other managed FoU ports before retrying
-    that same port.
-    """
+    """Prefer a different carrier after a runtime failure."""
 
     current = str(cfg.get("selected_profile") or "").strip().lower()
     current_port = 0
@@ -285,9 +287,11 @@ def _repair_meta(
             "selected_profile": profile,
             "gre_key": existing.get("gre_key"),
             "mtu": tp27_fast.MTU,
+            "fou_udp_checksum": "enabled" if profile == "gre-fou" else None,
             "repair_attempts": attempts[-8:],
             "tp27_self_repair_v265": {
                 "version": 265,
+                "stability_revision": STABILITY_REVISION,
                 "last_repair_at": now.isoformat() + "Z",
                 "last_repair_epoch": now.timestamp(),
                 "last_result": "online",
@@ -299,6 +303,8 @@ def _repair_meta(
             },
         }
     )
+    if profile != "gre-fou":
+        out.pop("fou_udp_checksum", None)
     if fou_port is None:
         out.pop("fou_port", None)
     else:
@@ -322,6 +328,7 @@ def _failed_repair_meta(
     state.update(
         {
             "version": 265,
+            "stability_revision": STABILITY_REVISION,
             "last_repair_at": now.isoformat() + "Z",
             "last_repair_epoch": now.timestamp(),
             "last_result": "failed",
@@ -376,6 +383,7 @@ async def _repair_tp27_locked(
             return {
                 "ok": True,
                 "marker": MARKER,
+                "stability_revision": STABILITY_REVISION,
                 "tunnel_id": int(tunnel_id),
                 "source": source,
                 "changed": False,
@@ -412,8 +420,6 @@ async def _repair_tp27_locked(
                     rt=rt,
                 )
 
-                # Do not publish ONLINE until both the full dataplane probe and
-                # the final carrier snapshot agree on bidirectional health.
                 after = await _diagnose_with_connections(ci, ce, rt)
                 if not bool(after["healthy"]):
                     raise RuntimeError("post_repair_carrier_probe_failed")
@@ -439,7 +445,6 @@ async def _repair_tp27_locked(
                     meta=json.dumps(meta, ensure_ascii=False, separators=(",", ":")),
                 )
 
-                # Carrier repair must never rewrite the user's transport policy.
                 db.expire_all()
                 live = db.get(Tunnel, int(tunnel_id))
                 if live is not None:
@@ -451,6 +456,7 @@ async def _repair_tp27_locked(
                 return {
                     "ok": True,
                     "marker": MARKER,
+                    "stability_revision": STABILITY_REVISION,
                     "tunnel_id": int(tunnel_id),
                     "source": source,
                     "changed": True,
@@ -520,8 +526,6 @@ async def _repair_tp27_locked(
         raise
 
     finally:
-        # Explicitly preserve the logical policy even if a future helper starts
-        # writing Tunnel fields as part of candidate installation.
         try:
             db.expire_all()
             live = db.get(Tunnel, int(tunnel_id))
@@ -609,10 +613,42 @@ def _diagnosis_error(diagnosis: dict[str, Any]) -> str:
             "peer_reachable",
         ):
             if not bool(side.get(key)):
-                problems.append(f"{role}.{key}=false")
+                if key == "peer_reachable" and side.get("packet_loss_pct") is not None:
+                    problems.append(
+                        f"{role}.peer_reachable=false(loss={float(side['packet_loss_pct']):.1f}%)"
+                    )
+                else:
+                    problems.append(f"{role}.{key}=false")
 
     suffix = ",".join(problems) if problems else "bidirectional_probe_failed"
     return f"tp27_carrier_unhealthy:{suffix}"[:1800]
+
+
+def _diagnosis_failure_kind(diagnosis: dict[str, Any]) -> str:
+    """Return structural for local carrier breakage, path for peer reachability loss."""
+
+    if str(diagnosis.get("error") or "").strip():
+        return "structural"
+
+    carrier = diagnosis.get("carrier")
+    if not isinstance(carrier, dict):
+        return "structural"
+
+    for role in ("iran", "exit"):
+        side = carrier.get(role)
+        if not isinstance(side, dict):
+            return "structural"
+        for key in ("service_active", "interface_present", "address_present"):
+            if not bool(side.get(key)):
+                return "structural"
+
+    return "path"
+
+
+def _failure_threshold(kind: str) -> int:
+    if str(kind).strip().lower() == "structural":
+        return STRUCTURAL_FAILURE_THRESHOLD
+    return PATH_FAILURE_THRESHOLD
 
 
 async def reconcile_once() -> dict:
@@ -628,15 +664,10 @@ async def reconcile_once() -> dict:
             row = _tp27_row(db, int(tunnel_id))
             if tunnel is None or row is None:
                 _failure_cycles.pop(int(tunnel_id), None)
+                _healthy_cycles.pop(int(tunnel_id), None)
                 continue
 
-            # Candidate discovery is tunnel-centric: every active Tunnel with
-            # enabled TP27 is observed, including warm standby lanes in Auto.
-            # Repair owns only the TP27 carrier and preserves active/preferred
-            # transport authority, so keeping a standby carrier healthy cannot
-            # switch the logical tunnel candidate.
             selected = str(tunnel.active_transport or "").strip().lower()
-            preferred = str(tunnel.preferred_transport or "").strip().lower()
             mode = str(tunnel.mode or "manual").strip().lower()
 
             try:
@@ -649,6 +680,17 @@ async def reconcile_once() -> dict:
 
             if bool(diagnosis.get("healthy")):
                 _failure_cycles[int(tunnel_id)] = 0
+                stable = _healthy_cycles.get(int(tunnel_id), 0) + 1
+                _healthy_cycles[int(tunnel_id)] = stable
+
+                if _status(row.status) == "degraded" and stable < RECOVERY_THRESHOLD:
+                    print(
+                        f"{MARKER}_RECOVERY_PENDING tunnel={int(tunnel_id)} "
+                        f"count={stable}/{RECOVERY_THRESHOLD}",
+                        flush=True,
+                    )
+                    continue
+
                 if _status(row.status) != "online" or row.last_error:
                     row.status = "online"
                     row.last_error = None
@@ -657,14 +699,13 @@ async def reconcile_once() -> dict:
                     db.commit()
                 continue
 
+            _healthy_cycles[int(tunnel_id)] = 0
             count = _failure_cycles.get(int(tunnel_id), 0) + 1
             _failure_cycles[int(tunnel_id)] = count
             health_error = _diagnosis_error(diagnosis)
+            failure_kind = _diagnosis_failure_kind(diagnosis)
+            threshold = _failure_threshold(failure_kind)
 
-            # Health truth is immediate even though mutation is debounced.
-            # A single failed carrier probe must never leave the row falsely
-            # ONLINE; mark it DEGRADED, then require the normal threshold before
-            # any rebuild is attempted.
             if _status(row.status) != "degraded" or row.last_error != health_error:
                 row.status = "degraded"
                 row.last_error = health_error
@@ -673,19 +714,19 @@ async def reconcile_once() -> dict:
 
             print(
                 f"{MARKER}_UNREACHABLE tunnel={int(tunnel_id)} "
-                f"count={count}/{FAILURE_THRESHOLD} "
+                f"kind={failure_kind} count={count}/{threshold} "
                 f"mode={mode} active={selected or 'none'}",
                 flush=True,
             )
 
-            if count < FAILURE_THRESHOLD:
+            if count < threshold:
                 continue
 
             remaining = _cooldown_remaining(row)
             if remaining > 0:
                 print(
                     f"{MARKER}_COOLDOWN tunnel={int(tunnel_id)} "
-                    f"remaining={remaining}s",
+                    f"kind={failure_kind} remaining={remaining}s",
                     flush=True,
                 )
                 continue
@@ -700,6 +741,7 @@ async def reconcile_once() -> dict:
                 if bool(result.get("ok")):
                     repaired.append(int(tunnel_id))
                     _failure_cycles[int(tunnel_id)] = 0
+                    _healthy_cycles[int(tunnel_id)] = 0
                     print(
                         f"{MARKER}_RECOVERED tunnel={int(tunnel_id)} "
                         f"profile={result.get('profile')} "
@@ -710,6 +752,7 @@ async def reconcile_once() -> dict:
                 db.rollback()
                 failed[int(tunnel_id)] = f"{type(exc).__name__}:{exc}"[:1800]
                 _failure_cycles[int(tunnel_id)] = 0
+                _healthy_cycles[int(tunnel_id)] = 0
                 print(
                     f"{MARKER}_REPAIR_FAILED tunnel={int(tunnel_id)} "
                     f"error={failed[int(tunnel_id)]!r}",
@@ -723,14 +766,19 @@ async def reconcile_once() -> dict:
         "repaired": repaired,
         "failed": failed,
         "marker": MARKER,
+        "stability_revision": STABILITY_REVISION,
     }
 
 
 async def reconciler_loop() -> None:
     print(
         f"{MARKER}_START interval={LOOP_SECONDS}s "
-        f"failure_threshold={FAILURE_THRESHOLD} "
-        f"cooldown={REPAIR_COOLDOWN_SECONDS}s",
+        f"structural_threshold={STRUCTURAL_FAILURE_THRESHOLD} "
+        f"path_threshold={PATH_FAILURE_THRESHOLD} "
+        f"recovery_threshold={RECOVERY_THRESHOLD} "
+        f"cooldown={REPAIR_COOLDOWN_SECONDS}s "
+        f"max_healthy_loss={MAX_HEALTHY_PACKET_LOSS_PCT:.1f}% "
+        f"stability_revision={STABILITY_REVISION}",
         flush=True,
     )
 
