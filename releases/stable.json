@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.302",
+  "version": "1.1.0-rc.303",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-28T13:12:45Z",
+  "released_at": "2026-10-28T14:04:15Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b7cf1371179f661bc509ee6d9eec98d645716cfc",
+  "source_sha": "07b95d67ff8b5e9e2d91e5f3f1f7afdd952e2761",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.302/twinpanel-1.1.0-rc.302-linux-x86_64.tar.gz",
-    "sha256": "660029c5f9498c1cacf4b9a8d6cb815847b1b8a7463b71a13765719a4db984f6",
-    "size_bytes": 28431554
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.303/twinpanel-1.1.0-rc.303-linux-x86_64.tar.gz",
+    "sha256": "825adccf0cc5ca078ea2120709a10585338686dc9db74c991cb3bf1799b3f917",
+    "size_bytes": 28433890
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.302 مشکل بازشدن ناپایدار صفحه اتصال عمومی روی موبایل را از ریشه مسیر URL اصلاح می‌کند. لینک‌های /v1/connect دیگر مجبور نیستند از PUBLIC_API_FALLBACK و IP خام Controller استفاده کنند و می‌توانند از PUBLIC_SUBSCRIPTION_BASE_URL مستقل پشت HTTPS edge/domain استفاده کنند؛ در نتیجه Cisco/OpenConnect روی TCP/443 Controller دست‌نخورده می‌ماند. بهبودهای ظاهری موبایل rc.301 شامل تایپوگرافی خواناتر، touch targetهای 44px، CTA اصلی 48px، RTL و کارت‌های جمع‌شونده حفظ شده‌اند. Desktop UI، TP27/VXLAN/Spoof، dataplane تانل‌ها، credential generation، Accounting/Quota و schema دیتابیس تغییری نکرده‌اند. Candidate روی SHA immutable b7cf1371179f661bc509ee6d9eec98d645716cfc قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.302 fixes intermittent mobile Public Connect resets at the URL-routing layer. /v1/connect links no longer have to inherit the controller raw-IP PUBLIC_API_FALLBACK and can use an independent PUBLIC_SUBSCRIPTION_BASE_URL behind an HTTPS edge/domain, while Cisco/OpenConnect remains untouched on controller TCP/443. The rc.301 mobile visual refinements—readable typography, 44px touch targets, 48px primary CTA, RTL and collapsible cards—are preserved. Desktop UI, TP27/VXLAN/Spoof, tunnel dataplane, credential generation, Accounting/Quota and database schema are unchanged. Candidate is pinned to immutable SHA b7cf1371179f661bc509ee6d9eec98d645716cfc."
+    "fa": "TwinPanel 1.1.0-rc.303 پایداری TP27 Fast را در چرخه Self-Repair سخت‌گیرانه‌تر می‌کند. Audit واقعی Tunnel #8 نشان داد FoU/UDP 443 در Repair قبلی از هر دو سمت Iran و Exit با 100٪ packet loss شکست خورده، در حالی که FoU 8443 Recovery موفق داشته و بعد از Update نیز سالم و پایدار باقی مانده است. V265 تاریخچه Repair را ذخیره می‌کرد اما ترتیب تلاش بعدی از آن تاریخچه استفاده نمی‌کرد؛ در نتیجه پورت شکست‌خورده 443 می‌توانست در خرابی بعدی دوباره اولین Candidate شود. V303 یک soft quarantine پایدار 24 ساعته اضافه می‌کند: FoU portهای اخیراً شکست‌خورده حذف نمی‌شوند، فقط بعد از گزینه‌های تازه قرار می‌گیرند؛ current-port-last، failure threshold=3 و cooldown=180s بدون تغییر می‌مانند. state در TunnelTransport.config_text ذخیره می‌شود، با repair history قدیمی V265 سازگار است، و Manager و API Repair/Rebuild هر دو از یک ordering استفاده می‌کنند. Carrier سالم فعلی، active/preferred transport، route/firewall/interface، Kernel VXLAN، Spoof WG، TP6، SSH Relay و dataplane پروتکل‌های سرویس تغییری نکرده‌اند. Candidate روی SHA immutable 07b95d67ff8b5e9e2d91e5f3f1f7afdd952e2761 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.303 hardens TP27 Fast self-repair resilience. Real Tunnel #8 diagnostics proved FoU/UDP 443 previously failed with 100% peer packet loss on both Iran and Exit while FoU 8443 recovered successfully and remained healthy across an update. V265 persisted repair history but did not consume it when ordering the next repair, allowing known-bad 443 to become the first candidate again. V303 adds durable 24-hour soft quarantine: recently failed FoU ports are never removed, only deprioritized behind fresh alternatives; current-port-last behavior, failure threshold=3 and cooldown=180s remain unchanged. State persists in TunnelTransport.config_text, bootstraps from pre-V303 V265 repair history, and is shared by Manager and API Repair/Rebuild. The current healthy carrier, active/preferred transport, routes/firewall/interfaces, Kernel VXLAN, Spoof WG, TP6, SSH Relay and service-protocol dataplanes are unchanged. Candidate is pinned to immutable SHA 07b95d67ff8b5e9e2d91e5f3f1f7afdd952e2761."
   }
 }
