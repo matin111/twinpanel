@@ -21,14 +21,23 @@ EnvironmentFile=/etc/twinpanel/frontend.env
 # them, Web skips them and continues with the canonical legacy helpers instead of
 # entering a restart loop/502 state.
 #
+# Accounting isolation rollback safety: if current points back to a release that
+# predates the dedicated worker helper, stop/disable the worker before that old
+# API is converged so its lifespan-owned collector cannot overlap the new worker.
+# After the API is verified on a release that does ship the helper, converge and
+# verify the dedicated worker. This ordering prevents two accounting collectors
+# from running across either upgrade or rollback activation.
+#
 # The updater owns the API restart transaction. Web verifies convergence and
 # must not queue a second API restart while the updater transaction is active.
 # The '+' systemd prefix intentionally applies only to these pre-start helpers;
 # the long-running Web process remains www-data + hardened below.
 ExecStartPre=+/opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_nginx_reconcile.py --reload
+ExecStartPre=+/bin/bash -lc 'test -f /opt/twinpanel/current/backend/scripts/twinpanel_accounting_unit_reconcile.py || systemctl disable --now twinpanel-modern-accounting.service >/dev/null 2>&1 || true'
 ExecStartPre=+/bin/bash -lc 'test ! -f /opt/twinpanel/current/backend/scripts/twinpanel_updater_unit_reconcile_v69.py || exec /opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_updater_unit_reconcile_v69.py'
 ExecStartPre=+/bin/bash -lc 'test ! -f /opt/twinpanel/current/backend/scripts/twinpanel_api_update_handoff_v69.py || exec /opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_api_update_handoff_v69.py'
 ExecStartPre=+/opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_runtime_unit_reconcile.py --verify
+ExecStartPre=+/bin/bash -lc 'test ! -f /opt/twinpanel/current/backend/scripts/twinpanel_accounting_unit_reconcile.py || exec /opt/twinpanel/venv/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_accounting_unit_reconcile.py --verify'
 ExecStart=/bin/bash -lc 'if [ -f /opt/twinpanel/current/.next/standalone/server.js ]; then cd /opt/twinpanel/current/.next/standalone && exec env HOSTNAME=127.0.0.1 PORT=__WEB_PORT__ /usr/bin/node server.js; else cd /opt/twinpanel/current && exec /usr/bin/node /opt/twinpanel/current/node_modules/next/dist/bin/next start -H 127.0.0.1 -p __WEB_PORT__; fi'
 Restart=always
 RestartSec=4
