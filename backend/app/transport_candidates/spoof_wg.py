@@ -26,7 +26,7 @@ from .common import (
 
 
 # ============================================================
-# TWINPANEL SPOOF + WIREGUARD L3 V204
+# TWINPANEL SPOOF + WIREGUARD L3 V205
 #
 # Spoof Tunnel is an outer packet carrier, not a TUN device. TwinPanel keeps a
 # real WireGuard /30 as the authoritative L3 dataplane and feeds WireGuard's
@@ -35,17 +35,21 @@ from .common import (
 #   Iran WG -> local Spoof relay -> spoofed outer packet -> Exit Spoof relay
 #           -> Exit WG -> real /30 peer L3
 #
-# Reverse traffic follows the symmetric relay path. XDP stays disabled in V204
-# so the first production qualification depends only on the upstream raw-socket
-# path and does not add kernel/NIC-driver requirements.
-#
 # V203 keeps source port 443 as the default but performs one bounded retry on
 # 44443 only when the shared-L3 probe fails at peer ping. The last successful
 # source port is persisted in transport metadata and preferred on later installs.
 #
 # V204 separates the private Exit WireGuard listener from the Kernel VXLAN
-# 37000+slot UDP range. Production Tunnel #8 proved VXLAN already owns 37008,
-# which made Spoof WG fail in ExecStartPre before the relay could start.
+# 37000+slot UDP range. Production Tunnel #8 proved VXLAN already owns 37008.
+#
+# V205 adapts only the reverse public ingress. Production packet captures on
+# Tunnel #8 proved Exit->Iran packets to the private Spoof receive port 36008
+# (and validation ports 46008/TCP 443) were filtered before Iran eth0, while
+# UDP/2053 on the same pair was delivered. Reverse Spoof packets therefore use
+# public UDP/2053 and an Iran-side, TwinPanel-owned PREROUTING adapter redirects
+# only authenticated-looking WireGuard payloads from the configured Exit IP and
+# selected Spoof source port to the private per-tunnel receive port. TP27/FoU
+# remains owner of UDP/2053; unmatched packets return untouched to its path.
 #
 # Upstream: https://github.com/ParsaKSH/spoof-tunnel
 # License : Apache-2.0
@@ -65,6 +69,10 @@ SPOOF_SOURCE_PORT = 443
 SPOOF_SOURCE_PORT_CANDIDATES = (SPOOF_SOURCE_PORT, 44443)
 SPOOF_SOURCE_PORT_META_KEY = "spoof_source_port"
 EXIT_WIREGUARD_PORT_BASE = 38000
+REVERSE_INGRESS_PORT = 2053
+WIREGUARD_MESSAGE_TYPES = (1, 2, 3, 4)
+WIREGUARD_PAYLOAD_FROM = 28
+WIREGUARD_PAYLOAD_TO = 32
 
 
 def _artifact() -> tuple[Path, str]:
@@ -198,9 +206,39 @@ def _ports(tunnel_id: int, spoof_source_port: int | None = None) -> dict[str, in
         "iran_local_relay_port": 34000 + slot,
         "exit_raw_receive_port": 35000 + slot,
         "iran_raw_receive_port": 36000 + slot,
+        "iran_reverse_public_port": REVERSE_INGRESS_PORT,
         "exit_wireguard_port": EXIT_WIREGUARD_PORT_BASE + slot,
         "spoof_source_port": source_port,
     }
+
+
+def _reverse_chain(tunnel_id: int) -> str:
+    return f"TPSP{int(tunnel_id)}REV"[:28]
+
+
+def _wireguard_redirect_rules(
+    *,
+    chain: str,
+    exit_spoof_ip: str,
+    spoof_source_port: int,
+    local_receive_port: int,
+    comment: str,
+) -> str:
+    rules: list[str] = []
+    for message_type in WIREGUARD_MESSAGE_TYPES:
+        signature = f"|{message_type:02x}000000|"
+        rules.append(
+            "iptables -t nat -A "
+            f"{shlex.quote(chain)} -p udp "
+            f"-s {shlex.quote(exit_spoof_ip)} "
+            f"--sport {int(spoof_source_port)} "
+            "-m string --algo bm "
+            f"--from {WIREGUARD_PAYLOAD_FROM} --to {WIREGUARD_PAYLOAD_TO} "
+            f"--hex-string {shlex.quote(signature)} "
+            f"-m comment --comment {shlex.quote(comment)} "
+            f"-j REDIRECT --to-ports {int(local_receive_port)}"
+        )
+    return "\n".join(rules)
 
 
 def _key_path(tunnel_id: int, role: str) -> str:
@@ -240,7 +278,7 @@ if [ ! -s {shlex.quote(path)} ]; then
 fi
 chmod 0600 {shlex.quote(path)}
 P="$(cat {shlex.quote(path)})"
-printf '%s\n%s\n' "$P" "$(printf '%s' "$P" | wg pubkey)"
+printf '%s\\n%s\\n' "$P" "$(printf '%s' "$P" | wg pubkey)"
 """,
         "spoof_wg_keypair",
         30,
@@ -259,21 +297,38 @@ async def _remove_owned_firewall(
     rt: dict,
     cfg: dict | None,
 ) -> None:
-    if not cfg:
-        return
     ports = _ports(tunnel_id)
     iran_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-IRAN"
     exit_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-EXIT"
     l3_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-L3"
+    reverse_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-REV"
+    reverse_chain = _reverse_chain(tunnel_id)
+
+    iran_legacy_cleanup = ""
+    exit_legacy_cleanup = ""
+    if cfg:
+        iran_legacy_cleanup = f"""
+  while iptables -C INPUT -p udp --dport {ports['iran_raw_receive_port']} -s {shlex.quote(cfg['exit_spoof_ip'])} -m comment --comment {shlex.quote(iran_comment)} -j ACCEPT 2>/dev/null; do
+    iptables -D INPUT -p udp --dport {ports['iran_raw_receive_port']} -s {shlex.quote(cfg['exit_spoof_ip'])} -m comment --comment {shlex.quote(iran_comment)} -j ACCEPT || break
+  done
+"""
+        exit_legacy_cleanup = f"""
+  while iptables -C INPUT -p tcp --dport {ports['exit_raw_receive_port']} -s {shlex.quote(cfg['iran_spoof_ip'])} -m comment --comment {shlex.quote(exit_comment)} -j ACCEPT 2>/dev/null; do
+    iptables -D INPUT -p tcp --dport {ports['exit_raw_receive_port']} -s {shlex.quote(cfg['iran_spoof_ip'])} -m comment --comment {shlex.quote(exit_comment)} -j ACCEPT || break
+  done
+"""
 
     await asyncio.gather(
         ci.run(
             f"""
 set +e
 if command -v iptables >/dev/null 2>&1; then
-  while iptables -C INPUT -p udp --dport {ports['iran_raw_receive_port']} -s {shlex.quote(cfg['exit_spoof_ip'])} -m comment --comment {shlex.quote(iran_comment)} -j ACCEPT 2>/dev/null; do
-    iptables -D INPUT -p udp --dport {ports['iran_raw_receive_port']} -s {shlex.quote(cfg['exit_spoof_ip'])} -m comment --comment {shlex.quote(iran_comment)} -j ACCEPT || break
+  while iptables -t nat -C PREROUTING -p udp --dport {REVERSE_INGRESS_PORT} -m comment --comment {shlex.quote(reverse_comment)} -j {shlex.quote(reverse_chain)} 2>/dev/null; do
+    iptables -t nat -D PREROUTING -p udp --dport {REVERSE_INGRESS_PORT} -m comment --comment {shlex.quote(reverse_comment)} -j {shlex.quote(reverse_chain)} || break
   done
+  iptables -t nat -F {shlex.quote(reverse_chain)} >/dev/null 2>&1 || true
+  iptables -t nat -X {shlex.quote(reverse_chain)} >/dev/null 2>&1 || true
+{iran_legacy_cleanup}
   while iptables -C INPUT -i {shlex.quote(rt['interface'])} -s {shlex.quote(rt['network'])} -m comment --comment {shlex.quote(l3_comment)} -j ACCEPT 2>/dev/null; do
     iptables -D INPUT -i {shlex.quote(rt['interface'])} -s {shlex.quote(rt['network'])} -m comment --comment {shlex.quote(l3_comment)} -j ACCEPT || break
   done
@@ -286,9 +341,7 @@ true
             f"""
 set +e
 if command -v iptables >/dev/null 2>&1; then
-  while iptables -C INPUT -p tcp --dport {ports['exit_raw_receive_port']} -s {shlex.quote(cfg['iran_spoof_ip'])} -m comment --comment {shlex.quote(exit_comment)} -j ACCEPT 2>/dev/null; do
-    iptables -D INPUT -p tcp --dport {ports['exit_raw_receive_port']} -s {shlex.quote(cfg['iran_spoof_ip'])} -m comment --comment {shlex.quote(exit_comment)} -j ACCEPT || break
-  done
+{exit_legacy_cleanup}
   while iptables -C INPUT -i {shlex.quote(rt['interface'])} -s {shlex.quote(rt['network'])} -m comment --comment {shlex.quote(l3_comment)} -j ACCEPT 2>/dev/null; do
     iptables -D INPUT -i {shlex.quote(rt['interface'])} -s {shlex.quote(rt['network'])} -m comment --comment {shlex.quote(l3_comment)} -j ACCEPT || break
   done
@@ -344,11 +397,28 @@ true
     )
 
 
-async def _install_firewall(ci, ce, *, tunnel_id: int, rt: dict, cfg: dict) -> None:
-    ports = _ports(tunnel_id)
+async def _install_firewall(
+    ci,
+    ce,
+    *,
+    tunnel_id: int,
+    rt: dict,
+    cfg: dict,
+    spoof_source_port: int,
+) -> None:
+    ports = _ports(tunnel_id, spoof_source_port)
     iran_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-IRAN"
     exit_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-EXIT"
     l3_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-L3"
+    reverse_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-REV"
+    reverse_chain = _reverse_chain(tunnel_id)
+    reverse_rules = _wireguard_redirect_rules(
+        chain=reverse_chain,
+        exit_spoof_ip=cfg["exit_spoof_ip"],
+        spoof_source_port=ports["spoof_source_port"],
+        local_receive_port=ports["iran_raw_receive_port"],
+        comment=reverse_comment,
+    )
 
     await asyncio.gather(
         run(
@@ -356,6 +426,11 @@ async def _install_firewall(ci, ce, *, tunnel_id: int, rt: dict, cfg: dict) -> N
             f"""
 set -e
 if command -v iptables >/dev/null 2>&1; then
+  iptables -t nat -N {shlex.quote(reverse_chain)} 2>/dev/null || true
+  iptables -t nat -F {shlex.quote(reverse_chain)}
+  {reverse_rules}
+  iptables -t nat -C PREROUTING -p udp --dport {ports['iran_reverse_public_port']} -m comment --comment {shlex.quote(reverse_comment)} -j {shlex.quote(reverse_chain)} 2>/dev/null || \
+  iptables -t nat -I PREROUTING -p udp --dport {ports['iran_reverse_public_port']} -m comment --comment {shlex.quote(reverse_comment)} -j {shlex.quote(reverse_chain)}
   iptables -C INPUT -p udp --dport {ports['iran_raw_receive_port']} -s {shlex.quote(cfg['exit_spoof_ip'])} -m comment --comment {shlex.quote(iran_comment)} -j ACCEPT 2>/dev/null || \
   iptables -I INPUT -p udp --dport {ports['iran_raw_receive_port']} -s {shlex.quote(cfg['exit_spoof_ip'])} -m comment --comment {shlex.quote(iran_comment)} -j ACCEPT
   iptables -C INPUT -i {shlex.quote(rt['interface'])} -s {shlex.quote(rt['network'])} -m comment --comment {shlex.quote(l3_comment)} -j ACCEPT 2>/dev/null || \
@@ -440,7 +515,7 @@ async def _write_peer_runtime(
             f"--listen-port {ports['exit_raw_receive_port']} "
             f"--forward 127.0.0.1:{ports['exit_wireguard_port']} "
             f"--client-ip {shlex.quote(iran_public)} "
-            f"--client-port {ports['iran_raw_receive_port']} "
+            f"--client-port {ports['iran_reverse_public_port']} "
             f"--spoof-ip {shlex.quote(cfg['exit_spoof_ip'])} "
             f"--spoof-port {ports['spoof_source_port']} "
             f"--peer-spoof-ip {shlex.quote(cfg['iran_spoof_ip'])} "
@@ -530,13 +605,19 @@ async def install(tunnel_id: int, db: Session) -> dict:
     artifact_path, artifact_sha = _artifact()
     meta = {
         **rt,
-        "generation": 204,
+        "generation": 205,
         "carrier_class": "spoof-mutual-ip-wireguard-l3",
         "depends_on": "wireguard",
         "mtu": MTU,
         "ports": _ports(tunnel_id, source_port_candidates[0]),
         "spoof_config": cfg,
         "spoof_source_port_candidates": list(SPOOF_SOURCE_PORT_CANDIDATES),
+        "reverse_ingress": {
+            "mode": "shared-public-udp-redirection",
+            "public_port": REVERSE_INGRESS_PORT,
+            "private_port": _ports(tunnel_id, source_port_candidates[0])["iran_raw_receive_port"],
+            "selector": "exit-ip+spoof-source-port+wireguard-message-type",
+        },
         "upstream_version": UPSTREAM_VERSION,
         "upstream_source_sha": UPSTREAM_SOURCE_SHA,
         "artifact_sha256": artifact_sha,
@@ -544,7 +625,13 @@ async def install(tunnel_id: int, db: Session) -> dict:
     }
     if persisted_source_port is not None:
         meta[SPOOF_SOURCE_PORT_META_KEY] = persisted_source_port
-    mark(db, tunnel_id, NAME, status="installing", meta=json.dumps(meta, separators=(",", ":"), sort_keys=True))
+    mark(
+        db,
+        tunnel_id,
+        NAME,
+        status="installing",
+        meta=json.dumps(meta, separators=(",", ":"), sort_keys=True),
+    )
 
     ci = ce = None
     try:
@@ -572,6 +659,17 @@ async def install(tunnel_id: int, db: Session) -> dict:
             source_port_attempts.append(source_port)
             await _reset_pair(ci, ce, rt, cfg)
 
+            # Install the reverse ingress adapter before either relay emits
+            # traffic. Unmatched UDP/2053 packets continue to TP27/FoU.
+            await _install_firewall(
+                ci,
+                ce,
+                tunnel_id=int(tunnel_id),
+                rt=rt,
+                cfg=cfg,
+                spoof_source_port=source_port,
+            )
+
             # Exit must be able to receive the first spoofed WireGuard handshake
             # before the Iran relay starts emitting it.
             await _write_peer_runtime(
@@ -598,13 +696,6 @@ async def install(tunnel_id: int, db: Session) -> dict:
                 iran_public=str(iran.public_ip),
                 exit_public=str(exit_node.public_ip),
                 spoof_source_port=source_port,
-            )
-            await _install_firewall(
-                ci,
-                ce,
-                tunnel_id=int(tunnel_id),
-                rt=rt,
-                cfg=cfg,
             )
 
             await asyncio.sleep(5.0)
@@ -634,8 +725,14 @@ async def install(tunnel_id: int, db: Session) -> dict:
             "ports": _ports(tunnel_id, selected_source_port),
             SPOOF_SOURCE_PORT_META_KEY: selected_source_port,
             "spoof_source_port_attempts": source_port_attempts,
+            "reverse_ingress": {
+                "mode": "shared-public-udp-redirection",
+                "public_port": REVERSE_INGRESS_PORT,
+                "private_port": _ports(tunnel_id, selected_source_port)["iran_raw_receive_port"],
+                "selector": "exit-ip+spoof-source-port+wireguard-message-type",
+            },
             "wireguard": True,
-            "qualification": "full-shared-l3-probe",
+            "qualification": "full-shared-l3-probe+reverse-ingress-v205",
         }
         mark(
             db,
@@ -652,6 +749,7 @@ async def install(tunnel_id: int, db: Session) -> dict:
             "probe": health,
             "spoof_source_port": selected_source_port,
             "source_port_attempts": source_port_attempts,
+            "reverse_ingress_port": REVERSE_INGRESS_PORT,
             "upstream_version": UPSTREAM_VERSION,
             "xdp": False,
         }
