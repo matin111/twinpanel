@@ -3,6 +3,9 @@ from __future__ import annotations
 from .public_connection_canonical_presentation_v24 import (
     refine_public_connection_canonical_presentation_v24,
 )
+from .public_connection_mobile_stability_v25 import (
+    refine_public_connection_mobile_stability_v25,
+)
 
 
 _V11_CSS = r"""
@@ -128,4 +131,5 @@ def refine_public_connection_device_actions_v11(source: str) -> str:
     if "TWINPANEL_PUBLIC_CONNECT_DEVICE_ACTIONS_V11" not in source:
         source = source.replace("</style>", _V11_CSS + "\n</style>", 1)
         source = source.replace("</body>", _V11_SCRIPT + "\n</body>", 1)
-    return refine_public_connection_canonical_presentation_v24(source)
+    source = refine_public_connection_canonical_presentation_v24(source)
+    return refine_public_connection_mobile_stability_v25(source)
