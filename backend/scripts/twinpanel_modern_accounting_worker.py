@@ -15,7 +15,11 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.services.modern_quota_runtime_v257 import modern_quota_runtime_loop
+# Keep the legacy import visible for rollback/source validation, but production
+# execution uses the deadlock-safe V314 orchestration. V314 reuses the proven
+# V257 protocol collectors while separating async network I/O from DB writes.
+from app.services.modern_quota_runtime_v257 import modern_quota_runtime_loop as legacy_modern_quota_runtime_loop
+from app.services.modern_quota_runtime_v314 import modern_quota_runtime_loop
 from app.services.singbox_native_accounting_v265 import singbox_native_accounting_loop
 
 
