@@ -21,6 +21,7 @@ os.environ.setdefault(
 
 from app import xray_customer_profile_policy_v30 as policy
 from app import xray_modern_runtime
+from app import xray_node_domain_runtime as domain_runtime
 from app import xray_tcp_tls_v39
 from app.protocol_catalog import PROTOCOL_CATALOG
 from app.routers import account_delivery
@@ -48,8 +49,15 @@ def vless(profile: str, port: int) -> dict:
 
 
 def main() -> None:
-    # Mirror the real self_hosted_runtime composition order: V39 registers the
-    # TCP TLS profile in PROFILE_META before V30/V261 isolates target ports.
+    # Exercise the production V3 composition without touching a real database.
+    # The domain runtime's DB/model migration hooks are irrelevant to endpoint
+    # routing and are replaced only inside this isolated smoke process.
+    domain_runtime._install_model_column = lambda: None
+    domain_runtime._ensure_database_column = lambda: None
+    domain_runtime.apply_xray_node_domain_runtime()
+
+    # Mirror the remaining real self_hosted_runtime composition order: V39
+    # registers the TCP TLS profile before V30/V261 isolates target ports.
     xray_tcp_tls_v39.apply_xray_tcp_tls_v39()
     policy._apply_tls_target_isolation_v261()
 
@@ -102,19 +110,56 @@ def main() -> None:
     node = SimpleNamespace(
         id=6,
         public_ip="204.10.192.96",
-        public_domain=None,
+        public_domain="generic.example.com",
+        xray_domain="xray.example.com",
     )
     db = FakeDB(node)
 
     original_qr = account_delivery._qr_data_uri
-    original_node_host = account_delivery._node_host
     original_port = account_delivery._port
+    original_tunnel_endpoint = account_delivery._tunnel_access_endpoint
 
     account_delivery._qr_data_uri = lambda value: "qr:" + str(len(value))
-    account_delivery._node_host = lambda current: current.public_ip
     account_delivery._port = lambda current_db, node_id, protocol: 8443
 
     try:
+        # Runtime generation: direct TLS uses the dedicated Xray domain, while
+        # REALITY keeps the generic/direct host. This protects no-domain flows.
+        account_delivery._tunnel_access_endpoint = (
+            lambda current_db, current_node, protocol: (
+                current_node.public_domain or current_node.public_ip,
+                8443,
+            )
+        )
+
+        direct_tls_endpoint = xray_modern_runtime._profile_endpoint(
+            db,
+            node,
+            xray_modern_runtime.PROFILE_WS,
+        )
+        assert direct_tls_endpoint == ("xray.example.com", 9444)
+
+        direct_reality_endpoint = xray_modern_runtime._profile_endpoint(
+            db,
+            node,
+            xray_modern_runtime.PROFILE_XHTTP,
+        )
+        assert direct_reality_endpoint == ("generic.example.com", 8444)
+
+        # Runtime generation: an active Iran ingress must remain the authority.
+        account_delivery._tunnel_access_endpoint = (
+            lambda current_db, current_node, protocol: (
+                "193.39.9.222",
+                23006,
+            )
+        )
+        tunneled_tls_endpoint = xray_modern_runtime._profile_endpoint(
+            db,
+            node,
+            xray_modern_runtime.PROFILE_WS,
+        )
+        assert tunneled_tls_endpoint == ("193.39.9.222", 26006)
+
         tunnel_item = {
             "node_id": 6,
             "server": "193.39.9.222",
@@ -155,8 +200,8 @@ def main() -> None:
         ]
         assert policy._customer_xray_item_v261(db, hidden_only) is None
 
-        # Explicit direct delivery keeps the Exit host and uses the isolated
-        # private Xray target port instead of the modern 8444..8452 range.
+        # Explicit direct delivery converges the VLESS authority to xray_domain
+        # and keeps the isolated private Xray target port.
         direct_item = dict(tunnel_item)
         direct_item["server"] = "204.10.192.96"
         direct_item["server_ip"] = "204.10.192.96"
@@ -165,9 +210,19 @@ def main() -> None:
 
         direct = policy._customer_xray_item_v261(db, direct_item)
         assert direct is not None
-        assert direct["server"] == "204.10.192.96"
+        assert direct["server"] == "xray.example.com"
         assert direct["port"] == 9444
-        assert "@204.10.192.96:9444?" in direct["uri"]
+        assert "@xray.example.com:9444?" in direct["uri"]
+
+        # Compatibility: without a dedicated Xray domain, direct TLS continues
+        # to use the generic Node public domain instead of changing semantics.
+        node.xray_domain = None
+        fallback = policy._customer_xray_item_v261(db, direct_item)
+        assert fallback is not None
+        assert fallback["server"] == "generic.example.com"
+        assert fallback["port"] == 9444
+        assert "@generic.example.com:9444?" in fallback["uri"]
+        node.xray_domain = "xray.example.com"
 
         # Migration compatibility: true legacy credentials without profiles[]
         # keep their historical single VLESS item.
@@ -204,8 +259,8 @@ def main() -> None:
 
     finally:
         account_delivery._qr_data_uri = original_qr
-        account_delivery._node_host = original_node_host
         account_delivery._port = original_port
+        account_delivery._tunnel_access_endpoint = original_tunnel_endpoint
 
     print("XRAY_CUSTOMER_DELIVERY_V261_OK")
 
