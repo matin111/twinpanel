@@ -34,6 +34,12 @@ from .. import node_bootstrap_control_v72 as _node_bootstrap_control_v72  # noqa
 # bootstrap workspace or native ControlMaster behind.
 from .. import node_bootstrap_control_v73 as _node_bootstrap_control_v73  # noqa: F401
 
+# V74 restores V72's intended saved-node control flow. The direct attempt uses
+# the original direct connector instead of the V61 direct+relay race, so
+# recurring accounting/runtime management cannot spawn local ssh->Iran->nc
+# fanout below the single API worker. Native Iran fallback remains sequential.
+from .. import node_bootstrap_control_v74 as _node_bootstrap_control_v74  # noqa: F401
+
 # Register guarded DELETE routes before app.main includes nodes/tunnels.
 from . import destructive_safety as _destructive_safety  # noqa: F401
 
