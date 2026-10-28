@@ -9,15 +9,16 @@ def read(path: str) -> str:
 
 def main() -> None:
     routed = read("components/routed-page-client-v2.tsx")
-    tunnel = read("components/tunnel-protocol-runtime-v298.tsx")
+    tunnel = read("components/tunnel-protocol-runtime-v307.tsx")
+    styles = read("components/tunnel-protocol-runtime-v307.module.css")
     smart = read("components/smart-transports-runtime-v27.tsx")
 
     assert 'routeKey==="admin/tunnels"' in routed
-    assert '<TunnelProtocolRuntimeV298/>' in routed
+    assert '<TunnelProtocolRuntimeV307/>' in routed
     assert 'routeKey==="admin/tunnel-transports"' in routed
     assert '<SmartTransportsRuntimeV27/>' in routed
 
-    assert "TWINPANEL_TUNNEL_PROTOCOL_MANAGEMENT_V298" in tunnel
+    assert "TWINPANEL_TUNNEL_MANAGEMENT_POPUP_V307" in tunnel
     assert "legacyAdminApi.classicProtocols()" in tunnel
     assert "modernTransportApi.protocolInventory()" in tunnel
     assert "ensureClassicProtocol" in tunnel
@@ -26,10 +27,20 @@ def main() -> None:
     assert "TunnelServiceConnectionsPanel" in tunnel
     assert 'window.location.href="/admin/tunnel-transports"' in tunnel
 
-    # Tunnel and Smart Transports must remain separate route authorities.
-    assert "TunnelProtocolRuntimeV298" not in smart
+    # Detailed management must live behind the modal, not as a long inline
+    # protocol/service section below the tunnel list.
+    assert "manageOpen" in tunnel
+    assert "openManage" in tunnel
+    assert "<Modal wide" in tunnel
+    assert "styles.tunnelGrid" in tunnel
+    assert "styles.modalCard" in tunnel
+    assert ".tunnelGrid" in styles
+    assert ".modalCard" in styles
 
-    print("tunnel protocol page separation v298: ok")
+    # Tunnel and Smart Transports remain separate route authorities.
+    assert "TunnelProtocolRuntimeV307" not in smart
+
+    print("tunnel protocol page separation/popup v307: ok")
 
 
 if __name__ == "__main__":
