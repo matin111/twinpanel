@@ -1,10 +1,12 @@
-name: Tunnel Protocol Page V298 Smoke
+name: Tunnel Protocol Page V307 Smoke
 
 on:
   pull_request:
     branches: [main]
     paths:
       - 'components/tunnel-protocol-runtime-v298.tsx'
+      - 'components/tunnel-protocol-runtime-v307.tsx'
+      - 'components/tunnel-protocol-runtime-v307.module.css'
       - 'components/routed-page-client-v2.tsx'
       - 'components/smart-transports-runtime-v27.tsx'
       - 'scripts/test_tunnel_protocol_page_separation_v298.py'
@@ -13,6 +15,8 @@ on:
     branches: [main]
     paths:
       - 'components/tunnel-protocol-runtime-v298.tsx'
+      - 'components/tunnel-protocol-runtime-v307.tsx'
+      - 'components/tunnel-protocol-runtime-v307.module.css'
       - 'components/routed-page-client-v2.tsx'
       - 'components/smart-transports-runtime-v27.tsx'
       - 'scripts/test_tunnel_protocol_page_separation_v298.py'
@@ -27,5 +31,5 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Verify tunnel/protocol route separation
+      - name: Verify tunnel/protocol route separation and popup management
         run: python scripts/test_tunnel_protocol_page_separation_v298.py
