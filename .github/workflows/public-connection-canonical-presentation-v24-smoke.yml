@@ -1,11 +1,13 @@
-name: TwinPanel Public Connection Canonical Presentation V24 Smoke
+name: TwinPanel Public Connection Canonical Presentation V24/V25 Smoke
 
 on:
   pull_request:
     paths:
       - "backend/app/routers/public_connection_device_actions_v11.py"
       - "backend/app/routers/public_connection_canonical_presentation_v24.py"
+      - "backend/app/routers/public_connection_mobile_stability_v25.py"
       - "backend/tests/smoke_public_connection_canonical_presentation_v24.py"
+      - "backend/tests/smoke_public_connection_mobile_stability_v25.py"
       - ".github/workflows/public-connection-canonical-presentation-v24-smoke.yml"
   push:
     branches:
@@ -13,7 +15,9 @@ on:
     paths:
       - "backend/app/routers/public_connection_device_actions_v11.py"
       - "backend/app/routers/public_connection_canonical_presentation_v24.py"
+      - "backend/app/routers/public_connection_mobile_stability_v25.py"
       - "backend/tests/smoke_public_connection_canonical_presentation_v24.py"
+      - "backend/tests/smoke_public_connection_mobile_stability_v25.py"
       - ".github/workflows/public-connection-canonical-presentation-v24-smoke.yml"
 
 jobs:
@@ -24,10 +28,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Compile V11/V24
+      - name: Compile V11/V24/V25
         run: |
           python -m py_compile \
             backend/app/routers/public_connection_device_actions_v11.py \
-            backend/app/routers/public_connection_canonical_presentation_v24.py
+            backend/app/routers/public_connection_canonical_presentation_v24.py \
+            backend/app/routers/public_connection_mobile_stability_v25.py
       - name: Verify canonical presentation contract
         run: python backend/tests/smoke_public_connection_canonical_presentation_v24.py
+      - name: Verify mobile stability regression
+        run: python backend/tests/smoke_public_connection_mobile_stability_v25.py
