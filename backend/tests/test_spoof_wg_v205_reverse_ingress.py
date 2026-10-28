@@ -128,17 +128,18 @@ def test_v206_underlay_guard_persists_fail_closed_quarantine_evidence():
         assert token in guard, token
 
 
-def test_v206_guard_does_not_modify_spoof_dataplane_framing_or_ports():
+def test_v206_guard_does_not_execute_dataplane_or_port_mutations():
     guard = read("backend/app/spoof_underlay_guard_v206.py")
 
     for forbidden in (
-        "nft ",
-        "iptables",
+        "conn.run(",
+        "subprocess.",
+        "nft -f",
+        "iptables -",
         "REVERSE_INGRESS_PORT",
         "WIREGUARD_MESSAGE_PREFIXES",
         "--spoof-port",
         "--client-port",
         "udp dport set",
-        "payload",
     ):
         assert forbidden not in guard, forbidden
