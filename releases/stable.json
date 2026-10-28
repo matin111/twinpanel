@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.312",
+  "version": "1.1.0-rc.313",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-28T19:41:37Z",
+  "released_at": "2026-10-28T20:32:17Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "ddc67571ca149ca4602d942321923ac3b17820ca",
+  "source_sha": "f3caa1eccfb68daaa258272cf78834375c98a3a5",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.312/twinpanel-1.1.0-rc.312-linux-x86_64.tar.gz",
-    "sha256": "f8b221f66e5186ddc70ccf1b20a432cc26425a93f3ae82953dd260933f6a19b5",
-    "size_bytes": 28490531
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.313/twinpanel-1.1.0-rc.313-linux-x86_64.tar.gz",
+    "sha256": "99df86b4609799389eba0dac07d044e302bc13f9c9cce2c60f0c6dc759d78409",
+    "size_bytes": 28497040
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.312 مسیر Production Accounting پروتکل‌های native sing-box را اصلاح می‌کند. پس از ایزوله‌سازی Modern Accounting از Uvicorn در rc.308، collector موجود V265 برای Hysteria2، TUIC، AnyTLS، Naive، ShadowTLS و Snell فقط در lifespan سازگاری FastAPI باقی مانده بود و worker اختصاصی systemd آن را اجرا نمی‌کرد؛ در نتیجه اتصال واقعی می‌توانست برقرار باشد اما QuotaSession و وضعیت Online در Public Connect ثبت نشود. در rc.312 همان collector موجود V265 بدون Rewrite به twinpanel-modern-accounting worker متصل شده و همراه collector canonical V257 اجرا می‌شود. اگر هر collector غیرمنتظره متوقف شود، کل worker fail می‌شود تا systemd مسیر Accounting را کامل restart کند. Public Connect همچنان DB-only باقی می‌ماند و هیچ probe شبکه‌ای به polling مرورگر برنگشته است. bootstrap import نسخه rc.310 و جداسازی دامنه Xray نسخه rc.311 حفظ شده‌اند. این نسخه هیچ تغییری در TP27، VXLAN، Spoof، Tunnel، Cisco/OpenConnect، پورت پروتکل‌ها یا الگوریتم‌های dataplane ایجاد نمی‌کند. Source candidate روی SHA immutable ddc67571ca149ca4602d942321923ac3b17820ca قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.312 repairs the production accounting execution path for native sing-box protocols. After Modern Accounting was isolated from Uvicorn in rc.308, the existing V265 collector for Hysteria2, TUIC, AnyTLS, Naive, ShadowTLS and Snell remained only in the compatibility FastAPI lifespan while the dedicated systemd worker did not run it; a real VPN connection could therefore succeed without producing the canonical QuotaSession/Online state consumed by Public Connect. rc.312 reconnects the existing V265 collector, without rewriting it, to the twinpanel-modern-accounting worker alongside canonical V257. If either collector exits unexpectedly, the whole worker fails so systemd restarts the complete accounting path. Public Connect remains DB-only and no network probe is reintroduced into browser polling. The rc.310 import bootstrap and rc.311 Xray-domain separation are preserved. This release does not change TP27, VXLAN, Spoof, Tunnel, Cisco/OpenConnect, protocol ports, or dataplane algorithms. The candidate source is pinned to immutable SHA ddc67571ca149ca4602d942321923ac3b17820ca."
+    "fa": "TwinPanel 1.1.0-rc.313 نمایش Customer Delivery برای Xray را اصلاح می‌کند. Hub V5 قبلاً قرارداد واقعی profiles[] نسخه V47 را به یک URI کلی تقلیل می‌داد؛ اکنون Quick Connect هر سرور سه پروفایل واقعی انتخاب‌شده توسط V47 را به‌صورت مستقل با QR، کپی لینک و اکشن‌های کلاینت نمایش می‌دهد. Smart Connect همچنان تک‌گزینه‌ای و canonical است، Mobile همان پروفایل‌های واقعی را حفظ می‌کند و Multilink/Subscription Delivery دست‌نخورده باقی مانده‌اند. هیچ پروفایل جعلی ساخته نمی‌شود و اگر فقط دو پروفایل واقعی وجود داشته باشد همان دو مورد نمایش داده می‌شوند. این نسخه هیچ تغییری در TP27، VXLAN، Spoof، Tunnel، Accounting، provisioning یا dataplane ایجاد نمی‌کند. Source candidate روی SHA immutable f3caa1eccfb68daaa258272cf78834375c98a3a5 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.313 fixes Xray Customer Delivery rendering. Hub V5 previously collapsed the real V47 profiles[] contract into one generic URI; Quick Connect now exposes each real V47-selected profile for a server independently with its own QR, copy action and client actions. Smart Connect remains canonical/single, mobile preserves the same real profile set, and Multilink/Subscription Delivery is unchanged. No fake profile is synthesized: if only two real profiles exist, only those two are rendered. This release does not change TP27, VXLAN, Spoof, Tunnel, Accounting, provisioning or dataplane behavior. The candidate source is pinned to immutable SHA f3caa1eccfb68daaa258272cf78834375c98a3a5."
   }
 }
