@@ -4,6 +4,7 @@ from __future__ import annotations
 _MOBILE_PROTOCOLS_V17_CSS = r"""
 /* TWINPANEL_PUBLIC_CONNECT_MOBILE_PROTOCOLS_V17 */
 /* TWINPANEL_MOBILE_ADAPTIVE_DELIVERY_V294 */
+/* TWINPANEL_MOBILE_CONNECT_VISUAL_DENSITY_V301 */
 .v17-mobile-stack{display:none}
 
 @media(max-width:720px){
@@ -15,44 +16,65 @@ _MOBILE_PROTOCOLS_V17_CSS = r"""
   body.v17-ready .v17-hidden{display:none!important}
   body.v17-ready .v9-mobile-stack{display:none!important}
 
-  .v17-mobile-stack{display:flex;flex-direction:column;gap:7px;margin-top:8px}
-  .v17-protocol-card,.v17-ha-card{overflow:hidden;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:0 7px 22px rgba(0,0,0,.07)}
-  .v17-protocol-card[open],.v17-ha-card[open]{border-color:color-mix(in srgb,var(--pc,var(--p)) 42%,var(--line))}
-  .v17-summary{min-height:50px;padding:7px 9px;display:grid;grid-template-columns:34px minmax(0,1fr) auto 16px;align-items:center;gap:7px;list-style:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .v17-mobile-stack{display:flex;flex-direction:column;gap:10px;margin-top:12px;direction:rtl}
+  .v17-protocol-card,.v17-ha-card{overflow:hidden;border:1px solid var(--line);border-radius:16px;background:var(--surface);box-shadow:0 8px 24px rgba(0,0,0,.07)}
+  .v17-protocol-card[open],.v17-ha-card[open]{border-color:color-mix(in srgb,var(--pc,var(--p)) 46%,var(--line));box-shadow:0 10px 26px color-mix(in srgb,var(--pc,var(--p)) 10%,transparent)}
+  .v17-summary{min-height:64px;padding:10px 12px;display:grid;grid-template-columns:40px minmax(0,1fr) auto 18px;align-items:center;gap:10px;list-style:none;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
   .v17-summary::-webkit-details-marker{display:none}
-  .v17-mark{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:linear-gradient(135deg,var(--pc,var(--p)),var(--s));color:#fff;font-size:9px;font-weight:950}
-  .v17-title{min-width:0}
-  .v17-title b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px;line-height:1.4}
-  .v17-title small{display:block;margin-top:1px;color:var(--muted);font-size:7px}
-  .v17-count{min-width:50px;height:24px;padding:0 7px;display:inline-flex;align-items:center;justify-content:center;border:1px solid color-mix(in srgb,var(--pc,var(--p)) 30%,var(--line));border-radius:999px;background:color-mix(in srgb,var(--pc,var(--p)) 7%,var(--surface));color:var(--pc,var(--p));font-size:7px;font-weight:900;white-space:nowrap}
-  .v17-chevron{color:var(--muted);font-size:14px;transition:transform .18s ease}
+  .v17-summary:focus-visible,.v17-action:focus-visible,.v17-device-app a:focus-visible{outline:2px solid var(--pc,var(--p));outline-offset:2px}
+  .v17-mark{width:40px;height:40px;display:grid;place-items:center;border-radius:12px;background:linear-gradient(135deg,var(--pc,var(--p)),var(--s));color:#fff;font-size:11px;font-weight:950;box-shadow:0 6px 14px color-mix(in srgb,var(--pc,var(--p)) 24%,transparent)}
+  .v17-title{min-width:0;text-align:right}
+  .v17-title b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14.5px;line-height:1.45;font-weight:900}
+  .v17-title small{display:block;margin-top:2px;color:var(--muted);font-size:11.5px;line-height:1.45}
+  .v17-count{min-width:62px;height:30px;padding:0 9px;display:inline-flex;align-items:center;justify-content:center;border:1px solid color-mix(in srgb,var(--pc,var(--p)) 34%,var(--line));border-radius:999px;background:color-mix(in srgb,var(--pc,var(--p)) 8%,var(--surface));color:var(--pc,var(--p));font-size:10.5px;font-weight:900;white-space:nowrap}
+  .v17-chevron{color:var(--muted);font-size:16px;transition:transform .18s ease}
   .v17-protocol-card[open] .v17-chevron,.v17-ha-card[open] .v17-chevron{transform:rotate(180deg)}
-  .v17-body{padding:7px;border-top:1px solid var(--line)}
-  .v17-device-app{min-height:32px;margin:0 0 7px;padding:5px 8px;display:flex;align-items:center;justify-content:space-between;gap:7px;border:1px solid color-mix(in srgb,var(--p) 24%,var(--line));border-radius:10px;background:color-mix(in srgb,var(--p) 6%,var(--surface2))}
-  .v17-device-app span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:7px}
-  .v17-device-app a{flex:0 0 auto;color:var(--p);font-size:7px;font-weight:900}
-  .v17-server-list{display:flex;flex-direction:column;gap:5px}
-  .v17-server-row{min-height:48px;padding:6px 7px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:7px;border:1px solid var(--line);border-radius:11px;background:var(--surface2)}
-  .v17-server-copy{min-width:0}
-  .v17-server-copy b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px}
-  .v17-server-copy small{display:block;margin-top:2px;color:var(--muted);font-size:6.5px}
-  .v17-server-actions{display:flex;align-items:center;justify-content:flex-end;gap:4px;min-width:0}
-  .v17-action{min-height:30px;max-width:132px;padding:0 8px;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;text-overflow:ellipsis;border:1px solid color-mix(in srgb,var(--p) 28%,var(--line));border-radius:8px;background:var(--surface);color:var(--text);font-size:7px;font-weight:900;text-decoration:none;white-space:nowrap}
-  .v17-action.primary{border-color:color-mix(in srgb,var(--p) 42%,var(--line));background:color-mix(in srgb,var(--p) 10%,var(--surface));color:var(--p)}
-  .v17-config-first .v17-advanced-action{width:30px;min-width:30px;padding:0;font-size:0}
-  .v17-config-first .v17-advanced-action::before{content:"•••";font-size:9px;letter-spacing:1px}
+  .v17-body{padding:10px 12px 12px;border-top:1px solid var(--line)}
+  .v17-device-app{min-height:44px;margin:0 0 9px;padding:8px 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid color-mix(in srgb,var(--p) 24%,var(--line));border-radius:12px;background:color-mix(in srgb,var(--p) 6%,var(--surface2))}
+  .v17-device-app span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:11.5px;line-height:1.45}
+  .v17-device-app a{flex:0 0 auto;min-height:36px;padding:0 8px;display:inline-flex;align-items:center;color:var(--p);font-size:12px;font-weight:900;text-decoration:none}
+  .v17-server-list{display:flex;flex-direction:column;gap:8px}
+  .v17-server-row{min-height:64px;padding:9px 10px;display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,auto);align-items:center;gap:9px;border:1px solid var(--line);border-radius:13px;background:var(--surface2)}
+  .v17-server-copy{min-width:0;text-align:right}
+  .v17-server-copy b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;line-height:1.45}
+  .v17-server-copy small{display:block;margin-top:3px;color:var(--muted);font-size:11px;line-height:1.45}
+  .v17-server-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:center;justify-content:end;gap:6px;min-width:0}
+  .v17-action{min-height:44px;max-width:none;width:100%;padding:0 11px;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;text-overflow:ellipsis;border:1px solid color-mix(in srgb,var(--p) 28%,var(--line));border-radius:11px;background:var(--surface);color:var(--text);font-size:12px;font-weight:900;text-decoration:none;white-space:nowrap;cursor:pointer;touch-action:manipulation}
+  .v17-action.primary{border-color:color-mix(in srgb,var(--p) 44%,var(--line));background:color-mix(in srgb,var(--p) 11%,var(--surface));color:var(--p)}
+  .v17-action.v17-main-action{grid-column:1/-1;min-height:48px;background:linear-gradient(135deg,color-mix(in srgb,var(--p) 16%,var(--surface)),color-mix(in srgb,var(--p) 8%,var(--surface)));box-shadow:0 5px 14px color-mix(in srgb,var(--p) 10%,transparent)}
+  .v17-config-first .v17-advanced-action{width:44px;min-width:44px;padding:0;font-size:0;justify-self:end}
+  .v17-config-first .v17-advanced-action::before{content:"•••";font-size:13px;letter-spacing:1px}
   .v17-credential-first .v17-advanced-action{border-color:color-mix(in srgb,var(--pc,var(--p)) 44%,var(--line));color:var(--pc,var(--p));background:color-mix(in srgb,var(--pc,var(--p)) 8%,var(--surface))}
-  .v17-details{display:none;grid-column:1/-1;padding:7px 8px;border-radius:9px;background:var(--surface);color:var(--muted);font-size:6.5px;line-height:1.8;direction:ltr;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere}
+  .v17-details{display:none;grid-column:1/-1;padding:10px 11px;border:1px solid color-mix(in srgb,var(--pc,var(--p)) 16%,var(--line));border-radius:11px;background:var(--surface);color:var(--muted);font-size:11.5px;line-height:1.9;direction:ltr;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere}
   .v17-server-row.show-details .v17-details{display:block}
-  .v17-pending{padding:9px;color:var(--muted);font-size:7px;text-align:center}
+  .v17-credential-first .v17-server-row.show-details{align-items:start}
+  .v17-pending{padding:14px 10px;color:var(--muted);font-size:12px;line-height:1.7;text-align:center}
 }
 
 @media(max-width:430px){
-  .v17-summary{grid-template-columns:32px minmax(0,1fr) auto 14px;padding:6px 7px}
-  .v17-mark{width:32px;height:32px}
-  .v17-server-row{grid-template-columns:minmax(0,1fr);gap:5px}
-  .v17-server-actions{justify-content:flex-start;flex-wrap:wrap}
-  .v17-action{max-width:calc(50vw - 34px)}
+  .v17-mobile-stack{gap:9px;margin-top:10px}
+  .v17-summary{grid-template-columns:38px minmax(0,1fr) auto 16px;min-height:60px;padding:9px 10px;gap:8px}
+  .v17-mark{width:38px;height:38px;border-radius:11px}
+  .v17-title b{font-size:14px}
+  .v17-title small{font-size:11px}
+  .v17-count{min-width:56px;height:28px;padding:0 7px;font-size:10px}
+  .v17-body{padding:9px 10px 10px}
+  .v17-server-row{grid-template-columns:minmax(0,1fr);gap:8px;padding:10px}
+  .v17-server-actions{width:100%;justify-content:stretch}
+  .v17-action{max-width:none}
+  .v17-config-first .v17-advanced-action{justify-self:stretch;width:100%}
+}
+
+@media(max-width:360px){
+  .v17-summary{grid-template-columns:36px minmax(0,1fr) 16px}
+  .v17-mark{width:36px;height:36px}
+  .v17-count{display:none}
+  .v17-server-actions{grid-template-columns:1fr}
+  .v17-action.v17-main-action{grid-column:1}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .v17-chevron{transition:none}
 }
 """
 
@@ -81,12 +103,12 @@ _MOBILE_PROTOCOLS_V17_SCRIPT = r"""
       if(!source)return null;let out;
       if(source.tagName==='A'){out=document.createElement('a');out.href=source.getAttribute('href')||'#';if(source.target)out.target=source.target;if(source.rel)out.rel=source.rel;if(source.hasAttribute('download'))out.setAttribute('download',source.getAttribute('download')||'')}
       else{out=document.createElement('button');out.type='button';out.addEventListener('click',()=>source.click())}
-      out.className='v17-action'+(primary?' primary':'');out.textContent=label;return out
+      out.className='v17-action'+(primary?' primary v17-main-action':'');out.textContent=label;return out
     }
     function primaryLabel(source,key){if(source?.classList.contains('v13-karing-import'))return'افزودن به Karing';const href=String(source?.getAttribute?.('href')||'');if(/^(vmess|vless|trojan|ss|hysteria2|hy2|tuic|karing):/i.test(href))return'باز کردن در برنامه';if(key==='openvpn')return'OpenVPN';if(key==='wireguard')return'WireGuard';return credentialFirst.has(key)?'اتصال':'باز کردن'}
     function factText(view){return [...view.querySelectorAll('.fact')].map(fact=>{const label=text(fact.querySelector('small'));const value=text(fact.querySelector('strong'));return label&&value?label+': '+value:''}).filter(Boolean).join('\n')}
     function addAdvanced(row,actions,details,key){
-      if(!details)return;const button=document.createElement('button');button.type='button';button.className='v17-action v17-advanced-action'+(credentialFirst.has(key)?' primary':'');button.textContent='جزئیات';const detail=document.createElement('div');detail.className='v17-details';detail.textContent=details;button.addEventListener('click',()=>row.classList.toggle('show-details'));actions.appendChild(button);row.appendChild(detail)
+      if(!details)return;const button=document.createElement('button');button.type='button';button.className='v17-action v17-advanced-action'+(credentialFirst.has(key)?' primary':'');const detail=document.createElement('div');detail.className='v17-details';detail.textContent=details;const credential=credentialFirst.has(key);if(credential)row.classList.add('show-details');function sync(){const expanded=row.classList.contains('show-details');button.textContent=credential?(expanded?'مخفی کردن اطلاعات':'نمایش اطلاعات'):'جزئیات';button.setAttribute('aria-expanded',expanded?'true':'false')}button.addEventListener('click',()=>{row.classList.toggle('show-details');sync()});sync();actions.appendChild(button);row.appendChild(detail)
     }
     function makeServerRow(view,name,key,index){
       const row=document.createElement('div');row.className='v17-server-row';row.dataset.protocolKey=key;
@@ -95,7 +117,7 @@ _MOBILE_PROTOCOLS_V17_SCRIPT = r"""
       if(credentialFirst.has(key))addAdvanced(row,actions,details,key);
       if(primary){const action=makeAction(primary,primaryLabel(primary,key),true);if(action)actions.appendChild(action)}else if(download){const action=makeAction(download,'دانلود کانفیگ',true);if(action)actions.appendChild(action)}
       if(!credentialFirst.has(key)){if(secondary){const action=makeAction(secondary,'دانلود',false);if(action)actions.appendChild(action)}else if(download&&primary){const action=makeAction(download,'دانلود',false);if(action)actions.appendChild(action)}addAdvanced(row,actions,details,key)}
-      if(!actions.childElementCount){const button=document.createElement('button');button.type='button';button.className='v17-action primary';button.textContent='مشاهده';button.addEventListener('click',()=>{const choice=choiceFor(view.closest('.protocol-panel'));if(choice)choice.click()});actions.appendChild(button)}
+      if(!actions.childElementCount){const button=document.createElement('button');button.type='button';button.className='v17-action primary v17-main-action';button.textContent='مشاهده';button.addEventListener('click',()=>{const choice=choiceFor(view.closest('.protocol-panel'));if(choice)choice.click()});actions.appendChild(button)}
       row.appendChild(actions);return row
     }
     function makeProtocolCard(panel){
@@ -116,7 +138,7 @@ _MOBILE_PROTOCOLS_V17_SCRIPT = r"""
     bindAccordion(mount);
     const smart=document.querySelector('.smart-card');if(smart){smart.classList.add('v17-hidden');const prev=smart.previousElementSibling;if(prev?.classList.contains('section-head'))prev.classList.add('v17-hidden')}
     const quick=[...document.querySelectorAll('.section-head')].find(el=>text(el.querySelector('h2')).includes('اتصال سریع'));if(quick?.querySelector('h2'))quick.querySelector('h2').textContent='سرورهای اتصال';
-    body.classList.add('v17-ready');body.dataset.tpMobileAdaptive='v294';
+    body.classList.add('v17-ready');body.dataset.tpMobileAdaptive='v301';
   }
   window.setTimeout(start,0);
 })();
@@ -125,7 +147,7 @@ _MOBILE_PROTOCOLS_V17_SCRIPT = r"""
 
 
 def refine_public_connection_mobile_protocols_v17(source: str) -> str:
-    """Render a compact, protocol-aware mobile stack without changing desktop."""
+    """Render a readable, protocol-aware mobile stack without changing desktop."""
     if "TWINPANEL_PUBLIC_CONNECT_MOBILE_PROTOCOLS_V17" in source:
         return source
     source = source.replace("</style>", _MOBILE_PROTOCOLS_V17_CSS + "\n</style>", 1)
