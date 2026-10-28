@@ -43,13 +43,15 @@ from .common import (
 # 37000+slot UDP range. Production Tunnel #8 proved VXLAN already owns 37008.
 #
 # V205 adapts only the reverse public ingress. Production packet captures on
-# Tunnel #8 proved Exit->Iran packets to the private Spoof receive port 36008
-# (and validation ports 46008/TCP 443) were filtered before Iran eth0, while
-# UDP/2053 on the same pair was delivered. Reverse Spoof packets therefore use
-# public UDP/2053 and an Iran-side, TwinPanel-owned PREROUTING adapter redirects
-# only authenticated-looking WireGuard payloads from the configured Exit IP and
-# selected Spoof source port to the private per-tunnel receive port. TP27/FoU
-# remains owner of UDP/2053; unmatched packets return untouched to its path.
+# Tunnel #8 proved Exit->Iran packets to the private Spoof receive port 36008,
+# UDP/46008 and raw TCP/443 were filtered before Iran eth0, while UDP/2053 on
+# the same pair was delivered. Reverse Spoof packets therefore use public
+# UDP/2053. A Spoof-owned nftables raw/prerouting chain runs before conntrack
+# and statelessly rewrites only packets matching the configured Exit IP,
+# selected Spoof source port, public ingress port and a WireGuard message-type
+# prefix. Unmatched UDP/2053 remains untouched for TP27/FoU.
+#
+# XDP stays disabled. The pinned upstream core and artifact are unchanged.
 #
 # Upstream: https://github.com/ParsaKSH/spoof-tunnel
 # License : Apache-2.0
@@ -70,9 +72,12 @@ SPOOF_SOURCE_PORT_CANDIDATES = (SPOOF_SOURCE_PORT, 44443)
 SPOOF_SOURCE_PORT_META_KEY = "spoof_source_port"
 EXIT_WIREGUARD_PORT_BASE = 38000
 REVERSE_INGRESS_PORT = 2053
-WIREGUARD_MESSAGE_TYPES = (1, 2, 3, 4)
-WIREGUARD_PAYLOAD_FROM = 28
-WIREGUARD_PAYLOAD_TO = 32
+WIREGUARD_MESSAGE_PREFIXES = (
+    "0x01000000",
+    "0x02000000",
+    "0x03000000",
+    "0x04000000",
+)
 
 
 def _artifact() -> tuple[Path, str]:
@@ -212,33 +217,8 @@ def _ports(tunnel_id: int, spoof_source_port: int | None = None) -> dict[str, in
     }
 
 
-def _reverse_chain(tunnel_id: int) -> str:
-    return f"TPSP{int(tunnel_id)}REV"[:28]
-
-
-def _wireguard_redirect_rules(
-    *,
-    chain: str,
-    exit_spoof_ip: str,
-    spoof_source_port: int,
-    local_receive_port: int,
-    comment: str,
-) -> str:
-    rules: list[str] = []
-    for message_type in WIREGUARD_MESSAGE_TYPES:
-        signature = f"|{message_type:02x}000000|"
-        rules.append(
-            "iptables -t nat -A "
-            f"{shlex.quote(chain)} -p udp "
-            f"-s {shlex.quote(exit_spoof_ip)} "
-            f"--sport {int(spoof_source_port)} "
-            "-m string --algo bm "
-            f"--from {WIREGUARD_PAYLOAD_FROM} --to {WIREGUARD_PAYLOAD_TO} "
-            f"--hex-string {shlex.quote(signature)} "
-            f"-m comment --comment {shlex.quote(comment)} "
-            f"-j REDIRECT --to-ports {int(local_receive_port)}"
-        )
-    return "\n".join(rules)
+def _ingress_table(tunnel_id: int) -> str:
+    return f"tpsp_ingress_{int(tunnel_id)}"
 
 
 def _key_path(tunnel_id: int, role: str) -> str:
@@ -264,6 +244,18 @@ async def _ensure_wireguard(conn) -> None:
             300,
         )
     await conn.run("modprobe wireguard >/dev/null 2>&1 || true", check=False, timeout=15)
+
+
+async def _ensure_nftables(conn) -> None:
+    check = await conn.run("command -v nft >/dev/null 2>&1", check=False, timeout=15)
+    if check.exit_status != 0:
+        await run(
+            conn,
+            "export DEBIAN_FRONTEND=noninteractive; "
+            "apt-get update -qq; apt-get install -y -qq nftables",
+            "spoof_wg_nftables",
+            300,
+        )
 
 
 async def _keypair(conn, path: str) -> tuple[str, str]:
@@ -301,8 +293,7 @@ async def _remove_owned_firewall(
     iran_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-IRAN"
     exit_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-EXIT"
     l3_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-L3"
-    reverse_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-REV"
-    reverse_chain = _reverse_chain(tunnel_id)
+    ingress_table = _ingress_table(tunnel_id)
 
     iran_legacy_cleanup = ""
     exit_legacy_cleanup = ""
@@ -322,12 +313,10 @@ async def _remove_owned_firewall(
         ci.run(
             f"""
 set +e
+if command -v nft >/dev/null 2>&1; then
+  nft delete table ip {shlex.quote(ingress_table)} >/dev/null 2>&1 || true
+fi
 if command -v iptables >/dev/null 2>&1; then
-  while iptables -t nat -C PREROUTING -p udp --dport {REVERSE_INGRESS_PORT} -m comment --comment {shlex.quote(reverse_comment)} -j {shlex.quote(reverse_chain)} 2>/dev/null; do
-    iptables -t nat -D PREROUTING -p udp --dport {REVERSE_INGRESS_PORT} -m comment --comment {shlex.quote(reverse_comment)} -j {shlex.quote(reverse_chain)} || break
-  done
-  iptables -t nat -F {shlex.quote(reverse_chain)} >/dev/null 2>&1 || true
-  iptables -t nat -X {shlex.quote(reverse_chain)} >/dev/null 2>&1 || true
 {iran_legacy_cleanup}
   while iptables -C INPUT -i {shlex.quote(rt['interface'])} -s {shlex.quote(rt['network'])} -m comment --comment {shlex.quote(l3_comment)} -j ACCEPT 2>/dev/null; do
     iptables -D INPUT -i {shlex.quote(rt['interface'])} -s {shlex.quote(rt['network'])} -m comment --comment {shlex.quote(l3_comment)} -j ACCEPT || break
@@ -411,26 +400,24 @@ async def _install_firewall(
     exit_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-EXIT"
     l3_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-L3"
     reverse_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-REV"
-    reverse_chain = _reverse_chain(tunnel_id)
-    reverse_rules = _wireguard_redirect_rules(
-        chain=reverse_chain,
-        exit_spoof_ip=cfg["exit_spoof_ip"],
-        spoof_source_port=ports["spoof_source_port"],
-        local_receive_port=ports["iran_raw_receive_port"],
-        comment=reverse_comment,
-    )
+    ingress_table = _ingress_table(tunnel_id)
+    wireguard_prefixes = ", ".join(WIREGUARD_MESSAGE_PREFIXES)
 
     await asyncio.gather(
         run(
             ci,
             f"""
 set -e
+nft delete table ip {shlex.quote(ingress_table)} >/dev/null 2>&1 || true
+nft -f - <<'NFT'
+table ip {ingress_table} {{
+  chain prerouting {{
+    type filter hook prerouting priority raw; policy accept;
+    ip saddr {cfg['exit_spoof_ip']} udp sport {ports['spoof_source_port']} udp dport {ports['iran_reverse_public_port']} @th,64,32 {{ {wireguard_prefixes} }} udp dport set {ports['iran_raw_receive_port']} udp checksum set 0 counter comment "{reverse_comment}"
+  }}
+}}
+NFT
 if command -v iptables >/dev/null 2>&1; then
-  iptables -t nat -N {shlex.quote(reverse_chain)} 2>/dev/null || true
-  iptables -t nat -F {shlex.quote(reverse_chain)}
-  {reverse_rules}
-  iptables -t nat -C PREROUTING -p udp --dport {ports['iran_reverse_public_port']} -m comment --comment {shlex.quote(reverse_comment)} -j {shlex.quote(reverse_chain)} 2>/dev/null || \
-  iptables -t nat -I PREROUTING -p udp --dport {ports['iran_reverse_public_port']} -m comment --comment {shlex.quote(reverse_comment)} -j {shlex.quote(reverse_chain)}
   iptables -C INPUT -p udp --dport {ports['iran_raw_receive_port']} -s {shlex.quote(cfg['exit_spoof_ip'])} -m comment --comment {shlex.quote(iran_comment)} -j ACCEPT 2>/dev/null || \
   iptables -I INPUT -p udp --dport {ports['iran_raw_receive_port']} -s {shlex.quote(cfg['exit_spoof_ip'])} -m comment --comment {shlex.quote(iran_comment)} -j ACCEPT
   iptables -C INPUT -i {shlex.quote(rt['interface'])} -s {shlex.quote(rt['network'])} -m comment --comment {shlex.quote(l3_comment)} -j ACCEPT 2>/dev/null || \
@@ -613,10 +600,12 @@ async def install(tunnel_id: int, db: Session) -> dict:
         "spoof_config": cfg,
         "spoof_source_port_candidates": list(SPOOF_SOURCE_PORT_CANDIDATES),
         "reverse_ingress": {
-            "mode": "shared-public-udp-redirection",
+            "mode": "shared-public-udp-stateless-nft",
             "public_port": REVERSE_INGRESS_PORT,
             "private_port": _ports(tunnel_id, source_port_candidates[0])["iran_raw_receive_port"],
-            "selector": "exit-ip+spoof-source-port+wireguard-message-type",
+            "selector": "exit-ip+spoof-source-port+wireguard-message-prefix",
+            "hook": "prerouting",
+            "priority": "raw",
         },
         "upstream_version": UPSTREAM_VERSION,
         "upstream_source_sha": UPSTREAM_SOURCE_SHA,
@@ -638,6 +627,7 @@ async def install(tunnel_id: int, db: Session) -> dict:
         ci, ce = await connect_pair(iran, exit_node, db)
         await asyncio.gather(prerequisites(ci), prerequisites(ce))
         await asyncio.gather(_ensure_wireguard(ci), _ensure_wireguard(ce))
+        await _ensure_nftables(ci)
         await asyncio.gather(
             copy_binary(ci, str(artifact_path), REMOTE_BINARY),
             copy_binary(ce, str(artifact_path), REMOTE_BINARY),
@@ -659,8 +649,8 @@ async def install(tunnel_id: int, db: Session) -> dict:
             source_port_attempts.append(source_port)
             await _reset_pair(ci, ce, rt, cfg)
 
-            # Install the reverse ingress adapter before either relay emits
-            # traffic. Unmatched UDP/2053 packets continue to TP27/FoU.
+            # Install the stateless reverse ingress adapter before either relay
+            # emits traffic. Unmatched UDP/2053 continues untouched to TP27/FoU.
             await _install_firewall(
                 ci,
                 ce,
@@ -726,10 +716,12 @@ async def install(tunnel_id: int, db: Session) -> dict:
             SPOOF_SOURCE_PORT_META_KEY: selected_source_port,
             "spoof_source_port_attempts": source_port_attempts,
             "reverse_ingress": {
-                "mode": "shared-public-udp-redirection",
+                "mode": "shared-public-udp-stateless-nft",
                 "public_port": REVERSE_INGRESS_PORT,
                 "private_port": _ports(tunnel_id, selected_source_port)["iran_raw_receive_port"],
-                "selector": "exit-ip+spoof-source-port+wireguard-message-type",
+                "selector": "exit-ip+spoof-source-port+wireguard-message-prefix",
+                "hook": "prerouting",
+                "priority": "raw",
             },
             "wireguard": True,
             "qualification": "full-shared-l3-probe+reverse-ingress-v205",
