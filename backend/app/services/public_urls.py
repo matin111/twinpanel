@@ -132,10 +132,23 @@ def subscription_base_url(
     db: Session,
     request: Request | None = None,
 ) -> str | None:
+    # TWINPANEL_PUBLIC_SUBSCRIPTION_ORIGIN_V302
+    # A managed Subscription domain is the strongest authority because the
+    # controller has explicitly provisioned that role.
     value = _domain_origin(db, DomainType.SUBSCRIPTION)
     if value:
         return value
 
+    # A dedicated externally-terminated HTTPS origin is independent from the
+    # public API fallback. This lets customer connection pages live behind an
+    # HTTPS edge/CDN while TCP/443 on the controller remains available to
+    # Cisco/ocserv.
+    value = _clean_base(settings.public_subscription_base_url)
+    if value:
+        return value
+
+    # When the helper is called from an HTTP request, preserve that public
+    # origin before considering other service roles.
     value = request_origin(request)
     if value:
         return value
@@ -149,6 +162,8 @@ def subscription_base_url(
         if value:
             return value
 
+    # Legacy compatibility only. New public customer links should prefer the
+    # dedicated subscription origin above instead of coupling to an API/IP.
     return _clean_base(settings.public_api_fallback)
 
 

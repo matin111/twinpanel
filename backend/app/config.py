@@ -16,13 +16,19 @@ class Settings(BaseSettings):
     #   automatically prefers the domain without requiring a frontend rebuild
     public_api_fallback: str = ""
 
+    # Public customer connection delivery can live behind a dedicated HTTPS
+    # edge/domain independently from the API origin. This is especially useful
+    # when TCP/443 on the controller is intentionally owned by Cisco/ocserv.
+    # Example: https://connect.example.com
+    public_subscription_base_url: str = ""
+
     # Packaged/licensed Backhaul runtime used by self-hosted tunnel provisioning.
     # Release/installer must place the binary at this path or override it by env.
     backhaul_binary_path: str = "/opt/twinpanel/runtime/backhaul/backhaul_premium"
 
     # Netrix remains a third-party licensed runtime. TwinPanel never bypasses
     # its license system; customers who own a valid binary can place it here
-    # (or override the path by env) and TwinPanel will provision it to nodes.
+    # (or override it by env) and TwinPanel will provision it to nodes.
     netrix_binary_path: str = "/opt/twinpanel/runtime/netrix/netrix"
 
     payment_sms_relay_secret: str = ""
