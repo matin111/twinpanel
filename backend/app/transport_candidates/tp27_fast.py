@@ -22,7 +22,7 @@ from .common import (
 
 
 # ============================================================
-# TWINPANEL TP27 FAST CARRIER V91
+# TWINPANEL TP27 FAST CARRIER V92
 #
 # Ported from matin111/tp27-core:
 #   1) Raw keyed GRE in the Linux kernel (fast path)
@@ -31,12 +31,18 @@ from .common import (
 # This is one logical SmartAuto candidate. The internal carrier profile is
 # selected fail-closed and persisted in TunnelTransport.config_text; SmartAuto
 # never sees raw GRE and FoU as competing logical tunnels.
+#
+# V92 keeps the existing carrier model but enables the outer UDP checksum for
+# FoU. Production path audits showed that checksum-free Iran->Exit UDP could
+# suffer materially higher loss on some asymmetric paths than checksum-valid
+# traffic, while the reverse direction remained healthy.
 # ============================================================
 
 NAME = "tp27_fast"
 MTU = 1400
 TXQUEUELEN = 1000
 FOU_PORT_CANDIDATES = (443, 8443, 2053, 2083, 10443)
+FOU_UDP_CHECKSUM = True
 
 
 def _gre_key(tunnel_id: int, iran_public: str, exit_public: str) -> int:
@@ -138,7 +144,7 @@ iptables -I INPUT -p udp --dport {port} -s "$REMOTE" -m comment --comment "$COMM
         link = (
             f"ip fou add port {port} ipproto 47 >/dev/null 2>&1 || true\n"
             "ip link add \"$IFACE\" type gre local \"$LOCAL\" remote \"$REMOTE\" "
-            f"ttl 255 key \"$KEY\" encap fou encap-sport auto encap-dport {port}"
+            f"ttl 255 key \"$KEY\" encap fou encap-sport auto encap-dport {port} encap-csum"
         )
 
     await run(
@@ -288,6 +294,7 @@ async def install(tunnel_id: int, db: Session) -> dict:
                     "profile_order": ["gre-native", "gre-fou"],
                     "mtu": MTU,
                     "gre_key": gre_key,
+                    "fou_udp_checksum": "enabled",
                 },
                 repair_state,
             )
@@ -394,6 +401,7 @@ async def install(tunnel_id: int, db: Session) -> dict:
                         "source": "matin111/tp27-core",
                         "selected_profile": "gre-fou",
                         "fou_port": fou_port,
+                        "fou_udp_checksum": "enabled",
                         "gre_key": gre_key,
                         "mtu": MTU,
                         "attempts": attempts,
@@ -414,6 +422,7 @@ async def install(tunnel_id: int, db: Session) -> dict:
                     "runtime": rt,
                     "profile": "gre-fou",
                     "fou_port": fou_port,
+                    "fou_udp_checksum": "enabled",
                     "probe": health,
                 }
             except Exception as exc:
