@@ -46,7 +46,6 @@ def main() -> None:
     client_source = CLIENT.read_text(encoding="utf-8")
     ui_source = UI.read_text(encoding="utf-8")
 
-    # Python syntax must stay valid independently of the full application import.
     for path, source in (
         (REPAIR, repair_source),
         (API, api_source),
@@ -55,10 +54,32 @@ def main() -> None:
     ):
         compile(source, str(path), "exec")
 
-    # Autonomous repair is deliberately debounced and rate-limited.
+    # V304 makes autonomous mutation path-aware and substantially less eager.
+    assert _literal_assignment(repair_source, "STABILITY_REVISION") == 304
     assert _literal_assignment(repair_source, "LOOP_SECONDS") == 30
-    assert _literal_assignment(repair_source, "FAILURE_THRESHOLD") == 3
-    assert _literal_assignment(repair_source, "REPAIR_COOLDOWN_SECONDS") == 180
+    assert _literal_assignment(repair_source, "FAILURE_THRESHOLD") == 8
+    assert _literal_assignment(repair_source, "STRUCTURAL_FAILURE_THRESHOLD") == 2
+    assert _literal_assignment(repair_source, "PATH_FAILURE_THRESHOLD") == 8
+    assert _literal_assignment(repair_source, "RECOVERY_THRESHOLD") == 2
+    assert _literal_assignment(repair_source, "REPAIR_COOLDOWN_SECONDS") == 900
+    assert _literal_assignment(repair_source, "MAX_HEALTHY_PACKET_LOSS_PCT") == 20.0
+
+    peer_snapshot = _function_source(repair_source, "_peer_snapshot")
+    assert "parse_packet_loss_pct" in peer_snapshot
+    assert "-c 5 -i 0.2 -W 1" in peer_snapshot
+    assert "packet_loss_pct" in peer_snapshot
+    assert "MAX_HEALTHY_PACKET_LOSS_PCT" in peer_snapshot
+
+    failure_kind = _function_source(repair_source, "_diagnosis_failure_kind")
+    assert 'return "structural"' in failure_kind
+    assert 'return "path"' in failure_kind
+    assert '"service_active"' in failure_kind
+    assert '"interface_present"' in failure_kind
+    assert '"address_present"' in failure_kind
+
+    threshold = _function_source(repair_source, "_failure_threshold")
+    assert "STRUCTURAL_FAILURE_THRESHOLD" in threshold
+    assert "PATH_FAILURE_THRESHOLD" in threshold
 
     attempt_order = _function_source(repair_source, "_attempt_order")
     assert 'current == "gre-native"' in attempt_order
@@ -88,23 +109,23 @@ def main() -> None:
     assert "TunnelTransport.enabled.is_(True)" in candidates
 
     diagnosis_error = _function_source(repair_source, "_diagnosis_error")
-    assert "iran.peer_reachable=false" not in diagnosis_error
     assert 'for role in ("iran", "exit")' in diagnosis_error
     assert '"peer_reachable"' in diagnosis_error
+    assert "packet_loss_pct" in diagnosis_error
     assert "tp27_carrier_unhealthy" in diagnosis_error
 
     reconcile = _function_source(repair_source, "reconcile_once")
-    assert "count < FAILURE_THRESHOLD" in reconcile
+    assert "failure_kind = _diagnosis_failure_kind(diagnosis)" in reconcile
+    assert "threshold = _failure_threshold(failure_kind)" in reconcile
+    assert "count < threshold" in reconcile
     assert "_cooldown_remaining(row)" in reconcile
     assert 'source="manager"' in reconcile
     assert "force_rebuild=True" in reconcile
     assert "row.status = \"degraded\"" in reconcile
     assert "row.last_error = health_error" in reconcile
-    assert "_diagnosis_error(diagnosis)" in reconcile
-    assert "if not relevant" not in reconcile
+    assert "RECOVERY_THRESHOLD" in reconcile
+    assert "_healthy_cycles" in reconcile
 
-    # Transport Manager owns the background loop; API runtime exposes only
-    # explicit admin diagnose/repair/rebuild actions.
     assert "tp27_self_repair_v265 import reconciler_loop as tp27_self_repair_loop" in manager_source
     assert 'name="twinpanel-tp27-self-repair-v265"' in manager_source
     assert "tp27_self_repair_task" in manager_source
@@ -128,7 +149,7 @@ def main() -> None:
     assert "بازسازی Carrier" in ui_source
     assert "Self‑Repair V265" in ui_source
 
-    print("TP27_SELF_REPAIR_V265=PASS")
+    print("TP27_SELF_REPAIR_V304=PASS")
 
 
 if __name__ == "__main__":
