@@ -4,11 +4,14 @@ on:
   pull_request:
     paths:
       - "backend/app/services/modern_quota_runtime_v257.py"
+      - "backend/app/services/modern_quota_runtime_v314.py"
       - "backend/app/services/quota_node_sync.py"
       - "backend/app/routers/modern_accounting_runtime_v257.py"
       - "backend/app/routers/public_connection_live_v4.py"
       - "backend/app/routers/public_connection_hub_live_v5.py"
+      - "backend/scripts/twinpanel_modern_accounting_worker.py"
       - "backend/tests/modern_accounting_v257_smoke.py"
+      - "backend/tests/modern_accounting_deadlock_v314_smoke.py"
       - ".github/workflows/modern-accounting-v257.yml"
   workflow_dispatch:
 
@@ -65,15 +68,22 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/services/modern_quota_runtime_v257.py \
+            backend/app/services/modern_quota_runtime_v314.py \
             backend/app/services/quota_node_sync.py \
             backend/app/routers/modern_accounting_runtime_v257.py \
             backend/app/routers/public_connection_live_v4.py \
             backend/app/routers/public_connection_hub_live_v5.py \
-            backend/tests/modern_accounting_v257_smoke.py
+            backend/scripts/twinpanel_modern_accounting_worker.py \
+            backend/tests/modern_accounting_v257_smoke.py \
+            backend/tests/modern_accounting_deadlock_v314_smoke.py
 
       - name: Run modern accounting regression smoke
         working-directory: backend
         run: PYTHONPATH=. python tests/modern_accounting_v257_smoke.py
+
+      - name: Run accounting deadlock regression smoke
+        working-directory: backend
+        run: PYTHONPATH=. python tests/modern_accounting_deadlock_v314_smoke.py
 
       - name: Verify application import with merged lifespan
         working-directory: backend
@@ -81,10 +91,13 @@ jobs:
           python - <<'PY'
           from app.main import app
           from app.routers.modern_accounting_runtime_v257 import modern_accounting_lifespan
-          from app.services.modern_quota_runtime_v257 import modern_quota_runtime_loop
+          from app.services.modern_quota_runtime_v257 import modern_quota_runtime_loop as legacy_loop
+          from app.services.modern_quota_runtime_v314 import modern_quota_runtime_loop
 
           assert app.title
           assert callable(modern_accounting_lifespan)
+          assert callable(legacy_loop)
           assert callable(modern_quota_runtime_loop)
           print("MODERN_ACCOUNTING_APP_IMPORT=PASS")
+          print("MODERN_ACCOUNTING_V314_IMPORT=PASS")
           PY
