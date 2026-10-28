@@ -240,6 +240,11 @@ def main() -> None:
     # release, verifies the API first, then converges the worker for new releases.
     assert "modern_quota_runtime_loop" in worker
     assert "asyncio.run(_serve())" in worker
+    assert "BACKEND_ROOT = Path(__file__).resolve().parents[1]" in worker
+    assert "sys.path.insert(0, str(BACKEND_ROOT))" in worker
+    assert worker.index("sys.path.insert(0, str(BACKEND_ROOT))") < worker.index(
+        "from app.services.modern_quota_runtime_v257 import modern_quota_runtime_loop"
+    )
     assert "twinpanel-modern-accounting.service" in reconcile
     assert "process_matches_release" in reconcile
     assert "systemctl disable --now twinpanel-modern-accounting.service" in web_unit
