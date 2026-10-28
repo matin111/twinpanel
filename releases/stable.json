@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.315",
+  "version": "1.1.0-rc.316",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-28T21:51:43Z",
+  "released_at": "2026-10-28T21:59:20Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b39813140cdc9173e16c04e128ef02a1d8f21f99",
+  "source_sha": "0e9f103893f5e713d7bee1397f5e7ebb901e486d",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.315/twinpanel-1.1.0-rc.315-linux-x86_64.tar.gz",
-    "sha256": "5c747398bf8014ee468e9ff538b2adb7c2b060aa820ee86698fd0ca127a881ee",
-    "size_bytes": 28501226
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.316/twinpanel-1.1.0-rc.316-linux-x86_64.tar.gz",
+    "sha256": "132a82791612b62f274377eef8ca633611f771cb9be04a7edd02155f6fc0928f",
+    "size_bytes": 28499313
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.315 نمایش Public Connect در موبایل را با داده canonical ویندوز یکسان می‌کند. rendererهای قدیمی موبایل که برای بعضی پروتکل‌ها اطلاعات عمومی Server/IP/Username/Password را دوباره از کانفیگ می‌ساختند از مالکیت نمایش نهایی خارج شده‌اند؛ در موبایل همان protocol panel و server view اصلی استفاده می‌شود. متن‌های آموزشی و توضیحی اضافه در نمای موبایل حذف شده‌اند و لینک برنامه‌ها به مقصد دقیق نصب/دانلود رسمی هدایت می‌شوند؛ برای برنامه‌هایی که فایل رسمی عمومی دارند لینک مستقیم فایل و برای توزیع‌های Store-only لینک دقیق همان اپ استفاده می‌شود. Accounting، TP27، VXLAN، Tunnel، Spoof، پورت‌ها، credentialها و dataplane تغییر نکرده‌اند. Source candidate روی SHA immutable b39813140cdc9173e16c04e128ef02a1d8f21f99 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.315 makes the mobile Public Connect view reuse the same canonical connection dataset as Windows. Legacy mobile renderers that reconstructed generic Server/IP/Username/Password fields for some protocols no longer own the final mobile presentation; mobile now presents the canonical protocol panels and server views. Extra tutorial/helper prose is removed from the mobile view and application links point to exact official install/download destinations: direct artifacts where an official public file exists, otherwise the exact store app listing for store-only distribution. Accounting, TP27, VXLAN, Tunnel, Spoof, ports, credentials and dataplane behavior are unchanged. The candidate source is pinned to immutable SHA b39813140cdc9173e16c04e128ef02a1d8f21f99."
+    "fa": "TwinPanel 1.1.0-rc.316 مسیر برگشتی Spoof WG را برای شبکه‌هایی که ingress دلخواه را قبل از رسیدن به Iran Node فیلتر می‌کنند اصلاح می‌کند. Audit و packet capture واقعی Tunnel #8 ثابت کرد مسیر Iran→Exit سالم است، اما پاسخ‌های Exit→Iran روی UDP/36008 و UDP/46008 و همچنین TCP/36008 و TCP/443 قبل از eth0 ایران Drop می‌شوند؛ در همان Pair، UDP/2053 به‌صورت پایدار عبور می‌کند. V205 مسیر رفت Spoof را بدون تغییر نگه می‌دارد، پاسخ Exit→Iran را روی public UDP/2053 می‌فرستد و روی Iran یک nftables raw/prerouting stateless demux قبل از conntrack ایجاد می‌کند که فقط packetهای منطبق با Exit IP، Iran public IP، source port انتخاب‌شده Spoof و prefix معتبر پیام WireGuard را به receiver خصوصی 36000+slot بازنویسی می‌کند. تمام UDP/2053های غیرمنطبق بدون تغییر برای TP27/FoU باقی می‌مانند؛ TP27 Fast و VXLAN دست‌نخورده‌اند، XDP غیرفعال می‌ماند و Spoof artifact پین‌شده تغییر نکرده است. Source candidate روی SHA immutable 0e9f103893f5e713d7bee1397f5e7ebb901e486d قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.316 fixes the Spoof WG reverse path on networks that selectively filter arbitrary ingress before traffic reaches the Iran node. Production audit and packet capture on Tunnel #8 proved Iran→Exit was healthy while Exit→Iran responses on UDP/36008, UDP/46008, TCP/36008 and TCP/443 were dropped before Iran eth0; UDP/2053 was reliably admitted on the same pair. V205 leaves the forward Spoof carrier unchanged, sends Exit→Iran reverse traffic to public UDP/2053, and installs an Iran-side nftables raw/prerouting stateless demux before conntrack. Only packets matching the configured Exit IP, actual Iran public IP, selected Spoof source port and a valid WireGuard message prefix are rewritten to the private 36000+slot receiver. All unmatched UDP/2053 remains untouched for TP27/FoU; TP27 Fast and VXLAN are unchanged, XDP remains disabled, and the pinned Spoof artifact is unchanged. The candidate source is pinned to immutable SHA 0e9f103893f5e713d7bee1397f5e7ebb901e486d."
   }
 }
