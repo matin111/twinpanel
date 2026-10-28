@@ -4,6 +4,9 @@ from datetime import datetime
 from typing import Any
 
 from . import tp27_self_repair_v265 as v265
+from .tp27_underlay_fault_domain_v306 import (
+    apply_tp27_underlay_fault_domain_v306,
+)
 from .transport_candidates import tp27_fast
 
 
@@ -244,9 +247,12 @@ def apply_tp27_fou_quarantine_v303() -> None:
     v265._repair_meta = _repair_meta
     v265._failed_repair_meta = _failed_repair_meta
 
+    apply_tp27_underlay_fault_domain_v306()
+
     _applied = True
     print(
         f"{MARKER}_ACTIVE soft_quarantine={SOFT_QUARANTINE_SECONDS}s "
-        "failed_ports=deprioritized current_port=last availability=preserved",
+        "failed_ports=deprioritized current_port=last availability=preserved "
+        "underlay_fault_domain=v306",
         flush=True,
     )

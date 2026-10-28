@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "backend/app/tp27_fou_quarantine_v303.py"
+      - "backend/app/tp27_underlay_fault_domain_v306.py"
       - "backend/app/tp27_self_repair_v265.py"
       - "backend/app/tp27_repair_api_v265.py"
       - "backend/app/tunnel_transport_manager_v12.py"
@@ -15,6 +16,7 @@ on:
       - main
     paths:
       - "backend/app/tp27_fou_quarantine_v303.py"
+      - "backend/app/tp27_underlay_fault_domain_v306.py"
       - "backend/app/tp27_self_repair_v265.py"
       - "backend/app/tp27_repair_api_v265.py"
       - "backend/app/tunnel_transport_manager_v12.py"
