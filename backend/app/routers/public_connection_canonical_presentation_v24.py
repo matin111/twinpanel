@@ -7,14 +7,13 @@ _MARKER = "TWINPANEL_PUBLIC_CONNECT_CANONICAL_PRESENTATION_V24"
 _CSS = r"""
 /* TWINPANEL_PUBLIC_CONNECT_CANONICAL_PRESENTATION_V24 */
 @media(max-width:720px){
-  /* Presentation only: canonical protocol panels/server views remain the sole data authority. */
+  /* Canonical protocol panels/server views are the only mobile data authority. */
   body.v24-ready .v9-mobile-stack,
-  body.v24-ready .v17-mobile-stack{
-    display:none!important;
-  }
-
+  body.v24-ready .v17-mobile-stack,
   body.v24-ready .protocol-toolbar,
-  body.v24-ready .protocols{
+  body.v24-ready .protocols,
+  body.v24-ready .multi-link-card,
+  body.v24-ready .smart-card{
     display:none!important;
   }
 
@@ -59,20 +58,29 @@ _CSS = r"""
     white-space:nowrap;
   }
 
+  body.v24-ready .section-head p,
+  body.v24-ready .section-head small,
+  body.v24-ready .apps-head,
+  body.v24-ready .platform-title,
+  body.v24-ready .app-card small,
+  body.v24-ready .protocol-panel .panel-head>div:first-child>span,
+  body.v24-ready .protocol-panel .action-copy,
+  body.v24-ready .protocol-panel .v13-action-copy,
+  body.v24-ready .protocol-panel .v13-client-only>span,
+  body.v24-ready .protocol-panel .v13-native-client,
+  body.v24-ready .protocol-panel .v13-pending-body,
+  body.v24-ready .protocol-panel .v13-pending-apps{
+    display:none!important;
+  }
+
   body.v24-ready .protocol-panel .panel-head{
     min-height:58px;
     padding:12px 14px;
     gap:10px;
   }
 
-  body.v24-ready .protocol-panel .panel-head span,
-  body.v24-ready .protocol-panel .panel-head small{
-    font-size:12px!important;
-    line-height:1.6;
-  }
-
   body.v24-ready .protocol-panel .panel-head h3{
-    margin-top:3px;
+    margin:0;
     font-size:16px!important;
     line-height:1.45;
   }
@@ -119,18 +127,12 @@ _CSS = r"""
   }
 
   body.v24-ready .protocol-panel .fact small,
-  body.v24-ready .protocol-panel .fact span,
-  body.v24-ready .protocol-panel .action-copy small,
-  body.v24-ready .protocol-panel .v13-action-copy small,
-  body.v24-ready .protocol-panel .v13-client-only>span,
-  body.v24-ready .protocol-panel .v13-native-client{
+  body.v24-ready .protocol-panel .fact span{
     font-size:12px!important;
     line-height:1.7!important;
   }
 
-  body.v24-ready .protocol-panel .fact strong,
-  body.v24-ready .protocol-panel .action-copy b,
-  body.v24-ready .protocol-panel .v13-action-copy b{
+  body.v24-ready .protocol-panel .fact strong{
     font-size:13px!important;
     line-height:1.65!important;
   }
@@ -169,6 +171,35 @@ _CSS = r"""
     line-height:1.4;
   }
 
+  body.v24-ready .apps{
+    margin-top:12px;
+  }
+
+  body.v24-ready .platforms{
+    padding:10px!important;
+  }
+
+  body.v24-ready .app-grid{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px!important;
+    overflow:visible!important;
+  }
+
+  body.v24-ready .app-card{
+    min-height:48px!important;
+    padding:9px 10px!important;
+    display:flex!important;
+    align-items:center!important;
+    gap:8px!important;
+    border-radius:11px!important;
+  }
+
+  body.v24-ready .app-card b{
+    font-size:12px!important;
+    line-height:1.4!important;
+  }
+
   /* Device detection changes app visibility only; connection facts/actions stay canonical. */
   body[data-tp-platform="android"].v24-ready .v13-app:not([data-v13-platform="android"]),
   body[data-tp-platform="ios"].v24-ready .v13-app:not([data-v13-platform="ios"]),
@@ -192,6 +223,12 @@ _CSS = r"""
     display:none!important;
   }
 }
+
+@media(max-width:430px){
+  body.v24-ready .app-grid{
+    grid-template-columns:1fr!important;
+  }
+}
 """
 
 
@@ -200,7 +237,39 @@ _SCRIPT = r"""
 (function(){
   const MOBILE='(max-width:720px)';
   let liveObserver=null;
+  let legacyObserver=null;
   let resizeTimer=null;
+
+  const DIRECT_APPS={
+    android:{
+      'OpenVPN Connect':['OpenVPN Connect','https://play.google.com/store/apps/details?id=net.openvpn.openvpn'],
+      'WireGuard':['WireGuard','https://download.wireguard.com/android-client/com.wireguard.android-1.0.20260315.apk'],
+      'Hiddify':['Hiddify','https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Android-universal.apk'],
+      'Karing':['Karing','https://github.com/KaringX/karing/releases/download/v1.2.25.2802/karing_1.2.25.2802_android_arm.apk'],
+      'OpenConnect':['Cisco Secure Client','https://play.google.com/store/apps/details?id=com.cisco.anyconnect.vpn.android.avf'],
+      'Cisco Secure Client':['Cisco Secure Client','https://play.google.com/store/apps/details?id=com.cisco.anyconnect.vpn.android.avf'],
+      'sing-box':['sing-box','https://github.com/SagerNet/sing-box/releases/download/v1.14.4/SFA-1.14.4-arm64-v8a.apk'],
+      'sing-box Desktop':['sing-box','https://github.com/SagerNet/sing-box/releases/download/v1.14.4/SFA-1.14.4-arm64-v8a.apk'],
+      'AmneziaWG':['AmneziaWG','https://github.com/amnezia-vpn/amneziawg-android/releases/download/v3.1.20260814/AmneziaWG-3.1.202060814.apk'],
+      'TrustTunnel':['TrustTunnel','https://play.google.com/store/apps/details?id=com.adguard.trusttunnel'],
+      'TrustTunnel GUI':['TrustTunnel','https://play.google.com/store/apps/details?id=com.adguard.trusttunnel'],
+      'Sudodroid':['Sudodroid','https://github.com/SUDOKU-ASCII/sudoku-android/releases/download/v0.3.3/sudodroid-v0.3.3-universal.apk']
+    },
+    ios:{
+      'OpenVPN Connect':['OpenVPN Connect','https://apps.apple.com/us/app/openvpn-connect/id590379981'],
+      'WireGuard':['WireGuard','https://apps.apple.com/us/app/wireguard/id1451685025'],
+      'Hiddify':['Hiddify','https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-iOS.ipa'],
+      'Karing':['Karing','https://apps.apple.com/us/app/karing/id6472431552'],
+      'OpenConnect':['Cisco Secure Client','https://apps.apple.com/us/app/cisco-secure-client/id1135064690'],
+      'Cisco Secure Client':['Cisco Secure Client','https://apps.apple.com/us/app/cisco-secure-client/id1135064690'],
+      'sing-box':['sing-box MT','https://apps.apple.com/us/app/sing-box-mt/id6785326793'],
+      'sing-box Desktop':['sing-box MT','https://apps.apple.com/us/app/sing-box-mt/id6785326793'],
+      'AmneziaWG':['AmneziaWG','https://apps.apple.com/app/amneziawg/id6478942365'],
+      'TrustTunnel':['TrustTunnel','https://apps.apple.com/us/app/trusttunnel/id6755807890'],
+      'TrustTunnel GUI':['TrustTunnel','https://apps.apple.com/us/app/trusttunnel/id6755807890'],
+      'Anywhere Proxy':['Anywhere Proxy','https://apps.apple.com/us/app/anywhere-proxy/id6758235178']
+    }
+  };
 
   function text(el){return String(el?.textContent||'').trim()}
 
@@ -230,12 +299,62 @@ _SCRIPT = r"""
     syncLive();
   }
 
+  function normalizeAppName(value){
+    return String(value||'').replace(/^دانلود\s+/,'').trim();
+  }
+
+  function applyDirectApp(link,platform){
+    const rows=DIRECT_APPS[platform]||{};
+    const current=normalizeAppName(link.textContent);
+    const target=rows[current];
+    if(!target)return;
+    link.textContent=target[0];
+    link.href=target[1];
+    link.target='_blank';
+    link.rel='noopener noreferrer';
+    link.dataset.v24DirectInstall='1';
+  }
+
   function syncApps(){
     const platform=String(document.body.dataset.tpPlatform||'unknown').toLowerCase();
     document.querySelectorAll('.v13-app[data-v13-platform]').forEach(link=>{
       const target=String(link.dataset.v13Platform||'').toLowerCase();
       link.style.display=(platform==='unknown'||target===platform)?'inline-flex':'none';
+      if(platform!=='unknown'&&target===platform)applyDirectApp(link,platform);
     });
+
+    document.querySelectorAll('.platform-group[data-platform]').forEach(group=>{
+      const target=String(group.dataset.platform||'').toLowerCase();
+      group.style.display=(platform==='unknown'||target===platform)?'block':'none';
+      if(platform==='unknown'||target!==platform)return;
+      group.querySelectorAll('.app-card').forEach(card=>{
+        const name=text(card.querySelector('b'));
+        const mapped=(DIRECT_APPS[platform]||{})[name];
+        if(!mapped)return;
+        card.href=mapped[1];
+        card.target='_blank';
+        card.rel='noopener noreferrer';
+        const title=card.querySelector('b');
+        if(title)title.textContent=mapped[0];
+        card.dataset.v24DirectInstall='1';
+      });
+    });
+  }
+
+  function retireLegacyMobile(){
+    const body=document.body;
+    body.classList.remove('v9-ready','v17-ready');
+    document.querySelectorAll('.v9-mobile-stack,.v17-mobile-stack').forEach(node=>node.remove());
+  }
+
+  function bindLegacyGuard(){
+    legacyObserver?.disconnect();
+    legacyObserver=new MutationObserver(()=>{
+      retireLegacyMobile();
+      syncApps();
+    });
+    legacyObserver.observe(document.body,{attributes:true,attributeFilter:['class'],childList:true,subtree:true});
+    retireLegacyMobile();
   }
 
   function activateMobile(){
@@ -253,15 +372,18 @@ _SCRIPT = r"""
       });
     });
 
-    syncApps();
-    bindLive();
     body.classList.add('v24-ready');
     body.dataset.tpDevicePresentation='v24';
+    syncApps();
+    bindLive();
+    bindLegacyGuard();
   }
 
   function deactivateMobile(){
     liveObserver?.disconnect();
     liveObserver=null;
+    legacyObserver?.disconnect();
+    legacyObserver=null;
     document.body.classList.remove('v24-ready');
     document.querySelectorAll('.protocol-panel').forEach(panel=>{
       panel.classList.remove('v24-canonical-panel','v24-empty','v24-live-online');
@@ -281,15 +403,24 @@ _SCRIPT = r"""
   }
 
   window.setTimeout(apply,0);
+  window.setTimeout(()=>{
+    if(window.matchMedia(MOBILE).matches){
+      retireLegacyMobile();
+      syncApps();
+    }
+  },120);
   window.addEventListener('resize',schedule,{passive:true});
-  window.addEventListener('pagehide',()=>liveObserver?.disconnect(),{once:true});
+  window.addEventListener('pagehide',()=>{
+    liveObserver?.disconnect();
+    legacyObserver?.disconnect();
+  },{once:true});
 })();
 </script>
 """
 
 
 def refine_public_connection_canonical_presentation_v24(source: str) -> str:
-    """Present one canonical connection dataset with device-specific layout/apps only."""
+    """Present one canonical connection dataset with a minimal device-specific mobile shell."""
     if _MARKER in source:
         return source
     source = source.replace("</style>", _CSS + "\n</style>", 1)
