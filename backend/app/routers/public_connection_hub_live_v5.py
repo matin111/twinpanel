@@ -8,6 +8,10 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..xray_public_hub_profiles_v48 import (
+    apply_xray_public_hub_profiles_v48,
+    refine_public_connection_xray_profiles_v48,
+)
 from .public_connection_hub_refine_v6 import refine_public_connection_hub_html
 from .public_connection_mobile_v7 import refine_public_connection_mobile_v7
 from .public_connection_hub_v8 import refine_public_connection_hub_v8
@@ -216,6 +220,9 @@ def public_connection_hub_live_v5(
     db: Session = Depends(get_db),
 ):
     """Render the V5 public hub and attach canonical live protocol status."""
+    # V48 is idempotent and resolves the final V47 customer profile selector at
+    # request time. Install it before Hub V5 renders this response.
+    apply_xray_public_hub_profiles_v48()
     base = public_connection_hub_v5(token, db)
     source = base.body.decode(getattr(base, "charset", None) or "utf-8")
 
@@ -296,6 +303,7 @@ def public_connection_hub_live_v5(
     source = refine_public_connection_mobile_server_inventory_v18(source)
     source = refine_public_connection_protocol_actions_v20(source)
     source = refine_public_connection_protocol_uri_details_v21(source)
+    source = refine_public_connection_xray_profiles_v48(source)
 
     return HTMLResponse(
         content=source,
