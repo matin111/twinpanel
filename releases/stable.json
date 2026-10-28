@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.310",
+  "version": "1.1.0-rc.311",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-28T18:58:21Z",
+  "released_at": "2026-10-28T19:20:20Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "feaccd55c9ab56892c726c346614a84d0a4498fa",
+  "source_sha": "6efbda24ef57ecc5af1cede231b1082cdea576ba",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.310/twinpanel-1.1.0-rc.310-linux-x86_64.tar.gz",
-    "sha256": "756eaa1ddc9d237f2ea4ea77cf359af37c06e9fd1d42e4635a8a1d38295e4cb9",
-    "size_bytes": 28487704
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.311/twinpanel-1.1.0-rc.311-linux-x86_64.tar.gz",
+    "sha256": "c08737fe9fb9aeb77bc748355bbb7dce7efc94f73363e2181c6b5be4485caeb8",
+    "size_bytes": 28487627
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.310 یک Hotfix برای Modern Accounting است. در Production نسخه rc.308، سرویس مستقل twinpanel-modern-accounting به‌دلیل اجرای مستقیم اسکریپت از backend/scripts با خطای ModuleNotFoundError: No module named 'app' وارد restart loop شد؛ در نتیجه اتصال واقعی VPN برقرار می‌ماند اما Online/session/quota به‌روزرسانی نمی‌شد. این نسخه worker را پیش از import ماژول‌های app با backend root خودش bootstrap می‌کند و regression test ترتیب bootstrap قبل از import را قفل می‌کند. تغییرات Xray/V2Ray نسخه rc.309 نیز در source این نسخه حفظ شده‌اند. این نسخه هیچ تغییری در Cisco/OpenConnect، TP27، VXLAN، Tunnel، Spoof، پورت پروتکل‌ها یا الگوریتم Accounting ایجاد نمی‌کند. Source candidate روی SHA immutable feaccd55c9ab56892c726c346614a84d0a4498fa قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.310 is a Modern Accounting hotfix. In production on rc.308, the dedicated twinpanel-modern-accounting service entered a restart loop because its directly executed backend/scripts worker could not import the sibling app package (`ModuleNotFoundError: No module named 'app'`). VPN connectivity itself remained healthy, but Online/session/quota state stopped updating because the collector never started. This release bootstraps the worker's own backend root before importing application modules and adds regression coverage that locks the bootstrap before the app import. The rc.309 Xray/V2Ray delivery changes remain included in this source. This release does not change Cisco/OpenConnect, TP27, VXLAN, Tunnel, Spoof, protocol ports, or accounting algorithms. The candidate source is pinned to immutable SHA feaccd55c9ab56892c726c346614a84d0a4498fa."
+    "fa": "TwinPanel 1.1.0-rc.311 مدیریت دامنه نود را در رابط کاربری به دو هویت مستقل تفکیک می‌کند: دامنه عمومی Node و دامنه اختصاصی Xray/V2Ray. در Exit Server، دامنه Xray اکنون از پنجره مستقل مدیریت می‌شود، فقط از API اختصاصی xray_domain ذخیره می‌شود و گزینه «ذخیره + آماده‌سازی TLS» نیز جدا از public_domain در دسترس است. Regression جدید V311 هرگونه cross-write بین public_domain و xray_domain را رد می‌کند. رفتار Xray V3 نسخه rc.309/rc.310 حفظ شده است: Direct TLS از دامنه اختصاصی استفاده می‌کند، Iran Tunnel authority حفظ می‌شود و REALITY/non-TLS تغییر نمی‌کند. Hotfix Modern Accounting نسخه rc.310 نیز بدون تغییر حفظ شده است. این نسخه هیچ تغییری در TP27، VXLAN، Spoof، Tunnel Transport یا پورت پروتکل‌ها ایجاد نمی‌کند. Source candidate روی SHA immutable 6efbda24ef57ecc5af1cede231b1082cdea576ba قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.311 separates Node domain management in the UI into two independent identities: the general Node public domain and the dedicated Xray/V2Ray domain. On Exit servers, the Xray domain now has its own management modal, is saved only through the dedicated xray_domain API, and offers a separate Save + Prepare TLS action without mutating public_domain. New V311 regression coverage rejects any cross-write between public_domain and xray_domain. The rc.309/rc.310 Xray V3 behavior is preserved: direct TLS uses the dedicated domain, Iran tunnel authority is preserved, and REALITY/non-TLS remains unchanged. The rc.310 Modern Accounting hotfix is also preserved unchanged. This release does not change TP27, VXLAN, Spoof, tunnel transports, or protocol ports. The candidate source is pinned to immutable SHA 6efbda24ef57ecc5af1cede231b1082cdea576ba."
   }
 }
