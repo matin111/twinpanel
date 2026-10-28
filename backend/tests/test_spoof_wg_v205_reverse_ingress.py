@@ -83,3 +83,63 @@ def test_v205_failure_diagnostics_include_owned_nft_counters():
     assert "nft -a list table ip" in spoof
     assert "c = await _ingress_diag(ci, int(tunnel_id)) if ci else" in spoof
     assert "reverse_ingress={c[-1500:]}" in spoof
+
+
+def test_v206_underlay_guard_is_syntax_valid_and_spoof_only():
+    guard = read("backend/app/spoof_underlay_guard_v206.py")
+    policy = read("backend/app/spoof_candidate_policy_v202.py")
+
+    ast.parse(guard)
+    ast.parse(policy)
+
+    assert 'UNDERLAY_REASON = "underlay_incompatible:reverse_carrier_not_reaching_iran"' in guard
+    assert "UNDERLAY_QUARANTINE_SECONDS = 24 * 60 * 60" in guard
+    assert 'candidates.INSTALLERS[spoof_wg.NAME] = _guarded_spoof_install' in guard
+    assert "spoof_wg.install = _guarded_spoof_install" in guard
+    assert "tp27_fast" not in guard
+    assert "kernel_vxlan" not in guard
+    assert "apply_spoof_underlay_guard_v206()" in policy
+    assert 'smart.AUTO_INSTALL_NAMES = ("tp27_fast",)' in policy
+
+
+def test_v206_underlay_guard_requires_three_independent_failure_signals():
+    guard = read("backend/app/spoof_underlay_guard_v206.py")
+
+    assert 'if "peer_ping_failed:" not in text:' in guard
+    assert "_exit_reverse_progress(text)" in guard
+    assert "_ZERO_INGRESS_RE.search(text)" in guard
+    assert "shutting down \\(up=\\d+ down=([1-9]\\d*)\\)" in guard
+    assert "counter packets 0 bytes 0" in guard
+
+
+def test_v206_underlay_guard_persists_fail_closed_quarantine_evidence():
+    guard = read("backend/app/spoof_underlay_guard_v206.py")
+
+    for token in (
+        '"quarantine_reason": reason',
+        '"quarantine_until_epoch": now + float(UNDERLAY_QUARANTINE_SECONDS)',
+        '"last_probe_ok": False',
+        '"exit_reverse_bytes_nonzero": True',
+        '"iran_reverse_ingress_packets": 0',
+        '"action": "fail_closed_keep_existing_authority"',
+        'status="failed"',
+        'enabled=True',
+    ):
+        assert token in guard, token
+
+
+def test_v206_guard_does_not_execute_dataplane_or_port_mutations():
+    guard = read("backend/app/spoof_underlay_guard_v206.py")
+
+    for forbidden in (
+        "conn.run(",
+        "subprocess.",
+        "nft -f",
+        "iptables -",
+        "REVERSE_INGRESS_PORT",
+        "WIREGUARD_MESSAGE_PREFIXES",
+        "--spoof-port",
+        "--client-port",
+        "udp dport set",
+    ):
+        assert forbidden not in guard, forbidden
