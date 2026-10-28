@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.305",
+  "version": "1.1.0-rc.306",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-28T16:55:33Z",
+  "released_at": "2026-10-28T17:49:16Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "98811b63168d348e8e6848b9b5cd5ea85310d80f",
+  "source_sha": "4517464d5b1d697f33e871db7e3fe2f084b59c7e",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.305/twinpanel-1.1.0-rc.305-linux-x86_64.tar.gz",
-    "sha256": "0dea292b061c3d2a02036f128c52942db75096fc667cfba111423b2c20db1ea8",
-    "size_bytes": 28461654
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.306/twinpanel-1.1.0-rc.306-linux-x86_64.tar.gz",
+    "sha256": "917d6ba8c6c64d77c0bca468d12b8820e102aa1c4cfde1383f0267ff32a0d3bf",
+    "size_bytes": 28473587
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.305 مسیر مدیریت SSH نودهای Exit را برای جلوگیری از fanout ناخواسته داخل API اصلاح می‌کند. Audit واقعی روی Controller نشان داد هنگام stall تک‌worker Uvicorn، چند child محلی از الگوی ssh → Iran → nc → Exit-private:22 هم‌زمان زیر همان API process ساخته می‌شوند و درخواست‌های پذیرفته‌شده روی 8095 در Recv-Q خوانده‌نشده می‌مانند. Root Cause در composition مسیر V72 با fallback قدیمی V61 بود: direct attempt مستندشده‌ی V72 عملاً دوباره وارد race مستقیم+relay V61 می‌شد. V74 برای saved-node management دقیقاً یک اتصال مستقیم bounded با AsyncSSH انجام می‌دهد و فقط بعد از شکست آن، یک Iran management session مستقیم و fallback بومی V72/V73 را به‌صورت sequential استفاده می‌کند. سازگاری V61، cleanup نسخه V73، accounting semantics و first-install bootstrap حفظ شده‌اند و TP27/VXLAN، tunnel selection، route/firewall، Cisco/OpenConnect روی 443، Public Connect UI، nginx و ocserv تغییری نکرده‌اند. Source candidate روی SHA immutable 98811b63168d348e8e6848b9b5cd5ea85310d80f قفل شده است؛ Production Acceptance پس از نصب release روی Controller انجام می‌شود.",
-    "en": "TwinPanel 1.1.0-rc.305 corrects saved Exit SSH management to prevent unintended local relay fanout inside the API process. Real Controller diagnostics showed that during single-worker Uvicorn stalls, multiple local children matching ssh -> Iran -> nc -> Exit-private:22 were spawned below the API process while accepted 8095 requests remained unread in Recv-Q. The source-level root cause was the V72/V61 composition: V72's documented direct attempt resolved back into V61's concurrent direct-plus-relay race. V74 performs exactly one bounded direct AsyncSSH attempt for saved-node management and, only after direct failure, uses one direct Iran management session followed by the existing sequential V72/V73 native fallback. V61 compatibility, V73 cleanup, accounting semantics, and first-install bootstrap are preserved. TP27/VXLAN, tunnel selection, routes/firewall, Cisco/OpenConnect on 443, Public Connect UI, nginx, and ocserv are unchanged. The candidate source is pinned to immutable SHA 98811b63168d348e8e6848b9b5cd5ea85310d80f; production acceptance follows installation on the Controller."
+    "fa": "TwinPanel 1.1.0-rc.306 مدل خطای TP27 Fast را برای جداسازی خرابی Carrier از خرابی Pair/Underlay اصلاح می‌کند. Audit واقعی نشان داد یک Iran Node می‌تواند هم‌زمان به یک Exit سالم و به Exit دیگری با loss شدید و نامتقارن متصل باشد؛ در این حالت rebuild کردن GRE/FoU مشکل Provider/Route را حل نمی‌کند و فقط churn ایجاد می‌کند. V306 وقتی service/interface/address سالم‌اند اما dataplane داخلی خراب است، مسیر عمومی Iran↔Exit را می‌سنجد. خرابی مسیر ابتدا underlay_suspected است و فقط وقتی یک TP27 sibling سالم روی همان Iran Node وجود دارد به underlay_pair ارتقا یافته و rebuild خودکار Manager متوقف می‌شود. Node مشترک offline نمی‌شود، Repair/Rebuild دستی اپراتور حفظ می‌شود، V303 soft quarantine و V304 anti-flap بدون تغییر باقی می‌مانند. این نسخه Exit را خودکار عوض نمی‌کند؛ فقط fault-domain صحیح و replacement recommendation را فراهم می‌کند. Source candidate روی SHA immutable 4517464d5b1d697f33e871db7e3fe2f084b59c7e قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.306 separates TP27 carrier failures from pair-specific public-underlay failures. Production audits showed the same Iran node could maintain a healthy TP27 pair to one Exit while suffering severe asymmetric loss to another Exit; rebuilding GRE/FoU cannot repair that provider/route fault and only adds churn. V306 probes the public Iran↔Exit underlay only when the carrier is structurally present but the inner dataplane is unhealthy. Public-path degradation starts as underlay_suspected and is promoted to underlay_pair only when another TP27 sibling on the same Iran node is concurrently healthy; only then is manager-initiated destructive rebuild suppressed. The shared node is not marked offline, explicit operator Repair/Rebuild remains available, and V303 soft quarantine plus V304 anti-flap remain unchanged. This release does not automatically reassign the Exit; it provides correct fault-domain classification and replacement recommendation. The candidate source is pinned to immutable SHA 4517464d5b1d697f33e871db7e3fe2f084b59c7e."
   }
 }
