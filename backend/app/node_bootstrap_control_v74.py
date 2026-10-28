@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+import asyncssh
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -10,7 +11,6 @@ from .models import Node, NodeType
 from .routers import provision
 from . import node_bootstrap_control_v63 as v63
 from . import node_bootstrap_control_v72 as v72
-from . import ssh_management_fallback_v61 as v61
 
 
 # ============================================================
@@ -29,28 +29,68 @@ from . import ssh_management_fallback_v61 as v61
 # accepted-but-unread HTTP sockets.
 #
 # V74 restores the architecture V72 documents:
-#   1) exactly one direct saved SSH attempt using the original connector;
+#   1) exactly one bounded direct saved SSH attempt;
 #   2) only after direct failure, select one Iran management node;
 #   3) open that Iran session directly (no Exit relay race);
 #   4) run V72/V73 native OpenSSH on Iran to reach the Exit.
 #
-# V61 remains installed for legacy compatibility callers. V74 only makes the
-# active saved-node control path direct-first and sequential. No tunnel, route,
-# firewall, TP27, VXLAN, VPN dataplane, credential, or quota semantics change.
+# V61 remains installed for legacy compatibility callers. V74 does not import
+# V61 or capture its module globals: doing so creates a circular-import hazard
+# when the standalone V61 smoke imports that compatibility module directly.
+# The small direct connector below intentionally mirrors the original saved-SSH
+# primitive using NodeAccess + AsyncSSH, without any relay/proxy machinery.
+#
+# No tunnel, route, firewall, TP27, VXLAN, VPN dataplane, credential, or quota
+# semantics change.
 # ============================================================
 
 
 _RUNTIME_APPLIED = False
+_DIRECT_TIMEOUT_SECONDS = 12
 
-# Capture the connector which V61 itself wrapped at package initialization.
-# This is the canonical direct saved-SSH implementation from routers.provision,
-# before any Exit relay compatibility layer was installed.
-_DIRECT_SAVED_CONNECT = v61._ORIGINAL_SSH_CONNECT_SAVED
+
+async def _direct_saved_connect(node: Node, db: Session):
+    """Open exactly one direct saved SSH connection, with no relay candidates."""
+
+    access = v63._access(db, int(node.id))
+    if access is None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "دسترسی امن این سرور ثبت نشده است. "
+                "یک‌بار «ثبت دسترسی سرور» را انجام دهید."
+            ),
+        )
+
+    key_path = Path(str(access.private_key_path or ""))
+    if not key_path.exists():
+        raise HTTPException(
+            status_code=409,
+            detail="کلید دسترسی این سرور پیدا نشد. دسترسی را دوباره ثبت کنید.",
+        )
+
+    try:
+        return await asyncssh.connect(
+            str(node.public_ip),
+            port=int(access.ssh_port or 22),
+            username=str(access.ssh_username or "root"),
+            client_keys=[str(key_path)],
+            known_hosts=None,
+            connect_timeout=_DIRECT_TIMEOUT_SECONDS,
+            login_timeout=_DIRECT_TIMEOUT_SECONDS,
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"اتصال ذخیره‌شده SSH ناموفق بود: {exc}",
+        ) from exc
 
 
 async def _open_iran_management_direct(iran: Node, db: Session):
     try:
-        return await _DIRECT_SAVED_CONNECT(iran, db)
+        return await _direct_saved_connect(iran, db)
     except asyncio.CancelledError:
         raise
     except BaseException as exc:
@@ -79,7 +119,7 @@ async def _saved_exit_via_iran_native_v74(
             ) from exc
 
         # node_bootstrap_control_v73 replaces this class in v72's module globals
-        # at import time, so the deterministic failed-open cleanup remains active.
+        # at import time, so deterministic failed-open cleanup remains active.
         return await v72.NativeIranExitConnection.open_with_private_key(
             iran_conn,
             host=str(node.public_ip),
@@ -97,15 +137,14 @@ async def _saved_exit_via_iran_native_v74(
 
 
 async def ssh_connect_saved_v74(node: Node, db: Session):
-    # Iran and any future non-Exit management remain direct-only, matching V61's
-    # original non-Exit behavior without entering the legacy relay selector.
+    # Iran and any future non-Exit management remain direct-only.
     if node.node_type != NodeType.EXIT:
-        return await _DIRECT_SAVED_CONNECT(node, db)
+        return await _direct_saved_connect(node, db)
 
     direct_error = "not_attempted"
 
     try:
-        return await _DIRECT_SAVED_CONNECT(node, db)
+        return await _direct_saved_connect(node, db)
     except asyncio.CancelledError:
         raise
     except BaseException as exc:
