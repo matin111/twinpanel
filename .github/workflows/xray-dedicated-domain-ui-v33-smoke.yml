@@ -97,10 +97,15 @@ jobs:
         run: |
           set -euo pipefail
           grep -F 'type NodeModal="manage"|"ssh"|"domain"|"xray-domain"|"protocols"|null;' components/legacy-nodes-exact.tsx
-          grep -F 'hasDedicatedXrayDomain' components/legacy-nodes-exact.tsx
+          grep -F 'const hasDedicatedXrayDomain=Boolean(selected&&selectedRole==="exit");' components/legacy-nodes-exact.tsx
+          grep -F 'if(roleOf(selected)==="exit"){' components/legacy-nodes-exact.tsx
+          ! grep -F 'selectedRole==="exit"&&selected.enable_v2ray' components/legacy-nodes-exact.tsx
+          ! grep -F 'roleOf(selected)==="exit"&&selected.enable_v2ray' components/legacy-nodes-exact.tsx
           grep -F 'adminApi.xrayDomain(selected.id)' components/legacy-nodes-exact.tsx
           grep -F 'adminApi.saveXrayDomain(selected.id,xrayDomainDraft.trim())' components/legacy-nodes-exact.tsx
           grep -F 'adminApi.prepareXrayDomain(selected.id,true)' components/legacy-nodes-exact.tsx
+          grep -F '!selected.enable_v2ray?<div className="runtime-warning"' components/legacy-nodes-exact.tsx
+          grep -F '!selected.enable_v2ray} onClick={()=>void saveXrayDomain(true)}' components/legacy-nodes-exact.tsx
           grep -F 'دامنه عمومی' components/legacy-nodes-exact.tsx
           grep -F 'دامنه Xray' components/legacy-nodes-exact.tsx
           grep -F 'دامنه اختصاصی V2Ray / Xray' components/legacy-nodes-exact.tsx

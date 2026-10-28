@@ -107,7 +107,9 @@ export function LegacyNodesRuntimePage(){
   const selectedDomain=selected?domains.find(row=>n(row.id||row.node_id)===selected.id):null;
   const effectiveDomain=s(selected?.public_domain||selectedDomain?.public_domain||selectedDomain?.domain);
   const selectedProtocols=selected?enabledProtocols(selected):[];
-  const hasDedicatedXrayDomain=Boolean(selected&&selectedRole==="exit"&&selected.enable_v2ray);
+  // Domain registration must be available before V2Ray/Xray is enabled.
+  // TLS preparation remains gated by the actual protocol/runtime readiness.
+  const hasDedicatedXrayDomain=Boolean(selected&&selectedRole==="exit");
 
   const filtered=useMemo(()=>{
     const q=query.trim().toLowerCase();
@@ -139,7 +141,7 @@ export function LegacyNodesRuntimePage(){
       if(active){setAccessConfigured(false);setAccessDraft({port:22,username:"root",password:""});}
     }).finally(()=>{if(active)setAccessLoading(false);});
 
-    if(roleOf(selected)==="exit"&&selected.enable_v2ray){
+    if(roleOf(selected)==="exit"){
       setXrayDomainLoading(true);
       adminApi.xrayDomain(selected.id).then(result=>{
         if(!active)return;
@@ -358,6 +360,7 @@ export function LegacyNodesRuntimePage(){
         {error?<div className="runtime-error">{error}</div>:null}
         {warning?<div className="runtime-warning">{warning}</div>:null}
         {success?<div className="runtime-success">{success}</div>:null}
+        {!selected.enable_v2ray?<div className="runtime-warning">{pick("دامنه را می‌توانید همین حالا ذخیره کنید؛ آماده‌سازی TLS بعد از فعال شدن V2Ray/Xray در Protocol Studio در دسترس می‌شود.","You can save the domain now; TLS preparation becomes available after V2Ray/Xray is enabled in Protocol Studio.")}</div>:null}
         {xrayDomainMeta?.legacy_public_domain_fallback?<div className="runtime-warning">{pick("در حال حاضر Xray از دامنه عمومی نود به‌عنوان fallback استفاده می‌کند. با ثبت دامنه اختصاصی، این وابستگی حذف می‌شود.","Xray currently falls back to the Node public domain. Saving a dedicated domain removes that dependency.")}</div>:null}
         <div className="runtime-form">
           <label>{pick("دامنه Xray","Xray domain")}<input dir="ltr" value={xrayDomainDraft} onChange={event=>setXrayDomainDraft(event.target.value)} placeholder="xray.example.com"/></label>
@@ -368,7 +371,7 @@ export function LegacyNodesRuntimePage(){
           </div>
           <div className="action-row">
             <button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>void saveXrayDomain(false)}>{busy==="xray-domain-save"?"…":pick("فقط ذخیره","Save only")}</button>
-            <button type="button" className="primary" disabled={Boolean(busy)||!xrayDomainDraft.trim()} onClick={()=>void saveXrayDomain(true)}>{busy==="xray-domain-prepare"?"…":pick("ذخیره و آماده‌سازی TLS","Save & prepare TLS")}</button>
+            <button type="button" className="primary" disabled={Boolean(busy)||!xrayDomainDraft.trim()||!selected.enable_v2ray} onClick={()=>void saveXrayDomain(true)}>{busy==="xray-domain-prepare"?"…":pick("ذخیره و آماده‌سازی TLS","Save & prepare TLS")}</button>
           </div>
         </div>
       </Modal>:null}
