@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.301",
+  "version": "1.1.0-rc.302",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-28T00:43:11Z",
+  "released_at": "2026-10-28T13:12:45Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "1582c1f0d8575490fd359357f8b4b3c4f38136ed",
+  "source_sha": "b7cf1371179f661bc509ee6d9eec98d645716cfc",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.301/twinpanel-1.1.0-rc.301-linux-x86_64.tar.gz",
-    "sha256": "71cb78babb5f7b66d97c42607093c8ece9bf94a2b463cddfa8fd72ffd527fd86",
-    "size_bytes": 28426943
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.302/twinpanel-1.1.0-rc.302-linux-x86_64.tar.gz",
+    "sha256": "660029c5f9498c1cacf4b9a8d6cb815847b1b8a7463b71a13765719a4db984f6",
+    "size_bytes": 28431554
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.301 ظاهر موبایل صفحه اتصال عمومی را خواناتر و لمس‌پذیرتر می‌کند: تایپوگرافی بزرگ‌تر، حداقل touch target برابر 44px، CTA اصلی 48px، چیدمان مقاوم برای عرض‌های 360/430px و نمایش credential-first برای Cisco/OpenConnect و L2TP. جزئیات پروتکل‌های Config/URI همچنان جمع‌شونده باقی می‌مانند و Desktop UI بدون تغییر است. این Release هیچ تغییری در Dynamic Subscription Delivery، credential generation، TP27/VXLAN/Spoof، dataplane تانل‌ها، Accounting/Quota یا schema دیتابیس ندارد. Candidate روی SHA immutable 1582c1f0d8575490fd359357f8b4b3c4f38136ed قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.301 refines the public mobile connection experience with readable typography, 44px minimum touch targets, a 48px primary CTA, resilient 360/430px layouts, and credential-first presentation for Cisco/OpenConnect and L2TP. Config/URI protocol details remain collapsible and the desktop UI is unchanged. This release does not change Dynamic Subscription Delivery, credential generation, TP27/VXLAN/Spoof, tunnel dataplane, Accounting/Quota, or database schema. Candidate is pinned to immutable SHA 1582c1f0d8575490fd359357f8b4b3c4f38136ed."
+    "fa": "TwinPanel 1.1.0-rc.302 مشکل بازشدن ناپایدار صفحه اتصال عمومی روی موبایل را از ریشه مسیر URL اصلاح می‌کند. لینک‌های /v1/connect دیگر مجبور نیستند از PUBLIC_API_FALLBACK و IP خام Controller استفاده کنند و می‌توانند از PUBLIC_SUBSCRIPTION_BASE_URL مستقل پشت HTTPS edge/domain استفاده کنند؛ در نتیجه Cisco/OpenConnect روی TCP/443 Controller دست‌نخورده می‌ماند. بهبودهای ظاهری موبایل rc.301 شامل تایپوگرافی خواناتر، touch targetهای 44px، CTA اصلی 48px، RTL و کارت‌های جمع‌شونده حفظ شده‌اند. Desktop UI، TP27/VXLAN/Spoof، dataplane تانل‌ها، credential generation، Accounting/Quota و schema دیتابیس تغییری نکرده‌اند. Candidate روی SHA immutable b7cf1371179f661bc509ee6d9eec98d645716cfc قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.302 fixes intermittent mobile Public Connect resets at the URL-routing layer. /v1/connect links no longer have to inherit the controller raw-IP PUBLIC_API_FALLBACK and can use an independent PUBLIC_SUBSCRIPTION_BASE_URL behind an HTTPS edge/domain, while Cisco/OpenConnect remains untouched on controller TCP/443. The rc.301 mobile visual refinements—readable typography, 44px touch targets, 48px primary CTA, RTL and collapsible cards—are preserved. Desktop UI, TP27/VXLAN/Spoof, tunnel dataplane, credential generation, Accounting/Quota and database schema are unchanged. Candidate is pinned to immutable SHA b7cf1371179f661bc509ee6d9eec98d645716cfc."
   }
 }
