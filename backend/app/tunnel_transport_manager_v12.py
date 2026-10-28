@@ -51,6 +51,7 @@ from .spoof_candidate_policy_v202 import (
 from .smart_transport_auto_v21 import install_smart_transport_auto_v21
 from .smart_auto_bootstrap_v24 import reconciler_loop as smart_bootstrap_loop
 from .smart_candidate_bootstrap_v38 import reconciler_loop as candidate_bootstrap_loop
+from .tp27_fou_quarantine_v303 import apply_tp27_fou_quarantine_v303
 from .tp27_reference_runtime_v91 import (
     activate_manager_candidate_policy_v91,
     reconciler_loop as tp27_reference_loop,
@@ -65,6 +66,7 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 # TWINPANEL TRANSPORT MANAGER V12
 # + TP27 REFERENCE V91
 # + TP27 SELF REPAIR V265
+# + TP27 FOU QUARANTINE V303
 # + TP27 REPAIR OWNER GUARD
 # + ADAPTIVE TUNNEL PERFORMANCE V148
 # + LEGACY ADAPTIVE LAYERS V149/V151/V165 (cleanup compatibility)
@@ -83,6 +85,11 @@ async def main() -> None:
     install_manager_runtime_v16()
     install_smart_transport_auto_v21()
     activate_manager_candidate_policy_v91()
+
+    # V303 wraps V265's attempt ordering and repair telemetry before the
+    # background repair task is started. It only deprioritizes recently failed
+    # FoU ports; it never removes candidates or mutates the healthy carrier.
+    apply_tp27_fou_quarantine_v303()
 
     # TP27 has a dedicated carrier repair owner. Fence the historical V8/V9
     # managed-repair scheduler before V10 starts so TP27 repair cannot race
@@ -123,6 +130,7 @@ async def main() -> None:
         "candidate_bootstrap=v38 "
         "tp27_reference=v91 "
         "tp27_self_repair=v265 "
+        "tp27_fou_quarantine=v303 "
         "tp27_repair_owner_guard=active "
         "adaptive_tunnel_performance=v148 "
         "compat_multilane=v149,v151,v165 "
