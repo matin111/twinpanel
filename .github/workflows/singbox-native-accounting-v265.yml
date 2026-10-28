@@ -5,11 +5,13 @@ on:
     paths:
       - "backend/app/services/singbox_native_accounting_v265.py"
       - "backend/app/services/modern_quota_runtime_v257.py"
+      - "backend/app/services/modern_quota_runtime_v314.py"
       - "backend/app/routers/modern_accounting_runtime_v257.py"
       - "backend/app/routers/public_connection_live_v4.py"
       - "backend/scripts/twinpanel_modern_accounting_worker.py"
       - "backend/tests/singbox_native_accounting_v265_smoke.py"
       - "backend/tests/modern_accounting_v257_smoke.py"
+      - "backend/tests/modern_accounting_deadlock_v314_smoke.py"
       - ".github/workflows/singbox-native-accounting-v265.yml"
   workflow_dispatch:
 
@@ -67,11 +69,13 @@ jobs:
           python -m py_compile \
             backend/app/services/singbox_native_accounting_v265.py \
             backend/app/services/modern_quota_runtime_v257.py \
+            backend/app/services/modern_quota_runtime_v314.py \
             backend/app/routers/modern_accounting_runtime_v257.py \
             backend/app/routers/public_connection_live_v4.py \
             backend/scripts/twinpanel_modern_accounting_worker.py \
             backend/tests/singbox_native_accounting_v265_smoke.py \
-            backend/tests/modern_accounting_v257_smoke.py
+            backend/tests/modern_accounting_v257_smoke.py \
+            backend/tests/modern_accounting_deadlock_v314_smoke.py
 
       - name: Run native sing-box accounting safety smoke
         working-directory: backend
@@ -81,12 +85,17 @@ jobs:
         working-directory: backend
         run: PYTHONPATH=. python tests/modern_accounting_v257_smoke.py
 
+      - name: Run accounting deadlock regression smoke
+        working-directory: backend
+        run: PYTHONPATH=. python tests/modern_accounting_deadlock_v314_smoke.py
+
       - name: Verify application import and collector lifecycle
         working-directory: backend
         run: |
           python - <<'PY'
           from app.main import app
           from app.routers.modern_accounting_runtime_v257 import modern_accounting_lifespan
+          from app.services.modern_quota_runtime_v314 import modern_quota_runtime_loop
           from app.services.singbox_native_accounting_v265 import (
               SINGBOX_ACCOUNTING_PROTOCOLS,
               activate_singbox_capabilities,
@@ -95,10 +104,12 @@ jobs:
 
           assert app.title
           assert callable(modern_accounting_lifespan)
+          assert callable(modern_quota_runtime_loop)
           assert callable(activate_singbox_capabilities)
           assert callable(singbox_native_accounting_loop)
           assert SINGBOX_ACCOUNTING_PROTOCOLS == {
               "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"
           }
           print("SINGBOX_NATIVE_ACCOUNTING_APP_IMPORT=PASS")
+          print("MODERN_ACCOUNTING_V314_IMPORT=PASS")
           PY
