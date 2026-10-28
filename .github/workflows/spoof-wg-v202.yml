@@ -9,6 +9,8 @@ on:
       - "backend/app/routers/modern_transports.py"
       - "backend/app/tunnel_transport_manager_v12.py"
       - "backend/tests/test_spoof_wg_v202.py"
+      - "backend/tests/test_spoof_wg_v203.py"
+      - "backend/tests/test_spoof_wg_v205_reverse_ingress.py"
       - "lib/modern-transport-api.ts"
       - "components/smart-transports-runtime-v25.tsx"
       - "third_party/spoof-tunnel/**"
@@ -23,6 +25,8 @@ on:
       - "backend/app/routers/modern_transports.py"
       - "backend/app/tunnel_transport_manager_v12.py"
       - "backend/tests/test_spoof_wg_v202.py"
+      - "backend/tests/test_spoof_wg_v203.py"
+      - "backend/tests/test_spoof_wg_v205_reverse_ingress.py"
       - "lib/modern-transport-api.ts"
       - "components/smart-transports-runtime-v25.tsx"
       - "third_party/spoof-tunnel/**"
@@ -41,7 +45,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Compile V202 backend surface
+      - name: Compile Spoof backend surface
         run: |
           python -m py_compile \
             backend/app/transport_candidates/spoof_wg.py \
@@ -49,24 +53,35 @@ jobs:
             backend/app/spoof_candidate_policy_v202.py \
             backend/app/routers/modern_transports.py \
             backend/app/tunnel_transport_manager_v12.py \
-            backend/tests/test_spoof_wg_v202.py
+            backend/tests/test_spoof_wg_v202.py \
+            backend/tests/test_spoof_wg_v203.py \
+            backend/tests/test_spoof_wg_v205_reverse_ingress.py
 
       - name: Run source-contract regression
         run: |
           python - <<'PY'
           import runpy
-          ns = runpy.run_path("backend/tests/test_spoof_wg_v202.py")
-          tests = sorted(
-              (name, value)
-              for name, value in ns.items()
-              if name.startswith("test_") and callable(value)
+
+          paths = (
+              "backend/tests/test_spoof_wg_v202.py",
+              "backend/tests/test_spoof_wg_v203.py",
+              "backend/tests/test_spoof_wg_v205_reverse_ingress.py",
           )
-          if not tests:
-              raise SystemExit("no spoof v202 tests discovered")
-          for name, test in tests:
-              test()
-              print(f"PASS {name}")
-          print(f"SPOOF_WG_V202_SOURCE_CONTRACT_OK tests={len(tests)}")
+          total = 0
+          for path in paths:
+              ns = runpy.run_path(path)
+              tests = sorted(
+                  (name, value)
+                  for name, value in ns.items()
+                  if name.startswith("test_") and callable(value)
+              )
+              if not tests:
+                  raise SystemExit(f"no spoof tests discovered in {path}")
+              for name, test in tests:
+                  test()
+                  total += 1
+                  print(f"PASS {path}:{name}")
+          print(f"SPOOF_WG_SOURCE_CONTRACT_OK tests={total}")
           PY
 
       - name: Verify pinned upstream Spoof Tunnel artifact
