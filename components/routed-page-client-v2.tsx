@@ -6,7 +6,7 @@ import {LegacyNodesRuntimePage} from "./legacy-nodes-runtime-v2";
 import {RoutedPageClient as BaseRoutedPageClient} from "./routed-page-client";
 import {SmartTransportsRuntimeV27} from "./smart-transports-runtime-v27";
 import {SubscriptionDeliveryPolicyManager} from "./subscription-delivery-policy-manager";
-import {TunnelProtocolRuntimeV298} from "./tunnel-protocol-runtime-v298";
+import {TunnelProtocolRuntimeV307} from "./tunnel-protocol-runtime-v307";
 
 const admin=(node:React.ReactNode)=><AdminAuthGuard><AdminOperationFeedback/>{node}</AdminAuthGuard>;
 
@@ -15,7 +15,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
     return admin(<LegacyNodesRuntimePage/>);
   }
   if(routeKey==="admin/tunnels"){
-    return admin(<TunnelProtocolRuntimeV298/>);
+    return admin(<TunnelProtocolRuntimeV307/>);
   }
   if(routeKey==="admin/tunnel-transports"){
     return admin(<SmartTransportsRuntimeV27/>);
