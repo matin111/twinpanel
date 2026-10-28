@@ -13,24 +13,26 @@ from .models import Node
 from .routers import account_delivery
 
 
-# TWINPANEL_XRAY_NODE_DOMAIN_RUNTIME_V2
+# TWINPANEL_XRAY_NODE_DOMAIN_RUNTIME_V3
 #
 # Xray TLS identity is independent from the Node's general/public domain.
 # Existing installations remain compatible: when xray_domain is empty, Modern
 # Xray still falls back to public_domain until an explicit Xray domain is saved.
 #
-# V2 closes the historical-subscription gap: preparing a dedicated TLS domain
-# makes the remote Xray listeners ready, but old ProtocolCredential rows may
-# still contain only retired/internal profiles. After TLS is verified we start
-# the existing V36/V41 reconcile pipeline in the background. That pipeline
-# preserves UUIDs, prepares the final TCP-TLS runtime when needed, and rewrites
-# only incomplete V2Ray subscription credentials. The HTTP mutation therefore
-# stays bounded and does not wait for every subscription, avoiding update/admin
-# gateway timeouts while existing public share links become usable again.
+# V2 closed the historical-subscription gap: preparing a dedicated TLS domain
+# starts the existing V36/V41 reconcile pipeline in the background.
+#
+# V3 closes the direct-delivery authority gap. The dedicated Xray domain was
+# already used for certificate/SNI preparation, but direct customer TLS links
+# could still publish Node.public_domain or the Exit IP as their VLESS authority.
+# Only direct TLS Xray authorities are converged to xray_domain. Iran-tunnel
+# authorities and non-TLS/REALITY profiles intentionally remain unchanged.
 
 _runtime_applied = False
 _original_node_payload = None
 _original_ensure_modern_xray = None
+_original_profile_endpoint = None
+_original_customer_profile_endpoint_v261 = None
 
 
 class XrayDomainIn(BaseModel):
@@ -92,6 +94,105 @@ def _effective_xray_domain(node: Node) -> str:
             getattr(node, "public_domain", None)
         )
     )
+
+
+def _profile_uses_tls(profile: str) -> bool:
+    meta = xray_modern_runtime.PROFILE_META.get(str(profile))
+    if not isinstance(meta, dict):
+        return False
+
+    return str(meta.get("security") or "").strip().lower() == "tls"
+
+
+def _dedicated_direct_tls_authority(
+    node: Node,
+    profile: str,
+    fallback_host: str,
+) -> str:
+    """Return xray_domain only for TLS profiles with an explicit dedicated domain."""
+
+    if not _profile_uses_tls(profile):
+        return str(fallback_host)
+
+    domain = _stored_xray_domain(node)
+    if not domain:
+        return str(fallback_host)
+
+    return domain
+
+
+def _profile_endpoint_with_dedicated_domain(
+    db: Session,
+    node: Node,
+    profile: str,
+) -> tuple[str, int]:
+    """Converge only direct TLS Xray authority; preserve Iran tunnel routing."""
+
+    assert _original_profile_endpoint is not None
+
+    host, port = _original_profile_endpoint(
+        db,
+        node,
+        profile,
+    )
+
+    if not _profile_uses_tls(profile):
+        return host, int(port)
+
+    try:
+        expected_public_port = xray_modern_runtime._public_port(
+            int(node.id),
+            profile,
+        )
+    except Exception:
+        return host, int(port)
+
+    # A public per-node profile port means the original resolver selected the
+    # Iran ingress. Replacing that host with the Exit domain would bypass the
+    # tunnel, so the authority must remain untouched.
+    if int(port) == int(expected_public_port):
+        return host, int(port)
+
+    return (
+        _dedicated_direct_tls_authority(
+            node,
+            profile,
+            host,
+        ),
+        int(port),
+    )
+
+
+def _customer_profile_endpoint_with_dedicated_domain(
+    db: Session,
+    node: Node,
+    profile: str,
+    item: dict[str, Any],
+) -> tuple[str, int]:
+    """Keep explicit tunnel delivery intact while fixing explicit direct TLS."""
+
+    assert _original_customer_profile_endpoint_v261 is not None
+
+    host, port = _original_customer_profile_endpoint_v261(
+        db,
+        node,
+        profile,
+        item,
+    )
+
+    mode = str(item.get("delivery_mode") or "").strip().lower()
+
+    if mode == "direct":
+        host = _dedicated_direct_tls_authority(
+            node,
+            profile,
+            host,
+        )
+
+    # Legacy/no-mode delivery delegates to xray_modern_runtime._profile_endpoint,
+    # which is already wrapped above and therefore gets the same direct-only
+    # behavior without duplicating tunnel detection here.
+    return host, int(port)
 
 
 class _XrayDomainNodeProxy:
@@ -378,6 +479,8 @@ def apply_xray_node_domain_runtime() -> None:
     global _runtime_applied
     global _original_node_payload
     global _original_ensure_modern_xray
+    global _original_profile_endpoint
+    global _original_customer_profile_endpoint_v261
 
     if _runtime_applied:
         return
@@ -405,6 +508,25 @@ def apply_xray_node_domain_runtime() -> None:
         _ensure_modern_xray_with_dedicated_domain
     )
 
+    _original_profile_endpoint = (
+        xray_modern_runtime._profile_endpoint
+    )
+    xray_modern_runtime._profile_endpoint = (
+        _profile_endpoint_with_dedicated_domain
+    )
+
+    # V30/V261 is intentionally imported lazily. self_hosted_runtime imports
+    # all runtime modules before composing them, so this avoids introducing a
+    # module-cycle while still patching the final customer delivery resolver.
+    from . import xray_customer_profile_policy_v30
+
+    _original_customer_profile_endpoint_v261 = (
+        xray_customer_profile_policy_v30._profile_endpoint_v261
+    )
+    xray_customer_profile_policy_v30._profile_endpoint_v261 = (
+        _customer_profile_endpoint_with_dedicated_domain
+    )
+
     _original_node_payload = (
         xray_modern_admin._node_payload
     )
@@ -415,8 +537,10 @@ def apply_xray_node_domain_runtime() -> None:
     _runtime_applied = True
 
     print(
-        "TWINPANEL_XRAY_NODE_DOMAIN_RUNTIME_V2_ACTIVE "
+        "TWINPANEL_XRAY_NODE_DOMAIN_RUNTIME_V3_ACTIVE "
         "dedicated_domain=1 legacy_public_domain_fallback=1 "
-        "subscription_reconcile_after_tls=1 background=1 uuid_preserved=1",
+        "direct_tls_authority=dedicated_domain tunnel_authority=preserved "
+        "reality_authority=preserved subscription_reconcile_after_tls=1 "
+        "background=1 uuid_preserved=1",
         flush=True,
     )
