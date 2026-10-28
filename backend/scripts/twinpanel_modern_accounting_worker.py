@@ -16,6 +16,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.services.modern_quota_runtime_v257 import modern_quota_runtime_loop
+from app.services.singbox_native_accounting_v265 import singbox_native_accounting_loop
 
 
 async def _serve() -> None:
@@ -28,27 +29,47 @@ async def _serve() -> None:
         except (NotImplementedError, RuntimeError):
             pass
 
-    worker = asyncio.create_task(
-        modern_quota_runtime_loop(),
-        name="twinpanel-modern-accounting",
+    workers = (
+        asyncio.create_task(
+            modern_quota_runtime_loop(),
+            name="twinpanel-modern-accounting",
+        ),
+        asyncio.create_task(
+            singbox_native_accounting_loop(),
+            name="twinpanel-singbox-native-accounting-v265",
+        ),
     )
     stopper = asyncio.create_task(stop.wait(), name="twinpanel-accounting-stop")
 
     done, _pending = await asyncio.wait(
-        {worker, stopper},
+        {*workers, stopper},
         return_when=asyncio.FIRST_COMPLETED,
     )
 
-    if worker in done:
-        stopper.cancel()
-        await asyncio.gather(stopper, return_exceptions=True)
+    if stopper in done:
+        for worker in workers:
+            worker.cancel()
+        await asyncio.gather(*workers, return_exceptions=True)
+        return
+
+    # A collector must be long-lived. If either collector exits unexpectedly,
+    # stop the sibling and fail this process so systemd can restart the complete
+    # accounting worker rather than leaving a partially healthy accounting path.
+    stopper.cancel()
+    for worker in workers:
+        if worker not in done:
+            worker.cancel()
+    await asyncio.gather(stopper, *workers, return_exceptions=True)
+
+    for worker in workers:
+        if worker not in done:
+            continue
         exc = worker.exception()
         if exc is not None:
             raise exc
-        return
-
-    worker.cancel()
-    await asyncio.gather(worker, return_exceptions=True)
+        raise RuntimeError(
+            f"accounting collector exited unexpectedly: {worker.get_name()}"
+        )
 
 
 if __name__ == "__main__":

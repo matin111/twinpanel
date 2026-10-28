@@ -7,6 +7,7 @@ on:
       - "backend/app/services/modern_quota_runtime_v257.py"
       - "backend/app/routers/modern_accounting_runtime_v257.py"
       - "backend/app/routers/public_connection_live_v4.py"
+      - "backend/scripts/twinpanel_modern_accounting_worker.py"
       - "backend/tests/singbox_native_accounting_v265_smoke.py"
       - "backend/tests/modern_accounting_v257_smoke.py"
       - ".github/workflows/singbox-native-accounting-v265.yml"
@@ -68,6 +69,7 @@ jobs:
             backend/app/services/modern_quota_runtime_v257.py \
             backend/app/routers/modern_accounting_runtime_v257.py \
             backend/app/routers/public_connection_live_v4.py \
+            backend/scripts/twinpanel_modern_accounting_worker.py \
             backend/tests/singbox_native_accounting_v265_smoke.py \
             backend/tests/modern_accounting_v257_smoke.py
 
