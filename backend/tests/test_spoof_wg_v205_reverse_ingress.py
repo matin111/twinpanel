@@ -40,21 +40,19 @@ def test_v205_shared_2053_demux_is_fail_closed_for_tp27():
     spoof = read("backend/app/transport_candidates/spoof_wg.py")
     tp27 = read("backend/app/transport_candidates/tp27_fast.py")
 
-    # TP27 stays on its existing candidate set and keeps FoU source-port auto.
     assert "FOU_PORT_CANDIDATES = (443, 8443, 2053, 2083, 10443)" in tp27
     assert "encap-sport auto" in tp27
 
-    # Spoof must not rewrite all UDP/2053 traffic. The stateless raw/prerouting
-    # rule requires the configured Exit IP, selected Spoof source port and one
-    # of the four real WireGuard message prefixes before changing dport.
     assert 'WIREGUARD_MESSAGE_PREFIXES = (' in spoof
     for prefix in ("0x01000000", "0x02000000", "0x03000000", "0x04000000"):
         assert f'"{prefix}"' in spoof
     assert "ip saddr {cfg['exit_spoof_ip']}" in spoof
+    assert "ip daddr {iran_public}" in spoof
     assert "udp sport {ports['spoof_source_port']}" in spoof
     assert "udp dport {ports['iran_reverse_public_port']}" in spoof
     assert "@th,64,32" in spoof
     assert "udp dport set {ports['iran_raw_receive_port']}" in spoof
+    assert "iran_public=str(iran.public_ip)" in spoof
 
 
 def test_v205_reverse_metadata_exposes_stateless_adapter_contract():
@@ -63,7 +61,7 @@ def test_v205_reverse_metadata_exposes_stateless_adapter_contract():
     assert '"generation": 205' in spoof
     assert '"mode": "shared-public-udp-stateless-nft"' in spoof
     assert '"public_port": REVERSE_INGRESS_PORT' in spoof
-    assert '"selector": "exit-ip+spoof-source-port+wireguard-message-prefix"' in spoof
+    assert '"selector": "exit-ip+iran-public-ip+spoof-source-port+wireguard-message-prefix"' in spoof
     assert '"hook": "prerouting"' in spoof
     assert '"priority": "raw"' in spoof
     assert '"reverse_ingress_port": REVERSE_INGRESS_PORT' in spoof
@@ -76,3 +74,12 @@ def test_v205_nftables_dependency_is_explicit_and_iran_only():
     assert 'apt-get update -qq; apt-get install -y -qq nftables' in spoof
     assert spoof.count("await _ensure_nftables(ci)") == 1
     assert "await _ensure_nftables(ce)" not in spoof
+
+
+def test_v205_failure_diagnostics_include_owned_nft_counters():
+    spoof = read("backend/app/transport_candidates/spoof_wg.py")
+
+    assert "async def _ingress_diag(conn, tunnel_id: int) -> str:" in spoof
+    assert "nft -a list table ip" in spoof
+    assert "c = await _ingress_diag(ci, int(tunnel_id)) if ci else" in spoof
+    assert "reverse_ingress={c[-1500:]}" in spoof
