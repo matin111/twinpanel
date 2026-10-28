@@ -1,0 +1,31 @@
+name: Xray Public Hub Profiles V48 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/xray_public_hub_profiles_v48.py"
+      - "backend/app/routers/public_connection_hub_live_v5.py"
+      - "backend/app/xray_public_delivery_runtime.py"
+      - "backend/app/xray_adaptive_three_profiles_v47.py"
+      - "backend/tests/xray_public_hub_profiles_v48_smoke.py"
+      - ".github/workflows/xray-public-hub-profiles-v48-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  xray-public-hub-profiles-v48:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Python syntax
+        run: |
+          python -m py_compile \
+            backend/app/xray_public_hub_profiles_v48.py \
+            backend/app/routers/public_connection_hub_live_v5.py \
+            backend/tests/xray_public_hub_profiles_v48_smoke.py
+
+      - name: Validate three-profile Customer Delivery contract
+        run: python backend/tests/xray_public_hub_profiles_v48_smoke.py
