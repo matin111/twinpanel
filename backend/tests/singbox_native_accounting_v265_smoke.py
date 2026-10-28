@@ -127,6 +127,9 @@ def main() -> None:
     live = (ROOT / "app" / "routers" / "public_connection_live_v4.py").read_text(
         encoding="utf-8"
     )
+    worker = (ROOT / "scripts" / "twinpanel_modern_accounting_worker.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "singbox-watermark:" in source
     assert "mode == \"full\"" in source
@@ -139,6 +142,23 @@ def main() -> None:
     assert guard_index < presence_index
     assert "singbox_native_accounting_loop" in lifespan
     assert "activate_singbox_capabilities" in lifespan
+
+    # rc.308 moved Modern Accounting out of Uvicorn. The production systemd
+    # worker must own both the canonical V257 collector and the native sing-box
+    # V265 collector; keeping V265 only in the now-unmounted FastAPI lifespan
+    # silently disables Hysteria2/TUIC/AnyTLS/Naive/ShadowTLS/Snell accounting.
+    assert "modern_quota_runtime_loop" in worker
+    assert "singbox_native_accounting_loop" in worker
+    assert 'name="twinpanel-modern-accounting"' in worker
+    assert 'name="twinpanel-singbox-native-accounting-v265"' in worker
+    assert "return_when=asyncio.FIRST_COMPLETED" in worker
+    assert "accounting collector exited unexpectedly" in worker
+    assert worker.index("sys.path.insert(0, str(BACKEND_ROOT))") < worker.index(
+        "from app.services.modern_quota_runtime_v257 import modern_quota_runtime_loop"
+    )
+    assert worker.index("sys.path.insert(0, str(BACKEND_ROOT))") < worker.index(
+        "from app.services.singbox_native_accounting_v265 import singbox_native_accounting_loop"
+    )
 
     # Preserve the rc.262 latency fix: public polling may consume canonical DB
     # state only and must never invoke native API/SSH runtime work itself.
@@ -153,6 +173,7 @@ def main() -> None:
     print("SINGBOX_NATIVE_SHORT_LIVED_WATERMARK=PASS")
     print("SINGBOX_NATIVE_RETENTION_SAFETY=PASS")
     print("SINGBOX_NATIVE_CAPABILITIES=PASS")
+    print("SINGBOX_NATIVE_DEDICATED_WORKER=PASS")
     print("SINGBOX_NATIVE_PUBLIC_LIVE_DB_ONLY=PASS")
 
 
