@@ -13,6 +13,7 @@ from .models import Node
 from .routers import account_delivery
 
 
+# TWINPANEL_XRAY_NODE_DOMAIN_RUNTIME_V2
 # TWINPANEL_XRAY_NODE_DOMAIN_RUNTIME_V3
 #
 # Xray TLS identity is independent from the Node's general/public domain.
