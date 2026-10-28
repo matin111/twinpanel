@@ -9,6 +9,7 @@ from .deps import require_admin
 from .models import Tunnel, TunnelTransport
 from .routers import tunnel_managed
 from .routers.modern_transports import router
+from .tp27_fou_quarantine_v303 import apply_tp27_fou_quarantine_v303
 from .tp27_self_repair_v265 import diagnose_tp27, repair_tp27
 from .transport_candidates import ACTIVE_SPECS
 
@@ -203,6 +204,10 @@ def apply_tp27_repair_api_v265() -> None:
     if _applied:
         return
 
+    # Keep API-triggered TP27 repair/rebuild on the same durable FoU ordering
+    # policy as the background transport manager.
+    apply_tp27_fou_quarantine_v303()
+
     # The historical managed-repair endpoint imports its repair callable into
     # the router module. Replace that module-global binding in API workers so a
     # TP27-owned tunnel cannot concurrently enter the legacy repair lock domain.
@@ -274,6 +279,6 @@ def apply_tp27_repair_api_v265() -> None:
 
     _applied = True
     print(
-        f"{MARKER}_ACTIVE endpoints=transport-probe,tp27-diagnose,tp27-repair,tp27-rebuild legacy-managed-repair-fenced=1",
+        f"{MARKER}_ACTIVE endpoints=transport-probe,tp27-diagnose,tp27-repair,tp27-rebuild legacy-managed-repair-fenced=1 fou_quarantine=v303",
         flush=True,
     )
