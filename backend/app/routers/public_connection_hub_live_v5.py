@@ -8,6 +8,17 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from . import account_delivery as _account_delivery
+from .public_connection_render_cache_v26 import (
+    install_public_payload_render_cache_v26,
+    public_connection_render_cache_v26,
+)
+
+# Install before V13/V14/V16/Hub V5 import _public_payload so every renderer
+# shares the same request-scoped wrapper. Outside this decorated route the
+# wrapper is inert and Account Delivery keeps its existing behavior.
+install_public_payload_render_cache_v26(_account_delivery)
+
 from ..xray_public_hub_profiles_v48 import (
     apply_xray_public_hub_profiles_v48,
     refine_public_connection_xray_profiles_v48,
@@ -215,6 +226,7 @@ _LIVE_SCRIPT = r"""
 
 
 @router.get("/{token}", response_class=HTMLResponse)
+@public_connection_render_cache_v26
 def public_connection_hub_live_v5(
     token: str,
     db: Session = Depends(get_db),
