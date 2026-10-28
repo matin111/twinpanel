@@ -1,0 +1,30 @@
+name: Public Connection Mobile Visual V301 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/public_connection_mobile_protocols_v17.py'
+      - 'backend/tests/integration/test_public_connection_mobile_visual_v301.py'
+      - '.github/workflows/public-connection-mobile-visual-v301-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  mobile-visual-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile mobile renderer
+        run: python -m py_compile backend/app/routers/public_connection_mobile_protocols_v17.py
+
+      - name: Install test runner
+        run: python -m pip install pytest
+
+      - name: Verify mobile visual contract
+        run: pytest -q backend/tests/integration/test_public_connection_mobile_visual_v301.py
