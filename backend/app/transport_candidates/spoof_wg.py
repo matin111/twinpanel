@@ -47,15 +47,12 @@ from .common import (
 # UDP/46008 and raw TCP/443 were filtered before Iran eth0, while UDP/2053 on
 # the same pair was delivered. Reverse Spoof packets therefore use public
 # UDP/2053. A Spoof-owned nftables raw/prerouting chain runs before conntrack
-# and statelessly rewrites only packets matching the configured Exit IP,
-# selected Spoof source port, public ingress port and a WireGuard message-type
-# prefix. Unmatched UDP/2053 remains untouched for TP27/FoU.
+# and statelessly rewrites only packets matching the configured Exit IP, actual
+# Iran public destination IP, selected Spoof source port, public ingress port
+# and a WireGuard message-type prefix. Unmatched UDP/2053 remains untouched for
+# TP27/FoU.
 #
 # XDP stays disabled. The pinned upstream core and artifact are unchanged.
-#
-# Upstream: https://github.com/ParsaKSH/spoof-tunnel
-# License : Apache-2.0
-# Pinned release: v3.1.0-beta.0 / upstream source ba29f0c8...
 # ============================================================
 
 NAME = "spoof_wg"
@@ -84,26 +81,22 @@ def _artifact() -> tuple[Path, str]:
     backend_dir = Path(__file__).resolve().parents[2]
     artifact = backend_dir / "artifacts" / ARTIFACT_NAME
     sidecar = backend_dir / "artifacts" / f"{ARTIFACT_NAME}.sha256"
-
     if not artifact.is_file():
         raise RuntimeError(f"spoof_wg_artifact_missing:{artifact}")
     if not sidecar.is_file():
         raise RuntimeError(f"spoof_wg_checksum_missing:{sidecar}")
-
     expected = sidecar.read_text(encoding="utf-8").strip().split()[0].lower()
     if expected != UPSTREAM_ARTIFACT_SHA256:
         raise RuntimeError(
             "spoof_wg_checksum_contract_mismatch:"
             f"expected={UPSTREAM_ARTIFACT_SHA256}:sidecar={expected}"
         )
-
     digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
     if digest != expected:
         raise RuntimeError(
             "spoof_wg_artifact_checksum_mismatch:"
             f"expected={expected}:actual={digest}"
         )
-
     return artifact, expected
 
 
@@ -294,7 +287,6 @@ async def _remove_owned_firewall(
     exit_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-EXIT"
     l3_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-L3"
     ingress_table = _ingress_table(tunnel_id)
-
     iran_legacy_cleanup = ""
     exit_legacy_cleanup = ""
     if cfg:
@@ -308,7 +300,6 @@ async def _remove_owned_firewall(
     iptables -D INPUT -p tcp --dport {ports['exit_raw_receive_port']} -s {shlex.quote(cfg['iran_spoof_ip'])} -m comment --comment {shlex.quote(exit_comment)} -j ACCEPT || break
   done
 """
-
     await asyncio.gather(
         ci.run(
             f"""
@@ -348,16 +339,19 @@ true
     )
 
 
+async def _ingress_diag(conn, tunnel_id: int) -> str:
+    table = _ingress_table(tunnel_id)
+    result = await conn.run(
+        f"nft -a list table ip {shlex.quote(table)} 2>&1 || true",
+        check=False,
+        timeout=15,
+    )
+    return ((result.stdout or "") + "\n" + (result.stderr or ""))[-2000:]
+
+
 async def _reset_pair(ci, ce, rt: dict, cfg: dict | None = None) -> None:
     tunnel_id = int(rt["tunnel_id"])
-    await _remove_owned_firewall(
-        ci,
-        ce,
-        tunnel_id=tunnel_id,
-        rt=rt,
-        cfg=cfg,
-    )
-
+    await _remove_owned_firewall(ci, ce, tunnel_id=tunnel_id, rt=rt, cfg=cfg)
     await asyncio.gather(
         ci.run(
             f"""
@@ -393,6 +387,7 @@ async def _install_firewall(
     tunnel_id: int,
     rt: dict,
     cfg: dict,
+    iran_public: str,
     spoof_source_port: int,
 ) -> None:
     ports = _ports(tunnel_id, spoof_source_port)
@@ -402,7 +397,6 @@ async def _install_firewall(
     reverse_comment = f"TwinPanel-SPOOF-WG-{int(tunnel_id)}-REV"
     ingress_table = _ingress_table(tunnel_id)
     wireguard_prefixes = ", ".join(WIREGUARD_MESSAGE_PREFIXES)
-
     await asyncio.gather(
         run(
             ci,
@@ -413,7 +407,7 @@ nft -f - <<'NFT'
 table ip {ingress_table} {{
   chain prerouting {{
     type filter hook prerouting priority raw; policy accept;
-    ip saddr {cfg['exit_spoof_ip']} udp sport {ports['spoof_source_port']} udp dport {ports['iran_reverse_public_port']} @th,64,32 {{ {wireguard_prefixes} }} udp dport set {ports['iran_raw_receive_port']} udp checksum set 0 counter comment "{reverse_comment}"
+    ip saddr {cfg['exit_spoof_ip']} ip daddr {iran_public} udp sport {ports['spoof_source_port']} udp dport {ports['iran_reverse_public_port']} @th,64,32 {{ {wireguard_prefixes} }} udp dport set {ports['iran_raw_receive_port']} udp checksum set 0 counter comment "{reverse_comment}"
   }}
 }}
 NFT
@@ -464,7 +458,6 @@ async def _write_peer_runtime(
     ports = _ports(tunnel_id, spoof_source_port)
     helper = _helper_path(tunnel_id, role)
     iface = rt["interface"]
-
     if role == "iran":
         local_addr = rt["iran_addr"]
         peer_ip = rt["exit_ip"]
@@ -510,7 +503,6 @@ async def _write_peer_runtime(
             f"--recv-transport {SEND_TRANSPORT}"
         )
         service = rt["exit_service"]
-
     helper_text = f"""#!/bin/bash
 set -Eeuo pipefail
 ACTION="${{1:-up}}"
@@ -529,7 +521,6 @@ ip addr replace {shlex.quote(local_addr)} dev "$IFACE"
 ip link set dev "$IFACE" mtu {MTU} up
 sysctl -w "net.ipv4.conf.$IFACE.rp_filter=2" >/dev/null 2>&1 || true
 """
-
     unit = f"""[Unit]
 Description=TwinPanel Spoof WG {int(tunnel_id)} {role}
 Wants=network-online.target
@@ -552,7 +543,6 @@ NoNewPrivileges=true
 [Install]
 WantedBy=multi-user.target
 """
-
     await run(
         conn,
         f"""
@@ -576,7 +566,6 @@ async def install(tunnel_id: int, db: Session) -> dict:
     _, iran, exit_node = tunnel_nodes(db, tunnel_id)
     rt = dict(runtime(NAME, tunnel_id))
     rt["tunnel_id"] = int(tunnel_id)
-
     row = (
         db.query(__import__("app.models", fromlist=["TunnelTransport"]).TunnelTransport)
         .filter_by(tunnel_id=int(tunnel_id), transport=NAME)
@@ -586,7 +575,6 @@ async def install(tunnel_id: int, db: Session) -> dict:
     cfg = configuration_from_text(raw_config)
     if cfg is None:
         raise RuntimeError("spoof_wg_configuration_required")
-
     source_port_candidates = _source_port_candidates(raw_config)
     persisted_source_port = _persisted_source_port(raw_config)
     artifact_path, artifact_sha = _artifact()
@@ -603,7 +591,7 @@ async def install(tunnel_id: int, db: Session) -> dict:
             "mode": "shared-public-udp-stateless-nft",
             "public_port": REVERSE_INGRESS_PORT,
             "private_port": _ports(tunnel_id, source_port_candidates[0])["iran_raw_receive_port"],
-            "selector": "exit-ip+spoof-source-port+wireguard-message-prefix",
+            "selector": "exit-ip+iran-public-ip+spoof-source-port+wireguard-message-prefix",
             "hook": "prerouting",
             "priority": "raw",
         },
@@ -614,13 +602,7 @@ async def install(tunnel_id: int, db: Session) -> dict:
     }
     if persisted_source_port is not None:
         meta[SPOOF_SOURCE_PORT_META_KEY] = persisted_source_port
-    mark(
-        db,
-        tunnel_id,
-        NAME,
-        status="installing",
-        meta=json.dumps(meta, separators=(",", ":"), sort_keys=True),
-    )
+    mark(db, tunnel_id, NAME, status="installing", meta=json.dumps(meta, separators=(",", ":"), sort_keys=True))
 
     ci = ce = None
     try:
@@ -632,7 +614,6 @@ async def install(tunnel_id: int, db: Session) -> dict:
             copy_binary(ci, str(artifact_path), REMOTE_BINARY),
             copy_binary(ce, str(artifact_path), REMOTE_BINARY),
         )
-
         iran_key_path = _key_path(tunnel_id, "iran")
         exit_key_path = _key_path(tunnel_id, "exit")
         (iran_private, iran_public_key), (exit_private, exit_public_key) = await asyncio.gather(
@@ -640,28 +621,21 @@ async def install(tunnel_id: int, db: Session) -> dict:
             _keypair(ce, exit_key_path),
         )
         _ = iran_private, exit_private
-
         health = None
         selected_source_port = None
         source_port_attempts: list[int] = []
-
         for index, source_port in enumerate(source_port_candidates):
             source_port_attempts.append(source_port)
             await _reset_pair(ci, ce, rt, cfg)
-
-            # Install the stateless reverse ingress adapter before either relay
-            # emits traffic. Unmatched UDP/2053 continues untouched to TP27/FoU.
             await _install_firewall(
                 ci,
                 ce,
                 tunnel_id=int(tunnel_id),
                 rt=rt,
                 cfg=cfg,
+                iran_public=str(iran.public_ip),
                 spoof_source_port=source_port,
             )
-
-            # Exit must be able to receive the first spoofed WireGuard handshake
-            # before the Iran relay starts emitting it.
             await _write_peer_runtime(
                 ce,
                 role="exit",
@@ -687,28 +661,18 @@ async def install(tunnel_id: int, db: Session) -> dict:
                 exit_public=str(exit_node.public_ip),
                 spoof_source_port=source_port,
             )
-
             await asyncio.sleep(5.0)
             try:
-                health = await probe(
-                    ci,
-                    ce,
-                    name=NAME,
-                    tunnel_id=int(tunnel_id),
-                    rt=rt,
-                )
+                health = await probe(ci, ce, name=NAME, tunnel_id=int(tunnel_id), rt=rt)
             except RuntimeError as exc:
                 has_fallback = index + 1 < len(source_port_candidates)
                 if not str(exc).startswith("peer_ping_failed:") or not has_fallback:
                     raise
                 continue
-
             selected_source_port = source_port
             break
-
         if health is None or selected_source_port is None:
             raise RuntimeError("spoof_wg_source_port_qualification_failed")
-
         final_meta = {
             **meta,
             **health,
@@ -719,7 +683,7 @@ async def install(tunnel_id: int, db: Session) -> dict:
                 "mode": "shared-public-udp-stateless-nft",
                 "public_port": REVERSE_INGRESS_PORT,
                 "private_port": _ports(tunnel_id, selected_source_port)["iran_raw_receive_port"],
-                "selector": "exit-ip+spoof-source-port+wireguard-message-prefix",
+                "selector": "exit-ip+iran-public-ip+spoof-source-port+wireguard-message-prefix",
                 "hook": "prerouting",
                 "priority": "raw",
             },
@@ -745,13 +709,13 @@ async def install(tunnel_id: int, db: Session) -> dict:
             "upstream_version": UPSTREAM_VERSION,
             "xdp": False,
         }
-
     except Exception as exc:
         a = await diag(ci, rt["iran_service"], rt["interface"]) if ci else ""
         b = await diag(ce, rt["exit_service"], rt["interface"]) if ce else ""
+        c = await _ingress_diag(ci, int(tunnel_id)) if ci else ""
         message = (
             f"{type(exc).__name__}: {exc} | "
-            f"iran={a[-2200:]} | exit={b[-2200:]}"
+            f"iran={a[-2000:]} | exit={b[-2000:]} | reverse_ingress={c[-1500:]}"
         )
         if ci is not None and ce is not None:
             try:
@@ -760,6 +724,5 @@ async def install(tunnel_id: int, db: Session) -> dict:
                 pass
         mark(db, tunnel_id, NAME, status="failed", error=message)
         raise RuntimeError(message) from exc
-
     finally:
         await close_pair(ci, ce)
