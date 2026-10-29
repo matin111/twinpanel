@@ -6,13 +6,16 @@ on:
       - "backend/app/transport_candidates/spoof_wg.py"
       - "backend/app/transport_candidates/__init__.py"
       - "backend/app/spoof_candidate_policy_v202.py"
+      - "backend/app/spoof_underlay_guard_v206.py"
       - "backend/app/routers/modern_transports.py"
       - "backend/app/tunnel_transport_manager_v12.py"
       - "backend/tests/test_spoof_wg_v202.py"
       - "backend/tests/test_spoof_wg_v203.py"
       - "backend/tests/test_spoof_wg_v205_reverse_ingress.py"
+      - "backend/tests/test_spoof_v207_state.py"
       - "lib/modern-transport-api.ts"
       - "components/smart-transports-runtime-v25.tsx"
+      - "components/smart-transports-runtime-v27.tsx"
       - "third_party/spoof-tunnel/**"
       - ".github/workflows/publish-prebuilt-release.yml"
       - ".github/workflows/spoof-wg-v202.yml"
@@ -22,13 +25,16 @@ on:
       - "backend/app/transport_candidates/spoof_wg.py"
       - "backend/app/transport_candidates/__init__.py"
       - "backend/app/spoof_candidate_policy_v202.py"
+      - "backend/app/spoof_underlay_guard_v206.py"
       - "backend/app/routers/modern_transports.py"
       - "backend/app/tunnel_transport_manager_v12.py"
       - "backend/tests/test_spoof_wg_v202.py"
       - "backend/tests/test_spoof_wg_v203.py"
       - "backend/tests/test_spoof_wg_v205_reverse_ingress.py"
+      - "backend/tests/test_spoof_v207_state.py"
       - "lib/modern-transport-api.ts"
       - "components/smart-transports-runtime-v25.tsx"
+      - "components/smart-transports-runtime-v27.tsx"
       - "third_party/spoof-tunnel/**"
       - ".github/workflows/publish-prebuilt-release.yml"
       - ".github/workflows/spoof-wg-v202.yml"
@@ -51,11 +57,13 @@ jobs:
             backend/app/transport_candidates/spoof_wg.py \
             backend/app/transport_candidates/__init__.py \
             backend/app/spoof_candidate_policy_v202.py \
+            backend/app/spoof_underlay_guard_v206.py \
             backend/app/routers/modern_transports.py \
             backend/app/tunnel_transport_manager_v12.py \
             backend/tests/test_spoof_wg_v202.py \
             backend/tests/test_spoof_wg_v203.py \
-            backend/tests/test_spoof_wg_v205_reverse_ingress.py
+            backend/tests/test_spoof_wg_v205_reverse_ingress.py \
+            backend/tests/test_spoof_v207_state.py
 
       - name: Run source-contract regression
         run: |
@@ -66,6 +74,7 @@ jobs:
               "backend/tests/test_spoof_wg_v202.py",
               "backend/tests/test_spoof_wg_v203.py",
               "backend/tests/test_spoof_wg_v205_reverse_ingress.py",
+              "backend/tests/test_spoof_v207_state.py",
           )
           total = 0
           for path in paths:
