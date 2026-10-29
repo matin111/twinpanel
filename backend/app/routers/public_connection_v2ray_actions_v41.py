@@ -8,14 +8,50 @@ _MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_ACTIONS_V41"
 
 _CSS = r"""
 /* TWINPANEL_PUBLIC_CONNECT_V2RAY_ACTIONS_V41 */
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .v34-server-actions{
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-xray-profiles{
+  display:grid!important;
+  gap:9px!important;
+  width:100%!important;
+}
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-xray-profile{
+  display:grid!important;
+  gap:8px!important;
+  width:100%!important;
+  padding:10px!important;
+  border:1px solid var(--line)!important;
+  border-radius:12px!important;
+  background:var(--surface2)!important;
+}
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-profile-actions{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:7px!important;
+}
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-profile-actions>a,
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-profile-actions>button{
+  width:100%!important;
+  min-height:40px!important;
+}
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-profile-actions .tp-v48-hiddify{
+  border-color:var(--p)!important;
+  background:var(--p)!important;
+  color:#fff!important;
+}
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-profile-actions .copy-btn{
+  color:var(--p)!important;
+}
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .v34-server-actions[data-v41-duplicate="1"],
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] [data-v41-retired-actions="1"]{
+  display:none!important;
+}
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .v34-server-actions:not([data-v41-duplicate="1"]){
   display:grid!important;
   grid-template-columns:repeat(2,minmax(0,1fr))!important;
   gap:7px!important;
   margin-top:8px!important;
 }
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .v34-server-actions>a,
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .v34-server-actions>button{
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .v34-server-actions:not([data-v41-duplicate="1"])>a,
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .v34-server-actions:not([data-v41-duplicate="1"])>button{
   width:100%!important;
   min-height:40px!important;
 }
@@ -45,24 +81,55 @@ _SCRIPT = r"""
     return view.querySelector(':scope > .v34-server-actions');
   }
 
-  function purgeLegacyInteractiveBlocks(view,row){
-    [...view.children].forEach(child=>{
-      if(child===row)return;
-      const interactive=child.matches?.('a,button')||Boolean(child.querySelector?.('a,button'));
-      if(interactive)child.remove();
-    });
+  function profileRows(view){
+    return [...view.querySelectorAll(':scope > .tp-v48-xray-profiles > .tp-v48-xray-profile')];
+  }
 
-    view.querySelectorAll('a,button').forEach(node=>{
-      if(row.contains(node))return;
-      node.remove();
+  function retireDirectLegacyActions(view,row,profiles){
+    view.querySelectorAll(
+      ':scope > .action-row,'+
+      ':scope > .v13-modern-action,'+
+      ':scope > .v13-client-only,'+
+      ':scope > .v31-canonical-actions'
+    ).forEach(node=>{
+      if(node===row||profiles.includes(node))return;
+      node.dataset.v41RetiredActions='1';
+      node.setAttribute('aria-hidden','true');
     });
   }
 
-  function enforceTwoActions(view){
-    const row=canonicalRow(view);
+  function simplifyProfile(profile){
+    profile.removeAttribute('data-v40-retired-actions');
+    profile.removeAttribute('aria-hidden');
+    profile.removeAttribute('hidden');
+    profile.style.removeProperty('display');
+
+    const actions=profile.querySelector('.tp-v48-profile-actions');
+    if(!actions)return;
+
+    const primary=actions.querySelector('.tp-v48-hiddify');
+    const copy=actions.querySelector('.copy-btn[data-copy]');
+
+    [...actions.children].forEach(node=>{
+      if(node!==primary&&node!==copy)node.remove();
+    });
+
+    if(primary){
+      primary.textContent='ارسال به Hiddify';
+      primary.setAttribute('aria-label','ارسال این اتصال به Hiddify');
+    }
+    if(copy){
+      copy.textContent='کپی کانفیگ';
+      copy.setAttribute('aria-label','کپی کانفیگ این اتصال');
+    }
+
+    actions.dataset.v41ProfileActions='1';
+  }
+
+  function simplifyCanonicalFallback(view,row){
     if(!row)return;
 
-    purgeLegacyInteractiveBlocks(view,row);
+    row.removeAttribute('data-v41-duplicate');
     row.removeAttribute('aria-hidden');
     row.removeAttribute('hidden');
     row.style.removeProperty('display');
@@ -84,6 +151,34 @@ _SCRIPT = r"""
     }
 
     row.dataset.v41Canonical='1';
+    retireDirectLegacyActions(view,row,[]);
+  }
+
+  function simplifyServer(view){
+    const row=canonicalRow(view);
+    const profiles=profileRows(view);
+
+    if(profiles.length){
+      const wrapper=view.querySelector(':scope > .tp-v48-xray-profiles');
+      if(wrapper){
+        wrapper.removeAttribute('data-v40-retired-actions');
+        wrapper.removeAttribute('aria-hidden');
+        wrapper.removeAttribute('hidden');
+        wrapper.style.removeProperty('display');
+        wrapper.dataset.v41ProfileCount=String(profiles.length);
+      }
+
+      profiles.forEach(simplifyProfile);
+      retireDirectLegacyActions(view,row,profiles);
+
+      if(row){
+        row.dataset.v41Duplicate='1';
+        row.setAttribute('aria-hidden','true');
+      }
+      return;
+    }
+
+    simplifyCanonicalFallback(view,row);
   }
 
   function apply(){
@@ -91,7 +186,7 @@ _SCRIPT = r"""
     document.querySelectorAll('.protocol-panel').forEach(panel=>{
       if(panelKey(panel)!=='v2ray')return;
       panel.dataset.v41V2ray='1';
-      panel.querySelectorAll('.server-view').forEach(enforceTwoActions);
+      panel.querySelectorAll('.server-view').forEach(simplifyServer);
     });
   }
 
@@ -111,7 +206,7 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_v2ray_actions_v41(source: str) -> str:
-    """Keep exactly Send to Hiddify + Copy Config for V2Ray server cards."""
+    """Preserve every real Xray profile and keep exactly Hiddify + Copy Config per profile."""
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
