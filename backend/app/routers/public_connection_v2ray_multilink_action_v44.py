@@ -53,12 +53,8 @@ _SCRIPT = r"""
     return window.location.origin+'/v1/connect/'+encodeURIComponent(value)+'/sub/meta';
   }
 
-  function hiddifyUrl(url){
-    return 'hiddify://import/'+encodeURI(url)+'#TwinPanel-v2ray';
-  }
-
-  function directHiddifyUrl(uri,title){
-    return 'hiddify://import/'+encodeURIComponent(String(uri||''))+'#'+encodeURIComponent(String(title||'TwinPanel-V2Ray'));
+  function karingUrl(url,title){
+    return 'karing://install-config?url='+encodeURIComponent(String(url||''))+'&name='+encodeURIComponent(String(title||'TwinPanel V2Ray'));
   }
 
   function fallbackCopy(value){
@@ -117,8 +113,8 @@ _SCRIPT = r"""
     actions.appendChild(copyButton);
 
     if(String(profile?.uri||'').trim()){
-      const send=el('a','', 'Hiddify');
-      send.href=directHiddifyUrl(profile.uri,title);
+      const send=el('a','', 'Karing');
+      send.href=karingUrl(profile.uri,title);
       send.rel='noopener noreferrer';
       actions.appendChild(send);
     }
@@ -196,10 +192,10 @@ _SCRIPT = r"""
       if(!actions)return;
 
       const send=document.createElement('a');
-      send.className='v38-primary v44-v2ray-multi-hiddify';
-      send.textContent='ارسال همه به Hiddify';
-      send.href=hiddifyUrl(url);
-      send.setAttribute('aria-label','ارسال همه کانفیگ‌های V2Ray به Hiddify');
+      send.className='v38-primary v44-v2ray-multi-karing';
+      send.textContent='ارسال همه به Karing';
+      send.href=karingUrl(url,'TwinPanel V2Ray');
+      send.setAttribute('aria-label','ارسال همه کانفیگ‌های V2Ray به Karing');
 
       const copyButton=document.createElement('button');
       copyButton.type='button';
@@ -227,7 +223,7 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_v2ray_multilink_action_v44(source: str) -> str:
-    """Wire V2Ray Multi-Link to all profiles and render grouped profile details."""
+    """Wire V2Ray Multi-Link to Karing while preserving all real profiles and grouped details."""
     if _MARKER in source:
         return source
     source = source.replace("</style>", _CSS + "\n</style>", 1)
