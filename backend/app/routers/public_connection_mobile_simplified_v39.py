@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .public_connection_mobile_authority_v40 import refine_public_connection_mobile_authority_v40
+
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_MOBILE_SIMPLIFIED_V39"
 
@@ -163,7 +165,7 @@ _SCRIPT = r"""
 
 def refine_public_connection_mobile_simplified_v39(source: str) -> str:
     """Show every real mobile protocol and keep only the two canonical V2Ray actions."""
-    if _MARKER in source:
-        return source
-    source = source.replace("</style>", _CSS + "\n</style>", 1)
-    return source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
+    if _MARKER not in source:
+        source = source.replace("</style>", _CSS + "\n</style>", 1)
+        source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
+    return refine_public_connection_mobile_authority_v40(source)
