@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from . import smart_transport_auto_v21 as smart
 from .database import get_db
 from .deps import require_admin
+from .manual_transport_benchmark_v351 import benchmark_transport_explicit_v351
 from .models import Tunnel, TunnelTransport
 from .routers import tunnel_managed
 from .routers.modern_transports import router
@@ -171,9 +172,40 @@ async def _fresh_transport_probe(
             detail="Tunnel or transport changed during health probe",
         )
 
+    benchmark = None
+    benchmark_error = None
+    benchmark_attempted = bool((health or {}).get("ok"))
+    if benchmark_attempted:
+        try:
+            benchmark = await benchmark_transport_explicit_v351(
+                int(tunnel_id),
+                int(row.id),
+            )
+        except Exception as exc:
+            # Health and throughput are independent acceptance layers. A bounded
+            # speed-test failure must never demote an otherwise healthy path or
+            # change production authority.
+            benchmark_error = (str(exc) or type(exc).__name__)[:1800]
+
+        db.expire_all()
+        tunnel = db.get(Tunnel, int(tunnel_id))
+        row = (
+            db.query(TunnelTransport)
+            .filter(
+                TunnelTransport.tunnel_id == int(tunnel_id),
+                TunnelTransport.transport == name,
+            )
+            .first()
+        )
+        if tunnel is None or row is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Tunnel or transport changed during benchmark",
+            )
+
     return {
         "ok": bool((health or {}).get("ok")),
-        "marker": "TWINPANEL_TRANSPORT_CARD_PROBE_V266",
+        "marker": "TWINPANEL_TRANSPORT_CARD_PROBE_V351",
         "tunnel_id": int(tunnel.id),
         "transport": name,
         "mode": tunnel.mode,
@@ -189,6 +221,9 @@ async def _fresh_transport_probe(
             else None
         ),
         "health": dict(health or {}),
+        "benchmark_attempted": benchmark_attempted,
+        "benchmark": benchmark,
+        "benchmark_error": benchmark_error,
     }
 
 
@@ -279,6 +314,6 @@ def apply_tp27_repair_api_v265() -> None:
 
     _applied = True
     print(
-        f"{MARKER}_ACTIVE endpoints=transport-probe,tp27-diagnose,tp27-repair,tp27-rebuild legacy-managed-repair-fenced=1 fou_quarantine=v303",
+        f"{MARKER}_ACTIVE endpoints=transport-probe,tp27-diagnose,tp27-repair,tp27-rebuild legacy-managed-repair-fenced=1 fou_quarantine=v303 explicit-benchmark=v351",
         flush=True,
     )
