@@ -202,26 +202,6 @@ _SCRIPT = r"""
     return window.location.origin+'/v1/connect/'+encodeURIComponent(value)+'/multi/'+encodeURIComponent(protocol);
   }
 
-  async function subscriptionCount(protocol){
-    const url=subscriptionUrl(protocol);if(!url)return 0;
-    try{
-      const response=await fetch(url,{cache:'no-store',headers:{Accept:'text/plain'}});
-      if(!response.ok)return 0;
-      const encoded=String(await response.text()).trim();if(!encoded)return 0;
-      const decoded=atob(encoded.replace(/\s+/g,''));
-      return decoded.split(/\r?\n/).map(row=>row.trim()).filter(Boolean).length;
-    }catch(_error){return 0}
-  }
-
-  async function multiMeta(protocol){
-    const url=multiUrl(protocol);if(!url)return null;
-    try{
-      const response=await fetch(url+'/meta',{cache:'no-store',headers:{Accept:'application/json'}});
-      if(!response.ok)return null;
-      return await response.json();
-    }catch(_error){return null}
-  }
-
   function fallbackCopy(value){
     const area=document.createElement('textarea');
     area.value=String(value||'');area.readOnly=true;area.style.position='fixed';area.style.left='-9999px';
@@ -275,6 +255,10 @@ _SCRIPT = r"""
       return 'karing://install-config?url='+encodeURIComponent(url)+'&name='+encodeURIComponent('TwinPanel '+protocol);
     }
     return'';
+  }
+
+  function serverCount(panel){
+    return panel.querySelectorAll('.server-views .server-view').length;
   }
 
   function allCard(panel,protocol,url,count,kind){
@@ -339,27 +323,26 @@ _SCRIPT = r"""
     return card;
   }
 
-  async function build(panel){
-    if(panel.dataset.v38Requested==='1')return;
+  function build(panel){
+    if(panel.dataset.v38Ready==='1')return;
     const protocol=panelKey(panel);if(!MULTI.has(protocol))return;
-    panel.dataset.v38Requested='1';
 
     panel.querySelectorAll('.v37-multi-card,.v38-all-card,.v38-server-list-title').forEach(node=>node.remove());
 
-    if(SUBSCRIPTIONS.has(protocol)){
-      const url=subscriptionUrl(protocol);
-      const count=await subscriptionCount(protocol);
-      if(!url||count<=0){delete panel.dataset.v38Requested;return}
-      allCard(panel,protocol,url,count,'subscription');
-      panel.dataset.v38Ready='1';
-      return;
-    }
+    const count=serverCount(panel);
+    if(count<=0)return;
 
-    const url=multiUrl(protocol);
-    const meta=await multiMeta(protocol);
-    const count=Number(meta?.node_count||0);
-    if(!url||!meta||count<=0){delete panel.dataset.v38Requested;return}
-    allCard(panel,protocol,url,count,String(meta.kind||''));
+    const subscription=SUBSCRIPTIONS.has(protocol);
+    const url=subscription?subscriptionUrl(protocol):multiUrl(protocol);
+    if(!url)return;
+
+    allCard(
+      panel,
+      protocol,
+      url,
+      count,
+      subscription?'subscription':(NATIVE_BUNDLES.has(protocol)?'bundle':'multi')
+    );
     panel.dataset.v38Ready='1';
   }
 
@@ -367,7 +350,7 @@ _SCRIPT = r"""
     document.body.classList.add('v38-reference');
     document.body.dataset.tpPublicReference='v38';
     document.querySelectorAll('.v37-multi-card').forEach(node=>node.remove());
-    document.querySelectorAll('.protocol-panel').forEach(panel=>{void build(panel)});
+    document.querySelectorAll('.protocol-panel').forEach(build);
   }
 
   apply();
@@ -380,7 +363,7 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_reference_layout_v38(source: str) -> str:
-    """Render the reference HA/Multi Server card using existing proven delivery authorities."""
+    """Render the reference HA/Multi Server card without eager API fan-out."""
     if _MARKER in source:
         return source
     source = source.replace("</style>", _CSS + "\n</style>", 1)
