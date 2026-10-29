@@ -5,11 +5,17 @@ on:
     paths:
       - 'backend/app/routers/public_connection_forward_v34.py'
       - 'backend/app/routers/public_connection_canonical_mobile_v26.py'
-      - 'backend/app/routers/public_connection_all_multilink_v34.py'
-      - 'backend/app/routers/public_connection_app_download_v34.py'
-      - 'backend/app/routers/public_connection_forward_mount_v34.py'
+      - 'backend/app/routers/public_connection_device_actions_v11.py'
       - 'backend/app/routers/public_connection_modern_delivery_v13.py'
+      - 'backend/app/routers/public_connection_modern_import_v15.py'
+      - 'backend/app/routers/public_connection_modern_delivery_v16.py'
+      - 'backend/app/routers/public_connection_protocol_actions_v20.py'
+      - 'backend/app/routers/public_connection_protocol_subscriptions_v30.py'
+      - 'backend/app/xray_public_hub_profiles_v48.py'
+      - 'backend/app/routers/public_connection_all_multilink_v34.py'
+      - 'backend/app/routers/public_connection_forward_mount_v34.py'
       - 'backend/tests/smoke_public_connection_forward_v34.py'
+      - 'backend/tests/smoke_public_connection_forward_v34_matrix.py'
       - '.github/workflows/public-connect-forward-v34-smoke.yml'
   push:
     branches:
@@ -17,11 +23,17 @@ on:
     paths:
       - 'backend/app/routers/public_connection_forward_v34.py'
       - 'backend/app/routers/public_connection_canonical_mobile_v26.py'
-      - 'backend/app/routers/public_connection_all_multilink_v34.py'
-      - 'backend/app/routers/public_connection_app_download_v34.py'
-      - 'backend/app/routers/public_connection_forward_mount_v34.py'
+      - 'backend/app/routers/public_connection_device_actions_v11.py'
       - 'backend/app/routers/public_connection_modern_delivery_v13.py'
+      - 'backend/app/routers/public_connection_modern_import_v15.py'
+      - 'backend/app/routers/public_connection_modern_delivery_v16.py'
+      - 'backend/app/routers/public_connection_protocol_actions_v20.py'
+      - 'backend/app/routers/public_connection_protocol_subscriptions_v30.py'
+      - 'backend/app/xray_public_hub_profiles_v48.py'
+      - 'backend/app/routers/public_connection_all_multilink_v34.py'
+      - 'backend/app/routers/public_connection_forward_mount_v34.py'
       - 'backend/tests/smoke_public_connection_forward_v34.py'
+      - 'backend/tests/smoke_public_connection_forward_v34_matrix.py'
       - '.github/workflows/public-connect-forward-v34-smoke.yml'
 
 jobs:
@@ -29,5 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run V34 all-protocol presentation smoke
+      - name: Run V34 presentation authority smoke
         run: python3 backend/tests/smoke_public_connection_forward_v34.py
+      - name: Run 15-protocol x 4-platform regression matrix
+        run: python3 backend/tests/smoke_public_connection_forward_v34_matrix.py
