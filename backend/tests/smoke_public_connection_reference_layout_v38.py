@@ -41,32 +41,55 @@ def main() -> None:
     require(js_set(v38, "SUBSCRIPTIONS") == EXPECTED_SUBSCRIPTIONS,
             "V38 legacy subscription authority set drifted")
 
-    # Restore exactly the reference pattern: all-servers first, then app/single-server content.
-    require("title.textContent='همه سرورها'" in v38, "all-servers title missing")
+    # Exact reference structure: HA heading -> Multi Server row -> client -> individual servers.
+    require("headingText.textContent='High Availability Config'" in v38,
+            "reference HA heading missing")
+    require("label.textContent='Multi Server'" in v38, "reference Multi Server row missing")
+    require("shield.textContent='🛡️'" in v38 and "globe.textContent='🌐'" in v38,
+            "reference HA visual markers missing")
+    require("badge.textContent=protocolTitle(panel,protocol)" in v38,
+            "protocol badge missing from HA card")
+    require("title.textContent='همه سرورها'" in v38,
+            "accessible Persian all-servers label missing")
     require("panel.querySelector('.panel-head')?.insertAdjacentElement('afterend',card)" in v38,
-            "all-servers card must be inserted immediately after the protocol heading")
-    require(".v38-all-card" in v38, "V38 all-servers card styling missing")
+            "HA card must be inserted immediately after the protocol heading")
+    require("listTitle.textContent='سرورهای تکی'" in v38,
+            "individual-server section label missing")
+    require(".v38-all-card" in v38 and ".v38-multi-row" in v38,
+            "reference HA card styling missing")
     require(".v37-multi-card" in v38, "V37 duplicate multilink retirement missing")
 
-    # The four proven subscription protocols must use their existing /sub authority, not V37's replacement.
+    # Keep the proven source of truth: the four subscription protocols use /sub.
     require("+'/sub/'+" in v38, "V38 does not restore existing subscription endpoint")
     require("subscriptionCount(protocol)" in v38, "V38 does not validate existing subscription content")
-    require("کپی لینک اشتراک" in v38, "subscription copy action missing")
-    require("افزودن همه به " in v38, "subscription app import action missing")
+    require("کپی لینک اشتراک" in v38, "subscription copy accessibility contract missing")
+    require("افزودن همه به " in v38, "subscription app import accessibility contract missing")
 
-    # Remaining multi-capable protocols keep the V34 all-protocol endpoint.
+    # Remaining multi-capable protocols keep the V34 /multi authority and real meta count.
     require("+'/multi/'+" in v38, "V38 all-protocol multilink endpoint missing")
     require("url+'/meta'" in v38, "V38 must verify all-protocol multilink metadata")
-    require("دانلود همه کانفیگ‌ها" in v38, "native multi bundle action missing")
-    require("کپی لینک همه سرورها" in v38, "multi copy action missing")
+    require("const count=Number(meta?.node_count||0)" in v38,
+            "V38 must use backend node_count rather than DOM server-card count")
+    require("views.length+' سرور'" not in v38,
+            "V38 must not infer multilink count from DOM server views")
+    require("دانلود همه کانفیگ‌ها" in v38, "native multi bundle accessibility contract missing")
+    require("کپی لینک همه سرورها" in v38, "multi copy accessibility contract missing")
 
-    # V36 remains the accordion authority; V38 only makes its final state visually authoritative.
+    # Customer-facing labels match the reference screenshot while preserving accessible detail.
+    require("link('دانلود همه'" in v38, "reference native bundle label missing")
+    require("link('افزودن همه'" in v38, "reference import label missing")
+    require("button('کپی لینک'" in v38, "reference copy label missing")
+    require("button('کپی مولتی‌لینک'" in v38, "fallback multilink label missing")
+
+    # V36 remains accordion authority; V38 makes the final compact state authoritative.
     require(".protocol-panel.v36-open{display:block!important}" in v38,
-            "V38 does not preserve one-open-protocol mobile accordion")
+            "V38 does not preserve one-open-protocol responsive accordion")
     require(".protocol-panel{display:none!important}" in v38,
-            "V38 mobile panels are not collapsed by default")
+            "V38 responsive panels are not collapsed by default")
+    require("v36-mobile-compact" in v38,
+            "V38 reference compact styling must follow V36 responsive state")
 
-    # Never delete the actual per-server or client content while restoring the reference card.
+    # Keep existing client and individual-server content; V38 only refines presentation.
     for forbidden_dom in (
         "querySelectorAll('.server-view').forEach(node=>node.remove())",
         "querySelectorAll('.server-views').forEach(node=>node.remove())",
@@ -83,7 +106,7 @@ def main() -> None:
     require("MutationObserver" not in v38, "V38 must not install a DOM observer")
     require("setInterval" not in v38, "V38 must not poll")
 
-    print("PUBLIC_CONNECT_REFERENCE_LAYOUT_V38_SMOKE=PASS")
+    print("PUBLIC_CONNECT_REFERENCE_HA_V38_SMOKE=PASS")
 
 
 if __name__ == "__main__":
