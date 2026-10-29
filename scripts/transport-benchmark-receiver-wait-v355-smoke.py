@@ -2,27 +2,15 @@
 from __future__ import annotations
 
 import asyncio
-import os
+import importlib.util
 import sys
+import types
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "backend"))
-
-os.environ.setdefault("APP_SECRET_KEY", "v355-smoke-secret-key-000000000000")
-os.environ.setdefault(
-    "DATABASE_URL",
-    "postgresql+psycopg2://twinpanel:twinpanel@127.0.0.1:5432/twinpanel",
-)
-os.environ.setdefault(
-    "NODE_AGENT_SHARED_SECRET",
-    "v355-smoke-node-agent-secret-000000000000",
-)
-os.environ.setdefault("REDIS_URL", "redis://127.0.0.1:6379/0")
-
-from app import smart_transport_auto_v21 as smart  # noqa: E402
-from app import transport_benchmark_receiver_wait_v355 as v355  # noqa: E402
+APP_DIR = ROOT / "backend" / "app"
+PATCH_PATH = APP_DIR / "transport_benchmark_receiver_wait_v355.py"
 
 
 class Result:
@@ -30,6 +18,49 @@ class Result:
         self.stdout = stdout
         self.stderr = stderr
         self.exit_status = exit_status
+
+
+# Load V355 against a deliberately tiny fake SmartAuto module. The regression
+# test exercises only the benchmark result-collection contract and therefore
+# does not need SQLAlchemy, PostgreSQL, Redis or SSH dependencies.
+app_pkg = types.ModuleType("app")
+app_pkg.__path__ = [str(APP_DIR)]
+sys.modules["app"] = app_pkg
+
+smart = types.ModuleType("app.smart_transport_auto_v21")
+smart.BENCHMARK_STREAMS = 4
+smart.BENCHMARK_SECONDS = 3.0
+smart.BENCHMARK_MAX_BYTES = 64 * 1024 * 1024
+
+
+async def placeholder_run(conn, command: str, timeout: int = 12):
+    return Result()
+
+
+async def placeholder_wait_ready(conn, logfile: str) -> bool:
+    return True
+
+
+async def placeholder_one_direction(*args, **kwargs):
+    return 1.0
+
+
+smart._run = placeholder_run
+smart._wait_ready = placeholder_wait_ready
+smart._one_direction = placeholder_one_direction
+smart.RECEIVER_CODE = "print('READY', flush=True)"
+smart.SENDER_CODE = "print('TX_MBPS=1.0', flush=True)"
+sys.modules["app.smart_transport_auto_v21"] = smart
+setattr(app_pkg, "smart_transport_auto_v21", smart)
+
+spec = importlib.util.spec_from_file_location(
+    "app.transport_benchmark_receiver_wait_v355",
+    PATCH_PATH,
+)
+assert spec is not None and spec.loader is not None
+v355 = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = v355
+spec.loader.exec_module(v355)
 
 
 async def delayed_result_case() -> None:
@@ -69,7 +100,7 @@ async def delayed_result_case() -> None:
         )
         assert abs(value - 14.010) < 0.0001, value
         assert polls == 4, polls
-        assert any(command.startswith("rm -f ") for command in calls), calls
+        assert sum(command.startswith("rm -f ") for command in calls) >= 2, calls
     finally:
         smart._run = old_run
         smart._wait_ready = old_wait_ready
@@ -125,21 +156,33 @@ async def bounded_timeout_case() -> None:
         v355.RESULT_WAIT_SECONDS = old_wait
 
 
+async def patch_activation_case() -> None:
+    original = smart._one_direction
+    v355._applied = False
+    v355._original_one_direction = None
+    v355.apply_transport_benchmark_receiver_wait_v355()
+    assert smart._one_direction is v355._one_direction_v355
+    assert v355._original_one_direction is original
+
+
 async def main() -> None:
     await delayed_result_case()
     await bounded_timeout_case()
+    await patch_activation_case()
 
-    source = (ROOT / "backend/app/transport_benchmark_receiver_wait_v355.py").read_text(
-        encoding="utf-8"
-    )
+    source = PATCH_PATH.read_text(encoding="utf-8")
     assert "RESULT_WAIT_SECONDS = 3.0" in source
     assert "RESULT_POLL_INTERVAL_SECONDS = 0.25" in source
-    assert "route" not in source.lower().split("def apply_transport_benchmark_receiver_wait_v355", 1)[1]
+    assert "systemctl" not in source
+    assert "iptables" not in source
+    assert "nft " not in source
+    assert "ip route" not in source
+    assert "wg set" not in source
 
-    manual = (ROOT / "backend/app/manual_transport_benchmark_v351.py").read_text(
+    manual = (APP_DIR / "manual_transport_benchmark_v351.py").read_text(
         encoding="utf-8"
     )
-    manager = (ROOT / "backend/app/tunnel_transport_manager_v12.py").read_text(
+    manager = (APP_DIR / "tunnel_transport_manager_v12.py").read_text(
         encoding="utf-8"
     )
     assert "apply_transport_benchmark_receiver_wait_v355()" in manual
