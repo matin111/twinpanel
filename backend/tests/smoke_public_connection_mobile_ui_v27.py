@@ -66,15 +66,23 @@ assert "v30-single-servers" in v30
 assert "سرورهای تکی" in v30
 assert "کپی لینک اشتراک" in v30
 
+# V31 is final authority for both phone and desktop actions.
 assert "TWINPANEL_PUBLIC_CONNECT_UNIFIED_ACTIONS_V31" in v31
-assert "اتصال به Karing" in v31
-assert "باز کردن در برنامه" in v31
-assert "کپی لینک" in v31
+assert "detectPlatform" in v31
+assert "currentClientLink" in v31
+assert "return links[0]" not in v31
+assert "برنامه مناسب دستگاه شما" in v31
+assert "'اتصال به '+" in v31
+assert "کپی لینک اتصال" in v31
 assert "دانلود کانفیگ" in v31
 assert "v31-client-card" in v31
+assert "v31-canonical-actions" in v31
 assert "data-v13-platform" in v31
-assert "node.removeAttribute('data-tp-copy-target')" in v31
-assert "panel.querySelectorAll('.v13-app,.v13-client-only')" in v31
+assert ".mobile-send-btn" in v31
+assert "primeSubscriptionPanels" in v31
+assert "panel.classList.add('v24-canonical-panel')" in v31
+assert "normalizeSubscriptionCard" in v31
+assert "panel.querySelectorAll('.v13-app,.v13-client-only,.mobile-send-btn,.v9-icon-btn.mobile')" in v31
 assert "کپی کانفیگ" not in v31
 
 print("PUBLIC_CONNECTION_MOBILE_UI_V27_V31_SMOKE=PASS")
