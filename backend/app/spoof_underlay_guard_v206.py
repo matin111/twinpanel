@@ -14,7 +14,7 @@ from .transport_candidates.common import mark
 
 
 # ============================================================
-# TWINPANEL SPOOF UNDERLAY GUARD V206
+# TWINPANEL SPOOF UNDERLAY GUARD V206 + QUARANTINE FAILFAST V207
 #
 # Production Tunnel #8 proved a specific failure shape:
 #   * Spoof forward carrier reaches Exit;
@@ -22,13 +22,21 @@ from .transport_candidates.common import mark
 #   * the Iran-owned reverse ingress nft counter remains at zero;
 #   * TP27 Fast / Kernel VXLAN remain healthy and authoritative.
 #
-# This layer does NOT alter framing, ports, payloads, TP27 or VXLAN. It only
-# classifies that evidence as an underlay incompatibility, persists the evidence,
-# and quarantines the failed Spoof candidate so selection stays fail-closed.
-# Explicit administrator install remains available after conditions change.
+# V206 classifies that evidence as an underlay incompatibility, persists the
+# evidence, and quarantines the failed Spoof candidate so selection stays
+# fail-closed.
+#
+# V207 makes that quarantine operational for explicit install/repair too. While
+# the exact V206 underlay quarantine is still active, a repeated Spoof install
+# is rejected before the original installer opens SSH connections or mutates any
+# node runtime. This prevents the same known-incompatible dataplane attempt from
+# repeatedly restarting services while TP27/VXLAN are already healthy.
+#
+# This layer does NOT alter framing, ports, payloads, TP27 or VXLAN.
 # ============================================================
 
 MARKER = "TWINPANEL_SPOOF_UNDERLAY_GUARD_V206"
+FAILFAST_MARKER = "TWINPANEL_SPOOF_QUARANTINE_FAILFAST_V207"
 UNDERLAY_REASON = "underlay_incompatible:reverse_carrier_not_reaching_iran"
 UNDERLAY_QUARANTINE_SECONDS = 24 * 60 * 60
 
@@ -75,6 +83,67 @@ def classify_spoof_install_failure(message: str) -> str | None:
     if _ZERO_INGRESS_RE.search(text) is None:
         return None
     return UNDERLAY_REASON
+
+
+def active_underlay_quarantine(
+    row: TunnelTransport | None,
+    *,
+    now_epoch: float | None = None,
+) -> dict | None:
+    """Return the active V206 block without mutating DB or node runtime."""
+
+    if row is None or str(row.transport or "").strip().lower() != spoof_wg.NAME:
+        return None
+
+    cfg = _meta_dict(row.config_text)
+    smart = cfg.get("smart_auto_v21")
+    guard = cfg.get("spoof_underlay_guard_v206")
+    if not isinstance(smart, dict) or not isinstance(guard, dict):
+        return None
+
+    reason = str(smart.get("quarantine_reason") or "").strip()
+    if reason != UNDERLAY_REASON:
+        return None
+    if guard.get("blocked") is not True or str(guard.get("reason") or "") != reason:
+        return None
+
+    try:
+        until = float(smart.get("quarantine_until_epoch") or 0.0)
+    except (TypeError, ValueError):
+        return None
+
+    now = time.time() if now_epoch is None else float(now_epoch)
+    remaining = max(0, int(until - now))
+    if remaining <= 0:
+        return None
+
+    return {
+        "blocked": True,
+        "transport": spoof_wg.NAME,
+        "reason": reason,
+        "quarantine_until_epoch": until,
+        "retry_after_seconds": remaining,
+        "authority_unchanged": True,
+        "action": "fail_fast_before_node_mutation",
+        "version": 207,
+    }
+
+
+def active_underlay_quarantine_for_tunnel(
+    db: Session,
+    tunnel_id: int,
+    *,
+    now_epoch: float | None = None,
+) -> dict | None:
+    row = (
+        db.query(TunnelTransport)
+        .filter(
+            TunnelTransport.tunnel_id == int(tunnel_id),
+            TunnelTransport.transport == spoof_wg.NAME,
+        )
+        .first()
+    )
+    return active_underlay_quarantine(row, now_epoch=now_epoch)
 
 
 def _persist_underlay_guard(
@@ -139,6 +208,16 @@ def _persist_underlay_guard(
 async def _guarded_spoof_install(tunnel_id: int, db: Session) -> dict:
     if _original_install is None:
         raise RuntimeError("spoof_underlay_guard_original_installer_missing")
+
+    active_block = active_underlay_quarantine_for_tunnel(db, int(tunnel_id))
+    if active_block is not None:
+        raise RuntimeError(
+            "spoof_underlay_quarantined:"
+            f"{active_block['reason']}:"
+            f"retry_after_seconds={active_block['retry_after_seconds']}:"
+            "authority_unchanged=true"
+        )
+
     try:
         return await _original_install(int(tunnel_id), db)
     except RuntimeError as exc:
@@ -173,5 +252,11 @@ def apply_spoof_underlay_guard_v206() -> None:
         f"reason={UNDERLAY_REASON} "
         f"quarantine_seconds={UNDERLAY_QUARANTINE_SECONDS} "
         "scope=spoof_wg_only tp27=unchanged vxlan=unchanged",
+        flush=True,
+    )
+    print(
+        f"{FAILFAST_MARKER}_ACTIVE "
+        "explicit_install=blocked_during_active_underlay_quarantine "
+        "node_mutation=none authority=unchanged",
         flush=True,
     )
