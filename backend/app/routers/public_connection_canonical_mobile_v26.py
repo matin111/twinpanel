@@ -109,4 +109,4 @@ def refine_public_connection_canonical_mobile_v26(source: str) -> str:
     source = refine_public_connection_mobile_ui_v27(source)
     source = refine_public_connection_mobile_v28(source)
     source = refine_public_connection_presentation_v29(source)
-    return refine_public_connection_protocol_subscriptions_v30(source, token="__TOKEN_FROM_HUB__")
+    return refine_public_connection_protocol_subscriptions_v30(source)
