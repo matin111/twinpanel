@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+from . import public_connection_all_multilink_v34 as multilink
+from . import public_connection_modern_delivery_v13 as modern_delivery
 from .public_connection_mobile_sheet_v42 import refine_public_connection_mobile_sheet_v42
 from .public_connection_v2ray_multilink_v43 import apply_v2ray_multilink_v43
 
 
 apply_v2ray_multilink_v43()
+# V2Ray's customer-facing canonical client is Karing. Keep this policy adjacent
+# to the final V2Ray presentation layer so metadata, download card and actions
+# cannot drift back to the historical Hiddify default.
+modern_delivery.CLIENTS["v2ray"] = modern_delivery._KARING
+multilink.PROTOCOL_CLIENT["v2ray"] = "karing"
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_ACTIONS_V41"
 
