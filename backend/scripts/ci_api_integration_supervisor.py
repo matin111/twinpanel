@@ -70,6 +70,7 @@ SMOKE_COMMANDS = (
     (sys.executable, "-m", "scripts.managed_relay_recovery_v20_smoke"),
     (sys.executable, "-m", "scripts.public_direct_tuning_v19_smoke"),
     (sys.executable, "-m", "scripts.transport_policy_v16_smoke"),
+    (sys.executable, "tests/spoof_health_guard_v211_smoke.py"),
     (sys.executable, "tests/outbound_performance_v261_smoke.py"),
     (sys.executable, "tests/outbound_performance_v262_smoke.py"),
     (sys.executable, "scripts/api_core_smoke.py"),
