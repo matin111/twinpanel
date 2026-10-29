@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.352",
+  "version": "1.1.0-rc.353",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T19:06:33Z",
+  "released_at": "2026-10-29T19:28:29Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "a3c431be1ea80f0f9db166b34c89fa07e00ded18",
+  "source_sha": "e1b9a0510aaf8bbdab0f20c0b09c367ee81829a0",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.352/twinpanel-1.1.0-rc.352-linux-x86_64.tar.gz",
-    "sha256": "9745d910d09a83f332844c57dae2d144891a700c9ca05f237efa8a6e3bdb695a",
-    "size_bytes": 28620565
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.353/twinpanel-1.1.0-rc.353-linux-x86_64.tar.gz",
+    "sha256": "3dfe6aed3c2f3e932bb24c16c5ec984888d7c744da05948914b3dc2612d44ee5",
+    "size_bytes": 28624413
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.352 رابط Public Connect را برای موبایل ساده و قابل‌فهم می‌کند. در V41 داخل کارت هر سرور V2Ray/Xray تمام اکشن‌های قدیمی و تکراری حذف می‌شوند و فقط «ارسال به Hiddify» و «کپی کانفیگ» باقی می‌مانند؛ کارت دانلود برنامه Hiddify حفظ می‌شود. در V42 با لمس پروتکل روی موبایل، همان پنل واقعی سرورها به‌صورت Bottom Sheet / Popup روی صفحه باز می‌شود و دیگر پایین فهرست پروتکل‌ها expand نمی‌شود. Desktop دست‌نخورده می‌ماند. این تغییر فقط presentation/UI است و هیچ تغییری در dataplane، Tunnel، TP27، VXLAN، Spoof، Accounting، quota، provisioning، credential generation، routing یا firewall ایجاد نمی‌کند. Source candidate روی SHA immutable a3c431be1ea80f0f9db166b34c89fa07e00ded18 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.352 simplifies the Public Connect mobile experience. V41 removes legacy and duplicate V2Ray/Xray per-server action surfaces so only Send to Hiddify and Copy Config remain, while preserving the Hiddify client download card. V42 opens the selected protocol's real server panel as a mobile bottom-sheet popup instead of expanding it inline below the protocol grid. Desktop remains unchanged. This is presentation/UI only and does not change dataplane, Tunnel, TP27, VXLAN, Spoof, Accounting, quota, provisioning, credential generation, routing or firewall behavior. The candidate source is pinned to immutable SHA a3c431be1ea80f0f9db166b34c89fa07e00ded18."
+    "fa": "TwinPanel 1.1.0-rc.353 اصلاح Public Connect برای V2Ray/Xray است. سه اتصال واقعی مشتری یعنی WebSocket TLS، XHTTP Reality و TCP ساده دوباره کامل حفظ و نمایش داده می‌شوند. داخل هر اتصال فقط دو اکشن لازم «ارسال به Hiddify» و «کپی کانفیگ» باقی می‌ماند؛ ردیف عمومی تکراری فقط وقتی پروفایل‌های واقعی وجود دارند مخفی می‌شود. دانلود برنامه Hiddify و Bottom Sheet موبایل V42 حفظ می‌شوند. این تغییر فقط presentation/UI است و هیچ تغییری در dataplane، Tunnel، TP27، VXLAN، Spoof، Accounting، quota، provisioning، credential generation، routing یا firewall ایجاد نمی‌کند. Source candidate روی SHA immutable e1b9a0510aaf8bbdab0f20c0b09c367ee81829a0 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.353 fixes Public Connect for V2Ray/Xray. The three real customer connection profiles—WebSocket TLS, XHTTP Reality, and TCP simple—are preserved and displayed again. Each profile keeps only the two required actions, Send to Hiddify and Copy Config; the generic duplicate row is hidden only when real profiles are present. The Hiddify client download card and V42 mobile bottom sheet are preserved. This is presentation/UI only and does not change dataplane, Tunnel, TP27, VXLAN, Spoof, Accounting, quota, provisioning, credential generation, routing or firewall behavior. The candidate source is pinned to immutable SHA e1b9a0510aaf8bbdab0f20c0b09c367ee81829a0."
   }
 }
