@@ -2,8 +2,8 @@ from __future__ import annotations
 
 # Preserve legacy V30 endpoints for backward compatibility, and mount V34's
 # all-protocol multi-server/direct-download routes before the public router is
-# included by Hub Live. Presentation itself is owned by V34 plus the additive
-# V36 mobile compact refinement below.
+# included by Hub Live. V34 remains the data/action builder; V36 owns responsive
+# accordion state and V37 is the final presentation cleanup/multilink authority.
 from . import public_connection_protocol_subscriptions_mount_v30 as _public_connection_protocol_subscriptions_mount_v30  # noqa: F401
 from . import public_connection_forward_mount_v34 as _public_connection_forward_mount_v34  # noqa: F401
 from .public_connection_forward_v34 import refine_public_connection_forward_v34
@@ -12,6 +12,9 @@ from .public_connection_manual_credentials_v35 import (
 )
 from .public_connection_mobile_compact_v36 import (
     refine_public_connection_mobile_compact_v36,
+)
+from .public_connection_final_presentation_v37 import (
+    refine_public_connection_final_presentation_v37,
 )
 
 
@@ -91,13 +94,13 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_canonical_mobile_v26(source: str) -> str:
-    """Keep phone cleanup guarded, hoist shared manual credentials, then use V34."""
+    """Compose canonical Public Connect presentation without changing delivery state."""
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
     source = refine_public_connection_manual_credentials_v35(source)
-    # V36 is inserted before V34 so existing V34 remains the canonical final
-    # data/action authority. V36 schedules one post-render pass that only removes
-    # retired Smart Connect presentation and owns phone accordion state.
+    # V36 binds the responsive accordion before V34 builds customer actions.
     source = refine_public_connection_mobile_compact_v36(source)
-    return refine_public_connection_forward_v34(source)
+    source = refine_public_connection_forward_v34(source)
+    # V37 runs last: restore all-protocol multilinks and remove presentation noise.
+    return refine_public_connection_final_presentation_v37(source)

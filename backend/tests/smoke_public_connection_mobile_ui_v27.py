@@ -10,6 +10,8 @@ V30_MOUNT = ROOT / "app" / "routers" / "public_connection_protocol_subscriptions
 V31 = ROOT / "app" / "routers" / "public_connection_unified_actions_v31.py"
 V32 = ROOT / "app" / "routers" / "public_connection_platform_guard_v32.py"
 V34 = ROOT / "app" / "routers" / "public_connection_forward_v34.py"
+V36 = ROOT / "app" / "routers" / "public_connection_mobile_compact_v36.py"
+V37 = ROOT / "app" / "routers" / "public_connection_final_presentation_v37.py"
 
 
 v26 = V26.read_text(encoding="utf-8")
@@ -20,6 +22,8 @@ v30_mount = V30_MOUNT.read_text(encoding="utf-8")
 v31 = V31.read_text(encoding="utf-8")
 v32 = V32.read_text(encoding="utf-8")
 v34 = V34.read_text(encoding="utf-8")
+v36 = V36.read_text(encoding="utf-8")
+v37 = V37.read_text(encoding="utf-8")
 
 
 # Historical refiners remain available for rollback/reference, but none may be
@@ -33,9 +37,6 @@ assert "TWINPANEL_PUBLIC_CONNECT_PLATFORM_GUARD_V32" in v32
 assert "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26" in v26
 assert "public_connection_protocol_subscriptions_mount_v30" in v26
 assert "public_connection_forward_mount_v34" in v26
-assert "isPhone()" in v26
-assert "platform==='android'||platform==='ios'" in v26
-assert "!isPhone()||!window.matchMedia(MOBILE).matches" in v26
 
 retired_imports = (
     "from .public_connection_mobile_ui_v27 import",
@@ -58,13 +59,38 @@ retired_calls = (
 for value in retired_calls:
     assert value not in v26, value
 
-# Only one new final authority is permitted after guarded V26 cleanup.
+# Current composition contract: V36 owns responsive accordion state, V34 builds
+# canonical actions from existing sources, V37 is the final customer-facing
+# presentation authority and restores all-protocol multilinks.
 assert "TWINPANEL_PUBLIC_CONNECT_FORWARD_V34" in v34
+assert "TWINPANEL_PUBLIC_CONNECT_MOBILE_COMPACT_V36" in v36
+assert "TWINPANEL_PUBLIC_CONNECT_FINAL_PRESENTATION_V37" in v37
 assert "from .public_connection_forward_v34 import refine_public_connection_forward_v34" in v26
-assert "return refine_public_connection_forward_v34(source)" in v26
+assert "from .public_connection_mobile_compact_v36 import" in v26
+assert "from .public_connection_final_presentation_v37 import" in v26
+
+v36_call = v26.index("source = refine_public_connection_mobile_compact_v36(source)")
+v34_call = v26.index("source = refine_public_connection_forward_v34(source)")
+v37_return = v26.index("return refine_public_connection_final_presentation_v37(source)")
+assert v36_call < v34_call < v37_return, (v36_call, v34_call, v37_return)
+
+# Responsive accordion is viewport-owned; narrow browser acceptance and real
+# mobile share the same collapsed/open behaviour without changing V11 platform
+# semantics used by client selection.
+assert "function isCompact()" in v36
+assert "window.matchMedia(MOBILE).matches" in v36
+assert "const PHONE=" not in v36
+assert "panel.classList.add('active','v36-open')" in v36
+assert "event.stopImmediatePropagation()" in v36
 
 # Old V30 backend endpoints remain available independently.
 assert "public_connection_multilink_v7_router.include_router" in v30_mount
 assert "public_connection_protocol_subscriptions_v30_router" in v30_mount
 
-print("PUBLIC_CONNECTION_SINGLE_V34_COMPOSITION=PASS")
+# V37 restores the existing V34 all-protocol multi route as presentation while
+# V30 stays available for backward compatibility.
+assert "+'/multi/'+" in v37
+assert "v37-multi-card" in v37
+assert "کپی لینک همه سرورها" in v37
+
+print("PUBLIC_CONNECTION_V37_COMPOSITION=PASS")

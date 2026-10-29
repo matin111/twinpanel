@@ -6,12 +6,14 @@ ROUTERS = ROOT / "app" / "routers"
 
 v11 = (ROUTERS / "public_connection_device_actions_v11.py").read_text(encoding="utf-8")
 v26 = (ROUTERS / "public_connection_canonical_mobile_v26.py").read_text(encoding="utf-8")
+v36 = (ROUTERS / "public_connection_mobile_compact_v36.py").read_text(encoding="utf-8")
+v37 = (ROUTERS / "public_connection_final_presentation_v37.py").read_text(encoding="utf-8")
 hub = (ROUTERS / "public_connection_hub_live_v5.py").read_text(encoding="utf-8")
 mount = (ROUTERS / "public_connection_protocol_subscriptions_mount_v30.py").read_text(encoding="utf-8")
 v30 = (ROUTERS / "public_connection_protocol_subscriptions_v30.py").read_text(encoding="utf-8")
 
 
-# Device detection stays owned by the established upstream authority.
+# Device detection stays owned by the established upstream authority for app/client semantics.
 for platform in ("windows", "macos", "android", "ios", "linux"):
     assert platform in v11, platform
 assert "function detectPlatform()" in v11
@@ -20,8 +22,6 @@ assert "body.classList.toggle('tp-phone-actions',phoneActions)" in v11
 assert "body.classList.toggle('tp-desktop-device',!phoneActions)" in v11
 
 
-# The live route still executes the real delivery/device pipeline and reaches
-# V26. V34 is composed inside V26 so the hub never regains a stacked chain.
 required_hub_calls = (
     "refine_public_connection_device_actions_v11(source)",
     "refine_public_connection_windows_v12(source)",
@@ -39,14 +39,23 @@ positions = [hub.index(call) for call in required_hub_calls]
 assert positions == sorted(positions), positions
 
 
-# V26 remains phone-gated. Narrow Windows must not enter its cleanup, then one
-# explicit V34 authority owns the final customer presentation.
+# V26 still keeps the legacy real-phone cleanup guard, while V36 adds the
+# responsive accordion and V37 is the final presentation/multilink authority.
 assert "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26" in v26
 assert "function isPhone()" in v26
 assert "platform==='android'||platform==='ios'" in v26
 assert "!isPhone()||!window.matchMedia(MOBILE).matches" in v26
 assert "refine_public_connection_forward_v34" in v26
-assert "return refine_public_connection_forward_v34(source)" in v26
+assert "refine_public_connection_mobile_compact_v36" in v26
+assert "refine_public_connection_final_presentation_v37" in v26
+
+v36_call = v26.index("source = refine_public_connection_mobile_compact_v36(source)")
+v34_call = v26.index("source = refine_public_connection_forward_v34(source)")
+v37_return = v26.index("return refine_public_connection_final_presentation_v37(source)")
+assert v36_call < v34_call < v37_return
+assert "function isCompact()" in v36
+assert "window.matchMedia(MOBILE).matches" in v36
+assert "+'/multi/'+" in v37
 
 retired_presentation_symbols = (
     "refine_public_connection_mobile_ui_v27",
@@ -60,8 +69,8 @@ for symbol in retired_presentation_symbols:
     assert symbol not in v26, symbol
 
 
-# Preserve old V30 endpoint compatibility while V34 adds the new all-protocol
-# route surface separately.
+# Preserve V30 endpoint compatibility while V37 makes the existing V34 multi
+# route customer-visible again.
 assert "public_connection_protocol_subscriptions_mount_v30" in v26
 assert "public_connection_forward_mount_v34" in v26
 assert "public_connection_multilink_v7_router.include_router" in mount
@@ -69,6 +78,8 @@ assert "public_connection_protocol_subscriptions_v30_router" in mount
 assert '@router.get(' in v30
 assert '"/{token}/sub/{protocol}"' in v30
 assert 'SUPPORTED_PROTOCOLS = ("v2ray", "hysteria2", "tuic", "anytls")' in v30
+assert "v37-multi-card" in v37
+assert "کپی لینک همه سرورها" in v37
 
 
 print("PUBLIC_CONNECTION_PRESENTATION_RESET_V33_SMOKE=PASS")

@@ -10,11 +10,9 @@ _CSS = r"""
 .smart-card{display:none!important}
 
 @media(max-width:720px){
-  /* Phone presentation is device-gated. Narrow desktop remains desktop. */
-  body.v24-ready.v36-mobile-compact[data-tp-platform="android"] .protocols,
-  body.v24-ready.v36-mobile-compact[data-tp-platform="ios"] .protocols,
-  body.v36-mobile-compact[data-tp-platform="android"] .protocols,
-  body.v36-mobile-compact[data-tp-platform="ios"] .protocols{
+  /* Responsive mobile presentation is viewport-owned so browser/mobile preview
+   * and real phones share exactly the same accordion behaviour. */
+  body.v36-mobile-compact .protocols{
     display:grid!important;
     grid-template-columns:repeat(2,minmax(0,1fr))!important;
     gap:7px!important;
@@ -22,52 +20,40 @@ _CSS = r"""
     padding:0!important;
   }
 
-  body.v36-mobile-compact[data-tp-platform="android"] .protocol-choice,
-  body.v36-mobile-compact[data-tp-platform="ios"] .protocol-choice{
+  body.v36-mobile-compact .protocol-choice{
     width:100%!important;
     min-height:62px!important;
   }
 
-  /* All protocol details start collapsed. Only the user-selected protocol opens. */
-  body.v24-ready.v36-mobile-compact[data-tp-platform="android"] .protocol-panel,
-  body.v24-ready.v36-mobile-compact[data-tp-platform="ios"] .protocol-panel,
-  body.v36-mobile-compact[data-tp-platform="android"] .protocol-panel,
-  body.v36-mobile-compact[data-tp-platform="ios"] .protocol-panel{
+  /* All protocol details start collapsed. Only the selected protocol opens. */
+  body.v36-mobile-compact .protocol-panel{
     display:none!important;
     margin-top:8px!important;
   }
 
-  body.v24-ready.v36-mobile-compact[data-tp-platform="android"] .protocol-panel.v36-open,
-  body.v24-ready.v36-mobile-compact[data-tp-platform="ios"] .protocol-panel.v36-open,
-  body.v36-mobile-compact[data-tp-platform="android"] .protocol-panel.v36-open,
-  body.v36-mobile-compact[data-tp-platform="ios"] .protocol-panel.v36-open{
+  body.v36-mobile-compact .protocol-panel.v36-open{
     display:block!important;
   }
 
-  body.v36-mobile-compact[data-tp-platform="android"] .server-tabs,
-  body.v36-mobile-compact[data-tp-platform="ios"] .server-tabs{
+  body.v36-mobile-compact .server-tabs{
     display:none!important;
   }
 
-  body.v36-mobile-compact[data-tp-platform="android"] .server-views,
-  body.v36-mobile-compact[data-tp-platform="ios"] .server-views{
+  body.v36-mobile-compact .server-views{
     display:grid!important;
     grid-template-columns:1fr!important;
     gap:8px!important;
     padding:8px!important;
   }
 
-  body.v36-mobile-compact[data-tp-platform="android"] .server-view,
-  body.v36-mobile-compact[data-tp-platform="ios"] .server-view{
+  body.v36-mobile-compact .server-view{
     display:block!important;
     margin:0!important;
   }
 
-  /* V34's nested long-list fold is intentionally retired: protocol tap is the fold. */
-  body.v36-mobile-compact[data-tp-platform="android"] .v34-mobile-servers,
-  body.v36-mobile-compact[data-tp-platform="ios"] .v34-mobile-servers,
-  body.v36-mobile-compact[data-tp-platform="android"] .v34-single-label,
-  body.v36-mobile-compact[data-tp-platform="ios"] .v34-single-label{
+  /* Protocol tap is the only fold; retire V34's nested server-list fold. */
+  body.v36-mobile-compact .v34-mobile-servers,
+  body.v36-mobile-compact .v34-single-label{
     display:none!important;
   }
 }
@@ -77,23 +63,21 @@ _CSS = r"""
 _SCRIPT = r"""
 <script id="twinpanelPublicConnectMobileCompactV36">
 (function(){
-  const PHONE=new Set(['android','ios']);
   const MOBILE='(max-width:720px)';
   const body=document.body;
-  let initialized=false;
+  let compactInitialized=false;
   let resizeTimer=null;
 
-  function platform(){
-    return String(body?.dataset?.tpPlatform||document.documentElement?.dataset?.tpPlatform||'unknown')
-      .trim().toLowerCase();
-  }
-
-  function isPhone(){
-    return PHONE.has(platform())&&window.matchMedia(MOBILE).matches;
+  function isCompact(){
+    return window.matchMedia(MOBILE).matches;
   }
 
   function removeSmartConnect(){
-    document.querySelectorAll('.smart-card').forEach(node=>node.remove());
+    document.querySelectorAll('.smart-card,.smart-empty').forEach(node=>node.remove());
+    document.querySelectorAll('.section-head').forEach(node=>{
+      const heading=String(node.querySelector('h2')?.textContent||'').trim();
+      if(heading==='اتصال هوشمند')node.remove();
+    });
     document.querySelectorAll('button,a').forEach(node=>{
       if(String(node.textContent||'').trim()!=='اتصال هوشمند')return;
       const smart=node.closest('.smart-card');
@@ -117,11 +101,32 @@ _SCRIPT = r"""
   }
 
   function closeAll(){
-    document.querySelectorAll('.protocol-choice').forEach(choice=>choice.classList.remove('active'));
+    document.querySelectorAll('.protocol-choice').forEach(choice=>{
+      choice.classList.remove('active');
+      choice.setAttribute('aria-expanded','false');
+    });
     document.querySelectorAll('.protocol-panel').forEach(panel=>{
       panel.classList.remove('active','v36-open');
       panel.setAttribute('aria-hidden','true');
     });
+  }
+
+  function restoreDesktop(){
+    body.classList.remove('v36-mobile-compact');
+    delete body.dataset.tpMobileCompact;
+    const panels=[...document.querySelectorAll('.protocol-panel')];
+    if(!panels.some(panel=>panel.classList.contains('active'))){
+      const firstChoice=document.querySelector('.protocol-choice');
+      const firstPanel=panelFor(firstChoice);
+      if(firstChoice&&firstPanel){
+        firstChoice.classList.add('active');
+        firstChoice.setAttribute('aria-expanded','true');
+        firstPanel.classList.add('active');
+        firstPanel.classList.remove('v36-open');
+        firstPanel.setAttribute('aria-hidden','false');
+      }
+    }
+    compactInitialized=false;
   }
 
   function bindChoice(choice){
@@ -129,14 +134,13 @@ _SCRIPT = r"""
     choice.dataset.v36Bound='1';
     choice.setAttribute('aria-expanded','false');
     choice.addEventListener('click',event=>{
-      if(!isPhone())return;
+      if(!isCompact())return;
       event.preventDefault();
       event.stopImmediatePropagation();
       const panel=panelFor(choice);
       if(!panel)return;
       const wasOpen=panel.classList.contains('v36-open');
       closeAll();
-      document.querySelectorAll('.protocol-choice[data-v36-bound="1"]').forEach(node=>node.setAttribute('aria-expanded','false'));
       if(wasOpen)return;
       choice.classList.add('active');
       choice.setAttribute('aria-expanded','true');
@@ -147,8 +151,8 @@ _SCRIPT = r"""
 
   function apply(){
     removeSmartConnect();
-    if(!isPhone()){
-      body.classList.remove('v36-mobile-compact');
+    if(!isCompact()){
+      restoreDesktop();
       return;
     }
 
@@ -159,16 +163,16 @@ _SCRIPT = r"""
     const choices=[...document.querySelectorAll('.protocol-choice')];
     choices.forEach(bindChoice);
 
-    if(!initialized){
+    if(!compactInitialized){
       closeAll();
-      choices.forEach(choice=>choice.setAttribute('aria-expanded','false'));
-      initialized=true;
+      compactInitialized=true;
     }
   }
 
   apply();
   window.setTimeout(apply,0);
   window.setTimeout(apply,180);
+  window.setTimeout(apply,650);
 
   window.addEventListener('resize',()=>{
     clearTimeout(resizeTimer);
@@ -182,7 +186,7 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_mobile_compact_v36(source: str) -> str:
-    """Retire Smart Connect and make phone protocol cards the only server-list accordion."""
+    """Retire Smart Connect and make the responsive mobile view a protocol accordion."""
     if _MARKER in source:
         return source
     source = source.replace("</style>", _CSS + "\n</style>", 1)

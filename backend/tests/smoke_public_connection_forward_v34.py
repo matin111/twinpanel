@@ -6,6 +6,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 V34 = ROOT / "backend/app/routers/public_connection_forward_v34.py"
+V36 = ROOT / "backend/app/routers/public_connection_mobile_compact_v36.py"
+V37 = ROOT / "backend/app/routers/public_connection_final_presentation_v37.py"
 V26 = ROOT / "backend/app/routers/public_connection_canonical_mobile_v26.py"
 V11 = ROOT / "backend/app/routers/public_connection_device_actions_v11.py"
 V13 = ROOT / "backend/app/routers/public_connection_modern_delivery_v13.py"
@@ -18,6 +20,10 @@ MULTI = ROOT / "backend/app/routers/public_connection_all_multilink_v34.py"
 MOUNT = ROOT / "backend/app/routers/public_connection_forward_mount_v34.py"
 
 PROVEN_SUBSCRIPTIONS = ("v2ray", "hysteria2", "tuic", "anytls")
+MULTI_PROTOCOLS = (
+    "openvpn", "wireguard", "v2ray", "hysteria2", "tuic", "anytls", "naive",
+    "shadowtls", "snell", "mieru", "trusttunnel", "amneziawg", "sudoku",
+)
 CANONICAL_PROTOCOLS = (
     "cisco", "openvpn", "wireguard", "l2tp", "v2ray",
     "hysteria2", "tuic", "anytls", "naive", "shadowtls",
@@ -60,6 +66,8 @@ def js_set(source: str, variable: str) -> tuple[str, ...]:
 
 def main() -> None:
     v34 = V34.read_text(encoding="utf-8")
+    v36 = V36.read_text(encoding="utf-8")
+    v37 = V37.read_text(encoding="utf-8")
     v26 = V26.read_text(encoding="utf-8")
     v11 = V11.read_text(encoding="utf-8")
     v13 = V13.read_text(encoding="utf-8")
@@ -72,8 +80,16 @@ def main() -> None:
     mount = MOUNT.read_text(encoding="utf-8")
 
     require("TWINPANEL_PUBLIC_CONNECT_FORWARD_V34" in v34, "V34 marker missing")
-    require("return refine_public_connection_forward_v34(source)" in v26, "V34 is not final authority")
+    require("TWINPANEL_PUBLIC_CONNECT_MOBILE_COMPACT_V36" in v36, "V36 marker missing")
+    require("TWINPANEL_PUBLIC_CONNECT_FINAL_PRESENTATION_V37" in v37, "V37 marker missing")
     require("public_connection_protocol_subscriptions_mount_v30" in v26, "V30 endpoint mount lost")
+
+    # V36 owns responsive accordion, V34 builds canonical actions, V37 is final UI.
+    v36_call = v26.find("source = refine_public_connection_mobile_compact_v36(source)")
+    v34_call = v26.find("source = refine_public_connection_forward_v34(source)")
+    v37_return = v26.find("return refine_public_connection_final_presentation_v37(source)")
+    require(v36_call >= 0 and v34_call > v36_call and v37_return > v34_call,
+            "V36 -> V34 -> V37 composition order drifted")
 
     for old in (
         "refine_public_connection_mobile_ui_v27(source)",
@@ -89,15 +105,14 @@ def main() -> None:
     modern = assigned_tuple(v13, "MODERN_PROTOCOLS")
     require(classic + modern == CANONICAL_PROTOCOLS, "15-protocol inventory drifted")
 
-    # V11 owns platform detection. V34 only consumes its data attribute.
+    # V11 remains client/platform authority. Responsive layout itself is V36-owned.
     require("body.dataset.tpPlatform=platform" in v11, "V11 platform data attribute missing")
     require("navigator.userAgentData" not in v34, "V34 duplicated V11 UA detection")
     require("navigator.userAgent||" not in v34, "V34 duplicated V11 UA detection")
     require("dataset?.tpPlatform" in v34, "V34 does not consume V11 platform data")
-    require('body.v34-ready[data-tp-platform="android"]' in v34, "Android phone guard missing")
-    require('body.v34-ready[data-tp-platform="ios"]' in v34, "iOS phone guard missing")
-    require('body.v34-ready[data-tp-platform="windows"] .server-tabs' not in v34,
-            "narrow Windows must keep desktop semantics")
+    require("function isCompact()" in v36, "V36 responsive layout authority missing")
+    require("window.matchMedia(MOBILE).matches" in v36, "V36 viewport guard missing")
+    require("const PHONE=" not in v36, "V36 must not gate compact layout by Android/iOS UA")
 
     # V13 is the sole client mapping authority; V34 must not invent a second map.
     require("CLIENTS as V13_CLIENTS" in v34, "V34 does not import V13 CLIENTS")
@@ -105,30 +120,34 @@ def main() -> None:
     require("const CLIENTS={" not in v34, "hard-coded V34 client map returned")
     require("دانلود '+client.name" in v34, "one protocol-level client download missing")
 
-    # V30 is the only subscription authority and only its proven cohort is shown.
+    # V30 legacy subscription endpoints stay exactly the proven four-protocol cohort.
     require(assigned_tuple(v30, "SUPPORTED_PROTOCOLS") == PROVEN_SUBSCRIPTIONS,
             "V30 proven subscription cohort changed")
     require(js_set(v34, "SUBSCRIPTIONS") == PROVEN_SUBSCRIPTIONS,
-            "V34 subscription cohort must match V30 exactly")
-    require("+'/sub/'+" in v34, "V34 does not use the V30 subscription endpoint")
-    require("+'/multi/'+" not in v34, "V34 presentation must not use synthetic all-protocol multi links")
-    require("کپی لینک اشتراک" in v34, "subscription copy label missing")
-    require("افزودن همه به " in v34, "subscription app import label missing")
+            "V34 subscription source cohort must match V30 exactly")
+    require("+'/sub/'+" in v34, "V34 does not retain V30 subscription source")
 
-    # Existing V34 multi backend may remain mounted for backward compatibility,
-    # but it is no longer a customer-facing subscription authority.
-    require('"/{token}/multi/{protocol}"' in multi, "legacy V34 multi route unexpectedly removed")
-    require("public_connection_all_multilink_v34_router" in mount, "legacy V34 multi route mount lost")
+    # Existing V34 multi backend is now intentionally customer-visible again via V37.
+    require(assigned_tuple(multi, "MULTI_PROTOCOLS") == MULTI_PROTOCOLS,
+            "V34 all-protocol multi backend drifted")
+    require('"/{token}/multi/{protocol}"' in multi, "V34 multi route unexpectedly removed")
+    require("public_connection_all_multilink_v34_router" in mount, "V34 multi route mount lost")
+    require(set(js_set(v37, "MULTI")) == set(MULTI_PROTOCOLS), "V37 multilink cohort drifted")
+    require("+'/multi/'+" in v37, "V37 does not expose existing multilink route")
+    require("کپی لینک همه سرورها" in v37, "V37 multilink copy action missing")
+    require("دانلود همه کانفیگ‌ها" in v37, "V37 native bundle action missing")
+    require("افزودن همه به " in v37, "V37 compatible-client multi import missing")
 
     # Canonical data/action sources remain intact and are consumed, not regenerated.
     require("standard_share_uri" in v15, "V15 standard share URI source missing")
     require("_resolve_delivery_content" in v16, "V16 lossless config source missing")
     require("refine_public_connection_protocol_actions_v20" in v20, "V20 classic action source missing")
     require("TWINPANEL_XRAY_PUBLIC_HUB_PROFILES_V48" in v48, "V48 Xray action source missing")
-    for forbidden in ("db.add(", "db.commit(", "ProtocolCredential(", "credential_generation"):
-        require(forbidden not in v34, f"presentation must not mutate credentials: {forbidden}")
+    for source in (v34, v36, v37):
+        for forbidden in ("db.add(", "db.commit(", "ProtocolCredential(", "credential_generation"):
+            require(forbidden not in source, f"presentation must not mutate credentials: {forbidden}")
 
-    # Beginner-facing action semantics and dedupe.
+    # Beginner-facing action semantics and dedupe remain in the V34 action builder.
     require("کپی کانفیگ" not in v34, "beginner UI must not expose copy-config")
     require("کپی لینک اتصال" in v34, "single-server link copy action missing")
     require("دانلود کانفیگ" in v34, "file config download action missing")
@@ -137,25 +156,23 @@ def main() -> None:
     require("view.querySelectorAll('.v34-server-actions').forEach" in v34,
             "server action idempotence missing")
     require("cleanupPanel(panel)" in v34, "panel idempotence cleanup missing")
-    require("MutationObserver" not in v34, "V34 must not use MutationObserver")
-    require("setTimeout(apply" not in v34, "V34 must not stack delayed presentation passes")
+    require("MutationObserver" not in v34 and "MutationObserver" not in v36 and "MutationObserver" not in v37,
+            "presentation must not use MutationObserver")
 
-    # Mobile uses a vertical server list and collapses only when the list is long.
-    require("views.length>3" in v34, "mobile long-list collapse threshold missing")
-    require("v34-mobile-servers" in v34, "mobile server details container missing")
-    require("سرورهای تکی" in v34, "single-server section label missing")
+    # Compact view is a protocol accordion, with no nested server fold.
+    require("panel.classList.add('active','v36-open')" in v36, "compact open state missing")
+    require("const wasOpen=panel.classList.contains('v36-open')" in v36, "toggle-close state missing")
+    require("event.stopImmediatePropagation()" in v36, "legacy click isolation missing")
+    require("v34-mobile-servers" in v36, "V34 nested fold cleanup missing")
 
-    # Legacy containers stay data sources but not final presentation.
-    for selector in (
-        ".v13-client-only",
-        ".v13-modern-action",
-        ".server-view>.action-row",
-        ".mobile-send-btn",
-        ".multi-link-card",
-    ):
-        require(selector in v34, f"legacy source hide missing for {selector}")
+    # V37 removes duplicate V30 presentation and extra Smart/section helper copy.
+    require(".v34-subscription-card{display:none!important}" in v37,
+            "V37 must retire competing V30 subscription card presentation")
+    require("heading==='اتصال هوشمند'" in v37, "Smart Connect heading cleanup missing")
+    require("node.querySelectorAll('small,p').forEach(extra=>extra.remove())" in v37,
+            "section helper copy cleanup missing")
 
-    print("PUBLIC_CONNECT_FORWARD_V34_SMOKE=PASS")
+    print("PUBLIC_CONNECT_FORWARD_V34_V37_SMOKE=PASS")
 
 
 if __name__ == "__main__":
