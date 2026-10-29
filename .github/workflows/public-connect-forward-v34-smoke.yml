@@ -8,6 +8,7 @@ on:
       - 'backend/app/routers/public_connection_mobile_compact_v36.py'
       - 'backend/app/routers/public_connection_final_presentation_v37.py'
       - 'backend/app/routers/public_connection_reference_layout_v38.py'
+      - 'backend/app/routers/public_connection_mobile_simplified_v39.py'
       - 'backend/app/routers/public_connection_device_actions_v11.py'
       - 'backend/app/routers/public_connection_modern_delivery_v13.py'
       - 'backend/app/routers/public_connection_modern_import_v15.py'
@@ -22,6 +23,7 @@ on:
       - 'backend/tests/smoke_public_connection_mobile_compact_v36.py'
       - 'backend/tests/smoke_public_connection_final_presentation_v37.py'
       - 'backend/tests/smoke_public_connection_reference_layout_v38.py'
+      - 'backend/tests/smoke_public_connection_mobile_simplified_v39.py'
       - '.github/workflows/public-connect-forward-v34-smoke.yml'
   push:
     branches:
@@ -32,6 +34,7 @@ on:
       - 'backend/app/routers/public_connection_mobile_compact_v36.py'
       - 'backend/app/routers/public_connection_final_presentation_v37.py'
       - 'backend/app/routers/public_connection_reference_layout_v38.py'
+      - 'backend/app/routers/public_connection_mobile_simplified_v39.py'
       - 'backend/app/routers/public_connection_device_actions_v11.py'
       - 'backend/app/routers/public_connection_modern_delivery_v13.py'
       - 'backend/app/routers/public_connection_modern_import_v15.py'
@@ -46,6 +49,7 @@ on:
       - 'backend/tests/smoke_public_connection_mobile_compact_v36.py'
       - 'backend/tests/smoke_public_connection_final_presentation_v37.py'
       - 'backend/tests/smoke_public_connection_reference_layout_v38.py'
+      - 'backend/tests/smoke_public_connection_mobile_simplified_v39.py'
       - '.github/workflows/public-connect-forward-v34-smoke.yml'
 
 jobs:
@@ -63,3 +67,5 @@ jobs:
         run: python3 backend/tests/smoke_public_connection_final_presentation_v37.py
       - name: Run V38 reference layout and multilink restore smoke
         run: python3 backend/tests/smoke_public_connection_reference_layout_v38.py
+      - name: Run V39 mobile all-protocol and V2Ray simplification smoke
+        run: python3 backend/tests/smoke_public_connection_mobile_simplified_v39.py
