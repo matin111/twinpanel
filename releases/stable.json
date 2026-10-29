@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.341",
+  "version": "1.1.0-rc.342",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T15:57:46Z",
+  "released_at": "2026-10-29T16:07:29Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "318d4b9328803a6700fc1216b1d177fcb3715ba9",
+  "source_sha": "a0b93b472a84ae3ac8568d4635fcfb46ceeb4d57",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.341/twinpanel-1.1.0-rc.341-linux-x86_64.tar.gz",
-    "sha256": "5e2b9e8b9a940d8988002e465c76719023072b46ec9c4bc4cd603a94fdc07434",
-    "size_bytes": 28589697
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.342/twinpanel-1.1.0-rc.342-linux-x86_64.tar.gz",
+    "sha256": "6d501678a0c227281a034f580e05c723648ed2077009b266338b740c1452e9cc",
+    "size_bytes": 28587837
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.341 اصلاح Public Connect V36 را منتشر می‌کند. در این نسخه Smart Connect از presentation عمومی حذف شده و روی Android/iOS کارت هر پروتکل به accordion واحد لیست سرورها تبدیل شده است: همه پروتکل‌ها در شروع بسته‌اند، با لمس یک پروتکل فقط همان بخش باز می‌شود، با لمس دوباره بسته می‌شود و با باز کردن پروتکل دیگر، قبلی بسته می‌شود. fold داخلی اضافی V34 برای mobile حذف شده تا دو لایه باز/بسته روی هم وجود نداشته باشد. رفتار Windows/Desktop، authority داده و actionهای V34، subscription cohort V30 و client mapping V13 حفظ شده‌اند. این تغییر presentation-only است و TP27، VXLAN، Tunnel، Spoof، Accounting، quota، provisioning، credential generation، routing، firewall و dataplane پروتکل‌ها را تغییر نمی‌دهد. Source candidate روی SHA immutable 318d4b9328803a6700fc1216b1d177fcb3715ba9 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.341 ships Public Connect V36. Smart Connect is retired from the public presentation, and on Android/iOS each protocol card becomes the single server-list accordion: all protocols start collapsed, tapping one opens only that protocol, tapping it again closes it, and opening another protocol closes the previous one. The extra V34 mobile inner fold is removed to avoid nested expand/collapse layers. Windows/Desktop behavior, V34 data/action authority, the V30 subscription cohort, and V13 client mapping are preserved. This is presentation-only and does not change TP27, VXLAN, Tunnel, Spoof, Accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplanes. The candidate source is pinned to immutable SHA 318d4b9328803a6700fc1216b1d177fcb3715ba9."
+    "fa": "TwinPanel 1.1.0-rc.342 اصلاح Spoof V218 را منتشر می‌کند. Root Cause واقعی Tunnel #8 این بود که source-policy rule مربوط به Spoof با priority تاریخی 330xx بعد از rule اصلی Linux با priority 32766 ارزیابی می‌شد؛ در نتیجه ترافیک bind شده به 10.250.0.33 به‌جای tpsp8 از default route اصلی Iran روی eth0 خارج می‌شد و هیچ packetی به NAT/FORWARD سمت Exit نمی‌رسید. V218 route-table تاریخی 330xx را حفظ می‌کند اما فقط RPDB rule مربوط به Spoof را به باند اختصاصی 28000-28899 قبل از main منتقل می‌کند و rule قدیمی 330xx را پیش از qualification پاک می‌کند. V217 scoped ICMP echo حفظ شده و TP27، VXLAN و shared V179 probe تغییر نکرده‌اند. Source candidate روی SHA immutable a0b93b472a84ae3ac8568d4635fcfb46ceeb4d57 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.342 ships Spoof V218. The production Tunnel #8 root cause was an RPDB ordering bug: the historical Spoof source-policy rule used priority 330xx, after Linux's built-in main rule at priority 32766, so traffic bound to 10.250.0.33 followed the Iran node main default route over eth0 instead of entering tpsp8 and never reached Exit NAT/FORWARD. V218 preserves the historical 330xx route-table namespace while moving only the Spoof source rule into the dedicated pre-main 28000-28899 band and cleaning the stale legacy 330xx rule before qualification. V217 scoped ICMP echo behavior is preserved; TP27, VXLAN, and the shared V179 probe are unchanged. The candidate source is pinned to immutable SHA a0b93b472a84ae3ac8568d4635fcfb46ceeb4d57."
   }
 }
