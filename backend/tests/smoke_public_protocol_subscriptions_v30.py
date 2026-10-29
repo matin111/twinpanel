@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 V30 = ROOT / "app" / "routers" / "public_connection_protocol_subscriptions_v30.py"
 V31 = ROOT / "app" / "routers" / "public_connection_unified_actions_v31.py"
+V32 = ROOT / "app" / "routers" / "public_connection_platform_guard_v32.py"
 MOUNT = ROOT / "app" / "routers" / "public_connection_protocol_subscriptions_mount_v30.py"
 V26 = ROOT / "app" / "routers" / "public_connection_canonical_mobile_v26.py"
 V7 = ROOT / "app" / "routers" / "public_connection_multilink_v7.py"
@@ -11,6 +12,7 @@ V7 = ROOT / "app" / "routers" / "public_connection_multilink_v7.py"
 
 v30 = V30.read_text(encoding="utf-8")
 v31 = V31.read_text(encoding="utf-8")
+v32 = V32.read_text(encoding="utf-8")
 mount = MOUNT.read_text(encoding="utf-8")
 v26 = V26.read_text(encoding="utf-8")
 v7 = V7.read_text(encoding="utf-8")
@@ -45,9 +47,14 @@ assert "decodeURIComponent(pathParts[connectIndex+1]||'')" in mount
 
 assert "refine_public_connection_protocol_subscriptions_v30" in v26
 assert "refine_public_connection_unified_actions_v31" in v26
-assert "source = refine_public_connection_presentation_v29(source)" in v26
-assert "source = refine_public_connection_protocol_subscriptions_v30(source)" in v26
-assert "return refine_public_connection_unified_actions_v31(source)" in v26
+assert "refine_public_connection_platform_guard_v32" in v26
+v29_call = "source = refine_public_connection_presentation_v29(source)"
+v30_call = "source = refine_public_connection_protocol_subscriptions_v30(source)"
+v31_call = "source = refine_public_connection_unified_actions_v31(source)"
+v32_call = "return refine_public_connection_platform_guard_v32(source)"
+for call in (v29_call, v30_call, v31_call, v32_call):
+    assert call in v26, call
+assert v26.index(v29_call) < v26.index(v30_call) < v26.index(v31_call) < v26.index(v32_call)
 
 # V30 still owns the real per-protocol subscription and mobile server grouping.
 for required in (
@@ -61,8 +68,7 @@ for required in (
 ):
     assert required in v30, required
 
-# V31 is the final customer-facing action authority. Labels are device-aware,
-# so connection text is generated from the detected recommended client name.
+# V31 owns canonical user actions; V32 is the final platform/precedence guard.
 for required in (
     "کپی لینک اتصال",
     "دانلود کانفیگ",
@@ -75,8 +81,12 @@ for required in (
 assert "کپی کانفیگ" not in v31
 assert "return links[0]" not in v31
 assert ".mobile-send-btn" in v31
+assert "TWINPANEL_PUBLIC_CONNECT_PLATFORM_GUARD_V32" in v32
+assert "restoreDesktopPresentation" in v32
+assert "details.v30-single-servers" in v32
 
-# Desktop and mobile must share the same V30 subscription authority.
+# Desktop and mobile share the same V30 subscription authority; only the mobile
+# grouping wrapper is removed again by V32 when the detected OS is desktop.
 assert "primeSubscriptionPanels" in v31
 assert "panel.classList.add('v24-canonical-panel')" in v31
 assert "normalizeSubscriptionCard" in v31
@@ -86,4 +96,4 @@ assert "v30-single-servers" in v30
 assert "details.className='v30-single-servers'" in v30
 assert "details.appendChild(views)" in v30
 
-print("PUBLIC_PROTOCOL_SUBSCRIPTIONS_V30_V31_SMOKE=PASS")
+print("PUBLIC_PROTOCOL_SUBSCRIPTIONS_V30_V31_V32_SMOKE=PASS")
