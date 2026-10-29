@@ -157,6 +157,12 @@ export type ModernProtocolInventory={
   nodes?:ModernProtocolInventoryNode[];
 };
 
+export const MODERN_TRANSPORT_AUTHORITY_REFRESH_EVENT="twinpanel-modern-transport-authority-refresh-v207";
+
+function notifyAuthorityRefresh(){
+  if(typeof window!=="undefined")window.dispatchEvent(new Event(MODERN_TRANSPORT_AUTHORITY_REFRESH_EVENT));
+}
+
 function requestBase(){
   if(typeof window!=="undefined")return window.location.origin;
   return "";
@@ -190,11 +196,25 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   return payload as T;
 }
 
+async function installTransport(tunnelId:number,transport:SmartTransportName){
+  try{
+    return await request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/${encodeURIComponent(transport)}/install`,{method:"POST"});
+  }catch(reason){
+    // V207: the install request can briefly expose the authoritative DB row as
+    // `installing` while the server performs qualification. If that request
+    // ultimately fails, force the Smart Transports surface to remount/refetch
+    // immediately instead of leaving the mid-install snapshot visible until a
+    // later polling interval.
+    notifyAuthorityRefresh();
+    throw reason;
+  }
+}
+
 export const modernTransportApi={
   state:(tunnelId:number)=>request<SmartTransportState>(`/v1/tunnels/${tunnelId}/modern-transports`),
   protocolInventory:()=>request<ModernProtocolInventory>("/v1/settings/vpn/modern-protocols"),
   probe:(tunnelId:number,transport:SmartTransportName)=>request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/${encodeURIComponent(transport)}/probe`,{method:"POST"}),
-  install:(tunnelId:number,transport:SmartTransportName)=>request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/${encodeURIComponent(transport)}/install`,{method:"POST"}),
+  install:installTransport,
   remove:(tunnelId:number,transport:SmartTransportName)=>request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/${encodeURIComponent(transport)}`,{method:"DELETE"}),
   configureSpoof:(tunnelId:number,configuration:{iran_spoof_ip:string;exit_spoof_ip:string})=>request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/spoof_wg/config`,{method:"PUT",body:JSON.stringify(configuration)}),
   checkSpoofCompatibility:(tunnelId:number)=>request<SpoofCompatibilityResult>(`/v1/tunnels/${tunnelId}/modern-transports/spoof_wg/compatibility-check`,{method:"POST"}),
