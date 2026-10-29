@@ -3,10 +3,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 V31 = ROOT / "app" / "routers" / "public_connection_unified_actions_v31.py"
+V32 = ROOT / "app" / "routers" / "public_connection_platform_guard_v32.py"
 V26 = ROOT / "app" / "routers" / "public_connection_canonical_mobile_v26.py"
 V30 = ROOT / "app" / "routers" / "public_connection_protocol_subscriptions_v30.py"
 
 v31 = V31.read_text(encoding="utf-8")
+v32 = V32.read_text(encoding="utf-8")
 v26 = V26.read_text(encoding="utf-8")
 v30 = V30.read_text(encoding="utf-8")
 
@@ -72,10 +74,18 @@ assert "افزودن همه به Karing" in v31
 # Backend subscription scope stays intentionally fail-closed.
 assert 'SUPPORTED_PROTOCOLS = ("v2ray", "hysteria2", "tuic", "anytls")' in v30
 
-# V31 remains the final presentation layer after V30 in the canonical chain.
+# V31 remains the unified action authority, while V32 is the final platform and
+# CSS-precedence guard. The canonical chain must therefore be V30 -> V31 -> V32.
 assert "public_connection_unified_actions_v31" in v26
-assert "source = refine_public_connection_protocol_subscriptions_v30(source)" in v26
-assert "return refine_public_connection_unified_actions_v31(source)" in v26
+assert "public_connection_platform_guard_v32" in v26
+v30_call = "source = refine_public_connection_protocol_subscriptions_v30(source)"
+v31_call = "source = refine_public_connection_unified_actions_v31(source)"
+v32_call = "return refine_public_connection_platform_guard_v32(source)"
+for call in (v30_call, v31_call, v32_call):
+    assert call in v26, call
+assert v26.index(v30_call) < v26.index(v31_call) < v26.index(v32_call)
+assert "TWINPANEL_PUBLIC_CONNECT_PLATFORM_GUARD_V32" in v32
+assert "style.setProperty('display','none','important')" in v32
 
 # Dependency-free composition contract: the refiner must inject both CSS and JS
 # before the closing tags and must be idempotent by marker.
@@ -84,4 +94,4 @@ assert 'source.replace("</body>", _SCRIPT + f"\\n<!-- {_MARKER} -->\\n</body>", 
 assert 'if _MARKER in source:' in v31
 assert 'return source' in v31
 
-print("PUBLIC_CONNECTION_UNIFIED_ACTIONS_V31_SMOKE=PASS")
+print("PUBLIC_CONNECTION_UNIFIED_ACTIONS_V31_V32_SMOKE=PASS")
