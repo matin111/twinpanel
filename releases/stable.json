@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.362",
+  "version": "1.1.0-rc.363",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T22:55:15Z",
+  "released_at": "2026-10-29T23:10:58Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "3a59c10fec4eed951f776efdd18dafbe8f717a36",
+  "source_sha": "4ecc2c8e396b79d0a9f3f261de8511dc5aab8d0e",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.362/twinpanel-1.1.0-rc.362-linux-x86_64.tar.gz",
-    "sha256": "bcc44c05cf3fa6acb72a2c98895e5fdfc4ace90392ab77a7aed98c78b80e358a",
-    "size_bytes": 28672816
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.363/twinpanel-1.1.0-rc.363-linux-x86_64.tar.gz",
+    "sha256": "cfa310ce0158373d1170948fd7f7208832026626a81c5bdf33ba87ba4c5c467f",
+    "size_bytes": 28679449
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.362 اصلاح URL عمومی V2Ray برای مسیرهای حساس به DPI را شامل می‌شود و داشبورد Admin را با کارت «سرور» برای CPU/RAM/Disk/Uptime سرور Controller، متن مینیمال‌تر و مسیر canonical مدیریت پروتکل‌ها در /admin/modern-protocols تکمیل می‌کند. مسیر قدیمی /admin/protocols به صفحه صحیح Redirect می‌شود تا 404 ایجاد نشود. این Release هیچ تغییری در TP27، VXLAN، Tunnel/Spoof dataplane، Accounting، quota، provisioning، credential generation، routing یا firewall ایجاد نمی‌کند. Source candidate روی SHA immutable 3a59c10fec4eed951f776efdd18dafbe8f717a36 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.362 includes the neutral V2Ray public subscription URL fix for DPI-sensitive paths and completes the Admin Dashboard with a dedicated Controller server CPU/RAM/Disk/Uptime card, reduced helper copy, and canonical protocol management at /admin/modern-protocols. The legacy /admin/protocols path redirects to the canonical page to prevent 404s. This release does not modify TP27, VXLAN, tunnel/spoof dataplane, accounting, quota, provisioning, credential generation, routing, or firewall behavior. The candidate source is pinned to immutable SHA 3a59c10fec4eed951f776efdd18dafbe8f717a36."
+    "fa": "TwinPanel 1.1.0-rc.363 کارت «سرور» داشبورد Admin را کامل‌تر می‌کند و ظرفیت واقعی منابع Controller را کنار درصد مصرف نمایش می‌دهد: تعداد vCPU، میزان RAM مصرف‌شده/کل، Disk مصرف‌شده/کل و Hostname. این Release فقط UI/Monitoring داشبورد را اصلاح می‌کند و هیچ تغییری در TP27، VXLAN، Tunnel/Spoof dataplane، Accounting، quota، provisioning، credential generation، routing، firewall یا protocol dataplane ایجاد نمی‌کند. Source candidate روی SHA immutable 4ecc2c8e396b79d0a9f3f261de8511dc5aab8d0e قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.363 completes the Admin Dashboard Server card by showing real Controller capacity next to live usage: vCPU count, RAM used/total, Disk used/total, and hostname. This release changes only dashboard UI/monitoring and does not modify TP27, VXLAN, tunnel/spoof dataplane, accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane behavior. The candidate source is pinned to immutable SHA 4ecc2c8e396b79d0a9f3f261de8511dc5aab8d0e."
   }
 }
