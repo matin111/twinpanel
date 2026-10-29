@@ -6,6 +6,9 @@ from .public_connection_presentation_v29 import refine_public_connection_present
 from .public_connection_protocol_subscriptions_mount_v30 import (
     refine_public_connection_protocol_subscriptions_v30,
 )
+from .public_connection_unified_actions_v31 import (
+    refine_public_connection_unified_actions_v31,
+)
 
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26"
@@ -109,4 +112,5 @@ def refine_public_connection_canonical_mobile_v26(source: str) -> str:
     source = refine_public_connection_mobile_ui_v27(source)
     source = refine_public_connection_mobile_v28(source)
     source = refine_public_connection_presentation_v29(source)
-    return refine_public_connection_protocol_subscriptions_v30(source)
+    source = refine_public_connection_protocol_subscriptions_v30(source)
+    return refine_public_connection_unified_actions_v31(source)
