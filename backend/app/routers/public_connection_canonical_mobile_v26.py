@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .public_connection_mobile_ui_v27 import refine_public_connection_mobile_ui_v27
+
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26"
 
@@ -96,7 +98,7 @@ _SCRIPT = r"""
 
 def refine_public_connection_canonical_mobile_v26(source: str) -> str:
     """Keep the phone surface canonical, compact and free of retired mobile renderers."""
-    if _MARKER in source:
-        return source
-    source = source.replace("</style>", _CSS + "\n</style>", 1)
-    return source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
+    if _MARKER not in source:
+        source = source.replace("</style>", _CSS + "\n</style>", 1)
+        source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
+    return refine_public_connection_mobile_ui_v27(source)
