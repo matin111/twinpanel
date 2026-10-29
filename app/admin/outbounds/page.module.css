@@ -39,7 +39,7 @@
   -webkit-backdrop-filter:none;
 }
 
-/* TWINPANEL_OUTBOUNDS_MINIMAL_COPY_LIGHT_V1
+/* TWINPANEL_OUTBOUNDS_MINIMAL_COPY_LIGHT_V2
    Keep operational labels/values/actions; remove decorative and explanatory copy. */
 .fullWidth :global([class*="heroMain"]),
 .fullWidth :global([class*="sectionKicker"]),
@@ -58,15 +58,29 @@
   display:none!important;
 }
 
+/* The hero copy is intentionally hidden, so collapse the decorative hero shell as well. */
 .fullWidth :global([class*="hero"]){
-  grid-template-columns:1fr!important;
+  display:flex!important;
+  justify-content:flex-end!important;
+  align-items:center!important;
   min-height:0!important;
-  padding:18px!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  overflow:visible!important;
+}
+
+.fullWidth :global([class*="heroGlow"]){
+  display:none!important;
 }
 
 .fullWidth :global([class*="heroControls"]){
   width:min(100%,420px);
-  justify-self:start;
+  margin-inline-start:auto;
+  justify-self:auto;
+  align-self:auto;
 }
 
 :global(html[data-theme="light"]) .fullWidth{
@@ -80,7 +94,6 @@
   color:#171725;
 }
 
-:global(html[data-theme="light"]) .fullWidth :global([class*="hero"]),
 :global(html[data-theme="light"]) .fullWidth :global([class*="panel"]),
 :global(html[data-theme="light"]) .fullWidth :global([class*="statCard"]),
 :global(html[data-theme="light"]) .fullWidth :global([class*="controlBar"]),
@@ -133,5 +146,14 @@
 @media(max-width:900px){
   .fullWidth :global(section > div:has(> aside) > aside){
     grid-template-columns:1fr;
+  }
+
+  .fullWidth :global([class*="hero"]){
+    justify-content:stretch!important;
+  }
+
+  .fullWidth :global([class*="heroControls"]){
+    width:100%;
+    margin-inline-start:0;
   }
 }
