@@ -1,14 +1,15 @@
-name: Public Connect Unified Actions V31 Smoke
+name: Public Connect Presentation Reset V33 Smoke
 
 on:
   pull_request:
     paths:
-      - 'backend/app/routers/public_connection_unified_actions_v31.py'
-      - 'backend/app/routers/public_connection_platform_guard_v32.py'
       - 'backend/app/routers/public_connection_canonical_mobile_v26.py'
-      - 'backend/tests/smoke_public_connection_unified_actions_v31.py'
-      - 'backend/tests/smoke_public_connection_platform_guard_v32.py'
+      - 'backend/app/routers/public_connection_device_actions_v11.py'
+      - 'backend/app/routers/public_connection_hub_live_v5.py'
+      - 'backend/app/routers/public_connection_protocol_subscriptions_mount_v30.py'
+      - 'backend/app/routers/public_connection_protocol_subscriptions_v30.py'
       - 'backend/tests/smoke_public_connection_mobile_ui_v27.py'
+      - 'backend/tests/smoke_public_connection_presentation_reset_v33.py'
       - '.github/workflows/public-connect-unified-actions-v31-smoke.yml'
   workflow_dispatch:
 
@@ -27,21 +28,18 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Compile V31/V32 presentation chain
+      - name: Compile reset composition
         run: |
           python -m py_compile \
-            backend/app/routers/public_connection_unified_actions_v31.py \
-            backend/app/routers/public_connection_platform_guard_v32.py \
             backend/app/routers/public_connection_canonical_mobile_v26.py \
-            backend/tests/smoke_public_connection_unified_actions_v31.py \
-            backend/tests/smoke_public_connection_platform_guard_v32.py \
-            backend/tests/smoke_public_connection_mobile_ui_v27.py
+            backend/app/routers/public_connection_device_actions_v11.py \
+            backend/app/routers/public_connection_protocol_subscriptions_mount_v30.py \
+            backend/app/routers/public_connection_protocol_subscriptions_v30.py \
+            backend/tests/smoke_public_connection_mobile_ui_v27.py \
+            backend/tests/smoke_public_connection_presentation_reset_v33.py
 
-      - name: Run V31 unified action contract
-        run: python backend/tests/smoke_public_connection_unified_actions_v31.py
-
-      - name: Run V32 all-protocol platform guard contract
-        run: python backend/tests/smoke_public_connection_platform_guard_v32.py
-
-      - name: Run final Public Connect composition contract
+      - name: Run retired-stack composition contract
         run: python backend/tests/smoke_public_connection_mobile_ui_v27.py
+
+      - name: Run V33 reset contract
+        run: python backend/tests/smoke_public_connection_presentation_reset_v33.py
