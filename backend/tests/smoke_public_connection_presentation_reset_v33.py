@@ -11,8 +11,7 @@ mount = (ROUTERS / "public_connection_protocol_subscriptions_mount_v30.py").read
 v30 = (ROUTERS / "public_connection_protocol_subscriptions_v30.py").read_text(encoding="utf-8")
 
 
-# Device detection must come from the established upstream authority, not from
-# a viewport-only presentation layer.
+# Device detection stays owned by the established upstream authority.
 for platform in ("windows", "macos", "android", "ios", "linux"):
     assert platform in v11, platform
 assert "function detectPlatform()" in v11
@@ -21,8 +20,8 @@ assert "body.classList.toggle('tp-phone-actions',phoneActions)" in v11
 assert "body.classList.toggle('tp-desktop-device',!phoneActions)" in v11
 
 
-# The main live route must still execute the real delivery/device pipeline and
-# finish with the guarded V26 cleanup. No delivery/dataplane refiner is removed.
+# The live route still executes the real delivery/device pipeline and reaches
+# V26. V34 is composed inside V26 so the hub never regains a stacked chain.
 required_hub_calls = (
     "refine_public_connection_device_actions_v11(source)",
     "refine_public_connection_windows_v12(source)",
@@ -40,14 +39,14 @@ positions = [hub.index(call) for call in required_hub_calls]
 assert positions == sorted(positions), positions
 
 
-# V26 is the only final presentation cleanup. It is phone-gated twice: actual
-# Android/iOS platform and a phone-sized viewport. Narrow Windows must never
-# enter this cleanup.
+# V26 remains phone-gated. Narrow Windows must not enter its cleanup, then one
+# explicit V34 authority owns the final customer presentation.
 assert "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26" in v26
 assert "function isPhone()" in v26
 assert "platform==='android'||platform==='ios'" in v26
 assert "!isPhone()||!window.matchMedia(MOBILE).matches" in v26
-assert "return source" in v26
+assert "refine_public_connection_forward_v34" in v26
+assert "return refine_public_connection_forward_v34(source)" in v26
 
 retired_presentation_symbols = (
     "refine_public_connection_mobile_ui_v27",
@@ -61,8 +60,10 @@ for symbol in retired_presentation_symbols:
     assert symbol not in v26, symbol
 
 
-# Preserve protocol subscription delivery without applying V30's DOM/UI layer.
+# Preserve old V30 endpoint compatibility while V34 adds the new all-protocol
+# route surface separately.
 assert "public_connection_protocol_subscriptions_mount_v30" in v26
+assert "public_connection_forward_mount_v34" in v26
 assert "public_connection_multilink_v7_router.include_router" in mount
 assert "public_connection_protocol_subscriptions_v30_router" in mount
 assert '@router.get(' in v30

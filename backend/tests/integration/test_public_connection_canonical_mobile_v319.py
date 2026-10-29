@@ -20,7 +20,8 @@ def test_public_hub_retires_duplicate_mobile_renderers_but_keeps_v18_endpoint_re
     assert "public_connection_mobile_server_inventory_v18 as _public_connection_mobile_server_inventory_v18" in hub
 
     # Desktop/classic action hygiene remains, while the final mobile presentation
-    # is an explicit canonical-only refinement after all data/profile refiners.
+    # reaches guarded V26 after all data/profile refiners. V26 then delegates to
+    # the single V34 customer-facing authority.
     assert "refine_public_connection_protocol_actions_v20(source)" in hub
     assert "refine_public_connection_canonical_mobile_v26(source)" in hub
     assert hub.index("refine_public_connection_xray_profiles_v48(source)") < hub.index(
@@ -41,20 +42,22 @@ def test_canonical_mobile_v26_blocks_legacy_surfaces_and_explanatory_copy():
     assert "content:none!important" in source
     assert "data.tpCanonicalMobile" not in source
     assert "document.body.dataset.tpCanonicalMobile='v26'" in source
+    assert "return refine_public_connection_forward_v34(source)" in source
 
 
 def test_android_direct_app_assets_are_verified_and_architecture_specific():
-    source = _text("backend/app/routers/public_connection_canonical_mobile_v26.py")
+    # Direct install assets are centralized in V34 rather than hardcoded inside
+    # the phone cleanup layer. This keeps Windows/mobile app delivery in one
+    # device-aware resolver and avoids project landing pages.
+    source = _text("backend/app/routers/public_connection_app_download_v34.py")
 
-    assert (
-        "https://github.com/KaringX/karing/releases/download/v1.2.25.2802/"
-        "karing_1.2.25.2802_android_arm64-v8a.apk"
-    ) in source
-    assert "karing_1.2.25.2802_android_arm.apk" not in source
-    assert (
-        "https://github.com/amnezia-vpn/amneziawg-android/releases/download/"
-        "v3.1.20260814/AmneziaWG-3.1.202060814.apk"
-    ) in source
+    assert 'GitHubAsset("KaringX/karing", r"_android_arm64-v8a\\.apk$")' in source
+    assert "_android_arm\\.apk$" not in source
+    assert 'GitHubAsset("amnezia-vpn/amneziawg-android", r"AmneziaWG-.*\\.apk$")' in source
+    assert '"/app-download/{app}/{platform}"' in source
+    assert "browser_download_url" in source
+    assert "karing.app/en/quickstart" not in source
+    assert "How-to-install-Hiddify-app" not in source
 
 
 if __name__ == "__main__":
