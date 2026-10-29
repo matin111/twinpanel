@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from .public_connection_mobile_refine_v28 import refine_public_connection_mobile_v28
 from .public_connection_mobile_ui_v27 import refine_public_connection_mobile_ui_v27
 
 
@@ -101,4 +102,5 @@ def refine_public_connection_canonical_mobile_v26(source: str) -> str:
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
-    return refine_public_connection_mobile_ui_v27(source)
+    source = refine_public_connection_mobile_ui_v27(source)
+    return refine_public_connection_mobile_v28(source)
