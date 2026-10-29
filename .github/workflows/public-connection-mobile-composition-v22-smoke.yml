@@ -7,7 +7,9 @@ on:
       - 'backend/app/routers/public_connection_mobile_server_inventory_v18.py'
       - 'backend/app/routers/public_connection_protocol_actions_v20.py'
       - 'backend/app/routers/public_connection_canonical_mobile_v26.py'
+      - 'backend/app/routers/public_connection_mobile_ui_v27.py'
       - 'backend/tests/integration/test_public_connection_canonical_mobile_v319.py'
+      - 'backend/tests/smoke_public_connection_mobile_ui_v27.py'
       - '.github/workflows/public-connection-mobile-composition-v22-smoke.yml'
   workflow_dispatch:
 
@@ -30,7 +32,9 @@ jobs:
             backend/app/routers/public_connection_mobile_server_inventory_v18.py \
             backend/app/routers/public_connection_protocol_actions_v20.py \
             backend/app/routers/public_connection_canonical_mobile_v26.py \
-            backend/tests/integration/test_public_connection_canonical_mobile_v319.py
+            backend/app/routers/public_connection_mobile_ui_v27.py \
+            backend/tests/integration/test_public_connection_canonical_mobile_v319.py \
+            backend/tests/smoke_public_connection_mobile_ui_v27.py
 
       - name: Verify canonical mobile composition
         run: |
@@ -66,14 +70,24 @@ jobs:
           v18 = Path('backend/app/routers/public_connection_mobile_server_inventory_v18.py').read_text(encoding='utf-8')
           v20 = Path('backend/app/routers/public_connection_protocol_actions_v20.py').read_text(encoding='utf-8')
           v26 = Path('backend/app/routers/public_connection_canonical_mobile_v26.py').read_text(encoding='utf-8')
+          v27 = Path('backend/app/routers/public_connection_mobile_ui_v27.py').read_text(encoding='utf-8')
           assert 'TWINPANEL_PUBLIC_CONNECT_MOBILE_SERVER_INVENTORY_V18' in v18
           assert 'TWINPANEL_PUBLIC_CONNECT_PROTOCOL_ACTIONS_V20' in v20
           assert 'TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26' in v26
           assert '.v9-apps-drawer' in v26 and '.v17-mobile-stack' in v26
           assert 'karing_1.2.25.2802_android_arm64-v8a.apk' in v26
+          assert 'TWINPANEL_PUBLIC_CONNECT_MOBILE_UI_V27' in v27
+          assert 'refine_public_connection_mobile_ui_v27' in v26
+          assert 'v27-protocol-strip' in v27
+          assert 'v27-server-strip' in v27
+          assert 'v27-active-protocol' in v27
+          assert 'v27-active-server' in v27
 
           print('PUBLIC_MOBILE_CANONICAL_COMPOSITION=PASS')
           PY
 
       - name: Run canonical mobile regression
         run: python backend/tests/integration/test_public_connection_canonical_mobile_v319.py
+
+      - name: Run compact mobile UI V27 regression
+        run: python backend/tests/smoke_public_connection_mobile_ui_v27.py
