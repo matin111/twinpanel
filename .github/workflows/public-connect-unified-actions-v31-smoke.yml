@@ -4,8 +4,10 @@ on:
   pull_request:
     paths:
       - 'backend/app/routers/public_connection_unified_actions_v31.py'
+      - 'backend/app/routers/public_connection_platform_guard_v32.py'
       - 'backend/app/routers/public_connection_canonical_mobile_v26.py'
       - 'backend/tests/smoke_public_connection_unified_actions_v31.py'
+      - 'backend/tests/smoke_public_connection_platform_guard_v32.py'
       - 'backend/tests/smoke_public_connection_mobile_ui_v27.py'
       - '.github/workflows/public-connect-unified-actions-v31-smoke.yml'
   workflow_dispatch:
@@ -25,16 +27,21 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Compile V31 presentation chain
+      - name: Compile V31/V32 presentation chain
         run: |
           python -m py_compile \
             backend/app/routers/public_connection_unified_actions_v31.py \
+            backend/app/routers/public_connection_platform_guard_v32.py \
             backend/app/routers/public_connection_canonical_mobile_v26.py \
             backend/tests/smoke_public_connection_unified_actions_v31.py \
+            backend/tests/smoke_public_connection_platform_guard_v32.py \
             backend/tests/smoke_public_connection_mobile_ui_v27.py
 
       - name: Run V31 unified action contract
         run: python backend/tests/smoke_public_connection_unified_actions_v31.py
+
+      - name: Run V32 all-protocol platform guard contract
+        run: python backend/tests/smoke_public_connection_platform_guard_v32.py
 
       - name: Run final Public Connect composition contract
         run: python backend/tests/smoke_public_connection_mobile_ui_v27.py
