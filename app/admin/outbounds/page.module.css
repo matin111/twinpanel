@@ -157,3 +157,61 @@
     margin-inline-start:0;
   }
 }
+
+/* OUTBOUNDS_COMPACT_HEADER_V3
+   Deterministic DOM-based override: do not rely on CSS-module class substrings. */
+.fullWidth :global(.page-head){
+  display:none!important;
+}
+
+.fullWidth :global(.page-head + section){
+  display:block!important;
+  min-height:0!important;
+  padding:0!important;
+  margin:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  overflow:visible!important;
+}
+
+.fullWidth :global(.page-head + section > div:nth-child(1)),
+.fullWidth :global(.page-head + section > div:nth-child(2)){
+  display:none!important;
+}
+
+.fullWidth :global(.page-head + section > div:nth-child(3)){
+  width:100%!important;
+  max-width:none!important;
+  margin:0!important;
+  padding:8px!important;
+  display:grid!important;
+  grid-template-columns:minmax(220px,1fr) auto!important;
+  align-items:end!important;
+  gap:10px!important;
+  border:1px solid var(--border,#e7e4f5)!important;
+  border-radius:12px!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+
+.fullWidth :global(.page-head + section > div:nth-child(3) > label){
+  min-width:0!important;
+}
+
+.fullWidth :global(.page-head + section > div:nth-child(3) > button){
+  min-width:150px!important;
+}
+
+@media(max-width:700px){
+  .fullWidth :global(.page-head + section > div:nth-child(3)){
+    grid-template-columns:1fr!important;
+  }
+
+  .fullWidth :global(.page-head + section > div:nth-child(3) > button){
+    width:100%!important;
+    min-width:0!important;
+  }
+}
