@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.326",
+  "version": "1.1.0-rc.327",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T02:30:12Z",
+  "released_at": "2026-10-29T02:51:28Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "0b83c3d76b05416a06e769154cfd915e9c4947ad",
+  "source_sha": "10f01da3333760a444f498cc245d3466d9030232",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.326/twinpanel-1.1.0-rc.326-linux-x86_64.tar.gz",
-    "sha256": "d6d2a2a654d47f19ddbb5840085c71173b36496ee61f4d03aebe519211848d0a",
-    "size_bytes": 28528138
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.327/twinpanel-1.1.0-rc.327-linux-x86_64.tar.gz",
+    "sha256": "b2ae15a9f451082354ff61724037798cb26368aed9e6f98e275ea65c6e819da4",
+    "size_bytes": 28537432
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.326 اصلاح Spoof Health Guard V211 را منتشر می‌کند. برای Spoof WG که قبلاً با evidence ساختاریافته V206/V208 به دلیل underlay_incompatible:reverse_carrier_not_reaching_iran قرنطینه شده است، Health Test اکنون قبل از SmartAuto cache، SSH، بررسی systemd و candidate_probe به‌صورت fail-closed متوقف می‌شود؛ بنابراین probe ثانویه دیگر سرویس‌های Spoof را لمس نمی‌کند و علت قطعی underlay را با candidate_probe_exception یا candidate_service_inactive پنهان/overwrite نمی‌کند. Structured guard تا پایان quarantine مرجع اصلی است و legacy recovery V208 حفظ شده است. TP27 Fast و Kernel VXLAN، Spoof framing/ports/payload، routing و firewall بدون تغییر باقی می‌مانند. قابلیت‌های rc.325 نیز حفظ شده‌اند. Source candidate روی SHA immutable 0b83c3d76b05416a06e769154cfd915e9c4947ad قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.326 ships Spoof Health Guard V211. For Spoof WG candidates already quarantined by structured V206/V208 evidence with underlay_incompatible:reverse_carrier_not_reaching_iran, Health Test now fails closed before the SmartAuto cache, SSH, systemd inspection, and candidate_probe. Secondary probes therefore no longer touch Spoof services or hide/overwrite the proven underlay reason with candidate_probe_exception or candidate_service_inactive. The structured guard remains authoritative for the quarantine lifetime while strict V208 legacy recovery is preserved. TP27 Fast, Kernel VXLAN, Spoof framing/ports/payload, routing, and firewall remain unchanged. The rc.325 functionality is preserved. The candidate source is pinned to immutable SHA 0b83c3d76b05416a06e769154cfd915e9c4947ad."
+    "fa": "TwinPanel 1.1.0-rc.327 قابلیت Public Connect Protocol Subscriptions V30 را منتشر می‌کند. برای پروتکل‌های دارای share-link استاندارد و سازگار در cohort اول یعنی V2Ray/Xray، Hysteria2، TUIC و AnyTLS، اکنون هر پروتکل یک لینک اشتراک مستقل دارد که همه سرورها/کشورهای واقعی همان پروتکل را با ترتیب پایدار و حذف URI تکراری به‌صورت Base64 subscription feed ارائه می‌کند. V30 از URIهای canonical موجود و سازنده استاندارد V15 استفاده می‌کند و هیچ credential یا فیلد اتصال جدیدی اختراع نمی‌کند. endpoint قدیمی V2Ray برای سازگاری باقی مانده است. در UI، «همه سرورها»، «افزودن همه به Karing»، «کپی لینک اشتراک» و دانلود صریح Karing/Hiddify/v2rayN اضافه شده و روی موبایل سرورهای تکی برای پروتکل‌های پشتیبانی‌شده زیر بخش «سرورهای تکی» قرار می‌گیرند. Snell، TrustTunnel، Sudoku، AmneziaWG و Mieru تا اثبات قرارداد مشترک Karing/Hiddify/v2rayN وارد این feed مشترک نمی‌شوند. هیچ تغییری در TP27، VXLAN، Tunnel، Spoof، Accounting، quota، provisioning، credential generation، routing، firewall یا protocol dataplane ایجاد نشده است. Source candidate روی SHA immutable 10f01da3333760a444f498cc245d3466d9030232 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.327 ships Public Connect Protocol Subscriptions V30. For the first cohort of protocols with standard compatible share links—V2Ray/Xray, Hysteria2, TUIC and AnyTLS—each protocol now has an independent subscription URL containing all real countries/nodes for that protocol, preserving deterministic order, deduplicating identical URIs, and returning a Base64 subscription feed. V30 reuses existing canonical URIs and the V15 standard share-link builder and never invents credentials or connection fields. The legacy V2Ray subscription endpoint is preserved for backward compatibility. The UI adds clear all-server actions: Add all to Karing, Copy subscription link, and explicit Karing/Hiddify/v2rayN download labels; on mobile, individual servers for supported protocols move under a secondary collapsible section. Snell, TrustTunnel, Sudoku, AmneziaWG and Mieru remain fail-closed for common subscriptions until a shared Karing/Hiddify/v2rayN contract is proven. This release does not modify TP27, VXLAN, Tunnel, Spoof, Accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane. The candidate source is pinned to immutable SHA 10f01da3333760a444f498cc245d3466d9030232."
   }
 }
