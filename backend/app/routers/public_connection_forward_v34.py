@@ -1,7 +1,39 @@
 from __future__ import annotations
 
+import json
+
+from .public_connection_modern_delivery_v13 import CLIENTS as V13_CLIENTS
+
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_FORWARD_V34"
+
+
+def _client_catalog() -> dict[str, dict[str, dict[str, str]]]:
+    """Expose only the already-authoritative V13 client name/link mapping."""
+    result: dict[str, dict[str, dict[str, str]]] = {}
+    for protocol, rows in V13_CLIENTS.items():
+        platform_rows: dict[str, dict[str, str]] = {}
+        for platform, value in rows.items():
+            if not isinstance(value, tuple) or len(value) != 2:
+                continue
+            name, url = value
+            name = str(name or "").strip()
+            url = str(url or "").strip()
+            if name and url:
+                platform_rows[str(platform)] = {"name": name, "url": url}
+        if platform_rows:
+            result[str(protocol)] = platform_rows
+    return result
+
+
+def _client_data_script() -> str:
+    payload = json.dumps(_client_catalog(), ensure_ascii=False, separators=(",", ":"))
+    payload = payload.replace("</", "<\\/")
+    return (
+        '<script id="twinpanelPublicConnectV34ClientData">'
+        f"window.__TP_V34_CLIENTS__={payload};"
+        "</script>"
+    )
 
 
 _CSS = r"""
@@ -25,11 +57,11 @@ body.v34-ready .tp-v15-client-note{display:none!important}
 /* Modern protocols must never show V5's generic Server/User/Password fallback. */
 body.v34-ready .protocol-panel[data-v34-modern="1"] .facts{display:none!important}
 
-body.v34-ready .v34-multi-card,
+body.v34-ready .v34-subscription-card,
 body.v34-ready .v34-client-card{
   margin:12px;padding:13px;border:1px solid var(--line);border-radius:14px;background:var(--surface2)
 }
-body.v34-ready .v34-multi-card{
+body.v34-ready .v34-subscription-card{
   border-color:color-mix(in srgb,var(--p) 34%,var(--line));
   background:linear-gradient(145deg,color-mix(in srgb,var(--p) 7%,var(--surface2)),var(--surface2))
 }
@@ -55,11 +87,18 @@ body.v34-ready .v34-primary{border-color:var(--p)!important;background:var(--p)!
 body.v34-ready .v34-copy{color:var(--p)!important}
 body.v34-ready .v34-client-card>a{min-width:150px}
 body.v34-ready .fact .copy-btn{min-height:34px;padding:6px 9px;font-size:11px}
+body.v34-ready .v34-single-label{margin:12px 12px 6px;color:var(--muted);font-size:12px;font-weight:900}
+body.v34-ready .v34-mobile-servers{margin:10px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface2)}
+body.v34-ready .v34-mobile-servers>summary{min-height:44px;padding:0 12px;display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:900;cursor:pointer;list-style:none}
+body.v34-ready .v34-mobile-servers>summary::-webkit-details-marker{display:none}
+body.v34-ready .v34-mobile-servers>summary:after{content:'⌄';color:var(--muted);font-size:16px}
+body.v34-ready .v34-mobile-servers[open]>summary:after{content:'⌃'}
 
-/* A narrow desktop browser stays desktop. Phone stacking requires Android/iOS. */
+/* A narrow desktop browser stays desktop. Phone stacking requires V11's
+ * authoritative Android/iOS platform value, never viewport width alone. */
 @media(max-width:720px){
-  body.v34-ready[data-tp-platform="android"] .v34-multi-card,
-  body.v34-ready[data-tp-platform="ios"] .v34-multi-card,
+  body.v34-ready[data-tp-platform="android"] .v34-subscription-card,
+  body.v34-ready[data-tp-platform="ios"] .v34-subscription-card,
   body.v34-ready[data-tp-platform="android"] .v34-client-card,
   body.v34-ready[data-tp-platform="ios"] .v34-client-card{margin:10px;padding:11px}
   body.v34-ready[data-tp-platform="android"] .v34-client-card,
@@ -84,6 +123,8 @@ body.v34-ready .fact .copy-btn{min-height:34px;padding:6px 9px;font-size:11px}
     content:attr(data-v34-server-label);display:block;margin-bottom:8px;color:var(--text);
     font-size:12px;font-weight:900;text-align:right
   }
+  body.v34-ready[data-tp-platform="android"] .v34-single-label,
+  body.v34-ready[data-tp-platform="ios"] .v34-single-label{margin:10px 10px 4px}
 }
 """
 
@@ -91,10 +132,7 @@ body.v34-ready .fact .copy-btn{min-height:34px;padding:6px 9px;font-size:11px}
 _SCRIPT = r"""
 <script id="twinpanelPublicConnectForwardV34">
 (function(){
-  const MULTI=new Set([
-    'openvpn','wireguard','v2ray','hysteria2','tuic','anytls','naive',
-    'shadowtls','snell','mieru','trusttunnel','amneziawg','sudoku'
-  ]);
+  const SUBSCRIPTIONS=new Set(['v2ray','hysteria2','tuic','anytls']);
   const MODERN=new Set([
     'hysteria2','tuic','anytls','naive','shadowtls','snell','mieru',
     'trusttunnel','amneziawg','sudoku'
@@ -102,25 +140,9 @@ _SCRIPT = r"""
   const MANUAL=new Set(['cisco','l2tp']);
   const NATIVE_FILES=new Set(['openvpn','wireguard','amneziawg']);
   const URI_RE=/^(?:vmess|vless|trojan|ss|hysteria2|hy2|tuic|anytls|naive|mieru|snell|sudoku|trusttunnel|wg|wireguard):\/\//i;
-  const APP_RE=/^(?:karing|hiddify|trusttunnel|sudoku|sing-box|amneziawg):\/\//i;
+  const CLIENTS=window.__TP_V34_CLIENTS__||{};
+  try{delete window.__TP_V34_CLIENTS__}catch(_error){}
   const text=el=>String(el?.textContent||'').trim();
-
-  const CLIENTS={
-    cisco:{key:'openconnect',name:'OpenConnect / Cisco'},
-    openvpn:{key:'openvpn',name:'OpenVPN'},
-    wireguard:{key:'wireguard',name:'WireGuard'},
-    v2ray:{key:'hiddify',name:'Hiddify'},
-    hysteria2:{key:'karing',name:'Karing'},
-    tuic:{key:'karing',name:'Karing'},
-    anytls:{key:'karing',name:'Karing'},
-    naive:{key:'karing',name:'Karing'},
-    shadowtls:{key:'karing',name:'Karing'},
-    snell:{key:'hiddify',name:'Hiddify'},
-    mieru:{key:'karing',name:'Karing'},
-    trusttunnel:{key:'trusttunnel',name:'TrustTunnel'},
-    amneziawg:{key:'amneziawg',name:'AmneziaWG'},
-    sudoku:{key:'sudoku',name:'Sudoku'}
-  };
 
   function normalize(value){
     const key=String(value||'').trim().toLowerCase();
@@ -131,19 +153,13 @@ _SCRIPT = r"""
   }
 
   function platform(){
-    const current=String(document.body?.dataset?.tpPlatform||'').trim().toLowerCase();
-    if(['windows','android','ios','macos','linux'].includes(current))return current;
-    const uaData=navigator.userAgentData||null;
-    const ua=String(navigator.userAgent||'');
-    const nav=String((uaData&&uaData.platform)||navigator.platform||'');
-    const all=(ua+' '+nav).toLowerCase();
-    if(/android/i.test(ua))return'android';
-    if(/iphone|ipad|ipod/i.test(ua))return'ios';
-    if(/macintosh|mac os|macintel/i.test(all)&&Number(navigator.maxTouchPoints||0)>1)return'ios';
-    if(/windows|win32|win64|winarm/i.test(all))return'windows';
-    if(/macintosh|mac os|macintel/i.test(all))return'macos';
-    if(/linux|x11|cros/i.test(all))return'linux';
-    return'unknown';
+    const current=String(document.body?.dataset?.tpPlatform||document.documentElement?.dataset?.tpPlatform||'').trim().toLowerCase();
+    return ['windows','android','ios','macos','linux','unknown'].includes(current)?current:'unknown';
+  }
+
+  function isPhone(){
+    const value=platform();
+    return value==='android'||value==='ios';
   }
 
   function panelKey(panel){
@@ -184,18 +200,14 @@ _SCRIPT = r"""
   function clientFor(key){
     const p=platform();
     if(p==='unknown'||key==='l2tp')return null;
-    const client=CLIENTS[key]||null;
-    if(!client)return null;
-    return {
-      key:client.key,
-      name:client.name,
-      href:'/v1/connect/app-download/'+encodeURIComponent(client.key)+'/'+encodeURIComponent(p)
-    };
+    const row=CLIENTS?.[key]?.[p]||null;
+    if(!row?.name||!row?.url)return null;
+    return {name:String(row.name),href:String(row.url)};
   }
 
   function directCandidates(view){
     return [...view.querySelectorAll(
-      'a.tp-win-hiddify[href],a.v15-karing-inline[href],a.v13-karing-inline[href],'+
+      'a.tp-win-hiddify[href],a.tp-v48-hiddify[href],a.v15-karing-inline[href],a.v13-karing-inline[href],'+
       'a.v13-open-uri[href],a.primary-btn[href],button.v13-karing-import,button.primary-btn[data-config-path]'
     )].filter(node=>{
       const href=String(node.getAttribute?.('href')||'');
@@ -205,27 +217,20 @@ _SCRIPT = r"""
     });
   }
 
-  function directScore(node,client){
-    const href=String(node.getAttribute?.('href')||'').toLowerCase();
+  function directMatchesClient(node,client){
+    if(!node||!client)return false;
+    const href=String(node.getAttribute?.('href')||'').trim().toLowerCase();
     const label=text(node).toLowerCase();
-    const name=String(client?.name||'').toLowerCase();
-    let score=0;
-    if(node.matches?.('.tp-win-hiddify,.v15-karing-inline,.v13-karing-inline'))score+=30;
-    if(node.matches?.('.v13-open-uri'))score+=20;
-    if(APP_RE.test(href))score+=15;
-    if(URI_RE.test(href))score+=10;
-    if(name.includes('hiddify')&&(href+label).includes('hiddify'))score+=100;
-    if(name.includes('karing')&&(href+label).includes('karing'))score+=100;
-    if(name.includes('trusttunnel')&&(href+label).includes('trusttunnel'))score+=100;
-    if(name.includes('amnezia')&&(href+label).includes('amnezia'))score+=100;
-    if(name.includes('sudoku')&&(href+label).includes('sudoku'))score+=100;
-    return score;
+    const name=String(client.name||'').toLowerCase();
+    if(name.includes('hiddify'))return href.startsWith('hiddify:')||(href+label).includes('hiddify');
+    if(name.includes('karing'))return href.startsWith('karing:')||(href+label).includes('karing');
+    if(name.includes('trusttunnel'))return href.startsWith('trusttunnel:')||(href+label).includes('trusttunnel');
+    if(name.includes('sudoku')||name.includes('sudodroid')||name.includes('anywhere proxy'))return href.startsWith('sudoku:')||(href+label).includes('sudoku');
+    return false;
   }
 
   function bestDirect(view,client){
-    const rows=directCandidates(view);
-    rows.sort((a,b)=>directScore(b,client)-directScore(a,client));
-    return rows[0]||null;
+    return directCandidates(view).find(node=>directMatchesClient(node,client))||null;
   }
 
   function downloadCandidate(view){
@@ -268,8 +273,6 @@ _SCRIPT = r"""
     return node;
   }
 
-  function absolute(href){try{return new URL(href,window.location.href).href}catch(_error){return href}}
-
   function proxyClick(source,label,primary){
     if(!source)return null;
     const href=String(source.getAttribute?.('href')||'').trim();
@@ -292,7 +295,7 @@ _SCRIPT = r"""
     if(!client?.href)return null;
     const card=document.createElement('section');card.className='v34-client-card';
     const label=document.createElement('span');label.className='v34-client-label';label.textContent='برنامه اتصال';
-    const app=link('دانلود مستقیم '+client.name,client.href,false);card.append(label,app);
+    const app=link('دانلود '+client.name,client.href,false);card.append(label,app);
     if(afterNode)afterNode.insertAdjacentElement('afterend',card);
     else panel.querySelector('.panel-head')?.insertAdjacentElement('afterend',card);
     return card;
@@ -303,57 +306,58 @@ _SCRIPT = r"""
     try{return decodeURIComponent(match[1])}catch(_error){return match[1]}
   }
 
-  function multiUrl(protocol){
-    const value=token();if(!value)return'';
-    return window.location.origin+'/v1/connect/'+encodeURIComponent(value)+'/multi/'+encodeURIComponent(protocol);
+  function subscriptionUrl(protocol){
+    const value=token();if(!value||!SUBSCRIPTIONS.has(protocol))return'';
+    return window.location.origin+'/v1/connect/'+encodeURIComponent(value)+'/sub/'+encodeURIComponent(protocol);
   }
-  function multiMetaUrl(protocol){return multiUrl(protocol)+'/meta'}
 
-  async function multiMeta(protocol){
+  async function subscriptionCount(protocol){
+    const url=subscriptionUrl(protocol);if(!url)return 0;
     try{
-      const response=await fetch(multiMetaUrl(protocol),{cache:'no-store',headers:{Accept:'application/json'}});
-      if(!response.ok)return null;return await response.json();
-    }catch(_error){return null}
+      const response=await fetch(url,{cache:'no-store',headers:{Accept:'text/plain'}});
+      if(!response.ok)return 0;
+      const encoded=String(await response.text()).trim();if(!encoded)return 0;
+      const decoded=atob(encoded.replace(/\s+/g,''));
+      return decoded.split(/\r?\n/).map(row=>row.trim()).filter(Boolean).length;
+    }catch(_error){return 0}
   }
 
-  async function useAll(protocol,client){
-    const url=multiUrl(protocol);if(!url)return;
-    const meta=await multiMeta(protocol);
-    if(!meta){notify('اطلاعات همه سرورها آماده نیست');return}
-    if(meta.kind==='bundle'){window.location.href=url;return}
-    if(client?.key==='hiddify'){
+  function useSubscription(protocol,client){
+    const url=subscriptionUrl(protocol);if(!url)return;
+    const name=String(client?.name||'').toLowerCase();
+    if(name.includes('hiddify')){
       window.location.href='hiddify://import/'+encodeURI(url)+'#TwinPanel-'+encodeURIComponent(protocol);return;
     }
-    if(client?.key==='karing'){
+    if(name.includes('karing')){
       window.location.href='karing://install-config?url='+encodeURIComponent(url)+'&name='+encodeURIComponent('TwinPanel '+protocol);return;
     }
-    notify(await copy(url)?'لینک همه سرورها کپی شد ✓':'کپی انجام نشد');
+    copy(url).then(ok=>notify(ok?'لینک اشتراک کپی شد ✓':'کپی انجام نشد'));
   }
 
-  function buildMultiCard(panel,key,count,client){
-    if(!MULTI.has(key))return null;
-    const url=multiUrl(key);if(!url)return null;
-    const card=document.createElement('section');card.className='v34-multi-card';
+  function buildSubscriptionCard(panel,key,client){
+    if(!SUBSCRIPTIONS.has(key))return null;
+    const url=subscriptionUrl(key);if(!url)return null;
+    const card=document.createElement('section');card.className='v34-subscription-card';card.hidden=true;
     const head=document.createElement('div');head.className='v34-head';
-    head.innerHTML='<b>همه سرورها</b><span>'+count+' سرور</span>';
+    head.innerHTML='<b>همه سرورها</b><span>در حال بررسی…</span>';
     const actions=document.createElement('div');actions.className='v34-actions';
-    let primary='دریافت همه سرورها';
-    if(client?.key==='hiddify'||client?.key==='karing')primary='افزودن همه به '+client.name;
-    else if(NATIVE_FILES.has(key))primary='دانلود همه کانفیگ‌ها';
-    actions.appendChild(button(primary,()=>useAll(key,client),true,false));
-    actions.appendChild(button('کپی لینک همه سرورها',async()=>{
-      notify(await copy(url)?'لینک همه سرورها کپی شد ✓':'کپی انجام نشد');
+    let primary='استفاده از لینک اشتراک';
+    const name=String(client?.name||'');
+    if(/hiddify|karing/i.test(name))primary='افزودن همه به '+name;
+    actions.appendChild(button(primary,()=>useSubscription(key,client),true,false));
+    actions.appendChild(button('کپی لینک اشتراک',async()=>{
+      notify(await copy(url)?'لینک اشتراک کپی شد ✓':'کپی انجام نشد');
     },false,true));
-    card.append(head,actions);panel.querySelector('.panel-head')?.insertAdjacentElement('afterend',card);return card;
+    card.append(head,actions);panel.querySelector('.panel-head')?.insertAdjacentElement('afterend',card);
+    subscriptionCount(key).then(count=>{
+      if(count<=0){card.remove();return}
+      const counter=head.querySelector('span');if(counter)counter.textContent=count+' سرور';
+      card.hidden=false;
+    });
+    return card;
   }
 
-  function hiddifyImportFromDownload(download){
-    if(!download||download.tagName!=='A')return'';
-    const href=String(download.getAttribute('href')||'').trim();if(!href)return'';
-    return 'hiddify://import/'+encodeURI(absolute(href))+'#TwinPanel';
-  }
-
-  function buildServerActions(panel,view,key,client){
+  function buildServerActions(view,key,client){
     view.querySelectorAll('.v34-server-actions').forEach(node=>node.remove());
     if(MANUAL.has(key))return;
     const row=document.createElement('div');row.className='v34-server-actions';
@@ -361,17 +365,16 @@ _SCRIPT = r"""
 
     if(NATIVE_FILES.has(key)){
       const action=proxyClick(download,'دانلود کانفیگ',true);if(action)row.appendChild(action);
-    }else if(key==='snell'&&client?.key==='hiddify'&&download){
-      const importUri=hiddifyImportFromDownload(download);
-      if(importUri)row.appendChild(link('اتصال به Hiddify',importUri,true));
-      const file=proxyClick(download,'دانلود کانفیگ',false);if(file)row.appendChild(file);
     }else{
-      if(direct){const action=proxyClick(direct,'اتصال به '+(client?.name||'برنامه'),true);if(action)row.appendChild(action)}
-      if(uri){
+      if(direct){
+        const action=proxyClick(direct,'اتصال به '+client.name,true);if(action)row.appendChild(action);
+      }
+      if(uri&&row.children.length<2){
         row.appendChild(button('کپی لینک اتصال',async()=>{
           notify(await copy(uri)?'لینک اتصال کپی شد ✓':'کپی انجام نشد');
         },false,true));
-      }else if(download){
+      }
+      if(download&&row.children.length<2){
         const action=proxyClick(download,'دانلود کانفیگ',row.children.length===0);if(action)row.appendChild(action);
       }
     }
@@ -379,35 +382,64 @@ _SCRIPT = r"""
     if(row.children.length)view.appendChild(row);
   }
 
+  function cleanupPanel(panel){
+    panel.querySelectorAll('.v34-subscription-card,.v34-client-card,.v34-single-label').forEach(node=>node.remove());
+    const fold=panel.querySelector('.v34-mobile-servers[data-v34-server-fold="1"]');
+    if(fold){
+      const views=fold.querySelector(':scope > .server-views');
+      if(views)fold.insertAdjacentElement('beforebegin',views);
+      fold.remove();
+    }
+  }
+
+  function organizeServerList(panel,views){
+    const serverViews=panel.querySelector('.server-views');if(!serverViews)return;
+    if(isPhone()&&views.length>3){
+      const fold=document.createElement('details');fold.className='v34-mobile-servers';fold.dataset.v34ServerFold='1';
+      const summary=document.createElement('summary');summary.textContent='سرورهای تکی';
+      serverViews.insertAdjacentElement('beforebegin',fold);fold.append(summary,serverViews);return;
+    }
+    const label=document.createElement('div');label.className='v34-single-label';label.textContent='سرورهای تکی';
+    const tabs=panel.querySelector('.server-tabs');
+    (tabs||serverViews).insertAdjacentElement('beforebegin',label);
+  }
+
   function buildPanel(panel){
-    panel.querySelectorAll('.v34-multi-card,.v34-client-card').forEach(node=>node.remove());
+    cleanupPanel(panel);
     const key=panelKey(panel);if(!key)return;
     panel.dataset.v34Protocol=key;
     if(MODERN.has(key))panel.dataset.v34Modern='1';else delete panel.dataset.v34Modern;
     explicitFactLabels(panel);
     const client=clientFor(key);const views=[...panel.querySelectorAll('.server-view')];
     views.forEach((view,index)=>{
-      view.dataset.v34ServerLabel=serverLabel(panel,view,index);buildServerActions(panel,view,key,client);
+      view.dataset.v34ServerLabel=serverLabel(panel,view,index);buildServerActions(view,key,client);
     });
-    const multi=buildMultiCard(panel,key,views.length,client);buildClientCard(panel,client,multi);
+    const subscription=buildSubscriptionCard(panel,key,client);
+    buildClientCard(panel,client,subscription);
+    organizeServerList(panel,views);
   }
 
   function apply(){
-    const p=platform();document.body.dataset.tpPlatform=p;document.documentElement.dataset.tpPlatform=p;
+    const p=platform();
+    document.body.dataset.tpPlatform=p;document.documentElement.dataset.tpPlatform=p;
     document.body.classList.add('v34-ready');document.body.dataset.tpPublicPresentation='v34';
     document.querySelectorAll('.protocol-panel').forEach(buildPanel);
   }
 
-  apply();window.setTimeout(apply,0);window.setTimeout(apply,180);window.setTimeout(apply,650);
+  apply();
 })();
 </script>
 """
 
 
 def refine_public_connection_forward_v34(source: str) -> str:
-    """Build one device-aware beginner presentation from canonical existing actions."""
+    """Build one V11-device-aware presentation from canonical existing actions."""
     if _MARKER in source:
         return source
     source = source.replace("</style>", _CSS + "\n</style>", 1)
-    source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
+    source = source.replace(
+        "</body>",
+        _client_data_script() + "\n" + _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>",
+        1,
+    )
     return source

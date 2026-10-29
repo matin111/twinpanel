@@ -12,6 +12,9 @@ on:
       - "backend/app/routers/public_connection_multilink_v7.py"
       - "backend/app/routers/public_connection_hub_v8.py"
       - "backend/app/routers/public_connection_hub_v9.py"
+      - "backend/app/routers/public_connection_device_actions_v11.py"
+      - "backend/app/routers/public_connection_modern_delivery_v13.py"
+      - "backend/app/routers/public_connection_protocol_subscriptions_v30.py"
       - "backend/app/routers/public_connection_canonical_mobile_v26.py"
       - "backend/app/routers/public_connection_forward_v34.py"
       - "backend/app/routers/public_connection_all_multilink_v34.py"
@@ -33,6 +36,9 @@ on:
       - "backend/app/routers/public_connection_multilink_v7.py"
       - "backend/app/routers/public_connection_hub_v8.py"
       - "backend/app/routers/public_connection_hub_v9.py"
+      - "backend/app/routers/public_connection_device_actions_v11.py"
+      - "backend/app/routers/public_connection_modern_delivery_v13.py"
+      - "backend/app/routers/public_connection_protocol_subscriptions_v30.py"
       - "backend/app/routers/public_connection_canonical_mobile_v26.py"
       - "backend/app/routers/public_connection_forward_v34.py"
       - "backend/app/routers/public_connection_all_multilink_v34.py"
@@ -60,6 +66,9 @@ jobs:
             backend/app/routers/public_connection_multilink_v7.py \
             backend/app/routers/public_connection_hub_v8.py \
             backend/app/routers/public_connection_hub_v9.py \
+            backend/app/routers/public_connection_device_actions_v11.py \
+            backend/app/routers/public_connection_modern_delivery_v13.py \
+            backend/app/routers/public_connection_protocol_subscriptions_v30.py \
             backend/app/routers/public_connection_canonical_mobile_v26.py \
             backend/app/routers/public_connection_forward_v34.py \
             backend/app/routers/public_connection_all_multilink_v34.py \
@@ -100,13 +109,15 @@ jobs:
 
           main = Path("backend/app/main.py").read_text()
           legacy_live = Path("backend/app/routers/public_connection_live_v4.py").read_text()
-          hub = Path("backend/app/routers/public_connection_hub_v5.py").read_text()
           hub_live = Path("backend/app/routers/public_connection_hub_live_v5.py").read_text()
           refine = Path("backend/app/routers/public_connection_hub_refine_v6.py").read_text()
           mobile = Path("backend/app/routers/public_connection_mobile_v7.py").read_text()
           multilink = Path("backend/app/routers/public_connection_multilink_v7.py").read_text()
           v8 = Path("backend/app/routers/public_connection_hub_v8.py").read_text()
           v9 = Path("backend/app/routers/public_connection_hub_v9.py").read_text()
+          v11 = Path("backend/app/routers/public_connection_device_actions_v11.py").read_text()
+          v13 = Path("backend/app/routers/public_connection_modern_delivery_v13.py").read_text()
+          v30 = Path("backend/app/routers/public_connection_protocol_subscriptions_v30.py").read_text()
           v26 = Path("backend/app/routers/public_connection_canonical_mobile_v26.py").read_text()
           v34 = Path("backend/app/routers/public_connection_forward_v34.py").read_text()
           multi34 = Path("backend/app/routers/public_connection_all_multilink_v34.py").read_text()
@@ -152,6 +163,13 @@ jobs:
           assert "navigator.share" in v9
           assert "!important" not in v9
 
+          # V11 owns platform detection and V34 consumes its data attribute.
+          assert "navigator.userAgentData" in v11
+          assert "body.dataset.tpPlatform=platform" in v11
+          assert "navigator.userAgentData" not in v34
+          assert "navigator.userAgent||" not in v34
+          assert "dataset?.tpPlatform" in v34
+
           # V26 is phone cleanup only; V34 is the single final UI authority.
           assert "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26" in v26
           assert ".v9-mobile-stack" in v26
@@ -160,11 +178,26 @@ jobs:
           assert "return refine_public_connection_forward_v34(source)" in v26
           assert "public_connection_forward_mount_v34" in v26
           assert "TWINPANEL_PUBLIC_CONNECT_FORWARD_V34" in v34
+          assert "CLIENTS as V13_CLIENTS" in v34
+          assert "const CLIENTS={" not in v34
           assert "کپی کانفیگ" not in v34
-          assert "کپی لینک همه سرورها" in v34
-          assert "دانلود مستقیم " in v34
+          assert "کپی لینک اتصال" in v34
+          assert "دانلود کانفیگ" in v34
 
-          # Exactly 13 non-manual protocols receive one all-server route.
+          # Customer-facing subscription UI is exactly the proven V30 cohort.
+          assert 'SUPPORTED_PROTOCOLS = ("v2ray", "hysteria2", "tuic", "anytls")' in v30
+          assert "const SUBSCRIPTIONS=new Set(['v2ray','hysteria2','tuic','anytls']);" in v34
+          assert "+'/sub/'+" in v34
+          assert "+'/multi/'+" not in v34
+          assert "کپی لینک اشتراک" in v34
+          assert "افزودن همه به " in v34
+
+          # Canonical V13 mapping remains the source of client names.
+          assert '"snell": {' in v13
+          assert '("sing-box Desktop", "https://github.com/SagerNet/sing-box-for-desktop/releases/latest")' in v13
+          assert '("TrustTunnel GUI", "https://github.com/blazuryk/TrustTunnel-GUI-Client/releases/latest")' in v13
+
+          # Legacy V34 multi backend remains mounted for compatibility only.
           for protocol in (
               "openvpn", "wireguard", "v2ray", "hysteria2", "tuic", "anytls",
               "naive", "shadowtls", "snell", "mieru", "trusttunnel", "amneziawg", "sudoku",
@@ -176,7 +209,7 @@ jobs:
           assert "public_connection_all_multilink_v34_router" in mount34
           assert "public_connection_app_download_v34_router" in mount34
 
-          # Direct app delivery is now centralized and architecture-aware.
+          # Existing direct-download resolver remains backward compatible.
           assert '"/app-download/{app}/{platform}"' in app34
           assert 'GitHubAsset("KaringX/karing", r"_android_arm64-v8a\\.apk$")' in app34
           assert "_android_arm\\.apk$" not in app34
@@ -185,12 +218,16 @@ jobs:
           assert "karing.app/en/quickstart" not in app34
           assert "How-to-install-Hiddify-app" not in app34
 
+          assert "MutationObserver" not in v34
+          assert "setTimeout(apply" not in v34
+          assert "while(row.children.length>2)" in v34
+
           forbidden = (
               "db.add(",
               "db.commit(",
               "subprocess",
               "asyncssh",
-              "ProtocolCredential",
+              "ProtocolCredential(",
               "QuotaDevice",
           )
           assert all(token not in mobile for token in forbidden)
