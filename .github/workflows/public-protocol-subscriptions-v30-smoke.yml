@@ -8,6 +8,7 @@ on:
       - 'backend/app/routers/public_connection_canonical_mobile_v26.py'
       - 'backend/app/routers/public_connection_multilink_v7.py'
       - 'backend/tests/smoke_public_protocol_subscriptions_v30.py'
+      - 'backend/tests/smoke_public_connection_mobile_ui_v27.py'
       - '.github/workflows/public-protocol-subscriptions-v30-smoke.yml'
   workflow_dispatch:
 
@@ -32,7 +33,11 @@ jobs:
             backend/app/routers/public_connection_protocol_subscriptions_v30.py \
             backend/app/routers/public_connection_protocol_subscriptions_mount_v30.py \
             backend/app/routers/public_connection_canonical_mobile_v26.py \
-            backend/tests/smoke_public_protocol_subscriptions_v30.py
+            backend/tests/smoke_public_protocol_subscriptions_v30.py \
+            backend/tests/smoke_public_connection_mobile_ui_v27.py
 
       - name: Run V30 subscription contract
         run: python backend/tests/smoke_public_protocol_subscriptions_v30.py
+
+      - name: Run final mobile composition contract
+        run: python backend/tests/smoke_public_connection_mobile_ui_v27.py
