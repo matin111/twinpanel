@@ -26,5 +26,21 @@ export function SmartTransportsRuntimeV27(){
     return()=>window.removeEventListener(MODERN_TRANSPORT_AUTHORITY_REFRESH_EVENT,refresh);
   },[]);
 
-  return <SmartTransportsRuntimeV26 key={authorityEpoch}/>;
+  return <>
+    <style>{`
+      .tp-transport-page .tp-hero .tp-eyebrow,
+      .tp-transport-page .tp-hero-copy > p,
+      .tp-transport-page .tp-overview-card > small,
+      .tp-transport-page .tp-service-plane .tp-eyebrow,
+      .tp-transport-page .tp-protocol-chip > small,
+      .tp-transport-page .tp-section-note,
+      .tp-transport-page .tp-card-top > div > p,
+      .tp-transport-page .tp-description,
+      .tp-transport-page .tp-registry-card .tp-eyebrow,
+      .tp-transport-page .tp-footnote {
+        display:none !important;
+      }
+    `}</style>
+    <SmartTransportsRuntimeV26 key={authorityEpoch}/>
+  </>;
 }
