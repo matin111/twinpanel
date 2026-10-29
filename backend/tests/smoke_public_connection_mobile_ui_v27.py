@@ -43,9 +43,11 @@ assert "body.v27-mobile-ui .apps" in v27
 assert "v13-action-buttons" in v27
 assert "tp-v48-profile-actions" in v27
 
-# V26 remains the canonical guard and delegates to V27 as the final mobile refinement.
+# V26 remains the canonical guard, applies V27, then delegates to V28.
 assert "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26" in v26
 assert "from .public_connection_mobile_ui_v27 import" in v26
-assert "return refine_public_connection_mobile_ui_v27(source)" in v26
+assert "from .public_connection_mobile_refine_v28 import" in v26
+assert "source = refine_public_connection_mobile_ui_v27(source)" in v26
+assert "return refine_public_connection_mobile_v28(source)" in v26
 
 print("PUBLIC_CONNECTION_MOBILE_UI_V27_SMOKE=PASS")
