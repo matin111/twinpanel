@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from .public_connection_mobile_authority_v40 import refine_public_connection_mobile_authority_v40
+from .public_connection_v2ray_actions_v41 import refine_public_connection_v2ray_actions_v41
 
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_MOBILE_SIMPLIFIED_V39"
@@ -168,4 +169,5 @@ def refine_public_connection_mobile_simplified_v39(source: str) -> str:
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
-    return refine_public_connection_mobile_authority_v40(source)
+    source = refine_public_connection_mobile_authority_v40(source)
+    return refine_public_connection_v2ray_actions_v41(source)
