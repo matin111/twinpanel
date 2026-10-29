@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.345",
+  "version": "1.1.0-rc.346",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T17:14:21Z",
+  "released_at": "2026-10-29T17:42:33Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "ae2b7e706a30bd5fab4397affa27675d9c1ddbc5",
+  "source_sha": "fa75d2ae6a2db437d62db22deb5701401e2ac1c5",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.345/twinpanel-1.1.0-rc.345-linux-x86_64.tar.gz",
-    "sha256": "ceda52b349d29701c42ee82df51e5fdc87501e1d7d9fb50cc4f69a2de4ae69fa",
-    "size_bytes": 28602909
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.346/twinpanel-1.1.0-rc.346-linux-x86_64.tar.gz",
+    "sha256": "a72cd44af8ef0ca0ac60d02ec3323cbabc33cbe91eba1a30f12e44e249c55e81",
+    "size_bytes": 28604120
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.345 اصلاح نهایی نمایش Public Connect را منتشر می‌کند. این نسخه ساختار مرجع موبایل را با ترتیب High Availability Config → Multi Server → برنامه اتصال → سرورهای تکی حفظ می‌کند، مولتی‌لینک‌ها را بر اساس authorityهای موجود برمی‌گرداند، پروتکل‌ها را در نمای فشرده بسته نگه می‌دارد و فقط پروتکل انتخاب‌شده را باز می‌کند. V2Ray/Hysteria2/TUIC/AnyTLS همچنان از مسیر ثابت /sub/{protocol} استفاده می‌کنند و سایر پروتکل‌های multi-capable از V34 /multi/{protocol} و /meta استفاده می‌کنند. Smart Connect و متن‌های توضیحی اضافی از presentation حذف شده‌اند. هیچ تغییری در dataplane، Tunnel، TP27، VXLAN، Accounting، quota، provisioning، credential generation، routing یا firewall این اصلاح ایجاد نمی‌کند. Source candidate روی SHA immutable ae2b7e706a30bd5fab4397affa27675d9c1ddbc5 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.345 ships the final Public Connect presentation refinement. The mobile reference layout preserves High Availability Config -> Multi Server -> client/app -> individual servers, restores multilinks from existing delivery authorities, keeps compact protocol cards collapsed by default, and opens only the selected protocol. V2Ray/Hysteria2/TUIC/AnyTLS retain the proven /sub/{protocol} authority while the remaining multi-capable protocols retain V34 /multi/{protocol} plus /meta. Smart Connect and redundant helper copy are removed from presentation. This refinement does not change dataplane, Tunnel, TP27, VXLAN, Accounting, quota, provisioning, credential generation, routing, or firewall behavior. The candidate source is pinned to immutable SHA ae2b7e706a30bd5fab4397affa27675d9c1ddbc5."
+    "fa": "TwinPanel 1.1.0-rc.346 فشار اضافی Public Connect در V38 را اصلاح می‌کند. نمایش مرجع High Availability Config → Multi Server → سرورهای تکی حفظ شده، اما V38 دیگر هنگام رندر اولیه برای همه پروتکل‌ها درخواست‌های موازی /sub و /multi/{protocol}/meta ارسال نمی‌کند. شمارش نمایشی سرورها از ردیف‌های ازقبل‌رندرشده گرفته می‌شود و endpointهای ثابت /sub/{protocol} و /multi/{protocol} فقط به‌عنوان اکشن واقعی کاربر حفظ شده‌اند. Accordion موبایل و مولتی‌لینک‌ها باقی می‌مانند. این اصلاح presentation-only است و هیچ تغییری در dataplane، Tunnel، TP27، VXLAN، Spoof، Accounting، quota، provisioning، credential generation، routing یا firewall ایجاد نمی‌کند. Source candidate روی SHA immutable fa75d2ae6a2db437d62db22deb5701401e2ac1c5 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.346 removes V38's eager Public Connect API fan-out while preserving the reference High Availability Config -> Multi Server -> individual servers layout. V38 no longer fires parallel /sub and /multi/{protocol}/meta requests for every protocol during initial rendering. The presentation-only server count comes from already-rendered server rows, while the proven /sub/{protocol} and /multi/{protocol} endpoints remain as real user actions. The mobile accordion and multilinks are preserved. This is presentation-only and does not change dataplane, Tunnel, TP27, VXLAN, Spoof, Accounting, quota, provisioning, credential generation, routing, or firewall behavior. The candidate source is pinned to immutable SHA fa75d2ae6a2db437d62db22deb5701401e2ac1c5."
   }
 }
