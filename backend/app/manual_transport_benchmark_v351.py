@@ -7,11 +7,19 @@ from . import smart_transport_auto_v21 as smart
 from .database import SessionLocal
 from .models import Node, Tunnel, TunnelTransport
 from .routers.provision import ssh_connect_saved
+from .transport_benchmark_receiver_wait_v355 import (
+    apply_transport_benchmark_receiver_wait_v355,
+)
 from .transport_candidates.common import close_pair
 
 
 MARKER = "TWINPANEL_MANUAL_TRANSPORT_BENCHMARK_V351"
 _benchmark_lock = asyncio.Lock()
+
+# The explicit admin health action and SmartAuto share the same V21 benchmark
+# primitive. Apply V355 before any explicit measurement can observe the old
+# fixed 0.5 second receiver-result race.
+apply_transport_benchmark_receiver_wait_v355()
 
 
 async def benchmark_transport_explicit_v351(
