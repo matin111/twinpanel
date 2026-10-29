@@ -11,16 +11,19 @@ assert "TWINPANEL_PUBLIC_CONNECT_V2RAY_MULTILINK_GROUPS_V49" in v44
 assert "refine_public_connection_v2ray_multilink_action_v44" in v42
 assert "return refine_public_connection_v2ray_multilink_action_v44(source)" in v42
 
-# V38 historically routes subscription protocols to /sub. V44 must explicitly
-# override only the V2Ray Multi Server card to the all-profile /multi endpoint.
+# V38 keeps generic subscription routing behavior, while V44 now overrides the
+# V2Ray card to the neutral all-profile subscription URL. The public action must
+# not expose the protocol-named /multi/v2ray path because that pathname is
+# externally DPI-sensitive on some networks.
 assert "subscription?subscriptionUrl(protocol):multiUrl(protocol)" in v38
-assert "'/multi/v2ray'" in v44
+assert "+'/sub'" in v44
+assert "'/multi/v2ray'" not in v44
 assert "'/sub/v2ray'" not in v44
 assert ".v38-all-card[data-v38-protocol=\"v2ray\"]" in v44
 assert "actions.replaceChildren(send,copyButton)" in v44
-assert "card.dataset.v44Endpoint='/multi/v2ray'" in v44
+assert "card.dataset.v44Endpoint='/sub'" in v44
 
-# Both top-level user actions must use the exact same all-profile multilink URL.
+# Both top-level user actions must use the exact same neutral all-profile URL.
 assert "send.href=hiddifyUrl(url)" in v44
 assert "copy(url)" in v44
 assert "ارسال همه به Hiddify" in v44
@@ -28,9 +31,10 @@ assert "کپی لینک" in v44
 assert "hiddify://import/" in v44
 assert "۹ کانفیگ" not in v44
 
-# V49 grouped architecture: server -> profiles, populated only from the
-# read-only subscription metadata endpoint. Do not parse subscription text in JS.
-assert "'/subscription/v2ray/meta'" in v44
+# V49 grouped architecture: server -> profiles, populated only from the neutral
+# read-only metadata endpoint. Do not parse subscription text in JS.
+assert "+'/sub/meta'" in v44
+assert "'/subscription/v2ray/meta'" not in v44
 assert "async function loadGroups(card)" in v44
 assert "Array.isArray(payload?.servers)" in v44
 assert "server?.profile_count" in v44
@@ -38,6 +42,7 @@ assert "server?.profiles" in v44
 assert "v49-v2ray-server" in v44
 assert "v49-v2ray-profile" in v44
 assert "مشاهده کانفیگ‌ها" in v44
+assert '"/{token}/sub/meta"' in v7
 assert '"/{token}/subscription/v2ray/meta"' in v7
 assert "_v2ray_profile_groups" in v7
 
@@ -50,4 +55,4 @@ for forbidden in [
 ]:
     assert forbidden not in v44.lower(), forbidden
 
-print("V44/V49 V2Ray Multi Server grouped-profile wiring smoke OK")
+print("V44/V49 V2Ray neutral subscription wiring smoke OK")
