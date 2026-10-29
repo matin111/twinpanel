@@ -134,11 +134,15 @@ def active_underlay_quarantine(
     if not isinstance(smart, dict):
         smart = {}
 
+    # Preserve the V207/V208 exact-reason contract while giving V211 structured
+    # evidence first authority. This local reason intentionally represents only
+    # the proven underlay class, not mutable generic health telemetry.
+    reason = UNDERLAY_REASON
     guard = cfg.get("spoof_underlay_guard_v206")
     guard_valid = bool(
         isinstance(guard, dict)
         and guard.get("blocked") is True
-        and str(guard.get("reason") or "").strip() == UNDERLAY_REASON
+        and str(guard.get("reason") or "") == reason
     )
 
     now = time.time() if now_epoch is None else float(now_epoch)
@@ -171,7 +175,7 @@ def active_underlay_quarantine(
         return {
             "blocked": True,
             "transport": spoof_wg.NAME,
-            "reason": UNDERLAY_REASON,
+            "reason": reason,
             "quarantine_until_epoch": until,
             "retry_after_seconds": remaining,
             "authority_unchanged": True,
@@ -213,8 +217,12 @@ def active_underlay_quarantine(
         "authority_unchanged": True,
         "action": "fail_fast_before_node_mutation",
         "version": 208,
-        "metadata_source": "smart_auto_v21_recovery_v208",
-        "repair_guard_metadata": True,
+        "metadata_source": (
+            "v206_guard"
+            if guard_valid
+            else "smart_auto_v21_recovery_v208"
+        ),
+        "repair_guard_metadata": not guard_valid,
     }
 
 
