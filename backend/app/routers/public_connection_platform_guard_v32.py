@@ -99,9 +99,10 @@ _SCRIPT = r"""
   }
 
   function restoreDesktopPanel(panel){
-    panel.classList.remove(
-      'v24-canonical-panel','v24-empty','v24-live-online','v27-active-protocol'
-    );
+    /* Keep v24-canonical-panel: V31 deliberately reuses it as V30's neutral
+     * per-protocol subscription marker on desktop. Only phone presentation
+     * state is removed here. */
+    panel.classList.remove('v24-empty','v24-live-online','v27-active-protocol');
     delete panel.dataset.v24ServerCount;
     panel.querySelectorAll('.server-view').forEach(view=>{
       view.classList.remove('v27-active-server','v29-server-card');
