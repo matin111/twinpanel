@@ -28,6 +28,9 @@ from .tp6_candidate_registry_v208 import apply_tp6_candidate_registry_v208
 # V212 rehydrates only exact historical V206 evidence that survived in
 # last_error after older health telemetry had already removed both structured
 # guard metadata and the SmartAuto underlay reason.
+# V213 keeps that evidence but anchors its quarantine lifetime to the original
+# TunnelTransport.updated_at failure observation instead of recovery time, and
+# normalizes synthetic V212 guards already persisted by rc.328.
 # ============================================================
 
 MARKER = "TWINPANEL_SPOOF_CANDIDATE_POLICY_V202"
@@ -89,9 +92,9 @@ def apply_spoof_candidate_policy_v202() -> None:
     # V206-V211 establish the fail-closed installer/health authority first.
     apply_spoof_underlay_guard_v206()
 
-    # V212 extends only the DB-backed authority lookup. It recovers exact
-    # historical V206 diagnostics before the existing V211 health wrapper or
-    # V207 install wrapper can fall through to SSH/node runtime.
+    # V212/V213 extend only the DB-backed authority lookup. Exact historical
+    # V206 diagnostics are preserved, but V213 prevents recovery time from
+    # becoming a new 24h outage clock. No node runtime is touched here.
     apply_spoof_last_error_recovery_v212()
 
     _apply_active_policy()
@@ -117,7 +120,7 @@ def apply_spoof_candidate_policy_v202() -> None:
         "active_candidates=tp27_fast,spoof_wg "
         "tp6_managed=explicit-install-only "
         "auto_install=tp27_fast "
-        "spoof_underlay_guard=v206-v212 "
+        "spoof_underlay_guard=v206-v213 "
         "retired_cleanup=official-v91-after-fast-online",
         flush=True,
     )
