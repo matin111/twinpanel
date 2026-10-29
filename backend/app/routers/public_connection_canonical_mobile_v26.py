@@ -3,7 +3,7 @@ from __future__ import annotations
 # Preserve legacy V30 endpoints for backward compatibility, and mount V34's
 # all-protocol multi-server/direct-download routes before the public router is
 # included by Hub Live. V34 remains the data/action builder; V36 owns responsive
-# accordion state and V37 is the final presentation cleanup/multilink authority.
+# accordion state, V37 cleanup, and V38 is the final HA/Multi Server presentation.
 from . import public_connection_protocol_subscriptions_mount_v30 as _public_connection_protocol_subscriptions_mount_v30  # noqa: F401
 from . import public_connection_forward_mount_v34 as _public_connection_forward_mount_v34  # noqa: F401
 from .public_connection_forward_v34 import refine_public_connection_forward_v34
@@ -15,6 +15,9 @@ from .public_connection_mobile_compact_v36 import (
 )
 from .public_connection_final_presentation_v37 import (
     refine_public_connection_final_presentation_v37,
+)
+from .public_connection_ha_card_v38 import (
+    refine_public_connection_ha_card_v38,
 )
 
 
@@ -102,5 +105,6 @@ def refine_public_connection_canonical_mobile_v26(source: str) -> str:
     # V36 binds the responsive accordion before V34 builds customer actions.
     source = refine_public_connection_mobile_compact_v36(source)
     source = refine_public_connection_forward_v34(source)
-    # V37 runs last: restore all-protocol multilinks and remove presentation noise.
-    return refine_public_connection_final_presentation_v37(source)
+    # V37 removes old noise; V38 owns the final deterministic HA/Multi Server card.
+    source = refine_public_connection_final_presentation_v37(source)
+    return refine_public_connection_ha_card_v38(source)
