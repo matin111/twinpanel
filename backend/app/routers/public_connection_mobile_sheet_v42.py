@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from .public_connection_v2ray_multilink_action_v44 import (
+    refine_public_connection_v2ray_multilink_action_v44,
+)
+
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_MOBILE_SHEET_V42"
 
@@ -237,7 +241,7 @@ _SCRIPT = r"""
 
 def refine_public_connection_mobile_sheet_v42(source: str) -> str:
     """Open selected protocol servers in a mobile bottom-sheet instead of inline below the grid."""
-    if _MARKER in source:
-        return source
-    source = source.replace("</style>", _CSS + "\n</style>", 1)
-    return source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
+    if _MARKER not in source:
+        source = source.replace("</style>", _CSS + "\n</style>", 1)
+        source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
+    return refine_public_connection_v2ray_multilink_action_v44(source)
