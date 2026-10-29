@@ -50,6 +50,12 @@ assert "'v24-ready','v27-mobile-ui'" in v32
 assert "details.v30-single-servers" in v32
 assert "MutationObserver" in v32
 
+# V31 deliberately reuses v24-canonical-panel as V30's neutral subscription
+# marker on desktop. V32 must preserve that marker while removing phone state.
+assert "Keep v24-canonical-panel" in v32
+restore_panel = v32.split("function restoreDesktopPanel(panel){", 1)[1].split("function restoreDesktopPresentation", 1)[0]
+assert "v24-canonical-panel" not in restore_panel.split("panel.classList.remove(", 1)[1].split(");", 1)[0]
+
 # Old mobile CSS uses more-specific display:* !important selectors. The final
 # authority therefore needs inline !important hiding, not another weak selector.
 assert "style.setProperty('display','none','important')" in v32
