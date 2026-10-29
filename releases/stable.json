@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.347",
+  "version": "1.1.0-rc.348",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T18:08:44Z",
+  "released_at": "2026-10-29T18:18:02Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "09059f3f96f62e285ccfcc3e7837c8e880e5a4f4",
+  "source_sha": "cca9b5ae975a3bd81e6003eaf2634665062f6770",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.347/twinpanel-1.1.0-rc.347-linux-x86_64.tar.gz",
-    "sha256": "f8b90f6e5f20ac4c8321f5f1d8043a0740169bacdd391222e7508802fafc68ce",
-    "size_bytes": 28604652
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.348/twinpanel-1.1.0-rc.348-linux-x86_64.tar.gz",
+    "sha256": "370ba1f74d6bb1990082ef525e99557caccfcd8dcdba18492ebfeae53d346c76",
+    "size_bytes": 28609036
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.347 رابط مسیرهای هوشمند Tunnel را جمع‌وجور می‌کند و متن‌های توضیحی و تکراری غیرعملیاتی را از صفحه Smart Transports حذف می‌کند. عنوان‌ها، وضعیت Tunnel، مسیر فعال، Candidateها، معیارها و همه کنترل‌های نصب، تست، انتخاب دستی، Smart Auto و تعمیر حفظ شده‌اند. Route همچنان از مرجع مشترک Tunnel Control Center استفاده می‌کند. این تغییر فقط presentation/UI است و هیچ تغییری در dataplane، Tunnel، TP27، VXLAN، Spoof، Failover، routing، backend، provisioning، Accounting یا firewall ایجاد نمی‌کند. Source candidate روی SHA immutable 09059f3f96f62e285ccfcc3e7837c8e880e5a4f4 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.347 makes the Smart Transports tunnel UI more compact by removing redundant non-operational explanatory copy. Tunnel status, active path, candidates, metrics, and all install, probe, manual selection, Smart Auto, and repair controls remain intact. The route continues to use the shared Tunnel Control Center authority. This is presentation/UI only and does not change dataplane, Tunnel, TP27, VXLAN, Spoof, failover, routing, backend, provisioning, Accounting, or firewall behavior. The candidate source is pinned to immutable SHA 09059f3f96f62e285ccfcc3e7837c8e880e5a4f4."
+    "fa": "TwinPanel 1.1.0-rc.348 رابط Public Connect موبایل را اصلاح می‌کند: همه پروتکل‌های واقعی موجود در اشتراک دوباره در انتخاب‌گر موبایل نمایش داده می‌شوند، رفتار accordion تک‌پروتکل V36 حفظ می‌شود، و در V2Ray/Xray اکشن‌های مشتری به دو گزینه «ارسال به Hiddify» و «کپی کانفیگ» محدود می‌شوند. کارت دانلود Hiddify حفظ شده و اکشن‌های تکراری قدیمی Karing/v2rayN/legacy از نمایش مشتری بازنشسته شده‌اند. این تغییر فقط presentation/UI است و هیچ تغییری در dataplane، Tunnel، TP27، VXLAN، Spoof، Accounting، quota، provisioning، credential generation، routing یا firewall ایجاد نمی‌کند. Source candidate روی SHA immutable cca9b5ae975a3bd81e6003eaf2634665062f6770 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.348 refines mobile Public Connect: all real protocols present in the subscription are shown again in the mobile selector, the V36 single-open accordion behavior is preserved, and V2Ray/Xray customer actions are reduced to two options: Send to Hiddify and Copy Config. The Hiddify download card remains available while duplicate legacy Karing/v2rayN/action surfaces are retired from customer view. This is presentation/UI only and does not change dataplane, Tunnel, TP27, VXLAN, Spoof, Accounting, quota, provisioning, credential generation, routing, or firewall behavior. The candidate source is pinned to immutable SHA cca9b5ae975a3bd81e6003eaf2634665062f6770."
   }
 }
