@@ -8,7 +8,9 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGET = ROOT / "backend/app/routers/public_connection_multilink_v7.py"
+ACTION_TARGET = ROOT / "backend/app/routers/public_connection_v2ray_multilink_action_v44.py"
 source = TARGET.read_text(encoding="utf-8")
+action_source = ACTION_TARGET.read_text(encoding="utf-8")
 module_ast = ast.parse(source)
 
 
@@ -89,12 +91,25 @@ legacy = {"uri": "vless://uuid@legacy.example:443?type=tcp#Legacy"}
 assert item_v2ray_uris(legacy) == [legacy["uri"]]
 assert item_v2ray_uris({}) == []
 
-# Architecture guardrails: grouped metadata is available for the modern UI and
-# subscription responses expose both server and profile counts.
+# Architecture guardrails: grouped metadata remains available and the neutral
+# canonical subscription route reuses the same payload without protocol words in
+# the public URL. Historical routes remain for compatibility only.
 assert "def _v2ray_profile_groups" in source
 assert '"/{token}/subscription/v2ray/meta"' in source
+assert '"/{token}/sub"' in source
+assert '"/{token}/sub/meta"' in source
+assert 'name="public_v2ray_subscription_neutral_v50"' in source
+assert 'request.url_for("public_v2ray_subscription_neutral_v50"' in source
 assert '"X-TwinPanel-Server-Count"' in source
 assert '"X-TwinPanel-Profile-Count"' in source
 assert "xray_delivery._customer_profiles(item)" in source
 
-print("Public Connect V2Ray all-profiles V49 smoke: PASS")
+# Public Connect/Hiddify must use the neutral path so plaintext-path DPI never
+# sees the protocol product name. Per-profile direct Hiddify URIs stay unchanged.
+assert "'/sub'" in action_source
+assert "'/sub/meta'" in action_source
+assert "card.dataset.v44Endpoint='/sub'" in action_source
+assert "+'/multi/v2ray'" not in action_source
+assert "+'/subscription/v2ray/meta'" not in action_source
+
+print("Public Connect V2Ray all-profiles V49/V50 smoke: PASS")
