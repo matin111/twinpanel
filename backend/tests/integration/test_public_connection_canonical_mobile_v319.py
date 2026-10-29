@@ -55,3 +55,10 @@ def test_android_direct_app_assets_are_verified_and_architecture_specific():
         "https://github.com/amnezia-vpn/amneziawg-android/releases/download/"
         "v3.1.20260814/AmneziaWG-3.1.202060814.apk"
     ) in source
+
+
+if __name__ == "__main__":
+    test_public_hub_retires_duplicate_mobile_renderers_but_keeps_v18_endpoint_registration()
+    test_canonical_mobile_v26_blocks_legacy_surfaces_and_explanatory_copy()
+    test_android_direct_app_assets_are_verified_and_architecture_specific()
+    print("PUBLIC_CONNECTION_CANONICAL_MOBILE_V319=PASS")
