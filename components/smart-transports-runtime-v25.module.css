@@ -1,0 +1,23 @@
+.clean {
+  display: contents;
+}
+
+/* Keep Smart Transports operational: titles, state, metrics and actions stay visible.
+   Hide only explanatory/marketing copy that makes the route unnecessarily tall. */
+.clean :global([class*="hero"] [class*="eyebrow"]),
+.clean :global([class*="hero"] > div > p),
+.clean :global([class*="controlBar"] + [class*="noticeWarn"]),
+.clean :global([class*="sectionHead"] > small),
+.clean :global(.tp-hero-copy .tp-eyebrow),
+.clean :global(.tp-hero-copy > p),
+.clean :global(.tp-overview-card > small),
+.clean :global(.tp-section-head .tp-eyebrow),
+.clean :global(.tp-section-note) {
+  display: none !important;
+}
+
+/* Remove the extra vertical gap left by hidden explanatory blocks. */
+.clean :global([class*="hero"]),
+.clean :global(.tp-hero) {
+  padding-bottom: 16px;
+}
