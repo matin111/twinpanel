@@ -27,7 +27,6 @@ assert "originalChoice" in v27
 assert "selectProtocol" in v27
 assert "selectServer" in v27
 
-# V27 remains available as the compact fallback layer and is presentation-only.
 for forbidden in (
     "JSON.parse(",
     "atob(",
@@ -42,7 +41,6 @@ assert "body.v27-mobile-ui .apps" in v27
 assert "v13-action-buttons" in v27
 assert "tp-v48-profile-actions" in v27
 
-# V26 remains the canonical guard. Final composition is V27 -> V28 -> V29 -> V30 -> V31.
 assert "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26" in v26
 assert "from .public_connection_mobile_ui_v27 import" in v26
 assert "from .public_connection_mobile_refine_v28 import" in v26
@@ -55,7 +53,6 @@ assert "source = refine_public_connection_presentation_v29(source)" in v26
 assert "source = refine_public_connection_protocol_subscriptions_v30(source)" in v26
 assert "return refine_public_connection_unified_actions_v31(source)" in v26
 
-# V29 overrides V27's one-active-panel phone UX with vertical canonical cards.
 assert "TWINPANEL_PUBLIC_CONNECT_PRESENTATION_V29" in v29
 assert "body.v29-ready.v27-mobile-ui .v27-connect-nav" in v29
 assert "body.v29-ready.v27-mobile-ui .protocol-panel.v24-canonical-panel" in v29
@@ -63,14 +60,12 @@ assert "body.v29-ready.v27-mobile-ui .protocol-panel .server-view" in v29
 assert "content:attr(data-v24-server-label)!important" in v29
 assert "protocol-panel[data-modern-protocol] .facts" in v29
 
-# V30 remains additive for only proven common-subscription protocols.
 assert "TWINPANEL_PUBLIC_PROTOCOL_SUBSCRIPTIONS_V30" in v30
 assert "v30-subscription-card" in v30
 assert "v30-single-servers" in v30
 assert "سرورهای تکی" in v30
 assert "کپی لینک اشتراک" in v30
 
-# V31 is the final semantic/presentation authority for every protocol.
 assert "TWINPANEL_PUBLIC_CONNECT_UNIFIED_ACTIONS_V31" in v31
 assert "اتصال به Karing" in v31
 assert "باز کردن در برنامه" in v31
