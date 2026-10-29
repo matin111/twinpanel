@@ -39,6 +39,97 @@
   -webkit-backdrop-filter:none;
 }
 
+/* TWINPANEL_OUTBOUNDS_MINIMAL_COPY_LIGHT_V1
+   Keep operational labels/values/actions; remove decorative and explanatory copy. */
+.fullWidth :global([class*="heroMain"]),
+.fullWidth :global([class*="sectionKicker"]),
+.fullWidth :global([class*="architectureNote"]),
+.fullWidth :global([class*="safetyChips"]),
+.fullWidth :global([class*="foot"]){
+  display:none!important;
+}
+
+.fullWidth :global([class*="sectionHead"] p),
+.fullWidth :global([class*="addMain"] > p),
+.fullWidth :global([class*="safetyCard"] p),
+.fullWidth :global([class*="head"] p),
+.fullWidth :global([class*="abBox"] p),
+.fullWidth :global([class*="head"] > div:first-child > span){
+  display:none!important;
+}
+
+.fullWidth :global([class*="hero"]){
+  grid-template-columns:1fr!important;
+  min-height:0!important;
+  padding:18px!important;
+}
+
+.fullWidth :global([class*="heroControls"]){
+  width:min(100%,420px);
+  justify-self:start;
+}
+
+:global(html[data-theme="light"]) .fullWidth{
+  --panel:#ffffff;
+  --panel-2:#f8f7ff;
+  --surface:#ffffff;
+  --surface2:#f8f7ff;
+  --text:#171725;
+  --muted:#707086;
+  --border:#e7e4f5;
+  color:#171725;
+}
+
+:global(html[data-theme="light"]) .fullWidth :global([class*="hero"]),
+:global(html[data-theme="light"]) .fullWidth :global([class*="panel"]),
+:global(html[data-theme="light"]) .fullWidth :global([class*="statCard"]),
+:global(html[data-theme="light"]) .fullWidth :global([class*="controlBar"]),
+:global(html[data-theme="light"]) .fullWidth :global([class*="wrap"]),
+:global(html[data-theme="light"]) .fullWidth :global([class*="card"]),
+:global(html[data-theme="light"]) .fullWidth :global([class*="abBox"]){
+  color:#171725!important;
+}
+
+:global(html[data-theme="light"]) .fullWidth :global([class*="heroControls"]),
+:global(html[data-theme="light"]) .fullWidth :global([class*="matrixHeader"]),
+:global(html[data-theme="light"]) .fullWidth :global([class*="matrixRowLocked"]),
+:global(html[data-theme="light"]) .fullWidth :global([class*="ghostButton"]),
+:global(html[data-theme="light"]) .fullWidth :global([class*="secondary"]){
+  background:#ffffff!important;
+  color:#171725!important;
+}
+
+:global(html[data-theme="light"]) .fullWidth :global(select),
+:global(html[data-theme="light"]) .fullWidth :global(input),
+:global(html[data-theme="light"]) .fullWidth :global(textarea){
+  background:#ffffff!important;
+  color:#171725!important;
+  border-color:#e7e4f5!important;
+}
+
+:global(html[data-theme="light"]) .fullWidth :global([class*="routePill"]){
+  color:#5b35c8!important;
+  background:#f3efff!important;
+  border-color:#ddd2ff!important;
+}
+
+:global(html[data-theme="light"]) .fullWidth :global([class*="protocolIcon"]){
+  color:#5b35c8!important;
+  background:#f3efff!important;
+}
+
+:global(html[data-theme="light"]) .fullWidth :global([class*="alertError"]),
+:global(html[data-theme="light"]) .fullWidth :global([class*="error"]){
+  color:#b4233b!important;
+  background:#fff1f3!important;
+}
+
+:global(html[data-theme="light"]) .fullWidth :global([class*="alertSuccess"]),
+:global(html[data-theme="light"]) .fullWidth :global([class*="notice"]){
+  color:#087a57!important;
+  background:#ecfdf5!important;
+}
+
 @media(max-width:900px){
   .fullWidth :global(section > div:has(> aside) > aside){
     grid-template-columns:1fr;
