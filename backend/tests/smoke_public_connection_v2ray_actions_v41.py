@@ -48,27 +48,30 @@ assert "profiles.forEach(simplifyProfile)" in v41
 assert "wrapper.dataset.v41ProfileCount=String(profiles.length)" in v41
 assert "purgeLegacyInteractiveBlocks" not in v41
 
-# Each real profile keeps only its own Hiddify import + exact config copy action.
-assert "const primary=actions.querySelector('.tp-v48-hiddify')" in v41
+# Each real profile keeps only its own Karing import + exact config copy action.
+assert "const primary=actions.querySelector('.tp-v48-karing')" in v41
 assert "const copy=actions.querySelector('.copy-btn[data-copy]')" in v41
 assert "if(node!==primary&&node!==copy)node.remove()" in v41
-assert "primary.textContent='ارسال به Hiddify'" in v41
+assert "primary.textContent='ارسال به Karing'" in v41
 assert "copy.textContent='کپی کانفیگ'" in v41
-assert "ارسال این اتصال به Hiddify" in v41
+assert "ارسال این اتصال به Karing" in v41
 assert "کپی کانفیگ این اتصال" in v41
+assert "const primary=actions.querySelector('.tp-v48-hiddify')" not in v41
 
 # Once real profiles exist, the generic canonical row is only a duplicate and is hidden.
 assert "row.dataset.v41Duplicate='1'" in v41
 assert "row.setAttribute('aria-hidden','true')" in v41
 assert '.v34-server-actions[data-v41-duplicate="1"]' in v41
 
-# Legacy V2Ray without profiles still keeps the canonical two-action fallback.
+# Legacy V2Ray without profiles still keeps the canonical two-action fallback,
+# but the primary label is normalized to Karing.
 assert "function simplifyCanonicalFallback(view,row)" in v41
 assert "const primary=row.querySelector('.v34-primary')" in v41
 assert "const copy=row.querySelector('.v34-copy')" in v41
+assert "primary.textContent='ارسال به Karing'" in v41
 assert "row.dataset.v41Canonical='1'" in v41
 
-# Hiddify app download is explicitly protected; V42 remains final presentation layer.
+# Client download card is preserved; V42 remains final presentation layer.
 assert '.v34-client-card' in v41
 assert "function preserveClientDownload(panel)" in v41
 assert "card.dataset.v41ClientDownload='1'" in v41
@@ -81,4 +84,4 @@ for item in forbidden:
     assert item not in v41.lower(), item
     assert item not in v43.lower(), item
 
-print("V41/V43 Xray 3-profile actions + single-payload all-country multilink smoke OK")
+print("V41/V43 Xray Karing actions + single-payload all-country multilink smoke OK")

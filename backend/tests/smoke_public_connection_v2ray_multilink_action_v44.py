@@ -24,11 +24,14 @@ assert "actions.replaceChildren(send,copyButton)" in v44
 assert "card.dataset.v44Endpoint='/sub'" in v44
 
 # Both top-level user actions must use the exact same neutral all-profile URL.
-assert "send.href=hiddifyUrl(url)" in v44
+# Karing is the canonical V2Ray client; Hiddify must not be reintroduced here.
+assert "send.href=karingUrl(url,'TwinPanel V2Ray')" in v44
 assert "copy(url)" in v44
-assert "ارسال همه به Hiddify" in v44
+assert "ارسال همه به Karing" in v44
 assert "کپی لینک" in v44
-assert "hiddify://import/" in v44
+assert "karing://install-config?url=" in v44
+assert "hiddify://import/" not in v44
+assert "ارسال همه به Hiddify" not in v44
 assert "۹ کانفیگ" not in v44
 
 # V49 grouped architecture: server -> profiles, populated only from the neutral
@@ -55,4 +58,4 @@ for forbidden in [
 ]:
     assert forbidden not in v44.lower(), forbidden
 
-print("V44/V49 V2Ray neutral subscription wiring smoke OK")
+print("V44/V49 V2Ray Karing neutral subscription wiring smoke OK")

@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+from . import public_connection_all_multilink_v34 as multilink
+from . import public_connection_modern_delivery_v13 as modern_delivery
 from .public_connection_mobile_sheet_v42 import refine_public_connection_mobile_sheet_v42
 from .public_connection_v2ray_multilink_v43 import apply_v2ray_multilink_v43
 
 
 apply_v2ray_multilink_v43()
+# V2Ray's customer-facing canonical client is Karing. Keep this policy adjacent
+# to the final V2Ray presentation layer so metadata, download card and actions
+# cannot drift back to the historical Hiddify default.
+modern_delivery.CLIENTS["v2ray"] = modern_delivery._KARING
+multilink.PROTOCOL_CLIENT["v2ray"] = "karing"
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_ACTIONS_V41"
 
@@ -40,7 +47,7 @@ body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-profile-a
   width:100%!important;
   min-height:40px!important;
 }
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-profile-actions .tp-v48-hiddify{
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-profile-actions .tp-v48-karing{
   border-color:var(--p)!important;
   background:var(--p)!important;
   color:#fff!important;
@@ -115,7 +122,7 @@ _SCRIPT = r"""
     const actions=profile.querySelector('.tp-v48-profile-actions');
     if(!actions)return;
 
-    const primary=actions.querySelector('.tp-v48-hiddify');
+    const primary=actions.querySelector('.tp-v48-karing');
     const copy=actions.querySelector('.copy-btn[data-copy]');
 
     [...actions.children].forEach(node=>{
@@ -123,8 +130,8 @@ _SCRIPT = r"""
     });
 
     if(primary){
-      primary.textContent='ارسال به Hiddify';
-      primary.setAttribute('aria-label','ارسال این اتصال به Hiddify');
+      primary.textContent='ارسال به Karing';
+      primary.setAttribute('aria-label','ارسال این اتصال به Karing');
     }
     if(copy){
       copy.textContent='کپی کانفیگ';
@@ -150,8 +157,15 @@ _SCRIPT = r"""
     });
 
     if(primary){
-      primary.textContent='ارسال به Hiddify';
-      primary.setAttribute('aria-label','ارسال کانفیگ به Hiddify');
+      const href=String(primary.getAttribute('href')||'');
+      if(!href.startsWith('karing://')){
+        const raw=String(primary.dataset?.copyTarget||primary.getAttribute('data-copy')||'').trim();
+        if(raw){
+          primary.setAttribute('href','karing://install-config?url='+encodeURIComponent(raw)+'&name='+encodeURIComponent('TwinPanel V2Ray'));
+        }
+      }
+      primary.textContent='ارسال به Karing';
+      primary.setAttribute('aria-label','ارسال کانفیگ به Karing');
     }
     if(copy){
       copy.textContent='کپی کانفیگ';
@@ -224,7 +238,7 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_v2ray_actions_v41(source: str) -> str:
-    """Preserve every real Xray profile and keep exactly Hiddify + Copy Config per profile."""
+    """Preserve every real Xray profile and keep exactly Karing + Copy Config per profile."""
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
