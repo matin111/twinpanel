@@ -2,9 +2,22 @@
 .online-summary{margin-top:16px;padding:12px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--surface2) 82%,transparent);display:grid;grid-template-columns:auto 1fr;gap:2px 8px;align-items:center}
 .online-summary .dot{grid-row:1/3}.online-summary b{font-size:10px}.online-summary small{color:var(--muted);font-size:8px}
 .admin-runtime-charts{margin-top:13px}.admin-runtime-charts .card{min-width:0}.admin-runtime-charts .chart{margin-top:10px}.admin-runtime-charts .admin-sales-grid{margin-top:2px}.admin-runtime-triple{margin-top:13px}.admin-runtime-protocols-card{margin-top:13px}.admin-runtime-protocols-card .admin-protocol-grid{margin-top:12px}
+
+/* TWINPANEL_ADMIN_DASHBOARD_MINIMAL_COPY_V1
+   Operational dashboard copy stays label-first: titles, names and values only. */
+.dash27 .dash27-title p,
+.dash27 .dash-kpi-copy small,
+.dash27 .dash27-section-head p,
+.dash27 .dash27-live small,
+.dash27 .dash27-health-copy small,
+.dash27 .dash27-node-meta,
+.dash27 .dash27-protocol-meta{display:none!important}
+
+.dash27-server-host{margin-top:0}.dash-server-card{display:grid;gap:12px;padding:16px;border:1px solid var(--line);border-radius:18px;background:var(--surface);box-shadow:0 12px 35px rgba(26,19,54,.045)}.dash-server-head{display:flex;align-items:center;justify-content:space-between;gap:14px}.dash-server-head h2{margin:0;font-size:15px}.dash-server-head b{font-size:10px;color:var(--muted);direction:ltr}.dash-server-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.dash-server-resource,.dash-server-uptime{display:grid;gap:7px;padding:11px 12px;border-radius:12px;background:var(--surface2)}.dash-server-resource>div,.dash-server-uptime{font-size:9px}.dash-server-resource>div{display:flex;align-items:center;justify-content:space-between;gap:8px}.dash-server-resource span,.dash-server-uptime span{color:var(--muted)}.dash-server-resource b,.dash-server-uptime b{font-size:10px}.dash-server-resource>i{display:block;height:6px;border-radius:999px;background:color-mix(in srgb,var(--line) 78%,transparent);overflow:hidden}.dash-server-resource>i em{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#22b8cf,#7c5cff)}.dash-server-uptime{align-content:center;grid-template-columns:1fr auto;align-items:center}
+
 html[data-theme="light"] .online-summary{background:#fff}
 html[data-theme="light"] .donut:after{background:#fff}
 @media(max-width:1250px){.dashboard-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:1050px){.admin-runtime-triple{grid-template-columns:1fr 1fr}.admin-runtime-triple>.card:last-child{grid-column:1/-1}}
+@media(max-width:1050px){.admin-runtime-triple{grid-template-columns:1fr 1fr}.admin-runtime-triple>.card:last-child{grid-column:1/-1}.dash-server-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:900px){.dashboard-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:760px){.dashboard-stats{grid-template-columns:1fr}.admin-runtime-triple{grid-template-columns:1fr}.admin-runtime-triple>.card:last-child{grid-column:auto}}
+@media(max-width:760px){.dashboard-stats{grid-template-columns:1fr}.admin-runtime-triple{grid-template-columns:1fr}.admin-runtime-triple>.card:last-child{grid-column:auto}.dash-server-grid{grid-template-columns:1fr 1fr}}
