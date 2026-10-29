@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.329",
+  "version": "1.1.0-rc.330",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T03:31:38Z",
+  "released_at": "2026-10-29T03:40:29Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9ed8dd415c1959372021abdda9e64341ce6e4699",
+  "source_sha": "6d15e60a0520f1aef219417132b65f91079c49fb",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.329/twinpanel-1.1.0-rc.329-linux-x86_64.tar.gz",
-    "sha256": "f7b9d6965a1f52dfca99023f828cfa58bef22e9f9da50e8593beb23e24679d63",
-    "size_bytes": 28539929
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.330/twinpanel-1.1.0-rc.330-linux-x86_64.tar.gz",
+    "sha256": "72b2606dd61c2ef5e6b27cee005adbe208a0031653ad868ae1dd514223a3b338",
+    "size_bytes": 28549395
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.329 اصلاح Spoof Historical Quarantine Requalification V213 را منتشر می‌کند. در rc.328، بازیابی V212 می‌توانست failure تاریخی ذخیره‌شده در last_error را در زمان recovery به یک quarantine تازه ۲۴ ساعته تبدیل کند و V211/V207 سپس Health/Install را قبل از SSH/node mutation ببندند؛ در نتیجه حتی پس از تغییر شرایط شبکه، Spoof امکان re-qualification نداشت. V213 TTL بازیابی‌شده را به زمان واقعی ثبت failure در TunnelTransport.updated_at متصل می‌کند، guardهای synthetic V212 موجود را normalize می‌کند، failureهای تاریخی تازه را فقط تا پایان TTL واقعی fail-closed نگه می‌دارد و evidence منقضی را به‌صورت forensic و non-blocking حفظ می‌کند تا Health/explicit install بتواند وضعیت فعلی underlay را دوباره ارزیابی کند. last_error، status، enabled state و Production authority حفظ می‌شوند و TP27 Fast، Kernel VXLAN، Spoof framing/ports/payload، routing و firewall بدون تغییر هستند. Source candidate روی SHA immutable 9ed8dd415c1959372021abdda9e64341ce6e4699 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.329 ships Spoof Historical Quarantine Requalification V213. In rc.328, V212 recovery could turn persisted historical last_error evidence into a fresh 24-hour quarantine at recovery time; V211/V207 would then block Health/Install before SSH/node mutation, preventing current Spoof underlay re-qualification even after network conditions changed. V213 anchors recovered TTL to the original failure observation in TunnelTransport.updated_at, normalizes already-persisted synthetic V212 guards, keeps recent historical failures fail-closed only for their remaining real TTL, and preserves expired forensic evidence as non-blocking metadata so normal Health/explicit install can re-evaluate the current underlay. last_error, status, enabled state and Production authority are preserved; TP27 Fast, Kernel VXLAN, Spoof framing/ports/payload, routing and firewall are unchanged. The candidate source is pinned to immutable SHA 9ed8dd415c1959372021abdda9e64341ce6e4699."
+    "fa": "TwinPanel 1.1.0-rc.330 قابلیت Public Connect Unified Actions V31 را منتشر می‌کند و rc.329 Spoof V213 و rc.327 Protocol Subscriptions V30 را حفظ می‌کند. V31 زبان اکشن‌ها را برای همه پروتکل‌ها در Windows و Mobile یکپارچه می‌کند: «کپی کانفیگ» خام از UI مبتدی حذف می‌شود، share/URI با «کپی لینک»، فایل با «دانلود کانفیگ»، import مستقیم با «اتصال به Karing» و URI عمومی با «باز کردن در برنامه» نمایش داده می‌شود. اجرای Karing دیگر صرفاً برای باز کردن برنامه raw config را کپی نمی‌کند. اکشن‌های تکراری حذف می‌شوند و دانلود برنامه از هر سرور/کشور به یک کارت سطح پروتکل و متناسب با سیستم‌عامل منتقل می‌شود. برای V2Ray/Xray، Hysteria2، TUIC و AnyTLS کارت Subscription V30 و همه‌سرورها حفظ می‌شود و برای پروتکل‌های فاقد قرارداد مشترک، subscription ساختگی ایجاد نمی‌شود. هیچ تغییری در TP27، VXLAN، Tunnel، Spoof، Accounting، quota، provisioning، credential generation، routing، firewall یا protocol dataplane ایجاد نشده است. Source candidate روی SHA immutable 6d15e60a0520f1aef219417132b65f91079c49fb قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.330 ships Public Connect Unified Actions V31 while preserving rc.329 Spoof V213 and rc.327 Protocol Subscriptions V30. V31 unifies action semantics across Windows and Mobile for every protocol: raw config copy is removed from the beginner-facing UI, share/URI actions are labeled Copy link, file delivery is Download config, direct import is Connect to Karing, and generic URI launch is Open in app. Launching Karing no longer copies raw configuration merely to open the client. Duplicate actions are removed, and app downloads move from every country/server row to one OS-appropriate protocol-level client card. V30 all-server subscription cards remain for V2Ray/Xray, Hysteria2, TUIC and AnyTLS only; no fake subscription is created for protocols without a proven common subscription contract. This release does not modify TP27, VXLAN, Tunnel, Spoof, Accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane. The candidate source is pinned to immutable SHA 6d15e60a0520f1aef219417132b65f91079c49fb."
   }
 }
