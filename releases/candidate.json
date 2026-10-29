@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.363",
-  "source_sha": "4ecc2c8e396b79d0a9f3f261de8511dc5aab8d0e",
+  "version": "1.1.0-rc.364",
+  "source_sha": "5d31b32fb4b78bdc81fb27340240a6bf03c80224",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.363 کارت «سرور» داشبورد Admin را کامل‌تر می‌کند و ظرفیت واقعی منابع Controller را کنار درصد مصرف نمایش می‌دهد: تعداد vCPU، میزان RAM مصرف‌شده/کل، Disk مصرف‌شده/کل و Hostname. این Release فقط UI/Monitoring داشبورد را اصلاح می‌کند و هیچ تغییری در TP27، VXLAN، Tunnel/Spoof dataplane، Accounting، quota، provisioning، credential generation، routing، firewall یا protocol dataplane ایجاد نمی‌کند. Source candidate روی SHA immutable 4ecc2c8e396b79d0a9f3f261de8511dc5aab8d0e قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.363 completes the Admin Dashboard Server card by showing real Controller capacity next to live usage: vCPU count, RAM used/total, Disk used/total, and hostname. This release changes only dashboard UI/monitoring and does not modify TP27, VXLAN, tunnel/spoof dataplane, accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane behavior. The candidate source is pinned to immutable SHA 4ecc2c8e396b79d0a9f3f261de8511dc5aab8d0e."
+    "fa": "TwinPanel 1.1.0-rc.364 صفحه Outbound مدیریت را اصلاح می‌کند: Light Mode برای Outbound Policy Center و Performance V4 با پس‌زمینه، متن، border، input و statusهای خوانا هماهنگ شده و متن‌های تزئینی/توضیحی تکراری حذف شده‌اند تا فقط عنوان‌ها، نام‌ها، وضعیت‌ها، مسیرها، مقادیر و عملیات اصلی باقی بمانند. این Release فقط UI صفحه /admin/outbounds را Refine می‌کند و هیچ تغییری در منطق Outbound Policy، routing، TP27، VXLAN، Tunnel/Spoof dataplane، Accounting، quota، provisioning، credential generation، firewall یا protocol dataplane ایجاد نمی‌کند. Source candidate روی SHA immutable 5d31b32fb4b78bdc81fb27340240a6bf03c80224 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.364 refines the Admin Outbound page: Light Mode for Outbound Policy Center and Performance V4 now uses readable backgrounds, text, borders, inputs and status surfaces, while decorative/redundant helper copy is removed so only primary titles, names, states, routes, values and actions remain. This release changes only the /admin/outbounds UI and does not modify outbound policy semantics, routing, TP27, VXLAN, tunnel/spoof dataplane, accounting, quota, provisioning, credential generation, firewall or protocol dataplane behavior. The candidate source is pinned to immutable SHA 5d31b32fb4b78bdc81fb27340240a6bf03c80224."
   }
 }
