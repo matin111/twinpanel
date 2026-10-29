@@ -76,4 +76,4 @@ jobs:
           PY
 
       - name: Run canonical mobile regression
-        run: python -m pytest -q backend/tests/integration/test_public_connection_canonical_mobile_v319.py
+        run: python backend/tests/integration/test_public_connection_canonical_mobile_v319.py
