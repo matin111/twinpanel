@@ -1,17 +1,20 @@
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..bot_texts import bot_text_catalog, reset_bot_texts, save_bot_texts
+from ..config import settings
 from ..database import get_db
 from ..deps import require_admin, require_reseller
 from ..domain_models import Domain, DomainType, SSLStatus
-from ..models import Subscription, SubscriptionStatus
+from ..models import Node, NodeStatus, Subscription, SubscriptionStatus
 from ..models_reseller import Reseller, ResellerSubscription
+from ..node_telemetry_models import NodeTelemetry
 from ..quota_models import QuotaSession, QuotaUsageEvent
+from ..schemas import NodeHeartbeatIn
 from ..services.dashboard_revenue import dashboard_revenue
 from ..services.public_urls import api_base_url
 from ..services.sales_analytics import (
@@ -19,6 +22,7 @@ from ..services.sales_analytics import (
     reseller_sales_analytics as build_reseller_sales_analytics,
 )
 from .admin import dashboard_summary_v2
+from .nodes import _refresh_stale_status
 
 
 router = APIRouter(tags=["runtime"])
@@ -138,6 +142,127 @@ def _live_item(subscription_id: int, states: dict[int, dict]) -> dict:
         "online": bool(state and state["online"]),
         "protocols": protocols,
         "last_seen_at": last_seen_at.isoformat() + "Z" if last_seen_at else None,
+    }
+
+
+# TWINPANEL_NODE_RESOURCE_TELEMETRY_V1
+# runtime_endpoints is registered before the legacy nodes router. These two
+# compatible routes therefore extend the existing heartbeat/health contract
+# without touching VPN dataplane, provisioning, quota or tunnel behavior.
+@router.post("/v1/nodes/{node_id}/heartbeat")
+def node_heartbeat_with_resource_telemetry(
+    node_id: int,
+    payload: NodeHeartbeatIn,
+    x_node_secret: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    if x_node_secret != settings.node_agent_shared_secret:
+        raise HTTPException(status_code=401, detail="Invalid node secret")
+
+    node = (
+        db.query(Node)
+        .filter(Node.retired_at.is_(None), Node.id == node_id)
+        .first()
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    now = datetime.utcnow()
+
+    if node.status != NodeStatus.MAINTENANCE:
+        node.status = NodeStatus.ONLINE
+
+    node.current_users = payload.current_users
+    node.last_seen_at = now
+
+    # Preserve the legacy classic-protocol heartbeat behavior exactly.
+    node.enable_cisco = bool(payload.protocols.get("cisco", False))
+    node.enable_openvpn = bool(payload.protocols.get("openvpn", False))
+    node.enable_wireguard = bool(payload.protocols.get("wireguard", False))
+    node.enable_l2tp = bool(payload.protocols.get("l2tp", False))
+    node.enable_v2ray = bool(payload.protocols.get("v2ray", False))
+
+    telemetry = db.get(NodeTelemetry, node_id)
+    if telemetry is None:
+        telemetry = NodeTelemetry(node_id=node_id)
+        db.add(telemetry)
+
+    telemetry.cpu_percent = float(payload.cpu_percent)
+    telemetry.memory_percent = float(payload.memory_percent)
+    telemetry.disk_percent = float(payload.disk_percent)
+    telemetry.hostname = (payload.hostname or "").strip() or None
+    telemetry.updated_at = now
+
+    db.commit()
+    return {"ok": True}
+
+
+@router.get(
+    "/v1/nodes/{node_id}/health",
+    dependencies=[Depends(require_admin)],
+)
+def node_health_with_resource_telemetry(
+    node_id: int,
+    db: Session = Depends(get_db),
+):
+    node = (
+        db.query(Node)
+        .filter(Node.retired_at.is_(None), Node.id == node_id)
+        .first()
+    )
+    if not node:
+        raise HTTPException(status_code=404, detail="سرور پیدا نشد")
+
+    now = datetime.utcnow()
+    changed = _refresh_stale_status(node, now)
+    if changed:
+        db.commit()
+        db.refresh(node)
+
+    age_seconds = None
+    if node.last_seen_at is not None:
+        age_seconds = max(0, int((now - node.last_seen_at).total_seconds()))
+
+    telemetry = db.get(NodeTelemetry, node_id)
+    telemetry_age_seconds = None
+    if telemetry is not None and telemetry.updated_at is not None:
+        telemetry_age_seconds = max(
+            0,
+            int((now - telemetry.updated_at).total_seconds()),
+        )
+
+    protocols = {
+        "cisco": node.enable_cisco,
+        "openvpn": node.enable_openvpn,
+        "wireguard": node.enable_wireguard,
+        "l2tp": node.enable_l2tp,
+        "v2ray": node.enable_v2ray,
+    }
+
+    return {
+        "ok": node.status == NodeStatus.ONLINE,
+        "node_id": node.id,
+        "status": node.status.value,
+        "last_seen_at": node.last_seen_at.isoformat() if node.last_seen_at else None,
+        "heartbeat_age_seconds": age_seconds,
+        "current_users": node.current_users,
+        "capacity_users": node.capacity_users,
+        "protocols": protocols,
+        "cpu_percent": telemetry.cpu_percent if telemetry else None,
+        "memory_percent": telemetry.memory_percent if telemetry else None,
+        "disk_percent": telemetry.disk_percent if telemetry else None,
+        "hostname": telemetry.hostname if telemetry else None,
+        "telemetry_updated_at": (
+            telemetry.updated_at.isoformat() if telemetry else None
+        ),
+        "telemetry_age_seconds": telemetry_age_seconds,
+        "message": (
+            "Node Agent آنلاین است"
+            if node.status == NodeStatus.ONLINE
+            else "Heartbeat نود دریافت نمی‌شود"
+            if node.status != NodeStatus.MAINTENANCE
+            else "نود در حالت نگهداری است"
+        ),
     }
 
 
