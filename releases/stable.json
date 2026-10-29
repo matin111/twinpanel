@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.327",
+  "version": "1.1.0-rc.328",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T02:51:28Z",
+  "released_at": "2026-10-29T02:59:20Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "10f01da3333760a444f498cc245d3466d9030232",
+  "source_sha": "8649bcc85836a6d07e88ec647d7b661f635b57a6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.327/twinpanel-1.1.0-rc.327-linux-x86_64.tar.gz",
-    "sha256": "b2ae15a9f451082354ff61724037798cb26368aed9e6f98e275ea65c6e819da4",
-    "size_bytes": 28537432
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.328/twinpanel-1.1.0-rc.328-linux-x86_64.tar.gz",
+    "sha256": "b5a630bf58418df1426ab1d560d363d54e65b7cf99599b490f38d4cd37c35582",
+    "size_bytes": 28535873
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.327 قابلیت Public Connect Protocol Subscriptions V30 را منتشر می‌کند. برای پروتکل‌های دارای share-link استاندارد و سازگار در cohort اول یعنی V2Ray/Xray، Hysteria2، TUIC و AnyTLS، اکنون هر پروتکل یک لینک اشتراک مستقل دارد که همه سرورها/کشورهای واقعی همان پروتکل را با ترتیب پایدار و حذف URI تکراری به‌صورت Base64 subscription feed ارائه می‌کند. V30 از URIهای canonical موجود و سازنده استاندارد V15 استفاده می‌کند و هیچ credential یا فیلد اتصال جدیدی اختراع نمی‌کند. endpoint قدیمی V2Ray برای سازگاری باقی مانده است. در UI، «همه سرورها»، «افزودن همه به Karing»، «کپی لینک اشتراک» و دانلود صریح Karing/Hiddify/v2rayN اضافه شده و روی موبایل سرورهای تکی برای پروتکل‌های پشتیبانی‌شده زیر بخش «سرورهای تکی» قرار می‌گیرند. Snell، TrustTunnel، Sudoku، AmneziaWG و Mieru تا اثبات قرارداد مشترک Karing/Hiddify/v2rayN وارد این feed مشترک نمی‌شوند. هیچ تغییری در TP27، VXLAN، Tunnel، Spoof، Accounting، quota، provisioning، credential generation، routing، firewall یا protocol dataplane ایجاد نشده است. Source candidate روی SHA immutable 10f01da3333760a444f498cc245d3466d9030232 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.327 ships Public Connect Protocol Subscriptions V30. For the first cohort of protocols with standard compatible share links—V2Ray/Xray, Hysteria2, TUIC and AnyTLS—each protocol now has an independent subscription URL containing all real countries/nodes for that protocol, preserving deterministic order, deduplicating identical URIs, and returning a Base64 subscription feed. V30 reuses existing canonical URIs and the V15 standard share-link builder and never invents credentials or connection fields. The legacy V2Ray subscription endpoint is preserved for backward compatibility. The UI adds clear all-server actions: Add all to Karing, Copy subscription link, and explicit Karing/Hiddify/v2rayN download labels; on mobile, individual servers for supported protocols move under a secondary collapsible section. Snell, TrustTunnel, Sudoku, AmneziaWG and Mieru remain fail-closed for common subscriptions until a shared Karing/Hiddify/v2rayN contract is proven. This release does not modify TP27, VXLAN, Tunnel, Spoof, Accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane. The candidate source is pinned to immutable SHA 10f01da3333760a444f498cc245d3466d9030232."
+    "fa": "TwinPanel 1.1.0-rc.328 اصلاح Spoof Last-Error Recovery V212 را منتشر می‌کند. اگر state قدیمی Spoof قبل از V211 خراب شده باشد و structured guard حذف شده و quarantine_reason توسط candidate_probe_exception overwrite شده باشد، V212 فقط در صورت باقی‌ماندن signature دقیق failure تاریخی V206 داخل last_error، guard را به‌صورت DB-metadata-only بازیابی می‌کند. بازیابی نیازمند Spoof enabled+failed، peer_ping_failed، پیشرفت forward در Iran با reverse down=0، پیشرفت reverse در Exit، reverse_ingress با counter صفر و rule مخصوص همان Tunnel است. last_error، status، enabled state و authority مسیر Production بدون تغییر می‌مانند؛ Health Guard V211 و Install Guard V207 سپس قبل از SSH/node mutation fail-closed می‌شوند. TP27 Fast، Kernel VXLAN، framing/ports/payload، routing و firewall بدون تغییر هستند. قابلیت‌های rc.327 نیز حفظ شده‌اند. Source candidate روی SHA immutable 8649bcc85836a6d07e88ec647d7b661f635b57a6 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.328 ships Spoof Last-Error Recovery V212. For legacy Spoof state corrupted before V211—where the structured guard was removed and quarantine_reason was overwritten by candidate_probe_exception—V212 restores the guard only when the exact historical V206 failure signature still survives in last_error. Recovery requires an enabled+failed Spoof candidate, peer_ping_failed, Iran forward progress with reverse down=0, Exit reverse progress, a zero reverse_ingress counter, and the tunnel-specific reverse rule. Recovery is DB-metadata-only and preserves last_error, status, enabled state, and Production authority; existing V211 Health Guard and V207 Install Guard then fail closed before SSH/node mutation. TP27 Fast, Kernel VXLAN, framing/ports/payload, routing, and firewall remain unchanged. rc.327 functionality is preserved. The candidate source is pinned to immutable SHA 8649bcc85836a6d07e88ec647d7b661f635b57a6."
   }
 }
