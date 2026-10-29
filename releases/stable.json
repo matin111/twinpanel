@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.328",
+  "version": "1.1.0-rc.329",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T02:59:20Z",
+  "released_at": "2026-10-29T03:31:38Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "8649bcc85836a6d07e88ec647d7b661f635b57a6",
+  "source_sha": "9ed8dd415c1959372021abdda9e64341ce6e4699",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.328/twinpanel-1.1.0-rc.328-linux-x86_64.tar.gz",
-    "sha256": "b5a630bf58418df1426ab1d560d363d54e65b7cf99599b490f38d4cd37c35582",
-    "size_bytes": 28535873
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.329/twinpanel-1.1.0-rc.329-linux-x86_64.tar.gz",
+    "sha256": "f7b9d6965a1f52dfca99023f828cfa58bef22e9f9da50e8593beb23e24679d63",
+    "size_bytes": 28539929
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.328 اصلاح Spoof Last-Error Recovery V212 را منتشر می‌کند. اگر state قدیمی Spoof قبل از V211 خراب شده باشد و structured guard حذف شده و quarantine_reason توسط candidate_probe_exception overwrite شده باشد، V212 فقط در صورت باقی‌ماندن signature دقیق failure تاریخی V206 داخل last_error، guard را به‌صورت DB-metadata-only بازیابی می‌کند. بازیابی نیازمند Spoof enabled+failed، peer_ping_failed، پیشرفت forward در Iran با reverse down=0، پیشرفت reverse در Exit، reverse_ingress با counter صفر و rule مخصوص همان Tunnel است. last_error، status، enabled state و authority مسیر Production بدون تغییر می‌مانند؛ Health Guard V211 و Install Guard V207 سپس قبل از SSH/node mutation fail-closed می‌شوند. TP27 Fast، Kernel VXLAN، framing/ports/payload، routing و firewall بدون تغییر هستند. قابلیت‌های rc.327 نیز حفظ شده‌اند. Source candidate روی SHA immutable 8649bcc85836a6d07e88ec647d7b661f635b57a6 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.328 ships Spoof Last-Error Recovery V212. For legacy Spoof state corrupted before V211—where the structured guard was removed and quarantine_reason was overwritten by candidate_probe_exception—V212 restores the guard only when the exact historical V206 failure signature still survives in last_error. Recovery requires an enabled+failed Spoof candidate, peer_ping_failed, Iran forward progress with reverse down=0, Exit reverse progress, a zero reverse_ingress counter, and the tunnel-specific reverse rule. Recovery is DB-metadata-only and preserves last_error, status, enabled state, and Production authority; existing V211 Health Guard and V207 Install Guard then fail closed before SSH/node mutation. TP27 Fast, Kernel VXLAN, framing/ports/payload, routing, and firewall remain unchanged. rc.327 functionality is preserved. The candidate source is pinned to immutable SHA 8649bcc85836a6d07e88ec647d7b661f635b57a6."
+    "fa": "TwinPanel 1.1.0-rc.329 اصلاح Spoof Historical Quarantine Requalification V213 را منتشر می‌کند. در rc.328، بازیابی V212 می‌توانست failure تاریخی ذخیره‌شده در last_error را در زمان recovery به یک quarantine تازه ۲۴ ساعته تبدیل کند و V211/V207 سپس Health/Install را قبل از SSH/node mutation ببندند؛ در نتیجه حتی پس از تغییر شرایط شبکه، Spoof امکان re-qualification نداشت. V213 TTL بازیابی‌شده را به زمان واقعی ثبت failure در TunnelTransport.updated_at متصل می‌کند، guardهای synthetic V212 موجود را normalize می‌کند، failureهای تاریخی تازه را فقط تا پایان TTL واقعی fail-closed نگه می‌دارد و evidence منقضی را به‌صورت forensic و non-blocking حفظ می‌کند تا Health/explicit install بتواند وضعیت فعلی underlay را دوباره ارزیابی کند. last_error، status، enabled state و Production authority حفظ می‌شوند و TP27 Fast، Kernel VXLAN، Spoof framing/ports/payload، routing و firewall بدون تغییر هستند. Source candidate روی SHA immutable 9ed8dd415c1959372021abdda9e64341ce6e4699 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.329 ships Spoof Historical Quarantine Requalification V213. In rc.328, V212 recovery could turn persisted historical last_error evidence into a fresh 24-hour quarantine at recovery time; V211/V207 would then block Health/Install before SSH/node mutation, preventing current Spoof underlay re-qualification even after network conditions changed. V213 anchors recovered TTL to the original failure observation in TunnelTransport.updated_at, normalizes already-persisted synthetic V212 guards, keeps recent historical failures fail-closed only for their remaining real TTL, and preserves expired forensic evidence as non-blocking metadata so normal Health/explicit install can re-evaluate the current underlay. last_error, status, enabled state and Production authority are preserved; TP27 Fast, Kernel VXLAN, Spoof framing/ports/payload, routing and firewall are unchanged. The candidate source is pinned to immutable SHA 9ed8dd415c1959372021abdda9e64341ce6e4699."
   }
 }
