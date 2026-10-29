@@ -5,6 +5,7 @@ on:
     paths:
       - 'backend/app/routers/public_connection_forward_v34.py'
       - 'backend/app/routers/public_connection_canonical_mobile_v26.py'
+      - 'backend/app/routers/public_connection_mobile_compact_v36.py'
       - 'backend/app/routers/public_connection_device_actions_v11.py'
       - 'backend/app/routers/public_connection_modern_delivery_v13.py'
       - 'backend/app/routers/public_connection_modern_import_v15.py'
@@ -16,6 +17,7 @@ on:
       - 'backend/app/routers/public_connection_forward_mount_v34.py'
       - 'backend/tests/smoke_public_connection_forward_v34.py'
       - 'backend/tests/smoke_public_connection_forward_v34_matrix.py'
+      - 'backend/tests/smoke_public_connection_mobile_compact_v36.py'
       - '.github/workflows/public-connect-forward-v34-smoke.yml'
   push:
     branches:
@@ -23,6 +25,7 @@ on:
     paths:
       - 'backend/app/routers/public_connection_forward_v34.py'
       - 'backend/app/routers/public_connection_canonical_mobile_v26.py'
+      - 'backend/app/routers/public_connection_mobile_compact_v36.py'
       - 'backend/app/routers/public_connection_device_actions_v11.py'
       - 'backend/app/routers/public_connection_modern_delivery_v13.py'
       - 'backend/app/routers/public_connection_modern_import_v15.py'
@@ -34,6 +37,7 @@ on:
       - 'backend/app/routers/public_connection_forward_mount_v34.py'
       - 'backend/tests/smoke_public_connection_forward_v34.py'
       - 'backend/tests/smoke_public_connection_forward_v34_matrix.py'
+      - 'backend/tests/smoke_public_connection_mobile_compact_v36.py'
       - '.github/workflows/public-connect-forward-v34-smoke.yml'
 
 jobs:
@@ -45,3 +49,5 @@ jobs:
         run: python3 backend/tests/smoke_public_connection_forward_v34.py
       - name: Run 15-protocol x 4-platform regression matrix
         run: python3 backend/tests/smoke_public_connection_forward_v34_matrix.py
+      - name: Run V36 compact mobile accordion smoke
+        run: python3 backend/tests/smoke_public_connection_mobile_compact_v36.py
