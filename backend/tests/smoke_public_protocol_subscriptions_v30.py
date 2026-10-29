@@ -49,6 +49,7 @@ assert "source = refine_public_connection_presentation_v29(source)" in v26
 assert "source = refine_public_connection_protocol_subscriptions_v30(source)" in v26
 assert "return refine_public_connection_unified_actions_v31(source)" in v26
 
+# V30 still owns the real per-protocol subscription and mobile server grouping.
 for required in (
     "همه سرورها",
     "افزودن همه به Karing",
@@ -60,14 +61,26 @@ for required in (
 ):
     assert required in v30, required
 
+# V31 is the final customer-facing action authority. Labels are device-aware,
+# so connection text is generated from the detected recommended client name.
 for required in (
-    "کپی لینک",
+    "کپی لینک اتصال",
     "دانلود کانفیگ",
-    "اتصال به Karing",
-    "باز کردن در برنامه",
+    "'اتصال به '+",
+    "برنامه مناسب دستگاه شما",
+    "افزودن همه به Hiddify",
+    "افزودن همه به Karing",
 ):
     assert required in v31, required
 assert "کپی کانفیگ" not in v31
+assert "return links[0]" not in v31
+assert ".mobile-send-btn" in v31
+
+# Desktop and mobile must share the same V30 subscription authority.
+assert "primeSubscriptionPanels" in v31
+assert "panel.classList.add('v24-canonical-panel')" in v31
+assert "normalizeSubscriptionCard" in v31
+assert ".v30-subscription-card .v30-client-downloads" in v31
 
 assert "v30-single-servers" in v30
 assert "details.className='v30-single-servers'" in v30
