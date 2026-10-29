@@ -103,10 +103,14 @@ assert "tp-v48-mobile-profiles" in source
 # Multilink remains a separate surface; V48 must not import or patch it.
 assert "public_connection_multilink" not in source
 
-# The active Hub V5 route installs V48 before base render and refines mobile last.
+# The active Hub resolves V48 before base render, applies V48 data refinement,
+# then finishes with the canonical-only mobile presentation. Retired URI parsing
+# must not run after V24/V48.
 assert "apply_xray_public_hub_profiles_v48" in live
 assert "refine_public_connection_xray_profiles_v48" in live
+assert "refine_public_connection_canonical_mobile_v26" in live
+assert "refine_public_connection_protocol_uri_details_v21" not in live
 assert live.index("apply_xray_public_hub_profiles_v48()") < live.index("base = public_connection_hub_v5(token, db)")
-assert live.index("refine_public_connection_protocol_uri_details_v21(source)") < live.index("refine_public_connection_xray_profiles_v48(source)")
+assert live.index("refine_public_connection_xray_profiles_v48(source)") < live.index("refine_public_connection_canonical_mobile_v26(source)")
 
 print("Xray Public Hub Profiles V48 smoke: PASS")
