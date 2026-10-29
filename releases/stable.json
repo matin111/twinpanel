@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.318",
+  "version": "1.1.0-rc.319",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-28T22:56:19Z",
+  "released_at": "2026-10-29T00:18:40Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9d19b7ca7b88c45eed79a20c707e7a278f9e7e4b",
+  "source_sha": "cb054f10bbe72bb848a1ff2900049cdf555faaa0",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.318/twinpanel-1.1.0-rc.318-linux-x86_64.tar.gz",
-    "sha256": "fa0bb8ea47afa7d5faad52d37be374e7a44d0ab939b3a885eb3ea901508b3f86",
-    "size_bytes": 28506807
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.319/twinpanel-1.1.0-rc.319-linux-x86_64.tar.gz",
+    "sha256": "08a9c5df8945092abd87dec1aeeb4250b20975343386d3a65e4591caca78ffd9",
+    "size_bytes": 28512934
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.318 تشخیص و Fail-Closed شدن Spoof WG را برای مسیرهای underlay ناسازگار دقیق می‌کند. Audit واقعی Tunnel #8 ثابت کرد مسیر رفت Spoof تا Exit سالم است و Exit برای مسیر برگشت bytes واقعی تولید می‌کند، اما counter ورودی اختصاصی Spoof روی Iran صفر می‌ماند؛ در همان زمان TP27 Fast و Kernel VXLAN سالم و مسیر اصلی باقی می‌مانند. V206 فقط وقتی سه شاهد مستقل peer_ping_failed، reverse bytes غیرصفر در Exit و reverse-ingress صفر روی Iran هم‌زمان وجود داشته باشند خطا را با دلیل underlay_incompatible:reverse_carrier_not_reaching_iran طبقه‌بندی می‌کند، evidence ساختاریافته را ذخیره می‌کند و candidate را ۲۴ ساعت quarantine می‌کند تا انتخاب اشتباه fail-closed بماند. Spoof همچنان explicit-install-only است و AUTO_INSTALL فقط TP27 Fast باقی می‌ماند. این نسخه framing یا payload را تغییر نمی‌دهد، فیلترینگ provider را دور نمی‌زند و هیچ تغییری در پورت‌ها، routing، firewall dataplane، TP27 Fast یا VXLAN ایجاد نمی‌کند. این Release ادعا نمی‌کند Spoof روی underlay فعلی Tunnel #8 قابل‌استفاده شده است؛ فقط failure را دقیق، پایدار و امن مدیریت می‌کند. Source candidate روی SHA immutable 9d19b7ca7b88c45eed79a20c707e7a278f9e7e4b قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.318 makes Spoof WG failure handling explicit and fail-closed on incompatible underlays. Production audit on Tunnel #8 proved that the Spoof forward path reaches Exit and Exit produces real reverse carrier bytes while the Spoof-owned reverse-ingress counter on Iran remains zero; TP27 Fast and Kernel VXLAN stay healthy and authoritative at the same time. V206 classifies the failure as underlay_incompatible:reverse_carrier_not_reaching_iran only when three independent signals are present together: peer_ping_failed, non-zero reverse bytes on Exit, and zero Spoof reverse-ingress packets on Iran. It persists structured evidence and quarantines the failed candidate for 24 hours so selection stays fail-closed. Spoof remains explicit-install-only and AUTO_INSTALL remains TP27 Fast only. This release does not change framing or payloads, does not bypass provider filtering, and does not modify ports, routing, firewall dataplane, TP27 Fast, or VXLAN. It does not claim that the Spoof dataplane is usable on Tunnel #8's current underlay; it makes that incompatibility explicit, persistent, and safe. The candidate source is pinned to immutable SHA 9d19b7ca7b88c45eed79a20c707e7a278f9e7e4b."
+    "fa": "TwinPanel 1.1.0-rc.319 اصلاح V207 برای رفتار تکراری Spoof WG را منتشر می‌کند. روی Tunnel #8، V206 قبلاً failure واقعی reverse carrier را با دلیل underlay_incompatible:reverse_carrier_not_reaching_iran و quarantine 24 ساعته ثبت می‌کرد، اما Install/Repair صریح می‌توانست در همان quarantine دوباره installer را اجرا کند و سرویس‌های Spoof را بی‌دلیل restart کند؛ همچنین UI پس از شکست نصب ممکن بود snapshot قدیمی installing را موقتاً نگه دارد. V207 قبل از هر SSH یا mutation روی Node، quarantine دقیق V206 را بررسی می‌کند و retry تکراری را fail-fast با retry-after و authority_unchanged رد می‌کند. UI Smart Transports نیز بعد از خطای install state authoritative را دوباره fetch می‌کند تا failed به‌اشتباه installing نمایش داده نشود. این نسخه packet carrier، framing، payload، port، nftables، routing، TP27 Fast یا Kernel VXLAN را تغییر نمی‌دهد و ادعا نمی‌کند Spoof dataplane روی underlay فعلی Tunnel #8 قابل‌استفاده شده است. Source candidate روی SHA immutable cb054f10bbe72bb848a1ff2900049cdf555faaa0 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.319 publishes the V207 control-plane correction for repeated Spoof WG failures. On Tunnel #8, V206 already persisted the proven reverse-carrier failure as underlay_incompatible:reverse_carrier_not_reaching_iran with a 24-hour quarantine, but an explicit Install/Repair could still invoke the installer again during that quarantine and unnecessarily restart Spoof services; the UI could also retain a stale installing snapshot after the request failed. V207 checks the exact V206 quarantine before any SSH or node mutation and rejects repeated retries fail-fast with retry-after metadata and authority_unchanged. Smart Transports also refetches authoritative state after a failed install so failed is not left displayed as stale installing. This release does not change the packet carrier, framing, payload, ports, nftables, routing, TP27 Fast, or Kernel VXLAN, and it does not claim that the Spoof dataplane is usable on Tunnel #8's current underlay. The candidate source is pinned to immutable SHA cb054f10bbe72bb848a1ff2900049cdf555faaa0."
   }
 }
