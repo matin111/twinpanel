@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from fastapi import HTTPException
+
 from . import public_connection_all_multilink_v34 as multilink
 
 
@@ -58,12 +60,36 @@ def _all_share_uris_v43(
 
 
 def _delivery_v43(token: str, protocol: str, db):
-    kind, count, sub, items, payload = _original_delivery(token, protocol, db)
-    if multilink._normalize(protocol) == "v2ray" and kind == "uri":
-        # Metadata keeps the real country/node count while payload contains
-        # every customer-safe connection profile for every node.
-        count = len(items)
-    return kind, count, sub, items, payload
+    protocol_key = multilink._normalize(protocol)
+    if protocol_key != "v2ray":
+        return _original_delivery(token, protocol, db)
+
+    # V34 captured account_delivery._public_payload before the Xray runtime
+    # adds the preserved TCP-simple fallback. Rebuild only the V2Ray delivery
+    # from the runtime customer payload so every country/node contributes the
+    # same customer-safe profile set used by the Public Connect page.
+    from .. import xray_public_delivery_runtime as delivery
+
+    sub, _legacy_payload = multilink._active(token, db)
+    payload = delivery._public_payload_customer_xray(db, sub)
+    items = multilink._protocol_items(payload, "v2ray")
+    if not items:
+        raise HTTPException(
+            status_code=404,
+            detail="سرور آماده‌ای برای این پروتکل وجود ندارد",
+        )
+
+    uris = _all_share_uris_v43(sub, "v2ray", items)
+    if uris:
+        # Keep metadata as real node/country count. The subscription payload
+        # deliberately contains multiple URIs per node (normally 3).
+        return "uri", len(items), sub, items, uris
+
+    outbounds = multilink._all_outbounds("v2ray", items)
+    if outbounds:
+        return "singbox", len(items), sub, items, outbounds
+
+    return "bundle", len(items), sub, items, None
 
 
 def apply_v2ray_multilink_v43() -> None:
