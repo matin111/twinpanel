@@ -4,6 +4,7 @@ from . import smart_transport_auto_v21 as smart
 from . import tp27_reference_runtime_v91 as reference_v91
 from . import transport_candidates as candidates
 from .spoof_last_error_recovery_v212 import apply_spoof_last_error_recovery_v212
+from .spoof_reverse_icmp_fallback_v214 import apply_spoof_reverse_icmp_fallback_v214
 from .spoof_underlay_guard_v206 import apply_spoof_underlay_guard_v206
 from .tp6_candidate_registry_v208 import apply_tp6_candidate_registry_v208
 
@@ -31,6 +32,8 @@ from .tp6_candidate_registry_v208 import apply_tp6_candidate_registry_v208
 # V213 keeps that evidence but anchors its quarantine lifetime to the original
 # TunnelTransport.updated_at failure observation instead of recovery time, and
 # normalizes synthetic V212 guards already persisted by rc.328.
+# V214 adds an ICMP reverse fallback only for the exact V206/V213 reverse-UDP
+# failure class, while preserving V205 UDP as the first-choice Spoof carrier.
 # ============================================================
 
 MARKER = "TWINPANEL_SPOOF_CANDIDATE_POLICY_V202"
@@ -97,6 +100,12 @@ def apply_spoof_candidate_policy_v202() -> None:
     # becoming a new 24h outage clock. No node runtime is touched here.
     apply_spoof_last_error_recovery_v212()
 
+    # V214 is intentionally outermost. It preserves the normal guarded V205 UDP
+    # path, but may re-qualify the exact reverse-carrier failure via ICMP. This
+    # must run after V206-V213 so an existing exact quarantine can be recovered
+    # without weakening fail-closed handling for unrelated Spoof failures.
+    apply_spoof_reverse_icmp_fallback_v214()
+
     _apply_active_policy()
 
     # V91 reapplies its policy when its reconciler task starts. Make that late
@@ -121,6 +130,7 @@ def apply_spoof_candidate_policy_v202() -> None:
         "tp6_managed=explicit-install-only "
         "auto_install=tp27_fast "
         "spoof_underlay_guard=v206-v213 "
+        "spoof_reverse_fallback=v214 "
         "retired_cleanup=official-v91-after-fast-online",
         flush=True,
     )
