@@ -3,6 +3,7 @@ from __future__ import annotations
 from . import smart_transport_auto_v21 as smart
 from . import tp27_reference_runtime_v91 as reference_v91
 from . import transport_candidates as candidates
+from .spoof_candidate_policy_v202 import apply_spoof_candidate_policy_v202
 from .tp6_candidate_registry_v208 import apply_tp6_candidate_registry_v208
 from .transport_candidates import kernel_ipip, kernel_vxlan
 
@@ -73,11 +74,22 @@ def apply_kernel_transport_registry_v209() -> None:
     auto-installed; after an explicit successful install they participate in
     the existing health/stability/benchmark lifecycle and can then be selected
     manually or considered by Smart Auto like any other qualified candidate.
+
+    V215 makes the dependency on the final Spoof policy explicit. API workers
+    historically called V209 directly, while the standalone manager called
+    V202 before V209. Bootstrapping V202 here keeps both processes on the same
+    V206/V212/V214 Spoof installer chain without changing any dataplane.
     """
 
     global _applied
     if _applied:
         return
+
+    # V215 API/manager parity: V202 owns the final TP27/Spoof baseline and
+    # installs the V206 -> V212/V213 -> V214 Spoof policy chain. The manager
+    # already calls V202 before V209, so this is idempotent there; API workers
+    # that enter through V209 now receive the same installer policy first.
+    apply_spoof_candidate_policy_v202()
 
     # TP6 is another additive candidate and its runtime wrapper must exist before
     # V209 extends the same fallback chain. This also fixes API processes that
@@ -142,6 +154,7 @@ def apply_kernel_transport_registry_v209() -> None:
         "candidates=kernel_ipip,kernel_vxlan "
         "install=explicit-only "
         "auto_install_unchanged=true "
+        "spoof_policy=v202-v214 "
         "encryption=none",
         flush=True,
     )
