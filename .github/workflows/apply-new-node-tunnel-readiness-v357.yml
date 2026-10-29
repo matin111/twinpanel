@@ -1,0 +1,102 @@
+name: Apply New Node Tunnel Readiness V357
+
+on:
+  push:
+    branches:
+      - fix/new-node-tunnel-readiness-v357
+    paths:
+      - .github/workflows/apply-new-node-tunnel-readiness-v357.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/new-node-tunnel-readiness-v357
+          fetch-depth: 0
+
+      - name: Apply readiness guard and regression smoke
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('components/tunnel-protocol-runtime-v307.tsx')
+          text = path.read_text()
+
+          old = '''  const iranNodes=useMemo(()=>nodes.filter(node=>normalize(node.node_type)==="iran"),[nodes]);
+          const exitNodes=useMemo(()=>nodes.filter(node=>normalize(node.node_type)==="exit"),[nodes]);'''
+          new = '''  const iranNodes=useMemo(()=>nodes.filter(node=>normalize(node.node_type)==="iran"),[nodes]);
+          const exitNodes=useMemo(()=>nodes.filter(node=>normalize(node.node_type)==="exit"),[nodes]);
+          // TWINPANEL_NEW_NODE_TUNNEL_READINESS_V357
+          // A fresh node must first prove a live Agent heartbeat. Tunnel creation
+          // still performs the authoritative SSH/Agent/Fabric preflight server-side.
+          const readyIranNodes=useMemo(()=>iranNodes.filter(node=>normalize(node.status)==="online"),[iranNodes]);
+          const readyExitNodes=useMemo(()=>exitNodes.filter(node=>normalize(node.status)==="online"),[exitNodes]);'''
+          assert old in text, 'node role selectors anchor missing'
+          text = text.replace(old, new, 1)
+
+          old = '''    event.preventDefault();if(busy||!draft.iran_node_id||!draft.exit_node_id)return;
+              setBusy("create");setError("");setNotice("");'''
+          new = '''    event.preventDefault();if(busy||!draft.iran_node_id||!draft.exit_node_id)return;
+              if(!readyIranNodes.some(node=>node.id===draft.iran_node_id)||!readyExitNodes.some(node=>node.id===draft.exit_node_id)){
+                setError(pick("برای ساخت Tunnel هر دو نود ایران و خارج باید Online و آماده باشند.","Both Iran and Exit nodes must be online and ready before creating a tunnel."));
+                return;
+              }
+              setBusy("create");setError("");setNotice("");'''
+          assert old in text, 'create tunnel guard anchor missing'
+          text = text.replace(old, new, 1)
+
+          old = '''  const openCreate=()=>{
+              const iran=iranNodes.find(node=>normalize(node.status)==="online")||iranNodes[0];
+              const exit=exitNodes.find(node=>normalize(node.status)==="online")||exitNodes[0];
+              setDraft({iran_node_id:iran?.id||0,exit_node_id:exit?.id||0,priority:100});setCreateOpen(true);
+            };'''
+          new = '''  const openCreate=()=>{
+              const iran=readyIranNodes[0];
+              const exit=readyExitNodes[0];
+              if(!iran||!exit){
+                setError(pick("برای ساخت Tunnel حداقل یک نود ایران و یک نود خارج Online لازم است.","At least one online Iran node and one online Exit node are required to create a tunnel."));
+                return;
+              }
+              setDraft({iran_node_id:iran.id,exit_node_id:exit.id,priority:100});setCreateOpen(true);
+            };'''
+          assert old in text, 'openCreate anchor missing'
+          text = text.replace(old, new, 1)
+
+          old = '''          <button type="button" className="primary" onClick={openCreate}>＋ {pick("Tunnel جدید","New tunnel")}</button>'''
+          new = '''          <button type="button" className="primary" disabled={loading||Boolean(busy)||readyIranNodes.length===0||readyExitNodes.length===0} title={readyIranNodes.length===0||readyExitNodes.length===0?pick("ابتدا یک نود ایران و یک نود خارج را Online کنید.","Bring one Iran node and one Exit node online first."):undefined} onClick={openCreate}>＋ {pick("Tunnel جدید","New tunnel")}</button>'''
+          assert old in text, 'new tunnel button anchor missing'
+          text = text.replace(old, new, 1)
+
+          assert '>{iranNodes.map(node=><option' in text, 'Iran options anchor missing'
+          assert '>{exitNodes.map(node=><option' in text, 'Exit options anchor missing'
+          text = text.replace('>{iranNodes.map(node=><option', '>{readyIranNodes.map(node=><option', 1)
+          text = text.replace('>{exitNodes.map(node=><option', '>{readyExitNodes.map(node=><option', 1)
+
+          path.write_text(text)
+
+          smoke = Path('scripts/new-node-tunnel-readiness-v357-smoke.py')
+          smoke.write_text('''from pathlib import Path\n\nSOURCE = Path("components/tunnel-protocol-runtime-v307.tsx").read_text()\n\nassert "TWINPANEL_NEW_NODE_TUNNEL_READINESS_V357" in SOURCE\nassert "const readyIranNodes=useMemo(()=>iranNodes.filter(node=>normalize(node.status)===\\\"online\\\")" in SOURCE\nassert "const readyExitNodes=useMemo(()=>exitNodes.filter(node=>normalize(node.status)===\\\"online\\\")" in SOURCE\nassert "!readyIranNodes.some(node=>node.id===draft.iran_node_id)" in SOURCE\nassert "!readyExitNodes.some(node=>node.id===draft.exit_node_id)" in SOURCE\nassert "const iran=readyIranNodes[0]" in SOURCE\nassert "const exit=readyExitNodes[0]" in SOURCE\nassert "readyIranNodes.length===0||readyExitNodes.length===0" in SOURCE\nassert ">{readyIranNodes.map(node=><option" in SOURCE\nassert ">{readyExitNodes.map(node=><option" in SOURCE\nassert ">{iranNodes.map(node=><option" not in SOURCE\nassert ">{exitNodes.map(node=><option" not in SOURCE\nprint("NEW_NODE_TUNNEL_READINESS_V357_SMOKE_OK")\n''')
+
+          workflow = Path('.github/workflows/new-node-tunnel-readiness-v357-smoke.yml')
+          workflow.write_text('''name: New Node Tunnel Readiness V357 Smoke\n\non:\n  pull_request:\n    paths:\n      - components/tunnel-protocol-runtime-v307.tsx\n      - scripts/new-node-tunnel-readiness-v357-smoke.py\n      - .github/workflows/new-node-tunnel-readiness-v357-smoke.yml\n  push:\n    branches: [main]\n    paths:\n      - components/tunnel-protocol-runtime-v307.tsx\n      - scripts/new-node-tunnel-readiness-v357-smoke.py\n      - .github/workflows/new-node-tunnel-readiness-v357-smoke.yml\n\njobs:\n  smoke:\n    runs-on: ubuntu-24.04\n    steps:\n      - uses: actions/checkout@v4\n      - name: Verify fail-closed tunnel selector\n        run: python3 scripts/new-node-tunnel-readiness-v357-smoke.py\n''')
+
+          # One-shot applier must not survive in the final PR.
+          Path('.github/workflows/apply-new-node-tunnel-readiness-v357.yml').unlink()
+          PY
+
+          python3 scripts/new-node-tunnel-readiness-v357-smoke.py
+
+      - name: Commit generated source fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/tunnel-protocol-runtime-v307.tsx scripts/new-node-tunnel-readiness-v357-smoke.py .github/workflows/new-node-tunnel-readiness-v357-smoke.yml .github/workflows/apply-new-node-tunnel-readiness-v357.yml
+          git commit -m "Guard new tunnel creation on online nodes"
+          git push origin HEAD:fix/new-node-tunnel-readiness-v357
