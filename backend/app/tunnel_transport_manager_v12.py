@@ -57,6 +57,9 @@ from .tp27_reference_runtime_v91 import (
 )
 from .tp27_repair_owner_guard import apply_tp27_repair_owner_guard
 from .tp27_self_repair_v265 import reconciler_loop as tp27_self_repair_loop
+from .transport_benchmark_receiver_wait_v355 import (
+    apply_transport_benchmark_receiver_wait_v355,
+)
 from .vpn_access_dataplane_v46 import reconciler_loop as vpn_access_dataplane_loop
 from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performance_loop
 
@@ -76,11 +79,16 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 # + STALE CANDIDATE INSTALL RECOVERY V200 (FINAL SELECTOR WRAPPER)
 # + SPOOF CANDIDATE POLICY V202 (FINAL ACTIVE SET)
 # + KERNEL TRANSPORT REGISTRY V209 (TP6 API + IPIP/VXLAN explicit lanes)
+# + TRANSPORT BENCHMARK RECEIVER WAIT V355
 # + RUNTIME RECONCILER V5 (extends runtime_reconciler_v4)
 # ============================================================
 
 
 async def main() -> None:
+    # V355 changes only benchmark result collection. Apply it before SmartAuto
+    # captures/uses the V21 measurement primitive so background AUTO benchmarks
+    # and explicit admin health benchmarks share the same bounded receiver wait.
+    apply_transport_benchmark_receiver_wait_v355()
     install_smart_transport_auto_v21()
     activate_manager_candidate_policy_v91()
 
@@ -155,6 +163,7 @@ async def main() -> None:
         "stale_candidate_install_recovery=v200-final-selector-wrapper "
         "spoof_candidate_policy=v202-final-active-set "
         "kernel_transport_registry=v209 "
+        "benchmark_receiver_wait=v355 "
         "vpn_access_dataplane=v46 "
         "vpn_access_performance=v51 "
         "exit_access_stability=v144 "

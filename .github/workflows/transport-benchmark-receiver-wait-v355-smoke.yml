@@ -1,0 +1,45 @@
+name: Transport Benchmark Receiver Wait V355 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/transport_benchmark_receiver_wait_v355.py'
+      - 'backend/app/manual_transport_benchmark_v351.py'
+      - 'backend/app/tunnel_transport_manager_v12.py'
+      - 'scripts/transport-benchmark-receiver-wait-v355-smoke.py'
+      - '.github/workflows/transport-benchmark-receiver-wait-v355-smoke.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/app/transport_benchmark_receiver_wait_v355.py'
+      - 'backend/app/manual_transport_benchmark_v351.py'
+      - 'backend/app/tunnel_transport_manager_v12.py'
+      - 'scripts/transport-benchmark-receiver-wait-v355-smoke.py'
+      - '.github/workflows/transport-benchmark-receiver-wait-v355-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  receiver-result-race-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile changed runtime
+        run: |
+          python -W error::SyntaxWarning -m py_compile \
+            backend/app/transport_benchmark_receiver_wait_v355.py \
+            backend/app/manual_transport_benchmark_v351.py \
+            backend/app/tunnel_transport_manager_v12.py \
+            scripts/transport-benchmark-receiver-wait-v355-smoke.py
+
+      - name: Delayed receiver result regression
+        run: python scripts/transport-benchmark-receiver-wait-v355-smoke.py
