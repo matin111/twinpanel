@@ -9,43 +9,88 @@ _CSS = r"""
 body.v38-reference .v37-multi-card{display:none!important}
 body.v38-reference .v38-all-card{
   margin:12px;
-  padding:13px;
-  border:1px solid color-mix(in srgb,var(--p) 34%,var(--line));
-  border-radius:14px;
-  background:linear-gradient(145deg,color-mix(in srgb,var(--p) 7%,var(--surface2)),var(--surface2));
+  border:1px solid color-mix(in srgb,var(--p) 30%,var(--line));
+  border-radius:16px;
+  overflow:hidden;
+  background:var(--surface2);
 }
 body.v38-reference .v38-all-head{
+  min-height:54px;
+  padding:11px 14px;
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:10px;
-  margin-bottom:10px;
+  border-bottom:1px solid var(--line);
 }
-body.v38-reference .v38-all-head b{font-size:14px;line-height:1.5}
-body.v38-reference .v38-all-head span{color:var(--muted);font-size:11px;font-weight:800}
+body.v38-reference .v38-ha-title{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-width:0;
+  font-size:14px;
+  font-weight:950;
+}
+body.v38-reference .v38-ha-shield{font-size:18px;line-height:1}
+body.v38-reference .v38-ha-badge{
+  padding:5px 10px;
+  border:1px solid color-mix(in srgb,var(--p) 48%,var(--line));
+  border-radius:999px;
+  color:var(--p);
+  font-size:11px;
+  font-weight:900;
+  white-space:nowrap;
+}
+body.v38-reference .v38-multi-row{
+  margin:12px;
+  min-height:54px;
+  padding:8px 10px 8px 13px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--surface);
+}
+body.v38-reference .v38-multi-name{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-width:0;
+  font-weight:950;
+}
+body.v38-reference .v38-multi-name small{
+  color:var(--muted);
+  font-size:10px;
+  font-weight:800;
+  white-space:nowrap;
+}
 body.v38-reference .v38-all-actions{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:8px;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  flex:0 0 auto;
 }
 body.v38-reference .v38-all-actions>a,
 body.v38-reference .v38-all-actions>button{
-  min-height:42px;
-  padding:9px 12px;
+  min-height:38px;
+  padding:8px 11px;
   display:inline-flex;
   align-items:center;
   justify-content:center;
   border:1px solid var(--line);
   border-radius:10px;
-  background:var(--surface);
+  background:var(--surface2);
   color:var(--text);
   font:inherit;
-  font-size:12px;
+  font-size:11px;
   font-weight:900;
   line-height:1.4;
   text-align:center;
   text-decoration:none;
   cursor:pointer;
+  white-space:nowrap;
 }
 body.v38-reference .v38-primary{
   border-color:var(--p)!important;
@@ -53,12 +98,56 @@ body.v38-reference .v38-primary{
   color:#fff!important;
 }
 body.v38-reference .v38-copy{color:var(--p)!important}
+body.v38-reference .v38-server-list-title{
+  margin:13px 12px 6px;
+  color:var(--muted);
+  font-size:11px;
+  font-weight:900;
+}
+body.v38-reference .v38-sr-only{
+  position:absolute!important;
+  width:1px!important;
+  height:1px!important;
+  padding:0!important;
+  margin:-1px!important;
+  overflow:hidden!important;
+  clip:rect(0,0,0,0)!important;
+  white-space:nowrap!important;
+  border:0!important;
+}
 
 @media(max-width:720px){
   body.v38-reference.v36-mobile-compact .protocol-panel{display:none!important}
   body.v38-reference.v36-mobile-compact .protocol-panel.v36-open{display:block!important}
-  body.v38-reference .v38-all-card{margin:10px;padding:11px}
-  body.v38-reference .v38-all-actions{grid-template-columns:1fr}
+  body.v38-reference .v38-all-card{margin:10px}
+  body.v38-reference .v38-all-head{min-height:50px;padding:9px 11px}
+  body.v38-reference .v38-multi-row{margin:10px;min-height:50px;padding:7px 8px 7px 10px}
+  body.v38-reference .v38-all-actions>a,
+  body.v38-reference .v38-all-actions>button{min-height:36px;padding:7px 9px;font-size:10px}
+
+  /* Match the reference: compact individual-server rows below Multi Server. */
+  body.v38-reference.v36-mobile-compact .protocol-panel.v36-open .server-views{
+    gap:7px!important;
+    padding:8px 10px 12px!important;
+  }
+  body.v38-reference.v36-mobile-compact .protocol-panel.v36-open .server-view{
+    padding:9px!important;
+    border-radius:11px!important;
+  }
+  body.v38-reference.v36-mobile-compact .protocol-panel.v36-open .server-view:before{
+    margin-bottom:6px!important;
+  }
+  body.v38-reference.v36-mobile-compact .protocol-panel.v36-open .v34-server-actions{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:6px!important;
+    margin-top:6px!important;
+  }
+  body.v38-reference.v36-mobile-compact .protocol-panel.v36-open .v34-server-actions>a,
+  body.v38-reference.v36-mobile-compact .protocol-panel.v36-open .v34-server-actions>button{
+    min-height:38px!important;
+    padding:7px 8px!important;
+    font-size:10px!important;
+  }
 }
 """
 
@@ -88,6 +177,11 @@ _SCRIPT = r"""
     const choice=[...document.querySelectorAll('.protocol-choice')]
       .find(item=>String(item.dataset.protocol||'')===String(panel?.id||''));
     return normalize(choice?.dataset?.protocolKey||choice?.dataset?.protocol||'');
+  }
+
+  function protocolTitle(panel,key){
+    const heading=text(panel.querySelector('.panel-head h2,.panel-head h3,.panel-head'));
+    return heading||key;
   }
 
   function token(){
@@ -150,17 +244,19 @@ _SCRIPT = r"""
     window.__tpV38Toast=setTimeout(()=>toast.classList.remove('show'),1500);
   }
 
-  function link(label,href,primary){
+  function link(label,href,primary,ariaLabel){
     const node=document.createElement('a');node.textContent=label;node.href=href;
     if(primary)node.classList.add('v38-primary');
+    if(ariaLabel)node.setAttribute('aria-label',ariaLabel);
     if(/^https?:\/\//i.test(href)){node.target='_blank';node.rel='noopener noreferrer'}
     return node;
   }
 
-  function button(label,handler,primary,copyClass){
+  function button(label,handler,primary,copyClass,ariaLabel){
     const node=document.createElement('button');node.type='button';node.textContent=label;
     if(primary)node.classList.add('v38-primary');
     if(copyClass)node.classList.add('v38-copy');
+    if(ariaLabel)node.setAttribute('aria-label',ariaLabel);
     node.addEventListener('click',handler);
     return node;
   }
@@ -183,10 +279,22 @@ _SCRIPT = r"""
 
   function allCard(panel,protocol,url,count,kind){
     const card=document.createElement('section');card.className='v38-all-card';
+    card.dataset.v38Protocol=protocol;
+
     const head=document.createElement('div');head.className='v38-all-head';
-    const title=document.createElement('b');title.textContent='همه سرورها';
-    const counter=document.createElement('span');counter.textContent=String(count)+' سرور';
-    head.append(title,counter);
+    const heading=document.createElement('div');heading.className='v38-ha-title';
+    const shield=document.createElement('span');shield.className='v38-ha-shield';shield.textContent='🛡️';
+    const headingText=document.createElement('span');headingText.textContent='High Availability Config';
+    const title=document.createElement('span');title.className='v38-sr-only';title.textContent='همه سرورها';
+    const badge=document.createElement('span');badge.className='v38-ha-badge';badge.textContent=protocolTitle(panel,protocol);
+    heading.append(shield,headingText,title);head.append(heading,badge);
+
+    const row=document.createElement('div');row.className='v38-multi-row';
+    const name=document.createElement('div');name.className='v38-multi-name';
+    const globe=document.createElement('span');globe.textContent='🌐';
+    const label=document.createElement('span');label.textContent='Multi Server';
+    const counter=document.createElement('small');counter.textContent=String(count)+' سرور';
+    name.append(globe,label,counter);
 
     const actions=document.createElement('div');actions.className='v38-all-actions';
     const client=clientName(panel);
@@ -195,32 +303,39 @@ _SCRIPT = r"""
     const bundle=kind==='bundle'||NATIVE_BUNDLES.has(protocol);
 
     if(subscription&&deep){
-      actions.appendChild(link('افزودن همه به '+client,deep,true));
-      actions.appendChild(button('کپی لینک اشتراک',async()=>{
+      actions.appendChild(link('افزودن همه',deep,true,'افزودن همه به '+client));
+      actions.appendChild(button('کپی لینک',async()=>{
         notify(await copy(url)?'لینک اشتراک کپی شد ✓':'کپی انجام نشد');
-      },false,true));
+      },false,true,'کپی لینک اشتراک'));
     }else if(subscription){
-      actions.appendChild(button('کپی لینک اشتراک',async()=>{
+      actions.appendChild(button('کپی لینک',async()=>{
         notify(await copy(url)?'لینک اشتراک کپی شد ✓':'کپی انجام نشد');
-      },true,false));
+      },true,false,'کپی لینک اشتراک'));
     }else if(bundle){
-      actions.appendChild(link('دانلود همه کانفیگ‌ها',url,true));
-      actions.appendChild(button('کپی لینک همه سرورها',async()=>{
+      actions.appendChild(link('دانلود همه',url,true,'دانلود همه کانفیگ‌ها'));
+      actions.appendChild(button('کپی لینک',async()=>{
         notify(await copy(url)?'لینک همه سرورها کپی شد ✓':'کپی انجام نشد');
-      },false,true));
+      },false,true,'کپی لینک همه سرورها'));
     }else if(deep){
-      actions.appendChild(link('افزودن همه به '+client,deep,true));
-      actions.appendChild(button('کپی لینک همه سرورها',async()=>{
+      actions.appendChild(link('افزودن همه',deep,true,'افزودن همه به '+client));
+      actions.appendChild(button('کپی لینک',async()=>{
         notify(await copy(url)?'لینک همه سرورها کپی شد ✓':'کپی انجام نشد');
-      },false,true));
+      },false,true,'کپی لینک همه سرورها'));
     }else{
-      actions.appendChild(button('کپی لینک همه سرورها',async()=>{
+      actions.appendChild(button('کپی مولتی‌لینک',async()=>{
         notify(await copy(url)?'لینک همه سرورها کپی شد ✓':'کپی انجام نشد');
-      },true,false));
+      },true,false,'کپی لینک همه سرورها'));
     }
 
-    card.append(head,actions);
+    row.append(name,actions);card.append(head,row);
     panel.querySelector('.panel-head')?.insertAdjacentElement('afterend',card);
+
+    const serverViews=panel.querySelector('.server-views');
+    if(serverViews&&!panel.querySelector('.v38-server-list-title')){
+      const listTitle=document.createElement('div');
+      listTitle.className='v38-server-list-title';listTitle.textContent='سرورهای تکی';
+      serverViews.insertAdjacentElement('beforebegin',listTitle);
+    }
     return card;
   }
 
@@ -229,7 +344,7 @@ _SCRIPT = r"""
     const protocol=panelKey(panel);if(!MULTI.has(protocol))return;
     panel.dataset.v38Requested='1';
 
-    panel.querySelectorAll('.v37-multi-card,.v38-all-card').forEach(node=>node.remove());
+    panel.querySelectorAll('.v37-multi-card,.v38-all-card,.v38-server-list-title').forEach(node=>node.remove());
 
     if(SUBSCRIPTIONS.has(protocol)){
       const url=subscriptionUrl(protocol);
@@ -265,7 +380,7 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_reference_layout_v38(source: str) -> str:
-    """Restore the reference all-servers card after V37 without changing delivery/dataplane state."""
+    """Render the reference HA/Multi Server card using existing proven delivery authorities."""
     if _MARKER in source:
         return source
     source = source.replace("</style>", _CSS + "\n</style>", 1)
