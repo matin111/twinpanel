@@ -9,6 +9,7 @@ on:
       - 'backend/app/routers/public_connection_final_presentation_v37.py'
       - 'backend/app/routers/public_connection_reference_layout_v38.py'
       - 'backend/app/routers/public_connection_mobile_simplified_v39.py'
+      - 'backend/app/routers/public_connection_mobile_authority_v40.py'
       - 'backend/app/routers/public_connection_device_actions_v11.py'
       - 'backend/app/routers/public_connection_modern_delivery_v13.py'
       - 'backend/app/routers/public_connection_modern_import_v15.py'
@@ -24,6 +25,7 @@ on:
       - 'backend/tests/smoke_public_connection_final_presentation_v37.py'
       - 'backend/tests/smoke_public_connection_reference_layout_v38.py'
       - 'backend/tests/smoke_public_connection_mobile_simplified_v39.py'
+      - 'backend/tests/smoke_public_connection_mobile_authority_v40.py'
       - '.github/workflows/public-connect-forward-v34-smoke.yml'
   push:
     branches:
@@ -35,6 +37,7 @@ on:
       - 'backend/app/routers/public_connection_final_presentation_v37.py'
       - 'backend/app/routers/public_connection_reference_layout_v38.py'
       - 'backend/app/routers/public_connection_mobile_simplified_v39.py'
+      - 'backend/app/routers/public_connection_mobile_authority_v40.py'
       - 'backend/app/routers/public_connection_device_actions_v11.py'
       - 'backend/app/routers/public_connection_modern_delivery_v13.py'
       - 'backend/app/routers/public_connection_modern_import_v15.py'
@@ -50,6 +53,7 @@ on:
       - 'backend/tests/smoke_public_connection_final_presentation_v37.py'
       - 'backend/tests/smoke_public_connection_reference_layout_v38.py'
       - 'backend/tests/smoke_public_connection_mobile_simplified_v39.py'
+      - 'backend/tests/smoke_public_connection_mobile_authority_v40.py'
       - '.github/workflows/public-connect-forward-v34-smoke.yml'
 
 jobs:
@@ -83,3 +87,19 @@ jobs:
           Path('/tmp/twinpanel-public-connect-v39.js').write_text(script)
           PY
           node --check /tmp/twinpanel-public-connect-v39.js
+      - name: Run V40 final mobile authority smoke
+        run: python3 backend/tests/smoke_public_connection_mobile_authority_v40.py
+      - name: Parse V40 inline JavaScript
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          source = Path('backend/app/routers/public_connection_mobile_authority_v40.py').read_text()
+          match = re.search(r'_SCRIPT\s*=\s*r"""(.*?)"""', source, re.S)
+          assert match, 'V40 script block missing'
+          script = match.group(1).strip()
+          script = re.sub(r'^<script[^>]*>\s*', '', script)
+          script = re.sub(r'\s*</script>$', '', script)
+          Path('/tmp/twinpanel-public-connect-v40.js').write_text(script)
+          PY
+          node --check /tmp/twinpanel-public-connect-v40.js
