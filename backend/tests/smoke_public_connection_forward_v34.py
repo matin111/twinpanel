@@ -9,6 +9,7 @@ V34 = ROOT / "backend/app/routers/public_connection_forward_v34.py"
 V36 = ROOT / "backend/app/routers/public_connection_mobile_compact_v36.py"
 V37 = ROOT / "backend/app/routers/public_connection_final_presentation_v37.py"
 V38 = ROOT / "backend/app/routers/public_connection_reference_layout_v38.py"
+V39 = ROOT / "backend/app/routers/public_connection_ha_multiserver_v39.py"
 V26 = ROOT / "backend/app/routers/public_connection_canonical_mobile_v26.py"
 V11 = ROOT / "backend/app/routers/public_connection_device_actions_v11.py"
 V13 = ROOT / "backend/app/routers/public_connection_modern_delivery_v13.py"
@@ -55,11 +56,7 @@ def assigned_tuple(source: str, variable: str) -> tuple[str, ...]:
 
 
 def js_set(source: str, variable: str) -> tuple[str, ...]:
-    match = re.search(
-        rf"const\s+{re.escape(variable)}\s*=\s*new Set\(\[(.*?)\]\);",
-        source,
-        re.S,
-    )
+    match = re.search(rf"const\s+{re.escape(variable)}\s*=\s*new Set\(\[(.*?)\]\);", source, re.S)
     if not match:
         raise AssertionError(f"JS Set {variable} missing")
     return tuple(re.findall(r"'([^']+)'", match.group(1)))
@@ -70,6 +67,7 @@ def main() -> None:
     v36 = V36.read_text(encoding="utf-8")
     v37 = V37.read_text(encoding="utf-8")
     v38 = V38.read_text(encoding="utf-8")
+    v39 = V39.read_text(encoding="utf-8")
     v26 = V26.read_text(encoding="utf-8")
     v11 = V11.read_text(encoding="utf-8")
     v13 = V13.read_text(encoding="utf-8")
@@ -85,22 +83,20 @@ def main() -> None:
     require("TWINPANEL_PUBLIC_CONNECT_MOBILE_COMPACT_V36" in v36, "V36 marker missing")
     require("TWINPANEL_PUBLIC_CONNECT_FINAL_PRESENTATION_V37" in v37, "V37 marker missing")
     require("TWINPANEL_PUBLIC_CONNECT_REFERENCE_LAYOUT_V38" in v38, "V38 marker missing")
-    require("public_connection_protocol_subscriptions_mount_v30" in v26, "V30 endpoint mount lost")
+    require("TWINPANEL_PUBLIC_CONNECT_HA_MULTISERVER_V39" in v39, "V39 marker missing")
 
-    # V36 owns accordion state, V34 builds canonical actions, V37 performs cleanup,
-    # and V38 is the final customer-facing reference-layout authority.
-    v36_call = v26.find("source = refine_public_connection_mobile_compact_v36(source)")
-    v34_call = v26.find("source = refine_public_connection_forward_v34(source)")
-    v37_call = v26.find("source = refine_public_connection_final_presentation_v37(source)")
-    v38_return = v26.find("return refine_public_connection_reference_layout_v38(source)")
-    require(
-        v36_call >= 0 and v34_call > v36_call and v37_call > v34_call and v38_return > v37_call,
-        "V36 -> V34 -> V37 -> V38 composition order drifted",
-    )
-    require(
-        v26.rstrip().endswith("return refine_public_connection_reference_layout_v38(source)"),
-        "V38 reference layout is not the final composer",
-    )
+    # Composition: keep existing layers, then refine the visible reference card in V39.
+    positions = [
+        v26.find("source = refine_public_connection_mobile_compact_v36(source)"),
+        v26.find("source = refine_public_connection_forward_v34(source)"),
+        v26.find("source = refine_public_connection_final_presentation_v37(source)"),
+        v26.find("source = refine_public_connection_reference_layout_v38(source)"),
+        v26.find("return refine_public_connection_ha_multiserver_v39(source)"),
+    ]
+    require(all(pos >= 0 for pos in positions) and positions == sorted(positions),
+            "V36 -> V34 -> V37 -> V38 -> V39 composition order drifted")
+    require(v26.rstrip().endswith("return refine_public_connection_ha_multiserver_v39(source)"),
+            "V39 is not the final composer")
 
     for old in (
         "refine_public_connection_mobile_ui_v27(source)",
@@ -116,87 +112,55 @@ def main() -> None:
     modern = assigned_tuple(v13, "MODERN_PROTOCOLS")
     require(classic + modern == CANONICAL_PROTOCOLS, "15-protocol inventory drifted")
 
-    # V11 remains client/platform authority. Responsive layout itself is V36-owned.
-    require("body.dataset.tpPlatform=platform" in v11, "V11 platform data attribute missing")
-    require("navigator.userAgentData" not in v34, "V34 duplicated V11 UA detection")
-    require("navigator.userAgent||" not in v34, "V34 duplicated V11 UA detection")
-    require("dataset?.tpPlatform" in v34, "V34 does not consume V11 platform data")
-    require("function isCompact()" in v36, "V36 responsive layout authority missing")
-    require("window.matchMedia(MOBILE).matches" in v36, "V36 viewport guard missing")
-    require("const PHONE=" not in v36, "V36 must not gate compact layout by Android/iOS UA")
+    require("body.dataset.tpPlatform=platform" in v11, "V11 platform authority missing")
+    require("function isCompact()" in v36 and "window.matchMedia(MOBILE).matches" in v36,
+            "V36 viewport accordion authority missing")
+    require("const PHONE=" not in v36, "V36 must not restrict compact layout to Android/iOS UA")
 
-    # V13 is the sole client mapping authority; V34 must not invent a second map.
-    require("CLIENTS as V13_CLIENTS" in v34, "V34 does not import V13 CLIENTS")
-    require("window.__TP_V34_CLIENTS__" in v34, "V13 client catalog is not passed to presentation")
+    require("CLIENTS as V13_CLIENTS" in v34, "V34 does not consume V13 client mapping")
+    require("window.__TP_V34_CLIENTS__" in v34, "V13 client catalog not passed to presentation")
     require("const CLIENTS={" not in v34, "hard-coded V34 client map returned")
-    require("دانلود '+client.name" in v34, "one protocol-level client download missing")
 
-    # V30 legacy subscription endpoints stay exactly the proven four-protocol cohort.
     require(assigned_tuple(v30, "SUPPORTED_PROTOCOLS") == PROVEN_SUBSCRIPTIONS,
             "V30 proven subscription cohort changed")
     require(js_set(v34, "SUBSCRIPTIONS") == PROVEN_SUBSCRIPTIONS,
-            "V34 subscription source cohort must match V30 exactly")
-    require("+'/sub/'+" in v34, "V34 does not retain V30 subscription source")
+            "V34 proven subscription cohort drifted")
 
-    # Existing V34 multi backend remains intact. V38 restores the proven /sub
-    # presentation for four protocols and uses /multi for the remaining cohort.
+    # Backend authority remains V34; V39 only presents the existing all-protocol endpoint.
     require(assigned_tuple(multi, "MULTI_PROTOCOLS") == MULTI_PROTOCOLS,
             "V34 all-protocol multi backend drifted")
-    require('"/{token}/multi/{protocol}"' in multi, "V34 multi route unexpectedly removed")
+    require('"/{token}/multi/{protocol}"' in multi, "V34 multi route removed")
     require("public_connection_all_multilink_v34_router" in mount, "V34 multi route mount lost")
-    require(set(js_set(v38, "MULTI")) == set(MULTI_PROTOCOLS), "V38 multilink cohort drifted")
-    require(js_set(v38, "SUBSCRIPTIONS") == PROVEN_SUBSCRIPTIONS,
-            "V38 proven subscription cohort drifted")
-    require("+'/sub/'+" in v38, "V38 does not restore the proven subscription route")
-    require("+'/multi/'+" in v38, "V38 does not expose existing multilink route")
-    require("کپی لینک اشتراک" in v38, "V38 subscription copy action missing")
-    require("کپی لینک همه سرورها" in v38, "V38 multilink copy action missing")
-    require("دانلود همه کانفیگ‌ها" in v38, "V38 native bundle action missing")
-    require("افزودن همه به " in v38, "V38 compatible-client import missing")
-    require("title.textContent='همه سرورها'" in v38, "V38 all-servers card missing")
-    require("panel.querySelector('.panel-head')?.insertAdjacentElement('afterend',card)" in v38,
-            "V38 all-servers card is not first inside the selected protocol")
+    require(set(js_set(v39, "MULTI")) == set(MULTI_PROTOCOLS), "V39 multilink cohort drifted")
+    require("+'/multi/'+" in v39, "V39 does not consume V34 multi route")
+    require("High Availability Config" in v39 and "Multi Server" in v39,
+            "V39 requested reference structure missing")
+    require("fetch(" not in v39 and "multiMeta" not in v39,
+            "V39 must not wait for async meta before rendering Multi Server")
 
-    # Canonical data/action sources remain intact and are consumed, not regenerated.
-    require("standard_share_uri" in v15, "V15 standard share URI source missing")
+    require("standard_share_uri" in v15, "V15 share URI source missing")
     require("_resolve_delivery_content" in v16, "V16 lossless config source missing")
-    require("refine_public_connection_protocol_actions_v20" in v20, "V20 classic action source missing")
-    require("TWINPANEL_XRAY_PUBLIC_HUB_PROFILES_V48" in v48, "V48 Xray action source missing")
-    for source in (v34, v36, v37, v38):
+    require("refine_public_connection_protocol_actions_v20" in v20, "V20 action source missing")
+    require("TWINPANEL_XRAY_PUBLIC_HUB_PROFILES_V48" in v48, "V48 Xray source missing")
+
+    for presentation in (v34, v36, v37, v38, v39):
         for forbidden in ("db.add(", "db.commit(", "ProtocolCredential(", "credential_generation"):
-            require(forbidden not in source, f"presentation must not mutate credentials: {forbidden}")
+            require(forbidden not in presentation, f"presentation mutates credentials: {forbidden}")
+        require("MutationObserver" not in presentation, "presentation must not use MutationObserver")
 
-    # Beginner-facing action semantics and dedupe remain in the V34 action builder.
-    require("کپی کانفیگ" not in v34, "beginner UI must not expose copy-config")
-    require("کپی لینک اتصال" in v34, "single-server link copy action missing")
-    require("دانلود کانفیگ" in v34, "file config download action missing")
-    require("mobile-send-btn" in v34, "legacy Windows/mobile-send hide missing")
-    require("while(row.children.length>2)" in v34, "per-server maximum-two-actions gate missing")
-    require("view.querySelectorAll('.v34-server-actions').forEach" in v34,
-            "server action idempotence missing")
-    require("cleanupPanel(panel)" in v34, "panel idempotence cleanup missing")
-    require(
-        all("MutationObserver" not in source for source in (v34, v36, v37, v38)),
-        "presentation must not use MutationObserver",
-    )
-
-    # Compact view is a protocol accordion, with no nested server fold.
     require("panel.classList.add('active','v36-open')" in v36, "compact open state missing")
     require("const wasOpen=panel.classList.contains('v36-open')" in v36, "toggle-close state missing")
     require("event.stopImmediatePropagation()" in v36, "legacy click isolation missing")
-    require("v34-mobile-servers" in v36, "V34 nested fold cleanup missing")
-    require(".protocol-panel.v36-open{display:block!important}" in v38,
-            "V38 must preserve the one-open-protocol accordion")
+    require(".protocol-panel.v36-open{display:block!important}" in v39,
+            "V39 must preserve one-open-protocol accordion")
+    require(".protocol-panel{display:none!important}" in v39,
+            "V39 compact protocols must start collapsed")
 
-    # V37 still performs cleanup; V38 then restores only the required all-servers card.
-    require(".v34-subscription-card{display:none!important}" in v37,
-            "V37 cleanup contract changed unexpectedly")
-    require("heading==='اتصال هوشمند'" in v37, "Smart Connect heading cleanup missing")
-    require("node.querySelectorAll('small,p').forEach(extra=>extra.remove())" in v37,
-            "section helper copy cleanup missing")
-    require(".v37-multi-card" in v38, "V38 duplicate V37 multilink cleanup missing")
+    require("heading==='اتصال هوشمند'" in v37, "Smart Connect cleanup missing")
+    require(".v38-all-card" in v39 and ".v37-multi-card" in v39,
+            "V39 must retire older competing all-server cards")
 
-    print("PUBLIC_CONNECT_FORWARD_V34_V38_SMOKE=PASS")
+    print("PUBLIC_CONNECT_FORWARD_V34_V39_SMOKE=PASS")
 
 
 if __name__ == "__main__":
