@@ -12,6 +12,7 @@ on:
       - "backend/app/routers/public_connection_multilink_v7.py"
       - "backend/app/routers/public_connection_hub_v8.py"
       - "backend/app/routers/public_connection_hub_v9.py"
+      - "backend/app/routers/public_connection_canonical_mobile_v26.py"
       - "backend/app/routers/public_connection_files_v9.py"
       - "app/layout.tsx"
       - "app/panel-copy-density-final.css"
@@ -28,6 +29,7 @@ on:
       - "backend/app/routers/public_connection_multilink_v7.py"
       - "backend/app/routers/public_connection_hub_v8.py"
       - "backend/app/routers/public_connection_hub_v9.py"
+      - "backend/app/routers/public_connection_canonical_mobile_v26.py"
       - "backend/app/routers/public_connection_files_v9.py"
       - "app/layout.tsx"
       - "app/panel-copy-density-final.css"
@@ -50,10 +52,11 @@ jobs:
             backend/app/routers/public_connection_multilink_v7.py \
             backend/app/routers/public_connection_hub_v8.py \
             backend/app/routers/public_connection_hub_v9.py \
+            backend/app/routers/public_connection_canonical_mobile_v26.py \
             backend/app/routers/public_connection_files_v9.py \
             backend/app/main.py
 
-      - name: Parse V8 and V9 inline JavaScript
+      - name: Parse V8, retired V9 and V26 inline JavaScript
         run: |
           python - <<'PY'
           import re
@@ -61,6 +64,7 @@ jobs:
           specs = (
               ("backend/app/routers/public_connection_hub_v8.py", "_V8_SCRIPT", "/tmp/twinpanel-public-connect-v8.js"),
               ("backend/app/routers/public_connection_hub_v9.py", "_V9_SCRIPT_TEMPLATE", "/tmp/twinpanel-public-connect-v9.js"),
+              ("backend/app/routers/public_connection_canonical_mobile_v26.py", "_SCRIPT", "/tmp/twinpanel-public-connect-v26.js"),
           )
           for path, name, output in specs:
               source = Path(path).read_text()
@@ -73,8 +77,9 @@ jobs:
           PY
           node --check /tmp/twinpanel-public-connect-v8.js
           node --check /tmp/twinpanel-public-connect-v9.js
+          node --check /tmp/twinpanel-public-connect-v26.js
 
-      - name: Verify live route precedence and V9 delivery contract
+      - name: Verify live route precedence and canonical mobile contract
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -88,6 +93,7 @@ jobs:
           multilink = Path("backend/app/routers/public_connection_multilink_v7.py").read_text()
           v8 = Path("backend/app/routers/public_connection_hub_v8.py").read_text()
           v9 = Path("backend/app/routers/public_connection_hub_v9.py").read_text()
+          v26 = Path("backend/app/routers/public_connection_canonical_mobile_v26.py").read_text()
           files = Path("backend/app/routers/public_connection_files_v9.py").read_text()
           layout = Path("app/layout.tsx").read_text()
           css = Path("app/panel-copy-density-final.css").read_text()
@@ -109,13 +115,16 @@ jobs:
 
           assert "public_connection_files_v9_router" in hub_live
           assert "router.include_router(public_connection_files_v9_router)" in hub_live
-          assert "refine_public_connection_hub_v9(source, token)" in hub_live
+          assert "refine_public_connection_hub_v9" not in hub_live
+          assert "refine_public_connection_canonical_mobile_v26(source)" in hub_live
           assert '"/{token}/file/{protocol}/{item_index}"' in files
           assert '"Content-Disposition"' in files
           assert 'attachment; filename=' in files
           assert '"X-Content-Type-Options": "nosniff"' in files
           assert '"application/x-openvpn-profile"' in files
           assert '"openvpn"' in files and '"wireguard"' in files
+
+          # V9 remains as a legacy source module but must not be part of the active Hub.
           assert "TWINPANEL_PUBLIC_CONNECT_HUB_V9" in v9
           assert "High Availability Config" in v9
           assert "v9-config-card" in v9
@@ -123,9 +132,13 @@ jobs:
           assert "sendRealFile" in v9
           assert "response.arrayBuffer()" in v9
           assert "navigator.share" in v9
-          assert "فایل واقعی دانلود شد" in v9
-          assert "HTTP" in v9 and "HTTPS" in v9
           assert "!important" not in v9
+
+          assert "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26" in v26
+          assert ".v9-mobile-stack" in v26
+          assert ".v17-mobile-stack" in v26
+          assert ".v8-app-launch" in v26
+          assert "karing_1.2.25.2802_android_arm64-v8a.apk" in v26
 
           forbidden = (
               "db.add(",
@@ -139,6 +152,7 @@ jobs:
           assert all(token not in multilink for token in forbidden)
           assert all(token not in v8 for token in forbidden)
           assert all(token not in v9 for token in forbidden)
+          assert all(token not in v26 for token in forbidden)
           assert all(token not in files for token in forbidden)
 
           assert "panel-copy-density-final.css" in layout
