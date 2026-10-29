@@ -1,0 +1,43 @@
+name: Public Protocol Subscriptions V30 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/public_connection_protocol_subscriptions_v30.py'
+      - 'backend/app/routers/public_connection_protocol_subscriptions_mount_v30.py'
+      - 'backend/app/routers/public_connection_canonical_mobile_v26.py'
+      - 'backend/app/routers/public_connection_multilink_v7.py'
+      - 'backend/tests/smoke_public_protocol_subscriptions_v30.py'
+      - 'backend/tests/smoke_public_connection_mobile_ui_v27.py'
+      - '.github/workflows/public-protocol-subscriptions-v30-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile V30 public subscription modules
+        run: |
+          python -m py_compile \
+            backend/app/routers/public_connection_protocol_subscriptions_v30.py \
+            backend/app/routers/public_connection_protocol_subscriptions_mount_v30.py \
+            backend/app/routers/public_connection_canonical_mobile_v26.py \
+            backend/tests/smoke_public_protocol_subscriptions_v30.py \
+            backend/tests/smoke_public_connection_mobile_ui_v27.py
+
+      - name: Run V30 subscription contract
+        run: python backend/tests/smoke_public_protocol_subscriptions_v30.py
+
+      - name: Run final mobile composition contract
+        run: python backend/tests/smoke_public_connection_mobile_ui_v27.py
