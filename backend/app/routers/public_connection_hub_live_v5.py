@@ -15,7 +15,6 @@ from ..xray_public_hub_profiles_v48 import (
 from .public_connection_hub_refine_v6 import refine_public_connection_hub_html
 from .public_connection_mobile_v7 import refine_public_connection_mobile_v7
 from .public_connection_hub_v8 import refine_public_connection_hub_v8
-from .public_connection_hub_v9 import refine_public_connection_hub_v9
 from .public_connection_manual_fields_v10 import refine_public_connection_manual_fields_v10
 from .public_connection_device_actions_v11 import refine_public_connection_device_actions_v11
 from .public_connection_windows_v12 import refine_public_connection_windows_v12
@@ -34,20 +33,15 @@ from .public_connection_modern_delivery_v16 import (
     refine_public_connection_modern_delivery_v16,
     router as public_connection_modern_delivery_v16_router,
 )
-from .public_connection_mobile_protocols_v17 import (
-    refine_public_connection_mobile_protocols_v17,
-)
 # Import V18 before the V16 router is included below. V18 mounts its read-only
-# mobile inventory endpoint into the V16 router at import time, so FastAPI sees
-# the endpoint when include_router copies the V16 routes into this public hub.
-from .public_connection_mobile_server_inventory_v18 import (
-    refine_public_connection_mobile_server_inventory_v18,
-)
+# mobile inventory endpoint into the V16 router at import time. The retired V18
+# presentation refiner is intentionally not applied to the customer page.
+from . import public_connection_mobile_server_inventory_v18 as _public_connection_mobile_server_inventory_v18  # noqa: F401
 from .public_connection_protocol_actions_v20 import (
     refine_public_connection_protocol_actions_v20,
 )
-from .public_connection_protocol_uri_details_v21 import (
-    refine_public_connection_protocol_uri_details_v21,
+from .public_connection_canonical_mobile_v26 import (
+    refine_public_connection_canonical_mobile_v26,
 )
 from .public_connection_files_v9 import router as public_connection_files_v9_router
 from .public_connection_multilink_v7 import router as public_connection_multilink_v7_router
@@ -291,7 +285,6 @@ def public_connection_hub_live_v5(
     source = refine_public_connection_hub_html(source)
     source = refine_public_connection_mobile_v7(source, token)
     source = refine_public_connection_hub_v8(source)
-    source = refine_public_connection_hub_v9(source, token)
     source = refine_public_connection_manual_fields_v10(source)
     source = refine_public_connection_device_actions_v11(source)
     source = refine_public_connection_windows_v12(source)
@@ -299,11 +292,9 @@ def public_connection_hub_live_v5(
     source = refine_public_connection_modern_names_v14(source, token, db)
     source = refine_public_connection_modern_import_v15(source, token, db)
     source = refine_public_connection_modern_delivery_v16(source, token, db)
-    source = refine_public_connection_mobile_protocols_v17(source)
-    source = refine_public_connection_mobile_server_inventory_v18(source)
     source = refine_public_connection_protocol_actions_v20(source)
-    source = refine_public_connection_protocol_uri_details_v21(source)
     source = refine_public_connection_xray_profiles_v48(source)
+    source = refine_public_connection_canonical_mobile_v26(source)
 
     return HTMLResponse(
         content=source,
