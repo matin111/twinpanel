@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.365",
+  "version": "1.1.0-rc.366",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T23:47:49Z",
+  "released_at": "2026-10-29T23:54:40Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "ba368e37514c7ce8f9bf473684618b6e6a570a2a",
+  "source_sha": "130f723ec0a0cefb1a81a07a863c9a256ca307ec",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.365/twinpanel-1.1.0-rc.365-linux-x86_64.tar.gz",
-    "sha256": "144607a0b6c04bf4f01f57a1c5870d69fd09f02ad306e79534a8f8b2f6f5a806",
-    "size_bytes": 28681214
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.366/twinpanel-1.1.0-rc.366-linux-x86_64.tar.gz",
+    "sha256": "dc302af4213fdc43b10c3f5bde17756a16fb3b7e7ba953fac73ad621d13d138f",
+    "size_bytes": 28681195
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.365 مسیر Public Connect برای V2Ray/Xray را کامل به Karing منتقل می‌کند: Karing کلاینت اصلی V2Ray در اکشن‌های هر پروفایل و Multi Server است، کارت/metadata کلاینت V2Ray با Karing هماهنگ شده و endpoint خنثی /sub بدون تغییر حفظ می‌شود. این Release فقط Presentation/Client Actions مربوط به V2Ray را Refine می‌کند و هیچ تغییری در تولید پروفایل Xray، semantics اشتراک، TP27، VXLAN، Tunnel/Spoof dataplane، Accounting، quota، provisioning، credential generation، routing، firewall یا protocol dataplane ایجاد نمی‌کند. Source candidate روی SHA immutable ba368e37514c7ce8f9bf473684618b6e6a570a2a قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.365 completes the Public Connect V2Ray/Xray client migration to Karing: Karing is now the primary V2Ray client for per-profile and multi-server actions, the V2Ray client card/metadata is aligned with Karing, and the neutral /sub endpoint remains unchanged. This release refines only V2Ray presentation/client actions and does not modify Xray profile generation, subscription semantics, TP27, VXLAN, tunnel/spoof dataplane, accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane behavior. The candidate source is pinned to immutable SHA ba368e37514c7ce8f9bf473684618b6e6a570a2a."
+    "fa": "TwinPanel 1.1.0-rc.366 صفحه /admin/outbounds را اصلاح می‌کند: هدر بزرگ و خالی به کنترل جمع‌وجور نود/به‌روزرسانی تبدیل شده و Race درخواست اولیه Outbound Performance V4 که می‌توانست هم‌زمان با نمایش داده معتبر بنر stale «API 502» باقی بگذارد حذف شده است. بارگذاری وضعیت هر نود اکنون یک مسیر درخواست واحد دارد. این Release فقط UI و orchestration درخواست‌های Control Plane را Refine می‌کند و هیچ تغییری در منطق Outbound Policy، routing، TP27، VXLAN، Tunnel/Spoof dataplane، Accounting، quota، provisioning، credential generation، firewall یا protocol dataplane ایجاد نمی‌کند. Source candidate روی SHA immutable 130f723ec0a0cefb1a81a07a863c9a256ca307ec قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.366 fixes /admin/outbounds by compacting the oversized empty header into the operational node/refresh control and removing the initial Outbound Performance V4 request race that could leave a stale `API 502` banner even while valid performance data had loaded. Node state loading now follows a single request path. This release refines only UI and control-plane request orchestration and does not change outbound policy semantics, routing, TP27, VXLAN, tunnel/spoof dataplane, accounting, quota, provisioning, credential generation, firewall, or protocol dataplane behavior. The candidate source is pinned to immutable SHA 130f723ec0a0cefb1a81a07a863c9a256ca307ec."
   }
 }
