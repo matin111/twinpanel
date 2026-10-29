@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.351",
+  "version": "1.1.0-rc.352",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T18:57:52Z",
+  "released_at": "2026-10-29T19:06:33Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e67ce0c11efd74b85cc87f470797f714c01b0a49",
+  "source_sha": "a3c431be1ea80f0f9db166b34c89fa07e00ded18",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.351/twinpanel-1.1.0-rc.351-linux-x86_64.tar.gz",
-    "sha256": "255f57756a413cc0af304c2863deead907a08e98f0a30709fe5b484e82b2f81b",
-    "size_bytes": 28614165
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.352/twinpanel-1.1.0-rc.352-linux-x86_64.tar.gz",
+    "sha256": "9745d910d09a83f332844c57dae2d144891a700c9ca05f237efa8a6e3bdb695a",
+    "size_bytes": 28620565
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.351 نمایش سرعت مسیرهای Tunnel را برای تست سلامت دستی اصلاح می‌کند. در حالت Manual، بعد از موفقیت Fresh Health Probe همان Benchmark محدود و دوطرفه داخلی روی L3 موجود اجرا می‌شود و مقادیر دانلود، آپلود و امتیاز سرعت در قرارداد موجود smart_auto_v21.throughput ذخیره می‌شوند. شکست Benchmark باعث Offline شدن مسیر سالم یا تغییر Production نمی‌شود و mode، active_transport و preferred_transport دست‌نخورده می‌مانند. این تغییر هیچ کد Spoof WG، TP27 Fast، VXLAN، routing، firewall، service، provisioning، Accounting، quota یا credential را تغییر نمی‌دهد. Source candidate روی SHA immutable e67ce0c11efd74b85cc87f470797f714c01b0a49 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.351 fixes Tunnel speed metrics for explicit per-card health tests. In Manual mode, a successful fresh health probe now runs the existing bounded bidirectional internal-L3 benchmark and persists download, upload and weighted speed under the existing smart_auto_v21.throughput contract. Benchmark failure remains soft and never demotes a healthy path or changes production authority; mode, active_transport and preferred_transport remain untouched. No Spoof WG, TP27 Fast, VXLAN, routing, firewall, service, provisioning, Accounting, quota or credential implementation is changed. The candidate source is pinned to immutable SHA e67ce0c11efd74b85cc87f470797f714c01b0a49."
+    "fa": "TwinPanel 1.1.0-rc.352 رابط Public Connect را برای موبایل ساده و قابل‌فهم می‌کند. در V41 داخل کارت هر سرور V2Ray/Xray تمام اکشن‌های قدیمی و تکراری حذف می‌شوند و فقط «ارسال به Hiddify» و «کپی کانفیگ» باقی می‌مانند؛ کارت دانلود برنامه Hiddify حفظ می‌شود. در V42 با لمس پروتکل روی موبایل، همان پنل واقعی سرورها به‌صورت Bottom Sheet / Popup روی صفحه باز می‌شود و دیگر پایین فهرست پروتکل‌ها expand نمی‌شود. Desktop دست‌نخورده می‌ماند. این تغییر فقط presentation/UI است و هیچ تغییری در dataplane، Tunnel، TP27، VXLAN، Spoof، Accounting، quota، provisioning، credential generation، routing یا firewall ایجاد نمی‌کند. Source candidate روی SHA immutable a3c431be1ea80f0f9db166b34c89fa07e00ded18 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.352 simplifies the Public Connect mobile experience. V41 removes legacy and duplicate V2Ray/Xray per-server action surfaces so only Send to Hiddify and Copy Config remain, while preserving the Hiddify client download card. V42 opens the selected protocol's real server panel as a mobile bottom-sheet popup instead of expanding it inline below the protocol grid. Desktop remains unchanged. This is presentation/UI only and does not change dataplane, Tunnel, TP27, VXLAN, Spoof, Accounting, quota, provisioning, credential generation, routing or firewall behavior. The candidate source is pinned to immutable SHA a3c431be1ea80f0f9db166b34c89fa07e00ded18."
   }
 }
