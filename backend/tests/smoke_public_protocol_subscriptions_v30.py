@@ -3,20 +3,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 V30 = ROOT / "app" / "routers" / "public_connection_protocol_subscriptions_v30.py"
-V31 = ROOT / "app" / "routers" / "public_connection_unified_actions_v31.py"
-V32 = ROOT / "app" / "routers" / "public_connection_platform_guard_v32.py"
 MOUNT = ROOT / "app" / "routers" / "public_connection_protocol_subscriptions_mount_v30.py"
 V26 = ROOT / "app" / "routers" / "public_connection_canonical_mobile_v26.py"
 V7 = ROOT / "app" / "routers" / "public_connection_multilink_v7.py"
 
 
 v30 = V30.read_text(encoding="utf-8")
-v31 = V31.read_text(encoding="utf-8")
-v32 = V32.read_text(encoding="utf-8")
 mount = MOUNT.read_text(encoding="utf-8")
 v26 = V26.read_text(encoding="utf-8")
 v7 = V7.read_text(encoding="utf-8")
 
+
+# Backend subscription delivery remains unchanged and intentionally limited to
+# the proven portable cohort.
 assert 'SUPPORTED_PROTOCOLS = ("v2ray", "hysteria2", "tuic", "anytls")' in v30
 assert '@router.get(\n    "/{token}/sub/{protocol}"' in v30
 assert "base64.b64encode(raw).decode(\"ascii\")" in v30
@@ -28,7 +27,8 @@ assert '"Cache-Control": "no-store"' in v30
 assert '"Profile-Update-Interval": "12"' in v30
 
 for protocol in ("snell", "trusttunnel", "sudoku", "amneziawg", "mieru"):
-    assert f'"{protocol}"' not in v30.split("SUPPORTED_PROTOCOLS =", 1)[1].split(")", 1)[0]
+    cohort = v30.split("SUPPORTED_PROTOCOLS =", 1)[1].split(")", 1)[0]
+    assert f'"{protocol}"' not in cohort
 
 subscription_logic = v30.split("_CSS =", 1)[0]
 for forbidden in (
@@ -39,61 +39,23 @@ for forbidden in (
 ):
     assert forbidden not in subscription_logic, forbidden
 
+
+# Legacy V2Ray subscription stays available and V30 is mounted into the same
+# public router by import side effect.
 assert '"/{token}/subscription/v2ray"' in v7
 assert "public_v2ray_subscription_v7" in v7
 assert "public_connection_multilink_v7_router.include_router" in mount
+assert "public_connection_protocol_subscriptions_v30_router" in mount
 assert "_public_protocol_subscriptions_v30_mounted" in mount
-assert "decodeURIComponent(pathParts[connectIndex+1]||'')" in mount
 
-assert "refine_public_connection_protocol_subscriptions_v30" in v26
-assert "refine_public_connection_unified_actions_v31" in v26
-assert "refine_public_connection_platform_guard_v32" in v26
-v29_call = "source = refine_public_connection_presentation_v29(source)"
-v30_call = "source = refine_public_connection_protocol_subscriptions_v30(source)"
-v31_call = "source = refine_public_connection_unified_actions_v31(source)"
-v32_call = "return refine_public_connection_platform_guard_v32(source)"
-for call in (v29_call, v30_call, v31_call, v32_call):
-    assert call in v26, call
-assert v26.index(v29_call) < v26.index(v30_call) < v26.index(v31_call) < v26.index(v32_call)
 
-# V30 still owns the real per-protocol subscription and mobile server grouping.
-for required in (
-    "همه سرورها",
-    "افزودن همه به Karing",
-    "کپی لینک اشتراک",
-    "دانلود Karing",
-    "دانلود Hiddify",
-    "دانلود v2rayN",
-    "سرورهای تکی",
-):
-    assert required in v30, required
+# V33 deliberately preserves the backend mount but retires V30's DOM renderer
+# from final customer composition. This prevents the subscription UI from
+# stacking with V11/V12/V13/V16 presentation layers again.
+assert "public_connection_protocol_subscriptions_mount_v30" in v26
+assert "refine_public_connection_protocol_subscriptions_v30(source)" not in v26
+assert "refine_public_connection_unified_actions_v31" not in v26
+assert "refine_public_connection_platform_guard_v32" not in v26
 
-# V31 owns canonical user actions; V32 is the final platform/precedence guard.
-for required in (
-    "کپی لینک اتصال",
-    "دانلود کانفیگ",
-    "'اتصال به '+",
-    "برنامه مناسب دستگاه شما",
-    "افزودن همه به Hiddify",
-    "افزودن همه به Karing",
-):
-    assert required in v31, required
-assert "کپی کانفیگ" not in v31
-assert "return links[0]" not in v31
-assert ".mobile-send-btn" in v31
-assert "TWINPANEL_PUBLIC_CONNECT_PLATFORM_GUARD_V32" in v32
-assert "restoreDesktopPresentation" in v32
-assert "details.v30-single-servers" in v32
 
-# Desktop and mobile share the same V30 subscription authority; only the mobile
-# grouping wrapper is removed again by V32 when the detected OS is desktop.
-assert "primeSubscriptionPanels" in v31
-assert "panel.classList.add('v24-canonical-panel')" in v31
-assert "normalizeSubscriptionCard" in v31
-assert ".v30-subscription-card .v30-client-downloads" in v31
-
-assert "v30-single-servers" in v30
-assert "details.className='v30-single-servers'" in v30
-assert "details.appendChild(views)" in v30
-
-print("PUBLIC_PROTOCOL_SUBSCRIPTIONS_V30_V31_V32_SMOKE=PASS")
+print("PUBLIC_PROTOCOL_SUBSCRIPTIONS_V30_BACKEND_PRESERVED_V33=PASS")
