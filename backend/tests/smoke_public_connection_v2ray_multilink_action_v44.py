@@ -4,8 +4,10 @@ ROOT = Path(__file__).resolve().parents[2]
 v44 = (ROOT / "backend/app/routers/public_connection_v2ray_multilink_action_v44.py").read_text()
 v42 = (ROOT / "backend/app/routers/public_connection_mobile_sheet_v42.py").read_text()
 v38 = (ROOT / "backend/app/routers/public_connection_reference_layout_v38.py").read_text()
+v7 = (ROOT / "backend/app/routers/public_connection_multilink_v7.py").read_text()
 
 assert "TWINPANEL_PUBLIC_CONNECT_V2RAY_MULTILINK_ACTION_V44" in v44
+assert "TWINPANEL_PUBLIC_CONNECT_V2RAY_MULTILINK_GROUPS_V49" in v44
 assert "refine_public_connection_v2ray_multilink_action_v44" in v42
 assert "return refine_public_connection_v2ray_multilink_action_v44(source)" in v42
 
@@ -18,18 +20,34 @@ assert ".v38-all-card[data-v38-protocol=\"v2ray\"]" in v44
 assert "actions.replaceChildren(send,copyButton)" in v44
 assert "card.dataset.v44Endpoint='/multi/v2ray'" in v44
 
-# Both user actions must use the exact same 9-config multilink URL.
+# Both top-level user actions must use the exact same all-profile multilink URL.
 assert "send.href=hiddifyUrl(url)" in v44
 assert "copy(url)" in v44
 assert "ارسال همه به Hiddify" in v44
 assert "کپی لینک" in v44
 assert "hiddify://import/" in v44
+assert "۹ کانفیگ" not in v44
 
-# Presentation-only: do not generate credentials, query DB, or touch dataplane.
+# V49 grouped architecture: server -> profiles, populated only from the
+# read-only subscription metadata endpoint. Do not parse subscription text in JS.
+assert "'/subscription/v2ray/meta'" in v44
+assert "async function loadGroups(card)" in v44
+assert "Array.isArray(payload?.servers)" in v44
+assert "server?.profile_count" in v44
+assert "server?.profiles" in v44
+assert "v49-v2ray-server" in v44
+assert "v49-v2ray-profile" in v44
+assert "مشاهده کانفیگ‌ها" in v44
+assert '"/{token}/subscription/v2ray/meta"' in v7
+assert "_v2ray_profile_groups" in v7
+
+# The only browser fetch is the read-only metadata request. Presentation must not
+# generate credentials or touch DB/dataplane/provisioning/accounting.
+assert "fetch(url,{cache:'no-store',headers:{Accept:'application/json'}})" in v44
 for forbidden in [
-    "fetch(", "db.", "session", "iptables", "nft", "vxlan", "tp27",
+    "db.", "session", "iptables", "nft", "vxlan", "tp27",
     "quota", "accounting", "provision", "credential", "firewall",
 ]:
     assert forbidden not in v44.lower(), forbidden
 
-print("V44 V2Ray Multi Server Hiddify wiring smoke OK")
+print("V44/V49 V2Ray Multi Server grouped-profile wiring smoke OK")
