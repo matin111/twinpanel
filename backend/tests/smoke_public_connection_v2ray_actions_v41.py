@@ -8,6 +8,7 @@ xray_runtime = (ROOT / "backend/app/xray_public_delivery_runtime.py").read_text(
 
 assert "TWINPANEL_PUBLIC_CONNECT_V2RAY_ACTIONS_V41" in v41
 assert "TWINPANEL_PUBLIC_CONNECT_V2RAY_MULTILINK_V43" in v43
+assert "TWINPANEL_PUBLIC_CONNECT_V2RAY_MULTILINK_SINGLE_PAYLOAD_V50" in v43
 assert "refine_public_connection_v2ray_actions_v41" in v39
 assert "source = refine_public_connection_mobile_authority_v40(source)" in v39
 assert "return refine_public_connection_v2ray_actions_v41(source)" in v39
@@ -20,11 +21,13 @@ assert "_PUBLIC_PROFILE_ORDER" in xray_runtime
 assert "_public_payload_customer_xray" in xray_runtime
 assert "profiles.append(tcp_profile)" in xray_runtime
 
-# V43 rebuilds V2Ray multi delivery from the runtime customer payload so the
-# generated TCP-simple fallback is available to the subscription too.
+# V43 reuses the single already-policy-applied customer payload from _active().
+# Rebuilding it through xray_public_delivery_runtime is intentionally forbidden:
+# that duplicate pass regenerated QR SVGs and caused subscription latency/timeouts.
 assert "from .public_connection_v2ray_multilink_v43 import apply_v2ray_multilink_v43" in v41
 assert "apply_v2ray_multilink_v43()" in v41
-assert "payload = delivery._public_payload_customer_xray(db, sub)" in v43
+assert "sub, payload = multilink._active(token, db)" in v43
+assert "payload = delivery._public_payload_customer_xray(db, sub)" not in v43
 assert 'items = multilink._protocol_items(payload, "v2ray")' in v43
 assert "delivery._customer_profiles(item)" in v43
 assert "for profile in delivery._customer_profiles(item):" in v43
@@ -78,4 +81,4 @@ for item in forbidden:
     assert item not in v41.lower(), item
     assert item not in v43.lower(), item
 
-print("V41/V43 Xray 3-profile actions + runtime-complete all-country multilink smoke OK")
+print("V41/V43 Xray 3-profile actions + single-payload all-country multilink smoke OK")
