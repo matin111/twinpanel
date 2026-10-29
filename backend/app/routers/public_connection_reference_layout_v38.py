@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from .public_connection_mobile_simplified_v39 import (
+    refine_public_connection_mobile_simplified_v39,
+)
+
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_REFERENCE_LAYOUT_V38"
 
@@ -125,7 +129,6 @@ body.v38-reference .v38-sr-only{
   body.v38-reference .v38-all-actions>a,
   body.v38-reference .v38-all-actions>button{min-height:36px;padding:7px 9px;font-size:10px}
 
-  /* Match the reference: compact individual-server rows below Multi Server. */
   body.v38-reference.v36-mobile-compact .protocol-panel.v36-open .server-views{
     gap:7px!important;
     padding:8px 10px 12px!important;
@@ -363,8 +366,8 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_reference_layout_v38(source: str) -> str:
-    """Render the reference HA/Multi Server card without eager API fan-out."""
-    if _MARKER in source:
-        return source
-    source = source.replace("</style>", _CSS + "\n</style>", 1)
-    return source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
+    """Render the reference HA/Multi Server card, then apply V39 mobile refinement."""
+    if _MARKER not in source:
+        source = source.replace("</style>", _CSS + "\n</style>", 1)
+        source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
+    return refine_public_connection_mobile_simplified_v39(source)
