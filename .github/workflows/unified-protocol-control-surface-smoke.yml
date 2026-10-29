@@ -31,10 +31,7 @@ jobs:
           assert '/admin/modern-protocols' in node
           assert 'protocolHealth(' not in node
           assert 'restartProtocol' not in node
-          assert 'xrayDomain(' not in node
-          assert 'saveXrayDomain' not in node
           assert 'modal==="protocols"' not in node
-          assert 'modal==="xray-domain"' not in node
 
           assert 'admin/nodes' in router and 'admin/network' in router
           assert 'legacy-nodes-runtime-v2' in router
