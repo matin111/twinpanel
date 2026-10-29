@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-# Keep the V30 protocol-subscription routes mounted, but do not apply its
-# presentation refiner here. Public Connect presentation is intentionally reset
-# to one guarded V26 authority; the subscription endpoints remain available for
-# a future clean UI that does not stack on top of legacy renderers.
+# Preserve legacy V30 endpoints for backward compatibility, and mount V34's
+# all-protocol multi-server/direct-download routes before the public router is
+# included by Hub Live. Presentation itself is owned only by V34 below.
 from . import public_connection_protocol_subscriptions_mount_v30 as _public_connection_protocol_subscriptions_mount_v30  # noqa: F401
+from . import public_connection_forward_mount_v34 as _public_connection_forward_mount_v34  # noqa: F401
+from .public_connection_forward_v34 import refine_public_connection_forward_v34
 
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26"
@@ -55,10 +56,6 @@ _SCRIPT = r"""
 <script id="twinpanelPublicConnectCanonicalMobileV26">
 (function(){
   const MOBILE='(max-width:720px)';
-  const KARING_ANDROID='https://github.com/KaringX/karing/releases/download/v1.2.25.2802/karing_1.2.25.2802_android_arm64-v8a.apk';
-  const AMNEZIAWG_ANDROID='https://github.com/amnezia-vpn/amneziawg-android/releases/download/v3.1.20260814/AmneziaWG-3.1.202060814.apk';
-
-  function text(el){return String(el?.textContent||'').trim()}
 
   function isPhone(){
     const platform=String(document.body.dataset.tpPlatform||'').toLowerCase();
@@ -72,28 +69,9 @@ _SCRIPT = r"""
     ).forEach(node=>node.remove());
   }
 
-  function enforceDirectAndroidApps(){
-    if(String(document.body.dataset.tpPlatform||'').toLowerCase()!=='android')return;
-    document.querySelectorAll('a.v13-app,a.app-card').forEach(link=>{
-      const name=text(link.querySelector('b'))||text(link);
-      if(name==='Karing'||name==='دانلود Karing'){
-        link.href=KARING_ANDROID;
-        link.target='_blank';
-        link.rel='noopener noreferrer';
-        link.dataset.v26DirectInstall='1';
-      }else if(name==='AmneziaWG'||name==='دانلود AmneziaWG'){
-        link.href=AMNEZIAWG_ANDROID;
-        link.target='_blank';
-        link.rel='noopener noreferrer';
-        link.dataset.v26DirectInstall='1';
-      }
-    });
-  }
-
   function apply(){
     if(!isPhone()||!window.matchMedia(MOBILE).matches)return;
     retireLegacy();
-    enforceDirectAndroidApps();
     document.body.dataset.tpCanonicalMobile='v26';
   }
 
@@ -106,8 +84,8 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_canonical_mobile_v26(source: str) -> str:
-    """Keep phone-only cleanup guarded and avoid stacked presentation refiners."""
+    """Keep phone cleanup guarded, then hand final presentation to one V34 authority."""
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
-    return source
+    return refine_public_connection_forward_v34(source)

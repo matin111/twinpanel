@@ -13,6 +13,10 @@ on:
       - "backend/app/routers/public_connection_hub_v8.py"
       - "backend/app/routers/public_connection_hub_v9.py"
       - "backend/app/routers/public_connection_canonical_mobile_v26.py"
+      - "backend/app/routers/public_connection_forward_v34.py"
+      - "backend/app/routers/public_connection_all_multilink_v34.py"
+      - "backend/app/routers/public_connection_app_download_v34.py"
+      - "backend/app/routers/public_connection_forward_mount_v34.py"
       - "backend/app/routers/public_connection_files_v9.py"
       - "app/layout.tsx"
       - "app/panel-copy-density-final.css"
@@ -30,6 +34,10 @@ on:
       - "backend/app/routers/public_connection_hub_v8.py"
       - "backend/app/routers/public_connection_hub_v9.py"
       - "backend/app/routers/public_connection_canonical_mobile_v26.py"
+      - "backend/app/routers/public_connection_forward_v34.py"
+      - "backend/app/routers/public_connection_all_multilink_v34.py"
+      - "backend/app/routers/public_connection_app_download_v34.py"
+      - "backend/app/routers/public_connection_forward_mount_v34.py"
       - "backend/app/routers/public_connection_files_v9.py"
       - "app/layout.tsx"
       - "app/panel-copy-density-final.css"
@@ -53,10 +61,14 @@ jobs:
             backend/app/routers/public_connection_hub_v8.py \
             backend/app/routers/public_connection_hub_v9.py \
             backend/app/routers/public_connection_canonical_mobile_v26.py \
+            backend/app/routers/public_connection_forward_v34.py \
+            backend/app/routers/public_connection_all_multilink_v34.py \
+            backend/app/routers/public_connection_app_download_v34.py \
+            backend/app/routers/public_connection_forward_mount_v34.py \
             backend/app/routers/public_connection_files_v9.py \
             backend/app/main.py
 
-      - name: Parse V8, retired V9 and V26 inline JavaScript
+      - name: Parse V8, retired V9, V26 and V34 inline JavaScript
         run: |
           python - <<'PY'
           import re
@@ -65,6 +77,7 @@ jobs:
               ("backend/app/routers/public_connection_hub_v8.py", "_V8_SCRIPT", "/tmp/twinpanel-public-connect-v8.js"),
               ("backend/app/routers/public_connection_hub_v9.py", "_V9_SCRIPT_TEMPLATE", "/tmp/twinpanel-public-connect-v9.js"),
               ("backend/app/routers/public_connection_canonical_mobile_v26.py", "_SCRIPT", "/tmp/twinpanel-public-connect-v26.js"),
+              ("backend/app/routers/public_connection_forward_v34.py", "_SCRIPT", "/tmp/twinpanel-public-connect-v34.js"),
           )
           for path, name, output in specs:
               source = Path(path).read_text()
@@ -78,8 +91,9 @@ jobs:
           node --check /tmp/twinpanel-public-connect-v8.js
           node --check /tmp/twinpanel-public-connect-v9.js
           node --check /tmp/twinpanel-public-connect-v26.js
+          node --check /tmp/twinpanel-public-connect-v34.js
 
-      - name: Verify live route precedence and canonical mobile contract
+      - name: Verify live route precedence and V34 Public Connect contract
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -94,6 +108,10 @@ jobs:
           v8 = Path("backend/app/routers/public_connection_hub_v8.py").read_text()
           v9 = Path("backend/app/routers/public_connection_hub_v9.py").read_text()
           v26 = Path("backend/app/routers/public_connection_canonical_mobile_v26.py").read_text()
+          v34 = Path("backend/app/routers/public_connection_forward_v34.py").read_text()
+          multi34 = Path("backend/app/routers/public_connection_all_multilink_v34.py").read_text()
+          app34 = Path("backend/app/routers/public_connection_app_download_v34.py").read_text()
+          mount34 = Path("backend/app/routers/public_connection_forward_mount_v34.py").read_text()
           files = Path("backend/app/routers/public_connection_files_v9.py").read_text()
           layout = Path("app/layout.tsx").read_text()
           css = Path("app/panel-copy-density-final.css").read_text()
@@ -124,7 +142,7 @@ jobs:
           assert '"application/x-openvpn-profile"' in files
           assert '"openvpn"' in files and '"wireguard"' in files
 
-          # V9 remains as a legacy source module but must not be part of the active Hub.
+          # V9 remains source-only and not part of active presentation.
           assert "TWINPANEL_PUBLIC_CONNECT_HUB_V9" in v9
           assert "High Availability Config" in v9
           assert "v9-config-card" in v9
@@ -134,11 +152,38 @@ jobs:
           assert "navigator.share" in v9
           assert "!important" not in v9
 
+          # V26 is phone cleanup only; V34 is the single final UI authority.
           assert "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26" in v26
           assert ".v9-mobile-stack" in v26
           assert ".v17-mobile-stack" in v26
           assert ".v8-app-launch" in v26
-          assert "karing_1.2.25.2802_android_arm64-v8a.apk" in v26
+          assert "return refine_public_connection_forward_v34(source)" in v26
+          assert "public_connection_forward_mount_v34" in v26
+          assert "TWINPANEL_PUBLIC_CONNECT_FORWARD_V34" in v34
+          assert "کپی کانفیگ" not in v34
+          assert "کپی لینک همه سرورها" in v34
+          assert "دانلود مستقیم " in v34
+
+          # Exactly 13 non-manual protocols receive one all-server route.
+          for protocol in (
+              "openvpn", "wireguard", "v2ray", "hysteria2", "tuic", "anytls",
+              "naive", "shadowtls", "snell", "mieru", "trusttunnel", "amneziawg", "sudoku",
+          ):
+              assert f'"{protocol}"' in multi34
+          assert '"/{token}/multi/{protocol}"' in multi34
+          assert '"/{token}/multi/{protocol}/meta"' in multi34
+          assert "NATIVE_BUNDLE_PROTOCOLS" in multi34
+          assert "public_connection_all_multilink_v34_router" in mount34
+          assert "public_connection_app_download_v34_router" in mount34
+
+          # Direct app delivery is now centralized and architecture-aware.
+          assert '"/app-download/{app}/{platform}"' in app34
+          assert 'GitHubAsset("KaringX/karing", r"_android_arm64-v8a\\.apk$")' in app34
+          assert "_android_arm\\.apk$" not in app34
+          assert 'GitHubAsset("amnezia-vpn/amneziawg-android", r"AmneziaWG-.*\\.apk$")' in app34
+          assert "browser_download_url" in app34
+          assert "karing.app/en/quickstart" not in app34
+          assert "How-to-install-Hiddify-app" not in app34
 
           forbidden = (
               "db.add(",
@@ -153,6 +198,7 @@ jobs:
           assert all(token not in v8 for token in forbidden)
           assert all(token not in v9 for token in forbidden)
           assert all(token not in v26 for token in forbidden)
+          assert all(token not in v34 for token in forbidden)
           assert all(token not in files for token in forbidden)
 
           assert "panel-copy-density-final.css" in layout
