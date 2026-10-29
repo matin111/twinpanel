@@ -166,19 +166,54 @@ def test_v207_failfast_is_exact_reason_and_expiry_scoped():
 
     for token in (
         'if reason != UNDERLAY_REASON:',
-        'guard.get("blocked") is not True',
-        'str(guard.get("reason") or "") != reason',
         'remaining = max(0, int(until - now))',
         'if remaining <= 0:',
+        'guard.get("blocked") is True',
+        'str(guard.get("reason") or "") == reason',
         '"retry_after_seconds": remaining',
-        '"version": 207',
         '"spoof_underlay_quarantined:"',
         '"authority_unchanged=true"',
     ):
         assert token in guard, token
 
 
-def test_v207_failfast_adds_no_network_or_dataplane_mutation():
+def test_v208_recovers_only_exact_failed_active_legacy_quarantine():
+    guard = read("backend/app/spoof_underlay_guard_v206.py")
+
+    for token in (
+        'RECOVERY_MARKER = "TWINPANEL_SPOOF_QUARANTINE_RECOVERY_V208"',
+        'legacy_guard_missing = not isinstance(guard, dict) or not guard',
+        'if not legacy_guard_missing:',
+        'if not bool(row.enabled):',
+        'if _row_status(row) != "failed":',
+        'if smart.get("last_probe_ok") is not False:',
+        '"metadata_source": (',
+        '"smart_auto_v21_recovery_v208"',
+        '"repair_guard_metadata": not guard_valid',
+        '"version": 208',
+    ):
+        assert token in guard, token
+
+
+def test_v208_rehydrates_missing_guard_in_db_before_failfast():
+    guard = read("backend/app/spoof_underlay_guard_v206.py")
+
+    assert "def _restore_recovered_guard_metadata(" in guard
+    assert 'if active_block.get("repair_guard_metadata") is not True:' in guard
+    assert '"recovered_from": "smart_auto_v21"' in guard
+    assert '"original_v206_guard_metadata_was_missing": True' in guard
+    assert '"recovered_at_epoch": now' in guard
+    assert "row.config_text = json.dumps(" in guard
+    assert "db.commit()" in guard
+    assert "db.refresh(row)" in guard
+
+    restore = guard.index("_restore_recovered_guard_metadata(db, int(tunnel_id), active_block)")
+    fail = guard.index('raise RuntimeError(\n            "spoof_underlay_quarantined:"')
+    call_original = guard.index("return await _original_install")
+    assert restore < fail < call_original
+
+
+def test_v208_failfast_adds_no_network_or_dataplane_mutation():
     guard = read("backend/app/spoof_underlay_guard_v206.py")
 
     assert "active_underlay_quarantine_for_tunnel(db, int(tunnel_id))" in guard
