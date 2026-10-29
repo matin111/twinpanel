@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.356",
+  "version": "1.1.0-rc.357",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T20:20:51Z",
+  "released_at": "2026-10-29T20:54:27Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "87c797402c79bc3a4f7327673d273e61deb2dbf1",
+  "source_sha": "809f8bc9625b5b40d26606036cd80fd5579ec462",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.356/twinpanel-1.1.0-rc.356-linux-x86_64.tar.gz",
-    "sha256": "0f55f4a6f761ba2d4b404ba686bec467f2913b3a1501bc937e9fc9c9ffceced8",
-    "size_bytes": 28626229
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.357/twinpanel-1.1.0-rc.357-linux-x86_64.tar.gz",
+    "sha256": "10606eff74e129dcd590ddca4aed03d18db2a7b3ee2c9e714fbe4758b729011a",
+    "size_bytes": 28624927
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.356 خطای کاذب نمایش سرعت مسیرهای تانل را اصلاح می‌کند. در Production روی Tunnel #8 ثابت شد Spoof WG در مسیر Iran→Exit واقعاً ترافیک دوطرفه عبور می‌دهد، اما receiver تست سرعت حدود ۱ ثانیه بعد از پایان sender مقدار RX_MBPS را ثبت می‌کرد و منطق قبلی پس از ۰.۵ ثانیه زودهنگام با throughput_receiver_result_missing:upload شکست می‌خورد. V355 بدون تغییر در برنامه sender/receiver، تعداد stream، حجم/زمان تست یا دیتاپلین، نتیجه receiver را هر ۲۵۰ms تا سقف ۳ ثانیه به‌صورت bounded بررسی می‌کند و سپس telemetry دانلود/آپلود را ذخیره می‌کند. این اصلاح هم Health Test دستی و هم Benchmark پس‌زمینه Smart Auto را پوشش می‌دهد. هیچ تغییری در Spoof WG carrier، TP27، VXLAN، route، firewall، WireGuard configuration، candidate health یا active/preferred production authority ایجاد نشده است. Source candidate روی SHA immutable 87c797402c79bc3a4f7327673d273e61deb2dbf1 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.356 fixes a false transport throughput-result failure. Production evidence on Tunnel #8 proved Spoof WG carries real bidirectional Iran-to-Exit traffic, while the benchmark receiver needed about one second after sender completion to flush RX_MBPS; the previous fixed 0.5-second collection delay therefore raised throughput_receiver_result_missing:upload. V355 keeps the existing sender/receiver programs, stream count, byte/time limits, and dataplane unchanged, but polls the receiver result every 250ms with a strict 3-second bound before persisting download/upload telemetry. The fix applies to both explicit admin Health Test benchmarks and background Smart Auto benchmarks. No Spoof WG carrier, TP27, VXLAN, routing, firewall, WireGuard configuration, candidate-health, or active/preferred production-authority behavior is changed. The candidate source is pinned to immutable SHA 87c797402c79bc3a4f7327673d273e61deb2dbf1."
+    "fa": "TwinPanel 1.1.0-rc.357 ساخت Tunnel جدید را برای سرورهای تازه fail-closed می‌کند. در UI اصلی /admin/tunnels فقط نودهای Iran و Exit با وضعیت online در فرم Tunnel جدید نمایش داده می‌شوند؛ fallback قبلی به اولین نود Offline حذف شده، دکمه Tunnel جدید در نبود حداقل یک Iran و یک Exit آنلاین غیرفعال است و هنگام Submit نیز انتخاب‌ها دوباره در برابر لیست نودهای آنلاین اعتبارسنجی می‌شوند. Backend preflight موجود همچنان authority نهایی است و SSH، Agent و Tunnel Fabric را پیش از ایجاد Pair بررسی می‌کند. هیچ تغییری در Tunnelهای موجود، Spoof WG، TP27، VXLAN، routing، firewall، WireGuard، پروتکل‌ها، Accounting، quota، subscription delivery، provisioning backend یا active/preferred production authority ایجاد نشده است. Source candidate روی SHA immutable 809f8bc9625b5b40d26606036cd80fd5579ec462 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.357 makes new-tunnel creation fail closed for newly added servers. The main /admin/tunnels UI now exposes only Iran and Exit nodes whose status is online in the New Tunnel form; the previous fallback to the first offline role-matching node is removed, the New Tunnel button is disabled unless at least one online Iran and one online Exit node exist, and submit-time validation rechecks the selected IDs against the current online-node sets. The existing backend preflight remains the final authority and still verifies SSH, Agent, and Tunnel Fabric readiness before a pair is created. No existing tunnel, Spoof WG, TP27, VXLAN, routing, firewall, WireGuard, protocol, accounting, quota, subscription-delivery, provisioning-backend, or active/preferred production-authority behavior is changed. The candidate source is pinned to immutable SHA 809f8bc9625b5b40d26606036cd80fd5579ec462."
   }
 }
