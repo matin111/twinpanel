@@ -185,6 +185,19 @@ export type TunnelServiceConnectionsResponse=RuntimeRow&{
     error?:string|null;
   };
 };
+export type SelectedTunnelCreateResponse={
+  ok:boolean;
+  operational:boolean;
+  tunnel:{id:number;iran_node_id:number;exit_node_id:number;priority:number;mode:string;status:string;active_transport:string|null;preferred_transport:string|null};
+  initial_transport:"tp27_fast"|"spoof_wg";
+  installed:string[];
+  other_transports:string;
+  spoof_configuration?:unknown;
+  bootstrap?:RuntimeRow;
+  install?:unknown;
+  selection?:unknown;
+};
+
 export type ManagedTunnelCreateResponse={
   ok:boolean;
   operational?:boolean;
@@ -243,6 +256,8 @@ export const legacyControlApi={
       return null;
     }
   },
+  createSelectedTunnel:(payload:{iran_node_id:number;exit_node_id:number;priority:number;initial_transport:"tp27_fast"|"spoof_wg";iran_spoof_ip?:string;exit_spoof_ip?:string})=>
+    requestWithTimeout<SelectedTunnelCreateResponse>("/v1/tunnels/create-selected",{method:"POST",body:JSON.stringify(payload)},360000),
   registerTunnel:async(payload:{iran_node_id:number;exit_node_id:number;transport:string;priority:number;is_active:boolean})=>{
     const body=JSON.stringify({...payload,is_active:true});
 

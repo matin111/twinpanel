@@ -1,0 +1,37 @@
+name: Selected Initial Transport V358 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/tunnel_selected_v358.py'
+      - 'backend/app/main.py'
+      - 'lib/legacy-control-api.ts'
+      - 'components/tunnel-protocol-runtime-v307.tsx'
+      - 'scripts/selected-initial-transport-v358-smoke.py'
+      - '.github/workflows/selected-initial-transport-v358-smoke.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/app/routers/tunnel_selected_v358.py'
+      - 'backend/app/main.py'
+      - 'lib/legacy-control-api.ts'
+      - 'components/tunnel-protocol-runtime-v307.tsx'
+      - 'scripts/selected-initial-transport-v358-smoke.py'
+      - '.github/workflows/selected-initial-transport-v358-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile V358 backend route
+        run: python3 -m py_compile backend/app/routers/tunnel_selected_v358.py backend/app/main.py
+      - name: Run selected initial transport regression
+        run: python3 scripts/selected-initial-transport-v358-smoke.py

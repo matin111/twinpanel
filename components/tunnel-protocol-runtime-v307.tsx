@@ -27,7 +27,8 @@ import styles from "./tunnel-protocol-runtime-v307.module.css";
 // Keep /admin/tunnels compact: tunnel cards stay on the page while detailed
 // protocol/service management lives in a dedicated modal for the selected pair.
 
-type Draft={iran_node_id:number;exit_node_id:number;priority:number};
+type InitialTransport="tp27_fast"|"spoof_wg";
+type Draft={iran_node_id:number;exit_node_id:number;priority:number;initial_transport:InitialTransport;iran_spoof_ip:string;exit_spoof_ip:string};
 type ModernRow=ModernProtocolInventoryItem&{preset?:string;settings?:Record<string,unknown>};
 type ProtocolRow={
   id:string;kind:"classic"|"modern";protocol:string;name:string;status:string;
@@ -92,7 +93,7 @@ export function TunnelProtocolRuntimeV307(){
   const [search,setSearch]=useState("");
   const [createOpen,setCreateOpen]=useState(false);
   const [manageOpen,setManageOpen]=useState(false);
-  const [draft,setDraft]=useState<Draft>({iran_node_id:0,exit_node_id:0,priority:100});
+  const [draft,setDraft]=useState<Draft>({iran_node_id:0,exit_node_id:0,priority:100,initial_transport:"tp27_fast",iran_spoof_ip:"",exit_spoof_ip:""});
 
   const nodeMap=useMemo(()=>new Map(nodes.map(node=>[node.id,node])),[nodes]);
   const iranNodes=useMemo(()=>nodes.filter(node=>normalize(node.node_type)==="iran"),[nodes]);
@@ -194,11 +195,18 @@ export function TunnelProtocolRuntimeV307(){
       setError(pick("برای ساخت Tunnel هر دو نود ایران و خارج باید Online و آماده باشند.","Both Iran and Exit nodes must be online and ready before creating a tunnel."));
       return;
     }
+    if(draft.initial_transport==="spoof_wg"&&(!draft.iran_spoof_ip.trim()||!draft.exit_spoof_ip.trim())){
+      setError(pick("برای Spoof Tunnel هر دو IP Spoof ایران و خارج الزامی است.","Both Iran and Exit spoof IPs are required for Spoof Tunnel."));
+      return;
+    }
     setBusy("create");setError("");setNotice("");
     try{
-      const result=await legacyControlApi.createManagedTunnel({...draft,transport:"auto",is_active:true});
-      const id=Number(result?.tunnel?.id||0);if(!id)throw new Error("INVALID_MANAGED_TUNNEL_RESPONSE");
-      setCreateOpen(false);await load(true,id);setSelectedId(id);setManageOpen(true);setNotice(pick(`Tunnel #${id} ساخته شد.`,`Tunnel #${id} was created.`));
+      const result=await legacyControlApi.createSelectedTunnel({
+        iran_node_id:draft.iran_node_id,exit_node_id:draft.exit_node_id,priority:draft.priority,initial_transport:draft.initial_transport,
+        ...(draft.initial_transport==="spoof_wg"?{iran_spoof_ip:draft.iran_spoof_ip.trim(),exit_spoof_ip:draft.exit_spoof_ip.trim()}:{}),
+      });
+      const id=Number(result?.tunnel?.id||0);if(!id)throw new Error("INVALID_SELECTED_TUNNEL_RESPONSE");
+      setCreateOpen(false);await load(true,id);setSelectedId(id);setManageOpen(true);setNotice(pick(`Tunnel #${id} با مسیر انتخابی ساخته شد.`,`Tunnel #${id} was created with the selected transport.`));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}
   };
   const toggleTunnel=()=>{if(selectedTunnel)void run(`toggle-${selectedTunnel.id}`,pick("وضعیت Tunnel تغییر کرد.","Tunnel state updated."),()=>legacyControlApi.toggleTunnel(selectedTunnel.id));};
@@ -214,7 +222,7 @@ export function TunnelProtocolRuntimeV307(){
       setError(pick("برای ساخت Tunnel حداقل یک نود ایران و یک نود خارج Online لازم است.","At least one online Iran node and one online Exit node are required to create a tunnel."));
       return;
     }
-    setDraft({iran_node_id:iran.id,exit_node_id:exit.id,priority:100});setCreateOpen(true);
+    setDraft({iran_node_id:iran.id,exit_node_id:exit.id,priority:100,initial_transport:"tp27_fast",iran_spoof_ip:"",exit_spoof_ip:""});setCreateOpen(true);
   };
   const openManage=(id:number)=>{setSelectedId(id);setManageOpen(true);};
   const openFullProtocolManager=()=>{if(selectedTunnel&&typeof window!=="undefined")window.location.href=`/admin/modern-protocols?node=${selectedTunnel.exit_node_id}`;};
@@ -297,7 +305,7 @@ export function TunnelProtocolRuntimeV307(){
         </div>
       </Modal>}
 
-      {createOpen&&<Modal title={pick("Tunnel جدید","New tunnel")} onClose={()=>!busy&&setCreateOpen(false)}><form className="runtime-form" onSubmit={createTunnel}><label>{pick("نود ایران","Iran node")}<select value={draft.iran_node_id} onChange={event=>setDraft(value=>({...value,iran_node_id:Number(event.target.value)}))}>{readyIranNodes.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}</select></label><label>{pick("نود خارج","Exit node")}<select value={draft.exit_node_id} onChange={event=>setDraft(value=>({...value,exit_node_id:Number(event.target.value)}))}>{readyExitNodes.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}</select></label><label>{pick("اولویت","Priority")}<input type="number" value={draft.priority} onChange={event=>setDraft(value=>({...value,priority:Number(event.target.value)||100}))}/></label><div className="action-row"><button type="submit" className="primary" disabled={Boolean(busy)||!draft.iran_node_id||!draft.exit_node_id}>{busy==="create"?"…":pick("ساخت و آماده‌سازی","Create & provision")}</button></div></form></Modal>}
+      {createOpen&&<Modal title={pick("Tunnel جدید","New tunnel")} onClose={()=>!busy&&setCreateOpen(false)}><form className="runtime-form" onSubmit={createTunnel}><label>{pick("نود ایران","Iran node")}<select value={draft.iran_node_id} onChange={event=>setDraft(value=>({...value,iran_node_id:Number(event.target.value)}))}>{readyIranNodes.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}</select></label><label>{pick("نود خارج","Exit node")}<select value={draft.exit_node_id} onChange={event=>setDraft(value=>({...value,exit_node_id:Number(event.target.value)}))}>{readyExitNodes.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}</select></label><label>{pick("مسیر اولیه","Initial transport")}<select value={draft.initial_transport} onChange={event=>setDraft(value=>({...value,initial_transport:event.target.value as InitialTransport}))}><option value="tp27_fast">TP27 Fast</option><option value="spoof_wg">Spoof Tunnel</option></select></label>{draft.initial_transport==="spoof_wg"&&<><label>{pick("IP Spoof ایران","Iran spoof IP")}<input dir="ltr" value={draft.iran_spoof_ip} onChange={event=>setDraft(value=>({...value,iran_spoof_ip:event.target.value}))}/></label><label>{pick("IP Spoof خارج","Exit spoof IP")}<input dir="ltr" value={draft.exit_spoof_ip} onChange={event=>setDraft(value=>({...value,exit_spoof_ip:event.target.value}))}/></label></>}<label>{pick("اولویت","Priority")}<input type="number" value={draft.priority} onChange={event=>setDraft(value=>({...value,priority:Number(event.target.value)||100}))}/></label><div className="action-row"><button type="submit" className="primary" disabled={Boolean(busy)||!draft.iran_node_id||!draft.exit_node_id||(draft.initial_transport==="spoof_wg"&&(!draft.iran_spoof_ip.trim()||!draft.exit_spoof_ip.trim()))}>{busy==="create"?"…":pick("ساخت و نصب مسیر","Create & install")}</button></div></form></Modal>}
     </div>
   </Shell>;
 }
