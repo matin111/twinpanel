@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.350",
+  "version": "1.1.0-rc.351",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T18:44:06Z",
+  "released_at": "2026-10-29T18:57:52Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "0c248c4b922a8b2c129e665f48f9b6cfa84e635a",
+  "source_sha": "e67ce0c11efd74b85cc87f470797f714c01b0a49",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.350/twinpanel-1.1.0-rc.350-linux-x86_64.tar.gz",
-    "sha256": "49629885834609132ea486df7a44798473ed503194fcd101384b3f72fdd32e02",
-    "size_bytes": 28613734
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.351/twinpanel-1.1.0-rc.351-linux-x86_64.tar.gz",
+    "sha256": "255f57756a413cc0af304c2863deead907a08e98f0a30709fe5b484e82b2f81b",
+    "size_bytes": 28614165
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.350 مشکل authority رابط Public Connect موبایل را در V40 اصلاح می‌کند. لایه قدیمی V27 که پروتکل آنلاین/اول را با state و CSS مستقل فعال نگه می‌داشت بازنشسته می‌شود و V36 تنها accordion موبایل باقی می‌ماند. همه پروتکل‌های واقعی دارای سرور در انتخاب‌گر موبایل نمایش داده می‌شوند، حالت اولیه بسته است و فقط پروتکل انتخاب‌شده باز می‌شود. در V2Ray/Xray اکشن‌های قدیمی Karing/v2rayN و سطوح تکراری بازنشسته شده و فقط «ارسال به Hiddify» و «کپی کانفیگ» باقی می‌مانند؛ کارت دانلود Hiddify و High Availability / Multi Server حفظ می‌شوند. این تغییر فقط presentation/UI است و هیچ تغییری در dataplane، Tunnel، TP27، VXLAN، Spoof، Accounting، quota، provisioning، credential generation، routing یا firewall ایجاد نمی‌کند. Source candidate روی SHA immutable 0c248c4b922a8b2c129e665f48f9b6cfa84e635a قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.350 fixes the mobile Public Connect presentation-authority conflict in V40. Legacy V27, which independently kept the online/first protocol active through its own state and CSS, is retired and V36 remains the single mobile accordion authority. Every real protocol backed by a server is restored to the mobile selector, the initial state is collapsed, and only the selected protocol opens. For V2Ray/Xray, duplicate legacy Karing/v2rayN/action surfaces are retired so only Send to Hiddify and Copy Config remain, while the Hiddify download card and High Availability / Multi Server are preserved. This is presentation/UI only and does not change dataplane, Tunnel, TP27, VXLAN, Spoof, Accounting, quota, provisioning, credential generation, routing, or firewall behavior. The candidate source is pinned to immutable SHA 0c248c4b922a8b2c129e665f48f9b6cfa84e635a."
+    "fa": "TwinPanel 1.1.0-rc.351 نمایش سرعت مسیرهای Tunnel را برای تست سلامت دستی اصلاح می‌کند. در حالت Manual، بعد از موفقیت Fresh Health Probe همان Benchmark محدود و دوطرفه داخلی روی L3 موجود اجرا می‌شود و مقادیر دانلود، آپلود و امتیاز سرعت در قرارداد موجود smart_auto_v21.throughput ذخیره می‌شوند. شکست Benchmark باعث Offline شدن مسیر سالم یا تغییر Production نمی‌شود و mode، active_transport و preferred_transport دست‌نخورده می‌مانند. این تغییر هیچ کد Spoof WG، TP27 Fast، VXLAN، routing، firewall، service، provisioning، Accounting، quota یا credential را تغییر نمی‌دهد. Source candidate روی SHA immutable e67ce0c11efd74b85cc87f470797f714c01b0a49 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.351 fixes Tunnel speed metrics for explicit per-card health tests. In Manual mode, a successful fresh health probe now runs the existing bounded bidirectional internal-L3 benchmark and persists download, upload and weighted speed under the existing smart_auto_v21.throughput contract. Benchmark failure remains soft and never demotes a healthy path or changes production authority; mode, active_transport and preferred_transport remain untouched. No Spoof WG, TP27 Fast, VXLAN, routing, firewall, service, provisioning, Accounting, quota or credential implementation is changed. The candidate source is pinned to immutable SHA e67ce0c11efd74b85cc87f470797f714c01b0a49."
   }
 }
