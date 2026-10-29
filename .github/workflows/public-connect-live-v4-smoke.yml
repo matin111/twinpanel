@@ -19,10 +19,12 @@ on:
       - "backend/app/routers/public_connection_forward_v34.py"
       - "backend/app/routers/public_connection_mobile_compact_v36.py"
       - "backend/app/routers/public_connection_final_presentation_v37.py"
+      - "backend/app/routers/public_connection_reference_layout_v38.py"
       - "backend/app/routers/public_connection_all_multilink_v34.py"
       - "backend/app/routers/public_connection_app_download_v34.py"
       - "backend/app/routers/public_connection_forward_mount_v34.py"
       - "backend/app/routers/public_connection_files_v9.py"
+      - "backend/tests/smoke_public_connection_reference_layout_v38.py"
       - "app/layout.tsx"
       - "app/panel-copy-density-final.css"
       - ".github/workflows/public-connect-live-v4-smoke.yml"
@@ -45,10 +47,12 @@ on:
       - "backend/app/routers/public_connection_forward_v34.py"
       - "backend/app/routers/public_connection_mobile_compact_v36.py"
       - "backend/app/routers/public_connection_final_presentation_v37.py"
+      - "backend/app/routers/public_connection_reference_layout_v38.py"
       - "backend/app/routers/public_connection_all_multilink_v34.py"
       - "backend/app/routers/public_connection_app_download_v34.py"
       - "backend/app/routers/public_connection_forward_mount_v34.py"
       - "backend/app/routers/public_connection_files_v9.py"
+      - "backend/tests/smoke_public_connection_reference_layout_v38.py"
       - "app/layout.tsx"
       - "app/panel-copy-density-final.css"
       - ".github/workflows/public-connect-live-v4-smoke.yml"
@@ -77,6 +81,7 @@ jobs:
             backend/app/routers/public_connection_forward_v34.py \
             backend/app/routers/public_connection_mobile_compact_v36.py \
             backend/app/routers/public_connection_final_presentation_v37.py \
+            backend/app/routers/public_connection_reference_layout_v38.py \
             backend/app/routers/public_connection_all_multilink_v34.py \
             backend/app/routers/public_connection_app_download_v34.py \
             backend/app/routers/public_connection_forward_mount_v34.py \
@@ -95,6 +100,7 @@ jobs:
               ("backend/app/routers/public_connection_forward_v34.py", "_SCRIPT", "/tmp/twinpanel-public-connect-v34.js"),
               ("backend/app/routers/public_connection_mobile_compact_v36.py", "_SCRIPT", "/tmp/twinpanel-public-connect-v36.js"),
               ("backend/app/routers/public_connection_final_presentation_v37.py", "_SCRIPT", "/tmp/twinpanel-public-connect-v37.js"),
+              ("backend/app/routers/public_connection_reference_layout_v38.py", "_SCRIPT", "/tmp/twinpanel-public-connect-v38.js"),
           )
           for path, name, output in specs:
               source = Path(path).read_text()
@@ -111,8 +117,9 @@ jobs:
           node --check /tmp/twinpanel-public-connect-v34.js
           node --check /tmp/twinpanel-public-connect-v36.js
           node --check /tmp/twinpanel-public-connect-v37.js
+          node --check /tmp/twinpanel-public-connect-v38.js
 
-      - name: Verify live route precedence and V37 Public Connect contract
+      - name: Verify live route precedence and V38 Public Connect contract
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -132,6 +139,7 @@ jobs:
           v34 = Path("backend/app/routers/public_connection_forward_v34.py").read_text()
           v36 = Path("backend/app/routers/public_connection_mobile_compact_v36.py").read_text()
           v37 = Path("backend/app/routers/public_connection_final_presentation_v37.py").read_text()
+          v38 = Path("backend/app/routers/public_connection_reference_layout_v38.py").read_text()
           multi34 = Path("backend/app/routers/public_connection_all_multilink_v34.py").read_text()
           app34 = Path("backend/app/routers/public_connection_app_download_v34.py").read_text()
           mount34 = Path("backend/app/routers/public_connection_forward_mount_v34.py").read_text()
@@ -187,18 +195,21 @@ jobs:
           assert "panel.classList.add('active','v36-open')" in v36
           assert "event.stopImmediatePropagation()" in v36
 
-          # V26 composition: V36 accordion -> V34 actions -> V37 final UI.
+          # V26 composition: V36 accordion -> V34 actions -> V37 cleanup -> V38 reference UI.
           assert "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26" in v26
           assert ".v9-mobile-stack" in v26
           assert ".v17-mobile-stack" in v26
           assert ".v8-app-launch" in v26
           v36_pos = v26.index("source = refine_public_connection_mobile_compact_v36(source)")
           v34_pos = v26.index("source = refine_public_connection_forward_v34(source)")
-          v37_pos = v26.index("return refine_public_connection_final_presentation_v37(source)")
-          assert v36_pos < v34_pos < v37_pos
+          v37_pos = v26.index("source = refine_public_connection_final_presentation_v37(source)")
+          v38_pos = v26.index("return refine_public_connection_reference_layout_v38(source)")
+          assert v36_pos < v34_pos < v37_pos < v38_pos
+          assert v26.rstrip().endswith("return refine_public_connection_reference_layout_v38(source)")
           assert "public_connection_forward_mount_v34" in v26
           assert "TWINPANEL_PUBLIC_CONNECT_FORWARD_V34" in v34
           assert "TWINPANEL_PUBLIC_CONNECT_FINAL_PRESENTATION_V37" in v37
+          assert "TWINPANEL_PUBLIC_CONNECT_REFERENCE_LAYOUT_V38" in v38
           assert "CLIENTS as V13_CLIENTS" in v34
           assert "const CLIENTS={" not in v34
           assert "کپی کانفیگ" not in v34
@@ -210,20 +221,25 @@ jobs:
           assert "const SUBSCRIPTIONS=new Set(['v2ray','hysteria2','tuic','anytls']);" in v34
           assert "+'/sub/'+" in v34
 
-          # Final V37 presentation restores all 13 existing V34 multilinks and
-          # retires the duplicate four-protocol subscription card presentation.
+          # V37 cleanup remains in the chain, but V38 is the final presentation:
+          # four proven protocols use /sub and the remaining multi cohort uses /multi.
           for protocol in (
               "openvpn", "wireguard", "v2ray", "hysteria2", "tuic", "anytls",
               "naive", "shadowtls", "snell", "mieru", "trusttunnel", "amneziawg", "sudoku",
           ):
-              assert f"'{protocol}'" in v37
+              assert f"'{protocol}'" in v38
               assert f'"{protocol}"' in multi34
-          assert "+'/multi/'+" in v37
-          assert "url+'/meta'" in v37
-          assert "v37-multi-card" in v37
-          assert "کپی لینک همه سرورها" in v37
-          assert "دانلود همه کانفیگ‌ها" in v37
-          assert "افزودن همه به " in v37
+          assert "+'/sub/'+" in v38
+          assert "+'/multi/'+" in v38
+          assert "url+'/meta'" in v38
+          assert "v38-all-card" in v38
+          assert "title.textContent='همه سرورها'" in v38
+          assert "panel.querySelector('.panel-head')?.insertAdjacentElement('afterend',card)" in v38
+          assert "کپی لینک اشتراک" in v38
+          assert "کپی لینک همه سرورها" in v38
+          assert "دانلود همه کانفیگ‌ها" in v38
+          assert "افزودن همه به " in v38
+          assert ".protocol-panel.v36-open{display:block!important}" in v38
           assert ".v34-subscription-card{display:none!important}" in v37
           assert "heading==='اتصال هوشمند'" in v37
           assert "node.querySelectorAll('small,p').forEach(extra=>extra.remove())" in v37
@@ -233,7 +249,7 @@ jobs:
           assert '("sing-box Desktop", "https://github.com/SagerNet/sing-box-for-desktop/releases/latest")' in v13
           assert '("TrustTunnel GUI", "https://github.com/blazuryk/TrustTunnel-GUI-Client/releases/latest")' in v13
 
-          # Existing multi backend is still the source; V37 only presents it.
+          # Existing multi backend remains the source; V38 only presents it.
           assert '"/{token}/multi/{protocol}"' in multi34
           assert '"/{token}/multi/{protocol}/meta"' in multi34
           assert "NATIVE_BUNDLE_PROTOCOLS" in multi34
@@ -252,6 +268,7 @@ jobs:
           assert "MutationObserver" not in v34
           assert "MutationObserver" not in v36
           assert "MutationObserver" not in v37
+          assert "MutationObserver" not in v38
           assert "while(row.children.length>2)" in v34
 
           forbidden = (
@@ -262,7 +279,7 @@ jobs:
               "ProtocolCredential(",
               "QuotaDevice",
           )
-          for source in (mobile, multilink, v8, v9, v26, v34, v36, v37, files):
+          for source in (mobile, multilink, v8, v9, v26, v34, v36, v37, v38, files):
               assert all(token not in source for token in forbidden)
 
           assert "panel-copy-density-final.css" in layout
