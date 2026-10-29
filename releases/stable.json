@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.359",
+  "version": "1.1.0-rc.360",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T21:29:22Z",
+  "released_at": "2026-10-29T22:07:04Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "28b34ccb9d5c06f05d2d95537fc8f8d9364fe1e8",
+  "source_sha": "a3d1ff78f872d5c470a5176f294275adb4b97b18",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.359/twinpanel-1.1.0-rc.359-linux-x86_64.tar.gz",
-    "sha256": "3c64c62dd7ed4a582890b3d25df49845f1205fb17063dcc14f16a8d3254c75cd",
-    "size_bytes": 28638046
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.360/twinpanel-1.1.0-rc.360-linux-x86_64.tar.gz",
+    "sha256": "24c7e26e19edc8584256c385285603994e22623b4f17f9fefbc24fd501bbb9ea",
+    "size_bytes": 28635263
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.359 ساخت Tunnel جدید را به انتخاب یک مسیر اولیه تبدیل می‌کند. در /admin/tunnels کاربر هنگام ساخت Pair یکی از دو مسیر Production-active یعنی TP27 Fast یا Spoof Tunnel را انتخاب می‌کند؛ فقط همان مسیر نصب، qualify و Production می‌شود و سایر Smart Transportها نصب‌نشده باقی می‌مانند تا بعداً از صفحه مسیرهای هوشمند اضافه شوند. برای Spoof Tunnel دو IP Spoof ایران و خارج در همان فرم دریافت می‌شود. مسیر جدید از Agent + Tunnel Fabric bootstrap، managed pair preflight و manual cutover/Agent acceptance موجود reuse می‌کند و اگر provisioning مسیر انتخابی کامل نشود Pair تازه rollback می‌شود. مسیر legacy /create-managed برای سازگاری بدون تغییر باقی مانده است. هیچ تغییری در Tunnelهای موجود، TP27/Spoof carrier implementation، VXLAN، routing، firewall، WireGuard، protocol dataplane، Accounting یا quota ایجاد نشده است. Source candidate روی SHA immutable 28b34ccb9d5c06f05d2d95537fc8f8d9364fe1e8 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.359 changes new-tunnel creation to provision one explicitly selected initial path. In /admin/tunnels the operator chooses one of the two production-active transports, TP27 Fast or Spoof Tunnel; only that path is installed, qualified and promoted to Production, while all other Smart Transports remain uninstalled for later addition from Smart Transports. Selecting Spoof Tunnel collects the Iran and Exit spoof IPs in the same form. The new flow reuses the existing Agent + Tunnel Fabric bootstrap, managed pair preflight and manual cutover/Agent acceptance authorities, and rolls back the brand-new pair if selected-path provisioning does not complete. Legacy /create-managed remains unchanged for compatibility. No existing tunnel, TP27/Spoof carrier implementation, VXLAN, routing, firewall, WireGuard, protocol dataplane, accounting or quota behavior is changed. The candidate source is pinned to immutable SHA 28b34ccb9d5c06f05d2d95537fc8f8d9364fe1e8."
+    "fa": "TwinPanel 1.1.0-rc.360 تأخیر V2Ray Multi-Link را اصلاح می‌کند. مسیر /multi/v2ray دیگر payload مشتری را دوباره از ابتدا بازسازی نمی‌کند و همان payload معتبر و policy‌شده‌ی مرحله اول را reuse می‌کند؛ بنابراین filtering و تولید QR SVG غیرضروری دوبار اجرا نمی‌شود. خروجی Subscription استاندارد Base64 و همه URIهای واقعی هر سرور بدون تغییر حفظ می‌شوند. این تغییر فقط مسیر delivery مربوط به V2Ray Multi-Link را لمس می‌کند و هیچ تغییری در TP27، VXLAN، Tunnel، Spoof، Accounting، quota، provisioning، credential generation، routing، firewall یا protocol dataplane ایجاد نمی‌کند. Source candidate روی SHA immutable a3d1ff78f872d5c470a5176f294275adb4b97b18 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.360 fixes V2Ray Multi-Link delivery latency. The /multi/v2ray path no longer rebuilds the customer payload a second time and instead reuses the already validated, policy-applied payload from the first stage, avoiding duplicated filtering and unnecessary QR SVG generation. The standard Base64 subscription format and all real per-server URIs are preserved unchanged. This release only touches V2Ray Multi-Link delivery and does not change TP27, VXLAN, tunnels, spoof, accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane behavior. The candidate source is pinned to immutable SHA a3d1ff78f872d5c470a5176f294275adb4b97b18."
   }
 }
