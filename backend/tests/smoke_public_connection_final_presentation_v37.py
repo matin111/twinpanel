@@ -59,7 +59,7 @@ def main() -> None:
     backend_multi = set(python_tuple(v34_multi, "MULTI_PROTOCOLS"))
     require(ui_multi == EXPECTED_MULTI, f"V37 customer multilink set drifted: {sorted(ui_multi)}")
     require(backend_multi == EXPECTED_MULTI, f"backend multilink set drifted: {sorted(backend_multi)}")
-    require("'/multi/'" in v37, "V37 does not use existing all-protocol multilink endpoint")
+    require("+'/multi/'+" in v37, "V37 does not use existing all-protocol multilink endpoint")
     require("url+'/meta'" in v37, "V37 does not verify multilink metadata")
     require("v37-multi-card" in v37, "V37 multilink card missing")
     require("کپی لینک همه سرورها" in v37, "multilink copy action missing")
