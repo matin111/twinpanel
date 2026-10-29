@@ -79,7 +79,8 @@ jobs:
           assert "!important" not in v10
 
           assert "refine_public_connection_manual_fields_v10" in live
-          assert live.index("refine_public_connection_hub_v9(source, token)") < live.index("refine_public_connection_manual_fields_v10(source)")
+          assert live.index("refine_public_connection_hub_v8(source)") < live.index("refine_public_connection_manual_fields_v10(source)")
+          assert "refine_public_connection_hub_v9" not in live
 
           forbidden = (
               "db.add(",
