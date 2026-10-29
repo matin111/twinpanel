@@ -7,18 +7,22 @@ on:
       - "backend/app/transport_candidates/__init__.py"
       - "backend/app/spoof_candidate_policy_v202.py"
       - "backend/app/spoof_underlay_guard_v206.py"
+      - "backend/app/spoof_last_error_recovery_v212.py"
       - "backend/app/routers/modern_transports.py"
       - "backend/app/tunnel_transport_manager_v12.py"
       - "backend/tests/test_spoof_wg_v202.py"
       - "backend/tests/test_spoof_wg_v203.py"
       - "backend/tests/test_spoof_wg_v205_reverse_ingress.py"
       - "backend/tests/test_spoof_v207_state.py"
+      - "backend/tests/spoof_health_guard_v211_smoke.py"
+      - "backend/tests/spoof_last_error_recovery_v212_smoke.py"
       - "lib/modern-transport-api.ts"
       - "components/smart-transports-runtime-v25.tsx"
       - "components/smart-transports-runtime-v27.tsx"
       - "third_party/spoof-tunnel/**"
       - ".github/workflows/publish-prebuilt-release.yml"
       - ".github/workflows/spoof-wg-v202.yml"
+      - ".github/workflows/spoof-last-error-recovery-v212-smoke.yml"
   push:
     branches: [main]
     paths:
@@ -26,22 +30,36 @@ on:
       - "backend/app/transport_candidates/__init__.py"
       - "backend/app/spoof_candidate_policy_v202.py"
       - "backend/app/spoof_underlay_guard_v206.py"
+      - "backend/app/spoof_last_error_recovery_v212.py"
       - "backend/app/routers/modern_transports.py"
       - "backend/app/tunnel_transport_manager_v12.py"
       - "backend/tests/test_spoof_wg_v202.py"
       - "backend/tests/test_spoof_wg_v203.py"
       - "backend/tests/test_spoof_wg_v205_reverse_ingress.py"
       - "backend/tests/test_spoof_v207_state.py"
+      - "backend/tests/spoof_health_guard_v211_smoke.py"
+      - "backend/tests/spoof_last_error_recovery_v212_smoke.py"
       - "lib/modern-transport-api.ts"
       - "components/smart-transports-runtime-v25.tsx"
       - "components/smart-transports-runtime-v27.tsx"
       - "third_party/spoof-tunnel/**"
       - ".github/workflows/publish-prebuilt-release.yml"
       - ".github/workflows/spoof-wg-v202.yml"
+      - ".github/workflows/spoof-last-error-recovery-v212-smoke.yml"
 
 jobs:
   smoke:
     runs-on: ubuntu-24.04
+    env:
+      APP_NAME: TwinPanel-Spoof-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+      PUBLIC_API_FALLBACK: http://127.0.0.1:8095
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,6 +68,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install --upgrade pip && pip install -r backend/requirements.txt
 
       - name: Compile Spoof backend surface
         run: |
@@ -58,12 +81,15 @@ jobs:
             backend/app/transport_candidates/__init__.py \
             backend/app/spoof_candidate_policy_v202.py \
             backend/app/spoof_underlay_guard_v206.py \
+            backend/app/spoof_last_error_recovery_v212.py \
             backend/app/routers/modern_transports.py \
             backend/app/tunnel_transport_manager_v12.py \
             backend/tests/test_spoof_wg_v202.py \
             backend/tests/test_spoof_wg_v203.py \
             backend/tests/test_spoof_wg_v205_reverse_ingress.py \
-            backend/tests/test_spoof_v207_state.py
+            backend/tests/test_spoof_v207_state.py \
+            backend/tests/spoof_health_guard_v211_smoke.py \
+            backend/tests/spoof_last_error_recovery_v212_smoke.py
 
       - name: Run source-contract regression
         run: |
@@ -92,6 +118,14 @@ jobs:
                   print(f"PASS {path}:{name}")
           print(f"SPOOF_WG_SOURCE_CONTRACT_OK tests={total}")
           PY
+
+      - name: Run V211 health guard regression
+        working-directory: backend
+        run: PYTHONPATH=. python tests/spoof_health_guard_v211_smoke.py
+
+      - name: Run V212 historical recovery regression
+        working-directory: backend
+        run: PYTHONPATH=. python tests/spoof_last_error_recovery_v212_smoke.py
 
       - name: Verify pinned upstream Spoof Tunnel artifact
         shell: bash
