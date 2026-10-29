@@ -12,6 +12,7 @@ V32 = ROOT / "app" / "routers" / "public_connection_platform_guard_v32.py"
 V34 = ROOT / "app" / "routers" / "public_connection_forward_v34.py"
 V36 = ROOT / "app" / "routers" / "public_connection_mobile_compact_v36.py"
 V37 = ROOT / "app" / "routers" / "public_connection_final_presentation_v37.py"
+V38 = ROOT / "app" / "routers" / "public_connection_ha_card_v38.py"
 
 
 v26 = V26.read_text(encoding="utf-8")
@@ -24,6 +25,7 @@ v32 = V32.read_text(encoding="utf-8")
 v34 = V34.read_text(encoding="utf-8")
 v36 = V36.read_text(encoding="utf-8")
 v37 = V37.read_text(encoding="utf-8")
+v38 = V38.read_text(encoding="utf-8")
 
 
 # Historical refiners remain available for rollback/reference, but none may be
@@ -60,19 +62,22 @@ for value in retired_calls:
     assert value not in v26, value
 
 # Current composition contract: V36 owns responsive accordion state, V34 builds
-# canonical actions from existing sources, V37 is the final customer-facing
-# presentation authority and restores all-protocol multilinks.
+# canonical actions, V37 removes presentation noise, and V38 owns the final
+# customer-facing HA/Multi Server card.
 assert "TWINPANEL_PUBLIC_CONNECT_FORWARD_V34" in v34
 assert "TWINPANEL_PUBLIC_CONNECT_MOBILE_COMPACT_V36" in v36
 assert "TWINPANEL_PUBLIC_CONNECT_FINAL_PRESENTATION_V37" in v37
+assert "TWINPANEL_PUBLIC_CONNECT_HA_CARD_V38" in v38
 assert "from .public_connection_forward_v34 import refine_public_connection_forward_v34" in v26
 assert "from .public_connection_mobile_compact_v36 import" in v26
 assert "from .public_connection_final_presentation_v37 import" in v26
+assert "from .public_connection_ha_card_v38 import" in v26
 
 v36_call = v26.index("source = refine_public_connection_mobile_compact_v36(source)")
 v34_call = v26.index("source = refine_public_connection_forward_v34(source)")
-v37_return = v26.index("return refine_public_connection_final_presentation_v37(source)")
-assert v36_call < v34_call < v37_return, (v36_call, v34_call, v37_return)
+v37_call = v26.index("source = refine_public_connection_final_presentation_v37(source)")
+v38_return = v26.index("return refine_public_connection_ha_card_v38(source)")
+assert v36_call < v34_call < v37_call < v38_return, (v36_call, v34_call, v37_call, v38_return)
 
 # Responsive accordion is viewport-owned; narrow browser acceptance and real
 # mobile share the same collapsed/open behaviour without changing V11 platform
@@ -87,10 +92,13 @@ assert "event.stopImmediatePropagation()" in v36
 assert "public_connection_multilink_v7_router.include_router" in v30_mount
 assert "public_connection_protocol_subscriptions_v30_router" in v30_mount
 
-# V37 restores the existing V34 all-protocol multi route as presentation while
-# V30 stays available for backward compatibility.
-assert "+'/multi/'+" in v37
-assert "v37-multi-card" in v37
-assert "کپی لینک همه سرورها" in v37
+# V38 deterministically exposes the existing V34 all-protocol multi route while
+# V30 remains available for backward compatibility.
+assert "+'/multi/'+" in v38
+assert "v38-ha-card" in v38
+assert "High Availability Config" in v38
+assert "Multi Server" in v38
+assert "دانلود همه" in v38
+assert "افزودن همه" in v38
 
-print("PUBLIC_CONNECTION_V37_COMPOSITION=PASS")
+print("PUBLIC_CONNECTION_V38_COMPOSITION=PASS")
