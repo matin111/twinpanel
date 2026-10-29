@@ -58,7 +58,9 @@ _SCRIPT = r"""
   }
 
   function directHiddifyUrl(uri,title){
-    return 'hiddify://import/'+encodeURIComponent(String(uri||''))+'#'+encodeURIComponent(String(title||'TwinPanel-V2Ray'));
+    const raw=String(uri||'').trim();
+    if(!raw)return'';
+    return 'hiddify://import/'+raw;
   }
 
   function fallbackCopy(value){
