@@ -28,10 +28,11 @@ def test_public_hub_retires_duplicate_mobile_renderers_but_keeps_v18_endpoint_re
     )
 
 
-def test_canonical_mobile_v26_composes_v36_v34_v37_without_legacy_stack():
+def test_canonical_mobile_v26_composes_v36_v34_v37_v38_without_legacy_stack():
     source = _text("backend/app/routers/public_connection_canonical_mobile_v26.py")
     v36 = _text("backend/app/routers/public_connection_mobile_compact_v36.py")
     v37 = _text("backend/app/routers/public_connection_final_presentation_v37.py")
+    v38 = _text("backend/app/routers/public_connection_ha_card_v38.py")
 
     assert "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26" in source
     assert ".v9-mobile-stack" in source
@@ -44,18 +45,22 @@ def test_canonical_mobile_v26_composes_v36_v34_v37_without_legacy_stack():
     assert "data.tpCanonicalMobile" not in source
     assert "document.body.dataset.tpCanonicalMobile='v26'" in source
 
-    # V26 still retains its old real-phone cleanup guard, but V36 now owns the
-    # responsive <=720px accordion for both real phones and narrow acceptance.
+    # V26 still retains its old real-phone cleanup guard, while V36 owns the
+    # responsive <=720px accordion used by the current compact presentation.
     assert "platform==='android'||platform==='ios'" in source
     assert "function isCompact()" in v36
     assert "window.matchMedia(MOBILE).matches" in v36
 
     v36_pos = source.index("source = refine_public_connection_mobile_compact_v36(source)")
     v34_pos = source.index("source = refine_public_connection_forward_v34(source)")
-    v37_pos = source.index("return refine_public_connection_final_presentation_v37(source)")
-    assert v36_pos < v34_pos < v37_pos
+    v37_pos = source.index("source = refine_public_connection_final_presentation_v37(source)")
+    v38_pos = source.index("return refine_public_connection_ha_card_v38(source)")
+    assert v36_pos < v34_pos < v37_pos < v38_pos
     assert "TWINPANEL_PUBLIC_CONNECT_FINAL_PRESENTATION_V37" in v37
     assert "+'/multi/'+" in v37
+    assert "TWINPANEL_PUBLIC_CONNECT_HA_CARD_V38" in v38
+    assert "High Availability Config" in v38
+    assert "Multi Server" in v38
 
 
 def test_android_direct_app_assets_are_verified_and_architecture_specific():
@@ -72,6 +77,6 @@ def test_android_direct_app_assets_are_verified_and_architecture_specific():
 
 if __name__ == "__main__":
     test_public_hub_retires_duplicate_mobile_renderers_but_keeps_v18_endpoint_registration()
-    test_canonical_mobile_v26_composes_v36_v34_v37_without_legacy_stack()
+    test_canonical_mobile_v26_composes_v36_v34_v37_v38_without_legacy_stack()
     test_android_direct_app_assets_are_verified_and_architecture_specific()
     print("PUBLIC_CONNECTION_CANONICAL_MOBILE_V319=PASS")
