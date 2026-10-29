@@ -1,0 +1,33 @@
+name: TMP Selected Initial Transport Audit V358
+
+on:
+  push:
+    branches:
+      - feature/selected-initial-transport-v358
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Print managed and modern tunnel authority anchors
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '===== MODERN ROUTES ====='
+          grep -nE '@router\.(post|put)|def (install|select|configure).*transport|def configure_spoof' backend/app/routers/modern_transports.py || true
+          echo '===== MODERN INSTALL CONTEXT ====='
+          for PAT in 'modern-transports/{name}/install' 'select-manual' 'configure_spoof_wg'; do
+            LINE="$(grep -nF "$PAT" backend/app/routers/modern_transports.py | head -n1 | cut -d: -f1 || true)"
+            if [ -n "$LINE" ]; then START=$((LINE>35?LINE-35:1)); END=$((LINE+120)); sed -n "${START},${END}p" backend/app/routers/modern_transports.py; fi
+          done
+          echo '===== REGISTER TUNNEL PAIR ====='
+          LINE="$(grep -n 'def register_tunnel_pair' backend/app/routers/tunnels.py | head -n1 | cut -d: -f1 || true)"
+          if [ -n "$LINE" ]; then START=$((LINE>40?LINE-40:1)); END=$((LINE+180)); sed -n "${START},${END}p" backend/app/routers/tunnels.py; fi
+          echo '===== TUNNEL CREATE SCHEMA ====='
+          grep -nA12 -B3 'class TunnelCreate' backend/app/schemas.py
+          echo '===== MAIN ROUTER INCLUDES ====='
+          grep -nE 'tunnel_managed|modern_transports' backend/app/main.py || true
