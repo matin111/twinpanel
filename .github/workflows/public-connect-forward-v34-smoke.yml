@@ -69,3 +69,17 @@ jobs:
         run: python3 backend/tests/smoke_public_connection_reference_layout_v38.py
       - name: Run V39 mobile all-protocol and V2Ray simplification smoke
         run: python3 backend/tests/smoke_public_connection_mobile_simplified_v39.py
+      - name: Parse V39 inline JavaScript
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          source = Path('backend/app/routers/public_connection_mobile_simplified_v39.py').read_text()
+          match = re.search(r'_SCRIPT\s*=\s*r"""(.*?)"""', source, re.S)
+          assert match, 'V39 script block missing'
+          script = match.group(1).strip()
+          script = re.sub(r'^<script[^>]*>\s*', '', script)
+          script = re.sub(r'\s*</script>$', '', script)
+          Path('/tmp/twinpanel-public-connect-v39.js').write_text(script)
+          PY
+          node --check /tmp/twinpanel-public-connect-v39.js
