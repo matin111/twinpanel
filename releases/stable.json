@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.355",
+  "version": "1.1.0-rc.356",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T20:14:44Z",
+  "released_at": "2026-10-29T20:20:51Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "09a2ef3b03317f1e598980e472f99ef0f9e45f66",
+  "source_sha": "87c797402c79bc3a4f7327673d273e61deb2dbf1",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.355/twinpanel-1.1.0-rc.355-linux-x86_64.tar.gz",
-    "sha256": "36beb2adf2794ce47836cc82c021042b254b40e4c3493d37711b9c6aec06f998",
-    "size_bytes": 28624326
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.356/twinpanel-1.1.0-rc.356-linux-x86_64.tar.gz",
+    "sha256": "0f55f4a6f761ba2d4b404ba686bec467f2913b3a1501bc937e9fc9c9ffceced8",
+    "size_bytes": 28626229
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.355 مسیر اکشن Multi Server ویتوری/Xray در Public Connect را اصلاح می‌کند. backend V43 از rc.354 برای هر کشور/سرور هر سه پروفایل مشتری WebSocket TLS، XHTTP Reality و TCP ساده را در endpoint رسمی /multi/v2ray قرار می‌دهد و در Production برای ۳ کشور ۹ کانفیگ واقعی تأیید شده است. V44 حالا کارت Multi Server را به همین endpoint ۹تایی وصل می‌کند؛ «ارسال همه به Hiddify» و «کپی لینک» هر دو دقیقاً /v1/connect/{token}/multi/v2ray را استفاده می‌کنند و دیگر مسیر قدیمی /sub/v2ray سه‌کانفیگی را نمی‌فرستند. سه اتصال هر کشور، دانلود برنامه Hiddify، اکشن‌های هر پروفایل و Bottom Sheet موبایل حفظ می‌شوند. هیچ تغییری در Tunnel، TP27، VXLAN، Spoof، Accounting، quota، provisioning، credential generation، routing یا firewall ایجاد نشده است. Source candidate روی SHA immutable 09a2ef3b03317f1e598980e472f99ef0f9e45f66 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.355 fixes the Public Connect V2Ray/Xray Multi Server action wiring. The V43 backend from rc.354 already puts all three customer profiles per country/node—WebSocket TLS, XHTTP Reality, and TCP simple—into the official /multi/v2ray endpoint, validated in production as 9 real configs for 3 countries. V44 now wires the Multi Server card to that 9-config endpoint: both Send all to Hiddify and Copy Link use exactly /v1/connect/{token}/multi/v2ray instead of the legacy 3-config /sub/v2ray path. The three per-country profiles, Hiddify client download, per-profile actions, and mobile bottom sheet remain preserved. No Tunnel, TP27, VXLAN, Spoof, Accounting, quota, provisioning, credential-generation, routing, or firewall behavior is changed. The candidate source is pinned to immutable SHA 09a2ef3b03317f1e598980e472f99ef0f9e45f66."
+    "fa": "TwinPanel 1.1.0-rc.356 خطای کاذب نمایش سرعت مسیرهای تانل را اصلاح می‌کند. در Production روی Tunnel #8 ثابت شد Spoof WG در مسیر Iran→Exit واقعاً ترافیک دوطرفه عبور می‌دهد، اما receiver تست سرعت حدود ۱ ثانیه بعد از پایان sender مقدار RX_MBPS را ثبت می‌کرد و منطق قبلی پس از ۰.۵ ثانیه زودهنگام با throughput_receiver_result_missing:upload شکست می‌خورد. V355 بدون تغییر در برنامه sender/receiver، تعداد stream، حجم/زمان تست یا دیتاپلین، نتیجه receiver را هر ۲۵۰ms تا سقف ۳ ثانیه به‌صورت bounded بررسی می‌کند و سپس telemetry دانلود/آپلود را ذخیره می‌کند. این اصلاح هم Health Test دستی و هم Benchmark پس‌زمینه Smart Auto را پوشش می‌دهد. هیچ تغییری در Spoof WG carrier، TP27، VXLAN، route، firewall، WireGuard configuration، candidate health یا active/preferred production authority ایجاد نشده است. Source candidate روی SHA immutable 87c797402c79bc3a4f7327673d273e61deb2dbf1 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.356 fixes a false transport throughput-result failure. Production evidence on Tunnel #8 proved Spoof WG carries real bidirectional Iran-to-Exit traffic, while the benchmark receiver needed about one second after sender completion to flush RX_MBPS; the previous fixed 0.5-second collection delay therefore raised throughput_receiver_result_missing:upload. V355 keeps the existing sender/receiver programs, stream count, byte/time limits, and dataplane unchanged, but polls the receiver result every 250ms with a strict 3-second bound before persisting download/upload telemetry. The fix applies to both explicit admin Health Test benchmarks and background Smart Auto benchmarks. No Spoof WG carrier, TP27, VXLAN, routing, firewall, WireGuard configuration, candidate-health, or active/preferred production-authority behavior is changed. The candidate source is pinned to immutable SHA 87c797402c79bc3a4f7327673d273e61deb2dbf1."
   }
 }
