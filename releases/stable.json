@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.358",
+  "version": "1.1.0-rc.359",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T21:20:27Z",
+  "released_at": "2026-10-29T21:29:22Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b17f26900388f85e94bfb75ec6ed0bc2380233bb",
+  "source_sha": "28b34ccb9d5c06f05d2d95537fc8f8d9364fe1e8",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.358/twinpanel-1.1.0-rc.358-linux-x86_64.tar.gz",
-    "sha256": "08eb5860cb32752a2a03c151d7d3351e8043b6313bb9b7088a9b01abe9404fdc",
-    "size_bytes": 28632015
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.359/twinpanel-1.1.0-rc.359-linux-x86_64.tar.gz",
+    "sha256": "3c64c62dd7ed4a582890b3d25df49845f1205fb17063dcc14f16a8d3254c75cd",
+    "size_bytes": 28638046
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.358 تحویل V2Ray Multi-Link را اصلاح می‌کند تا برای هر سرور همه پروفایل‌های واقعی انتخاب‌شده توسط policy نهایی Xray در subscription وارد شوند، نه فقط URI اصلی item. رابط Multi-Link نیز سرورها و کانفیگ‌های واقعی هر سرور را جدا، داینامیک و قابل‌تشخیص نمایش می‌دهد و تعداد ثابت کانفیگ حذف شده است. Legacy credentialهایی که profiles[] ندارند همچنان fallback تک-URI خود را حفظ می‌کنند. هیچ تغییری در TP27، VXLAN، Tunnel dataplane، Spoof، Accounting، quota، provisioning، credential generation، routing، firewall یا runtime سایر پروتکل‌ها ایجاد نشده است. Source candidate روی SHA immutable b17f26900388f85e94bfb75ec6ed0bc2380233bb قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.358 fixes V2Ray Multi-Link delivery so every server contributes all real customer profiles selected by the final Xray policy instead of only the item's primary URI. The Multi-Link UI now groups real configurations by server, shows dynamic server/profile counts, and removes the fixed config-count assumption. Legacy credentials without profiles[] retain their single-URI fallback. No TP27, VXLAN, tunnel dataplane, spoofing, accounting, quota, provisioning, credential generation, routing, firewall, or other protocol runtime behavior is changed. The candidate source is pinned to immutable SHA b17f26900388f85e94bfb75ec6ed0bc2380233bb."
+    "fa": "TwinPanel 1.1.0-rc.359 ساخت Tunnel جدید را به انتخاب یک مسیر اولیه تبدیل می‌کند. در /admin/tunnels کاربر هنگام ساخت Pair یکی از دو مسیر Production-active یعنی TP27 Fast یا Spoof Tunnel را انتخاب می‌کند؛ فقط همان مسیر نصب، qualify و Production می‌شود و سایر Smart Transportها نصب‌نشده باقی می‌مانند تا بعداً از صفحه مسیرهای هوشمند اضافه شوند. برای Spoof Tunnel دو IP Spoof ایران و خارج در همان فرم دریافت می‌شود. مسیر جدید از Agent + Tunnel Fabric bootstrap، managed pair preflight و manual cutover/Agent acceptance موجود reuse می‌کند و اگر provisioning مسیر انتخابی کامل نشود Pair تازه rollback می‌شود. مسیر legacy /create-managed برای سازگاری بدون تغییر باقی مانده است. هیچ تغییری در Tunnelهای موجود، TP27/Spoof carrier implementation، VXLAN، routing، firewall، WireGuard، protocol dataplane، Accounting یا quota ایجاد نشده است. Source candidate روی SHA immutable 28b34ccb9d5c06f05d2d95537fc8f8d9364fe1e8 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.359 changes new-tunnel creation to provision one explicitly selected initial path. In /admin/tunnels the operator chooses one of the two production-active transports, TP27 Fast or Spoof Tunnel; only that path is installed, qualified and promoted to Production, while all other Smart Transports remain uninstalled for later addition from Smart Transports. Selecting Spoof Tunnel collects the Iran and Exit spoof IPs in the same form. The new flow reuses the existing Agent + Tunnel Fabric bootstrap, managed pair preflight and manual cutover/Agent acceptance authorities, and rolls back the brand-new pair if selected-path provisioning does not complete. Legacy /create-managed remains unchanged for compatibility. No existing tunnel, TP27/Spoof carrier implementation, VXLAN, routing, firewall, WireGuard, protocol dataplane, accounting or quota behavior is changed. The candidate source is pinned to immutable SHA 28b34ccb9d5c06f05d2d95537fc8f8d9364fe1e8."
   }
 }
