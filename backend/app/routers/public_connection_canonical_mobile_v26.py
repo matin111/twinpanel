@@ -1,17 +1,10 @@
 from __future__ import annotations
 
-from .public_connection_mobile_refine_v28 import refine_public_connection_mobile_v28
-from .public_connection_mobile_ui_v27 import refine_public_connection_mobile_ui_v27
-from .public_connection_presentation_v29 import refine_public_connection_presentation_v29
-from .public_connection_protocol_subscriptions_mount_v30 import (
-    refine_public_connection_protocol_subscriptions_v30,
-)
-from .public_connection_unified_actions_v31 import (
-    refine_public_connection_unified_actions_v31,
-)
-from .public_connection_platform_guard_v32 import (
-    refine_public_connection_platform_guard_v32,
-)
+# Keep the V30 protocol-subscription routes mounted, but do not apply its
+# presentation refiner here. Public Connect presentation is intentionally reset
+# to one guarded V26 authority; the subscription endpoints remain available for
+# a future clean UI that does not stack on top of legacy renderers.
+from . import public_connection_protocol_subscriptions_mount_v30 as _public_connection_protocol_subscriptions_mount_v30  # noqa: F401
 
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26"
@@ -113,13 +106,8 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_canonical_mobile_v26(source: str) -> str:
-    """Keep the phone surface canonical, compact and free of retired mobile renderers."""
+    """Keep phone-only cleanup guarded and avoid stacked presentation refiners."""
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
-    source = refine_public_connection_mobile_ui_v27(source)
-    source = refine_public_connection_mobile_v28(source)
-    source = refine_public_connection_presentation_v29(source)
-    source = refine_public_connection_protocol_subscriptions_v30(source)
-    source = refine_public_connection_unified_actions_v31(source)
-    return refine_public_connection_platform_guard_v32(source)
+    return source
