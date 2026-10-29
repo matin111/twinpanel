@@ -3,12 +3,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 V30 = ROOT / "app" / "routers" / "public_connection_protocol_subscriptions_v30.py"
+V31 = ROOT / "app" / "routers" / "public_connection_unified_actions_v31.py"
 MOUNT = ROOT / "app" / "routers" / "public_connection_protocol_subscriptions_mount_v30.py"
 V26 = ROOT / "app" / "routers" / "public_connection_canonical_mobile_v26.py"
 V7 = ROOT / "app" / "routers" / "public_connection_multilink_v7.py"
 
 
 v30 = V30.read_text(encoding="utf-8")
+v31 = V31.read_text(encoding="utf-8")
 mount = MOUNT.read_text(encoding="utf-8")
 v26 = V26.read_text(encoding="utf-8")
 v7 = V7.read_text(encoding="utf-8")
@@ -48,12 +50,14 @@ assert "public_connection_multilink_v7_router.include_router" in mount
 assert "_public_protocol_subscriptions_v30_mounted" in mount
 assert "decodeURIComponent(pathParts[connectIndex+1]||'')" in mount
 
-# V30 is final presentation composition after V29.
+# V30 remains the subscription layer; V31 is the final semantic presentation authority.
 assert "refine_public_connection_protocol_subscriptions_v30" in v26
+assert "refine_public_connection_unified_actions_v31" in v26
 assert "source = refine_public_connection_presentation_v29(source)" in v26
-assert "return refine_public_connection_protocol_subscriptions_v30(source)" in v26
+assert "source = refine_public_connection_protocol_subscriptions_v30(source)" in v26
+assert "return refine_public_connection_unified_actions_v31(source)" in v26
 
-# Beginner-facing UI has explicit semantics; no bare app-name controls.
+# V30 subscription UI keeps explicit all-server semantics.
 for required in (
     "همه سرورها",
     "افزودن همه به Karing",
@@ -62,16 +66,22 @@ for required in (
     "دانلود Hiddify",
     "دانلود v2rayN",
     "سرورهای تکی",
-    "کپی لینک",
-    "کپی کانفیگ",
-    "دانلود کانفیگ",
-    "اتصال به Karing",
 ):
     assert required in v30, required
 
-# Mobile individual-server section is secondary/collapsible.
+# V31 owns final single-server wording; raw config copy is not beginner-facing.
+for required in (
+    "کپی لینک",
+    "دانلود کانفیگ",
+    "اتصال به Karing",
+    "باز کردن در برنامه",
+):
+    assert required in v31, required
+assert "کپی کانفیگ" not in v31
+
+# Mobile individual-server section remains secondary/collapsible for V30 protocols.
 assert "v30-single-servers" in v30
 assert "details.className='v30-single-servers'" in v30
 assert "details.appendChild(views)" in v30
 
-print("PUBLIC_PROTOCOL_SUBSCRIPTIONS_V30_SMOKE=PASS")
+print("PUBLIC_PROTOCOL_SUBSCRIPTIONS_V30_V31_SMOKE=PASS")
