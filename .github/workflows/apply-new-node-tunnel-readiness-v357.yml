@@ -82,16 +82,10 @@ jobs:
           assert '>{exitNodes.map(node=><option' in text, 'Exit modal options anchor missing'
           text = text.replace('>{iranNodes.map(node=><option', '>{readyIranNodes.map(node=><option', 1)
           text = text.replace('>{exitNodes.map(node=><option', '>{readyExitNodes.map(node=><option', 1)
-
           path.write_text(text)
 
           smoke = Path('scripts/new-node-tunnel-readiness-v357-smoke.py')
           smoke.write_text('''from pathlib import Path\n\nSOURCE = Path("components/tunnel-protocol-runtime-v307.tsx").read_text()\n\nassert "TWINPANEL_NEW_NODE_TUNNEL_READINESS_V357" in SOURCE\nassert 'const readyIranNodes=useMemo(()=>iranNodes.filter(node=>normalize(node.status)==="online")' in SOURCE\nassert 'const readyExitNodes=useMemo(()=>exitNodes.filter(node=>normalize(node.status)==="online")' in SOURCE\nassert "!readyIranNodes.some(node=>node.id===draft.iran_node_id)" in SOURCE\nassert "!readyExitNodes.some(node=>node.id===draft.exit_node_id)" in SOURCE\nassert "const iran=readyIranNodes[0]" in SOURCE\nassert "const exit=readyExitNodes[0]" in SOURCE\nassert "readyIranNodes.length===0||readyExitNodes.length===0" in SOURCE\nassert ">{readyIranNodes.map(node=><option" in SOURCE\nassert ">{readyExitNodes.map(node=><option" in SOURCE\nassert ">{iranNodes.map(node=><option" not in SOURCE\nassert ">{exitNodes.map(node=><option" not in SOURCE\nassert '||iranNodes[0]' not in SOURCE\nassert '||exitNodes[0]' not in SOURCE\nprint("NEW_NODE_TUNNEL_READINESS_V357_SMOKE_OK")\n''')
-
-          workflow = Path('.github/workflows/new-node-tunnel-readiness-v357-smoke.yml')
-          workflow.write_text('''name: New Node Tunnel Readiness V357 Smoke\n\non:\n  pull_request:\n    paths:\n      - components/tunnel-protocol-runtime-v307.tsx\n      - scripts/new-node-tunnel-readiness-v357-smoke.py\n      - .github/workflows/new-node-tunnel-readiness-v357-smoke.yml\n  push:\n    branches: [main]\n    paths:\n      - components/tunnel-protocol-runtime-v307.tsx\n      - scripts/new-node-tunnel-readiness-v357-smoke.py\n      - .github/workflows/new-node-tunnel-readiness-v357-smoke.yml\n\njobs:\n  smoke:\n    runs-on: ubuntu-24.04\n    steps:\n      - uses: actions/checkout@v4\n      - name: Verify fail-closed tunnel selector\n        run: python3 scripts/new-node-tunnel-readiness-v357-smoke.py\n''')
-
-          Path('.github/workflows/apply-new-node-tunnel-readiness-v357.yml').unlink()
           PY
 
           python3 scripts/new-node-tunnel-readiness-v357-smoke.py
@@ -101,6 +95,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+matin111@users.noreply.github.com"
-          git add -A
+          git add components/tunnel-protocol-runtime-v307.tsx scripts/new-node-tunnel-readiness-v357-smoke.py
           git commit -m "Guard new tunnel creation on online nodes"
           git push origin HEAD:fix/new-node-tunnel-readiness-v357
