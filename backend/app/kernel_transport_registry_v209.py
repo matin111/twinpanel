@@ -6,6 +6,7 @@ from . import transport_candidates as candidates
 from .spoof_candidate_policy_v202 import apply_spoof_candidate_policy_v202
 from .spoof_icmp_scoped_echo_v217 import apply_spoof_icmp_scoped_echo_v217
 from .spoof_policy_rule_priority_v218 import apply_spoof_policy_rule_priority_v218
+from .spoof_wireguard_egress_v219 import apply_spoof_wireguard_egress_v219
 from .tp6_candidate_registry_v208 import apply_tp6_candidate_registry_v208
 from .transport_candidates import kernel_ipip, kernel_vxlan
 
@@ -94,6 +95,7 @@ def apply_kernel_transport_registry_v209() -> None:
     apply_spoof_candidate_policy_v202()
     apply_spoof_icmp_scoped_echo_v217()
     apply_spoof_policy_rule_priority_v218()
+    apply_spoof_wireguard_egress_v219()
 
     # TP6 is another additive candidate and its runtime wrapper must exist before
     # V209 extends the same fallback chain. This also fixes API processes that
@@ -158,7 +160,7 @@ def apply_kernel_transport_registry_v209() -> None:
         "candidates=kernel_ipip,kernel_vxlan "
         "install=explicit-only "
         "auto_install_unchanged=true "
-        "spoof_policy=v202-v214+v217+v218 "
+        "spoof_policy=v202-v214+v217+v218+v219 "
         "encryption=none",
         flush=True,
     )
