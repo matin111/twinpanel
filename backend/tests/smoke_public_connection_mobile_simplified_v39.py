@@ -4,6 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 V26 = ROOT / "backend/app/routers/public_connection_canonical_mobile_v26.py"
+V38 = ROOT / "backend/app/routers/public_connection_reference_layout_v38.py"
 V39 = ROOT / "backend/app/routers/public_connection_mobile_simplified_v39.py"
 
 
@@ -14,15 +15,16 @@ def require(condition: bool, message: str) -> None:
 
 def main() -> None:
     v26 = V26.read_text(encoding="utf-8")
+    v38 = V38.read_text(encoding="utf-8")
     v39 = V39.read_text(encoding="utf-8")
 
     require("TWINPANEL_PUBLIC_CONNECT_MOBILE_SIMPLIFIED_V39" in v39, "V39 marker missing")
-    require("refine_public_connection_mobile_simplified_v39" in v26, "V39 not mounted by V26")
-    require(
-        v26.index("source = refine_public_connection_reference_layout_v38(source)")
-        < v26.index("return refine_public_connection_mobile_simplified_v39(source)"),
-        "V39 must be the final presentation authority after V38",
-    )
+    require("return refine_public_connection_reference_layout_v38(source)" in v26,
+            "V26 reference-layout contract drifted")
+    require("refine_public_connection_mobile_simplified_v39" in v38,
+            "V39 not mounted by V38")
+    require("return refine_public_connection_mobile_simplified_v39(source)" in v38,
+            "V39 must be V38's final presentation refinement")
 
     # Mobile must expose every real protocol choice already present in the canonical payload.
     require("body.v39-mobile-simple .protocols" in v39, "mobile protocol list restore CSS missing")
