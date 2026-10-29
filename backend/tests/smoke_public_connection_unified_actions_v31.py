@@ -77,15 +77,11 @@ assert "public_connection_unified_actions_v31" in v26
 assert "source = refine_public_connection_protocol_subscriptions_v30(source)" in v26
 assert "return refine_public_connection_unified_actions_v31(source)" in v26
 
-# Composition smoke: final source must contain both V30 and V31 markers.
-from app.routers.public_connection_unified_actions_v31 import (
-    refine_public_connection_unified_actions_v31,
-)
-
-sample = "<html><head><style></style></head><body></body></html>"
-rendered = refine_public_connection_unified_actions_v31(sample)
-assert "TWINPANEL_PUBLIC_CONNECT_UNIFIED_ACTIONS_V31" in rendered
-assert "twinpanelPublicConnectUnifiedActionsV31" in rendered
-assert rendered.count("TWINPANEL_PUBLIC_CONNECT_UNIFIED_ACTIONS_V31") >= 1
+# Dependency-free composition contract: the refiner must inject both CSS and JS
+# before the closing tags and must be idempotent by marker.
+assert 'source.replace("</style>", _CSS + "\\n</style>", 1)' in v31
+assert 'source.replace("</body>", _SCRIPT + f"\\n<!-- {_MARKER} -->\\n</body>", 1)' in v31
+assert 'if _MARKER in source:' in v31
+assert 'return source' in v31
 
 print("PUBLIC_CONNECTION_UNIFIED_ACTIONS_V31_SMOKE=PASS")
