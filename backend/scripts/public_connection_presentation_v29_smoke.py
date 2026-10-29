@@ -1,8 +1,16 @@
 from __future__ import annotations
 
-from app.routers.public_connection_presentation_v29 import (
-    refine_public_connection_presentation_v29,
-)
+import importlib.util
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+MODULE = ROOT / "app" / "routers" / "public_connection_presentation_v29.py"
+spec = importlib.util.spec_from_file_location("public_connection_presentation_v29", MODULE)
+assert spec is not None and spec.loader is not None
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+refine_public_connection_presentation_v29 = module.refine_public_connection_presentation_v29
 
 
 FIXTURE = """<!doctype html>
