@@ -1,0 +1,26 @@
+name: Public Connect Karing Downloads V50 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/public_connection_device_actions_v11.py'
+      - 'backend/tests/smoke_public_connection_karing_downloads_v50.py'
+      - '.github/workflows/public-connect-karing-v50-smoke.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/app/routers/public_connection_device_actions_v11.py'
+      - 'backend/tests/smoke_public_connection_karing_downloads_v50.py'
+      - '.github/workflows/public-connect-karing-v50-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Karing download-link regression
+        run: python3 backend/tests/smoke_public_connection_karing_downloads_v50.py
