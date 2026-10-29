@@ -8,7 +8,7 @@ import {useI18n} from "../lib/i18n";
 
 type SystemHealth={
   hostname?:string;
-  cpu?:{percent?:number};
+  cpu?:{percent?:number;cores?:number};
   memory?:{percent?:number;used_bytes?:number;total_bytes?:number};
   disk?:{percent?:number;used_bytes?:number;total_bytes?:number};
   uptime_seconds?:number;
@@ -27,10 +27,17 @@ function formatUptime(value:number|undefined){
   return days>0?`${days}d ${hours}h`:`${hours}h`;
 }
 
-function Resource({label,value}:{label:string;value:number|null}){
+function formatGiB(value:number|undefined){
+  const bytes=Number(value);
+  if(!Number.isFinite(bytes)||bytes<0)return "—";
+  return `${(bytes/1073741824).toFixed(bytes>=10737418240?0:1)} GB`;
+}
+
+function Resource({label,value,capacity}:{label:string;value:number|null;capacity?:string}){
   const safe=value??0;
   return <div className="dash-server-resource">
     <div><span>{label}</span><b>{value==null?"—":`${Math.round(value)}%`}</b></div>
+    {capacity?<small>{capacity}</small>:null}
     <i><em style={{width:`${safe}%`}}/></i>
   </div>;
 }
@@ -84,17 +91,21 @@ export function AdminDashboardServerCard(){
   const cpu=percent(health?.cpu?.percent);
   const ram=percent(health?.memory?.percent);
   const disk=percent(health?.disk?.percent);
+  const cores=Number(health?.cpu?.cores);
+  const cpuCapacity=Number.isFinite(cores)&&cores>0?`${Math.round(cores)} vCPU`:"—";
+  const ramCapacity=`${formatGiB(health?.memory?.used_bytes)} / ${formatGiB(health?.memory?.total_bytes)}`;
+  const diskCapacity=`${formatGiB(health?.disk?.used_bytes)} / ${formatGiB(health?.disk?.total_bytes)}`;
 
   return createPortal(
     <div className="dash-server-card">
       <div className="dash-server-head">
         <h2>{pick("سرور","Server")}</h2>
-        <b>{health?.hostname||"—"}</b>
+        <b><span>Hostname</span> · {health?.hostname||"—"}</b>
       </div>
       <div className="dash-server-grid">
-        <Resource label="CPU" value={cpu}/>
-        <Resource label="RAM" value={ram}/>
-        <Resource label="Disk" value={disk}/>
+        <Resource label="CPU" value={cpu} capacity={cpuCapacity}/>
+        <Resource label="RAM" value={ram} capacity={ramCapacity}/>
+        <Resource label="Disk" value={disk} capacity={diskCapacity}/>
         <div className="dash-server-uptime"><span>Uptime</span><b>{formatUptime(health?.uptime_seconds)}</b></div>
       </div>
     </div>,
