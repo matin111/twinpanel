@@ -1,11 +1,12 @@
 "use client";
 
 import {TunnelControlCenterV1} from "./tunnel-control-center-v1";
+import styles from "./smart-transports-runtime-v25.module.css";
 
 // TWINPANEL_SINGLE_TUNNEL_UI_AUTHORITY_V1
 // TWINPANEL_SINGLE_TUNNEL_UI_AUTHORITY_V293
-// Kept only as a route-compatible adapter. /admin/tunnel-transports and
-// /admin/tunnels must render the same data-driven control surface.
+// Keep /admin/tunnel-transports on the shared tunnel control surface while
+// trimming non-operational explanatory copy from the Smart Transports route.
 export function SmartTransportsRuntimeV25(){
-  return <TunnelControlCenterV1/>;
+  return <div className={styles.clean}><TunnelControlCenterV1/></div>;
 }
