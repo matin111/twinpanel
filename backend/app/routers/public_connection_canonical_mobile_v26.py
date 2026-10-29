@@ -6,6 +6,9 @@ from __future__ import annotations
 from . import public_connection_protocol_subscriptions_mount_v30 as _public_connection_protocol_subscriptions_mount_v30  # noqa: F401
 from . import public_connection_forward_mount_v34 as _public_connection_forward_mount_v34  # noqa: F401
 from .public_connection_forward_v34 import refine_public_connection_forward_v34
+from .public_connection_manual_credentials_v35 import (
+    refine_public_connection_manual_credentials_v35,
+)
 
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26"
@@ -84,8 +87,9 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_canonical_mobile_v26(source: str) -> str:
-    """Keep phone cleanup guarded, then hand final presentation to one V34 authority."""
+    """Keep phone cleanup guarded, hoist shared manual credentials, then use V34."""
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
+    source = refine_public_connection_manual_credentials_v35(source)
     return refine_public_connection_forward_v34(source)
