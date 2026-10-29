@@ -14,7 +14,7 @@ from .transport_candidates.common import mark
 
 
 # ============================================================
-# TWINPANEL SPOOF UNDERLAY GUARD V206 + QUARANTINE FAILFAST V207
+# TWINPANEL SPOOF UNDERLAY GUARD V206 + QUARANTINE FAILFAST V207/V208
 #
 # Production Tunnel #8 proved a specific failure shape:
 #   * Spoof forward carrier reaches Exit;
@@ -29,14 +29,20 @@ from .transport_candidates.common import mark
 # V207 makes that quarantine operational for explicit install/repair too. While
 # the exact V206 underlay quarantine is still active, a repeated Spoof install
 # is rejected before the original installer opens SSH connections or mutates any
-# node runtime. This prevents the same known-incompatible dataplane attempt from
-# repeatedly restarting services while TP27/VXLAN are already healthy.
+# node runtime.
+#
+# V208 handles production rows where a later candidate metadata rewrite kept the
+# SmartAuto quarantine namespace but dropped spoof_underlay_guard_v206. The exact
+# active V206 reason is recovered only for an enabled failed Spoof row whose last
+# probe is explicitly failed. The guard metadata is rehydrated in DB before the
+# request is rejected; no node runtime is touched.
 #
 # This layer does NOT alter framing, ports, payloads, TP27 or VXLAN.
 # ============================================================
 
 MARKER = "TWINPANEL_SPOOF_UNDERLAY_GUARD_V206"
 FAILFAST_MARKER = "TWINPANEL_SPOOF_QUARANTINE_FAILFAST_V207"
+RECOVERY_MARKER = "TWINPANEL_SPOOF_QUARANTINE_RECOVERY_V208"
 UNDERLAY_REASON = "underlay_incompatible:reverse_carrier_not_reaching_iran"
 UNDERLAY_QUARANTINE_SECONDS = 24 * 60 * 60
 
@@ -65,6 +71,11 @@ def _meta_dict(raw: str | None) -> dict:
     except Exception:
         pass
     return {}
+
+
+def _row_status(row: TunnelTransport) -> str:
+    raw = getattr(row.status, "value", row.status)
+    return str(raw or "").strip().lower()
 
 
 def _exit_reverse_progress(message: str) -> bool:
@@ -97,14 +108,11 @@ def active_underlay_quarantine(
 
     cfg = _meta_dict(row.config_text)
     smart = cfg.get("smart_auto_v21")
-    guard = cfg.get("spoof_underlay_guard_v206")
-    if not isinstance(smart, dict) or not isinstance(guard, dict):
+    if not isinstance(smart, dict):
         return None
 
     reason = str(smart.get("quarantine_reason") or "").strip()
     if reason != UNDERLAY_REASON:
-        return None
-    if guard.get("blocked") is not True or str(guard.get("reason") or "") != reason:
         return None
 
     try:
@@ -117,6 +125,24 @@ def active_underlay_quarantine(
     if remaining <= 0:
         return None
 
+    guard = cfg.get("spoof_underlay_guard_v206")
+    guard_valid = bool(
+        isinstance(guard, dict)
+        and guard.get("blocked") is True
+        and str(guard.get("reason") or "") == reason
+    )
+    legacy_guard_missing = not isinstance(guard, dict) or not guard
+
+    if not guard_valid:
+        if not legacy_guard_missing:
+            return None
+        if not bool(row.enabled):
+            return None
+        if _row_status(row) != "failed":
+            return None
+        if smart.get("last_probe_ok") is not False:
+            return None
+
     return {
         "blocked": True,
         "transport": spoof_wg.NAME,
@@ -125,7 +151,13 @@ def active_underlay_quarantine(
         "retry_after_seconds": remaining,
         "authority_unchanged": True,
         "action": "fail_fast_before_node_mutation",
-        "version": 207,
+        "version": 208,
+        "metadata_source": (
+            "v206_guard"
+            if guard_valid
+            else "smart_auto_v21_recovery_v208"
+        ),
+        "repair_guard_metadata": not guard_valid,
     }
 
 
@@ -144,6 +176,63 @@ def active_underlay_quarantine_for_tunnel(
         .first()
     )
     return active_underlay_quarantine(row, now_epoch=now_epoch)
+
+
+def _restore_recovered_guard_metadata(
+    db: Session,
+    tunnel_id: int,
+    active_block: dict,
+) -> None:
+    """Repair only the missing guard namespace for an already-active quarantine."""
+
+    if active_block.get("repair_guard_metadata") is not True:
+        return
+
+    row = (
+        db.query(TunnelTransport)
+        .filter(
+            TunnelTransport.tunnel_id == int(tunnel_id),
+            TunnelTransport.transport == spoof_wg.NAME,
+        )
+        .first()
+    )
+    if row is None:
+        return
+
+    cfg = _meta_dict(row.config_text)
+    smart = cfg.get("smart_auto_v21")
+    if not isinstance(smart, dict):
+        return
+    if str(smart.get("quarantine_reason") or "").strip() != UNDERLAY_REASON:
+        return
+
+    existing = cfg.get("spoof_underlay_guard_v206")
+    if isinstance(existing, dict) and existing:
+        return
+
+    now = time.time()
+    detected = smart.get("last_probe_epoch") or smart.get("stable_since_epoch") or now
+    cfg["spoof_underlay_guard_v206"] = {
+        "version": 208,
+        "blocked": True,
+        "reason": UNDERLAY_REASON,
+        "detected_at_epoch": detected,
+        "quarantine_seconds": UNDERLAY_QUARANTINE_SECONDS,
+        "evidence": {
+            "recovered_from": "smart_auto_v21",
+            "original_v206_guard_metadata_was_missing": True,
+        },
+        "action": "fail_closed_keep_existing_authority",
+        "recovered_at_epoch": now,
+    }
+    row.config_text = json.dumps(
+        cfg,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    db.commit()
+    db.refresh(row)
 
 
 def _persist_underlay_guard(
@@ -211,10 +300,12 @@ async def _guarded_spoof_install(tunnel_id: int, db: Session) -> dict:
 
     active_block = active_underlay_quarantine_for_tunnel(db, int(tunnel_id))
     if active_block is not None:
+        _restore_recovered_guard_metadata(db, int(tunnel_id), active_block)
         raise RuntimeError(
             "spoof_underlay_quarantined:"
             f"{active_block['reason']}:"
             f"retry_after_seconds={active_block['retry_after_seconds']}:"
+            f"metadata_source={active_block['metadata_source']}:"
             "authority_unchanged=true"
         )
 
@@ -258,5 +349,11 @@ def apply_spoof_underlay_guard_v206() -> None:
         f"{FAILFAST_MARKER}_ACTIVE "
         "explicit_install=blocked_during_active_underlay_quarantine "
         "node_mutation=none authority=unchanged",
+        flush=True,
+    )
+    print(
+        f"{RECOVERY_MARKER}_ACTIVE "
+        "legacy_missing_guard=smart_auto_exact_reason_only "
+        "repair=db_metadata_only node_mutation=none",
         flush=True,
     )
