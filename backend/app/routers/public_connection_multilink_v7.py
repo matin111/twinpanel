@@ -176,15 +176,7 @@ def _subscription_content(token: str, db: Session) -> tuple[str, int, int]:
     return base64.b64encode(raw).decode("ascii"), len(groups), len(uris)
 
 
-@router.get(
-    "/{token}/subscription/v2ray",
-    name="public_v2ray_subscription_v7",
-)
-def public_v2ray_subscription_v7(
-    token: str,
-    db: Session = Depends(get_db),
-):
-    """Return a base64 feed containing every customer-safe V2Ray/Xray profile."""
+def _subscription_response(token: str, db: Session) -> Response:
     content, server_count, profile_count = _subscription_content(token, db)
     return Response(
         content=content,
@@ -199,15 +191,7 @@ def public_v2ray_subscription_v7(
     )
 
 
-@router.get(
-    "/{token}/subscription/v2ray/meta",
-    name="public_v2ray_subscription_meta_v49",
-)
-def public_v2ray_subscription_meta_v49(
-    token: str,
-    db: Session = Depends(get_db),
-):
-    """Expose grouped server/profile metadata for the modern Public Connect UI."""
+def _subscription_meta_response(token: str, db: Session) -> JSONResponse:
     payload = _active_public_payload(token, db)
     groups = _v2ray_profile_groups(payload)
     return JSONResponse(
@@ -221,16 +205,67 @@ def public_v2ray_subscription_meta_v49(
     )
 
 
+@router.get(
+    "/{token}/subscription/v2ray",
+    name="public_v2ray_subscription_v7",
+)
+def public_v2ray_subscription_v7(
+    token: str,
+    db: Session = Depends(get_db),
+):
+    """Return a base64 feed containing every customer-safe V2Ray/Xray profile."""
+    return _subscription_response(token, db)
+
+
+@router.get(
+    "/{token}/subscription/v2ray/meta",
+    name="public_v2ray_subscription_meta_v49",
+)
+def public_v2ray_subscription_meta_v49(
+    token: str,
+    db: Session = Depends(get_db),
+):
+    """Expose grouped server/profile metadata for the modern Public Connect UI."""
+    return _subscription_meta_response(token, db)
+
+
+# TWINPANEL_PUBLIC_CONNECT_NEUTRAL_SUB_URL_V50
+# Some public networks inspect plaintext HTTP paths and interfere when protocol
+# product names appear in the URL. Preserve the historical V2Ray routes for
+# compatibility, but expose a neutral canonical feed used by Public Connect and
+# external clients. The payload, policy and credentials are identical.
+@router.get(
+    "/{token}/sub",
+    name="public_v2ray_subscription_neutral_v50",
+)
+def public_v2ray_subscription_neutral_v50(
+    token: str,
+    db: Session = Depends(get_db),
+):
+    return _subscription_response(token, db)
+
+
+@router.get(
+    "/{token}/sub/meta",
+    name="public_v2ray_subscription_neutral_meta_v50",
+)
+def public_v2ray_subscription_neutral_meta_v50(
+    token: str,
+    db: Session = Depends(get_db),
+):
+    return _subscription_meta_response(token, db)
+
+
 @router.get("/{token}/subscription/v2ray/qr")
 def public_v2ray_subscription_qr_v7(
     token: str,
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """QR contains the stable subscription URL, not duplicated credential data."""
+    """QR contains the neutral stable subscription URL, not duplicated data."""
     _subscription_content(token, db)
     subscription_url = str(
-        request.url_for("public_v2ray_subscription_v7", token=token)
+        request.url_for("public_v2ray_subscription_neutral_v50", token=token)
     )
     image = qrcode.make(subscription_url)
     buffer = io.BytesIO()
