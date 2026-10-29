@@ -93,6 +93,7 @@ export function OutboundPerformanceV4(){
 
   const loadState=async(id:number)=>{
     if(!id)return;
+    setError("");
     const data=await api<V4State>(`/v1/settings/vpn/outbound-performance-v4/${id}`);
     setState(data);
     setTag(current=>data.benchmarkable_tags.includes(current)?current:(data.smart_route.candidate_tag||data.smart_route.current_tag||data.benchmarkable_tags[0]||""));
@@ -103,7 +104,6 @@ export function OutboundPerformanceV4(){
     setInventory(inv);
     const id=inv.nodes.some(item=>item.id===nodeId)?nodeId:(inv.nodes[0]?.id||0);
     setNodeId(id);
-    if(id)await loadState(id);
   };
   useEffect(()=>{void load().catch(exc=>setError(exc instanceof Error?exc.message:String(exc)));},[]);
   useEffect(()=>{if(nodeId)void loadState(nodeId).catch(exc=>setError(exc instanceof Error?exc.message:String(exc)));},[nodeId]);
