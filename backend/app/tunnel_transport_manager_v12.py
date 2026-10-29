@@ -32,7 +32,6 @@ from .kernel_transport_registry_v209 import (
 )
 from .legacy_ingress_reconciler import reconciler_loop as legacy_ingress_loop
 from .runtime_reconciler_v5 import reconciler_loop as runtime_reconciler_loop
-from .manager_runtime_v16 import install_manager_runtime_v16
 from .smart_candidate_fair_retry_v171 import (
     apply_smart_candidate_fair_retry_v171,
 )
@@ -82,7 +81,6 @@ from .vpn_access_performance_v51 import reconciler_loop as vpn_access_performanc
 
 
 async def main() -> None:
-    install_manager_runtime_v16()
     install_smart_transport_auto_v21()
     activate_manager_candidate_policy_v91()
 
@@ -102,6 +100,20 @@ async def main() -> None:
     apply_adaptive_multilane_v149()
     apply_adaptive_multilane_v151()
     apply_adaptive_multilane_v165()
+
+    # TWINPANEL_MANAGER_IMPORT_ORDER_V216
+    # manager_runtime_v16 imports the self-hosted/router composition. In the
+    # API process that composition legitimately applies V202/V209, which narrows
+    # SmartAuto to the final production candidate set. Importing it at module
+    # scope therefore made the standalone manager lose retired Direct TCP before
+    # V149/V151/V165 could register their cleanup-compatibility hooks. Defer the
+    # import until those legacy layers are applied. No background worker has
+    # started yet, so the V195 manual-authority guard and all self-hosted runtime
+    # hooks are still installed before any manager task can touch production.
+    from .manager_runtime_v16 import install_manager_runtime_v16
+
+    install_manager_runtime_v16()
+
     apply_smart_candidate_install_guard_v167()
     apply_smart_candidate_retry_guard_v169()
     apply_smart_candidate_fair_retry_v171()
