@@ -7,9 +7,9 @@ on:
       - 'backend/app/routers/public_connection_mobile_server_inventory_v18.py'
       - 'backend/app/routers/public_connection_protocol_actions_v20.py'
       - 'backend/app/routers/public_connection_canonical_mobile_v26.py'
-      - 'backend/app/routers/public_connection_mobile_ui_v27.py'
       - 'backend/tests/integration/test_public_connection_canonical_mobile_v319.py'
       - 'backend/tests/smoke_public_connection_mobile_ui_v27.py'
+      - 'backend/tests/smoke_public_connection_presentation_reset_v33.py'
       - '.github/workflows/public-connection-mobile-composition-v22-smoke.yml'
   workflow_dispatch:
 
@@ -32,33 +32,38 @@ jobs:
             backend/app/routers/public_connection_mobile_server_inventory_v18.py \
             backend/app/routers/public_connection_protocol_actions_v20.py \
             backend/app/routers/public_connection_canonical_mobile_v26.py \
-            backend/app/routers/public_connection_mobile_ui_v27.py \
             backend/tests/integration/test_public_connection_canonical_mobile_v319.py \
-            backend/tests/smoke_public_connection_mobile_ui_v27.py
+            backend/tests/smoke_public_connection_mobile_ui_v27.py \
+            backend/tests/smoke_public_connection_presentation_reset_v33.py
 
-      - name: Verify canonical mobile composition
+      - name: Verify canonical presentation composition
         run: |
           python - <<'PY'
           from pathlib import Path
 
           hub = Path('backend/app/routers/public_connection_hub_live_v5.py').read_text(encoding='utf-8')
+          v26 = Path('backend/app/routers/public_connection_canonical_mobile_v26.py').read_text(encoding='utf-8')
 
-          # V18 remains imported only for its read-only endpoint registration.
           include_v16 = 'router.include_router(public_connection_modern_delivery_v16_router)'
           import_v18 = 'public_connection_mobile_server_inventory_v18 as _public_connection_mobile_server_inventory_v18'
           assert import_v18 in hub, 'V18 endpoint registration import is missing'
           assert hub.index(import_v18) < hub.index(include_v16), 'V18 endpoint registration must occur before V16 router include'
 
-          retired = (
+          retired_hub = (
               'refine_public_connection_hub_v9',
               'refine_public_connection_mobile_protocols_v17',
               'refine_public_connection_mobile_server_inventory_v18(source)',
               'refine_public_connection_protocol_uri_details_v21',
           )
-          for symbol in retired:
-              assert symbol not in hub, f'retired mobile renderer still active: {symbol}'
+          for symbol in retired_hub:
+              assert symbol not in hub, f'retired renderer still active in hub: {symbol}'
 
           chain = [
+              'source = refine_public_connection_device_actions_v11(source)',
+              'source = refine_public_connection_windows_v12(source)',
+              'source = refine_public_connection_modern_delivery_v13(source, token, db)',
+              'source = refine_public_connection_modern_names_v14(source, token, db)',
+              'source = refine_public_connection_modern_import_v15(source, token, db)',
               'source = refine_public_connection_modern_delivery_v16(source, token, db)',
               'source = refine_public_connection_protocol_actions_v20(source)',
               'source = refine_public_connection_xray_profiles_v48(source)',
@@ -67,27 +72,30 @@ jobs:
           positions = [hub.index(item) for item in chain]
           assert positions == sorted(positions), f'bad canonical refinement order: {positions}'
 
-          v18 = Path('backend/app/routers/public_connection_mobile_server_inventory_v18.py').read_text(encoding='utf-8')
-          v20 = Path('backend/app/routers/public_connection_protocol_actions_v20.py').read_text(encoding='utf-8')
-          v26 = Path('backend/app/routers/public_connection_canonical_mobile_v26.py').read_text(encoding='utf-8')
-          v27 = Path('backend/app/routers/public_connection_mobile_ui_v27.py').read_text(encoding='utf-8')
-          assert 'TWINPANEL_PUBLIC_CONNECT_MOBILE_SERVER_INVENTORY_V18' in v18
-          assert 'TWINPANEL_PUBLIC_CONNECT_PROTOCOL_ACTIONS_V20' in v20
           assert 'TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26' in v26
-          assert '.v9-apps-drawer' in v26 and '.v17-mobile-stack' in v26
-          assert 'karing_1.2.25.2802_android_arm64-v8a.apk' in v26
-          assert 'TWINPANEL_PUBLIC_CONNECT_MOBILE_UI_V27' in v27
-          assert 'refine_public_connection_mobile_ui_v27' in v26
-          assert 'v27-protocol-strip' in v27
-          assert 'v27-server-strip' in v27
-          assert 'v27-active-protocol' in v27
-          assert 'v27-active-server' in v27
+          assert 'public_connection_protocol_subscriptions_mount_v30' in v26
+          assert "platform==='android'||platform==='ios'" in v26
+          assert '!isPhone()||!window.matchMedia(MOBILE).matches' in v26
 
-          print('PUBLIC_MOBILE_CANONICAL_COMPOSITION=PASS')
+          retired_stack = (
+              'refine_public_connection_mobile_ui_v27(source)',
+              'refine_public_connection_mobile_v28(source)',
+              'refine_public_connection_presentation_v29(source)',
+              'refine_public_connection_protocol_subscriptions_v30(source)',
+              'refine_public_connection_unified_actions_v31(source)',
+              'refine_public_connection_platform_guard_v32(source)',
+          )
+          for symbol in retired_stack:
+              assert symbol not in v26, f'stacked presentation still active: {symbol}'
+
+          print('PUBLIC_PRESENTATION_RESET_V33_COMPOSITION=PASS')
           PY
 
       - name: Run canonical mobile regression
         run: python backend/tests/integration/test_public_connection_canonical_mobile_v319.py
 
-      - name: Run compact mobile UI V27 regression
+      - name: Run retired-stack composition regression
         run: python backend/tests/smoke_public_connection_mobile_ui_v27.py
+
+      - name: Run V33 reset regression
+        run: python backend/tests/smoke_public_connection_presentation_reset_v33.py
