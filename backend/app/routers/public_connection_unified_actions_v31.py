@@ -11,8 +11,8 @@ _CSS = r"""
 body.v31-ready .tp-v15-client-note,
 body.v31-ready .v13-action-copy,
 body.v31-ready .action-copy,
+body.v31-ready .v13-client-only,
 body.v31-ready .server-view .v13-app,
-body.v31-ready .server-view .v13-client-only,
 body.v31-ready [data-v31-hide="1"]{
   display:none!important;
 }
@@ -49,7 +49,6 @@ body.v31-ready .v31-client-card>a{
   white-space:nowrap;
 }
 
-body.v31-ready .protocol-panel .v31-server-actions,
 body.v31-ready .protocol-panel .v13-action-buttons,
 body.v31-ready .protocol-panel .action-buttons,
 body.v31-ready .protocol-panel .tp-v48-profile-actions{
@@ -140,6 +139,9 @@ _SCRIPT = r"""
 
     if(node.matches('.v15-karing-inline,.v13-karing-import,.v13-karing-inline,.tp-v15-karing-classic')){
       node.textContent='اتصال به Karing';
+      // V15 used this hidden target to copy raw config before app launch.
+      // V31 keeps the action simple: launch the app only, with no raw-config copy toast.
+      node.removeAttribute('data-tp-copy-target');
       return;
     }
 
@@ -226,6 +228,9 @@ _SCRIPT = r"""
   }
 
   function normalizePanel(panel){
+    // Build the one protocol-level client download before hiding old per-server client rows.
+    protocolClientCard(panel);
+
     panel.querySelectorAll('.v13-action-buttons a,.v13-action-buttons button,.action-buttons a,.action-buttons button,.tp-v48-profile-actions a,.tp-v48-profile-actions button')
       .forEach(normalizeServerAction);
 
@@ -233,10 +238,8 @@ _SCRIPT = r"""
       .forEach(dedupeActions);
 
     // App downloads belong to the protocol, never to every country/server row.
-    panel.querySelectorAll('.server-view .v13-app,.server-view .v13-client-only')
+    panel.querySelectorAll('.v13-app,.v13-client-only')
       .forEach(hide);
-
-    protocolClientCard(panel);
   }
 
   function apply(){
