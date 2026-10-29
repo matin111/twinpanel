@@ -1,0 +1,22 @@
+name: New Node Tunnel Readiness V357 Smoke
+
+on:
+  pull_request:
+    paths:
+      - components/tunnel-protocol-runtime-v307.tsx
+      - scripts/new-node-tunnel-readiness-v357-smoke.py
+      - .github/workflows/new-node-tunnel-readiness-v357-smoke.yml
+  push:
+    branches: [main]
+    paths:
+      - components/tunnel-protocol-runtime-v307.tsx
+      - scripts/new-node-tunnel-readiness-v357-smoke.py
+      - .github/workflows/new-node-tunnel-readiness-v357-smoke.yml
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify fail-closed tunnel selector
+        run: python3 scripts/new-node-tunnel-readiness-v357-smoke.py
