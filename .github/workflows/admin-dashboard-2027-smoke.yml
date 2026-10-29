@@ -1,0 +1,53 @@
+name: Admin Dashboard 2027 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "components/admin-dashboard-runtime.tsx"
+      - "backend/app/node_telemetry_models.py"
+      - "backend/app/routers/runtime_endpoints.py"
+      - "backend/tests/admin_dashboard_telemetry_v1_smoke.py"
+      - ".github/workflows/admin-dashboard-2027-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dashboard-telemetry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Static telemetry contract smoke
+        run: python backend/tests/admin_dashboard_telemetry_v1_smoke.py
+
+      - name: Compile changed backend modules
+        run: |
+          python -m py_compile backend/app/node_telemetry_models.py
+          python -m py_compile backend/app/routers/runtime_endpoints.py
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install frontend dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --include=optional --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Production frontend build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_API_BASE: ""
+        run: npm run build
