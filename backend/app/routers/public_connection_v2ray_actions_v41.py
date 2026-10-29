@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 from .public_connection_mobile_sheet_v42 import refine_public_connection_mobile_sheet_v42
+from .public_connection_v2ray_multilink_v43 import apply_v2ray_multilink_v43
 
+
+apply_v2ray_multilink_v43()
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_ACTIONS_V41"
 
 
 _CSS = r"""
 /* TWINPANEL_PUBLIC_CONNECT_V2RAY_ACTIONS_V41 */
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .v34-client-card{
+  display:flex!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
 body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-xray-profiles{
   display:grid!important;
   gap:9px!important;
@@ -154,6 +162,15 @@ _SCRIPT = r"""
     retireDirectLegacyActions(view,row,[]);
   }
 
+  function preserveClientDownload(panel){
+    const card=panel.querySelector('.v34-client-card');
+    if(!card)return;
+    card.hidden=false;
+    card.removeAttribute('aria-hidden');
+    card.style.removeProperty('display');
+    card.dataset.v41ClientDownload='1';
+  }
+
   function simplifyServer(view){
     const row=canonicalRow(view);
     const profiles=profileRows(view);
@@ -186,6 +203,7 @@ _SCRIPT = r"""
     document.querySelectorAll('.protocol-panel').forEach(panel=>{
       if(panelKey(panel)!=='v2ray')return;
       panel.dataset.v41V2ray='1';
+      preserveClientDownload(panel);
       panel.querySelectorAll('.server-view').forEach(simplifyServer);
     });
   }
