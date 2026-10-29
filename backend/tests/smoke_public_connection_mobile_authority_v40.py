@@ -22,8 +22,10 @@ def main() -> None:
 
     require("TWINPANEL_PUBLIC_CONNECT_MOBILE_AUTHORITY_V40" in v40, "V40 marker missing")
     require("refine_public_connection_mobile_authority_v40" in v39, "V40 is not imported by V39")
-    require("return refine_public_connection_mobile_authority_v40(source)" in v39,
-            "V40 must be the final refinement after V39")
+    require("source = refine_public_connection_mobile_authority_v40(source)" in v39,
+            "V40 must run after V39 before later presentation refinements")
+    require("return refine_public_connection_v2ray_actions_v41(source)" in v39,
+            "V41 must follow V40 as the next presentation authority")
 
     # Root-cause evidence: V27 owns an online-first active protocol while V36 owns v36-open.
     require("activePanelId=(online||panels[0]).id" in v27, "V27 online-first selector evidence drifted")
@@ -56,14 +58,14 @@ def main() -> None:
     require(".protocol-choice:not(.v40-real-protocol)" in v40,
             "non-real mobile protocol choices are not excluded")
 
-    # Initial state is collapsed and V36 remains the only user-driven accordion.
+    # Initial state is collapsed and V36 remains the mobile accordion state authority.
     require("panel.classList.remove('active','v36-open','v27-active-protocol')" in v40,
             "initial mobile panels are not explicitly collapsed")
     require("choice.setAttribute('aria-expanded','false')" in v40,
             "initial protocol choices are not collapsed")
     require("initialized=true" in v40, "initial collapse guard missing")
 
-    # V2Ray/Xray keeps data but retires only legacy action surfaces.
+    # V2Ray/Xray cleanup remains present in V40; V41 may refine it further.
     require("if(panelKey(panel)!=='v2ray')return" in v40, "V2Ray simplification escaped protocol scope")
     require("[data-v39-retired=\"1\"]" in v40, "V39 over-hide cleanup missing")
     require(":scope > .action-row" in v40 and ":scope > .v31-canonical-actions" in v40,
