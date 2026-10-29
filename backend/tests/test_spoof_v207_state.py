@@ -45,3 +45,79 @@ def test_v207_frontend_refresh_is_state_only_not_dataplane():
         "spoof-port",
     ):
         assert forbidden not in joined, forbidden
+
+
+def test_v210_underlay_preflight_combines_prerequisites_and_persisted_evidence():
+    api = read("lib/modern-transport-api.ts")
+
+    assert 'SPOOF_UNDERLAY_REASON_V210="underlay_incompatible:reverse_carrier_not_reaching_iran"' in api
+    assert "async function checkSpoofCompatibilityV210" in api
+    assert "Promise.all([" in api
+    assert "/modern-transports/spoof_wg/compatibility-check" in api
+    assert "/modern-transports`)" in api
+
+    for token in (
+        "row?.last_error",
+        "row?.auto_block_reason",
+        "row?.quarantine_until_epoch",
+        'verdict="known_incompatible_active"',
+        'verdict="known_incompatible_observed"',
+        'verdict="qualified_online"',
+        'verdict="eligible_unproven"',
+        'verdict="configuration_required"',
+        'verdict="prerequisite_blocked"',
+        "compatible:Boolean(prerequisite.compatible)&&!knownIncompatible",
+        "ready_for_install:Boolean(prerequisite.ready_for_install)&&!knownIncompatible",
+        "retry_blocked:Boolean(knownIncompatible&&quarantineActive)",
+        "preflight_version:210",
+        "checkSpoofCompatibility:checkSpoofCompatibilityV210",
+    ):
+        assert token in api, token
+
+
+def test_v210_known_underlay_failure_cannot_be_labeled_ready_by_host_prerequisites():
+    api = read("lib/modern-transport-api.ts")
+
+    start = api.index("async function checkSpoofCompatibilityV210")
+    end = api.index("export const modernTransportApi", start)
+    preflight = api[start:end]
+
+    evidence_pos = preflight.index("const evidenceObserved=")
+    compatibility_pos = preflight.index(
+        "compatible:Boolean(prerequisite.compatible)&&!knownIncompatible"
+    )
+    ready_pos = preflight.index(
+        "ready_for_install:Boolean(prerequisite.ready_for_install)&&!knownIncompatible"
+    )
+
+    assert evidence_pos < compatibility_pos < ready_pos
+    assert "v206_v208_failure_evidence" in preflight
+    assert "underlay_reason:knownIncompatible?SPOOF_UNDERLAY_REASON_V210:null" in preflight
+    assert "blockers=Array.from(new Set([" in preflight
+
+
+def test_v210_preflight_is_read_only_and_does_not_claim_untested_underlay_compatibility():
+    api = read("lib/modern-transport-api.ts")
+
+    start = api.index("async function checkSpoofCompatibilityV210")
+    end = api.index("export const modernTransportApi", start)
+    preflight = api[start:end]
+
+    assert "host-prerequisite" in preflight
+    assert "does not generate spoofed traffic" in preflight
+    assert "cannot prove an untested provider underlay compatible" in preflight
+
+    for forbidden in (
+        "installTransport(",
+        "/install",
+        "/select-manual",
+        "configureSpoof",
+        "iptables",
+        "nft ",
+        "ip route",
+        "ip link",
+        "systemctl",
+        "spoof-port",
+        "udp dport",
+    ):
+        assert forbidden not in preflight, forbidden
