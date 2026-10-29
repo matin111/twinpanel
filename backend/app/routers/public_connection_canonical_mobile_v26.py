@@ -3,8 +3,8 @@ from __future__ import annotations
 # Preserve legacy V30 endpoints for backward compatibility, and mount V34's
 # all-protocol multi-server/direct-download routes before the public router is
 # included by Hub Live. V34 remains the data/action builder; V36 owns responsive
-# accordion state, V37 performs cleanup, V38 restores the reference HA layout,
-# and V39 is the final mobile visibility/action simplification authority.
+# accordion state, V37 performs cleanup, and V38 restores the exact customer
+# reference layout with an all-servers card before individual servers.
 from . import public_connection_protocol_subscriptions_mount_v30 as _public_connection_protocol_subscriptions_mount_v30  # noqa: F401
 from . import public_connection_forward_mount_v34 as _public_connection_forward_mount_v34  # noqa: F401
 from .public_connection_forward_v34 import refine_public_connection_forward_v34
@@ -19,9 +19,6 @@ from .public_connection_final_presentation_v37 import (
 )
 from .public_connection_reference_layout_v38 import (
     refine_public_connection_reference_layout_v38,
-)
-from .public_connection_mobile_simplified_v39 import (
-    refine_public_connection_mobile_simplified_v39,
 )
 
 
@@ -109,6 +106,6 @@ def refine_public_connection_canonical_mobile_v26(source: str) -> str:
     # V36 binds the responsive accordion before V34 builds customer actions.
     source = refine_public_connection_mobile_compact_v36(source)
     source = refine_public_connection_forward_v34(source)
+    # V37 cleanup remains intact; V38 is the final reference-layout authority.
     source = refine_public_connection_final_presentation_v37(source)
-    source = refine_public_connection_reference_layout_v38(source)
-    return refine_public_connection_mobile_simplified_v39(source)
+    return refine_public_connection_reference_layout_v38(source)
