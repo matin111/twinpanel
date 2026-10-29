@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.333",
+  "version": "1.1.0-rc.334",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T05:09:49Z",
+  "released_at": "2026-10-29T05:19:59Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7792d7ca60e556a8480482aaa828d80781bd1226",
+  "source_sha": "a3b8dee539d3761250c2479a6f7bfe5da223df0a",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.333/twinpanel-1.1.0-rc.333-linux-x86_64.tar.gz",
-    "sha256": "6c9910eba62ff0b2861e738a75dd22adf205e1f10052846278f42da75be7eaa5",
-    "size_bytes": 28555545
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.334/twinpanel-1.1.0-rc.334-linux-x86_64.tar.gz",
+    "sha256": "5ad12a6cc93d24ee3e7bb4081bf1257f3de95d0bff93363eb2a14de0406bdfc3",
+    "size_bytes": 28555985
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.333 قابلیت Spoof WG V214 را منتشر می‌کند. بر اساس شواهد Production Tunnel #8، مسیر reverse UDP در شرایط مشخص underlay از Exit خارج می‌شد اما به ingress ایران نمی‌رسید، در حالی‌که A/B همان payload روی ICMP به ایران می‌رسید. V214 مسیر V205 UDP را به‌عنوان انتخاب اول حفظ می‌کند و فقط برای failure class دقیق V206/V213 یا انتخاب ICMP قبلاً qualified شده، reverse carrier را به ICMP fallback می‌دهد. forward carrier همچنان TCP و دیتاپلین داخلی WireGuard /30 بدون تغییر می‌ماند. در حالت ICMP، nft adapter مربوط به UDP/2053 اعمال نمی‌شود، transport موفق persist می‌شود، evidence قدیمی guard حذف نمی‌شود و فقط پس از موفقیت full shared-L3 probe به حالت تاریخی non-blocking تبدیل می‌شود. مقدار قبلی net.ipv4.icmp_echo_ignore_all روی Iran node قبل از فعال‌شدن receiver ذخیره و هنگام stop/failure بازگردانده می‌شود. TP27 Fast، Kernel VXLAN، XDP و policy نصب خودکار Spoof تغییری نکرده‌اند. Source candidate روی SHA immutable 7792d7ca60e556a8480482aaa828d80781bd1226 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.333 ships Spoof WG V214. Production evidence from Tunnel #8 showed a narrow underlay failure where the reverse UDP carrier left Exit but did not reach Iran ingress, while an A/B probe carrying the same payload over ICMP reached Iran. V214 keeps the existing V205 UDP reverse path as first choice and falls back to ICMP only for the exact V206/V213 failure class or a previously-qualified ICMP selection. The forward carrier remains TCP and the inner WireGuard /30 dataplane is unchanged. In ICMP mode the V205 UDP/2053 nft adapter is not installed, the successful reverse transport is persisted, historical guard evidence is preserved and becomes non-blocking only after the full shared-L3 probe succeeds. The previous Iran-node net.ipv4.icmp_echo_ignore_all value is snapshotted before the receiver starts and restored on stop/failure. TP27 Fast, Kernel VXLAN, XDP and the explicit-only Spoof install policy remain unchanged. The candidate source is pinned to immutable SHA 7792d7ca60e556a8480482aaa828d80781bd1226."
+    "fa": "TwinPanel 1.1.0-rc.334 ریست Presentation بخش Public Connect V33 را منتشر می‌کند. Root Cause، انباشته‌شدن refinerهای نمایشی V27، V28، V29، UI مربوط به V30، V31 و V32 روی DOM و rendererهای device-aware موجود بود که در مرورگر واقعی باعث دانلودهای تکراری برنامه، اکشن‌های تکراری هر سرور، نوارهای خالی و رفتار ناپایدار Windows/Mobile می‌شد. V33 این لایه‌های نمایشی انباشته را از composition نهایی کاربر خارج می‌کند و authority را به مسیر تثبیت‌شده V11/V12/V13/V14/V15/V16/V20/V48 برمی‌گرداند. V26 فقط برای Android/iOS همراه viewport موبایل به‌عنوان cleanup محدود باقی می‌ماند. Endpointهای backend مربوط به Protocol Subscription V30 برای V2Ray/Xray، Hysteria2، TUIC و AnyTLS همچنان mount و فعال می‌مانند، اما DOM refiner آن دیگر روی صفحه کاربر اجرا نمی‌شود. این release هیچ تغییری در TP27، VXLAN، Tunnel، Spoof، Accounting، quota، provisioning، credential generation، routing، firewall یا protocol dataplane ایجاد نمی‌کند. Source candidate روی SHA immutable a3b8dee539d3761250c2479a6f7bfe5da223df0a قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.334 ships Public Connect presentation reset V33. The root cause was accumulated presentation refiners V27, V28, V29, V30 UI, V31 and V32 stacking on top of the existing device-aware DOM/renderers, producing duplicate client downloads, duplicate per-server actions, blank action bands and unstable Windows/mobile behavior in real browsers. V33 removes those stacked presentation layers from the final customer composition and returns presentation authority to the established V11/V12/V13/V14/V15/V16/V20/V48 path. V26 remains only as a guarded Android/iOS plus mobile-viewport cleanup. V30 protocol-subscription backend endpoints for V2Ray/Xray, Hysteria2, TUIC and AnyTLS remain mounted and active, while its DOM refiner is no longer applied to the customer page. This release does not modify TP27, VXLAN, Tunnel, Spoof, Accounting, quota, provisioning, credential generation, routing, firewall or protocol dataplane. The candidate source is pinned to immutable SHA a3b8dee539d3761250c2479a6f7bfe5da223df0a."
   }
 }
