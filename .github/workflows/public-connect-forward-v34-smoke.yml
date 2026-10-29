@@ -7,6 +7,7 @@ on:
       - 'backend/app/routers/public_connection_canonical_mobile_v26.py'
       - 'backend/app/routers/public_connection_mobile_compact_v36.py'
       - 'backend/app/routers/public_connection_final_presentation_v37.py'
+      - 'backend/app/routers/public_connection_ha_card_v38.py'
       - 'backend/app/routers/public_connection_device_actions_v11.py'
       - 'backend/app/routers/public_connection_modern_delivery_v13.py'
       - 'backend/app/routers/public_connection_modern_import_v15.py'
@@ -20,6 +21,7 @@ on:
       - 'backend/tests/smoke_public_connection_forward_v34_matrix.py'
       - 'backend/tests/smoke_public_connection_mobile_compact_v36.py'
       - 'backend/tests/smoke_public_connection_final_presentation_v37.py'
+      - 'backend/tests/smoke_public_connection_ha_card_v38.py'
       - '.github/workflows/public-connect-forward-v34-smoke.yml'
   push:
     branches:
@@ -29,6 +31,7 @@ on:
       - 'backend/app/routers/public_connection_canonical_mobile_v26.py'
       - 'backend/app/routers/public_connection_mobile_compact_v36.py'
       - 'backend/app/routers/public_connection_final_presentation_v37.py'
+      - 'backend/app/routers/public_connection_ha_card_v38.py'
       - 'backend/app/routers/public_connection_device_actions_v11.py'
       - 'backend/app/routers/public_connection_modern_delivery_v13.py'
       - 'backend/app/routers/public_connection_modern_import_v15.py'
@@ -42,6 +45,7 @@ on:
       - 'backend/tests/smoke_public_connection_forward_v34_matrix.py'
       - 'backend/tests/smoke_public_connection_mobile_compact_v36.py'
       - 'backend/tests/smoke_public_connection_final_presentation_v37.py'
+      - 'backend/tests/smoke_public_connection_ha_card_v38.py'
       - '.github/workflows/public-connect-forward-v34-smoke.yml'
 
 jobs:
@@ -57,3 +61,5 @@ jobs:
         run: python3 backend/tests/smoke_public_connection_mobile_compact_v36.py
       - name: Run V37 final multilink and cleanup smoke
         run: python3 backend/tests/smoke_public_connection_final_presentation_v37.py
+      - name: Run V38 HA/Multi Server card smoke
+        run: python3 backend/tests/smoke_public_connection_ha_card_v38.py
