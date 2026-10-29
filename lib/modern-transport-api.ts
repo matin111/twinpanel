@@ -55,6 +55,14 @@ export type SpoofCompatibilityNode={
   compatible?:boolean;
 };
 
+export type SpoofUnderlayVerdict=
+  |"known_incompatible_active"
+  |"known_incompatible_observed"
+  |"qualified_online"
+  |"eligible_unproven"
+  |"configuration_required"
+  |"prerequisite_blocked";
+
 export type SpoofCompatibilityResult={
   ok?:boolean;
   tunnel_id:number;
@@ -76,6 +84,12 @@ export type SpoofCompatibilityResult={
   blockers:string[];
   source_spoofing_verified:false;
   limitation:string;
+  preflight_version?:210;
+  underlay_verdict?:SpoofUnderlayVerdict;
+  underlay_reason?:string|null;
+  underlay_evidence_source?:string;
+  retry_blocked?:boolean;
+  quarantine_until_epoch?:number|null;
 };
 
 export type SmartTransportCandidate={
@@ -158,6 +172,7 @@ export type ModernProtocolInventory={
 };
 
 export const MODERN_TRANSPORT_AUTHORITY_REFRESH_EVENT="twinpanel-modern-transport-authority-refresh-v207";
+export const SPOOF_UNDERLAY_REASON_V210="underlay_incompatible:reverse_carrier_not_reaching_iran";
 
 function notifyAuthorityRefresh(){
   if(typeof window!=="undefined")window.dispatchEvent(new Event(MODERN_TRANSPORT_AUTHORITY_REFRESH_EVENT));
@@ -210,6 +225,73 @@ async function installTransport(tunnelId:number,transport:SmartTransportName){
   }
 }
 
+async function checkSpoofCompatibilityV210(tunnelId:number):Promise<SpoofCompatibilityResult>{
+  // V210 is intentionally read-only. It combines the existing host-prerequisite
+  // probe with persisted Spoof candidate evidence. It does not install/repair a
+  // transport, open a new carrier, forge source addresses, or mutate node state.
+  const [prerequisite,state]=await Promise.all([
+    request<SpoofCompatibilityResult>(`/v1/tunnels/${tunnelId}/modern-transports/spoof_wg/compatibility-check`,{method:"POST"}),
+    request<SmartTransportState>(`/v1/tunnels/${tunnelId}/modern-transports`),
+  ]);
+
+  const row=(state.transports||[]).find(item=>String(item.transport||"").trim().toLowerCase()==="spoof_wg");
+  const status=String(row?.status||"").trim().toLowerCase();
+  const lastError=String(row?.last_error||"");
+  const autoBlock=String(row?.auto_block_reason||"");
+  const evidenceObserved=lastError.includes(SPOOF_UNDERLAY_REASON_V210)||autoBlock.includes(SPOOF_UNDERLAY_REASON_V210);
+
+  const quarantineRaw=Number(row?.quarantine_until_epoch||0);
+  const quarantineUntil=Number.isFinite(quarantineRaw)&&quarantineRaw>0?quarantineRaw:null;
+  const quarantineActive=Boolean(quarantineUntil&&quarantineUntil>Date.now()/1000);
+  const online=Boolean(row?.enabled&&status==="online");
+
+  let verdict:SpoofUnderlayVerdict;
+  let evidenceSource="host_prerequisites_only";
+
+  if(!prerequisite.compatible){
+    verdict="prerequisite_blocked";
+    evidenceSource="host_prerequisites";
+  }else if(evidenceObserved&&quarantineActive){
+    verdict="known_incompatible_active";
+    evidenceSource="v206_v208_failure_evidence";
+  }else if(evidenceObserved){
+    verdict="known_incompatible_observed";
+    evidenceSource="v206_v208_failure_evidence";
+  }else if(online){
+    verdict="qualified_online";
+    evidenceSource="existing_online_candidate";
+  }else if(!prerequisite.configured){
+    verdict="configuration_required";
+    evidenceSource="configuration";
+  }else{
+    verdict="eligible_unproven";
+  }
+
+  const knownIncompatible=evidenceObserved;
+  const blockers=Array.from(new Set([
+    ...(Array.isArray(prerequisite.blockers)?prerequisite.blockers:[]),
+    ...(knownIncompatible?[SPOOF_UNDERLAY_REASON_V210]:[]),
+  ]));
+
+  return {
+    ...prerequisite,
+    compatible:Boolean(prerequisite.compatible)&&!knownIncompatible,
+    ready_for_install:Boolean(prerequisite.ready_for_install)&&!knownIncompatible,
+    blockers,
+    preflight_version:210,
+    underlay_verdict:verdict,
+    underlay_reason:knownIncompatible?SPOOF_UNDERLAY_REASON_V210:null,
+    underlay_evidence_source:evidenceSource,
+    retry_blocked:Boolean(knownIncompatible&&quarantineActive),
+    quarantine_until_epoch:quarantineUntil,
+    limitation:[
+      prerequisite.limitation,
+      "V210 also checks persisted V206/V208 failure evidence before the UI labels this pair Ready.",
+      "A pair with eligible_unproven status has passed host prerequisites only; this read-only preflight does not generate spoofed traffic and cannot prove an untested provider underlay compatible.",
+    ].filter(Boolean).join(" "),
+  };
+}
+
 export const modernTransportApi={
   state:(tunnelId:number)=>request<SmartTransportState>(`/v1/tunnels/${tunnelId}/modern-transports`),
   protocolInventory:()=>request<ModernProtocolInventory>("/v1/settings/vpn/modern-protocols"),
@@ -217,7 +299,7 @@ export const modernTransportApi={
   install:installTransport,
   remove:(tunnelId:number,transport:SmartTransportName)=>request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/${encodeURIComponent(transport)}`,{method:"DELETE"}),
   configureSpoof:(tunnelId:number,configuration:{iran_spoof_ip:string;exit_spoof_ip:string})=>request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/spoof_wg/config`,{method:"PUT",body:JSON.stringify(configuration)}),
-  checkSpoofCompatibility:(tunnelId:number)=>request<SpoofCompatibilityResult>(`/v1/tunnels/${tunnelId}/modern-transports/spoof_wg/compatibility-check`,{method:"POST"}),
+  checkSpoofCompatibility:checkSpoofCompatibilityV210,
   setMode:(tunnelId:number,mode:"auto"|"manual",transport?:string)=>{
     if(mode==="manual"&&transport){
       return request<Record<string,unknown>>(`/v1/tunnels/${tunnelId}/modern-transports/${encodeURIComponent(transport)}/select-manual`,{method:"POST"});
