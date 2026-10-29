@@ -97,6 +97,10 @@ export function TunnelProtocolRuntimeV307(){
   const nodeMap=useMemo(()=>new Map(nodes.map(node=>[node.id,node])),[nodes]);
   const iranNodes=useMemo(()=>nodes.filter(node=>normalize(node.node_type)==="iran"),[nodes]);
   const exitNodes=useMemo(()=>nodes.filter(node=>normalize(node.node_type)==="exit"),[nodes]);
+  // TWINPANEL_NEW_NODE_TUNNEL_READINESS_V357
+  // Online is the UI eligibility gate; backend SSH/Agent/Fabric preflight remains authoritative.
+  const readyIranNodes=useMemo(()=>iranNodes.filter(node=>normalize(node.status)==="online"),[iranNodes]);
+  const readyExitNodes=useMemo(()=>exitNodes.filter(node=>normalize(node.status)==="online"),[exitNodes]);
   const selectedTunnel=useMemo(()=>tunnels.find(row=>row.id===selectedId)||null,[tunnels,selectedId]);
   const selectedIran=selectedTunnel?nodeMap.get(selectedTunnel.iran_node_id):undefined;
   const selectedExit=selectedTunnel?nodeMap.get(selectedTunnel.exit_node_id):undefined;
@@ -186,6 +190,10 @@ export function TunnelProtocolRuntimeV307(){
 
   const createTunnel=async(event:FormEvent)=>{
     event.preventDefault();if(busy||!draft.iran_node_id||!draft.exit_node_id)return;
+    if(!readyIranNodes.some(node=>node.id===draft.iran_node_id)||!readyExitNodes.some(node=>node.id===draft.exit_node_id)){
+      setError(pick("برای ساخت Tunnel هر دو نود ایران و خارج باید Online و آماده باشند.","Both Iran and Exit nodes must be online and ready before creating a tunnel."));
+      return;
+    }
     setBusy("create");setError("");setNotice("");
     try{
       const result=await legacyControlApi.createManagedTunnel({...draft,transport:"auto",is_active:true});
@@ -200,9 +208,13 @@ export function TunnelProtocolRuntimeV307(){
     void run(`delete-${id}`,pick(`Tunnel #${id} حذف شد.`,`Tunnel #${id} deleted.`),()=>legacyControlApi.deleteTunnel(id)).then(()=>{setManageOpen(false);setSelectedId(0);});
   };
   const openCreate=()=>{
-    const iran=iranNodes.find(node=>normalize(node.status)==="online")||iranNodes[0];
-    const exit=exitNodes.find(node=>normalize(node.status)==="online")||exitNodes[0];
-    setDraft({iran_node_id:iran?.id||0,exit_node_id:exit?.id||0,priority:100});setCreateOpen(true);
+    const iran=readyIranNodes[0];
+    const exit=readyExitNodes[0];
+    if(!iran||!exit){
+      setError(pick("برای ساخت Tunnel حداقل یک نود ایران و یک نود خارج Online لازم است.","At least one online Iran node and one online Exit node are required to create a tunnel."));
+      return;
+    }
+    setDraft({iran_node_id:iran.id,exit_node_id:exit.id,priority:100});setCreateOpen(true);
   };
   const openManage=(id:number)=>{setSelectedId(id);setManageOpen(true);};
   const openFullProtocolManager=()=>{if(selectedTunnel&&typeof window!=="undefined")window.location.href=`/admin/modern-protocols?node=${selectedTunnel.exit_node_id}`;};
@@ -215,7 +227,7 @@ export function TunnelProtocolRuntimeV307(){
           <button type="button" className="ghost" disabled={loading||Boolean(busy)} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button>
           <TunnelServerPairSelectorV293 disabled={loading||Boolean(busy)} onSelected={tunnel=>{setSelectedId(tunnel.id);setManageOpen(true);void load(true,tunnel.id);}}/>
           <button type="button" className="primary-soft" onClick={()=>{window.location.href="/admin/tunnel-transports";}}>{pick("مسیرهای هوشمند","Smart Transports")}</button>
-          <button type="button" className="primary" onClick={openCreate}>＋ {pick("Tunnel جدید","New tunnel")}</button>
+          <button type="button" className="primary" disabled={loading||Boolean(busy)||readyIranNodes.length===0||readyExitNodes.length===0} title={readyIranNodes.length===0||readyExitNodes.length===0?pick("ابتدا یک نود ایران و یک نود خارج را Online کنید.","Bring one Iran node and one Exit node online first."):undefined} onClick={openCreate}>＋ {pick("Tunnel جدید","New tunnel")}</button>
         </div>
       </div>
 
@@ -285,7 +297,7 @@ export function TunnelProtocolRuntimeV307(){
         </div>
       </Modal>}
 
-      {createOpen&&<Modal title={pick("Tunnel جدید","New tunnel")} onClose={()=>!busy&&setCreateOpen(false)}><form className="runtime-form" onSubmit={createTunnel}><label>{pick("نود ایران","Iran node")}<select value={draft.iran_node_id} onChange={event=>setDraft(value=>({...value,iran_node_id:Number(event.target.value)}))}>{iranNodes.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}</select></label><label>{pick("نود خارج","Exit node")}<select value={draft.exit_node_id} onChange={event=>setDraft(value=>({...value,exit_node_id:Number(event.target.value)}))}>{exitNodes.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}</select></label><label>{pick("اولویت","Priority")}<input type="number" value={draft.priority} onChange={event=>setDraft(value=>({...value,priority:Number(event.target.value)||100}))}/></label><div className="action-row"><button type="submit" className="primary" disabled={Boolean(busy)||!draft.iran_node_id||!draft.exit_node_id}>{busy==="create"?"…":pick("ساخت و آماده‌سازی","Create & provision")}</button></div></form></Modal>}
+      {createOpen&&<Modal title={pick("Tunnel جدید","New tunnel")} onClose={()=>!busy&&setCreateOpen(false)}><form className="runtime-form" onSubmit={createTunnel}><label>{pick("نود ایران","Iran node")}<select value={draft.iran_node_id} onChange={event=>setDraft(value=>({...value,iran_node_id:Number(event.target.value)}))}>{readyIranNodes.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}</select></label><label>{pick("نود خارج","Exit node")}<select value={draft.exit_node_id} onChange={event=>setDraft(value=>({...value,exit_node_id:Number(event.target.value)}))}>{readyExitNodes.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}</select></label><label>{pick("اولویت","Priority")}<input type="number" value={draft.priority} onChange={event=>setDraft(value=>({...value,priority:Number(event.target.value)||100}))}/></label><div className="action-row"><button type="submit" className="primary" disabled={Boolean(busy)||!draft.iran_node_id||!draft.exit_node_id}>{busy==="create"?"…":pick("ساخت و آماده‌سازی","Create & provision")}</button></div></form></Modal>}
     </div>
   </Shell>;
 }
