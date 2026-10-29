@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.324",
+  "version": "1.1.0-rc.325",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T01:48:21Z",
+  "released_at": "2026-10-29T02:17:22Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "5f00002614df3374c5c17847e0f44fd5537fc5ee",
+  "source_sha": "bca15054b67fb3a1e6424a77eb6ecc46a64f58ed",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.324/twinpanel-1.1.0-rc.324-linux-x86_64.tar.gz",
-    "sha256": "8dbbcfbc4b47c18dcf82362f2766921e275cd6fc9a2a6576eb9a1928e5f0d1a0",
-    "size_bytes": 28525504
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.325/twinpanel-1.1.0-rc.325-linux-x86_64.tar.gz",
+    "sha256": "92aedb1596db7fb618cb1838518b7c85235ef5ad8f8af652381dc85fa89ca802",
+    "size_bytes": 28525161
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.324 اصلاح تکمیلی V28 را برای Public Connect موبایل منتشر می‌کند. در پروتکل‌های Modern که اتصال واقعی آن‌ها از URI/Config/Import/Download انجام می‌شود، نمایش عمومی و گمراه‌کننده Server / Username / Password در موبایل مخفی شده و action واقعی همان پروتکل حفظ می‌شود. نوار انتخاب پروتکل نیز داخل کادر مشخص نمایش داده می‌شود و فقط در صورت وجود overflow افقی، راهنمای «↔ برای دیدن همه پروتکل‌ها به چپ یا راست بکشید» ظاهر می‌شود تا کاربر متوجه قابلیت اسکرول شود. Desktop، Cisco/L2TP و پروتکل‌های کلاسیک بدون تغییر می‌مانند. این نسخه هیچ تغییری در TP27، VXLAN، Tunnel، Spoof، Accounting، provisioning، credentialها یا protocol dataplane ایجاد نمی‌کند. Source candidate روی SHA immutable 5f00002614df3374c5c17847e0f44fd5537fc5ee قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.324 ships the V28 follow-up refinement for Public Connect on mobile. For Modern protocols whose real customer connection path is URI/config/import/download, misleading generic Server / Username / Password facts are hidden on phones while the protocol-specific action remains intact. The protocol selector is now presented inside a clear bordered container, and only when real horizontal overflow exists an explicit left/right swipe hint is shown so users can discover additional protocols. Desktop, Cisco/L2TP and classic protocols remain unchanged. This release does not modify TP27, VXLAN, Tunnel, Spoof, Accounting, provisioning, credentials or protocol dataplane. The candidate source is pinned to immutable SHA 5f00002614df3374c5c17847e0f44fd5537fc5ee."
+    "fa": "TwinPanel 1.1.0-rc.325 اصلاح Presentation V29 را برای Public Connect منتشر می‌کند. Smart Connect نمایشی که فقط بر پایه اولویت ثابت پروتکل انتخاب می‌کرد از رابط کاربر حذف شده است. کارت جداگانه Multilink نیز برای کاهش شلوغی از UI حذف شده اما endpointهای واقعی V2Ray/Xray subscription و QR بدون تغییر باقی مانده‌اند. در Windows و Mobile متن‌های آموزشی و تکراری حذف، اکشن‌ها به اتصال/دانلود/کپی ساده‌تر شده و اندازه نوشته‌ها و کنترل‌ها خواناتر شده است. در موبایل نوار افقی V27/V28 دیگر سطح اصلی نیست و پروتکل‌های canonical به‌صورت کارت‌های عمودی با ردیف‌های مستقل سرور نمایش داده می‌شوند؛ Modern protocolها همچنان فقط مسیر واقعی URI/Config/Import/Download را نشان می‌دهند و facts عمومی Server/Username/Password در موبایل مخفی می‌ماند. این نسخه هیچ تغییری در TP27، VXLAN، Tunnel، Spoof، Accounting، provisioning، credentialها، quota یا protocol dataplane ایجاد نمی‌کند. Source candidate روی SHA immutable bca15054b67fb3a1e6424a77eb6ecc46a64f58ed قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.325 ships Public Connect Presentation V29. The misleading Smart Connect presentation, which only selected the first available credential from a fixed protocol priority, is removed. The standalone Multilink card is also removed to reduce clutter while the real V2Ray/Xray subscription and QR endpoints remain unchanged. Windows and mobile remove redundant instructional copy, simplify actions to connect/download/copy semantics, and increase typography/control readability. On mobile, the V27/V28 horizontal picker is no longer the primary surface: canonical protocols are presented as vertical cards with independent server rows. Modern protocols continue to expose only their real URI/config/import/download path while generic Server/Username/Password facts stay hidden on phones. This release does not modify TP27, VXLAN, Tunnel, Spoof, Accounting, provisioning, credentials, quota, or protocol dataplane. The candidate source is pinned to immutable SHA bca15054b67fb3a1e6424a77eb6ecc46a64f58ed."
   }
 }
