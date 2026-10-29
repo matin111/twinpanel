@@ -4,6 +4,7 @@ from . import smart_transport_auto_v21 as smart
 from . import tp27_reference_runtime_v91 as reference_v91
 from . import transport_candidates as candidates
 from .spoof_candidate_policy_v202 import apply_spoof_candidate_policy_v202
+from .spoof_icmp_scoped_echo_v217 import apply_spoof_icmp_scoped_echo_v217
 from .tp6_candidate_registry_v208 import apply_tp6_candidate_registry_v208
 from .transport_candidates import kernel_ipip, kernel_vxlan
 
@@ -90,6 +91,7 @@ def apply_kernel_transport_registry_v209() -> None:
     # already calls V202 before V209, so this is idempotent there; API workers
     # that enter through V209 now receive the same installer policy first.
     apply_spoof_candidate_policy_v202()
+    apply_spoof_icmp_scoped_echo_v217()
 
     # TP6 is another additive candidate and its runtime wrapper must exist before
     # V209 extends the same fallback chain. This also fixes API processes that
@@ -154,7 +156,7 @@ def apply_kernel_transport_registry_v209() -> None:
         "candidates=kernel_ipip,kernel_vxlan "
         "install=explicit-only "
         "auto_install_unchanged=true "
-        "spoof_policy=v202-v214 "
+        "spoof_policy=v202-v214+v217 "
         "encryption=none",
         flush=True,
     )
