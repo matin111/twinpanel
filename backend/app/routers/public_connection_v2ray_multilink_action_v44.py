@@ -44,13 +44,13 @@ _SCRIPT = r"""
   function multiUrl(){
     const value=token();
     if(!value)return'';
-    return window.location.origin+'/v1/connect/'+encodeURIComponent(value)+'/multi/v2ray';
+    return window.location.origin+'/v1/connect/'+encodeURIComponent(value)+'/sub';
   }
 
   function metaUrl(){
     const value=token();
     if(!value)return'';
-    return window.location.origin+'/v1/connect/'+encodeURIComponent(value)+'/subscription/v2ray/meta';
+    return window.location.origin+'/v1/connect/'+encodeURIComponent(value)+'/sub/meta';
   }
 
   function hiddifyUrl(url){
@@ -212,7 +212,7 @@ _SCRIPT = r"""
 
       actions.replaceChildren(send,copyButton);
       card.dataset.v44V2rayMulti='1';
-      card.dataset.v44Endpoint='/multi/v2ray';
+      card.dataset.v44Endpoint='/sub';
       ensureDetails(card);
     });
   }
