@@ -3,6 +3,7 @@ from __future__ import annotations
 from . import smart_transport_auto_v21 as smart
 from . import tp27_reference_runtime_v91 as reference_v91
 from . import transport_candidates as candidates
+from .spoof_last_error_recovery_v212 import apply_spoof_last_error_recovery_v212
 from .spoof_underlay_guard_v206 import apply_spoof_underlay_guard_v206
 from .tp6_candidate_registry_v208 import apply_tp6_candidate_registry_v208
 
@@ -24,6 +25,9 @@ from .tp6_candidate_registry_v208 import apply_tp6_candidate_registry_v208
 # V206 adds a Spoof-only underlay guard that classifies the proven reverse
 # carrier loss shape and quarantines that failed candidate without changing the
 # authoritative TP27/VXLAN dataplane.
+# V212 rehydrates only exact historical V206 evidence that survived in
+# last_error after older health telemetry had already removed both structured
+# guard metadata and the SmartAuto underlay reason.
 # ============================================================
 
 MARKER = "TWINPANEL_SPOOF_CANDIDATE_POLICY_V202"
@@ -82,9 +86,14 @@ def apply_spoof_candidate_policy_v202() -> None:
     if "tp6_fast" not in candidates.ACTIVE_SPECS:
         raise RuntimeError("spoof_policy_tp6_fast_missing")
 
-    # V206 wraps only the explicit Spoof installer. It does not expand
-    # auto-install authority or alter TP27/VXLAN runtime ownership.
+    # V206-V211 establish the fail-closed installer/health authority first.
     apply_spoof_underlay_guard_v206()
+
+    # V212 extends only the DB-backed authority lookup. It recovers exact
+    # historical V206 diagnostics before the existing V211 health wrapper or
+    # V207 install wrapper can fall through to SSH/node runtime.
+    apply_spoof_last_error_recovery_v212()
+
     _apply_active_policy()
 
     # V91 reapplies its policy when its reconciler task starts. Make that late
@@ -108,7 +117,7 @@ def apply_spoof_candidate_policy_v202() -> None:
         "active_candidates=tp27_fast,spoof_wg "
         "tp6_managed=explicit-install-only "
         "auto_install=tp27_fast "
-        "spoof_underlay_guard=v206 "
+        "spoof_underlay_guard=v206-v212 "
         "retired_cleanup=official-v91-after-fast-online",
         flush=True,
     )
