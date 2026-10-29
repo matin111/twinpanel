@@ -40,7 +40,7 @@ body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-profile-a
   width:100%!important;
   min-height:40px!important;
 }
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-profile-actions .tp-v48-hiddify{
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-profile-actions .tp-v48-karing{
   border-color:var(--p)!important;
   background:var(--p)!important;
   color:#fff!important;
@@ -115,7 +115,7 @@ _SCRIPT = r"""
     const actions=profile.querySelector('.tp-v48-profile-actions');
     if(!actions)return;
 
-    const primary=actions.querySelector('.tp-v48-hiddify');
+    const primary=actions.querySelector('.tp-v48-karing');
     const copy=actions.querySelector('.copy-btn[data-copy]');
 
     [...actions.children].forEach(node=>{
@@ -123,8 +123,8 @@ _SCRIPT = r"""
     });
 
     if(primary){
-      primary.textContent='ارسال به Hiddify';
-      primary.setAttribute('aria-label','ارسال این اتصال به Hiddify');
+      primary.textContent='ارسال به Karing';
+      primary.setAttribute('aria-label','ارسال این اتصال به Karing');
     }
     if(copy){
       copy.textContent='کپی کانفیگ';
@@ -150,8 +150,15 @@ _SCRIPT = r"""
     });
 
     if(primary){
-      primary.textContent='ارسال به Hiddify';
-      primary.setAttribute('aria-label','ارسال کانفیگ به Hiddify');
+      const href=String(primary.getAttribute('href')||'');
+      if(!href.startsWith('karing://')){
+        const raw=String(primary.dataset?.copyTarget||primary.getAttribute('data-copy')||'').trim();
+        if(raw){
+          primary.setAttribute('href','karing://install-config?url='+encodeURIComponent(raw)+'&name='+encodeURIComponent('TwinPanel V2Ray'));
+        }
+      }
+      primary.textContent='ارسال به Karing';
+      primary.setAttribute('aria-label','ارسال کانفیگ به Karing');
     }
     if(copy){
       copy.textContent='کپی کانفیگ';
@@ -224,7 +231,7 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_v2ray_actions_v41(source: str) -> str:
-    """Preserve every real Xray profile and keep exactly Hiddify + Copy Config per profile."""
+    """Preserve every real Xray profile and keep exactly Karing + Copy Config per profile."""
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
