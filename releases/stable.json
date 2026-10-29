@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.336",
+  "version": "1.1.0-rc.337",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-29T05:54:02Z",
+  "released_at": "2026-10-29T06:21:41Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "fa10cb6854af695f246ff8a29290b8ef751b6745",
+  "source_sha": "ee6a157c1d8e3da07d021649737e1e4e6cf954d3",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.336/twinpanel-1.1.0-rc.336-linux-x86_64.tar.gz",
-    "sha256": "dd11e12bbb11152c1aa8087b0f187ce4fbdee6458d7dc2031ecaa2284ff18edb",
-    "size_bytes": 28555846
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.337/twinpanel-1.1.0-rc.337-linux-x86_64.tar.gz",
+    "sha256": "d8356eb889bcbb6d6e460134e994cf3ac38b8e848248eddb9b849c7226036248",
+    "size_bytes": 28572539
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.336 اصلاح Transport Manager Import Order V216 را منتشر می‌کند. Production rc.335 نشان داد import شدن manager_runtime_v16 در module scope، زنجیره self-hosted/router را زودتر از bootstrap اصلی فعال می‌کرد و V202/V209 قبل از V149/V151/V165 مجموعه SmartAuto را محدود می‌کردند؛ نتیجه crash تکرارشونده Transport Manager با خطای adaptive_multilane_v149_candidates_missing:tp27_tcp_direct بود. V216 import/install مربوط به Manager Runtime را تا بعد از ثبت legacy cleanup-compatibility layers به تعویق می‌اندازد، درحالی‌که V202/V209 همچنان final production authority باقی می‌مانند و هیچ candidate بازنشسته‌ای به production برنمی‌گردد. TP27 Fast، Kernel VXLAN، Spoof WG dataplane، framing، portها، routing و firewall تغییر نکرده‌اند. Source candidate روی SHA immutable fa10cb6854af695f246ff8a29290b8ef751b6745 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.336 ships Transport Manager Import Order V216. Production rc.335 proved that importing manager_runtime_v16 at module scope activated the self-hosted/router composition too early, allowing V202/V209 to narrow SmartAuto before legacy V149/V151/V165 compatibility registration and causing repeated Transport Manager crashes with adaptive_multilane_v149_candidates_missing:tp27_tcp_direct. V216 defers Manager Runtime import/install until after those cleanup-compatibility layers are registered, while V202/V209 remain the final production authority and no retired candidate is returned to production. TP27 Fast, Kernel VXLAN, Spoof WG dataplane, framing, ports, routing and firewall are unchanged. The candidate source is pinned to immutable SHA fa10cb6854af695f246ff8a29290b8ef751b6745."
+    "fa": "TwinPanel 1.1.0-rc.337 قابلیت Public Connect Forward V34 را منتشر می‌کند. V34 به‌جای بازگرداندن زنجیره نمایشی V27 تا V32، یک authority واحد روی داده‌ها و اکشن‌های canonical موجود می‌سازد. inventory هر 15 پروتکل حفظ می‌شود؛ Cisco و L2TP دستی باقی می‌مانند و 13 پروتکل دیگر تحویل همه‌سرورها دارند. OpenVPN/WireGuard/AmneziaWG به‌صورت ZIP همه کانفیگ‌های واقعی، پروتکل‌های دارای share URI به‌صورت subscription feed، و پروتکل‌های دارای outbound canonical به‌صورت sing-box multi-outbound تحویل می‌شوند؛ در صورت نبود این دو، bundle lossless استفاده می‌شود. برنامه مناسب Windows/Android/iOS/macOS/Linux یک‌بار در سطح پروتکل نمایش داده می‌شود، هر سرور حداکثر دو اکشن دارد و عبارت مبهم «کپی کانفیگ» از UI مبتدی حذف شده است. Windows حتی در viewport باریک desktop باقی می‌ماند و stack موبایل فقط برای Android/iOS فعال می‌شود. Endpointهای قدیمی V30 برای سازگاری حفظ شده‌اند. هیچ تغییری در TP27، VXLAN، Tunnel، Spoof، Accounting، quota، provisioning، credential generation، routing، firewall یا protocol dataplane انجام نشده است. Source candidate روی SHA immutable ee6a157c1d8e3da07d021649737e1e4e6cf954d3 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.337 ships Public Connect Forward V34. Instead of restoring the stacked V27-V32 presentation chain, V34 builds one final customer-facing authority from existing canonical delivery data/actions. The full 15-protocol inventory is preserved; Cisco and L2TP remain manual while the other 13 protocols receive all-server delivery. OpenVPN/WireGuard/AmneziaWG deliver ZIP bundles of real configs, protocols with real share URIs deliver subscription feeds, protocols with canonical outbounds deliver sing-box multi-outbound, with a lossless bundle fallback otherwise. One device-appropriate app download is shown per protocol, each server is capped at two actions, and ambiguous copy-config UI is removed. Narrow Windows remains desktop while phone stacking is Android/iOS only. Legacy V30 endpoints stay mounted for compatibility. No TP27, VXLAN, Tunnel, Spoof, Accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane changes are included. The candidate source is pinned to immutable SHA ee6a157c1d8e3da07d021649737e1e4e6cf954d3."
   }
 }
