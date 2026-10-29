@@ -7,6 +7,10 @@ import styles from "./smart-transports-runtime-v25.module.css";
 // TWINPANEL_SINGLE_TUNNEL_UI_AUTHORITY_V293
 // Keep /admin/tunnel-transports on the shared tunnel control surface while
 // trimming non-operational explanatory copy from the Smart Transports route.
+function SharedTunnelAuthority(){
+  return <TunnelControlCenterV1/>;
+}
+
 export function SmartTransportsRuntimeV25(){
-  return <div className={styles.clean}><TunnelControlCenterV1/></div>;
+  return <div className={styles.clean}><SharedTunnelAuthority/></div>;
 }
