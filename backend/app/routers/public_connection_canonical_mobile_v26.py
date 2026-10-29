@@ -3,6 +3,9 @@ from __future__ import annotations
 from .public_connection_mobile_refine_v28 import refine_public_connection_mobile_v28
 from .public_connection_mobile_ui_v27 import refine_public_connection_mobile_ui_v27
 from .public_connection_presentation_v29 import refine_public_connection_presentation_v29
+from .public_connection_protocol_subscriptions_mount_v30 import (
+    refine_public_connection_protocol_subscriptions_v30,
+)
 
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26"
@@ -105,4 +108,5 @@ def refine_public_connection_canonical_mobile_v26(source: str) -> str:
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
     source = refine_public_connection_mobile_ui_v27(source)
     source = refine_public_connection_mobile_v28(source)
-    return refine_public_connection_presentation_v29(source)
+    source = refine_public_connection_presentation_v29(source)
+    return refine_public_connection_protocol_subscriptions_v30(source, token="__TOKEN_FROM_HUB__")
