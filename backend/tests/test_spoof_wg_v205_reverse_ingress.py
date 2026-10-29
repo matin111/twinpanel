@@ -143,3 +143,53 @@ def test_v206_guard_does_not_execute_dataplane_or_port_mutations():
         "udp dport set",
     ):
         assert forbidden not in guard, forbidden
+
+
+def test_v207_repeated_install_is_rejected_before_original_installer():
+    guard = read("backend/app/spoof_underlay_guard_v206.py")
+
+    ast.parse(guard)
+    assert 'FAILFAST_MARKER = "TWINPANEL_SPOOF_QUARANTINE_FAILFAST_V207"' in guard
+    assert "def active_underlay_quarantine(" in guard
+    assert "def active_underlay_quarantine_for_tunnel(" in guard
+    assert "active_block = active_underlay_quarantine_for_tunnel" in guard
+    assert '"action": "fail_fast_before_node_mutation"' in guard
+    assert '"authority_unchanged": True' in guard
+
+    check = guard.index("active_block = active_underlay_quarantine_for_tunnel")
+    call_original = guard.index("return await _original_install")
+    assert check < call_original
+
+
+def test_v207_failfast_is_exact_reason_and_expiry_scoped():
+    guard = read("backend/app/spoof_underlay_guard_v206.py")
+
+    for token in (
+        'if reason != UNDERLAY_REASON:',
+        'guard.get("blocked") is not True',
+        'str(guard.get("reason") or "") != reason',
+        'remaining = max(0, int(until - now))',
+        'if remaining <= 0:',
+        '"retry_after_seconds": remaining',
+        '"version": 207',
+        '"spoof_underlay_quarantined:"',
+        '"authority_unchanged=true"',
+    ):
+        assert token in guard, token
+
+
+def test_v207_failfast_adds_no_network_or_dataplane_mutation():
+    guard = read("backend/app/spoof_underlay_guard_v206.py")
+
+    assert "active_underlay_quarantine_for_tunnel(db, int(tunnel_id))" in guard
+    for forbidden in (
+        "ssh_connect",
+        "conn.run(",
+        "subprocess.",
+        "nft -f",
+        "iptables -",
+        "ip route ",
+        "ip link ",
+        "systemctl ",
+    ):
+        assert forbidden not in guard, forbidden
