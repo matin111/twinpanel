@@ -8,6 +8,7 @@ from . import public_connection_all_multilink_v34 as multilink
 
 
 MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_MULTILINK_V43"
+FAST_MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_MULTILINK_SINGLE_PAYLOAD_V50"
 _applied = False
 _original_all_share_uris = multilink._all_share_uris
 _original_delivery = multilink._delivery
@@ -64,14 +65,20 @@ def _delivery_v43(token: str, protocol: str, db):
     if protocol_key != "v2ray":
         return _original_delivery(token, protocol, db)
 
-    # V34 captured account_delivery._public_payload before the Xray runtime
-    # adds the preserved TCP-simple fallback. Rebuild only the V2Ray delivery
-    # from the runtime customer payload so every country/node contributes the
-    # same customer-safe profile set used by the Public Connect page.
-    from .. import xray_public_delivery_runtime as delivery
-
-    sub, _legacy_payload = multilink._active(token, db)
-    payload = delivery._public_payload_customer_xray(db, sub)
+    # V50 latency fix:
+    # multilink._active() already resolves the customer payload through the
+    # runtime-patched account_delivery._stored_info chain. V30/V47 therefore
+    # enforce the final customer-safe Xray profile policy before this function
+    # receives the payload. Rebuilding the payload a second time through
+    # xray_public_delivery_runtime duplicated all delivery work and, critically,
+    # regenerated expensive QR SVGs for every Xray profile. Under live API load
+    # that duplicate CPU/GIL work pushed a standard subscription fetch to
+    # roughly 9-12 seconds and caused Hiddify imports to time out.
+    #
+    # Reuse the single payload returned by _active(). This keeps the exact same
+    # customer policy, active-subscription guard, Mother/explicit delivery
+    # wrappers and real per-profile URIs while eliminating the duplicate pass.
+    sub, payload = multilink._active(token, db)
     items = multilink._protocol_items(payload, "v2ray")
     if not items:
         raise HTTPException(
@@ -100,10 +107,12 @@ def apply_v2ray_multilink_v43() -> None:
     multilink._all_share_uris = _all_share_uris_v43
     multilink._delivery = _delivery_v43
     setattr(multilink, "_V2RAY_MULTILINK_V43", MARKER)
+    setattr(multilink, "_V2RAY_MULTILINK_SINGLE_PAYLOAD_V50", FAST_MARKER)
     _applied = True
 
 
 __all__ = [
     "MARKER",
+    "FAST_MARKER",
     "apply_v2ray_multilink_v43",
 ]
