@@ -28,10 +28,11 @@ def test_public_hub_retires_duplicate_mobile_renderers_but_keeps_v18_endpoint_re
     )
 
 
-def test_canonical_mobile_v26_composes_v36_v34_v37_without_legacy_stack():
+def test_canonical_mobile_v26_composes_v36_v34_v37_v38_without_legacy_stack():
     source = _text("backend/app/routers/public_connection_canonical_mobile_v26.py")
     v36 = _text("backend/app/routers/public_connection_mobile_compact_v36.py")
     v37 = _text("backend/app/routers/public_connection_final_presentation_v37.py")
+    v38 = _text("backend/app/routers/public_connection_reference_layout_v38.py")
 
     assert "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26" in source
     assert ".v9-mobile-stack" in source
@@ -52,10 +53,20 @@ def test_canonical_mobile_v26_composes_v36_v34_v37_without_legacy_stack():
 
     v36_pos = source.index("source = refine_public_connection_mobile_compact_v36(source)")
     v34_pos = source.index("source = refine_public_connection_forward_v34(source)")
-    v37_pos = source.index("return refine_public_connection_final_presentation_v37(source)")
-    assert v36_pos < v34_pos < v37_pos
+    v37_pos = source.index("source = refine_public_connection_final_presentation_v37(source)")
+    v38_pos = source.index("return refine_public_connection_reference_layout_v38(source)")
+    assert v36_pos < v34_pos < v37_pos < v38_pos
+    assert source.rstrip().endswith("return refine_public_connection_reference_layout_v38(source)")
     assert "TWINPANEL_PUBLIC_CONNECT_FINAL_PRESENTATION_V37" in v37
-    assert "+'/multi/'+" in v37
+    assert "TWINPANEL_PUBLIC_CONNECT_REFERENCE_LAYOUT_V38" in v38
+
+    # V38 restores the exact reference order inside the selected protocol:
+    # all servers first, then the existing client and individual-server blocks.
+    assert "title.textContent='همه سرورها'" in v38
+    assert "panel.querySelector('.panel-head')?.insertAdjacentElement('afterend',card)" in v38
+    assert "+'/sub/'+" in v38
+    assert "+'/multi/'+" in v38
+    assert ".protocol-panel.v36-open{display:block!important}" in v38
 
 
 def test_android_direct_app_assets_are_verified_and_architecture_specific():
@@ -72,6 +83,6 @@ def test_android_direct_app_assets_are_verified_and_architecture_specific():
 
 if __name__ == "__main__":
     test_public_hub_retires_duplicate_mobile_renderers_but_keeps_v18_endpoint_registration()
-    test_canonical_mobile_v26_composes_v36_v34_v37_without_legacy_stack()
+    test_canonical_mobile_v26_composes_v36_v34_v37_v38_without_legacy_stack()
     test_android_direct_app_assets_are_verified_and_architecture_specific()
-    print("PUBLIC_CONNECTION_CANONICAL_MOBILE_V319=PASS")
+    print("PUBLIC_CONNECTION_CANONICAL_MOBILE_V319_V38=PASS")
