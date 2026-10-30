@@ -1,0 +1,21 @@
+name: Admin Polling Storm V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "lib/admin-ops-api.ts"
+      - "components/admin-notification-center.tsx"
+      - ".github/workflows/admin-polling-storm-v1-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify missing pulse endpoint is never polled
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -R --line-number --fixed-strings '/v1/admin/panel-notifications/pulse' lib components
+          grep -n --fixed-strings 'adminRealtimePulse:async()' lib/admin-ops-api.ts
