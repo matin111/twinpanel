@@ -28,7 +28,15 @@ assert "v42-sheet-close" in v42
 # Same real panel is presented; no cloning/copying of server actions.
 assert "cloneNode" not in v42
 assert "innerHTML=panel" not in v42
+assert "function hasSheetSurface(panel)" in v42
 assert "panel.querySelector('.server-view')" in v42
+
+# V41 intentionally removes V2Ray server-views. V42 must still recognize the
+# real V2Ray all-server/client surface so the mobile protocol can open.
+assert "panel.dataset.v41V2ray==='1'||panel.dataset.v41LowerConfigsRemoved==='1'" in v42
+assert "panel.querySelector('.v38-all-card[data-v38-protocol=\"v2ray\"]')" in v42
+assert "panel.querySelector('.v34-client-card')" in v42
+assert "if(!hasSheetSurface(panel))return;" in v42
 
 # Sheet remains mobile-only and desktop restores normal presentation.
 assert "const MOBILE='(max-width:720px)'" in v42
@@ -41,4 +49,4 @@ for item in forbidden:
     assert item not in v42.lower(), item
     assert item not in backpressure.lower(), item
 
-print("V42 mobile bottom-sheet + request backpressure chain smoke OK")
+print("V42 mobile bottom-sheet + V2Ray visibility + request backpressure chain smoke OK")
