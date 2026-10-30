@@ -46,6 +46,28 @@ def _acme_location() -> str:
 """
 
 
+def _service_locations_frontdoor(
+    kind: str,
+    host: str,
+    port: int,
+    secure: bool,
+) -> str:
+    try:
+        return _service_locations(kind, host, port, secure)
+    except RuntimeError as exc:
+        # TWINPANEL_API_HTTPS_QUOTA_FAIL_CLOSED_V1
+        if (
+            kind == "api"
+            and secure
+            and str(exc) in {
+                "quota_mtls_ca_missing",
+                "quota_mtls_proxy_secret_missing",
+            }
+        ):
+            return _service_locations(kind, host, port, False)
+        raise
+
+
 def _write_with_rollback(path: Path, content: str, mode: int) -> tuple[str | None, int | None]:
     old_content = None
     old_mode = None
@@ -59,11 +81,7 @@ def _write_with_rollback(path: Path, content: str, mode: int) -> tuple[str | Non
 
 def _snapshot_enabled_entry(enabled: Path) -> dict[str, object]:
     if enabled.is_symlink():
-        return {
-            "kind": "symlink",
-            "target": os.readlink(enabled),
-        }
-
+        return {"kind": "symlink", "target": os.readlink(enabled)}
     if enabled.exists():
         if not enabled.is_file():
             raise RuntimeError("unsupported_enabled_entry_type")
@@ -72,7 +90,6 @@ def _snapshot_enabled_entry(enabled: Path) -> dict[str, object]:
             "content": enabled.read_text(encoding="utf-8"),
             "mode": enabled.stat().st_mode & 0o777,
         }
-
     return {"kind": "missing"}
 
 
@@ -83,41 +100,30 @@ def _ensure_enabled_symlink(path: Path, enabled: Path) -> None:
                 return
         except OSError:
             pass
-
     if os.path.lexists(enabled):
         enabled.unlink()
-
     enabled.symlink_to(path)
 
 
 def _restore_enabled_entry(enabled: Path, state: dict[str, object]) -> None:
     if os.path.lexists(enabled):
         enabled.unlink()
-
     kind = state.get("kind")
-
     if kind == "missing":
         return
-
     if kind == "symlink":
         enabled.symlink_to(str(state.get("target") or ""))
         return
-
     if kind == "file":
         enabled.write_text(str(state.get("content") or ""), encoding="utf-8")
         mode = state.get("mode")
         if isinstance(mode, int):
             os.chmod(enabled, mode)
         return
-
     raise RuntimeError("unsupported_enabled_snapshot")
 
 
-def _restore_site(
-    path: Path,
-    old_content: str | None,
-    old_mode: int | None,
-) -> None:
+def _restore_site(path: Path, old_content: str | None, old_mode: int | None) -> None:
     if old_content is None:
         try:
             path.unlink()
@@ -133,42 +139,26 @@ def refresh_frontdoor_map() -> None:
     if not frontdoor_enabled() or not STREAM_MAP_BUILDER.is_file():
         return
     result = subprocess.run(
-        [str(STREAM_MAP_BUILDER)],
-        capture_output=True,
-        text=True,
-        timeout=15,
-        check=False,
+        [str(STREAM_MAP_BUILDER)], capture_output=True, text=True, timeout=15, check=False
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            (result.stderr or result.stdout or "frontdoor_map_refresh_failed").strip()
-        )
+        raise RuntimeError((result.stderr or result.stdout or "frontdoor_map_refresh_failed").strip())
 
 
 def _reload_nginx() -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["systemctl", "reload", "nginx"],
-        capture_output=True,
-        text=True,
-        timeout=20,
-        check=False,
+        ["systemctl", "reload", "nginx"], capture_output=True, text=True, timeout=20, check=False
     )
 
 
-def create_nginx_config(
-    domain: str,
-    host: str,
-    port: int,
-    domain_type=None,
-):
-    """Render a domain site without competing with the TCP/443 stream front door."""
+def create_nginx_config(domain: str, host: str, port: int, domain_type=None):
     filename = f"{domain}.conf"
     path = Path(NGINX_DIR) / filename
     enabled = Path(NGINX_ENABLED) / filename
     kind = _domain_type_key(domain_type, port)
     cert = _certificate(domain)
     secure = cert is not None
-    locations = _service_locations(kind, host, port, secure)
+    locations = _service_locations_frontdoor(kind, host, port, secure)
     acme = _acme_location()
 
     if secure:
@@ -217,48 +207,29 @@ server {{
 
     enabled_state = _snapshot_enabled_entry(enabled)
     old_content, old_mode = _write_with_rollback(
-        path,
-        config,
-        0o600 if kind == "api" else 0o644,
+        path, config, 0o600 if kind == "api" else 0o644
     )
 
     try:
-        # Historical installs may contain an independent regular file under
-        # sites-enabled. Always converge the active entry to the canonical
-        # sites-available file so renderer updates actually reach Nginx.
         _ensure_enabled_symlink(path, enabled)
         refresh_frontdoor_map()
-
         test = subprocess.run(
-            ["nginx", "-t"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-            check=False,
+            ["nginx", "-t"], capture_output=True, text=True, timeout=15, check=False
         )
         if test.returncode != 0:
             raise RuntimeError(test.stderr.strip() or "nginx_config_test_failed")
-
         reload_result = _reload_nginx()
         if reload_result.returncode != 0:
             raise RuntimeError(
                 (reload_result.stderr or reload_result.stdout or "nginx_reload_failed").strip()
             )
     except Exception:
-        _restore_site(
-            path,
-            old_content,
-            old_mode,
-        )
+        _restore_site(path, old_content, old_mode)
         _restore_enabled_entry(enabled, enabled_state)
         try:
             refresh_frontdoor_map()
             rollback_test = subprocess.run(
-                ["nginx", "-t"],
-                capture_output=True,
-                text=True,
-                timeout=15,
-                check=False,
+                ["nginx", "-t"], capture_output=True, text=True, timeout=15, check=False
             )
             if rollback_test.returncode == 0:
                 _reload_nginx()
