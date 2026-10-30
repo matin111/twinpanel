@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.382",
+  "version": "1.1.0-rc.383",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-30T04:44:15Z",
+  "released_at": "2026-10-30T04:54:48Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b30bf06cdd583e2b61c9636a674ac9d6fc8a740d",
+  "source_sha": "182c091e0739b06d7748105d4e00756ff66018ad",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.382/twinpanel-1.1.0-rc.382-linux-x86_64.tar.gz",
-    "sha256": "4263ee5e9cb6719960b400de7afe499c58b893ab285b1fec4330daff2927cfa5",
-    "size_bytes": 28692479
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.383/twinpanel-1.1.0-rc.383-linux-x86_64.tar.gz",
+    "sha256": "ee921e077655471545e09036d0b5b7e53f53d2b92b7932a0d19446a52f47e7c7",
+    "size_bytes": 28698641
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.382 مسیر Public Connect را بهینه می‌کند. پروفایل واقعی Production نشان داد Hub V5 و refinerهای V13/V14/V15/V16 در یک request همان payload اشتراک را چند بار بازسازی می‌کنند و روی single-worker زمان پاسخ را به 10 تا 40 ثانیه و 504 می‌رسانند. این release همان payload خواندنی را فقط یک بار در SQLAlchemy Session همان request می‌سازد و چهار مرحله بعدی از cache محلی همان request استفاده می‌کنند. cache بین requestها یا workerها مشترک نیست و برای جلوگیری از mutation بین refinerها deep-copy استفاده می‌شود. هیچ تغییری در provisioning، credential generation، accounting، quota، Tunnel/TP27/VXLAN/Spoof، routing، firewall یا protocol dataplane ایجاد نشده است. Source candidate روی SHA immutable b30bf06cdd583e2b61c9636a674ac9d6fc8a740d قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.382 optimizes the Public Connect request path. Production profiling showed that Hub V5 and the V13/V14/V15/V16 refiners were rebuilding the same subscription payload multiple times in one request, which on the single API worker expanded into 10-40 second responses and 504s. This release builds the same read-only payload once in the SQLAlchemy Session for that request and reuses a request-local cached copy across the later presentation stages. The cache is not shared across requests or workers, and deep copies isolate refiner mutations. This release does not change provisioning, credential generation, accounting, quota, Tunnel/TP27/VXLAN/Spoof, routing, firewall, or protocol dataplane behavior. The candidate source is pinned to immutable SHA b30bf06cdd583e2b61c9636a674ac9d6fc8a740d."
+    "fa": "TwinPanel 1.1.0-rc.383 قرارداد نرم‌افزاری Front-door امن TCP/443 را برای هم‌زیستی Cisco/OpenConnect و HTTPS دامنه‌های مدیریت‌شده اضافه می‌کند. در حالت Front-door، Nginx دامنه‌های دارای SSL را فقط روی 127.0.0.1:9443 رندر می‌کند، مسیر ثابت HTTP-01 webroot برای ACME ایجاد می‌شود، Certbot به‌جای دستکاری Nginx از certonly --webroot استفاده می‌کند، مالکیت Nginx روی TCP/443 قبل از صدور SSL اعتبارسنجی می‌شود و SNI map هنگام ایجاد/حذف/تغییر دامنه refresh می‌شود. عملیات Nginx rollback-safe شده است. این release به‌تنهایی listenerهای Production را جابه‌جا نمی‌کند؛ migration runtime و Acceptance واقعی به‌صورت مرحله جدا انجام می‌شود. Tunnel/TP27/VXLAN/Spoof، Xray، accounting، quota و credential generation تغییر نکرده‌اند. Source candidate روی SHA immutable 182c091e0739b06d7748105d4e00756ff66018ad قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.383 adds the application-side Cisco-safe TCP/443 front-door contract for coexistence between Cisco/OpenConnect and managed-domain HTTPS. In front-door mode, managed TLS virtual hosts render only on 127.0.0.1:9443, a permanent HTTP-01 ACME webroot is provided, Certbot uses certonly --webroot instead of mutating Nginx, Nginx ownership of public TCP/443 is validated before issuance, and the managed SNI map is refreshed when domains are created, removed, or changed. Nginx site updates are rollback-safe. This release does not by itself move production listeners; runtime migration and real acceptance remain a separate controlled step. Tunnel/TP27/VXLAN/Spoof, Xray, accounting, quota, and credential generation are unchanged. The candidate source is pinned to immutable SHA 182c091e0739b06d7748105d4e00756ff66018ad."
   }
 }
