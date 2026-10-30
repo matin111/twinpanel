@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.390",
-  "source_sha": "82e906fc3c3196e6e1a12addb921e34bbc1247de",
+  "version": "1.1.0-rc.391",
+  "source_sha": "2b0e6aa4d48695145cee4ee44e078adf6d7e5aaa",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.390 تگ‌های client مربوط به Naive و ShadowTLS را برای هر اشتراک و هر سرور یکتا می‌کند تا ترکیب چند سرور داخل یک sing-box config باعث تکرار tag و ابهام در route.final یا detour نشود. الگو از username، protocol، نام Node و Node ID ساخته می‌شود؛ ShadowTLS transport نیز suffix مستقل -transport دارد. credential، endpoint، TLS، runtime account و protocol dataplane تغییر نکرده‌اند. Source candidate روی SHA immutable 82e906fc3c3196e6e1a12addb921e34bbc1247de قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.390 makes delivered Naive and ShadowTLS client tags unique per subscription and per server so multi-server sing-box configurations do not contain duplicate tags or ambiguous route.final/detour references. Tags are derived from username, protocol, Node name, and Node ID; the ShadowTLS transport receives a dedicated -transport suffix. Credentials, endpoints, TLS material, runtime accounts, and protocol dataplane are unchanged. The candidate source is pinned to immutable SHA 82e906fc3c3196e6e1a12addb921e34bbc1247de."
+    "fa": "TwinPanel 1.1.0-rc.391 ساخت اشتراک را Fail-Closed می‌کند: admin-create-v2 فقط زمانی موفق اعلام می‌شود که Provisioning واقعی، credential/config تمام پروتکل‌های انتخاب‌شده و همگام‌سازی quota کامل شده باشد. اگر ساخت ناقص باشد اشتراک ACTIVE تحویل داده نمی‌شود و به SUSPENDED می‌رود تا cleanup انجام شود. تست ساخت ۱۵ پروتکل و API smoke با این قرارداد به‌روزرسانی شده‌اند. این نسخه همچنین تغییرات موجود در main تا SHA قفل‌شده را شامل می‌شود. Source candidate روی SHA immutable 2b0e6aa4d48695145cee4ee44e078adf6d7e5aaa قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.391 makes subscription creation fail closed: admin-create-v2 succeeds only after real provisioning, generated credential/config persistence for every selected protocol, and quota synchronization complete successfully. Incomplete creation is not exposed as ACTIVE and is moved to SUSPENDED for cleanup. The 15-protocol creation smoke and API smoke were updated to enforce this contract. This release also includes all changes already present on main up to the pinned source SHA. The candidate source is pinned to immutable SHA 2b0e6aa4d48695145cee4ee44e078adf6d7e5aaa."
   }
 }
