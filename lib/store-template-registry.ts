@@ -28,9 +28,9 @@ export const DEFAULT_STORE_TEMPLATE_ID="conversion-2027";
 export const STORE_TEMPLATE_CATALOG:readonly StoreTemplateDefinition[]=[
   {
     id:"conversion-2027",
-    nameFa:"فروش حرفه‌ای 2027",
+    nameFa:"قالب یک",
     nameEn:"Conversion 2027",
-    descriptionFa:"قالب فروش نوآورانه و Mobile-first با Hero تصویری، پلن‌های واقعی، پروتکل‌ها، آموزش نصب، امکانات، FAQ، شبکه‌های اجتماعی و چت آنلاین.",
+    descriptionFa:"قالب ساده و مدرن برای معرفی خدمات و فروش.",
     descriptionEn:"Mobile-first conversion storefront with visual hero, live plans, protocols, setup guides, benefits, FAQ, social contact and live chat.",
     version:"2.0.0",
     author:"TwinPanel",
@@ -40,9 +40,9 @@ export const STORE_TEMPLATE_CATALOG:readonly StoreTemplateDefinition[]=[
   },
   {
     id:"editorial-grid-2027",
-    nameFa:"Editorial Pro 2027",
+    nameFa:"قالب دو",
     nameEn:"Editorial Pro 2027",
-    descriptionFa:"قالب پریمیوم مستقل با هویت ادیتوریال مدرن، تنظیمات اختصاصی، Hero قابل انتخاب، چیدمان فروش Spotlight/Comparison، تراکم صفحه، کنترل اجزای ادیتوریال و تجربه راهنمای حرفه‌ای؛ کاملاً مستقل از تنظیمات قالب Conversion.",
+    descriptionFa:"چیدمان حرفه‌ای برای معرفی محتوا و امکانات.",
     descriptionEn:"A premium independent editorial storefront with its own editor, selectable hero compositions, Spotlight/Comparison plan layouts, density controls, editorial modules and a refined guide experience—fully separate from Conversion theme settings.",
     version:"2.0.0",
     author:"TwinPanel",
@@ -52,9 +52,9 @@ export const STORE_TEMPLATE_CATALOG:readonly StoreTemplateDefinition[]=[
   },
   {
     id:"orbit-neo-2027",
-    nameFa:"Orbit Neo 2027",
+    nameFa:"قالب سه",
     nameEn:"Orbit Neo 2027",
-    descriptionFa:"قالب سوم کاملاً مستقل و تصویرمحور با طراحی Spatial/Bento، Header شناور، Hero سینمایی، Ticket Rail برای پلن‌ها، Constellation پروتکل‌ها، Setup Lab تعاملی، Light/Dark مستقل و Media Studio برای آپلود بنر و تصاویر همه نقاط کلیدی.",
+    descriptionFa:"قالب فروش‌محور برای معرفی محصولات و سفارش.",
     descriptionEn:"A fully independent image-led spatial/Bento storefront with a floating header, cinematic hero, ticket-style plan rail, protocol constellation, interactive setup lab, independent Light/Dark palettes and a Media Studio for every key visual slot.",
     version:"1.0.0",
     author:"TwinPanel",
