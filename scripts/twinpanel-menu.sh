@@ -76,7 +76,7 @@ brand_row(){
   fi
   pixel=' '
   gap=' '
-  if (( cols >= 104 )); then
+  if (( cols >= 88 )); then
     pixel='  '
   fi
 
