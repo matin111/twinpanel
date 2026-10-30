@@ -15,7 +15,7 @@ assert "refine_public_connection_v2ray_multilink_action_v44" in v42
 assert "return refine_public_connection_v2ray_multilink_action_v44(source)" in v42
 assert "TWINPANEL_PUBLIC_CONNECT_V2RAY_MULTILINK_ACTION_V44" in v44
 
-# Mobile protocol tap must be owned before V36 target listeners and open a fixed sheet.
+# Mobile protocol tap must be owned before V36 target listeners and open one fixed sheet.
 assert "document.addEventListener('click',handleProtocolTap,true)" in v42
 assert "event.stopImmediatePropagation()" in v42
 assert "panel.classList.add('active','v36-open','v42-sheet-open')" in v42
@@ -31,12 +31,22 @@ assert "innerHTML=panel" not in v42
 assert "function hasSheetSurface(panel)" in v42
 assert "panel.querySelector('.server-view')" in v42
 
-# V41 intentionally removes V2Ray server-views. V42 must still recognize the
-# real V2Ray all-server/client surface so the mobile protocol can open.
+# V41 intentionally removes V2Ray server-views. V42 must still recognize and
+# explicitly expose the surviving V38/V44 all-server and client surfaces.
 assert "panel.dataset.v41V2ray==='1'||panel.dataset.v41LowerConfigsRemoved==='1'" in v42
 assert "panel.querySelector('.v38-all-card[data-v38-protocol=\"v2ray\"]')" in v42
 assert "panel.querySelector('.v34-client-card')" in v42
 assert "if(!hasSheetSurface(panel))return;" in v42
+assert '.v42-sheet-open[data-v41-v2ray="1"] .v38-all-card[data-v38-protocol="v2ray"]' in v42
+assert '.v42-sheet-open[data-v41-v2ray="1"] .v34-client-card' in v42
+
+# V42 is the single mobile presentation authority: stale V36/V27/active panels
+# and choices are retired before a new fixed sheet opens.
+assert "function closeAllMobileSurfaces()" in v42
+assert "document.querySelectorAll('.protocol-panel.active,.protocol-panel.v36-open,.protocol-panel.v42-sheet-open')" in v42
+assert "panel.classList.remove('v42-sheet-open','active','v36-open','v27-active-protocol')" in v42
+assert "document.querySelectorAll('.protocol-choice.active')" in v42
+assert "closeAllMobileSurfaces();" in v42
 
 # Sheet remains mobile-only and desktop restores normal presentation.
 assert "const MOBILE='(max-width:720px)'" in v42
@@ -49,4 +59,4 @@ for item in forbidden:
     assert item not in v42.lower(), item
     assert item not in backpressure.lower(), item
 
-print("V42 mobile bottom-sheet + V2Ray visibility + request backpressure chain smoke OK")
+print("V42 single mobile sheet + V2Ray visibility + request backpressure chain smoke OK")

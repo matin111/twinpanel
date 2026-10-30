@@ -108,6 +108,19 @@ _CSS = r"""
     display:block!important;
     margin:0!important;
   }
+
+  /* V41 removes the lower V2Ray server inventory. The fixed V42 sheet must
+     therefore expose the surviving V38/V44 multi-link and client surfaces. */
+  body.v42-mobile-sheet .protocol-panel.v42-sheet-open[data-v41-v2ray="1"] .v38-all-card[data-v38-protocol="v2ray"]{
+    display:block!important;
+    visibility:visible!important;
+    opacity:1!important;
+  }
+  body.v42-mobile-sheet .protocol-panel.v42-sheet-open[data-v41-v2ray="1"] .v34-client-card{
+    display:flex!important;
+    visibility:visible!important;
+    opacity:1!important;
+  }
 }
 """
 
@@ -176,15 +189,19 @@ _SCRIPT = r"""
     if(title)title.textContent=titleFor(choice,panel);
   }
 
+  function closeAllMobileSurfaces(){
+    document.querySelectorAll('.protocol-panel.active,.protocol-panel.v36-open,.protocol-panel.v42-sheet-open').forEach(panel=>{
+      panel.classList.remove('v42-sheet-open','active','v36-open','v27-active-protocol');
+      panel.setAttribute('aria-hidden','true');
+    });
+    document.querySelectorAll('.protocol-choice.active').forEach(choice=>{
+      choice.classList.remove('active');
+      choice.setAttribute('aria-expanded','false');
+    });
+  }
+
   function closeSheet(){
-    if(activePanel){
-      activePanel.classList.remove('v42-sheet-open','active','v36-open');
-      activePanel.setAttribute('aria-hidden','true');
-    }
-    if(activeChoice){
-      activeChoice.classList.remove('active');
-      activeChoice.setAttribute('aria-expanded','false');
-    }
+    closeAllMobileSurfaces();
     backdrop?.remove();
     backdrop=null;
     activePanel=null;
