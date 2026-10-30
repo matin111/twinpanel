@@ -16,7 +16,12 @@ from ..subscription_override_models import (
     get_subscription_override,
 )
 from ..subscription_plan_schema import ensure_subscription_plan_schema
+from .account_delivery import public_router as account_delivery_public_router
 from .migration_center_v1 import router as migration_center_v1_router
+from .migration_center_v2 import (
+    admin_router as migration_center_v2_admin_router,
+    public_router as migration_center_v2_public_router,
+)
 from .subscription_delivery_policy_v1 import DeliveryPolicyIn, put_delivery_policy
 from .subscriptions import subscription_out
 
@@ -334,8 +339,11 @@ async def admin_create_v2(
     return result
 
 
-# main.py already mounts this aggregate with prefix="/v1". Appending the
-# independently protected migration routes keeps the public paths at
-# /v1/admin/migration-center/* without changing main.py or legacy subscription
-# endpoints. This phase is dry-run only and carries no database dependency.
+# main.py already mounts this aggregate with prefix="/v1". Append migration
+# admin routes here to avoid changing the central router registration order.
 router.routes.extend(migration_center_v1_router.routes)
+router.routes.extend(migration_center_v2_admin_router.routes)
+
+# account_delivery.public_router is already registered by main.py. Attach the
+# Phase 2 legacy passthrough without changing the existing /v1/connect authority.
+account_delivery_public_router.routes.extend(migration_center_v2_public_router.routes)
