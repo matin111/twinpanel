@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.380",
+  "version": "1.1.0-rc.381",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-30T04:02:47Z",
+  "released_at": "2026-10-30T04:15:06Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "c37e378409ce1f54907873979235a3ef12c066cf",
+  "source_sha": "602b44bd75cdfdc2db912735f8f94208b1aba396",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.380/twinpanel-1.1.0-rc.380-linux-x86_64.tar.gz",
-    "sha256": "4ab4cfbb71fc6a64d0cbfa8c1ae4c2a5be954faea21f97b3cf3270fd79a620a2",
-    "size_bytes": 28688712
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.381/twinpanel-1.1.0-rc.381-linux-x86_64.tar.gz",
+    "sha256": "fdbbcb357388ef8568fbb50a3ffcfefd5ff4a0b4d0b0acd818e2c799c79207e7",
+    "size_bytes": 28689255
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.380 اصلاح تکمیلی latency صفحه Public Connect را منتشر می‌کند. در rc.379 فقط Hub V5 از payload سبک استفاده می‌کرد، اما refinerهای V13/V14/V15/V16 در ادامه همان request دوباره account_delivery._public_payload را اجرا می‌کردند و تولید eager QR برای V2Ray/Xray را تا چهار بار دیگر تکرار می‌کردند. rc.380 همان fast payload read-only را برای این refinerهای Presentation نیز استفاده می‌کند، در حالی که WireGuard QR compatibility و رفتار legacy Account Delivery خارج از صفحه Public Connect حفظ شده است. این release به subscription payload semantics، provisioning، accounting، quota، credential generation، TP27، VXLAN، Tunnel/Spoof dataplane، routing، firewall یا protocol dataplane دست نمی‌زند. Source candidate روی SHA immutable c37e378409ce1f54907873979235a3ef12c066cf قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.380 ships the follow-up Public Connect latency fix. In rc.379 only Hub V5 used the lightweight payload, while V13/V14/V15/V16 refiners later in the same request still called account_delivery._public_payload and retriggered eager V2Ray/Xray QR generation up to four additional times. rc.380 routes those presentation refiners through the same read-only fast payload while preserving WireGuard QR compatibility and legacy Account Delivery behavior outside the Public Connect page. This release does not change subscription payload semantics, provisioning, accounting, quota, credential generation, TP27, VXLAN, Tunnel/Spoof dataplane, routing, firewall, or protocol dataplane. The candidate source is pinned to immutable SHA c37e378409ce1f54907873979235a3ef12c066cf."
+    "fa": "TwinPanel 1.1.0-rc.381 باگ نمایش خطای ساختاریافته در صفحه دامنه و SSL را اصلاح می‌کند. پاسخ‌های FastAPI که detail را به‌صورت object برمی‌گرداندند دیگر به [object Object] تبدیل نمی‌شوند و پیام واقعی مانند https_port_conflict:ocserv-main به‌صورت خوانا نمایش داده می‌شود. متن موفقیت ثبت دامنه نیز با جریان جدید Domain Manager هماهنگ شده و به‌درستی اعلام می‌کند که ثبت دامنه و Nginx انجام شده و فعال‌سازی SSL action جداگانه است. این release هیچ تغییری در ocserv/Cisco، Nginx dataplane، Xray، Tunnel/TP27/VXLAN/Spoof، firewall، routing، accounting، quota، provisioning یا credential generation ندارد. Source candidate روی SHA immutable 602b44bd75cdfdc2db912735f8f94208b1aba396 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.381 fixes structured error rendering on the Domains & SSL admin page. FastAPI responses whose detail field is an object are no longer stringified as [object Object]; the real message, such as https_port_conflict:ocserv-main, is rendered readably. The successful domain-registration copy now also matches the current Domain Manager flow by stating that the domain and Nginx route were configured while SSL remains a separate explicit action. This release does not change ocserv/Cisco, Nginx dataplane, Xray, Tunnel/TP27/VXLAN/Spoof, firewall, routing, accounting, quota, provisioning, or credential generation. The candidate source is pinned to immutable SHA 602b44bd75cdfdc2db912735f8f94208b1aba396."
   }
 }
