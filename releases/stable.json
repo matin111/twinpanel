@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.388",
+  "version": "1.1.0-rc.389",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-30T13:09:30Z",
+  "released_at": "2026-10-30T13:29:42Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "a4887813b022f060f3090404a46b73b7319f6bb9",
+  "source_sha": "fe77985fbae19f04299618db34cace368a6d2873",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.388/twinpanel-1.1.0-rc.388-linux-x86_64.tar.gz",
-    "sha256": "ce8a5e1ca611700b06e35a48087143edff354ce6a37a1e54295bbc60b243afb9",
-    "size_bytes": 28711783
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.389/twinpanel-1.1.0-rc.389-linux-x86_64.tar.gz",
+    "sha256": "27ce84c8c7fad5dbfc34859ae0f4d4aa4a369afc1947cbb1470e19016b348ca4",
+    "size_bytes": 28711879
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.388 صفحه مدیریت دامنه و SSL را با طراحی حرفه‌ای‌تر 2027 بازطراحی می‌کند. هدر اختصاصی، کارت‌های آماری واضح، جستجوی دامنه، نمایش خواناتر نقش سرویس، وضعیت SSL/Nginx، اکشن‌های تمدید و حذف و responsive موبایل/تبلت اضافه شده‌اند، بدون تغییر در قراردادهای backend دامنه و SSL. Tunnel/TP27/VXLAN/Spoof، Xray، accounting، quota، routing، firewall و protocol dataplane تغییر نکرده‌اند. Source candidate روی SHA immutable a4887813b022f060f3090404a46b73b7319f6bb9 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.388 redesigns the Domains & SSL administration page with a more polished 2027 UI. It adds a dedicated hero, clearer KPI cards, domain search, improved service-role and SSL/Nginx status presentation, refined renew/delete actions, and responsive mobile/tablet behavior without changing the existing domain or SSL backend contracts. Tunnel/TP27/VXLAN/Spoof, Xray, accounting, quota, routing, firewall, and protocol dataplane are unchanged. The candidate source is pinned to immutable SHA a4887813b022f060f3090404a46b73b7319f6bb9."
+    "fa": "TwinPanel 1.1.0-rc.389 منوی مدیریت SSH را کامل‌تر می‌کند و گزینه مستقل Install / Reinstall TwinPanel را به منوی اصلی اضافه می‌کند. این اکشن فقط پس از تأیید صریح اجرا می‌شود و از installer رسمی همان release استفاده می‌کند؛ در نصب مجدد، دیتابیس، backend environment، حساب administrator و تنظیمات runtime موجود طبق رفتار فعلی installer حفظ می‌شوند. Smoke اختصاصی منوی SSH و bash syntax validation نیز اضافه شده‌اند. Tunnel/TP27/VXLAN/Spoof، provisioning، credential generation، accounting، quota، routing، firewall و protocol dataplane تغییر نکرده‌اند. Source candidate روی SHA immutable fe77985fbae19f04299618db34cace368a6d2873 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.389 completes the SSH management menu by adding a first-class Install / Reinstall TwinPanel action. The action runs only after explicit confirmation and invokes the official installer from the active release; on an existing installation, the current installer preserves the database, backend environment, administrator account, and runtime settings. A dedicated SSH-menu regression smoke and shell syntax validation are included. Tunnel/TP27/VXLAN/Spoof, provisioning, credential generation, accounting, quota, routing, firewall, and protocol dataplane are unchanged. The candidate source is pinned to immutable SHA fe77985fbae19f04299618db34cace368a6d2873."
   }
 }
