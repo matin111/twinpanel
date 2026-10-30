@@ -7,9 +7,8 @@ from .public_connection_v2ray_multilink_v43 import apply_v2ray_multilink_v43
 
 
 apply_v2ray_multilink_v43()
-# V2Ray's customer-facing canonical client is Karing. Keep this policy adjacent
-# to the final V2Ray presentation layer so metadata, download card and actions
-# cannot drift back to the historical Hiddify default.
+# Keep backend compatibility metadata unchanged. The final customer-facing
+# client card below is rewritten per device to the V2Ray/Xray client family.
 modern_delivery.CLIENTS["v2ray"] = modern_delivery._KARING
 multilink.PROTOCOL_CLIENT["v2ray"] = "karing"
 
@@ -95,6 +94,15 @@ _SCRIPT = r"""
 (function(){
   let timer=null;
 
+  const CLIENTS={
+    windows:{name:'v2rayN',url:'https://github.com/2dust/v2rayN/releases/latest'},
+    macos:{name:'v2rayN',url:'https://github.com/2dust/v2rayN/releases/latest'},
+    linux:{name:'v2rayN',url:'https://github.com/2dust/v2rayN/releases/latest'},
+    android:{name:'v2rayNG',url:'https://github.com/2dust/v2rayNG/releases/latest'},
+    ios:{name:'V2Box',url:'https://apps.apple.com/us/app/v2box-v2ray-client/id6446814690'},
+    unknown:{name:'v2rayN / v2rayNG / V2Box',url:'https://github.com/2dust/v2rayN/releases/latest'}
+  };
+
   function normalize(value){
     const key=String(value||'').trim().toLowerCase();
     if(key==='xray')return'v2ray';
@@ -107,6 +115,21 @@ _SCRIPT = r"""
     const choice=[...document.querySelectorAll('.protocol-choice')]
       .find(item=>String(item.dataset.protocol||'')===String(panel?.id||''));
     return normalize(choice?.dataset?.protocolKey||choice?.dataset?.protocol||panel?.id||'');
+  }
+
+  function platform(){
+    const explicit=String(document.body?.dataset?.tpPlatform||document.documentElement?.dataset?.tpPlatform||'').trim().toLowerCase();
+    if(CLIENTS[explicit])return explicit;
+    const ua=String(navigator.userAgent||'');
+    const navPlatform=String(navigator.platform||'');
+    const haystack=(ua+' '+navPlatform).toLowerCase();
+    if(/android/i.test(ua))return'android';
+    if(/iphone|ipad|ipod/i.test(ua))return'ios';
+    if(/macintosh|mac os|macintel/i.test(haystack)&&Number(navigator.maxTouchPoints||0)>1)return'ios';
+    if(/windows|win32|win64|winarm/i.test(haystack))return'windows';
+    if(/macintosh|mac os|macintel/i.test(haystack))return'macos';
+    if(/linux|x11|cros/i.test(haystack))return'linux';
+    return'unknown';
   }
 
   function canonicalRow(view){
@@ -193,13 +216,25 @@ _SCRIPT = r"""
     retireDirectLegacyActions(view,row,[]);
   }
 
-  function preserveClientDownload(panel){
+  function rewriteClientDownload(panel){
     const card=panel.querySelector('.v34-client-card');
     if(!card)return;
+    const client=CLIENTS[platform()]||CLIENTS.unknown;
     card.hidden=false;
     card.removeAttribute('aria-hidden');
     card.style.removeProperty('display');
     card.dataset.v41ClientDownload='1';
+    card.dataset.v41V2rayClient=client.name;
+
+    const link=card.querySelector('a');
+    if(link){
+      link.href=client.url;
+      link.target='_blank';
+      link.rel='noopener noreferrer';
+      link.textContent='دانلود '+client.name;
+      link.setAttribute('aria-label','دانلود '+client.name+' برای V2Ray / Xray');
+      link.dataset.client=client.name.toLowerCase();
+    }
   }
 
   function ensureProfileAccordion(view,wrapper,profiles){
@@ -269,7 +304,7 @@ _SCRIPT = r"""
     document.querySelectorAll('.protocol-panel').forEach(panel=>{
       if(panelKey(panel)!=='v2ray')return;
       panel.dataset.v41V2ray='1';
-      preserveClientDownload(panel);
+      rewriteClientDownload(panel);
       panel.querySelectorAll('.server-view').forEach(simplifyServer);
     });
   }
@@ -290,7 +325,7 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_v2ray_actions_v41(source: str) -> str:
-    """Preserve every real Xray profile and present profile rows in a collapsed accordion by default."""
+    """Preserve real Xray profiles, collapse them by default, and show the right V2Ray client per device."""
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
