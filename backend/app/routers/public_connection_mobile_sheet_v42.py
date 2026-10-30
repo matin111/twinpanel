@@ -135,6 +135,17 @@ _SCRIPT = r"""
     return String(panel?.dataset?.v34Protocol||panel?.id||'سرورها').trim();
   }
 
+  function hasSheetSurface(panel){
+    if(!panel)return false;
+    if(panel.querySelector('.server-view'))return true;
+    const v2rayReady=panel.dataset.v41V2ray==='1'||panel.dataset.v41LowerConfigsRemoved==='1';
+    if(!v2rayReady)return false;
+    return Boolean(
+      panel.querySelector('.v38-all-card[data-v38-protocol="v2ray"]') ||
+      panel.querySelector('.v34-client-card')
+    );
+  }
+
   function ensureBackdrop(){
     if(backdrop?.isConnected)return backdrop;
     backdrop=document.createElement('div');
@@ -200,7 +211,7 @@ _SCRIPT = r"""
     const choice=event.target?.closest?.('.protocol-choice');
     if(!choice)return;
     const panel=panelFor(choice);
-    if(!panel||!panel.querySelector('.server-view'))return;
+    if(!hasSheetSurface(panel))return;
 
     event.preventDefault();
     event.stopPropagation();
