@@ -1,0 +1,25 @@
+name: Subscription Page Freeze Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/admin-subscription-live-table.tsx'
+      - '.github/workflows/subscription-page-freeze-smoke.yml'
+
+jobs:
+  subscription-page-freeze-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify live table observer is scoped and throttled
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('components/admin-subscription-live-table.tsx')
+          s = p.read_text()
+          assert 'observer.observe(document.body' not in s
+          assert 'observer.observe(body,{childList:true,subtree:false})' in s
+          assert 'requestAnimationFrame' in s
+          assert 'window.setInterval(refresh,5000)' in s
+          print('SUBSCRIPTION_PAGE_FREEZE_SMOKE_OK')
+          PY
