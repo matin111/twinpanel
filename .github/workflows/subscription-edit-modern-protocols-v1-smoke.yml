@@ -39,5 +39,5 @@ jobs:
           NODE
       - name: Build frontend
         run: |
-          npm ci
+          npm install --no-audit --no-fund
           npm run build
