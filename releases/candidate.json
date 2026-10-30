@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.395",
-  "source_sha": "e1685c592304e79fd1882368cef768c765441877",
+  "version": "1.1.0-rc.396",
+  "source_sha": "d94a6b97ece99947f360701f8a77f6e167c6513e",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.395 طوفان درخواست در پنل مدیریت را اصلاح می‌کند. کلاینت دیگر endpoint غایب /v1/admin/panel-notifications/pulse را از hot loop فراخوانی نمی‌کند، در نتیجه 404های تکراری و بار غیرضروری API حذف می‌شوند؛ regression smoke نیز بازگشت این polling مرده را مسدود می‌کند. این نسخه فقط frontend/admin polling را تغییر می‌دهد و backend semantics، TP27/VXLAN/Tunnel/Spoof/accounting/quota/provisioning/routing/firewall/protocol dataplane را تغییر نمی‌دهد. Source candidate روی SHA immutable e1685c592304e79fd1882368cef768c765441877 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.395 fixes the admin-panel request storm. The client no longer calls the missing /v1/admin/panel-notifications/pulse endpoint from a hot loop, eliminating repeated 404s and unnecessary API load; a regression smoke prevents the dead polling route from being reintroduced. This release changes only frontend/admin polling and does not alter backend semantics, TP27/VXLAN, Tunnel, Spoof, accounting, quota, provisioning, routing, firewall, or protocol dataplane behavior. The candidate source is pinned to immutable SHA e1685c592304e79fd1882368cef768c765441877."
+    "fa": "TwinPanel 1.1.0-rc.396 اصلاحات جدید پنل را منتشر می‌کند: ویرایش اشتراک اکنون پروتکل‌های Modern را از مسیر canonical backend مدیریت می‌کند و لوگوی منوی SSH نیز با سلول‌های background سفید یک‌دست رندر می‌شود تا به‌جای glyphهای بلوکی/foreground قبلی، ظاهر یکپارچه و بدون درز داشته باشد. این Release تغییرات موجود در main تا SHA immutable d94a6b97ece99947f360701f8a77f6e167c6513e را شامل می‌شود؛ TP27/VXLAN/Tunnel/Spoof/accounting/quota/routing/firewall/protocol dataplane در تغییر لوگو دست‌کاری نشده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.396 publishes the latest panel fixes: subscription Edit now handles Modern protocols through the canonical backend lifecycle, and the SSH management-menu logo now renders with solid white background cells for a seamless terminal brand instead of the previous foreground/block-glyph style. This release is pinned to immutable source SHA d94a6b97ece99947f360701f8a77f6e167c6513e; the logo change does not alter TP27/VXLAN, Tunnel, Spoof, accounting, quota, routing, firewall, or protocol dataplane behavior."
   }
 }
