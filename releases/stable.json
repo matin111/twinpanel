@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.371",
+  "version": "1.1.0-rc.372",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-30T01:22:19Z",
+  "released_at": "2026-10-30T01:36:59Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "cb0cbc0c7fceccd0033f37a19dd7525c32988390",
+  "source_sha": "77f4bb4141af1e458dfd52c26ff6670c01100282",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.371/twinpanel-1.1.0-rc.371-linux-x86_64.tar.gz",
-    "sha256": "c55ff9795060fd450b29f3411cc301e2bf7f6117b0829fd8abd292f8add0c05c",
-    "size_bytes": 28682874
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.372/twinpanel-1.1.0-rc.372-linux-x86_64.tar.gz",
+    "sha256": "19ead954f5de824274c35bda07693e1c800d937cb3fb4fdd0cb0b107511c7232",
+    "size_bytes": 28683924
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.371 اصلاح نهایی رابط مدیریت را منتشر می‌کند: در /admin/outbounds منوی «سیستم و نگهداری» و مرکز بروزرسانی دیگر پشت هدر Sticky یا داخل Dropdown بریده نمی‌شود و کارت بروزرسانی کامل قابل مشاهده است. در اعلان‌های مدیریت، متن وضعیت خوانده‌شده/خوانده‌نشده حذف شده و وضعیت با آیکن چشم مشخص می‌شود؛ اعلان خوانده‌نشده با چشم خط‌خورده بنفش و اعلان خوانده‌شده با چشم سبز نمایش داده می‌شود. کنترل «خواندن همه» نیز فقط آیکنی است و aria-label/title فارسی و انگلیسی حفظ شده است. این نسخه همچنین اصلاحات V2Ray/Xray نسخه rc.370 را نیز در Source کامل خود دارد. هیچ تغییری در Outbound Policy، routing، TP27، VXLAN، Tunnel/Spoof dataplane، Accounting، quota، provisioning، credential generation، firewall، update API یا protocol dataplane انجام نشده است. Source candidate روی SHA immutable cb0cbc0c7fceccd0033f37a19dd7525c32988390 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.371 publishes the final Admin UI refinement: on /admin/outbounds, the System & Maintenance / Update Center dropdown is no longer clipped behind sticky headers or by the dropdown container, so the full update card remains visible. Admin notification read/unread status text is removed and replaced by eye-based states: unread is shown as a purple crossed eye and read as a green eye. The mark-all-read control is icon-only while preserving Persian/English aria-label and title accessibility. This source also includes the V2Ray/Xray refinements from rc.370. No outbound policy, routing, TP27, VXLAN, tunnel/spoof dataplane, accounting, quota, provisioning, credential generation, firewall, update API, or protocol dataplane behavior is changed. The candidate source is pinned to immutable SHA cb0cbc0c7fceccd0033f37a19dd7525c32988390."
+    "fa": "TwinPanel 1.1.0-rc.372 اتصال Credential پروتکل‌های Naive و ShadowTLS به حساب مرکزی Subscription را اصلاح می‌کند. Naive و Credential بیرونی ShadowTLS اکنون از account_username و account_password خود اشتراک استفاده می‌کنند؛ هنگام مهاجرت یا تغییر نام کاربری، identity قدیمی runtime حذف می‌شود و revoke نیز identity ذخیره‌شده واقعی را هدف می‌گیرد. inner_password داخلی ShadowTLS همچنان secret مستقل runtime روی Node باقی می‌ماند. Accounting همان identity ذخیره‌شده Provisioning را برای Online/Usage استفاده می‌کند. این تغییر فقط Naive و ShadowTLS را پوشش می‌دهد و رفتار Hysteria2، TUIC، AnyTLS، Snell، پروتکل‌های Modern مستقل، TP27، VXLAN، Tunnel/Spoof dataplane، routing، firewall و quota/accounting core را تغییر نمی‌دهد. Source candidate روی SHA immutable 77f4bb4141af1e458dfd52c26ff6670c01100282 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.372 fixes Naive and ShadowTLS credential binding to the canonical Subscription account. Naive and the outer ShadowTLS credential now use the subscription account_username and account_password; legacy runtime identities are removed during migration or username rotation, and revoke targets the actual stored identity. The internal ShadowTLS inner_password remains independent node runtime state. Accounting continues to use the identity persisted by provisioning for Online/Usage mapping. This change is limited to Naive and ShadowTLS and does not alter Hysteria2, TUIC, AnyTLS, Snell, standalone Modern protocols, TP27, VXLAN, tunnel/spoof dataplane, routing, firewall, or the quota/accounting core. The candidate source is pinned to immutable SHA 77f4bb4141af1e458dfd52c26ff6670c01100282."
   }
 }
