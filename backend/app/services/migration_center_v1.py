@@ -107,7 +107,7 @@ def _expand_record(source: str, record: dict[str, Any]) -> list[dict[str, Any]]:
     return [deepcopy(record)]
 
 
-def _credentials(record: dict[str, Any]) -> dict[str, Any]:
+def _credentials(source: str, record: dict[str, Any]) -> dict[str, Any]:
     """Copy existing credential values exactly; never derive or regenerate them."""
     preserved: dict[str, Any] = {}
 
@@ -119,6 +119,11 @@ def _credentials(record: dict[str, Any]) -> dict[str, Any]:
     for key in _CREDENTIAL_KEYS:
         if key in record and _nonempty(record[key]):
             preserved.setdefault(key, deepcopy(record[key]))
+
+    # Sanaei/3x-ui client exports use ``id`` as the existing client UUID. Keep
+    # the exact value, but expose its semantic meaning in the normalized report.
+    if source == "sanaei" and _nonempty(record.get("id")):
+        preserved.setdefault("uuid", deepcopy(record["id"]))
 
     # Marzban exports can expose protocol links as the effective client material.
     links = record.get("links")
@@ -136,7 +141,7 @@ def normalize_record(source: str, record: dict[str, Any], index: int) -> dict[st
 
     username = _first(record, _USERNAME_KEYS)
     legacy_url = _first(record, _LEGACY_URL_KEYS)
-    credentials = _credentials(record)
+    credentials = _credentials(source, record)
     source_id = _first(record, _SOURCE_ID_KEYS)
 
     warnings: list[str] = []
