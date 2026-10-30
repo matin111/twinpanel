@@ -1,0 +1,36 @@
+name: Fix SSH logo newline literals
+
+on:
+  push:
+    branches:
+      - fix/ssh-logo-no-wrap
+    paths:
+      - '.github/workflows/tmp-fix-logo-newline.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/ssh-logo-no-wrap
+          fetch-depth: 0
+      - name: Fix newline literals
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/twinpanel-menu.sh')
+          s=p.read_text()
+          s=s.replace("printf '\\\\n'", "printf '\\n'")
+          p.write_text(s)
+          PY
+          rm -f .github/workflows/tmp-fix-logo-newline.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/twinpanel-menu.sh .github/workflows/tmp-fix-logo-newline.yml
+          git commit -m 'Fix SSH logo newline output'
+          git push origin HEAD:fix/ssh-logo-no-wrap
