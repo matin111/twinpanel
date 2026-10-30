@@ -1,0 +1,55 @@
+name: Subscription Hard Delete V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/destructive_safety.py'
+      - 'backend/app/quota_models.py'
+      - 'backend/app/subscription_enforcement.py'
+      - '.github/workflows/subscription-hard-delete-v1-smoke.yml'
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify hard-delete contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('backend/app/routers/destructive_safety.py').read_text()
+          quota = Path('backend/app/quota_models.py').read_text()
+
+          required = [
+              'TWINPANEL_SUBSCRIPTION_HARD_DELETE_V1',
+              'queue_subscription_enforcement(',
+              'reason="subscription_hard_deleted"',
+              'db.query(QuotaUsageEvent)',
+              'db.query(QuotaSession)',
+              'db.query(QuotaCursor)',
+              'db.query(QuotaDevice)',
+              'db.query(ProtocolCredential)',
+              'db.query(SubscriptionProtocol)',
+              'db.query(SubscriptionNode)',
+              'db.delete(sub)',
+              '"deleted": True',
+              '"status": "deleted"',
+              'subscriptions_module.router.routes[:0]',
+          ]
+          for marker in required:
+              assert marker in source, marker
+
+          assert 'ForeignKey("subscriptions.id", ondelete="RESTRICT")' in quota
+          assert source.index('db.query(QuotaUsageEvent)') < source.index('db.query(QuotaSession)')
+          assert source.index('db.query(QuotaSession)') < source.index('db.query(QuotaDevice)')
+          assert source.index('db.query(QuotaDevice)') < source.index('db.delete(sub)')
+
+          # Regression: the hard-delete override must not preserve the old
+          # archived/canceled semantics of subscriptions.delete_subscription.
+          hard_delete = source[source.index('def _hard_delete_subscription'):source.index('safe_nodes_router =')]
+          assert '"archived": True' not in hard_delete
+          assert 'sub.status = SubscriptionStatus.CANCELED' not in hard_delete
+
+          print('SUBSCRIPTION_HARD_DELETE_V1_OK')
+          PY
