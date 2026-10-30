@@ -24,17 +24,23 @@ assert "card.dataset.v44Endpoint='/sub'" in v44
 
 # Device-aware client behavior must stay aligned with the download card:
 # Windows/macOS/Linux -> v2rayN, Android -> v2rayNG, iOS -> V2Box.
-assert "windows:{name:'v2rayN'" in v44
-assert "macos:{name:'v2rayN'" in v44
-assert "linux:{name:'v2rayN'" in v44
-assert "android:{name:'v2rayNG'" in v44
-assert "ios:{name:'V2Box'" in v44
+assert "function platform()" in v44
+assert "if(/android/i.test(ua))return'android'" in v44
+assert "if(/iphone|ipad|ipod/i.test(ua))return'ios'" in v44
+assert "if(/windows|win32|win64|winarm/i.test(haystack))return'windows'" in v44
+assert "if(/macintosh|mac os|macintel/i.test(haystack))return'macos'" in v44
+assert "if(/linux|x11|cros/i.test(haystack))return'linux'" in v44
+assert "function clientName()" in v44
+assert "if(p==='android')return'v2rayNG'" in v44
+assert "if(p==='ios')return'V2Box'" in v44
+assert "return'v2rayN'" in v44
 assert "v2rayng://install-sub?url=" in v44
 assert "v2rayng://install-config?url=" in v44
-assert "کپی لینک برای v2rayN" in v44
-assert "کپی لینک برای V2Box" in v44
 assert "ارسال همه به v2rayNG" in v44
 assert "ارسال به v2rayNG" in v44
+assert "کپی لینک برای "+"client" in v44
+assert "کپی کانفیگ برای "+"client" in v44
+assert "card.dataset.v44Client=clientName()" in v44
 
 # Karing/Hiddify-specific customer actions must not return.
 assert "karing://" not in v44.lower()
