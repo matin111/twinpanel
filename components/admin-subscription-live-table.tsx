@@ -23,11 +23,6 @@ function rowSubscriptionId(row:HTMLTableRowElement){
 }
 
 function statusCell(row:HTMLTableRowElement){
-  // The production table has Status immediately before Actions. We decorate
-  // that existing React-owned cell instead of inserting an extra <td>. The old
-  // sidecar inserted cells imperatively, which desynchronised React's table DOM
-  // after the 15s subscription refresh and caused new rows to lose live state
-  // or appear visually misaligned.
   return row.cells.length>=2?row.cells[row.cells.length-2] as HTMLTableCellElement:null;
 }
 
@@ -38,25 +33,24 @@ export function AdminSubscriptionLiveTable(){
     let disposed=false;
     let timer:number|undefined;
     let observer:MutationObserver|undefined;
+    let observedBody:HTMLTableSectionElement|null=null;
+    let frame:number|undefined;
     let loaded=false;
     const states=new Map<number,LiveItem>();
 
-    const decorate=()=>{
+    const decorateNow=()=>{
+      if(disposed)return;
       const table=document.querySelector<HTMLTableElement>(".legacy-subscriptions-page .table table");
-      if(!table)return;
+      const body=table?.tBodies?.[0]||null;
+      if(!table||!body)return;
 
-      // Clean up cells/header left behind by pre-v87 builds if a soft navigation
-      // kept the old document alive. Fresh v87 renders never create them.
-      table.querySelectorAll("[data-live-sub-head]").forEach(node=>node.remove());
-      table.querySelectorAll("td[data-live-sub-cell]").forEach(node=>node.remove());
-
-      for(const row of Array.from(table.tBodies?.[0]?.rows||[])){
+      for(const row of Array.from(body.rows)){
         const id=rowSubscriptionId(row);
         if(!Number.isFinite(id)||id<=0)continue;
         const cell=statusCell(row);
         if(!cell)continue;
 
-        let host=cell.querySelector<HTMLDivElement>("div[data-live-sub-state]");
+        let host=cell.querySelector<HTMLDivElement>(":scope > div[data-live-sub-state]");
         if(!host){
           host=document.createElement("div");
           host.dataset.liveSubState="1";
@@ -94,6 +88,25 @@ export function AdminSubscriptionLiveTable(){
       }
     };
 
+    const bindObserver=()=>{
+      if(disposed)return;
+      const body=document.querySelector<HTMLTableSectionElement>(".legacy-subscriptions-page .table table tbody");
+      if(!body||body===observedBody)return;
+      observer?.disconnect();
+      observedBody=body;
+      observer=new MutationObserver(()=>scheduleDecorate());
+      observer.observe(body,{childList:true,subtree:false});
+    };
+
+    const scheduleDecorate=()=>{
+      if(disposed||frame!==undefined)return;
+      frame=window.requestAnimationFrame(()=>{
+        frame=undefined;
+        decorateNow();
+        bindObserver();
+      });
+    };
+
     const refresh=async()=>{
       const token=getCustomerToken();
       if(!token||disposed)return;
@@ -107,22 +120,22 @@ export function AdminSubscriptionLiveTable(){
         states.clear();
         for(const item of payload.items||[])states.set(Number(item.subscription_id),item);
         loaded=true;
-        decorate();
+        scheduleDecorate();
       }catch{}
     };
 
-    decorate();
-    observer=new MutationObserver(decorate);
-    observer.observe(document.body,{childList:true,subtree:true});
+    scheduleDecorate();
     void refresh();
-    timer=window.setInterval(refresh,3000);
-    document.addEventListener("visibilitychange",refresh);
+    timer=window.setInterval(refresh,5000);
+    const onVisibilityChange=()=>{if(document.visibilityState==="visible")void refresh();};
+    document.addEventListener("visibilitychange",onVisibilityChange);
 
     return()=>{
       disposed=true;
       if(timer)window.clearInterval(timer);
+      if(frame!==undefined)window.cancelAnimationFrame(frame);
       observer?.disconnect();
-      document.removeEventListener("visibilitychange",refresh);
+      document.removeEventListener("visibilitychange",onVisibilityChange);
     };
   },[]);
 
