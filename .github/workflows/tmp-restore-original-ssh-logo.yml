@@ -1,0 +1,71 @@
+name: Restore original SSH logo renderer
+
+on:
+  push:
+    branches:
+      - fix/ssh-logo-no-wrap
+    paths:
+      - '.github/workflows/tmp-restore-original-ssh-logo.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/ssh-logo-no-wrap
+          fetch-depth: 0
+      - name: Restore original wordmark geometry with white background cells
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/twinpanel-menu.sh')
+          s = p.read_text()
+          start = s.index('brand_row(){')
+          end = s.index('\nseparator(){', start)
+          replacement = r'''brand_row(){
+  local glyph cell i
+
+  printf '  '
+  for glyph in "$@"; do
+    for ((i=0; i<${#glyph}; i++)); do
+      cell="${glyph:i:1}"
+      if [[ "$cell" == "1" ]]; then
+        if [[ -n "$C_WHITE_BG" ]]; then
+          printf '%b %b' "$C_WHITE_BG" "$C_RESET"
+        else
+          printf '#'
+        fi
+      else
+        printf ' '
+      fi
+    done
+    printf '  '
+  done
+  printf '\n'
+}
+
+brand(){
+  printf '\n'
+  brand_row '11111' '10001' '11111' '10001' '11110' '01110' '10001' '11111' '10000'
+  brand_row '00100' '10001' '00100' '11001' '10001' '10001' '11001' '10000' '10000'
+  brand_row '00100' '10001' '00100' '10101' '10001' '10001' '10101' '10000' '10000'
+  brand_row '00100' '10101' '00100' '10101' '11110' '11111' '10101' '11110' '10000'
+  brand_row '00100' '10101' '00100' '10011' '10000' '10001' '10011' '10000' '10000'
+  brand_row '00100' '11011' '00100' '10011' '10000' '10001' '10011' '10000' '10000'
+  brand_row '00100' '11011' '11111' '10001' '10000' '10001' '10001' '11111' '11111'
+  printf '\n'
+}
+'''
+          p.write_text(s[:start] + replacement + s[end:])
+          PY
+          rm -f .github/workflows/tmp-restore-original-ssh-logo.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/twinpanel-menu.sh .github/workflows/tmp-restore-original-ssh-logo.yml
+          git commit -m 'Restore original SSH wordmark with white background cells'
+          git push origin HEAD:fix/ssh-logo-no-wrap
