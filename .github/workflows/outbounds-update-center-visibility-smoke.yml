@@ -1,0 +1,27 @@
+name: Outbounds Update Center Visibility Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'app/admin/outbounds/page.module.css'
+      - 'components/ui.tsx'
+      - 'components/system-release-footer.tsx'
+      - '.github/workflows/outbounds-update-center-visibility-smoke.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Outbounds does not hide System Release Footer
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          css = Path('app/admin/outbounds/page.module.css').read_text()
+          ui = Path('components/ui.tsx').read_text()
+          assert 'SystemReleaseFooter' in ui
+          assert 'group.en==="System & Maintenance"' in ui
+          assert '[class*="foot"]:not(.system-release-footer)' in css
+          assert '.fullWidth :global([class*="foot"]){' not in css
+          print('Outbounds Update Center visibility contract OK')
+          PY
