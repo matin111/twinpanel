@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.386",
+  "version": "1.1.0-rc.387",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-30T05:52:24Z",
+  "released_at": "2026-10-30T12:57:08Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "2d4545f337a2f6bb6e9b15505fee904cf629f59c",
+  "source_sha": "1d2bd83c04657ed9b1a676071b8326ffc708969a",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.386/twinpanel-1.1.0-rc.386-linux-x86_64.tar.gz",
-    "sha256": "e91e2c23b8096bd0af2f4f0b5c4975aa208e40abd30582b3c48db5e70b5f9d08",
-    "size_bytes": 28696448
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.387/twinpanel-1.1.0-rc.387-linux-x86_64.tar.gz",
+    "sha256": "0e954c784a97d0c4061a3cc6e05d56cb2c777fa20802bcf65537768166979e9e",
+    "size_bytes": 28696458
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.386 آخرین blocker دامنه API در Front-door را اصلاح می‌کند. صدور گواهی panel/sub/api موفق بود اما renderer امن API در صورت نبود quota-mTLS CA یا proxy secret کل HTTPS API را با quota_mtls_ca_missing متوقف می‌کرد. در این release فقط همین حالت اختیاری fail-closed شده است: اگر quota-mTLS هنوز provision نشده باشد، endpoint حساس quota همچنان با قرارداد بسته 426 در دسترس نیست، اما بقیه API می‌تواند روی HTTPS داخلی Front-door رندر شود. تمام RuntimeErrorهای دیگر بدون تغییر propagate می‌شوند. Tunnel/TP27/VXLAN/Spoof، Xray، accounting، quota dataplane، routing، firewall و credential generation تغییر نکرده‌اند. Source candidate روی SHA immutable 2d4545f337a2f6bb6e9b15505fee904cf629f59c قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.386 removes the final managed API blocker in the TCP/443 front-door flow. Certificate issuance for panel/sub/api succeeds, but the secure API renderer previously aborted the entire HTTPS vhost with quota_mtls_ca_missing when the optional quota-mTLS CA or proxy secret was not provisioned. This release makes only that optional edge fail closed: the sensitive quota endpoint remains unavailable under the existing 426 contract until quota-mTLS is provisioned, while the rest of the API HTTPS vhost can render normally. All other RuntimeErrors continue to propagate unchanged. Tunnel/TP27/VXLAN/Spoof, Xray, accounting, quota dataplane, routing, firewall, and credential generation are unchanged. The candidate source is pinned to immutable SHA 2d4545f337a2f6bb6e9b15505fee904cf629f59c."
+    "fa": "TwinPanel 1.1.0-rc.387 نمایش V2Ray/Xray روی موبایل را تک‌سطحی می‌کند. در نسخه‌های قبلی، V36/V40 و bottom-sheet ثابت V42 می‌توانستند هم‌زمان فعال بمانند و روی موبایل چند سطح گرافیکی هم‌پوشان دیده شود؛ در عین حال V41 بخش server-views را برای V2Ray حذف می‌کرد و سطح باقی‌مانده V38/V44 یا client card لزوماً داخل sheet ثابت به‌صورت قابل‌مشاهده ارائه نمی‌شد. این release V42 را authority واحد نمایش موبایل می‌کند: قبل از باز شدن sheet، پنل‌های فعال قدیمی بسته می‌شوند و برای V2Ray، کارت Multi-Link و client card باقی‌مانده داخل همان sheet صریحاً visible می‌شوند. Tunnel/TP27/VXLAN/Spoof، provisioning، credential generation، accounting، quota، routing، firewall و protocol dataplane تغییر نکرده‌اند. Source candidate روی SHA immutable 1d2bd83c04657ed9b1a676071b8326ffc708969a قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.387 makes V2Ray/Xray mobile presentation single-surface. Previously V36/V40 and the fixed V42 bottom-sheet could remain active at the same time, producing overlapping graphical surfaces on mobile, while V41 removed V2Ray server-views and the surviving V38/V44 Multi-Link or client card was not guaranteed to be visibly presented inside the fixed sheet. This release makes V42 the single mobile presentation authority: stale active panels are retired before opening the sheet, and the surviving V2Ray Multi-Link and client cards are explicitly exposed inside that same sheet. Tunnel/TP27/VXLAN/Spoof, provisioning, credential generation, accounting, quota, routing, firewall, and protocol dataplane are unchanged. The candidate source is pinned to immutable SHA 1d2bd83c04657ed9b1a676071b8326ffc708969a."
   }
 }
