@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 import uuid
 from typing import Any
 
@@ -176,6 +178,103 @@ def _credential_identity(protocol: str, secret: Any) -> str:
     return str(getattr(secret, "username", "") or "")
 
 
+def _tag_token(value: Any, fallback: str) -> str:
+    token = re.sub(r"[^A-Za-z0-9._-]+", "-", str(value or "").strip())
+    token = re.sub(r"-{2,}", "-", token).strip("-._")
+    return token[:48] or fallback
+
+
+def _client_tag_base(node: Node, protocol: str, username: str) -> str:
+    user_token = _tag_token(username, "user")
+    protocol_token = _tag_token(protocol, "protocol")
+    node_token = _tag_token(getattr(node, "name", None), "node")
+    node_id = int(getattr(node, "id", 0) or 0)
+    return f"{user_token}-{protocol_token}-{node_token}-n{node_id}"
+
+
+def _bind_unique_client_tags(
+    item: dict[str, Any],
+    *,
+    node: Node,
+    protocol: str,
+    username: str,
+) -> dict[str, Any]:
+    """Bind client-only sing-box tags to subscription + protocol + node identity.
+
+    Naive and ShadowTLS credentials are shared across the subscription while the
+    delivered config can contain several server items. Static tags such as
+    ``twinpanel-naive`` therefore collide when those items are combined. This
+    helper changes only client metadata/references; endpoint, TLS and secrets are
+    preserved byte-for-byte.
+    """
+
+    protocol = str(protocol or "").strip().lower()
+    if protocol not in SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS:
+        return item
+
+    raw_config = str(item.get("config") or "").strip()
+    try:
+        config = json.loads(raw_config)
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"{protocol} client config is invalid") from exc
+
+    outbounds = config.get("outbounds") if isinstance(config, dict) else None
+    if not isinstance(outbounds, list):
+        raise RuntimeError(f"{protocol} client outbounds are missing")
+
+    base_tag = _client_tag_base(node, protocol, username)
+    route = config.get("route")
+    if not isinstance(route, dict):
+        route = {}
+        config["route"] = route
+
+    if protocol == "naive":
+        candidates = [
+            outbound
+            for outbound in outbounds
+            if isinstance(outbound, dict)
+            and str(outbound.get("type") or "").strip().lower() == "naive"
+        ]
+        if len(candidates) != 1:
+            raise RuntimeError("naive client outbound is ambiguous")
+        candidates[0]["tag"] = base_tag
+        route["final"] = base_tag
+
+        public_outbound = item.get("outbound")
+        if isinstance(public_outbound, dict):
+            public_outbound["tag"] = base_tag
+
+    else:
+        proxies = [
+            outbound
+            for outbound in outbounds
+            if isinstance(outbound, dict)
+            and str(outbound.get("type") or "").strip().lower() == "shadowsocks"
+            and "detour" in outbound
+        ]
+        transports = [
+            outbound
+            for outbound in outbounds
+            if isinstance(outbound, dict)
+            and str(outbound.get("type") or "").strip().lower() == "shadowtls"
+        ]
+        if len(proxies) != 1 or len(transports) != 1:
+            raise RuntimeError("shadowtls client chain is ambiguous")
+
+        transport_tag = f"{base_tag}-transport"
+        proxies[0]["tag"] = base_tag
+        proxies[0]["detour"] = transport_tag
+        transports[0]["tag"] = transport_tag
+        route["final"] = base_tag
+
+        public_outbound = item.get("outbound")
+        if isinstance(public_outbound, dict):
+            public_outbound["tag"] = transport_tag
+
+    item["config"] = json.dumps(config, ensure_ascii=False, indent=2)
+    return item
+
+
 async def _provision_modern_protocol(
     ad: Any,
     db: Session,
@@ -240,6 +339,13 @@ async def _provision_modern_protocol(
                         previous_username,
                     )
                 item = await apply_account(conn, node, secret)
+                if protocol in SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS:
+                    item = _bind_unique_client_tags(
+                        item,
+                        node=node,
+                        protocol=protocol,
+                        username=current_username,
+                    )
             items.append(item)
         except Exception as exc:
             errors.append(
