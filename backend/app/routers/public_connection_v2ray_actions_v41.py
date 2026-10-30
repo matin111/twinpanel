@@ -28,6 +28,23 @@ body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-xray-prof
   gap:9px!important;
   width:100%!important;
 }
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-xray-profiles[data-v41-collapsed="1"]{
+  display:none!important;
+}
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v41-profile-toggle{
+  width:100%!important;
+  min-height:40px!important;
+  margin:8px 0 0!important;
+  padding:0 12px!important;
+  border:1px solid var(--line)!important;
+  border-radius:12px!important;
+  background:var(--surface2)!important;
+  color:var(--text)!important;
+  font:inherit!important;
+  font-size:12px!important;
+  font-weight:850!important;
+  cursor:pointer!important;
+}
 body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-xray-profile{
   display:grid!important;
   gap:8px!important;
@@ -185,6 +202,38 @@ _SCRIPT = r"""
     card.dataset.v41ClientDownload='1';
   }
 
+  function ensureProfileAccordion(view,wrapper,profiles){
+    let toggle=view.querySelector(':scope > .tp-v41-profile-toggle');
+    if(!toggle){
+      toggle=document.createElement('button');
+      toggle.type='button';
+      toggle.className='tp-v41-profile-toggle';
+      wrapper.before(toggle);
+    }
+
+    if(!wrapper.dataset.v41AccordionReady){
+      wrapper.dataset.v41AccordionReady='1';
+      wrapper.dataset.v41Collapsed='1';
+      wrapper.setAttribute('aria-hidden','true');
+    }
+
+    const sync=()=>{
+      const collapsed=wrapper.dataset.v41Collapsed==='1';
+      toggle.textContent=collapsed?'مشاهده کانفیگ‌ها ('+profiles.length+')':'بستن کانفیگ‌ها';
+      toggle.setAttribute('aria-expanded',collapsed?'false':'true');
+      wrapper.setAttribute('aria-hidden',collapsed?'true':'false');
+    };
+
+    if(toggle.dataset.v41Bound!=='1'){
+      toggle.dataset.v41Bound='1';
+      toggle.addEventListener('click',()=>{
+        wrapper.dataset.v41Collapsed=wrapper.dataset.v41Collapsed==='1'?'0':'1';
+        sync();
+      });
+    }
+    sync();
+  }
+
   function simplifyServer(view){
     const row=canonicalRow(view);
     const profiles=profileRows(view);
@@ -193,7 +242,6 @@ _SCRIPT = r"""
       const wrapper=view.querySelector(':scope > .tp-v48-xray-profiles');
       if(wrapper){
         wrapper.removeAttribute('data-v40-retired-actions');
-        wrapper.removeAttribute('aria-hidden');
         wrapper.removeAttribute('hidden');
         wrapper.style.removeProperty('display');
         wrapper.dataset.v41ProfileCount=String(profiles.length);
@@ -201,6 +249,10 @@ _SCRIPT = r"""
 
       profiles.forEach(simplifyProfile);
       retireDirectLegacyActions(view,row,profiles);
+
+      if(wrapper){
+        ensureProfileAccordion(view,wrapper,profiles);
+      }
 
       if(row){
         row.dataset.v41Duplicate='1';
@@ -238,7 +290,7 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_v2ray_actions_v41(source: str) -> str:
-    """Preserve every real Xray profile and keep exactly Karing + Copy Config per profile."""
+    """Preserve every real Xray profile and present profile rows in a collapsed accordion by default."""
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
