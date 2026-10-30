@@ -57,6 +57,7 @@ from .modern_account_delivery_v1 import router as _modern_account_delivery_v1_ro
 from .modern_legacy_reconcile_v1 import router as _modern_legacy_reconcile_v1_router
 from .modern_enforcement_runtime_v1 import router as _modern_enforcement_runtime_v1_router
 from .subscription_protocol_lifecycle_v2 import router as _subscription_protocol_lifecycle_v2_router
+from .subscription_hard_delete_v1 import router as _subscription_hard_delete_v1_router
 from .dns_emergency import router as _dns_emergency_router
 from .dns_emergency_iran import router as _dns_emergency_iran_router
 from .dns_emergency_masterdnsvpn import router as _dns_emergency_masterdnsvpn_router
@@ -97,10 +98,16 @@ from .manual_authority_v193 import router as _manual_authority_v193_router
 # so SubscriptionProtocol can be the final desired-state authority for all 15
 # protocols without rewriting the legacy delivery module.
 #
+# TWINPANEL_SUBSCRIPTION_HARD_DELETE_V1
+# DELETE is mounted on runtime_endpoints, which app.main includes before the
+# legacy subscriptions router. This gives hard-delete precedence without
+# importing subscriptions.py during package initialization.
+#
 # TWINPANEL_MODERN_LEGACY_RECONCILE_V1
 # Old installations may retain empty Modern ProtocolCredential placeholders
 # created before Modern drivers owned their identity. Reconcile only missing or
 # fully empty selected Modern credentials; partial identities fail closed.
+_runtime_endpoints.router.include_router(_subscription_hard_delete_v1_router)
 _runtime_endpoints.router.include_router(_modern_enforcement_runtime_v1_router)
 _runtime_endpoints.router.include_router(_subscription_protocol_lifecycle_v2_router)
 _runtime_endpoints.router.include_router(_modern_account_delivery_v1_router)
