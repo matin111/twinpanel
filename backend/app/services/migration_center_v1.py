@@ -145,11 +145,20 @@ def normalize_record(source: str, record: dict[str, Any], index: int) -> dict[st
     source_id = _first(record, _SOURCE_ID_KEYS)
 
     warnings: list[str] = []
+    blocking_warnings: list[str] = []
+    if not _nonempty(source_id):
+        warnings.append("missing_source_id")
+        blocking_warnings.append("missing_source_id")
     if not _nonempty(username):
         warnings.append("missing_username")
+        blocking_warnings.append("missing_username")
     if not credentials:
         warnings.append("missing_existing_credentials")
+        blocking_warnings.append("missing_existing_credentials")
     if not _nonempty(legacy_url):
+        # Legacy subscription delivery is optional for import. Keep this visible
+        # as a warning, but do not block records that otherwise contain the
+        # identity and credential material required by Phase 2 import.
         warnings.append("missing_legacy_subscription_url")
 
     return {
@@ -163,7 +172,7 @@ def normalize_record(source: str, record: dict[str, Any], index: int) -> dict[st
             "credentials": "preserve_existing" if credentials else "not_present",
             "subscription_url": "preserve_existing" if _nonempty(legacy_url) else "not_present",
         },
-        "ready_for_future_import": not warnings,
+        "ready_for_future_import": not blocking_warnings,
         "warnings": warnings,
     }
 
@@ -188,6 +197,7 @@ def dry_run_migration(source: str, records: list[dict[str, Any]]) -> dict[str, A
         for index, record in enumerate(expanded)
     ]
     ready = sum(1 for item in normalized if item["ready_for_future_import"])
+    warning_records = sum(1 for item in normalized if item["warnings"])
 
     return {
         "dry_run": True,
@@ -197,7 +207,7 @@ def dry_run_migration(source: str, records: list[dict[str, Any]]) -> dict[str, A
             "input_records": len(records),
             "expanded_records": len(normalized),
             "ready_records": ready,
-            "warning_records": len(normalized) - ready,
+            "warning_records": warning_records,
         },
         "records": normalized,
     }
