@@ -82,13 +82,16 @@ jobs:
         working-directory: backend
         run: |
           python - <<'PY'
+          import asyncio
+
           from fastapi import HTTPException
           from sqlalchemy import inspect, text
 
           from app.main import app
           from app.database import SessionLocal, engine
-          from app.models import Plan, Subscription, SubscriptionProtocol, User
+          from app.models import Plan, ProtocolCredential, Subscription, SubscriptionProtocol, User
           from app.protocol_account_registry import ALL_PROTOCOL_KEYS
+          from app.routers import modern_account_delivery_v1
           from app.routers.subscription_admin_v2 import AdminSubscriptionCreateV2, admin_create_v2
           from app.security import hash_password
 
@@ -96,6 +99,40 @@ jobs:
           assert len(ALL_PROTOCOL_KEYS) == 15
           assert Subscription.__table__.c.plan_id.nullable is True
           assert inspect(engine).get_columns('subscriptions')
+
+          async def fake_provision_account_v1(subscription_id: int, db):
+              protocols = [
+                  row[0]
+                  for row in db.query(SubscriptionProtocol.protocol)
+                  .filter(SubscriptionProtocol.subscription_id == subscription_id)
+                  .all()
+              ]
+              for protocol in protocols:
+                  cred = (
+                      db.query(ProtocolCredential)
+                      .filter(
+                          ProtocolCredential.subscription_id == subscription_id,
+                          ProtocolCredential.protocol == protocol,
+                      )
+                      .first()
+                  )
+                  if cred is None:
+                      cred = ProtocolCredential(
+                          subscription_id=subscription_id,
+                          protocol=protocol,
+                      )
+                      db.add(cred)
+                  cred.username = cred.username or f'ci-{subscription_id}-{protocol}'
+                  cred.config_text_encrypted = f'ci-config-{subscription_id}-{protocol}'
+                  cred.is_active = True
+              db.commit()
+              return {
+                  'ok': True,
+                  'errors': [],
+                  'quota': {'ok': True, 'nodes': []},
+              }
+
+          modern_account_delivery_v1.provision_account_v1 = fake_provision_account_v1
 
           db = SessionLocal()
           try:
@@ -125,7 +162,7 @@ jobs:
 
           db = SessionLocal()
           try:
-              manual = admin_create_v2(
+              manual = asyncio.run(admin_create_v2(
                   AdminSubscriptionCreateV2(
                       user_id=user_id,
                       plan_id=None,
@@ -135,8 +172,9 @@ jobs:
                       protocols=['cisco','sudoku'],
                   ),
                   db,
-              )
+              ))
               assert manual['plan_id'] is None
+              assert manual['provisioning']['ok'] is True
               manual_id=int(manual['id'])
           finally:
               db.close()
@@ -146,39 +184,43 @@ jobs:
               manual_protocols=[row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==manual_id).order_by(SubscriptionProtocol.protocol).all()]
               assert manual_protocols == ['cisco','sudoku']
 
-              all_protocols = admin_create_v2(
+              all_protocols = asyncio.run(admin_create_v2(
                   AdminSubscriptionCreateV2(
                       user_id=user_id,
                       plan_id=plan_id,
                       protocols=list(ALL_PROTOCOL_KEYS),
                   ),
                   db,
-              )
+              ))
+              assert all_protocols['provisioning']['ok'] is True
               all_id=int(all_protocols['id'])
               stored={row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==all_id).all()}
               assert stored == set(ALL_PROTOCOL_KEYS)
+              provisioned={row[0] for row in db.query(ProtocolCredential.protocol).filter(ProtocolCredential.subscription_id==all_id, ProtocolCredential.is_active.is_(True)).all()}
+              assert provisioned == set(ALL_PROTOCOL_KEYS)
 
-              explicit = admin_create_v2(
+              explicit = asyncio.run(admin_create_v2(
                   AdminSubscriptionCreateV2(
                       user_id=user_id,
                       plan_id=plan_id,
                       protocols=['wireguard','hysteria2'],
                   ),
                   db,
-              )
+              ))
+              assert explicit['provisioning']['ok'] is True
               explicit_id=int(explicit['id'])
               explicit_protocols={row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==explicit_id).all()}
               assert explicit_protocols == {'wireguard','hysteria2'}
 
               try:
-                  admin_create_v2(
+                  asyncio.run(admin_create_v2(
                       AdminSubscriptionCreateV2(
                           user_id=user_id,
                           plan_id=plan_id,
                           protocols=[],
                       ),
                       db,
-                  )
+                  ))
               except HTTPException as exc:
                   assert exc.status_code == 422
               else:
