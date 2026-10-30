@@ -30,22 +30,8 @@ body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-xray-prof
   gap:9px!important;
   width:100%!important;
 }
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-xray-profiles[data-v41-collapsed="1"]{
-  display:none!important;
-}
 body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v41-profile-toggle{
-  width:100%!important;
-  min-height:40px!important;
-  margin:8px 0 0!important;
-  padding:0 12px!important;
-  border:1px solid var(--line)!important;
-  border-radius:12px!important;
-  background:var(--surface2)!important;
-  color:var(--text)!important;
-  font:inherit!important;
-  font-size:12px!important;
-  font-weight:850!important;
-  cursor:pointer!important;
+  display:none!important;
 }
 body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-xray-profile{
   display:grid!important;
@@ -242,36 +228,12 @@ _SCRIPT = r"""
     }
   }
 
-  function ensureProfileAccordion(view,wrapper,profiles){
-    let toggle=view.querySelector(':scope > .tp-v41-profile-toggle');
-    if(!toggle){
-      toggle=document.createElement('button');
-      toggle.type='button';
-      toggle.className='tp-v41-profile-toggle';
-      wrapper.before(toggle);
-    }
-
-    if(!wrapper.dataset.v41AccordionReady){
-      wrapper.dataset.v41AccordionReady='1';
-      wrapper.dataset.v41Collapsed='1';
-      wrapper.setAttribute('aria-hidden','true');
-    }
-
-    const sync=()=>{
-      const collapsed=wrapper.dataset.v41Collapsed==='1';
-      toggle.textContent=collapsed?'مشاهده کانفیگ‌ها ('+profiles.length+')':'بستن کانفیگ‌ها';
-      toggle.setAttribute('aria-expanded',collapsed?'false':'true');
-      wrapper.setAttribute('aria-hidden',collapsed?'true':'false');
-    };
-
-    if(toggle.dataset.v41Bound!=='1'){
-      toggle.dataset.v41Bound='1';
-      toggle.addEventListener('click',()=>{
-        wrapper.dataset.v41Collapsed=wrapper.dataset.v41Collapsed==='1'?'0':'1';
-        sync();
-      });
-    }
-    sync();
+  function useOuterConfigToggle(view,wrapper){
+    const duplicate=view.querySelector(':scope > .tp-v41-profile-toggle');
+    if(duplicate)duplicate.remove();
+    wrapper.removeAttribute('data-v41-collapsed');
+    wrapper.removeAttribute('data-v41-accordion-ready');
+    wrapper.removeAttribute('aria-hidden');
   }
 
   function simplifyServer(view){
@@ -291,7 +253,7 @@ _SCRIPT = r"""
       retireDirectLegacyActions(view,row,profiles);
 
       if(wrapper){
-        ensureProfileAccordion(view,wrapper,profiles);
+        useOuterConfigToggle(view,wrapper);
       }
 
       if(row){
@@ -330,7 +292,7 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_v2ray_actions_v41(source: str) -> str:
-    """Preserve real Xray profiles, collapse them by default, and show one device-appropriate V2Ray client."""
+    """Preserve real Xray profiles under the existing outer config toggle and show one device-appropriate V2Ray client."""
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
