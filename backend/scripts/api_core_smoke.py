@@ -50,6 +50,46 @@ def request(
         ) from exc
 
 
+def request_error(
+    method: str,
+    path: str,
+    *,
+    expected_status: int,
+    token: str | None = None,
+    payload: dict[str, Any] | None = None,
+) -> Any:
+    headers = {"Accept": "application/json"}
+    data = None
+
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+
+    if payload is not None:
+        headers["Content-Type"] = "application/json"
+        data = json.dumps(payload).encode("utf-8")
+
+    req = urllib.request.Request(
+        BASE + path,
+        data=data,
+        headers=headers,
+        method=method,
+    )
+
+    try:
+        urllib.request.urlopen(req, timeout=15)
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        if exc.code != expected_status:
+            raise RuntimeError(
+                f"{method} {path} -> HTTP {exc.code}, expected {expected_status}: {body[:1600]}"
+            ) from exc
+        return json.loads(body) if body else None
+
+    raise RuntimeError(
+        f"{method} {path} unexpectedly succeeded; expected HTTP {expected_status}"
+    )
+
+
 def main() -> int:
     ready = request("GET", "/health/ready")
     assert ready["ok"] is True, ready
@@ -164,11 +204,14 @@ def main() -> int:
     }
     assert names == {"mtunnel", "backhaul", "ssh_tun"}, transports
 
-    # V2 is the admin-panel contract. Deliberately omit traffic, duration and
-    # device limit so the API itself must apply the selected plan defaults.
-    subscription = request(
+    # This generic API smoke intentionally creates DB-only placeholder nodes with
+    # documentation IPs and no protocol runtime/SSH access. V2 creation must now
+    # fail closed instead of reporting a false ACTIVE subscription. The dedicated
+    # subscription-creation workflow covers the successful provisioned path.
+    failed_create = request_error(
         "POST",
         "/v1/subscriptions/admin-create-v2",
+        expected_status=502,
         token=token,
         payload={
             "user_id": user_id,
@@ -183,22 +226,9 @@ def main() -> int:
             ],
         },
     )
-    subscription_id = int(subscription["id"])
-    assert subscription["status"] == "active", subscription
-    assert set(subscription["node_ids"]) >= {iran_id, exit_id}, subscription
-    assert set(subscription["protocols"]) == {
-        "cisco",
-        "openvpn",
-        "wireguard",
-        "l2tp",
-        "v2ray",
-    }, subscription
-    assert round(float(subscription["traffic_limit_gb"]), 2) == 20.0, subscription
-    assert int(subscription["activation_duration_days"]) == 30, subscription
-    assert int(subscription["device_limit"]) == 2, subscription
-    assert subscription["device_limit_source"] == "subscription", subscription
-    assert subscription["traffic_unlimited"] is False, subscription
-    assert subscription["duration_unlimited"] is False, subscription
+    detail = failed_create.get("detail") or {}
+    assert "Provisioning" in str(detail.get("message") or ""), failed_create
+    subscription_id = int(detail["subscription_id"])
 
     subscriptions_v2 = request(
         "GET",
@@ -214,10 +244,24 @@ def main() -> int:
         None,
     )
     assert listed is not None, subscriptions_v2
-    assert int(listed["device_limit"]) == 2, listed
+    assert listed["status"] == "suspended", listed
+    assert set(listed["node_ids"]) >= {iran_id, exit_id}, listed
+    assert set(listed["protocols"]) == {
+        "cisco",
+        "openvpn",
+        "wireguard",
+        "l2tp",
+        "v2ray",
+    }, listed
+    assert round(float(listed["traffic_limit_gb"]), 2) == 20.0, listed
     assert int(listed["activation_duration_days"]) == 30, listed
+    assert int(listed["device_limit"]) == 2, listed
+    assert listed["device_limit_source"] == "subscription", listed
+    assert listed["traffic_unlimited"] is False, listed
+    assert listed["duration_unlimited"] is False, listed
 
-    # Keep the legacy endpoint available for older customers/upgrades.
+    # Keep the legacy endpoint available for older customers/upgrades and ensure
+    # the failed V2 desired-state remains auditable rather than disappearing.
     subscriptions = request("GET", "/v1/subscriptions", token=token)
     assert any(int(item["id"]) == subscription_id for item in subscriptions), subscriptions
 
@@ -229,6 +273,7 @@ def main() -> int:
         f"exit={exit_id}",
         f"tunnel={tunnel_id}",
         f"subscription={subscription_id}",
+        "subscription_create=fail_closed_without_runtime",
         f"api_base={api_base}",
     )
     return 0
