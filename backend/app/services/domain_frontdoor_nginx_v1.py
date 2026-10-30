@@ -46,6 +46,34 @@ def _acme_location() -> str:
 """
 
 
+def _service_locations_frontdoor(
+    kind: str,
+    host: str,
+    port: int,
+    secure: bool,
+) -> str:
+    """Keep API HTTPS available while an optional quota-mTLS edge is absent.
+
+    The fallback deliberately reuses the non-secure API location contract,
+    where quota identity requests are rejected with 426. This keeps the
+    sensitive route fail-closed without blocking unrelated HTTPS API routes.
+    """
+    try:
+        return _service_locations(kind, host, port, secure)
+    except RuntimeError as exc:
+        # TWINPANEL_API_HTTPS_QUOTA_FAIL_CLOSED_V1
+        if (
+            kind == "api"
+            and secure
+            and str(exc) in {
+                "quota_mtls_ca_missing",
+                "quota_mtls_proxy_secret_missing",
+            }
+        ):
+            return _service_locations(kind, host, port, False)
+        raise
+
+
 def _write_with_rollback(path: Path, content: str, mode: int) -> tuple[str | None, int | None]:
     old_content = None
     old_mode = None
@@ -168,7 +196,7 @@ def create_nginx_config(
     kind = _domain_type_key(domain_type, port)
     cert = _certificate(domain)
     secure = cert is not None
-    locations = _service_locations(kind, host, port, secure)
+    locations = _service_locations_frontdoor(kind, host, port, secure)
     acme = _acme_location()
 
     if secure:
