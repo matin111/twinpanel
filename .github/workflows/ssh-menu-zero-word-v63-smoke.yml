@@ -19,7 +19,7 @@ jobs:
           bash -n scripts/twinpanel-menu.sh
           python3 -m py_compile backend/scripts/twinpanel_protocol_cli_en.py
 
-      - name: Verify one-key numeric terminal UX
+      - name: Verify one-key letter terminal UX
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -33,9 +33,17 @@ jobs:
           assert '[y/N]' not in shell
           assert 'confirm_action "Install the latest TwinPanel update?"' in shell
           assert 'header "Administrator"' in shell
-          assert 'echo "  [1] Account info"' in shell
-          assert 'echo "  [2] Reset password"' in shell
-          assert 'echo "  [3] Edit account"' in shell
+          assert "0) printf 'X'" in shell
+          assert "1) printf 'A'" in shell
+          assert "8) printf 'H'" in shell
+          assert '[Aa]) CHOICE=1' in shell
+          assert '[Hh]) CHOICE=8' in shell
+          assert '[Xx]) CHOICE=0' in shell
+          assert 'menu_item 1 "Account info"' in shell
+          assert 'menu_item 2 "Reset password"' in shell
+          assert 'menu_item 3 "Edit account"' in shell
+          assert 'menu_back' in shell
+          assert 'Use the menu letters only.' in shell
           assert 'header "Protocol management"' in shell
           assert 'echo "Available protocols:"' not in shell
 
