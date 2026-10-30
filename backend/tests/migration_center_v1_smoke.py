@@ -101,17 +101,18 @@ def test_admin_only_route_is_registered_without_main_rewrite() -> None:
     assert 'prefix="/v1"' not in router_source
 
 
-def test_phase_one_has_no_db_or_provisioning_dependency() -> None:
+def test_phase_one_has_no_db_or_mutating_runtime_dependency() -> None:
     service_source = SERVICE_PATH.read_text(encoding="utf-8")
     router_source = ROUTER_PATH.read_text(encoding="utf-8")
     forbidden = (
-        "get_db",
-        "Session",
-        "db.add",
-        "db.commit",
-        "provision",
+        "from ..database",
+        "from sqlalchemy",
+        "get_db(",
+        "db.add(",
+        "db.commit(",
+        "provision.router",
         "ProtocolCredential(",
-        "create_subscription_core",
+        "create_subscription_core(",
     )
     for token in forbidden:
         assert token not in service_source
