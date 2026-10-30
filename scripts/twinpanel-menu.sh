@@ -21,6 +21,7 @@ if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
   C_YELLOW='\033[1;33m'
   C_RED='\033[1;31m'
   C_WHITE='\033[1;37m'
+  C_WHITE_BG='\033[107m'
   C_DIM='\033[2m'
   C_RESET='\033[0m'
 else
@@ -32,6 +33,7 @@ else
   C_YELLOW=''
   C_RED=''
   C_WHITE=''
+  C_WHITE_BG=''
   C_DIM=''
   C_RESET=''
 fi
@@ -67,27 +69,35 @@ state_badge(){
 }
 
 brand_row(){
+  local glyph cell i
   printf '  '
-  printf '%b%-7s%b  ' "$C_MAGENTA" "$1" "$C_RESET"
-  printf '%b%-7s%b  ' "$C_PURPLE" "$2" "$C_RESET"
-  printf '%b%-7s%b  ' "$C_BLUE" "$3" "$C_RESET"
-  printf '%b%-7s%b  ' "$C_CYAN" "$4" "$C_RESET"
-  printf '%b%-7s%b  ' "$C_CYAN" "$5" "$C_RESET"
-  printf '%b%-7s%b  ' "$C_BLUE" "$6" "$C_RESET"
-  printf '%b%-7s%b  ' "$C_PURPLE" "$7" "$C_RESET"
-  printf '%b%-7s%b  ' "$C_MAGENTA" "$8" "$C_RESET"
-  printf '%b%-7s%b\n' "$C_MAGENTA" "$9" "$C_RESET"
+  for glyph in "$@"; do
+    for ((i=0; i<${#glyph}; i++)); do
+      cell="${glyph:i:1}"
+      if [[ "$cell" == "1" ]]; then
+        if [[ -n "$C_WHITE_BG" ]]; then
+          printf '%b  %b' "$C_WHITE_BG" "$C_RESET"
+        else
+          printf '##'
+        fi
+      else
+        printf '  '
+      fi
+    done
+    printf '  '
+  done
+  printf '\n'
 }
 
 brand(){
   printf '\n'
-  brand_row '#######' '##   ##' '#######' '##   ##' '###### ' ' ##### ' '##   ##' '#######' '##     '
-  brand_row '  ###  ' '##   ##' '  ###  ' '###  ##' '##   ##' '##   ##' '###  ##' '##     ' '##     '
-  brand_row '  ###  ' '##   ##' '  ###  ' '#### ##' '##   ##' '##   ##' '#### ##' '##     ' '##     '
-  brand_row '  ###  ' '## # ##' '  ###  ' '## ####' '###### ' '#######' '## ####' '###### ' '##     '
-  brand_row '  ###  ' '#######' '  ###  ' '##  ###' '##     ' '##   ##' '##  ###' '##     ' '##     '
-  brand_row '  ###  ' '### ###' '  ###  ' '##   ##' '##     ' '##   ##' '##   ##' '##     ' '##     '
-  brand_row '  ###  ' '##   ##' '#######' '##   ##' '##     ' '##   ##' '##   ##' '#######' '#######'
+  brand_row '1111111' '11   11' '1111111' '11   11' '111111 ' ' 11111 ' '11   11' '1111111' '11     '
+  brand_row '  111  ' '11   11' '  111  ' '111  11' '11   11' '11   11' '111  11' '11     ' '11     '
+  brand_row '  111  ' '11   11' '  111  ' '1111 11' '11   11' '11   11' '1111 11' '11     ' '11     '
+  brand_row '  111  ' '11 1 11' '  111  ' '11 1111' '111111 ' '1111111' '11 1111' '111111 ' '11     '
+  brand_row '  111  ' '1111111' '  111  ' '11  111' '11     ' '11   11' '11  111' '11     ' '11     '
+  brand_row '  111  ' '111 111' '  111  ' '11   11' '11     ' '11   11' '11   11' '11     ' '11     '
+  brand_row '  111  ' '11   11' '1111111' '11   11' '11     ' '11   11' '11   11' '1111111' '1111111'
   printf '\n'
 }
 
