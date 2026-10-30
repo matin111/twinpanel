@@ -1,0 +1,57 @@
+name: Subscription Hard Delete V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/subscription_hard_delete_v1.py'
+      - 'backend/app/routers/__init__.py'
+      - 'backend/app/quota_models.py'
+      - 'backend/app/subscription_enforcement.py'
+      - '.github/workflows/subscription-hard-delete-v1-smoke.yml'
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify standalone hard-delete contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('backend/app/routers/subscription_hard_delete_v1.py').read_text()
+          init = Path('backend/app/routers/__init__.py').read_text()
+          quota = Path('backend/app/quota_models.py').read_text()
+
+          required = [
+              'TWINPANEL_SUBSCRIPTION_HARD_DELETE_V1',
+              'queue_subscription_enforcement(',
+              'reason="subscription_hard_deleted"',
+              'db.query(QuotaUsageEvent)',
+              'db.query(QuotaSession)',
+              'db.query(QuotaCursor)',
+              'db.query(QuotaDevice)',
+              'db.query(ProtocolCredential)',
+              'db.query(SubscriptionProtocol)',
+              'db.query(SubscriptionNode)',
+              'db.delete(sub)',
+              '"deleted": True',
+              '"status": "deleted"',
+          ]
+          for marker in required:
+              assert marker in source, marker
+
+          assert 'ForeignKey("subscriptions.id", ondelete="RESTRICT")' in quota
+          assert source.index('db.query(QuotaUsageEvent)') < source.index('db.query(QuotaSession)')
+          assert source.index('db.query(QuotaSession)') < source.index('db.query(QuotaDevice)')
+          assert source.index('db.query(QuotaDevice)') < source.index('db.delete(sub)')
+
+          assert 'from .subscription_hard_delete_v1 import router as _subscription_hard_delete_v1_router' in init
+          assert '_runtime_endpoints.router.include_router(_subscription_hard_delete_v1_router)' in init
+          assert 'from . import subscriptions as subscriptions_module' not in source
+
+          assert '"archived": True' not in source
+          assert 'sub.status = SubscriptionStatus.CANCELED' not in source
+
+          print('SUBSCRIPTION_HARD_DELETE_V1_OK')
+          PY
