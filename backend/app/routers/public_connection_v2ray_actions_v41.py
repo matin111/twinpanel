@@ -22,6 +22,9 @@ body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .v34-client-card{
   visibility:visible!important;
   opacity:1!important;
 }
+body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .v38-server-list-title{
+  display:none!important;
+}
 body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-xray-profiles{
   display:grid!important;
   gap:9px!important;
@@ -226,7 +229,9 @@ _SCRIPT = r"""
     card.dataset.v41ClientDownload='1';
     card.dataset.v41V2rayClient=client.name;
 
-    const link=card.querySelector('a');
+    const links=[...card.querySelectorAll('a')];
+    const link=links[0]||null;
+    links.slice(1).forEach(node=>node.remove());
     if(link){
       link.href=client.url;
       link.target='_blank';
@@ -325,7 +330,7 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_v2ray_actions_v41(source: str) -> str:
-    """Preserve real Xray profiles, collapse them by default, and show the right V2Ray client per device."""
+    """Preserve real Xray profiles, collapse them by default, and show one device-appropriate V2Ray client."""
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
