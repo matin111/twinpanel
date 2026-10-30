@@ -18,6 +18,7 @@ from ..models import (
     Subscription,
     User,
 )
+from ..services.provisioning_guard import SubscriptionProvisioningGuard
 
 
 router = APIRouter(dependencies=[Depends(require_admin)])
@@ -422,10 +423,9 @@ async def _provision_classic_protocol(
     return items, errors
 
 
-@router.post("/v1/subscriptions/{subscription_id}/provision-account")
-async def provision_account_v1(
+async def _provision_account_v1_locked(
     subscription_id: int,
-    db: Session = Depends(get_db),
+    db: Session,
 ):
     """Canonical account provisioning bridge for all 15 protocols.
 
@@ -552,3 +552,25 @@ async def provision_account_v1(
         }
     )
     return payload
+
+
+@router.post("/v1/subscriptions/{subscription_id}/provision-account")
+async def provision_account_v1(
+    subscription_id: int,
+    db: Session = Depends(get_db),
+):
+    guard = SubscriptionProvisioningGuard(subscription_id)
+    if not guard.acquire():
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "subscription_provisioning_in_progress",
+                "message": "Provisioning این اشتراک در حال اجراست؛ درخواست تکراری رد شد",
+                "subscription_id": subscription_id,
+            },
+        )
+
+    try:
+        return await _provision_account_v1_locked(subscription_id, db)
+    finally:
+        guard.release()
