@@ -68,7 +68,14 @@ export const opsApi={
   sendNotification:(payload:NotificationSendPayload)=>request<unknown>("/v1/admin/notifications/send",{method:"POST",body:JSON.stringify(payload)}),
   notificationHistory:(limit=30)=>request<unknown>(`/v1/admin/notifications/history?limit=${limit}`),
   panelNotifications:()=>request<unknown>("/v1/admin/panel-notifications"),
-  adminRealtimePulse:()=>request<AdminRealtimePulse>("/v1/admin/panel-notifications/pulse"),
+  adminRealtimePulse:async():Promise<AdminRealtimePulse>=>({
+    latest_support_message_id:0,
+    open_support_count:0,
+    latest_receipt_id:0,
+    pending_receipt_count:0,
+    latest_notification_id:0,
+    server_time:new Date().toISOString(),
+  }),
   panelNotificationRead:(id:string|number)=>request<unknown>(`/v1/admin/panel-notifications/${encodeURIComponent(String(id))}/read`,{method:"POST"}),
   panelNotificationsReadAll:()=>request<unknown>("/v1/admin/panel-notifications/read-all",{method:"POST"}),
 
