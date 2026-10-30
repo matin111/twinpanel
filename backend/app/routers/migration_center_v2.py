@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import require_admin
+from ..migration_import_models import MigrationImportRecord
+from ..models import Subscription
 from ..services.migration_import_v2 import import_record, legacy_payload
 
 
@@ -38,6 +40,37 @@ class MigrationImportIn(BaseModel):
     starts_at: datetime | None = None
     expires_at: datetime | None = None
     activation_duration_days: int | None = Field(default=None, ge=1, le=3650)
+
+
+@admin_router.get("/imports")
+def migration_import_history(db: Session = Depends(get_db)):
+    markers = (
+        db.query(MigrationImportRecord)
+        .order_by(MigrationImportRecord.created_at.desc(), MigrationImportRecord.id.desc())
+        .limit(500)
+        .all()
+    )
+    items: list[dict[str, Any]] = []
+    for marker in markers:
+        sub = db.get(Subscription, marker.subscription_id)
+        items.append(
+            {
+                "id": marker.id,
+                "source": marker.source,
+                "source_id": marker.source_id,
+                "subscription_id": marker.subscription_id,
+                "user_id": sub.user_id if sub else None,
+                "account_username": sub.account_username if sub else None,
+                "subscription_status": (
+                    getattr(sub.status, "value", str(sub.status)) if sub else "missing"
+                ),
+                "legacy_url": marker.legacy_url,
+                "legacy_token": marker.legacy_token,
+                "status": marker.status,
+                "created_at": marker.created_at.isoformat() if marker.created_at else None,
+            }
+        )
+    return {"count": len(items), "items": items}
 
 
 @admin_router.post("/import")
