@@ -16,6 +16,7 @@ from .ssl_manager import (
 FRONTDOOR_MARKER = Path("/etc/twinpanel/domain-frontdoor-v1")
 ACME_ROOT = Path("/var/lib/twinpanel/acme")
 INTERNAL_HTTPS_LISTEN = "127.0.0.1:9443"
+STREAM_MAP_BUILDER = Path("/usr/local/sbin/twinpanel-domain-stream-map")
 
 
 def frontdoor_enabled() -> bool:
@@ -54,6 +55,22 @@ def _write_with_rollback(path: Path, content: str, mode: int) -> tuple[str | Non
     path.write_text(content, encoding="utf-8")
     os.chmod(path, mode)
     return old_content, old_mode
+
+
+def _refresh_frontdoor_map() -> None:
+    if not frontdoor_enabled() or not STREAM_MAP_BUILDER.is_file():
+        return
+    result = subprocess.run(
+        [str(STREAM_MAP_BUILDER)],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            (result.stderr or result.stdout or "frontdoor_map_refresh_failed").strip()
+        )
 
 
 def create_nginx_config(
@@ -131,6 +148,25 @@ server {{
 
     if not enabled_existed:
         enabled.symlink_to(path)
+
+    try:
+        _refresh_frontdoor_map()
+    except Exception:
+        if old_content is None:
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
+        else:
+            path.write_text(old_content, encoding="utf-8")
+            if old_mode is not None:
+                os.chmod(path, old_mode)
+        if not enabled_existed:
+            try:
+                enabled.unlink()
+            except FileNotFoundError:
+                pass
+        raise
 
     test = subprocess.run(
         ["nginx", "-t"],
