@@ -1,0 +1,35 @@
+name: Temporary terminal install menu patch
+
+on:
+  push:
+    branches:
+      - fix/terminal-install-reinstall-menu-v2
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply guarded patch
+        run: python3 .github/tmp_patch_terminal_install_menu.py
+
+      - name: Validate shell syntax
+        run: bash -n scripts/twinpanel-menu.sh
+
+      - name: Run regression smoke
+        run: python3 scripts/terminal_install_reinstall_menu_smoke.py
+
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(cli): add install reinstall action to terminal menu"
+          git push origin HEAD:fix/terminal-install-reinstall-menu-v2
