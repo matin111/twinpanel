@@ -16,27 +16,33 @@ jobs:
       - name: Verify bounded PostgreSQL lock waits
         run: |
           python3 - <<'PY'
-          import ast
           from pathlib import Path
 
-          path = Path('backend/app/database.py')
-          source = path.read_text()
-          tree = ast.parse(source)
+          source = Path('backend/app/database.py').read_text()
+          assert 'TWINPANEL_API_DB_LOCK_TIMEOUT_V2' in source
+          assert 'lock_timeout=3000' in source
+          assert 'postgresql://' in source
+          assert 'postgresql+psycopg2://' in source
+          assert 'else {}' in source
+          assert 'connect_args=_DATABASE_CONNECT_ARGS' in source
+          print('PostgreSQL-scoped API DB lock timeout contract OK')
+          PY
 
-          calls = [
-              node for node in ast.walk(tree)
-              if isinstance(node, ast.Call)
-              and isinstance(node.func, ast.Name)
-              and node.func.id == 'create_engine'
-          ]
-          assert len(calls) == 1, f'expected one create_engine call, got {len(calls)}'
-
-          kwargs = {kw.arg: kw.value for kw in calls[0].keywords if kw.arg}
-          assert 'connect_args' in kwargs, 'create_engine connect_args missing'
-          value = ast.literal_eval(kwargs['connect_args'])
-          assert value == {'options': '-c lock_timeout=3000'}, value
-          assert 'TWINPANEL_API_DB_LOCK_TIMEOUT_V1' in source
-          print('API DB lock timeout contract OK')
+      - name: Verify SQLite compatibility
+        env:
+          APP_NAME: TwinPanel-DB-Lock-CI
+          APP_ENV: test
+          APP_SECRET_KEY: db-lock-ci-secret-db-lock-ci-secret
+          DATABASE_URL: sqlite:////tmp/twinpanel-db-lock-ci.db
+          REDIS_URL: redis://127.0.0.1:6379/15
+          NODE_AGENT_SHARED_SECRET: db-lock-ci-node-secret-db-lock-ci-node-secret
+        run: |
+          PYTHONPATH=backend python3 - <<'PY'
+          from app.database import engine
+          assert engine.dialect.name == 'sqlite'
+          with engine.connect() as conn:
+              assert conn.exec_driver_sql('SELECT 1').scalar() == 1
+          print('SQLite compatibility OK')
           PY
 
       - name: Compile database module
