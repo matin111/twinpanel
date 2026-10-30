@@ -31,6 +31,25 @@ def test_marzban_preserves_existing_material() -> None:
     assert row["ready_for_future_import"] is True
 
 
+def test_marzban_preserves_quota_usage_and_expiry() -> None:
+    report = module.dry_run_migration(
+        "marzban",
+        [
+            {
+                "username": "alice-state",
+                "password": "existing-secret",
+                "data_limit": 50_000_000_000,
+                "used_traffic": 12_345_678,
+                "expire": 1_767_225_600,
+            }
+        ],
+    )
+    row = report["records"][0]
+    assert row["traffic_limit_bytes"] == 50_000_000_000
+    assert row["traffic_used_bytes"] == 12_345_678
+    assert row["expires_at"] == "2026-01-01T00:00:00Z"
+
+
 def test_sanaei_expands_clients_and_preserves_uuid() -> None:
     client_uuid = "11111111-2222-3333-4444-555555555555"
     legacy_url = "https://legacy.example/s/sanaei-client"
@@ -55,6 +74,86 @@ def test_sanaei_expands_clients_and_preserves_uuid() -> None:
     assert row["credentials"]["uuid"] == client_uuid
     assert row["legacy_subscription_url"] == legacy_url
     assert row["username"] == "sanaei-client"
+
+
+def test_sanaei_matches_client_stats_and_preserves_account_state() -> None:
+    client_uuid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+    settings = json.dumps(
+        {
+            "clients": [
+                {
+                    "id": client_uuid,
+                    "email": "sanaei-state",
+                    "totalGB": 25_000_000_000,
+                    "expiryTime": 1_767_225_600_000,
+                }
+            ]
+        }
+    )
+    report = module.dry_run_migration(
+        "sanaei",
+        [
+            {
+                "id": 88,
+                "settings": settings,
+                "clientStats": [
+                    {"email": "sanaei-state", "up": 2_000_000, "down": 7_000_000}
+                ],
+            }
+        ],
+    )
+    row = report["records"][0]
+    assert row["traffic_limit_bytes"] == 25_000_000_000
+    assert row["traffic_used_bytes"] == 9_000_000
+    assert row["expires_at"] == "2026-01-01T00:00:00Z"
+
+
+def test_zero_state_is_not_confused_with_missing_state() -> None:
+    zero_report = module.dry_run_migration(
+        "sanaei",
+        [
+            {
+                "id": "bbbbbbbb-cccc-dddd-eeee-ffffffffffff",
+                "email": "zero-state",
+                "totalGB": 0,
+                "up": 0,
+                "down": 0,
+                "expiryTime": 0,
+            }
+        ],
+    )
+    zero = zero_report["records"][0]
+    assert "traffic_limit_bytes" in zero and zero["traffic_limit_bytes"] == 0
+    assert "traffic_used_bytes" in zero and zero["traffic_used_bytes"] == 0
+    assert "expires_at" in zero and zero["expires_at"] is None
+
+    missing_report = module.dry_run_migration(
+        "sanaei",
+        [{"id": "cccccccc-dddd-eeee-ffff-000000000000", "email": "missing-state"}],
+    )
+    missing = missing_report["records"][0]
+    assert "traffic_limit_bytes" not in missing
+    assert "traffic_used_bytes" not in missing
+    assert "expires_at" not in missing
+
+
+def test_normalized_state_survives_phase_two_round_trip() -> None:
+    original = module.dry_run_migration(
+        "marzban",
+        [
+            {
+                "username": "round-trip",
+                "password": "existing-secret",
+                "data_limit": 0,
+                "used_traffic": 987,
+                "expire": 0,
+            }
+        ],
+    )["records"][0]
+    normalized_again = module.normalize_record("marzban", original, 0)
+    assert normalized_again["traffic_limit_bytes"] == 0
+    assert normalized_again["traffic_used_bytes"] == 987
+    assert "expires_at" in normalized_again and normalized_again["expires_at"] is None
 
 
 def test_pasargad_preserves_password_and_url() -> None:
@@ -84,6 +183,22 @@ def test_missing_legacy_url_warns_without_blocking_import() -> None:
     assert "missing_legacy_subscription_url" in row["warnings"]
     assert report["summary"]["ready_records"] == 1
     assert report["summary"]["warning_records"] == 1
+
+
+def test_negative_sanaei_expiry_is_not_guessed() -> None:
+    report = module.dry_run_migration(
+        "sanaei",
+        [
+            {
+                "id": "dddddddd-eeee-ffff-0000-111111111111",
+                "email": "first-use-unknown",
+                "expiryTime": -86_400_000,
+            }
+        ],
+    )
+    row = report["records"][0]
+    assert "expires_at" not in row
+    assert "unsupported_negative_expiryTime" in row["warnings"]
 
 
 def test_missing_required_material_still_blocks_import() -> None:
