@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.377",
+  "version": "1.1.0-rc.378",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-30T02:54:04Z",
+  "released_at": "2026-10-30T02:59:55Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "ef1bfccaff86712dc582c5cdde02c895dc15dbd4",
+  "source_sha": "2d05cd78ecaccae54116bf4dae91247851897957",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.377/twinpanel-1.1.0-rc.377-linux-x86_64.tar.gz",
-    "sha256": "660b63a77c5d3516e1337e176f23ce8a0ff94f950bcfe34e380b434b46971882",
-    "size_bytes": 28684465
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.378/twinpanel-1.1.0-rc.378-linux-x86_64.tar.gz",
+    "sha256": "c5e5dc5ec83af729a621df3af2f4a61620c9f6310e47161374ef4a2d494645b4",
+    "size_bytes": 28683945
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.377 نمایش Public Connect V2Ray/Xray را روی موبایل بعد از حذف legacy per-server views حفظ می‌کند. Android همچنان v2rayNG، iPhone/iPad همچنان V2Box و macOS/Windows/Linux همچنان v2rayN را دریافت می‌کنند. منطق تشخیص پروتکل واقعی در V40 برای همه پروتکل‌های عادی همچنان نیازمند server-view است و فقط V2Ray/Xray با Multi Server/V41 evidence معتبر می‌ماند. این release به Xray generation، subscription payload semantics، provisioning، accounting، quota، TP27، VXLAN، tunnel/spoof dataplane، routing، firewall، credential generation یا protocol dataplane دست نمی‌زند. Source candidate روی SHA immutable ef1bfccaff86712dc582c5cdde02c895dc15dbd4 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.377 preserves Public Connect V2Ray/Xray visibility on mobile after legacy per-server views are removed. Android continues to use v2rayNG, iPhone/iPad continue to use V2Box, and macOS/Windows/Linux continue to use v2rayN. V40 still requires server-view evidence for ordinary protocols, while V2Ray/Xray alone may remain renderable through its preserved Multi Server/V41 evidence. This release does not change Xray generation, subscription payload semantics, provisioning, accounting, quota, TP27, VXLAN, tunnel/spoof dataplane, routing, firewall, credential generation, or protocol dataplane. The candidate source is pinned to immutable SHA ef1bfccaff86712dc582c5cdde02c895dc15dbd4."
+    "fa": "TwinPanel 1.1.0-rc.378 مشکل rollback شدن Tunnel جدید در مرحله post-switch Agent acceptance را اصلاح می‌کند. Pair جدید همچنان هنگام bootstrap/install غیرفعال و OFFLINE می‌ماند؛ فقط پس از نصب موفق transport برای Agent desired feed با is_active=true منتشر می‌شود، در حالی که status همچنان OFFLINE و active_transport unset باقی می‌ماند تا route election نتواند ترافیک کاربر را زودتر از cutover ایمن منتقل کند. سپس همان V257/V289 fresh full-L3 probe، manual cutover، Agent confirmation و rollback موجود بدون تغییر اجرا می‌شود. این release منطق TP27/VXLAN/Spoof transport، routing، firewall، accounting، quota، credential generation یا protocol dataplane را تغییر نمی‌دهد. Source candidate روی SHA immutable 2d05cd78ecaccae54116bf4dae91247851897957 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.378 fixes newly created selected Tunnels rolling back during post-switch Agent acceptance. A new pair remains inactive and OFFLINE during bootstrap/install; only after the selected transport installs successfully is it published to the Agent desired feed with is_active=true, while status remains OFFLINE and active_transport remains unset so service-route election cannot move user traffic before the safe cutover. The existing V257/V289 fresh full-L3 probe, manual cutover, Agent confirmation and rollback flow then runs unchanged. This release does not change TP27/VXLAN/Spoof transport implementations, routing, firewall, accounting, quota, credential generation, or protocol dataplane logic. The candidate source is pinned to immutable SHA 2d05cd78ecaccae54116bf4dae91247851897957."
   }
 }
