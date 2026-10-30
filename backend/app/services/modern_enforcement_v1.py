@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 SINGBOX_MODERN_PROTOCOLS = frozenset(
     {"hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"}
 )
+SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS = frozenset({"naive", "shadowtls"})
 STANDALONE_MODERN_PROTOCOLS = frozenset(
     {"mieru", "trusttunnel", "amneziawg", "sudoku"}
 )
@@ -178,6 +179,24 @@ def _decode_stored_secret(protocol: str, credential: ProtocolCredential):
     return secret
 
 
+async def _remove_singbox_stored_identity(conn: Any, protocol: str, secret: Any) -> None:
+    if protocol not in SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS:
+        from ..singbox_subscription_accounts import remove_account
+
+        await remove_account(conn, protocol, int(secret.subscription_id))
+        return
+
+    from ..singbox_subscription_accounts import _commit_account_config, _mutation_script
+
+    username = str(getattr(secret, "username", "") or "").strip()
+    if not username:
+        raise RuntimeError(f"{protocol} stored credential identity is missing")
+    await _commit_account_config(
+        conn,
+        _mutation_script(protocol, username, None),
+    )
+
+
 async def _execute_command(command: dict[str, Any]) -> None:
     command_id = str(command["command_id"])
     protocol = str(command["protocol"])
@@ -214,10 +233,23 @@ async def _execute_command(command: dict[str, Any]) -> None:
         conn = await ssh_connect_saved(node, db)
 
         if protocol in SINGBOX_MODERN_PROTOCOLS:
-            from ..singbox_subscription_accounts import apply_account, remove_account
+            from ..singbox_subscription_accounts import apply_account
 
             if command_type == "revoke_subscription":
-                await remove_account(conn, protocol, subscription_id)
+                if protocol in SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS:
+                    from ..singbox_subscription_accounts import _commit_account_config, _mutation_script
+
+                    username = str(getattr(secret, "username", "") or "").strip()
+                    if not username:
+                        raise RuntimeError(f"{protocol} stored credential identity is missing")
+                    await _commit_account_config(
+                        conn,
+                        _mutation_script(protocol, username, None),
+                    )
+                else:
+                    from ..singbox_subscription_accounts import remove_account
+
+                    await remove_account(conn, protocol, subscription_id)
                 result_code = "controller_modern_revoked"
             elif command_type == "restore_subscription":
                 if not bool(credential.is_active):
