@@ -9,13 +9,26 @@ import {legacyAdminApi} from "../lib/legacy-admin-api";
 import {useI18n} from "../lib/i18n";
 
 const GB=1024**3;
-const protocolKeys=["cisco","openvpn","wireguard","l2tp","v2ray"] as const;
+const classicProtocolKeys=["cisco","openvpn","wireguard","l2tp","v2ray"] as const;
+const modernProtocolKeys=["hysteria2","tuic","anytls","naive","shadowtls","snell","mieru","trusttunnel","amneziawg","sudoku"] as const;
+const protocolKeys=[...classicProtocolKeys,...modernProtocolKeys] as const;
+const classicProtocolSet=new Set<string>(classicProtocolKeys);
 const protocolLabels:Record<string,string>={
   cisco:"Cisco / OpenConnect",
   openvpn:"OpenVPN",
   wireguard:"WireGuard",
   l2tp:"L2TP / IPsec",
-  v2ray:"V2Ray / Xray"
+  v2ray:"V2Ray / Xray",
+  hysteria2:"Hysteria2",
+  tuic:"TUIC",
+  anytls:"AnyTLS",
+  naive:"NaiveProxy",
+  shadowtls:"ShadowTLS",
+  snell:"Snell",
+  mieru:"Mieru",
+  trusttunnel:"TrustTunnel",
+  amneziawg:"AmneziaWG",
+  sudoku:"Sudoku"
 };
 
 const s=(value:unknown)=>String(value??"");
@@ -27,7 +40,11 @@ const formatBytes=(value:unknown)=>`${(n(value)/GB).toLocaleString("fa-IR",{maxi
 const tone=(value:unknown):"ok"|"warn"|"bad"|"violet"=>{const key=s(value).toLowerCase();return key==="active"?"ok":["expired","canceled"].includes(key)?"bad":"warn";};
 const statusLabel=(value:unknown)=>{const key=s(value).toLowerCase();return key==="active"?"فعال":key==="pending"?"در انتظار":key==="expired"?"منقضی":key==="suspended"?"معلق":key==="canceled"?"لغوشده":s(value)||"نامشخص";};
 const optionalPositive=(value:string)=>{const clean=value.trim();if(!clean)return undefined;const out=Number(clean);return Number.isFinite(out)&&out>0?out:undefined;};
-const planProtocols=(plan:RuntimeRow|undefined)=>plan?protocolKeys.filter(key=>Boolean(plan[`enable_${key}`])):[];
+const planProtocols=(plan:RuntimeRow|undefined)=>{
+  if(!plan)return [];
+  const explicit=strings(plan.protocols).filter(key=>protocolKeys.includes(key as typeof protocolKeys[number]));
+  return explicit.length?explicit:classicProtocolKeys.filter(key=>Boolean(plan[`enable_${key}`]));
+};
 const planTraffic=(plan:RuntimeRow|undefined)=>n(plan?.traffic_gb)>0?String(n(plan?.traffic_gb)):"";
 const planDuration=(plan:RuntimeRow|undefined)=>n(plan?.duration_days)>0?String(Math.trunc(n(plan?.duration_days))):"";
 
@@ -132,8 +149,7 @@ export function LegacySubscriptionsRuntimePage(){
     if(!draft.user_id||!draft.plan_id){setError(pick("کاربر و پلن را انتخاب کنید","Select user and plan"));return;}
     const traffic=optionalPositive(draft.traffic_gb);const duration=optionalPositive(draft.duration_days);const device=Math.max(1,Math.trunc(optionalPositive(draft.device_limit)||1));
     void act("create",pick("اشتراک ساخته و اکانت صادر شد","Subscription created and account provisioned"),async()=>{
-      const created=await adminApi.createSubscriptionV2({user_id:draft.user_id,plan_id:draft.plan_id,node_ids:[],protocols:draft.protocols,...(traffic!==undefined?{traffic_gb:traffic}:{}),...(duration!==undefined?{duration_days:Math.trunc(duration)}:{}),device_limit:device,...(draft.username.trim()?{username:draft.username.trim()}:{}),...(draft.password.trim()?{password:draft.password.trim()}:{})});
-      try{await adminApi.provisionSubscription(n(created.id));}catch{}
+      await adminApi.createSubscriptionV2({user_id:draft.user_id,plan_id:draft.plan_id,node_ids:[],protocols:draft.protocols,...(traffic!==undefined?{traffic_gb:traffic}:{}),...(duration!==undefined?{duration_days:Math.trunc(duration)}:{}),device_limit:device,...(draft.username.trim()?{username:draft.username.trim()}:{}),...(draft.password.trim()?{password:draft.password.trim()}:{})});
     },true);
   };
 
@@ -204,7 +220,7 @@ export function LegacySubscriptionsRuntimePage(){
     </Modal>}
 
     {modal==="edit"&&selected&&<Modal title={pick("ویرایش اشتراک","Edit subscription")} sub={`MV-${n(selected.id)}`} onClose={()=>!busy&&setModal(null)} wide>
-      <form onSubmit={saveEdit}><div className="setting-grid"><label className="field"><span>{pick("پلن","Plan")}</span><select value={draft.plan_id} onChange={event=>setDraft(current=>({...current,plan_id:Number(event.target.value)}))}>{plans.map(plan=><option key={n(plan.id)} value={n(plan.id)}>{s(plan.name)||`#${plan.id}`}</option>)}</select></label><label className="field"><span>{pick("حجم کل GB","Total traffic GB")}</span><input type="number" min={0} step="0.1" value={draft.traffic_gb} onChange={event=>setDraft(current=>({...current,traffic_gb:event.target.value}))} placeholder={pick("خالی = نامحدود","empty = unlimited")}/></label><label className="field"><span>{pick("نام کاربری","Username")}</span><input dir="ltr" value={draft.username} onChange={event=>setDraft(current=>({...current,username:event.target.value}))}/></label><label className="field"><span>{pick("رمز جدید","New password")}</span><input dir="ltr" autoComplete="new-password" value={draft.password} onChange={event=>setDraft(current=>({...current,password:event.target.value}))} placeholder={pick("خالی = بدون تغییر","empty = unchanged")}/></label></div><div className="manage-section-head"><div><b>{pick("پروتکل‌ها","Protocols")}</b><small>{draft.protocols.length.toLocaleString("fa-IR")} {pick("انتخاب","selected")}</small></div></div><div className="protocol-toggle-grid">{protocolKeys.map(key=>{const supported=nodes.some(node=>node.status==="online"&&Boolean((node as unknown as RuntimeRow)[`enable_${key}`]));const checked=draft.protocols.includes(key);return <label key={key} className="toggle module-toggle compact-toggle"><span>{protocolLabels[key]}<small>{supported?pick("قابل استفاده","Available"):pick("روی سرور آنلاین فعال نیست","Not enabled on an online server")}</small></span><input type="checkbox" disabled={!supported} checked={checked} onChange={event=>setDraft(current=>({...current,protocols:event.target.checked?[...new Set([...current.protocols,key])]:current.protocols.filter(item=>item!==key)}))}/><i/></label>;})}</div><div className="modalActions"><button type="button" className="ghost" onClick={()=>setModal(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy==="edit"||!draft.plan_id||!draft.protocols.length}>{busy==="edit"?"…":pick("ذخیره تغییرات","Save changes")}</button></div></form>
+      <form onSubmit={saveEdit}><div className="setting-grid"><label className="field"><span>{pick("پلن","Plan")}</span><select value={draft.plan_id} onChange={event=>setDraft(current=>({...current,plan_id:Number(event.target.value)}))}>{plans.map(plan=><option key={n(plan.id)} value={n(plan.id)}>{s(plan.name)||`#${plan.id}`}</option>)}</select></label><label className="field"><span>{pick("حجم کل GB","Total traffic GB")}</span><input type="number" min={0} step="0.1" value={draft.traffic_gb} onChange={event=>setDraft(current=>({...current,traffic_gb:event.target.value}))} placeholder={pick("خالی = نامحدود","empty = unlimited")}/></label><label className="field"><span>{pick("نام کاربری","Username")}</span><input dir="ltr" value={draft.username} onChange={event=>setDraft(current=>({...current,username:event.target.value}))}/></label><label className="field"><span>{pick("رمز جدید","New password")}</span><input dir="ltr" autoComplete="new-password" value={draft.password} onChange={event=>setDraft(current=>({...current,password:event.target.value}))} placeholder={pick("خالی = بدون تغییر","empty = unchanged")}/></label></div><div className="manage-section-head"><div><b>{pick("پروتکل‌ها","Protocols")}</b><small>{draft.protocols.length.toLocaleString("fa-IR")} {pick("انتخاب","selected")}</small></div></div><div className="protocol-toggle-grid">{protocolKeys.map(key=>{const modern=!classicProtocolSet.has(key);const supported=modern||nodes.some(node=>node.status==="online"&&Boolean((node as unknown as RuntimeRow)[`enable_${key}`]));const checked=draft.protocols.includes(key);return <label key={key} className="toggle module-toggle compact-toggle"><span>{protocolLabels[key]}<small>{modern?pick("وضعیت Runtime هنگام ذخیره بررسی می‌شود","Runtime readiness is checked on save"):supported?pick("قابل استفاده","Available"):pick("روی سرور آنلاین فعال نیست","Not enabled on an online server")}</small></span><input type="checkbox" disabled={!supported} checked={checked} onChange={event=>setDraft(current=>({...current,protocols:event.target.checked?[...new Set([...current.protocols,key])]:current.protocols.filter(item=>item!==key)}))}/><i/></label>;})}</div><div className="modalActions"><button type="button" className="ghost" onClick={()=>setModal(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy==="edit"||!draft.plan_id||!draft.protocols.length}>{busy==="edit"?"…":pick("ذخیره تغییرات","Save changes")}</button></div></form>
     </Modal>}
 
     {modal==="extend"&&selected&&<Modal title={pick("تمدید اشتراک","Renew subscription")} sub={`MV-${n(selected.id)} · ${expiryCell(selected)}`} onClose={()=>!busy&&setModal(null)}><div className="setting-grid"><label className="field"><span>{pick("روز اضافه","Add days")}</span><input type="number" min={0} value={extendDays} onChange={event=>setExtendDays(Math.max(0,Number(event.target.value)||0))}/></label><label className="field"><span>{pick("حجم اضافه GB","Add traffic GB")}</span><input type="number" min={0} step="0.1" value={extendTraffic} onChange={event=>setExtendTraffic(Math.max(0,Number(event.target.value)||0))}/></label></div><div className="modalActions"><button className="ghost" onClick={()=>setModal(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy==="extend"||(!extendDays&&!extendTraffic)} onClick={saveExtend}>{busy==="extend"?"…":pick("اعمال تمدید","Apply renewal")}</button></div></Modal>}
