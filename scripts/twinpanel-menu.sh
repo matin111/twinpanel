@@ -69,16 +69,7 @@ state_badge(){
 }
 
 brand_row(){
-  local glyph cell i cols pixel gap
-  cols="${COLUMNS:-0}"
-  if [[ ! "$cols" =~ ^[0-9]+$ || "$cols" -le 0 ]]; then
-    cols="$(tput cols 2>/dev/null || printf '80')"
-  fi
-  pixel=' '
-  gap=' '
-  if (( cols >= 88 )); then
-    pixel='  '
-  fi
+  local glyph cell i
 
   printf '  '
   for glyph in "$@"; do
@@ -86,19 +77,15 @@ brand_row(){
       cell="${glyph:i:1}"
       if [[ "$cell" == "1" ]]; then
         if [[ -n "$C_WHITE_BG" ]]; then
-          printf '%b%s%b' "$C_WHITE_BG" "$pixel" "$C_RESET"
+          printf '%b %b' "$C_WHITE_BG" "$C_RESET"
         else
-          if [[ "$pixel" == '  ' ]]; then
-            printf '##'
-          else
-            printf '#'
-          fi
+          printf '#'
         fi
       else
-        printf '%s' "$pixel"
+        printf ' '
       fi
     done
-    printf '%s' "$gap"
+    printf '  '
   done
   printf '\n'
 }
