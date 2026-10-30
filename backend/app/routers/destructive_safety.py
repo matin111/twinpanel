@@ -15,13 +15,26 @@ from ..lifecycle_cleanup import related_tunnel_ids_for_node
 from ..models import (
     CleanupJob,
     Node,
+    ProtocolCredential,
+    Subscription,
+    SubscriptionNode,
+    SubscriptionProtocol,
+    SubscriptionStatus,
     Tunnel,
     TunnelPeerState,
     TunnelStatus,
     TunnelTransport,
 )
+from ..quota_models import (
+    QuotaCursor,
+    QuotaDevice,
+    QuotaSession,
+    QuotaUsageEvent,
+)
+from ..subscription_enforcement import queue_subscription_enforcement
 from .provision import ssh_connect_saved
 from . import nodes as nodes_module
+from . import subscriptions as subscriptions_module
 from . import tunnels as tunnels_module
 
 
@@ -293,6 +306,144 @@ def _force_delete_tunnel_control_plane(tunnel_id: int, db: Session) -> dict:
     }
 
 
+# TWINPANEL_SUBSCRIPTION_HARD_DELETE_V1
+# Normal subscription DELETE is intentionally a true destructive action. Revoke
+# commands are captured before any credential/session state is removed. Quota
+# history has RESTRICT foreign keys, so child rows are removed in dependency
+# order before deleting the Subscription itself. Already-canceled legacy rows
+# are also hard-deleted; they were revoked by the previous soft-delete flow.
+def _hard_delete_subscription(subscription_id: int, db: Session) -> dict:
+    sub = db.get(Subscription, int(subscription_id))
+    if sub is None:
+        raise HTTPException(status_code=404, detail="اشتراک پیدا نشد")
+
+    deleted_id = int(sub.id)
+    was_canceled = sub.status == SubscriptionStatus.CANCELED
+    enforcement = {
+        "operation_id": None,
+        "commands": [],
+        "commands_created": 0,
+        "devices_updated": 0,
+    }
+
+    try:
+        if not was_canceled:
+            enforcement = queue_subscription_enforcement(
+                db,
+                sub,
+                command_type="revoke_subscription",
+                reason="subscription_hard_deleted",
+            )
+            db.flush()
+
+        # quota_usage_events references both Subscription and QuotaDevice using
+        # RESTRICT, so it must be removed before sessions/devices. Explicitly
+        # clearing every dependent row also makes behavior deterministic on
+        # SQLite smoke tests where FK cascade settings can differ.
+        deleted_usage_events = (
+            db.query(QuotaUsageEvent)
+            .filter(QuotaUsageEvent.subscription_id == deleted_id)
+            .delete(synchronize_session=False)
+        )
+        deleted_sessions = (
+            db.query(QuotaSession)
+            .filter(QuotaSession.subscription_id == deleted_id)
+            .delete(synchronize_session=False)
+        )
+        deleted_cursors = (
+            db.query(QuotaCursor)
+            .filter(QuotaCursor.subscription_id == deleted_id)
+            .delete(synchronize_session=False)
+        )
+        deleted_devices = (
+            db.query(QuotaDevice)
+            .filter(QuotaDevice.subscription_id == deleted_id)
+            .delete(synchronize_session=False)
+        )
+        deleted_credentials = (
+            db.query(ProtocolCredential)
+            .filter(ProtocolCredential.subscription_id == deleted_id)
+            .delete(synchronize_session=False)
+        )
+        deleted_protocols = (
+            db.query(SubscriptionProtocol)
+            .filter(SubscriptionProtocol.subscription_id == deleted_id)
+            .delete(synchronize_session=False)
+        )
+        deleted_nodes = (
+            db.query(SubscriptionNode)
+            .filter(SubscriptionNode.subscription_id == deleted_id)
+            .delete(synchronize_session=False)
+        )
+
+        db.delete(sub)
+        db.flush()
+
+        if db.get(Subscription, deleted_id) is not None:
+            raise RuntimeError("subscription row still exists after hard delete")
+
+        db.commit()
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "حذف کامل اشتراک انجام نشد: "
+                + str(exc)[:500]
+            ),
+        ) from exc
+
+    return {
+        "ok": True,
+        "subscription_id": deleted_id,
+        "deleted": True,
+        "status": "deleted",
+        "previously_canceled": bool(was_canceled),
+        "enforcement": (
+            "already_revoked"
+            if was_canceled
+            else (
+                "queued"
+                if int(enforcement.get("commands_created") or 0) > 0
+                else "no_credentials"
+            )
+        ),
+        **enforcement,
+        "deleted_rows": {
+            "quota_usage_events": int(deleted_usage_events),
+            "quota_sessions": int(deleted_sessions),
+            "quota_cursors": int(deleted_cursors),
+            "quota_devices": int(deleted_devices),
+            "protocol_credentials": int(deleted_credentials),
+            "subscription_protocols": int(deleted_protocols),
+            "subscription_nodes": int(deleted_nodes),
+            "subscriptions": 1,
+        },
+        "message": "اشتراک به‌طور کامل حذف شد",
+    }
+
+
+safe_subscriptions_router = APIRouter(
+    prefix="/v1/subscriptions",
+    tags=["subscriptions"],
+)
+
+
+@safe_subscriptions_router.delete(
+    "/{subscription_id}",
+    dependencies=[Depends(require_admin)],
+)
+def hard_delete_subscription(
+    subscription_id: int,
+    db: Session = Depends(get_db),
+):
+    return _hard_delete_subscription(int(subscription_id), db)
+
+
 safe_nodes_router = APIRouter(
     prefix="/v1/nodes",
     tags=["nodes"],
@@ -380,8 +531,9 @@ async def safe_delete_tunnel(
         raise
 
 
-# Route precedence is intentional. app.main later includes nodes.router and
-# tunnels.router; FastAPI resolves the first matching method+path. Prepending
-# these guarded routes leaves every other legacy route untouched.
+# Route precedence is intentional. app.main later includes the legacy routers;
+# FastAPI resolves the first matching method+path. Prepending these guarded
+# routes leaves every other legacy route untouched.
+subscriptions_module.router.routes[:0] = list(safe_subscriptions_router.routes)
 nodes_module.router.routes[:0] = list(safe_nodes_router.routes)
 tunnels_module.router.routes[:0] = list(safe_tunnels_router.routes)
