@@ -1,4 +1,4 @@
-name: TwinPanel Long-request Nginx Timeout V2 Integration
+name: TwinPanel Long-request Nginx Timeout V3 Integration
 
 on:
   pull_request:
@@ -27,7 +27,7 @@ jobs:
           python3 -m py_compile backend/scripts/twinpanel_nginx_reconcile.py
           python3 -m py_compile backend/tests/integration/test_provision_nginx_timeout_v74.py
 
-      - name: Test existing-install V1 to V2 convergence
+      - name: Test existing-install V1/V2 to V3 convergence
         run: |
           python3 backend/tests/integration/test_provision_nginx_timeout_v74.py
 
@@ -36,11 +36,11 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq nginx
 
-      - name: Prove protocol install timeouts are long and scoped
+      - name: Prove long-running mutations are long and scoped
         shell: bash
         run: |
           set -euo pipefail
-          TMP="$(mktemp -d -t tp-nginx-long-v2-XXXXXX)"
+          TMP="$(mktemp -d -t tp-nginx-long-v3-XXXXXX)"
           BACKEND_PID=""
 
           cleanup() {
@@ -70,6 +70,7 @@ jobs:
               "/v1/provision/install",
               "/v1/provision/ensure-classic-protocol",
               "/v1/provision/repair-protocols-saved",
+              "/v1/tunnels/create-selected",
           }
 
           class Handler(BaseHTTPRequestHandler):
@@ -164,6 +165,7 @@ jobs:
             /v1/provision/install \
             /v1/provision/ensure-classic-protocol \
             /v1/provision/repair-protocols-saved \
+            /v1/tunnels/create-selected \
             /v1/settings/vpn/modern-protocols/1/install
           do
             safe="$(printf '%s' "$path" | tr '/-' '__')"
@@ -191,6 +193,6 @@ jobs:
           )"
           test "$generic_status" = "504"
 
-          grep -q 'TWINPANEL_LONG_REQUESTS_V2' "$TMP/server.conf"
+          grep -q 'TWINPANEL_LONG_REQUESTS_V3' "$TMP/server.conf"
           echo "GENERIC_ROUTE_STATUS=$generic_status"
-          echo "REAL_NGINX_SCOPED_LONG_REQUESTS_V2=PASS"
+          echo "REAL_NGINX_SCOPED_LONG_REQUESTS_V3=PASS"
