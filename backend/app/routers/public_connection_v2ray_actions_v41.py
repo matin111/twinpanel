@@ -7,68 +7,29 @@ from .public_connection_v2ray_multilink_v43 import apply_v2ray_multilink_v43
 
 
 apply_v2ray_multilink_v43()
-# V2Ray's customer-facing canonical client is Karing. Keep this policy adjacent
-# to the final V2Ray presentation layer so metadata, download card and actions
-# cannot drift back to the historical Hiddify default.
+# Keep the existing backend compatibility metadata untouched. The final customer
+# presentation below is device-aware and intentionally does not expose Karing
+# as the V2Ray/Xray client because XHTTP compatibility is required.
 modern_delivery.CLIENTS["v2ray"] = modern_delivery._KARING
 multilink.PROTOCOL_CLIENT["v2ray"] = "karing"
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_ACTIONS_V41"
+_SUBSCRIPTION_ONLY_MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_SUBSCRIPTION_ONLY_V51"
 
 
 _CSS = r"""
 /* TWINPANEL_PUBLIC_CONNECT_V2RAY_ACTIONS_V41 */
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .v34-client-card{
+/* TWINPANEL_PUBLIC_CONNECT_V2RAY_SUBSCRIPTION_ONLY_V51 */
+body.v41-v2ray-subscription-only .protocol-panel[data-v41-v2ray="1"] .v34-client-card{
   display:flex!important;
   visibility:visible!important;
   opacity:1!important;
 }
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-xray-profiles{
-  display:grid!important;
-  gap:9px!important;
-  width:100%!important;
-}
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-xray-profile{
-  display:grid!important;
-  gap:8px!important;
-  width:100%!important;
-  padding:10px!important;
-  border:1px solid var(--line)!important;
-  border-radius:12px!important;
-  background:var(--surface2)!important;
-}
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-profile-actions{
-  display:grid!important;
-  grid-template-columns:repeat(2,minmax(0,1fr))!important;
-  gap:7px!important;
-}
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-profile-actions>a,
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-profile-actions>button{
-  width:100%!important;
-  min-height:40px!important;
-}
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-profile-actions .tp-v48-karing{
-  border-color:var(--p)!important;
-  background:var(--p)!important;
-  color:#fff!important;
-}
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .tp-v48-profile-actions .copy-btn{
-  color:var(--p)!important;
-}
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .v34-server-actions[data-v41-duplicate="1"],
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] [data-v41-retired-actions="1"]{
+body.v41-v2ray-subscription-only .protocol-panel[data-v41-v2ray="1"] .v38-server-list-title,
+body.v41-v2ray-subscription-only .protocol-panel[data-v41-v2ray="1"] .server-views,
+body.v41-v2ray-subscription-only .protocol-panel[data-v41-v2ray="1"] .v49-v2ray-summary,
+body.v41-v2ray-subscription-only .protocol-panel[data-v41-v2ray="1"] .v49-v2ray-groups{
   display:none!important;
-}
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .v34-server-actions:not([data-v41-duplicate="1"]){
-  display:grid!important;
-  grid-template-columns:repeat(2,minmax(0,1fr))!important;
-  gap:7px!important;
-  margin-top:8px!important;
-}
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .v34-server-actions:not([data-v41-duplicate="1"])>a,
-body.v41-v2ray-two-actions .protocol-panel[data-v41-v2ray="1"] .v34-server-actions:not([data-v41-duplicate="1"])>button{
-  width:100%!important;
-  min-height:40px!important;
 }
 """
 
@@ -77,6 +38,33 @@ _SCRIPT = r"""
 <script id="twinpanelPublicConnectV2rayActionsV41">
 (function(){
   let timer=null;
+
+  const CLIENTS={
+    windows:{
+      name:'v2rayN',
+      url:'https://github.com/2dust/v2rayN/releases/latest'
+    },
+    macos:{
+      name:'v2rayN',
+      url:'https://github.com/2dust/v2rayN/releases/latest'
+    },
+    linux:{
+      name:'v2rayN',
+      url:'https://github.com/2dust/v2rayN/releases/latest'
+    },
+    android:{
+      name:'v2rayNG',
+      url:'https://github.com/2dust/v2rayNG/releases/latest'
+    },
+    ios:{
+      name:'V2Box',
+      url:'https://apps.apple.com/us/app/v2box-v2ray-client/id6446814690'
+    },
+    unknown:{
+      name:'v2rayN / v2rayNG / V2Box',
+      url:'https://github.com/2dust/v2rayN/releases/latest'
+    }
+  };
 
   function normalize(value){
     const key=String(value||'').trim().toLowerCase();
@@ -92,133 +80,67 @@ _SCRIPT = r"""
     return normalize(choice?.dataset?.protocolKey||choice?.dataset?.protocol||panel?.id||'');
   }
 
-  function canonicalRow(view){
-    return view.querySelector(':scope > .v34-server-actions');
+  function platform(){
+    const explicit=String(document.body?.dataset?.tpPlatform||document.documentElement?.dataset?.tpPlatform||'').trim().toLowerCase();
+    if(CLIENTS[explicit])return explicit;
+    const ua=String(navigator.userAgent||'');
+    const navPlatform=String(navigator.platform||'');
+    const haystack=(ua+' '+navPlatform).toLowerCase();
+    if(/android/i.test(ua))return'android';
+    if(/iphone|ipad|ipod/i.test(ua))return'ios';
+    if(/macintosh|mac os|macintel/i.test(haystack)&&Number(navigator.maxTouchPoints||0)>1)return'ios';
+    if(/windows|win32|win64|winarm/i.test(haystack))return'windows';
+    if(/macintosh|mac os|macintel/i.test(haystack))return'macos';
+    if(/linux|x11|cros/i.test(haystack))return'linux';
+    return'unknown';
   }
 
-  function profileRows(view){
-    return [...view.querySelectorAll(':scope > .tp-v48-xray-profiles > .tp-v48-xray-profile')];
-  }
-
-  function retireDirectLegacyActions(view,row,profiles){
-    view.querySelectorAll(
-      ':scope > .action-row,'+
-      ':scope > .v13-modern-action,'+
-      ':scope > .v13-client-only,'+
-      ':scope > .v31-canonical-actions'
-    ).forEach(node=>{
-      if(node===row||profiles.includes(node))return;
-      node.dataset.v41RetiredActions='1';
-      node.setAttribute('aria-hidden','true');
-    });
-  }
-
-  function simplifyProfile(profile){
-    profile.removeAttribute('data-v40-retired-actions');
-    profile.removeAttribute('aria-hidden');
-    profile.removeAttribute('hidden');
-    profile.style.removeProperty('display');
-
-    const actions=profile.querySelector('.tp-v48-profile-actions');
-    if(!actions)return;
-
-    const primary=actions.querySelector('.tp-v48-karing');
-    const copy=actions.querySelector('.copy-btn[data-copy]');
-
-    [...actions.children].forEach(node=>{
-      if(node!==primary&&node!==copy)node.remove();
-    });
-
-    if(primary){
-      primary.textContent='ارسال به Karing';
-      primary.setAttribute('aria-label','ارسال این اتصال به Karing');
-    }
-    if(copy){
-      copy.textContent='کپی کانفیگ';
-      copy.setAttribute('aria-label','کپی کانفیگ این اتصال');
-    }
-
-    actions.dataset.v41ProfileActions='1';
-  }
-
-  function simplifyCanonicalFallback(view,row){
-    if(!row)return;
-
-    row.removeAttribute('data-v41-duplicate');
-    row.removeAttribute('aria-hidden');
-    row.removeAttribute('hidden');
-    row.style.removeProperty('display');
-
-    const primary=row.querySelector('.v34-primary');
-    const copy=row.querySelector('.v34-copy');
-
-    [...row.children].forEach(node=>{
-      if(node!==primary&&node!==copy)node.remove();
-    });
-
-    if(primary){
-      const href=String(primary.getAttribute('href')||'');
-      if(!href.startsWith('karing://')){
-        const raw=String(primary.dataset?.copyTarget||primary.getAttribute('data-copy')||'').trim();
-        if(raw){
-          primary.setAttribute('href','karing://install-config?url='+encodeURIComponent(raw)+'&name='+encodeURIComponent('TwinPanel V2Ray'));
-        }
-      }
-      primary.textContent='ارسال به Karing';
-      primary.setAttribute('aria-label','ارسال کانفیگ به Karing');
-    }
-    if(copy){
-      copy.textContent='کپی کانفیگ';
-      copy.setAttribute('aria-label','کپی کانفیگ');
-    }
-
-    row.dataset.v41Canonical='1';
-    retireDirectLegacyActions(view,row,[]);
-  }
-
-  function preserveClientDownload(panel){
+  function rewriteClientDownload(panel){
     const card=panel.querySelector('.v34-client-card');
     if(!card)return;
+    const client=CLIENTS[platform()]||CLIENTS.unknown;
     card.hidden=false;
     card.removeAttribute('aria-hidden');
     card.style.removeProperty('display');
     card.dataset.v41ClientDownload='1';
+    card.dataset.v41V2rayClient=client.name;
+
+    const link=card.querySelector('a');
+    if(link){
+      link.href=client.url;
+      link.target='_blank';
+      link.rel='noopener noreferrer';
+      link.textContent='دانلود '+client.name;
+      link.setAttribute('aria-label','دانلود '+client.name+' برای V2Ray / Xray');
+      link.dataset.client=client.name.toLowerCase();
+    }
   }
 
-  function simplifyServer(view){
-    const row=canonicalRow(view);
-    const profiles=profileRows(view);
-
-    if(profiles.length){
-      const wrapper=view.querySelector(':scope > .tp-v48-xray-profiles');
-      if(wrapper){
-        wrapper.removeAttribute('data-v40-retired-actions');
-        wrapper.removeAttribute('aria-hidden');
-        wrapper.removeAttribute('hidden');
-        wrapper.style.removeProperty('display');
-        wrapper.dataset.v41ProfileCount=String(profiles.length);
-      }
-
-      profiles.forEach(simplifyProfile);
-      retireDirectLegacyActions(view,row,profiles);
-
-      if(row){
-        row.dataset.v41Duplicate='1';
-        row.setAttribute('aria-hidden','true');
-      }
-      return;
+  function hideSingleProfiles(panel){
+    const listTitle=panel.querySelector('.v38-server-list-title');
+    if(listTitle){
+      listTitle.hidden=true;
+      listTitle.setAttribute('aria-hidden','true');
     }
-
-    simplifyCanonicalFallback(view,row);
+    const views=panel.querySelector('.server-views');
+    if(views){
+      views.hidden=true;
+      views.setAttribute('aria-hidden','true');
+      views.dataset.v41SingleProfiles='hidden';
+    }
+    panel.querySelectorAll('.v49-v2ray-summary,.v49-v2ray-groups').forEach(node=>{
+      node.remove();
+    });
   }
 
   function apply(){
-    document.body.classList.add('v41-v2ray-two-actions');
+    document.body.classList.remove('v41-v2ray-two-actions');
+    document.body.classList.add('v41-v2ray-subscription-only');
     document.querySelectorAll('.protocol-panel').forEach(panel=>{
       if(panelKey(panel)!=='v2ray')return;
       panel.dataset.v41V2ray='1';
-      preserveClientDownload(panel);
-      panel.querySelectorAll('.server-view').forEach(simplifyServer);
+      rewriteClientDownload(panel);
+      hideSingleProfiles(panel);
     });
   }
 
@@ -238,8 +160,12 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_v2ray_actions_v41(source: str) -> str:
-    """Preserve every real Xray profile and keep exactly Karing + Copy Config per profile."""
+    """Expose only the V2Ray subscription card and a device-appropriate XHTTP client download."""
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
-        source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
+        source = source.replace(
+            "</body>",
+            _SCRIPT + f"\n<!-- {_MARKER} -->\n<!-- {_SUBSCRIPTION_ONLY_MARKER} -->\n</body>",
+            1,
+        )
     return refine_public_connection_mobile_sheet_v42(source)
