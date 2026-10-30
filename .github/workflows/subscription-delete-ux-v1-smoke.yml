@@ -1,0 +1,37 @@
+name: Subscription Delete UX V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/legacy-subscriptions-exact.tsx'
+      - '.github/workflows/subscription-delete-ux-v1-smoke.yml'
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify delete is optimistic and does not full-reload on success
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path('components/legacy-subscriptions-exact.tsx').read_text()
+          start = source.index('  const remove=async(item:RuntimeRow)=>{')
+          end = source.index('\n\n  const loadConnection=', start)
+          block = source[start:end]
+
+          optimistic = 'setRows(current=>current.filter(row=>n(row.id)!==id));'
+          request = 'await adminApi.deleteSubscription(id);'
+          rollback = 'setRows(snapshot);'
+
+          assert optimistic in block
+          assert request in block
+          assert block.index(optimistic) < block.index(request)
+          assert rollback in block
+          assert 'await act(`delete-' not in block
+          assert 'await load(true)' not in block
+          assert 'void load(true);' in block
+          assert 'setBusy(' not in block
+          print('SUBSCRIPTION_DELETE_UX_V1_OK')
+          PY
