@@ -1,4 +1,6 @@
 from pathlib import Path
+import sys
+import tempfile
 
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -30,6 +32,39 @@ def test_frontdoor_https_is_internal_only() -> None:
     assert_true("_restore_site(" in RENDERER, "Nginx update rollback helper missing")
 
 
+def test_enabled_regular_file_converges_to_canonical_symlink() -> None:
+    sys.path.insert(0, str(BACKEND))
+    from app.services import domain_frontdoor_nginx_v1 as renderer
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        available = root / "sites-available"
+        enabled_dir = root / "sites-enabled"
+        available.mkdir()
+        enabled_dir.mkdir()
+
+        canonical = available / "api.example.test.conf"
+        active = enabled_dir / "api.example.test.conf"
+        canonical.write_text("new-config\n", encoding="utf-8")
+        active.write_text("legacy-copy\n", encoding="utf-8")
+        active.chmod(0o600)
+
+        state = renderer._snapshot_enabled_entry(active)
+        assert_true(state.get("kind") == "file", "legacy regular file must be snapshotted")
+
+        renderer._ensure_enabled_symlink(canonical, active)
+        assert_true(active.is_symlink(), "legacy enabled file must converge to symlink")
+        assert_true(
+            active.resolve(strict=False) == canonical.resolve(strict=False),
+            "enabled symlink must target canonical sites-available file",
+        )
+
+        renderer._restore_enabled_entry(active, state)
+        assert_true(active.is_file() and not active.is_symlink(), "rollback must restore regular file")
+        assert_true(active.read_text(encoding="utf-8") == "legacy-copy\n", "rollback content mismatch")
+        assert_true((active.stat().st_mode & 0o777) == 0o600, "rollback mode mismatch")
+
+
 def test_frontdoor_acme_uses_webroot_not_nginx_mutation() -> None:
     assert_true('"certonly"' in RUNTIME, "front-door ACME must use certonly")
     assert_true('"--webroot"' in RUNTIME, "front-door ACME webroot mode missing")
@@ -54,6 +89,7 @@ def test_frontdoor_requires_nginx_on_public_tcp_443() -> None:
 if __name__ == "__main__":
     test_router_uses_frontdoor_renderer()
     test_frontdoor_https_is_internal_only()
+    test_enabled_regular_file_converges_to_canonical_symlink()
     test_frontdoor_acme_uses_webroot_not_nginx_mutation()
     test_existing_domains_refresh_before_frontdoor_acme()
     test_frontdoor_requires_nginx_on_public_tcp_443()
