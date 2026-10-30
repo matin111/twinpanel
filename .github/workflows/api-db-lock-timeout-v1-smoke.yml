@@ -13,6 +13,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install DB smoke dependencies
+        run: |
+          python -m pip install \
+            'SQLAlchemy==2.0.43' \
+            'pydantic==2.11.7' \
+            'pydantic-settings==2.10.1'
+
       - name: Verify bounded PostgreSQL lock waits
         run: |
           python3 - <<'PY'
