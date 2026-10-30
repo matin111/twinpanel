@@ -57,7 +57,7 @@ export function StoreSettingsManager(){
     <div className="page-head">
       <div>
         <h1>{pick("قالب‌های فروشگاه","Storefront templates")}</h1>
-        <small>{pick("قالب را فعال کنید یا برای تنظیمات اختصاصی وارد صفحه شخصی‌سازی همان قالب شوید.","Activate a template or open its dedicated customization page.")}</small>
+        <small>{pick("قالب فروشگاه را انتخاب و مدیریت کنید.","Choose and manage the storefront template.")}</small>
       </div>
       <div className="action-row">
         <Link className="ghost" href="/store" target="_blank">{pick("مشاهده فروشگاه","Open storefront")} ↗</Link>
@@ -72,10 +72,10 @@ export function StoreSettingsManager(){
     {!loading&&<>
       <Card className="storeAdminIntro">
         <div>
-          <b>{pick("قالب‌های مستقل فروشگاه","Independent storefront templates")}</b>
-          <p>{pick("هر قالب تنظیمات مستقل خودش را دارد. تنظیمات عمومی قدیمی از این صفحه حذف شده‌اند و شخصی‌سازی هر قالب فقط در صفحه اختصاصی همان قالب انجام می‌شود.","Each template owns its independent settings. The legacy shared-settings editor has been removed from this screen, and every template is customized only on its dedicated page.")}</p>
+          <b>{pick("قالب‌های فروشگاه","Storefront templates")}</b>
+          <p>{pick("قالب دلخواه را فعال کنید یا وارد شخصی‌سازی شوید.","Activate a template or open its customization page.")}</p>
         </div>
-        <Badge tone="violet">{STORE_TEMPLATE_CATALOG.length} {pick("قالب نصب‌شده","installed")}</Badge>
+        <Badge tone="violet">{pick("سه قالب نصب‌شده",`${STORE_TEMPLATE_CATALOG.length} installed`)}</Badge>
       </Card>
 
       {unknownTemplate&&<div className="runtime-warning">{pick(`قالب ذخیره‌شده «${settings.active_template}» در این نسخه نصب نیست؛ فروشگاه از قالب پیش‌فرض استفاده می‌کند.`,`Saved template “${settings.active_template}” is not installed in this version; the storefront falls back to the default template.`)}</div>}
@@ -83,9 +83,9 @@ export function StoreSettingsManager(){
       <div className="storeTemplateGrid">{STORE_TEMPLATE_CATALOG.map(template=>{
         const active=settings.active_template===template.id||(!activeTemplate&&template.id==="conversion-2027");
         return <Card className={`storeTemplateCard ${active?"active":""}`} key={template.id}>
-          <div className="storeTemplatePreview"><span>◈</span><small>{template.id}</small></div>
+          <div className="storeTemplatePreview"><span>◈</span><small>{pick(template.nameFa,template.nameEn)}</small></div>
           <div className="card-head">
-            <div><b>{pick(template.nameFa,template.nameEn)}</b><small>v{template.version} · {template.author}</small></div>
+            <div><b>{pick(template.nameFa,template.nameEn)}</b></div>
             {active?<Badge tone="ok">{pick("فعال","Active")}</Badge>:<Badge tone="violet">{pick("نصب‌شده","Installed")}</Badge>}
           </div>
           <p>{pick(template.descriptionFa,template.descriptionEn)}</p>
