@@ -3,14 +3,19 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+from pathlib import Path
 from typing import Any
 
 
-# TWINPANEL_DOMAIN_SSL_RUNTIME_V1
+# TWINPANEL_DOMAIN_SSL_RUNTIME_V2
 #
 # Domain SSL issuance must never install packages inside an HTTP request.
-# It also must not let Certbot attempt to take over TCP/443 when another
-# production daemon (notably ocserv) already owns that listener.
+# Before the TCP/443 front door exists, a non-Nginx owner is a hard conflict.
+# Once the front door marker exists, Nginx owns TCP/443 and ACME HTTP-01 uses
+# the permanent port-80 webroot instead of asking Certbot to rewrite Nginx.
+
+FRONTDOOR_MARKER = Path("/etc/twinpanel/domain-frontdoor-v1")
+ACME_ROOT = Path("/var/lib/twinpanel/acme")
 
 
 def _tcp_443_owners() -> list[str]:
@@ -33,6 +38,10 @@ def _tcp_443_owners() -> list[str]:
     return owners
 
 
+def frontdoor_enabled() -> bool:
+    return FRONTDOOR_MARKER.is_file()
+
+
 def https_port_conflict() -> dict[str, Any] | None:
     owners = _tcp_443_owners()
     blocking = [name for name in owners if name != "nginx"]
@@ -43,6 +52,36 @@ def https_port_conflict() -> dict[str, Any] | None:
         "owners": blocking,
         "message": "TCP/443 is owned by another service",
     }
+
+
+def _certbot_command(certbot: str, domain: str) -> list[str]:
+    common = [
+        certbot,
+        "-d",
+        domain,
+        "--non-interactive",
+        "--agree-tos",
+        "-m",
+        f"admin@{domain}",
+    ]
+
+    if frontdoor_enabled():
+        ACME_ROOT.mkdir(parents=True, exist_ok=True)
+        return [
+            certbot,
+            "certonly",
+            "--webroot",
+            "-w",
+            str(ACME_ROOT),
+            *common[1:],
+        ]
+
+    return [
+        certbot,
+        "--nginx",
+        *common[1:],
+        "--redirect",
+    ]
 
 
 def issue_ssl(domain: str, *, timeout_seconds: int = 180) -> dict[str, Any]:
@@ -56,6 +95,14 @@ def issue_ssl(domain: str, *, timeout_seconds: int = 180) -> dict[str, Any]:
             "owners": conflict["owners"],
         }
 
+    if frontdoor_enabled() and "nginx" not in _tcp_443_owners():
+        return {
+            "ok": False,
+            "error": "frontdoor_tcp_443_not_owned_by_nginx",
+            "code": "frontdoor_not_ready",
+            "owners": _tcp_443_owners(),
+        }
+
     certbot = shutil.which("certbot")
     if not certbot:
         return {
@@ -66,17 +113,7 @@ def issue_ssl(domain: str, *, timeout_seconds: int = 180) -> dict[str, Any]:
 
     try:
         result = subprocess.run(
-            [
-                certbot,
-                "--nginx",
-                "-d",
-                domain,
-                "--non-interactive",
-                "--agree-tos",
-                "-m",
-                f"admin@{domain}",
-                "--redirect",
-            ],
+            _certbot_command(certbot, domain),
             capture_output=True,
             text=True,
             timeout=max(30, int(timeout_seconds)),
@@ -104,4 +141,5 @@ def issue_ssl(domain: str, *, timeout_seconds: int = 180) -> dict[str, Any]:
         "code": "ok" if result.returncode == 0 else "certbot_failed",
         "output": (result.stdout or "")[-2000:],
         "error": (result.stderr or "")[-2000:],
+        "frontdoor": frontdoor_enabled(),
     }
