@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.374",
+  "version": "1.1.0-rc.375",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-30T01:57:03Z",
+  "released_at": "2026-10-30T02:24:16Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "8e4d1213b3216625cae74e06bd6259a8a759e4d2",
+  "source_sha": "12466b2731bd1e61e9f19fee14a901d07a713a39",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.374/twinpanel-1.1.0-rc.374-linux-x86_64.tar.gz",
-    "sha256": "1f5ad8fb436be5d5d3d560a6500eb757ad50a12a83cfe2fa8009e5c45ce583c9",
-    "size_bytes": 28684065
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.375/twinpanel-1.1.0-rc.375-linux-x86_64.tar.gz",
+    "sha256": "f5d7ed7f7e86ed780c8778f77283867775e2df30d9984eb7af5c2c959e369ee4",
+    "size_bytes": 28684783
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.374 اصلاح Public Connect V2Ray/Xray را منتشر می‌کند: موجودی قدیمی کانفیگ‌های تکی پایین صفحه شامل کارت‌های QR، ارسال تکی به Karing و کپی کانفیگ از نمایش مشتری حذف شده است؛ در عین حال کنترل Multi Server بالایی، جریان گروه‌بندی‌شده «مشاهده کانفیگ‌ها» و دانلود هوشمند برنامه متناسب با دستگاه حفظ می‌شوند. این تغییر فقط Presentation لایه V2Ray/Xray است و Xray generation، subscription payload semantics، TP27، VXLAN، Tunnel/Spoof dataplane، accounting، quota، provisioning، credential generation، routing، firewall و protocol dataplane را تغییر نمی‌دهد. Source candidate روی SHA immutable 8e4d1213b3216625cae74e06bd6259a8a759e4d2 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.374 publishes the Public Connect V2Ray/Xray UI cleanup: the legacy lower per-server config inventory, including QR cards, per-profile Karing actions, and copy-config actions, is removed from the customer view while the upper Multi Server controls, grouped `View configs` flow, and device-aware client download remain available. This is limited to the V2Ray/Xray presentation layer and does not change Xray generation, subscription payload semantics, TP27, VXLAN, tunnel/spoof dataplane, accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane. The candidate source is pinned to immutable SHA 8e4d1213b3216625cae74e06bd6259a8a759e4d2."
+    "fa": "TwinPanel 1.1.0-rc.375 اکشن‌های Public Connect V2Ray/Xray را با برنامه مناسب دستگاه هماهنگ می‌کند: Windows/macOS/Linux با v2rayN، Android با v2rayNG و iPhone/iPad با V2Box. متن‌ها و اکشن‌های قدیمی Karing و karing:// از V44 حذف شده‌اند؛ Android از deep-linkهای v2rayNG برای اشتراک و کانفیگ استفاده می‌کند و در v2rayN/V2Box لینک یا کانفیگ مناسب برای Import کپی می‌شود. Multi Server، جریان گروه‌بندی‌شده «مشاهده کانفیگ‌ها» و دانلود هوشمند برنامه حفظ می‌شوند. این تغییر فقط Presentation/Client-action لایه V2Ray/Xray است و Xray generation، subscription payload semantics، TP27، VXLAN، Tunnel/Spoof dataplane، accounting، quota، provisioning، credential generation، routing، firewall و protocol dataplane را تغییر نمی‌دهد. Source candidate روی SHA immutable 12466b2731bd1e61e9f19fee14a901d07a713a39 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.375 aligns Public Connect V2Ray/Xray actions with the device-appropriate client: v2rayN on Windows/macOS/Linux, v2rayNG on Android, and V2Box on iPhone/iPad. Legacy Karing labels and karing:// actions are removed from V44; Android uses v2rayNG deep links for subscriptions and configs, while v2rayN/V2Box users receive the correct link or config copy action for import. Multi Server, the grouped View Configs flow, and device-aware client download remain intact. This is limited to the V2Ray/Xray presentation/client-action layer and does not change Xray generation, subscription payload semantics, TP27, VXLAN, tunnel/spoof dataplane, accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane. The candidate source is pinned to immutable SHA 12466b2731bd1e61e9f19fee14a901d07a713a39."
   }
 }
