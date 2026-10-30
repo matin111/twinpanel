@@ -45,7 +45,7 @@
 .fullWidth :global([class*="sectionKicker"]),
 .fullWidth :global([class*="architectureNote"]),
 .fullWidth :global([class*="safetyChips"]),
-.fullWidth :global([class*="foot"]){
+.fullWidth :global([class*="foot"]:not(.system-release-footer)){
   display:none!important;
 }
 
