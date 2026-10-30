@@ -1,0 +1,43 @@
+name: Domain Frontdoor V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/domains.py'
+      - 'backend/app/services/domain_frontdoor_nginx_v1.py'
+      - 'backend/app/services/domain_ssl_runtime_v1.py'
+      - 'backend/tests/domain_frontdoor_v1_smoke.py'
+      - '.github/workflows/domain-frontdoor-v1-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/routers/domains.py'
+      - 'backend/app/services/domain_frontdoor_nginx_v1.py'
+      - 'backend/app/services/domain_ssl_runtime_v1.py'
+      - 'backend/tests/domain_frontdoor_v1_smoke.py'
+      - '.github/workflows/domain-frontdoor-v1-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Compile front-door modules
+        run: |
+          python -m py_compile \
+            backend/app/routers/domains.py \
+            backend/app/services/domain_frontdoor_nginx_v1.py \
+            backend/app/services/domain_ssl_runtime_v1.py
+
+      - name: Run domain front-door smoke
+        run: python backend/tests/domain_frontdoor_v1_smoke.py

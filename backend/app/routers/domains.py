@@ -1,6 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..services.ssl_manager import create_nginx_config
+from ..services.domain_frontdoor_nginx_v1 import (
+    create_nginx_config,
+    frontdoor_enabled,
+    refresh_frontdoor_map,
+)
 from ..services.domain_ssl_runtime_v1 import issue_ssl
 from ..services.domain_router import resolve_domain_route
 import subprocess
@@ -84,25 +88,54 @@ def _remove_nginx_domain(domain: str):
         filename
     )
 
+    old_available = None
+    old_enabled_target = None
+    if os.path.exists(available):
+        with open(available, "r", encoding="utf-8") as handle:
+            old_available = handle.read()
+    if os.path.islink(enabled):
+        old_enabled_target = os.readlink(enabled)
+
     if os.path.lexists(enabled):
         os.unlink(enabled)
 
     if os.path.exists(available):
         os.unlink(available)
 
-    test = subprocess.run(
-        ["nginx", "-t"],
-        capture_output=True,
-        text=True
-    )
+    try:
+        refresh_frontdoor_map()
+        test = subprocess.run(
+            ["nginx", "-t"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if test.returncode != 0:
+            raise RuntimeError(test.stderr)
 
-    if test.returncode != 0:
-        raise RuntimeError(test.stderr)
-
-    subprocess.run(
-        ["systemctl", "reload", "nginx"],
-        check=False
-    )
+        reload_result = subprocess.run(
+            ["systemctl", "reload", "nginx"],
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+        if reload_result.returncode != 0:
+            raise RuntimeError(
+                reload_result.stderr or reload_result.stdout or "nginx_reload_failed"
+            )
+    except Exception:
+        if old_available is not None:
+            with open(available, "w", encoding="utf-8") as handle:
+                handle.write(old_available)
+        if old_enabled_target is not None and not os.path.lexists(enabled):
+            os.symlink(old_enabled_target, enabled)
+        try:
+            refresh_frontdoor_map()
+            subprocess.run(["nginx", "-t"], check=False, timeout=15)
+            subprocess.run(["systemctl", "reload", "nginx"], check=False, timeout=20)
+        except Exception:
+            pass
+        raise
 
 
 @router.get("")
@@ -269,7 +302,6 @@ def update_domain(
                 old_domain
             )
 
-            # SSL دامنه قبلی برای دامنه جدید معتبر نیست.
             item.ssl_status = SSLStatus.NONE
             item.ssl_expires_at = None
             item.ssl_error = None
@@ -363,10 +395,7 @@ def request_ssl(
         host = item.target_host or "127.0.0.1"
         nginx_path = f"/etc/nginx/sites-available/{item.domain}.conf"
 
-        # Existing and newly-created rows normally already have their HTTP
-        # config. Recreate it only when the file is missing so a 443 conflict
-        # cannot make a harmless retry reload an existing SSL server block.
-        if not os.path.exists(nginx_path):
+        if frontdoor_enabled() or not os.path.exists(nginx_path):
             create_nginx_config(
                 item.domain,
                 host,
@@ -413,6 +442,7 @@ def request_ssl(
         status_code = 409 if code in {
             "https_port_conflict",
             "certbot_not_installed",
+            "frontdoor_not_ready",
         } else 502
 
         raise HTTPException(
