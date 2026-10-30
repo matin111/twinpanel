@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..migration_import_models import MigrationImportRecord
 from ..models import Subscription, SubscriptionProtocol, SubscriptionStatus, User
+from ..protocol_account_registry import normalize_protocols
 from .migration_center_v1 import SUPPORTED_SOURCES, normalize_record
 
 
@@ -107,16 +108,25 @@ def import_record(
     if not user or not user.is_active:
         raise ValueError("target TwinPanel user is missing or inactive")
 
-    protocol_values = []
-    for value in protocols:
-        key = str(value or "").strip().lower()
-        if key and key not in protocol_values:
-            protocol_values.append(key)
+    requested_protocols = protocols or ["v2ray"]
+    try:
+        protocol_values = normalize_protocols(requested_protocols)
+    except ValueError as exc:
+        raise ValueError(str(exc)) from exc
     if not protocol_values:
         protocol_values = ["v2ray"]
 
     legacy_url = normalized.get("legacy_subscription_url")
     token = _legacy_token(legacy_url)
+
+    if token:
+        marker_collision = (
+            db.query(MigrationImportRecord)
+            .filter(MigrationImportRecord.legacy_token == token)
+            .first()
+        )
+        if marker_collision:
+            raise ValueError("legacy subscription token is already imported")
 
     share_code = None
     if token and len(token) <= 64:
