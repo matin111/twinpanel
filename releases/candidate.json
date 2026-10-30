@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.396",
-  "source_sha": "d94a6b97ece99947f360701f8a77f6e167c6513e",
+  "version": "1.1.0-rc.397",
+  "source_sha": "de45d965e872f523c52400085baf06b4f4c299dc",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.396 اصلاحات جدید پنل را منتشر می‌کند: ویرایش اشتراک اکنون پروتکل‌های Modern را از مسیر canonical backend مدیریت می‌کند و لوگوی منوی SSH نیز با سلول‌های background سفید یک‌دست رندر می‌شود تا به‌جای glyphهای بلوکی/foreground قبلی، ظاهر یکپارچه و بدون درز داشته باشد. این Release تغییرات موجود در main تا SHA immutable d94a6b97ece99947f360701f8a77f6e167c6513e را شامل می‌شود؛ TP27/VXLAN/Tunnel/Spoof/accounting/quota/routing/firewall/protocol dataplane در تغییر لوگو دست‌کاری نشده‌اند.",
-    "en": "TwinPanel 1.1.0-rc.396 publishes the latest panel fixes: subscription Edit now handles Modern protocols through the canonical backend lifecycle, and the SSH management-menu logo now renders with solid white background cells for a seamless terminal brand instead of the previous foreground/block-glyph style. This release is pinned to immutable source SHA d94a6b97ece99947f360701f8a77f6e167c6513e; the logo change does not alter TP27/VXLAN, Tunnel, Spoof, accounting, quota, routing, firewall, or protocol dataplane behavior."
+    "fa": "TwinPanel 1.1.0-rc.397 لوگوی منوی SSH را برای عرض‌های معمول ترمینال خوانا می‌کند: wordmark به الگوی 5x7 جمع‌وجور و width-aware تغییر کرده و همچنان با سلول‌های background سفید بدون block glyph رندر می‌شود. این Release همچنین تغییر hard delete اشتراک‌های Merge‌شده در main را شامل می‌شود. Source روی SHA immutable de45d965e872f523c52400085baf06b4f4c299dc قفل شده است؛ تغییر لوگو به TP27/VXLAN/Tunnel/Spoof/accounting/quota/provisioning/routing/firewall/protocol dataplane دست نمی‌زند.",
+    "en": "TwinPanel 1.1.0-rc.397 makes the SSH management-menu logo readable at normal terminal widths: the wordmark now uses a compact width-aware 5x7 pattern while retaining white background-cell rendering without block glyphs. This release also includes the hard-delete subscription change already merged into main. The source is pinned to immutable SHA de45d965e872f523c52400085baf06b4f4c299dc; the logo change does not modify TP27/VXLAN, Tunnel, Spoof, accounting, quota, provisioning, routing, firewall, or protocol dataplane logic."
   }
 }
