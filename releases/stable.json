@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.370",
+  "version": "1.1.0-rc.371",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-30T01:19:05Z",
+  "released_at": "2026-10-30T01:22:19Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "880ee1f852b2aaca239ed61cc0431ec9f864dac0",
+  "source_sha": "cb0cbc0c7fceccd0033f37a19dd7525c32988390",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.370/twinpanel-1.1.0-rc.370-linux-x86_64.tar.gz",
-    "sha256": "8bf89c4fea5c145636a3c09b7828873730a4a9c122551348751b4ca3d383113c",
-    "size_bytes": 28682278
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.371/twinpanel-1.1.0-rc.371-linux-x86_64.tar.gz",
+    "sha256": "c55ff9795060fd450b29f3411cc301e2bf7f6117b0829fd8abd292f8add0c05c",
+    "size_bytes": 28682874
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.370 رابط Public Connect برای V2Ray/Xray را اصلاح می‌کند: صفحه سیستم‌عامل کاربر را تشخیص می‌دهد و فقط برنامه مناسب همان دستگاه را نمایش می‌دهد (Windows/macOS/Linux → v2rayN، Android → v2rayNG، iOS → V2Box)، عنوان تکراری «سرورهای تکی» حذف شده و دکمه بالای «مشاهده کانفیگ‌ها» با همه کانفیگ‌های واقعی داخل Accordion حفظ شده است. هیچ تغییری در Xray generation، subscription payload semantics، TP27، VXLAN، Tunnel/Spoof dataplane، Accounting، quota، provisioning، credential generation، routing، firewall یا protocol dataplane انجام نشده است. Source candidate روی SHA immutable 880ee1f852b2aaca239ed61cc0431ec9f864dac0 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.370 refines the Public Connect V2Ray/Xray UI: the page detects the user's platform and shows only the relevant client for that device (Windows/macOS/Linux → v2rayN, Android → v2rayNG, iOS → V2Box), removes the redundant lower single-server heading, and keeps the top config accordion with all real configs intact. No Xray generation, subscription payload semantics, TP27, VXLAN, tunnel/spoof dataplane, accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane behavior is changed. The candidate source is pinned to immutable SHA 880ee1f852b2aaca239ed61cc0431ec9f864dac0."
+    "fa": "TwinPanel 1.1.0-rc.371 اصلاح نهایی رابط مدیریت را منتشر می‌کند: در /admin/outbounds منوی «سیستم و نگهداری» و مرکز بروزرسانی دیگر پشت هدر Sticky یا داخل Dropdown بریده نمی‌شود و کارت بروزرسانی کامل قابل مشاهده است. در اعلان‌های مدیریت، متن وضعیت خوانده‌شده/خوانده‌نشده حذف شده و وضعیت با آیکن چشم مشخص می‌شود؛ اعلان خوانده‌نشده با چشم خط‌خورده بنفش و اعلان خوانده‌شده با چشم سبز نمایش داده می‌شود. کنترل «خواندن همه» نیز فقط آیکنی است و aria-label/title فارسی و انگلیسی حفظ شده است. این نسخه همچنین اصلاحات V2Ray/Xray نسخه rc.370 را نیز در Source کامل خود دارد. هیچ تغییری در Outbound Policy، routing، TP27، VXLAN، Tunnel/Spoof dataplane، Accounting، quota، provisioning، credential generation، firewall، update API یا protocol dataplane انجام نشده است. Source candidate روی SHA immutable cb0cbc0c7fceccd0033f37a19dd7525c32988390 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.371 publishes the final Admin UI refinement: on /admin/outbounds, the System & Maintenance / Update Center dropdown is no longer clipped behind sticky headers or by the dropdown container, so the full update card remains visible. Admin notification read/unread status text is removed and replaced by eye-based states: unread is shown as a purple crossed eye and read as a green eye. The mark-all-read control is icon-only while preserving Persian/English aria-label and title accessibility. This source also includes the V2Ray/Xray refinements from rc.370. No outbound policy, routing, TP27, VXLAN, tunnel/spoof dataplane, accounting, quota, provisioning, credential generation, firewall, update API, or protocol dataplane behavior is changed. The candidate source is pinned to immutable SHA cb0cbc0c7fceccd0033f37a19dd7525c32988390."
   }
 }
