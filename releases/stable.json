@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.400",
+  "version": "1.1.0-rc.401",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-30T22:17:48Z",
+  "released_at": "2026-10-30T22:27:07Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "a62eeee247c1b0144d60965bdd554727c4049351",
+  "source_sha": "cbae252960c5a3346e4539df0865fd08673bb211",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.400/twinpanel-1.1.0-rc.400-linux-x86_64.tar.gz",
-    "sha256": "b479e473c6b7591ca4c187f1e39d3a88009191e218ff334e8918709319e11c46",
-    "size_bytes": 28727157
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.401/twinpanel-1.1.0-rc.401-linux-x86_64.tar.gz",
+    "sha256": "5c830b5899c9cf7fbfd0db8dd82ba1c6d47f87fef07d6230421b6d835ed0c9de",
+    "size_bytes": 28745978
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.400 لوگوی SSH منوی TWINPANEL را به طرح اصلی توافق‌شده برمی‌گرداند: همان هندسه 5 ستونه، رندر با space روی پس‌زمینه سفید ترمینال، بدون کاراکتر بلوکی █ و بدون کش‌دادن مصنوعی دو ستونه که در Bitvise باعث wrap می‌شد. Source روی SHA immutable a62eeee247c1b0144d60965bdd554727c4049351 قفل شده است؛ این Release به TP27/VXLAN/Tunnel/Spoof/accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane دست نمی‌زند.",
-    "en": "TwinPanel 1.1.0-rc.400 restores the agreed original SSH TWINPANEL wordmark: the same 5-column geometry rendered with spaces on a white terminal background, without block glyphs such as █ and without artificial two-column stretching that caused wrapping in Bitvise. The source is pinned to immutable SHA a62eeee247c1b0144d60965bdd554727c4049351 and does not modify TP27/VXLAN, Tunnel, Spoof, accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane logic."
+    "fa": "TwinPanel 1.1.0-rc.401 مرکز انتقال اکانت‌ها را داخل پنل مدیریت قابل مشاهده می‌کند و اصلاحات صفحه قالب‌های فروشگاه را نیز منتشر می‌کند. Migration Center برای Sanaei/3x-ui، Marzban و Pasargad شامل تاریخچه Importهای انجام‌شده، Dry-run فایل JSON و Import کنترل‌شده روی User موجود TwinPanel است. همچنین نام و توضیح قالب‌های فروشگاه ساده و فارسی شده‌اند (قالب یک، قالب دو، قالب سه) و متن‌های اضافی نمایشی حذف شده‌اند. Source روی SHA immutable cbae252960c5a3346e4539df0865fd08673bb211 قفل شده است؛ این Release به TP27/VXLAN/Tunnel/Spoof/accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane دست نمی‌زند.",
+    "en": "TwinPanel 1.1.0-rc.401 exposes the Migration Center in the admin panel and publishes the storefront template copy refinements. Migration Center supports Sanaei/3x-ui, Marzban and Pasargad with imported-record history, JSON dry-run and controlled import into an existing TwinPanel user. Storefront template cards are simplified and localized as Template One/Two/Three equivalents in Persian, with extra visible slug/version copy removed. The source is pinned to immutable SHA cbae252960c5a3346e4539df0865fd08673bb211 and does not modify TP27/VXLAN, Tunnel, Spoof, accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane logic."
   }
 }
