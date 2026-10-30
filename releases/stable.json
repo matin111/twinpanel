@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.368",
+  "version": "1.1.0-rc.369",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-30T00:43:58Z",
+  "released_at": "2026-10-30T01:00:02Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "eb1d96f57dcf6cc27ddb59f23dfc9ee50b71503c",
+  "source_sha": "ace7212f7183f7a77ae8334eac722519777930f9",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.368/twinpanel-1.1.0-rc.368-linux-x86_64.tar.gz",
-    "sha256": "47248f773112f9784d419d750ea7be3f9c0ab5a107e9d3c159847083bed346c6",
-    "size_bytes": 28685948
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.369/twinpanel-1.1.0-rc.369-linux-x86_64.tar.gz",
+    "sha256": "1464d620c294eacc7af0c61b4908086f71eb5145c3a373f7397c2880f02f021f",
+    "size_bytes": 28684593
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.368 خوانایی Light Mode صفحه /admin/outbounds را اصلاح می‌کند: رنگ متن اصلی و ثانویه، placeholder، input/select/textarea، tabها، badgeها، کنترل‌های disabled و کارت‌ها/پنل‌ها با کنتراست مناسب روی پس‌زمینه روشن نمایش داده می‌شوند. Dark Mode و تمام منطق Outbound Policy، routing، TP27، VXLAN، Tunnel/Spoof dataplane، Accounting، quota، provisioning، credential generation، firewall و protocol dataplane بدون تغییر باقی می‌مانند. Source candidate روی SHA immutable eb1d96f57dcf6cc27ddb59f23dfc9ee50b71503c قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.368 fixes Light Mode readability on /admin/outbounds by increasing contrast for primary/secondary text, placeholders, inputs/selects/textarea, tabs, badges, disabled controls, cards and panels against light backgrounds. Dark Mode and all outbound policy, routing, TP27, VXLAN, tunnel/spoof dataplane, accounting, quota, provisioning, credential generation, firewall and protocol dataplane behavior remain unchanged. The candidate source is pinned to immutable SHA eb1d96f57dcf6cc27ddb59f23dfc9ee50b71503c."
+    "fa": "TwinPanel 1.1.0-rc.369 رفتار استاندارد مرکز بروزرسانی را در /admin/outbounds بازیابی می‌کند تا کارت بروزرسانی، وضعیت نسخه و اعلان وجود نسخه جدید مانند سایر صفحات Admin در منوی سیستم و نگهداری در دسترس باشد. همچنین رابط اعلان‌های مدیریت در فارسی و انگلیسی اصلاح شده است: دکمه «خواندن همه اعلان‌ها» / «Mark all as read» کامل نمایش داده می‌شود و چیدمان RTL/LTR و موبایل پایدار است. هیچ تغییری در Outbound Policy، routing، TP27، VXLAN، Tunnel/Spoof dataplane، Accounting، quota، provisioning، credential generation، firewall یا protocol dataplane انجام نشده است. Source candidate روی SHA immutable ace7212f7183f7a77ae8334eac722519777930f9 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.369 restores the standard Update Center behavior on /admin/outbounds so release status and update availability work like the rest of the Admin shell under System & Maintenance. It also fixes the Admin notifications UI in Persian and English: the full ‘Read all notifications’ / ‘Mark all as read’ control is visible with stable RTL/LTR and mobile layout. No outbound policy, routing, TP27, VXLAN, tunnel/spoof dataplane, accounting, quota, provisioning, credential generation, firewall, or protocol dataplane behavior is changed. The candidate source is pinned to immutable SHA ace7212f7183f7a77ae8334eac722519777930f9."
   }
 }
