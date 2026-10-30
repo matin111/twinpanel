@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.373",
+  "version": "1.1.0-rc.374",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-30T01:41:38Z",
+  "released_at": "2026-10-30T01:57:03Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b34aaf2dda63d689b3fdb74c262a9f3763be4166",
+  "source_sha": "8e4d1213b3216625cae74e06bd6259a8a759e4d2",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.373/twinpanel-1.1.0-rc.373-linux-x86_64.tar.gz",
-    "sha256": "78ff31cecd8aad1899e5efd6f49237d90c88b3293efb3419f9585588640d36ef",
-    "size_bytes": 28683771
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.374/twinpanel-1.1.0-rc.374-linux-x86_64.tar.gz",
+    "sha256": "1f5ad8fb436be5d5d3d560a6500eb757ad50a12a83cfe2fa8009e5c45ce583c9",
+    "size_bytes": 28684065
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.373 گزینه «مرکز بروزرسانی» را در منوی «سیستم و نگهداری» صفحه /admin/outbounds بازیابی می‌کند. Root Cause یک selector بیش‌ازحد گسترده در CSS اختصاصی Outbound بود که هر کلاس شامل foot را مخفی می‌کرد و در نتیجه .system-release-footer نیز ناخواسته حذف می‌شد. selector اکنون System Release Footer را مستثنا می‌کند و Regression Test اختصاصی برای جلوگیری از بازگشت این مشکل اضافه شده است. این Source همچنین اصلاح اتصال Credential پروتکل‌های Naive و ShadowTLS به حساب مرکزی Subscription را که در candidate قبلی وجود داشت حفظ می‌کند. هیچ تغییری در Outbound Policy، routing، TP27، VXLAN، Tunnel/Spoof dataplane، quota/accounting core، firewall یا update API انجام نشده است. Source candidate روی SHA immutable b34aaf2dda63d689b3fdb74c262a9f3763be4166 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.373 restores the Update Center under System & Maintenance on /admin/outbounds. The root cause was an overly broad Outbounds CSS selector that hid any class containing foot, unintentionally hiding .system-release-footer. The selector now explicitly preserves the System Release Footer and a dedicated regression smoke prevents recurrence. This source also preserves the Naive and ShadowTLS canonical Subscription credential binding included in the previous candidate. No Outbound Policy, routing, TP27, VXLAN, tunnel/spoof dataplane, quota/accounting core, firewall, or update API behavior is changed. The candidate source is pinned to immutable SHA b34aaf2dda63d689b3fdb74c262a9f3763be4166."
+    "fa": "TwinPanel 1.1.0-rc.374 اصلاح Public Connect V2Ray/Xray را منتشر می‌کند: موجودی قدیمی کانفیگ‌های تکی پایین صفحه شامل کارت‌های QR، ارسال تکی به Karing و کپی کانفیگ از نمایش مشتری حذف شده است؛ در عین حال کنترل Multi Server بالایی، جریان گروه‌بندی‌شده «مشاهده کانفیگ‌ها» و دانلود هوشمند برنامه متناسب با دستگاه حفظ می‌شوند. این تغییر فقط Presentation لایه V2Ray/Xray است و Xray generation، subscription payload semantics، TP27، VXLAN، Tunnel/Spoof dataplane، accounting، quota، provisioning، credential generation، routing، firewall و protocol dataplane را تغییر نمی‌دهد. Source candidate روی SHA immutable 8e4d1213b3216625cae74e06bd6259a8a759e4d2 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.374 publishes the Public Connect V2Ray/Xray UI cleanup: the legacy lower per-server config inventory, including QR cards, per-profile Karing actions, and copy-config actions, is removed from the customer view while the upper Multi Server controls, grouped `View configs` flow, and device-aware client download remain available. This is limited to the V2Ray/Xray presentation layer and does not change Xray generation, subscription payload semantics, TP27, VXLAN, tunnel/spoof dataplane, accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane. The candidate source is pinned to immutable SHA 8e4d1213b3216625cae74e06bd6259a8a759e4d2."
   }
 }
