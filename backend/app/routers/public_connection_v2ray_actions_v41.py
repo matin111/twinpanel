@@ -3,6 +3,9 @@ from __future__ import annotations
 from . import public_connection_all_multilink_v34 as multilink
 from . import public_connection_modern_delivery_v13 as modern_delivery
 from .public_connection_mobile_sheet_v42 import refine_public_connection_mobile_sheet_v42
+from .public_connection_request_backpressure_v1 import (
+    refine_public_connection_request_backpressure_v1,
+)
 from .public_connection_v2ray_multilink_v43 import apply_v2ray_multilink_v43
 
 
@@ -131,4 +134,5 @@ def refine_public_connection_v2ray_actions_v41(source: str) -> str:
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
-    return refine_public_connection_mobile_sheet_v42(source)
+    source = refine_public_connection_mobile_sheet_v42(source)
+    return refine_public_connection_request_backpressure_v1(source)
