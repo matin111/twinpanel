@@ -1,0 +1,43 @@
+name: TwinPanel API DB Lock Timeout V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/database.py'
+      - '.github/workflows/api-db-lock-timeout-v1-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify bounded PostgreSQL lock waits
+        run: |
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          path = Path('backend/app/database.py')
+          source = path.read_text()
+          tree = ast.parse(source)
+
+          calls = [
+              node for node in ast.walk(tree)
+              if isinstance(node, ast.Call)
+              and isinstance(node.func, ast.Name)
+              and node.func.id == 'create_engine'
+          ]
+          assert len(calls) == 1, f'expected one create_engine call, got {len(calls)}'
+
+          kwargs = {kw.arg: kw.value for kw in calls[0].keywords if kw.arg}
+          assert 'connect_args' in kwargs, 'create_engine connect_args missing'
+          value = ast.literal_eval(kwargs['connect_args'])
+          assert value == {'options': '-c lock_timeout=3000'}, value
+          assert 'TWINPANEL_API_DB_LOCK_TIMEOUT_V1' in source
+          print('API DB lock timeout contract OK')
+          PY
+
+      - name: Compile database module
+        run: python3 -m py_compile backend/app/database.py
