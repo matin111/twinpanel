@@ -15,6 +15,7 @@ from ..subscription_override_models import (
     get_subscription_override,
 )
 from ..subscription_plan_schema import ensure_subscription_plan_schema
+from .migration_center_v1 import router as migration_center_v1_router
 from .subscription_delivery_policy_v1 import DeliveryPolicyIn, put_delivery_policy
 from .subscriptions import subscription_out
 
@@ -211,3 +212,10 @@ def admin_create_v2(
 
     db.refresh(sub)
     return _enriched_payload(db, sub)
+
+
+# main.py already mounts this aggregate with prefix="/v1". Appending the
+# independently protected migration routes keeps the public paths at
+# /v1/admin/migration-center/* without changing main.py or legacy subscription
+# endpoints. This phase is dry-run only and carries no database dependency.
+router.routes.extend(migration_center_v1_router.routes)
