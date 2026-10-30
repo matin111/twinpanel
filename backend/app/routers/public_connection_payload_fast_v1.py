@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -37,3 +38,25 @@ def public_connection_payload_fast_v1(
         2,
     )
     return info
+
+
+# The active Public Connect page composes V13/V14/V15/V16 refiners after Hub V5.
+# Those modules historically imported account_delivery._public_payload directly,
+# causing four extra eager V2Ray/Xray QR-generation passes after the Hub payload
+# had already been made lightweight. Rebind only the already-loaded presentation
+# modules to this read-only payload. Their config/download paths consume the same
+# credentials/items and do not depend on the omitted legacy V2Ray QR field.
+def install_public_connection_fast_payload_refiners_v1() -> None:
+    module_names = (
+        "app.routers.public_connection_modern_delivery_v13",
+        "app.routers.public_connection_modern_names_v14",
+        "app.routers.public_connection_modern_import_v15",
+        "app.routers.public_connection_modern_delivery_v16",
+    )
+    for module_name in module_names:
+        module = sys.modules.get(module_name)
+        if module is not None and hasattr(module, "_public_payload"):
+            module._public_payload = public_connection_payload_fast_v1
+
+
+install_public_connection_fast_payload_refiners_v1()
