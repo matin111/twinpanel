@@ -23,7 +23,8 @@ def main() -> None:
     require("!= \"wireguard\"" in fast, "fast payload must scope eager QR to WireGuard only")
     require("item[\"qr\"] = _qr_data_uri(item[\"config\"])" in fast,
             "WireGuard QR compatibility missing")
-    require("v2ray" not in fast.lower(), "fast payload must not eagerly generate V2Ray QR")
+    require("_qr_data_uri(item[\"uri\"])" not in fast,
+            "fast payload must not eagerly generate V2Ray/Xray QR")
 
     require("public_connection_payload_fast_v1" in live, "live hub does not import fast payload")
     require("_public_connection_hub_v5_module._public_payload = public_connection_payload_fast_v1" in live,
