@@ -69,35 +69,49 @@ state_badge(){
 }
 
 brand_row(){
-  local glyph cell i
+  local glyph cell i cols pixel gap
+  cols="${COLUMNS:-0}"
+  if [[ ! "$cols" =~ ^[0-9]+$ || "$cols" -le 0 ]]; then
+    cols="$(tput cols 2>/dev/null || printf '80')"
+  fi
+  pixel=' '
+  gap=' '
+  if (( cols >= 104 )); then
+    pixel='  '
+  fi
+
   printf '  '
   for glyph in "$@"; do
     for ((i=0; i<${#glyph}; i++)); do
       cell="${glyph:i:1}"
       if [[ "$cell" == "1" ]]; then
         if [[ -n "$C_WHITE_BG" ]]; then
-          printf '%b  %b' "$C_WHITE_BG" "$C_RESET"
+          printf '%b%s%b' "$C_WHITE_BG" "$pixel" "$C_RESET"
         else
-          printf '##'
+          if [[ "$pixel" == '  ' ]]; then
+            printf '##'
+          else
+            printf '#'
+          fi
         fi
       else
-        printf '  '
+        printf '%s' "$pixel"
       fi
     done
-    printf '  '
+    printf '%s' "$gap"
   done
   printf '\n'
 }
 
 brand(){
   printf '\n'
-  brand_row '1111111' '11   11' '1111111' '11   11' '111111 ' ' 11111 ' '11   11' '1111111' '11     '
-  brand_row '  111  ' '11   11' '  111  ' '111  11' '11   11' '11   11' '111  11' '11     ' '11     '
-  brand_row '  111  ' '11   11' '  111  ' '1111 11' '11   11' '11   11' '1111 11' '11     ' '11     '
-  brand_row '  111  ' '11 1 11' '  111  ' '11 1111' '111111 ' '1111111' '11 1111' '111111 ' '11     '
-  brand_row '  111  ' '1111111' '  111  ' '11  111' '11     ' '11   11' '11  111' '11     ' '11     '
-  brand_row '  111  ' '111 111' '  111  ' '11   11' '11     ' '11   11' '11   11' '11     ' '11     '
-  brand_row '  111  ' '11   11' '1111111' '11   11' '11     ' '11   11' '11   11' '1111111' '1111111'
+  brand_row '11111' '10001' '11111' '10001' '11110' '01110' '10001' '11111' '10000'
+  brand_row '00100' '10001' '00100' '11001' '10001' '10001' '11001' '10000' '10000'
+  brand_row '00100' '10001' '00100' '10101' '10001' '10001' '10101' '10000' '10000'
+  brand_row '00100' '10101' '00100' '10101' '11110' '11111' '10101' '11110' '10000'
+  brand_row '00100' '10101' '00100' '10011' '10000' '10001' '10011' '10000' '10000'
+  brand_row '00100' '11011' '00100' '10011' '10000' '10001' '10011' '10000' '10000'
+  brand_row '00100' '11011' '11111' '10001' '10000' '10001' '10001' '11111' '11111'
   printf '\n'
 }
 
