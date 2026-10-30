@@ -57,10 +57,64 @@ def _write_with_rollback(path: Path, content: str, mode: int) -> tuple[str | Non
     return old_content, old_mode
 
 
+def _snapshot_enabled_entry(enabled: Path) -> dict[str, object]:
+    if enabled.is_symlink():
+        return {
+            "kind": "symlink",
+            "target": os.readlink(enabled),
+        }
+
+    if enabled.exists():
+        if not enabled.is_file():
+            raise RuntimeError("unsupported_enabled_entry_type")
+        return {
+            "kind": "file",
+            "content": enabled.read_text(encoding="utf-8"),
+            "mode": enabled.stat().st_mode & 0o777,
+        }
+
+    return {"kind": "missing"}
+
+
+def _ensure_enabled_symlink(path: Path, enabled: Path) -> None:
+    if enabled.is_symlink():
+        try:
+            if enabled.resolve(strict=False) == path.resolve(strict=False):
+                return
+        except OSError:
+            pass
+
+    if os.path.lexists(enabled):
+        enabled.unlink()
+
+    enabled.symlink_to(path)
+
+
+def _restore_enabled_entry(enabled: Path, state: dict[str, object]) -> None:
+    if os.path.lexists(enabled):
+        enabled.unlink()
+
+    kind = state.get("kind")
+
+    if kind == "missing":
+        return
+
+    if kind == "symlink":
+        enabled.symlink_to(str(state.get("target") or ""))
+        return
+
+    if kind == "file":
+        enabled.write_text(str(state.get("content") or ""), encoding="utf-8")
+        mode = state.get("mode")
+        if isinstance(mode, int):
+            os.chmod(enabled, mode)
+        return
+
+    raise RuntimeError("unsupported_enabled_snapshot")
+
+
 def _restore_site(
     path: Path,
-    enabled: Path,
-    enabled_existed: bool,
     old_content: str | None,
     old_mode: int | None,
 ) -> None:
@@ -73,12 +127,6 @@ def _restore_site(
         path.write_text(old_content, encoding="utf-8")
         if old_mode is not None:
             os.chmod(path, old_mode)
-
-    if not enabled_existed:
-        try:
-            enabled.unlink()
-        except FileNotFoundError:
-            pass
 
 
 def refresh_frontdoor_map() -> None:
@@ -167,17 +215,18 @@ server {{
 }}
 """
 
-    enabled_existed = enabled.exists() or enabled.is_symlink()
+    enabled_state = _snapshot_enabled_entry(enabled)
     old_content, old_mode = _write_with_rollback(
         path,
         config,
         0o600 if kind == "api" else 0o644,
     )
 
-    if not enabled_existed:
-        enabled.symlink_to(path)
-
     try:
+        # Historical installs may contain an independent regular file under
+        # sites-enabled. Always converge the active entry to the canonical
+        # sites-available file so renderer updates actually reach Nginx.
+        _ensure_enabled_symlink(path, enabled)
         refresh_frontdoor_map()
 
         test = subprocess.run(
@@ -198,11 +247,10 @@ server {{
     except Exception:
         _restore_site(
             path,
-            enabled,
-            enabled_existed,
             old_content,
             old_mode,
         )
+        _restore_enabled_entry(enabled, enabled_state)
         try:
             refresh_frontdoor_map()
             rollback_test = subprocess.run(
