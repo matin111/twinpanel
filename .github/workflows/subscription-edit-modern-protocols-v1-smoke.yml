@@ -1,0 +1,43 @@
+name: Subscription Edit Modern Protocols V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/legacy-subscriptions-exact.tsx'
+      - 'backend/app/routers/subscription_protocol_lifecycle_v2.py'
+      - 'backend/app/protocol_account_registry.py'
+      - '.github/workflows/subscription-edit-modern-protocols-v1-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify edit UI and backend lifecycle contract
+        run: |
+          node <<'NODE'
+          const fs=require('fs');
+          const ui=fs.readFileSync('components/legacy-subscriptions-exact.tsx','utf8');
+          const backend=fs.readFileSync('backend/app/routers/subscription_protocol_lifecycle_v2.py','utf8');
+          const registry=fs.readFileSync('backend/app/protocol_account_registry.py','utf8');
+          const protocols=['cisco','openvpn','wireguard','l2tp','v2ray','hysteria2','tuic','anytls','naive','shadowtls','snell','mieru','trusttunnel','amneziawg','sudoku'];
+          for(const p of protocols){
+            if(!ui.includes(`\"${p}\"`)) throw new Error(`edit UI missing protocol ${p}`);
+            if(!registry.includes(`\"${p}\"`)) throw new Error(`registry missing protocol ${p}`);
+          }
+          if(!ui.includes('modernProtocolKeys')) throw new Error('modern protocol catalog marker missing');
+          if(!ui.includes('Runtime readiness is checked on save')) throw new Error('modern runtime save-time contract missing');
+          if(ui.includes('try{await adminApi.provisionSubscription(n(created.id));}catch{}')) throw new Error('legacy duplicate create provisioning still present');
+          if(!backend.includes('Canonical SubscriptionProtocol lifecycle for all 15 protocols')) throw new Error('backend 15-protocol edit lifecycle missing');
+          if(!backend.includes('_provision_modern_protocol')) throw new Error('backend modern provision path missing');
+          if(!backend.includes('protocol_removed_v2')) throw new Error('backend removed-protocol revoke contract missing');
+          console.log('SUBSCRIPTION_EDIT_MODERN_PROTOCOLS_V1_OK');
+          NODE
+      - name: Build frontend
+        run: |
+          npm ci
+          npm run build
