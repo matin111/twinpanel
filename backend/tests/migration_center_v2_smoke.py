@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib.util
 from pathlib import Path
 
 
@@ -55,6 +54,14 @@ def test_phase2_keeps_legacy_delivery_separate() -> None:
     assert "legacy_payload(db, token)" in router
     assert 'prefix="/admin/migration-center"' in router
     assert "dependencies=[Depends(require_admin)]" in router
+
+
+def test_phase2_exposes_admin_import_history() -> None:
+    router = _text(ROUTER_PATH)
+    assert '@admin_router.get("/imports")' in router
+    assert "MigrationImportRecord.created_at.desc()" in router
+    assert '"subscription_id": marker.subscription_id' in router
+    assert '"account_username": sub.account_username if sub else None' in router
 
 
 def test_phase2_registration_does_not_rewrite_main() -> None:
