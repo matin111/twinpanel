@@ -45,7 +45,16 @@ from .public_connection_canonical_mobile_v26 import (
 )
 from .public_connection_files_v9 import router as public_connection_files_v9_router
 from .public_connection_multilink_v7 import router as public_connection_multilink_v7_router
+from . import public_connection_hub_v5 as _public_connection_hub_v5_module
 from .public_connection_hub_v5 import public_connection_hub_v5
+from .public_connection_payload_fast_v1 import public_connection_payload_fast_v1
+
+
+# TWINPANEL_PUBLIC_CONNECT_PAYLOAD_FAST_V1
+# Hub V5 still imports the legacy payload symbol for compatibility. Point only
+# the Hub module's global lookup at the lightweight page payload so unrelated
+# account-delivery endpoints retain their historical QR behavior.
+_public_connection_hub_v5_module._public_payload = public_connection_payload_fast_v1
 
 
 router = APIRouter(
