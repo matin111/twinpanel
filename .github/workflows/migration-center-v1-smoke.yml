@@ -1,0 +1,37 @@
+name: Migration Center V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/services/migration_center_v1.py"
+      - "backend/app/routers/migration_center_v1.py"
+      - "backend/app/routers/subscription_admin_v2.py"
+      - "backend/tests/migration_center_v1_smoke.py"
+      - ".github/workflows/migration-center-v1-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migration-center-v1-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile Phase 1 modules
+        run: |
+          python -m py_compile \
+            backend/app/services/migration_center_v1.py \
+            backend/app/routers/migration_center_v1.py \
+            backend/app/routers/subscription_admin_v2.py \
+            backend/tests/migration_center_v1_smoke.py
+
+      - name: Run Migration Center smoke
+        run: python backend/tests/migration_center_v1_smoke.py
