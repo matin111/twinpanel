@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.399",
+  "version": "1.1.0-rc.400",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-30T22:00:22Z",
+  "released_at": "2026-10-30T22:17:48Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "33d996703304478cfbb862f4c49ab35453311be9",
+  "source_sha": "a62eeee247c1b0144d60965bdd554727c4049351",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.399/twinpanel-1.1.0-rc.399-linux-x86_64.tar.gz",
-    "sha256": "11c15829d323a80322d258a078577929b68da89f1981dd3fe57951b3a1d850a0",
-    "size_bytes": 28729855
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.400/twinpanel-1.1.0-rc.400-linux-x86_64.tar.gz",
+    "sha256": "b479e473c6b7591ca4c187f1e39d3a88009191e218ff334e8918709319e11c46",
+    "size_bytes": 28727157
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.399 تجربه حذف اشتراک را بدون تغییر در Hard Delete واقعی Backend سریع می‌کند: ردیف و آمار اشتراک بلافاصله به‌صورت Optimistic در UI بروزرسانی می‌شوند، مسیر حذف دیگر منتظر reload کامل subscriptions/users/plans/nodes نمی‌ماند و busy سراسری صفحه را فعال نمی‌کند. اگر DELETE Backend خطا بدهد، snapshot قبلی برگردانده می‌شود و reconcile غیرمسدودکننده انجام می‌شود. Source روی SHA immutable 33d996703304478cfbb862f4c49ab35453311be9 قفل شده است؛ این Release به TP27/VXLAN/Tunnel/Spoof/accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane دست نمی‌زند.",
-    "en": "TwinPanel 1.1.0-rc.399 removes the perceived multi-second freeze from subscription deletion without changing the backend hard-delete semantics: the row and derived stats update optimistically, Delete no longer waits for a full subscriptions/users/plans/nodes reload, and it does not set the page-wide busy state. If the backend DELETE fails, the previous snapshot is restored and a non-blocking reconciliation load is started. The source is pinned to immutable SHA 33d996703304478cfbb862f4c49ab35453311be9 and does not modify TP27/VXLAN, Tunnel, Spoof, accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane logic."
+    "fa": "TwinPanel 1.1.0-rc.400 لوگوی SSH منوی TWINPANEL را به طرح اصلی توافق‌شده برمی‌گرداند: همان هندسه 5 ستونه، رندر با space روی پس‌زمینه سفید ترمینال، بدون کاراکتر بلوکی █ و بدون کش‌دادن مصنوعی دو ستونه که در Bitvise باعث wrap می‌شد. Source روی SHA immutable a62eeee247c1b0144d60965bdd554727c4049351 قفل شده است؛ این Release به TP27/VXLAN/Tunnel/Spoof/accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane دست نمی‌زند.",
+    "en": "TwinPanel 1.1.0-rc.400 restores the agreed original SSH TWINPANEL wordmark: the same 5-column geometry rendered with spaces on a white terminal background, without block glyphs such as █ and without artificial two-column stretching that caused wrapping in Bitvise. The source is pinned to immutable SHA a62eeee247c1b0144d60965bdd554727c4049351 and does not modify TP27/VXLAN, Tunnel, Spoof, accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane logic."
   }
 }
