@@ -1,0 +1,44 @@
+name: TEMP widen SSH logo
+
+on:
+  push:
+    branches:
+      - fix/ssh-menu-wider-logo
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/ssh-menu-wider-logo
+          fetch-depth: 0
+      - name: Widen SSH logo renderer only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/twinpanel-menu.sh')
+          s = p.read_text()
+          old = 'if (( cols >= 104 )); then'
+          new = 'if (( cols >= 88 )); then'
+          if s.count(old) != 1:
+              raise SystemExit(f'expected exactly one renderer threshold, found {s.count(old)}')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          git diff --check
+          git diff -- scripts/twinpanel-menu.sh
+      - name: Commit targeted patch and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/temp-widen-ssh-logo.yml
+          git add scripts/twinpanel-menu.sh
+          git commit -m 'Widen SSH menu logo on normal terminal widths'
+          git push origin HEAD:fix/ssh-menu-wider-logo
