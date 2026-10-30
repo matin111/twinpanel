@@ -163,7 +163,23 @@ export function LegacySubscriptionsRuntimePage(){
   const openExtend=(item:RuntimeRow)=>{setSelected(item);setExtendDays(30);setExtendTraffic(10);setModal("extend");};
   const saveExtend=()=>{if(!selected)return;void act("extend",pick("اشتراک تمدید شد","Subscription extended"),()=>legacyAdminApi.extendSubscription(n(selected.id),{add_days:extendDays,add_traffic_gb:extendTraffic}),true);};
   const toggleStatus=async(item:RuntimeRow)=>{const activate=s(item.status).toLowerCase()!=="active";await act(`status-${item.id}`,activate?pick("اشتراک فعال شد","Subscription activated"):pick("اشتراک معلق شد","Subscription suspended"),()=>adminApi.setSubscriptionActive(n(item.id),activate));};
-  const remove=async(item:RuntimeRow)=>{const user=userMap.get(n(item.user_id));if(!window.confirm(pick(`اشتراک ${user?.full_name||user?.email||`#${item.id}`} حذف شود؟ این عملیات قابل بازگشت نیست.`,`Delete subscription #${item.id}? This cannot be undone.`)))return;await act(`delete-${item.id}`,pick("اشتراک حذف شد","Subscription deleted"),()=>adminApi.deleteSubscription(n(item.id)));};
+  const remove=async(item:RuntimeRow)=>{
+    const id=n(item.id);if(id<=0)return;
+    const user=userMap.get(n(item.user_id));
+    if(!window.confirm(pick(`اشتراک ${user?.full_name||user?.email||`#${item.id}`} حذف شود؟ این عملیات قابل بازگشت نیست.`,`Delete subscription #${item.id}? This cannot be undone.`)))return;
+    const snapshot=rows;
+    setError("");setOk("");
+    setRows(current=>current.filter(row=>n(row.id)!==id));
+    setSelected(current=>n(current?.id)===id?null:current);
+    try{
+      await adminApi.deleteSubscription(id);
+      setOk(pick("اشتراک حذف شد","Subscription deleted"));
+    }catch(reason){
+      setRows(snapshot);
+      setError(reason instanceof Error?reason.message:String(reason));
+      void load(true);
+    }
+  };
 
   const loadConnection=async(item:RuntimeRow)=>{setSelected(item);setConnection(null);setModal("connect");setBusy("connection");setError("");try{const data=await adminApi.subscriptionConnectionInfo(n(item.id));setConnection(data);const first=(Array.isArray(data.credentials)?data.credentials:[])[0] as RuntimeRow|undefined;setActiveProtocol(s(first?.protocol)||"cisco");}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}};
   const openSubscriptionLink=async(item:RuntimeRow)=>{
