@@ -6,9 +6,10 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import require_admin
-from ..models import Plan, Subscription
+from ..models import Plan, ProtocolCredential, Subscription, SubscriptionStatus
 from ..protocol_account_registry import normalize_protocols, registry_payload
 from ..services.subscription_factory import create_subscription_core
+from ..subscription_enforcement import queue_subscription_enforcement
 from ..subscription_override_models import (
     SubscriptionRuntimeOverride,
     effective_device_limit,
@@ -85,6 +86,49 @@ def _enriched_payload(db: Session, sub: Subscription) -> dict:
     return payload
 
 
+def _missing_provisioned_protocols(
+    db: Session,
+    subscription_id: int,
+    protocols: list[str],
+) -> list[str]:
+    rows = (
+        db.query(ProtocolCredential)
+        .filter(
+            ProtocolCredential.subscription_id == subscription_id,
+            ProtocolCredential.protocol.in_(protocols),
+        )
+        .all()
+    )
+    ready = {
+        str(row.protocol).strip().lower()
+        for row in rows
+        if bool(row.is_active)
+        and bool(str(row.config_text_encrypted or "").strip())
+    }
+    return [protocol for protocol in protocols if protocol not in ready]
+
+
+def _fail_created_subscription(
+    db: Session,
+    sub: Subscription,
+    *,
+    reason: str,
+) -> None:
+    sub.status = SubscriptionStatus.SUSPENDED
+    try:
+        queue_subscription_enforcement(
+            db,
+            sub,
+            command_type="revoke_subscription",
+            reason=reason,
+        )
+    except Exception:
+        # Creation must still be marked non-active even if cleanup queueing has
+        # its own transient failure. Reconcile/retry can safely repair it later.
+        pass
+    db.commit()
+
+
 @router.get("/protocol-catalog")
 def subscription_protocol_catalog():
     return {"protocols": registry_payload()}
@@ -101,7 +145,7 @@ def admin_list_v2(db: Session = Depends(get_db)):
 
 
 @router.post("/admin-create-v2")
-def admin_create_v2(
+async def admin_create_v2(
     payload: AdminSubscriptionCreateV2,
     db: Session = Depends(get_db),
 ):
@@ -211,7 +255,83 @@ def admin_create_v2(
         db.commit()
 
     db.refresh(sub)
-    return _enriched_payload(db, sub)
+
+    # Creation is not complete until the real protocol accounts/configs exist on
+    # the selected Exit nodes and quota state has been synchronized. Keeping this
+    # backend-owned prevents UI/store/reseller callers from accidentally creating
+    # a DB-only ACTIVE subscription.
+    try:
+        from .modern_account_delivery_v1 import provision_account_v1
+
+        provisioning = await provision_account_v1(
+            subscription_id=sub.id,
+            db=db,
+        )
+    except HTTPException as exc:
+        _fail_created_subscription(
+            db,
+            sub,
+            reason="subscription_create_provision_failed",
+        )
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "ساخت اشتراک کامل نشد؛ Provisioning ناموفق بود",
+                "subscription_id": sub.id,
+                "provision_error": exc.detail,
+            },
+        ) from exc
+    except Exception as exc:
+        db.rollback()
+        sub = db.get(Subscription, sub.id)
+        if sub is not None:
+            _fail_created_subscription(
+                db,
+                sub,
+                reason="subscription_create_provision_exception",
+            )
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "ساخت اشتراک کامل نشد؛ خطای Provisioning رخ داد",
+                "subscription_id": sub.id if sub is not None else None,
+                "provision_error": str(exc)[:800],
+            },
+        ) from exc
+
+    missing_protocols = _missing_provisioned_protocols(
+        db,
+        sub.id,
+        requested_protocols,
+    )
+    provision_errors = list(provisioning.get("errors") or [])
+    quota_ok = bool((provisioning.get("quota") or {}).get("ok", True))
+
+    if missing_protocols or provision_errors or not quota_ok or not provisioning.get("ok", False):
+        _fail_created_subscription(
+            db,
+            sub,
+            reason="subscription_create_postcondition_failed",
+        )
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "ساخت اشتراک ناقص بود و فعال نشد",
+                "subscription_id": sub.id,
+                "missing_protocols": missing_protocols,
+                "provision_errors": provision_errors,
+                "quota": provisioning.get("quota"),
+            },
+        )
+
+    db.refresh(sub)
+    result = _enriched_payload(db, sub)
+    result["provisioning"] = {
+        "ok": True,
+        "protocols": requested_protocols,
+        "quota": provisioning.get("quota"),
+    }
+    return result
 
 
 # main.py already mounts this aggregate with prefix="/v1". Appending the
