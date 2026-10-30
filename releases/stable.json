@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.402",
+  "version": "1.1.0-rc.403",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-30T22:40:22Z",
+  "released_at": "2026-10-30T22:45:06Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "932f902c45faccb66b6525a4ebb788bdf1faac2e",
+  "source_sha": "a984c47b6bcb7c7f15da9bc36ccf107336b48361",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.402/twinpanel-1.1.0-rc.402-linux-x86_64.tar.gz",
-    "sha256": "b881b0a14605eadc39c5db3c2d962ae28275ac9f717cdd4bac4dc0e64e54f235",
-    "size_bytes": 28747212
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.403/twinpanel-1.1.0-rc.403-linux-x86_64.tar.gz",
+    "sha256": "5154c5e41d29c2ab3952010ba4158f5cf3ff848cfadc843a52afb59ec4705a95",
+    "size_bytes": 28747165
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.402 ظاهر لوگوی TWINPANEL در منوی SSH را برای خوانایی بهتر در Bitvise اصلاح می‌کند. هندسه ۵ ستونه و renderer فعلی با space و پس‌زمینه سفید حفظ شده، اما stroke حروف پُرتر شده است؛ بدون استفاده از کاراکتر بلوکی، بدون افزایش عرض کلی و بدون بازگشت مشکل wrap. Source روی SHA immutable 932f902c45faccb66b6525a4ebb788bdf1faac2e قفل شده است. این Release به TP27/VXLAN/Tunnel/Spoof/accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane دست نمی‌زند.",
-    "en": "TwinPanel 1.1.0-rc.402 refines the TWINPANEL SSH menu wordmark for better Bitvise readability. The existing 5-column geometry and white-background space renderer are preserved while the glyph strokes are made bolder, without block characters, extra overall width, or reintroducing wrapping. The source is pinned to immutable SHA 932f902c45faccb66b6525a4ebb788bdf1faac2e and does not modify TP27/VXLAN, Tunnel, Spoof, accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane logic."
+    "fa": "TwinPanel 1.1.0-rc.403 اصلاح Migration Center را منتشر می‌کند: نبود legacy_subscription_url دیگر رکوردهای معتبر Sanaei/3x-ui را از آماده انتقال خارج نمی‌کند؛ آمادگی بر اساس source_id، نام کاربری و credential موجود تعیین می‌شود و لینک قدیمی فقط هشدار غیرمسدودکننده است. Source روی SHA immutable a984c47b6bcb7c7f15da9bc36ccf107336b48361 قفل شده است. این Release به TP27/VXLAN/Tunnel/Spoof/accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane دست نمی‌زند.",
+    "en": "TwinPanel 1.1.0-rc.403 publishes the Migration Center readiness fix: missing legacy_subscription_url no longer blocks otherwise valid Sanaei/3x-ui records; readiness is based on source_id, username, and existing credential material while the legacy URL remains a non-blocking warning. The source is pinned to immutable SHA a984c47b6bcb7c7f15da9bc36ccf107336b48361 and does not modify TP27/VXLAN, Tunnel, Spoof, accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane logic."
   }
 }
