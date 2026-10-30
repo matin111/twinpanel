@@ -46,6 +46,73 @@ const compactHeaderCss=`
 [data-outbounds-compact] section:has(> div > h1):has(select) button{
   min-height:38px!important;
 }
+
+html[data-theme="light"] [data-outbounds-compact]{
+  --text:#171725;
+  --muted:#5f6375;
+  --panel:#ffffff;
+  --panel-2:#f7f7fb;
+  --border:#d9ddea;
+}
+html[data-theme="light"] [data-outbounds-compact] section,
+html[data-theme="light"] [data-outbounds-compact] article{
+  color:#171725;
+}
+html[data-theme="light"] [data-outbounds-compact] small,
+html[data-theme="light"] [data-outbounds-compact] label,
+html[data-theme="light"] [data-outbounds-compact] .muted,
+html[data-theme="light"] [data-outbounds-compact] [class*="muted"],
+html[data-theme="light"] [data-outbounds-compact] [class*="Meta"],
+html[data-theme="light"] [data-outbounds-compact] [class*="meta"]{
+  color:#5f6375!important;
+}
+html[data-theme="light"] [data-outbounds-compact] input,
+html[data-theme="light"] [data-outbounds-compact] select,
+html[data-theme="light"] [data-outbounds-compact] textarea{
+  color:#171725!important;
+  background:#ffffff!important;
+  border-color:#d9ddea!important;
+}
+html[data-theme="light"] [data-outbounds-compact] input::placeholder,
+html[data-theme="light"] [data-outbounds-compact] textarea::placeholder{
+  color:#8a8fa3!important;
+  opacity:1!important;
+}
+html[data-theme="light"] [data-outbounds-compact] button:not(.primary):not([class*="refresh"]){
+  color:#3f4352;
+}
+html[data-theme="light"] [data-outbounds-compact] button:disabled{
+  opacity:.68!important;
+}
+html[data-theme="light"] [data-outbounds-compact] [class*="tabActive"],
+html[data-theme="light"] [data-outbounds-compact] [class*="routePill"],
+html[data-theme="light"] [data-outbounds-compact] [class*="protocolChips"] span,
+html[data-theme="light"] [data-outbounds-compact] [class*="typeBadge"],
+html[data-theme="light"] [data-outbounds-compact] [class*="defaultBadge"]{
+  color:#5b21b6!important;
+}
+html[data-theme="light"] [data-outbounds-compact] [class*="healthOk"]{
+  color:#047857!important;
+}
+html[data-theme="light"] [data-outbounds-compact] [class*="healthIdle"],
+html[data-theme="light"] [data-outbounds-compact] [class*="healthNeutral"]{
+  color:#5f6375!important;
+}
+html[data-theme="light"] [data-outbounds-compact] h1,
+html[data-theme="light"] [data-outbounds-compact] h2,
+html[data-theme="light"] [data-outbounds-compact] h3,
+html[data-theme="light"] [data-outbounds-compact] strong,
+html[data-theme="light"] [data-outbounds-compact] b{
+  color:#171725;
+}
+html[data-theme="light"] [data-outbounds-compact] [class*="controlBar"],
+html[data-theme="light"] [data-outbounds-compact] [class*="panel"],
+html[data-theme="light"] [data-outbounds-compact] [class*="statCard"],
+html[data-theme="light"] [data-outbounds-compact] [class*="outboundCard"]{
+  background:#ffffff!important;
+  border-color:#d9ddea!important;
+}
+
 @media (max-width:720px){
   [data-outbounds-compact] section:has(> div > h1):has(select){
     padding:8px 10px!important;
