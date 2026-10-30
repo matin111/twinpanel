@@ -145,8 +145,25 @@ header(){
   printf '\n'
 }
 
+menu_letter(){
+  case "$1" in
+    0) printf 'X' ;;
+    1) printf 'A' ;;
+    2) printf 'B' ;;
+    3) printf 'C' ;;
+    4) printf 'D' ;;
+    5) printf 'E' ;;
+    6) printf 'F' ;;
+    7) printf 'G' ;;
+    8) printf 'H' ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
 menu_item(){
-  printf '  %b[%s]%b  %s\n' "$C_MAGENTA" "$1" "$C_RESET" "$2"
+  local key
+  key="$(menu_letter "$1")"
+  printf '  %b[%s]%b  %s\n' "$C_MAGENTA" "$key" "$C_RESET" "$2"
 }
 
 menu_back(){
@@ -155,13 +172,26 @@ menu_back(){
 }
 
 pick(){
+  local raw
   CHOICE=""
   printf '  '
-  if ! IFS= read -r -n 1 -p "Choose: " CHOICE; then
+  if ! IFS= read -r -n 1 -p "Choose: " raw; then
     echo
     return 1
   fi
-  echo "$CHOICE"
+  echo "$raw"
+  case "$raw" in
+    [Aa]) CHOICE=1 ;;
+    [Bb]) CHOICE=2 ;;
+    [Cc]) CHOICE=3 ;;
+    [Dd]) CHOICE=4 ;;
+    [Ee]) CHOICE=5 ;;
+    [Ff]) CHOICE=6 ;;
+    [Gg]) CHOICE=7 ;;
+    [Hh]) CHOICE=8 ;;
+    [Xx]) CHOICE=0 ;;
+    *) CHOICE="$raw" ;;
+  esac
   return 0
 }
 
@@ -172,7 +202,7 @@ pause(){
 }
 
 invalid_choice(){
-  printf '\n  %bInvalid selection. Use the menu numbers only.%b\n' "$C_RED" "$C_RESET"
+  printf '\n  %bInvalid selection. Use the menu letters only.%b\n' "$C_RED" "$C_RESET"
   pause
 }
 
@@ -398,12 +428,11 @@ admin_edit_menu(){
 admin_menu(){
   while true; do
     header "Administrator"
-    echo "  [1] Account info"
-    echo "  [2] Reset password"
-    echo "  [3] Edit account"
-    echo "  [4] Delete saved first-login file"
-    echo
-    echo "  [0] Back"
+    menu_item 1 "Account info"
+    menu_item 2 "Reset password"
+    menu_item 3 "Edit account"
+    menu_item 4 "Delete saved first-login file"
+    menu_back
     pick || return
     case "$CHOICE" in
       1) admin_account_info; pause ;;
