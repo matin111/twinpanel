@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+from datetime import datetime, timezone
 from typing import Any, Iterable
 
 
@@ -26,6 +27,13 @@ _CREDENTIAL_KEYS = (
     "config_text",
 )
 _SOURCE_ID_KEYS = ("source_id", "id", "uuid", "username", "email")
+_CANONICAL_STATE_KEYS = (
+    "traffic_limit_bytes",
+    "traffic_used_bytes",
+    "starts_at",
+    "expires_at",
+    "activation_duration_days",
+)
 
 
 def _nonempty(value: Any) -> bool:
@@ -59,17 +67,44 @@ def _json_object(value: Any) -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
+def _present_int(record: dict[str, Any], key: str) -> tuple[bool, int | None]:
+    if key not in record:
+        return False, None
+    raw = record.get(key)
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return False, None
+    try:
+        return True, int(raw)
+    except (TypeError, ValueError):
+        return True, None
+
+
+def _unix_iso(value: int, *, milliseconds: bool) -> str:
+    timestamp = value / 1000 if milliseconds else value
+    return datetime.fromtimestamp(timestamp, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 def _expand_sanaei(record: dict[str, Any]) -> list[dict[str, Any]]:
     """Expand a 3x-ui/Sanaei inbound export without mutating the source payload.
 
-    Sanaei commonly stores clients inside an inbound ``settings`` JSON object.
-    Direct client-shaped records are accepted unchanged. No network lookup or
-    credential generation is performed here.
+    Sanaei commonly stores clients inside an inbound ``settings`` JSON object
+    while per-client traffic counters live in ``clientStats``. Match those
+    counters by the existing client email; never generate or rewrite identity.
     """
     settings = _json_object(record.get("settings"))
     clients = settings.get("clients")
     if not isinstance(clients, list):
         return [deepcopy(record)]
+
+    stats_by_email: dict[str, dict[str, Any]] = {}
+    client_stats = record.get("clientStats")
+    if isinstance(client_stats, list):
+        for item in client_stats:
+            if not isinstance(item, dict):
+                continue
+            email = str(item.get("email") or "").strip()
+            if email:
+                stats_by_email[email] = item
 
     expanded: list[dict[str, Any]] = []
     for client in clients:
@@ -78,6 +113,14 @@ def _expand_sanaei(record: dict[str, Any]) -> list[dict[str, Any]]:
         candidate = deepcopy(client)
         candidate.setdefault("inbound_id", record.get("id"))
         candidate.setdefault("inbound_remark", record.get("remark"))
+        email = str(candidate.get("email") or "").strip()
+        stat = stats_by_email.get(email)
+        if stat:
+            for key in ("up", "down"):
+                if key not in candidate and key in stat:
+                    candidate[key] = deepcopy(stat[key])
+            if "expiryTime" not in candidate and "expiryTime" in stat:
+                candidate["expiryTime"] = deepcopy(stat["expiryTime"])
         expanded.append(candidate)
     return expanded or [deepcopy(record)]
 
@@ -133,6 +176,87 @@ def _credentials(source: str, record: dict[str, Any]) -> dict[str, Any]:
     return preserved
 
 
+def _migration_state(source: str, record: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Extract source account state while preserving absent-vs-zero semantics."""
+    state: dict[str, Any] = {}
+    warnings: list[str] = []
+
+    # A normalized Dry-run record is sent back to Phase 2 by the admin UI.
+    # Preserve canonical fields exactly so explicit zero/null values survive.
+    for key in _CANONICAL_STATE_KEYS:
+        if key in record:
+            state[key] = deepcopy(record[key])
+
+    if source == "sanaei":
+        if "traffic_limit_bytes" not in state:
+            present, value = _present_int(record, "totalGB")
+            if present:
+                if value is None or value < 0:
+                    warnings.append("invalid_totalGB")
+                else:
+                    state["traffic_limit_bytes"] = value
+
+        if "traffic_used_bytes" not in state:
+            up_present, up = _present_int(record, "up")
+            down_present, down = _present_int(record, "down")
+            if up_present or down_present:
+                if (up_present and (up is None or up < 0)) or (down_present and (down is None or down < 0)):
+                    warnings.append("invalid_traffic_counters")
+                else:
+                    state["traffic_used_bytes"] = (up or 0) + (down or 0)
+
+        if "expires_at" not in state:
+            present, expiry_ms = _present_int(record, "expiryTime")
+            if present:
+                if expiry_ms is None:
+                    warnings.append("invalid_expiryTime")
+                elif expiry_ms > 0:
+                    try:
+                        state["expires_at"] = _unix_iso(expiry_ms, milliseconds=True)
+                    except (OverflowError, OSError, ValueError):
+                        warnings.append("invalid_expiryTime")
+                elif expiry_ms == 0:
+                    # 3x-ui uses zero for no absolute expiration.
+                    state["expires_at"] = None
+                else:
+                    # Negative expiry values have version-dependent first-use
+                    # semantics. Do not guess or convert them into a wrong date.
+                    warnings.append("unsupported_negative_expiryTime")
+
+    elif source == "marzban":
+        if "traffic_limit_bytes" not in state:
+            present, value = _present_int(record, "data_limit")
+            if present:
+                if value is None or value < 0:
+                    warnings.append("invalid_data_limit")
+                else:
+                    state["traffic_limit_bytes"] = value
+
+        if "traffic_used_bytes" not in state:
+            present, value = _present_int(record, "used_traffic")
+            if present:
+                if value is None or value < 0:
+                    warnings.append("invalid_used_traffic")
+                else:
+                    state["traffic_used_bytes"] = value
+
+        if "expires_at" not in state:
+            present, expiry_s = _present_int(record, "expire")
+            if present:
+                if expiry_s is None or expiry_s < 0:
+                    warnings.append("invalid_expire")
+                elif expiry_s > 0:
+                    try:
+                        state["expires_at"] = _unix_iso(expiry_s, milliseconds=False)
+                    except (OverflowError, OSError, ValueError):
+                        warnings.append("invalid_expire")
+                else:
+                    # Marzban zero means no absolute expiration.
+                    state["expires_at"] = None
+
+    return state, warnings
+
+
 def normalize_record(source: str, record: dict[str, Any], index: int) -> dict[str, Any]:
     if source not in SUPPORTED_SOURCES:
         raise ValueError(f"unsupported migration source: {source}")
@@ -143,8 +267,9 @@ def normalize_record(source: str, record: dict[str, Any], index: int) -> dict[st
     legacy_url = _first(record, _LEGACY_URL_KEYS)
     credentials = _credentials(source, record)
     source_id = _first(record, _SOURCE_ID_KEYS)
+    migration_state, state_warnings = _migration_state(source, record)
 
-    warnings: list[str] = []
+    warnings: list[str] = list(state_warnings)
     blocking_warnings: list[str] = []
     if not _nonempty(source_id):
         warnings.append("missing_source_id")
@@ -161,7 +286,7 @@ def normalize_record(source: str, record: dict[str, Any], index: int) -> dict[st
         # identity and credential material required by Phase 2 import.
         warnings.append("missing_legacy_subscription_url")
 
-    return {
+    normalized = {
         "index": index,
         "source": source,
         "source_id": source_id,
@@ -175,6 +300,8 @@ def normalize_record(source: str, record: dict[str, Any], index: int) -> dict[st
         "ready_for_future_import": not blocking_warnings,
         "warnings": warnings,
     }
+    normalized.update(migration_state)
+    return normalized
 
 
 def dry_run_migration(source: str, records: list[dict[str, Any]]) -> dict[str, Any]:

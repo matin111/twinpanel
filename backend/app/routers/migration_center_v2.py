@@ -35,8 +35,8 @@ class MigrationImportIn(BaseModel):
     record: dict[str, Any]
     target_user_id: int
     protocols: list[str] = Field(default_factory=lambda: ["v2ray"], max_length=20)
-    traffic_limit_bytes: int = Field(default=0, ge=0)
-    traffic_used_bytes: int = Field(default=0, ge=0)
+    traffic_limit_bytes: int | None = Field(default=None, ge=0)
+    traffic_used_bytes: int | None = Field(default=None, ge=0)
     starts_at: datetime | None = None
     expires_at: datetime | None = None
     activation_duration_days: int | None = Field(default=None, ge=1, le=3650)
