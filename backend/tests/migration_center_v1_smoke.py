@@ -74,13 +74,36 @@ def test_pasargad_preserves_password_and_url() -> None:
     assert row["preservation"]["subscription_url"] == "preserve_existing"
 
 
-def test_missing_material_is_warning_not_generation() -> None:
+def test_missing_legacy_url_warns_without_blocking_import() -> None:
+    report = module.dry_run_migration(
+        "sanaei",
+        [{"id": "11111111-2222-3333-4444-555555555555", "email": "ready-user"}],
+    )
+    row = report["records"][0]
+    assert row["ready_for_future_import"] is True
+    assert "missing_legacy_subscription_url" in row["warnings"]
+    assert report["summary"]["ready_records"] == 1
+    assert report["summary"]["warning_records"] == 1
+
+
+def test_missing_required_material_still_blocks_import() -> None:
     report = module.dry_run_migration("pasargad", [{"username": "incomplete"}])
     row = report["records"][0]
     assert row["ready_for_future_import"] is False
     assert "missing_existing_credentials" in row["warnings"]
     assert "missing_legacy_subscription_url" in row["warnings"]
     assert row["credentials"] == {}
+
+
+def test_missing_source_id_blocks_import() -> None:
+    report = module.dry_run_migration(
+        "pasargad",
+        [{"password": "existing-secret", "subscription_url": "https://legacy.example/sub/no-id"}],
+    )
+    row = report["records"][0]
+    assert row["ready_for_future_import"] is False
+    assert "missing_source_id" in row["warnings"]
+    assert "missing_username" in row["warnings"]
 
 
 def test_unsupported_source_is_rejected() -> None:
