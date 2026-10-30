@@ -27,7 +27,7 @@ server {
     proxy_set_header X-Forwarded-Proto $scheme;
   }
 
-  # TWINPANEL_LONG_REQUESTS_V2
+  # TWINPANEL_LONG_REQUESTS_V3
   # Keep only bounded package/runtime mutations on the long timeout.
   # Ordinary /v1 reads and fast mutations retain Nginx defaults.
   location = /v1/provision/install {
