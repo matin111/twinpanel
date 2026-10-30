@@ -57,7 +57,31 @@ def _write_with_rollback(path: Path, content: str, mode: int) -> tuple[str | Non
     return old_content, old_mode
 
 
-def _refresh_frontdoor_map() -> None:
+def _restore_site(
+    path: Path,
+    enabled: Path,
+    enabled_existed: bool,
+    old_content: str | None,
+    old_mode: int | None,
+) -> None:
+    if old_content is None:
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+    else:
+        path.write_text(old_content, encoding="utf-8")
+        if old_mode is not None:
+            os.chmod(path, old_mode)
+
+    if not enabled_existed:
+        try:
+            enabled.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def refresh_frontdoor_map() -> None:
     if not frontdoor_enabled() or not STREAM_MAP_BUILDER.is_file():
         return
     result = subprocess.run(
@@ -73,19 +97,23 @@ def _refresh_frontdoor_map() -> None:
         )
 
 
+def _reload_nginx() -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["systemctl", "reload", "nginx"],
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+    )
+
+
 def create_nginx_config(
     domain: str,
     host: str,
     port: int,
     domain_type=None,
 ):
-    """Render a domain site without competing with the TCP/443 stream front door.
-
-    Before the front door is enabled, behavior remains compatible with the legacy
-    renderer. Once the marker exists, HTTPS virtual hosts bind only to
-    127.0.0.1:9443; TCP/443 is owned exclusively by Nginx stream and SNI-routed
-    to this internal listener or to ocserv TCP/4443.
-    """
+    """Render a domain site without competing with the TCP/443 stream front door."""
     filename = f"{domain}.conf"
     path = Path(NGINX_DIR) / filename
     enabled = Path(NGINX_ENABLED) / filename
@@ -150,60 +178,45 @@ server {{
         enabled.symlink_to(path)
 
     try:
-        _refresh_frontdoor_map()
-    except Exception:
-        if old_content is None:
-            try:
-                path.unlink()
-            except FileNotFoundError:
-                pass
-        else:
-            path.write_text(old_content, encoding="utf-8")
-            if old_mode is not None:
-                os.chmod(path, old_mode)
-        if not enabled_existed:
-            try:
-                enabled.unlink()
-            except FileNotFoundError:
-                pass
-        raise
+        refresh_frontdoor_map()
 
-    test = subprocess.run(
-        ["nginx", "-t"],
-        capture_output=True,
-        text=True,
-        timeout=15,
-        check=False,
-    )
-
-    if test.returncode != 0:
-        if old_content is None:
-            try:
-                path.unlink()
-            except FileNotFoundError:
-                pass
-        else:
-            path.write_text(old_content, encoding="utf-8")
-            if old_mode is not None:
-                os.chmod(path, old_mode)
-        if not enabled_existed:
-            try:
-                enabled.unlink()
-            except FileNotFoundError:
-                pass
-        raise RuntimeError(test.stderr.strip() or "nginx_config_test_failed")
-
-    reload_result = subprocess.run(
-        ["systemctl", "reload", "nginx"],
-        capture_output=True,
-        text=True,
-        timeout=20,
-        check=False,
-    )
-    if reload_result.returncode != 0:
-        raise RuntimeError(
-            (reload_result.stderr or reload_result.stdout or "nginx_reload_failed").strip()
+        test = subprocess.run(
+            ["nginx", "-t"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
         )
+        if test.returncode != 0:
+            raise RuntimeError(test.stderr.strip() or "nginx_config_test_failed")
+
+        reload_result = _reload_nginx()
+        if reload_result.returncode != 0:
+            raise RuntimeError(
+                (reload_result.stderr or reload_result.stdout or "nginx_reload_failed").strip()
+            )
+    except Exception:
+        _restore_site(
+            path,
+            enabled,
+            enabled_existed,
+            old_content,
+            old_mode,
+        )
+        try:
+            refresh_frontdoor_map()
+            rollback_test = subprocess.run(
+                ["nginx", "-t"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+            if rollback_test.returncode == 0:
+                _reload_nginx()
+        except Exception:
+            pass
+        raise
 
     return {
         "ok": True,
