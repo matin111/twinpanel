@@ -13,20 +13,24 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 
-MARKER = "# TWINPANEL_LONG_REQUESTS_V2"
+MARKER = "# TWINPANEL_LONG_REQUESTS_V3"
+PREVIOUS_MARKER = "# TWINPANEL_LONG_REQUESTS_V2"
 LEGACY_MARKER = "# TWINPANEL_PROVISION_LONG_REQUEST_V1"
 DEFAULT_SITE = Path("/etc/nginx/sites-available/twinpanel")
 DEFAULT_BACKUP = Path(
-    "/etc/nginx/sites-available/twinpanel.pre-long-requests-v2"
+    "/etc/nginx/sites-available/twinpanel.pre-long-requests-v3"
 )
 DEFAULT_STATE = Path(
     "/var/lib/twinpanel-license/nginx-reconcile.json"
 )
 
-LONG_EXACT_PATHS = (
+PREVIOUS_LONG_EXACT_PATHS = (
     "/v1/provision/install",
     "/v1/provision/ensure-classic-protocol",
     "/v1/provision/repair-protocols-saved",
+)
+LONG_EXACT_PATHS = PREVIOUS_LONG_EXACT_PATHS + (
+    "/v1/tunnels/create-selected",
 )
 MODERN_INSTALL_LOCATION = (
     r"location ~ ^/v1/settings/vpn/modern-protocols/[0-9]+/install$ {"
@@ -135,6 +139,27 @@ def _legacy_managed_block_valid(content: str) -> bool:
     )
 
 
+def _previous_managed_block_valid(content: str) -> bool:
+    required = [
+        PREVIOUS_MARKER,
+        MODERN_INSTALL_LOCATION,
+        "proxy_connect_timeout 15s;",
+        "proxy_send_timeout 1800s;",
+        "proxy_read_timeout 1800s;",
+        "send_timeout 1800s;",
+    ]
+    required.extend(
+        f"location = {path} {{" for path in PREVIOUS_LONG_EXACT_PATHS
+    )
+    return (
+        content.count(PREVIOUS_MARKER) == 1
+        and MARKER not in content
+        and LEGACY_MARKER not in content
+        and all(item in content for item in required)
+        and content.count("proxy_read_timeout 1800s;") >= 4
+    )
+
+
 def _managed_block_valid(content: str) -> bool:
     required = [
         MARKER,
@@ -147,10 +172,23 @@ def _managed_block_valid(content: str) -> bool:
     required.extend(f"location = {path} {{" for path in LONG_EXACT_PATHS)
     return (
         content.count(MARKER) == 1
+        and PREVIOUS_MARKER not in content
         and LEGACY_MARKER not in content
         and all(item in content for item in required)
-        and content.count("proxy_read_timeout 1800s;") >= 4
+        and content.count("proxy_read_timeout 1800s;") >= 5
     )
+
+
+def _remove_managed_block(content: str, marker: str, error: str) -> str:
+    pattern = re.compile(
+        r"(?ms)^[ \t]*"
+        + re.escape(marker)
+        + r"\n.*?^[ \t]*}\n\n(?=[ \t]*location[ \t]+/v1/[ \t]*\{)"
+    )
+    upgraded, count = pattern.subn("", content, count=1)
+    if count != 1:
+        raise RuntimeError(error)
+    return upgraded
 
 
 def _remove_legacy_block(content: str) -> str:
@@ -158,16 +196,23 @@ def _remove_legacy_block(content: str) -> str:
         return content
     if not _legacy_managed_block_valid(content):
         raise RuntimeError("NGINX_PROVISION_BLOCK_INVALID")
-
-    pattern = re.compile(
-        r"(?ms)^[ \t]*"
-        + re.escape(LEGACY_MARKER)
-        + r"\n.*?^[ \t]*}\n\n(?=[ \t]*location[ \t]+/v1/[ \t]*\{)"
+    return _remove_managed_block(
+        content,
+        LEGACY_MARKER,
+        "NGINX_LEGACY_BLOCK_UPGRADE_FAILED",
     )
-    upgraded, count = pattern.subn("", content, count=1)
-    if count != 1:
-        raise RuntimeError("NGINX_LEGACY_BLOCK_UPGRADE_FAILED")
-    return upgraded
+
+
+def _remove_previous_block(content: str) -> str:
+    if PREVIOUS_MARKER not in content:
+        return content
+    if not _previous_managed_block_valid(content):
+        raise RuntimeError("NGINX_LONG_REQUEST_V2_BLOCK_INVALID")
+    return _remove_managed_block(
+        content,
+        PREVIOUS_MARKER,
+        "NGINX_LONG_REQUEST_V2_BLOCK_UPGRADE_FAILED",
+    )
 
 
 def patch_nginx_site_text(content: str, api_port: int) -> str:
@@ -177,6 +222,7 @@ def patch_nginx_site_text(content: str, api_port: int) -> str:
             raise RuntimeError("NGINX_LONG_REQUEST_BLOCK_INVALID")
         return content
 
+    content = _remove_previous_block(content)
     content = _remove_legacy_block(content)
 
     generic = re.search(

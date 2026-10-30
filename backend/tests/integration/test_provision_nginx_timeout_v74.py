@@ -57,13 +57,43 @@ V1_SITE = """server {
 """
 
 
+def v2_site(api_port: int = 8095) -> str:
+    parts = [
+        "server {\n",
+        "  listen 80 default_server;\n",
+        "  server_name custom.example.test _;\n\n",
+        f"  {MODULE.PREVIOUS_MARKER}\n",
+        "  # Keep only bounded package/runtime mutations on the long timeout.\n",
+        "  # Ordinary /v1 reads and fast mutations retain Nginx defaults.\n",
+    ]
+    for path in MODULE.PREVIOUS_LONG_EXACT_PATHS:
+        parts.append(
+            MODULE._proxy_block(f"location = {path} {{", api_port, "  ")
+        )
+    parts.append(MODULE._proxy_block(MODULE.MODERN_INSTALL_LOCATION, api_port, "  "))
+    parts.extend(
+        [
+            "  location /v1/ {\n",
+            f"    proxy_pass http://127.0.0.1:{api_port};\n",
+            "    proxy_http_version 1.1;\n",
+            "  }\n",
+            "}\n",
+        ]
+    )
+    return "".join(parts)
+
+
 def assert_true(value: bool, message: str) -> None:
     if not value:
         raise AssertionError(message)
 
 
-def assert_v2_contract(patched: str, api_port: int) -> None:
+def assert_v3_contract(patched: str, api_port: int) -> None:
     assert_true(patched.count(MODULE.MARKER) == 1, "managed marker must be unique")
+    assert_true(
+        MODULE.PREVIOUS_MARKER not in patched,
+        "previous V2 marker must be removed",
+    )
     assert_true(MODULE.LEGACY_MARKER not in patched, "legacy marker must be removed")
     generic_index = patched.index("location /v1/ {")
     for path in MODULE.LONG_EXACT_PATHS:
@@ -73,6 +103,10 @@ def assert_v2_contract(patched: str, api_port: int) -> None:
             patched.index(location) < generic_index,
             f"{location} must precede generic /v1/",
         )
+    assert_true(
+        "location = /v1/tunnels/create-selected {" in patched,
+        "create-selected must be scoped as an exact long-running route",
+    )
     assert_true(
         MODULE.MODERN_INSTALL_LOCATION in patched,
         "modern protocol install matcher missing",
@@ -91,12 +125,12 @@ def assert_v2_contract(patched: str, api_port: int) -> None:
         "proxy_read_timeout 1800s;",
         "send_timeout 1800s;",
     ):
-        assert_true(patched.count(directive) >= 4, f"missing scoped {directive}")
+        assert_true(patched.count(directive) >= 5, f"missing scoped {directive}")
 
 
 def test_patch_is_scoped_and_idempotent() -> None:
     patched = MODULE.patch_nginx_site_text(LEGACY_SITE, 18095)
-    assert_v2_contract(patched, 18095)
+    assert_v3_contract(patched, 18095)
     assert_true(
         "server_name custom.example.test _;" in patched,
         "custom server_name must be preserved",
@@ -113,10 +147,25 @@ def test_patch_is_scoped_and_idempotent() -> None:
 
 def test_v1_managed_site_is_upgraded_in_place() -> None:
     patched = MODULE.patch_nginx_site_text(V1_SITE, 8095)
-    assert_v2_contract(patched, 8095)
+    assert_v3_contract(patched, 8095)
     assert_true(
         patched.count("location = /v1/provision/install {") == 1,
         "V1 exact location must not be duplicated",
+    )
+
+
+def test_v2_managed_site_is_upgraded_in_place() -> None:
+    before = v2_site(8095)
+    assert_true(MODULE.PREVIOUS_MARKER in before, "V2 fixture marker missing")
+    assert_true(
+        "location = /v1/tunnels/create-selected {" not in before,
+        "V2 fixture must represent the pre-fix contract",
+    )
+    patched = MODULE.patch_nginx_site_text(before, 8095)
+    assert_v3_contract(patched, 8095)
+    assert_true(
+        patched.count("location = /v1/tunnels/create-selected {") == 1,
+        "V2 migration must add create-selected exactly once",
     )
 
 
@@ -137,11 +186,11 @@ def test_invalid_existing_marker_is_rejected() -> None:
 
 
 def test_file_convergence_and_validation_rollback() -> None:
-    with tempfile.TemporaryDirectory(prefix="tp-nginx-long-v2-") as raw:
+    with tempfile.TemporaryDirectory(prefix="tp-nginx-long-v3-") as raw:
         root = Path(raw)
         site = root / "twinpanel.conf"
         backup = root / "twinpanel.conf.backup"
-        site.write_text(V1_SITE, encoding="utf-8")
+        site.write_text(v2_site(8095), encoding="utf-8")
 
         first = MODULE.reconcile_nginx_site(
             site=site,
@@ -151,11 +200,14 @@ def test_file_convergence_and_validation_rollback() -> None:
             systemctl="/bin/true",
             reload_nginx=True,
         )
-        assert_true(first["changed"] is True, "V1 site must be upgraded")
+        assert_true(first["changed"] is True, "V2 site must be upgraded")
         assert_true(first["reloaded"] is True, "successful migration must reload nginx")
-        assert_true(backup.read_text(encoding="utf-8") == V1_SITE, "backup mismatch")
+        assert_true(
+            backup.read_text(encoding="utf-8") == v2_site(8095),
+            "backup mismatch",
+        )
         migrated = site.read_text(encoding="utf-8")
-        assert_v2_contract(migrated, 19095)
+        assert_v3_contract(migrated, 19095)
 
         second = MODULE.reconcile_nginx_site(
             site=site,
@@ -170,7 +222,7 @@ def test_file_convergence_and_validation_rollback() -> None:
 
         failing_site = root / "failing.conf"
         failing_backup = root / "failing.conf.backup"
-        failing_site.write_text(V1_SITE, encoding="utf-8")
+        failing_site.write_text(v2_site(8095), encoding="utf-8")
         try:
             MODULE.reconcile_nginx_site(
                 site=failing_site,
@@ -187,9 +239,29 @@ def test_file_convergence_and_validation_rollback() -> None:
         else:
             raise AssertionError("invalid nginx validation unexpectedly succeeded")
         assert_true(
-            failing_site.read_text(encoding="utf-8") == V1_SITE,
+            failing_site.read_text(encoding="utf-8") == v2_site(8095),
             "failed validation must restore original site",
         )
+
+
+def test_release_template_contains_create_selected_long_request_contract() -> None:
+    template = (ROOT / "deploy/nginx/twinpanel.conf.tpl").read_text(encoding="utf-8")
+    exact = "location = /v1/tunnels/create-selected {"
+    generic = "location /v1/ {"
+    assert_true(MODULE.MARKER in template, "release template must use V3 marker")
+    assert_true(exact in template, "release template missing create-selected exact route")
+    assert_true(
+        template.index(exact) < template.index(generic),
+        "create-selected exact route must precede generic /v1/",
+    )
+    block = template[template.index(exact) : template.index("  }", template.index(exact))]
+    for directive in (
+        "proxy_connect_timeout 15s;",
+        "proxy_send_timeout 1800s;",
+        "proxy_read_timeout 1800s;",
+        "send_timeout 1800s;",
+    ):
+        assert_true(directive in block, f"create-selected missing {directive}")
 
 
 def test_public_updater_bridge_is_present() -> None:
@@ -212,7 +284,9 @@ def test_public_updater_bridge_is_present() -> None:
 if __name__ == "__main__":
     test_patch_is_scoped_and_idempotent()
     test_v1_managed_site_is_upgraded_in_place()
+    test_v2_managed_site_is_upgraded_in_place()
     test_invalid_existing_marker_is_rejected()
     test_file_convergence_and_validation_rollback()
+    test_release_template_contains_create_selected_long_request_contract()
     test_public_updater_bridge_is_present()
-    print("LONG_REQUEST_NGINX_TIMEOUT_V2_INTEGRATION=PASS")
+    print("LONG_REQUEST_NGINX_TIMEOUT_V3_INTEGRATION=PASS")

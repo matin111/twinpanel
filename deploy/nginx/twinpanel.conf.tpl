@@ -27,7 +27,7 @@ server {
     proxy_set_header X-Forwarded-Proto $scheme;
   }
 
-  # TWINPANEL_LONG_REQUESTS_V2
+  # TWINPANEL_LONG_REQUESTS_V3
   # Keep only bounded package/runtime mutations on the long timeout.
   # Ordinary /v1 reads and fast mutations retain Nginx defaults.
   location = /v1/provision/install {
@@ -59,6 +59,20 @@ server {
   }
 
   location = /v1/provision/repair-protocols-saved {
+    proxy_pass http://127.0.0.1:__API_PORT__;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_connect_timeout 15s;
+    proxy_send_timeout 1800s;
+    proxy_read_timeout 1800s;
+    send_timeout 1800s;
+  }
+
+  location = /v1/tunnels/create-selected {
     proxy_pass http://127.0.0.1:__API_PORT__;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
