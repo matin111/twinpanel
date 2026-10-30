@@ -1,0 +1,158 @@
+name: Temporary terminal install menu patch
+
+on:
+  push:
+    branches:
+      - fix/terminal-install-reinstall-menu
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/terminal-install-reinstall-menu
+          fetch-depth: 0
+
+      - name: Patch terminal menu and add regression smoke
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/twinpanel-menu.sh')
+          text = path.read_text(encoding='utf-8')
+
+          constants_old = '''UPDATE_STATE_FILE="/var/lib/twinpanel-license/update-state.json"\n'''
+          constants_new = '''UPDATE_STATE_FILE="/var/lib/twinpanel-license/update-state.json"\nOFFICIAL_INSTALLER_URL="https://raw.githubusercontent.com/matin111/twinpanel/main/install.sh"\n'''
+          if 'OFFICIAL_INSTALLER_URL=' not in text:
+              if constants_old not in text:
+                  raise SystemExit('constants anchor not found')
+              text = text.replace(constants_old, constants_new, 1)
+
+          anchor = '''services_menu(){\n'''
+          fn = r'''install_reinstall_menu(){
+  header "Install / Reinstall TwinPanel"
+  local existing=0 prompt tmp rc
+
+  if [[ -f "$BACKEND_ENV" || -e "$ROOT" ]]; then
+    existing=1
+  fi
+
+  if (( existing )); then
+    printf '  %bExisting TwinPanel installation detected.%b\n' "$C_YELLOW" "$C_RESET"
+    printf '  Current version: %s\n\n' "$(version_value)"
+    echo "  Reinstall uses the official Stable installer."
+    echo "  Existing database, backend.env, administrator and protocol runtime are preserved by default."
+    echo "  This is not a factory reset and does not wipe customer data."
+    prompt="Reinstall the latest Stable TwinPanel release?"
+  else
+    printf '  %bTwinPanel runtime is not fully installed.%b\n\n' "$C_CYAN" "$C_RESET"
+    echo "  The official Stable installer will install the panel and required services."
+    prompt="Install the latest Stable TwinPanel release?"
+  fi
+
+  echo
+  if ! confirm_action "$prompt"; then
+    echo "  Cancelled."
+    pause
+    return 0
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    printf '  %bcurl is required to download the official installer.%b\n' "$C_RED" "$C_RESET"
+    pause
+    return 1
+  fi
+
+  tmp="$(mktemp -t twinpanel-installer-XXXXXX.sh)"
+  if ! curl -fsSL --connect-timeout 10 --max-time 60 "$OFFICIAL_INSTALLER_URL" -o "$tmp"; then
+    rm -f "$tmp"
+    printf '  %bCould not download the official TwinPanel installer.%b\n' "$C_RED" "$C_RESET"
+    pause
+    return 1
+  fi
+  chmod 700 "$tmp"
+
+  echo
+  printf '  %bStarting official TwinPanel Stable installer...%b\n\n' "$C_CYAN" "$C_RESET"
+  if bash "$tmp"; then
+    rc=0
+    printf '\n  %bInstall / reinstall completed successfully.%b\n' "$C_GREEN" "$C_RESET"
+  else
+    rc=$?
+    printf '\n  %bInstaller exited with code %s. Existing data was not intentionally wiped.%b\n' "$C_RED" "$rc" "$C_RESET"
+  fi
+  rm -f "$tmp"
+  pause
+  return "$rc"
+}
+
+'''
+          if 'install_reinstall_menu(){' not in text:
+              if anchor not in text:
+                  raise SystemExit('services_menu anchor not found')
+              text = text.replace(anchor, fn + anchor, 1)
+
+          menu_old = '''    menu_item 4 "Panel update"\n    menu_item 5 "More tools"\n'''
+          menu_new = '''    menu_item 4 "Panel update"\n    menu_item 5 "Install / Reinstall TwinPanel (نصب / نصب مجدد پنل)"\n    menu_item 6 "More tools"\n'''
+          if menu_old in text:
+              text = text.replace(menu_old, menu_new, 1)
+          elif menu_new not in text:
+              raise SystemExit('main menu anchor not found')
+
+          case_old = '''      4) update_menu ;;\n      5) more_menu ;;\n'''
+          case_new = '''      4) update_menu ;;\n      5) install_reinstall_menu ;;\n      6) more_menu ;;\n'''
+          if case_old in text:
+              text = text.replace(case_old, case_new, 1)
+          elif case_new not in text:
+              raise SystemExit('main menu case anchor not found')
+
+          path.write_text(text, encoding='utf-8')
+
+          smoke = Path('scripts/terminal_install_menu_v388_smoke.py')
+          smoke.write_text(r'''from pathlib import Path
+
+menu = Path("scripts/twinpanel-menu.sh").read_text(encoding="utf-8")
+installer = Path("install.sh").read_text(encoding="utf-8")
+
+checks = {
+    "official installer URL": 'OFFICIAL_INSTALLER_URL="https://raw.githubusercontent.com/matin111/twinpanel/main/install.sh"' in menu,
+    "install menu entry": 'menu_item 5 "Install / Reinstall TwinPanel (نصب / نصب مجدد پنل)"' in menu,
+    "more tools renumbered": 'menu_item 6 "More tools"' in menu,
+    "install action wired": '5) install_reinstall_menu ;;' in menu,
+    "more action wired": '6) more_menu ;;' in menu,
+    "safe download to temp": 'curl -fsSL --connect-timeout 10 --max-time 60 "$OFFICIAL_INSTALLER_URL" -o "$tmp"' in menu,
+    "no pipe to bash in menu": 'curl -fsSL "$OFFICIAL_INSTALLER_URL" | bash' not in menu,
+    "existing install warning": 'Existing database, backend.env, administrator and protocol runtime are preserved by default.' in menu,
+    "not factory reset warning": 'This is not a factory reset and does not wipe customer data.' in menu,
+    "installer preserves existing env": 'if [[ -f /etc/twinpanel/backend.env ]]; then' in installer,
+    "public installer detects existing install": '[[ -f /etc/twinpanel/backend.env ]] && EXISTING_INSTALL=1' in installer,
+}
+
+failed = [name for name, ok in checks.items() if not ok]
+if failed:
+    raise SystemExit("terminal install menu smoke failed: " + ", ".join(failed))
+print("terminal install menu smoke: OK")
+''', encoding='utf-8')
+          PY
+
+          bash -n scripts/twinpanel-menu.sh
+          python3 scripts/terminal_install_menu_v388_smoke.py
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/twinpanel-menu.sh scripts/terminal_install_menu_v388_smoke.py
+          if git diff --cached --quiet; then
+            echo "No patch changes to commit"
+            exit 0
+          fi
+          git commit -m "fix(cli): add safe panel install and reinstall action"
+          git push origin HEAD:fix/terminal-install-reinstall-menu
