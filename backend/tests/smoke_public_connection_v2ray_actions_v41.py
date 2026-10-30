@@ -22,8 +22,6 @@ assert "_public_payload_customer_xray" in xray_runtime
 assert "profiles.append(tcp_profile)" in xray_runtime
 
 # V43 reuses the single already-policy-applied customer payload from _active().
-# Rebuilding it through xray_public_delivery_runtime is intentionally forbidden:
-# that duplicate pass regenerated QR SVGs and caused subscription latency/timeouts.
 assert "from .public_connection_v2ray_multilink_v43 import apply_v2ray_multilink_v43" in v41
 assert "apply_v2ray_multilink_v43()" in v41
 assert "sub, payload = multilink._active(token, db)" in v43
@@ -57,34 +55,41 @@ assert "aria-expanded" in v41
 assert '.tp-v48-xray-profiles[data-v41-collapsed="1"]' in v41
 assert "wrapper.remove()" not in v41
 
-# Each real profile keeps only its own Karing import + exact config copy action.
+# Existing exact per-profile actions remain intact.
 assert "const primary=actions.querySelector('.tp-v48-karing')" in v41
 assert "const copy=actions.querySelector('.copy-btn[data-copy]')" in v41
 assert "if(node!==primary&&node!==copy)node.remove()" in v41
-assert "primary.textContent='ارسال به Karing'" in v41
 assert "copy.textContent='کپی کانفیگ'" in v41
-assert "ارسال این اتصال به Karing" in v41
 assert "کپی کانفیگ این اتصال" in v41
-assert "const primary=actions.querySelector('.tp-v48-hiddify')" not in v41
+
+# Customer-facing app card must be V2Ray-family and device-aware.
+assert "const CLIENTS={" in v41
+assert "name:'v2rayN'" in v41
+assert "name:'v2rayNG'" in v41
+assert "name:'V2Box'" in v41
+assert "https://github.com/2dust/v2rayN/releases/latest" in v41
+assert "https://github.com/2dust/v2rayNG/releases/latest" in v41
+assert "https://apps.apple.com/us/app/v2box-v2ray-client/id6446814690" in v41
+assert "function platform()" in v41
+assert "function rewriteClientDownload(panel)" in v41
+assert "card.dataset.v41V2rayClient=client.name" in v41
+assert "link.textContent='دانلود '+client.name" in v41
+assert "rewriteClientDownload(panel)" in v41
+assert "preserveClientDownload(panel)" not in v41
 
 # Once real profiles exist, the generic canonical row is only a duplicate and is hidden.
 assert "row.dataset.v41Duplicate='1'" in v41
 assert "row.setAttribute('aria-hidden','true')" in v41
 assert '.v34-server-actions[data-v41-duplicate="1"]' in v41
 
-# Legacy V2Ray without profiles still keeps the canonical two-action fallback,
-# but the primary label is normalized to Karing.
+# Legacy V2Ray without profiles still keeps the canonical fallback.
 assert "function simplifyCanonicalFallback(view,row)" in v41
 assert "const primary=row.querySelector('.v34-primary')" in v41
 assert "const copy=row.querySelector('.v34-copy')" in v41
-assert "primary.textContent='ارسال به Karing'" in v41
 assert "row.dataset.v41Canonical='1'" in v41
 
-# Client download card is preserved; V42 remains final presentation layer.
+# V42 remains the final presentation layer.
 assert '.v34-client-card' in v41
-assert "function preserveClientDownload(panel)" in v41
-assert "card.dataset.v41ClientDownload='1'" in v41
-assert "preserveClientDownload(panel)" in v41
 assert "return refine_public_connection_mobile_sheet_v42(source)" in v41
 assert "matchMedia" not in v41
 
@@ -93,4 +98,4 @@ for item in forbidden:
     assert item not in v41.lower(), item
     assert item not in v43.lower(), item
 
-print("V41/V43 Xray accordion + Karing actions + single-payload all-country multilink smoke OK")
+print("V41/V43 Xray accordion + device-aware V2Ray clients + single-payload all-country multilink smoke OK")
