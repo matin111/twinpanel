@@ -63,7 +63,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   padding: 15px 16px 13px;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
@@ -73,6 +73,7 @@
   display: grid;
   gap: 4px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .customerNotificationPopover header b {
@@ -89,7 +90,9 @@
 }
 
 .customerNotificationPopover header button {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  max-width: 48%;
+  min-width: 0;
   border: 1px solid rgba(139, 92, 246, .2);
   border-radius: 10px;
   padding: 7px 10px;
@@ -98,8 +101,11 @@
   font: inherit;
   font-size: 10px;
   font-weight: 900;
+  line-height: 1.45;
   cursor: pointer;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .customerNotificationPopover header button:hover {
@@ -287,7 +293,23 @@ html[data-theme="light"] .customerNotificationBell {
     padding: 14px;
   }
 
+  .customerNotificationPopover header button {
+    max-width: 50%;
+  }
+
   .customerNotificationList > button {
     padding: 11px;
+  }
+}
+
+@media (max-width: 430px) {
+  .customerNotificationPopover header {
+    display: grid;
+    grid-template-columns: minmax(0,1fr);
+  }
+
+  .customerNotificationPopover header button {
+    width: 100%;
+    max-width: none;
   }
 }
