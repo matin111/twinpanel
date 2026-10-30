@@ -1,8 +1,8 @@
 {
   "version": "1.1.0-rc.402",
-  "source_sha": "932f902c45faccb66b6525a4ebb788bdf1faac2e",
+  "source_sha": "4e648bb565510dc3291beaab814756a229c390fd",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.402 ظاهر لوگوی TWINPANEL در منوی SSH را برای خوانایی بهتر در Bitvise اصلاح می‌کند. هندسه ۵ ستونه و renderer فعلی با space و پس‌زمینه سفید حفظ شده، اما stroke حروف پُرتر شده است؛ بدون استفاده از کاراکتر بلوکی، بدون افزایش عرض کلی و بدون بازگشت مشکل wrap. Source روی SHA immutable 932f902c45faccb66b6525a4ebb788bdf1faac2e قفل شده است. این Release به TP27/VXLAN/Tunnel/Spoof/accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane دست نمی‌زند.",
-    "en": "TwinPanel 1.1.0-rc.402 refines the TWINPANEL SSH menu wordmark for better Bitvise readability. The existing 5-column geometry and white-background space renderer are preserved while the glyph strokes are made bolder, without block characters, extra overall width, or reintroducing wrapping. The source is pinned to immutable SHA 932f902c45faccb66b6525a4ebb788bdf1faac2e and does not modify TP27/VXLAN, Tunnel, Spoof, accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane logic."
+    "fa": "TwinPanel 1.1.0-rc.402 علاوه بر اصلاح خوانایی لوگوی TWINPANEL در منوی SSH، Fix مرکز انتقال اکانت‌ها را نیز شامل می‌شود: نبود legacy_subscription_url دیگر مانع Import نیست و فقط هشدار محسوب می‌شود؛ آمادگی انتقال بر اساس source_id، نام کاربری و credential موجود تعیین می‌شود. Source روی SHA immutable 4e648bb565510dc3291beaab814756a229c390fd قفل شده است. این Release به TP27/VXLAN/Tunnel/Spoof/accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane دست نمی‌زند.",
+    "en": "TwinPanel 1.1.0-rc.402 includes both the SSH TWINPANEL wordmark readability refinement and the Migration Center readiness fix: a missing legacy_subscription_url is now a non-blocking warning, while import readiness is based on source_id, username, and existing credential material. The source is pinned to immutable SHA 4e648bb565510dc3291beaab814756a229c390fd and does not modify TP27/VXLAN, Tunnel, Spoof, accounting, quota, provisioning, credential generation, routing, firewall, or protocol dataplane logic."
   }
 }
