@@ -1,0 +1,52 @@
+name: Apply bolder SSH wordmark strokes
+
+on:
+  push:
+    branches:
+      - fix/ssh-logo-bolder-strokes
+    paths:
+      - '.github/workflows/tmp-bold-ssh-logo.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/ssh-logo-bolder-strokes
+          fetch-depth: 0
+      - name: Bold only the existing 5-column wordmark
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/twinpanel-menu.sh')
+          s = p.read_text()
+          old = """  brand_row '11111' '10001' '11111' '10001' '11110' '01110' '10001' '11111' '10000'
+          brand_row '00100' '10001' '00100' '11001' '10001' '10001' '11001' '10000' '10000'
+          brand_row '00100' '10001' '00100' '10101' '10001' '10001' '10101' '10000' '10000'
+          brand_row '00100' '10101' '00100' '10101' '11110' '11111' '10101' '11110' '10000'
+          brand_row '00100' '10101' '00100' '10011' '10000' '10001' '10011' '10000' '10000'
+          brand_row '00100' '11011' '00100' '10011' '10000' '10001' '10011' '10000' '10000'
+          brand_row '00100' '11011' '11111' '10001' '10000' '10001' '10001' '11111' '11111'"""
+          new = """  brand_row '11111' '11011' '11111' '11001' '11110' '01110' '11001' '11111' '11000'
+          brand_row '01100' '11011' '01110' '11001' '11001' '11011' '11001' '11000' '11000'
+          brand_row '01100' '11011' '01110' '10101' '11001' '11011' '10101' '11000' '11000'
+          brand_row '01100' '11111' '01110' '10101' '11110' '11111' '10101' '11110' '11000'
+          brand_row '01100' '11011' '01110' '10011' '11000' '11011' '10011' '11000' '11000'
+          brand_row '01100' '11011' '01110' '10011' '11000' '11011' '10011' '11000' '11000'
+          brand_row '01100' '11011' '11111' '10001' '11000' '11011' '10001' '11111' '11111'"""
+          if old not in s:
+              raise SystemExit('expected original wordmark block not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          bash -n scripts/twinpanel-menu.sh
+          rm -f .github/workflows/tmp-bold-ssh-logo.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/twinpanel-menu.sh .github/workflows/tmp-bold-ssh-logo.yml
+          git commit -m 'Bold SSH menu wordmark strokes'
+          git push origin HEAD:fix/ssh-logo-bolder-strokes
