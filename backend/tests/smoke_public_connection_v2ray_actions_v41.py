@@ -4,11 +4,13 @@ ROOT = Path(__file__).resolve().parents[2]
 v41 = (ROOT / "backend/app/routers/public_connection_v2ray_actions_v41.py").read_text()
 v43 = (ROOT / "backend/app/routers/public_connection_v2ray_multilink_v43.py").read_text()
 v39 = (ROOT / "backend/app/routers/public_connection_mobile_simplified_v39.py").read_text()
+backpressure = (ROOT / "backend/app/routers/public_connection_request_backpressure_v1.py").read_text()
 xray_runtime = (ROOT / "backend/app/xray_public_delivery_runtime.py").read_text()
 
 assert "TWINPANEL_PUBLIC_CONNECT_V2RAY_ACTIONS_V41" in v41
 assert "TWINPANEL_PUBLIC_CONNECT_V2RAY_MULTILINK_V43" in v43
 assert "TWINPANEL_PUBLIC_CONNECT_V2RAY_MULTILINK_SINGLE_PAYLOAD_V50" in v43
+assert "TWINPANEL_PUBLIC_CONNECT_REQUEST_BACKPRESSURE_V1" in backpressure
 assert "refine_public_connection_v2ray_actions_v41" in v39
 assert "source = refine_public_connection_mobile_authority_v40(source)" in v39
 assert "return refine_public_connection_v2ray_actions_v41(source)" in v39
@@ -68,12 +70,21 @@ assert "rewriteClientDownload(panel)" in v41
 assert "removeLowerConfigSection(panel)" in v41
 
 assert '.v34-client-card' in v41
-assert "return refine_public_connection_mobile_sheet_v42(source)" in v41
+assert "source = refine_public_connection_mobile_sheet_v42(source)" in v41
+assert "return refine_public_connection_request_backpressure_v1(source)" in v41
 assert "matchMedia" not in v41
+
+# Backpressure is a read-only final HTML post-processor; it must not change delivery URLs.
+assert "function subscriptionCount(panel)" in backpressure
+assert "const meta=multiMeta(panel);" in backpressure
+assert "setInterval(refresh,10000)" in backpressure
+assert "refreshInFlight" in backpressure
+assert "_V44_EAGER_GROUP_LOAD_OLD" in backpressure
 
 forbidden = ["iptables", "nft", "vxlan", "tp27", "quota", "accounting", "provision"]
 for item in forbidden:
     assert item not in v41.lower(), item
     assert item not in v43.lower(), item
+    assert item not in backpressure.lower(), item
 
-print("V41/V43 Xray lower config inventory removed + smart client smoke OK")
+print("V41/V43 Xray lower config inventory + request backpressure smoke OK")
