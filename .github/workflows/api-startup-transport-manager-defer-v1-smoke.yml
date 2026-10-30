@@ -1,0 +1,23 @@
+name: API Startup Transport Manager Defer V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/transport_manager_service_v12.py"
+      - "backend/tests/api_startup_transport_manager_defer_v1_smoke.py"
+      - ".github/workflows/api-startup-transport-manager-defer-v1-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Run startup defer smoke
+        working-directory: backend
+        run: python tests/api_startup_transport_manager_defer_v1_smoke.py
