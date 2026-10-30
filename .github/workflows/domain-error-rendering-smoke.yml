@@ -1,0 +1,27 @@
+name: Domain Error Rendering Smoke
+
+on:
+  pull_request:
+    paths:
+      - "components/domains-runtime.tsx"
+      - ".github/workflows/domain-error-rendering-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify structured domain error rendering contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE="components/domains-runtime.tsx"
+          grep -F 'function readableApiError(value:unknown):string' "$FILE"
+          grep -F 'detail=readableApiError(data?.detail??data?.message??data);' "$FILE"
+          grep -F 'for(const key of ["message","error","reason","code"])' "$FILE"
+          grep -F 'Domain added and Nginx configured. Enable SSL separately.' "$FILE"
+          if grep -F 'String(data?.detail||data?.message||"")' "$FILE"; then
+            echo "legacy object-stringification path still present" >&2
+            exit 1
+          fi
