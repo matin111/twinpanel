@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.397",
-  "source_sha": "de45d965e872f523c52400085baf06b4f4c299dc",
+  "version": "1.1.0-rc.398",
+  "source_sha": "3f94ed7eecf297723d05d0fc2dc5138f9eeed928",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.397 لوگوی منوی SSH را برای عرض‌های معمول ترمینال خوانا می‌کند: wordmark به الگوی 5x7 جمع‌وجور و width-aware تغییر کرده و همچنان با سلول‌های background سفید بدون block glyph رندر می‌شود. این Release همچنین تغییر hard delete اشتراک‌های Merge‌شده در main را شامل می‌شود. Source روی SHA immutable de45d965e872f523c52400085baf06b4f4c299dc قفل شده است؛ تغییر لوگو به TP27/VXLAN/Tunnel/Spoof/accounting/quota/provisioning/routing/firewall/protocol dataplane دست نمی‌زند.",
-    "en": "TwinPanel 1.1.0-rc.397 makes the SSH management-menu logo readable at normal terminal widths: the wordmark now uses a compact width-aware 5x7 pattern while retaining white background-cell rendering without block glyphs. This release also includes the hard-delete subscription change already merged into main. The source is pinned to immutable SHA de45d965e872f523c52400085baf06b4f4c299dc; the logo change does not modify TP27/VXLAN, Tunnel, Spoof, accounting, quota, provisioning, routing, firewall, or protocol dataplane logic."
+    "fa": "TwinPanel 1.1.0-rc.398 منوی SSH را در ترمینال‌های معمولی خواناتر و پهن‌تر رندر می‌کند: آستانه حالت wide لوگوی 5x7 از 104 ستون به 88 ستون کاهش یافته تا wordmark روی Bitvise و عرض‌های مشابه، پهن‌تر نمایش داده شود. این Release همچنین shortcutهای حرفی جدید منوی SSH را که پیش از bump نسخه روی main ادغام شده‌اند شامل می‌شود. Source روی SHA immutable 3f94ed7eecf297723d05d0fc2dc5138f9eeed928 قفل شده است؛ TP27/VXLAN/Tunnel/Spoof/accounting/quota/provisioning/routing/firewall/protocol dataplane در تغییر لوگو دست‌کاری نشده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.398 renders the SSH management-menu wordmark wider at normal terminal widths: the 5x7 logo wide-mode threshold is lowered from 104 columns to 88 so it appears wider in Bitvise and similar terminals. This release also includes the new letter shortcuts for the SSH menu that were merged into main before the version bump. The source is pinned to immutable SHA 3f94ed7eecf297723d05d0fc2dc5138f9eeed928; the logo change does not modify TP27/VXLAN, Tunnel, Spoof, accounting, quota, provisioning, routing, firewall, or protocol dataplane behavior."
   }
 }
