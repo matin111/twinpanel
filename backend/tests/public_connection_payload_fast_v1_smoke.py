@@ -36,6 +36,17 @@ def main() -> None:
     require("_qr_data_uri(item[\"uri\"])" not in fast,
             "fast payload must not eagerly generate V2Ray/Xray QR")
 
+    require("TWINPANEL_PUBLIC_CONNECT_REQUEST_PAYLOAD_CACHE_V2" in fast,
+            "request-local payload cache marker missing")
+    require("cache_key = (_CACHE_PREFIX, int(sub.id))" in fast,
+            "payload cache must be subscription-scoped")
+    require("cached = db.info.get(cache_key)" in fast,
+            "payload cache must use the request Session.info boundary")
+    require("return deepcopy(cached)" in fast,
+            "cache hits must be isolated from presentation mutations")
+    require("db.info[cache_key] = deepcopy(info)" in fast,
+            "canonical cached payload must be isolated from the first caller")
+
     require("public_connection_payload_fast_v1" in live, "live hub does not import fast payload")
     require("_public_connection_hub_v5_module._public_payload = public_connection_payload_fast_v1" in live,
             "Hub V5 payload hook missing")
