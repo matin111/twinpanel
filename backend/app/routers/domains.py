@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..services.ssl_manager import create_nginx_config
+from ..services.domain_frontdoor_nginx_v1 import create_nginx_config
 from ..services.domain_ssl_runtime_v1 import issue_ssl
 from ..services.domain_router import resolve_domain_route
 import subprocess
