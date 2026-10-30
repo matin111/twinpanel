@@ -252,6 +252,23 @@ async def create_selected_tunnel_v358(
                 db,
             )
 
+            # TWINPANEL_SELECTED_AGENT_VISIBILITY_V359
+            # /node/{node_id}/desired intentionally publishes only is_active
+            # tunnels. A brand-new selected pair starts inactive/offline so it
+            # stays outside production route election during bootstrap/install.
+            # Once the selected transport has installed successfully, publish
+            # the pair to both Agents before V257 waits for their fresh reports.
+            # Keep status OFFLINE and active_transport unset here: service-route
+            # election requires ONLINE, so this visibility step cannot promote
+            # user traffic before the existing manual cutover safety gate.
+            db.expire_all()
+            pending = db.get(Tunnel, tunnel_id)
+            if pending is None:
+                raise RuntimeError("created_tunnel_missing_before_agent_visibility")
+            pending.is_active = True
+            db.commit()
+            db.refresh(pending)
+
             # Reuse V257/V289 fresh full-L3 probe + post-switch Agent
             # acceptance + rollback authority. No custom cutover is invented.
             selection_result = await select_modern_transport_manual(
