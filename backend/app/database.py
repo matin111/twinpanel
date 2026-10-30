@@ -14,6 +14,16 @@ engine = create_engine(
     max_overflow=20,
     pool_timeout=10,
     pool_recycle=1800,
+
+    # TWINPANEL_API_DB_LOCK_TIMEOUT_V1
+    # The API currently uses synchronous SQLAlchemy sessions from routes which
+    # may also perform async remote work. A database lock wait therefore blocks
+    # the single Uvicorn event-loop worker. Bound PostgreSQL lock waits so one
+    # contended transaction cannot freeze the whole admin/customer API.
+    #
+    # This is deliberately a lock timeout only; normal long-running statements
+    # are not given a statement_timeout here.
+    connect_args={"options": "-c lock_timeout=3000"},
     future=True,
 )
 
