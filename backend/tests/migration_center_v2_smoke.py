@@ -24,6 +24,37 @@ def test_phase2_has_source_identity_idempotency() -> None:
     assert '"idempotent": True' in service
 
 
+def test_phase2_repairs_existing_subscription_without_duplicate() -> None:
+    service = _text(SERVICE_PATH)
+    assert "def _repair_existing_subscription(" in service
+    assert "sub = db.get(Subscription, marker.subscription_id)" in service
+    assert 'raise ValueError("existing migration record belongs to a different TwinPanel user")' in service
+    assert "for field, (present, value) in state.items():" in service
+    assert '"updated": updated' in service
+    existing_block = service.split("if existing:", 1)[1].split("if not normalized.get", 1)[0]
+    assert "Subscription(" not in existing_block
+    assert "MigrationImportRecord(" not in existing_block
+
+
+def test_phase2_state_overrides_are_presence_aware() -> None:
+    router = _text(ROUTER_PATH)
+    service = _text(SERVICE_PATH)
+    assert "traffic_limit_bytes: int | None = Field(default=None, ge=0)" in router
+    assert "traffic_used_bytes: int | None = Field(default=None, ge=0)" in router
+    assert 'elif "traffic_limit_bytes" in normalized:' in service
+    assert 'elif "traffic_used_bytes" in normalized:' in service
+    assert 'elif "expires_at" in normalized:' in service
+    assert "limit_value if limit_present else 0" in service
+    assert "used_value if used_present else 0" in service
+
+
+def test_phase2_reimport_does_not_require_replacement_credentials() -> None:
+    service = _text(SERVICE_PATH)
+    existing_index = service.index("if existing:")
+    credential_guard_index = service.index('if not links and not normalized.get("credentials")')
+    assert existing_index < credential_guard_index
+
+
 def test_phase2_preserves_payload_encrypted() -> None:
     service = _text(SERVICE_PATH)
     assert "preserved_payload_encrypted=_enc_payload(preserved)" in service
