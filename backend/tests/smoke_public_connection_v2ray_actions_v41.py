@@ -48,6 +48,15 @@ assert "profiles.forEach(simplifyProfile)" in v41
 assert "wrapper.dataset.v41ProfileCount=String(profiles.length)" in v41
 assert "purgeLegacyInteractiveBlocks" not in v41
 
+# Real profiles are collapsed by default but remain present and toggleable.
+assert "function ensureProfileAccordion(view,wrapper,profiles)" in v41
+assert "wrapper.dataset.v41Collapsed='1'" in v41
+assert "مشاهده کانفیگ‌ها (" in v41
+assert "بستن کانفیگ‌ها" in v41
+assert "aria-expanded" in v41
+assert '.tp-v48-xray-profiles[data-v41-collapsed="1"]' in v41
+assert "wrapper.remove()" not in v41
+
 # Each real profile keeps only its own Karing import + exact config copy action.
 assert "const primary=actions.querySelector('.tp-v48-karing')" in v41
 assert "const copy=actions.querySelector('.copy-btn[data-copy]')" in v41
@@ -84,4 +93,4 @@ for item in forbidden:
     assert item not in v41.lower(), item
     assert item not in v43.lower(), item
 
-print("V41/V43 Xray Karing actions + single-payload all-country multilink smoke OK")
+print("V41/V43 Xray accordion + Karing actions + single-payload all-country multilink smoke OK")
