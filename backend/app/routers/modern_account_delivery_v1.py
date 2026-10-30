@@ -37,6 +37,7 @@ SINGBOX_ACCOUNT_PROTOCOLS = frozenset(
         "snell",
     }
 )
+SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS = frozenset({"naive", "shadowtls"})
 STANDALONE_ACCOUNT_PROTOCOLS = frozenset(
     {
         "mieru",
@@ -101,22 +102,54 @@ def _get_credential(
     return cred
 
 
-def _singbox_secret(ad: Any, cred: ProtocolCredential, protocol: str, subscription_id: int):
-    from ..singbox_subscription_accounts import (
-        SingBoxAccountError,
-        new_account_secret,
-        secret_from_dict,
-    )
+def _stored_singbox_secret(ad: Any, cred: ProtocolCredential, protocol: str):
+    from ..singbox_subscription_accounts import SingBoxAccountError, secret_from_dict
 
     decoded = ad._dec(cred.secret_encrypted)
-    if isinstance(decoded, dict):
-        try:
-            secret = secret_from_dict(decoded)
-            if secret.protocol == protocol:
-                return secret
-        except (SingBoxAccountError, TypeError, ValueError):
-            pass
-    return new_account_secret(protocol, subscription_id)
+    if not isinstance(decoded, dict):
+        return None
+    try:
+        secret = secret_from_dict(decoded)
+    except (SingBoxAccountError, TypeError, ValueError):
+        return None
+    return secret if secret.protocol == protocol else None
+
+
+def _singbox_secret(
+    ad: Any,
+    cred: ProtocolCredential,
+    protocol: str,
+    sub: Subscription,
+):
+    from ..singbox_subscription_accounts import SingBoxAccountSecret, new_account_secret
+
+    if protocol in SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS:
+        username = str(sub.account_username or "").strip()
+        password = str(sub.account_password_encrypted or "")
+        if not username or not password:
+            raise RuntimeError(f"{protocol} subscription credential is incomplete")
+        return SingBoxAccountSecret(
+            protocol=protocol,
+            username=username,
+            password=password,
+        )
+
+    stored = _stored_singbox_secret(ad, cred, protocol)
+    if stored is not None:
+        return stored
+    return new_account_secret(protocol, sub.id)
+
+
+async def _remove_singbox_identity(conn: Any, protocol: str, username: str) -> None:
+    from ..singbox_subscription_accounts import _commit_account_config, _mutation_script
+
+    username = str(username or "").strip()
+    if not username:
+        return
+    await _commit_account_config(
+        conn,
+        _mutation_script(protocol, username, None),
+    )
 
 
 def _stored_standalone_secret(ad: Any, cred: ProtocolCredential, protocol: str):
@@ -154,10 +187,12 @@ async def _provision_modern_protocol(
     items: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
 
+    previous_secret = None
     if protocol in SINGBOX_ACCOUNT_PROTOCOLS:
         from ..singbox_subscription_accounts import apply_account, secret_to_dict
 
-        secret = _singbox_secret(ad, cred, protocol, sub.id)
+        previous_secret = _stored_singbox_secret(ad, cred, protocol)
+        secret = _singbox_secret(ad, cred, protocol, sub)
         standalone = False
     else:
         from ..standalone_subscription_accounts import (
@@ -190,6 +225,20 @@ async def _provision_modern_protocol(
                     egress = await ensure_amneziawg_egress(conn)
                     item["egress_contract"] = int(egress["contract"])
             else:
+                previous_username = str(
+                    getattr(previous_secret, "username", "") or ""
+                ).strip()
+                current_username = str(getattr(secret, "username", "") or "").strip()
+                if (
+                    protocol in SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS
+                    and previous_username
+                    and previous_username != current_username
+                ):
+                    await _remove_singbox_identity(
+                        conn,
+                        protocol,
+                        previous_username,
+                    )
                 item = await apply_account(conn, node, secret)
             items.append(item)
         except Exception as exc:
@@ -323,6 +372,8 @@ async def provision_account_v1(
     if not sub.account_username:
         sub.account_username = username
     password = sub.account_password_encrypted or ad._numeric_secret(8)
+    if not sub.account_password_encrypted:
+        sub.account_password_encrypted = password
     xray_id = str(uuid.uuid4())
 
     results: list[dict[str, Any]] = []
