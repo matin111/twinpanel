@@ -14,6 +14,7 @@ const DiscountsRuntimePage=dynamic(()=>import("./admin-parity-runtime").then(m=>
 const AdminResellersManagementRuntime=dynamic(()=>import("./admin-resellers-management-runtime").then(m=>m.AdminResellersManagementRuntime));
 const AdminResellerTrafficPlans=dynamic(()=>import("./admin-reseller-traffic-plans").then(m=>m.AdminResellerTrafficPlans));
 const StoreSettingsManager=dynamic(()=>import("./store-settings-manager").then(m=>m.StoreSettingsManager));
+const MigrationCenterAdmin=dynamic(()=>import("./migration-center-admin").then(m=>m.MigrationCenterAdmin));
 const BackupsFullRuntimePage=dynamic(()=>import("./backups-full-runtime").then(m=>m.BackupsFullRuntimePage));
 const ProvisionRuntimeXrayDomainPage=dynamic(()=>import("./provision-runtime-xray-domain").then(m=>m.ProvisionRuntimeXrayDomainPage));
 const SmsReaderRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.SmsReaderRuntimePage));
@@ -93,6 +94,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(key==="admin/users") return admin(<AdminUsersRuntime/>);
   if(key==="admin/subscriptions") return admin(<><LegacySubscriptionsRuntimePage/><AdminSubscriptionLiveTable/><AdminManualSubscriptionCreate/></>);
   if(key==="admin/subscription-tools") return admin(<SubscriptionToolsRuntimePage/>);
+  if(key==="admin/migration-center") return admin(<MigrationCenterAdmin/>);
   if(key==="admin/plans") return admin(<LegacyPlansRuntimePage/>);
   if(key==="admin/nodes") return admin(<LegacyNodesRuntimePage/>);
   if(key==="admin/network") return admin(<LegacyNodesRuntimePage/>);
