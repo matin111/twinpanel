@@ -71,6 +71,7 @@ def import_record(
     starts_at: datetime | None = None,
     expires_at: datetime | None = None,
     activation_duration_days: int | None = None,
+    allow_inactive_target: bool = False,
 ) -> dict[str, Any]:
     if source not in SUPPORTED_SOURCES:
         raise ValueError(f"unsupported migration source: {source}")
@@ -105,7 +106,7 @@ def import_record(
         }
 
     user = db.get(User, target_user_id)
-    if not user or not user.is_active:
+    if not user or (not user.is_active and not allow_inactive_target):
         raise ValueError("target TwinPanel user is missing or inactive")
 
     requested_protocols = protocols or ["v2ray"]
