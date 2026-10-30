@@ -1,10 +1,10 @@
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[2]
-ROUTER = (ROOT / "app/routers/domains.py").read_text(encoding="utf-8")
-RUNTIME = (ROOT / "app/services/domain_ssl_runtime_v1.py").read_text(encoding="utf-8")
-RENDERER = (ROOT / "app/services/domain_frontdoor_nginx_v1.py").read_text(encoding="utf-8")
+BACKEND = Path(__file__).resolve().parents[1]
+ROUTER = (BACKEND / "app/routers/domains.py").read_text(encoding="utf-8")
+RUNTIME = (BACKEND / "app/services/domain_ssl_runtime_v1.py").read_text(encoding="utf-8")
+RENDERER = (BACKEND / "app/services/domain_frontdoor_nginx_v1.py").read_text(encoding="utf-8")
 
 
 def assert_true(value: bool, message: str) -> None:
@@ -19,6 +19,7 @@ def test_router_uses_frontdoor_renderer() -> None:
     )
     assert_true("create_nginx_config" in ROUTER, "front-door renderer import missing")
     assert_true("frontdoor_enabled" in ROUTER, "front-door marker helper missing")
+    assert_true("refresh_frontdoor_map" in ROUTER, "domain removal must refresh the SNI map")
 
 
 def test_frontdoor_https_is_internal_only() -> None:
@@ -26,6 +27,7 @@ def test_frontdoor_https_is_internal_only() -> None:
     assert_true("TWINPANEL_ACME_WEBROOT_V1" in RENDERER, "permanent ACME webroot location missing")
     assert_true("frontdoor_enabled()" in RENDERER, "front-door marker gate missing")
     assert_true("STREAM_MAP_BUILDER" in RENDERER, "managed SNI map refresh hook missing")
+    assert_true("_restore_site(" in RENDERER, "Nginx update rollback helper missing")
 
 
 def test_frontdoor_acme_uses_webroot_not_nginx_mutation() -> None:
