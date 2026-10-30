@@ -12,8 +12,10 @@ from ..services.migration_center_v1 import SUPPORTED_SOURCES, dry_run_migration
 MigrationSource = Literal["sanaei", "marzban", "pasargad"]
 
 
+# This router is attached to the already-registered subscription-admin-v2
+# aggregate. main.py adds the shared /v1 prefix exactly once.
 router = APIRouter(
-    prefix="/v1/admin/migration-center",
+    prefix="/admin/migration-center",
     tags=["migration-center-v1"],
     dependencies=[Depends(require_admin)],
 )
