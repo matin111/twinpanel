@@ -11,7 +11,7 @@ assert "TWINPANEL_PUBLIC_CONNECT_V2RAY_MULTILINK_GROUPS_V49" in v44
 assert "refine_public_connection_v2ray_multilink_action_v44" in v42
 assert "return refine_public_connection_v2ray_multilink_action_v44(source)" in v42
 
-# V38 keeps generic subscription routing behavior, while V44 now overrides the
+# V38 keeps generic subscription routing behavior, while V44 overrides the
 # V2Ray card to the neutral all-profile subscription URL. The public action must
 # not expose the protocol-named /multi/v2ray path because that pathname is
 # externally DPI-sensitive on some networks.
@@ -20,16 +20,25 @@ assert "+'/sub'" in v44
 assert "'/multi/v2ray'" not in v44
 assert "'/sub/v2ray'" not in v44
 assert ".v38-all-card[data-v38-protocol=\"v2ray\"]" in v44
-assert "actions.replaceChildren(send,copyButton)" in v44
 assert "card.dataset.v44Endpoint='/sub'" in v44
 
-# Both top-level user actions must use the exact same neutral all-profile URL.
-# Karing is the canonical V2Ray client; Hiddify must not be reintroduced here.
-assert "send.href=karingUrl(url,'TwinPanel V2Ray')" in v44
-assert "copy(url)" in v44
-assert "ارسال همه به Karing" in v44
-assert "کپی لینک" in v44
-assert "karing://install-config?url=" in v44
+# Device-aware client behavior must stay aligned with the download card:
+# Windows/macOS/Linux -> v2rayN, Android -> v2rayNG, iOS -> V2Box.
+assert "windows:{name:'v2rayN'" in v44
+assert "macos:{name:'v2rayN'" in v44
+assert "linux:{name:'v2rayN'" in v44
+assert "android:{name:'v2rayNG'" in v44
+assert "ios:{name:'V2Box'" in v44
+assert "v2rayng://install-sub?url=" in v44
+assert "v2rayng://install-config?url=" in v44
+assert "کپی لینک برای v2rayN" in v44
+assert "کپی لینک برای V2Box" in v44
+assert "ارسال همه به v2rayNG" in v44
+assert "ارسال به v2rayNG" in v44
+
+# Karing/Hiddify-specific customer actions must not return.
+assert "karing://" not in v44.lower()
+assert "ارسال همه به Karing" not in v44
 assert "hiddify://import/" not in v44
 assert "ارسال همه به Hiddify" not in v44
 assert "۹ کانفیگ" not in v44
@@ -58,4 +67,4 @@ for forbidden in [
 ]:
     assert forbidden not in v44.lower(), forbidden
 
-print("V44/V49 V2Ray Karing neutral subscription wiring smoke OK")
+print("V44/V49 V2Ray device-aware client action smoke OK")
