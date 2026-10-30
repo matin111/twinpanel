@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..services.ssl_manager import create_nginx_config, issue_ssl
+from ..services.ssl_manager import create_nginx_config
+from ..services.domain_ssl_runtime_v1 import issue_ssl
 from ..services.domain_router import resolve_domain_route
 import subprocess
 import os
@@ -25,8 +26,7 @@ def admin_only(user: User):
         )
 
 
-
-# TWINPANEL_DOMAIN_MANAGER_V2
+# TWINPANEL_DOMAIN_MANAGER_V4
 _DOMAIN_RE = re.compile(
     r"^(?=.{1,253}$)"
     r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
@@ -125,6 +125,12 @@ def create_domain(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
+    """Register the domain and activate its plain-HTTP Nginx route only.
+
+    SSL issuance is intentionally a separate action. Package installation,
+    ACME validation and certificate deployment must not keep this API request
+    open long enough for the reverse proxy to return 504.
+    """
     admin_only(user)
 
     domain = _normalize_domain(
@@ -178,35 +184,8 @@ def create_domain(
             f"/etc/nginx/sites-available/"
             f"{item.domain}.conf"
         )
-
-        # SSL automatic
-        try:
-            result = issue_ssl(
-                item.domain
-            )
-
-            if result.get("ok"):
-                item.ssl_status = SSLStatus.ACTIVE
-                item.ssl_error = None
-
-                create_nginx_config(
-                    item.domain,
-                    item.target_host or "127.0.0.1",
-                    item.target_port,
-                    item.domain_type
-                )
-            else:
-                item.ssl_status = SSLStatus.FAILED
-                item.ssl_error = result.get(
-                    "error",
-                    ""
-                )
-
-        except Exception as ssl_error:
-            item.ssl_status = SSLStatus.FAILED
-            item.ssl_error = str(
-                ssl_error
-            )
+        item.ssl_status = SSLStatus.NONE
+        item.ssl_error = None
 
     except Exception as exc:
         item.nginx_status = "failed"
@@ -362,15 +341,15 @@ def delete_domain(
 
 @router.post("/{domain_id}/ssl")
 def request_ssl(
-    domain_id:int,
-    db:Session=Depends(get_db),
-    user:User=Depends(get_current_user)
+    domain_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
 ):
     admin_only(user)
 
     item = (
         db.query(Domain)
-        .filter(Domain.id==domain_id)
+        .filter(Domain.id == domain_id)
         .first()
     )
 
@@ -381,21 +360,26 @@ def request_ssl(
         )
 
     try:
-
         host = item.target_host or "127.0.0.1"
+        nginx_path = f"/etc/nginx/sites-available/{item.domain}.conf"
 
-        create_nginx_config(
-            item.domain,
-            host,
-            item.target_port,
-            item.domain_type
-        )
+        # Existing and newly-created rows normally already have their HTTP
+        # config. Recreate it only when the file is missing so a 443 conflict
+        # cannot make a harmless retry reload an existing SSL server block.
+        if not os.path.exists(nginx_path):
+            create_nginx_config(
+                item.domain,
+                host,
+                item.target_port,
+                item.domain_type
+            )
 
-        item.nginx_status="active"
-        item.nginx_file=f"/etc/nginx/sites-available/{item.domain}.conf"
+        item.nginx_status = "active"
+        item.nginx_file = nginx_path
 
         result = issue_ssl(
-            item.domain
+            item.domain,
+            timeout_seconds=180,
         )
 
         if result["ok"]:
@@ -408,29 +392,46 @@ def request_ssl(
                 item.target_port,
                 item.domain_type
             )
-        else:
-            item.ssl_status = SSLStatus.FAILED
-            item.ssl_error = result.get("error","")
 
+            db.commit()
+            db.refresh(item)
+
+            return {
+                "ok": True,
+                "domain": item.domain,
+                "ssl_status": item.ssl_status,
+                "nginx_status": item.nginx_status,
+                "detail": result,
+            }
+
+        item.ssl_status = SSLStatus.FAILED
+        item.ssl_error = result.get("error", "")
         db.commit()
         db.refresh(item)
 
-        return {
-            "ok": result["ok"],
-            "domain": item.domain,
-            "ssl_status": item.ssl_status,
-            "nginx_status": item.nginx_status,
-            "detail": result
-        }
+        code = str(result.get("code") or "ssl_failed")
+        status_code = 409 if code in {
+            "https_port_conflict",
+            "certbot_not_installed",
+        } else 502
 
-    except Exception as e:
+        raise HTTPException(
+            status_code=status_code,
+            detail={
+                "code": code,
+                "message": result.get("error") or code,
+                "owners": result.get("owners") or [],
+            },
+        )
 
+    except HTTPException:
+        raise
+    except Exception as exc:
         item.ssl_status = SSLStatus.FAILED
-        item.ssl_error = str(e)
+        item.ssl_error = str(exc)
         db.commit()
 
         raise HTTPException(
             status_code=500,
-            detail=str(e)
+            detail=str(exc)
         )
-
