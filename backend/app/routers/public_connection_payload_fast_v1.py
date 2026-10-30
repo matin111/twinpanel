@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import sys
 from typing import Any
 
@@ -16,10 +17,27 @@ from .account_delivery import _qr_data_uri, _share_url, _stored_info
 # HTML is wasted CPU on the single API worker. Keep WireGuard QR compatibility,
 # because that file-oriented surface can still render its QR, but leave V2Ray QR
 # generation to explicit/on-demand surfaces instead of the initial page request.
+#
+# TWINPANEL_PUBLIC_CONNECT_REQUEST_PAYLOAD_CACHE_V2
+# Hub V5 and the V13/V14/V15/V16 presentation refiners consume the same payload
+# during one HTTP request. Rebuilding _stored_info() for every refiner repeats DB
+# reads, decrypt/filter work and endpoint normalization several times. FastAPI's
+# get_db() creates one SQLAlchemy Session per request, so Session.info is a safe
+# request-local cache boundary: no payload is shared across requests or workers.
+# Keep a deep-copied canonical value in the cache because presentation refiners
+# are allowed to transform their local payload without contaminating later stages.
+_CACHE_PREFIX = "twinpanel_public_connect_payload_fast_v2"
+
+
 def public_connection_payload_fast_v1(
     db: Session,
     sub: Subscription,
 ) -> dict[str, Any]:
+    cache_key = (_CACHE_PREFIX, int(sub.id))
+    cached = db.info.get(cache_key)
+    if isinstance(cached, dict):
+        return deepcopy(cached)
+
     info = _stored_info(db, sub)
 
     for cred in info.get("credentials", []):
@@ -37,6 +55,10 @@ def public_connection_payload_fast_v1(
         (sub.traffic_limit_bytes or 0) / 1024 / 1024 / 1024,
         2,
     )
+
+    # Cache an isolated canonical copy. The first caller receives the freshly
+    # built object, while later presentation stages receive their own deep copy.
+    db.info[cache_key] = deepcopy(info)
     return info
 
 
