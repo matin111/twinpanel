@@ -3,6 +3,17 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 from .config import settings
 
+
+# TWINPANEL_API_DB_LOCK_TIMEOUT_V2
+# PostgreSQL accepts libpq `options`; SQLite and other CI/test dialects do not.
+# Keep the freeze protection production-scoped without changing test/database
+# compatibility for non-PostgreSQL URLs.
+_DATABASE_CONNECT_ARGS = (
+    {"options": "-c lock_timeout=3000"}
+    if settings.database_url.startswith(("postgresql://", "postgresql+psycopg2://"))
+    else {}
+)
+
 engine = create_engine(
     settings.database_url,
 
@@ -15,15 +26,9 @@ engine = create_engine(
     pool_timeout=10,
     pool_recycle=1800,
 
-    # TWINPANEL_API_DB_LOCK_TIMEOUT_V1
-    # The API currently uses synchronous SQLAlchemy sessions from routes which
-    # may also perform async remote work. A database lock wait therefore blocks
-    # the single Uvicorn event-loop worker. Bound PostgreSQL lock waits so one
-    # contended transaction cannot freeze the whole admin/customer API.
-    #
-    # This is deliberately a lock timeout only; normal long-running statements
-    # are not given a statement_timeout here.
-    connect_args={"options": "-c lock_timeout=3000"},
+    # Bound PostgreSQL lock waits so a contended synchronous SQL statement
+    # cannot freeze the single Uvicorn event-loop worker indefinitely.
+    connect_args=_DATABASE_CONNECT_ARGS,
     future=True,
 )
 

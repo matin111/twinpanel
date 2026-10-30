@@ -42,8 +42,9 @@ jobs:
           assert 'finally:' in route and 'guard.release()' in route
           assert '_provision_account_v1_locked' in route
 
-          assert 'TWINPANEL_API_DB_LOCK_TIMEOUT_V1' in db
+          assert 'TWINPANEL_API_DB_LOCK_TIMEOUT_V2' in db
           assert 'lock_timeout=3000' in db
+          assert 'connect_args=_DATABASE_CONNECT_ARGS' in db
 
           print('Subscription provisioning concurrency guard contract OK')
           PY
