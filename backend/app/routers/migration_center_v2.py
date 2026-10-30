@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 from datetime import datetime
 from typing import Any, Literal
 
@@ -12,7 +13,9 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..migration_import_models import MigrationImportRecord
-from ..models import Subscription
+from ..models import Subscription, User
+from ..security import hash_password
+from ..services.migration_center_v1 import normalize_record
 from ..services.migration_import_v2 import import_record, legacy_payload
 
 
@@ -40,6 +43,40 @@ class MigrationImportIn(BaseModel):
     starts_at: datetime | None = None
     expires_at: datetime | None = None
     activation_duration_days: int | None = Field(default=None, ge=1, le=3650)
+
+
+class MigrationBatchImportIn(BaseModel):
+    source: MigrationSource
+    records: list[dict[str, Any]] = Field(min_length=1, max_length=5000)
+    protocols: list[str] = Field(default_factory=lambda: ["v2ray"], max_length=20)
+
+
+def _migration_owner_email(source: str, source_id: str) -> str:
+    digest = hashlib.sha256(f"{source}:{source_id}".encode()).hexdigest()[:32]
+    return f"migration-{source}-{digest}@import.invalid"
+
+
+def _ensure_migration_owner(
+    db: Session,
+    *,
+    source: str,
+    source_id: str,
+    username: str,
+) -> tuple[User, bool]:
+    email = _migration_owner_email(source, source_id)
+    user = db.query(User).filter(User.email == email).first()
+    if user:
+        return user, False
+
+    user = User(
+        email=email,
+        full_name=username[:150] or None,
+        password_hash=hash_password("migration-login-disabled"),
+        is_active=False,
+    )
+    db.add(user)
+    db.flush()
+    return user, True
 
 
 @admin_router.get("/imports")
@@ -94,6 +131,98 @@ def migration_import(payload: MigrationImportIn, db: Session = Depends(get_db)):
     except Exception:
         db.rollback()
         raise
+
+
+@admin_router.post("/import-batch")
+def migration_import_batch(payload: MigrationBatchImportIn, db: Session = Depends(get_db)):
+    imported = 0
+    existing = 0
+    failed = 0
+    auto_created_users = 0
+    results: list[dict[str, Any]] = []
+
+    for index, record in enumerate(payload.records):
+        try:
+            normalized = normalize_record(payload.source, record, index)
+            source_id = str(normalized.get("source_id") or "").strip()
+            username = str(normalized.get("username") or "").strip()
+            if not source_id:
+                raise ValueError("source_id is required for idempotent import")
+            if not username:
+                raise ValueError("username is required for import")
+
+            marker = (
+                db.query(MigrationImportRecord)
+                .filter(
+                    MigrationImportRecord.source == payload.source,
+                    MigrationImportRecord.source_id == source_id,
+                )
+                .first()
+            )
+            if marker:
+                existing += 1
+                results.append(
+                    {
+                        "index": index,
+                        "source_id": source_id,
+                        "username": username,
+                        "imported": False,
+                        "idempotent": True,
+                        "subscription_id": marker.subscription_id,
+                    }
+                )
+                continue
+
+            user, created_user = _ensure_migration_owner(
+                db,
+                source=payload.source,
+                source_id=source_id,
+                username=username,
+            )
+            result = import_record(
+                db,
+                source=payload.source,
+                record=record,
+                target_user_id=user.id,
+                protocols=payload.protocols,
+                allow_inactive_target=True,
+            )
+            if result.get("imported"):
+                imported += 1
+                auto_created_users += 1 if created_user else 0
+            elif result.get("idempotent"):
+                existing += 1
+            results.append(
+                {
+                    "index": index,
+                    "source_id": source_id,
+                    "username": username,
+                    "user_id": user.id,
+                    **result,
+                }
+            )
+        except Exception as exc:
+            db.rollback()
+            failed += 1
+            results.append(
+                {
+                    "index": index,
+                    "source_id": str(record.get("source_id") or record.get("id") or ""),
+                    "username": str(record.get("username") or record.get("email") or ""),
+                    "imported": False,
+                    "idempotent": False,
+                    "error": str(exc),
+                }
+            )
+
+    return {
+        "total": len(payload.records),
+        "imported": imported,
+        "existing": existing,
+        "failed": failed,
+        "auto_created_users": auto_created_users,
+        "results": results,
+    }
 
 
 @public_router.get("/{token}", response_class=PlainTextResponse)
