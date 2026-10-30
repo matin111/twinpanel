@@ -484,6 +484,47 @@ update_menu(){
   done
 }
 
+install_reinstall_menu(){
+  header "Install / Reinstall TwinPanel"
+  echo "  Installs the latest verified Stable release using TwinPanel's official installer."
+  echo "  Existing database, backend environment, administrator and runtime settings are preserved."
+  echo "  Services may restart while the installation is completed."
+  echo
+
+  if [[ ! -f "$ROOT/install.sh" ]]; then
+    printf '%bOfficial installer is missing from the active release: %s/install.sh%b\n' \
+      "$C_RED" "$ROOT" "$C_RESET"
+    pause
+    return
+  fi
+
+  if [[ -f "$BACKEND_ENV" ]]; then
+    printf '%bExisting TwinPanel installation detected.%b\n' "$C_YELLOW" "$C_RESET"
+  else
+    printf '%bTwinPanel runtime configuration was not detected.%b\n' "$C_YELLOW" "$C_RESET"
+  fi
+  echo
+
+  if ! confirm_action "Run the official TwinPanel installer now?"; then
+    echo "  Cancelled."
+    pause
+    return
+  fi
+
+  echo
+  printf '%bStarting official installer...%b\n' "$C_CYAN" "$C_RESET"
+  if bash "$ROOT/install.sh"; then
+    echo
+    printf '%bTwinPanel installation / reinstall completed successfully.%b\n' "$C_GREEN" "$C_RESET"
+  else
+    rc=$?
+    echo
+    printf '%bInstaller exited with status %s. Existing data was not intentionally removed by this menu action.%b\n' \
+      "$C_RED" "$rc" "$C_RESET"
+  fi
+  pause
+}
+
 backup_menu(){
   while true; do
     header "Backup"
@@ -591,7 +632,8 @@ main_menu(){
     menu_item 2 "Restart TwinPanel"
     menu_item 3 "Protocol management"
     menu_item 4 "Panel update"
-    menu_item 5 "More tools"
+    menu_item 5 "Install / Reinstall TwinPanel"
+    menu_item 6 "More tools"
     printf '\n'
     menu_item 0 "Exit"
     if ! pick; then
@@ -603,7 +645,8 @@ main_menu(){
       2) restart_menu ;;
       3) protocol_menu ;;
       4) update_menu ;;
-      5) more_menu ;;
+      5) install_reinstall_menu ;;
+      6) more_menu ;;
       0) [[ -t 1 ]] && clear 2>/dev/null || true; exit 0 ;;
       *) invalid_choice ;;
     esac
