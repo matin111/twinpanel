@@ -23,25 +23,29 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+
           p = Path('scripts/twinpanel-menu.sh')
-          s = p.read_text()
-          old = """  brand_row '11111' '10001' '11111' '10001' '11110' '01110' '10001' '11111' '10000'
-          brand_row '00100' '10001' '00100' '11001' '10001' '10001' '11001' '10000' '10000'
-          brand_row '00100' '10001' '00100' '10101' '10001' '10001' '10101' '10000' '10000'
-          brand_row '00100' '10101' '00100' '10101' '11110' '11111' '10101' '11110' '10000'
-          brand_row '00100' '10101' '00100' '10011' '10000' '10001' '10011' '10000' '10000'
-          brand_row '00100' '11011' '00100' '10011' '10000' '10001' '10011' '10000' '10000'
-          brand_row '00100' '11011' '11111' '10001' '10000' '10001' '10001' '11111' '11111'"""
-          new = """  brand_row '11111' '11011' '11111' '11001' '11110' '01110' '11001' '11111' '11000'
-          brand_row '01100' '11011' '01110' '11001' '11001' '11011' '11001' '11000' '11000'
-          brand_row '01100' '11011' '01110' '10101' '11001' '11011' '10101' '11000' '11000'
-          brand_row '01100' '11111' '01110' '10101' '11110' '11111' '10101' '11110' '11000'
-          brand_row '01100' '11011' '01110' '10011' '11000' '11011' '10011' '11000' '11000'
-          brand_row '01100' '11011' '01110' '10011' '11000' '11011' '10011' '11000' '11000'
-          brand_row '01100' '11011' '11111' '10001' '11000' '11011' '10001' '11111' '11111'"""
-          if old not in s:
-              raise SystemExit('expected original wordmark block not found')
-          p.write_text(s.replace(old, new, 1))
+          lines = p.read_text().splitlines()
+          brand_idx = next(i for i, line in enumerate(lines) if line == 'brand(){')
+          row_indexes = [
+              i for i in range(brand_idx + 1, min(len(lines), brand_idx + 20))
+              if lines[i].startswith('  brand_row ')
+          ]
+          if len(row_indexes) != 7:
+              raise SystemExit(f'expected 7 brand rows, got {len(row_indexes)}')
+
+          new_rows = [
+              "  brand_row '11111' '11011' '11111' '11001' '11110' '01110' '11001' '11111' '11000'",
+              "  brand_row '01100' '11011' '01110' '11001' '11001' '11011' '11001' '11000' '11000'",
+              "  brand_row '01100' '11011' '01110' '10101' '11001' '11011' '10101' '11000' '11000'",
+              "  brand_row '01100' '11111' '01110' '10101' '11110' '11111' '10101' '11110' '11000'",
+              "  brand_row '01100' '11011' '01110' '10011' '11000' '11011' '10011' '11000' '11000'",
+              "  brand_row '01100' '11011' '01110' '10011' '11000' '11011' '10011' '11000' '11000'",
+              "  brand_row '01100' '11011' '11111' '10001' '11000' '11011' '10001' '11111' '11111'",
+          ]
+          for index, row in zip(row_indexes, new_rows):
+              lines[index] = row
+          p.write_text('\n'.join(lines) + '\n')
           PY
           bash -n scripts/twinpanel-menu.sh
           rm -f .github/workflows/tmp-bold-ssh-logo.yml
