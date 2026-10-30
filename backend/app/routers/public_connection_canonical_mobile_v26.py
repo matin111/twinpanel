@@ -20,6 +20,9 @@ from .public_connection_final_presentation_v37 import (
 from .public_connection_reference_layout_v38 import (
     refine_public_connection_reference_layout_v38,
 )
+from .public_connection_request_backpressure_v42 import (
+    refine_public_connection_request_backpressure_v42,
+)
 
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26"
@@ -108,4 +111,5 @@ def refine_public_connection_canonical_mobile_v26(source: str) -> str:
     source = refine_public_connection_forward_v34(source)
     # V37 cleanup remains intact; V38 is the final reference-layout authority.
     source = refine_public_connection_final_presentation_v37(source)
-    return refine_public_connection_reference_layout_v38(source)
+    source = refine_public_connection_reference_layout_v38(source)
+    return refine_public_connection_request_backpressure_v42(source)
