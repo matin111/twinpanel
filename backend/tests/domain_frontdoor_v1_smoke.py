@@ -14,9 +14,11 @@ def assert_true(value: bool, message: str) -> None:
 
 def test_router_uses_frontdoor_renderer() -> None:
     assert_true(
-        "from ..services.domain_frontdoor_nginx_v1 import create_nginx_config" in ROUTER,
-        "domains router must use front-door aware renderer",
+        "from ..services.domain_frontdoor_nginx_v1 import" in ROUTER,
+        "domains router must import front-door renderer",
     )
+    assert_true("create_nginx_config" in ROUTER, "front-door renderer import missing")
+    assert_true("frontdoor_enabled" in ROUTER, "front-door marker helper missing")
 
 
 def test_frontdoor_https_is_internal_only() -> None:
@@ -34,6 +36,14 @@ def test_frontdoor_acme_uses_webroot_not_nginx_mutation() -> None:
     assert_true("apt-get" not in RUNTIME, "SSL request runtime must never install packages")
 
 
+def test_existing_domains_refresh_before_frontdoor_acme() -> None:
+    assert_true(
+        "if frontdoor_enabled() or not os.path.exists(nginx_path):" in ROUTER,
+        "existing managed domains must gain ACME webroot before issuance",
+    )
+    assert_true('"frontdoor_not_ready"' in ROUTER, "front-door readiness must map to a stable API error")
+
+
 def test_frontdoor_requires_nginx_on_public_tcp_443() -> None:
     assert_true("frontdoor_tcp_443_not_owned_by_nginx" in RUNTIME, "front-door readiness guard missing")
     assert_true('name != "nginx"' in RUNTIME, "non-nginx TCP/443 owners must still block SSL")
@@ -43,5 +53,6 @@ if __name__ == "__main__":
     test_router_uses_frontdoor_renderer()
     test_frontdoor_https_is_internal_only()
     test_frontdoor_acme_uses_webroot_not_nginx_mutation()
+    test_existing_domains_refresh_before_frontdoor_acme()
     test_frontdoor_requires_nginx_on_public_tcp_443()
     print("DOMAIN_FRONTDOOR_V1_SMOKE=PASS")
