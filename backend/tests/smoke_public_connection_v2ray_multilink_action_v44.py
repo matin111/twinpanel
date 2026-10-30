@@ -38,8 +38,7 @@ assert "v2rayng://install-sub?url=" in v44
 assert "v2rayng://install-config?url=" in v44
 assert "ارسال همه به v2rayNG" in v44
 assert "ارسال به v2rayNG" in v44
-assert "کپی لینک برای "+"client" in v44
-assert "کپی کانفیگ برای "+"client" in v44
+assert "isSubscription?('کپی لینک برای '+client):('کپی کانفیگ برای '+client)" in v44
 assert "card.dataset.v44Client=clientName()" in v44
 
 # Karing/Hiddify-specific customer actions must not return.
