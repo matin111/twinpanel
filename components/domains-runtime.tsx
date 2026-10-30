@@ -27,6 +27,17 @@ const typeLabel:Record<DomainType,{fa:string;en:string}>={
   subscription:{fa:"سابسکریپشن",en:"Subscription"}
 };
 
+function readableApiError(value:unknown):string{
+  if(typeof value==="string")return value;
+  if(!value||typeof value!=="object")return "";
+  const record=value as Record<string,unknown>;
+  for(const key of ["message","error","reason","code"]){
+    const candidate=record[key];
+    if(typeof candidate==="string"&&candidate.trim())return candidate;
+  }
+  try{return JSON.stringify(value);}catch{return "";}
+}
+
 async function domainRequest<T>(path:string,init:RequestInit={}):Promise<T>{
   const token=getCustomerToken();
   if(!token)throw new Error("نشست مدیر پیدا نشد؛ دوباره وارد شوید.");
@@ -36,7 +47,10 @@ async function domainRequest<T>(path:string,init:RequestInit={}):Promise<T>{
   const response=await fetch(`${API_BASE}${path}`,{...init,headers,cache:"no-store"});
   if(!response.ok){
     let detail="";
-    try{const data=await response.json();detail=String(data?.detail||data?.message||"");}catch{}
+    try{
+      const data=await response.json();
+      detail=readableApiError(data?.detail??data?.message??data);
+    }catch{}
     throw new Error(detail||`API ${response.status}`);
   }
   if(response.status===204)return undefined as T;
@@ -81,7 +95,7 @@ export function DomainsRuntimePage(){
     setBusy("create");setError("");setSuccess("");
     try{
       await domainRequest<DomainRow>(api.admin.domains,{method:"POST",body:JSON.stringify({domain:clean,domain_type:domainType})});
-      setDomain("");setShowAdd(false);setSuccess(pick("دامنه اضافه شد و تنظیم Nginx/SSL شروع شد.","Domain added and Nginx/SSL setup started."));
+      setDomain("");setShowAdd(false);setSuccess(pick("دامنه اضافه شد و Nginx تنظیم شد. SSL را جداگانه فعال کنید.","Domain added and Nginx configured. Enable SSL separately."));
       await load();
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy(null);}
