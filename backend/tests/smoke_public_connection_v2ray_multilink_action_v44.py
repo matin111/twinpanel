@@ -3,6 +3,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 v44 = (ROOT / "backend/app/routers/public_connection_v2ray_multilink_action_v44.py").read_text()
 v42 = (ROOT / "backend/app/routers/public_connection_mobile_sheet_v42.py").read_text()
+v40 = (ROOT / "backend/app/routers/public_connection_mobile_authority_v40.py").read_text()
+v41 = (ROOT / "backend/app/routers/public_connection_v2ray_actions_v41.py").read_text()
 v38 = (ROOT / "backend/app/routers/public_connection_reference_layout_v38.py").read_text()
 v7 = (ROOT / "backend/app/routers/public_connection_multilink_v7.py").read_text()
 
@@ -22,8 +24,27 @@ assert "'/sub/v2ray'" not in v44
 assert ".v38-all-card[data-v38-protocol=\"v2ray\"]" in v44
 assert "card.dataset.v44Endpoint='/sub'" in v44
 
-# Device-aware client behavior must stay aligned with the download card:
-# Windows/macOS/Linux -> v2rayN, Android -> v2rayNG, iOS -> V2Box.
+# Mobile authority must keep V2Ray visible after V41 removes legacy .server-view
+# inventory. Android and iPhone/iPad use this <=720px path, so V40 must accept
+# the preserved Multi Server surface as a real renderable protocol.
+assert "function hasRenderableSurface(panel)" in v40
+assert "if(panel.querySelector('.server-view'))return true" in v40
+assert "if(panelKey(panel)==='v2ray')" in v40
+assert "panel.querySelector('.v38-all-card[data-v38-protocol=\"v2ray\"]')" in v40
+assert "panel.dataset.v41LowerConfigsRemoved==='1'" in v40
+assert "panel.dataset.v41V2ray==='1'" in v40
+assert "hasRenderableSurface(panel)" in v40
+
+# Device-aware client behavior must stay aligned across V41 download and V44
+# import actions: macOS -> v2rayN, Android -> v2rayNG, iPhone/iPad -> V2Box.
+assert "macos:{name:'v2rayN'" in v41
+assert "android:{name:'v2rayNG'" in v41
+assert "ios:{name:'V2Box'" in v41
+assert "https://apps.apple.com/us/app/v2box-v2ray-client/id6446814690" in v41
+assert "if(/iphone|ipad|ipod/i.test(ua))return'ios'" in v41
+assert "if(/macintosh|mac os|macintel/i.test(haystack)&&Number(navigator.maxTouchPoints||0)>1)return'ios'" in v41
+assert "if(/macintosh|mac os|macintel/i.test(haystack))return'macos'" in v41
+
 assert "function platform()" in v44
 assert "if(/android/i.test(ua))return'android'" in v44
 assert "if(/iphone|ipad|ipod/i.test(ua))return'ios'" in v44
@@ -72,4 +93,4 @@ for forbidden in [
 ]:
     assert forbidden not in v44.lower(), forbidden
 
-print("V44/V49 V2Ray device-aware client action smoke OK")
+print("V40/V41/V44/V49 V2Ray mobile visibility and Apple client smoke OK")

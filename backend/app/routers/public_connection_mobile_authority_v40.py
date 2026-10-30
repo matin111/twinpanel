@@ -105,9 +105,21 @@ _SCRIPT = r"""
       .find(choice=>String(choice.dataset.protocol||'')===String(panel.id));
   }
 
+  function hasRenderableSurface(panel){
+    if(panel.querySelector('.server-view'))return true;
+    if(panelKey(panel)==='v2ray'){
+      return Boolean(
+        panel.querySelector('.v38-all-card[data-v38-protocol="v2ray"]') ||
+        panel.dataset.v41LowerConfigsRemoved==='1' ||
+        panel.dataset.v41V2ray==='1'
+      );
+    }
+    return false;
+  }
+
   function realPanels(){
     return [...document.querySelectorAll('.protocol-panel.v24-canonical-panel')]
-      .filter(panel=>!panel.classList.contains('v24-empty')&&Boolean(panel.querySelector('.server-view')));
+      .filter(panel=>!panel.classList.contains('v24-empty')&&hasRenderableSurface(panel));
   }
 
   function retireV27(){

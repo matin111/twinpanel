@@ -48,10 +48,25 @@ def main() -> None:
     require("body.v40-mobile-final .v27-connect-nav" in v40 and "display:none!important" in v40,
             "V27 nav is not hard-retired in final CSS")
 
-    # Real mobile protocol inventory comes from panels that actually have server views.
+    # Real mobile protocol inventory still requires a concrete renderable surface.
+    # Ordinary protocols use .server-view. V2Ray/Xray is the sole exception after
+    # V41 removes legacy .server-views while preserving the canonical Multi Server surface.
+    require("function hasRenderableSurface(panel)" in v40,
+            "renderable-surface helper missing")
+    require("if(panel.querySelector('.server-view'))return true" in v40,
+            "real server evidence is no longer required for ordinary protocols")
     require("function realPanels()" in v40, "real panel inventory helper missing")
     require(".protocol-panel.v24-canonical-panel" in v40, "canonical panel authority missing")
-    require("Boolean(panel.querySelector('.server-view'))" in v40, "real server evidence is not required")
+    require("hasRenderableSurface(panel)" in v40,
+            "real panel inventory does not use renderable-surface evidence")
+    require("panelKey(panel)==='v2ray'" in v40,
+            "V2Ray-specific renderable exception missing")
+    require("panel.querySelector('.v38-all-card[data-v38-protocol=\"v2ray\"]')" in v40,
+            "V2Ray Multi Server renderability evidence missing")
+    require("panel.dataset.v41LowerConfigsRemoved==='1'" in v40,
+            "V2Ray V41 cleanup renderability evidence missing")
+    require("panel.dataset.v41V2ray==='1'" in v40,
+            "V2Ray V41 protocol marker renderability evidence missing")
     require("choice.classList.add('v40-real-protocol')" in v40, "real protocol choice marker missing")
     require("choice.removeAttribute('data-v31-hide')" in v40,
             "stale presentation hide flag is not cleared for proven real protocols")
@@ -72,10 +87,10 @@ def main() -> None:
             "legacy V2Ray action surfaces are not explicitly retired")
     require("data-v40-retired-actions" in v40, "V40 action retirement marker missing")
     require(".v34-client-card" in v40 and "display:flex!important" in v40,
-            "Hiddify download card is not preserved")
+            "device-aware download card is not preserved")
     require(".v31-client-card" in v40 and "display:none!important" in v40,
             "duplicate client download surface is not retired")
-    require("primary.textContent='ارسال به Hiddify'" in v40, "Hiddify send action label missing")
+    require("primary.textContent='ارسال به Hiddify'" in v40, "V40 legacy send label missing")
     require("copy.textContent='کپی کانفیگ'" in v40, "copy config action label missing")
     require("if(node!==primary&&node!==copy)node.remove()" in v40,
             "V2Ray canonical rows are not capped at two actions")
