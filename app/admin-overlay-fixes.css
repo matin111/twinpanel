@@ -1,0 +1,114 @@
+/* Admin overlay fixes: keep top-nav dropdowns above sticky headers and make notification read state icon-only. */
+.admin-topbar,
+.admin-topbar-inner,
+.admin-topnav,
+.topnav-group,
+.topnav-group[open],
+.topnav-menu,
+.topnav-release{
+  overflow:visible!important;
+}
+
+.topnav-group[open]{
+  z-index:6000!important;
+}
+
+.topnav-menu{
+  z-index:6100!important;
+  max-height:calc(100dvh - 88px)!important;
+}
+
+.topnav-release{
+  position:relative!important;
+  z-index:2!important;
+}
+
+.topnav-release .system-release-footer{
+  position:relative!important;
+  z-index:3!important;
+  width:100%!important;
+  max-width:none!important;
+}
+
+.admin-shell main>header.admin-commandbar,
+.admin-shell main>header{
+  z-index:1040!important;
+}
+
+.customerNotificationPopover header{
+  grid-template-columns:minmax(0,1fr) auto!important;
+}
+
+.customerNotificationPopover header small{
+  display:none!important;
+}
+
+.notificationEyeAction{
+  width:36px!important;
+  height:36px!important;
+  min-width:36px!important;
+  max-width:36px!important;
+  padding:0!important;
+  display:grid!important;
+  place-items:center!important;
+  border-radius:11px!important;
+  font-size:16px!important;
+  line-height:1!important;
+  overflow:visible!important;
+}
+
+.customerNotificationList > button{
+  grid-template-columns:30px minmax(0,1fr)!important;
+  align-items:center!important;
+}
+
+.notificationReadState{
+  position:relative;
+  width:28px;
+  height:28px;
+  display:grid;
+  place-items:center;
+  border-radius:9px;
+  border:1px solid var(--line);
+  background:var(--surface2);
+  color:var(--muted);
+  font-size:14px;
+  line-height:1;
+}
+
+.notificationReadState.isUnread{
+  color:#7c3aed;
+  border-color:rgba(124,58,237,.34);
+  background:rgba(124,58,237,.1);
+  box-shadow:0 0 0 3px rgba(124,58,237,.06);
+}
+
+.notificationReadState.isUnread::after{
+  content:"";
+  position:absolute;
+  width:20px;
+  height:2px;
+  border-radius:999px;
+  background:currentColor;
+  transform:rotate(-42deg);
+}
+
+.notificationReadState.isRead{
+  color:#16a34a;
+  border-color:rgba(22,163,74,.28);
+  background:rgba(22,163,74,.08);
+}
+
+.customerNotificationList > button > i{
+  display:none!important;
+}
+
+html[data-theme="light"] .notificationReadState{
+  background:#fff;
+}
+
+@media (max-width:900px){
+  .topnav-menu{
+    max-height:none!important;
+  }
+}
