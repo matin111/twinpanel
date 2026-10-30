@@ -4,6 +4,7 @@ import fcntl
 import os
 import shutil
 import subprocess
+import threading
 from pathlib import Path
 
 
@@ -147,16 +148,6 @@ def _ensure_locked(systemctl: str, result: dict) -> dict:
     # TWINPANEL_TRANSPORT_MANAGER_RELEASE_RELOAD_V48
     # TWINPANEL_TRANSPORT_MANAGER_RESTART_STORM_V54
     # TWINPANEL_TRANSPORT_MANAGER_SELF_RESTART_GUARD_V56
-    #
-    # V48 correctly reloaded a manager that was still running code from the
-    # previous /opt/twinpanel/current target, but it restarted every active
-    # manager on every API import. V54 made that decision release-aware.
-    #
-    # V56 additionally guarantees that even an accidental future call from the
-    # standalone manager itself can never systemctl-restart its own MainPID.
-    # The manager may reconcile a drifted unit file and daemon-reload systemd,
-    # but the currently executing process remains alive; the API/controller is
-    # the only owner allowed to perform a release activation restart.
     active_cp = _run(systemctl, "is-active", "--quiet", UNIT_NAME)
 
     if active_cp.returncode == 0:
@@ -204,19 +195,7 @@ def _ensure_locked(systemctl: str, result: dict) -> dict:
     return result
 
 
-def ensure_transport_manager_service_v12() -> dict:
-    """Best-effort, idempotent activation of the controller transport manager.
-
-    Release activation must reload a process that is genuinely still running
-    from the previous release, while ordinary app.main imports must not restart
-    a process already loaded from the current release. A cross-process flock
-    serializes concurrent API workers before the live MainPID/cwd check.
-
-    The standalone manager is never permitted to restart its own MainPID.
-    This function remains deliberately non-fatal: manager activation must never
-    prevent the API itself from starting.
-    """
-
+def _ensure_transport_manager_service_v12_blocking() -> dict:
     result = {
         "ok": True,
         "managed": False,
@@ -253,3 +232,30 @@ def ensure_transport_manager_service_v12() -> dict:
         result["ok"] = False
         result["reason"] = f"activation_lock_failed:{type(exc).__name__}"
         return result
+
+
+def ensure_transport_manager_service_v12() -> dict:
+    """Schedule transport-manager activation without blocking API import.
+
+    The release-aware reconciliation still runs exactly once under the existing
+    cross-process flock, but it runs in a daemon thread so synchronous systemctl
+    calls cannot hold the single Uvicorn worker before port 8095 is accepting.
+    The manager itself is still protected by the self-process restart guard.
+    """
+
+    thread = threading.Thread(
+        target=_ensure_transport_manager_service_v12_blocking,
+        name="twinpanel-transport-manager-activation",
+        daemon=True,
+    )
+    thread.start()
+
+    return {
+        "ok": True,
+        "managed": True,
+        "changed": False,
+        "started": False,
+        "restarted": False,
+        "reason": "activation_deferred",
+        "runtime_detail": None,
+    }
