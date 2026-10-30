@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import inspect
 
 
 mod = importlib.import_module("app.transport_manager_service_v12")
@@ -32,9 +33,11 @@ assert captured["daemon"] is True
 assert captured["name"] == "twinpanel-transport-manager-activation"
 assert captured["target"] is mod._ensure_transport_manager_service_v12_blocking
 
-source = open(mod.__file__, "r", encoding="utf-8").read()
-assert "manager_pid == os.getpid()" in source
-assert "systemctl,\n            \"restart\",\n            \"--no-block\"" in source
-assert "timeout=20" in source
+ensure_locked_source = inspect.getsource(mod._ensure_locked)
+run_source = inspect.getsource(mod._run)
+assert "manager_pid == os.getpid()" in ensure_locked_source
+assert '"restart"' in ensure_locked_source
+assert '"--no-block"' in ensure_locked_source
+assert "timeout=20" in run_source
 
 print("API_STARTUP_TRANSPORT_MANAGER_DEFER_V1_OK")
