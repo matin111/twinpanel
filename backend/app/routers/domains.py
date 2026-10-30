@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..services.domain_frontdoor_nginx_v1 import create_nginx_config
+from ..services.domain_frontdoor_nginx_v1 import create_nginx_config, frontdoor_enabled
 from ..services.domain_ssl_runtime_v1 import issue_ssl
 from ..services.domain_router import resolve_domain_route
 import subprocess
@@ -363,10 +363,10 @@ def request_ssl(
         host = item.target_host or "127.0.0.1"
         nginx_path = f"/etc/nginx/sites-available/{item.domain}.conf"
 
-        # Existing and newly-created rows normally already have their HTTP
-        # config. Recreate it only when the file is missing so a 443 conflict
-        # cannot make a harmless retry reload an existing SSL server block.
-        if not os.path.exists(nginx_path):
+        # In front-door mode every SSL attempt refreshes the managed domain
+        # config first so legacy rows gain the permanent ACME webroot and
+        # existing certificates move to the internal 127.0.0.1:9443 listener.
+        if frontdoor_enabled() or not os.path.exists(nginx_path):
             create_nginx_config(
                 item.domain,
                 host,
@@ -413,6 +413,7 @@ def request_ssl(
         status_code = 409 if code in {
             "https_port_conflict",
             "certbot_not_installed",
+            "frontdoor_not_ready",
         } else 502
 
         raise HTTPException(
