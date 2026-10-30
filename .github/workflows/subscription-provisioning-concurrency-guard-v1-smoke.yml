@@ -1,0 +1,49 @@
+name: TwinPanel Subscription Provisioning Concurrency Guard V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/modern_account_delivery_v1.py'
+      - 'backend/app/services/provisioning_guard.py'
+      - 'backend/app/database.py'
+      - '.github/workflows/subscription-provisioning-concurrency-guard-v1-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile changed Python modules
+        run: |
+          python3 -m py_compile \
+            backend/app/database.py \
+            backend/app/services/provisioning_guard.py \
+            backend/app/routers/modern_account_delivery_v1.py
+
+      - name: Verify fail-fast provisioning guard contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          guard = Path('backend/app/services/provisioning_guard.py').read_text()
+          route = Path('backend/app/routers/modern_account_delivery_v1.py').read_text()
+          db = Path('backend/app/database.py').read_text()
+
+          assert 'TWINPANEL_SUBSCRIPTION_PROVISIONING_GUARD_V1' in guard
+          assert 'pg_try_advisory_lock' in guard
+          assert 'pg_advisory_unlock' in guard
+          assert 'isolation_level="AUTOCOMMIT"' in guard
+
+          assert 'SubscriptionProvisioningGuard' in route
+          assert 'subscription_provisioning_in_progress' in route
+          assert 'status_code=409' in route
+          assert 'finally:' in route and 'guard.release()' in route
+          assert '_provision_account_v1_locked' in route
+
+          assert 'TWINPANEL_API_DB_LOCK_TIMEOUT_V1' in db
+          assert 'lock_timeout=3000' in db
+
+          print('Subscription provisioning concurrency guard contract OK')
+          PY
