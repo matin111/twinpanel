@@ -1,0 +1,54 @@
+name: Subscription Create Fast V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/admin-manual-subscription-create.tsx'
+      - 'backend/app/routers/subscription_create_fast_v1.py'
+      - 'backend/app/routers/__init__.py'
+      - '.github/workflows/subscription-create-fast-v1-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify fast create contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          ui = Path('components/admin-manual-subscription-create.tsx').read_text(encoding='utf-8')
+          bridge = Path('backend/app/routers/subscription_create_fast_v1.py').read_text(encoding='utf-8')
+          init = Path('backend/app/routers/__init__.py').read_text(encoding='utf-8')
+
+          assert 'await adminApi.createSubscriptionV2' in ui
+          assert 'adminApi.provisionSubscription' not in ui
+          assert 'asyncio.create_task(_run_provisioning(subscription_id))' in bridge
+          assert 'SessionLocal()' in bridge
+          assert '_REAL_PROVISION_ACCOUNT' in bridge
+          assert '_REAL_MISSING_PROTOCOLS' in bridge
+          assert '_fail_created_subscription' in bridge
+          assert 'subscription_create_fast_v1' in init
+
+          print('SUBSCRIPTION_CREATE_FAST_V1_CONTRACT_OK')
+          PY
+
+      - name: Compile bridge
+        run: python -m py_compile backend/app/routers/subscription_create_fast_v1.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install frontend dependencies
+        run: npm ci --include=optional --no-audit --no-fund
+
+      - name: Build frontend
+        run: npm run build
