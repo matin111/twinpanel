@@ -18,8 +18,8 @@ router = APIRouter(
 async def _run_create(payload: dict[str, Any]) -> dict[str, Any]:
     """Run the authoritative create lifecycle to completion.
 
-    This endpoint used to detach ``admin_create_v2`` with ``asyncio.create_task``
-    and return HTTP 202 after one event-loop turn. That allowed the browser to
+    This endpoint used to detach ``admin_create_v2`` in a background task and
+    return HTTP 202 after one event-loop turn. That allowed the browser to
     report success while the subscription row had already been committed but
     protocol provisioning was still running. A worker restart/cancellation or a
     late provisioning failure could therefore leave an ACTIVE DB-only
