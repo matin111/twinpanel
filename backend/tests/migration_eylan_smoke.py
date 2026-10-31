@@ -63,6 +63,26 @@ def test_parser_uses_download_plus_upload_and_cisco_password() -> None:
     assert row["ready_for_future_import"] is True
 
 
+def test_parser_accepts_decimal_data_limit_exactly() -> None:
+    service = _load_service()
+    row = service.parse_eylan_sql(
+        _sql("71\tdecimal\t2026-12-01 12:00:00+00\t15.25\tGB\t100\t200\tl2\tcisco")
+    )[0]
+    assert row["traffic_limit_bytes"] == 15 * 1024**3 + 256 * 1024**2
+    assert row["traffic_used_bytes"] == 300
+    assert row["warnings"] == []
+    assert row["ready_for_future_import"] is True
+
+
+def test_parser_accepts_integer_shaped_decimal_limit() -> None:
+    service = _load_service()
+    row = service.parse_eylan_sql(
+        _sql("72\tdecimal2\t\\N\t50.00\tGB\t0\t0\tl2\tcisco")
+    )[0]
+    assert row["traffic_limit_bytes"] == 50 * 1024**3
+    assert row["warnings"] == []
+
+
 def test_parser_falls_back_to_l2tp_password() -> None:
     service = _load_service()
     row = service.parse_eylan_sql(
