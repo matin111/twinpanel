@@ -1,0 +1,21 @@
+name: Release Publisher Queue Guard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/release-publisher-queue-guard.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: twinpanel-publish-prebuilt-release
+  cancel-in-progress: true
+
+jobs:
+  clear-stale-slot:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Clear stale publisher concurrency slot
+        run: echo "Latest release workflow owns the publisher slot"
