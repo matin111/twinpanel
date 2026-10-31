@@ -18,10 +18,33 @@ ACCOUNT_LINK_CALLBACK = "account_link:start"
 CANCEL_BUTTON = "❌ لغو"
 CANCEL_CALLBACK = "account_link:cancel"
 MAIN_HOME_CALLBACK = "main:home"
+DEFAULT_BRAND_NAME = "TwinPanel"
 
 
 class AccountLinkState(StatesGroup):
     username = State()
+
+
+async def _brand_name(request_fn):
+    """Use the same public branding source as the web panel."""
+
+    try:
+        branding = await request_fn(
+            "GET",
+            "/v1/settings/branding",
+        )
+    except Exception:
+        return DEFAULT_BRAND_NAME
+
+    if not isinstance(branding, dict):
+        return DEFAULT_BRAND_NAME
+
+    for field in ("brand_name", "site_title"):
+        value = str(branding.get(field) or "").strip()
+        if value:
+            return value
+
+    return DEFAULT_BRAND_NAME
 
 
 def _cancel_keyboard():
@@ -274,7 +297,6 @@ def install_account_link_feature(
 ):
     """Attach inline main navigation and owned account-link recovery."""
 
-    _ = session_fn
     main_runtime = _install_main_keyboard_button()
 
     @router.message(CommandStart())
@@ -282,6 +304,8 @@ def install_account_link_feature(
         message: Message,
         state: FSMContext,
     ):
+        await state.clear()
+
         cleanup = await message.answer(
             "\u2063",
             reply_markup=ReplyKeyboardRemove(),
@@ -292,9 +316,46 @@ def install_account_link_feature(
         except Exception:
             pass
 
-        await main_runtime.start(
-            message,
-            state,
+        brand_name = escape(await _brand_name(request_fn))
+
+        try:
+            await session_fn(
+                message.from_user.id,
+                telegram_username=message.from_user.username,
+                telegram_first_name=message.from_user.first_name,
+            )
+        except Exception as exc:
+            await message.answer(
+                f"❌ ارتباط با {brand_name} برقرار نشد.\n\n"
+                + escape(str(exc))
+            )
+            return
+
+        first_name = str(
+            message.from_user.first_name or ""
+        ).strip()
+
+        greeting = (
+            f"👋 <b>{escape(first_name)} عزیز، "
+            f"به {brand_name} خوش آمدید</b>"
+            if first_name
+            else f"👋 <b>به {brand_name} خوش آمدید</b>"
+        )
+
+        await message.answer(
+            f"{greeting}\n\n"
+            "مدیریت و خرید اشتراک VPN از داخل تلگرام.\n\n"
+            "از طریق ربات می‌توانید:\n\n"
+            "🛒 اشتراک جدید تهیه کنید\n"
+            "📦 اکانت‌های خود را مدیریت کنید\n"
+            "🔗 اطلاعات اتصال را دریافت کنید\n"
+            "🔄 اشتراک خود را تمدید کنید\n"
+            "💰 کیف پول خود را مدیریت کنید\n"
+            "📚 آموزش اتصال را مشاهده کنید\n"
+            "⬇️ برنامه مناسب دستگاه خود را دانلود کنید\n"
+            "🎫 با پشتیبانی در ارتباط باشید\n\n"
+            "از منوی زیر بخش موردنظر را انتخاب کنید.",
+            reply_markup=main_runtime.main_keyboard(),
         )
 
     @router.callback_query(F.data == MAIN_HOME_CALLBACK)
@@ -306,8 +367,9 @@ def install_account_link_feature(
         await callback.answer()
 
         if callback.message is not None:
+            brand_name = escape(await _brand_name(request_fn))
             await callback.message.edit_text(
-                "🤖 <b>Twin Panel</b>\n\n"
+                f"🤖 <b>{brand_name}</b>\n\n"
                 "بخش موردنظر را انتخاب کنید.",
                 reply_markup=main_runtime.main_keyboard(),
             )
@@ -377,8 +439,9 @@ def install_account_link_feature(
         await callback.answer()
 
         if callback.message is not None:
+            brand_name = escape(await _brand_name(request_fn))
             await callback.message.edit_text(
-                "ایمیل حساب Twin Panel را وارد کنید.",
+                f"ایمیل حساب {brand_name} را وارد کنید.",
                 reply_markup=_home_keyboard(),
             )
 
