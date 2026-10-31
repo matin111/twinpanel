@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.407",
+  "version": "1.1.0-rc.408",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-31T03:22:58Z",
+  "released_at": "2026-10-31T03:42:55Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "fc9eff14fd321277f0758ee981211ded2a896a44",
+  "source_sha": "606acb79c5bb7fcca9e081fb5308867451025581",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.407/twinpanel-1.1.0-rc.407-linux-x86_64.tar.gz",
-    "sha256": "6c39964f189536b94963187967b5190a5ed4005c6a6ad1a09c3eb0de5b9f9b2f",
-    "size_bytes": 28760157
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.408/twinpanel-1.1.0-rc.408-linux-x86_64.tar.gz",
+    "sha256": "70af1c6180b561e797773c67941bbdd904b886cff124670de1e8255d98c4f354",
+    "size_bytes": 28757855
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.407 انتقال مستقیم بکاپ Eylan را به Migration Center اضافه می‌کند. ادمین می‌تواند فایل‌های .tar.gz / .tgz / .tar / .zip را آپلود کند؛ سیستم فقط root/instance/postgres_dump.sql را می‌خواند و قبل از هر Write یک Preview بدون تغییر دیتابیس ارائه می‌دهد. برای هر اکانت، username، رمز، حجم کل، مصرف واقعی به صورت download_bytes + upload_bytes و expiry_date منتقل می‌شود. UUID و کانفیگ قدیمی Eylan حفظ نمی‌شود؛ TwinPanel برای V2Ray شناسه جدید خودش را می‌سازد و Provision به صورت Batch با همان helper موجود انجام می‌شود تا Xray حداکثر یک‌بار برای هر Exit node ری‌استارت شود. Source روی SHA immutable fc9eff14fd321277f0758ee981211ded2a896a44 قفل شده است. منطق TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall/protocol dataplane تغییر نکرده است.",
-    "en": "TwinPanel 1.1.0-rc.407 adds direct Eylan backup import to Migration Center. Admins can upload .tar.gz / .tgz / .tar / .zip backups; the importer reads only root/instance/postgres_dump.sql and always provides a no-write preview before import. For each account it migrates username, password, total traffic, actual usage as download_bytes + upload_bytes, and expiry_date. Eylan UUID/config material is not preserved; TwinPanel generates fresh V2Ray identities and provisions the batch through the existing helper so Xray is restarted at most once per Exit node. The source is pinned to immutable SHA fc9eff14fd321277f0758ee981211ded2a896a44. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall/protocol dataplane logic is unchanged."
+    "fa": "TwinPanel 1.1.0-rc.408 نمایش تاریخچه انتقال‌های قبلی را از UI مرکز انتقال حذف می‌کند تا اکانت‌های منتقل‌شده بعد از Refresh دوباره داخل همان صفحه نمایش داده نشوند. نتیجه Import فقط در همان نشست مرورگر نمایش داده می‌شود و با Refresh پاک می‌شود. رکوردهای Migration در دیتابیس حذف نمی‌شوند و همچنان برای جلوگیری از Import تکراری و idempotency باقی می‌مانند؛ خود Subscriptionها نیز دست‌نخورده هستند. قابلیت Import مستقیم بکاپ Eylan از rc.407 حفظ شده است. منطق TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane تغییر نکرده است. Source روی SHA immutable 606acb79c5bb7fcca9e081fb5308867451025581 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.408 removes persistent previous-import history from the Migration Center UI so migrated accounts are not shown again on that page after refresh. Import feedback is session-only and clears on refresh. Migration markers remain in the database for duplicate protection and idempotency, and the created subscriptions are untouched. Direct Eylan backup import from rc.407 remains available. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane logic is unchanged. The source is pinned to immutable SHA 606acb79c5bb7fcca9e081fb5308867451025581."
   }
 }
