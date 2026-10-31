@@ -30,12 +30,7 @@ def stage_eylan_records(
     records: list[Any],
     target_user_id: int,
 ) -> dict[str, Any]:
-    """Create/update Eylan subscriptions without touching remote Xray nodes.
-
-    The UI intentionally calls this in small chunks. Each request remains short,
-    while migration markers keep the operation idempotent if the browser or
-    reverse proxy disconnects between chunks.
-    """
+    """Create/update Eylan subscriptions without touching remote Xray nodes."""
 
     if len(records) > EYLAN_STAGE_LIMIT:
         raise ValueError(f"Eylan stage accepts at most {EYLAN_STAGE_LIMIT} records per request")
@@ -62,6 +57,7 @@ def stage_eylan_records(
     for record in records:
         source_id = str(record.source_id).strip()
         marker = markers_by_source.get(source_id)
+        was_existing = marker is not None
 
         if marker is not None:
             sub = db.get(Subscription, marker.subscription_id)
@@ -139,7 +135,7 @@ def stage_eylan_records(
             {
                 "source_id": source_id,
                 "subscription_id": sub.id,
-                "existing": marker.subscription_id != sub.id or source_id in markers_by_source,
+                "existing": was_existing,
                 "already_imported": False,
             }
         )
