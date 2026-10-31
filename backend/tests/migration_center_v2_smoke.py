@@ -81,10 +81,11 @@ def test_single_record_import_service_remains_db_only() -> None:
 def test_v2ray_batch_endpoint_requires_preserved_uuid_before_provisioning() -> None:
     router = _text(ROUTER_PATH)
     assert '@admin_router.post("/import-batch")' in router
-    assert "uuid.UUID(value)" in router
-    assert 'raise ValueError("preserved V2Ray UUID is missing from migration record")' in router
-    assert 'raise ValueError("preserved V2Ray UUID is invalid")' in router
-    assert 'subscription_uuids[int(result["subscription_id"])] = _preserved_v2ray_uuid(record)' in router
+    assert "return str(uuid.UUID(raw))" in router
+    assert 'raise ValueError("V2Ray migration record is missing preserved UUID")' in router
+    assert 'raise ValueError(f"invalid preserved V2Ray UUID: {raw}")' in router
+    assert "preserved_uuids = [_preserved_v2ray_uuid(record) for record in payload.records]" in router
+    assert "subscription_uuids[subscription_id] = preserved_uuid" in router
     assert "await provision_migrated_v2ray_batch(" in router
 
 
