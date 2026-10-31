@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.405",
+  "version": "1.1.0-rc.406",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-31T02:01:53Z",
+  "released_at": "2026-10-31T03:11:02Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "19f3a7decbafab862201e377fb5f2319cc049195",
+  "source_sha": "542747eaf38c817a18ba5fe2d1b48ba32b9a0f4e",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.405/twinpanel-1.1.0-rc.405-linux-x86_64.tar.gz",
-    "sha256": "e1614b6a6b49eddab7434191b961267fcc366d3e2913364c217a47172e1db8ba",
-    "size_bytes": 28747766
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.406/twinpanel-1.1.0-rc.406-linux-x86_64.tar.gz",
+    "sha256": "0e8db73ced09c19e2905be3c64f24f92f928471340ea5570cc6c3468feaa766d",
+    "size_bytes": 28755458
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.405 اصلاح Migration Center برای انتقال گروهی V2Ray را منتشر می‌کند: UUID اصلی هر اکانت مهاجرت‌شده حفظ می‌شود، اعتبار همه رکوردها قبل از نوشتن بررسی می‌شود، provisioning به‌صورت batch روی Exit Nodeها انجام می‌شود و برای هر Node فقط یک بازنویسی config و یک restart سرویس Xray انجام می‌گیرد. خروجی credential همان UUID حفظ‌شده را به Subscription متصل می‌کند و رابط Migration Center از endpoint گروهی استفاده می‌کند تا انتقال صدها اکانت سریع‌تر و بدون race ناشی از restartهای تکی انجام شود. Source روی SHA immutable 19f3a7decbafab862201e377fb5f2319cc049195 قفل شده است. دامنه تغییر به Migration Center/V2Ray batch provisioning محدود است و منطق TP27/VXLAN/Tunnel/Spoof، routing و firewall تغییر نکرده است.",
-    "en": "TwinPanel 1.1.0-rc.405 publishes the Migration Center V2Ray batch-provisioning fix: each migrated account keeps its original UUID, the full batch is validated before writes, provisioning is grouped per Exit node with one config rewrite and one Xray restart per node, and the delivery credential is bound to the preserved UUID. The Migration Center UI uses the batch endpoint so large imports avoid per-account restart overhead and lost-update races. The source is pinned to immutable SHA 19f3a7decbafab862201e377fb5f2319cc049195. The change is scoped to Migration Center/V2Ray batch provisioning; TP27/VXLAN/Tunnel/Spoof, routing, and firewall logic are unchanged."
+    "fa": "TwinPanel 1.1.0-rc.406 قابلیت «🔗 دریافت لینک اکانت» را به ربات فروش/نمایندگی تلگرام اضافه می‌کند. کاربر با وارد کردن نام‌کاربری اکانت، سابلینک رسمی همان اشتراک را دریافت می‌کند؛ جست‌وجو فقط داخل اشتراک‌های متعلق به همان کاربر تلگرام و همان نماینده انجام می‌شود و لینک از helper رسمی account-delivery تولید می‌شود. هیچ lookup سراسری برای اکانت‌های دیگر انجام نمی‌شود. Source روی SHA immutable 542747eaf38c817a18ba5fe2d1b48ba32b9a0f4e قفل شده است. دامنه تغییر به runtime ربات فروش/نمایندگی تلگرام و تست‌های مربوط محدود است و منطق TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane تغییر نکرده است.",
+    "en": "TwinPanel 1.1.0-rc.406 adds the ‘🔗 Get account link’ flow to the reseller/sales Telegram bot. A user enters the VPN account username and receives the official subscription link for that owned account. Lookup is scoped to subscriptions owned by the same Telegram-linked user and the same reseller, and delivery uses the existing official account-delivery helper. No global cross-customer username lookup is performed. The source is pinned to immutable SHA 542747eaf38c817a18ba5fe2d1b48ba32b9a0f4e. The change is scoped to reseller Telegram bot runtime and its focused tests; TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane logic is unchanged."
   }
 }
