@@ -1,6 +1,7 @@
 from html import escape
 
 from aiogram import F
+from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
@@ -8,6 +9,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
+    ReplyKeyboardRemove,
 )
 
 
@@ -164,6 +166,29 @@ def install_account_link_feature(
 
     _ = session_fn
     main_runtime = _install_main_keyboard_button()
+
+    @router.message(CommandStart())
+    async def inline_main_start(
+        message: Message,
+        state: FSMContext,
+    ):
+        # Inline keyboards do not remove a ReplyKeyboard that Telegram clients
+        # retained from an older release. Explicitly remove it before delegating
+        # to the existing /start flow, whose patched main_keyboard is inline.
+        cleanup = await message.answer(
+            "⌨️ منوی قبلی بسته شد.",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+
+        await main_runtime.start(
+            message,
+            state,
+        )
+
+        try:
+            await cleanup.delete()
+        except Exception:
+            pass
 
     @router.callback_query(F.data == MAIN_HOME_CALLBACK)
     async def main_home_inline(
