@@ -71,6 +71,7 @@ from .outbound_performance_v262_runtime import router as _outbound_performance_v
 from .outbound_performance_v265 import router as _outbound_performance_v265_router
 from .outbound_performance_v268_guard import router as _outbound_performance_v268_guard_router
 from .outbound_performance_v268 import router as _outbound_performance_v268_router
+from .telegram_account_link_lookup import router as _telegram_account_link_lookup_router
 
 # TWINPANEL_MASTERDNSVPN_PORT53_V221
 # rc.220 over-classified wildcard UDP/53 listeners as fatal and could not
@@ -107,6 +108,7 @@ from .manual_authority_v193 import router as _manual_authority_v193_router
 # Old installations may retain empty Modern ProtocolCredential placeholders
 # created before Modern drivers owned their identity. Reconcile only missing or
 # fully empty selected Modern credentials; partial identities fail closed.
+_runtime_endpoints.router.include_router(_telegram_account_link_lookup_router)
 _runtime_endpoints.router.include_router(_subscription_hard_delete_v1_router)
 _runtime_endpoints.router.include_router(_modern_enforcement_runtime_v1_router)
 _runtime_endpoints.router.include_router(_subscription_protocol_lifecycle_v2_router)
