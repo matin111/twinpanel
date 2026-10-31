@@ -31,4 +31,4 @@ jobs:
             backend/tests/test_v2ray_provision_idempotency_v1.py
       - name: Verify stable V2Ray identity across retries
         working-directory: backend
-        run: python3 tests/test_v2ray_provision_idempotency_v1.py
+        run: PYTHONPATH=. python3 tests/test_v2ray_provision_idempotency_v1.py
