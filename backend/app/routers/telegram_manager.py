@@ -87,7 +87,7 @@ class BroadcastIn(BaseModel):
 
 
 def _runtime_file() -> Path:
-    return PROJECT_DIR / "app/telegram_runtime_bot.py"
+    return PROJECT_DIR / "app/telegram_runtime_custom.py"
 
 
 def _ensure_dir():
@@ -185,10 +185,10 @@ StartLimitIntervalSec=0
 Type=simple
 WorkingDirectory={project}
 Environment=PYTHONUNBUFFERED=1
-Environment=TWINPANEL_API_BASE=http://127.0.0.1:8095
+EnvironmentFile=-/etc/twinpanel/install.env
 EnvironmentFile=/etc/twinpanel/backend.env
 EnvironmentFile=/etc/twinpanel-telegram-api.env
-ExecStart={python} -m app.telegram_runtime_bot
+ExecStart={python} -m app.telegram_runtime_custom
 Restart=always
 RestartSec=4
 
