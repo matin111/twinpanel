@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect,useMemo,useState} from "react";
+import {useMemo,useState} from "react";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
@@ -30,20 +30,6 @@ type DryRunResult={
   source:Source;
   summary:{input_records:number;expanded_records:number;ready_records:number;warning_records:number};
   records:DryRunRecord[];
-};
-
-type ImportHistoryItem={
-  id:number;
-  source:Source;
-  source_id:string;
-  subscription_id:number;
-  user_id:number|null;
-  account_username:string|null;
-  subscription_status:string;
-  legacy_url:string|null;
-  legacy_token:string|null;
-  status:string;
-  created_at:string|null;
 };
 
 type BatchImportResult={
@@ -109,25 +95,12 @@ export function MigrationCenterAdmin(){
   const [targetUserId,setTargetUserId]=useState("");
   const [protocols,setProtocols]=useState("v2ray");
   const [dryRun,setDryRun]=useState<DryRunResult|null>(null);
-  const [history,setHistory]=useState<ImportHistoryItem[]>([]);
   const [busy,setBusy]=useState(false);
-  const [loadingHistory,setLoadingHistory]=useState(true);
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
 
   const readyRecords=useMemo(()=>dryRun?.records.filter(item=>item.ready_for_future_import)??[],[dryRun]);
   const isEylan=source==="eylan";
-
-  const loadHistory=async()=>{
-    setLoadingHistory(true);
-    try{
-      const result=await api<{count:number;items:ImportHistoryItem[]}>("/v1/admin/migration-center/imports");
-      setHistory(result.items||[]);
-    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
-    finally{setLoadingHistory(false);}
-  };
-
-  useEffect(()=>{void loadHistory();},[]);
 
   const runDry=async()=>{
     setError("");setOk("");setDryRun(null);
@@ -179,9 +152,8 @@ export function MigrationCenterAdmin(){
           const failedNodes=result.provision.errors.map(item=>`${item.node}: ${item.error}`).join(" | ");
           setError(pick(`اطلاعات ایلان وارد شد اما Provision همه نودها کامل نشد. ${failedNodes}`,`Eylan records were imported, but provisioning did not complete on every node. ${failedNodes}`));
         }else{
-          setOk(pick(`انتقال ایلان تمام شد: ${result.imported} جدید، ${result.existing} موجود، ${result.provision.node_restarts} ری‌استارت Xray.`,`Eylan import finished: ${result.imported} new, ${result.existing} existing, ${result.provision.node_restarts} Xray restarts.`));
+          setOk(pick(`انتقال ایلان تمام شد: ${result.imported} جدید، ${result.existing} موجود، ${result.provision.node_restarts} ری‌استارت Xray. بعد از رفرش این نتیجه از صفحه پاک می‌شود.`,`Eylan import finished: ${result.imported} new, ${result.existing} existing, ${result.provision.node_restarts} Xray restarts. This result clears from the page after refresh.`));
         }
-        await loadHistory();
         return;
       }
 
@@ -196,7 +168,6 @@ export function MigrationCenterAdmin(){
         }else{
           setOk(pick(`انتقال و ساخت روی نودها تمام شد: ${result.imported} رکورد جدید، ${result.existing} رکورد موجود، ${result.provision.node_restarts} ری‌استارت Xray.`,`Import and node provisioning finished: ${result.imported} new, ${result.existing} existing, ${result.provision.node_restarts} Xray restarts.`));
         }
-        await loadHistory();
         return;
       }
 
@@ -211,7 +182,6 @@ export function MigrationCenterAdmin(){
         else if(result.idempotent)existing+=1;
       }
       setOk(pick(`انتقال تمام شد: ${imported} رکورد جدید، ${existing} رکورد از قبل موجود.`,`Import finished: ${imported} new, ${existing} already imported.`));
-      await loadHistory();
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy(false);}
   };
@@ -222,28 +192,13 @@ export function MigrationCenterAdmin(){
         <h1>{pick("مرکز انتقال اکانت‌ها","Migration Center")}</h1>
         <small>{pick("انتقال کنترل‌شده از سنایی، مرزبان، پاسارگاد و بکاپ ایلان.","Controlled import from Sanaei, Marzban, Pasargad and Eylan backups.")}</small>
       </div>
-      <button className="ghost" onClick={()=>void loadHistory()} disabled={loadingHistory||busy}>{pick("بازخوانی","Reload")}</button>
     </div>
 
     {error&&<div className="runtime-error">{error}</div>}
     {ok&&<div className="runtime-success">{ok}</div>}
 
     <Card>
-      <div className="card-head">
-        <div><b>{pick("وضعیت انتقال‌های قبلی","Previous imports")}</b><small>{pick("رکوردهایی که واقعاً وارد TwinPanel شده‌اند","Records already imported into TwinPanel")}</small></div>
-        <Badge tone="violet">{history.length}</Badge>
-      </div>
-      {loadingHistory?<div className="runtime-loading">{pick("در حال دریافت...","Loading...")}</div>:history.length===0?
-        <p>{pick("هنوز هیچ انتقال ثبت‌شده‌ای وجود ندارد.","No imports have been recorded yet.")}</p>:
-        <div style={{overflowX:"auto"}}><table style={{width:"100%"}}><thead><tr>
-          <th>{pick("منبع","Source")}</th><th>{pick("اکانت","Account")}</th><th>{pick("کاربر TwinPanel","TwinPanel user")}</th><th>{pick("اشتراک","Subscription")}</th><th>{pick("وضعیت","Status")}</th>
-        </tr></thead><tbody>{history.map(item=><tr key={item.id}>
-          <td>{sourceLabel[item.source]||item.source}</td><td>{item.account_username||item.source_id}</td><td>#{item.user_id??"—"}</td><td>#{item.subscription_id}</td><td><Badge tone={item.subscription_status==="active"?"ok":"warn"}>{item.subscription_status}</Badge></td>
-        </tr>)}</tbody></table></div>}
-    </Card>
-
-    <Card>
-      <div className="card-head"><div><b>{pick("انتقال جدید","New import")}</b><small>{pick("ابتدا Preview؛ سپس فقط رکوردهای آماده را Import کنید.","Preview first, then import only ready records.")}</small></div></div>
+      <div className="card-head"><div><b>{pick("انتقال جدید","New import")}</b><small>{pick("ابتدا Preview؛ سپس فقط رکوردهای آماده را Import کنید. نتیجه انتقال فقط در همین نشست نمایش داده می‌شود و با رفرش پاک می‌شود.","Preview first, then import only ready records. Import results are shown only for this session and clear on refresh.")}</small></div></div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}>
         <label><span>{pick("پنل مبدا","Source panel")}</span><select value={source} onChange={event=>{const next=event.target.value as Source;setSource(next);setDryRun(null);setOk("");setError("");if(next==="eylan")setProtocols("v2ray");}} style={{width:"100%"}}>
           <option value="sanaei">سنایی / 3x-ui</option><option value="marzban">مرزبان</option><option value="pasargad">پاسارگاد</option><option value="eylan">ایلان</option>
