@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.413",
+  "version": "1.1.0-rc.414",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-31T15:45:24Z",
+  "released_at": "2026-10-31T16:27:12Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b2a624f9253f8ad360da983145252ad1503ad782",
+  "source_sha": "2a85b9dc788e6cc4ed67fd3ff37cdb4d20a49895",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.413/twinpanel-1.1.0-rc.413-linux-x86_64.tar.gz",
-    "sha256": "0c7f2f82bf696c1306130eec2eaf400d46e977d51b3657899a033f9739fde648",
-    "size_bytes": 28770587
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.414/twinpanel-1.1.0-rc.414-linux-x86_64.tar.gz",
+    "sha256": "5a55ea05e2dc140c6206e5af88496fd6c1145ed165033e1a33d82fff0d45e3c8",
+    "size_bytes": 28772686
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.413 پایداری ارتباط ربات اصلی Telegram را اصلاح می‌کند. وابستگی سخت systemd بین twinpanel-bot و twinpanel-api حذف شده تا restart یا قطع موقت API باعث توقف polling ربات نشود؛ ترتیب راه‌اندازی API همچنان با After حفظ شده است. Restart=always و RestartSec=4 حفظ شده و StartLimitIntervalSec=0 اضافه شده تا خطاهای موقت شبکه یا polling سرویس را در حالت متوقف/Rate-Limited باقی نگذارند. قابلیت «دریافت لینک اکانت با نام کاربری» حذف نشده و خطاهای API آن نباید lifecycle ارتباط Telegram را متوقف کنند. برای این قرارداد یک Telegram Connection Stability Smoke اختصاصی نیز اضافه شده است. منطق TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane تغییر نکرده است. Source روی SHA immutable b2a624f9253f8ad360da983145252ad1503ad782 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.413 fixes persistent connectivity of the main Telegram bot. The hard systemd dependency between twinpanel-bot and twinpanel-api has been removed so an API restart or transient API outage no longer stops Telegram polling; startup ordering is still preserved with After. Restart=always and RestartSec=4 remain enabled, while StartLimitIntervalSec=0 prevents repeated transient polling or network failures from leaving the bot rate-limited/stopped. The account-link-by-username feature remains enabled, and its API failures are isolated from the Telegram connection lifecycle. A dedicated Telegram Connection Stability Smoke test now locks this contract. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane logic is unchanged. The source is pinned to immutable SHA b2a624f9253f8ad360da983145252ad1503ad782."
+    "fa": "TwinPanel 1.1.0-rc.414 قابلیت «دریافت لینک اکانت» در ربات اصلی Telegram را برای اکانت‌های VPN معتبری که به اشتراک‌های کاربر تلگرام متصل نیستند اصلاح می‌کند. ربات اکنون برای جلوگیری از افشای لینک با حدس نام کاربری، نام کاربری و رمز همان اکانت VPN را درخواست می‌کند؛ resolver داخلی با bot secret محافظت می‌شود، مقایسه رمز به‌صورت constant-time انجام می‌شود، خطای نام کاربری/رمز یکسان است و تلاش‌های ناموفق محدود می‌شوند. لینک از همان سازوکار canonical اشتراک ساخته می‌شود و هیچ تغییری در provisioning یا credential generation ایجاد نمی‌شود. پایداری ارتباط ربات از rc.413 نیز حفظ شده است. منطق TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane تغییر نکرده است. Source روی SHA immutable 2a85b9dc788e6cc4ed67fd3ff37cdb4d20a49895 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.414 fixes the main Telegram bot account-link recovery for valid VPN accounts that are not attached to the Telegram-linked user's Panel subscriptions. To prevent link disclosure through guessed usernames, the bot now requires both the VPN account username and that account's password; the internal resolver is protected by the bot secret, password comparison is constant-time, username/password failures use the same error, and failed attempts are throttled. The link is generated through the canonical subscription share URL path without changing provisioning or credential generation. Telegram connection persistence from rc.413 is preserved. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane logic is unchanged. The source is pinned to immutable SHA 2a85b9dc788e6cc4ed67fd3ff37cdb4d20a49895."
   }
 }
