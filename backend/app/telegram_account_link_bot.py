@@ -11,8 +11,7 @@ CANCEL_BUTTON = "❌ لغو"
 
 
 class AccountLinkState(StatesGroup):
-    username = State()
-    password = State()
+    migrated_username = State()
 
 
 def _cancel_keyboard():
@@ -66,14 +65,17 @@ def install_account_link_feature(
     request_fn,
     session_fn,
 ):
-    """Attach secure VPN-account link recovery to the customer bot.
+    """Attach passwordless recovery for imported/migrated VPN accounts.
 
-    A VPN account username is not an ownership secret. The bot therefore asks
-    for the account password and calls a bot-secret-protected internal endpoint
-    which validates both values before returning only that account's public
-    subscription link. No subscription ownership or provisioning is changed.
+    This flow is deliberately separate from «اکانت‌های من». It asks only for
+    the preserved username and the API resolver is restricted to subscriptions
+    that have an imported MigrationImportRecord. Ordinary TwinPanel accounts
+    and their existing My Accounts flow are not changed.
     """
 
+    # Keep the extension signature stable for the runtime installer. Migrated
+    # recovery uses the private bot-auth endpoint rather than customer session.
+    _ = session_fn
     main_runtime = _install_main_keyboard_button()
 
     @router.message(F.text == ACCOUNT_LINK_BUTTON)
@@ -82,15 +84,16 @@ def install_account_link_feature(
         state: FSMContext,
     ):
         await state.clear()
-        await state.set_state(AccountLinkState.username)
+        await state.set_state(AccountLinkState.migrated_username)
         await message.answer(
-            "🔗 <b>دریافت لینک اکانت</b>\n\n"
-            "نام کاربری VPN اکانت خود را وارد کنید.",
+            "🔗 <b>دریافت لینک اکانت مهاجرتی</b>\n\n"
+            "نام کاربری اکانتی که از پنل قبلی منتقل شده را وارد کنید.\n"
+            "برای اکانت‌های مهاجرتی V2Ray نیازی به رمز عبور نیست.",
             reply_markup=_cancel_keyboard(),
         )
 
-    @router.message(AccountLinkState.username)
-    async def account_link_username(
+    @router.message(AccountLinkState.migrated_username)
+    async def account_link_migrated_username(
         message: Message,
         state: FSMContext,
     ):
@@ -111,71 +114,22 @@ def install_account_link_feature(
             )
             return
 
-        await state.update_data(
-            account_link_username=username,
-        )
-        await state.set_state(AccountLinkState.password)
-        await message.answer(
-            "🔐 رمز عبور VPN همین اکانت را وارد کنید.",
-            reply_markup=_cancel_keyboard(),
-        )
-
-    @router.message(AccountLinkState.password)
-    async def account_link_password(
-        message: Message,
-        state: FSMContext,
-    ):
-        password = str(message.text or "")
-
-        if password.strip() == CANCEL_BUTTON:
-            await state.clear()
-            await message.answer(
-                "عملیات لغو شد.",
-                reply_markup=main_runtime.main_keyboard(),
-            )
-            return
-
-        if not password or len(password) > 512:
-            await message.answer(
-                "❌ رمز عبور معتبر وارد کنید یا «❌ لغو» را بزنید.",
-                reply_markup=_cancel_keyboard(),
-            )
-            return
-
-        data = await state.get_data()
-        username = str(
-            data.get("account_link_username")
-            or ""
-        ).strip()
-
-        if not username:
-            await state.clear()
-            await state.set_state(AccountLinkState.username)
-            await message.answer(
-                "نام کاربری اکانت را دوباره وارد کنید.",
-                reply_markup=_cancel_keyboard(),
-            )
-            return
-
         try:
             result = await request_fn(
                 "POST",
-                "/v1/telegram/account-link/resolve",
+                "/v1/telegram/account-link/resolve-migrated",
                 payload={
                     "telegram_id": message.from_user.id,
                     "username": username,
-                    "password": password,
                 },
                 bot_auth=True,
             )
 
             account_username = str(
-                result.get("account_username")
-                or username
+                result.get("account_username") or username
             ).strip()
             link = str(
-                result.get("subscription_link")
-                or ""
+                result.get("subscription_link") or ""
             ).strip()
 
             if not link.startswith(("http://", "https://")):
@@ -184,18 +138,16 @@ def install_account_link_feature(
                 )
 
         except Exception as exc:
-            await state.clear()
-            await state.set_state(AccountLinkState.username)
             await message.answer(
                 "❌ " + escape(str(exc)) + "\n\n"
-                "نام کاربری را دوباره وارد کنید.",
+                "نام کاربری اکانت مهاجرتی را دوباره وارد کنید.",
                 reply_markup=_cancel_keyboard(),
             )
             return
 
         await state.clear()
         await message.answer(
-            "✅ <b>لینک اکانت پیدا شد</b>\n\n"
+            "✅ <b>لینک اکانت مهاجرتی پیدا شد</b>\n\n"
             f"👤 نام کاربری: <code>{escape(account_username)}</code>\n\n"
             f"🔗 <code>{escape(link)}</code>\n\n"
             "این لینک را فقط برای دستگاه‌های خودتان استفاده کنید.",
