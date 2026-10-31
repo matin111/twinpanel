@@ -57,7 +57,7 @@ from .routers.subscription_delivery_policy_v1 import router as subscription_deli
 from .self_hosted_runtime import apply_self_hosted_runtime
 from .subscription_delivery_policy_v1 import install_account_delivery_hooks
 from .openvpn_runtime_v1 import install_openvpn_runtime_hooks
-from .xray_modern_runtime import router as xray_modern_router
+from .xray_modern_runtime import apply_xray_modern_runtime, router as xray_modern_router
 from .xray_modern_admin import router as xray_modern_admin_router
 from .admin_notification_service import notification_watch_loop
 from .services.customer_maintenance import customer_maintenance_loop
@@ -100,6 +100,11 @@ apply_self_hosted_runtime()
 # runtime guard before any provisioning/repair request can use the legacy router.
 install_openvpn_runtime_hooks(provision)
 
+# Xray modern runtime owns the canonical V2Ray account provisioning hook.
+# Importing its routers alone does not install that hook, so activate it before
+# any subscription create/repair request can fall back to legacy _xray.
+apply_xray_modern_runtime()
+
 # TWINPANEL_PAYMENT_TABLE_BOOTSTRAP_V1
 # Payment/store/reseller-bot models must be registered before create_all.
 _ = store_models
@@ -126,15 +131,9 @@ from .routers.admin_panel_notifications import (
 from . import reseller_notification_models
 
 Base.metadata.create_all(bind=engine)
-# Existing installations need idempotent ALTERs because create_all does not add
-# newly introduced columns to existing tables. Delivery policy V1 uses additive
-# tables only, so create_all is its backward-compatible and reversible migration.
 ensure_payment_crypto_schema()
 ensure_wallet_crypto_schema()
 
-# Explicit delivery policy is a compatibility layer over the existing Account
-# Delivery engine. Subscriptions without a policy-state row remain on the exact
-# legacy behavior.
 install_account_delivery_hooks()
 
 
@@ -276,28 +275,13 @@ app.include_router(storefront_settings_router)
 app.include_router(store_router)
 app.include_router(general_settings_router)
 app.include_router(notification_settings_router)
-# Crypto purchase discount overrides the exact gateway /methods and /intents
-# routes. It must be first so the discounted immutable quote is the route FastAPI
-# resolves for new crypto plan purchases.
 app.include_router(payment_crypto_discount_router)
-# Exact crypto payment router removes USDT-TRC20 and exposes USDT-BEP20 +
-# native TRX + native BNB with immutable live-rate quotes.
 app.include_router(payment_native_gateways_router)
-# Resilient market-rate and automation-status API must precede the older
-# payment automation router because it overrides /admin/live-rate.
 app.include_router(payment_market_rates_router)
-# Payment automation keeps legacy SMS Reader and historical crypto behavior.
 app.include_router(payment_automation_router)
-# Register local receipt handling before the legacy payments router so the
-# admin receipt path can transparently serve both local and Telegram receipts.
 app.include_router(payment_receipts_local_router)
-# Canonical approval fast path must precede the legacy payments router. All
-# other payment endpoints continue to come from the existing router unchanged.
 app.include_router(payment_approval_fast_router)
 app.include_router(payments_router)
-# Operational SMS dashboard stays available, while the wallet-aware event
-# endpoints come before the legacy reader so the same bank SMS can safely match
-# either a plan payment or a wallet top-up, never both.
 app.include_router(sms_reader_dashboard_router)
 app.include_router(wallet_sms_reader_router)
 app.include_router(sms_reader_router)
@@ -307,10 +291,6 @@ app.include_router(user_notification_router)
 app.include_router(user_notification_admin_router)
 app.include_router(telegram_bot_router)
 app.include_router(telegram_manager_router)
-# Modern customer wallet payment routes come first. Admin V2 then overrides
-# wallet listing, idempotent approval and manual balance adjustment with
-# notifications. The legacy admin router remains after it for reject and other
-# compatibility endpoints that V2 intentionally does not redefine.
 app.include_router(wallet_payment_v2_router)
 app.include_router(wallet_payment_v2_admin_router)
 app.include_router(wallet_admin_v2_router)
@@ -328,21 +308,13 @@ app.include_router(tunnels.router)
 app.include_router(tunnel_managed_router)
 app.include_router(modern_transports_router)
 app.include_router(tunnel_selected_v358_router)
-# Central admin user-management routes must win before the legacy admin router.
-# They hide reseller owners/customers while leaving reseller subscriptions visible.
 app.include_router(admin_user_isolation_router)
 app.include_router(admin.router)
-# Simplified volume-only reseller admin routes override legacy create/list/stats
-# and traffic adjustment while keeping the older detail/plan endpoints available.
 app.include_router(reseller_admin_v2_router)
 app.include_router(reseller_traffic_admin_v2_router)
 app.include_router(resellers.router)
-# Reseller-owned plans and traffic purchase routes must win before legacy portal
-# routes. Sales/account creation are unlimited; the shared pool is charged only
-# from accepted real usage events.
 app.include_router(reseller_owned_plans_router)
 app.include_router(reseller_traffic_purchase_v3_router)
-# Correct reseller profile/edit/renewal flows must precede legacy routes.
 app.include_router(reseller_sale_v2_router)
 app.include_router(reseller_profile_v2_router)
 app.include_router(reseller_subscription_volume_v2_router)
@@ -351,40 +323,27 @@ app.include_router(domains.router)
 app.include_router(branding.router)
 app.include_router(provision.router)
 app.include_router(quota_security.router)
-# Preserve the modern Xray migration/provisioning routes that landed on main
-# while keeping the stable release/account-delivery ordering intact.
 app.include_router(xray_modern_router)
 app.include_router(xray_modern_admin_router)
 app.include_router(account_delivery.router)
-# Public Connection Hub V5 owns the exact /v1/connect/{token} page while the
-# existing V4 router continues to own /live telemetry. V3 and legacy stay as
-# compatibility fallbacks and rollback references.
 app.include_router(public_connection_hub_live_v5_router)
 app.include_router(public_connection_live_v4_router)
 app.include_router(public_connection_v3_router)
 app.include_router(account_delivery.public_router)
 app.include_router(account_delivery.customer_router)
-
-# Unified modern protocol V3 must be registered before the legacy VPN settings
-# router so /modern-protocols uses Local Core + Exit dispatch while L2TP and
-# compatibility-only routes continue to be served by the legacy router.
 app.include_router(modern_protocol_admin_v3_router)
 
-# TWINPANEL_VPN_SETTINGS_V1
 from .routers.vpn_settings import router as vpn_settings_router
 app.include_router(vpn_settings_router)
 
-# Mother server access policy
 from .routers.mother_access import router as mother_access_router
 app.include_router(mother_access_router)
 
-# TWINPANEL_RESELLER_BOT_API_V1
 from .routers.reseller_bot import (
     router as reseller_bot_router,
 )
 app.include_router(reseller_bot_router)
 
-# TWINPANEL_RESELLER_BOT_COMMERCE_V1
 from .routers.reseller_bot_orders import (
     router as reseller_bot_orders_router,
 )
@@ -397,14 +356,11 @@ from .routers.reseller_bot_orders_owned_v3 import (
 from .routers.reseller_bot_wallet_topups import (
     router as reseller_bot_wallet_topups_router,
 )
-# Wallet top-up review and owned-plan approval win first, then usage-only renewal
-# compatibility, then legacy endpoints for receipts/payment methods/history.
 app.include_router(reseller_bot_wallet_topups_router)
 app.include_router(reseller_bot_orders_owned_v3_router)
 app.include_router(reseller_bot_orders_volume_v2_router)
 app.include_router(reseller_bot_orders_router)
 
-# TWINPANEL_DISCOUNT_CORE_V1
 from .routers.discounts import router as discounts_router
 app.include_router(discounts_router)
 
@@ -412,6 +368,5 @@ app.include_router(admin_panel_notifications_router)
 app.include_router(reseller_notifications_router)
 app.include_router(system_release_router)
 
-# TWINPANEL_ADMIN_BACKUP_ROUTER_V1
 from .routers.backups import router as backups_router
 app.include_router(backups_router)
