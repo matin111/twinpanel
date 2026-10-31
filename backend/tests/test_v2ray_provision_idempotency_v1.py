@@ -47,3 +47,11 @@ def test_invalid_stored_identity_falls_back_cleanly() -> None:
     from app.v2ray_provision_idempotency_v1 import _uuid_from_items
 
     assert _uuid_from_items([{"uuid": "bad", "uri": "vless://bad@example.com:443"}]) == ""
+
+
+if __name__ == "__main__":
+    test_deterministic_v2ray_uuid_is_stable_per_subscription()
+    test_uuid_recovery_prefers_stored_uuid_field()
+    test_uuid_recovery_supports_legacy_uri_only_items()
+    test_invalid_stored_identity_falls_back_cleanly()
+    print("v2ray_provision_idempotency_v1: 4 passed")
