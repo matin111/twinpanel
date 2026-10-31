@@ -30,6 +30,7 @@ for source in (
 # for a subscription owned by the user linked to this Telegram ID.
 assert 'ACCOUNT_LINK_BUTTON = "🔗 دریافت لینک اکانت"' in feature_source
 assert 'CANCEL_BUTTON = "❌ لغو"' in feature_source
+assert 'CANCEL_CALLBACK = "account_link:cancel"' in feature_source
 assert "AccountLinkState.username" in feature_source
 assert "نام کاربری VPN اکانت خود را وارد کنید" in feature_source
 assert "اکانت مهاجرتی" not in feature_source
@@ -40,26 +41,39 @@ assert '"username": username' in feature_source
 assert "bot_auth=True" in feature_source
 assert 'link.startswith(("http://", "https://"))' in feature_source
 
+# Menu UX contract: account-link recovery must be the first row instead of an
+# appended bottom row, and the active-flow cancel action is an inline button so
+# Telegram does not show one oversized reply-keyboard button at the bottom.
+assert "rows.insert(0, [" in feature_source
+assert "rows.append([" not in feature_source
+assert "InlineKeyboardButton" in feature_source
+assert "InlineKeyboardMarkup" in feature_source
+assert 'text="❌ لغو عملیات"' in feature_source
+assert "callback_data=CANCEL_CALLBACK" in feature_source
+assert "@router.callback_query(F.data == CANCEL_CALLBACK)" in feature_source
+assert "async def account_link_cancel_inline" in feature_source
+assert "await callback.answer()" in feature_source
+assert "edit_reply_markup(" in feature_source
+
 # Restart/stale-keyboard regression: aiogram MemoryStorage is process-local, so
-# a Telegram reply keyboard can outlive the FSM state across updater restarts.
-# CANCEL must therefore be handled independently of AccountLinkState and before
-# the main router's generic fallback.
+# an old Telegram reply keyboard can outlive the FSM state across updater
+# restarts. Keep the old text CANCEL handler independently of state while new
+# prompts use the inline callback above.
 assert "MemoryStorage()" in runtime_source
 assert "@router.message(F.text == CANCEL_BUTTON)" in feature_source
 assert "async def account_link_cancel" in feature_source
-cancel_handler = feature_source[
-    feature_source.index("async def account_link_cancel"):
+stale_cancel_handler = feature_source[
+    feature_source.index("async def account_link_cancel(\n"):
     feature_source.index("@router.message(F.text == ACCOUNT_LINK_BUTTON)")
 ]
-assert "await state.clear()" in cancel_handler
-assert "reply_markup=main_runtime.main_keyboard()" in cancel_handler
-assert "AccountLinkState.username" not in cancel_handler
+assert "await state.clear()" in stale_cancel_handler
+assert "reply_markup=main_runtime.main_keyboard()" in stale_cancel_handler
+assert "AccountLinkState.username" not in stale_cancel_handler
 
 # Regression guards: recovery must not become a My Accounts picker or a
 # username+password FSM again.
 assert '"/v1/subscriptions/me"' not in feature_source
 assert "/v1/customer/subscriptions/" not in feature_source
-assert "InlineKeyboardButton" not in feature_source
 assert "password = State()" not in feature_source
 assert '"password": password' not in feature_source
 assert '"/v1/telegram/account-link/resolve"' not in feature_source
