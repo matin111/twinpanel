@@ -3,11 +3,19 @@ from html import escape
 from aiogram import F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    Message,
+    ReplyKeyboardMarkup,
+)
 
 
 ACCOUNT_LINK_BUTTON = "🔗 دریافت لینک اکانت"
 CANCEL_BUTTON = "❌ لغو"
+CANCEL_CALLBACK = "account_link:cancel"
 
 
 class AccountLinkState(StatesGroup):
@@ -15,10 +23,14 @@ class AccountLinkState(StatesGroup):
 
 
 def _cancel_keyboard():
-    return ReplyKeyboardMarkup(
-        resize_keyboard=True,
-        keyboard=[
-            [KeyboardButton(text=CANCEL_BUTTON)],
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="❌ لغو عملیات",
+                    callback_data=CANCEL_CALLBACK,
+                )
+            ],
         ],
     )
 
@@ -46,7 +58,9 @@ def _install_main_keyboard_button():
             for row in rows
             for button in row
         ):
-            rows.append([
+            # Keep account-link recovery visible without requiring the user to
+            # scroll to the bottom of Telegram's reply keyboard.
+            rows.insert(0, [
                 KeyboardButton(text=ACCOUNT_LINK_BUTTON),
             ])
 
@@ -78,14 +92,34 @@ def install_account_link_feature(
     _ = session_fn
     main_runtime = _install_main_keyboard_button()
 
+    @router.callback_query(F.data == CANCEL_CALLBACK)
+    async def account_link_cancel_inline(
+        callback: CallbackQuery,
+        state: FSMContext,
+    ):
+        await state.clear()
+        await callback.answer()
+
+        if callback.message is not None:
+            try:
+                await callback.message.edit_reply_markup(
+                    reply_markup=None,
+                )
+            except Exception:
+                pass
+
+            await callback.message.answer(
+                "عملیات لغو شد.",
+                reply_markup=main_runtime.main_keyboard(),
+            )
+
     @router.message(F.text == CANCEL_BUTTON)
     async def account_link_cancel(
         message: Message,
         state: FSMContext,
     ):
-        # MemoryStorage is process-local. After an updater-driven restart,
-        # Telegram may still display an old cancel keyboard although the state
-        # has disappeared. Consume it before the main router generic fallback.
+        # Compatibility for stale reply keyboards left on Telegram clients by
+        # older releases. New account-link prompts use an inline cancel button.
         await state.clear()
         await message.answer(
             "عملیات لغو شد.",
@@ -114,7 +148,7 @@ def install_account_link_feature(
 
         if not username or len(username) > 128:
             await message.answer(
-                "❌ نام کاربری معتبر وارد کنید یا «❌ لغو» را بزنید.",
+                "❌ نام کاربری معتبر وارد کنید.",
                 reply_markup=_cancel_keyboard(),
             )
             return
