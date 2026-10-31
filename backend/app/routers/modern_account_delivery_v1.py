@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import uuid
@@ -50,6 +51,17 @@ STANDALONE_ACCOUNT_PROTOCOLS = frozenset(
     }
 )
 MODERN_ACCOUNT_PROTOCOLS = SINGBOX_ACCOUNT_PROTOCOLS | STANDALONE_ACCOUNT_PROTOCOLS
+
+# Creation stays fail-closed, but one unhealthy remote account driver must not
+# hold an admin/reseller HTTP request for five minutes. These limits sit above
+# SSH connect/login limits and below common reverse-proxy request deadlines.
+DEFAULT_PROTOCOL_PROVISION_TIMEOUT_SECONDS = 45.0
+PROTOCOL_PROVISION_TIMEOUT_SECONDS = {
+    "v2ray": 30.0,
+    "openvpn": 60.0,
+}
+TOTAL_PROVISION_TIMEOUT_SECONDS = 120.0
+QUOTA_SYNC_TIMEOUT_SECONDS = 20.0
 
 
 def _status_value(value: Any) -> str:
@@ -200,15 +212,6 @@ def _bind_unique_client_tags(
     protocol: str,
     username: str,
 ) -> dict[str, Any]:
-    """Bind client-only sing-box tags to subscription + protocol + node identity.
-
-    Naive and ShadowTLS credentials are shared across the subscription while the
-    delivered config can contain several server items. Static tags such as
-    ``twinpanel-naive`` therefore collide when those items are combined. This
-    helper changes only client metadata/references; endpoint, TLS and secrets are
-    preserved byte-for-byte.
-    """
-
     protocol = str(protocol or "").strip().lower()
     if protocol not in SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS:
         return item
@@ -427,13 +430,6 @@ async def _provision_account_v1_locked(
     subscription_id: int,
     db: Session,
 ):
-    """Canonical account provisioning bridge for all 15 protocols.
-
-    Classic behavior reuses the established production helpers. All ten Modern
-    protocols require a real online NodeProtocolConfig and a real account
-    driver; nothing is synthesized when a runtime is absent.
-    """
-
     from . import account_delivery as ad
 
     sub = db.get(Subscription, subscription_id)
@@ -484,28 +480,65 @@ async def _provision_account_v1_locked(
 
     results: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + TOTAL_PROVISION_TIMEOUT_SECONDS
 
     for protocol in protocols:
-        if protocol in MODERN_ACCOUNT_PROTOCOLS:
-            items, protocol_errors = await _provision_modern_protocol(
-                ad,
-                db,
-                sub,
-                protocol,
-                nodes,
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            errors.append(
+                {
+                    "protocol": protocol,
+                    "node": "provisioning",
+                    "error": (
+                        "Provisioning total deadline exceeded before this protocol "
+                        f"({int(TOTAL_PROVISION_TIMEOUT_SECONDS)}s)"
+                    ),
+                }
             )
-        else:
-            items, protocol_errors = await _provision_classic_protocol(
-                ad,
-                db,
-                sub,
-                user,
-                protocol,
-                nodes,
-                username,
-                password,
-                xray_id,
+            break
+
+        protocol_timeout = PROTOCOL_PROVISION_TIMEOUT_SECONDS.get(
+            protocol,
+            DEFAULT_PROTOCOL_PROVISION_TIMEOUT_SECONDS,
+        )
+        timeout = max(1.0, min(float(protocol_timeout), remaining))
+
+        try:
+            if protocol in MODERN_ACCOUNT_PROTOCOLS:
+                operation = _provision_modern_protocol(
+                    ad,
+                    db,
+                    sub,
+                    protocol,
+                    nodes,
+                )
+            else:
+                operation = _provision_classic_protocol(
+                    ad,
+                    db,
+                    sub,
+                    user,
+                    protocol,
+                    nodes,
+                    username,
+                    password,
+                    xray_id,
+                )
+            items, protocol_errors = await asyncio.wait_for(
+                operation,
+                timeout=timeout,
             )
+        except asyncio.TimeoutError:
+            errors.append(
+                {
+                    "protocol": protocol,
+                    "node": "provisioning",
+                    "error": f"Provisioning timeout after {int(timeout)} seconds",
+                }
+            )
+            continue
+
         errors.extend(protocol_errors)
         if items:
             cred = _get_credential(db, sub.id, protocol)
@@ -523,8 +556,44 @@ async def _provision_account_v1_locked(
     if results:
         from ..services.quota_refresh import sync_subscription_quota_nodes
 
-        quota_sync = await sync_subscription_quota_nodes(db, sub.id)
-        if not quota_sync.get("ok"):
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            quota_sync = {
+                "ok": False,
+                "nodes": [],
+                "error": "Provisioning deadline reached before quota sync",
+            }
+            errors.append(
+                {
+                    "protocol": "quota",
+                    "node": "quota-agent",
+                    "error": "Provisioning deadline reached before quota sync",
+                }
+            )
+        else:
+            quota_timeout = max(1.0, min(QUOTA_SYNC_TIMEOUT_SECONDS, remaining))
+            try:
+                quota_sync = await asyncio.wait_for(
+                    sync_subscription_quota_nodes(db, sub.id),
+                    timeout=quota_timeout,
+                )
+            except asyncio.TimeoutError:
+                quota_sync = {
+                    "ok": False,
+                    "nodes": [],
+                    "error": f"Quota sync timeout after {int(quota_timeout)} seconds",
+                }
+                errors.append(
+                    {
+                        "protocol": "quota",
+                        "node": "quota-agent",
+                        "error": f"Quota sync timeout after {int(quota_timeout)} seconds",
+                    }
+                )
+
+        if not quota_sync.get("ok") and not any(
+            item.get("protocol") == "quota" for item in errors
+        ):
             errors.append(
                 {
                     "protocol": "quota",

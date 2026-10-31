@@ -24,6 +24,9 @@ from ..reseller_owned_plans import (
     plan_out,
     sync_owned_plan_backing,
 )
+from ..services.subscription_provision_preflight_v1 import (
+    assert_subscription_provisioning_ready,
+)
 from ..subscription_enforcement import queue_subscription_enforcement
 
 
@@ -183,8 +186,6 @@ def _fail_created_subscription(
             reason=reason,
         )
     except Exception:
-        # Creation must still be non-active if cleanup queueing has its own
-        # transient failure. Reconcile/retry can safely repair it later.
         pass
     db.commit()
 
@@ -209,6 +210,8 @@ async def _complete_reseller_provisioning(
         protocols = _requested_protocols(db, subscription_id)
 
     try:
+        preflight = assert_subscription_provisioning_ready(db, protocols)
+
         from .modern_account_delivery_v1 import provision_account_v1
 
         provisioning = await provision_account_v1(
@@ -276,6 +279,7 @@ async def _complete_reseller_provisioning(
         )
 
     result["provisioning_complete"] = True
+    result["preflight"] = preflight
     return result
 
 
@@ -380,7 +384,6 @@ def update_reseller_owned_plan(
     return plan_out(row)
 
 
-# Legacy DELETE keeps its historical soft-disable semantics for compatibility.
 @router.delete("/plans/{plan_id}")
 def disable_reseller_owned_plan(
     plan_id: int,
@@ -403,9 +406,6 @@ def disable_reseller_owned_plan(
     return {"ok": True, "plan_id": int(row.id), "is_active": False}
 
 
-# The explicit owned-plans endpoint is the reseller UI's real delete action.
-# A plan that already has order/subscription history is intentionally protected;
-# the reseller can still deactivate it without damaging historical records.
 @router.delete("/owned-plans/{plan_id}")
 def delete_reseller_owned_plan(
     plan_id: int,
@@ -496,8 +496,5 @@ async def create_reseller_manual_subscription(
     )
 
 
-# The guard router is prefix-less by design. Mounting it through this router
-# applies /v1/reseller exactly once and keeps guard routes ahead of the legacy
-# volume/portal routers registered later in app.main.
 from .reseller_pool_guard_v3 import router as reseller_pool_guard_v3_router
 router.include_router(reseller_pool_guard_v3_router)
