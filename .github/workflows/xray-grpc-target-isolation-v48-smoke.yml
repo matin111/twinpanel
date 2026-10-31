@@ -1,0 +1,33 @@
+name: Xray gRPC Target Isolation V48 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/__init__.py'
+      - 'backend/app/xray_grpc_target_isolation_v48.py'
+      - 'backend/app/xray_adaptive_three_profiles_v47.py'
+      - 'backend/app/xray_customer_xhttp_v46.py'
+      - 'backend/app/xray_modern_runtime.py'
+      - 'backend/tests/test_xray_grpc_target_isolation_v48.py'
+      - '.github/workflows/xray-grpc-target-isolation-v48-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile V48 refinement
+        run: |
+          python3 -m py_compile \
+            backend/app/xray_grpc_target_isolation_v48.py \
+            backend/tests/test_xray_grpc_target_isolation_v48.py
+      - name: Verify domainless Xray target isolation contract
+        working-directory: backend
+        run: python3 tests/test_xray_grpc_target_isolation_v48.py
