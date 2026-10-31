@@ -304,6 +304,10 @@ def public_connection_hub_live_v5(
     source = refine_public_connection_protocol_actions_v20(source)
     source = refine_public_connection_xray_profiles_v48(source)
     source = refine_public_connection_canonical_mobile_v26(source)
+    source = source.replace(
+        "پروتکل برای این اشتراک غیرفعال است",
+        "پروتکل فعال است؛ کانفیگ نیاز به ساخت/Repair دارد",
+    )
 
     return HTMLResponse(
         content=source,
