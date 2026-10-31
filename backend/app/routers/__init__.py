@@ -142,3 +142,8 @@ _runtime_endpoints.router.include_router(_netmod_dns_router)
 # Additive performance lab: client-side resolver profile bundle plus rollback-
 # safe DNSTT MTU tuning. It never fabricates resolver ranking from the Exit.
 _runtime_endpoints.router.include_router(_netmod_dns_performance_v226_router)
+
+# TWINPANEL_SUBSCRIPTION_CREATE_FAST_V1
+# Keep admin create HTTP latency independent from remote SSH/runtime provisioning
+# while preserving the canonical provision-account endpoint for manual repair.
+from . import subscription_create_fast_v1 as _subscription_create_fast_v1  # noqa: F401
