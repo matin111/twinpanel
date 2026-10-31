@@ -32,16 +32,24 @@ SERVICE_FILE = Path(
     "/etc/systemd/system/twinpanel-bot.service"
 )
 
-# The old implementation was pinned to /root/vpnshop/vpnshop even though
-# production TwinPanel now runs from /opt/twinpanel-product/backend (or the
-# /opt/twinpanel/current/backend symlink). Resolve the backend that actually
-# loaded this router so status/install/repair always target the live runtime.
+# Resolve the backend that loaded this router for source/runtime validation.
+# This may resolve to an immutable /opt/twinpanel/releases/<version>/backend.
 PROJECT_DIR = Path(
     os.getenv(
         "TWINPANEL_BACKEND_DIR",
         str(Path(__file__).resolve().parents[2]),
     )
 ).resolve()
+
+# The managed systemd unit must never pin an immutable release directory.
+# /opt/twinpanel/current is atomically switched by the public updater, so a
+# normal service restart must always load the newly activated release.
+SERVICE_PROJECT_DIR = Path(
+    os.getenv(
+        "TWINPANEL_BOT_WORKING_DIR",
+        "/opt/twinpanel/current/backend",
+    )
+)
 
 # Keep the virtualenv path itself instead of resolving its interpreter symlink.
 # Resolving /opt/twinpanel/venv/bin/python3 could turn it into /usr/bin/python3
@@ -172,7 +180,7 @@ def _ensure_internal_secret() -> None:
 
 
 def _service_text() -> str:
-    project = str(PROJECT_DIR)
+    project = str(SERVICE_PROJECT_DIR)
     python = str(PYTHON_BIN)
 
     return f"""[Unit]
@@ -205,9 +213,9 @@ def _write_service_file() -> None:
     os.chmod(SERVICE_FILE, 0o644)
 
 
-def _repair_existing_service_env() -> None:
+def _repair_existing_service_env() -> bool:
     if not SERVICE_FILE.exists():
-        return
+        return False
 
     expected = _service_text()
     current = SERVICE_FILE.read_text(
@@ -215,9 +223,9 @@ def _repair_existing_service_env() -> None:
     )
 
     if current == expected:
-        return
+        return False
 
-    # Repair old installs as well as the old /root/vpnshop/vpnshop unit.
+    # Repair old installs as well as release-pinned WorkingDirectory units.
     _write_service_file()
 
     subprocess.run(
@@ -229,6 +237,48 @@ def _repair_existing_service_env() -> None:
         capture_output=True,
         text=True,
     )
+
+    return True
+
+
+def _repair_service_after_release_switch() -> None:
+    """Self-heal a stale bot unit when the new API release boots.
+
+    The public updater restarts API and bot units after switching the `current`
+    symlink. Older bot units can still point to the previous immutable release.
+    The new API imports this router from the active release, repairs the unit to
+    the logical `current` path, then restarts an already-running bot once so it
+    cannot remain on stale code. Fresh installs without a bot unit are ignored.
+    """
+    if not SERVICE_FILE.exists():
+        return
+
+    try:
+        changed = _repair_existing_service_env()
+    except Exception:
+        # Telegram management must never make the API fail to import/start.
+        return
+
+    if not changed:
+        return
+
+    try:
+        subprocess.run(
+            [
+                "systemctl",
+                "try-restart",
+                "twinpanel-bot.service",
+            ],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=20,
+        )
+    except Exception:
+        pass
+
+
+_repair_service_after_release_switch()
 
 
 def _fernet() -> Fernet:
@@ -556,7 +606,7 @@ def install_bot():
             timeout=180,
         )
 
-        # Install and repair both use the current live backend/python paths.
+        # Install and repair both use the logical current backend/python paths.
         _write_service_file()
 
         _run(
