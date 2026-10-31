@@ -42,6 +42,20 @@ type ImportHistoryItem={
   created_at:string|null;
 };
 
+type BatchImportResult={
+  ok:boolean;
+  imported:number;
+  existing:number;
+  subscriptions:number;
+  provision:{
+    ok:boolean;
+    subscriptions:number;
+    nodes:number;
+    node_restarts:number;
+    errors:Array<{node:string;error:string}>;
+  };
+};
+
 async function api<T>(path:string,init:RequestInit={}):Promise<T>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
@@ -120,9 +134,37 @@ export function MigrationCenterAdmin(){
     const userId=Number(targetUserId);
     if(!Number.isInteger(userId)||userId<=0){setError(pick("شناسه کاربر TwinPanel معتبر وارد کنید.","Enter a valid TwinPanel user ID."));return;}
     if(!dryRun||readyRecords.length===0){setError(pick("ابتدا Dry-run بگیرید و رکورد آماده داشته باشید.","Run a dry-run first and make sure at least one record is ready."));return;}
-    const protocolList=protocols.split(",").map(item=>item.trim()).filter(Boolean);
+    const protocolList=protocols.split(",").map(item=>item.trim().toLowerCase()).filter(Boolean);
+    const effectiveProtocols=protocolList.length?protocolList:["v2ray"];
     setBusy(true);
     try{
+      if(effectiveProtocols.length===1&&effectiveProtocols[0]==="v2ray"){
+        const result=await api<BatchImportResult>("/v1/admin/migration-center/import-batch",{
+          method:"POST",
+          body:JSON.stringify({
+            source,
+            records:readyRecords,
+            target_user_id:userId,
+            protocols:["v2ray"],
+          }),
+        });
+
+        if(!result.ok||!result.provision.ok){
+          const failedNodes=result.provision.errors.map(item=>`${item.node}: ${item.error}`).join(" | ");
+          setError(pick(
+            `انتقال دیتابیس انجام شد اما Provision بعضی نودها کامل نشد. ${failedNodes}`,
+            `Database import completed, but provisioning did not complete on every node. ${failedNodes}`,
+          ));
+        }else{
+          setOk(pick(
+            `انتقال و ساخت روی نودها تمام شد: ${result.imported} رکورد جدید، ${result.existing} رکورد موجود، ${result.provision.node_restarts} ری‌استارت Xray.`,
+            `Import and node provisioning finished: ${result.imported} new, ${result.existing} existing, ${result.provision.node_restarts} Xray restarts.`,
+          ));
+        }
+        await loadHistory();
+        return;
+      }
+
       let imported=0;
       let existing=0;
       for(const record of readyRecords){
@@ -132,7 +174,7 @@ export function MigrationCenterAdmin(){
             source,
             record,
             target_user_id:userId,
-            protocols:protocolList.length?protocolList:["v2ray"],
+            protocols:effectiveProtocols,
           }),
         });
         if(result.imported)imported+=1;
