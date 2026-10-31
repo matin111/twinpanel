@@ -53,10 +53,10 @@ def _valid_port(value: str) -> str:
 def _resolve_internal_api_base() -> str:
     """Resolve the API endpoint actually installed on this controller.
 
-    The Telegram systemd unit historically exported a fixed 8095 base even
-    though TwinPanel supports TWINPANEL_API_PORT in install.env. Prefer the
-    controller's installed port, then the frontend's canonical backend URL,
-    and only then fall back to the legacy runtime value.
+    The Telegram service historically exported a fixed 8095 base even though
+    TwinPanel supports TWINPANEL_API_PORT. Prefer an explicit bot override,
+    then the live installed API port, then the frontend's canonical backend
+    URL, and only then the legacy runtime value.
     """
     explicit = str(
         os.getenv("TWINPANEL_BOT_API_BASE", "")
@@ -65,6 +65,8 @@ def _resolve_internal_api_base() -> str:
         return explicit.rstrip("/")
 
     port = _valid_port(
+        os.getenv("TWINPANEL_API_PORT", "")
+    ) or _valid_port(
         _env_file_value(
             INSTALL_ENV_FILE,
             "TWINPANEL_API_PORT",
