@@ -29,4 +29,4 @@ def test_reseller_create_routes_require_provisioning_completion() -> None:
 
     assert "async def create_reseller_subscription" in source
     assert "async def create_reseller_manual_subscription" in source
-    assert source.count("return await _complete_reseller_provisioning(db, result)") == 2
+    assert source.count("return await _complete_reseller_provisioning(") == 2
