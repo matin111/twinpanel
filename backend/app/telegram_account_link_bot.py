@@ -34,6 +34,13 @@ def _cancel_keyboard():
                     style="danger",
                 )
             ],
+            [
+                InlineKeyboardButton(
+                    text="🏠 منوی اصلی",
+                    callback_data=MAIN_HOME_CALLBACK,
+                    style="primary",
+                )
+            ],
         ],
     )
 
@@ -123,30 +130,16 @@ def _connect_keyboard():
                     callback_data="main:connect-account",
                     style="success",
                 )
-            ]
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🏠 منوی اصلی",
+                    callback_data=MAIN_HOME_CALLBACK,
+                    style="primary",
+                )
+            ],
         ],
     )
-
-
-def _install_main_keyboard_button():
-    # Imported only after telegram_runtime_bot has finished loading.
-    # create_purchase_router() is called from runtime main() before polling.
-    from . import telegram_runtime_bot as main_runtime
-
-    if getattr(
-        main_runtime,
-        "_account_link_keyboard_installed",
-        False,
-    ):
-        return main_runtime
-
-    # Keep legacy text handlers for old Telegram reply keyboards, but all newly
-    # rendered primary navigation is inline. Patching here avoids rewriting the
-    # large runtime module while preserving every existing business flow.
-    main_runtime.main_keyboard = _main_menu_keyboard
-    main_runtime.connect_keyboard = _connect_keyboard
-    main_runtime._account_link_keyboard_installed = True
-    return main_runtime
 
 
 def _with_home(markup):
@@ -157,17 +150,121 @@ def _with_home(markup):
             [list(row) for row in markup.inline_keyboard]
         )
 
-    rows.append([
-        InlineKeyboardButton(
-            text="🏠 منوی اصلی",
-            callback_data=MAIN_HOME_CALLBACK,
-            style="primary",
-        )
-    ])
+    has_home = any(
+        getattr(button, "callback_data", None)
+        == MAIN_HOME_CALLBACK
+        for row in rows
+        for button in row
+    )
+
+    if not has_home:
+        rows.append([
+            InlineKeyboardButton(
+                text="🏠 منوی اصلی",
+                callback_data=MAIN_HOME_CALLBACK,
+                style="primary",
+            )
+        ])
 
     return InlineKeyboardMarkup(
         inline_keyboard=rows
     )
+
+
+def _wrap_keyboard_builder(target, name):
+    original = getattr(target, name, None)
+
+    if original is None:
+        return
+
+    marker = f"_main_home_wrapped_{name}"
+    if getattr(target, marker, False):
+        return
+
+    def wrapped(*args, **kwargs):
+        return _with_home(
+            original(*args, **kwargs)
+        )
+
+    setattr(target, name, wrapped)
+    setattr(target, marker, True)
+
+
+def _install_back_navigation(main_runtime):
+    """Keep one identical full-width main-menu button on every bot subpage."""
+
+    if getattr(
+        main_runtime,
+        "_submenu_back_navigation_installed",
+        False,
+    ):
+        return
+
+    for name in (
+        "subscription_list_keyboard",
+        "subscription_actions_keyboard",
+        "renewal_confirm_keyboard",
+        "renewal_payment_methods_keyboard",
+        "renewal_proof_keyboard",
+        "_dashboard_keyboard",
+    ):
+        _wrap_keyboard_builder(main_runtime, name)
+
+    from . import telegram_purchase_bot as purchase_runtime
+    from . import telegram_wallet_bot as wallet_runtime
+    from . import telegram_learning_center as learning_runtime
+    from . import telegram_support_bot as support_runtime
+
+    for name in (
+        "plans_keyboard",
+        "plan_confirm_keyboard",
+        "discount_choice_keyboard",
+        "discount_entry_keyboard",
+        "payment_methods_keyboard",
+        "proof_keyboard",
+    ):
+        _wrap_keyboard_builder(purchase_runtime, name)
+
+    for name in (
+        "wallet_keyboard",
+        "amount_keyboard",
+        "methods_keyboard",
+        "submit_keyboard",
+    ):
+        _wrap_keyboard_builder(wallet_runtime, name)
+
+    for name in (
+        "_platform_keyboard",
+        "_apps_keyboard",
+        "_detail_keyboard",
+    ):
+        _wrap_keyboard_builder(learning_runtime, name)
+
+    for name in (
+        "support_keyboard",
+        "cancel_keyboard",
+    ):
+        _wrap_keyboard_builder(support_runtime, name)
+
+    main_runtime._submenu_back_navigation_installed = True
+
+
+def _install_main_keyboard_button():
+    from . import telegram_runtime_bot as main_runtime
+
+    if getattr(
+        main_runtime,
+        "_account_link_keyboard_installed",
+        False,
+    ):
+        _install_back_navigation(main_runtime)
+        return main_runtime
+
+    main_runtime.main_keyboard = _main_menu_keyboard
+    main_runtime.connect_keyboard = _connect_keyboard
+    _install_back_navigation(main_runtime)
+    main_runtime._account_link_keyboard_installed = True
+    return main_runtime
 
 
 def install_account_link_feature(
@@ -185,9 +282,6 @@ def install_account_link_feature(
         message: Message,
         state: FSMContext,
     ):
-        # Telegram clients can retain a persistent ReplyKeyboard from an older
-        # release. Send an invisible cleanup marker, remove it immediately, and
-        # only then render the existing /start flow with the inline main menu.
         cleanup = await message.answer(
             "\u2063",
             reply_markup=ReplyKeyboardRemove(),
@@ -241,9 +335,7 @@ def install_account_link_feature(
         if callback.message is not None:
             await callback.message.edit_text(
                 main_runtime._dashboard_text(data),
-                reply_markup=_with_home(
-                    main_runtime._dashboard_keyboard(data)
-                ),
+                reply_markup=main_runtime._dashboard_keyboard(data),
             )
 
     @router.callback_query(F.data == "main:account")
@@ -286,7 +378,8 @@ def install_account_link_feature(
 
         if callback.message is not None:
             await callback.message.edit_text(
-                "ایمیل حساب Twin Panel را وارد کنید."
+                "ایمیل حساب Twin Panel را وارد کنید.",
+                reply_markup=_home_keyboard(),
             )
 
     @router.callback_query(F.data == CANCEL_CALLBACK)
@@ -308,7 +401,6 @@ def install_account_link_feature(
         message: Message,
         state: FSMContext,
     ):
-        # Compatibility for stale reply keyboards from older releases.
         await state.clear()
         await message.answer(
             "عملیات لغو شد.",
@@ -336,7 +428,6 @@ def install_account_link_feature(
         message: Message,
         state: FSMContext,
     ):
-        # Compatibility for stale reply keyboards from older releases.
         await state.clear()
         await state.set_state(AccountLinkState.username)
         await message.answer(
