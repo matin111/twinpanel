@@ -43,7 +43,7 @@ def _home_keyboard():
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="🏠 منوی اصلی",
+                    text="⬅️ بازگشت",
                     callback_data=MAIN_HOME_CALLBACK,
                     style="primary",
                 )
@@ -128,6 +128,114 @@ def _connect_keyboard():
     )
 
 
+def _with_home(markup):
+    rows = []
+
+    if markup is not None:
+        rows.extend(
+            [list(row) for row in markup.inline_keyboard]
+        )
+
+    has_home = any(
+        getattr(button, "callback_data", None)
+        == MAIN_HOME_CALLBACK
+        for row in rows
+        for button in row
+    )
+
+    if not has_home:
+        rows.append([
+            InlineKeyboardButton(
+                text="⬅️ بازگشت",
+                callback_data=MAIN_HOME_CALLBACK,
+                style="primary",
+            )
+        ])
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=rows
+    )
+
+
+def _install_back_navigation(main_runtime):
+    """Add one consistent return-to-main row to primary submenu roots."""
+
+    if getattr(
+        main_runtime,
+        "_submenu_back_navigation_installed",
+        False,
+    ):
+        return
+
+    # Subscription list is rendered by the legacy main runtime.
+    original_subscription_list_keyboard = (
+        main_runtime.subscription_list_keyboard
+    )
+
+    def subscription_list_keyboard_with_back(rows):
+        return _with_home(
+            original_subscription_list_keyboard(rows)
+        )
+
+    main_runtime.subscription_list_keyboard = (
+        subscription_list_keyboard_with_back
+    )
+
+    # The purchase, wallet, learning/download and support routers were written
+    # before the inline main menu. Their handlers resolve these module-level
+    # keyboard builders at callback time, so wrapping only the root builders
+    # keeps business/payment flows untouched while restoring navigation.
+    from . import telegram_purchase_bot as purchase_runtime
+    from . import telegram_wallet_bot as wallet_runtime
+    from . import telegram_learning_center as learning_runtime
+    from . import telegram_support_bot as support_runtime
+
+    original_plans_keyboard = purchase_runtime.plans_keyboard
+
+    def plans_keyboard_with_back(plans):
+        return _with_home(
+            original_plans_keyboard(plans)
+        )
+
+    purchase_runtime.plans_keyboard = plans_keyboard_with_back
+
+    original_wallet_keyboard = wallet_runtime.wallet_keyboard
+
+    def wallet_keyboard_with_back():
+        return _with_home(
+            original_wallet_keyboard()
+        )
+
+    wallet_runtime.wallet_keyboard = wallet_keyboard_with_back
+
+    original_platform_keyboard = learning_runtime._platform_keyboard
+
+    def platform_keyboard_with_back(prefix, mode):
+        return _with_home(
+            original_platform_keyboard(prefix, mode)
+        )
+
+    learning_runtime._platform_keyboard = platform_keyboard_with_back
+
+    original_support_keyboard = support_runtime.support_keyboard
+    original_support_cancel_keyboard = support_runtime.cancel_keyboard
+
+    def support_keyboard_with_back():
+        return _with_home(
+            original_support_keyboard()
+        )
+
+    def support_cancel_keyboard_with_back():
+        return _with_home(
+            original_support_cancel_keyboard()
+        )
+
+    support_runtime.support_keyboard = support_keyboard_with_back
+    support_runtime.cancel_keyboard = support_cancel_keyboard_with_back
+
+    main_runtime._submenu_back_navigation_installed = True
+
+
 def _install_main_keyboard_button():
     # Imported only after telegram_runtime_bot has finished loading.
     # create_purchase_router() is called from runtime main() before polling.
@@ -138,6 +246,7 @@ def _install_main_keyboard_button():
         "_account_link_keyboard_installed",
         False,
     ):
+        _install_back_navigation(main_runtime)
         return main_runtime
 
     # Keep legacy text handlers for old Telegram reply keyboards, but all newly
@@ -145,29 +254,9 @@ def _install_main_keyboard_button():
     # large runtime module while preserving every existing business flow.
     main_runtime.main_keyboard = _main_menu_keyboard
     main_runtime.connect_keyboard = _connect_keyboard
+    _install_back_navigation(main_runtime)
     main_runtime._account_link_keyboard_installed = True
     return main_runtime
-
-
-def _with_home(markup):
-    rows = []
-
-    if markup is not None:
-        rows.extend(
-            [list(row) for row in markup.inline_keyboard]
-        )
-
-    rows.append([
-        InlineKeyboardButton(
-            text="🏠 منوی اصلی",
-            callback_data=MAIN_HOME_CALLBACK,
-            style="primary",
-        )
-    ])
-
-    return InlineKeyboardMarkup(
-        inline_keyboard=rows
-    )
 
 
 def install_account_link_feature(
