@@ -6,6 +6,9 @@ from fastapi import APIRouter, Depends
 
 from ..database import SessionLocal
 from ..deps import require_admin
+from ..services.subscription_provision_preflight_v1 import (
+    assert_subscription_provisioning_ready,
+)
 
 
 router = APIRouter(
@@ -18,40 +21,34 @@ router = APIRouter(
 async def _run_create(payload: dict[str, Any]) -> dict[str, Any]:
     """Run the authoritative create lifecycle to completion.
 
-    This endpoint used to detach ``admin_create_v2`` in a background task and
-    return HTTP 202 after one event-loop turn. That allowed the browser to
-    report success while the subscription row had already been committed but
-    protocol provisioning was still running. A worker restart/cancellation or a
-    late provisioning failure could therefore leave an ACTIVE DB-only
-    subscription whose public page said the protocol needed Build/Repair.
-
-    Keep the compatibility endpoint name, but never acknowledge success until
-    the canonical fail-closed lifecycle has verified every requested protocol.
+    The request is fail-closed: success is returned only after every requested
+    protocol has a stored active credential/config. A cheap readiness preflight
+    runs first so an unavailable runtime is reported before any subscription or
+    remote account mutation is created.
     """
 
     from .subscription_admin_v2 import AdminSubscriptionCreateV2, admin_create_v2
 
     db = SessionLocal()
     try:
-        result = await admin_create_v2(AdminSubscriptionCreateV2(**payload), db)
+        request = AdminSubscriptionCreateV2(**payload)
+        preflight = assert_subscription_provisioning_ready(db, request.protocols)
+        result = await admin_create_v2(request, db)
         if isinstance(result, dict):
+            result.setdefault("preflight", preflight)
             return result
         if hasattr(result, "model_dump"):
-            return result.model_dump(mode="json")
-        return {"ok": True, "result": result}
+            body = result.model_dump(mode="json")
+            body.setdefault("preflight", preflight)
+            return body
+        return {"ok": True, "result": result, "preflight": preflight}
     finally:
         db.close()
 
 
 @router.post("/admin-create-fast-v1")
 async def admin_create_fast_v1(payload: dict[str, Any]):
-    """Compatibility create endpoint with fail-closed completion semantics.
-
-    Success now means the authoritative lifecycle has completed provisioning and
-    its postconditions. The endpoint intentionally no longer starts an
-    in-process fire-and-forget task; correctness is more important than a fast
-    but non-durable acknowledgement.
-    """
+    """Compatibility create endpoint with fail-closed completion semantics."""
 
     result = await _run_create(dict(payload))
     if isinstance(result, dict):
