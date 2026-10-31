@@ -78,6 +78,22 @@ def install_account_link_feature(
     _ = session_fn
     main_runtime = _install_main_keyboard_button()
 
+    @router.message(F.text == CANCEL_BUTTON)
+    async def account_link_cancel(
+        message: Message,
+        state: FSMContext,
+    ):
+        # MemoryStorage is intentionally process-local. After an updater-driven
+        # bot restart Telegram can still display the old reply keyboard while
+        # the FSM state has already disappeared. Always consume the stale
+        # cancel button before the main router's generic fallback, clear any
+        # surviving state and restore the canonical main keyboard.
+        await state.clear()
+        await message.answer(
+            "عملیات لغو شد.",
+            reply_markup=main_runtime.main_keyboard(),
+        )
+
     @router.message(F.text == ACCOUNT_LINK_BUTTON)
     async def account_link_start(
         message: Message,
@@ -98,14 +114,6 @@ def install_account_link_feature(
         state: FSMContext,
     ):
         username = str(message.text or "").strip()
-
-        if username == CANCEL_BUTTON:
-            await state.clear()
-            await message.answer(
-                "عملیات لغو شد.",
-                reply_markup=main_runtime.main_keyboard(),
-            )
-            return
 
         if not username or len(username) > 128:
             await message.answer(
