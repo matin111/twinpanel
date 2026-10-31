@@ -23,6 +23,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install Telegram model dependency
+        run: pip install "aiogram==3.30.0"
+
       - name: Compile changed bot modules
         run: |
           python -m py_compile \

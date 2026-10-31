@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
+from aiogram.types import InlineKeyboardButton
+
 
 ROOT = Path(__file__).resolve().parents[1]
 FEATURE = ROOT / "app" / "telegram_account_link_bot.py"
@@ -24,6 +26,16 @@ for source in (
     guides_source,
 ):
     ast.parse(source)
+
+# The installed aiogram must preserve the Bot API style field in the serialized
+# inline button payload, including when style is accepted through extra_data on
+# an older 3.x model.
+style_probe = InlineKeyboardButton(
+    text="probe",
+    callback_data="probe",
+    style="primary",
+)
+assert style_probe.model_dump(exclude_none=True).get("style") == "primary"
 
 # Main-bot contract: account-link recovery is source/protocol agnostic. It asks
 # only for the account username and resolves the canonical TwinPanel share URL
@@ -63,24 +75,34 @@ for callback_id in (
     assert callback_id in feature_source
 
 # A cached ReplyKeyboard from rc.419 and older must be explicitly removed on
-# /start before the existing start handler renders the new inline menu.
+# /start without leaving a visible cleanup message in the conversation.
 assert "from aiogram.filters import CommandStart" in feature_source
 assert "ReplyKeyboardRemove" in feature_source
 assert "@router.message(CommandStart())" in feature_source
 assert "async def inline_main_start" in feature_source
 assert "reply_markup=ReplyKeyboardRemove()" in feature_source
-assert "await main_runtime.start(" in feature_source
-assert feature_source.index("@router.message(CommandStart())") < feature_source.index(
+assert '"\\u2063"' in feature_source
+assert "⌨️ منوی قبلی بسته شد." not in feature_source
+start_begin = feature_source.index("@router.message(CommandStart())")
+start_end = feature_source.index(
     "@router.callback_query(F.data == MAIN_HOME_CALLBACK)"
+)
+start_source = feature_source[start_begin:start_end]
+assert start_source.index("await cleanup.delete()") < start_source.index(
+    "await main_runtime.start("
 )
 
 # Account-link must be the first, full-width row. Remaining main actions are
-# compact two-column inline rows.
+# compact two-column inline rows. Every main action has an explicit Bot API
+# style so supported Telegram clients render the requested color semantics.
 menu_start = feature_source.index("def _main_menu_keyboard():")
 menu_end = feature_source.index("def _connect_keyboard():")
 menu_source = feature_source[menu_start:menu_end]
 assert menu_source.index("text=ACCOUNT_LINK_BUTTON") < menu_source.index('text="🏠 داشبورد"')
 assert menu_source.count("InlineKeyboardButton(") == 9
+assert menu_source.count('style="success"') == 2
+assert menu_source.count('style="primary"') == 6
+assert menu_source.count('style="danger"') == 1
 assert 'text="🏠 داشبورد"' in menu_source
 assert 'text="📦 اشتراک‌های من"' in menu_source
 assert 'text="🛒 خرید اشتراک"' in menu_source
@@ -89,6 +111,27 @@ assert 'text="📚 آموزش"' in menu_source
 assert 'text="⬇️ دانلود برنامه"' in menu_source
 assert 'text="🎫 پشتیبانی"' in menu_source
 assert 'text="👤 حساب من"' in menu_source
+
+# Secondary inline controls carry matching styles as well.
+cancel_start = feature_source.index("def _cancel_keyboard():")
+cancel_end = feature_source.index("def _home_keyboard():")
+cancel_source = feature_source[cancel_start:cancel_end]
+assert 'style="danger"' in cancel_source
+
+home_start = feature_source.index("def _home_keyboard():")
+home_end = feature_source.index("def _main_menu_keyboard():")
+home_source = feature_source[home_start:home_end]
+assert 'style="primary"' in home_source
+
+connect_start = feature_source.index("def _connect_keyboard():")
+connect_end = feature_source.index("def _install_main_keyboard_button():")
+connect_source = feature_source[connect_start:connect_end]
+assert 'style="success"' in connect_source
+
+with_home_start = feature_source.index("def _with_home(markup):")
+with_home_end = feature_source.index("def install_account_link_feature(")
+with_home_source = feature_source[with_home_start:with_home_end]
+assert 'style="primary"' in with_home_source
 
 # Runtime patch replaces both persistent primary keyboards at startup while old
 # text handlers remain available only for stale keyboards from previous builds.
