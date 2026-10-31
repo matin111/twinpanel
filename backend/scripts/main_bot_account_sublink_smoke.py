@@ -62,6 +62,18 @@ for callback_id in (
 ):
     assert callback_id in feature_source
 
+# A cached ReplyKeyboard from rc.419 and older must be explicitly removed on
+# /start before the existing start handler renders the new inline menu.
+assert "from aiogram.filters import CommandStart" in feature_source
+assert "ReplyKeyboardRemove" in feature_source
+assert "@router.message(CommandStart())" in feature_source
+assert "async def inline_main_start" in feature_source
+assert "reply_markup=ReplyKeyboardRemove()" in feature_source
+assert "await main_runtime.start(" in feature_source
+assert feature_source.index("@router.message(CommandStart())") < feature_source.index(
+    "@router.callback_query(F.data == MAIN_HOME_CALLBACK)"
+)
+
 # Account-link must be the first, full-width row. Remaining main actions are
 # compact two-column inline rows.
 menu_start = feature_source.index("def _main_menu_keyboard():")
