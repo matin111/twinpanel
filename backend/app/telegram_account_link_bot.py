@@ -11,7 +11,7 @@ CANCEL_BUTTON = "❌ لغو"
 
 
 class AccountLinkState(StatesGroup):
-    migrated_username = State()
+    username = State()
 
 
 def _cancel_keyboard():
@@ -65,16 +65,16 @@ def install_account_link_feature(
     request_fn,
     session_fn,
 ):
-    """Attach passwordless recovery for imported/migrated VPN accounts.
+    """Attach passwordless account-link recovery for the linked TwinPanel user.
 
-    This flow is deliberately separate from «اکانت‌های من». It asks only for
-    the preserved username and the API resolver is restricted to subscriptions
-    that have an imported MigrationImportRecord. Ordinary TwinPanel accounts
-    and their existing My Accounts flow are not changed.
+    The user enters an account username. The private API resolves that username
+    only inside subscriptions owned by the TwinPanel user linked to this
+    Telegram ID and returns the canonical panel share URL. Protocol/source is
+    irrelevant; My Accounts and provisioning are not changed.
     """
 
-    # Keep the extension signature stable for the runtime installer. Migrated
-    # recovery uses the private bot-auth endpoint rather than customer session.
+    # Keep the extension signature stable for the runtime installer. Recovery
+    # uses the private bot-auth endpoint rather than exposing a customer token.
     _ = session_fn
     main_runtime = _install_main_keyboard_button()
 
@@ -83,11 +83,9 @@ def install_account_link_feature(
         message: Message,
         state: FSMContext,
     ):
-        # MemoryStorage is intentionally process-local. After an updater-driven
-        # bot restart Telegram can still display the old reply keyboard while
-        # the FSM state has already disappeared. Always consume the stale
-        # cancel button before the main router's generic fallback, clear any
-        # surviving state and restore the canonical main keyboard.
+        # MemoryStorage is process-local. After an updater-driven restart,
+        # Telegram may still display an old cancel keyboard although the state
+        # has disappeared. Consume it before the main router generic fallback.
         await state.clear()
         await message.answer(
             "عملیات لغو شد.",
@@ -100,16 +98,15 @@ def install_account_link_feature(
         state: FSMContext,
     ):
         await state.clear()
-        await state.set_state(AccountLinkState.migrated_username)
+        await state.set_state(AccountLinkState.username)
         await message.answer(
-            "🔗 <b>دریافت لینک اکانت مهاجرتی</b>\n\n"
-            "نام کاربری اکانتی که از پنل قبلی منتقل شده را وارد کنید.\n"
-            "برای اکانت‌های مهاجرتی V2Ray نیازی به رمز عبور نیست.",
+            "🔗 <b>دریافت لینک اکانت</b>\n\n"
+            "نام کاربری VPN اکانت خود را وارد کنید.",
             reply_markup=_cancel_keyboard(),
         )
 
-    @router.message(AccountLinkState.migrated_username)
-    async def account_link_migrated_username(
+    @router.message(AccountLinkState.username)
+    async def account_link_username(
         message: Message,
         state: FSMContext,
     ):
@@ -125,7 +122,7 @@ def install_account_link_feature(
         try:
             result = await request_fn(
                 "POST",
-                "/v1/telegram/account-link/resolve-migrated",
+                "/v1/telegram/account-link/resolve-owned",
                 payload={
                     "telegram_id": message.from_user.id,
                     "username": username,
@@ -148,14 +145,14 @@ def install_account_link_feature(
         except Exception as exc:
             await message.answer(
                 "❌ " + escape(str(exc)) + "\n\n"
-                "نام کاربری اکانت مهاجرتی را دوباره وارد کنید.",
+                "نام کاربری اکانت را دوباره وارد کنید.",
                 reply_markup=_cancel_keyboard(),
             )
             return
 
         await state.clear()
         await message.answer(
-            "✅ <b>لینک اکانت مهاجرتی پیدا شد</b>\n\n"
+            "✅ <b>لینک اکانت پیدا شد</b>\n\n"
             f"👤 نام کاربری: <code>{escape(account_username)}</code>\n\n"
             f"🔗 <code>{escape(link)}</code>\n\n"
             "این لینک را فقط برای دستگاه‌های خودتان استفاده کنید.",
