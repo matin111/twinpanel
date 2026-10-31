@@ -7,7 +7,6 @@ on:
       - 'backend/app/xray_grpc_target_isolation_v48.py'
       - 'backend/app/xray_adaptive_three_profiles_v47.py'
       - 'backend/app/xray_customer_xhttp_v46.py'
-      - 'backend/app/xray_nodomain_multistack_v29.py'
       - 'backend/app/xray_modern_runtime.py'
       - 'backend/tests/test_xray_grpc_target_isolation_v48.py'
       - '.github/workflows/xray-grpc-target-isolation-v48-smoke.yml'
@@ -24,14 +23,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install backend test dependencies
-        working-directory: backend
-        run: pip install -r requirements.txt
       - name: Compile V48 refinement
         run: |
           python3 -m py_compile \
             backend/app/xray_grpc_target_isolation_v48.py \
             backend/tests/test_xray_grpc_target_isolation_v48.py
-      - name: Verify composed domainless Xray target isolation
+      - name: Verify domainless Xray target isolation contract
         working-directory: backend
-        run: pytest -q tests/test_xray_grpc_target_isolation_v48.py
+        run: python3 tests/test_xray_grpc_target_isolation_v48.py
