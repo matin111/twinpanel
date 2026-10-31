@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.430",
+  "version": "1.1.0-rc.431",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-31T22:32:48Z",
+  "released_at": "2026-10-31T22:44:59Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "df33657e41ac32ac1ab85e80a2c024303bf42b0f",
+  "source_sha": "8f7361b9dceabef5804bd6b1309231e032f74e11",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.430/twinpanel-1.1.0-rc.430-linux-x86_64.tar.gz",
-    "sha256": "ec95689418e50ac51934bba3576618c0d91de113fad9e061cff50b86a8c69e4d",
-    "size_bytes": 25134946
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.431/twinpanel-1.1.0-rc.431-linux-x86_64.tar.gz",
+    "sha256": "834e1ae448430613952969bded85fd8962c5495b15990da967cde33337c21de9",
+    "size_bytes": 25135004
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.430 جایگزین rc.429 می‌شود که در یک race انتشار، قبل از واردشدن Fix نهایی Provisioning از Source قدیمی منتشر شد. این نسخه فلو درخواست نمایندگی ربات اصلی تلگرام و اصلاح fail-closed ساخت اشتراک برای ادمین و نماینده را با هم دارد. endpoint ساخت ادمین دیگر قبل از پایان Provisioning و postconditionها موفقیت برنمی‌گرداند؛ ساخت دستی و ساخت از پلن نماینده نیز قبل از ok=true وجود credential فعال و config واقعی همه پروتکل‌های درخواستی را کنترل می‌کند. اگر Provisioning ناقص باشد اشتراک suspended می‌شود و cleanup/revoke صف می‌شود. تست‌های Subscription Create Fast V1، Reseller Manual Create/Menu، Reseller Owned Plans، API Build، Release Race، Manifest، Install-time protocols، TP27 و Preview/Tunnel سبز شده‌اند. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall و protocol dataplaneها بازنویسی نشده‌اند. Source روی SHA immutable df33657e41ac32ac1ab85e80a2c024303bf42b0f قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.430 supersedes rc.429, which was published from a pre-fix source during a release race. This release combines the main Telegram bot reseller-application flow with fail-closed admin and reseller subscription creation. Admin creation no longer acknowledges success before provisioning and postconditions complete; reseller manual and owned-plan creation verifies active credentials with stored configs for every requested protocol before returning ok=true. Incomplete provisioning suspends the subscription and queues revoke cleanup. Subscription Create Fast V1, Reseller Manual Create/Menu, Reseller Owned Plans, API Build, Release Race, Manifest, install-time protocol setup, TP27, Preview, and Tunnel checks passed. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall and protocol dataplanes are not rewritten. Source is pinned to immutable SHA df33657e41ac32ac1ab85e80a2c024303bf42b0f."
+    "fa": "TwinPanel 1.1.0-rc.431 چیدمان منوی اصلی ربات تلگرام را اصلاح می‌کند: دکمه خرید اشتراک به‌صورت تمام‌عرض به بالای منو منتقل شده و با استایل قرمز/danger نمایش داده می‌شود؛ دکمه دریافت لینک اکانت نیز به جای قبلی خرید اشتراک کنار کیف پول منتقل شده است. فلو درخواست نمایندگی، پشتیبانی، داشبورد، حساب، خرید و سایر مسیرها دست‌نخورده مانده‌اند. هیچ تغییری در TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall یا protocol dataplaneها انجام نشده است. Source روی SHA immutable 8f7361b9dceabef5804bd6b1309231e032f74e11 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.431 refines the main Telegram bot menu layout: the subscription purchase action is moved to the top full-width slot and rendered with danger/red styling, while account-link recovery is moved into the former purchase slot beside the wallet. Reseller request, support, dashboard, account, purchase and other existing flows remain unchanged. No TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall or protocol dataplane changes are included. Source is pinned to immutable SHA 8f7361b9dceabef5804bd6b1309231e032f74e11."
   }
 }
