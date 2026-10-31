@@ -32,19 +32,39 @@ type DryRunResult={
   records:DryRunRecord[];
 };
 
+type ProvisionResult={
+  ok:boolean;
+  subscriptions:number;
+  nodes:number;
+  node_restarts:number;
+  errors:Array<{node:string;error:string}>;
+};
+
 type BatchImportResult={
   ok:boolean;
   imported:number;
   existing:number;
   subscriptions:number;
-  provision:{
-    ok:boolean;
-    subscriptions:number;
-    nodes:number;
-    node_restarts:number;
-    errors:Array<{node:string;error:string}>;
-  };
+  provision:ProvisionResult;
 };
+
+type EylanStageResult={
+  ok:boolean;
+  imported:number;
+  existing:number;
+  already_imported:number;
+  staged:number;
+  staged_source_ids:string[];
+};
+
+type EylanFinalizeResult={
+  ok:boolean;
+  subscriptions:number;
+  existing_imported:number;
+  provision:ProvisionResult;
+};
+
+const EYLAN_STAGE_CHUNK=50;
 
 async function api<T>(path:string,init:RequestInit={}):Promise<T>{
   const token=getCustomerToken();
@@ -144,15 +164,34 @@ export function MigrationCenterAdmin(){
           traffic_used_bytes:Number(item.traffic_used_bytes||0),
           expires_at:item.expires_at||null,
         }));
-        const result=await api<BatchImportResult>("/v1/admin/migration-center/eylan/import",{
+
+        let imported=0;
+        let existing=0;
+        let alreadyImported=0;
+        for(let offset=0;offset<records.length;offset+=EYLAN_STAGE_CHUNK){
+          const chunk=records.slice(offset,offset+EYLAN_STAGE_CHUNK);
+          const staged=await api<EylanStageResult>("/v1/admin/migration-center/eylan/stage",{
+            method:"POST",
+            body:JSON.stringify({records:chunk,target_user_id:userId,protocols:["v2ray"]}),
+          });
+          imported+=staged.imported;
+          existing+=staged.existing;
+          alreadyImported+=staged.already_imported;
+          const done=Math.min(offset+chunk.length,records.length);
+          setOk(pick(`در حال انتقال ایلان: ${done} از ${records.length} رکورد در دیتابیس آماده شد...`,`Eylan transfer: ${done} of ${records.length} records staged in the database...`));
+        }
+
+        setOk(pick("رکوردها آماده شدند؛ در حال ساخت یک‌جای V2Ray روی Exitها...","Records staged; provisioning V2Ray once across Exit nodes..."));
+        const sourceIds=records.map(item=>item.source_id);
+        const finalized=await api<EylanFinalizeResult>("/v1/admin/migration-center/eylan/finalize",{
           method:"POST",
-          body:JSON.stringify({records,target_user_id:userId,protocols:["v2ray"]}),
+          body:JSON.stringify({source_ids:sourceIds,target_user_id:userId,protocols:["v2ray"]}),
         });
-        if(!result.ok||!result.provision.ok){
-          const failedNodes=result.provision.errors.map(item=>`${item.node}: ${item.error}`).join(" | ");
-          setError(pick(`اطلاعات ایلان وارد شد اما Provision همه نودها کامل نشد. ${failedNodes}`,`Eylan records were imported, but provisioning did not complete on every node. ${failedNodes}`));
+        if(!finalized.ok||!finalized.provision.ok){
+          const failedNodes=finalized.provision.errors.map(item=>`${item.node}: ${item.error}`).join(" | ");
+          setError(pick(`اطلاعات ایلان Stage شد اما Provision همه نودها کامل نشد. ${failedNodes}`,`Eylan records were staged, but provisioning did not complete on every node. ${failedNodes}`));
         }else{
-          setOk(pick(`انتقال ایلان تمام شد: ${result.imported} جدید، ${result.existing} موجود، ${result.provision.node_restarts} ری‌استارت Xray. بعد از رفرش این نتیجه از صفحه پاک می‌شود.`,`Eylan import finished: ${result.imported} new, ${result.existing} existing, ${result.provision.node_restarts} Xray restarts. This result clears from the page after refresh.`));
+          setOk(pick(`انتقال ایلان تمام شد: ${imported} جدید، ${existing} موجود (${alreadyImported} قبلاً کامل)، ${finalized.provision.node_restarts} ری‌استارت Xray. بعد از رفرش این نتیجه از صفحه پاک می‌شود.`,`Eylan import finished: ${imported} new, ${existing} existing (${alreadyImported} already complete), ${finalized.provision.node_restarts} Xray restarts. This result clears from the page after refresh.`));
         }
         return;
       }
@@ -208,7 +247,7 @@ export function MigrationCenterAdmin(){
       </div>
 
       {isEylan?<>
-        <p><small>{pick("بکاپ ایلان مستقیم خوانده می‌شود؛ فقط نام کاربری، رمز، حجم کل، مصرف واقعی (دانلود + آپلود) و تاریخ انقضا منتقل می‌شود. UUID و کانفیگ قدیمی منتقل نمی‌شود.","The Eylan backup is read directly; only username, password, total traffic, actual usage (download + upload), and expiry are imported. Old UUIDs and configs are not preserved.")}</small></p>
+        <p><small>{pick("بکاپ ایلان مستقیم خوانده می‌شود؛ فقط نام کاربری، رمز، حجم کل، مصرف واقعی (دانلود + آپلود) و تاریخ انقضا منتقل می‌شود. UUID و کانفیگ قدیمی منتقل نمی‌شود. برای بکاپ‌های بزرگ، ساخت رکوردها خودکار در بسته‌های کوچک انجام می‌شود تا Gateway Timeout رخ ندهد.","The Eylan backup is read directly; only username, password, total traffic, actual usage (download + upload), and expiry are imported. Old UUIDs and configs are not preserved. Large backups are staged automatically in small chunks to avoid gateway timeouts.")}</small></p>
         <label><span>{pick("فایل بکاپ ایلان","Eylan backup file")}</span><input type="file" accept=".tar,.tar.gz,.tgz,.zip,application/gzip,application/zip" onChange={event=>{setEylanFile(event.target.files?.[0]||null);setDryRun(null);}} style={{width:"100%"}}/></label>
         {eylanFile&&<small>{eylanFile.name}</small>}
       </>:<>
