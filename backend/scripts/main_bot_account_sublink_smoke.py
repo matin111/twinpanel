@@ -25,52 +25,49 @@ for source in (
 ):
     ast.parse(source)
 
-# Main-bot UI/FSM contract.
+# Main-bot UI contract: account link recovery is driven by My Accounts, not by
+# VPN username/password. This is required for migrated V2Ray subscriptions
+# imported from external panels which legitimately have no password identity.
 assert 'ACCOUNT_LINK_BUTTON = "🔗 دریافت لینک اکانت"' in feature_source
-assert "AccountLinkState.username" in feature_source
-assert "AccountLinkState.password" in feature_source
-assert '"/v1/telegram/account-link/resolve"' in feature_source
-assert '"username": username' in feature_source
-assert '"password": password' in feature_source
-assert "bot_auth=True" in feature_source
+assert 'ACCOUNT_LINK_CALLBACK_PREFIX = "account_link:"' in feature_source
+assert '"/v1/subscriptions/me"' in feature_source
+assert feature_source.count('"/v1/subscriptions/me"') >= 2
+assert 'f"/v1/customer/subscriptions/{sub_id}/connection-info"' in feature_source
+assert "F.data.startswith(ACCOUNT_LINK_CALLBACK_PREFIX)" in feature_source
+assert "_status_value(row) == \"active\"" in feature_source
 assert 'link.startswith(("http://", "https://"))' in feature_source
-assert 'CANCEL_BUTTON = "❌ لغو"' in feature_source
+assert "برای اشتراک‌های مهاجرتی نیازی به نام کاربری یا رمز VPN نیست" in feature_source
 
-# Two-step regression guard: entering a username must only store it and advance
-# to the password state. Credential resolution is allowed only after the
-# password-state handler begins.
-username_handler = feature_source[
-    feature_source.index("async def account_link_username"):
-    feature_source.index("async def account_link_password")
+# Regression guard: never reintroduce VPN credential proof as a prerequisite
+# for a Telegram-linked customer selecting one of their own My Accounts rows.
+assert "AccountLinkState.username" not in feature_source
+assert "AccountLinkState.password" not in feature_source
+assert '"/v1/telegram/account-link/resolve"' not in feature_source
+assert '"password": password' not in feature_source
+assert "bot_auth=True" not in feature_source
+
+# Callback IDs are not trusted on their own. The bot re-reads My Accounts and
+# the customer connection-info endpoint performs the server-side ownership
+# check before returning the canonical subscription link.
+callback_handler = feature_source[
+    feature_source.index("async def account_link_pick"):
 ]
-password_handler = feature_source[
-    feature_source.index("async def account_link_password"):
-]
-assert "state.update_data(" in username_handler
-assert "account_link_username=username" in username_handler
-assert "AccountLinkState.password" in username_handler
-assert "/v1/telegram/account-link/resolve" not in username_handler
-assert "/v1/telegram/account-link/resolve" in password_handler
-assert '"password": password' in password_handler
+assert '"/v1/subscriptions/me"' in callback_handler
+assert "_subscription_id(row) == sub_id" in callback_handler
+assert "_status_value(row) == \"active\"" in callback_handler
+assert 'f"/v1/customer/subscriptions/{sub_id}/connection-info"' in callback_handler
+assert "token=token" in callback_handler
 
-# Regression guard: username-only lookup through Telegram-linked subscriptions
-# was the root cause of valid VPN accounts being reported as missing.
-assert '"/v1/subscriptions/me"' not in feature_source
-assert 'f"{sub_id}/manage"' not in feature_source
-assert 'f"{sub_id}/connection-info"' not in feature_source
-
-# The bot module must not gain direct database access. Global resolution lives
-# behind the private bot-authenticated endpoint and requires VPN password proof.
+# The bot module must not gain direct database access. Ownership remains behind
+# authenticated customer APIs. Keep the old bot-secret resolver intact only as
+# backward compatibility for older clients/releases; the main bot no longer
+# uses it for My Accounts recovery.
 assert "db.query(" not in feature_source
 assert "db.get(" not in feature_source
 assert "from .models import" not in feature_source
 assert "dependencies=[Depends(bot_guard)]" in lookup_source
-assert "func.lower(Subscription.account_username)" in lookup_source
 assert "hmac.compare_digest(" in lookup_source
-assert "نام کاربری یا رمز عبور اکانت اشتباه است" in lookup_source
 assert "_FAILURE_LIMIT = 6" in lookup_source
-assert "status_code=429" in lookup_source
-assert "from .account_delivery import _share_url" in lookup_source
 
 # The feature must be attached to a router included before the main router's
 # generic fallback, while preserving the existing runtime entrypoint.
