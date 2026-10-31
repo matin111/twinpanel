@@ -54,6 +54,14 @@ assert '"username": username' in feature_source
 assert "bot_auth=True" in feature_source
 assert 'link.startswith(("http://", "https://"))' in feature_source
 
+# Branding contract: Telegram display copy follows the same public Branding
+# settings as the web panel and keeps a safe fallback for unavailable settings.
+assert 'DEFAULT_BRAND_NAME = "TwinPanel"' in feature_source
+assert "async def _brand_name(request_fn):" in feature_source
+assert '"/v1/settings/branding"' in feature_source
+assert 'for field in ("brand_name", "site_title")' in feature_source
+assert "brand_name = escape(await _brand_name(request_fn))" in feature_source
+
 # Entire primary navigation is inline. No newly rendered main/connect/account-link
 # control may depend on Telegram's persistent ReplyKeyboard.
 assert "def _main_menu_keyboard():" in feature_source
@@ -89,8 +97,10 @@ start_end = feature_source.index(
 )
 start_source = feature_source[start_begin:start_end]
 assert start_source.index("await cleanup.delete()") < start_source.index(
-    "await main_runtime.start("
+    "brand_name = escape(await _brand_name(request_fn))"
 )
+assert "await session_fn(" in start_source
+assert "reply_markup=main_runtime.main_keyboard()" in start_source
 
 # Account-link must be the first, full-width row. Remaining main actions are
 # compact two-column inline rows. Every main action has an explicit Bot API
