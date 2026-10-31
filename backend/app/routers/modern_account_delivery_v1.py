@@ -52,18 +52,16 @@ STANDALONE_ACCOUNT_PROTOCOLS = frozenset(
 )
 MODERN_ACCOUNT_PROTOCOLS = SINGBOX_ACCOUNT_PROTOCOLS | STANDALONE_ACCOUNT_PROTOCOLS
 
-# Subscription creation is fail-closed, but it must also be bounded. A single
-# remote service restart or account driver used to keep the browser request open
-# for several minutes because all 15 protocols are provisioned serially. Keep
-# OpenVPN more generous for legacy EasyRSA while bounding the common paths and
-# the entire provisioning lifecycle.
-DEFAULT_PROTOCOL_PROVISION_TIMEOUT_SECONDS = 75.0
+# Creation stays fail-closed, but one unhealthy remote account driver must not
+# hold an admin/reseller HTTP request for five minutes. These limits sit above
+# SSH connect/login limits and below common reverse-proxy request deadlines.
+DEFAULT_PROTOCOL_PROVISION_TIMEOUT_SECONDS = 45.0
 PROTOCOL_PROVISION_TIMEOUT_SECONDS = {
-    "v2ray": 45.0,
-    "openvpn": 150.0,
+    "v2ray": 30.0,
+    "openvpn": 60.0,
 }
-TOTAL_PROVISION_TIMEOUT_SECONDS = 180.0
-QUOTA_SYNC_TIMEOUT_SECONDS = 30.0
+TOTAL_PROVISION_TIMEOUT_SECONDS = 120.0
+QUOTA_SYNC_TIMEOUT_SECONDS = 20.0
 
 
 def _status_value(value: Any) -> str:
@@ -214,15 +212,6 @@ def _bind_unique_client_tags(
     protocol: str,
     username: str,
 ) -> dict[str, Any]:
-    """Bind client-only sing-box tags to subscription + protocol + node identity.
-
-    Naive and ShadowTLS credentials are shared across the subscription while the
-    delivered config can contain several server items. Static tags such as
-    ``twinpanel-naive`` therefore collide when those items are combined. This
-    helper changes only client metadata/references; endpoint, TLS and secrets are
-    preserved byte-for-byte.
-    """
-
     protocol = str(protocol or "").strip().lower()
     if protocol not in SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS:
         return item
@@ -441,13 +430,6 @@ async def _provision_account_v1_locked(
     subscription_id: int,
     db: Session,
 ):
-    """Canonical account provisioning bridge for all 15 protocols.
-
-    Classic behavior reuses the established production helpers. All ten Modern
-    protocols require a real online NodeProtocolConfig and a real account
-    driver; nothing is synthesized when a runtime is absent.
-    """
-
     from . import account_delivery as ad
 
     sub = db.get(Subscription, subscription_id)
