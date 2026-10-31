@@ -4,6 +4,7 @@ import {FormEvent,useEffect,useMemo,useState} from "react";
 import {createPortal} from "react-dom";
 
 import {adminApi,type AdminUser,type RuntimeRow} from "../lib/admin-api";
+import {createSubscriptionFastV1} from "../lib/subscription-create-fast-api";
 import {subscriptionProtocolApi,type SubscriptionProtocolDefinition} from "../lib/subscription-protocol-api";
 import {useI18n} from "../lib/i18n";
 
@@ -153,7 +154,7 @@ export function AdminManualSubscriptionCreate(){
 
     setBusy(true);setError("");setOk("");
     try{
-      await adminApi.createSubscriptionV2({
+      await createSubscriptionFastV1({
         user_id:userId,
         plan_id:planId||null,
         node_ids:[],
@@ -165,7 +166,7 @@ export function AdminManualSubscriptionCreate(){
         ...(password.trim()?{password:password.trim()}:{}),
       });
 
-      setOk(pick("اشتراک با پروتکل‌های انتخابی ساخته و اکانت صادر شد. لیست در حال بروزرسانی است…","Subscription created with the selected protocols and provisioned. Refreshing…"));
+      setOk(pick("ساخت اشتراک ثبت شد؛ صدور کانفیگ‌ها در پس‌زمینه ادامه دارد. لیست در حال بروزرسانی است…","Subscription creation started; configs continue provisioning in the background. Refreshing…"));
       window.setTimeout(()=>window.location.reload(),900);
     }catch(reason){
       setError(reason instanceof Error?reason.message:String(reason));
@@ -234,7 +235,7 @@ export function AdminManualSubscriptionCreate(){
 
           <div className="modalActions">
             <button type="button" className="ghost" disabled={busy} onClick={()=>setOpen(false)}>{pick("انصراف","Cancel")}</button>
-            <button type="submit" className="primary" disabled={busy||loading||catalog.length!==15}>{busy?pick("در حال ساخت…","Creating…"):pick("ساخت و صدور اکانت","Create & provision account")}</button>
+            <button type="submit" className="primary" disabled={busy||loading||catalog.length!==15}>{busy?pick("در حال ثبت…","Submitting…"):pick("ساخت و صدور اکانت","Create & provision account")}</button>
           </div>
         </form>
       </div>
