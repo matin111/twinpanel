@@ -7,15 +7,15 @@ from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
-    KeyboardButton,
     Message,
-    ReplyKeyboardMarkup,
 )
 
 
 ACCOUNT_LINK_BUTTON = "🔗 دریافت لینک اکانت"
+ACCOUNT_LINK_CALLBACK = "account_link:start"
 CANCEL_BUTTON = "❌ لغو"
 CANCEL_CALLBACK = "account_link:cancel"
+MAIN_HOME_CALLBACK = "main:home"
 
 
 class AccountLinkState(StatesGroup):
@@ -35,6 +35,85 @@ def _cancel_keyboard():
     )
 
 
+def _home_keyboard():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🏠 منوی اصلی",
+                    callback_data=MAIN_HOME_CALLBACK,
+                )
+            ]
+        ],
+    )
+
+
+def _main_menu_keyboard():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=ACCOUNT_LINK_BUTTON,
+                    callback_data=ACCOUNT_LINK_CALLBACK,
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🏠 داشبورد",
+                    callback_data="main:dashboard",
+                ),
+                InlineKeyboardButton(
+                    text="📦 اشتراک‌های من",
+                    callback_data="subs:list",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🛒 خرید اشتراک",
+                    callback_data="shop:list",
+                ),
+                InlineKeyboardButton(
+                    text="💰 کیف پول",
+                    callback_data="wallet:refresh",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="📚 آموزش",
+                    callback_data="mlearn:g:root",
+                ),
+                InlineKeyboardButton(
+                    text="⬇️ دانلود برنامه",
+                    callback_data="mlearn:d:root",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🎫 پشتیبانی",
+                    callback_data="ts:send",
+                ),
+                InlineKeyboardButton(
+                    text="👤 حساب من",
+                    callback_data="main:account",
+                ),
+            ],
+        ],
+    )
+
+
+def _connect_keyboard():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🔗 اتصال حساب",
+                    callback_data="main:connect-account",
+                )
+            ]
+        ],
+    )
+
+
 def _install_main_keyboard_button():
     # Imported only after telegram_runtime_bot has finished loading.
     # create_purchase_router() is called from runtime main() before polling.
@@ -47,31 +126,33 @@ def _install_main_keyboard_button():
     ):
         return main_runtime
 
-    original_main_keyboard = main_runtime.main_keyboard
-
-    def main_keyboard_with_account_link():
-        keyboard = original_main_keyboard()
-        rows = [list(row) for row in keyboard.keyboard]
-
-        if not any(
-            button.text == ACCOUNT_LINK_BUTTON
-            for row in rows
-            for button in row
-        ):
-            # Keep account-link recovery visible without requiring the user to
-            # scroll to the bottom of Telegram's reply keyboard.
-            rows.insert(0, [
-                KeyboardButton(text=ACCOUNT_LINK_BUTTON),
-            ])
-
-        return ReplyKeyboardMarkup(
-            resize_keyboard=True,
-            keyboard=rows,
-        )
-
-    main_runtime.main_keyboard = main_keyboard_with_account_link
+    # Keep legacy text handlers for old Telegram reply keyboards, but all newly
+    # rendered primary navigation is inline. Patching here avoids rewriting the
+    # large runtime module while preserving every existing business flow.
+    main_runtime.main_keyboard = _main_menu_keyboard
+    main_runtime.connect_keyboard = _connect_keyboard
     main_runtime._account_link_keyboard_installed = True
     return main_runtime
+
+
+def _with_home(markup):
+    rows = []
+
+    if markup is not None:
+        rows.extend(
+            [list(row) for row in markup.inline_keyboard]
+        )
+
+    rows.append([
+        InlineKeyboardButton(
+            text="🏠 منوی اصلی",
+            callback_data=MAIN_HOME_CALLBACK,
+        )
+    ])
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=rows
+    )
 
 
 def install_account_link_feature(
@@ -79,18 +160,96 @@ def install_account_link_feature(
     request_fn,
     session_fn,
 ):
-    """Attach passwordless account-link recovery for the linked TwinPanel user.
+    """Attach inline main navigation and owned account-link recovery."""
 
-    The user enters an account username. The private API resolves that username
-    only inside subscriptions owned by the TwinPanel user linked to this
-    Telegram ID and returns the canonical panel share URL. Protocol/source is
-    irrelevant; My Accounts and provisioning are not changed.
-    """
-
-    # Keep the extension signature stable for the runtime installer. Recovery
-    # uses the private bot-auth endpoint rather than exposing a customer token.
     _ = session_fn
     main_runtime = _install_main_keyboard_button()
+
+    @router.callback_query(F.data == MAIN_HOME_CALLBACK)
+    async def main_home_inline(
+        callback: CallbackQuery,
+        state: FSMContext,
+    ):
+        await state.clear()
+        await callback.answer()
+
+        if callback.message is not None:
+            await callback.message.edit_text(
+                "🤖 <b>Twin Panel</b>\n\n"
+                "بخش موردنظر را انتخاب کنید.",
+                reply_markup=main_runtime.main_keyboard(),
+            )
+
+    @router.callback_query(F.data == "main:dashboard")
+    async def main_dashboard_inline(
+        callback: CallbackQuery,
+        state: FSMContext,
+    ):
+        await state.clear()
+
+        try:
+            data = await main_runtime._customer_dashboard_data(
+                callback.from_user.id
+            )
+        except Exception as exc:
+            await callback.answer(
+                str(exc),
+                show_alert=True,
+            )
+            return
+
+        await callback.answer()
+
+        if callback.message is not None:
+            await callback.message.edit_text(
+                main_runtime._dashboard_text(data),
+                reply_markup=_with_home(
+                    main_runtime._dashboard_keyboard(data)
+                ),
+            )
+
+    @router.callback_query(F.data == "main:account")
+    async def main_account_inline(
+        callback: CallbackQuery,
+        state: FSMContext,
+    ):
+        await state.clear()
+
+        try:
+            result = await main_runtime.status(
+                callback.from_user.id
+            )
+            user = result.get("user") or {}
+        except Exception as exc:
+            await callback.answer(
+                str(exc),
+                show_alert=True,
+            )
+            return
+
+        await callback.answer()
+
+        if callback.message is not None:
+            await callback.message.edit_text(
+                "<b>👤 حساب من</b>\n\n"
+                f"نام: {escape(str(user.get('full_name') or '-'))}\n"
+                f"ایمیل: {escape(str(user.get('email') or '-'))}",
+                reply_markup=_home_keyboard(),
+            )
+
+    @router.callback_query(F.data == "main:connect-account")
+    async def main_connect_account_inline(
+        callback: CallbackQuery,
+        state: FSMContext,
+    ):
+        await state.clear()
+        await state.set_state(main_runtime.LinkState.email)
+        await callback.answer()
+
+        if callback.message is not None:
+            await callback.message.edit_text(
+                "ایمیل حساب Twin Panel را وارد کنید."
+            )
 
     @router.callback_query(F.data == CANCEL_CALLBACK)
     async def account_link_cancel_inline(
@@ -101,14 +260,7 @@ def install_account_link_feature(
         await callback.answer()
 
         if callback.message is not None:
-            try:
-                await callback.message.edit_reply_markup(
-                    reply_markup=None,
-                )
-            except Exception:
-                pass
-
-            await callback.message.answer(
+            await callback.message.edit_text(
                 "عملیات لغو شد.",
                 reply_markup=main_runtime.main_keyboard(),
             )
@@ -118,19 +270,35 @@ def install_account_link_feature(
         message: Message,
         state: FSMContext,
     ):
-        # Compatibility for stale reply keyboards left on Telegram clients by
-        # older releases. New account-link prompts use an inline cancel button.
+        # Compatibility for stale reply keyboards from older releases.
         await state.clear()
         await message.answer(
             "عملیات لغو شد.",
             reply_markup=main_runtime.main_keyboard(),
         )
 
+    @router.callback_query(F.data == ACCOUNT_LINK_CALLBACK)
+    async def account_link_start_inline(
+        callback: CallbackQuery,
+        state: FSMContext,
+    ):
+        await state.clear()
+        await state.set_state(AccountLinkState.username)
+        await callback.answer()
+
+        if callback.message is not None:
+            await callback.message.edit_text(
+                "🔗 <b>دریافت لینک اکانت</b>\n\n"
+                "نام کاربری VPN اکانت خود را وارد کنید.",
+                reply_markup=_cancel_keyboard(),
+            )
+
     @router.message(F.text == ACCOUNT_LINK_BUTTON)
     async def account_link_start(
         message: Message,
         state: FSMContext,
     ):
+        # Compatibility for stale reply keyboards from older releases.
         await state.clear()
         await state.set_state(AccountLinkState.username)
         await message.answer(
