@@ -26,8 +26,8 @@ def test_live_status_polling_is_single_flight_and_throttled() -> None:
     assert 'document.visibilityState==="hidden"' in text
     assert "signal:controller.signal" in text
     assert "controller?.abort();" in text
-    assert "15000" in text
-    assert "5000" not in text
+    assert "window.setInterval(()=>{void refresh();},15000)" in text
+    assert "window.setInterval(refresh,5000)" not in text
 
 
 if __name__ == "__main__":
