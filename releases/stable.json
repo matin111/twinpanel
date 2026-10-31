@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.410",
+  "version": "1.1.0-rc.411",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-31T04:26:38Z",
+  "released_at": "2026-10-31T04:40:57Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e854e052bb759f2604efe73286f9867d10cbe64c",
+  "source_sha": "c8e3a61e39993c906c2bb628193699374bcfc54d",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.410/twinpanel-1.1.0-rc.410-linux-x86_64.tar.gz",
-    "sha256": "2cf11449b033eb1435260e6fa0d02657455cd9d4a788ff8400b254075dc31fd4",
-    "size_bytes": 28760193
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.411/twinpanel-1.1.0-rc.411-linux-x86_64.tar.gz",
+    "sha256": "9efb4568d2ca160e9f3886f579c1933e96125f3d3505997b9357ea7c722640cc",
+    "size_bytes": 28765462
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.410 خطای Import بکاپ Eylan در ستون NOT NULL مربوط به migration_import_records.preserved_payload_encrypted را اصلاح می‌کند. رکورد Migration ایلان اکنون metadata حداقلی لازم برای audit/idempotency را به‌صورت رمزنگاری‌شده ذخیره می‌کند و دیگر مقدار NULL نمی‌فرستد. Credential، UUID و کانفیگ پروتکل‌های قدیمی Eylan همچنان منتقل نمی‌شوند؛ UUID جدید TwinPanel و Batch provisioning فعلی بدون تغییر باقی مانده‌اند. اصلاح data_limit اعشاری rc.409 نیز حفظ شده است. منطق TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane تغییر نکرده است. Source روی SHA immutable e854e052bb759f2604efe73286f9867d10cbe64c قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.410 fixes the Eylan backup import NOT NULL failure for migration_import_records.preserved_payload_encrypted. Eylan migration markers now store the minimal audit/idempotency metadata in encrypted form instead of writing NULL. Legacy Eylan protocol credentials, UUIDs and configs are still not preserved; fresh TwinPanel UUID generation and the existing batch provisioning flow remain unchanged. The decimal data_limit fix from rc.409 is retained. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane logic is unchanged. The source is pinned to immutable SHA e854e052bb759f2604efe73286f9867d10cbe64c."
+    "fa": "TwinPanel 1.1.0-rc.411 قابلیت «🔗 دریافت لینک اکانت» را به ربات اصلی کاربر اضافه می‌کند. کاربر نام کاربری VPN اکانت خود را وارد می‌کند و ربات فقط داخل اشتراک‌های همان کاربرِ متصل به تلگرام جست‌وجو می‌کند و لینک رسمی اتصال را از endpoint موجود connection-info تحویل می‌دهد؛ lookup سراسری بر اساس account_username وجود ندارد و حدس نام کاربری کاربر دیگر لینک او را افشا نمی‌کند. رفتار ربات نماینده بدون تغییر باقی مانده است. منطق TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane تغییر نکرده است. Source روی SHA immutable c8e3a61e39993c906c2bb628193699374bcfc54d قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.411 adds the 'Get account link' flow to the main customer Telegram bot. The user enters their VPN account username; the bot searches only within that Telegram-linked customer's own subscriptions and returns the official connection link from the existing connection-info endpoint. There is no global account_username lookup, so guessing another customer's username cannot expose their link. Reseller bot behavior is unchanged. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane logic is unchanged. The source is pinned to immutable SHA c8e3a61e39993c906c2bb628193699374bcfc54d."
   }
 }
