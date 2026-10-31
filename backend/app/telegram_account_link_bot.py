@@ -12,6 +12,7 @@ CANCEL_BUTTON = "❌ لغو"
 
 class AccountLinkState(StatesGroup):
     username = State()
+    password = State()
 
 
 def _cancel_keyboard():
@@ -65,60 +66,15 @@ def install_account_link_feature(
     request_fn,
     session_fn,
 ):
-    """Attach the owned-account sublink flow to the main customer bot.
+    """Attach secure VPN-account link recovery to the customer bot.
 
-    Ownership is enforced by using only customer-token-scoped endpoints:
-    /v1/subscriptions/me -> per-subscription /manage -> /connection-info.
-    There is intentionally no global account_username database lookup.
+    A VPN account username is not an ownership secret. The bot therefore asks
+    for the account password and calls a bot-secret-protected internal endpoint
+    which validates both values before returning only that account's public
+    subscription link. No subscription ownership or provisioning is changed.
     """
 
     main_runtime = _install_main_keyboard_button()
-
-    async def user_token(telegram_id):
-        result = await session_fn(telegram_id)
-        return result["access_token"]
-
-    async def find_owned_subscription(
-        telegram_id,
-        username,
-    ):
-        token = await user_token(telegram_id)
-        rows = await request_fn(
-            "GET",
-            "/v1/subscriptions/me",
-            token=token,
-        )
-
-        rows = rows if isinstance(rows, list) else []
-        wanted = str(username or "").strip().casefold()
-
-        for row in rows:
-            try:
-                sub_id = int(row.get("id"))
-            except Exception:
-                continue
-
-            try:
-                manage = await request_fn(
-                    "GET",
-                    (
-                        "/v1/customer/subscriptions/"
-                        f"{sub_id}/manage"
-                    ),
-                    token=token,
-                )
-            except Exception:
-                continue
-
-            account_username = str(
-                manage.get("account_username")
-                or ""
-            ).strip()
-
-            if account_username.casefold() == wanted:
-                return token, sub_id, account_username
-
-        return token, None, ""
 
     @router.message(F.text == ACCOUNT_LINK_BUTTON)
     async def account_link_start(
@@ -155,33 +111,70 @@ def install_account_link_feature(
             )
             return
 
+        await state.update_data(
+            account_link_username=username,
+        )
+        await state.set_state(AccountLinkState.password)
+        await message.answer(
+            "🔐 رمز عبور VPN همین اکانت را وارد کنید.",
+            reply_markup=_cancel_keyboard(),
+        )
+
+    @router.message(AccountLinkState.password)
+    async def account_link_password(
+        message: Message,
+        state: FSMContext,
+    ):
+        password = str(message.text or "")
+
+        if password.strip() == CANCEL_BUTTON:
+            await state.clear()
+            await message.answer(
+                "عملیات لغو شد.",
+                reply_markup=main_runtime.main_keyboard(),
+            )
+            return
+
+        if not password or len(password) > 512:
+            await message.answer(
+                "❌ رمز عبور معتبر وارد کنید یا «❌ لغو» را بزنید.",
+                reply_markup=_cancel_keyboard(),
+            )
+            return
+
+        data = await state.get_data()
+        username = str(
+            data.get("account_link_username")
+            or ""
+        ).strip()
+
+        if not username:
+            await state.clear()
+            await state.set_state(AccountLinkState.username)
+            await message.answer(
+                "نام کاربری اکانت را دوباره وارد کنید.",
+                reply_markup=_cancel_keyboard(),
+            )
+            return
+
         try:
-            token, sub_id, account_username = (
-                await find_owned_subscription(
-                    message.from_user.id,
-                    username,
-                )
+            result = await request_fn(
+                "POST",
+                "/v1/telegram/account-link/resolve",
+                payload={
+                    "telegram_id": message.from_user.id,
+                    "username": username,
+                    "password": password,
+                },
+                bot_auth=True,
             )
 
-            if not sub_id:
-                await message.answer(
-                    "❌ اکانتی با این نام کاربری در اشتراک‌های شما پیدا نشد.\n\n"
-                    "نام کاربری را دوباره وارد کنید.",
-                    reply_markup=_cancel_keyboard(),
-                )
-                return
-
-            info = await request_fn(
-                "GET",
-                (
-                    "/v1/customer/subscriptions/"
-                    f"{sub_id}/connection-info"
-                ),
-                token=token,
-            )
-
+            account_username = str(
+                result.get("account_username")
+                or username
+            ).strip()
             link = str(
-                info.get("subscription_link")
+                result.get("subscription_link")
                 or ""
             ).strip()
 
@@ -191,8 +184,11 @@ def install_account_link_feature(
                 )
 
         except Exception as exc:
+            await state.clear()
+            await state.set_state(AccountLinkState.username)
             await message.answer(
-                "❌ " + escape(str(exc)),
+                "❌ " + escape(str(exc)) + "\n\n"
+                "نام کاربری را دوباره وارد کنید.",
                 reply_markup=_cancel_keyboard(),
             )
             return
