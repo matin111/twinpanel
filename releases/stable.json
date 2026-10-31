@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.431",
+  "version": "1.1.0-rc.433",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-31T22:44:59Z",
+  "released_at": "2026-10-31T23:22:26Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "8f7361b9dceabef5804bd6b1309231e032f74e11",
+  "source_sha": "e496442962bce84a16caf85cf377e97650027c5a",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.431/twinpanel-1.1.0-rc.431-linux-x86_64.tar.gz",
-    "sha256": "834e1ae448430613952969bded85fd8962c5495b15990da967cde33337c21de9",
-    "size_bytes": 25135004
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.433/twinpanel-1.1.0-rc.433-linux-x86_64.tar.gz",
+    "sha256": "491ff8f7b9572428f2cde3f01e1c7ac13632be3d7e2fdcd440d3342f3b2afd13",
+    "size_bytes": 25137304
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.431 چیدمان منوی اصلی ربات تلگرام را اصلاح می‌کند: دکمه خرید اشتراک به‌صورت تمام‌عرض به بالای منو منتقل شده و با استایل قرمز/danger نمایش داده می‌شود؛ دکمه دریافت لینک اکانت نیز به جای قبلی خرید اشتراک کنار کیف پول منتقل شده است. فلو درخواست نمایندگی، پشتیبانی، داشبورد، حساب، خرید و سایر مسیرها دست‌نخورده مانده‌اند. هیچ تغییری در TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall یا protocol dataplaneها انجام نشده است. Source روی SHA immutable 8f7361b9dceabef5804bd6b1309231e032f74e11 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.431 refines the main Telegram bot menu layout: the subscription purchase action is moved to the top full-width slot and rendered with danger/red styling, while account-link recovery is moved into the former purchase slot beside the wallet. Reseller request, support, dashboard, account, purchase and other existing flows remain unchanged. No TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall or protocol dataplane changes are included. Source is pinned to immutable SHA 8f7361b9dceabef5804bd6b1309231e032f74e11."
+    "fa": "TwinPanel 1.1.0-rc.433 نسخه معتبر اصلاح ساخت اشتراک ادمین/نماینده و V2Ray/Xray است. Provisioning همچنان fail-closed است اما زمان‌دار شده: OpenVPN حداکثر 60 ثانیه، V2Ray حداکثر 30 ثانیه، سایر پروتکل‌ها به‌طور پیش‌فرض 45 ثانیه، کل چرخه حداکثر 120 ثانیه و quota sync حداکثر 20 ثانیه. در Xray/V2Ray، drift تاریخی که یک email را با UUIDهای متفاوت بین inboundهای VLESS باقی گذاشته بود هنگام bootstrap normalize می‌شود و sync نهایی همان identity را با یک UUID واحد روی همه inboundها بازسازی می‌کند؛ بنابراین Repair اشتراک‌های قدیمی دیگر قبل از sync با خطای Xray duplicate email conflict متوقف نمی‌شود. اگر هر پروتکل ناقص بماند اشتراک موفق اعلام نمی‌شود و مسیر نماینده نیز همان postcondition را اعمال می‌کند. rc.433 جایگزین rc.432 در این اصلاح است. صف Publisher قدیمی پاک شده و این Candidate همان Source immutable را بدون تغییر کد دوباره منتشر می‌کند. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall و protocol dataplaneها بازنویسی نشده‌اند. Source روی SHA immutable e496442962bce84a16caf85cf377e97650027c5a قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.433 is the canonical release for the admin/reseller subscription provisioning and V2Ray/Xray repair. Provisioning remains fail-closed but bounded: OpenVPN 60s, V2Ray 30s, other protocols 45s by default, 120s total lifecycle, and 20s quota sync. For Xray/V2Ray, historical drift which left one email mapped to different UUIDs across VLESS inbounds is normalized during bootstrap, then the authoritative sync rebuilds the identity with one UUID across all inbounds; Repair no longer stops before sync with Xray duplicate email conflict. Incomplete protocol credentials/configs are never reported as successful, and reseller creation enforces the same postcondition. rc.433 supersedes rc.432 for this fix. The stale publisher queue has been cleared and this candidate republishes the same immutable source without runtime changes. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall and protocol dataplanes are not rewritten. Source is pinned to immutable SHA e496442962bce84a16caf85cf377e97650027c5a."
   }
 }
