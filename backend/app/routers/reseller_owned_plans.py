@@ -98,11 +98,12 @@ def _validate_protocols(row: ResellerBotPlan) -> None:
 
 
 def _plan_has_history(db: Session, row: ResellerBotPlan) -> bool:
+    backing_plan_id = int(row.backing_plan_id)
     order_exists = (
         db.query(ResellerBotOrder.id)
         .filter(
             ResellerBotOrder.reseller_id == int(row.reseller_id),
-            ResellerBotOrder.plan_id == int(row.backing_plan_id),
+            ResellerBotOrder.plan_id == backing_plan_id,
         )
         .first()
         is not None
@@ -118,7 +119,7 @@ def _plan_has_history(db: Session, row: ResellerBotPlan) -> bool:
         )
         .filter(
             ResellerSubscription.reseller_id == int(row.reseller_id),
-            Subscription.plan_id == int(row.backing_plan_id),
+            Subscription.plan_id == backing_plan_id,
         )
         .first()
         is not None
@@ -131,7 +132,9 @@ def _requested_protocols(db: Session, subscription_id: int) -> list[str]:
         str(row[0]).strip().lower()
         for row in (
             db.query(SubscriptionProtocol.protocol)
-            .filter(SubscriptionProtocol.subscription_id == int(subscription_id))
+            .filter(
+                SubscriptionProtocol.subscription_id == int(subscription_id)
+            )
             .order_by(SubscriptionProtocol.id.asc())
             .all()
         )
@@ -139,14 +142,11 @@ def _requested_protocols(db: Session, subscription_id: int) -> list[str]:
     ]
 
 
-def _missing_credentials(
+def _missing_provisioned_protocols(
     db: Session,
     subscription_id: int,
     protocols: list[str],
 ) -> list[str]:
-    if not protocols:
-        return []
-
     rows = (
         db.query(ProtocolCredential)
         .filter(
@@ -164,7 +164,7 @@ def _missing_credentials(
     return [protocol for protocol in protocols if protocol not in ready]
 
 
-def _fail_incomplete_subscription(
+def _fail_created_subscription(
     db: Session,
     subscription_id: int,
     *,
@@ -183,8 +183,8 @@ def _fail_incomplete_subscription(
             reason=reason,
         )
     except Exception:
-        # The subscription must still become non-active even if cleanup queueing
-        # has a transient failure. A later reconcile can finish physical cleanup.
+        # Creation must still be non-active if cleanup queueing has its own
+        # transient failure. Reconcile/retry can safely repair it later.
         pass
     db.commit()
 
@@ -193,18 +193,12 @@ async def _complete_reseller_provisioning(
     db: Session,
     result: dict,
 ) -> dict:
-    """Do not acknowledge a reseller sale until real configs exist.
-
-    Reseller UI creation used to commit the subscription first and perform
-    ``provision-account`` as a separate browser request. Closing/reloading the
-    page or a late Xray failure could therefore leave an ACTIVE DB-only account.
-    Keep the existing idempotent sale records, but make the backend creation
-    endpoint own provisioning and the same postconditions as admin creation.
-    """
-
     subscription_id = int(result.get("subscription_id") or 0)
     if subscription_id <= 0:
-        raise HTTPException(status_code=500, detail="شناسه اشتراک ساخته‌شده معتبر نیست")
+        raise HTTPException(
+            status_code=500,
+            detail="شناسه اشتراک ساخته‌شده معتبر نیست",
+        )
 
     protocols = [
         str(value).strip().lower()
@@ -222,7 +216,7 @@ async def _complete_reseller_provisioning(
             db=db,
         )
     except HTTPException as exc:
-        _fail_incomplete_subscription(
+        _fail_created_subscription(
             db,
             subscription_id,
             reason="reseller_subscription_create_provision_failed",
@@ -237,7 +231,7 @@ async def _complete_reseller_provisioning(
         ) from exc
     except Exception as exc:
         db.rollback()
-        _fail_incomplete_subscription(
+        _fail_created_subscription(
             db,
             subscription_id,
             reason="reseller_subscription_create_provision_exception",
@@ -251,13 +245,21 @@ async def _complete_reseller_provisioning(
             },
         ) from exc
 
-    missing = _missing_credentials(db, subscription_id, protocols)
-    errors = list((provisioning or {}).get("errors") or [])
+    missing_protocols = _missing_provisioned_protocols(
+        db,
+        subscription_id,
+        protocols,
+    )
+    provision_errors = list((provisioning or {}).get("errors") or [])
     quota_ok = bool(((provisioning or {}).get("quota") or {}).get("ok", True))
-    provisioning_ok = bool((provisioning or {}).get("ok", False))
 
-    if missing or errors or not quota_ok or not provisioning_ok:
-        _fail_incomplete_subscription(
+    if (
+        missing_protocols
+        or provision_errors
+        or not quota_ok
+        or not (provisioning or {}).get("ok", False)
+    ):
+        _fail_created_subscription(
             db,
             subscription_id,
             reason="reseller_subscription_create_postcondition_failed",
@@ -267,20 +269,14 @@ async def _complete_reseller_provisioning(
             detail={
                 "message": "ساخت اشتراک نماینده کامل نشد؛ بعضی کانفیگ‌ها ساخته نشدند",
                 "subscription_id": subscription_id,
-                "missing_protocols": missing,
-                "provision_errors": errors,
+                "missing_protocols": missing_protocols,
+                "provision_errors": provision_errors,
                 "quota_ok": quota_ok,
             },
         )
 
-    result["ok"] = True
     result["provisioning_complete"] = True
-    result["provisioning"] = provisioning
     return result
-
-
-def plan_out_guarded(row: ResellerBotPlan) -> dict:
-    return plan_out(row)
 
 
 @router.get("/owned-plans")
@@ -291,14 +287,16 @@ def list_owned_plans(
 ):
     rows = (
         db.query(ResellerBotPlan)
-        .filter(ResellerBotPlan.reseller_id == reseller.id)
+        .filter(
+            ResellerBotPlan.reseller_id == reseller.id,
+        )
         .order_by(
             ResellerBotPlan.sort_order.asc(),
             ResellerBotPlan.id.asc(),
         )
         .all()
     )
-    return [plan_out_guarded(row) for row in rows]
+    return [plan_out(row) for row in rows]
 
 
 @router.post("/owned-plans")
@@ -326,7 +324,7 @@ def create_reseller_owned_plan(
     )
     db.commit()
     db.refresh(row)
-    return plan_out_guarded(row)
+    return plan_out(row)
 
 
 @router.patch("/owned-plans/{plan_id}")
@@ -345,7 +343,10 @@ def update_reseller_owned_plan(
         lock=True,
     )
     if not row:
-        raise HTTPException(status_code=404, detail="پلن نماینده پیدا نشد")
+        raise HTTPException(
+            status_code=404,
+            detail="پلن نماینده پیدا نشد",
+        )
 
     values = payload.model_dump(exclude_unset=True)
     if "title" in values:
@@ -376,9 +377,10 @@ def update_reseller_owned_plan(
     sync_owned_plan_backing(db, row)
     db.commit()
     db.refresh(row)
-    return plan_out_guarded(row)
+    return plan_out(row)
 
 
+# Legacy DELETE keeps its historical soft-disable semantics for compatibility.
 @router.delete("/plans/{plan_id}")
 def disable_reseller_owned_plan(
     plan_id: int,
@@ -401,6 +403,9 @@ def disable_reseller_owned_plan(
     return {"ok": True, "plan_id": int(row.id), "is_active": False}
 
 
+# The explicit owned-plans endpoint is the reseller UI's real delete action.
+# A plan that already has order/subscription history is intentionally protected;
+# the reseller can still deactivate it without damaging historical records.
 @router.delete("/owned-plans/{plan_id}")
 def delete_reseller_owned_plan(
     plan_id: int,
@@ -446,7 +451,10 @@ async def create_reseller_subscription(
         active_only=True,
     )
     if not row:
-        raise HTTPException(status_code=404, detail="پلن فعال نماینده پیدا نشد")
+        raise HTTPException(
+            status_code=404,
+            detail="پلن فعال نماینده پیدا نشد",
+        )
 
     result = create_subscription_from_owned_plan(
         db,
@@ -459,7 +467,10 @@ async def create_reseller_subscription(
         password=payload.password,
         sell_price_toman=0,
     )
-    return await _complete_reseller_provisioning(db, result)
+    return await _complete_reseller_provisioning(
+        db,
+        result,
+    )
 
 
 @router.post("/subscriptions/manual-create")
@@ -479,8 +490,14 @@ async def create_reseller_manual_subscription(
         username=payload.username,
         password=payload.password,
     )
-    return await _complete_reseller_provisioning(db, result)
+    return await _complete_reseller_provisioning(
+        db,
+        result,
+    )
 
 
+# The guard router is prefix-less by design. Mounting it through this router
+# applies /v1/reseller exactly once and keeps guard routes ahead of the legacy
+# volume/portal routers registered later in app.main.
 from .reseller_pool_guard_v3 import router as reseller_pool_guard_v3_router
 router.include_router(reseller_pool_guard_v3_router)
