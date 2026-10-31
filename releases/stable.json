@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.425",
+  "version": "1.1.0-rc.426",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-31T21:06:48Z",
+  "released_at": "2026-10-31T21:27:10Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "5cfb7c522af842a8dfea022ece8b1bf98cb08633",
+  "source_sha": "014d0d21bee624e6d1c51389d1aa602408a18cfc",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.425/twinpanel-1.1.0-rc.425-linux-x86_64.tar.gz",
-    "sha256": "bbe5491de4ed2b7eed99a3344dbb3f2e6ecb2842de076ed8786732852017b75d",
-    "size_bytes": 25129293
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.426/twinpanel-1.1.0-rc.426-linux-x86_64.tar.gz",
+    "sha256": "709989d35844ab72cd5dfaf41aabc175cea7863bebbc2d2c94007cfb929d57f9",
+    "size_bytes": 25130426
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.425 حذف کامل MasterDnsVPN بازنشسته‌شده را نهایی می‌کند. residueهای باقی‌مانده از release pipeline، workflowهای CI اختصاصی، backend router/model/artifact/Port53 hook و UI ادمین حذف شده‌اند. TP27، Spoof، DNSTT، NetMod UDPGW، provisioning، credentials، accounting/quota، routing/firewall و سایر protocol dataplaneها تغییر نکرده‌اند. Source روی SHA immutable 5cfb7c522af842a8dfea022ece8b1bf98cb08633 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.425 completes retirement of the removed MasterDnsVPN feature. Remaining residue has been removed from the release pipeline, dedicated CI workflows, backend router/model/artifact/Port53 hook, and admin UI. TP27, Spoof, DNSTT, NetMod UDPGW, provisioning, credentials, accounting/quota, routing/firewall, and other protocol dataplanes are unchanged. Source is pinned to immutable SHA 5cfb7c522af842a8dfea022ece8b1bf98cb08633."
+    "fa": "TwinPanel 1.1.0-rc.426 Provisioning واقعی V2Ray/Xray را به Runtime مدرن موجود متصل می‌کند. Root Cause این بود که Xray modern runtime در سورس وجود داشت اما هنگام startup فعال نمی‌شد و ساخت اشتراک به مسیر Legacy می‌افتاد؛ در نتیجه V2Ray بدون credential/config می‌ماند و postcondition fail-closed می‌توانست کل اشتراک را suspend کند. این نسخه apply_xray_modern_runtime() را قبل از مسیرهای ساخت/Repair فعال می‌کند. Audit مسیرهای ساخت اکانت نیز تأیید کرده که ساخت از پنل ادمین، Store/پنل کاربری و Payment Fulfillment، و فروش/ربات نمایندگی همگی به Account Delivery مرکزی می‌رسند و V2Ray را از همان Runtime مدرن resolve می‌کنند. تست‌های Modern Protocol Runtime، API Build، Payment Fast Path، Telegram isolation و تمام Smokeهای Release سبز هستند. هیچ تغییری در TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall انجام نشده است. Source روی SHA immutable 014d0d21bee624e6d1c51389d1aa602408a18cfc قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.426 connects real V2Ray/Xray provisioning to the existing modern runtime. The root cause was that the modern Xray runtime existed in source but was never activated during application startup, so fresh subscription creation fell back to the legacy path; V2Ray could remain without an active credential/config and the existing fail-closed postcondition could suspend the whole subscription. This release calls apply_xray_modern_runtime() before create/repair flows can provision accounts. A cross-path audit also confirms that admin creation, Store/customer-panel and payment fulfillment, plus reseller sales/bot fulfillment all converge on central Account Delivery and resolve V2Ray through the same modern runtime. Modern Protocol Runtime, API Build, Payment Fast Path, Telegram isolation and all release smoke checks are green. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall are unchanged. Source is pinned to immutable SHA 014d0d21bee624e6d1c51389d1aa602408a18cfc."
   }
 }
