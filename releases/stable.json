@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.408",
+  "version": "1.1.0-rc.409",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-31T03:42:55Z",
+  "released_at": "2026-10-31T04:06:54Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "606acb79c5bb7fcca9e081fb5308867451025581",
+  "source_sha": "89aac7cd05b3167720787b37a73dc41927601f1b",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.408/twinpanel-1.1.0-rc.408-linux-x86_64.tar.gz",
-    "sha256": "70af1c6180b561e797773c67941bbdd904b886cff124670de1e8255d98c4f354",
-    "size_bytes": 28757855
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.409/twinpanel-1.1.0-rc.409-linux-x86_64.tar.gz",
+    "sha256": "f348eaae0e5e86b3e3aa3502403169bc6305962fe34a5be552dfe809e2f99de9",
+    "size_bytes": 28759414
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.408 نمایش تاریخچه انتقال‌های قبلی را از UI مرکز انتقال حذف می‌کند تا اکانت‌های منتقل‌شده بعد از Refresh دوباره داخل همان صفحه نمایش داده نشوند. نتیجه Import فقط در همان نشست مرورگر نمایش داده می‌شود و با Refresh پاک می‌شود. رکوردهای Migration در دیتابیس حذف نمی‌شوند و همچنان برای جلوگیری از Import تکراری و idempotency باقی می‌مانند؛ خود Subscriptionها نیز دست‌نخورده هستند. قابلیت Import مستقیم بکاپ Eylan از rc.407 حفظ شده است. منطق TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane تغییر نکرده است. Source روی SHA immutable 606acb79c5bb7fcca9e081fb5308867451025581 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.408 removes persistent previous-import history from the Migration Center UI so migrated accounts are not shown again on that page after refresh. Import feedback is session-only and clears on refresh. Migration markers remain in the database for duplicate protection and idempotency, and the created subscriptions are untouched. Direct Eylan backup import from rc.407 remains available. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane logic is unchanged. The source is pinned to immutable SHA 606acb79c5bb7fcca9e081fb5308867451025581."
+    "fa": "TwinPanel 1.1.0-rc.409 مشکل Preview بکاپ Eylan را برای مقادیر اعشاری data_limit اصلاح می‌کند. مقادیری مانند 50.00 GB یا 15.25 GB دیگر با خطای invalid Eylan data_limit رد نمی‌شوند و با Decimal به byte تبدیل می‌شوند. مصرف واقعی همچنان از مجموع download_bytes + upload_bytes خوانده می‌شود و رمز، تاریخ انقضا، UUID جدید TwinPanel و Batch provisioning بدون تغییر باقی مانده‌اند. این اصلاح فقط Parser مهاجرت Eylan و تست‌های آن را تغییر می‌دهد و به TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane دست نمی‌زند. Source روی SHA immutable 89aac7cd05b3167720787b37a73dc41927601f1b قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.409 fixes Eylan backup preview for decimal data_limit values. Values such as 50.00 GB or 15.25 GB are no longer rejected as invalid Eylan data_limit and are converted to bytes using Decimal-safe parsing. Actual usage remains download_bytes + upload_bytes, while password mapping, expiry, fresh TwinPanel UUID generation and batch provisioning are unchanged. This release only changes the Eylan migration parser and its tests; TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane logic is unchanged. The source is pinned to immutable SHA 89aac7cd05b3167720787b37a73dc41927601f1b."
   }
 }
