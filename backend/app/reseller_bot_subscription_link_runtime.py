@@ -78,6 +78,20 @@ def _cancel_keyboard() -> InlineKeyboardMarkup:
     )
 
 
+def _link_keyboard(subscription_link: str) -> InlineKeyboardMarkup | None:
+    if not subscription_link.startswith(("http://", "https://")):
+        return None
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[
+            InlineKeyboardButton(
+                text="🔗 باز کردن لینک",
+                url=subscription_link,
+            )
+        ]]
+    )
+
+
 def build_subscription_link_router(reseller_id: int) -> Router:
     router = Router(
         name=f"reseller-subscription-link-{reseller_id}"
@@ -183,14 +197,7 @@ def build_subscription_link_router(reseller_id: int) -> Router:
                 "✅ <b>لینک اکانت</b>\n\n"
                 f"👤 نام کاربری: <code>{escape(username)}</code>\n"
                 f"🔗 سابلینک:\n<code>{escape(subscription_link)}</code>",
-                reply_markup=InlineKeyboardMarkup(
-                    inline_keyboard=[[
-                        InlineKeyboardButton(
-                            text="🔗 باز کردن لینک",
-                            url=subscription_link,
-                        )
-                    ]]
-                ),
+                reply_markup=_link_keyboard(subscription_link),
             )
             await message.answer(
                 "منوی اصلی",
