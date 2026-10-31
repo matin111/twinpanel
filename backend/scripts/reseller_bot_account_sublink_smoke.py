@@ -23,8 +23,12 @@ assert "account_username" in feature_source
 assert "_share_url(db, sub)" in feature_source
 assert 'subscription_link.startswith(("http://", "https://"))' in feature_source
 assert "reply_markup=_link_keyboard(subscription_link)" in feature_source
+
+# Ownership must stay delegated to the existing reseller-scoped helper.
+# Do not allow this feature to introduce direct/global subscription queries.
 assert "db.query(Subscription)" not in feature_source
-assert "ResellerSubscription" not in feature_source
+assert "db.query(ResellerSubscription)" not in feature_source
+assert "from .models_reseller import ResellerSubscription" not in feature_source
 assert "rsublink:cancel" in feature_source
 
 assert "build_subscription_link_router" in runtime_source
