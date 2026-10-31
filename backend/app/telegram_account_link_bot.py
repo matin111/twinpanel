@@ -43,7 +43,7 @@ def _home_keyboard():
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="⬅️ بازگشت",
+                    text="🏠 منوی اصلی",
                     callback_data=MAIN_HOME_CALLBACK,
                     style="primary",
                 )
@@ -146,7 +146,7 @@ def _with_home(markup):
     if not has_home:
         rows.append([
             InlineKeyboardButton(
-                text="⬅️ بازگشت",
+                text="🏠 منوی اصلی",
                 callback_data=MAIN_HOME_CALLBACK,
                 style="primary",
             )
@@ -167,7 +167,6 @@ def _install_back_navigation(main_runtime):
     ):
         return
 
-    # Subscription list is rendered by the legacy main runtime.
     original_subscription_list_keyboard = (
         main_runtime.subscription_list_keyboard
     )
@@ -181,10 +180,6 @@ def _install_back_navigation(main_runtime):
         subscription_list_keyboard_with_back
     )
 
-    # The purchase, wallet, learning/download and support routers were written
-    # before the inline main menu. Their handlers resolve these module-level
-    # keyboard builders at callback time, so wrapping only the root builders
-    # keeps business/payment flows untouched while restoring navigation.
     from . import telegram_purchase_bot as purchase_runtime
     from . import telegram_wallet_bot as wallet_runtime
     from . import telegram_learning_center as learning_runtime
@@ -237,8 +232,6 @@ def _install_back_navigation(main_runtime):
 
 
 def _install_main_keyboard_button():
-    # Imported only after telegram_runtime_bot has finished loading.
-    # create_purchase_router() is called from runtime main() before polling.
     from . import telegram_runtime_bot as main_runtime
 
     if getattr(
@@ -249,9 +242,6 @@ def _install_main_keyboard_button():
         _install_back_navigation(main_runtime)
         return main_runtime
 
-    # Keep legacy text handlers for old Telegram reply keyboards, but all newly
-    # rendered primary navigation is inline. Patching here avoids rewriting the
-    # large runtime module while preserving every existing business flow.
     main_runtime.main_keyboard = _main_menu_keyboard
     main_runtime.connect_keyboard = _connect_keyboard
     _install_back_navigation(main_runtime)
@@ -274,9 +264,6 @@ def install_account_link_feature(
         message: Message,
         state: FSMContext,
     ):
-        # Telegram clients can retain a persistent ReplyKeyboard from an older
-        # release. Send an invisible cleanup marker, remove it immediately, and
-        # only then render the existing /start flow with the inline main menu.
         cleanup = await message.answer(
             "\u2063",
             reply_markup=ReplyKeyboardRemove(),
@@ -397,7 +384,6 @@ def install_account_link_feature(
         message: Message,
         state: FSMContext,
     ):
-        # Compatibility for stale reply keyboards from older releases.
         await state.clear()
         await message.answer(
             "عملیات لغو شد.",
@@ -425,7 +411,6 @@ def install_account_link_feature(
         message: Message,
         state: FSMContext,
     ):
-        # Compatibility for stale reply keyboards from older releases.
         await state.clear()
         await state.set_state(AccountLinkState.username)
         await message.answer(
