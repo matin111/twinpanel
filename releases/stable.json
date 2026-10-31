@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.416",
+  "version": "1.1.0-rc.417",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-31T17:54:34Z",
+  "released_at": "2026-10-31T18:21:27Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "18a8df3b5e9798562517420807640688968b2775",
+  "source_sha": "7d82939477ec75d7b12e00e6c03e7ae89420f239",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.416/twinpanel-1.1.0-rc.416-linux-x86_64.tar.gz",
-    "sha256": "9f7110c5e344090cb1b5c6b440e76cedeb12c4f7f78826324ad37e8f570478a7",
-    "size_bytes": 28772931
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.417/twinpanel-1.1.0-rc.417-linux-x86_64.tar.gz",
+    "sha256": "777f898fc12c61a1a1e46b8f5a71c6d0d1cd9421a9b4c5c58a673e335409f32c",
+    "size_bytes": 28778586
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.416 بازیابی لینک اکانت‌های مهاجرتی Telegram را اصلاح می‌کند. در مسیر «دریافت لینک اکانت»، اکانت‌های مهاجرتی سنایی/مرزبان/پاسارگاد فقط با نام کاربری حفظ‌شده پیدا می‌شوند و دیگر به رمز VPN وابسته نیستند. مسیر «اکانت‌های من» بدون تغییر باقی مانده است. Resolver جدید فقط اشتراک‌هایی را می‌پذیرد که MigrationImportRecord با وضعیت imported داشته باشند، اشتراک فعال و منقضی‌نشده باشد و username تکراری به‌صورت fail-closed رد می‌شود. endpoint قدیمی username+password برای سازگاری عقب‌رو حفظ شده است. منطق migration data، provisioning، credential generation، TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall/protocol dataplane تغییر نکرده است. Source روی SHA immutable 18a8df3b5e9798562517420807640688968b2775 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.416 fixes Telegram subscription-link recovery for migrated accounts. The main 'Get account link' flow now resolves Sanaei/Marzban/Pasargad migrated accounts using only their preserved username, without requiring a VPN password. The existing My Accounts flow is unchanged. The new resolver only accepts subscriptions backed by an imported MigrationImportRecord, requires the subscription to be active and non-expired, and fails closed on duplicate usernames. The legacy username+password resolver remains available for backward compatibility. Migration data, provisioning, credential generation, TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall/protocol dataplane logic is unchanged. Source is pinned to immutable SHA 18a8df3b5e9798562517420807640688968b2775."
+    "fa": "TwinPanel 1.1.0-rc.417 فشار صفحه اشتراک‌های ادمین را کاهش می‌دهد. live-status دیگر هر ۵ ثانیه بدون کنترل اجرا نمی‌شود؛ polling به ۱۵ ثانیه افزایش یافته، درخواست هم‌زمان تکراری جلوگیری می‌شود، هنگام hidden بودن صفحه polling متوقف می‌شود و درخواست در unmount لغو می‌گردد. مسیر /v1/subscriptions/admin-list-v2 نیز به‌جای lookupهای تکراری برای هر اشتراک، context کاربر/پلن/override/node/protocol را به‌صورت bulk بارگذاری می‌کند تا N+1 روی دیتاست‌های بزرگ حذف شود. تست‌های CI مرتبط با polling، freeze و bulk-list نیز به قرارداد جدید به‌روزرسانی شده‌اند. منطق TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane تغییر نکرده است. Source روی SHA immutable 7d82939477ec75d7b12e00e6c03e7ae89420f239 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.417 reduces load on the admin subscriptions page. live-status polling is no longer an uncontrolled 5-second loop; it now runs every 15 seconds, prevents overlapping requests, pauses while the page is hidden, and aborts on unmount. The /v1/subscriptions/admin-list-v2 path now bulk-loads user/plan/override/node/protocol context instead of performing repeated per-subscription lookups, eliminating the major N+1 pattern on large datasets. Related CI coverage for polling, page freeze, and bulk-list behavior was updated to lock the new contract. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane logic is unchanged. Source is pinned to immutable SHA 7d82939477ec75d7b12e00e6c03e7ae89420f239."
   }
 }
