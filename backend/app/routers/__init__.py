@@ -72,6 +72,7 @@ from .outbound_performance_v265 import router as _outbound_performance_v265_rout
 from .outbound_performance_v268_guard import router as _outbound_performance_v268_guard_router
 from .outbound_performance_v268 import router as _outbound_performance_v268_router
 from .telegram_account_link_lookup import router as _telegram_account_link_lookup_router
+from .subscription_create_fast_v1 import router as _subscription_create_fast_v1_router
 
 # TWINPANEL_MASTERDNSVPN_PORT53_V221
 # rc.220 over-classified wildcard UDP/53 listeners as fatal and could not
@@ -108,6 +109,7 @@ from .manual_authority_v193 import router as _manual_authority_v193_router
 # Old installations may retain empty Modern ProtocolCredential placeholders
 # created before Modern drivers owned their identity. Reconcile only missing or
 # fully empty selected Modern credentials; partial identities fail closed.
+_runtime_endpoints.router.include_router(_subscription_create_fast_v1_router)
 _runtime_endpoints.router.include_router(_telegram_account_link_lookup_router)
 _runtime_endpoints.router.include_router(_subscription_hard_delete_v1_router)
 _runtime_endpoints.router.include_router(_modern_enforcement_runtime_v1_router)
@@ -142,8 +144,3 @@ _runtime_endpoints.router.include_router(_netmod_dns_router)
 # Additive performance lab: client-side resolver profile bundle plus rollback-
 # safe DNSTT MTU tuning. It never fabricates resolver ranking from the Exit.
 _runtime_endpoints.router.include_router(_netmod_dns_performance_v226_router)
-
-# TWINPANEL_SUBSCRIPTION_CREATE_FAST_V1
-# Keep admin create HTTP latency independent from remote SSH/runtime provisioning
-# while preserving the canonical provision-account endpoint for manual repair.
-from . import subscription_create_fast_v1 as _subscription_create_fast_v1  # noqa: F401
