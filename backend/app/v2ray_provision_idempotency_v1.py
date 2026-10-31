@@ -5,7 +5,6 @@ import uuid
 from typing import Any
 
 from .models import ProtocolCredential, Subscription
-from .routers import modern_account_delivery_v1
 
 
 _runtime_applied = False
@@ -81,6 +80,11 @@ def install() -> None:
 
     if _runtime_applied:
         return
+
+    # app.__init__ installs compatibility hooks before main.py imports the full
+    # router graph. Load the target lazily so this module does not create an
+    # eager router import/cycle during package initialization.
+    from .routers import modern_account_delivery_v1
 
     original = modern_account_delivery_v1._provision_classic_protocol
     _original_provision_classic_protocol = original
