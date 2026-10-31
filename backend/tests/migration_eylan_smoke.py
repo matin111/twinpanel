@@ -11,6 +11,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SERVICE_PATH = ROOT / "app" / "services" / "migration_eylan.py"
 ROUTER_PATH = ROOT / "app" / "routers" / "migration_center_v2.py"
+TRANSFER_PATH = ROOT / "app" / "services" / "migration_eylan_transfer.py"
+BATCH_PATH = ROOT / "app" / "services" / "migration_v2ray_batch.py"
 UI_PATH = ROOT.parent / "components" / "migration-center-admin.tsx"
 
 
@@ -132,19 +134,24 @@ def test_naive_expiry_is_normalized_before_duration_math() -> None:
     assert days == 2
 
 
-def test_router_and_ui_keep_eylan_on_dedicated_safe_path() -> None:
+def test_large_eylan_ui_uses_staged_transfer_not_one_long_request() -> None:
     router = ROUTER_PATH.read_text(encoding="utf-8")
+    transfer = TRANSFER_PATH.read_text(encoding="utf-8")
+    batch = BATCH_PATH.read_text(encoding="utf-8")
     ui = UI_PATH.read_text(encoding="utf-8")
+
     assert '@admin_router.post("/eylan/preview")' in router
-    assert '@admin_router.post("/eylan/import")' in router
-    assert "preview_eylan_backup" in router
-    assert "traffic_used_bytes = int(record.traffic_used_bytes)" in router
-    assert "subscription_uuids[sub.id] = str(uuid.uuid4())" in router
-    assert "await provision_migrated_v2ray_batch(db, subscription_uuids)" in router
-    assert 'type Source="sanaei"|"marzban"|"pasargad"|"eylan"' in ui
+    assert '@admin_router.post("/eylan/stage")' in router
+    assert '@admin_router.post("/eylan/finalize")' in router
+    assert "EYLAN_STAGE_LIMIT = 100" in transfer
+    assert 'marker.status = "staged"' in transfer
+    assert "await provision_migrated_v2ray_batch(db, subscription_uuids)" in transfer
+    assert "Subscription.id.in_(subscription_ids)" in batch
+    assert "ProtocolCredential.subscription_id.in_(subscription_ids)" in batch
+    assert "const EYLAN_STAGE_CHUNK=50" in ui
+    assert '"/v1/admin/migration-center/eylan/stage"' in ui
+    assert '"/v1/admin/migration-center/eylan/finalize"' in ui
     assert 'accept=".tar,.tar.gz,.tgz,.zip,application/gzip,application/zip"' in ui
-    assert '"/v1/admin/migration-center/eylan/preview"' in ui
-    assert '"/v1/admin/migration-center/eylan/import"' in ui
     assert 'item.password?pick("موجود","Set")' in ui
 
 
