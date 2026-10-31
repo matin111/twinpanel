@@ -102,15 +102,15 @@ assert start_source.index("await cleanup.delete()") < start_source.index(
 assert "await session_fn(" in start_source
 assert "reply_markup=main_runtime.main_keyboard()" in start_source
 
-# Account-link must be the first, full-width row. Remaining main actions are
-# compact two-column inline rows. Every main action has an explicit Bot API
-# style so supported Telegram clients render the requested color semantics.
+# Account-link stays the first full-width row. Reseller request is also a
+# dedicated full-width action and delegates to the existing support flow.
+# Every main action has an explicit Bot API style for supported clients.
 menu_start = feature_source.index("def _main_menu_keyboard():")
 menu_end = feature_source.index("def _connect_keyboard():")
 menu_source = feature_source[menu_start:menu_end]
 assert menu_source.index("text=ACCOUNT_LINK_BUTTON") < menu_source.index('text="🏠 داشبورد"')
-assert menu_source.count("InlineKeyboardButton(") == 9
-assert menu_source.count('style="success"') == 2
+assert menu_source.count("InlineKeyboardButton(") == 10
+assert menu_source.count('style="success"') == 3
 assert menu_source.count('style="primary"') == 6
 assert menu_source.count('style="danger"') == 1
 assert 'text="🏠 داشبورد"' in menu_source
@@ -119,6 +119,7 @@ assert 'text="🛒 خرید اشتراک"' in menu_source
 assert 'text="💰 کیف پول"' in menu_source
 assert 'text="📚 آموزش"' in menu_source
 assert 'text="⬇️ دانلود برنامه"' in menu_source
+assert 'text="🤝 درخواست نمایندگی"' in menu_source
 assert 'text="🎫 پشتیبانی"' in menu_source
 assert 'text="👤 حساب من"' in menu_source
 
