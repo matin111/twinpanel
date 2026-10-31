@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.422",
+  "version": "1.1.0-rc.423",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-31T19:36:16Z",
+  "released_at": "2026-10-31T20:05:54Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "2a4410d79eb90f3a75a70b05a6f127882c6806c8",
+  "source_sha": "6c24e580adf205a9420fb007cafaecd8a99957f6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.422/twinpanel-1.1.0-rc.422-linux-x86_64.tar.gz",
-    "sha256": "c42466526654daf9223a792e58a0ae40d81600c44dfd1eee38d8afe59e341019",
-    "size_bytes": 28787322
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.423/twinpanel-1.1.0-rc.423-linux-x86_64.tar.gz",
+    "sha256": "37524e4a7ebf093cbee3cc28a4333a24f1758b23e1cba643a9792318969152c6",
+    "size_bytes": 28786664
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.422 مسیر ساخت دستی اشتراک در پنل ادمین را سریع می‌کند. رابط ادمین دیگر تا پایان Provisioning ریموت همه پروتکل‌های انتخابی منتظر نمی‌ماند و درخواست تکراری provision-account که دوباره همان عملیات سنگین را اجرا می‌کرد حذف شده است. یک endpoint ادمینِ ایزوله با پاسخ HTTP 202 اضافه شده که lifecycle فعلی و fail-closed ساخت و Provisioning را در پس‌زمینه اجرا می‌کند؛ قرارداد synchronous قبلی admin-create-v2 برای سازگاری و مصرف‌کنندگان مستقیم API بدون تغییر حفظ شده است. تست اختصاصی Fast Create، تست ساخت ۱۵ پروتکل، API Build و تمام Smokeهای Release سبز هستند. هیچ تغییری در TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall یا protocol dataplane انجام نشده است. Source روی SHA immutable 2a4410d79eb90f3a75a70b05a6f127882c6806c8 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.422 makes manual admin subscription creation responsive. The admin UI no longer waits for all selected remote protocol provisioning to finish, and the regressed duplicate provision-account request that repeated the same expensive work has been removed. A dedicated isolated admin endpoint now returns HTTP 202 while the existing authoritative fail-closed create/provision lifecycle continues in the background; the original synchronous admin-create-v2 contract remains unchanged for compatibility and direct API callers. Dedicated Fast Create coverage, 15-protocol creation coverage, API Build, and all release smoke checks are green. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall and protocol dataplane logic are unchanged. Source is pinned to immutable SHA 2a4410d79eb90f3a75a70b05a6f127882c6806c8."
+    "fa": "TwinPanel 1.1.0-rc.423 ظاهر منوی اصلی ربات Telegram را کامل می‌کند. تمام دکمه‌های Inline اصلی دارای style رسمی Bot API هستند: عملیات دریافت لینک اکانت و خرید سبز، ناوبری‌های عادی آبی و پشتیبانی/لغو قرمز هستند. همچنین متن قابل‌مشاهده «منوی قبلی بسته شد» از مسیر /start حذف شده و پاک‌سازی ReplyKeyboard قدیمی با marker نامرئی انجام می‌شود که پیش از نمایش منوی اصلی حذف می‌شود. تست اختصاصی با aiogram 3.30.0 serialization فیلد style را بررسی می‌کند. منطق مالکیت دریافت لینک، subscription، provisioning، credentials، accounting/quota و dataplane تغییر نکرده است. Source روی SHA immutable 6c24e580adf205a9420fb007cafaecd8a99957f6 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.423 completes the Telegram main-menu presentation. All primary inline buttons now use official Bot API styles: account-link and purchase actions are success/green, normal navigation is primary/blue, and support/cancel actions are danger/red. The visible 'previous menu closed' cleanup message is removed from /start; stale ReplyKeyboard cleanup now uses an invisible marker that is deleted before the normal start response. Dedicated coverage validates style serialization with aiogram 3.30.0. Account-link ownership, subscriptions, provisioning, credentials, accounting/quota and dataplane behavior are unchanged. Source is pinned to immutable SHA 6c24e580adf205a9420fb007cafaecd8a99957f6."
   }
 }
