@@ -6,6 +6,10 @@ from .xray_provision_patch import install as _install_xray_provision_patch
 from .xray_grpc_target_isolation_v48 import (
     install as _install_xray_grpc_target_isolation_v48,
 )
+from .xray_duplicate_email_repair_v1 import (
+    install as _install_xray_duplicate_email_repair_v1,
+)
 
 _install_xray_provision_patch()
 _install_xray_grpc_target_isolation_v48()
+_install_xray_duplicate_email_repair_v1()
