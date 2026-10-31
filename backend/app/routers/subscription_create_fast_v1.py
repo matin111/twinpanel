@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-import asyncio
-import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from ..database import SessionLocal
 from ..deps import require_admin
 
-logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/v1/subscriptions",
@@ -17,58 +14,49 @@ router = APIRouter(
     dependencies=[Depends(require_admin)],
 )
 
-_TASKS: set[asyncio.Task[Any]] = set()
 
+async def _run_create(payload: dict[str, Any]) -> dict[str, Any]:
+    """Run the authoritative create lifecycle to completion.
 
-def _log_task_result(task: asyncio.Task[Any]) -> None:
-    _TASKS.discard(task)
-    try:
-        task.result()
-    except Exception:
-        logger.exception("fast subscription create background task failed")
+    This endpoint used to detach ``admin_create_v2`` in a background task and
+    return HTTP 202 after one event-loop turn. That allowed the browser to
+    report success while the subscription row had already been committed but
+    protocol provisioning was still running. A worker restart/cancellation or a
+    late provisioning failure could therefore leave an ACTIVE DB-only
+    subscription whose public page said the protocol needed Build/Repair.
 
+    Keep the compatibility endpoint name, but never acknowledge success until
+    the canonical fail-closed lifecycle has verified every requested protocol.
+    """
 
-async def _run_create(payload: dict[str, Any]) -> None:
-    # Import the authoritative lifecycle only when this endpoint is actually
-    # used. Keeping it out of routers package import prevents unrelated DNS /
-    # tunnel test modules from touching subscription schema/database bootstrap.
     from .subscription_admin_v2 import AdminSubscriptionCreateV2, admin_create_v2
 
     db = SessionLocal()
     try:
-        await admin_create_v2(AdminSubscriptionCreateV2(**payload), db)
+        result = await admin_create_v2(AdminSubscriptionCreateV2(**payload), db)
+        if isinstance(result, dict):
+            return result
+        if hasattr(result, "model_dump"):
+            return result.model_dump(mode="json")
+        return {"ok": True, "result": result}
     finally:
         db.close()
 
 
-@router.post("/admin-create-fast-v1", status_code=202)
+@router.post("/admin-create-fast-v1")
 async def admin_create_fast_v1(payload: dict[str, Any]):
-    """Queue the existing fail-closed create lifecycle and return immediately.
+    """Compatibility create endpoint with fail-closed completion semantics.
 
-    The authoritative admin_create_v2 path is intentionally left unchanged: it
-    still creates desired-state, performs canonical provisioning, validates all
-    requested credentials/configs and suspends incomplete subscriptions. This
-    endpoint only moves that existing lifecycle off the browser request path.
+    Success now means the authoritative lifecycle has completed provisioning and
+    its postconditions. The endpoint intentionally no longer starts an
+    in-process fire-and-forget task; correctness is more important than a fast
+    but non-durable acknowledgement.
     """
 
-    task = asyncio.create_task(_run_create(dict(payload)))
-    _TASKS.add(task)
-    task.add_done_callback(_log_task_result)
-
-    # Give the task one event-loop turn. admin_create_v2 performs validation and
-    # commits desired-state before its first remote provisioning await. Immediate
-    # validation/schema failures can therefore still be returned to the caller.
-    await asyncio.sleep(0)
-    if task.done():
-        try:
-            task.result()
-        except HTTPException:
-            raise
-        except Exception as exc:
-            raise HTTPException(status_code=502, detail=str(exc)[:800]) from exc
-
-    return {
-        "ok": True,
-        "queued": True,
-        "message": "ساخت اشتراک ثبت شد و صدور اکانت در پس‌زمینه ادامه دارد",
-    }
+    result = await _run_create(dict(payload))
+    if isinstance(result, dict):
+        result.setdefault("ok", True)
+        result["queued"] = False
+        result["provisioning_complete"] = True
+        result.setdefault("message", "اشتراک و کانفیگ‌های درخواستی با موفقیت ساخته شد")
+    return result

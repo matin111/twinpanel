@@ -33,14 +33,19 @@ jobs:
           assert 'createSubscriptionFastV1' in ui
           assert 'adminApi.provisionSubscription' not in ui
           assert '/v1/subscriptions/admin-create-fast-v1' in client
-          assert 'asyncio.create_task(_run_create(dict(payload)))' in endpoint
+          assert 'asyncio.create_task' not in endpoint
+          assert '_TASKS' not in endpoint
           assert 'from .subscription_admin_v2 import AdminSubscriptionCreateV2, admin_create_v2' in endpoint
           assert endpoint.index('from .subscription_admin_v2 import AdminSubscriptionCreateV2, admin_create_v2') > endpoint.index('async def _run_create')
-          assert '@router.post("/admin-create-fast-v1", status_code=202)' in endpoint
+          assert 'await admin_create_v2' in endpoint
+          assert '@router.post("/admin-create-fast-v1")' in endpoint
+          assert 'status_code=202' not in endpoint
+          assert 'result["queued"] = False' in endpoint
+          assert 'result["provisioning_complete"] = True' in endpoint
           assert 'dependencies=[Depends(require_admin)]' in endpoint
           assert '_runtime_endpoints.router.include_router(_subscription_create_fast_v1_router)' in init
 
-          print('SUBSCRIPTION_CREATE_FAST_V1_CONTRACT_OK')
+          print('SUBSCRIPTION_CREATE_FAST_V1_FAIL_CLOSED_CONTRACT_OK')
           PY
 
       - name: Compile endpoint

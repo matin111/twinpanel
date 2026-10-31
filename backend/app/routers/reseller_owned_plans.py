@@ -6,7 +6,13 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import require_reseller
-from ..models import Plan, Subscription
+from ..models import (
+    Plan,
+    ProtocolCredential,
+    Subscription,
+    SubscriptionProtocol,
+    SubscriptionStatus,
+)
 from ..models_reseller import Reseller, ResellerSubscription
 from ..reseller_bot_order_models import ResellerBotOrder
 from ..reseller_manual_subscriptions import create_manual_reseller_subscription
@@ -18,6 +24,7 @@ from ..reseller_owned_plans import (
     plan_out,
     sync_owned_plan_backing,
 )
+from ..subscription_enforcement import queue_subscription_enforcement
 
 
 router = APIRouter(
@@ -118,6 +125,158 @@ def _plan_has_history(db: Session, row: ResellerBotPlan) -> bool:
         is not None
     )
     return subscription_exists
+
+
+def _requested_protocols(db: Session, subscription_id: int) -> list[str]:
+    return [
+        str(row[0]).strip().lower()
+        for row in (
+            db.query(SubscriptionProtocol.protocol)
+            .filter(
+                SubscriptionProtocol.subscription_id == int(subscription_id)
+            )
+            .order_by(SubscriptionProtocol.id.asc())
+            .all()
+        )
+        if str(row[0] or "").strip()
+    ]
+
+
+def _missing_provisioned_protocols(
+    db: Session,
+    subscription_id: int,
+    protocols: list[str],
+) -> list[str]:
+    rows = (
+        db.query(ProtocolCredential)
+        .filter(
+            ProtocolCredential.subscription_id == int(subscription_id),
+            ProtocolCredential.protocol.in_(protocols),
+        )
+        .all()
+    )
+    ready = {
+        str(row.protocol).strip().lower()
+        for row in rows
+        if bool(row.is_active)
+        and bool(str(row.config_text_encrypted or "").strip())
+    }
+    return [protocol for protocol in protocols if protocol not in ready]
+
+
+def _fail_created_subscription(
+    db: Session,
+    subscription_id: int,
+    *,
+    reason: str,
+) -> None:
+    sub = db.get(Subscription, int(subscription_id))
+    if sub is None:
+        return
+
+    sub.status = SubscriptionStatus.SUSPENDED
+    try:
+        queue_subscription_enforcement(
+            db,
+            sub,
+            command_type="revoke_subscription",
+            reason=reason,
+        )
+    except Exception:
+        # Creation must still be non-active if cleanup queueing has its own
+        # transient failure. Reconcile/retry can safely repair it later.
+        pass
+    db.commit()
+
+
+async def _complete_reseller_provisioning(
+    db: Session,
+    result: dict,
+) -> dict:
+    subscription_id = int(result.get("subscription_id") or 0)
+    if subscription_id <= 0:
+        raise HTTPException(
+            status_code=500,
+            detail="شناسه اشتراک ساخته‌شده معتبر نیست",
+        )
+
+    protocols = [
+        str(value).strip().lower()
+        for value in (result.get("protocols") or [])
+        if str(value or "").strip()
+    ]
+    if not protocols:
+        protocols = _requested_protocols(db, subscription_id)
+
+    try:
+        from .modern_account_delivery_v1 import provision_account_v1
+
+        provisioning = await provision_account_v1(
+            subscription_id=subscription_id,
+            db=db,
+        )
+    except HTTPException as exc:
+        _fail_created_subscription(
+            db,
+            subscription_id,
+            reason="reseller_subscription_create_provision_failed",
+        )
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "ساخت اشتراک نماینده کامل نشد؛ Provisioning ناموفق بود",
+                "subscription_id": subscription_id,
+                "provision_error": exc.detail,
+            },
+        ) from exc
+    except Exception as exc:
+        db.rollback()
+        _fail_created_subscription(
+            db,
+            subscription_id,
+            reason="reseller_subscription_create_provision_exception",
+        )
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "ساخت اشتراک نماینده کامل نشد؛ خطای Provisioning رخ داد",
+                "subscription_id": subscription_id,
+                "provision_error": str(exc)[:800],
+            },
+        ) from exc
+
+    missing_protocols = _missing_provisioned_protocols(
+        db,
+        subscription_id,
+        protocols,
+    )
+    provision_errors = list((provisioning or {}).get("errors") or [])
+    quota_ok = bool(((provisioning or {}).get("quota") or {}).get("ok", True))
+
+    if (
+        missing_protocols
+        or provision_errors
+        or not quota_ok
+        or not (provisioning or {}).get("ok", False)
+    ):
+        _fail_created_subscription(
+            db,
+            subscription_id,
+            reason="reseller_subscription_create_postcondition_failed",
+        )
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": "ساخت اشتراک نماینده کامل نشد؛ بعضی کانفیگ‌ها ساخته نشدند",
+                "subscription_id": subscription_id,
+                "missing_protocols": missing_protocols,
+                "provision_errors": provision_errors,
+                "quota_ok": quota_ok,
+            },
+        )
+
+    result["provisioning_complete"] = True
+    return result
 
 
 @router.get("/owned-plans")
@@ -280,7 +439,7 @@ def delete_reseller_owned_plan(
 
 
 @router.post("/subscriptions/create")
-def create_reseller_subscription(
+async def create_reseller_subscription(
     payload: ResellerManualSubscriptionIn,
     reseller: Reseller = Depends(require_reseller),
     db: Session = Depends(get_db),
@@ -297,7 +456,7 @@ def create_reseller_subscription(
             detail="پلن فعال نماینده پیدا نشد",
         )
 
-    return create_subscription_from_owned_plan(
+    result = create_subscription_from_owned_plan(
         db,
         reseller=reseller,
         reseller_plan=row,
@@ -308,15 +467,19 @@ def create_reseller_subscription(
         password=payload.password,
         sell_price_toman=0,
     )
+    return await _complete_reseller_provisioning(
+        db,
+        result,
+    )
 
 
 @router.post("/subscriptions/manual-create")
-def create_reseller_manual_subscription(
+async def create_reseller_manual_subscription(
     payload: ResellerDirectSubscriptionIn,
     reseller: Reseller = Depends(require_reseller),
     db: Session = Depends(get_db),
 ):
-    return create_manual_reseller_subscription(
+    result = create_manual_reseller_subscription(
         db,
         reseller=reseller,
         traffic_gb=payload.traffic_gb,
@@ -326,6 +489,10 @@ def create_reseller_manual_subscription(
         node_ids=payload.node_ids,
         username=payload.username,
         password=payload.password,
+    )
+    return await _complete_reseller_provisioning(
+        db,
+        result,
     )
 
 
