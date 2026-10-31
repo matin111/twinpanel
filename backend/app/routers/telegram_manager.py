@@ -594,9 +594,13 @@ def start_bot():
         )
 
     try:
+        # Starting from the admin panel must restore the persistent boot state
+        # as well as the current process state. A plain `systemctl start` can
+        # leave a previously-disabled bot active only for the current boot.
         _run([
             "systemctl",
-            "start",
+            "enable",
+            "--now",
             "twinpanel-bot.service",
         ])
     except Exception as exc:
@@ -643,6 +647,11 @@ def restart_bot():
         )
 
     try:
+        _run([
+            "systemctl",
+            "enable",
+            "twinpanel-bot.service",
+        ])
         _run([
             "systemctl",
             "restart",
