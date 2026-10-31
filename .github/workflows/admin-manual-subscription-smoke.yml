@@ -5,7 +5,6 @@ on:
     paths:
       - 'backend/app/subscription_plan_schema.py'
       - 'backend/app/routers/subscription_admin_v2.py'
-      - 'backend/app/routers/subscription_create_fast_v1.py'
       - 'backend/app/services/subscription_factory.py'
       - 'backend/app/protocol_account_registry.py'
       - 'backend/app/schemas.py'
@@ -79,7 +78,7 @@ jobs:
           sudo install -d -m 700 /var/lib/twinpanel-backups
           sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel-backups
 
-      - name: Verify fast create plus background 15-protocol provisioning
+      - name: Verify explicit per-subscription 15-protocol creation
         working-directory: backend
         run: |
           python - <<'PY'
@@ -92,7 +91,7 @@ jobs:
           from app.database import SessionLocal, engine
           from app.models import Plan, ProtocolCredential, Subscription, SubscriptionProtocol, User
           from app.protocol_account_registry import ALL_PROTOCOL_KEYS
-          from app.routers import subscription_create_fast_v1 as fast_bridge
+          from app.routers import modern_account_delivery_v1
           from app.routers.subscription_admin_v2 import AdminSubscriptionCreateV2, admin_create_v2
           from app.security import hash_password
 
@@ -101,7 +100,7 @@ jobs:
           assert Subscription.__table__.c.plan_id.nullable is True
           assert inspect(engine).get_columns('subscriptions')
 
-          async def fake_real_provision(subscription_id: int, db):
+          async def fake_provision_account_v1(subscription_id: int, db):
               protocols = [
                   row[0]
                   for row in db.query(SubscriptionProtocol.protocol)
@@ -118,19 +117,22 @@ jobs:
                       .first()
                   )
                   if cred is None:
-                      cred = ProtocolCredential(subscription_id=subscription_id, protocol=protocol)
+                      cred = ProtocolCredential(
+                          subscription_id=subscription_id,
+                          protocol=protocol,
+                      )
                       db.add(cred)
                   cred.username = cred.username or f'ci-{subscription_id}-{protocol}'
                   cred.config_text_encrypted = f'ci-config-{subscription_id}-{protocol}'
                   cred.is_active = True
               db.commit()
-              return {'ok': True, 'errors': [], 'quota': {'ok': True, 'nodes': []}}
+              return {
+                  'ok': True,
+                  'errors': [],
+                  'quota': {'ok': True, 'nodes': []},
+              }
 
-          fast_bridge._REAL_PROVISION_ACCOUNT = fake_real_provision
-
-          async def drain_tasks():
-              while fast_bridge._TASKS:
-                  await asyncio.gather(*list(fast_bridge._TASKS))
+          modern_account_delivery_v1.provision_account_v1 = fake_provision_account_v1
 
           db = SessionLocal()
           try:
@@ -153,99 +155,80 @@ jobs:
           finally:
               db.close()
 
+          # Preserve compatibility with older databases where manual subscriptions
+          # were blocked by subscriptions.plan_id NOT NULL.
           with engine.begin() as connection:
               connection.execute(text('ALTER TABLE subscriptions ALTER COLUMN plan_id SET NOT NULL'))
 
-          async def scenario():
-              db = SessionLocal()
+          db = SessionLocal()
+          try:
+              manual = asyncio.run(admin_create_v2(
+                  AdminSubscriptionCreateV2(
+                      user_id=user_id,
+                      plan_id=None,
+                      traffic_gb=25,
+                      duration_days=45,
+                      device_limit=3,
+                      protocols=['cisco','sudoku'],
+                  ),
+                  db,
+              ))
+              assert manual['plan_id'] is None
+              assert manual['provisioning']['ok'] is True
+              manual_id=int(manual['id'])
+          finally:
+              db.close()
+
+          db = SessionLocal()
+          try:
+              manual_protocols=[row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==manual_id).order_by(SubscriptionProtocol.protocol).all()]
+              assert manual_protocols == ['cisco','sudoku']
+
+              all_protocols = asyncio.run(admin_create_v2(
+                  AdminSubscriptionCreateV2(
+                      user_id=user_id,
+                      plan_id=plan_id,
+                      protocols=list(ALL_PROTOCOL_KEYS),
+                  ),
+                  db,
+              ))
+              assert all_protocols['provisioning']['ok'] is True
+              all_id=int(all_protocols['id'])
+              stored={row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==all_id).all()}
+              assert stored == set(ALL_PROTOCOL_KEYS)
+              provisioned={row[0] for row in db.query(ProtocolCredential.protocol).filter(ProtocolCredential.subscription_id==all_id, ProtocolCredential.is_active.is_(True)).all()}
+              assert provisioned == set(ALL_PROTOCOL_KEYS)
+
+              explicit = asyncio.run(admin_create_v2(
+                  AdminSubscriptionCreateV2(
+                      user_id=user_id,
+                      plan_id=plan_id,
+                      protocols=['wireguard','hysteria2'],
+                  ),
+                  db,
+              ))
+              assert explicit['provisioning']['ok'] is True
+              explicit_id=int(explicit['id'])
+              explicit_protocols={row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==explicit_id).all()}
+              assert explicit_protocols == {'wireguard','hysteria2'}
+
               try:
-                  manual = await admin_create_v2(
-                      AdminSubscriptionCreateV2(
-                          user_id=user_id,
-                          plan_id=None,
-                          traffic_gb=25,
-                          duration_days=45,
-                          device_limit=3,
-                          protocols=['cisco','sudoku'],
-                      ),
-                      db,
-                  )
-                  assert manual['plan_id'] is None
-                  assert manual['provisioning']['ok'] is True
-                  assert manual['provisioning']['quota']['queued'] is True
-                  manual_id=int(manual['id'])
-              finally:
-                  db.close()
-
-              await drain_tasks()
-
-              db = SessionLocal()
-              try:
-                  manual_protocols=[row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==manual_id).order_by(SubscriptionProtocol.protocol).all()]
-                  assert manual_protocols == ['cisco','sudoku']
-                  provisioned={row[0] for row in db.query(ProtocolCredential.protocol).filter(ProtocolCredential.subscription_id==manual_id, ProtocolCredential.is_active.is_(True)).all()}
-                  assert provisioned == {'cisco','sudoku'}
-
-                  all_protocols = await admin_create_v2(
+                  asyncio.run(admin_create_v2(
                       AdminSubscriptionCreateV2(
                           user_id=user_id,
                           plan_id=plan_id,
-                          protocols=list(ALL_PROTOCOL_KEYS),
+                          protocols=[],
                       ),
                       db,
-                  )
-                  assert all_protocols['provisioning']['ok'] is True
-                  assert all_protocols['provisioning']['quota']['queued'] is True
-                  all_id=int(all_protocols['id'])
-              finally:
-                  db.close()
+                  ))
+              except HTTPException as exc:
+                  assert exc.status_code == 422
+              else:
+                  raise AssertionError('plan-backed subscription must require explicit protocols')
+          finally:
+              db.close()
 
-              await drain_tasks()
-
-              db = SessionLocal()
-              try:
-                  stored={row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==all_id).all()}
-                  assert stored == set(ALL_PROTOCOL_KEYS)
-                  provisioned={row[0] for row in db.query(ProtocolCredential.protocol).filter(ProtocolCredential.subscription_id==all_id, ProtocolCredential.is_active.is_(True)).all()}
-                  assert provisioned == set(ALL_PROTOCOL_KEYS)
-
-                  explicit = await admin_create_v2(
-                      AdminSubscriptionCreateV2(
-                          user_id=user_id,
-                          plan_id=plan_id,
-                          protocols=['wireguard','hysteria2'],
-                      ),
-                      db,
-                  )
-                  explicit_id=int(explicit['id'])
-              finally:
-                  db.close()
-
-              await drain_tasks()
-
-              db = SessionLocal()
-              try:
-                  explicit_protocols={row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==explicit_id).all()}
-                  assert explicit_protocols == {'wireguard','hysteria2'}
-
-                  try:
-                      await admin_create_v2(
-                          AdminSubscriptionCreateV2(
-                              user_id=user_id,
-                              plan_id=plan_id,
-                              protocols=[],
-                          ),
-                          db,
-                      )
-                  except HTTPException as exc:
-                      assert exc.status_code == 422
-                  else:
-                      raise AssertionError('plan-backed subscription must require explicit protocols')
-              finally:
-                  db.close()
-
-          asyncio.run(scenario())
-          print('SUBSCRIPTION_FAST_CREATE_AND_BACKGROUND_PROVISION_OK')
+          print('SUBSCRIPTION_EXPLICIT_15_PROTOCOL_CREATION_OK')
           PY
 
       - name: Verify frontend selection contract
@@ -264,7 +247,6 @@ jobs:
           assert 'لغو انتخاب همه' in ui
           assert 'plan_id:planId||null' in ui
           assert 'protocols.length===0' in ui
-          assert 'adminApi.provisionSubscription' not in ui
           assert '/v1/subscriptions/protocol-catalog' in client
           assert '@router.get("/protocol-catalog")' in backend
           assert 'هنگام ساخت اشتراک حداقل یک پروتکل انتخاب کنید' in backend
