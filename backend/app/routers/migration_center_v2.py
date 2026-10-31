@@ -15,7 +15,7 @@ from ..deps import require_admin
 from ..migration_import_models import MigrationImportRecord
 from ..models import Subscription, SubscriptionStatus
 from ..services.migration_eylan import EYLAN_SOURCE, MAX_ARCHIVE_BYTES, duration_days_for_expiry, preview_eylan_backup
-from ..services.migration_import_v2 import import_record, legacy_payload
+from ..services.migration_import_v2 import _enc_payload, import_record, legacy_payload
 from ..services.migration_v2ray_batch import provision_migrated_v2ray_batch
 from ..services.subscription_factory import create_subscription_core
 
@@ -204,7 +204,17 @@ async def eylan_import(payload: EylanImportIn, db: Session = Depends(get_db)):
                     subscription_id=sub.id,
                     legacy_url=None,
                     legacy_token=None,
-                    preserved_payload_encrypted=None,
+                    preserved_payload_encrypted=_enc_payload(
+                        {
+                            "source": EYLAN_SOURCE,
+                            "source_id": source_id,
+                            "username": record.username.strip(),
+                            "traffic_limit_bytes": int(record.traffic_limit_bytes),
+                            "traffic_used_bytes": int(record.traffic_used_bytes),
+                            "expires_at": record.expires_at.isoformat() if record.expires_at else None,
+                            "credential_policy": "twinpanel_generated_protocol_credentials",
+                        }
+                    ),
                     status="provisioning",
                 )
                 db.add(marker)
