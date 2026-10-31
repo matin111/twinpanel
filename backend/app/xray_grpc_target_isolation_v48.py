@@ -7,7 +7,7 @@ GRPC_TARGET_OFFSET_V48 = 1006
 _runtime_applied = False
 
 
-def apply_xray_grpc_target_isolation_v48() -> None:
+def install() -> None:
     global _runtime_applied
 
     if _runtime_applied:
