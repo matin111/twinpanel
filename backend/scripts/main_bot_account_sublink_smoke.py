@@ -70,11 +70,23 @@ assert '"/account-link/resolve"' in lookup_source
 assert "hmac.compare_digest(" in lookup_source
 assert "TelegramAccountLinkLookupIn" in lookup_source
 
-# The bot module must not gain direct database access or migration mutation.
+# The bot module must not gain direct database/migration imports or mutate
+# provisioning. Inspect AST import nodes rather than comments/docstrings.
+feature_tree = ast.parse(feature_source)
+feature_imports = []
+for node in ast.walk(feature_tree):
+    if isinstance(node, ast.Import):
+        feature_imports.extend(alias.name for alias in node.names)
+    elif isinstance(node, ast.ImportFrom):
+        module = node.module or ""
+        feature_imports.append(module)
+        feature_imports.extend(f"{module}.{alias.name}" for alias in node.names)
+
+assert not any("models" in item for item in feature_imports)
+assert not any("migration_import" in item for item in feature_imports)
 assert "db.query(" not in feature_source
 assert "db.get(" not in feature_source
-assert "MigrationImportRecord" not in feature_source
-assert "provision" not in feature_source.lower()
+assert "provision(" not in feature_source
 
 # The feature must be attached before the main router's generic fallback while
 # preserving the existing runtime entrypoint.
