@@ -11,8 +11,8 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..migration_import_models import MigrationImportRecord
 from ..models import Subscription, SubscriptionStatus
+from ..telegram_models import TelegramUserLink
 from .telegram_bot import bot_guard
 
 
@@ -28,12 +28,12 @@ class TelegramAccountLinkLookupIn(BaseModel):
     password: str = Field(min_length=1, max_length=512)
 
 
-class TelegramMigratedAccountLinkLookupIn(BaseModel):
+class TelegramOwnedAccountLinkLookupIn(BaseModel):
     telegram_id: int = Field(gt=0)
     username: str = Field(min_length=1, max_length=128)
 
 
-# Both account-link endpoints are protected by the private bot secret. Keep a
+# All account-link endpoints are protected by the private bot secret. Keep a
 # small per-Telegram failure window as defense in depth against username or
 # credential guessing from the public bot UI.
 _FAILURE_WINDOW_SECONDS = 10 * 60
@@ -88,13 +88,13 @@ def _credential_error(telegram_id: int) -> HTTPException:
     )
 
 
-def _migrated_lookup_error(telegram_id: int) -> HTTPException:
+def _owned_lookup_error(telegram_id: int) -> HTTPException:
     _record_failure(telegram_id)
-    # Keep one generic response for missing, duplicate, inactive and expired
-    # migrated rows so the bot cannot be used to enumerate migration data.
+    # Keep one generic response for missing Telegram ownership, missing or
+    # duplicate usernames, inactive subscriptions and expired subscriptions.
     return HTTPException(
         status_code=404,
-        detail="اکانت مهاجرتی با این نام کاربری پیدا نشد",
+        detail="اکانتی با این نام کاربری در حساب شما پیدا نشد",
     )
 
 
@@ -112,38 +112,26 @@ def _public_share_link(db: Session, sub: Subscription) -> str:
     return link
 
 
-@router.post(
-    "/account-link/resolve-migrated",
-    dependencies=[Depends(bot_guard)],
-)
-def resolve_migrated_account_link(
-    payload: TelegramMigratedAccountLinkLookupIn,
-    db: Session = Depends(get_db),
-):
-    """Resolve only an imported/migrated account by its preserved username.
-
-    Sanaei/Marzban/Pasargad V2Ray imports preserve the old username but may not
-    have any VPN password. This endpoint intentionally does not scan ordinary
-    TwinPanel subscriptions: a row must have a MigrationImportRecord in imported
-    state. Exact duplicate usernames fail closed instead of selecting one.
-    """
-
+def _resolve_owned_subscription(
+    payload: TelegramOwnedAccountLinkLookupIn,
+    db: Session,
+) -> dict:
     telegram_id = int(payload.telegram_id)
     username = str(payload.username or "").strip()
 
     _guard_attempts(telegram_id)
     if not username:
-        raise _migrated_lookup_error(telegram_id)
+        raise _owned_lookup_error(telegram_id)
+
+    telegram_link = db.get(TelegramUserLink, telegram_id)
+    if telegram_link is None:
+        raise _owned_lookup_error(telegram_id)
 
     now = datetime.utcnow()
     matches = (
-        db.query(Subscription, MigrationImportRecord)
-        .join(
-            MigrationImportRecord,
-            MigrationImportRecord.subscription_id == Subscription.id,
-        )
+        db.query(Subscription)
         .filter(
-            MigrationImportRecord.status == "imported",
+            Subscription.user_id == int(telegram_link.user_id),
             func.lower(Subscription.account_username) == username.casefold(),
             Subscription.status == SubscriptionStatus.ACTIVE,
             or_(
@@ -157,9 +145,9 @@ def resolve_migrated_account_link(
     )
 
     if len(matches) != 1:
-        raise _migrated_lookup_error(telegram_id)
+        raise _owned_lookup_error(telegram_id)
 
-    sub, marker = matches[0]
+    sub = matches[0]
     link = _public_share_link(db, sub)
     _clear_failures(telegram_id)
 
@@ -167,8 +155,36 @@ def resolve_migrated_account_link(
         "ok": True,
         "account_username": str(sub.account_username or username),
         "subscription_link": link,
-        "migration_source": str(marker.source or ""),
     }
+
+
+@router.post(
+    "/account-link/resolve-owned",
+    dependencies=[Depends(bot_guard)],
+)
+def resolve_owned_account_link(
+    payload: TelegramOwnedAccountLinkLookupIn,
+    db: Session = Depends(get_db),
+):
+    """Resolve an active account owned by the linked TwinPanel user.
+
+    Protocol and import source are intentionally irrelevant. The username is
+    matched only inside subscriptions belonging to the user linked to this
+    Telegram ID, then the canonical TwinPanel share URL is returned.
+    """
+    return _resolve_owned_subscription(payload, db)
+
+
+@router.post(
+    "/account-link/resolve-migrated",
+    dependencies=[Depends(bot_guard)],
+)
+def resolve_migrated_account_link_compat(
+    payload: TelegramOwnedAccountLinkLookupIn,
+    db: Session = Depends(get_db),
+):
+    """Compatibility alias for rc.416 bots; ownership rules are identical."""
+    return _resolve_owned_subscription(payload, db)
 
 
 @router.post(
@@ -179,7 +195,7 @@ def resolve_account_link(
     payload: TelegramAccountLinkLookupIn,
     db: Session = Depends(get_db),
 ):
-    """Backward-compatible credential resolver for non-migration callers."""
+    """Backward-compatible credential resolver for legacy callers."""
 
     telegram_id = int(payload.telegram_id)
     username = str(payload.username or "").strip()
