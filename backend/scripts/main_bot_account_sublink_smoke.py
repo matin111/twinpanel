@@ -36,6 +36,23 @@ assert "bot_auth=True" in feature_source
 assert 'link.startswith(("http://", "https://"))' in feature_source
 assert 'CANCEL_BUTTON = "❌ لغو"' in feature_source
 
+# Two-step regression guard: entering a username must only store it and advance
+# to the password state. Credential resolution is allowed only after the
+# password-state handler begins.
+username_handler = feature_source[
+    feature_source.index("async def account_link_username"):
+    feature_source.index("async def account_link_password")
+]
+password_handler = feature_source[
+    feature_source.index("async def account_link_password"):
+]
+assert "state.update_data(" in username_handler
+assert "account_link_username=username" in username_handler
+assert "AccountLinkState.password" in username_handler
+assert "/v1/telegram/account-link/resolve" not in username_handler
+assert "/v1/telegram/account-link/resolve" in password_handler
+assert '"password": password' in password_handler
+
 # Regression guard: username-only lookup through Telegram-linked subscriptions
 # was the root cause of valid VPN accounts being reported as missing.
 assert '"/v1/subscriptions/me"' not in feature_source
