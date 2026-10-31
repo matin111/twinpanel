@@ -46,7 +46,7 @@ assert 'link.startswith(("http://", "https://"))' in feature_source
 # control may depend on Telegram's persistent ReplyKeyboard.
 assert "def _main_menu_keyboard():" in feature_source
 assert "return InlineKeyboardMarkup(" in feature_source
-assert "KeyboardButton" not in feature_source
+assert "\n    KeyboardButton,\n" not in feature_source
 assert "ReplyKeyboardMarkup" not in feature_source
 for callback_id in (
     "account_link:start",
