@@ -6,36 +6,54 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FEATURE = ROOT / "app" / "telegram_account_link_bot.py"
+LOOKUP = ROOT / "app" / "routers" / "telegram_account_link_lookup.py"
 EXTENSIONS = ROOT / "app" / "telegram_main_extensions.py"
 GUIDES = ROOT / "app" / "telegram_guides_bot.py"
 RUNTIME = ROOT / "app" / "telegram_runtime_bot.py"
 
 feature_source = FEATURE.read_text(encoding="utf-8")
+lookup_source = LOOKUP.read_text(encoding="utf-8")
 extension_source = EXTENSIONS.read_text(encoding="utf-8")
 guides_source = GUIDES.read_text(encoding="utf-8")
 runtime_source = RUNTIME.read_text(encoding="utf-8")
 
 for source in (
     feature_source,
+    lookup_source,
     extension_source,
     guides_source,
 ):
     ast.parse(source)
 
+# Main-bot UI/FSM contract.
 assert 'ACCOUNT_LINK_BUTTON = "🔗 دریافت لینک اکانت"' in feature_source
 assert "AccountLinkState.username" in feature_source
-assert '"/v1/subscriptions/me"' in feature_source
-assert 'f"{sub_id}/manage"' in feature_source
-assert 'f"{sub_id}/connection-info"' in feature_source
-assert "account_username.casefold() == wanted" in feature_source
+assert "AccountLinkState.password" in feature_source
+assert '"/v1/telegram/account-link/resolve"' in feature_source
+assert '"username": username' in feature_source
+assert '"password": password' in feature_source
+assert "bot_auth=True" in feature_source
 assert 'link.startswith(("http://", "https://"))' in feature_source
 assert 'CANCEL_BUTTON = "❌ لغو"' in feature_source
 
-# The lookup must stay inside token-scoped customer endpoints.
+# Regression guard: username-only lookup through Telegram-linked subscriptions
+# was the root cause of valid VPN accounts being reported as missing.
+assert '"/v1/subscriptions/me"' not in feature_source
+assert 'f"{sub_id}/manage"' not in feature_source
+assert 'f"{sub_id}/connection-info"' not in feature_source
+
+# The bot module must not gain direct database access. Global resolution lives
+# behind the private bot-authenticated endpoint and requires VPN password proof.
 assert "db.query(" not in feature_source
 assert "db.get(" not in feature_source
 assert "from .models import" not in feature_source
-assert "Subscription.account_username" not in feature_source
+assert "dependencies=[Depends(bot_guard)]" in lookup_source
+assert "func.lower(Subscription.account_username)" in lookup_source
+assert "hmac.compare_digest(" in lookup_source
+assert "نام کاربری یا رمز عبور اکانت اشتباه است" in lookup_source
+assert "_FAILURE_LIMIT = 6" in lookup_source
+assert "status_code=429" in lookup_source
+assert "from .account_delivery import _share_url" in lookup_source
 
 # The feature must be attached to a router included before the main router's
 # generic fallback, while preserving the existing runtime entrypoint.
