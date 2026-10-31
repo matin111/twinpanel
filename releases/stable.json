@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.417",
+  "version": "1.1.0-rc.418",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-31T18:21:27Z",
+  "released_at": "2026-10-31T18:28:51Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7d82939477ec75d7b12e00e6c03e7ae89420f239",
+  "source_sha": "afcb5d054be6649ea31ca412fafc18768f2aa459",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.417/twinpanel-1.1.0-rc.417-linux-x86_64.tar.gz",
-    "sha256": "777f898fc12c61a1a1e46b8f5a71c6d0d1cd9421a9b4c5c58a673e335409f32c",
-    "size_bytes": 28778586
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.418/twinpanel-1.1.0-rc.418-linux-x86_64.tar.gz",
+    "sha256": "4f69881c3dc563b2dfd27c06cb9332409153869d79f91434fdfc5dc6480739c6",
+    "size_bytes": 28778611
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.417 فشار صفحه اشتراک‌های ادمین را کاهش می‌دهد. live-status دیگر هر ۵ ثانیه بدون کنترل اجرا نمی‌شود؛ polling به ۱۵ ثانیه افزایش یافته، درخواست هم‌زمان تکراری جلوگیری می‌شود، هنگام hidden بودن صفحه polling متوقف می‌شود و درخواست در unmount لغو می‌گردد. مسیر /v1/subscriptions/admin-list-v2 نیز به‌جای lookupهای تکراری برای هر اشتراک، context کاربر/پلن/override/node/protocol را به‌صورت bulk بارگذاری می‌کند تا N+1 روی دیتاست‌های بزرگ حذف شود. تست‌های CI مرتبط با polling، freeze و bulk-list نیز به قرارداد جدید به‌روزرسانی شده‌اند. منطق TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane تغییر نکرده است. Source روی SHA immutable 7d82939477ec75d7b12e00e6c03e7ae89420f239 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.417 reduces load on the admin subscriptions page. live-status polling is no longer an uncontrolled 5-second loop; it now runs every 15 seconds, prevents overlapping requests, pauses while the page is hidden, and aborts on unmount. The /v1/subscriptions/admin-list-v2 path now bulk-loads user/plan/override/node/protocol context instead of performing repeated per-subscription lookups, eliminating the major N+1 pattern on large datasets. Related CI coverage for polling, page freeze, and bulk-list behavior was updated to lock the new contract. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane logic is unchanged. Source is pinned to immutable SHA 7d82939477ec75d7b12e00e6c03e7ae89420f239."
+    "fa": "TwinPanel 1.1.0-rc.418 مسیر «دریافت لینک اکانت» در ربات اصلی Telegram را عمومی و مالکیت‌محور می‌کند. متن‌های محدود به اکانت مهاجرتی/V2Ray حذف شده‌اند و کاربر فقط نام کاربری VPN را وارد می‌کند. Resolver ابتدا Telegram ID را به کاربر TwinPanel لینک‌شده نگاشت می‌کند و سپس فقط میان اشتراک‌های فعال و منقضی‌نشده همان user_id، account_username را پیدا کرده و ساب‌لینک canonical خود پنل را برمی‌گرداند؛ بنابراین اشتراک‌های Eylan، V2Ray و سایر منابع/پروتکل‌ها با یک قرارداد واحد پشتیبانی می‌شوند و دانستن username کاربر دیگر برای گرفتن لینک او کافی نیست. دکمه قدیمی «لغو» بعد از Restart ربات نیز مستقل از FSM مدیریت می‌شود تا به fallback عمومی نیفتد. مسیر «اکانت‌های من»، migration data، provisioning، credentials، TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall/protocol dataplane تغییر نکرده است. Source روی SHA immutable afcb5d054be6649ea31ca412fafc18768f2aa459 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.418 makes the main Telegram bot's 'Get account link' flow generic and ownership-scoped. Migration/V2Ray-specific copy is removed and the user enters only the VPN account username. The resolver maps Telegram ID to the linked TwinPanel user, then matches account_username only among that user_id's active, non-expired subscriptions and returns the canonical panel share URL. This supports Eylan, V2Ray, and other subscription sources/protocols under one contract while preventing a user from retrieving another customer's link merely by knowing a username. A stale Cancel keyboard after bot restarts is also handled independently of FSM state so it cannot fall through to the generic fallback. My Accounts, migration data, provisioning, credentials, TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall/protocol dataplane logic is unchanged. Source is pinned to immutable SHA afcb5d054be6649ea31ca412fafc18768f2aa459."
   }
 }
