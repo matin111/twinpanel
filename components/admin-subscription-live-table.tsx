@@ -36,6 +36,8 @@ export function AdminSubscriptionLiveTable(){
     let observedBody:HTMLTableSectionElement|null=null;
     let frame:number|undefined;
     let loaded=false;
+    let inFlight=false;
+    let controller:AbortController|undefined;
     const states=new Map<number,LiveItem>();
 
     const decorateNow=()=>{
@@ -109,29 +111,38 @@ export function AdminSubscriptionLiveTable(){
 
     const refresh=async()=>{
       const token=getCustomerToken();
-      if(!token||disposed)return;
+      if(!token||disposed||inFlight||document.visibilityState==="hidden")return;
+      inFlight=true;
+      controller=new AbortController();
       try{
         const response=await fetch(`${API_BASE}/v1/admin/subscriptions/live-status?ts=${Date.now()}`,{
           cache:"no-store",
           headers:{Authorization:`Bearer ${token}`,Accept:"application/json"},
+          signal:controller.signal,
         });
         if(!response.ok)return;
         const payload=await response.json() as LivePayload;
+        if(disposed)return;
         states.clear();
         for(const item of payload.items||[])states.set(Number(item.subscription_id),item);
         loaded=true;
         scheduleDecorate();
       }catch{}
+      finally{
+        inFlight=false;
+        controller=undefined;
+      }
     };
 
     scheduleDecorate();
     void refresh();
-    timer=window.setInterval(refresh,5000);
+    timer=window.setInterval(()=>{void refresh();},15000);
     const onVisibilityChange=()=>{if(document.visibilityState==="visible")void refresh();};
     document.addEventListener("visibilitychange",onVisibilityChange);
 
     return()=>{
       disposed=true;
+      controller?.abort();
       if(timer)window.clearInterval(timer);
       if(frame!==undefined)window.cancelAnimationFrame(frame);
       observer?.disconnect();
