@@ -130,6 +130,13 @@ def _main_menu_keyboard():
             ],
             [
                 InlineKeyboardButton(
+                    text="🤝 درخواست نمایندگی",
+                    callback_data="ts:send",
+                    style="success",
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text="🎫 پشتیبانی",
                     callback_data="ts:send",
                     style="danger",
