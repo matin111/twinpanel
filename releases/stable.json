@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.411",
+  "version": "1.1.0-rc.412",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-31T04:40:57Z",
+  "released_at": "2026-10-31T04:49:35Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "c8e3a61e39993c906c2bb628193699374bcfc54d",
+  "source_sha": "3f39f1987fdb020c84a17848fcdd6c8dd667b0d1",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.411/twinpanel-1.1.0-rc.411-linux-x86_64.tar.gz",
-    "sha256": "9efb4568d2ca160e9f3886f579c1933e96125f3d3505997b9357ea7c722640cc",
-    "size_bytes": 28765462
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.412/twinpanel-1.1.0-rc.412-linux-x86_64.tar.gz",
+    "sha256": "097b536406f6c8b2341027c62731159cf5eca8fc1a172d1ad908d32c19ceb88f",
+    "size_bytes": 28768934
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.411 قابلیت «🔗 دریافت لینک اکانت» را به ربات اصلی کاربر اضافه می‌کند. کاربر نام کاربری VPN اکانت خود را وارد می‌کند و ربات فقط داخل اشتراک‌های همان کاربرِ متصل به تلگرام جست‌وجو می‌کند و لینک رسمی اتصال را از endpoint موجود connection-info تحویل می‌دهد؛ lookup سراسری بر اساس account_username وجود ندارد و حدس نام کاربری کاربر دیگر لینک او را افشا نمی‌کند. رفتار ربات نماینده بدون تغییر باقی مانده است. منطق TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane تغییر نکرده است. Source روی SHA immutable c8e3a61e39993c906c2bb628193699374bcfc54d قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.411 adds the 'Get account link' flow to the main customer Telegram bot. The user enters their VPN account username; the bot searches only within that Telegram-linked customer's own subscriptions and returns the official connection link from the existing connection-info endpoint. There is no global account_username lookup, so guessing another customer's username cannot expose their link. Reseller bot behavior is unchanged. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane logic is unchanged. The source is pinned to immutable SHA c8e3a61e39993c906c2bb628193699374bcfc54d."
+    "fa": "TwinPanel 1.1.0-rc.412 خطای API 504 هنگام انتقال بکاپ‌های بزرگ Eylan را اصلاح می‌کند. رکوردهای آماده در UI به‌صورت بسته‌های 50تایی Stage می‌شوند و Backend هر درخواست Stage را حداکثر تا 100 رکورد محدود می‌کند تا ساخت هزاران Subscription داخل یک درخواست طولانی انجام نشود. پس از Stage کامل، V2Ray فقط یک‌بار برای کل مجموعه Finalize می‌شود و همچنان برای هر Exit فعال فقط یک restart Xray انجام می‌شود. Subscription/User/ProtocolCredentialها در مرحله Finalize به‌صورت bulk load می‌شوند تا N+1 query حذف شود. Stage و Finalize با migration markerها idempotent هستند و retry باعث ساخت دوباره اکانت‌های کامل‌شده نمی‌شود. منطق TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall/protocol dataplane تغییر نکرده است. Source روی SHA immutable 3f39f1987fdb020c84a17848fcdd6c8dd667b0d1 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.412 fixes API 504 timeouts during large Eylan backup imports. Ready records are staged by the UI in chunks of 50, while the backend caps each stage request at 100 records so thousands of subscriptions are no longer created inside one long HTTP request. After staging completes, V2Ray is finalized once for the whole set and still performs only one Xray restart per active Exit node. Subscription/User/ProtocolCredential state is bulk-loaded during finalization to remove N+1 database queries. Stage and finalize remain idempotent through migration markers, so retries do not recreate completed accounts. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall/protocol dataplane logic is unchanged. The source is pinned to immutable SHA 3f39f1987fdb020c84a17848fcdd6c8dd667b0d1."
   }
 }
