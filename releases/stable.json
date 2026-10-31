@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.414",
+  "version": "1.1.0-rc.415",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-31T16:27:12Z",
+  "released_at": "2026-10-31T17:01:22Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "2a85b9dc788e6cc4ed67fd3ff37cdb4d20a49895",
+  "source_sha": "b9d15f840fd53d0768fb8373a942bc273dab8df1",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.414/twinpanel-1.1.0-rc.414-linux-x86_64.tar.gz",
-    "sha256": "5a55ea05e2dc140c6206e5af88496fd6c1145ed165033e1a33d82fff0d45e3c8",
-    "size_bytes": 28772686
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.415/twinpanel-1.1.0-rc.415-linux-x86_64.tar.gz",
+    "sha256": "67cc23ba8f5a995fd7da996624abd815af4ea94060a6ab0af20feeec2465c1fb",
+    "size_bytes": 28772569
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.414 قابلیت «دریافت لینک اکانت» در ربات اصلی Telegram را برای اکانت‌های VPN معتبری که به اشتراک‌های کاربر تلگرام متصل نیستند اصلاح می‌کند. ربات اکنون برای جلوگیری از افشای لینک با حدس نام کاربری، نام کاربری و رمز همان اکانت VPN را درخواست می‌کند؛ resolver داخلی با bot secret محافظت می‌شود، مقایسه رمز به‌صورت constant-time انجام می‌شود، خطای نام کاربری/رمز یکسان است و تلاش‌های ناموفق محدود می‌شوند. لینک از همان سازوکار canonical اشتراک ساخته می‌شود و هیچ تغییری در provisioning یا credential generation ایجاد نمی‌شود. پایداری ارتباط ربات از rc.413 نیز حفظ شده است. منطق TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane تغییر نکرده است. Source روی SHA immutable 2a85b9dc788e6cc4ed67fd3ff37cdb4d20a49895 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.414 fixes the main Telegram bot account-link recovery for valid VPN accounts that are not attached to the Telegram-linked user's Panel subscriptions. To prevent link disclosure through guessed usernames, the bot now requires both the VPN account username and that account's password; the internal resolver is protected by the bot secret, password comparison is constant-time, username/password failures use the same error, and failed attempts are throttled. The link is generated through the canonical subscription share URL path without changing provisioning or credential generation. Telegram connection persistence from rc.413 is preserved. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane logic is unchanged. The source is pinned to immutable SHA 2a85b9dc788e6cc4ed67fd3ff37cdb4d20a49895."
+    "fa": "TwinPanel 1.1.0-rc.415 پایداری Runtime ربات اصلی Telegram را تکمیل می‌کند. ربات دیگر مسیر داخلی API را به پورت ثابت 8095 قفل نمی‌کند و پورت واقعی نصب‌شده را از تنظیمات Controller تشخیص می‌دهد؛ برای خطاهای موقت شبکه/timeout نیز retry محدود دارد، بدون retry کردن خطاهای کاربردی HTTP. قرارداد systemd ربات با runtime واقعی app.telegram_runtime_custom هم‌راستا شده و install.env را بارگذاری می‌کند، در حالی که جداسازی lifecycle از twinpanel-api، Restart=always، RestartSec=4 و StartLimitIntervalSec=0 حفظ شده‌اند. جریان امن «دریافت لینک اکانت» همچنان دقیقاً دو مرحله‌ای است: ابتدا نام کاربری، سپس رمز، و فقط در مرحله رمز resolver فراخوانی می‌شود. انتشار نسخه جدید همچنین باعث restart واقعی process می‌شود تا هیچ runtime قدیمیِ مانده در حافظه رفتار قبل از rc.414 را ادامه ندهد. منطق TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane تغییر نکرده است. Source روی SHA immutable b9d15f840fd53d0768fb8373a942bc273dab8df1 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.415 completes the main Telegram bot runtime resilience fix. The bot no longer pins its internal API endpoint to port 8095; it resolves the controller's installed API port from runtime configuration and applies bounded retries only to transient network/timeout transport failures, without retrying application HTTP errors. The managed systemd contract is aligned with the actual app.telegram_runtime_custom entrypoint and loads install.env while preserving API lifecycle isolation, Restart=always, RestartSec=4 and StartLimitIntervalSec=0. Secure account-link recovery remains strictly two-step: username first, password second, and the resolver is called only from the password state. Publishing a new version also forces a real bot process restart so an older in-memory runtime cannot continue serving pre-rc.414 behavior. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane logic is unchanged. Source is pinned to immutable SHA b9d15f840fd53d0768fb8373a942bc273dab8df1."
   }
 }
