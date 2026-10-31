@@ -168,8 +168,6 @@ def _expiry_iso(value: Any) -> str | None:
 
 
 def _password(row: dict[str, Any]) -> str | None:
-    # The audited Eylan user schema has protocol passwords rather than a generic
-    # password column. Cisco is the primary login password; L2TP is the fallback.
     for key in ("cisco_password", "l2tp_password"):
         value = str(row.get(key) or "").strip()
         if value:
@@ -280,8 +278,15 @@ def preview_eylan_backup(raw: bytes, filename: str) -> dict[str, Any]:
 def duration_days_for_expiry(expires_at: datetime | None, *, now: datetime | None = None) -> int:
     if expires_at is None:
         return 3650
+    expiry = expires_at
+    if expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=timezone.utc)
+    else:
+        expiry = expiry.astimezone(timezone.utc)
     current = now or datetime.now(timezone.utc)
     if current.tzinfo is None:
         current = current.replace(tzinfo=timezone.utc)
-    remaining = (expires_at - current).total_seconds()
+    else:
+        current = current.astimezone(timezone.utc)
+    remaining = (expiry - current).total_seconds()
     return max(1, min(3650, math.ceil(remaining / 86400)))
