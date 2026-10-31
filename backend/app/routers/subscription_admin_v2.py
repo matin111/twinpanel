@@ -1,13 +1,24 @@
 from __future__ import annotations
 
+from collections import defaultdict
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import require_admin
-from ..models import Plan, ProtocolCredential, Subscription, SubscriptionStatus
+from ..models import (
+    Plan,
+    ProtocolCredential,
+    Subscription,
+    SubscriptionNode,
+    SubscriptionProtocol,
+    SubscriptionStatus,
+    User,
+)
 from ..protocol_account_registry import normalize_protocols, registry_payload
+from ..schemas import SubscriptionOut
 from ..services.subscription_factory import create_subscription_core
 from ..subscription_enforcement import queue_subscription_enforcement
 from ..subscription_override_models import (
@@ -91,6 +102,138 @@ def _enriched_payload(db: Session, sub: Subscription) -> dict:
     return payload
 
 
+def _bulk_admin_list_context(db: Session, rows: list[Subscription]) -> dict:
+    """Load list-page relationships in a bounded number of queries.
+
+    The old list called _enriched_payload() for every subscription, which in
+    turn performed plan/override/node/protocol/user lookups per row. Large
+    migrations therefore turned one admin refresh into thousands of SQL calls.
+    """
+    if not rows:
+        return {
+            "users": {},
+            "plans": {},
+            "overrides": {},
+            "node_ids": {},
+            "protocols": {},
+        }
+
+    subscription_ids = [int(sub.id) for sub in rows]
+    user_ids = {int(sub.user_id) for sub in rows if sub.user_id is not None}
+    plan_ids = {int(sub.plan_id) for sub in rows if sub.plan_id is not None}
+
+    users = (
+        {int(item.id): item for item in db.query(User).filter(User.id.in_(user_ids)).all()}
+        if user_ids
+        else {}
+    )
+    plans = (
+        {int(item.id): item for item in db.query(Plan).filter(Plan.id.in_(plan_ids)).all()}
+        if plan_ids
+        else {}
+    )
+    overrides = {
+        int(item.subscription_id): item
+        for item in (
+            db.query(SubscriptionRuntimeOverride)
+            .filter(SubscriptionRuntimeOverride.subscription_id.in_(subscription_ids))
+            .all()
+        )
+    }
+
+    node_ids: dict[int, list[int]] = defaultdict(list)
+    for subscription_id, node_id in (
+        db.query(SubscriptionNode.subscription_id, SubscriptionNode.node_id)
+        .filter(SubscriptionNode.subscription_id.in_(subscription_ids))
+        .order_by(SubscriptionNode.id)
+        .all()
+    ):
+        node_ids[int(subscription_id)].append(int(node_id))
+
+    protocols: dict[int, list[str]] = defaultdict(list)
+    for subscription_id, protocol in (
+        db.query(SubscriptionProtocol.subscription_id, SubscriptionProtocol.protocol)
+        .filter(SubscriptionProtocol.subscription_id.in_(subscription_ids))
+        .order_by(SubscriptionProtocol.id)
+        .all()
+    ):
+        protocols[int(subscription_id)].append(str(protocol))
+
+    return {
+        "users": users,
+        "plans": plans,
+        "overrides": overrides,
+        "node_ids": dict(node_ids),
+        "protocols": dict(protocols),
+    }
+
+
+def _enriched_payload_from_context(sub: Subscription, context: dict) -> dict:
+    user = context["users"].get(int(sub.user_id)) if sub.user_id is not None else None
+    plan = context["plans"].get(int(sub.plan_id)) if sub.plan_id is not None else None
+    override = context["overrides"].get(int(sub.id))
+
+    node_ids = list(context["node_ids"].get(int(sub.id), []))
+    if not node_ids:
+        node_ids = [
+            int(node_id)
+            for node_id in (sub.iran_node_id, sub.exit_node_id)
+            if node_id is not None
+        ]
+
+    base = SubscriptionOut(
+        id=sub.id,
+        user_id=sub.user_id,
+        plan_id=sub.plan_id,
+        status=sub.status,
+        traffic_limit_bytes=sub.traffic_limit_bytes,
+        traffic_used_bytes=sub.traffic_used_bytes,
+        iran_node_id=sub.iran_node_id,
+        exit_node_id=sub.exit_node_id,
+        starts_at=sub.starts_at,
+        expires_at=sub.expires_at,
+        created_at=sub.created_at,
+        account_username=sub.account_username,
+        customer_email=user.email if user else None,
+        customer_name=user.full_name if user else None,
+        plan_name=plan.name if plan else None,
+        traffic_limit_gb=round((sub.traffic_limit_bytes or 0) / 1024 / 1024 / 1024, 2),
+        traffic_used_gb=round((sub.traffic_used_bytes or 0) / 1024 / 1024 / 1024, 2),
+        node_ids=node_ids,
+        protocols=list(context["protocols"].get(int(sub.id), [])),
+    ).model_dump(mode="json")
+
+    if override is not None and override.device_limit is not None:
+        device_limit = max(int(override.device_limit), 1)
+    elif plan is not None:
+        device_limit = max(int(getattr(plan, "device_limit", 1) or 1), 1)
+    else:
+        device_limit = 1
+
+    base.update(
+        {
+            "creation_mode": "plan" if sub.plan_id is not None else "manual",
+            "plan_name": plan.name if plan is not None else "دستی",
+            "activation_duration_days": int(
+                sub.activation_duration_days
+                or (plan.duration_days if plan else 0)
+                or 0
+            ),
+            "traffic_unlimited": int(sub.traffic_limit_bytes or 0) <= 0,
+            "duration_unlimited": bool(override and override.duration_unlimited),
+            "device_limit": device_limit,
+            "device_limit_source": (
+                "subscription"
+                if override and override.device_limit is not None
+                else "plan"
+                if plan is not None
+                else "manual"
+            ),
+        }
+    )
+    return base
+
+
 def _missing_provisioned_protocols(
     db: Session,
     subscription_id: int,
@@ -146,7 +289,8 @@ def admin_list_v2(db: Session = Depends(get_db)):
         .order_by(Subscription.id.desc())
         .all()
     )
-    return [_enriched_payload(db, sub) for sub in rows]
+    context = _bulk_admin_list_context(db, rows)
+    return [_enriched_payload_from_context(sub, context) for sub in rows]
 
 
 @router.post("/admin-create-v2")

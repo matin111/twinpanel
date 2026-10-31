@@ -20,6 +20,9 @@ jobs:
           assert 'observer.observe(document.body' not in s
           assert 'observer.observe(body,{childList:true,subtree:false})' in s
           assert 'requestAnimationFrame' in s
-          assert 'window.setInterval(refresh,5000)' in s
+          assert 'let inFlight=false;' in s
+          assert 'document.visibilityState==="hidden"' in s
+          assert 'window.setInterval(()=>{void refresh();},15000)' in s
+          assert 'window.setInterval(refresh,5000)' not in s
           print('SUBSCRIPTION_PAGE_FREEZE_SMOKE_OK')
           PY

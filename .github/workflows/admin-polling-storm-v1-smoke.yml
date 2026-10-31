@@ -5,6 +5,9 @@ on:
     paths:
       - "lib/admin-ops-api.ts"
       - "components/admin-notification-center.tsx"
+      - "components/admin-subscription-live-table.tsx"
+      - "backend/app/routers/subscription_admin_v2.py"
+      - "backend/tests/subscriptions_bulk_smoke.py"
       - ".github/workflows/admin-polling-storm-v1-smoke.yml"
   workflow_dispatch:
 
@@ -19,3 +22,8 @@ jobs:
           set -euo pipefail
           ! grep -R --line-number --fixed-strings '/v1/admin/panel-notifications/pulse' lib components
           grep -n --fixed-strings 'adminRealtimePulse:async()' lib/admin-ops-api.ts
+      - name: Verify subscription list bulk loading and live polling guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          python backend/tests/subscriptions_bulk_smoke.py
