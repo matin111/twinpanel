@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import uuid
 from datetime import datetime
 from typing import Any, Literal
 
@@ -14,6 +15,7 @@ from ..deps import require_admin
 from ..migration_import_models import MigrationImportRecord
 from ..models import Subscription
 from ..services.migration_import_v2 import import_record, legacy_payload
+from ..services.migration_v2ray_batch import provision_migrated_v2ray_batch
 
 
 MigrationSource = Literal["sanaei", "marzban", "pasargad"]
@@ -40,6 +42,26 @@ class MigrationImportIn(BaseModel):
     starts_at: datetime | None = None
     expires_at: datetime | None = None
     activation_duration_days: int | None = Field(default=None, ge=1, le=3650)
+
+
+class MigrationBatchImportIn(BaseModel):
+    source: MigrationSource
+    records: list[dict[str, Any]] = Field(min_length=1, max_length=1000)
+    target_user_id: int
+    protocols: list[str] = Field(default_factory=lambda: ["v2ray"], max_length=20)
+
+
+def _preserved_v2ray_uuid(record: dict[str, Any]) -> str:
+    credentials = record.get("credentials")
+    if not isinstance(credentials, dict):
+        raise ValueError("V2Ray migration record is missing preserved credentials")
+    raw = str(credentials.get("uuid") or "").strip()
+    if not raw:
+        raise ValueError("V2Ray migration record is missing preserved UUID")
+    try:
+        return str(uuid.UUID(raw))
+    except (ValueError, AttributeError) as exc:
+        raise ValueError(f"invalid preserved V2Ray UUID: {raw}") from exc
 
 
 @admin_router.get("/imports")
@@ -94,6 +116,76 @@ def migration_import(payload: MigrationImportIn, db: Session = Depends(get_db)):
     except Exception:
         db.rollback()
         raise
+
+
+@admin_router.post("/import-batch")
+async def migration_import_batch(
+    payload: MigrationBatchImportIn,
+    db: Session = Depends(get_db),
+):
+    """Import and provision a V2Ray migration batch without per-account restarts.
+
+    The normal single-account endpoint remains unchanged for compatibility. This
+    optimized path is deliberately limited to V2Ray because its canonical
+    account driver rewrites Xray config.json and restarts the service. Applying
+    all imported clients in one node transaction is both faster and race-free.
+    """
+
+    protocols = [str(item).strip().lower() for item in payload.protocols if str(item).strip()]
+    if protocols != ["v2ray"]:
+        raise HTTPException(
+            status_code=422,
+            detail="Bulk migration provisioning currently supports exactly the v2ray protocol",
+        )
+
+    try:
+        # Validate the complete batch before the first database write so a bad
+        # source UUID cannot leave a half-imported batch behind.
+        preserved_uuids = [_preserved_v2ray_uuid(record) for record in payload.records]
+
+        imported = 0
+        existing = 0
+        subscription_uuids: dict[int, str] = {}
+        results: list[dict[str, Any]] = []
+
+        for record, preserved_uuid in zip(payload.records, preserved_uuids, strict=True):
+            result = import_record(
+                db,
+                source=payload.source,
+                record=record,
+                target_user_id=payload.target_user_id,
+                protocols=["v2ray"],
+            )
+            subscription_id = int(result["subscription_id"])
+            subscription_uuids[subscription_id] = preserved_uuid
+            results.append(result)
+            if result.get("imported"):
+                imported += 1
+            elif result.get("idempotent"):
+                existing += 1
+
+        provision = await provision_migrated_v2ray_batch(db, subscription_uuids)
+
+        return {
+            "ok": bool(provision.get("ok")),
+            "imported": imported,
+            "existing": existing,
+            "subscriptions": len(subscription_uuids),
+            "provision": provision,
+            "items": results,
+        }
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=502,
+            detail=f"migration batch imported but node provisioning failed: {exc}",
+        ) from exc
 
 
 @public_router.get("/{token}", response_class=PlainTextResponse)
