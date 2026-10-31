@@ -11,36 +11,17 @@ from ..models import Node, NodeType, ProtocolCredential, Subscription, User
 from ..routers.provision import cmd, ssh_connect_saved
 
 
-# TWINPANEL_MIGRATION_V2RAY_BATCH_PROVISION_V1
+# TWINPANEL_MIGRATION_V2RAY_BATCH_PROVISION_V2
 #
-# Migration imports can contain hundreds of V2Ray accounts. Provisioning each
+# Migration imports can contain thousands of V2Ray accounts. Provisioning each
 # account through the normal single-account path would open one SSH session and
 # restart Xray once per account. Besides being slow, parallelising that legacy
 # read/modify/write flow would create a lost-update race on config.json.
 #
 # This helper keeps the canonical account shape but applies the whole migration
 # batch atomically per Exit node: one SSH connection, one config rewrite and one
-# Xray restart per node.
-
-
-def _credential(db: Session, subscription_id: int) -> ProtocolCredential:
-    item = (
-        db.query(ProtocolCredential)
-        .filter(
-            ProtocolCredential.subscription_id == subscription_id,
-            ProtocolCredential.protocol == "v2ray",
-        )
-        .first()
-    )
-    if item is None:
-        item = ProtocolCredential(
-            subscription_id=subscription_id,
-            protocol="v2ray",
-            is_active=True,
-        )
-        db.add(item)
-        db.flush()
-    return item
+# Xray restart per node. Database state is loaded in bulk so large imports do not
+# spend the proxy timeout budget on thousands of individual SELECT statements.
 
 
 def _remote_batch_script(clients_payload: list[dict[str, str]]) -> str:
@@ -54,12 +35,7 @@ async def provision_migrated_v2ray_batch(
     db: Session,
     subscription_uuids: dict[int, str],
 ) -> dict[str, Any]:
-    """Provision imported V2Ray identities with one Xray restart per Exit node.
-
-    ``subscription_uuids`` must contain the preserved source UUID for every
-    imported subscription. Existing deterministic TwinPanel client e-mails are
-    replaced, making the operation idempotent for re-imports.
-    """
+    """Provision imported V2Ray identities with one Xray restart per Exit node."""
 
     from ..routers import account_delivery as ad
 
@@ -72,17 +48,41 @@ async def provision_migrated_v2ray_batch(
             "errors": [],
         }
 
-    subscriptions: dict[int, Subscription] = {}
+    subscription_ids = sorted(int(item) for item in subscription_uuids)
+    subscriptions_list = (
+        db.query(Subscription)
+        .filter(Subscription.id.in_(subscription_ids))
+        .all()
+    )
+    subscriptions = {item.id: item for item in subscriptions_list}
+    missing_subscriptions = [item for item in subscription_ids if item not in subscriptions]
+    if missing_subscriptions:
+        raise RuntimeError(
+            "subscriptions not found after migration import: "
+            + ",".join(str(item) for item in missing_subscriptions[:20])
+        )
+
+    user_ids = sorted({int(item.user_id) for item in subscriptions_list})
+    user_list = db.query(User).filter(User.id.in_(user_ids)).all()
+    users_by_id = {item.id: item for item in user_list}
     users: dict[int, User] = {}
-    for subscription_id in subscription_uuids:
-        sub = db.get(Subscription, int(subscription_id))
-        if sub is None:
-            raise RuntimeError(f"subscription {subscription_id} not found after migration import")
-        user = db.get(User, sub.user_id)
+    for subscription_id, sub in subscriptions.items():
+        user = users_by_id.get(int(sub.user_id))
         if user is None:
             raise RuntimeError(f"user {sub.user_id} not found for subscription {subscription_id}")
-        subscriptions[sub.id] = sub
-        users[sub.id] = user
+        users[subscription_id] = user
+
+    existing_credentials = (
+        db.query(ProtocolCredential)
+        .filter(
+            ProtocolCredential.subscription_id.in_(subscription_ids),
+            ProtocolCredential.protocol == "v2ray",
+        )
+        .all()
+    )
+    credentials_by_subscription = {
+        int(item.subscription_id): item for item in existing_credentials
+    }
 
     nodes = (
         db.query(Node)
@@ -108,7 +108,7 @@ async def provision_migrated_v2ray_batch(
             "id": str(subscription_uuids[subscription_id]),
             "email": f"mv-{subscription_id}@twinpanel",
         }
-        for subscription_id in sorted(subscriptions)
+        for subscription_id in subscription_ids
     ]
     script = _remote_batch_script(clients_payload)
     encoded_script = base64.b64encode(script.encode()).decode()
@@ -172,7 +172,15 @@ async def provision_migrated_v2ray_batch(
     for subscription_id, items in items_by_subscription.items():
         if not items:
             continue
-        cred = _credential(db, subscription_id)
+        cred = credentials_by_subscription.get(subscription_id)
+        if cred is None:
+            cred = ProtocolCredential(
+                subscription_id=subscription_id,
+                protocol="v2ray",
+                is_active=True,
+            )
+            db.add(cred)
+            credentials_by_subscription[subscription_id] = cred
         cred.username = None
         cred.secret_encrypted = None
         cred.config_text_encrypted = ad._enc(items)

@@ -15,6 +15,7 @@ from ..deps import require_admin
 from ..migration_import_models import MigrationImportRecord
 from ..models import Subscription, SubscriptionStatus
 from ..services.migration_eylan import EYLAN_SOURCE, MAX_ARCHIVE_BYTES, duration_days_for_expiry, preview_eylan_backup
+from ..services.migration_eylan_transfer import EYLAN_STAGE_LIMIT, finalize_eylan_records, stage_eylan_records
 from ..services.migration_import_v2 import _enc_payload, import_record, legacy_payload
 from ..services.migration_v2ray_batch import provision_migrated_v2ray_batch
 from ..services.subscription_factory import create_subscription_core
@@ -66,6 +67,27 @@ class EylanImportIn(BaseModel):
     records: list[EylanImportRecord] = Field(min_length=1, max_length=5000)
     target_user_id: int = Field(gt=0)
     protocols: list[str] = Field(default_factory=lambda: ["v2ray"], min_length=1, max_length=20)
+
+
+class EylanStageIn(BaseModel):
+    records: list[EylanImportRecord] = Field(min_length=1, max_length=EYLAN_STAGE_LIMIT)
+    target_user_id: int = Field(gt=0)
+    protocols: list[str] = Field(default_factory=lambda: ["v2ray"], min_length=1, max_length=1)
+
+
+class EylanFinalizeIn(BaseModel):
+    source_ids: list[str] = Field(min_length=1, max_length=5000)
+    target_user_id: int = Field(gt=0)
+    protocols: list[str] = Field(default_factory=lambda: ["v2ray"], min_length=1, max_length=1)
+
+
+def _require_v2ray_only(protocols: list[str]) -> None:
+    normalized = [str(item).strip().lower() for item in protocols if str(item).strip()]
+    if normalized != ["v2ray"]:
+        raise HTTPException(
+            status_code=422,
+            detail="Eylan bulk import currently supports exactly the v2ray protocol",
+        )
 
 
 def _preserved_v2ray_uuid(record: dict[str, Any]) -> str:
@@ -125,150 +147,84 @@ async def eylan_preview(file: UploadFile = File(...)):
         await file.close()
 
 
+@admin_router.post("/eylan/stage")
+def eylan_stage(payload: EylanStageIn, db: Session = Depends(get_db)):
+    _require_v2ray_only(payload.protocols)
+    try:
+        return stage_eylan_records(
+            db,
+            records=payload.records,
+            target_user_id=payload.target_user_id,
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=502, detail=f"Eylan stage failed: {exc}") from exc
+
+
+@admin_router.post("/eylan/finalize")
+async def eylan_finalize(payload: EylanFinalizeIn, db: Session = Depends(get_db)):
+    _require_v2ray_only(payload.protocols)
+    try:
+        return await finalize_eylan_records(
+            db,
+            source_ids=payload.source_ids,
+            target_user_id=payload.target_user_id,
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=502, detail=f"Eylan finalize failed: {exc}") from exc
+
+
 @admin_router.post("/eylan/import")
 async def eylan_import(payload: EylanImportIn, db: Session = Depends(get_db)):
-    protocols = [str(item).strip().lower() for item in payload.protocols if str(item).strip()]
-    if protocols != ["v2ray"]:
+    """Compatibility endpoint for small Eylan imports.
+
+    Large browser imports use /eylan/stage in bounded chunks followed by one
+    /eylan/finalize request. Keeping this endpoint avoids breaking older clients.
+    """
+
+    _require_v2ray_only(payload.protocols)
+    if len(payload.records) > EYLAN_STAGE_LIMIT:
         raise HTTPException(
             status_code=422,
-            detail="Eylan bulk import currently supports exactly the v2ray protocol so Xray can be provisioned once per Exit node",
+            detail=(
+                f"Large Eylan imports must use staged transfer; maximum direct batch is "
+                f"{EYLAN_STAGE_LIMIT} records"
+            ),
         )
 
-    subscription_uuids: dict[int, str] = {}
-    marker_ids: list[int] = []
-    items: list[dict[str, Any]] = []
-    imported = 0
-    existing = 0
-
     try:
-        for record in payload.records:
-            source_id = record.source_id.strip()
-            marker = (
-                db.query(MigrationImportRecord)
-                .filter(
-                    MigrationImportRecord.source == EYLAN_SOURCE,
-                    MigrationImportRecord.source_id == source_id,
-                )
-                .first()
-            )
-            was_existing = marker is not None
-
-            if marker is not None:
-                sub = db.get(Subscription, marker.subscription_id)
-                if sub is None:
-                    raise HTTPException(
-                        status_code=409,
-                        detail=f"Eylan marker {source_id} points to a missing subscription",
-                    )
-                if int(sub.user_id) != int(payload.target_user_id):
-                    raise HTTPException(
-                        status_code=409,
-                        detail=f"Eylan account {source_id} belongs to another TwinPanel user",
-                    )
-                sub.account_username = record.username.strip()
-                sub.account_password_encrypted = record.password.strip()
-                sub.traffic_limit_bytes = int(record.traffic_limit_bytes)
-                sub.traffic_used_bytes = int(record.traffic_used_bytes)
-                sub.expires_at = record.expires_at.replace(tzinfo=None) if record.expires_at else None
-                sub.activation_duration_days = None
-                existing += 1
-                if marker.status == "imported":
-                    items.append(
-                        {
-                            "source_id": source_id,
-                            "subscription_id": sub.id,
-                            "existing": True,
-                        }
-                    )
-                    continue
-            else:
-                sub = create_subscription_core(
-                    db=db,
-                    user_id=payload.target_user_id,
-                    plan_id=None,
-                    traffic_bytes=int(record.traffic_limit_bytes),
-                    duration_days=duration_days_for_expiry(record.expires_at),
-                    node_ids=[],
-                    protocols=["v2ray"],
-                    username=record.username.strip(),
-                    password=record.password.strip(),
-                )
-                sub.traffic_used_bytes = int(record.traffic_used_bytes)
-                sub.expires_at = record.expires_at.replace(tzinfo=None) if record.expires_at else None
-                # Eylan carries an absolute expiry. First-connect activation must
-                # not replace it with a new relative duration.
-                sub.activation_duration_days = None
-                marker = MigrationImportRecord(
-                    source=EYLAN_SOURCE,
-                    source_id=source_id,
-                    subscription_id=sub.id,
-                    legacy_url=None,
-                    legacy_token=None,
-                    preserved_payload_encrypted=_enc_payload(
-                        {
-                            "source": EYLAN_SOURCE,
-                            "source_id": source_id,
-                            "username": record.username.strip(),
-                            "traffic_limit_bytes": int(record.traffic_limit_bytes),
-                            "traffic_used_bytes": int(record.traffic_used_bytes),
-                            "expires_at": record.expires_at.isoformat() if record.expires_at else None,
-                            "credential_policy": "twinpanel_generated_protocol_credentials",
-                        }
-                    ),
-                    status="provisioning",
-                )
-                db.add(marker)
-                db.flush()
-                imported += 1
-
-            marker.status = "provisioning"
-            marker_ids.append(marker.id)
-            # Eylan protocol credentials are intentionally NOT preserved. A new
-            # TwinPanel-owned V2Ray UUID is generated for each subscription.
-            subscription_uuids[sub.id] = str(uuid.uuid4())
-            items.append(
-                {
-                    "source_id": source_id,
-                    "subscription_id": sub.id,
-                    "existing": was_existing,
-                }
-            )
-
-        db.commit()
-
-        if subscription_uuids:
-            provision = await provision_migrated_v2ray_batch(db, subscription_uuids)
-            final_status = "imported" if int(provision.get("nodes") or 0) > 0 else "failed"
-            for marker_id in marker_ids:
-                marker = db.get(MigrationImportRecord, marker_id)
-                if marker is not None:
-                    marker.status = final_status
-            for subscription_id in subscription_uuids:
-                sub = db.get(Subscription, subscription_id)
-                if sub is not None:
-                    sub.status = (
-                        SubscriptionStatus.ACTIVE
-                        if final_status == "imported"
-                        else SubscriptionStatus.SUSPENDED
-                    )
-            db.commit()
-        else:
-            provision = {
-                "ok": True,
-                "subscriptions": 0,
-                "nodes": 0,
-                "node_restarts": 0,
-                "errors": [],
-            }
-
+        staged = stage_eylan_records(
+            db,
+            records=payload.records,
+            target_user_id=payload.target_user_id,
+        )
+        source_ids = [str(item.source_id).strip() for item in payload.records]
+        finalized = await finalize_eylan_records(
+            db,
+            source_ids=source_ids,
+            target_user_id=payload.target_user_id,
+        )
         return {
-            "ok": bool(provision.get("ok", True)),
+            "ok": bool(finalized.get("ok", True)),
             "source": EYLAN_SOURCE,
-            "imported": imported,
-            "existing": existing,
-            "subscriptions": len(items),
-            "provision": provision,
-            "items": items,
+            "imported": int(staged.get("imported") or 0),
+            "existing": int(staged.get("existing") or 0),
+            "subscriptions": len(source_ids),
+            "provision": finalized.get("provision") or {},
+            "items": staged.get("items") or [],
         }
     except ValueError as exc:
         db.rollback()
@@ -309,13 +265,7 @@ async def migration_import_batch(
     payload: MigrationBatchImportIn,
     db: Session = Depends(get_db),
 ):
-    """Import and provision a V2Ray migration batch without per-account restarts.
-
-    The normal single-account endpoint remains unchanged for compatibility. This
-    optimized path is deliberately limited to V2Ray because its canonical
-    account driver rewrites Xray config.json and restarts the service. Applying
-    all imported clients in one node transaction is both faster and race-free.
-    """
+    """Import and provision a V2Ray migration batch without per-account restarts."""
 
     protocols = [str(item).strip().lower() for item in payload.protocols if str(item).strip()]
     if protocols != ["v2ray"]:
