@@ -21,11 +21,54 @@ export type FastSubscriptionCreateResult={
   message?:string;
 };
 
+function detailText(detail:unknown){
+  if(!detail||typeof detail!=="object")return "";
+  const value=detail as {
+    message?:unknown;
+    unavailable_protocols?:unknown;
+    missing_protocols?:unknown;
+    provision_errors?:unknown;
+    provision_error?:unknown;
+  };
+  const parts:string[]=[];
+  if(typeof value.message==="string"&&value.message.trim())parts.push(value.message.trim());
+
+  if(Array.isArray(value.unavailable_protocols)){
+    const names=value.unavailable_protocols
+      .map(item=>item&&typeof item==="object"?String((item as {protocol?:unknown}).protocol||""):"")
+      .filter(Boolean);
+    if(names.length)parts.push(`آماده نیست: ${names.join(", ")}`);
+  }
+
+  if(Array.isArray(value.missing_protocols)){
+    const names=value.missing_protocols.map(item=>String(item||"")).filter(Boolean);
+    if(names.length)parts.push(`کانفیگ ساخته نشد: ${names.join(", ")}`);
+  }
+
+  if(Array.isArray(value.provision_errors)){
+    const errors=value.provision_errors.slice(0,3).map(item=>{
+      if(!item||typeof item!=="object")return String(item||"");
+      const row=item as {protocol?:unknown;node?:unknown;error?:unknown};
+      return [row.protocol,row.node,row.error].filter(Boolean).map(String).join(" · ");
+    }).filter(Boolean);
+    if(errors.length)parts.push(errors.join(" | "));
+  }
+
+  if(value.provision_error){
+    const nested=detailText(value.provision_error);
+    if(nested)parts.push(nested);
+    else if(typeof value.provision_error==="string")parts.push(value.provision_error);
+  }
+
+  return parts.join(" — ");
+}
+
 function errorText(payload:unknown,status:number){
   if(payload&&typeof payload==="object"){
     const value=payload as {detail?:unknown;message?:unknown};
     if(typeof value.detail==="string")return value.detail;
-    if(value.detail&&typeof value.detail==="object")return JSON.stringify(value.detail);
+    const detail=detailText(value.detail);
+    if(detail)return detail;
     if(typeof value.message==="string")return value.message;
   }
   if(typeof payload==="string"&&payload.trim())return payload.trim();
