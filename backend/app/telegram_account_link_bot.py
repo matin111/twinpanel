@@ -23,7 +23,23 @@ def _main_menu_keyboard():
     for row in markup.inline_keyboard:
         new_row = []
         for button in row:
-            if button.text == "🤝 درخواست نمایندگی":
+            if button.text == _base.ACCOUNT_LINK_BUTTON:
+                new_row.append(
+                    InlineKeyboardButton(
+                        text="🛒 خرید اشتراک",
+                        callback_data="shop:list",
+                        style="danger",
+                    )
+                )
+            elif button.text == "🛒 خرید اشتراک":
+                new_row.append(
+                    InlineKeyboardButton(
+                        text=_base.ACCOUNT_LINK_BUTTON,
+                        callback_data=_base.ACCOUNT_LINK_CALLBACK,
+                        style="success",
+                    )
+                )
+            elif button.text == "🤝 درخواست نمایندگی":
                 new_row.append(
                     InlineKeyboardButton(
                         text=button.text,
