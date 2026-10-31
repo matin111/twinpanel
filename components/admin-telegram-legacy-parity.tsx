@@ -42,6 +42,7 @@ async function telegramAdminRequest<T>(path:string,init:RequestInit={}):Promise<
 export function AdminTelegramLegacyPage(){
   const {pick}=useI18n();
   const [status,setStatus]=useState<TelegramBotStatus|null>(null);
+  const [statusLoaded,setStatusLoaded]=useState(false);
   const [logs,setLogs]=useState("");
   const [token,setToken]=useState("");
   const [busy,setBusy]=useState("");
@@ -54,8 +55,11 @@ export function AdminTelegramLegacyPage(){
   const load=async()=>{
     setError("");
     try{
-      setStatus(await parityApi.telegramStatus());
+      const nextStatus=await parityApi.telegramStatus();
+      setStatus(nextStatus);
+      setStatusLoaded(true);
     }catch(e){
+      setStatusLoaded(true);
       setError(e instanceof Error?e.message:String(e));
     }
     try{
@@ -135,18 +139,27 @@ export function AdminTelegramLegacyPage(){
     }
   };
 
-  const state=String(status?.service_state||"not_installed").toLowerCase();
-  const active=["active","running"].includes(state);
-  const installed=Boolean(status?.installed);
-  const tokenReady=Boolean(status?.token_configured);
-  const runtimeReady=Boolean(status?.runtime_ready);
+  const statusKnown=Boolean(status);
+  const state=statusKnown?String(status?.service_state||"inactive").toLowerCase():"unknown";
+  const active=statusKnown&&["active","running"].includes(state);
+  const installed=statusKnown&&Boolean(status?.installed);
+  const tokenReady=statusKnown&&Boolean(status?.token_configured);
+  const runtimeReady=statusKnown&&Boolean(status?.runtime_ready);
   const username=status?.bot?.username?`@${status.bot.username}`:"—";
+  const unknownLabel=pick(statusLoaded?"نامشخص":"در حال دریافت...",statusLoaded?"Unknown":"Loading...");
 
-  const stateLabel=active
-    ?pick("فعال","Active")
-    :installed
-      ?pick("متوقف","Stopped")
-      :pick("نصب نشده","Not installed");
+  const stateLabel=!statusKnown
+    ?unknownLabel
+    :active
+      ?pick("فعال","Active")
+      :installed
+        ?pick("متوقف","Stopped")
+        :pick("نصب نشده","Not installed");
+
+  const tokenLabel=!statusKnown?unknownLabel:(tokenReady?pick("تنظیم شده","Configured"):pick("تنظیم نشده","Missing"));
+  const runtimeLabel=!statusKnown?unknownLabel:(runtimeReady?pick("آماده","Ready"):pick("آماده نیست","Not ready"));
+  const installLabel=!statusKnown?unknownLabel:(installed?pick("نصب شده","Installed"):pick("نصب نشده","Not installed"));
+  const processLabel=!statusKnown?unknownLabel:(active?pick("فعال","Active"):pick("متوقف","Stopped"));
 
   return <Shell active="/admin/telegram">
     <div className="page telegram-legacy">
@@ -158,7 +171,7 @@ export function AdminTelegramLegacyPage(){
           <p>{pick("تنظیم، راه‌اندازی و کنترل ربات فروش و پشتیبانی تلگرام.","Configure, run and control the Telegram sales and support bot.")}</p>
         </div>
         <div className="tg-legacy-hero-side">
-          <Badge tone={active?"ok":installed?"warn":"bad"}>{stateLabel}</Badge>
+          <Badge tone={statusKnown?(active?"ok":installed?"warn":"bad"):"warn"}>{stateLabel}</Badge>
           <button className="tg-hero-refresh" disabled={Boolean(busy)} onClick={()=>void load()}>{pick("بروزرسانی وضعیت","Refresh status")}</button>
         </div>
       </section>
@@ -168,8 +181,8 @@ export function AdminTelegramLegacyPage(){
 
       <div className="stats dashboard-stats tg-legacy-stats">
         <Stat label={pick("وضعیت ربات","Bot status")} value={stateLabel} icon="◉"/>
-        <Stat label={pick("توکن","Token")} value={tokenReady?pick("تنظیم شده","Configured"):pick("تنظیم نشده","Missing")} icon="⌁"/>
-        <Stat label={pick("آمادگی اجرا","Runtime")} value={runtimeReady?pick("آماده","Ready"):pick("آماده نیست","Not ready")} icon="▦"/>
+        <Stat label={pick("توکن","Token")} value={tokenLabel} icon="⌁"/>
+        <Stat label={pick("آمادگی اجرا","Runtime")} value={runtimeLabel} icon="▦"/>
         <Stat label={pick("نام کاربری","Username")} value={username} icon="♙"/>
       </div>
 
@@ -179,7 +192,7 @@ export function AdminTelegramLegacyPage(){
             <small>{pick("تنظیمات ربات","BOT SETTINGS")}</small>
             <h2>{pick("توکن و کنترل ربات","Token and bot control")}</h2>
           </div>
-          <Badge tone={active?"ok":"warn"}>{active?pick("در حال اجرا","Running"):pick("متوقف","Stopped")}</Badge>
+          <Badge tone={statusKnown&&active?"ok":"warn"}>{!statusKnown?unknownLabel:(active?pick("در حال اجرا","Running"):pick("متوقف","Stopped"))}</Badge>
         </div>
 
         <div className="tg-service-grid">
@@ -197,14 +210,14 @@ export function AdminTelegramLegacyPage(){
           </div>
 
           <div className="tg-runtime-panel">
-            <div className="tg-runtime-row"><span><b>{pick("آمادگی اجرا","Runtime")}</b></span><Badge tone={runtimeReady?"ok":"bad"}>{runtimeReady?pick("آماده","Ready"):pick("آماده نیست","Not ready")}</Badge></div>
-            <div className="tg-runtime-row"><span><b>{pick("نصب ربات","Bot install")}</b></span><Badge tone={installed?"ok":"warn"}>{installed?pick("نصب شده","Installed"):pick("نصب نشده","Not installed")}</Badge></div>
-            <div className="tg-runtime-row"><span><b>{pick("وضعیت اجرا","Process state")}</b></span><Badge tone={active?"ok":"warn"}>{active?pick("فعال","Active"):pick("متوقف","Stopped")}</Badge></div>
+            <div className="tg-runtime-row"><span><b>{pick("آمادگی اجرا","Runtime")}</b></span><Badge tone={statusKnown&&runtimeReady?"ok":"warn"}>{runtimeLabel}</Badge></div>
+            <div className="tg-runtime-row"><span><b>{pick("نصب ربات","Bot install")}</b></span><Badge tone={statusKnown&&installed?"ok":"warn"}>{installLabel}</Badge></div>
+            <div className="tg-runtime-row"><span><b>{pick("وضعیت اجرا","Process state")}</b></span><Badge tone={statusKnown&&active?"ok":"warn"}>{processLabel}</Badge></div>
             <div className="tg-action-row tg-service-actions">
-              <button className="primary" disabled={Boolean(busy)||!tokenReady} onClick={()=>void act("install",pick("نصب / تعمیر ربات انجام شد","Bot install / repair completed"),parityApi.telegramInstall)}>{busy==="install"?pick("در حال نصب...","Installing..."):pick("نصب / تعمیر","Install / Repair")}</button>
-              <button className="ghost" disabled={Boolean(busy)||!installed||active} onClick={()=>void act("start",pick("ربات شروع شد","Bot started"),parityApi.telegramStart)}>{pick("شروع","Start")}</button>
-              <button className="ghost" disabled={Boolean(busy)||!installed} onClick={()=>void act("restart",pick("ربات راه‌اندازی مجدد شد","Bot restarted"),parityApi.telegramRestart)}>{pick("راه‌اندازی مجدد","Restart")}</button>
-              <button className="ghost danger" disabled={Boolean(busy)||!installed||!active} onClick={()=>void act("stop",pick("ربات متوقف شد","Bot stopped"),parityApi.telegramStop)}>{pick("توقف","Stop")}</button>
+              <button className="primary" disabled={Boolean(busy)||!statusKnown||!tokenReady} onClick={()=>void act("install",pick("نصب / تعمیر ربات انجام شد","Bot install / repair completed"),parityApi.telegramInstall)}>{busy==="install"?pick("در حال نصب...","Installing..."):pick("نصب / تعمیر","Install / Repair")}</button>
+              <button className="ghost" disabled={Boolean(busy)||!statusKnown||!installed||active} onClick={()=>void act("start",pick("ربات شروع شد","Bot started"),parityApi.telegramStart)}>{pick("شروع","Start")}</button>
+              <button className="ghost" disabled={Boolean(busy)||!statusKnown||!installed} onClick={()=>void act("restart",pick("ربات راه‌اندازی مجدد شد","Bot restarted"),parityApi.telegramRestart)}>{pick("راه‌اندازی مجدد","Restart")}</button>
+              <button className="ghost danger" disabled={Boolean(busy)||!statusKnown||!installed||!active} onClick={()=>void act("stop",pick("ربات متوقف شد","Bot stopped"),parityApi.telegramStop)}>{pick("توقف","Stop")}</button>
             </div>
           </div>
         </div>
