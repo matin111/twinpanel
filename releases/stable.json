@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.415",
+  "version": "1.1.0-rc.416",
   "installable": true,
   "published": true,
-  "released_at": "2026-10-31T17:01:22Z",
+  "released_at": "2026-10-31T17:54:34Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b9d15f840fd53d0768fb8373a942bc273dab8df1",
+  "source_sha": "18a8df3b5e9798562517420807640688968b2775",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.415/twinpanel-1.1.0-rc.415-linux-x86_64.tar.gz",
-    "sha256": "67cc23ba8f5a995fd7da996624abd815af4ea94060a6ab0af20feeec2465c1fb",
-    "size_bytes": 28772569
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.416/twinpanel-1.1.0-rc.416-linux-x86_64.tar.gz",
+    "sha256": "9f7110c5e344090cb1b5c6b440e76cedeb12c4f7f78826324ad37e8f570478a7",
+    "size_bytes": 28772931
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.415 پایداری Runtime ربات اصلی Telegram را تکمیل می‌کند. ربات دیگر مسیر داخلی API را به پورت ثابت 8095 قفل نمی‌کند و پورت واقعی نصب‌شده را از تنظیمات Controller تشخیص می‌دهد؛ برای خطاهای موقت شبکه/timeout نیز retry محدود دارد، بدون retry کردن خطاهای کاربردی HTTP. قرارداد systemd ربات با runtime واقعی app.telegram_runtime_custom هم‌راستا شده و install.env را بارگذاری می‌کند، در حالی که جداسازی lifecycle از twinpanel-api، Restart=always، RestartSec=4 و StartLimitIntervalSec=0 حفظ شده‌اند. جریان امن «دریافت لینک اکانت» همچنان دقیقاً دو مرحله‌ای است: ابتدا نام کاربری، سپس رمز، و فقط در مرحله رمز resolver فراخوانی می‌شود. انتشار نسخه جدید همچنین باعث restart واقعی process می‌شود تا هیچ runtime قدیمیِ مانده در حافظه رفتار قبل از rc.414 را ادامه ندهد. منطق TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane تغییر نکرده است. Source روی SHA immutable b9d15f840fd53d0768fb8373a942bc273dab8df1 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.415 completes the main Telegram bot runtime resilience fix. The bot no longer pins its internal API endpoint to port 8095; it resolves the controller's installed API port from runtime configuration and applies bounded retries only to transient network/timeout transport failures, without retrying application HTTP errors. The managed systemd contract is aligned with the actual app.telegram_runtime_custom entrypoint and loads install.env while preserving API lifecycle isolation, Restart=always, RestartSec=4 and StartLimitIntervalSec=0. Secure account-link recovery remains strictly two-step: username first, password second, and the resolver is called only from the password state. Publishing a new version also forces a real bot process restart so an older in-memory runtime cannot continue serving pre-rc.414 behavior. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential generation/routing/firewall/protocol dataplane logic is unchanged. Source is pinned to immutable SHA b9d15f840fd53d0768fb8373a942bc273dab8df1."
+    "fa": "TwinPanel 1.1.0-rc.416 بازیابی لینک اکانت‌های مهاجرتی Telegram را اصلاح می‌کند. در مسیر «دریافت لینک اکانت»، اکانت‌های مهاجرتی سنایی/مرزبان/پاسارگاد فقط با نام کاربری حفظ‌شده پیدا می‌شوند و دیگر به رمز VPN وابسته نیستند. مسیر «اکانت‌های من» بدون تغییر باقی مانده است. Resolver جدید فقط اشتراک‌هایی را می‌پذیرد که MigrationImportRecord با وضعیت imported داشته باشند، اشتراک فعال و منقضی‌نشده باشد و username تکراری به‌صورت fail-closed رد می‌شود. endpoint قدیمی username+password برای سازگاری عقب‌رو حفظ شده است. منطق migration data، provisioning، credential generation، TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall/protocol dataplane تغییر نکرده است. Source روی SHA immutable 18a8df3b5e9798562517420807640688968b2775 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.416 fixes Telegram subscription-link recovery for migrated accounts. The main 'Get account link' flow now resolves Sanaei/Marzban/Pasargad migrated accounts using only their preserved username, without requiring a VPN password. The existing My Accounts flow is unchanged. The new resolver only accepts subscriptions backed by an imported MigrationImportRecord, requires the subscription to be active and non-expired, and fails closed on duplicate usernames. The legacy username+password resolver remains available for backward compatibility. Migration data, provisioning, credential generation, TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall/protocol dataplane logic is unchanged. Source is pinned to immutable SHA 18a8df3b5e9798562517420807640688968b2775."
   }
 }
