@@ -5,9 +5,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SERVICE_PATH = ROOT / "app" / "services" / "migration_import_v2.py"
+BATCH_SERVICE_PATH = ROOT / "app" / "services" / "migration_v2ray_batch.py"
 ROUTER_PATH = ROOT / "app" / "routers" / "migration_center_v2.py"
 AGGREGATE_PATH = ROOT / "app" / "routers" / "subscription_admin_v2.py"
 MODEL_PATH = ROOT / "app" / "migration_import_models.py"
+UI_PATH = ROOT.parent / "components" / "migration-center-admin.tsx"
 
 
 def _text(path: Path) -> str:
@@ -62,9 +64,8 @@ def test_phase2_preserves_payload_encrypted() -> None:
     assert "app_secret_key" in service
 
 
-def test_phase2_does_not_call_provisioning_or_accounting() -> None:
+def test_single_record_import_service_remains_db_only() -> None:
     service = _text(SERVICE_PATH)
-    router = _text(ROUTER_PATH)
     forbidden = (
         "create_subscription_core(",
         "queue_subscription_enforcement(",
@@ -75,7 +76,44 @@ def test_phase2_does_not_call_provisioning_or_accounting() -> None:
     )
     for token in forbidden:
         assert token not in service
-        assert token not in router
+
+
+def test_v2ray_batch_endpoint_requires_preserved_uuid_before_provisioning() -> None:
+    router = _text(ROUTER_PATH)
+    assert '@admin_router.post("/import-batch")' in router
+    assert "uuid.UUID(value)" in router
+    assert 'raise ValueError("preserved V2Ray UUID is missing from migration record")' in router
+    assert 'raise ValueError("preserved V2Ray UUID is invalid")' in router
+    assert 'subscription_uuids[int(result["subscription_id"])] = _preserved_v2ray_uuid(record)' in router
+    assert "await provision_migrated_v2ray_batch(" in router
+
+
+def test_v2ray_batch_provision_is_atomic_and_one_restart_per_node() -> None:
+    service = _text(BATCH_SERVICE_PATH)
+    assert "clients[:]=[item for item in clients if item.get('email') not in emails]" in service
+    assert "clients.extend(payload)" in service
+    assert "os.fsync(handle.fileno())" in service
+    assert "os.replace(tmp,p)" in service
+    assert '"email": f"mv-{subscription_id}@twinpanel"' in service
+    assert "for node in nodes:" in service
+    assert service.count("systemctl restart xray") == 1
+    assert '"node_restarts": successful_nodes' in service
+
+
+def test_v2ray_batch_writes_preserved_uuid_to_delivery_credential() -> None:
+    service = _text(BATCH_SERVICE_PATH)
+    assert 'client_id = str(subscription_uuids[subscription_id])' in service
+    assert 'f"vless://{client_id}@{host}:{port}"' in service
+    assert 'cred.config_text_encrypted = ad._enc(items)' in service
+    assert "db.commit()" in service
+
+
+def test_migration_admin_ui_uses_single_batch_request_for_v2ray() -> None:
+    ui = _text(UI_PATH)
+    assert '"/v1/admin/migration-center/import-batch"' in ui
+    assert "records:readyRecords" in ui
+    assert 'protocols:["v2ray"]' in ui
+    assert "result.provision.node_restarts" in ui
 
 
 def test_phase2_keeps_legacy_delivery_separate() -> None:
