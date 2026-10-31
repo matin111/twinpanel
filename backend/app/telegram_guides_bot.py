@@ -200,3 +200,11 @@ def create_guides_router():
         )
 
     return router
+
+
+# Runtime imports this module immediately before telegram_wallet_bot.
+# Use that existing startup hook to attach main-bot extensions without
+# changing the large telegram_runtime_bot module or its generic fallback.
+from .telegram_main_extensions import install_main_bot_extensions
+
+install_main_bot_extensions()
