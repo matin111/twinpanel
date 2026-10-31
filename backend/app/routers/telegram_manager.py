@@ -179,7 +179,7 @@ def _service_text() -> str:
 Description=TwinPanel Telegram Bot
 After=network-online.target {API_SERVICE_NAME}
 Wants=network-online.target
-Requires={API_SERVICE_NAME}
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
