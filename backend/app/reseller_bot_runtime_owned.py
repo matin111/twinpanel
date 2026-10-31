@@ -67,6 +67,12 @@ def reseller_main_keyboard() -> ReplyKeyboardMarkup:
     )
 
 
+# Preserve the established Account Sublink runtime contract while pointing it
+# at the unified reseller menu. The sublink module itself is also patched below
+# so every handler resolves the same keyboard dynamically.
+subscription_link_main_keyboard = reseller_main_keyboard
+
+
 def _subscription_detail_without_renew(sub_id: int, subscription_link: str | None):
     markup = _original_subscription_detail_keyboard(sub_id, subscription_link)
     rows = []
@@ -209,7 +215,7 @@ async def _run_bot_with_texts(
 
 def install_runtime_overrides() -> None:
     legacy_runtime.build_router = build_router
-    legacy_runtime._main_keyboard = reseller_main_keyboard
+    legacy_runtime._main_keyboard = subscription_link_main_keyboard
     legacy_runtime._subscription_detail_keyboard = _subscription_detail_without_renew
     legacy_runtime._run_bot = _run_bot_with_texts
 
