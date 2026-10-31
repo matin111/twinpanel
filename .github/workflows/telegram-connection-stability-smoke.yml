@@ -1,0 +1,28 @@
+name: Telegram Connection Stability Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/telegram_manager.py"
+      - "backend/app/telegram_runtime_bot.py"
+      - "backend/scripts/telegram_connection_stability_smoke.py"
+      - ".github/workflows/telegram-connection-stability-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile Telegram manager
+        run: python -m py_compile backend/app/routers/telegram_manager.py
+
+      - name: Verify persistent Telegram connection contract
+        run: python backend/scripts/telegram_connection_stability_smoke.py
