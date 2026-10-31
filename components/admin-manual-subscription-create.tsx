@@ -153,7 +153,7 @@ export function AdminManualSubscriptionCreate(){
 
     setBusy(true);setError("");setOk("");
     try{
-      const created=await adminApi.createSubscriptionV2({
+      await adminApi.createSubscriptionV2({
         user_id:userId,
         plan_id:planId||null,
         node_ids:[],
@@ -164,8 +164,6 @@ export function AdminManualSubscriptionCreate(){
         ...(username.trim()?{username:username.trim()}:{}),
         ...(password.trim()?{password:password.trim()}:{}),
       });
-
-      try{await adminApi.provisionSubscription(Number(created.id||0));}catch{}
 
       setOk(pick("اشتراک با پروتکل‌های انتخابی ساخته و اکانت صادر شد. لیست در حال بروزرسانی است…","Subscription created with the selected protocols and provisioned. Refreshing…"));
       window.setTimeout(()=>window.location.reload(),900);
