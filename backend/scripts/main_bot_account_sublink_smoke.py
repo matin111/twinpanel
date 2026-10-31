@@ -29,6 +29,7 @@ for source in (
 # accounts. It asks for the preserved migrated username and never changes or
 # replaces the existing My Accounts flow.
 assert 'ACCOUNT_LINK_BUTTON = "🔗 دریافت لینک اکانت"' in feature_source
+assert 'CANCEL_BUTTON = "❌ لغو"' in feature_source
 assert "AccountLinkState.migrated_username" in feature_source
 assert "نام کاربری اکانتی که از پنل قبلی منتقل شده" in feature_source
 assert "نیازی به رمز عبور نیست" in feature_source
@@ -37,6 +38,21 @@ assert '"telegram_id": message.from_user.id' in feature_source
 assert '"username": username' in feature_source
 assert "bot_auth=True" in feature_source
 assert 'link.startswith(("http://", "https://"))' in feature_source
+
+# Restart/stale-keyboard regression: aiogram MemoryStorage is process-local, so
+# a Telegram reply keyboard can outlive the FSM state across updater restarts.
+# CANCEL must therefore be handled independently of AccountLinkState and before
+# the main router's generic fallback.
+assert "MemoryStorage()" in runtime_source
+assert "@router.message(F.text == CANCEL_BUTTON)" in feature_source
+assert "async def account_link_cancel" in feature_source
+cancel_handler = feature_source[
+    feature_source.index("async def account_link_cancel"):
+    feature_source.index("@router.message(F.text == ACCOUNT_LINK_BUTTON)")
+]
+assert "await state.clear()" in cancel_handler
+assert "reply_markup=main_runtime.main_keyboard()" in cancel_handler
+assert "AccountLinkState.migrated_username" not in cancel_handler
 
 # Regression guards: migrated recovery must not become a My Accounts picker or
 # a username+password FSM again.
@@ -95,5 +111,6 @@ assert "install_account_link_feature(" in extension_source
 assert "install_main_bot_extensions()" in guides_source
 assert runtime_source.index("from .telegram_guides_bot import") < runtime_source.index("from .telegram_wallet_bot import")
 assert runtime_source.index("create_wallet_router(") < runtime_source.index("dp.include_router(router)")
+assert 'await message.answer(\n        "این بخش در حال اتصال به "' in runtime_source
 
 print("MAIN_BOT_ACCOUNT_SUBLINK_SMOKE_OK")
