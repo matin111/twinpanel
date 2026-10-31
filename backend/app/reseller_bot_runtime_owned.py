@@ -15,10 +15,11 @@ from .discount_schema import ensure_discount_schema
 from .models import Plan
 from .reseller_bot_owned_runtime import build_owned_plan_router
 from .reseller_bot_payment_runtime import build_owned_payment_router
-from .reseller_bot_wallet_menu_runtime import (
-    build_wallet_menu_router,
-    wallet_main_keyboard,
+from .reseller_bot_subscription_link_runtime import (
+    build_subscription_link_router,
+    subscription_link_main_keyboard,
 )
+from .reseller_bot_wallet_menu_runtime import build_wallet_menu_router
 from .reseller_owned_plans import owned_plan_by_backing
 from .routers import reseller_bot_orders as legacy_orders
 from .routers.reseller_bot_orders_owned_v3 import approve_order_owned_v3
@@ -54,6 +55,11 @@ def _owned_review_caption(db, order):
 
 def build_router(reseller_id: int) -> Router:
     parent = Router(name=f"reseller-bot-root-owned-{reseller_id}")
+    # The account-link state router must win before generic legacy text handlers.
+    # It only searches subscriptions already owned by this Telegram customer.
+    parent.include_router(
+        build_subscription_link_router(reseller_id)
+    )
     # Wallet menu/state handlers must win before purchase and legacy handlers.
     # This gives every reseller bot a first-class wallet instead of exposing
     # wallet balance only as a checkout payment method.
@@ -127,7 +133,7 @@ async def _run_bot_with_texts(
 
 def install_runtime_overrides() -> None:
     legacy_runtime.build_router = build_router
-    legacy_runtime._main_keyboard = wallet_main_keyboard
+    legacy_runtime._main_keyboard = subscription_link_main_keyboard
     legacy_runtime._run_bot = _run_bot_with_texts
 
     # Direct Python callers inside receipt review and legacy wallet code import
