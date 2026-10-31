@@ -183,6 +183,10 @@ def create_subscription_core(
     # Classic drivers historically start from the subscription username/password
     # and then replace config material during provisioning. Modern drivers own
     # their secret/key formats and must create them inside their real provisioner.
+    # V2Ray is different from the username/password classic protocols: a usable
+    # credential does not exist until provisioning has produced a real client
+    # config. Keeping the placeholder inactive prevents ACTIVE + NO_CONFIG rows
+    # from being treated as successfully provisioned.
     for protocol in requested_protocols:
         if protocol not in CLASSIC_PROTOCOL_KEYS:
             continue
@@ -192,7 +196,7 @@ def create_subscription_core(
                 protocol=protocol,
                 username=username,
                 secret_encrypted=password,
-                is_active=True,
+                is_active=(protocol != "v2ray"),
             )
         )
 
