@@ -31,6 +31,7 @@ def _cancel_keyboard():
                 InlineKeyboardButton(
                     text="❌ لغو عملیات",
                     callback_data=CANCEL_CALLBACK,
+                    style="danger",
                 )
             ],
         ],
@@ -44,6 +45,7 @@ def _home_keyboard():
                 InlineKeyboardButton(
                     text="🏠 منوی اصلی",
                     callback_data=MAIN_HOME_CALLBACK,
+                    style="primary",
                 )
             ]
         ],
@@ -57,46 +59,55 @@ def _main_menu_keyboard():
                 InlineKeyboardButton(
                     text=ACCOUNT_LINK_BUTTON,
                     callback_data=ACCOUNT_LINK_CALLBACK,
+                    style="success",
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="🏠 داشبورد",
                     callback_data="main:dashboard",
+                    style="primary",
                 ),
                 InlineKeyboardButton(
                     text="📦 اشتراک‌های من",
                     callback_data="subs:list",
+                    style="primary",
                 ),
             ],
             [
                 InlineKeyboardButton(
                     text="🛒 خرید اشتراک",
                     callback_data="shop:list",
+                    style="success",
                 ),
                 InlineKeyboardButton(
                     text="💰 کیف پول",
                     callback_data="wallet:refresh",
+                    style="primary",
                 ),
             ],
             [
                 InlineKeyboardButton(
                     text="📚 آموزش",
                     callback_data="mlearn:g:root",
+                    style="primary",
                 ),
                 InlineKeyboardButton(
                     text="⬇️ دانلود برنامه",
                     callback_data="mlearn:d:root",
+                    style="primary",
                 ),
             ],
             [
                 InlineKeyboardButton(
                     text="🎫 پشتیبانی",
                     callback_data="ts:send",
+                    style="danger",
                 ),
                 InlineKeyboardButton(
                     text="👤 حساب من",
                     callback_data="main:account",
+                    style="primary",
                 ),
             ],
         ],
@@ -110,6 +121,7 @@ def _connect_keyboard():
                 InlineKeyboardButton(
                     text="🔗 اتصال حساب",
                     callback_data="main:connect-account",
+                    style="success",
                 )
             ]
         ],
@@ -149,6 +161,7 @@ def _with_home(markup):
         InlineKeyboardButton(
             text="🏠 منوی اصلی",
             callback_data=MAIN_HOME_CALLBACK,
+            style="primary",
         )
     ])
 
@@ -172,23 +185,23 @@ def install_account_link_feature(
         message: Message,
         state: FSMContext,
     ):
-        # Inline keyboards do not remove a ReplyKeyboard that Telegram clients
-        # retained from an older release. Explicitly remove it before delegating
-        # to the existing /start flow, whose patched main_keyboard is inline.
+        # Telegram clients can retain a persistent ReplyKeyboard from an older
+        # release. Send an invisible cleanup marker, remove it immediately, and
+        # only then render the existing /start flow with the inline main menu.
         cleanup = await message.answer(
-            "⌨️ منوی قبلی بسته شد.",
+            "\u2063",
             reply_markup=ReplyKeyboardRemove(),
-        )
-
-        await main_runtime.start(
-            message,
-            state,
         )
 
         try:
             await cleanup.delete()
         except Exception:
             pass
+
+        await main_runtime.start(
+            message,
+            state,
+        )
 
     @router.callback_query(F.data == MAIN_HOME_CALLBACK)
     async def main_home_inline(
