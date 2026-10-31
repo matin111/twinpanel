@@ -2,18 +2,25 @@ from html import escape
 
 from aiogram import F
 from aiogram.fsm.context import FSMContext
-from aiogram.types import (
-    CallbackQuery,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    KeyboardButton,
-    Message,
-    ReplyKeyboardMarkup,
-)
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.types import KeyboardButton, Message, ReplyKeyboardMarkup
 
 
 ACCOUNT_LINK_BUTTON = "🔗 دریافت لینک اکانت"
-ACCOUNT_LINK_CALLBACK_PREFIX = "account_link:"
+CANCEL_BUTTON = "❌ لغو"
+
+
+class AccountLinkState(StatesGroup):
+    migrated_username = State()
+
+
+def _cancel_keyboard():
+    return ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[
+            [KeyboardButton(text=CANCEL_BUTTON)],
+        ],
+    )
 
 
 def _install_main_keyboard_button():
@@ -53,106 +60,22 @@ def _install_main_keyboard_button():
     return main_runtime
 
 
-def _status_value(row: dict) -> str:
-    return str(row.get("status") or "").strip().lower()
-
-
-def _subscription_id(row: dict) -> int | None:
-    try:
-        value = int(row.get("id") or 0)
-    except (TypeError, ValueError):
-        return None
-    return value if value > 0 else None
-
-
-def _protocol_label(row: dict) -> str:
-    labels = {
-        "v2ray": "V2Ray",
-        "cisco": "Cisco",
-        "openvpn": "OpenVPN",
-        "wireguard": "WireGuard",
-        "l2tp": "L2TP",
-    }
-    values = []
-
-    for raw in row.get("protocols") or []:
-        key = str(raw or "").strip().lower()
-        if not key or key in values:
-            continue
-        values.append(key)
-
-    return "/".join(
-        labels.get(key, key.upper())
-        for key in values[:2]
-    )
-
-
-def _subscription_label(row: dict) -> str:
-    sub_id = _subscription_id(row)
-    username = str(row.get("account_username") or "").strip()
-    plan_name = str(row.get("plan_name") or "").strip()
-    protocol = _protocol_label(row)
-
-    # Migrated V2Ray subscriptions may legitimately have no VPN username or
-    # password. Never make either field the display identity for My Accounts.
-    parts = [username or plan_name or "اشتراک"]
-
-    if protocol and protocol.casefold() not in parts[0].casefold():
-        parts.append(protocol)
-
-    if sub_id:
-        parts.append(f"#{sub_id}")
-
-    return " • ".join(parts)[:64]
-
-
-def _account_keyboard(rows: list[dict]) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=_subscription_label(row),
-                    callback_data=(
-                        ACCOUNT_LINK_CALLBACK_PREFIX
-                        + str(_subscription_id(row))
-                    ),
-                )
-            ]
-            for row in rows
-            if _subscription_id(row)
-        ]
-    )
-
-
-async def _customer_session(
-    telegram_id: int,
-    session_fn,
-) -> tuple[str, dict]:
-    session = await session_fn(int(telegram_id))
-    token = str(session.get("access_token") or "").strip()
-
-    if not token:
-        raise RuntimeError(
-            "اتصال حساب تلگرام به پنل کامل نیست؛ دوباره /start را بزنید."
-        )
-
-    return token, session
-
-
 def install_account_link_feature(
     router,
     request_fn,
     session_fn,
 ):
-    """Attach owned My Accounts subscription-link delivery to the main bot.
+    """Attach passwordless recovery for imported/migrated VPN accounts.
 
-    The Telegram-linked customer session is the ownership authority. The bot
-    lists subscriptions returned by /v1/subscriptions/me and resolves a chosen
-    subscription through the customer connection-info endpoint, which checks
-    ownership again server-side. Migrated V2Ray accounts therefore do not need
-    a VPN username/password merely to recover their subscription link.
+    This flow is deliberately separate from «اکانت‌های من». It asks only for
+    the preserved username and the API resolver is restricted to subscriptions
+    that have an imported MigrationImportRecord. Ordinary TwinPanel accounts
+    and their existing My Accounts flow are not changed.
     """
 
+    # Keep the extension signature stable for the runtime installer. Migrated
+    # recovery uses the private bot-auth endpoint rather than customer session.
+    _ = session_fn
     main_runtime = _install_main_keyboard_button()
 
     @router.message(F.text == ACCOUNT_LINK_BUTTON)
@@ -161,132 +84,74 @@ def install_account_link_feature(
         state: FSMContext,
     ):
         await state.clear()
-
-        try:
-            token, _ = await _customer_session(
-                message.from_user.id,
-                session_fn,
-            )
-            rows = await request_fn(
-                "GET",
-                "/v1/subscriptions/me",
-                token=token,
-            )
-        except Exception as exc:
-            await message.answer(
-                "❌ " + escape(str(exc)),
-                reply_markup=main_runtime.main_keyboard(),
-            )
-            return
-
-        owned_rows = [
-            row
-            for row in (rows or [])
-            if isinstance(row, dict)
-            and _subscription_id(row)
-            and _status_value(row) == "active"
-        ]
-
-        if not owned_rows:
-            await message.answer(
-                "❌ اشتراک فعالی در «اکانت‌های من» پیدا نشد.",
-                reply_markup=main_runtime.main_keyboard(),
-            )
-            return
-
+        await state.set_state(AccountLinkState.migrated_username)
         await message.answer(
-            "🔗 <b>دریافت لینک اکانت</b>\n\n"
-            "یکی از اشتراک‌های «اکانت‌های من» را انتخاب کنید.\n"
-            "برای اشتراک‌های مهاجرتی نیازی به نام کاربری یا رمز VPN نیست.",
-            reply_markup=_account_keyboard(owned_rows),
+            "🔗 <b>دریافت لینک اکانت مهاجرتی</b>\n\n"
+            "نام کاربری اکانتی که از پنل قبلی منتقل شده را وارد کنید.\n"
+            "برای اکانت‌های مهاجرتی V2Ray نیازی به رمز عبور نیست.",
+            reply_markup=_cancel_keyboard(),
         )
 
-    @router.callback_query(
-        F.data.startswith(ACCOUNT_LINK_CALLBACK_PREFIX)
-    )
-    async def account_link_pick(
-        callback: CallbackQuery,
+    @router.message(AccountLinkState.migrated_username)
+    async def account_link_migrated_username(
+        message: Message,
+        state: FSMContext,
     ):
-        raw_id = str(callback.data or "")[
-            len(ACCOUNT_LINK_CALLBACK_PREFIX):
-        ].strip()
+        username = str(message.text or "").strip()
 
-        if not raw_id.isdigit() or int(raw_id) <= 0:
-            await callback.answer(
-                "انتخاب نامعتبر است.",
-                show_alert=True,
+        if username == CANCEL_BUTTON:
+            await state.clear()
+            await message.answer(
+                "عملیات لغو شد.",
+                reply_markup=main_runtime.main_keyboard(),
             )
             return
 
-        sub_id = int(raw_id)
-        await callback.answer("در حال دریافت لینک...")
+        if not username or len(username) > 128:
+            await message.answer(
+                "❌ نام کاربری معتبر وارد کنید یا «❌ لغو» را بزنید.",
+                reply_markup=_cancel_keyboard(),
+            )
+            return
 
         try:
-            token, _ = await _customer_session(
-                callback.from_user.id,
-                session_fn,
-            )
-
-            # Re-read My Accounts on every callback. This rejects stale or
-            # crafted callback IDs before asking for connection information.
-            rows = await request_fn(
-                "GET",
-                "/v1/subscriptions/me",
-                token=token,
-            )
-            owned = next(
-                (
-                    row
-                    for row in (rows or [])
-                    if isinstance(row, dict)
-                    and _subscription_id(row) == sub_id
-                    and _status_value(row) == "active"
-                ),
-                None,
-            )
-
-            if not owned:
-                raise RuntimeError(
-                    "این اشتراک دیگر در اکانت‌های فعال شما نیست."
-                )
-
             result = await request_fn(
-                "GET",
-                f"/v1/customer/subscriptions/{sub_id}/connection-info",
-                token=token,
+                "POST",
+                "/v1/telegram/account-link/resolve-migrated",
+                payload={
+                    "telegram_id": message.from_user.id,
+                    "username": username,
+                },
+                bot_auth=True,
             )
+
+            account_username = str(
+                result.get("account_username") or username
+            ).strip()
             link = str(
-                result.get("subscription_link")
-                or ""
+                result.get("subscription_link") or ""
             ).strip()
 
             if not link.startswith(("http://", "https://")):
                 raise RuntimeError(
-                    "لینک اتصال این اشتراک هنوز آماده نیست"
+                    "لینک اتصال این اکانت هنوز آماده نیست"
                 )
 
         except Exception as exc:
-            if callback.message:
-                await callback.message.answer(
-                    "❌ " + escape(str(exc)),
-                    reply_markup=main_runtime.main_keyboard(),
-                )
+            await message.answer(
+                "❌ " + escape(str(exc)) + "\n\n"
+                "نام کاربری اکانت مهاجرتی را دوباره وارد کنید.",
+                reply_markup=_cancel_keyboard(),
+            )
             return
 
-        if callback.message:
-            try:
-                await callback.message.edit_reply_markup(
-                    reply_markup=None,
-                )
-            except Exception:
-                pass
-
-            await callback.message.answer(
-                "✅ <b>لینک اشتراک آماده است</b>\n\n"
-                f"📦 {escape(_subscription_label(owned))}\n\n"
-                f"🔗 <code>{escape(link)}</code>\n\n"
-                "این لینک را فقط برای دستگاه‌های خودتان استفاده کنید.",
-                reply_markup=main_runtime.main_keyboard(),
-            )
+        await state.clear()
+        await message.answer(
+            "✅ <b>لینک اکانت مهاجرتی پیدا شد</b>\n\n"
+            f"👤 نام کاربری: <code>{escape(account_username)}</code>\n\n"
+            f"🔗 <code>{escape(link)}</code>\n\n"
+            "این لینک را فقط برای دستگاه‌های خودتان استفاده کنید.",
+            reply_markup=main_runtime.main_keyboard(),
+        )
 
     return router
