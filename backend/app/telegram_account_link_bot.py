@@ -127,7 +127,7 @@ def _account_keyboard(rows: list[dict]) -> InlineKeyboardMarkup:
 async def _customer_session(
     telegram_id: int,
     session_fn,
-) -> tuple[str, list[dict]]:
+) -> tuple[str, dict]:
     session = await session_fn(int(telegram_id))
     token = str(session.get("access_token") or "").strip()
 
