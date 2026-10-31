@@ -7,6 +7,7 @@ import {LegacyNodesRuntimePage} from "./legacy-nodes-runtime-v2";
 import {RoutedPageClient as BaseRoutedPageClient} from "./routed-page-client";
 import {SmartTransportsRuntimeV27} from "./smart-transports-runtime-v27";
 import {SubscriptionDeliveryPolicyManager} from "./subscription-delivery-policy-manager";
+import {AdminTelegramMembershipSettings,ResellerTelegramMembershipSettings} from "./telegram-membership-settings";
 import {TunnelProtocolRuntimeV307} from "./tunnel-protocol-runtime-v307";
 
 const admin=(node:React.ReactNode)=><AdminAuthGuard><AdminOperationFeedback/>{node}</AdminAuthGuard>;
@@ -26,6 +27,12 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   }
   if(routeKey==="admin/subscriptions"){
     return <><BaseRoutedPageClient routeKey={routeKey}/><SubscriptionDeliveryPolicyManager/></>;
+  }
+  if(routeKey==="admin/telegram"){
+    return <><BaseRoutedPageClient routeKey={routeKey}/><AdminTelegramMembershipSettings/></>;
+  }
+  if(routeKey==="reseller/bot"){
+    return <><BaseRoutedPageClient routeKey={routeKey}/><ResellerTelegramMembershipSettings/></>;
   }
   return <BaseRoutedPageClient routeKey={routeKey}/>;
 }
