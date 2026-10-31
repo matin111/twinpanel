@@ -21,6 +21,8 @@ assert "linked_user(" in feature_source
 assert "_subscriptions(db, reseller_id, user_id)" in feature_source
 assert "account_username" in feature_source
 assert "_share_url(db, sub)" in feature_source
+assert 'subscription_link.startswith(("http://", "https://"))' in feature_source
+assert "reply_markup=_link_keyboard(subscription_link)" in feature_source
 assert "db.query(Subscription)" not in feature_source
 assert "ResellerSubscription" not in feature_source
 assert "rsublink:cancel" in feature_source
