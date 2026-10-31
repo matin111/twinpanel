@@ -17,6 +17,10 @@ permissions:
 jobs:
   regression:
     runs-on: ubuntu-24.04
+    env:
+      APP_SECRET_KEY: ci-v2ray-provision-idempotency-secret
+      DATABASE_URL: sqlite:////tmp/twinpanel-v2ray-provision-idempotency.db
+      NODE_AGENT_SHARED_SECRET: ci-v2ray-node-agent-secret
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
