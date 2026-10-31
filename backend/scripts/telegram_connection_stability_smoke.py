@@ -26,6 +26,26 @@ assert "StartLimitIntervalSec=0" in service
 assert "Restart=always" in service
 assert "RestartSec=4" in service
 
+# The managed service must follow the updater-controlled logical current symlink,
+# never an immutable /releases/<version> path. This prevents an updater restart
+# from launching the previous bot release after CURRENT has advanced.
+assert '"/opt/twinpanel/current/backend"' in manager
+assert "SERVICE_PROJECT_DIR" in manager
+assert "project = str(SERVICE_PROJECT_DIR)" in manager
+assert "WorkingDirectory={project}" in service
+assert "project = str(PROJECT_DIR)" not in manager
+
+# Existing release-pinned units self-heal when the new API imports this router.
+# Fresh installs without a bot unit remain untouched.
+assert "def _repair_service_after_release_switch()" in manager
+assert "if not SERVICE_FILE.exists():" in manager
+assert "changed = _repair_existing_service_env()" in manager
+assert '"try-restart",' in manager
+assert '"twinpanel-bot.service",' in manager
+assert "_repair_service_after_release_switch()" in manager
+assert "def _repair_existing_service_env() -> bool:" in manager
+assert "return True" in manager
+
 # The managed service must run the text-aware resilient runtime and must not pin
 # the internal API to the legacy 8095 port. The installed port is loaded from
 # install.env / runtime configuration instead.
