@@ -34,6 +34,13 @@ def _cancel_keyboard():
                     style="danger",
                 )
             ],
+            [
+                InlineKeyboardButton(
+                    text="🏠 منوی اصلی",
+                    callback_data=MAIN_HOME_CALLBACK,
+                    style="primary",
+                )
+            ],
         ],
     )
 
@@ -123,7 +130,14 @@ def _connect_keyboard():
                     callback_data="main:connect-account",
                     style="success",
                 )
-            ]
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🏠 منوی اصلی",
+                    callback_data=MAIN_HOME_CALLBACK,
+                    style="primary",
+                )
+            ],
         ],
     )
 
@@ -157,8 +171,27 @@ def _with_home(markup):
     )
 
 
+def _wrap_keyboard_builder(target, name):
+    original = getattr(target, name, None)
+
+    if original is None:
+        return
+
+    marker = f"_main_home_wrapped_{name}"
+    if getattr(target, marker, False):
+        return
+
+    def wrapped(*args, **kwargs):
+        return _with_home(
+            original(*args, **kwargs)
+        )
+
+    setattr(target, name, wrapped)
+    setattr(target, marker, True)
+
+
 def _install_back_navigation(main_runtime):
-    """Add one consistent return-to-main row to primary submenu roots."""
+    """Keep one identical full-width main-menu button on every bot subpage."""
 
     if getattr(
         main_runtime,
@@ -167,66 +200,51 @@ def _install_back_navigation(main_runtime):
     ):
         return
 
-    original_subscription_list_keyboard = (
-        main_runtime.subscription_list_keyboard
-    )
-
-    def subscription_list_keyboard_with_back(rows):
-        return _with_home(
-            original_subscription_list_keyboard(rows)
-        )
-
-    main_runtime.subscription_list_keyboard = (
-        subscription_list_keyboard_with_back
-    )
+    for name in (
+        "subscription_list_keyboard",
+        "subscription_actions_keyboard",
+        "renewal_confirm_keyboard",
+        "renewal_payment_methods_keyboard",
+        "renewal_proof_keyboard",
+        "_dashboard_keyboard",
+    ):
+        _wrap_keyboard_builder(main_runtime, name)
 
     from . import telegram_purchase_bot as purchase_runtime
     from . import telegram_wallet_bot as wallet_runtime
     from . import telegram_learning_center as learning_runtime
     from . import telegram_support_bot as support_runtime
 
-    original_plans_keyboard = purchase_runtime.plans_keyboard
+    for name in (
+        "plans_keyboard",
+        "plan_confirm_keyboard",
+        "discount_choice_keyboard",
+        "discount_entry_keyboard",
+        "payment_methods_keyboard",
+        "proof_keyboard",
+    ):
+        _wrap_keyboard_builder(purchase_runtime, name)
 
-    def plans_keyboard_with_back(plans):
-        return _with_home(
-            original_plans_keyboard(plans)
-        )
+    for name in (
+        "wallet_keyboard",
+        "amount_keyboard",
+        "methods_keyboard",
+        "submit_keyboard",
+    ):
+        _wrap_keyboard_builder(wallet_runtime, name)
 
-    purchase_runtime.plans_keyboard = plans_keyboard_with_back
+    for name in (
+        "_platform_keyboard",
+        "_apps_keyboard",
+        "_detail_keyboard",
+    ):
+        _wrap_keyboard_builder(learning_runtime, name)
 
-    original_wallet_keyboard = wallet_runtime.wallet_keyboard
-
-    def wallet_keyboard_with_back():
-        return _with_home(
-            original_wallet_keyboard()
-        )
-
-    wallet_runtime.wallet_keyboard = wallet_keyboard_with_back
-
-    original_platform_keyboard = learning_runtime._platform_keyboard
-
-    def platform_keyboard_with_back(prefix, mode):
-        return _with_home(
-            original_platform_keyboard(prefix, mode)
-        )
-
-    learning_runtime._platform_keyboard = platform_keyboard_with_back
-
-    original_support_keyboard = support_runtime.support_keyboard
-    original_support_cancel_keyboard = support_runtime.cancel_keyboard
-
-    def support_keyboard_with_back():
-        return _with_home(
-            original_support_keyboard()
-        )
-
-    def support_cancel_keyboard_with_back():
-        return _with_home(
-            original_support_cancel_keyboard()
-        )
-
-    support_runtime.support_keyboard = support_keyboard_with_back
-    support_runtime.cancel_keyboard = support_cancel_keyboard_with_back
+    for name in (
+        "support_keyboard",
+        "cancel_keyboard",
+    ):
+        _wrap_keyboard_builder(support_runtime, name)
 
     main_runtime._submenu_back_navigation_installed = True
 
@@ -317,9 +335,7 @@ def install_account_link_feature(
         if callback.message is not None:
             await callback.message.edit_text(
                 main_runtime._dashboard_text(data),
-                reply_markup=_with_home(
-                    main_runtime._dashboard_keyboard(data)
-                ),
+                reply_markup=main_runtime._dashboard_keyboard(data),
             )
 
     @router.callback_query(F.data == "main:account")
@@ -362,7 +378,8 @@ def install_account_link_feature(
 
         if callback.message is not None:
             await callback.message.edit_text(
-                "ایمیل حساب Twin Panel را وارد کنید."
+                "ایمیل حساب Twin Panel را وارد کنید.",
+                reply_markup=_home_keyboard(),
             )
 
     @router.callback_query(F.data == CANCEL_CALLBACK)
