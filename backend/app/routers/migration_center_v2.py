@@ -151,6 +151,7 @@ async def eylan_import(payload: EylanImportIn, db: Session = Depends(get_db)):
                 )
                 .first()
             )
+            was_existing = marker is not None
 
             if marker is not None:
                 sub = db.get(Subscription, marker.subscription_id)
@@ -219,7 +220,7 @@ async def eylan_import(payload: EylanImportIn, db: Session = Depends(get_db)):
                 {
                     "source_id": source_id,
                     "subscription_id": sub.id,
-                    "existing": marker.id not in marker_ids[:-1] and existing > 0,
+                    "existing": was_existing,
                 }
             )
 
