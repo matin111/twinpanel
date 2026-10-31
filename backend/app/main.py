@@ -57,7 +57,7 @@ from .routers.subscription_delivery_policy_v1 import router as subscription_deli
 from .self_hosted_runtime import apply_self_hosted_runtime
 from .subscription_delivery_policy_v1 import install_account_delivery_hooks
 from .openvpn_runtime_v1 import install_openvpn_runtime_hooks
-from .xray_modern_runtime import router as xray_modern_router
+from .xray_modern_runtime import apply_xray_modern_runtime, router as xray_modern_router
 from .xray_modern_admin import router as xray_modern_admin_router
 from .admin_notification_service import notification_watch_loop
 from .services.customer_maintenance import customer_maintenance_loop
@@ -99,6 +99,10 @@ apply_self_hosted_runtime()
 # OpenVPN drops privileges before client-connect hooks run. Install the additive
 # runtime guard before any provisioning/repair request can use the legacy router.
 install_openvpn_runtime_hooks(provision)
+
+# Xray modern runtime must own account provisioning before any create/repair
+# request can fall back to the legacy _xray implementation.
+apply_xray_modern_runtime()
 
 # TWINPANEL_PAYMENT_TABLE_BOOTSTRAP_V1
 # Payment/store/reseller-bot models must be registered before create_all.
