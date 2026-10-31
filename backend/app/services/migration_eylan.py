@@ -6,6 +6,7 @@ import re
 import tarfile
 import zipfile
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
 
 
@@ -132,8 +133,22 @@ def _int_value(value: Any, *, field: str, default: int = 0) -> int:
     return parsed
 
 
+def _decimal_value(value: Any, *, field: str, default: Decimal = Decimal(0)) -> Decimal:
+    if value is None or str(value).strip() == "":
+        return default
+    try:
+        parsed = Decimal(str(value).strip())
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError(f"invalid Eylan {field}") from exc
+    if not parsed.is_finite():
+        raise ValueError(f"invalid Eylan {field}")
+    if parsed < 0:
+        raise ValueError(f"Eylan {field} must be non-negative")
+    return parsed
+
+
 def _traffic_limit_bytes(data_limit: Any, data_limit_unit: Any) -> int:
-    value = _int_value(data_limit, field="data_limit", default=0)
+    value = _decimal_value(data_limit, field="data_limit")
     if value == 0:
         return 0
     unit = str(data_limit_unit or "").strip().upper().replace("IB", "B")
@@ -148,7 +163,8 @@ def _traffic_limit_bytes(data_limit: Any, data_limit_unit: Any) -> int:
     }
     if unit not in factors:
         raise ValueError(f"unsupported Eylan data_limit_unit: {data_limit_unit}")
-    return value * factors[unit]
+    bytes_value = value * factors[unit]
+    return int(bytes_value.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 def _expiry_iso(value: Any) -> str | None:
