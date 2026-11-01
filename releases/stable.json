@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.460",
+  "version": "1.1.0-rc.461",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-01T20:25:44Z",
+  "released_at": "2026-11-01T20:47:31Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "75fbe64a6cb49ce89faa29537ad786a7c3ae83d9",
+  "source_sha": "e25b385505697f7a2b6121e20dc82669d7708832",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.460/twinpanel-1.1.0-rc.460-linux-x86_64.tar.gz",
-    "sha256": "1eb83fc8ae034763b139e0298ba816f39da2ea7ab981727bf738dcbec11f8a43",
-    "size_bytes": 25187521
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.461/twinpanel-1.1.0-rc.461-linux-x86_64.tar.gz",
+    "sha256": "c6cfc278d17f348898ffe13dee556856dbc59ccc3a08f846338423e2715bb26d",
+    "size_bytes": 25189219
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.460 تشخیص موفقیت جزئی Provisioning سفارش‌های ربات نمایندگی را با خروجی واقعی Account Driver مدرن ۱۵ پروتکل هماهنگ می‌کند. اگر برای هر پروتکل در credentials حداقل یک آیتم اتصال قابل استفاده ساخته شده باشد، خطاهای یک نود دیگر کل سفارش را provision_failed نمی‌کنند و به‌صورت warning ثبت می‌شوند. اگر حتی یک پروتکل واقعاً بدون خروجی قابل استفاده باشد، شکست کامل همچنان حفظ می‌شود. این Fix بر اساس Evidence واقعی Order #6 / Subscription #2146 ساخته شد که هر ۱۵ credential فعال داشت اما به‌خاطر سه خطای per-node اشتباهاً provision_failed شده بود. PR #1706 با 5/5 CI سبز Merge شد و Release PR #1707 با 9/9 Workflow سبز Merge شد. Source روی SHA immutable 75fbe64a6cb49ce89faa29537ad786a7c3ae83d9 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.460 aligns reseller-bot partial provisioning success with the real modern 15-protocol Account Driver output. When every requested protocol has at least one usable credentials item, node-specific failures are kept as warnings instead of incorrectly failing the entire order. A genuinely missing protocol still remains a hard failure. This fix is based on production evidence from Order #6 / Subscription #2146, where all 15 credentials were active but three per-node errors incorrectly produced provision_failed. PR #1706 merged with 5/5 green CI checks and Release PR #1707 merged with 9/9 green workflows. Source is pinned to immutable SHA 75fbe64a6cb49ce89faa29537ad786a7c3ae83d9."
+    "fa": "TwinPanel 1.1.0-rc.461 فشار CPU کنترلر را بدون تغییر در منطق provisioning، credential، quota یا dataplane کاهش می‌دهد. چرخه‌های کامل حسابداری Classic و Modern/Sing-box از هر ۵ ثانیه به هر ۱۵ ثانیه تغییر کرده‌اند تا اسکن‌های تکراری DB/شبکه کمتر شوند؛ در نتیجه فقط تازگی telemetry حداکثر ۱۰ ثانیه دیرتر می‌شود و منطق حجم/سشن دست‌نخورده می‌ماند. همچنین N+1 در همگام‌سازی اعلان‌های پرداخت حذف شده است: سفارش‌ها و اعلان‌های مربوط به حداکثر ۱۰۰۰ پرداخت به‌صورت Bulk خوانده می‌شوند، در حالی که cadence اعلان پرداخت همچنان ۵ ثانیه باقی می‌ماند. این Fix از Evidence واقعی سرور CLY984318 با مصرف پایدار حدود 65% برای Uvicorn و 64% برای Modern Accounting و timeoutهای 5-10 ثانیه‌ای /health ساخته شد. PR #1709 با تست‌های تخصصی Modern Accounting، Sing-box، OpenVPN، L2TP، API Build، Preview و Tunnel Control سبز Merge شد و Release PR #1710 با 9/9 Workflow سبز Merge شد. Source روی SHA immutable e25b385505697f7a2b6121e20dc82669d7708832 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.461 reduces controller CPU pressure without changing provisioning, credential, quota semantics or protocol dataplane behavior. Full Classic and Modern/Sing-box accounting sweeps move from every 5 seconds to every 15 seconds, reducing redundant database/network reconciliation; only telemetry freshness may be up to 10 seconds less fresh. The customer payment notification sync also removes its N+1 query pattern by bulk-loading related orders and notifications for up to 1000 payment intents while keeping the notification cadence at 5 seconds. The fix is based on production evidence from CLY984318, where steady-state Uvicorn and Modern Accounting consumed roughly 65% and 64% CPU with intermittent 5-10 second /health timeouts. PR #1709 merged after specialized Modern Accounting, Sing-box, OpenVPN, L2TP, API Build, Preview and Tunnel Control checks passed, and Release PR #1710 merged with 9/9 green workflows. Source is pinned to immutable SHA e25b385505697f7a2b6121e20dc82669d7708832."
   }
 }
