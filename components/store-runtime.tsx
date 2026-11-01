@@ -32,10 +32,14 @@ export function StoreRuntime2027(){
 
   const load=async()=>{
     setLoading(true);setReady(false);setError("");
-    const [plansResult,settingsResult,templateSettingsResult]=await Promise.allSettled([
+
+    // Template customization is optional presentation data and must never block
+    // the first storefront render. Start it in parallel, but only gate the
+    // initial UI on commerce plans + core storefront settings.
+    const templateSettingsPromise=loadStoreTemplateSettings();
+    const [plansResult,settingsResult]=await Promise.allSettled([
       storeRuntimeApi.plans(),
       storeRuntimeApi.storefrontSettings(),
-      loadStoreTemplateSettings(),
     ]);
 
     if(plansResult.status==="fulfilled")setPlans(plansResult.value.filter(plan=>plan.is_active));
@@ -47,11 +51,12 @@ export function StoreRuntime2027(){
       if(plansResult.status==="fulfilled")setError(settingsResult.reason instanceof Error?settingsResult.reason.message:String(settingsResult.reason));
     }
 
-    if(templateSettingsResult.status==="fulfilled")setTemplateSettings(templateSettingsResult.value.templates||{});
-    else setTemplateSettings({});
-
     setLoading(false);
     setReady(true);
+
+    void templateSettingsPromise
+      .then(result=>setTemplateSettings(result.templates||{}))
+      .catch(()=>setTemplateSettings({}));
   };
 
   useEffect(()=>{void load();},[]);
