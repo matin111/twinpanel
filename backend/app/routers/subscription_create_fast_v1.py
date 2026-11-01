@@ -6,16 +6,9 @@ from fastapi import APIRouter, Depends
 
 from ..database import SessionLocal
 from ..deps import require_admin
-from ..services.asyncssh_close_guard import install_asyncssh_close_guard
 from ..services.subscription_provision_preflight_v1 import (
     assert_subscription_provisioning_ready,
 )
-
-
-# Provisioning drivers close SSH connections in finally blocks. Bound the
-# transport teardown wait at process startup so an unhealthy connection cannot
-# keep asyncio.wait_for() cancellation pending forever and strand the admin UI.
-install_asyncssh_close_guard()
 
 
 router = APIRouter(
