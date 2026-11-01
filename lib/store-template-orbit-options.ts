@@ -15,14 +15,14 @@ export type OrbitMediaSlot={
 };
 
 export const ORBIT_MEDIA_SLOTS:readonly OrbitMediaSlot[]=[
-  {key:"orbit_banner_image",fa:"تصویر بنر بالای سایت",en:"Top banner image",helpFa:"برای نوار تبلیغ یا اطلاع‌رسانی بالای سایت.",helpEn:"Used for the announcement strip above the storefront.",aspect:"1920×320"},
-  {key:"orbit_hero_image",fa:"تصویر اصلی فروشگاه",en:"Main storefront image",helpFa:"تصویر اصلی بخش معرفی سرویس.",helpEn:"Primary image used in the service introduction section.",aspect:"1400×1100"},
-  {key:"orbit_story_image",fa:"تصویر بخش امکانات",en:"Features image",helpFa:"تصویر اصلی بخش امکانات و مزایا.",helpEn:"Main image used in the features section.",aspect:"1200×900"},
-  {key:"orbit_protocol_image",fa:"تصویر بخش روش‌های اتصال",en:"Connection methods image",helpFa:"تصویر بخش روش‌های اتصال و پروتکل‌ها.",helpEn:"Image used in the connection methods section.",aspect:"1000×1000"},
-  {key:"orbit_guides_image",fa:"تصویر بخش آموزش",en:"Guides image",helpFa:"تصویر کنار آموزش‌های اتصال.",helpEn:"Image shown beside connection guides.",aspect:"1200×900"},
-  {key:"orbit_account_image",fa:"تصویر پنل کاربری",en:"Account image",helpFa:"تصویر بخش مدیریت اشتراک و حساب کاربری.",helpEn:"Image used in the subscription and account section.",aspect:"1200×900"},
-  {key:"orbit_cta_image",fa:"پس‌زمینه بخش خرید",en:"Purchase section background",helpFa:"تصویر پس‌زمینه بخش پایانی خرید.",helpEn:"Background image for the final purchase section.",aspect:"1920×900"},
-  {key:"orbit_footer_image",fa:"تصویر فوتر",en:"Footer image",helpFa:"تصویر کوچک برای فوتر فروشگاه.",helpEn:"Small image used in the storefront footer.",aspect:"1000×700"},
+  {key:"orbit_banner_image",fa:"تصویر بنر بالای سایت",en:"Top banner image",helpFa:"برای نوار تبلیغ یا اطلاع‌رسانی بالای سایت.",helpEn:"Used for the announcement strip above the storefront.",aspect:"عرض 1920 × ارتفاع 80 پیکسل"},
+  {key:"orbit_hero_image",fa:"تصویر اصلی فروشگاه",en:"Main storefront image",helpFa:"تصویر اصلی بخش معرفی سرویس.",helpEn:"Primary image used in the service introduction section.",aspect:"عرض 1200 × ارتفاع 1300 پیکسل"},
+  {key:"orbit_story_image",fa:"تصویر بخش امکانات",en:"Features image",helpFa:"تصویر اصلی بخش امکانات و مزایا.",helpEn:"Main image used in the features section.",aspect:"عرض 1200 × ارتفاع 1300 پیکسل"},
+  {key:"orbit_protocol_image",fa:"تصویر بخش روش‌های اتصال",en:"Connection methods image",helpFa:"تصویر بخش روش‌های اتصال و پروتکل‌ها.",helpEn:"Image used in the connection methods section.",aspect:"عرض 1200 × ارتفاع 1200 پیکسل"},
+  {key:"orbit_guides_image",fa:"تصویر بخش آموزش",en:"Guides image",helpFa:"تصویر کنار آموزش‌های اتصال.",helpEn:"Image shown beside connection guides.",aspect:"عرض 1000 × ارتفاع 1600 پیکسل"},
+  {key:"orbit_account_image",fa:"تصویر پنل کاربری",en:"Account image",helpFa:"تصویر بخش مدیریت اشتراک و حساب کاربری.",helpEn:"Image used in the subscription and account section.",aspect:"عرض 1200 × ارتفاع 1100 پیکسل"},
+  {key:"orbit_cta_image",fa:"پس‌زمینه بخش خرید",en:"Purchase section background",helpFa:"تصویر پس‌زمینه بخش پایانی خرید.",helpEn:"Background image for the final purchase section.",aspect:"عرض 1920 × ارتفاع 720 پیکسل"},
+  {key:"orbit_footer_image",fa:"تصویر فوتر",en:"Footer image",helpFa:"تصویر کوچک برای فوتر فروشگاه.",helpEn:"Small image used in the storefront footer.",aspect:"عرض 1000 × ارتفاع 1000 پیکسل"},
 ] as const;
 
 export const ORBIT_SECTION_LABELS:Record<StorefrontSectionId,{fa:string;en:string}>={
