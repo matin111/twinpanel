@@ -18,15 +18,10 @@ export type FastSubscriptionCreatePayload={
 export type FastSubscriptionCreateResult={
   ok:boolean;
   queued:boolean;
+  subscription_id?:number;
+  provisioning_complete?:boolean;
   message?:string;
 };
-
-// admin-create-fast-v1 commits the Subscription before the slower protocol
-// provisioning phase. The UI therefore must not stay blocked for that entire
-// backend lifecycle. Most importantly, do NOT AbortController.abort() here:
-// aborting the browser request only creates a false UI failure while the server
-// may still be completing the already-committed Subscription.
-export const SUBSCRIPTION_CREATE_UI_DETACH_MS=12_000;
 
 function detailText(detail:unknown){
   if(!detail||typeof detail!=="object")return "";
@@ -82,7 +77,7 @@ function errorText(payload:unknown,status:number){
   return `API error ${status}`;
 }
 
-async function runCreateRequest(payload:FastSubscriptionCreatePayload):Promise<FastSubscriptionCreateResult>{
+export async function createSubscriptionFastV1(payload:FastSubscriptionCreatePayload):Promise<FastSubscriptionCreateResult>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
 
@@ -103,25 +98,4 @@ async function runCreateRequest(payload:FastSubscriptionCreatePayload):Promise<F
   }
   if(!response.ok)throw new Error(errorText(body,response.status));
   return body as FastSubscriptionCreateResult;
-}
-
-export async function createSubscriptionFastV1(payload:FastSubscriptionCreatePayload):Promise<FastSubscriptionCreateResult>{
-  // Keep the real request alive after the UI detaches. Promise.race attaches
-  // handlers to the request promise, so a later backend failure is consumed
-  // rather than becoming an unhandled browser rejection.
-  const request=runCreateRequest(payload);
-  let timer:number|undefined;
-  const detached=new Promise<FastSubscriptionCreateResult>(resolve=>{
-    timer=globalThis.setTimeout(()=>resolve({
-      ok:true,
-      queued:true,
-      message:"ثبت اولیه انجام شد؛ صدور کانفیگ‌ها در سمت سرور ادامه دارد",
-    }),SUBSCRIPTION_CREATE_UI_DETACH_MS);
-  });
-
-  try{
-    return await Promise.race([request,detached]);
-  }finally{
-    if(timer!==undefined)globalThis.clearTimeout(timer);
-  }
 }
