@@ -21,6 +21,23 @@ if str(BACKEND_ROOT) not in sys.path:
 from app.services.modern_quota_runtime_v257 import modern_quota_runtime_loop as legacy_modern_quota_runtime_loop
 from app.services.modern_quota_runtime_v314 import modern_quota_runtime_loop
 from app.services.singbox_native_accounting_v265 import singbox_native_accounting_loop
+from app.services import modern_quota_runtime_v314 as modern_quota_runtime_v314_module
+from app.services import singbox_native_accounting_v265 as singbox_native_accounting_v265_module
+
+
+# Full modern/Sing-box accounting reconciliation performs network collection,
+# DB matching and quota writes. A 5-second full sweep kept production CPUs busy
+# continuously on controllers with hundreds of subscriptions. Preserve all
+# accounting semantics while reducing redundant sweeps to a 15-second cadence.
+# This only affects telemetry freshness; provisioning, credentials, sessions,
+# quota limits and protocol dataplane behavior are unchanged.
+ACCOUNTING_RECONCILE_INTERVAL_SECONDS = 15.0
+modern_quota_runtime_v314_module.MODERN_ACCOUNTING_INTERVAL_SECONDS = (
+    ACCOUNTING_RECONCILE_INTERVAL_SECONDS
+)
+singbox_native_accounting_v265_module.SINGBOX_ACCOUNTING_INTERVAL_SECONDS = (
+    ACCOUNTING_RECONCILE_INTERVAL_SECONDS
+)
 
 
 async def _serve() -> None:

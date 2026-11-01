@@ -17,11 +17,17 @@ from .payment_automation import (
 )
 from .payment_native_crypto_exact import process_pending_native_crypto_exact_once
 from .quota_runtime_reconcile import (
-    QUOTA_RUNTIME_INTERVAL_SECONDS,
     reconcile_quota_runtime_once,
 )
 
 
+# Controller-side quota reconciliation is telemetry, not dataplane control.
+# Running full Cisco/Xray/OpenVPN/L2TP reconciliation every 5 seconds caused
+# sustained controller CPU saturation on installations with hundreds of active
+# subscriptions. A 15-second cadence preserves quota/session semantics while
+# bounding telemetry freshness to at most 15 seconds and freeing the API event
+# loop for interactive admin/user requests.
+QUOTA_RUNTIME_INTERVAL_SECONDS = 15.0
 PAYMENT_NOTIFICATION_INTERVAL_SECONDS = 5
 CRYPTO_VERIFY_INTERVAL_SECONDS = 10
 RECEIPT_CLEANUP_INTERVAL_SECONDS = 6 * 60 * 60
@@ -36,6 +42,9 @@ def sync_payment_notifications_once() -> dict:
 
     The notification is idempotent. If fulfillment completes after approval,
     the same notification is upgraded to say that the subscription is ready.
+    Related StoreOrder/UserNotification rows are loaded in bulk so the frequent
+    notification pass stays O(1) queries instead of issuing N+1 queries for up
+    to 1000 historical payment intents on every iteration.
     """
 
     db = SessionLocal()
@@ -55,13 +64,52 @@ def sync_payment_notifications_once() -> dict:
             .all()
         )
 
+        order_ids = {
+            int(intent.order_id)
+            for intent in rows
+            if intent.order_id
+        }
+        orders_by_id = {
+            int(order.id): order
+            for order in (
+                db.query(StoreOrder)
+                .filter(StoreOrder.id.in_(order_ids))
+                .all()
+                if order_ids
+                else []
+            )
+        }
+
+        batch_ids = [
+            _payment_notification_batch_id(intent.id)
+            for intent in rows
+            if intent.user_id
+        ]
+        notifications_by_batch: dict[str, UserNotification] = {}
+        if batch_ids:
+            existing_notifications = (
+                db.query(UserNotification)
+                .filter(UserNotification.batch_id.in_(batch_ids))
+                .order_by(UserNotification.id.desc())
+                .all()
+            )
+            for notification in existing_notifications:
+                notifications_by_batch.setdefault(
+                    str(notification.batch_id),
+                    notification,
+                )
+
         now = datetime.utcnow()
 
         for intent in rows:
             if not intent.user_id:
                 continue
 
-            order = db.get(StoreOrder, intent.order_id) if intent.order_id else None
+            order = (
+                orders_by_id.get(int(intent.order_id))
+                if intent.order_id
+                else None
+            )
 
             fulfilled = bool(
                 order
@@ -90,29 +138,20 @@ def sync_payment_notifications_once() -> dict:
                 kind = "info"
 
             batch_id = _payment_notification_batch_id(intent.id)
-
-            notification = (
-                db.query(UserNotification)
-                .filter(
-                    UserNotification.user_id == intent.user_id,
-                    UserNotification.batch_id == batch_id,
-                )
-                .order_by(UserNotification.id.desc())
-                .first()
-            )
+            notification = notifications_by_batch.get(batch_id)
 
             if notification is None:
-                db.add(
-                    UserNotification(
-                        batch_id=batch_id,
-                        user_id=int(intent.user_id),
-                        title=title,
-                        message=message,
-                        kind=kind,
-                        telegram_requested=False,
-                        created_at=(intent.verified_at or now),
-                    )
+                notification = UserNotification(
+                    batch_id=batch_id,
+                    user_id=int(intent.user_id),
+                    title=title,
+                    message=message,
+                    kind=kind,
+                    telegram_requested=False,
+                    created_at=(intent.verified_at or now),
                 )
+                db.add(notification)
+                notifications_by_batch[batch_id] = notification
                 created += 1
                 continue
 
