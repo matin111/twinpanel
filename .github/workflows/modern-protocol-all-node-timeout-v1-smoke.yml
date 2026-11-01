@@ -1,0 +1,26 @@
+name: Modern Protocol All Node Timeout V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/modern_account_delivery_v1.py'
+      - '.github/workflows/modern-protocol-all-node-timeout-v1-smoke.yml'
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify modern protocols use per-node timeout
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('backend/app/routers/modern_account_delivery_v1.py').read_text()
+          assert 'MODERN_NODE_PROVISION_TIMEOUT_SECONDS = 45.0' in text
+          assert 'timeout_seconds=MODERN_NODE_PROVISION_TIMEOUT_SECONDS' in text
+          assert 'Provisioning timeout on this server after' in text
+          modern_branch = text.split('for protocol in protocols:', 1)[1].split('db.commit()', 1)[0]
+          assert 'items, protocol_errors = await _provision_modern_protocol(' in modern_branch
+          assert 'operation = _provision_modern_protocol(' not in modern_branch
+          assert 'node": str(node.name)' in text
+          PY
