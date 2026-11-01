@@ -63,10 +63,12 @@ def main() -> None:
         "Sudoku",
     ):
         assert label in plan_ui, label
-    assert "Allowed servers" in plan_ui
+    assert "Allowed exit servers" in plan_ui
+    assert "Iran nodes are tunnel-only" in plan_ui
+    assert "exitNodes" in plan_ui
     assert "node_ids" in plan_ui
     assert "protocols" in plan_ui
-    assert "snapshotted onto each subscription" in plan_ui
+    assert "snapshotted onto subscriptions" in plan_ui
 
     plan_router = PLAN_ROUTER.read_text(encoding="utf-8")
     assert "replace_plan_template_protocols" in plan_router
@@ -82,6 +84,7 @@ def main() -> None:
     assert "ALL_PROTOCOL_KEYS" in template
     assert "PlanNode" in template
     assert "all_active_node_ids" in template
+    assert "NodeType.EXIT" in template
 
     node_model = PLAN_NODE_MODEL.read_text(encoding="utf-8")
     assert '__tablename__ = "plan_nodes"' in node_model
