@@ -66,6 +66,13 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
         result = str(text)
 
         if self.scope == "reseller":
+            # Preserve the legacy source contract too: old runtimes emitted this
+            # sentence verbatim and the delivery smoke verifies it is stripped.
+            result = result.replace(
+                "تعداد فروش محدود نیست؛ مصرف واقعی از حجم نماینده کم می‌شود.\n\n",
+                "",
+            )
+
             # Keep internal reseller role/model names untouched, but never expose
             # reseller terminology in customer-facing Telegram copy. Centralizing
             # this at the request middleware also covers legacy child routers.
