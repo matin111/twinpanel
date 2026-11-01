@@ -1,15 +1,28 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 from pathlib import Path
-
-from app.services.asyncssh_close_guard import install_asyncssh_close_guard
 
 
 ROOT = Path(__file__).resolve().parents[2]
+GUARD_PATH = ROOT / "backend/app/services/asyncssh_close_guard.py"
+
+
+def _load_guard_module():
+    spec = importlib.util.spec_from_file_location(
+        "twinpanel_asyncssh_close_guard_test",
+        GUARD_PATH,
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_asyncssh_close_guard_returns_after_bounded_teardown_wait() -> None:
+    install_asyncssh_close_guard = _load_guard_module().install_asyncssh_close_guard
+
     class FakeConnection:
         async def wait_closed(self) -> None:
             await asyncio.Event().wait()
