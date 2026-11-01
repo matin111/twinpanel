@@ -106,6 +106,13 @@ def install() -> None:
                         changed,
                         flush=True,
                     )
+                for item in result.get("errors") or []:
+                    print(
+                        "quota runtime reconcile failed:",
+                        f"collector={item.get('collector') or 'unknown'}",
+                        str(item.get("error") or "unknown_error")[:800],
+                        flush=True,
+                    )
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
