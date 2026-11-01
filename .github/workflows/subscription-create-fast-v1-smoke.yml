@@ -6,7 +6,8 @@ on:
       - 'components/admin-manual-subscription-create.tsx'
       - 'lib/subscription-create-fast-api.ts'
       - 'backend/app/routers/subscription_create_fast_v1.py'
-      - 'backend/app/services/asyncssh_close_guard.py'
+      - 'backend/app/routers/modern_account_delivery_v1.py'
+      - 'backend/app/services/hard_async_timeout.py'
       - 'backend/tests/test_subscription_create_stuck_spinner_v1.py'
       - 'backend/tests/test_subscription_provision_timeout_v1.py'
       - 'backend/app/routers/__init__.py'
@@ -31,6 +32,7 @@ jobs:
           ui = Path('components/admin-manual-subscription-create.tsx').read_text(encoding='utf-8')
           client = Path('lib/subscription-create-fast-api.ts').read_text(encoding='utf-8')
           endpoint = Path('backend/app/routers/subscription_create_fast_v1.py').read_text(encoding='utf-8')
+          delivery = Path('backend/app/routers/modern_account_delivery_v1.py').read_text(encoding='utf-8')
           init = Path('backend/app/routers/__init__.py').read_text(encoding='utf-8')
 
           assert 'createSubscriptionFastV1' in ui
@@ -43,29 +45,29 @@ jobs:
           assert '_TASKS' not in endpoint
           assert 'from .subscription_admin_v2 import AdminSubscriptionCreateV2, admin_create_v2' in endpoint
           assert endpoint.index('from .subscription_admin_v2 import AdminSubscriptionCreateV2, admin_create_v2') > endpoint.index('async def _run_create')
-          assert 'install_asyncssh_close_guard()' in endpoint
           assert 'await admin_create_v2' in endpoint
           assert '@router.post("/admin-create-fast-v1")' in endpoint
           assert 'status_code=202' not in endpoint
           assert 'result["queued"] = False' in endpoint
           assert 'result["provisioning_complete"] = True' in endpoint
           assert 'dependencies=[Depends(require_admin)]' in endpoint
+          assert 'from ..services.hard_async_timeout import await_hard_timeout' in delivery
+          assert delivery.count('await await_hard_timeout(') >= 2
           assert '_runtime_endpoints.router.include_router(_subscription_create_fast_v1_router)' in init
 
           print('SUBSCRIPTION_CREATE_FAST_V1_FAIL_CLOSED_CONTRACT_OK')
           PY
 
-      - name: Compile endpoint and SSH close guard
+      - name: Compile endpoint, delivery and hard timeout helper
         run: |
           python -m py_compile backend/app/routers/subscription_create_fast_v1.py
-          python -m py_compile backend/app/services/asyncssh_close_guard.py
+          python -m py_compile backend/app/routers/modern_account_delivery_v1.py
+          python -m py_compile backend/app/services/hard_async_timeout.py
 
-      - name: Install focused backend regression dependencies
-        run: python -m pip install --disable-pip-version-check pytest asyncssh
+      - name: Install focused backend regression dependency
+        run: python -m pip install --disable-pip-version-check pytest
 
       - name: Run stuck-spinner timeout regressions
-        env:
-          PYTHONPATH: backend
         run: |
           pytest -q \
             backend/tests/test_subscription_create_stuck_spinner_v1.py \
