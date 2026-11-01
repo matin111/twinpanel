@@ -4,21 +4,49 @@
 [data-motion][data-shape][data-header] [class*="mediaLabel"]{display:none!important}
 [data-motion][data-shape][data-header] [class*="storyFallback"] b{display:none!important}
 
-/* Plan cards: hide protocol chips and show supported device icons instead. */
-[data-motion][data-shape][data-header] [class*="planProtocols"]{display:flex!important;align-items:center!important;gap:0!important;min-height:34px!important;margin-top:auto!important}
+/* Plan cards: keep the customer-facing benefits short and clear. */
+[data-motion][data-shape][data-header] [class*="planBenefits"]>span{
+  font-size:0!important;
+}
+[data-motion][data-shape][data-header] [class*="planBenefits"]>span::after{
+  font-size:11px;
+  color:var(--orbit-muted);
+}
+html[dir="rtl"] [data-motion][data-shape][data-header] [class*="planBenefits"]>span:nth-child(1)::after{content:"✓ فعال‌سازی سریع"}
+html[dir="rtl"] [data-motion][data-shape][data-header] [class*="planBenefits"]>span:nth-child(2)::after{content:"✓ همه دستگاه‌ها"}
+html[dir="rtl"] [data-motion][data-shape][data-header] [class*="planBenefits"]>span:nth-child(3)::after{content:"✓ تحویل داخل پنل"}
+html[dir="ltr"] [data-motion][data-shape][data-header] [class*="planBenefits"]>span:nth-child(1)::after{content:"✓ Fast activation"}
+html[dir="ltr"] [data-motion][data-shape][data-header] [class*="planBenefits"]>span:nth-child(2)::after{content:"✓ All devices"}
+html[dir="ltr"] [data-motion][data-shape][data-header] [class*="planBenefits"]>span:nth-child(3)::after{content:"✓ In-account delivery"}
+
+/* Plan cards: hide protocol chips and show explicit supported-platform names.
+ * Do not use emoji/symbol-only labels; they render inconsistently across browsers.
+ */
+[data-motion][data-shape][data-header] [class*="planProtocols"]{
+  display:flex!important;
+  align-items:center!important;
+  gap:0!important;
+  min-height:34px!important;
+  margin-top:auto!important;
+  overflow:hidden;
+}
 [data-motion][data-shape][data-header] [class*="planProtocols"]>span{display:none!important}
 [data-motion][data-shape][data-header] [class*="planProtocols"]::after{
-  content:"⊞   🤖      🐧   ⌘";
+  content:"Windows  ·  Android  ·  iPhone  ·  Linux  ·  macOS";
   display:block;
   direction:ltr;
   unicode-bidi:isolate;
-  font-size:21px;
-  line-height:1;
-  letter-spacing:.2em;
+  font-size:11px;
+  line-height:1.5;
+  font-weight:750;
+  letter-spacing:.01em;
   color:var(--orbit-muted);
   white-space:nowrap;
 }
 
 @media (max-width:640px){
-  [data-motion][data-shape][data-header] [class*="planProtocols"]::after{font-size:19px;letter-spacing:.16em}
+  [data-motion][data-shape][data-header] [class*="planProtocols"]::after{
+    font-size:9px;
+    letter-spacing:0;
+  }
 }
