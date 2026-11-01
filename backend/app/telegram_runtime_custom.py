@@ -8,6 +8,7 @@ import httpx
 from aiogram import Bot as AiogramBot
 
 from .bot_text_middleware import BotTextRequestMiddleware
+from .telegram_membership import install_membership_guard
 from . import telegram_runtime_bot as runtime
 
 
@@ -141,8 +142,10 @@ class TextAwareBot(AiogramBot):
 
 async def main() -> None:
     # Keep the existing runtime, routers, payment flow, FSM and notifications.
-    # Only the Bot constructor and internal API transport resilience are added.
+    # Membership runs as an outer middleware so users cannot bypass it through
+    # old inline buttons or deep callback data.
     runtime.Bot = TextAwareBot
+    install_membership_guard(runtime.router)
     _install_internal_api_resilience()
     await runtime.main()
 

@@ -7,12 +7,20 @@ import shlex
 from pathlib import Path
 from types import SimpleNamespace
 
+from app import node_bootstrap_control_v74 as v74
 from app import ssh_management_fallback_v61 as fallback
 from app.routers import provision
 
 
 def main() -> None:
-    assert provision.ssh_connect_saved is fallback.ssh_connect_saved_v61
+    # V61 remains a legacy compatibility implementation, but routers/__init__.py
+    # intentionally loads V74 afterwards. V74 is therefore the current owner of
+    # saved Exit management and prevents recurring collectors from re-entering
+    # the old V61 relay race. Validate both contracts without forcing runtime
+    # authority back to V61.
+    assert callable(fallback.ssh_connect_saved_v61)
+    assert fallback._RUNTIME_APPLIED is True
+    assert provision.ssh_connect_saved is v74.ssh_connect_saved_v74
 
     # Tunnel #1 Kernel GRE deterministic runtime is the exact production
     # management path validated during the incident: Iran .5 -> Exit .6.
@@ -45,6 +53,7 @@ def main() -> None:
     asyncio.run(_relay_retry_contract(relay_node, relay_access))
 
     print("SSH_MANAGEMENT_FALLBACK_V62_SMOKE=OK")
+    print("CURRENT_SAVED_SSH_OWNER=V74")
     print("KERNEL_GRE_TUNNEL_1_EXIT_IP=10.248.0.6")
     print("MANAGEMENT_PATH=controller->iran-ssh->nc->exit-private-ssh")
     print("RELAY_RETRY=FIRST_CONNECTION_LOST_SECOND_SUCCESS")
