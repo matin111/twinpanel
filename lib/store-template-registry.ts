@@ -13,25 +13,13 @@ export type StoreTemplateDefinition={
 
 export const DEFAULT_STORE_TEMPLATE_ID="conversion-2027";
 
-/**
- * Installed storefront themes ship with TwinPanel updates.
- * A theme is made of three explicit contracts:
- * 1) metadata in this catalog,
- * 2) its isolated option schema/defaults in lib/store-template-options.ts or a
- *    dedicated theme contract for advanced independent themes,
- * 3) its renderer registration in components/store-template-runtime-registry.tsx.
- *
- * Per-theme admin settings are persisted under the storefront JSON namespace and
- * survive activation switches and later product updates. No database migration is
- * required when a new built-in theme is added.
- */
 export const STORE_TEMPLATE_CATALOG:readonly StoreTemplateDefinition[]=[
   {
     id:"conversion-2027",
     nameFa:"قالب یک",
-    nameEn:"Conversion 2027",
-    descriptionFa:"قالب ساده و مدرن برای معرفی خدمات و فروش.",
-    descriptionEn:"Mobile-first conversion storefront with visual hero, live plans, protocols, setup guides, benefits, FAQ, social contact and live chat.",
+    nameEn:"Template 1",
+    descriptionFa:"قالب ساده و مدرن برای فروش اشتراک VPN.",
+    descriptionEn:"A clean modern storefront for selling VPN subscriptions.",
     version:"2.0.0",
     author:"TwinPanel",
     builtIn:true,
@@ -41,9 +29,9 @@ export const STORE_TEMPLATE_CATALOG:readonly StoreTemplateDefinition[]=[
   {
     id:"editorial-grid-2027",
     nameFa:"قالب دو",
-    nameEn:"Editorial Pro 2027",
-    descriptionFa:"چیدمان حرفه‌ای برای معرفی محتوا و امکانات.",
-    descriptionEn:"A premium independent editorial storefront with its own editor, selectable hero compositions, Spotlight/Comparison plan layouts, density controls, editorial modules and a refined guide experience—fully separate from Conversion theme settings.",
+    nameEn:"Template 2",
+    descriptionFa:"قالب حرفه‌ای برای معرفی سرویس، پلن‌ها و امکانات VPN.",
+    descriptionEn:"A professional storefront for VPN plans, service details and support.",
     version:"2.0.0",
     author:"TwinPanel",
     builtIn:true,
@@ -53,9 +41,9 @@ export const STORE_TEMPLATE_CATALOG:readonly StoreTemplateDefinition[]=[
   {
     id:"orbit-neo-2027",
     nameFa:"قالب سه",
-    nameEn:"Orbit Neo 2027",
-    descriptionFa:"قالب فروش‌محور برای معرفی محصولات و سفارش.",
-    descriptionEn:"A fully independent image-led spatial/Bento storefront with a floating header, cinematic hero, ticket-style plan rail, protocol constellation, interactive setup lab, independent Light/Dark palettes and a Media Studio for every key visual slot.",
+    nameEn:"Template 3",
+    descriptionFa:"قالب تصویری و فروش‌محور برای اشتراک VPN.",
+    descriptionEn:"A visual sales-focused storefront for VPN subscriptions.",
     version:"1.0.0",
     author:"TwinPanel",
     builtIn:true,

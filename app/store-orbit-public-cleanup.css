@@ -1,0 +1,24 @@
+/* Orbit storefront presentation cleanup.
+ * Keep plan provisioning/protocol data unchanged; this only adjusts public-facing copy/presentation.
+ */
+[data-motion][data-shape][data-header] [class*="mediaLabel"]{display:none!important}
+[data-motion][data-shape][data-header] [class*="storyFallback"] b{display:none!important}
+
+/* Plan cards: hide protocol chips and show supported device icons instead. */
+[data-motion][data-shape][data-header] [class*="planProtocols"]{display:flex!important;align-items:center!important;gap:0!important;min-height:34px!important;margin-top:auto!important}
+[data-motion][data-shape][data-header] [class*="planProtocols"]>span{display:none!important}
+[data-motion][data-shape][data-header] [class*="planProtocols"]::after{
+  content:"⊞   🤖      🐧   ⌘";
+  display:block;
+  direction:ltr;
+  unicode-bidi:isolate;
+  font-size:21px;
+  line-height:1;
+  letter-spacing:.2em;
+  color:var(--orbit-muted);
+  white-space:nowrap;
+}
+
+@media (max-width:640px){
+  [data-motion][data-shape][data-header] [class*="planProtocols"]::after{font-size:19px;letter-spacing:.16em}
+}
