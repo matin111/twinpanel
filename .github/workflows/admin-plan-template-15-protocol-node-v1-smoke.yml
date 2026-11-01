@@ -1,0 +1,59 @@
+name: Admin Plan Template 15 Protocol Node V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/plan_node_models.py'
+      - 'backend/app/plan_template_selection.py'
+      - 'backend/app/routers/plans.py'
+      - 'backend/app/routers/store.py'
+      - 'backend/app/services/subscription_factory.py'
+      - 'components/legacy-plans-exact.tsx'
+      - '.github/workflows/admin-plan-template-15-protocol-node-v1-smoke.yml'
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify plan template to subscription snapshot contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          ui = Path('components/legacy-plans-exact.tsx').read_text()
+          protocols = [
+              'Cisco / OpenConnect','OpenVPN','WireGuard','L2TP / IPsec','V2Ray / Xray',
+              'Hysteria2','TUIC','AnyTLS','NaiveProxy','ShadowTLS','Snell','Mieru',
+              'TrustTunnel','AmneziaWG','Sudoku',
+          ]
+          missing = [name for name in protocols if name not in ui]
+          assert not missing, f'missing protocol labels: {missing}'
+          assert 'Allowed servers' in ui
+          assert 'node_ids' in ui
+
+          model = Path('backend/app/plan_node_models.py').read_text()
+          assert '__tablename__ = "plan_nodes"' in model
+          assert 'UniqueConstraint("plan_id", "node_id"' in model
+
+          plans = Path('backend/app/routers/plans.py').read_text()
+          assert 'plan_template_protocols' in plans
+          assert 'plan_template_node_ids' in plans
+          assert 'replace_plan_template_protocols' in plans
+          assert 'replace_plan_nodes' in plans
+          assert '"selection_scope": "plan_template_snapshot"' in plans
+
+          factory = Path('backend/app/services/subscription_factory.py').read_text()
+          assert 'allowed_protocols = plan_template_protocols' in factory
+          assert 'allowed_node_ids = (' in factory
+          assert 'requested_node_ids = _unique_node_ids' in factory
+          assert 'for node in nodes:' in factory
+          assert 'SubscriptionNode(' in factory
+          assert 'SubscriptionProtocol(' in factory
+          assert 'node_ids from callers are kept only for API compatibility' not in factory
+
+          store = Path('backend/app/routers/store.py').read_text()
+          assert 'allowed_protocols = plan_template_protocols' in store
+          assert 'normalize_protocols(payload.protocols)' in store
+          assert 'PLAN_PROTOCOL_FIELDS' not in store
+          PY
