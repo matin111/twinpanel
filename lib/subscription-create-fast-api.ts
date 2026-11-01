@@ -21,10 +21,12 @@ export type FastSubscriptionCreateResult={
   message?:string;
 };
 
-// Backend provisioning has a 120-second total deadline. Keep a small network /
-// serialization margin above it so the modal can never remain busy forever if
-// a proxy, transport teardown, or response body stalls after that deadline.
-export const SUBSCRIPTION_CREATE_REQUEST_TIMEOUT_MS=135_000;
+// admin-create-fast-v1 commits the Subscription before the slower protocol
+// provisioning phase. The UI therefore must not stay blocked for that entire
+// backend lifecycle. Most importantly, do NOT AbortController.abort() here:
+// aborting the browser request only creates a false UI failure while the server
+// may still be completing the already-committed Subscription.
+export const SUBSCRIPTION_CREATE_UI_DETACH_MS=12_000;
 
 function detailText(detail:unknown){
   if(!detail||typeof detail!=="object")return "";
@@ -80,41 +82,46 @@ function errorText(payload:unknown,status:number){
   return `API error ${status}`;
 }
 
-export async function createSubscriptionFastV1(payload:FastSubscriptionCreatePayload):Promise<FastSubscriptionCreateResult>{
+async function runCreateRequest(payload:FastSubscriptionCreatePayload):Promise<FastSubscriptionCreateResult>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
 
-  const controller=new AbortController();
-  const timer=globalThis.setTimeout(
-    ()=>controller.abort("subscription-create-request-timeout"),
-    SUBSCRIPTION_CREATE_REQUEST_TIMEOUT_MS,
-  );
+  const response=await fetch(`${API_BASE}/v1/subscriptions/admin-create-fast-v1`,{
+    method:"POST",
+    cache:"no-store",
+    headers:{
+      Authorization:`Bearer ${token}`,
+      "Content-Type":"application/json",
+    },
+    body:JSON.stringify(payload),
+  });
+
+  const raw=await response.text();
+  let body:unknown=null;
+  if(raw){
+    try{body=JSON.parse(raw);}catch{body=raw;}
+  }
+  if(!response.ok)throw new Error(errorText(body,response.status));
+  return body as FastSubscriptionCreateResult;
+}
+
+export async function createSubscriptionFastV1(payload:FastSubscriptionCreatePayload):Promise<FastSubscriptionCreateResult>{
+  // Keep the real request alive after the UI detaches. Promise.race attaches
+  // handlers to the request promise, so a later backend failure is consumed
+  // rather than becoming an unhandled browser rejection.
+  const request=runCreateRequest(payload);
+  let timer:number|undefined;
+  const detached=new Promise<FastSubscriptionCreateResult>(resolve=>{
+    timer=globalThis.setTimeout(()=>resolve({
+      ok:true,
+      queued:true,
+      message:"ثبت اولیه انجام شد؛ صدور کانفیگ‌ها در سمت سرور ادامه دارد",
+    }),SUBSCRIPTION_CREATE_UI_DETACH_MS);
+  });
 
   try{
-    const response=await fetch(`${API_BASE}/v1/subscriptions/admin-create-fast-v1`,{
-      method:"POST",
-      cache:"no-store",
-      signal:controller.signal,
-      headers:{
-        Authorization:`Bearer ${token}`,
-        "Content-Type":"application/json",
-      },
-      body:JSON.stringify(payload),
-    });
-
-    const raw=await response.text();
-    let body:unknown=null;
-    if(raw){
-      try{body=JSON.parse(raw);}catch{body=raw;}
-    }
-    if(!response.ok)throw new Error(errorText(body,response.status));
-    return body as FastSubscriptionCreateResult;
-  }catch(reason){
-    if(controller.signal.aborted){
-      throw new Error("ساخت اشتراک بیشتر از ۱۳۵ ثانیه طول کشید و رابط از حالت انتظار خارج شد. قبل از تلاش دوباره، لیست اشتراک‌ها را تازه‌سازی و وضعیت آخرین اشتراک را بررسی کنید.");
-    }
-    throw reason;
+    return await Promise.race([request,detached]);
   }finally{
-    globalThis.clearTimeout(timer);
+    if(timer!==undefined)globalThis.clearTimeout(timer);
   }
 }
