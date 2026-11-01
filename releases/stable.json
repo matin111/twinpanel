@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.440",
+  "version": "1.1.0-rc.441",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-01T01:58:06Z",
+  "released_at": "2026-11-01T02:17:53Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "1619d3d9cffad0773840ff8b3ec12cfdc5fe1c5f",
+  "source_sha": "371f6f943b16f906e2562a838f82be159ae10d7b",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.440/twinpanel-1.1.0-rc.440-linux-x86_64.tar.gz",
-    "sha256": "f41a909c5eb24077912bac987409ae356d1805ff7c4239d7fb77b52ed9902db1",
-    "size_bytes": 25158753
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.441/twinpanel-1.1.0-rc.441-linux-x86_64.tar.gz",
+    "sha256": "f321e75911580e9c3839e0d2439b97d934c673e484fc968c77c50f9d98ce942a",
+    "size_bytes": 25159701
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.440 منوی اصلی ربات نماینده را از ReplyKeyboard قدیمی به InlineKeyboard داخل پیام تبدیل می‌کند. PR #1641 ورودی‌های اصلی /start را به دکمه‌های Inline منتقل می‌کند و مسیرهای خرید اشتراک، داشبورد، اشتراک‌های من، دریافت لینک اکانت، کیف پول، آموزش، دانلود برنامه، درخواست نمایندگی، پشتیبانی و حساب من را به جریان‌های موجود متصل نگه می‌دارد. Handlerهای متنی قبلی برای سازگاری حفظ شده‌اند، Guard عضویت اجباری parent-level بدون تغییر باقی مانده و تمدید اشتراک در ربات نماینده همچنان غیرفعال است. همچنین Workflow تست Bot Texts که DATABASE_URL داشت ولی PostgreSQL service نداشت اصلاح شد و CI کامل سبز شد. هیچ تغییری در TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane در این Release وجود ندارد. Source روی SHA immutable 1619d3d9cffad0773840ff8b3ec12cfdc5fe1c5f قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.440 switches the reseller bot main menu from the legacy ReplyKeyboard to an InlineKeyboard attached to the message. PR #1641 moves the main /start navigation to inline buttons while preserving the existing purchase, dashboard, subscriptions, account-link lookup, wallet, learning, app download, reseller request, support, and account flows. Legacy text handlers remain for compatibility, the parent-level mandatory membership guard is unchanged, and reseller-bot renewal remains disabled. The Bot Texts workflow was also corrected to provide the PostgreSQL service required by its configured DATABASE_URL, and the complete CI suite passed. No TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane changes are included in this release. Source is pinned to immutable SHA 1619d3d9cffad0773840ff8b3ec12cfdc5fe1c5f."
+    "fa": "TwinPanel 1.1.0-rc.441 مشکل باقی‌ماندن دکمه‌های ReplyKeyboard قدیمی در پایین چت ربات نماینده را برطرف می‌کند. ربات نماینده هنگام /start ابتدا ReplyKeyboardRemove ارسال می‌کند و سپس منوی اصلی را فقط به‌صورت InlineKeyboard داخل پیام نمایش می‌دهد، بنابراین کیبورد قدیمی کلاینت تلگرام حذف می‌شود. همچنین گزینه و Handlerهای «درخواست نمایندگی» از ربات نماینده حذف شده‌اند، چون کاربر این ربات از قبل زیرمجموعه نماینده است. Guard عضویت اجباری و مسیرهای خرید، داشبورد، اشتراک‌ها، دریافت لینک اکانت، کیف پول، آموزش، دانلود، پشتیبانی و حساب من بدون تغییر منطقی حفظ شده‌اند. هیچ تغییری در TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane وجود ندارد. Source روی SHA immutable 371f6f943b16f906e2562a838f82be159ae10d7b قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.441 fixes the stale legacy ReplyKeyboard that could remain visible at the bottom of reseller-bot chats after the menu moved inline. On /start the reseller bot now explicitly sends ReplyKeyboardRemove before rendering the main menu exclusively as an InlineKeyboard attached to the message. The reseller-request option and handlers are also removed from the reseller bot because users there are already under a reseller. Mandatory membership enforcement and the existing purchase, dashboard, subscriptions, account-link lookup, wallet, learning, app download, support, and account flows are preserved. No TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane changes are included. Source is pinned to immutable SHA 371f6f943b16f906e2562a838f82be159ae10d7b."
   }
 }
