@@ -19,8 +19,10 @@ if str(BACKEND_ROOT) not in sys.path:
 # execution uses the deadlock-safe V314 orchestration. V314 reuses the proven
 # V257 protocol collectors while separating async network I/O from DB writes.
 from app.services.modern_quota_runtime_v257 import modern_quota_runtime_loop as legacy_modern_quota_runtime_loop
-from app.services import modern_quota_runtime_v314
-from app.services import singbox_native_accounting_v265
+from app.services.modern_quota_runtime_v314 import modern_quota_runtime_loop
+from app.services.singbox_native_accounting_v265 import singbox_native_accounting_loop
+from app.services import modern_quota_runtime_v314 as modern_quota_runtime_v314_module
+from app.services import singbox_native_accounting_v265 as singbox_native_accounting_v265_module
 
 
 # Full modern/Sing-box accounting reconciliation performs network collection,
@@ -30,16 +32,11 @@ from app.services import singbox_native_accounting_v265
 # This only affects telemetry freshness; provisioning, credentials, sessions,
 # quota limits and protocol dataplane behavior are unchanged.
 ACCOUNTING_RECONCILE_INTERVAL_SECONDS = 15.0
-modern_quota_runtime_v314.MODERN_ACCOUNTING_INTERVAL_SECONDS = (
+modern_quota_runtime_v314_module.MODERN_ACCOUNTING_INTERVAL_SECONDS = (
     ACCOUNTING_RECONCILE_INTERVAL_SECONDS
 )
-singbox_native_accounting_v265.SINGBOX_ACCOUNTING_INTERVAL_SECONDS = (
+singbox_native_accounting_v265_module.SINGBOX_ACCOUNTING_INTERVAL_SECONDS = (
     ACCOUNTING_RECONCILE_INTERVAL_SECONDS
-)
-
-modern_quota_runtime_loop = modern_quota_runtime_v314.modern_quota_runtime_loop
-singbox_native_accounting_loop = (
-    singbox_native_accounting_v265.singbox_native_accounting_loop
 )
 
 
