@@ -11,15 +11,14 @@ export function AdminLogoutControl(){
   const [target,setTarget]=useState<HTMLElement|null>(null);
 
   useEffect(()=>{
-    if(!window.location.pathname.startsWith("/admin")){setTarget(null);return;}
     const findTarget=()=>{
       const node=document.querySelector<HTMLElement>(".admin-shell .admin-commandbar .head-actions");
-      if(!node)return false;
-      setTarget(node);
-      return true;
+      setTarget(current=>current===node?current:node);
+      return Boolean(node);
     };
-    if(findTarget())return;
-    const observer=new MutationObserver(()=>{if(findTarget())observer.disconnect();});
+
+    findTarget();
+    const observer=new MutationObserver(()=>{findTarget();});
     observer.observe(document.body,{childList:true,subtree:true});
     return()=>observer.disconnect();
   },[]);
