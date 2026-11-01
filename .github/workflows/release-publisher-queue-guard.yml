@@ -1,5 +1,7 @@
 name: Release Publisher Queue Guard
 
+# One-shot stale-slot recovery marker for rc.434 publisher run #425.
+
 on:
   push:
     branches: [main]
