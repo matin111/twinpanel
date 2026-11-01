@@ -20,14 +20,18 @@ async def await_hard_timeout(
     *,
     timeout_seconds: float,
     cancel_grace_seconds: float = 2.0,
+    wait_for_cancel: bool = False,
 ) -> T:
-    """Apply a request deadline without waiting forever for cancellation cleanup.
+    """Apply a request deadline with an optional cancellation drain.
 
-    ``asyncio.wait_for()`` cancels an overdue task and then waits until that task
-    finishes cancellation. A coroutine stuck in an async ``finally`` block can
-    therefore make a nominal timeout unbounded. This helper gives cancellation a
-    short grace period, then lets cleanup drain in the background while the
-    caller receives ``TimeoutError`` and can settle its HTTP request.
+    The default preserves the original hard-deadline behaviour: an overdue task
+    is cancelled, given a short grace period, and then allowed to finish cleanup
+    in the background.
+
+    ``wait_for_cancel=True`` is required for operations that retain request-local
+    resources such as a SQLAlchemy Session or ORM instances. In that mode this
+    helper never returns while the cancelled task can still touch those objects,
+    preventing background work from racing a caller rollback/close.
     """
 
     timeout = max(0.01, float(timeout_seconds))
@@ -46,6 +50,15 @@ async def await_hard_timeout(
                 return task.result()
             except asyncio.CancelledError as exc:
                 raise asyncio.TimeoutError from exc
+
+    if wait_for_cancel:
+        try:
+            await task
+        except asyncio.CancelledError as exc:
+            raise asyncio.TimeoutError from exc
+        except BaseException:
+            raise
+        raise asyncio.TimeoutError
 
     task.add_done_callback(_consume_task_result)
     raise asyncio.TimeoutError

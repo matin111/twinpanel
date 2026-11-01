@@ -371,6 +371,7 @@ async def _provision_modern_protocol(
             item = await await_hard_timeout(
                 provision_node(),
                 timeout_seconds=MODERN_NODE_PROVISION_TIMEOUT_SECONDS,
+                wait_for_cancel=True,
             )
             items.append(item)
         except asyncio.TimeoutError:
@@ -416,6 +417,15 @@ async def _provision_classic_protocol(
     items: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
     flag = CLASSIC_NODE_FLAGS[protocol]
+    node_timeout = max(
+        1.0,
+        float(
+            PROTOCOL_PROVISION_TIMEOUT_SECONDS.get(
+                protocol,
+                DEFAULT_PROTOCOL_PROVISION_TIMEOUT_SECONDS,
+            )
+        ),
+    )
 
     for node in nodes:
         if not bool(getattr(node, flag, False)):
@@ -427,18 +437,36 @@ async def _provision_classic_protocol(
                 }
             )
             continue
-        try:
+
+        async def provision_node() -> dict[str, Any]:
             if protocol == "cisco":
-                item = await ad._cisco(db, node, sub, user, username, password)
-            elif protocol == "openvpn":
-                item = await ad._openvpn(db, node, sub, user)
-            elif protocol == "wireguard":
-                item = await ad._wireguard(db, node, sub, user)
-            elif protocol == "l2tp":
-                item = await ad._l2tp(db, node, sub, user, username, password)
-            else:
-                item = await ad._xray(db, node, sub, user, xray_id)
+                return await ad._cisco(db, node, sub, user, username, password)
+            if protocol == "openvpn":
+                return await ad._openvpn(db, node, sub, user)
+            if protocol == "wireguard":
+                return await ad._wireguard(db, node, sub, user)
+            if protocol == "l2tp":
+                return await ad._l2tp(db, node, sub, user, username, password)
+            return await ad._xray(db, node, sub, user, xray_id)
+
+        try:
+            item = await await_hard_timeout(
+                provision_node(),
+                timeout_seconds=node_timeout,
+                wait_for_cancel=True,
+            )
             items.append(item)
+        except asyncio.TimeoutError:
+            errors.append(
+                {
+                    "protocol": protocol,
+                    "node": str(node.name),
+                    "error": (
+                        "Provisioning timeout on this server after "
+                        f"{int(node_timeout)} seconds"
+                    ),
+                }
+            )
         except Exception as exc:
             errors.append(
                 {
@@ -526,37 +554,17 @@ async def _provision_account_v1_locked(
                 nodes,
             )
         else:
-            protocol_timeout = PROTOCOL_PROVISION_TIMEOUT_SECONDS.get(
+            items, protocol_errors = await _provision_classic_protocol(
+                ad,
+                db,
+                sub,
+                user,
                 protocol,
-                DEFAULT_PROTOCOL_PROVISION_TIMEOUT_SECONDS,
+                nodes,
+                username,
+                password,
+                xray_id,
             )
-            timeout = max(1.0, float(protocol_timeout))
-            try:
-                items, protocol_errors = await await_hard_timeout(
-                    _provision_classic_protocol(
-                        ad,
-                        db,
-                        sub,
-                        user,
-                        protocol,
-                        nodes,
-                        username,
-                        password,
-                        xray_id,
-                    ),
-                    timeout_seconds=timeout,
-                )
-            except asyncio.TimeoutError:
-                errors.append(
-                    {
-                        "protocol": protocol,
-                        "node": "provisioning",
-                        "error": (
-                            f"Provisioning timeout after {int(timeout)} seconds"
-                        ),
-                    }
-                )
-                continue
 
         errors.extend(protocol_errors)
         if items:
@@ -579,6 +587,7 @@ async def _provision_account_v1_locked(
             quota_sync = await await_hard_timeout(
                 sync_subscription_quota_nodes(db, sub.id),
                 timeout_seconds=QUOTA_SYNC_TIMEOUT_SECONDS,
+                wait_for_cancel=True,
             )
         except asyncio.TimeoutError:
             quota_sync = {

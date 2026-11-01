@@ -15,8 +15,9 @@ def test_account_provisioning_has_independent_protocol_deadlines() -> None:
     assert "DEFAULT_PROTOCOL_PROVISION_TIMEOUT_SECONDS = 45.0" in source
     assert "from ..services.hard_async_timeout import await_hard_timeout" in source
     assert source.count("await await_hard_timeout(") >= 2
-    assert "timeout_seconds=timeout" in source
+    assert "timeout_seconds=node_timeout" in source
+    assert "wait_for_cancel=True" in source
     assert "timeout_seconds=QUOTA_SYNC_TIMEOUT_SECONDS" in source
-    assert "Provisioning timeout after" in source
+    assert "Provisioning timeout on this server after" in source
     assert "Quota sync timeout after" in source
     assert "Provisioning total deadline exceeded before this protocol" not in source
