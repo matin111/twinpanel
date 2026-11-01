@@ -73,6 +73,7 @@ from .outbound_performance_v268 import router as _outbound_performance_v268_rout
 from .telegram_account_link_lookup import router as _telegram_account_link_lookup_router
 from .telegram_membership_settings import router as _telegram_membership_settings_router
 from .subscription_create_fast_v1 import router as _subscription_create_fast_v1_router
+from . import reseller_bot_delivery_runtime_v2 as _reseller_bot_delivery_runtime_v2  # noqa: F401
 
 # TWINPANEL_MANUAL_AUTHORITY_REGISTER_V193
 # Agent reports arrive on an exact route also retained in the legacy tunnels
