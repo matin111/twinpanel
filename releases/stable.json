@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.454",
+  "version": "1.1.0-rc.455",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-01T18:25:08Z",
+  "released_at": "2026-11-01T18:30:36Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e295fdbec527232b238a4b7df8be898155cfbf0e",
+  "source_sha": "2c374cd85d46ae3b3b1310865ab76920f9294a64",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.454/twinpanel-1.1.0-rc.454-linux-x86_64.tar.gz",
-    "sha256": "ed5464f9452f1b2860d745cbe8c275c4c9a881482970080295de11a9d6ef7a00",
-    "size_bytes": 25177459
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.455/twinpanel-1.1.0-rc.455-linux-x86_64.tar.gz",
+    "sha256": "fc5066c767337998ab35b0c232fb74db9fda2949085aa30cf5b8ea61ee397d36",
+    "size_bytes": 25181730
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.454 تحویل اکانت از ربات اصلی بعد از تأیید پرداخت را یکپارچه می‌کند. ثبت اعلان Telegram دیگر فقط به بعضی مسیرهای تأیید پرداخت وابسته نیست و پس از موفق‌شدن fulfillment در مرز مرکزی سفارش انجام می‌شود؛ بنابراین تأیید مستقیم ادمین و تأیید خودکار کارت‌به‌کارت/SMS نیز وارد همان صف تحویل پایدار ربات اصلی می‌شوند. event keyهای موجود حفظ شده‌اند تا مسیرهای قبلی idempotent بمانند و خطای صف Telegram نتواند سفارش پرداخت‌شده و ساخته‌شده را به provision_failed برگرداند. PR #1688 با ۷/۷ Workflow سبز Merge شد و Release PR #1689 با ۹/۹ Workflow سبز Merge شد. هیچ تغییری در TP27/VXLAN/Tunnel/Spoof/Accounting/quota/credential generation/routing/firewall/protocol dataplane انجام نشده است. Source روی SHA immutable e295fdbec527232b238a4b7df8be898155cfbf0e قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.454 unifies main-bot account delivery after payment approval. Telegram notification enqueueing is no longer limited to selected approval paths and now happens at the canonical successful fulfillment boundary, so direct admin confirmation and automatic card/SMS verification also enter the existing durable main-bot delivery queue. Existing event-key conventions are preserved for idempotency, and a Telegram queue failure cannot roll a successfully paid and fulfilled order back to provision_failed. PR #1688 merged with 7/7 green workflows and Release PR #1689 merged with 9/9 green workflows. No TP27/VXLAN/Tunnel/Spoof/Accounting/quota/credential-generation/routing/firewall/protocol-dataplane behavior is changed. Source is pinned to immutable SHA e295fdbec527232b238a4b7df8be898155cfbf0e."
+    "fa": "TwinPanel 1.1.0-rc.455 سرعت نمایش اولیه فروشگاه و قالب‌های جدید را بهبود می‌دهد. تنظیمات اختصاصی قالب دیگر مسیر رندر اولیه را مسدود نمی‌کند؛ فروشگاه با پلن‌ها و تنظیمات اصلی سریع نمایش داده می‌شود و تنظیمات قالب پس از دریافت، بدون سفید ماندن طولانی صفحه اعمال می‌شوند. PR #1691 با ۴/۴ CI سبز Merge شد و Release PR #1692 با ۹/۹ Workflow سبز Merge شد. هیچ تغییری در Provisioning، پروتکل‌ها، Tunnel، Accounting، Quota، Routing، Firewall یا Dataplane انجام نشده است. Source روی SHA immutable 2c374cd85d46ae3b3b1310865ab76920f9294a64 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.455 improves first-render performance for the storefront and newer templates. Template-specific settings no longer block the initial render; the storefront displays using plans and core settings first, then applies template settings when they arrive instead of leaving the page blank for an extended period. PR #1691 merged with 4/4 green CI checks and Release PR #1692 merged with 9/9 green workflows. No provisioning, protocol, tunnel, accounting, quota, routing, firewall, or dataplane behavior is changed. Source is pinned to immutable SHA 2c374cd85d46ae3b3b1310865ab76920f9294a64."
   }
 }
