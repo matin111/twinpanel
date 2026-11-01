@@ -21,7 +21,6 @@ from ..reseller_owned_plans import (
     owned_plan_by_backing,
 )
 from ..reseller_telegram_models import ResellerTelegramLink
-from ..services.hard_async_timeout import await_hard_timeout
 from . import reseller_bot_orders as legacy
 from .customer_wallet import _wallet
 from .reseller_bot_orders_volume_v2 import (
@@ -34,8 +33,6 @@ router = APIRouter(
     prefix="/v1/reseller/bot-commerce",
     tags=["reseller-bot-commerce-owned-v3"],
 )
-
-RESELLER_ORDER_PROVISION_TIMEOUT_SECONDS = 120.0
 
 
 class ResellerBotWalletAdjustIn(BaseModel):
@@ -433,19 +430,13 @@ async def approve_order_owned_v3(
 
         subscription_id = int(row.subscription_id)
 
-        try:
-            provision = await await_hard_timeout(
-                legacy.provision_account(
-                    subscription_id,
-                    db,
-                ),
-                timeout_seconds=RESELLER_ORDER_PROVISION_TIMEOUT_SECONDS,
-            )
-        except TimeoutError as exc:
-            raise RuntimeError(
-                "Provisioning سفارش نماینده بیش از 120 ثانیه طول کشید؛ "
-                "سفارش برای Retry امن روی provision_failed قرار گرفت"
-            ) from exc
+        # Account delivery owns its per-node/per-protocol deadlines. A single
+        # outer deadline here used to cancel healthy 15-protocol provisioning
+        # while it still held request-local ORM state.
+        provision = await legacy.provision_account(
+            subscription_id,
+            db,
+        )
 
         if isinstance(provision, dict):
             errors = (
