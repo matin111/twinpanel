@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.439",
+  "version": "1.1.0-rc.440",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-01T01:46:38Z",
+  "released_at": "2026-11-01T01:58:06Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "5fb24d01584cccba2cbbc25ea25231402d72c2a7",
+  "source_sha": "1619d3d9cffad0773840ff8b3ec12cfdc5fe1c5f",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.439/twinpanel-1.1.0-rc.439-linux-x86_64.tar.gz",
-    "sha256": "68b6e63579af1fb85a070cb8c8e39666dcdbbd930baa322a88fc176ac04bb541",
-    "size_bytes": 25155427
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.440/twinpanel-1.1.0-rc.440-linux-x86_64.tar.gz",
+    "sha256": "f41a909c5eb24077912bac987409ae356d1805ff7c4239d7fb77b52ed9902db1",
+    "size_bytes": 25158753
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.439 اصلاح ساخت اشتراک ادمین را از Source immutable منتشر می‌کند. PR #1635 مسیر ساخت اشتراک را به قرارداد پاسخ فوری 202 منتقل می‌کند: Subscription ابتدا ثبت و commit می‌شود، UI بلافاصله از حالت انتظار خارج می‌شود و provisioning پروتکل‌ها با DB session مستقل در backend ادامه پیدا می‌کند. timeout/Abort کاذب 135 ثانیه‌ای فرانت حذف شده و Smoke/Regression مربوط به قرارداد جدید به‌روزرسانی و سبز شده‌اند. در صورت شکست provisioning، منطق fail-closed موجود اشتراک را suspend می‌کند. هیچ تغییری در TP27/VXLAN/Tunnel/Spoof/Accounting/quota algorithm/routing/firewall/protocol dataplane در این Release وجود ندارد. Source روی SHA immutable 5fb24d01584cccba2cbbc25ea25231402d72c2a7 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.439 publishes the admin subscription creation fix from an immutable source. PR #1635 changes subscription creation to an immediate 202 contract: the Subscription is persisted and committed first, the UI returns immediately, and protocol provisioning continues in the backend with an independent DB session. The false 135-second frontend timeout/Abort behavior is removed, and the smoke/regression coverage is updated and green for the new contract. Existing fail-closed behavior suspends the subscription if background provisioning fails. No TP27/VXLAN/Tunnel/Spoof/Accounting/quota algorithm/routing/firewall/protocol dataplane changes are included in this release. Source is pinned to immutable SHA 5fb24d01584cccba2cbbc25ea25231402d72c2a7."
+    "fa": "TwinPanel 1.1.0-rc.440 منوی اصلی ربات نماینده را از ReplyKeyboard قدیمی به InlineKeyboard داخل پیام تبدیل می‌کند. PR #1641 ورودی‌های اصلی /start را به دکمه‌های Inline منتقل می‌کند و مسیرهای خرید اشتراک، داشبورد، اشتراک‌های من، دریافت لینک اکانت، کیف پول، آموزش، دانلود برنامه، درخواست نمایندگی، پشتیبانی و حساب من را به جریان‌های موجود متصل نگه می‌دارد. Handlerهای متنی قبلی برای سازگاری حفظ شده‌اند، Guard عضویت اجباری parent-level بدون تغییر باقی مانده و تمدید اشتراک در ربات نماینده همچنان غیرفعال است. همچنین Workflow تست Bot Texts که DATABASE_URL داشت ولی PostgreSQL service نداشت اصلاح شد و CI کامل سبز شد. هیچ تغییری در TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane در این Release وجود ندارد. Source روی SHA immutable 1619d3d9cffad0773840ff8b3ec12cfdc5fe1c5f قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.440 switches the reseller bot main menu from the legacy ReplyKeyboard to an InlineKeyboard attached to the message. PR #1641 moves the main /start navigation to inline buttons while preserving the existing purchase, dashboard, subscriptions, account-link lookup, wallet, learning, app download, reseller request, support, and account flows. Legacy text handlers remain for compatibility, the parent-level mandatory membership guard is unchanged, and reseller-bot renewal remains disabled. The Bot Texts workflow was also corrected to provide the PostgreSQL service required by its configured DATABASE_URL, and the complete CI suite passed. No TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/routing/firewall/protocol dataplane changes are included in this release. Source is pinned to immutable SHA 1619d3d9cffad0773840ff8b3ec12cfdc5fe1c5f."
   }
 }
