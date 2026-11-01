@@ -23,6 +23,9 @@ from app.services.modern_quota_runtime_v314 import modern_quota_runtime_loop
 from app.services.singbox_native_accounting_v265 import singbox_native_accounting_loop
 from app.services import modern_quota_runtime_v314 as modern_quota_runtime_v314_module
 from app.services import singbox_native_accounting_v265 as singbox_native_accounting_v265_module
+from app.services.accounting_device_map_batch_v1 import (
+    install_accounting_device_batch_cache,
+)
 
 
 # Full modern/Sing-box accounting reconciliation performs network collection,
@@ -38,6 +41,13 @@ modern_quota_runtime_v314_module.MODERN_ACCOUNTING_INTERVAL_SECONDS = (
 singbox_native_accounting_v265_module.SINGBOX_ACCOUNTING_INTERVAL_SECONDS = (
     ACCOUNTING_RECONCILE_INTERVAL_SECONDS
 )
+
+# The accounting collectors historically import the node-oriented device
+# builder directly. Install a worker-local replacement before either loop starts
+# so one fresh SQLAlchemy Session builds the full credential/device mapping once
+# and every node in that same reconcile pass reuses it. No global API/runtime
+# caller is changed and each next sweep receives a fresh Session/cache.
+install_accounting_device_batch_cache()
 
 
 async def _serve() -> None:
