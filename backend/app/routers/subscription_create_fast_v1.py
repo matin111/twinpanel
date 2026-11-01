@@ -146,6 +146,26 @@ def _persist_subscription(payload: dict[str, Any]) -> tuple[int, list[str], dict
         db.close()
 
 
+def _should_suspend_after_background_provisioning(
+    requested_protocols: list[str],
+    missing_protocols: list[str],
+    *,
+    quota_ok: bool,
+) -> bool:
+    """Fail closed only when delivery is unusable or quota enforcement failed.
+
+    A per-node or per-protocol partial provisioning error is degraded delivery,
+    not a reason to suspend the entire subscription. The convergence/retry path
+    can repair those missing node/protocol pairs later.
+    """
+
+    requested = {str(value or "").strip().lower() for value in requested_protocols}
+    requested.discard("")
+    missing = {str(value or "").strip().lower() for value in missing_protocols}
+    usable_protocols = requested - missing
+    return (not quota_ok) or (bool(requested) and not usable_protocols)
+
+
 async def _provision_subscription_background(
     subscription_id: int,
     requested_protocols: list[str],
@@ -190,12 +210,12 @@ async def _provision_subscription_background(
         )
         provision_errors = list(provisioning.get("errors") or [])
         quota_ok = bool((provisioning.get("quota") or {}).get("ok", True))
+        provisioning_ok = bool(provisioning.get("ok", False))
 
-        if (
-            missing_protocols
-            or provision_errors
-            or not quota_ok
-            or not provisioning.get("ok", False)
+        if _should_suspend_after_background_provisioning(
+            requested_protocols,
+            missing_protocols,
+            quota_ok=quota_ok,
         ):
             sub = db.get(Subscription, subscription_id)
             if sub is not None:
@@ -204,6 +224,20 @@ async def _provision_subscription_background(
                     sub,
                     reason="subscription_create_postcondition_failed",
                 )
+            return
+
+        if missing_protocols or provision_errors or not provisioning_ok:
+            print(
+                "TWINPANEL_SUBSCRIPTION_BACKGROUND_PROVISION_DEGRADED_V1",
+                {
+                    "subscription_id": subscription_id,
+                    "missing_protocols": sorted(set(missing_protocols)),
+                    "provision_error_count": len(provision_errors),
+                    "provisioning_ok": provisioning_ok,
+                    "quota_ok": quota_ok,
+                },
+                flush=True,
+            )
     finally:
         db.close()
 
