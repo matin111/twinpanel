@@ -95,8 +95,9 @@ export function LegacyPlansRuntimePage(){
 
   useEffect(()=>{void load();},[]);
 
-  const allNodeIds=useMemo(()=>nodes.map(row=>n(row.id)).filter(Boolean),[nodes]);
-  const nodeNameById=useMemo(()=>new Map(nodes.map(row=>[n(row.id),s(row.name)||`#${n(row.id)}`])),[nodes]);
+  const exitNodes=useMemo(()=>nodes.filter(row=>s(row.node_type).trim().toLowerCase()==="exit"),[nodes]);
+  const allNodeIds=useMemo(()=>exitNodes.map(row=>n(row.id)).filter(Boolean),[exitNodes]);
+  const nodeNameById=useMemo(()=>new Map(exitNodes.map(row=>[n(row.id),s(row.name)||`#${n(row.id)}`])),[exitNodes]);
 
   const filtered=useMemo(()=>{
     const value=q.trim().toLowerCase();
@@ -109,6 +110,7 @@ export function LegacyPlansRuntimePage(){
       setEditing(row);
       const protocols=stringList(row.protocols);
       const nodeIds=numberList(row.node_ids);
+      const allowedNodeIds=nodeIds.filter(nodeId=>allNodeIds.includes(nodeId));
       setDraft({
         name:s(row.name),
         description:s(row.description),
@@ -118,7 +120,7 @@ export function LegacyPlansRuntimePage(){
         price_toman:n(row.price_toman),
         is_active:Boolean(row.is_active),
         protocols:protocols.length?protocols:[...ALL_PROTOCOLS],
-        node_ids:nodeIds.length?nodeIds:[...allNodeIds],
+        node_ids:allowedNodeIds.length?allowedNodeIds:[...allNodeIds],
       });
     }else{
       setEditing(null);
@@ -145,7 +147,7 @@ export function LegacyPlansRuntimePage(){
     event.preventDefault();
     if(busy)return;
     if(!draft.protocols.length){setError(pick("حداقل یک پروتکل را انتخاب کنید","Select at least one protocol"));return;}
-    if(!draft.node_ids.length){setError(pick("حداقل یک سرور را انتخاب کنید","Select at least one server"));return;}
+    if(!draft.node_ids.length){setError(pick("حداقل یک سرور خارج را انتخاب کنید","Select at least one exit server"));return;}
 
     setBusy("save");
     setError("");
@@ -158,7 +160,7 @@ export function LegacyPlansRuntimePage(){
         await adminApi.createPlan(draft as unknown as RuntimeRow);
       }
 
-      setOk(editing?pick("پلن ویرایش شد","Plan updated"):pick("پلن با پروتکل‌ها و سرورهای انتخابی ساخته شد","Plan created with selected protocols and servers"));
+      setOk(editing?pick("پلن ویرایش شد","Plan updated"):pick("پلن با پروتکل‌ها و سرورهای خارج انتخابی ساخته شد","Plan created with selected protocols and exit servers"));
       setOpen(false);
       await load();
     }catch(reason){
@@ -174,7 +176,7 @@ export function LegacyPlansRuntimePage(){
         <div className="page-head">
           <div>
             <h1>{pick("پلن‌ها","Plans")}</h1>
-            <small>{pick("هر پلن می‌تواند هر ۱۵ پروتکل و سرورهای مجاز خودش را داشته باشد. هنگام ساخت اکانت، این انتخاب‌ها روی خود اشتراک ثبت می‌شوند.","Each plan can define all 15 protocols and its allowed servers. The selection is snapshotted onto each subscription at creation time.")}</small>
+            <small>{pick("هر پلن می‌تواند هر ۱۵ پروتکل و سرورهای خارج مجاز خودش را داشته باشد. سرورهای ایران فقط برای تانل هستند و در پلن نمایش داده نمی‌شوند.","Each plan can define all 15 protocols and its allowed exit servers. Iran nodes are tunnel-only and are not shown in plans.")}</small>
           </div>
           <button className="primary" onClick={()=>start()}>＋ {pick("پلن جدید","New plan")}</button>
         </div>
@@ -195,7 +197,7 @@ export function LegacyPlansRuntimePage(){
                   <th>{pick("مدت","Duration")}</th>
                   <th>{pick("حجم","Traffic")}</th>
                   <th>{pick("پروتکل‌ها","Protocols")}</th>
-                  <th>{pick("سرورها","Servers")}</th>
+                  <th>{pick("سرورهای خارج","Exit servers")}</th>
                   <th>{pick("قیمت","Price")}</th>
                   <th>{pick("وضعیت","Status")}</th>
                   <th>{pick("عملیات","Actions")}</th>
@@ -240,7 +242,7 @@ export function LegacyPlansRuntimePage(){
               <div className="card-head">
                 <div>
                   <b>{editing?pick("ویرایش پلن","Edit plan"):pick("پلن جدید","New plan")}</b>
-                  <small>{pick("پروتکل‌ها و سرورهای مجاز این پلن را انتخاب کنید. اکانت‌های قبلی با ویرایش پلن تغییر نمی‌کنند.","Choose the protocols and allowed servers for this plan. Existing accounts are not changed by later plan edits.")}</small>
+                  <small>{pick("پروتکل‌ها و سرورهای خارج مجاز این پلن را انتخاب کنید. سرورهای ایران فقط برای تانل هستند.","Choose the protocols and allowed exit servers for this plan. Iran nodes are reserved for tunnels.")}</small>
                 </div>
                 <button type="button" className="icon-button" onClick={()=>setOpen(false)}>×</button>
               </div>
@@ -259,9 +261,9 @@ export function LegacyPlansRuntimePage(){
                 {PROTOCOLS.map(([key,label])=><Check key={key} label={label} checked={draft.protocols.includes(key)} onChange={checked=>toggleProtocol(key,checked)}/>)}
               </div>
 
-              <div className="card-head"><div><b>{pick("سرورهای مجاز","Allowed servers")}</b><small>{pick("فقط سرورهای انتخاب‌شده هنگام ساخت اشتراک روی آن اکانت ثبت می‌شوند.","Only selected servers are snapshotted onto subscriptions created from this plan.")}</small></div><button type="button" className="ghost" onClick={()=>setDraft(current=>({...current,node_ids:[...allNodeIds]}))}>{pick("انتخاب همه","Select all")}</button></div>
+              <div className="card-head"><div><b>{pick("سرورهای خارج مجاز","Allowed exit servers")}</b><small>{pick("فقط سرورهای خارج انتخاب‌شده هنگام ساخت اشتراک روی اکانت ثبت می‌شوند.","Only selected exit servers are snapshotted onto subscriptions created from this plan.")}</small></div><button type="button" className="ghost" onClick={()=>setDraft(current=>({...current,node_ids:[...allNodeIds]}))}>{pick("انتخاب همه","Select all")}</button></div>
               <div className="protocol-toggle-grid">
-                {nodes.map(row=>{const nodeId=n(row.id);const label=`${s(row.name)||`#${nodeId}`} · ${s(row.country_code)} · ${s(row.node_type)}`;return <Check key={nodeId} label={label} checked={draft.node_ids.includes(nodeId)} onChange={checked=>toggleNode(nodeId,checked)}/>;})}
+                {exitNodes.map(row=>{const nodeId=n(row.id);const label=`${s(row.name)||`#${nodeId}`} · ${s(row.country_code)} · ${s(row.node_type)}`;return <Check key={nodeId} label={label} checked={draft.node_ids.includes(nodeId)} onChange={checked=>toggleNode(nodeId,checked)}/>;})}
               </div>
 
               <div className="protocol-toggle-grid">

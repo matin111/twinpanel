@@ -29,12 +29,20 @@ jobs:
           ]
           missing = [name for name in protocols if name not in ui]
           assert not missing, f'missing protocol labels: {missing}'
-          assert 'Allowed servers' in ui
+          assert 'Allowed exit servers' in ui
+          assert 'exitNodes=useMemo' in ui
+          assert 'toLowerCase()==="exit"' in ui
+          assert 'exitNodes.map' in ui
           assert 'node_ids' in ui
 
           model = Path('backend/app/plan_node_models.py').read_text()
           assert '__tablename__ = "plan_nodes"' in model
           assert 'UniqueConstraint("plan_id", "node_id"' in model
+
+          selection = Path('backend/app/plan_template_selection.py').read_text()
+          assert 'from .models import Node, NodeType' in selection
+          assert selection.count('Node.node_type == NodeType.EXIT') >= 3
+          assert 'invalid, retired, or non-exit server ids' in selection
 
           plans = Path('backend/app/routers/plans.py').read_text()
           assert 'plan_template_protocols' in plans

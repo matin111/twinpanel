@@ -179,14 +179,13 @@ def main() -> int:
     )
     exit_id = int(exit_node["id"])
 
-    # Plans snapshot their allowed servers at creation time. This smoke creates
-    # its placeholder nodes afterwards, so explicitly bind them to the plan
-    # before exercising plan-backed subscription creation.
+    # Plans expose only EXIT servers. The Iran node remains available solely
+    # for tunnel registration below and must never enter the plan template.
     request(
         "PATCH",
         f"/v1/plans/{plan_id}",
         token=token,
-        payload={"node_ids": [iran_id, exit_id]},
+        payload={"node_ids": [exit_id]},
     )
 
     tunnel = request(
@@ -226,7 +225,7 @@ def main() -> int:
         payload={
             "user_id": user_id,
             "plan_id": plan_id,
-            "node_ids": [iran_id, exit_id],
+            "node_ids": [exit_id],
             "protocols": [
                 "cisco",
                 "openvpn",
@@ -255,7 +254,7 @@ def main() -> int:
     )
     assert listed is not None, subscriptions_v2
     assert listed["status"] == "suspended", listed
-    assert set(listed["node_ids"]) >= {iran_id, exit_id}, listed
+    assert set(listed["node_ids"]) == {exit_id}, listed
     assert set(listed["protocols"]) == {
         "cisco",
         "openvpn",
@@ -283,6 +282,8 @@ def main() -> int:
         f"exit={exit_id}",
         f"tunnel={tunnel_id}",
         f"subscription={subscription_id}",
+        "plan_nodes=exit_only",
+        "iran_node=tunnel_only",
         "subscription_create=fail_closed_without_runtime",
         f"api_base={api_base}",
     )
