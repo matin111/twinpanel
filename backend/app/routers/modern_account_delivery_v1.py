@@ -19,6 +19,7 @@ from ..models import (
     Subscription,
     User,
 )
+from ..services.hard_async_timeout import await_hard_timeout
 from ..services.provisioning_guard import SubscriptionProvisioningGuard
 
 
@@ -525,9 +526,9 @@ async def _provision_account_v1_locked(
                     password,
                     xray_id,
                 )
-            items, protocol_errors = await asyncio.wait_for(
+            items, protocol_errors = await await_hard_timeout(
                 operation,
-                timeout=timeout,
+                timeout_seconds=timeout,
             )
         except asyncio.TimeoutError:
             errors.append(
@@ -573,9 +574,9 @@ async def _provision_account_v1_locked(
         else:
             quota_timeout = max(1.0, min(QUOTA_SYNC_TIMEOUT_SECONDS, remaining))
             try:
-                quota_sync = await asyncio.wait_for(
+                quota_sync = await await_hard_timeout(
                     sync_subscription_quota_nodes(db, sub.id),
-                    timeout=quota_timeout,
+                    timeout_seconds=quota_timeout,
                 )
             except asyncio.TimeoutError:
                 quota_sync = {
