@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Verify isolated fast create contract
+      - name: Verify immediate create and backend provisioning contract
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -38,24 +38,22 @@ jobs:
           assert 'createSubscriptionFastV1' in ui
           assert 'adminApi.provisionSubscription' not in ui
           assert '/v1/subscriptions/admin-create-fast-v1' in client
-          assert 'SUBSCRIPTION_CREATE_REQUEST_TIMEOUT_MS=135_000' in client
-          assert 'new AbortController()' in client
-          assert 'signal:controller.signal' in client
-          assert 'asyncio.create_task' not in endpoint
-          assert '_TASKS' not in endpoint
-          assert 'from .subscription_admin_v2 import AdminSubscriptionCreateV2, admin_create_v2' in endpoint
-          assert endpoint.index('from .subscription_admin_v2 import AdminSubscriptionCreateV2, admin_create_v2') > endpoint.index('async def _run_create')
-          assert 'await admin_create_v2' in endpoint
-          assert '@router.post("/admin-create-fast-v1")' in endpoint
-          assert 'status_code=202' not in endpoint
-          assert 'result["queued"] = False' in endpoint
-          assert 'result["provisioning_complete"] = True' in endpoint
+          assert 'SUBSCRIPTION_CREATE_REQUEST_TIMEOUT_MS=135_000' not in client
+          assert 'new AbortController()' not in client
+          assert 'signal:controller.signal' not in client
+          assert 'from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException' in endpoint
+          assert 'def _persist_subscription(' in endpoint
+          assert 'async def _provision_subscription_background(' in endpoint
+          assert '@router.post("/admin-create-fast-v1", status_code=202)' in endpoint
+          assert 'background_tasks.add_task(' in endpoint
+          assert '"queued": True' in endpoint
+          assert '"provisioning_complete": False' in endpoint
           assert 'dependencies=[Depends(require_admin)]' in endpoint
           assert 'from ..services.hard_async_timeout import await_hard_timeout' in delivery
           assert delivery.count('await await_hard_timeout(') >= 2
           assert '_runtime_endpoints.router.include_router(_subscription_create_fast_v1_router)' in init
 
-          print('SUBSCRIPTION_CREATE_FAST_V1_FAIL_CLOSED_CONTRACT_OK')
+          print('SUBSCRIPTION_CREATE_FAST_V1_BACKGROUND_CONTRACT_OK')
           PY
 
       - name: Compile endpoint, delivery and hard timeout helper
@@ -67,7 +65,7 @@ jobs:
       - name: Install focused backend regression dependency
         run: python -m pip install --disable-pip-version-check pytest
 
-      - name: Run stuck-spinner timeout regressions
+      - name: Run create and provisioning regressions
         run: |
           pytest -q \
             backend/tests/test_subscription_create_stuck_spinner_v1.py \
