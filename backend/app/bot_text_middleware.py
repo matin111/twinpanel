@@ -63,11 +63,17 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
         return escape(str(value or "").strip())
 
     def _rewrite(self, text: str) -> str:
-        values = self._load()
-        if not values or not text:
-            return text
-
         result = str(text)
+
+        if self.scope == "reseller":
+            result = result.replace(
+                "تعداد فروش محدود نیست؛ مصرف واقعی از حجم نماینده کم می‌شود.\n\n",
+                "",
+            )
+
+        values = self._load()
+        if not values or not result:
+            return result
 
         welcome = values.get("welcome")
         if (
@@ -100,7 +106,7 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
             receipt_variants = (
                 "پس از واریز، فقط رسید پرداخت را ارسال کنید.",
                 "📷 <b>رسید پرداخت را ارسال کنید.</b>",
-                "📷 لطفاً فقط رسید پرداخت را ارسال کنید.",
+                "📷 لطفاً فقط رسید پرداخت را ارسال کنید.</b>",
                 "بعد از پرداخت، <b>کد پیگیری یا تصویر رسید</b> را همین‌جا ارسال کنید.",
                 "کد پیگیری یا تصویر رسید را ارسال کنید.",
             )
