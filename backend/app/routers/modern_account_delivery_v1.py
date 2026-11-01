@@ -52,14 +52,15 @@ STANDALONE_ACCOUNT_PROTOCOLS = frozenset(
 )
 MODERN_ACCOUNT_PROTOCOLS = SINGBOX_ACCOUNT_PROTOCOLS | STANDALONE_ACCOUNT_PROTOCOLS
 
-# Each protocol has its own hard limit. Provisioning now runs in the backend,
-# so one shared wall-clock deadline must never prevent later protocols from
-# being attempted.
+# Classic protocol drivers still keep their per-protocol hard limit. Modern
+# protocols have a per-node hard limit so one slow server can never prevent
+# later servers from being attempted for the same protocol.
 DEFAULT_PROTOCOL_PROVISION_TIMEOUT_SECONDS = 45.0
 PROTOCOL_PROVISION_TIMEOUT_SECONDS = {
     "v2ray": 30.0,
     "openvpn": 60.0,
 }
+MODERN_NODE_PROVISION_TIMEOUT_SECONDS = 45.0
 QUOTA_SYNC_TIMEOUT_SECONDS = 20.0
 
 
@@ -318,45 +319,71 @@ async def _provision_modern_protocol(
             )
             continue
 
-        conn = None
-        try:
-            conn = await ad.ssh_connect_saved(node, db)
-            if standalone:
-                if secret is None:
-                    secret = await new_account_secret(conn, protocol, sub.id)
-                port = int(cfg.port or 0)
-                if not 1 <= port <= 65535:
-                    raise RuntimeError(f"{protocol} runtime port is unavailable")
-                item = await apply_account(conn, node, secret, port)
-                if protocol == "amneziawg":
-                    from ..amneziawg_egress_v221 import ensure_amneziawg_egress
+        async def provision_node() -> dict[str, Any]:
+            nonlocal secret
+            conn = None
+            try:
+                conn = await ad.ssh_connect_saved(node, db)
+                if standalone:
+                    if secret is None:
+                        secret = await new_account_secret(conn, protocol, sub.id)
+                    port = int(cfg.port or 0)
+                    if not 1 <= port <= 65535:
+                        raise RuntimeError(f"{protocol} runtime port is unavailable")
+                    item = await apply_account(conn, node, secret, port)
+                    if protocol == "amneziawg":
+                        from ..amneziawg_egress_v221 import ensure_amneziawg_egress
 
-                    egress = await ensure_amneziawg_egress(conn)
-                    item["egress_contract"] = int(egress["contract"])
-            else:
-                previous_username = str(
-                    getattr(previous_secret, "username", "") or ""
-                ).strip()
-                current_username = str(getattr(secret, "username", "") or "").strip()
-                if (
-                    protocol in SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS
-                    and previous_username
-                    and previous_username != current_username
-                ):
-                    await _remove_singbox_identity(
-                        conn,
-                        protocol,
-                        previous_username,
-                    )
-                item = await apply_account(conn, node, secret)
-                if protocol in SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS:
-                    item = _bind_unique_client_tags(
-                        item,
-                        node=node,
-                        protocol=protocol,
-                        username=current_username,
-                    )
+                        egress = await ensure_amneziawg_egress(conn)
+                        item["egress_contract"] = int(egress["contract"])
+                else:
+                    previous_username = str(
+                        getattr(previous_secret, "username", "") or ""
+                    ).strip()
+                    current_username = str(
+                        getattr(secret, "username", "") or ""
+                    ).strip()
+                    if (
+                        protocol in SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS
+                        and previous_username
+                        and previous_username != current_username
+                    ):
+                        await _remove_singbox_identity(
+                            conn,
+                            protocol,
+                            previous_username,
+                        )
+                    item = await apply_account(conn, node, secret)
+                    if protocol in SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS:
+                        item = _bind_unique_client_tags(
+                            item,
+                            node=node,
+                            protocol=protocol,
+                            username=current_username,
+                        )
+                return item
+            finally:
+                if conn is not None:
+                    conn.close()
+                    await conn.wait_closed()
+
+        try:
+            item = await await_hard_timeout(
+                provision_node(),
+                timeout_seconds=MODERN_NODE_PROVISION_TIMEOUT_SECONDS,
+            )
             items.append(item)
+        except asyncio.TimeoutError:
+            errors.append(
+                {
+                    "protocol": protocol,
+                    "node": str(node.name),
+                    "error": (
+                        "Provisioning timeout on this server after "
+                        f"{int(MODERN_NODE_PROVISION_TIMEOUT_SECONDS)} seconds"
+                    ),
+                }
+            )
         except Exception as exc:
             errors.append(
                 {
@@ -365,10 +392,6 @@ async def _provision_modern_protocol(
                     "error": str(exc)[:800],
                 }
             )
-        finally:
-            if conn is not None:
-                conn.close()
-                await conn.wait_closed()
 
     if items and secret is not None:
         cred.username = _credential_identity(protocol, secret)
@@ -494,46 +517,46 @@ async def _provision_account_v1_locked(
     errors: list[dict[str, str]] = []
 
     for protocol in protocols:
-        protocol_timeout = PROTOCOL_PROVISION_TIMEOUT_SECONDS.get(
-            protocol,
-            DEFAULT_PROTOCOL_PROVISION_TIMEOUT_SECONDS,
-        )
-        timeout = max(1.0, float(protocol_timeout))
-
-        try:
-            if protocol in MODERN_ACCOUNT_PROTOCOLS:
-                operation = _provision_modern_protocol(
-                    ad,
-                    db,
-                    sub,
-                    protocol,
-                    nodes,
-                )
-            else:
-                operation = _provision_classic_protocol(
-                    ad,
-                    db,
-                    sub,
-                    user,
-                    protocol,
-                    nodes,
-                    username,
-                    password,
-                    xray_id,
-                )
-            items, protocol_errors = await await_hard_timeout(
-                operation,
-                timeout_seconds=timeout,
+        if protocol in MODERN_ACCOUNT_PROTOCOLS:
+            items, protocol_errors = await _provision_modern_protocol(
+                ad,
+                db,
+                sub,
+                protocol,
+                nodes,
             )
-        except asyncio.TimeoutError:
-            errors.append(
-                {
-                    "protocol": protocol,
-                    "node": "provisioning",
-                    "error": f"Provisioning timeout after {int(timeout)} seconds",
-                }
+        else:
+            protocol_timeout = PROTOCOL_PROVISION_TIMEOUT_SECONDS.get(
+                protocol,
+                DEFAULT_PROTOCOL_PROVISION_TIMEOUT_SECONDS,
             )
-            continue
+            timeout = max(1.0, float(protocol_timeout))
+            try:
+                items, protocol_errors = await await_hard_timeout(
+                    _provision_classic_protocol(
+                        ad,
+                        db,
+                        sub,
+                        user,
+                        protocol,
+                        nodes,
+                        username,
+                        password,
+                        xray_id,
+                    ),
+                    timeout_seconds=timeout,
+                )
+            except asyncio.TimeoutError:
+                errors.append(
+                    {
+                        "protocol": protocol,
+                        "node": "provisioning",
+                        "error": (
+                            f"Provisioning timeout after {int(timeout)} seconds"
+                        ),
+                    }
+                )
+                continue
 
         errors.extend(protocol_errors)
         if items:
