@@ -13,6 +13,11 @@ def require(text: str, needle: str, label: str) -> None:
         raise SystemExit(f"missing {label}: {needle}")
 
 
+def forbid(text: str, needle: str, label: str) -> None:
+    if needle in text:
+        raise SystemExit(f"unexpected {label}: {needle}")
+
+
 def main() -> None:
     styles = read("backend/app/telegram_button_styles.py")
     settings = read("backend/app/routers/telegram_membership_settings.py")
@@ -30,7 +35,10 @@ def main() -> None:
     require(runtime, "live_button_styles()", "live RuntimeSetting lookup")
     require(frontend, "ظاهر دکمه‌های ربات", "admin style editor heading")
     require(frontend, "پیش‌نمایش زنده", "live preview")
-    require(frontend, "apiFetch<Styles>", "frontend API wiring")
+    require(frontend, 'getCustomerToken', "authenticated token lookup")
+    require(frontend, 'headers.set("Authorization",`Bearer ${token}`)', "Bearer auth header")
+    require(frontend, 'fetch(`${API_BASE}/v1/admin/telegram-bot/button-styles`', "authenticated frontend API wiring")
+    forbid(frontend, "apiFetch<Styles>", "unauthenticated generic API helper")
     require(router, "<AdminTelegramButtonStyleSettings/>", "admin Telegram mount")
 
     print("telegram button styles smoke: ok")
