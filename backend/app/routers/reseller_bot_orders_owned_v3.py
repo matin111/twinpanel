@@ -21,6 +21,7 @@ from ..reseller_owned_plans import (
     owned_plan_by_backing,
 )
 from ..reseller_telegram_models import ResellerTelegramLink
+from ..services.hard_async_timeout import await_hard_timeout
 from . import reseller_bot_orders as legacy
 from .customer_wallet import _wallet
 from .reseller_bot_orders_volume_v2 import (
@@ -33,6 +34,8 @@ router = APIRouter(
     prefix="/v1/reseller/bot-commerce",
     tags=["reseller-bot-commerce-owned-v3"],
 )
+
+RESELLER_ORDER_PROVISION_TIMEOUT_SECONDS = 120.0
 
 
 class ResellerBotWalletAdjustIn(BaseModel):
@@ -373,9 +376,7 @@ async def approve_order_owned_v3(
     try:
         if not row.subscription_id:
             # Preserve the immutable order snapshot even if the reseller edits
-            # the plan while a receipt is waiting for review. Display-only
-            # fields which were not historically stored on the order use the
-            # owned-plan mapping and do not affect quota or pricing.
+            # the plan while a receipt is waiting for review.
             requested_protocols = {
                 str(value).strip().lower()
                 for value in (row.protocols or [])
@@ -395,6 +396,7 @@ async def approve_order_owned_v3(
                 traffic_gb=int(row.traffic_gb),
                 duration_days=int(row.duration_days),
                 sell_price_toman=int(row.sell_price_toman),
+                protocols=sorted(requested_protocols),
                 enable_cisco="cisco" in requested_protocols,
                 enable_openvpn="openvpn" in requested_protocols,
                 enable_wireguard="wireguard" in requested_protocols,
@@ -431,10 +433,19 @@ async def approve_order_owned_v3(
 
         subscription_id = int(row.subscription_id)
 
-        provision = await legacy.provision_account(
-            subscription_id,
-            db,
-        )
+        try:
+            provision = await await_hard_timeout(
+                legacy.provision_account(
+                    subscription_id,
+                    db,
+                ),
+                timeout_seconds=RESELLER_ORDER_PROVISION_TIMEOUT_SECONDS,
+            )
+        except TimeoutError as exc:
+            raise RuntimeError(
+                "Provisioning سفارش نماینده بیش از 120 ثانیه طول کشید؛ "
+                "سفارش برای Retry امن روی provision_failed قرار گرفت"
+            ) from exc
 
         if isinstance(provision, dict):
             errors = (
