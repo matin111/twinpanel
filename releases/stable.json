@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.463",
+  "version": "1.1.0-rc.464",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-01T21:27:44Z",
+  "released_at": "2026-11-01T21:32:30Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "190eb1d7da8363a52cc10de0d4d42d29645b1b80",
+  "source_sha": "9d99a94a1a7f679f3b8232572af6b87c55eade1a",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.463/twinpanel-1.1.0-rc.463-linux-x86_64.tar.gz",
-    "sha256": "047d5a29fbd560ffefc6f03753653c339624873fbfdff7ef2dbed9bee61c5d3c",
-    "size_bytes": 25187772
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.464/twinpanel-1.1.0-rc.464-linux-x86_64.tar.gz",
+    "sha256": "5b9f61ab78975168fe18b04bdfe5a66062ca1a31959c835cefd42e0718f3716f",
+    "size_bytes": 25187811
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.463 سرعت ساخت اکانت‌های ۱۵ پروتکلی را بدون تغییر رفتار Classic، quota، accounting، tunnel، firewall یا fulfillment افزایش می‌دهد. فقط Nodeهای مختلف یک پروتکل Modern به‌صورت محدود و هم‌زمان با سقف ۳ اجرا می‌شوند؛ خود پروتکل‌ها همچنان sequential باقی می‌مانند تا روی یک سرور mutation هم‌زمان بین پروتکل‌ها رخ ندهد. SQLAlchemy Session داخل taskهای موازی استفاده نمی‌شود و secretهای اشتراکی Standalone مانند AmneziaWG و Sudoku قبل از fan-out فقط یک‌بار ساخته می‌شوند. PR #1717 با 4/4 Workflow شامل API Build، API integration، Admin UI build، Preview و Telegram/Tunnel smoke سبز Merge شد. Release PR #1719 نیز 9/9 Workflow سبز Merge شد. Source روی SHA immutable 190eb1d7da8363a52cc10de0d4d42d29645b1b80 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.463 speeds up 15-protocol account creation without changing Classic protocol, quota, accounting, tunnel, firewall or fulfillment behavior. Only different nodes of the same Modern protocol are provisioned concurrently, with a hard concurrency cap of 3; protocols themselves remain sequential so a server is never mutated by multiple protocol drivers at once. The SQLAlchemy Session is not used inside concurrent tasks, and shared Standalone identities such as AmneziaWG and Sudoku are generated exactly once before fan-out. PR #1717 merged with 4/4 green workflows including API Build, API integration, Admin UI build, Preview and Telegram/Tunnel smoke. Release PR #1719 merged with 9/9 green workflows. Source is pinned to immutable SHA 190eb1d7da8363a52cc10de0d4d42d29645b1b80."
+    "fa": "TwinPanel 1.1.0-rc.464 پاسخ‌گویی پنل را زیر بار Subscription Convergence پایدارتر می‌کند، بدون تغییر منطق provisioning، credential، quota، tunnel، routing یا protocol dataplane. Reconciliation تاریخی V114/V299 با همان رفتار canonical در یک process کم‌اولویت جدا اجرا می‌شود تا CPU/GIL آن Uvicorn و درخواست‌های تعاملی پنل را مسدود نکند. این نسخه همچنین بهینه‌سازی bounded parallel provisioning نسخه rc.463 را حفظ می‌کند. PR #1718 با 7/7 Workflow شامل API Build و integration، Preview، V2Ray/Xray، Telegram و Tunnel smoke سبز Merge شد. Release PR #1721 نیز 9/9 Workflow سبز Merge شد. Source روی SHA immutable 9d99a94a1a7f679f3b8232572af6b87c55eade1a قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.464 improves panel responsiveness under Subscription Convergence load without changing provisioning, credential, quota, tunnel, routing or protocol dataplane semantics. Canonical V114/V299 reconciliation now runs in a separate low-priority process so its CPU/GIL work cannot block Uvicorn interactive requests. This release also retains the bounded parallel provisioning optimization from rc.463. PR #1718 merged with 7/7 green workflows including API Build/integration, Preview, V2Ray/Xray, Telegram and Tunnel smoke. Release PR #1721 merged with 9/9 green workflows. Source is pinned to immutable SHA 9d99a94a1a7f679f3b8232572af6b87c55eade1a."
   }
 }
