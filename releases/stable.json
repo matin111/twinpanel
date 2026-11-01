@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.435",
+  "version": "1.1.0-rc.437",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-01T00:39:36Z",
+  "released_at": "2026-11-01T01:07:46Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "ae19da380f23c4ea8115f8b601fcba9d3580b99b",
+  "source_sha": "0a39f4b7b575d2a2ef0c7aada38411b53e260e78",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.435/twinpanel-1.1.0-rc.435-linux-x86_64.tar.gz",
-    "sha256": "feaf4aa6140535a250baa1932b03404d71262c7bb75b4e5f4f4a60311a6e6daf",
-    "size_bytes": 25146877
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.437/twinpanel-1.1.0-rc.437-linux-x86_64.tar.gz",
+    "sha256": "1a243dfaa62d87e0d923534765f34caf6c88a20de6407609e0bc764b66b822a0",
+    "size_bytes": 25149852
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.435 تغییرات Telegram/Reseller مربوط به PR #1621 را منتشر می‌کند: عضویت اجباری برای ربات اصلی و ربات‌های نمایندگی با تنظیم مستقل هر نماینده، همسان‌سازی منوی ربات نمایندگی با منوی اصلی، استانداردسازی مسیرهای خانه/بازگشت، حفظ مسیر دریافت لینک اکانت، و حذف گزینه تمدید فقط از سطح ربات تلگرام نمایندگی. تنظیمات عضویت از RuntimeSetting استفاده می‌کنند و migration دیتابیس جدیدی اضافه نشده است. PR اصلی #1621 و PR نسخه #1625 با CI سبز Merge شده‌اند. Tunnel/Accounting/Provisioning/quota/routing/firewall و protocol dataplaneها در این بسته بازنویسی نشده‌اند. Source روی SHA immutable ae19da380f23c4ea8115f8b601fcba9d3580b99b قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.435 publishes the Telegram/Reseller changes from PR #1621: mandatory membership for the main bot and reseller bots with independent per-reseller configuration, reseller menu alignment with the main bot, standardized home/back navigation, preserved account-link delivery, and removal of renewal only from the reseller Telegram bot surface. Membership settings use RuntimeSetting and do not add a new database migration. Main PR #1621 and release PR #1625 were merged with green CI. Tunnel/Accounting/Provisioning/quota/routing/firewall and protocol dataplanes are not rewritten by this package. Source is pinned to immutable SHA ae19da380f23c4ea8115f8b601fcba9d3580b99b."
+    "fa": "TwinPanel 1.1.0-rc.437 دو اصلاح Merge‌شده را در یک Source immutable منتشر می‌کند. اول، اصلاح PR #1627 برای گیرکردن پنجره ساخت اشتراک روی «در حال ثبت…»: Provisioning همچنان fail-closed است، اما timeoutهای ساخت پروتکل و quota دیگر به‌خاطر cancellation/cleanup بدون سقف نمی‌مانند و frontend نیز AbortController با سقف ۱۳۵ ثانیه دارد؛ قرارداد regression فعلی ۱۲۰ ثانیه برای کل provisioning، ۳۰ ثانیه برای V2Ray و ۶۰ ثانیه برای OpenVPN است. دوم، PR #1628 منوی ربات تلگرام نماینده را از نظر ساختار با منوی اصلی همسان می‌کند و Handlerهای واقعی کیف پول، حساب من و درخواست نمایندگی را اضافه می‌کند. PR نسخه #1631 با CI سبز Merge شده است. هیچ global AsyncSSH monkey-patch و هیچ بازنویسی TP27/VXLAN/Tunnel/Spoof/Accounting/routing/firewall/protocol dataplane انجام نشده است. Source روی SHA immutable 0a39f4b7b575d2a2ef0c7aada38411b53e260e78 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.437 publishes two merged fixes from one immutable source. First, PR #1627 fixes the admin subscription-create modal remaining indefinitely in its busy state: provisioning remains fail-closed, protocol/quota deadlines can no longer become unbounded while cancellation cleanup drains, and the frontend has a 135-second AbortController safety deadline; regression coverage locks the current contract at 120 seconds total provisioning, 30 seconds for V2Ray, and 60 seconds for OpenVPN. Second, PR #1628 aligns the reseller Telegram bot menu structure with the production main bot and adds working handlers for wallet, account, and reseller-request actions. Release PR #1631 was merged with green CI. No global AsyncSSH monkey patch and no TP27/VXLAN/Tunnel/Spoof/Accounting/routing/firewall/protocol dataplane rewrite is included. Source is pinned to immutable SHA 0a39f4b7b575d2a2ef0c7aada38411b53e260e78."
   }
 }
