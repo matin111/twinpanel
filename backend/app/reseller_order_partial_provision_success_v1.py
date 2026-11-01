@@ -4,8 +4,6 @@ import logging
 from functools import wraps
 from typing import Any, Iterable
 
-from .models import SubscriptionProtocol
-
 
 logger = logging.getLogger(__name__)
 _INSTALLED = False
@@ -19,6 +17,8 @@ def _protocol_name(value: Any) -> str:
 
 
 def _requested_protocols(db, subscription_id: int) -> set[str]:
+    from .models import SubscriptionProtocol
+
     return {
         _protocol_name(row[0])
         for row in (
