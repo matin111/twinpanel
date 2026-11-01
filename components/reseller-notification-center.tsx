@@ -103,10 +103,10 @@ export function ResellerNotificationCenter(){
       {unread>0&&<b>{unread>99?"99+":resellerNumber(lang,unread)}</b>}
     </button>
 
-    {open&&<div className="customerNotificationPopover">
+    {open&&<div className="customerNotificationPopover resellerNotificationPopover">
       <header>
         <div>
-          <b>{pick("اعلان‌های نمایندگی","Reseller notifications")}</b>
+          <b>{pick("اعلان‌ها","Notifications")}</b>
           <small>{unread?`${resellerNumber(lang,unread)} ${pick("خوانده‌نشده","unread")}`:pick("همه خوانده شده‌اند","All caught up")}</small>
         </div>
         {unread>0&&<button type="button" onClick={()=>void markAll()}>{pick("خواندن همه","Mark all read")}</button>}

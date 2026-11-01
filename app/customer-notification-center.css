@@ -313,3 +313,45 @@ html[data-theme="light"] .customerNotificationBell {
     max-width: none;
   }
 }
+
+/* Reseller notification bell sits on the RTL inline-end (left edge).
+   Open the popover inward so it stays fully inside the viewport. */
+.resellerNotificationCenter .resellerNotificationPopover {
+  right: auto;
+  left: 0;
+  width: min(430px, calc(100vw - 28px));
+  max-width: calc(100vw - 28px);
+  direction: rtl;
+  text-align: right;
+}
+.resellerNotificationCenter .resellerNotificationPopover header small {
+  display: block !important;
+}
+.resellerNotificationCenter .resellerNotificationPopover .customerNotificationList > button {
+  grid-template-columns: 9px minmax(0, 1fr) !important;
+  align-items: start !important;
+  text-align: right;
+}
+.resellerNotificationCenter .resellerNotificationPopover .customerNotificationList > button > i {
+  display: block !important;
+}
+html[dir="ltr"] .resellerNotificationCenter .resellerNotificationPopover {
+  right: 0;
+  left: auto;
+  direction: ltr;
+  text-align: left;
+}
+html[dir="ltr"] .resellerNotificationCenter .resellerNotificationPopover .customerNotificationList > button {
+  text-align: left;
+}
+@media (max-width: 720px) {
+  .resellerNotificationCenter .resellerNotificationPopover,
+  html[dir="ltr"] .resellerNotificationCenter .resellerNotificationPopover {
+    position: fixed;
+    top: 68px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: none;
+  }
+}

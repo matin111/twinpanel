@@ -89,6 +89,26 @@ BOT_TEXT_SPECS: tuple[BotTextSpec, ...] = (
 _SPEC_BY_KEY = {item.key: item for item in BOT_TEXT_SPECS}
 
 
+_RESELLER_COPY_REPLACEMENTS = (
+    ("در انتظار تأیید نماینده", "در انتظار تأیید"),
+    ("ربات نمایندگی", "ربات"),
+    ("ربات نماینده", "ربات"),
+    ("کیف پول نمایندگی", "کیف پول"),
+    ("حجم نمایندگی", "حجم حساب"),
+    ("حجم نماینده", "حجم حساب"),
+    ("نمایندگی", "فروشگاه"),
+    ("نماینده", "فروشنده"),
+)
+
+def _neutralize_reseller_copy(value: str | None) -> str | None:
+    if value is None:
+        return None
+    result = str(value)
+    for source, target in _RESELLER_COPY_REPLACEMENTS:
+        result = result.replace(source, target)
+    return result
+
+
 ADMIN_DEFAULTS = {
     "welcome": (
         "مدیریت و خرید اشتراک VPN از داخل تلگرام.\n\n"
@@ -119,7 +139,7 @@ RESELLER_DEFAULTS = {
     "plan_select": "پلن موردنظر را انتخاب کنید:",
     "payment_select": "روش پرداخت را انتخاب کنید:",
     "receipt_request": "کد پیگیری یا تصویر رسید را همین‌جا ارسال کنید.",
-    "awaiting_approval": "در انتظار تأیید نماینده",
+    "awaiting_approval": "در انتظار تأیید",
     "purchase_success": "خرید با موفقیت انجام شد.",
     "payment_rejected": "پرداخت تأیید نشد",
     "renewal_intro": "تمدید اشتراک",
@@ -177,9 +197,6 @@ def _reload_main_bot_runtime() -> None:
                 timeout=40,
             )
     except Exception:
-        # The setting itself is durable even when the service is currently
-        # unavailable. Existing install/repair/restart controls will use the
-        # patched service definition on the next operator action.
         return
 
 
@@ -299,6 +316,9 @@ def bot_text_catalog(
             reseller_id,
         )
         default = _default_text(scope, spec.key, reseller)
+        if scope == "reseller":
+            custom = _neutralize_reseller_copy(custom)
+            default = _neutralize_reseller_copy(default) or ""
         items.append(
             {
                 "key": spec.key,
