@@ -2,7 +2,8 @@
 
 import {createPortal} from "react-dom";
 import {useEffect,useState} from "react";
-import {apiFetch} from "../lib/api";
+import {API_BASE} from "../lib/api";
+import {getCustomerToken} from "../lib/customer-api";
 
 type Style="default"|"primary"|"success"|"danger";
 type Styles={
@@ -31,6 +32,24 @@ const BUTTONS:{key:keyof Styles;label:string;emoji:string}[]=[
 
 function cls(style:Style){return `tg-style-${style}`;}
 
+async function request(init:RequestInit={}):Promise<Styles>{
+  const token=getCustomerToken();
+  if(!token)throw new Error("AUTH_REQUIRED");
+  const headers=new Headers(init.headers);
+  headers.set("Authorization",`Bearer ${token}`);
+  if(init.body)headers.set("Content-Type","application/json");
+  const response=await fetch(`${API_BASE}/v1/admin/telegram-bot/button-styles`,{...init,headers,cache:"no-store"});
+  let payload:unknown=null;
+  try{payload=await response.json();}catch{}
+  if(!response.ok){
+    const detail=payload&&typeof payload==="object"&&"detail" in payload
+      ?String((payload as {detail:unknown}).detail)
+      :`API error ${response.status}`;
+    throw new Error(detail);
+  }
+  return payload as Styles;
+}
+
 export function AdminTelegramButtonStyleSettings(){
   const [host,setHost]=useState<Element|null>(null);
   const [styles,setStyles]=useState<Styles>(DEFAULTS);
@@ -41,7 +60,7 @@ export function AdminTelegramButtonStyleSettings(){
   async function load(){
     setLoading(true);setMessage("");
     try{
-      const data=await apiFetch<Styles>("/v1/admin/telegram-bot/button-styles");
+      const data=await request();
       setStyles({...DEFAULTS,...data});
     }catch(error){setMessage(error instanceof Error?error.message:"خطا در دریافت تنظیمات");}
     finally{setLoading(false);}
@@ -49,7 +68,7 @@ export function AdminTelegramButtonStyleSettings(){
   async function save(){
     setSaving(true);setMessage("");
     try{
-      const data=await apiFetch<Styles>("/v1/admin/telegram-bot/button-styles",{method:"PATCH",body:JSON.stringify(styles)});
+      const data=await request({method:"PATCH",body:JSON.stringify(styles)});
       setStyles({...DEFAULTS,...data});setMessage("تنظیمات رنگ دکمه‌ها ذخیره شد.");
     }catch(error){setMessage(error instanceof Error?error.message:"ذخیره تنظیمات انجام نشد");}
     finally{setSaving(false);}
