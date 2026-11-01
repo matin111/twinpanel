@@ -7,15 +7,22 @@ from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    KeyboardButton,
+    ReplyKeyboardMarkup,
+)
 
 from . import reseller_bot_review
 from . import reseller_bot_runtime as legacy_runtime
 from . import reseller_bot_subscription_link_runtime as subscription_link_runtime
 from . import reseller_bot_wallet_menu_runtime as wallet_menu_runtime
 from .bot_text_middleware import BotTextRequestMiddleware
+from .database import SessionLocal
 from .discount_schema import ensure_discount_schema
 from .models import Plan
+from .models_reseller import Reseller, ResellerBotSettings
 from .reseller_bot_owned_runtime import build_owned_plan_router
 from .reseller_bot_payment_runtime import build_owned_payment_router
 from .reseller_bot_subscription_link_runtime import build_subscription_link_router
@@ -41,27 +48,31 @@ def _reply_button(text: str, style: str | None = None) -> KeyboardButton:
 
 
 def reseller_main_keyboard() -> ReplyKeyboardMarkup:
-    """Main/admin parity menu without Telegram reseller renewal."""
+    """Match the production main-bot menu while keeping reseller-safe actions."""
     return ReplyKeyboardMarkup(
         resize_keyboard=True,
         keyboard=[
             [
+                _reply_button("🛒 خرید اشتراک", "danger"),
+            ],
+            [
                 _reply_button("🏠 داشبورد", "primary"),
-                _reply_button("🛒 خرید اشتراک", "success"),
-            ],
-            [
                 _reply_button("📦 اشتراک‌های من", "primary"),
-                _reply_button("👛 کیف پول من", "primary"),
             ],
             [
-                _reply_button("🔗 دریافت لینک اکانت", "primary"),
+                _reply_button("🔗 دریافت لینک اکانت", "success"),
+                _reply_button("💰 کیف پول", "primary"),
             ],
             [
                 _reply_button("📚 آموزش", "primary"),
                 _reply_button("⬇️ دانلود برنامه", "primary"),
             ],
             [
-                _reply_button("🎫 پشتیبانی", "primary"),
+                _reply_button("🤝 درخواست نمایندگی", "success"),
+            ],
+            [
+                _reply_button("🎫 پشتیبانی", "danger"),
+                _reply_button("👤 حساب من", "primary"),
             ],
         ],
     )
@@ -115,6 +126,110 @@ def _owned_review_caption(db, order):
 
 def _policy_router(reseller_id: int) -> Router:
     router = Router(name=f"reseller-bot-policy-{reseller_id}")
+
+    @router.message(F.text == "💰 کیف پول")
+    async def wallet_alias(message):
+        db = SessionLocal()
+        try:
+            user = legacy_runtime.linked_user(
+                db,
+                reseller_id,
+                int(message.from_user.id),
+            )
+            if not user:
+                await message.answer(
+                    "ابتدا /start را ارسال کنید.",
+                    reply_markup=reseller_main_keyboard(),
+                )
+                return
+
+            await message.answer(
+                wallet_menu_runtime._wallet_text(
+                    db,
+                    reseller_id,
+                    int(user.id),
+                ),
+                reply_markup=wallet_menu_runtime._wallet_inline_keyboard(),
+            )
+        finally:
+            db.close()
+
+    @router.message(F.text == "👤 حساب من")
+    async def account_menu(message):
+        db = SessionLocal()
+        try:
+            user = legacy_runtime.linked_user(
+                db,
+                reseller_id,
+                int(message.from_user.id),
+            )
+            if not user:
+                await message.answer(
+                    "ابتدا /start را ارسال کنید.",
+                    reply_markup=reseller_main_keyboard(),
+                )
+                return
+
+            reseller = db.get(Reseller, reseller_id)
+            rows = legacy_runtime._subscriptions(
+                db,
+                reseller_id,
+                int(user.id),
+            )
+            active = sum(
+                1
+                for _, sub in rows
+                if legacy_runtime._status_value(sub.status) == "active"
+            )
+
+            await message.answer(
+                "👤 <b>حساب من</b>\n\n"
+                f"نام: <b>{escape(str(user.full_name or '-'))}</b>\n"
+                f"فروشگاه: <b>{escape(legacy_runtime._brand(reseller) if reseller else '-')}</b>\n"
+                f"📦 تعداد اشتراک: <b>{len(rows)}</b>\n"
+                f"🟢 اشتراک فعال: <b>{active}</b>",
+                reply_markup=reseller_main_keyboard(),
+            )
+        finally:
+            db.close()
+
+    @router.message(F.text == "🤝 درخواست نمایندگی")
+    async def reseller_request(message):
+        db = SessionLocal()
+        try:
+            settings = (
+                db.query(ResellerBotSettings)
+                .filter(
+                    ResellerBotSettings.reseller_id == reseller_id
+                )
+                .first()
+            )
+            username = str(
+                (settings.support_username if settings else "") or ""
+            ).strip().lstrip("@")
+
+            markup = None
+            if username:
+                markup = InlineKeyboardMarkup(
+                    inline_keyboard=[[
+                        InlineKeyboardButton(
+                            text="🤝 ارسال درخواست نمایندگی",
+                            url="https://t.me/" + username,
+                        )
+                    ]]
+                )
+
+            await message.answer(
+                "🤝 <b>درخواست نمایندگی</b>\n\n"
+                "برای ثبت درخواست نمایندگی با پشتیبانی در ارتباط باشید.",
+                reply_markup=markup,
+            )
+            await message.answer(
+                "منوی اصلی",
+                reply_markup=reseller_main_keyboard(),
+            )
+        finally:
+            db.close()
 
     @router.message(F.text == "🔄 تمدید اشتراک")
     async def renewal_removed(message):
