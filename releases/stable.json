@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.468",
+  "version": "1.1.0-rc.469",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-01T22:42:09Z",
+  "released_at": "2026-11-01T23:20:15Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e6f572f46a5024c758129975371bf665c36efe7e",
+  "source_sha": "94b5671e889a0793116b4ffc419e52b505d4dcfa",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.468/twinpanel-1.1.0-rc.468-linux-x86_64.tar.gz",
-    "sha256": "f4a46ff5ee3db5c836d44b31ad3d00fd8ded690cdcacee9766c34114a63313e5",
-    "size_bytes": 25211440
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.469/twinpanel-1.1.0-rc.469-linux-x86_64.tar.gz",
+    "sha256": "6d1c1748de090d35d9f33aec49fceeeb25d1ea4f9e3cd08d9d61fb7415d68de5",
+    "size_bytes": 25209343
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.468 رابط پنل فروش و ربات را تمیزتر می‌کند: Popover اعلان‌ها در RTL کامل داخل صفحه باز می‌شود، متن‌های قابل‌نمایش «نماینده/نمایندگی» از پنل فروش و خروجی ربات حذف یا با عبارت خنثی جایگزین می‌شوند، و شناسه‌ها/route/modelهای داخلی reseller بدون تغییر باقی می‌مانند. منطق خرید، پرداخت، provisioning، quota، accounting، tunnel، firewall، credential و protocol dataplane تغییر نکرده است. PR #1732 پس از اصلاح compatibility با 11/11 Workflow سبز Merge شد و Release PR #1733 نیز 9/9 Workflow سبز Merge شد. Source روی SHA immutable e6f572f46a5024c758129975371bf665c36efe7e قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.468 cleans up the sales portal and bot UI: the notification popover opens fully inside the viewport in RTL, visible reseller terminology is neutralized in the sales portal and bot output, and internal reseller identifiers/routes/models remain unchanged. Purchase, payment, provisioning, quota, accounting, tunnel, firewall, credential and protocol dataplane semantics are unchanged. PR #1732 merged with 11/11 green workflows after the compatibility follow-up, and Release PR #1733 merged with 9/9 green workflows. Source is pinned to immutable SHA e6f572f46a5024c758129975371bf665c36efe7e."
+    "fa": "TwinPanel 1.1.0-rc.469 یک دکمه خروج واضح به نوار فرمان پنل اصلی مدیریت اضافه می‌کند. خروج، توکن فعلی و cache دسترسی همان نشست را پاک می‌کند و کاربر را به /login برمی‌گرداند. این تغییر فقط UI/session cleanup پنل مدیریت است و منطق backend authentication، پنل مشتری/فروش، پرداخت، provisioning، quota، accounting، tunnel، routing، firewall، credential و protocol dataplane را تغییر نمی‌دهد. PR #1735 با 16/16 Workflow سبز Merge شد و Release PR #1736 نیز 9/9 Workflow سبز Merge شد. Source روی SHA immutable 94b5671e889a0793116b4ffc419e52b505d4dcfa قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.469 adds a clear logout button to the main admin command bar. Logout clears the current token and that session's cached portal access, then redirects to /login. This is limited to admin UI/session cleanup and does not change backend authentication semantics, customer/sales portals, payment, provisioning, quota, accounting, tunnel, routing, firewall, credential, or protocol dataplane behavior. PR #1735 merged with 16/16 green workflows and Release PR #1736 merged with 9/9 green workflows. Source is pinned to immutable SHA 94b5671e889a0793116b4ffc419e52b505d4dcfa."
   }
 }
