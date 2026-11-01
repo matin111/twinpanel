@@ -4,12 +4,17 @@ on:
   pull_request:
     paths:
       - "backend/app/routers/telegram_manager.py"
+      - "backend/app/routers/telegram_membership_settings.py"
       - "backend/app/telegram_runtime_bot.py"
       - "backend/app/telegram_runtime_custom.py"
       - "backend/app/telegram_membership.py"
+      - "backend/app/telegram_button_styles.py"
       - "backend/app/reseller_bot_runtime_owned.py"
       - "backend/scripts/telegram_connection_stability_smoke.py"
       - "backend/scripts/telegram_membership_enforcement_smoke.py"
+      - "backend/scripts/telegram_button_styles_smoke.py"
+      - "components/telegram-button-style-settings.tsx"
+      - "components/routed-page-client-v2.tsx"
       - ".github/workflows/telegram-connection-stability-smoke.yml"
   workflow_dispatch:
 
@@ -28,13 +33,19 @@ jobs:
       - name: Compile Telegram runtimes
         run: |
           python -m py_compile backend/app/routers/telegram_manager.py
+          python -m py_compile backend/app/routers/telegram_membership_settings.py
           python -m py_compile backend/app/telegram_runtime_custom.py
           python -m py_compile backend/app/telegram_membership.py
+          python -m py_compile backend/app/telegram_button_styles.py
           python -m py_compile backend/app/reseller_bot_runtime_owned.py
           python -m py_compile backend/scripts/telegram_membership_enforcement_smoke.py
+          python -m py_compile backend/scripts/telegram_button_styles_smoke.py
 
       - name: Verify persistent Telegram connection contract
         run: python backend/scripts/telegram_connection_stability_smoke.py
 
       - name: Verify mandatory membership enforcement contract
         run: python backend/scripts/telegram_membership_enforcement_smoke.py
+
+      - name: Verify button style admin contract
+        run: python backend/scripts/telegram_button_styles_smoke.py

@@ -7,6 +7,7 @@ import {LegacyNodesRuntimePage} from "./legacy-nodes-runtime-v2";
 import {RoutedPageClient as BaseRoutedPageClient} from "./routed-page-client";
 import {SmartTransportsRuntimeV27} from "./smart-transports-runtime-v27";
 import {SubscriptionDeliveryPolicyManager} from "./subscription-delivery-policy-manager";
+import {AdminTelegramButtonStyleSettings} from "./telegram-button-style-settings";
 import {AdminTelegramMembershipSettings,ResellerTelegramMembershipSettings} from "./telegram-membership-settings";
 import {TunnelProtocolRuntimeV307} from "./tunnel-protocol-runtime-v307";
 
@@ -29,7 +30,7 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
     return <><BaseRoutedPageClient routeKey={routeKey}/><SubscriptionDeliveryPolicyManager/></>;
   }
   if(routeKey==="admin/telegram"){
-    return <><BaseRoutedPageClient routeKey={routeKey}/><AdminTelegramMembershipSettings/></>;
+    return <><BaseRoutedPageClient routeKey={routeKey}/><AdminTelegramButtonStyleSettings/><AdminTelegramMembershipSettings/></>;
   }
   if(routeKey==="reseller/bot"){
     return <><BaseRoutedPageClient routeKey={routeKey}/><ResellerTelegramMembershipSettings/></>;
