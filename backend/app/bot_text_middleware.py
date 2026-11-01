@@ -66,8 +66,27 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
         result = str(text)
 
         if self.scope == "reseller":
+            # Keep internal reseller role/model names untouched, but never expose
+            # reseller terminology in customer-facing Telegram copy. Centralizing
+            # this at the request middleware also covers legacy child routers.
+            replacements = (
+                ("در انتظار تأیید نماینده", "در انتظار تأیید"),
+                ("ربات نمایندگی", "ربات"),
+                ("ربات نماینده", "ربات"),
+                ("مالک نمایندگی", "مالک ربات"),
+                ("کیف پول نمایندگی", "کیف پول"),
+                ("حجم نمایندگی", "حجم حساب"),
+                ("حجم نماینده", "حجم حساب"),
+                ("قیمت نمایندگی", "قیمت فروش"),
+                ("نمایندگی پیدا نشد", "حساب فروش پیدا نشد"),
+                ("نمایندگی", "فروشگاه"),
+                ("نماینده", "فروشنده"),
+            )
+            for source, target in replacements:
+                result = result.replace(source, target)
+
             result = result.replace(
-                "تعداد فروش محدود نیست؛ مصرف واقعی از حجم نماینده کم می‌شود.\n\n",
+                "تعداد فروش محدود نیست؛ مصرف واقعی از حجم حساب کم می‌شود.\n\n",
                 "",
             )
 

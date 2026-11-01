@@ -44,7 +44,7 @@ const resellerMenu:MenuItem[]=[
   ["خرید و شارژ حجم","Traffic Recharge","/reseller/traffic","cart"],
   ["سفارش‌ها","Orders","/reseller/orders","orders"],
   ["کدهای تخفیف","Discounts","/reseller/discounts","payments"],
-  ["ربات نمایندگی","Reseller Bot","/reseller/bot","bell"],
+  ["ربات","Bot","/reseller/bot","bell"],
   ["متن‌های ربات","Bot Texts","/reseller/bot-texts","bell"],
   ["اعلان‌ها","Notifications","/reseller/notifications","bell"],
   ["تنظیمات","Settings","/reseller/settings","profile"]
@@ -89,7 +89,7 @@ function ResellerIdentity(){
   const {pick}=useI18n();
   const [profile,setProfile]=useState<ResellerRow>({});
   useEffect(()=>{let alive=true;resellerApi.me().then(value=>{if(alive)setProfile(value);}).catch(()=>{});return()=>{alive=false};},[]);
-  const name=String(profile.brand_name||profile.name||pick("نماینده فروش","Reseller"));
+  const name=String(profile.brand_name||profile.name||pick("حساب فروش","Sales account"));
   const secondary=String(profile.email||profile.code||"Partner");
   const initial=name.trim().charAt(0).toUpperCase()||"R";
   const logout=()=>{clearCustomerToken();window.location.replace("/login");};
@@ -97,6 +97,78 @@ function ResellerIdentity(){
     <div className="customer-portal-user"><span className="customer-portal-avatar">{initial}</span><div className="customer-portal-user-copy"><b>{name}</b><small dir="ltr">{secondary}</small></div></div>
     <button type="button" className="customer-portal-logout" onClick={logout} title={pick("خروج از حساب","Sign out")}><span>↪</span><em>{pick("خروج","Sign out")}</em></button>
   </div>;
+}
+
+const resellerVisibleCopyReplacements:[string,string][]=[
+  ["اعلان‌های نمایندگی","اعلان‌ها"],
+  ["اعلان جدید نمایندگی","اعلان جدید"],
+  ["مرکز اعلان نمایندگی","مرکز اعلان‌ها"],
+  ["داشبورد نمایندگی","داشبورد فروش"],
+  ["پنل نمایندگی","پنل فروش"],
+  ["ربات نمایندگی","ربات"],
+  ["ربات نماینده","ربات"],
+  ["کیف پول نمایندگی","کیف پول"],
+  ["حجم نمایندگی","حجم حساب"],
+  ["حجم نماینده","حجم حساب"],
+  ["نماینده فروش","حساب فروش"],
+  ["پروفایل نمایندگی","پروفایل فروش"],
+  ["نام نمایندگی","نام فروشگاه"],
+  ["نمایندگی","فروشگاه"],
+  ["نماینده","فروشنده"],
+  ["Reseller notifications","Notifications"],
+  ["Reseller Dashboard","Sales Dashboard"],
+  ["Reseller Bot","Bot"],
+  ["Reseller Wallet","Wallet"],
+  ["Reseller profile","Sales profile"],
+  ["Reseller name","Store name"],
+];
+
+function normalizeResellerVisibleCopy(value:string){
+  let next=String(value||"");
+  for(const [source,target] of resellerVisibleCopyReplacements)next=next.split(source).join(target);
+  return next;
+}
+
+function ResellerVisibleCopyNormalizer(){
+  useEffect(()=>{
+    const root=document.querySelector<HTMLElement>(".reseller-portal-shell");
+    if(!root)return;
+    const normalizeText=(node:Node)=>{
+      if(node.nodeType===Node.TEXT_NODE&&node.nodeValue){
+        const next=normalizeResellerVisibleCopy(node.nodeValue);
+        if(next!==node.nodeValue)node.nodeValue=next;
+      }
+    };
+    const normalizeElement=(element:Element)=>{
+      for(const attr of ["placeholder","title","aria-label"]){
+        const value=element.getAttribute(attr);
+        if(!value)continue;
+        const next=normalizeResellerVisibleCopy(value);
+        if(next!==value)element.setAttribute(attr,next);
+      }
+    };
+    const normalizeTree=(target:Node)=>{
+      normalizeText(target);
+      if(target instanceof Element)normalizeElement(target);
+      const walker=document.createTreeWalker(target,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT);
+      let current:Node|null=walker.nextNode();
+      while(current){
+        normalizeText(current);
+        if(current instanceof Element)normalizeElement(current);
+        current=walker.nextNode();
+      }
+    };
+    normalizeTree(root);
+    const observer=new MutationObserver(records=>{
+      for(const record of records){
+        if(record.type==="characterData")normalizeText(record.target);
+        for(const node of Array.from(record.addedNodes))normalizeTree(node);
+      }
+    });
+    observer.observe(root,{subtree:true,childList:true,characterData:true});
+    return()=>observer.disconnect();
+  },[]);
+  return null;
 }
 
 function AccessSkeleton({label}:{label:string}){
@@ -157,8 +229,8 @@ function ResellerAccessGuard({children}:{children:React.ReactNode}){
     };
     void run();return()=>{alive=false};
   },[]);
-  if(error)return <div className="page"><div className="auth-gate-card"><b>{pick("بررسی دسترسی نمایندگی ناموفق بود","Could not verify reseller access")}</b><small>{error}</small><button className="ghost" onClick={()=>window.location.reload()}>{pick("تلاش دوباره","Retry")}</button></div></div>;
-  if(!ready)return <AccessSkeleton label={pick("در حال آماده‌سازی نمایندگی...","Preparing reseller panel...")}/>;
+  if(error)return <div className="page"><div className="auth-gate-card"><b>{pick("بررسی دسترسی حساب ناموفق بود","Could not verify account access")}</b><small>{error}</small><button className="ghost" onClick={()=>window.location.reload()}>{pick("تلاش دوباره","Retry")}</button></div></div>;
+  if(!ready)return <AccessSkeleton label={pick("در حال آماده‌سازی حساب...","Preparing account...")}/>;
   return <>{children}</>;
 }
 
@@ -178,7 +250,7 @@ function PortalMenuLink({item,active,onClick,attention}:{item:MenuItem;active:st
 function PortalTopNav({active,type,attention}:{active:string;type:"customer"|"reseller";attention?:NavAttention}){
   const {pick}=useI18n();
   const groups=type==="customer"?customerGroups:resellerGroups;
-  return <nav className="customer-portal-topnav" aria-label={type==="customer"?pick("منوی حساب کاربری","Customer navigation"):pick("منوی نمایندگی","Reseller navigation")}>
+  return <nav className="customer-portal-topnav" aria-label={type==="customer"?pick("منوی حساب کاربری","Customer navigation"):pick("منوی فروش","Sales navigation")}>
     {groups.map(group=>{
       const groupActive=group.items.some(([, ,href])=>href===active);
       const paths=group.items.map(([, ,href])=>href);
@@ -201,7 +273,7 @@ function PortalMobileDrawer({active,type,open,close,attention}:{active:string;ty
     <button type="button" aria-label={pick("بستن منو","Close menu")} className={`customer-portal-mobile-backdrop ${open?"open":""}`} onClick={close}/>
     <aside className={`customer-portal-sidebar ${open?"open":""} ${type==="reseller"?"reseller-portal-sidebar":""}`}>
       <div className="customer-portal-brand-row"><div className="customer-portal-brand"><BrandMark/></div><button className="customer-portal-mobile-close" type="button" onClick={close} aria-label={pick("بستن منو","Close menu")}>×</button></div>
-      <div className="customer-portal-section-label">{type==="customer"?pick("حساب کاربری","Customer account"):pick("مرکز نمایندگی","Reseller center")}</div>
+      <div className="customer-portal-section-label">{type==="customer"?pick("حساب کاربری","Customer account"):pick("مرکز فروش","Sales center")}</div>
       <nav className="customer-portal-nav">{menu.map(item=><PortalMenuLink key={item[2]} item={item} active={active} onClick={close} attention={attention}/>)}</nav>
       {type==="customer"?<CustomerIdentity/>:<ResellerIdentity/>}
     </aside>
@@ -214,6 +286,7 @@ function PortalFrame({children,active="",type}:PortalShellProps){
   const resellerAttention=useResellerNavAttention(type==="reseller");
   const attention=type==="reseller"?resellerAttention:undefined;
   return <div className={`customer-portal-shell ${type==="reseller"?"reseller-portal-shell":""}`}>
+    {type==="reseller"&&<ResellerVisibleCopyNormalizer/>}
     <main className="customer-portal-main">
       <header className="customer-portal-header">
         <div className="customer-portal-primarybar">
@@ -227,7 +300,7 @@ function PortalFrame({children,active="",type}:PortalShellProps){
           </div>
         </div>
         <div className="customer-portal-utilitybar">
-          <div className="customer-portal-search"><span>⌕</span><input placeholder={type==="customer"?pick("جستجو در حساب...","Search account..."):pick("جستجو در نمایندگی...","Search reseller panel...")}/></div>
+          <div className="customer-portal-search"><span>⌕</span><input placeholder={type==="customer"?pick("جستجو در حساب...","Search account..."):pick("جستجو در پنل...","Search panel...")}/></div>
           <div className="customer-portal-top-identity">{type==="customer"?<CustomerIdentity/>:<ResellerIdentity/>}</div>
         </div>
         <PortalMobileDrawer active={active} type={type} open={mobileOpen} close={()=>setMobileOpen(false)} attention={attention}/>
