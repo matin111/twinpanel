@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.444",
+  "version": "1.1.0-rc.445",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-01T03:34:08Z",
+  "released_at": "2026-11-01T03:46:25Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "67bc030cbec8ed5776cd757ede83249523d132b8",
+  "source_sha": "ffd376f58174be0ec063ae24851aa1f32810b903",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.444/twinpanel-1.1.0-rc.444-linux-x86_64.tar.gz",
-    "sha256": "3ab94e7e9f77d0702f1e928849346a4ea454238a203401da4e174f00f136459c",
-    "size_bytes": 25165606
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.445/twinpanel-1.1.0-rc.445-linux-x86_64.tar.gz",
+    "sha256": "9e4244034890aa5a61241c35f21ebbefaf62ea28d046550c528654fbb1dc2fca",
+    "size_bytes": 25165401
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.444 رفتار ساخت اشتراک در حالت Partial Provision را اصلاح می‌کند. اگر حداقل یک پروتکل درخواستی قابل استفاده باشد و اعمال سهمیه موفق شود، خطای یک نود یا یک پروتکل دیگر باعث غیرفعال یا Suspend شدن کل اشتراک نمی‌شود و وضعیت به‌صورت degraded برای همگرایی/Retry بعدی ثبت می‌شود. Fail-closed فقط زمانی حفظ می‌شود که هیچ پروتکل قابل استفاده‌ای باقی نماند، اعمال quota شکست بخورد یا provisioning با خطای fatal متوقف شود. Regression coverage برای تفاوت Partial Failure و Hard Failure اضافه شده است. PR #1656 Merge شده و Release PR #1657 با تمام CIهای اجراشده سبز Merge شده است. هیچ تغییری در TP27/VXLAN/Tunnel/Spoof/Accounting/quota algorithm/credential format/routing/firewall/protocol dataplane وجود ندارد. Source روی SHA immutable 67bc030cbec8ed5776cd757ede83249523d132b8 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.444 fixes subscription behavior during partial provisioning. When at least one requested protocol is usable and quota enforcement succeeds, a failed node or protocol no longer suspends or disables the entire Subscription; the delivery is recorded as degraded for later convergence/retry. Fail-closed behavior remains for zero usable requested protocols, quota enforcement failure, or fatal provisioning exceptions. Regression coverage distinguishes partial delivery loss from hard failure. PR #1656 was merged and release PR #1657 passed all executed CI checks before merge. No TP27/VXLAN/Tunnel/Spoof/Accounting/quota algorithm/credential format/routing/firewall/protocol dataplane changes are included. Source is pinned to immutable SHA 67bc030cbec8ed5776cd757ede83249523d132b8."
+    "fa": "TwinPanel 1.1.0-rc.445 قرارداد Runtime رنگ دکمه‌های ربات تلگرام را اصلاح می‌کند. در نسخه قبلی اگر Runtime نصب‌شده aiogram فیلد style را پشتیبانی نمی‌کرد، درخواست رنگ به‌صورت بی‌صدا حذف و دکمه معمولی ساخته می‌شد؛ بنابراین UI می‌توانست تنظیمات رنگ را ذخیره کند اما ربات بدون رنگ نمایش داده شود. در این نسخه برای Styleهای غیردیفالت ناسازگاری Runtime دیگر مخفی نمی‌شود و با خطای مشخص Fail می‌شود. Regression Smoke نیز aiogram==3.30.0 را واقعاً نصب می‌کند و serialization دکمه‌های Inline و Reply با styleهای primary، success و danger را با model_dump بررسی می‌کند. PR #1659 با 5/5 CI سبز Merge شد و Release PR #1660 با 9/9 CI سبز Merge شد. عضویت اجباری، Routerهای ربات و منطق VPN/Tunnel بدون تغییر حفظ شده‌اند. هیچ تغییری در TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential/routing/firewall/protocol dataplane وجود ندارد. Source روی SHA immutable ffd376f58174be0ec063ae24851aa1f32810b903 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.445 fixes the Telegram colored-button runtime contract. Previously, when the installed aiogram runtime did not expose the Bot API style field, requested colors were silently dropped and plain buttons were created, allowing the admin UI to save styles while the bot rendered unstyled buttons. Non-default styles now fail explicitly on an incompatible runtime instead of silently downgrading. The regression smoke now installs aiogram==3.30.0 and verifies real InlineKeyboardButton and KeyboardButton serialization for primary, success, and danger via model_dump. PR #1659 merged with 5/5 green CI and release PR #1660 merged with 9/9 green CI. Mandatory membership, bot routing, and VPN/Tunnel behavior are preserved. No TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential/routing/firewall/protocol dataplane changes are included. Source is pinned to immutable SHA ffd376f58174be0ec063ae24851aa1f32810b903."
   }
 }
