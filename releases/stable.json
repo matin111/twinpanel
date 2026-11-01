@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.470",
+  "version": "1.1.0-rc.471",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-01T23:39:03Z",
+  "released_at": "2026-11-01T23:49:35Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "50b6428cff3e3e5c915d49988b301687e78717b1",
+  "source_sha": "d621739ad7a775ad8f81151ff9d630fd49a6b5d3",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.470/twinpanel-1.1.0-rc.470-linux-x86_64.tar.gz",
-    "sha256": "96ad0de5b119c94218d73e790be86d585aac8f89515e2d2cfc87a21fef7b599e",
-    "size_bytes": 25210506
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.471/twinpanel-1.1.0-rc.471-linux-x86_64.tar.gz",
+    "sha256": "36f593a1604baafec476387b8328a93293f8d539ed9432e9ec6e7ee7f26ea1be",
+    "size_bytes": 25220112
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.470 کنترل خروج پنل اصلی مدیریت را مینیمال و هماهنگ با دکمه‌های زبان، تم و اعلان می‌کند. متن قرمز خروج حذف شده، کنترل فقط آیکون خروج دارد، حالت عادی خنثی است و فقط روی Hover قرمز می‌شود. منطق خروج، پاک‌کردن Session و مسیر احراز هویت تغییر نکرده است. PR #1738 با Workflowهای سبز Merge شد و Release PR #1740 نیز با 9/9 Workflow سبز Merge شد. Source روی SHA immutable 50b6428cff3e3e5c915d49988b301687e78717b1 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.470 polishes the main admin logout control to a minimal icon-only control aligned with the language, theme, and notification buttons. The red logout text is removed, the default state is neutral, and red styling appears only on hover. Logout behavior, session clearing, and authentication flow are unchanged. PR #1738 merged with green workflows and Release PR #1740 merged with 9/9 green workflows. Source is pinned to immutable SHA 50b6428cff3e3e5c915d49988b301687e78717b1."
+    "fa": "TwinPanel 1.1.0-rc.471 برای قالب ۳ / Orbit Neo 2027 کنترل مستقل توضیح پروتکل‌های مدرن را اضافه می‌کند. این فیلد بدون Reset کردن سایر تنظیمات ذخیره‌شده قالب و با Merge روی تازه‌ترین payload سرور ذخیره می‌شود؛ خالی‌کردن آن نیز متن نمایشی را حذف می‌کند. Runtime از همین مقدار قابل‌ویرایش استفاده می‌کند و اگر مقداری ذخیره نشده باشد fallback قبلی حفظ می‌شود. PR #1742 با 4/4 Workflow سبز Merge شد و Release PR #1743 نیز با 9/9 Workflow سبز Merge شد. Source روی SHA immutable d621739ad7a775ad8f81151ff9d630fd49a6b5d3 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.471 adds an isolated modern-protocol description control for Template 3 / Orbit Neo 2027. Saving this field merges into the freshest server-side template payload without resetting the rest of the saved template configuration, and clearing it removes the rendered description. The storefront runtime reads this configurable value while preserving the previous fallback when no value has been saved. PR #1742 merged with 4/4 green workflows and Release PR #1743 merged with 9/9 green workflows. Source is pinned to immutable SHA d621739ad7a775ad8f81151ff9d630fd49a6b5d3."
   }
 }
