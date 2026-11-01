@@ -6,7 +6,10 @@ on:
       - "backend/app/routers/telegram_manager.py"
       - "backend/app/telegram_runtime_bot.py"
       - "backend/app/telegram_runtime_custom.py"
+      - "backend/app/telegram_membership.py"
+      - "backend/app/reseller_bot_runtime_owned.py"
       - "backend/scripts/telegram_connection_stability_smoke.py"
+      - "backend/scripts/telegram_membership_enforcement_smoke.py"
       - ".github/workflows/telegram-connection-stability-smoke.yml"
   workflow_dispatch:
 
@@ -26,6 +29,12 @@ jobs:
         run: |
           python -m py_compile backend/app/routers/telegram_manager.py
           python -m py_compile backend/app/telegram_runtime_custom.py
+          python -m py_compile backend/app/telegram_membership.py
+          python -m py_compile backend/app/reseller_bot_runtime_owned.py
+          python -m py_compile backend/scripts/telegram_membership_enforcement_smoke.py
 
       - name: Verify persistent Telegram connection contract
         run: python backend/scripts/telegram_connection_stability_smoke.py
+
+      - name: Verify mandatory membership enforcement contract
+        run: python backend/scripts/telegram_membership_enforcement_smoke.py

@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 import httpx
-from aiogram import Bot as AiogramBot
+from aiogram import Bot as AiogramBot, Dispatcher as AiogramDispatcher
 
 from .bot_text_middleware import BotTextRequestMiddleware
 from .telegram_membership import install_membership_guard
@@ -140,12 +140,26 @@ class TextAwareBot(AiogramBot):
         )
 
 
+class MembershipAwareDispatcher(AiogramDispatcher):
+    """Protect every main-bot router, including Dispatcher-level siblings.
+
+    The main runtime attaches purchase, wallet and support routers directly to
+    the Dispatcher. Installing membership only on ``runtime.router`` leaves
+    those sibling routers outside the guard. Putting the outer middleware on
+    the Dispatcher makes membership enforcement precede every child router.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        install_membership_guard(self)
+
+
 async def main() -> None:
     # Keep the existing runtime, routers, payment flow, FSM and notifications.
-    # Membership runs as an outer middleware so users cannot bypass it through
-    # old inline buttons or deep callback data.
+    # Replace the runtime's Dispatcher class so mandatory membership protects
+    # every router included by runtime.main(), not just runtime.router.
     runtime.Bot = TextAwareBot
-    install_membership_guard(runtime.router)
+    runtime.Dispatcher = MembershipAwareDispatcher
     _install_internal_api_resilience()
     await runtime.main()
 
