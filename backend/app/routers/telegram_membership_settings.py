@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -7,16 +9,30 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin, require_reseller
 from ..models_reseller import Reseller
+from ..telegram_button_styles import button_style_config, save_button_style_config
 from ..telegram_membership import membership_config, save_membership_config
 
 
 router = APIRouter(tags=["telegram-membership"])
+ButtonStyle = Literal["default", "primary", "success", "danger"]
 
 
 class MembershipSettingsIn(BaseModel):
     enabled: bool = False
     chat: str | None = Field(default=None, max_length=180)
     join_url: str | None = Field(default=None, max_length=500)
+
+
+class TelegramButtonStylesIn(BaseModel):
+    dashboard: ButtonStyle = "default"
+    purchase: ButtonStyle = "success"
+    subscriptions: ButtonStyle = "default"
+    wallet: ButtonStyle = "success"
+    learning: ButtonStyle = "primary"
+    download: ButtonStyle = "primary"
+    support: ButtonStyle = "default"
+    account: ButtonStyle = "default"
+    connect: ButtonStyle = "primary"
 
 
 def _normalize_chat(value: str | None) -> str:
@@ -85,6 +101,25 @@ def update_admin_membership(
         join_url=join_url,
     )
     return _payload(config)
+
+
+@router.get(
+    "/v1/admin/telegram-bot/button-styles",
+    dependencies=[Depends(require_admin)],
+)
+def admin_button_styles(db: Session = Depends(get_db)):
+    return button_style_config(db).as_dict()
+
+
+@router.patch(
+    "/v1/admin/telegram-bot/button-styles",
+    dependencies=[Depends(require_admin)],
+)
+def update_admin_button_styles(
+    payload: TelegramButtonStylesIn,
+    db: Session = Depends(get_db),
+):
+    return save_button_style_config(db, payload.model_dump()).as_dict()
 
 
 @router.get("/v1/reseller/bot/membership")
