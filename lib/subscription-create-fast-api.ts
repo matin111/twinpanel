@@ -21,6 +21,11 @@ export type FastSubscriptionCreateResult={
   message?:string;
 };
 
+// Backend provisioning has a 120-second total deadline. Keep a small network /
+// serialization margin above it so the modal can never remain busy forever if
+// a proxy, transport teardown, or response body stalls after that deadline.
+export const SUBSCRIPTION_CREATE_REQUEST_TIMEOUT_MS=135_000;
+
 function detailText(detail:unknown){
   if(!detail||typeof detail!=="object")return "";
   const value=detail as {
@@ -79,21 +84,37 @@ export async function createSubscriptionFastV1(payload:FastSubscriptionCreatePay
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
 
-  const response=await fetch(`${API_BASE}/v1/subscriptions/admin-create-fast-v1`,{
-    method:"POST",
-    cache:"no-store",
-    headers:{
-      Authorization:`Bearer ${token}`,
-      "Content-Type":"application/json",
-    },
-    body:JSON.stringify(payload),
-  });
+  const controller=new AbortController();
+  const timer=globalThis.setTimeout(
+    ()=>controller.abort("subscription-create-request-timeout"),
+    SUBSCRIPTION_CREATE_REQUEST_TIMEOUT_MS,
+  );
 
-  const raw=await response.text();
-  let body:unknown=null;
-  if(raw){
-    try{body=JSON.parse(raw);}catch{body=raw;}
+  try{
+    const response=await fetch(`${API_BASE}/v1/subscriptions/admin-create-fast-v1`,{
+      method:"POST",
+      cache:"no-store",
+      signal:controller.signal,
+      headers:{
+        Authorization:`Bearer ${token}`,
+        "Content-Type":"application/json",
+      },
+      body:JSON.stringify(payload),
+    });
+
+    const raw=await response.text();
+    let body:unknown=null;
+    if(raw){
+      try{body=JSON.parse(raw);}catch{body=raw;}
+    }
+    if(!response.ok)throw new Error(errorText(body,response.status));
+    return body as FastSubscriptionCreateResult;
+  }catch(reason){
+    if(controller.signal.aborted){
+      throw new Error("ساخت اشتراک بیشتر از ۱۳۵ ثانیه طول کشید و رابط از حالت انتظار خارج شد. قبل از تلاش دوباره، لیست اشتراک‌ها را تازه‌سازی و وضعیت آخرین اشتراک را بررسی کنید.");
+    }
+    throw reason;
+  }finally{
+    globalThis.clearTimeout(timer);
   }
-  if(!response.ok)throw new Error(errorText(body,response.status));
-  return body as FastSubscriptionCreateResult;
 }
