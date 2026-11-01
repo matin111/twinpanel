@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.448",
+  "version": "1.1.0-rc.449",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-01T14:57:59Z",
+  "released_at": "2026-11-01T15:33:47Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "69d317f91c345c877e8ff02e422c816bd41b92d6",
+  "source_sha": "84c21e3c85ef07ded846da3d4839caafe48536f6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.448/twinpanel-1.1.0-rc.448-linux-x86_64.tar.gz",
-    "sha256": "7e3ef279fee4108ccb2e6a590c0c5577d1ce5ae84afb4b5510406ea4495cface",
-    "size_bytes": 25175520
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.449/twinpanel-1.1.0-rc.449-linux-x86_64.tar.gz",
+    "sha256": "3ad3b483b35c4a775a12e4a19ba226e7e9b8ba7d016e0ff9958d5b0f4e1ae114",
+    "size_bytes": 25177514
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.448 ارسال اکانت سفارش تأییدشده در ربات نماینده و متن اضافی صفحه خرید را اصلاح می‌کند. متن «تعداد فروش محدود نیست؛ مصرف واقعی از حجم نماینده کم می‌شود.» از پیام‌های ربات نماینده حذف شده است. مسیر تحویل اکانت پس از تأیید سفارش به‌جای درخواست خام httpx مستقل، از Bot client رسمی aiogram استفاده می‌کند و خطاهای Telegram delivery دیگر بی‌صدا خورده نمی‌شوند و با جزئیات در لاگ ثبت می‌شوند. منطق Provisioning، Accounting و dataplane تغییری نکرده است. Regression Smoke اختصاصی Delivery اضافه شد و PR #1670 پس از سبز شدن تمام 29 Workflow Merge شد. همچنین سه Workflow قدیمی CI که DATABASE_URL داشتند اما PostgreSQL service نداشتند با credential موجود خودشان اصلاح شدند. Release PR #1671 با 9/9 CI سبز Merge شد. Source روی SHA immutable 69d317f91c345c877e8ff02e422c816bd41b92d6 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.448 fixes fulfilled-account delivery in the reseller bot and removes the extra reseller purchase copy. The reseller message stating that sales are unlimited and real usage is deducted from the reseller pool is removed. Post-approval account delivery now uses aiogram's Bot client instead of a separate raw httpx Bot API request, and Telegram delivery failures are no longer silently swallowed; concrete failures are logged. Provisioning, accounting, and protocol dataplane behavior are unchanged. A dedicated delivery regression smoke was added, and PR #1670 merged after all 29 triggered workflows passed. Three legacy CI workflows that declared DATABASE_URL without starting PostgreSQL were also repaired using their existing exact credentials. Release PR #1671 merged with 9/9 green CI. Source is pinned to immutable SHA 69d317f91c345c877e8ff02e422c816bd41b92d6."
+    "fa": "TwinPanel 1.1.0-rc.449 خطای وضعیت سفارش‌های ربات نماینده پس از Provisioning جزئی را اصلاح می‌کند. Root Cause این بود که Account Delivery به‌درستی credentialهای موفق هر protocol/node را Commit می‌کرد و خطاهای Nodeهای دیگر را در provision_errors برمی‌گرداند، اما مسیر تأیید سفارش نماینده وجود هر خطای Node را شکست کامل تلقی می‌کرد؛ بنابراین اکانت واقعاً ساخته می‌شد ولی سفارش provision_failed می‌شد و مرحله ارسال تلگرام اجرا نمی‌شد. در این نسخه، فقط در مسیر سفارش ربات نماینده، خطاهای per-node زمانی Warning محسوب می‌شوند که برای هر پروتکل خریداری‌شده حداقل یک credential pair ساخته یا reuse شده باشد. اگر حتی یک پروتکل هیچ خروجی قابل تحویلی نداشته باشد، سفارش همچنان provision_failed باقی می‌ماند. سفارش‌های provision_failed قبلی که subscription_id دارند نیز در Retry همان اشتراک را reuse می‌کنند و اشتراک تکراری ساخته نمی‌شود. مسیر ارسال Telegram مبتنی بر aiogram نسخه قبل حفظ شده است. PR #1674 با 7/7 CI سبز Merge شد و Release PR #1675 با 9/9 CI سبز Merge شد. هیچ تغییری در TP27/VXLAN/Tunnel/Spoof/Accounting/quota/credential generation/routing/firewall/protocol dataplane توسط این Fix انجام نشده است. Source روی SHA immutable 84c21e3c85ef07ded846da3d4839caafe48536f6 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.449 fixes false reseller-order provisioning failures after deliverable partial provisioning. Account Delivery correctly commits successful protocol/node credentials while returning failures for other nodes, but reseller order approval previously treated any per-node error as a total failure. As a result, an account could exist while the order became provision_failed and Telegram delivery never ran. In this release, only the reseller-order path converts per-node errors to warnings when every purchased protocol has at least one created or reused deliverable credential pair. If any requested protocol has no deliverable pair, the order still remains provision_failed. Existing provision_failed orders with a subscription_id safely retry the same subscription without creating a duplicate, then continue to the existing aiogram Telegram delivery path. PR #1674 merged with 7/7 green CI and release PR #1675 merged with 9/9 green CI. No TP27/VXLAN/Tunnel/Spoof/Accounting/quota/credential-generation/routing/firewall/protocol-dataplane behavior is changed by this fix. Source is pinned to immutable SHA 84c21e3c85ef07ded846da3d4839caafe48536f6."
   }
 }
