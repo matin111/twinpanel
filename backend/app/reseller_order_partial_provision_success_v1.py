@@ -41,16 +41,40 @@ def _pair_protocols(rows: Iterable[Any]) -> set[str]:
     return result
 
 
+def _credential_protocols(rows: Iterable[Any]) -> set[str]:
+    """Return protocols with at least one usable item in modern delivery output."""
+    result: set[str] = set()
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+
+        name = _protocol_name(row.get("protocol"))
+        if not name:
+            continue
+
+        items = row.get("items")
+        if isinstance(items, list):
+            usable = any(isinstance(item, dict) and bool(item) for item in items)
+        else:
+            usable = isinstance(items, dict) and bool(items)
+
+        if usable:
+            result.add(name)
+
+    return result
+
+
 def reconcile_reseller_provision_result(
     provision: Any,
     requested_protocols: set[str],
 ) -> Any:
     """Treat per-node errors as warnings only when the order is deliverable.
 
-    account_delivery intentionally commits successful protocol/node pairs and
-    reports individual node failures in provision_errors. Reseller order review
-    must not convert that useful partial success into a total order failure.
-    Every requested protocol still needs at least one created/reused pair.
+    Both the legacy account driver and the modern 15-protocol driver may report
+    node-specific failures after already creating a usable credential on another
+    selected node. Reseller order review must not convert that useful partial
+    success into a total order failure. Every requested protocol still needs at
+    least one usable delivery item.
     """
     if not isinstance(provision, dict):
         return provision
@@ -75,6 +99,10 @@ def reconcile_reseller_provision_result(
         list(provision.get("created_pairs") or [])
         + list(provision.get("reused_pairs") or [])
     )
+    good_protocols.update(
+        _credential_protocols(provision.get("credentials") or [])
+    )
+
     missing = sorted(requested - good_protocols)
     if missing:
         return provision
@@ -82,9 +110,9 @@ def reconcile_reseller_provision_result(
     patched = dict(provision)
     patched["ok"] = True
     patched["provision_warnings"] = errors
-    # reseller_bot_orders_owned_v3 historically treats any item in either
-    # error collection as a total failure. Clear only the reseller-local copy;
-    # the canonical provision_account result is otherwise untouched.
+    # reseller_bot_orders historically treats any item in either error
+    # collection as a total failure. Clear only the reseller-local copy; the
+    # canonical provision_account result is otherwise untouched.
     patched["errors"] = []
     patched["provision_errors"] = []
     return patched
