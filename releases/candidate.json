@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.470",
-  "source_sha": "50b6428cff3e3e5c915d49988b301687e78717b1",
+  "version": "1.1.0-rc.471",
+  "source_sha": "d621739ad7a775ad8f81151ff9d630fd49a6b5d3",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.470 کنترل خروج پنل اصلی مدیریت را مینیمال و هماهنگ با دکمه‌های زبان، تم و اعلان می‌کند. متن قرمز خروج حذف شده، کنترل فقط آیکون خروج دارد، حالت عادی خنثی است و فقط روی Hover قرمز می‌شود. منطق خروج، پاک‌کردن Session و مسیر احراز هویت تغییر نکرده است. PR #1738 با Workflowهای سبز Merge شد و Release PR #1740 نیز با 9/9 Workflow سبز Merge شد. Source روی SHA immutable 50b6428cff3e3e5c915d49988b301687e78717b1 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.470 polishes the main admin logout control to a minimal icon-only control aligned with the language, theme, and notification buttons. The red logout text is removed, the default state is neutral, and red styling appears only on hover. Logout behavior, session clearing, and authentication flow are unchanged. PR #1738 merged with green workflows and Release PR #1740 merged with 9/9 green workflows. Source is pinned to immutable SHA 50b6428cff3e3e5c915d49988b301687e78717b1."
+    "fa": "TwinPanel 1.1.0-rc.471 برای قالب ۳ / Orbit Neo 2027 کنترل مستقل توضیح پروتکل‌های مدرن را اضافه می‌کند. این فیلد بدون Reset کردن سایر تنظیمات ذخیره‌شده قالب و با Merge روی تازه‌ترین payload سرور ذخیره می‌شود؛ خالی‌کردن آن نیز متن نمایشی را حذف می‌کند. Runtime از همین مقدار قابل‌ویرایش استفاده می‌کند و اگر مقداری ذخیره نشده باشد fallback قبلی حفظ می‌شود. PR #1742 با 4/4 Workflow سبز Merge شد و Release PR #1743 نیز با 9/9 Workflow سبز Merge شد. Source روی SHA immutable d621739ad7a775ad8f81151ff9d630fd49a6b5d3 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.471 adds an isolated modern-protocol description control for Template 3 / Orbit Neo 2027. Saving this field merges into the freshest server-side template payload without resetting the rest of the saved template configuration, and clearing it removes the rendered description. The storefront runtime reads this configurable value while preserving the previous fallback when no value has been saved. PR #1742 merged with 4/4 green workflows and Release PR #1743 merged with 9/9 green workflows. Source is pinned to immutable SHA d621739ad7a775ad8f81151ff9d630fd49a6b5d3."
   }
 }
