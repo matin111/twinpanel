@@ -74,6 +74,7 @@ from .telegram_account_link_lookup import router as _telegram_account_link_looku
 from .telegram_membership_settings import router as _telegram_membership_settings_router
 from .subscription_create_fast_v1 import router as _subscription_create_fast_v1_router
 from . import reseller_bot_delivery_runtime_v2 as _reseller_bot_delivery_runtime_v2  # noqa: F401
+from . import central_account_delivery_runtime_v3 as _central_account_delivery_runtime_v3  # noqa: F401
 
 # TWINPANEL_MANUAL_AUTHORITY_REGISTER_V193
 # Agent reports arrive on an exact route also retained in the legacy tunnels
