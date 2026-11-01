@@ -92,7 +92,8 @@ jobs:
 
           from app.main import app
           from app.database import SessionLocal, engine
-          from app.models import Plan, ProtocolCredential, Subscription, SubscriptionProtocol, User
+          from app.models import Node, NodeType, Plan, ProtocolCredential, Subscription, SubscriptionProtocol, User
+          from app.plan_template_selection import replace_plan_nodes, replace_plan_template_protocols
           from app.protocol_account_registry import ALL_PROTOCOL_KEYS
           from app.routers import modern_account_delivery_v1
           from app.routers.subscription_admin_v2 import AdminSubscriptionCreateV2, admin_create_v2
@@ -153,8 +154,18 @@ jobs:
                   price_toman=1000,
                   is_active=True,
               )
-              db.add_all([user, plan]); db.commit(); db.refresh(user); db.refresh(plan)
-              user_id=user.id; plan_id=plan.id
+              node = Node(
+                  name='subscription-create-ci-exit',
+                  node_type=NodeType.EXIT,
+                  country_code='DE',
+                  public_ip='198.51.100.50',
+                  agent_url='http://127.0.0.1:65535',
+              )
+              db.add_all([user, plan, node]); db.flush()
+              replace_plan_template_protocols(db, plan.id, ALL_PROTOCOL_KEYS)
+              replace_plan_nodes(db, plan.id, [node.id])
+              db.commit(); db.refresh(user); db.refresh(plan); db.refresh(node)
+              user_id=user.id; plan_id=plan.id; node_id=node.id
           finally:
               db.close()
 
@@ -191,6 +202,7 @@ jobs:
                   AdminSubscriptionCreateV2(
                       user_id=user_id,
                       plan_id=plan_id,
+                      node_ids=[node_id],
                       protocols=list(ALL_PROTOCOL_KEYS),
                   ),
                   db,
@@ -206,6 +218,7 @@ jobs:
                   AdminSubscriptionCreateV2(
                       user_id=user_id,
                       plan_id=plan_id,
+                      node_ids=[node_id],
                       protocols=['wireguard','hysteria2'],
                   ),
                   db,
@@ -223,6 +236,7 @@ jobs:
                       AdminSubscriptionCreateV2(
                           user_id=user_id,
                           plan_id=plan_id,
+                          node_ids=[node_id],
                           protocols=[],
                       ),
                       db,
