@@ -6,11 +6,13 @@ import logging
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    ReplyKeyboardRemove,
 )
 
 from . import reseller_bot_review
@@ -81,12 +83,6 @@ def reseller_main_keyboard() -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="⬇️ دانلود برنامه",
                     callback_data="rlearn:d:root",
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text="🤝 درخواست نمایندگی",
-                    callback_data="rmenu:reseller-request",
                 ),
             ],
             [
@@ -253,39 +249,6 @@ def _policy_router(reseller_id: int) -> Router:
         finally:
             db.close()
 
-    async def _send_reseller_request(target):
-        db = SessionLocal()
-        try:
-            settings = (
-                db.query(ResellerBotSettings)
-                .filter(ResellerBotSettings.reseller_id == reseller_id)
-                .first()
-            )
-            username = str(
-                (settings.support_username if settings else "") or ""
-            ).strip().lstrip("@")
-            rows = []
-            if username:
-                rows.append([
-                    InlineKeyboardButton(
-                        text="🤝 ارسال درخواست نمایندگی",
-                        url="https://t.me/" + username,
-                    )
-                ])
-            rows.append([
-                InlineKeyboardButton(
-                    text="⬅️ منوی اصلی",
-                    callback_data="rmenu:home",
-                )
-            ])
-            await target.answer(
-                "🤝 <b>درخواست نمایندگی</b>\n\n"
-                "برای ثبت درخواست نمایندگی با پشتیبانی در ارتباط باشید.",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
-            )
-        finally:
-            db.close()
-
     async def _send_purchase(target):
         db = SessionLocal()
         try:
@@ -329,6 +292,61 @@ def _policy_router(reseller_id: int) -> Router:
         finally:
             db.close()
 
+    @router.message(CommandStart())
+    async def start_inline(message):
+        db = SessionLocal()
+        try:
+            reseller = db.get(Reseller, reseller_id)
+            settings = (
+                db.query(ResellerBotSettings)
+                .filter(ResellerBotSettings.reseller_id == reseller_id)
+                .first()
+            )
+            if (
+                not reseller
+                or not reseller.is_active
+                or not settings
+                or not settings.is_active
+            ):
+                await message.answer(
+                    "این ربات در حال حاضر فعال نیست.",
+                    reply_markup=ReplyKeyboardRemove(),
+                )
+                return
+
+            _, _, created = legacy_runtime._get_or_create_customer(
+                db,
+                reseller_id,
+                message.from_user,
+            )
+            brand = legacy_runtime._brand(reseller)
+            if settings.welcome_message:
+                welcome = settings.welcome_message
+            else:
+                welcome = f"👋 به <b>{escape(brand)}</b> خوش آمدید."
+            if created:
+                welcome += "\n\n✅ حساب کاربری شما به‌صورت خودکار ایجاد شد."
+
+            # Telegram keeps a previous ReplyKeyboard on the client until an
+            # explicit ReplyKeyboardRemove is delivered. Remove it first, then
+            # render the current inline menu in a separate message.
+            await message.answer(
+                welcome,
+                reply_markup=ReplyKeyboardRemove(),
+            )
+            await message.answer(
+                "منوی اصلی",
+                reply_markup=reseller_main_keyboard(),
+            )
+        except Exception:
+            log.exception("start failed reseller=%s", reseller_id)
+            await message.answer(
+                "خطا در ارتباط با پنل.",
+                reply_markup=ReplyKeyboardRemove(),
+            )
+        finally:
+            db.close()
+
     @router.message(F.text == "💰 کیف پول")
     async def wallet_alias(message):
         db = SessionLocal()
@@ -360,10 +378,6 @@ def _policy_router(reseller_id: int) -> Router:
     async def account_menu(message):
         await _send_account(message, int(message.from_user.id))
 
-    @router.message(F.text == "🤝 درخواست نمایندگی")
-    async def reseller_request(message):
-        await _send_reseller_request(message)
-
     @router.callback_query(F.data == "rmenu:home")
     async def inline_home(callback):
         await callback.answer()
@@ -391,11 +405,6 @@ def _policy_router(reseller_id: int) -> Router:
     async def inline_support(callback):
         await callback.answer()
         await _send_support(callback.message)
-
-    @router.callback_query(F.data == "rmenu:reseller-request")
-    async def inline_reseller_request(callback):
-        await callback.answer()
-        await _send_reseller_request(callback.message)
 
     @router.callback_query(F.data == "rmenu:link")
     async def inline_subscription_link(callback, state: FSMContext):
