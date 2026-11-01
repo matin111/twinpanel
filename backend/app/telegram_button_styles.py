@@ -16,9 +16,11 @@ _KEYS = (
     "dashboard",
     "purchase",
     "subscriptions",
+    "account_link",
     "wallet",
     "learning",
     "download",
+    "reseller_request",
     "support",
     "account",
     "connect",
@@ -30,9 +32,11 @@ class TelegramButtonStyles:
     dashboard: str = "default"
     purchase: str = "success"
     subscriptions: str = "default"
+    account_link: str = "success"
     wallet: str = "success"
     learning: str = "primary"
     download: str = "primary"
+    reseller_request: str = "success"
     support: str = "default"
     account: str = "default"
     connect: str = "primary"

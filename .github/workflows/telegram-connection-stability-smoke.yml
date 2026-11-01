@@ -7,6 +7,8 @@ on:
       - "backend/app/routers/telegram_membership_settings.py"
       - "backend/app/telegram_runtime_bot.py"
       - "backend/app/telegram_runtime_custom.py"
+      - "backend/app/telegram_account_link_bot.py"
+      - "backend/app/telegram_account_link_bot_original.py"
       - "backend/app/telegram_membership.py"
       - "backend/app/telegram_button_styles.py"
       - "backend/app/reseller_bot_runtime_owned.py"
@@ -39,6 +41,7 @@ jobs:
           python -m py_compile backend/app/routers/telegram_manager.py
           python -m py_compile backend/app/routers/telegram_membership_settings.py
           python -m py_compile backend/app/telegram_runtime_custom.py
+          python -m py_compile backend/app/telegram_account_link_bot.py
           python -m py_compile backend/app/telegram_membership.py
           python -m py_compile backend/app/telegram_button_styles.py
           python -m py_compile backend/app/reseller_bot_runtime_owned.py

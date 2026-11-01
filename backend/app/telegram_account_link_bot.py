@@ -6,6 +6,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from . import telegram_account_link_bot_original as _base
+from .telegram_button_styles import inline_button, live_button_styles
 
 
 RESELLER_REQUEST_CALLBACK = "reseller:request"
@@ -17,41 +18,80 @@ class ResellerRequestState(StatesGroup):
 
 
 def _main_menu_keyboard():
-    markup = _base._main_menu_keyboard()
-    rows = []
+    """Build the exact production main menu from live admin button styles.
 
-    for row in markup.inline_keyboard:
-        new_row = []
-        for button in row:
-            if button.text == _base.ACCOUNT_LINK_BUTTON:
-                new_row.append(
-                    InlineKeyboardButton(
-                        text="🛒 خرید اشتراک",
-                        callback_data="shop:list",
-                        style="danger",
-                    )
+    This module is the last keyboard override installed by the account-link /
+    reseller-request feature. It must therefore own styling for every visible
+    main-menu button; inheriting buttons from ``_base`` would re-introduce the
+    old hard-coded styles and override values saved in /admin/telegram.
+    """
+    styles = live_button_styles()
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                inline_button(
+                    "🛒 خرید اشتراک",
+                    callback_data="shop:list",
+                    style=styles.purchase,
                 )
-            elif button.text == "🛒 خرید اشتراک":
-                new_row.append(
-                    InlineKeyboardButton(
-                        text=_base.ACCOUNT_LINK_BUTTON,
-                        callback_data=_base.ACCOUNT_LINK_CALLBACK,
-                        style="success",
-                    )
+            ],
+            [
+                inline_button(
+                    "🏠 داشبورد",
+                    callback_data="main:dashboard",
+                    style=styles.dashboard,
+                ),
+                inline_button(
+                    "📦 اشتراک‌های من",
+                    callback_data="subs:list",
+                    style=styles.subscriptions,
+                ),
+            ],
+            [
+                inline_button(
+                    _base.ACCOUNT_LINK_BUTTON,
+                    callback_data=_base.ACCOUNT_LINK_CALLBACK,
+                    style=styles.account_link,
+                ),
+                inline_button(
+                    "💰 کیف پول",
+                    callback_data="wallet:refresh",
+                    style=styles.wallet,
+                ),
+            ],
+            [
+                inline_button(
+                    "📚 آموزش",
+                    callback_data="mlearn:g:root",
+                    style=styles.learning,
+                ),
+                inline_button(
+                    "⬇️ دانلود برنامه",
+                    callback_data="mlearn:d:root",
+                    style=styles.download,
+                ),
+            ],
+            [
+                inline_button(
+                    "🤝 درخواست نمایندگی",
+                    callback_data=RESELLER_REQUEST_CALLBACK,
+                    style=styles.reseller_request,
                 )
-            elif button.text == "🤝 درخواست نمایندگی":
-                new_row.append(
-                    InlineKeyboardButton(
-                        text=button.text,
-                        callback_data=RESELLER_REQUEST_CALLBACK,
-                        style="success",
-                    )
-                )
-            else:
-                new_row.append(button)
-        rows.append(new_row)
-
-    return InlineKeyboardMarkup(inline_keyboard=rows)
+            ],
+            [
+                inline_button(
+                    "🎫 پشتیبانی",
+                    callback_data="ts:send",
+                    style=styles.support,
+                ),
+                inline_button(
+                    "👤 حساب من",
+                    callback_data="main:account",
+                    style=styles.account,
+                ),
+            ],
+        ]
+    )
 
 
 def _conditions_keyboard():
