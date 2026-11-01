@@ -10,7 +10,40 @@ import {resellerMoney,resellerNumber} from "../lib/reseller-i18n";
 const num=(row:ResellerRow,key:string)=>{const value=Number(row?.[key]??0);return Number.isFinite(value)?value:0;};
 const str=(row:ResellerRow,key:string)=>String(row?.[key]??"");
 const defaults:ResellerOwnedPlanPayload={title:"",traffic_gb:50,duration_days:30,device_limit:1,sell_price_toman:0,enable_cisco:true,enable_openvpn:true,enable_wireguard:true,enable_l2tp:true,enable_v2ray:true,sort_order:100,is_active:true};
-const protocolRows:[keyof ResellerOwnedPlanPayload,string][]=[["enable_cisco","Cisco / OpenConnect"],["enable_openvpn","OpenVPN"],["enable_wireguard","WireGuard"],["enable_l2tp","L2TP / IPsec"],["enable_v2ray","V2Ray / Xray"]];
+const classicProtocolRows:[keyof ResellerOwnedPlanPayload,string,string][]=[
+  ["enable_cisco","cisco","Cisco / OpenConnect"],
+  ["enable_openvpn","openvpn","OpenVPN"],
+  ["enable_wireguard","wireguard","WireGuard"],
+  ["enable_l2tp","l2tp","L2TP / IPsec"],
+  ["enable_v2ray","v2ray","V2Ray / Xray"]
+];
+const modernProtocolRows:[string,string][]=[
+  ["hysteria2","Hysteria2"],
+  ["tuic","TUIC"],
+  ["anytls","AnyTLS"],
+  ["naive","NaiveProxy"],
+  ["shadowtls","ShadowTLS"],
+  ["snell","Snell"],
+  ["mieru","Mieru"],
+  ["trusttunnel","TrustTunnel"],
+  ["amneziawg","AmneziaWG"],
+  ["sudoku","Sudoku"]
+];
+const protocolLabels=new Map<string,string>([
+  ...classicProtocolRows.map(([,protocol,label])=>[protocol,label] as [string,string]),
+  ...modernProtocolRows
+]);
+
+function visibleProtocols(row:ResellerRow){
+  if(Array.isArray(row.protocols)){
+    const values=row.protocols.map(value=>String(value||"").trim().toLowerCase()).filter(Boolean);
+    if(values.length)return values;
+  }
+  return [
+    ...classicProtocolRows.filter(([key])=>Boolean(row[String(key)])).map(([,protocol])=>protocol),
+    ...modernProtocolRows.map(([protocol])=>protocol)
+  ];
+}
 
 function planForm(row:ResellerRow):ResellerOwnedPlanPayload{
   return {
@@ -69,7 +102,6 @@ export function ResellerOwnedPlansRuntime(){
   const submit=async(event:FormEvent)=>{
     event.preventDefault();if(busy)return;
     if(!form.title.trim()){setError(pick("عنوان پلن را وارد کنید.","Enter a plan title."));return;}
-    if(!protocolRows.some(([key])=>Boolean(form[key]))){setError(pick("حداقل یک پروتکل را فعال کنید.","Enable at least one protocol."));return;}
     const editingId=editing;
     setBusy(true);setError("");setOk("");
     try{
@@ -77,7 +109,7 @@ export function ResellerOwnedPlansRuntime(){
       if(editingId)await resellerApi.updatePlan(editingId,payload);else await resellerApi.createPlan(payload);
       await load();
       closeEditor();
-      setOk(editingId?pick(`پلن #${editingId} با موفقیت بروزرسانی شد.`,`Plan #${editingId} updated successfully.`):pick("پلن ربات ساخته شد.","Bot plan created."));
+      setOk(editingId?pick(`پلن #${editingId} با موفقیت بروزرسانی شد.`,`Plan #${editingId} updated successfully.`):pick("پلن ربات با ۱۵ پروتکل ساخته شد.","Bot plan created with 15 protocols."));
     }catch(reason){
       setError(reason instanceof Error?reason.message:String(reason));
       editorRef.current?.scrollIntoView({behavior:"smooth",block:"start"});
@@ -117,7 +149,7 @@ export function ResellerOwnedPlansRuntime(){
     {error&&<div className="runtime-error" role="alert">{error}</div>}{ok&&<div className="runtime-success" role="status">{ok}</div>}
     <div className="stats"><Stat label={pick("کل پلن‌ها","Total plans")} value={resellerNumber(lang,rows.length)}/><Stat label={pick("پلن فعال","Active plans")} value={resellerNumber(lang,active)}/><Stat label={pick("مدل فروش","Sales model")} value={pick("نامحدود","Unlimited")}/><Stat label={pick("میانگین قیمت","Average price")} value={resellerMoney(lang,avg)}/></div>
 
-    {open&&<div ref={editorRef} className="owned-plan-editor-anchor"><Card className="runtime-editor owned-plan-editor"><div className="card-head"><div><b>{editing?pick("ویرایش پلن","Edit plan"):pick("ساخت پلن ربات","Create bot plan")}</b><small>{editing?pick(`در حال ویرایش پلن #${editing}. پس از ذخیره، همان پلن بروزرسانی می‌شود.`,`Editing plan #${editing}. Saving updates this exact plan.`):pick("حجم اینجا سقف هر اکانت است؛ هنگام فروش از حجم نماینده رزرو نمی‌شود.","This traffic is the account quota; it is not reserved from the reseller pool at sale time.")}</small></div>{editing&&<Badge tone="violet">#{resellerNumber(lang,editing)}</Badge>}</div><form onSubmit={submit}>
+    {open&&<div ref={editorRef} className="owned-plan-editor-anchor"><Card className="runtime-editor owned-plan-editor"><div className="card-head"><div><b>{editing?pick("ویرایش پلن","Edit plan"):pick("ساخت پلن ربات","Create bot plan")}</b><small>{pick("هر پلن جدید شامل ۱۵ پروتکل TwinPanel است؛ پنج پروتکل کلاسیک قابل خاموش/روشن‌کردن‌اند و ده پروتکل مدرن از Registry مرکزی فعال می‌شوند.","Every new plan includes all 15 TwinPanel protocols; the five classic protocols remain configurable while ten modern protocols come from the central registry.")}</small></div>{editing&&<Badge tone="violet">#{resellerNumber(lang,editing)}</Badge>}</div><form onSubmit={submit}>
       <div className="setting-grid">
         <label className="field"><span>{pick("عنوان پلن","Plan title")}</span><input ref={titleRef} required minLength={2} maxLength={120} value={form.title} onChange={e=>setForm(v=>({...v,title:e.target.value}))}/></label>
         <label className="field"><span>{pick("حجم هر اکانت (GB)","Account traffic (GB)")}</span><input type="number" min={1} max={100000} value={form.traffic_gb} onChange={e=>setForm(v=>({...v,traffic_gb:Number(e.target.value)}))}/></label>
@@ -126,12 +158,17 @@ export function ResellerOwnedPlansRuntime(){
         <label className="field"><span>{pick("قیمت فروش ربات (تومان)","Bot sale price (Toman)")}</span><input type="number" min={0} step={1} value={form.sell_price_toman} onChange={e=>setForm(v=>({...v,sell_price_toman:Number(e.target.value)}))}/></label>
         <label className="field"><span>{pick("ترتیب نمایش","Sort order")}</span><input type="number" min={0} value={form.sort_order} onChange={e=>setForm(v=>({...v,sort_order:Number(e.target.value)}))}/></label>
       </div>
-      <div className="card-head"><b>{pick("پروتکل‌ها","Protocols")}</b></div><div className="setting-grid owned-plan-protocol-grid">{protocolRows.map(([key,label])=><label className="field" key={String(key)}><span>{label}</span><input type="checkbox" checked={Boolean(form[key])} onChange={e=>setForm(v=>({...v,[key]:e.target.checked}))}/></label>)}<label className="field"><span>{pick("فعال","Active")}</span><input type="checkbox" checked={form.is_active} onChange={e=>setForm(v=>({...v,is_active:e.target.checked}))}/></label></div>
+      <div className="card-head"><b>{pick("پروتکل‌ها · ۱۵ مورد","Protocols · 15")}</b></div>
+      <div className="setting-grid owned-plan-protocol-grid">
+        {classicProtocolRows.map(([key,,label])=><label className="field" key={String(key)}><span>{label}</span><input type="checkbox" checked={Boolean(form[key])} onChange={e=>setForm(v=>({...v,[key]:e.target.checked}))}/></label>)}
+        {modernProtocolRows.map(([protocol,label])=><label className="field" key={protocol}><span>{label}</span><input type="checkbox" checked readOnly aria-label={`${label} enabled`}/></label>)}
+        <label className="field"><span>{pick("فعال","Active")}</span><input type="checkbox" checked={form.is_active} onChange={e=>setForm(v=>({...v,is_active:e.target.checked}))}/></label>
+      </div>
       <div className="action-row"><button type="button" className="ghost" onClick={closeEditor}>{pick("انصراف","Cancel")}</button><button type="submit" className="primary" disabled={busy}>{busy?"…":editing?pick("ذخیره تغییرات","Save changes"):pick("ذخیره پلن","Save plan")}</button></div>
     </form></Card></div>}
 
     <Card><div className="card-head"><div><b>{pick("پلن‌های اختصاصی نمایندگی","Reseller-owned plans")}</b><small>{pick("ربات فقط پلن‌های فعال همین لیست را به مشتری نمایش می‌دهد.","The bot only shows active plans from this list.")}</small></div><Badge tone="violet">{resellerNumber(lang,rows.length)}</Badge></div>
-      <div className="table"><table><thead><tr><th>{pick("پلن","Plan")}</th><th>{pick("حجم / مدت","Traffic / Duration")}</th><th>{pick("پروتکل‌ها","Protocols")}</th><th>{pick("قیمت","Price")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{rows.map((row,index)=>{const id=Number(row.id||0);const protocols=protocolRows.filter(([key])=>Boolean(row[String(key)])).map(([,label])=>label);return <tr key={id||index}><td><b>{str(row,"title")||str(row,"name")||`#${id}`}</b><small>#{resellerNumber(lang,id)}</small></td><td>{resellerNumber(lang,num(row,"traffic_gb"))} GB · {resellerNumber(lang,num(row,"duration_days"))} {pick("روز","days")}</td><td>{protocols.join(" · ")||"—"}</td><td>{resellerMoney(lang,num(row,"sell_price_toman"))}</td><td><Badge tone={Boolean(row.is_active)?"ok":"bad"}>{Boolean(row.is_active)?pick("فعال","Active"):pick("غیرفعال","Inactive")}</Badge></td><td><div className="row-actions"><button type="button" className="mini-btn" disabled={busy} onClick={()=>startEdit(row)}>{pick("ویرایش","Edit")}</button><button type="button" className="mini-btn" disabled={busy} onClick={()=>void toggleActive(row)}>{Boolean(row.is_active)?pick("غیرفعال","Disable"):pick("فعال‌سازی","Activate")}</button><button type="button" className="mini-btn danger" disabled={busy} onClick={()=>void remove(row)}>{pick("حذف","Delete")}</button></div></td></tr>})}</tbody></table></div>
+      <div className="table"><table><thead><tr><th>{pick("پلن","Plan")}</th><th>{pick("حجم / مدت","Traffic / Duration")}</th><th>{pick("پروتکل‌ها","Protocols")}</th><th>{pick("قیمت","Price")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{rows.map((row,index)=>{const id=Number(row.id||0);const protocols=visibleProtocols(row).map(protocol=>protocolLabels.get(protocol)||protocol);return <tr key={id||index}><td><b>{str(row,"title")||str(row,"name")||`#${id}`}</b><small>#{resellerNumber(lang,id)}</small></td><td>{resellerNumber(lang,num(row,"traffic_gb"))} GB · {resellerNumber(lang,num(row,"duration_days"))} {pick("روز","days")}</td><td>{protocols.join(" · ")||"—"}</td><td>{resellerMoney(lang,num(row,"sell_price_toman"))}</td><td><Badge tone={Boolean(row.is_active)?"ok":"bad"}>{Boolean(row.is_active)?pick("فعال","Active"):pick("غیرفعال","Inactive")}</Badge></td><td><div className="row-actions"><button type="button" className="mini-btn" disabled={busy} onClick={()=>startEdit(row)}>{pick("ویرایش","Edit")}</button><button type="button" className="mini-btn" disabled={busy} onClick={()=>void toggleActive(row)}>{Boolean(row.is_active)?pick("غیرفعال","Disable"):pick("فعال‌سازی","Activate")}</button><button type="button" className="mini-btn danger" disabled={busy} onClick={()=>void remove(row)}>{pick("حذف","Delete")}</button></div></td></tr>})}</tbody></table></div>
       {!rows.length&&<div className="runtime-empty">{pick("هنوز پلنی نساخته‌اید. اولین پلن ربات را ایجاد کنید.","No plans yet. Create your first bot plan.")}</div>}
     </Card>
   </div></PortalShell>;
