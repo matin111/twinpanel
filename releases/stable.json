@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.451",
+  "version": "1.1.0-rc.452",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-01T16:17:51Z",
+  "released_at": "2026-11-01T17:36:18Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "2a137e95f638d212edb57972098d66148ff153b1",
+  "source_sha": "74d20ff7434493787be8211195b861bce342ac6c",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.451/twinpanel-1.1.0-rc.451-linux-x86_64.tar.gz",
-    "sha256": "8d63a449c94a1dc7c0809f33974596043ae7082155e88e054c448e3fc9e35f85",
-    "size_bytes": 25179143
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.452/twinpanel-1.1.0-rc.452-linux-x86_64.tar.gz",
+    "sha256": "65c23dcdd926f5388591609036d1bb50ec12a0c9284904a0975c88dcdd110cfd",
+    "size_bytes": 25177717
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.451 مسیر Account Delivery را برای ربات اصلی/Store و ربات نماینده روی Provisioner مرکزی ۱۵ پروتکل یکپارچه می‌کند. Root Cause این بود که بعضی مسیرهای Fulfillment هنوز callable قدیمی پنج‌پروتکلی را نگه داشته بودند و node resolution نیز SubscriptionNode snapshot را رعایت نمی‌کرد. در این نسخه Store/admin و reseller bot هر دو از provision_account_v1 استفاده می‌کنند و nodeها فقط از Snapshot همان اشتراک خوانده می‌شوند؛ هیچ fallback به همه Global Nodeها وجود ندارد. PR #1679 پس از سبز شدن تمام Workflowهای Head نهایی Merge شد و Release PR #1680 نیز با هر ۹ Workflow سبز Merge شد. هیچ بازنویسی در TP27/VXLAN/Tunnel/Spoof/Accounting/quota/credential generation/routing/firewall/protocol dataplane انجام نشده است. Source روی SHA immutable 2a137e95f638d212edb57972098d66148ff153b1 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.451 converges Account Delivery for the main/Store path and reseller bot on the central 15-protocol provisioner. The root cause was that some fulfillment paths still held the legacy five-protocol callable and node resolution did not honor the subscription's SubscriptionNode snapshot. In this release both Store/admin and reseller bot use provision_account_v1, and nodes are resolved only from the immutable snapshot owned by that subscription with no fallback to all global nodes. PR #1679 merged after all workflows for its final head passed, and release PR #1680 merged with all 9 workflows green. No TP27/VXLAN/Tunnel/Spoof/Accounting/quota/credential-generation/routing/firewall/protocol-dataplane behavior is rewritten. Source is pinned to immutable SHA 2a137e95f638d212edb57972098d66148ff153b1."
+    "fa": "TwinPanel 1.1.0-rc.452 متن هر سه قالب فروشگاه را برای فروش واقعی VPN بازنویسی می‌کند و متن‌های سازنده‌محور درباره قالب، طراحی، Backend و Placeholderهای عمومی را از تجربه مشتری حذف می‌کند. قالب‌های یک و دو از متن مشترک جدید درباره سرعت و پایداری، ۱۵ روش اتصال، پشتیبانی Windows/Android/iPhone/macOS/Linux، خرید، آموزش اتصال و پشتیبانی استفاده می‌کنند و قالب سه نیز متن مستقل فروشگاهی دریافت کرده است. در کارت پلن قالب سه، چیپ‌های پروتکل از نمایش عمومی حذف و آیکون دستگاه‌های Windows، Android، iPhone، Linux و macOS جایگزین شده‌اند؛ داده واقعی پروتکل پلن برای ساخت اشتراک و Provisioning بدون تغییر باقی مانده است. صفحه مدیریت قالب‌ها نیز به قالب یک، قالب دو و قالب سه با توضیح کوتاه و طبیعی ساده شده است. PR #1682 با ۱۷/۱۷ Workflow سبز Merge شد و Release PR #1683 با ۹/۹ Workflow سبز Merge شد. CI fixture نمایندگی با EXIT node هماهنگ شد و Workflow تست Transport فقط برای فراهم‌کردن PostgreSQL/Redis موردنیاز تست اصلاح شد؛ هیچ منطق Transport یا dataplane تغییر نکرد. هیچ تغییری در TP27/VXLAN/Tunnel/Spoof/Accounting/quota/credential generation/routing/firewall/protocol dataplane انجام نشده است. Source روی SHA immutable 74d20ff7434493787be8211195b861bce342ac6c قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.452 rewrites the public copy across all three storefront templates around real VPN sales and removes builder-facing language about templates, design, backend internals and public placeholders. Templates 1 and 2 use refreshed shared copy focused on speed and reliability, 15 connection methods, Windows/Android/iPhone/macOS/Linux support, purchasing, setup guides and support, while Template 3 receives its own customer-facing sales copy. On Template 3 plan cards, public protocol chips are replaced with Windows, Android, iPhone, Linux and macOS device icons; the actual plan protocol data used for subscription creation and provisioning remains unchanged. The template manager is also simplified to Template 1, Template 2 and Template 3 with short natural descriptions. PR #1682 merged with 17/17 green workflows and release PR #1683 merged with 9/9 green workflows. The reseller CI fixture was aligned with an EXIT node and the Transport smoke workflow was only updated to provide the PostgreSQL/Redis services its test already required; no Transport or dataplane logic was changed. No TP27/VXLAN/Tunnel/Spoof/Accounting/quota/credential-generation/routing/firewall/protocol-dataplane behavior is changed. Source is pinned to immutable SHA 74d20ff7434493787be8211195b861bce342ac6c."
   }
 }
