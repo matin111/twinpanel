@@ -13,11 +13,20 @@ const categoryLabel:Record<Exclude<StoreProtocolCategory,"classic">,{fa:string;e
   standalone:{fa:"Runtime مستقل",en:"Standalone runtime"},
 };
 
+const DEFAULT_MODERN_DESCRIPTION_FA="پروتکل‌های جدید TwinPanel در کنار گزینه‌های کلاسیک؛ برای هر شبکه مسیر مناسب‌تری در دسترس است.";
+const DEFAULT_MODERN_DESCRIPTION_EN="TwinPanel's newer protocols alongside the classic options, giving each network a better-matched path.";
+
 type ProtocolStyle=CSSProperties&Record<`--${string}`,string>;
 
 function option(options:StoreTemplateOptionMap,key:string,fallback:string){
   const value=options[key];
   return typeof value==="string"&&value.trim()?value:fallback;
+}
+
+function editableText(options:StoreTemplateOptionMap,key:string,fallback:string){
+  if(!Object.prototype.hasOwnProperty.call(options,key))return fallback;
+  const value=options[key];
+  return typeof value==="string"?value:fallback;
 }
 
 function protocolThemeStyle(templateId:string,options:StoreTemplateOptionMap):ProtocolStyle{
@@ -74,6 +83,9 @@ function protocolThemeStyle(templateId:string,options:StoreTemplateOptionMap):Pr
 export function StoreProtocolCatalogLayer({templateId,themeOptions}:{templateId:string;themeOptions:StoreTemplateOptionMap}){
   const {pick,lang}=useI18n();
   const [target,setTarget]=useState<HTMLElement|null>(null);
+  const modernDescription=lang==="en"
+    ?editableText(themeOptions,"modern_protocols_description_en",DEFAULT_MODERN_DESCRIPTION_EN)
+    :editableText(themeOptions,"modern_protocols_description",DEFAULT_MODERN_DESCRIPTION_FA);
 
   useEffect(()=>{
     const section=document.getElementById("protocols");
@@ -105,10 +117,7 @@ export function StoreProtocolCatalogLayer({templateId,themeOptions}:{templateId:
           <span className={styles.eyebrow}>{pick("نسل جدید اتصال","NEXT-GEN CONNECTIVITY")}</span>
           <h3>{pick("پروتکل‌های مدرن","Modern protocols")}</h3>
         </div>
-        <p>{pick(
-          "پروتکل‌های جدید TwinPanel در کنار گزینه‌های کلاسیک؛ برای هر شبکه مسیر مناسب‌تری در دسترس است.",
-          "TwinPanel's newer protocols alongside the classic options, giving each network a better-matched path."
-        )}</p>
+        {modernDescription.trim()?<p>{modernDescription}</p>:null}
       </header>
 
       <div className={styles.grid}>
