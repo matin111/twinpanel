@@ -17,11 +17,17 @@ from .payment_automation import (
 )
 from .payment_native_crypto_exact import process_pending_native_crypto_exact_once
 from .quota_runtime_reconcile import (
-    QUOTA_RUNTIME_INTERVAL_SECONDS,
     reconcile_quota_runtime_once,
 )
 
 
+# Controller-side quota reconciliation is telemetry, not dataplane control.
+# Running full Cisco/Xray/OpenVPN/L2TP reconciliation every 5 seconds caused
+# sustained controller CPU saturation on installations with hundreds of active
+# subscriptions. A 15-second cadence preserves quota/session semantics while
+# bounding telemetry freshness to at most 15 seconds and freeing the API event
+# loop for interactive admin/user requests.
+QUOTA_RUNTIME_INTERVAL_SECONDS = 15.0
 PAYMENT_NOTIFICATION_INTERVAL_SECONDS = 5
 CRYPTO_VERIFY_INTERVAL_SECONDS = 10
 RECEIPT_CLEANUP_INTERVAL_SECONDS = 6 * 60 * 60
