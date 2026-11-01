@@ -81,12 +81,13 @@ jobs:
           sudo install -d -m 700 /var/lib/twinpanel-backups
           sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel-backups
 
-      - name: Verify explicit and plan-template 15-protocol creation
+      - name: Verify explicit per-subscription 15-protocol creation
         working-directory: backend
         run: |
           python - <<'PY'
           import asyncio
 
+          from fastapi import HTTPException
           from sqlalchemy import inspect, text
 
           from app.main import app
@@ -214,25 +215,26 @@ jobs:
               explicit_protocols={row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==explicit_id).all()}
               assert explicit_protocols == {'wireguard','hysteria2'}
 
-              # A plan-backed create with no explicit protocol override now
-              # snapshots the Plan template. Legacy plans with no plan_protocols
-              # rows intentionally default to all 15 canonical protocols.
-              defaulted = asyncio.run(admin_create_v2(
-                  AdminSubscriptionCreateV2(
-                      user_id=user_id,
-                      plan_id=plan_id,
-                      protocols=[],
-                  ),
-                  db,
-              ))
-              assert defaulted['provisioning']['ok'] is True
-              defaulted_id=int(defaulted['id'])
-              defaulted_protocols={row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==defaulted_id).all()}
-              assert defaulted_protocols == set(ALL_PROTOCOL_KEYS)
+              # The admin/manual creation endpoint intentionally keeps explicit
+              # protocol selection. Store/plan purchase paths default to the Plan
+              # template before reaching the subscription factory.
+              try:
+                  asyncio.run(admin_create_v2(
+                      AdminSubscriptionCreateV2(
+                          user_id=user_id,
+                          plan_id=plan_id,
+                          protocols=[],
+                      ),
+                      db,
+                  ))
+              except HTTPException as exc:
+                  assert exc.status_code == 422
+              else:
+                  raise AssertionError('admin create must keep explicit protocol selection')
           finally:
               db.close()
 
-          print('SUBSCRIPTION_PLAN_TEMPLATE_15_PROTOCOL_CREATION_OK')
+          print('SUBSCRIPTION_EXPLICIT_15_PROTOCOL_CREATION_OK')
           PY
 
       - name: Verify frontend selection contract
@@ -255,7 +257,8 @@ jobs:
           assert '@router.get("/protocol-catalog")' in backend
           assert 'هنگام ساخت اشتراک حداقل یک پروتکل انتخاب کنید' in backend
 
-          # Plan UI now owns a creation template, not runtime desired-state.
+          # Plan UI is a creation template. Runtime desired-state remains on the
+          # created SubscriptionProtocol / SubscriptionNode snapshot.
           assert 'Protocols · 15' in plan_ui
           assert 'Allowed servers' in plan_ui
           assert 'node_ids' in plan_ui
