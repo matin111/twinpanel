@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.434",
+  "version": "1.1.0-rc.435",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-01T00:27:25Z",
+  "released_at": "2026-11-01T00:39:36Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "3ce3f8e6672acbf485d28f5eb5dbe394f154e24a",
+  "source_sha": "ae19da380f23c4ea8115f8b601fcba9d3580b99b",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.434/twinpanel-1.1.0-rc.434-linux-x86_64.tar.gz",
-    "sha256": "105ddcc83cd9084680b270a2188728fc0932f27a85ccdb220959e2b9df8ab43c",
-    "size_bytes": 25139212
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.435/twinpanel-1.1.0-rc.435-linux-x86_64.tar.gz",
+    "sha256": "feaf4aa6140535a250baa1932b03404d71262c7bb75b4e5f4f4a60311a6e6daf",
+    "size_bytes": 25146877
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.434 اصلاح idempotency در Provisioning پروتکل V2Ray/Xray را منتشر می‌کند. در retry ساخت اکانت، هویت V2Ray دیگر با UUID تصادفی تازه جایگزین نمی‌شود: اگر credential قبلی موجود باشد همان UUID استفاده می‌شود و در غیر این صورت UUID پایدار از Subscription ساخته می‌شود. این رفتار سناریویی را می‌بندد که ساخت remote موفق شده اما پاسخ/مرحله بعدی fail شده و retry با UUID جدید به duplicate email conflict می‌رسید. regression اختصاصی retry/UUID به CI اضافه شده و PR اصلاحی #1620 و PR نسخه #1622 با CI سبز Merge شده‌اند. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall و protocol dataplaneها بازنویسی نشده‌اند. Source روی SHA immutable 3ce3f8e6672acbf485d28f5eb5dbe394f154e24a قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.434 publishes the V2Ray/Xray provisioning retry-idempotency fix. Account-creation retries no longer replace the V2Ray identity with a fresh random UUID: an existing stored credential is reused, otherwise a stable UUID is derived for the subscription. This closes the case where remote creation succeeded but a later response/stage failed and the retry reached a duplicate-email conflict with a new UUID. Dedicated retry/UUID regression coverage is included in CI; fix PR #1620 and release PR #1622 were merged with green CI. TP27/VXLAN/Tunnel/Spoof/Accounting/quota/routing/firewall and protocol dataplanes are not rewritten. Source is pinned to immutable SHA 3ce3f8e6672acbf485d28f5eb5dbe394f154e24a."
+    "fa": "TwinPanel 1.1.0-rc.435 تغییرات Telegram/Reseller مربوط به PR #1621 را منتشر می‌کند: عضویت اجباری برای ربات اصلی و ربات‌های نمایندگی با تنظیم مستقل هر نماینده، همسان‌سازی منوی ربات نمایندگی با منوی اصلی، استانداردسازی مسیرهای خانه/بازگشت، حفظ مسیر دریافت لینک اکانت، و حذف گزینه تمدید فقط از سطح ربات تلگرام نمایندگی. تنظیمات عضویت از RuntimeSetting استفاده می‌کنند و migration دیتابیس جدیدی اضافه نشده است. PR اصلی #1621 و PR نسخه #1625 با CI سبز Merge شده‌اند. Tunnel/Accounting/Provisioning/quota/routing/firewall و protocol dataplaneها در این بسته بازنویسی نشده‌اند. Source روی SHA immutable ae19da380f23c4ea8115f8b601fcba9d3580b99b قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.435 publishes the Telegram/Reseller changes from PR #1621: mandatory membership for the main bot and reseller bots with independent per-reseller configuration, reseller menu alignment with the main bot, standardized home/back navigation, preserved account-link delivery, and removal of renewal only from the reseller Telegram bot surface. Membership settings use RuntimeSetting and do not add a new database migration. Main PR #1621 and release PR #1625 were merged with green CI. Tunnel/Accounting/Provisioning/quota/routing/firewall and protocol dataplanes are not rewritten by this package. Source is pinned to immutable SHA ae19da380f23c4ea8115f8b601fcba9d3580b99b."
   }
 }
