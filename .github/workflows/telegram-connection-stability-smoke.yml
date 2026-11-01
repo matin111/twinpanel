@@ -3,6 +3,8 @@ name: Telegram Connection Stability Smoke
 on:
   pull_request:
     paths:
+      - "backend/app/__init__.py"
+      - "backend/app/reseller_order_partial_provision_success_v1.py"
       - "backend/app/routers/telegram_manager.py"
       - "backend/app/routers/telegram_membership_settings.py"
       - "backend/app/routers/reseller_bot_delivery_runtime_v2.py"
@@ -20,6 +22,7 @@ on:
       - "backend/scripts/telegram_membership_enforcement_smoke.py"
       - "backend/scripts/telegram_button_styles_smoke.py"
       - "backend/scripts/reseller_bot_account_delivery_smoke.py"
+      - "backend/scripts/reseller_order_partial_provision_success_smoke.py"
       - "components/telegram-button-style-settings.tsx"
       - "components/routed-page-client-v2.tsx"
       - ".github/workflows/telegram-connection-stability-smoke.yml"
@@ -42,6 +45,7 @@ jobs:
 
       - name: Compile Telegram runtimes
         run: |
+          python -m py_compile backend/app/reseller_order_partial_provision_success_v1.py
           python -m py_compile backend/app/routers/telegram_manager.py
           python -m py_compile backend/app/routers/telegram_membership_settings.py
           python -m py_compile backend/app/routers/reseller_bot_delivery_runtime_v2.py
@@ -54,6 +58,7 @@ jobs:
           python -m py_compile backend/scripts/telegram_membership_enforcement_smoke.py
           python -m py_compile backend/scripts/telegram_button_styles_smoke.py
           python -m py_compile backend/scripts/reseller_bot_account_delivery_smoke.py
+          python -m py_compile backend/scripts/reseller_order_partial_provision_success_smoke.py
 
       - name: Verify persistent Telegram connection contract
         run: python backend/scripts/telegram_connection_stability_smoke.py
@@ -66,3 +71,6 @@ jobs:
 
       - name: Verify reseller bot account delivery contract
         run: python backend/scripts/reseller_bot_account_delivery_smoke.py
+
+      - name: Verify reseller partial provisioning delivery contract
+        run: python backend/scripts/reseller_order_partial_provision_success_smoke.py
