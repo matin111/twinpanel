@@ -42,17 +42,12 @@ def verify_main_dispatcher_guard() -> None:
     assert "runtime.Dispatcher = MembershipAwareDispatcher" in custom_main, "main runtime must use guarded Dispatcher"
     assert "install_membership_guard(runtime.router)" not in custom_main, "router-only guard reintroduces sibling bypass"
 
-    # The legacy main runtime intentionally mounts feature routers directly on
-    # Dispatcher. Keep this assertion so CI fails if enforcement is ever moved
-    # back to only runtime.router while sibling routers still exist.
-    direct_dispatcher_routers = (
-        "dp.include_router(purchase_router)",
-        "dp.include_router(wallet_router)",
-        "dp.include_router(support_router)",
-    )
-    assert any(item in runtime_main for item in direct_dispatcher_routers), (
-        "smoke assumption changed: expected at least one main feature router "
-        "to be mounted directly on Dispatcher"
+    # The main runtime mounts multiple routers directly on Dispatcher. The
+    # membership guard therefore has to live on Dispatcher, not on one child
+    # router. Avoid coupling this regression test to individual router names.
+    assert runtime_main.count("dp.include_router(") >= 2, (
+        "smoke assumption changed: expected multiple routers mounted directly "
+        "on the main Dispatcher"
     )
 
 
