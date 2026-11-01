@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.458",
-  "source_sha": "2cfe9831fab52a1eb39a4c43c79f81840aad2b19",
+  "version": "1.1.0-rc.459",
+  "source_sha": "d7347e2a6e66664fcdea09f63aa13db6016be012",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.458 راهنمای آپلود تصاویر قالب Orbit را با هندسه واقعی اسلات‌ها هماهنگ می‌کند. نسبت و اندازه استاندارد برای Hero، امکانات، روش‌های اتصال، آموزش، پنل کاربری، CTA و فوتر مشخص شده و برای بنر و CTA ناحیه امن Responsive توضیح داده شده است تا کاربر فایل را با اندازه مناسب بسازد و Crop ناخواسته به حداقل برسد. PR #1700 با 4/4 CI سبز Merge شد و Release PR #1701 با 9/9 Workflow سبز Merge شد. Source روی SHA immutable 2cfe9831fab52a1eb39a4c43c79f81840aad2b19 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.458 aligns Orbit media upload guidance with the real slot geometry. Standard aspect ratios and upload dimensions are documented for Hero, features, connection methods, guides, account, CTA and footer media, with responsive safe-area guidance for the top banner and CTA to minimize unintended cropping. PR #1700 merged with 4/4 green CI checks and Release PR #1701 merged with 9/9 green workflows. Source is pinned to immutable SHA 2cfe9831fab52a1eb39a4c43c79f81840aad2b19."
+    "fa": "TwinPanel 1.1.0-rc.459 ارسال اکانت ربات اصلی پس از تأیید پرداخت را در دیتابیس‌های مهاجرت‌شده اصلاح می‌کند. کلید idempotency اعلان پرداخت دیگر فقط از PaymentIntent ID ساخته نمی‌شود و با Order + Payment + Subscription namespace می‌شود تا با رکوردهای تاریخی collision نکند. همچنین اگر سفارش قبلاً fulfilled شده ولی اعلان تلگرام به صف نرفته باشد، Fulfillment همان سفارش می‌تواند اعلان را به‌صورت idempotent بازیابی کند. PR #1703 با 7/7 CI سبز Merge شد و Release PR #1704 با 9/9 Workflow سبز Merge شد. این Release رفتار Provisioning را تغییر نمی‌دهد و Source روی SHA immutable d7347e2a6e66664fcdea09f63aa13db6016be012 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.459 fixes main-bot account delivery after payment approval on migrated databases. Payment notification idempotency keys are no longer based on PaymentIntent ID alone; they are namespaced by Order + Payment + Subscription to avoid collisions with historical queue rows. Already-fulfilled orders can also idempotently recover a Telegram notification that was previously skipped. PR #1703 merged with 7/7 green CI checks and Release PR #1704 merged with 9/9 green workflows. This release does not change provisioning behavior. Source is pinned to immutable SHA d7347e2a6e66664fcdea09f63aa13db6016be012."
   }
 }
