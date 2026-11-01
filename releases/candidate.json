@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.455",
-  "source_sha": "2c374cd85d46ae3b3b1310865ab76920f9294a64",
+  "version": "1.1.0-rc.456",
+  "source_sha": "a263ab07caf2712ef0493236a67252a5a8e54eaa",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.455 سرعت نمایش اولیه فروشگاه و قالب‌های جدید را بهبود می‌دهد. تنظیمات اختصاصی قالب دیگر مسیر رندر اولیه را مسدود نمی‌کند؛ فروشگاه با پلن‌ها و تنظیمات اصلی سریع نمایش داده می‌شود و تنظیمات قالب پس از دریافت، بدون سفید ماندن طولانی صفحه اعمال می‌شوند. PR #1691 با ۴/۴ CI سبز Merge شد و Release PR #1692 با ۹/۹ Workflow سبز Merge شد. هیچ تغییری در Provisioning، پروتکل‌ها، Tunnel، Accounting، Quota، Routing، Firewall یا Dataplane انجام نشده است. Source روی SHA immutable 2c374cd85d46ae3b3b1310865ab76920f9294a64 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.455 improves first-render performance for the storefront and newer templates. Template-specific settings no longer block the initial render; the storefront displays using plans and core settings first, then applies template settings when they arrive instead of leaving the page blank for an extended period. PR #1691 merged with 4/4 green CI checks and Release PR #1692 merged with 9/9 green workflows. No provisioning, protocol, tunnel, accounting, quota, routing, firewall, or dataplane behavior is changed. Source is pinned to immutable SHA 2c374cd85d46ae3b3b1310865ab76920f9294a64."
+    "fa": "TwinPanel 1.1.0-rc.456 راهنمای ابعاد تصاویر قالب Orbit را با هندسه واقعی جایگاه‌های تصویر هماهنگ می‌کند. اندازه‌های آپلود برای بنر، Hero، امکانات، روش‌های اتصال، آموزش، پنل کاربری، بخش خرید و فوتر به‌صورت دقیق و با برچسب صریح عرض × ارتفاع نمایش داده می‌شوند تا در رابط RTL جابه‌جا یا مبهم دیده نشوند. PR #1694 با ۴/۴ CI سبز Merge شد و Release PR #1695 با ۹/۹ Workflow سبز Merge شد. هیچ تغییری در Provisioning، پروتکل‌ها، Tunnel، Accounting، Quota، Routing، Firewall یا Dataplane انجام نشده است. Source روی SHA immutable a263ab07caf2712ef0493236a67252a5a8e54eaa قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.456 aligns Orbit image-upload guidance with the actual geometry of each storefront media slot. Upload dimensions for the banner, hero, features, connection methods, guides, account, purchase section, and footer are now shown explicitly as width × height so RTL rendering cannot reverse or obscure them. PR #1694 merged with 4/4 green CI checks and Release PR #1695 merged with 9/9 green workflows. No provisioning, protocol, tunnel, accounting, quota, routing, firewall, or dataplane behavior is changed. Source is pinned to immutable SHA a263ab07caf2712ef0493236a67252a5a8e54eaa."
   }
 }
