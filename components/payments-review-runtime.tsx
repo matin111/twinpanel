@@ -174,15 +174,26 @@ export function PaymentsReviewRuntime(){
   const act=async(key:string,label:string,fn:()=>Promise<unknown>,optimistic?:()=>void)=>{
     if(busyKey)return;
     setBusyKey(key);setError("");setOk("");
+
+    // TWINPANEL_PAYMENT_REVIEW_OPTIMISTIC_V2
+    // Remove the row from the review queue immediately. Approval endpoints
+    // commit payment state before slow provisioning continues in background,
+    // so the admin UI must not look stuck while account delivery is running.
+    optimistic?.();
+
     try{
       await fn();
-      optimistic?.();
       setOk(label);
-      // Refresh in the background. The user gets immediate visual feedback and
-      // the action button is released without waiting for three follow-up APIs.
-      void load(true);
+
+      // Reconcile after a short delay instead of replacing the optimistic row
+      // immediately with a concurrent/stale list response. The delayed refresh
+      // keeps the UI truthful without requiring a manual page reload.
+      window.setTimeout(()=>{void load(true);},1500);
     }catch(e){
       setError(e instanceof Error?e.message:String(e));
+      // Roll back the optimistic state from the authoritative API if approval
+      // actually failed.
+      void load(true);
     }finally{
       setBusyKey("");
     }
