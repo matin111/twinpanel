@@ -1,0 +1,28 @@
+name: Reseller Plan 15 Protocol UI V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'components/reseller-owned-plans.tsx'
+      - '.github/workflows/reseller-plan-15-protocol-ui-v1-smoke.yml'
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify all 15 reseller plan protocols are visible
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('components/reseller-owned-plans.tsx').read_text()
+          protocols = [
+              'Cisco / OpenConnect','OpenVPN','WireGuard','L2TP / IPsec','V2Ray / Xray',
+              'Hysteria2','TUIC','AnyTLS','NaiveProxy','ShadowTLS','Snell','Mieru',
+              'TrustTunnel','AmneziaWG','Sudoku',
+          ]
+          missing = [p for p in protocols if p not in text]
+          assert not missing, f'missing protocol labels: {missing}'
+          assert 'Protocols · 15' in text
+          assert 'visibleProtocols(row)' in text
+          PY
