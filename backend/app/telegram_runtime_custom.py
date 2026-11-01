@@ -6,8 +6,10 @@ from pathlib import Path
 
 import httpx
 from aiogram import Bot as AiogramBot, Dispatcher as AiogramDispatcher
+from aiogram.types import ReplyKeyboardMarkup
 
 from .bot_text_middleware import BotTextRequestMiddleware
+from .telegram_button_styles import keyboard_button, live_button_styles
 from .telegram_membership import install_membership_guard
 from . import telegram_runtime_bot as runtime
 
@@ -132,6 +134,49 @@ def _install_internal_api_resilience() -> None:
     runtime.request = resilient_request
 
 
+def _styled_main_keyboard() -> ReplyKeyboardMarkup:
+    styles = live_button_styles()
+    return ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[
+            [
+                keyboard_button("🏠 داشبورد", styles.dashboard),
+                keyboard_button("🛒 خرید اشتراک", styles.purchase),
+            ],
+            [
+                keyboard_button("📦 اشتراک‌های من", styles.subscriptions),
+                keyboard_button("💰 کیف پول", styles.wallet),
+            ],
+            [
+                keyboard_button("📚 آموزش", styles.learning),
+                keyboard_button("⬇️ دانلود برنامه", styles.download),
+            ],
+            [
+                keyboard_button("🎫 پشتیبانی", styles.support),
+                keyboard_button("👤 حساب من", styles.account),
+            ],
+        ],
+    )
+
+
+def _styled_connect_keyboard() -> ReplyKeyboardMarkup:
+    styles = live_button_styles()
+    return ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[
+            [keyboard_button("🔗 اتصال حساب", styles.connect)]
+        ],
+    )
+
+
+def _install_button_styles() -> None:
+    # Refine the existing runtime without changing its handlers/FSM contract.
+    # Every menu render reads the latest RuntimeSetting values so changes made
+    # in the admin panel take effect without rewriting the Telegram flows.
+    runtime.main_keyboard = _styled_main_keyboard
+    runtime.connect_keyboard = _styled_connect_keyboard
+
+
 class TextAwareBot(AiogramBot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -161,6 +206,7 @@ async def main() -> None:
     runtime.Bot = TextAwareBot
     runtime.Dispatcher = MembershipAwareDispatcher
     _install_internal_api_resilience()
+    _install_button_styles()
     await runtime.main()
 
 
