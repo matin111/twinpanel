@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.445",
+  "version": "1.1.0-rc.446",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-01T03:46:25Z",
+  "released_at": "2026-11-01T04:20:50Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "ffd376f58174be0ec063ae24851aa1f32810b903",
+  "source_sha": "80c840d84f688a8c73fcc97db913543227c3edef",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.445/twinpanel-1.1.0-rc.445-linux-x86_64.tar.gz",
-    "sha256": "9e4244034890aa5a61241c35f21ebbefaf62ea28d046550c528654fbb1dc2fca",
-    "size_bytes": 25165401
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.446/twinpanel-1.1.0-rc.446-linux-x86_64.tar.gz",
+    "sha256": "59bf55796e2dc823f9a41fc5280f2a3b831ccb7cc0962cd426f20876c1e8024f",
+    "size_bytes": 25170376
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.445 قرارداد Runtime رنگ دکمه‌های ربات تلگرام را اصلاح می‌کند. در نسخه قبلی اگر Runtime نصب‌شده aiogram فیلد style را پشتیبانی نمی‌کرد، درخواست رنگ به‌صورت بی‌صدا حذف و دکمه معمولی ساخته می‌شد؛ بنابراین UI می‌توانست تنظیمات رنگ را ذخیره کند اما ربات بدون رنگ نمایش داده شود. در این نسخه برای Styleهای غیردیفالت ناسازگاری Runtime دیگر مخفی نمی‌شود و با خطای مشخص Fail می‌شود. Regression Smoke نیز aiogram==3.30.0 را واقعاً نصب می‌کند و serialization دکمه‌های Inline و Reply با styleهای primary، success و danger را با model_dump بررسی می‌کند. PR #1659 با 5/5 CI سبز Merge شد و Release PR #1660 با 9/9 CI سبز Merge شد. عضویت اجباری، Routerهای ربات و منطق VPN/Tunnel بدون تغییر حفظ شده‌اند. هیچ تغییری در TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential/routing/firewall/protocol dataplane وجود ندارد. Source روی SHA immutable ffd376f58174be0ec063ae24851aa1f32810b903 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.445 fixes the Telegram colored-button runtime contract. Previously, when the installed aiogram runtime did not expose the Bot API style field, requested colors were silently dropped and plain buttons were created, allowing the admin UI to save styles while the bot rendered unstyled buttons. Non-default styles now fail explicitly on an incompatible runtime instead of silently downgrading. The regression smoke now installs aiogram==3.30.0 and verifies real InlineKeyboardButton and KeyboardButton serialization for primary, success, and danger via model_dump. PR #1659 merged with 5/5 green CI and release PR #1660 merged with 9/9 green CI. Mandatory membership, bot routing, and VPN/Tunnel behavior are preserved. No TP27/VXLAN/Tunnel/Spoof/Accounting/quota/provisioning/credential/routing/firewall/protocol dataplane changes are included. Source is pinned to immutable SHA ffd376f58174be0ec063ae24851aa1f32810b903."
+    "fa": "TwinPanel 1.1.0-rc.446 ساخت و نمایش پلن‌های ۱۵ پروتکلی و Provisioning ده پروتکل مدرن روی همه سرورهای واجدشرایط را اصلاح می‌کند. UI پلن نماینده اکنون هر ۱۵ پروتکل TwinPanel را نمایش می‌دهد و لیست پلن از مجموعه canonical protocols API استفاده می‌کند. برای Hysteria2، TUIC، AnyTLS، NaiveProxy، ShadowTLS، Snell، Mieru، TrustTunnel، AmneziaWG و Sudoku دیگر یک timeout مشترک ۴۵ ثانیه‌ای کل حلقه سرورها را قطع نمی‌کند؛ هر Node timeout مستقل ۴۵ ثانیه‌ای دارد، خطای همان سرور ثبت می‌شود و Node بعدی حتماً امتحان می‌شود. شرط Runtime online همچنان به‌عنوان safety gate حفظ شده و Runtime خاموش/ناموجود با خطای صریح گزارش می‌شود. PR #1662 با 6/6 CI سبز، PR #1663 با 11/11 CI سبز و Release PR #1665 با 9/9 CI سبز Merge شدند. Source روی SHA immutable 80c840d84f688a8c73fcc97db913543227c3edef قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.446 fixes 15-protocol reseller plan visibility and modern-protocol provisioning across all eligible servers. The reseller plan UI now exposes all 15 TwinPanel protocols and renders the canonical protocol set returned by the API. Hysteria2, TUIC, AnyTLS, NaiveProxy, ShadowTLS, Snell, Mieru, TrustTunnel, AmneziaWG, and Sudoku no longer share one 45-second deadline across the entire node loop; each eligible node gets its own 45-second hard timeout, a timeout is recorded for that server only, and provisioning continues to later nodes. The runtime-online safety gate remains intact and missing/offline runtimes are reported explicitly. PR #1662 merged with 6/6 green CI, PR #1663 with 11/11 green CI, and release PR #1665 with 9/9 green CI. Source is pinned to immutable SHA 80c840d84f688a8c73fcc97db913543227c3edef."
   }
 }
