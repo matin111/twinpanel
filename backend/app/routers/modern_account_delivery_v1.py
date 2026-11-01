@@ -476,9 +476,14 @@ async def _provision_classic_protocol(
                 }
             )
 
-    if items and secret is not None:
-        cred.username = _credential_identity(protocol, secret)
-        cred.secret_encrypted = ad._enc(secret_to_dict(secret))
+    if items:
+        cred = _get_credential(db, sub.id, protocol)
+        cred.username = username if protocol in {"cisco", "l2tp"} else None
+        cred.secret_encrypted = (
+            ad._enc({"password": password})
+            if protocol in {"cisco", "l2tp"}
+            else None
+        )
         cred.config_text_encrypted = ad._enc(items)
         cred.is_active = True
 
@@ -508,8 +513,8 @@ async def _provision_account_v1_locked(
     if not nodes:
         raise HTTPException(
             status_code=409,
-            detail="�رای این اشتراک هین سرور معتبري در پنل وجود نؘ�ارد",
-      )
+            detail="برای این اشتراک هیچ سرور معتبری در پنل وجود ندارد",
+        )
     if not protocols:
         raise HTTPException(status_code=409, detail="برای اشتراک پروتکلی انتخاب نشده است")
 
