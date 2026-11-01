@@ -27,8 +27,6 @@ def test_hard_timeout_returns_even_when_cancel_cleanup_stalls() -> None:
         try:
             await asyncio.Event().wait()
         finally:
-            # Models an SSH transport whose wait_closed() remains pending after
-            # the provisioning task has already received cancellation.
             await asyncio.Event().wait()
 
     async def scenario() -> None:
@@ -63,11 +61,16 @@ def test_subscription_provisioning_uses_scoped_hard_timeout() -> None:
     assert "timeout_seconds=quota_timeout" in source
 
 
-def test_browser_create_request_has_hard_timeout() -> None:
-    source = (ROOT / "lib/subscription-create-fast-api.ts").read_text(encoding="utf-8")
+def test_browser_create_request_returns_on_backend_acceptance() -> None:
+    client = (ROOT / "lib/subscription-create-fast-api.ts").read_text(encoding="utf-8")
+    endpoint = (ROOT / "backend/app/routers/subscription_create_fast_v1.py").read_text(
+        encoding="utf-8"
+    )
 
-    assert "SUBSCRIPTION_CREATE_REQUEST_TIMEOUT_MS=135_000" in source
-    assert "new AbortController()" in source
-    assert "signal:controller.signal" in source
-    assert "controller.signal.aborted" in source
-    assert "رابط از حالت انتظار خارج شد" in source
+    assert "SUBSCRIPTION_CREATE_REQUEST_TIMEOUT_MS=135_000" not in client
+    assert "new AbortController()" not in client
+    assert "signal:controller.signal" not in client
+    assert '@router.post("/admin-create-fast-v1", status_code=202)' in endpoint
+    assert "background_tasks.add_task(" in endpoint
+    assert '"queued": True' in endpoint
+    assert '"provisioning_complete": False' in endpoint
