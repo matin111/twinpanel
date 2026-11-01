@@ -4,7 +4,7 @@ from collections.abc import Iterable
 
 from sqlalchemy.orm import Session
 
-from .models import Node
+from .models import Node, NodeType
 from .plan_node_models import PlanNode
 from .protocol_account_registry import (
     ALL_PROTOCOL_KEYS,
@@ -24,7 +24,12 @@ def explicit_plan_node_ids(db: Session, plan_id: int) -> list[int]:
         int(row[0])
         for row in (
             db.query(PlanNode.node_id)
-            .filter(PlanNode.plan_id == int(plan_id))
+            .join(Node, Node.id == PlanNode.node_id)
+            .filter(
+                PlanNode.plan_id == int(plan_id),
+                Node.node_type == NodeType.EXIT,
+                Node.retired_at.is_(None),
+            )
             .order_by(PlanNode.id.asc())
             .all()
         )
@@ -36,7 +41,10 @@ def all_active_node_ids(db: Session) -> list[int]:
         int(row[0])
         for row in (
             db.query(Node.id)
-            .filter(Node.retired_at.is_(None))
+            .filter(
+                Node.node_type == NodeType.EXIT,
+                Node.retired_at.is_(None),
+            )
             .order_by(Node.id.asc())
             .all()
         )
@@ -81,6 +89,7 @@ def replace_plan_nodes(
             db.query(Node.id)
             .filter(
                 Node.id.in_(values),
+                Node.node_type == NodeType.EXIT,
                 Node.retired_at.is_(None),
             )
             .all()
@@ -89,7 +98,8 @@ def replace_plan_nodes(
     missing = [node_id for node_id in values if node_id not in existing]
     if missing:
         raise ValueError(
-            "invalid or retired server ids: " + ", ".join(str(value) for value in missing)
+            "invalid, retired, or non-exit server ids: "
+            + ", ".join(str(value) for value in missing)
         )
 
     db.query(PlanNode).filter(
