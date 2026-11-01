@@ -18,6 +18,9 @@ from .reseller_order_partial_provision_success_v1 import (
 from .convergence_event_loop_isolation_v1 import (
     install as _install_convergence_event_loop_isolation_v1,
 )
+from .convergence_process_isolation_v2 import (
+    install as _install_convergence_process_isolation_v2,
+)
 
 _install_xray_provision_patch()
 _install_xray_grpc_target_isolation_v48()
@@ -25,3 +28,4 @@ _install_xray_duplicate_email_repair_v1()
 _install_v2ray_provision_idempotency_v1()
 _install_reseller_order_partial_provision_success_v1()
 _install_convergence_event_loop_isolation_v1()
+_install_convergence_process_isolation_v2()
