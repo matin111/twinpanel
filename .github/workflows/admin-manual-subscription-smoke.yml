@@ -274,9 +274,11 @@ jobs:
           # Plan UI is a creation template. Runtime desired-state remains on the
           # created SubscriptionProtocol / SubscriptionNode snapshot.
           assert 'Protocols · 15' in plan_ui
-          assert 'Allowed servers' in plan_ui
+          assert 'Allowed exit servers' in plan_ui
+          assert 'Iran nodes are tunnel-only' in plan_ui
+          assert 'exitNodes' in plan_ui
           assert 'node_ids' in plan_ui
-          assert 'snapshotted onto each subscription' in plan_ui
+          assert 'snapshotted onto subscriptions' in plan_ui
           assert 'allowed_protocols = plan_template_protocols' in factory
           assert 'plan_template_node_ids' in factory
           assert 'SubscriptionProtocol(' in factory
