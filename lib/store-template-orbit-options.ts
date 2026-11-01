@@ -15,14 +15,14 @@ export type OrbitMediaSlot={
 };
 
 export const ORBIT_MEDIA_SLOTS:readonly OrbitMediaSlot[]=[
-  {key:"orbit_banner_image",fa:"تصویر بنر بالای سایت",en:"Top banner image",helpFa:"برای نوار تبلیغ یا اطلاع‌رسانی بالای سایت.",helpEn:"Used for the announcement strip above the storefront.",aspect:"عرض 1920 × ارتفاع 80 پیکسل"},
-  {key:"orbit_hero_image",fa:"تصویر اصلی فروشگاه",en:"Main storefront image",helpFa:"تصویر اصلی بخش معرفی سرویس.",helpEn:"Primary image used in the service introduction section.",aspect:"عرض 1200 × ارتفاع 1300 پیکسل"},
-  {key:"orbit_story_image",fa:"تصویر بخش امکانات",en:"Features image",helpFa:"تصویر اصلی بخش امکانات و مزایا.",helpEn:"Main image used in the features section.",aspect:"عرض 1200 × ارتفاع 1300 پیکسل"},
-  {key:"orbit_protocol_image",fa:"تصویر بخش روش‌های اتصال",en:"Connection methods image",helpFa:"تصویر بخش روش‌های اتصال و پروتکل‌ها.",helpEn:"Image used in the connection methods section.",aspect:"عرض 1200 × ارتفاع 1200 پیکسل"},
-  {key:"orbit_guides_image",fa:"تصویر بخش آموزش",en:"Guides image",helpFa:"تصویر کنار آموزش‌های اتصال.",helpEn:"Image shown beside connection guides.",aspect:"عرض 1000 × ارتفاع 1600 پیکسل"},
-  {key:"orbit_account_image",fa:"تصویر پنل کاربری",en:"Account image",helpFa:"تصویر بخش مدیریت اشتراک و حساب کاربری.",helpEn:"Image used in the subscription and account section.",aspect:"عرض 1200 × ارتفاع 1100 پیکسل"},
-  {key:"orbit_cta_image",fa:"پس‌زمینه بخش خرید",en:"Purchase section background",helpFa:"تصویر پس‌زمینه بخش پایانی خرید.",helpEn:"Background image for the final purchase section.",aspect:"عرض 1920 × ارتفاع 720 پیکسل"},
-  {key:"orbit_footer_image",fa:"تصویر فوتر",en:"Footer image",helpFa:"تصویر کوچک برای فوتر فروشگاه.",helpEn:"Small image used in the storefront footer.",aspect:"عرض 1000 × ارتفاع 1000 پیکسل"},
+  {key:"orbit_banner_image",fa:"تصویر بنر بالای سایت",en:"Top banner image",helpFa:"بنر تمام‌عرض و واکنش‌گراست؛ متن و سوژه مهم را در 70٪ میانی قرار دهید تا در موبایل Crop نشود.",helpEn:"Full-width responsive banner; keep important content inside the center 70% safe area to avoid mobile cropping.",aspect:"نسبت 24:1 · فایل استاندارد 1920 × 80 پیکسل · Safe Area میانی 70٪"},
+  {key:"orbit_hero_image",fa:"تصویر اصلی فروشگاه",en:"Main storefront image",helpFa:"کادر Hero عمودی است و با cover نمایش داده می‌شود؛ سوژه اصلی را نزدیک مرکز نگه دارید.",helpEn:"Portrait Hero slot rendered with cover; keep the main subject near the center.",aspect:"نسبت 12:13 · فایل استاندارد 1200 × 1300 پیکسل"},
+  {key:"orbit_story_image",fa:"تصویر بخش امکانات",en:"Features image",helpFa:"کادر عمودی بخش امکانات؛ برای کمترین Crop سوژه اصلی را نزدیک مرکز نگه دارید.",helpEn:"Portrait features slot; keep the main subject near the center for minimal cropping.",aspect:"نسبت 12:13 · فایل استاندارد 1200 × 1300 پیکسل"},
+  {key:"orbit_protocol_image",fa:"تصویر بخش روش‌های اتصال",en:"Connection methods image",helpFa:"کادر تقریباً مربع روش‌های اتصال؛ از نسبت واقعی این بخش استفاده کنید تا تصویر کشیده یا بریده نشود.",helpEn:"Near-square connection-methods slot; use this real ratio to avoid stretching or excessive cropping.",aspect:"نسبت 48:49 · فایل استاندارد 1200 × 1225 پیکسل"},
+  {key:"orbit_guides_image",fa:"تصویر بخش آموزش",en:"Guides image",helpFa:"کادر آموزش عمودی است؛ نسبت 2:3 با ساختار واقعی این بخش هماهنگ است و روی دسکتاپ و موبایل Crop کنترل‌شده دارد.",helpEn:"Portrait guides slot; 2:3 matches the real layout across desktop and mobile with controlled cropping.",aspect:"نسبت 2:3 · فایل استاندارد 1200 × 1800 پیکسل"},
+  {key:"orbit_account_image",fa:"تصویر پنل کاربری",en:"Account image",helpFa:"کادر بخش پنل کاربری کمی افقی و واکنش‌گراست؛ سوژه مهم را در مرکز نگه دارید.",helpEn:"Slightly landscape responsive account slot; keep important content centered.",aspect:"نسبت تقریبی 15:14 · فایل استاندارد 1200 × 1120 پیکسل"},
+  {key:"orbit_cta_image",fa:"پس‌زمینه بخش خرید",en:"Purchase section background",helpFa:"پس‌زمینه CTA عریض است؛ متن و سوژه مهم را از لبه‌ها دور نگه دارید چون در موبایل Crop افقی دارد.",helpEn:"Wide CTA background; keep important content away from edges because mobile crops horizontally.",aspect:"نسبت 8:3 · فایل استاندارد 1920 × 720 پیکسل · Safe Area میانی 70٪"},
+  {key:"orbit_footer_image",fa:"تصویر فوتر",en:"Footer image",helpFa:"تصویر کوچک برند در فوتر مربع است؛ رزولوشن خیلی بزرگ لازم نیست.",helpEn:"Small square footer brand image; very high resolution is unnecessary.",aspect:"نسبت 1:1 · فایل استاندارد 512 × 512 پیکسل"},
 ] as const;
 
 export const ORBIT_SECTION_LABELS:Record<StorefrontSectionId,{fa:string;en:string}>={
