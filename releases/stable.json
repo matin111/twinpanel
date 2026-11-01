@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.449",
+  "version": "1.1.0-rc.451",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-01T15:33:47Z",
+  "released_at": "2026-11-01T16:17:51Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "84c21e3c85ef07ded846da3d4839caafe48536f6",
+  "source_sha": "2a137e95f638d212edb57972098d66148ff153b1",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.449/twinpanel-1.1.0-rc.449-linux-x86_64.tar.gz",
-    "sha256": "3ad3b483b35c4a775a12e4a19ba226e7e9b8ba7d016e0ff9958d5b0f4e1ae114",
-    "size_bytes": 25177514
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.451/twinpanel-1.1.0-rc.451-linux-x86_64.tar.gz",
+    "sha256": "8d63a449c94a1dc7c0809f33974596043ae7082155e88e054c448e3fc9e35f85",
+    "size_bytes": 25179143
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.449 خطای وضعیت سفارش‌های ربات نماینده پس از Provisioning جزئی را اصلاح می‌کند. Root Cause این بود که Account Delivery به‌درستی credentialهای موفق هر protocol/node را Commit می‌کرد و خطاهای Nodeهای دیگر را در provision_errors برمی‌گرداند، اما مسیر تأیید سفارش نماینده وجود هر خطای Node را شکست کامل تلقی می‌کرد؛ بنابراین اکانت واقعاً ساخته می‌شد ولی سفارش provision_failed می‌شد و مرحله ارسال تلگرام اجرا نمی‌شد. در این نسخه، فقط در مسیر سفارش ربات نماینده، خطاهای per-node زمانی Warning محسوب می‌شوند که برای هر پروتکل خریداری‌شده حداقل یک credential pair ساخته یا reuse شده باشد. اگر حتی یک پروتکل هیچ خروجی قابل تحویلی نداشته باشد، سفارش همچنان provision_failed باقی می‌ماند. سفارش‌های provision_failed قبلی که subscription_id دارند نیز در Retry همان اشتراک را reuse می‌کنند و اشتراک تکراری ساخته نمی‌شود. مسیر ارسال Telegram مبتنی بر aiogram نسخه قبل حفظ شده است. PR #1674 با 7/7 CI سبز Merge شد و Release PR #1675 با 9/9 CI سبز Merge شد. هیچ تغییری در TP27/VXLAN/Tunnel/Spoof/Accounting/quota/credential generation/routing/firewall/protocol dataplane توسط این Fix انجام نشده است. Source روی SHA immutable 84c21e3c85ef07ded846da3d4839caafe48536f6 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.449 fixes false reseller-order provisioning failures after deliverable partial provisioning. Account Delivery correctly commits successful protocol/node credentials while returning failures for other nodes, but reseller order approval previously treated any per-node error as a total failure. As a result, an account could exist while the order became provision_failed and Telegram delivery never ran. In this release, only the reseller-order path converts per-node errors to warnings when every purchased protocol has at least one created or reused deliverable credential pair. If any requested protocol has no deliverable pair, the order still remains provision_failed. Existing provision_failed orders with a subscription_id safely retry the same subscription without creating a duplicate, then continue to the existing aiogram Telegram delivery path. PR #1674 merged with 7/7 green CI and release PR #1675 merged with 9/9 green CI. No TP27/VXLAN/Tunnel/Spoof/Accounting/quota/credential-generation/routing/firewall/protocol-dataplane behavior is changed by this fix. Source is pinned to immutable SHA 84c21e3c85ef07ded846da3d4839caafe48536f6."
+    "fa": "TwinPanel 1.1.0-rc.451 مسیر Account Delivery را برای ربات اصلی/Store و ربات نماینده روی Provisioner مرکزی ۱۵ پروتکل یکپارچه می‌کند. Root Cause این بود که بعضی مسیرهای Fulfillment هنوز callable قدیمی پنج‌پروتکلی را نگه داشته بودند و node resolution نیز SubscriptionNode snapshot را رعایت نمی‌کرد. در این نسخه Store/admin و reseller bot هر دو از provision_account_v1 استفاده می‌کنند و nodeها فقط از Snapshot همان اشتراک خوانده می‌شوند؛ هیچ fallback به همه Global Nodeها وجود ندارد. PR #1679 پس از سبز شدن تمام Workflowهای Head نهایی Merge شد و Release PR #1680 نیز با هر ۹ Workflow سبز Merge شد. هیچ بازنویسی در TP27/VXLAN/Tunnel/Spoof/Accounting/quota/credential generation/routing/firewall/protocol dataplane انجام نشده است. Source روی SHA immutable 2a137e95f638d212edb57972098d66148ff153b1 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.451 converges Account Delivery for the main/Store path and reseller bot on the central 15-protocol provisioner. The root cause was that some fulfillment paths still held the legacy five-protocol callable and node resolution did not honor the subscription's SubscriptionNode snapshot. In this release both Store/admin and reseller bot use provision_account_v1, and nodes are resolved only from the immutable snapshot owned by that subscription with no fallback to all global nodes. PR #1679 merged after all workflows for its final head passed, and release PR #1680 merged with all 9 workflows green. No TP27/VXLAN/Tunnel/Spoof/Accounting/quota/credential-generation/routing/firewall/protocol-dataplane behavior is rewritten. Source is pinned to immutable SHA 2a137e95f638d212edb57972098d66148ff153b1."
   }
 }
