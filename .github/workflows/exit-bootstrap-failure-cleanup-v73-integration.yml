@@ -95,6 +95,13 @@ jobs:
             --network tp-v73-control \
             -v "$GITHUB_WORKSPACE:/workspace:ro" \
             -w /workspace \
+            -e APP_NAME=TwinPanel-CI \
+            -e APP_ENV=test \
+            -e APP_SECRET_KEY=ci-only-secret-key-ci-only-secret-key-ci-only-secret-key \
+            -e DATABASE_URL=sqlite:////tmp/twinpanel-v73-ci.db \
+            -e REDIS_URL=redis://127.0.0.1:6379/0 \
+            -e NODE_AGENT_SHARED_SECRET=ci-node-agent-secret-ci-node-agent-secret \
+            -e PUBLIC_API_FALLBACK=http://127.0.0.1:8095 \
             python:3.12-slim \
             bash -lc \
             'pip install -q -r backend/requirements.txt && python backend/tests/integration/test_exit_bootstrap_failure_cleanup_v73.py'
