@@ -63,11 +63,17 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
         return escape(str(value or "").strip())
 
     def _rewrite(self, text: str) -> str:
-        values = self._load()
-        if not values or not text:
-            return text
-
         result = str(text)
+
+        if self.scope == "reseller":
+            result = result.replace(
+                "تعداد فروش محدود نیست؛ مصرف واقعی از حجم نماینده کم می‌شود.\n\n",
+                "",
+            )
+
+        values = self._load()
+        if not values or not result:
+            return result
 
         welcome = values.get("welcome")
         if (
