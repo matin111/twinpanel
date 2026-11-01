@@ -21,6 +21,9 @@ from .convergence_event_loop_isolation_v1 import (
 from .convergence_process_isolation_v2 import (
     install as _install_convergence_process_isolation_v2,
 )
+from .quota_process_isolation_v1 import (
+    install as _install_quota_process_isolation_v1,
+)
 from .telegram_purchase_delivery_fix_v1 import (
     install as _install_telegram_purchase_delivery_fix_v1,
 )
@@ -35,5 +38,6 @@ _install_v2ray_provision_idempotency_v1()
 _install_reseller_order_partial_provision_success_v1()
 _install_convergence_event_loop_isolation_v1()
 _install_convergence_process_isolation_v2()
+_install_quota_process_isolation_v1()
 _install_telegram_purchase_delivery_fix_v1()
 _install_classic_node_parallel_v1()
