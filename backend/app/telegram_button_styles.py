@@ -84,14 +84,24 @@ def live_button_styles() -> TelegramButtonStyles:
         db.close()
 
 
-def _supports_style(model) -> bool:
+def _supports_style(model: type[Any]) -> bool:
     return "style" in getattr(model, "model_fields", {})
+
+
+def _require_style_support(model: type[Any], value: str) -> None:
+    if value == "default" or _supports_style(model):
+        return
+    raise RuntimeError(
+        "Telegram button style requested but the loaded aiogram runtime does not "
+        f"support the 'style' field on {model.__name__}. Reinstall backend/requirements.txt."
+    )
 
 
 def keyboard_button(text: str, style: str = "default") -> KeyboardButton:
     kwargs: dict[str, Any] = {"text": text}
     value = _normalize(style)
-    if value != "default" and _supports_style(KeyboardButton):
+    _require_style_support(KeyboardButton, value)
+    if value != "default":
         kwargs["style"] = value
     return KeyboardButton(**kwargs)
 
@@ -109,6 +119,7 @@ def inline_button(
     if url:
         kwargs["url"] = url
     value = _normalize(style)
-    if value != "default" and _supports_style(InlineKeyboardButton):
+    _require_style_support(InlineKeyboardButton, value)
+    if value != "default":
         kwargs["style"] = value
     return InlineKeyboardButton(**kwargs)
