@@ -14,7 +14,6 @@ from ..deps import require_admin
 from ..models import (
     Node,
     NodeProtocolConfig,
-    NodeType,
     ProtocolCredential,
     Subscription,
     User,
@@ -53,15 +52,14 @@ STANDALONE_ACCOUNT_PROTOCOLS = frozenset(
 )
 MODERN_ACCOUNT_PROTOCOLS = SINGBOX_ACCOUNT_PROTOCOLS | STANDALONE_ACCOUNT_PROTOCOLS
 
-# Creation stays fail-closed, but one unhealthy remote account driver must not
-# hold an admin/reseller HTTP request for five minutes. These limits sit above
-# SSH connect/login limits and below common reverse-proxy request deadlines.
+# Each protocol has its own hard limit. Provisioning now runs in the backend,
+# so one shared wall-clock deadline must never prevent later protocols from
+# being attempted.
 DEFAULT_PROTOCOL_PROVISION_TIMEOUT_SECONDS = 45.0
 PROTOCOL_PROVISION_TIMEOUT_SECONDS = {
     "v2ray": 30.0,
     "openvpn": 60.0,
 }
-TOTAL_PROVISION_TIMEOUT_SECONDS = 120.0
 QUOTA_SYNC_TIMEOUT_SECONDS = 20.0
 
 
@@ -311,6 +309,13 @@ async def _provision_modern_protocol(
     for node in nodes:
         cfg = _modern_runtime_config(db, node, protocol)
         if cfg is None or _status_value(cfg.status) != "online":
+            errors.append(
+                {
+                    "protocol": protocol,
+                    "node": str(node.name),
+                    "error": "Protocol runtime is not online on this server",
+                }
+            )
             continue
 
         conn = None
@@ -391,6 +396,13 @@ async def _provision_classic_protocol(
 
     for node in nodes:
         if not bool(getattr(node, flag, False)):
+            errors.append(
+                {
+                    "protocol": protocol,
+                    "node": str(node.name),
+                    "error": "Protocol is not enabled on this server",
+                }
+            )
             continue
         try:
             if protocol == "cisco":
@@ -443,15 +455,14 @@ async def _provision_account_v1_locked(
     nodes = [
         node
         for node in ad._nodes(db, sub)
-        if node.node_type == NodeType.EXIT
-        and getattr(node, "retired_at", None) is None
+        if getattr(node, "retired_at", None) is None
     ]
     protocols = [str(value).strip().lower() for value in ad._protocols(db, sub)]
 
     if not nodes:
         raise HTTPException(
             status_code=409,
-            detail="برای این اشتراک هیچ سرور خروجی معتبری انتخاب نشده است",
+            detail="برای این اشتراک هیچ سرور معتبری در پنل وجود ندارد",
         )
     if not protocols:
         raise HTTPException(status_code=409, detail="برای اشتراک پروتکلی انتخاب نشده است")
@@ -481,29 +492,13 @@ async def _provision_account_v1_locked(
 
     results: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
-    loop = asyncio.get_running_loop()
-    deadline = loop.time() + TOTAL_PROVISION_TIMEOUT_SECONDS
 
     for protocol in protocols:
-        remaining = deadline - loop.time()
-        if remaining <= 0:
-            errors.append(
-                {
-                    "protocol": protocol,
-                    "node": "provisioning",
-                    "error": (
-                        "Provisioning total deadline exceeded before this protocol "
-                        f"({int(TOTAL_PROVISION_TIMEOUT_SECONDS)}s)"
-                    ),
-                }
-            )
-            break
-
         protocol_timeout = PROTOCOL_PROVISION_TIMEOUT_SECONDS.get(
             protocol,
             DEFAULT_PROTOCOL_PROVISION_TIMEOUT_SECONDS,
         )
-        timeout = max(1.0, min(float(protocol_timeout), remaining))
+        timeout = max(1.0, float(protocol_timeout))
 
         try:
             if protocol in MODERN_ACCOUNT_PROTOCOLS:
@@ -557,40 +552,24 @@ async def _provision_account_v1_locked(
     if results:
         from ..services.quota_refresh import sync_subscription_quota_nodes
 
-        remaining = deadline - loop.time()
-        if remaining <= 0:
+        try:
+            quota_sync = await await_hard_timeout(
+                sync_subscription_quota_nodes(db, sub.id),
+                timeout_seconds=QUOTA_SYNC_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
             quota_sync = {
                 "ok": False,
                 "nodes": [],
-                "error": "Provisioning deadline reached before quota sync",
+                "error": f"Quota sync timeout after {int(QUOTA_SYNC_TIMEOUT_SECONDS)} seconds",
             }
             errors.append(
                 {
                     "protocol": "quota",
                     "node": "quota-agent",
-                    "error": "Provisioning deadline reached before quota sync",
+                    "error": f"Quota sync timeout after {int(QUOTA_SYNC_TIMEOUT_SECONDS)} seconds",
                 }
             )
-        else:
-            quota_timeout = max(1.0, min(QUOTA_SYNC_TIMEOUT_SECONDS, remaining))
-            try:
-                quota_sync = await await_hard_timeout(
-                    sync_subscription_quota_nodes(db, sub.id),
-                    timeout_seconds=quota_timeout,
-                )
-            except asyncio.TimeoutError:
-                quota_sync = {
-                    "ok": False,
-                    "nodes": [],
-                    "error": f"Quota sync timeout after {int(quota_timeout)} seconds",
-                }
-                errors.append(
-                    {
-                        "protocol": "quota",
-                        "node": "quota-agent",
-                        "error": f"Quota sync timeout after {int(quota_timeout)} seconds",
-                    }
-                )
 
         if not quota_sync.get("ok") and not any(
             item.get("protocol") == "quota" for item in errors

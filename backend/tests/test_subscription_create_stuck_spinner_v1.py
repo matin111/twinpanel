@@ -58,7 +58,8 @@ def test_subscription_provisioning_uses_scoped_hard_timeout() -> None:
     assert "from ..services.hard_async_timeout import await_hard_timeout" in source
     assert source.count("await await_hard_timeout(") >= 2
     assert "timeout_seconds=timeout" in source
-    assert "timeout_seconds=quota_timeout" in source
+    assert "timeout_seconds=QUOTA_SYNC_TIMEOUT_SECONDS" in source
+    assert "TOTAL_PROVISION_TIMEOUT_SECONDS" not in source
 
 
 def test_browser_create_request_returns_on_backend_acceptance() -> None:
