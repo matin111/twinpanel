@@ -5,7 +5,9 @@ from ..database import get_db
 from ..deps import require_admin
 from ..models import Plan
 from ..protocol_account_registry import (
-    plan_protocols,
+    MODERN_PROTOCOL_KEYS,
+    explicit_plan_protocols,
+    legacy_plan_protocols,
     registry_payload,
     replace_plan_protocols,
 )
@@ -22,6 +24,15 @@ def _central_plans(db: Session):
     return db.query(Plan).filter(
         ~Plan.name.startswith(INTERNAL_PLAN_PREFIX)
     )
+
+
+def _admin_plan_protocols(db: Session, plan: Plan) -> list[str]:
+    explicit = explicit_plan_protocols(db, int(plan.id))
+    if explicit:
+        return explicit
+    # Existing plans predate PlanProtocol. Preserve their classic toggles and
+    # make all modern protocol families visible without requiring a migration.
+    return legacy_plan_protocols(plan) + list(MODERN_PROTOCOL_KEYS)
 
 
 @router.get("/protocol-catalog", dependencies=[Depends(require_admin)])
@@ -65,7 +76,7 @@ def get_plan_protocols(
         raise HTTPException(status_code=404, detail="پلن پیدا نشد")
     return {
         "plan_id": int(plan.id),
-        "protocols": plan_protocols(db, plan),
+        "protocols": _admin_plan_protocols(db, plan),
         "deprecated": False,
         "selection_scope": "plan_and_subscription",
     }
@@ -89,8 +100,6 @@ def set_plan_protocols(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    # Keep the five legacy columns synchronized for old clients while the
-    # canonical PlanProtocol rows carry both classic and modern protocols.
     legacy_fields = {
         "cisco": "enable_cisco",
         "openvpn": "enable_openvpn",
