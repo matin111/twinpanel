@@ -16,6 +16,7 @@ from ..models import (
     SubscriptionStatus,
     User,
 )
+from ..plan_template_selection import plan_template_node_ids, plan_template_protocols
 from ..protocol_account_registry import CLASSIC_PROTOCOL_KEYS, normalize_protocols
 from ..quota_models import QuotaDevice
 from ..routers.general_settings import build_subscription_username
@@ -49,6 +50,17 @@ def generate_account_password():
     return str(
         secrets.randbelow(90000000) + 10000000
     )
+
+
+def _unique_node_ids(values: list[int]) -> list[int]:
+    result: list[int] = []
+    for raw in values:
+        node_id = int(raw)
+        if node_id <= 0:
+            raise HTTPException(status_code=422, detail="شناسه سرور معتبر نیست")
+        if node_id not in result:
+            result.append(node_id)
+    return result
 
 
 def create_subscription_core(
@@ -86,26 +98,76 @@ def create_subscription_core(
             detail=str(exc),
         ) from exc
 
-    # Protocol desired-state belongs to the Subscription, never to the Plan.
-    # Every creation path must submit the exact protocols selected for this
-    # account. This also prevents later Plan edits from changing live accounts.
+    # A Plan is a creation template/allow-list only. Runtime desired-state is
+    # snapshotted into SubscriptionProtocol and never read live from the Plan.
+    if plan is not None:
+        allowed_protocols = plan_template_protocols(db, int(plan.id))
+        if requested_protocols:
+            unavailable = [
+                protocol
+                for protocol in requested_protocols
+                if protocol not in allowed_protocols
+            ]
+            if unavailable:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        "این پروتکل در پلن فعال نیست: "
+                        + ", ".join(unavailable)
+                    ),
+                )
+        else:
+            requested_protocols = list(allowed_protocols)
+
     if not requested_protocols:
         raise HTTPException(
             status_code=422,
             detail="حداقل یک پروتکل برای این اشتراک انتخاب کنید",
         )
 
-    # TWINPANEL_GLOBAL_NODES_FOR_ALL_SUBSCRIPTIONS_V1
-    # Node selection is infrastructure-wide.
-    # Every subscription belongs to every Node.
-    # node_ids from callers are kept only for API compatibility
-    # and no longer restrict the subscription.
-    nodes = (
+    all_nodes = (
         db.query(Node)
         .filter(Node.retired_at.is_(None))
         .order_by(Node.id.asc())
         .all()
     )
+    nodes_by_id = {int(node.id): node for node in all_nodes}
+
+    # Server desired-state follows the same template -> snapshot contract.
+    # Old plans with no PlanNode rows resolve to every current non-retired node.
+    allowed_node_ids = (
+        plan_template_node_ids(db, int(plan.id))
+        if plan is not None
+        else list(nodes_by_id)
+    )
+    requested_node_ids = _unique_node_ids(node_ids or [])
+
+    if requested_node_ids:
+        invalid = [
+            node_id
+            for node_id in requested_node_ids
+            if node_id not in nodes_by_id or node_id not in allowed_node_ids
+        ]
+        if invalid:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "این سرور در پلن فعال نیست یا بازنشسته شده است: "
+                    + ", ".join(str(value) for value in invalid)
+                ),
+            )
+        selected_node_ids = requested_node_ids
+    else:
+        selected_node_ids = [
+            node_id for node_id in allowed_node_ids if node_id in nodes_by_id
+        ]
+
+    nodes = [nodes_by_id[node_id] for node_id in selected_node_ids]
+    if not nodes:
+        raise HTTPException(
+            status_code=422,
+            detail="حداقل یک سرور برای این اشتراک انتخاب کنید",
+        )
 
     iran_node = next(
         (

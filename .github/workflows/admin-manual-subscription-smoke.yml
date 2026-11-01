@@ -7,8 +7,11 @@ on:
       - 'backend/app/routers/subscription_admin_v2.py'
       - 'backend/app/services/subscription_factory.py'
       - 'backend/app/protocol_account_registry.py'
+      - 'backend/app/plan_template_selection.py'
+      - 'backend/app/plan_node_models.py'
       - 'backend/app/schemas.py'
       - 'components/admin-manual-subscription-create.tsx'
+      - 'components/legacy-plans-exact.tsx'
       - 'components/legacy-subscriptions-exact.tsx'
       - 'components/routed-page-client.tsx'
       - 'lib/admin-api.ts'
@@ -89,7 +92,8 @@ jobs:
 
           from app.main import app
           from app.database import SessionLocal, engine
-          from app.models import Plan, ProtocolCredential, Subscription, SubscriptionProtocol, User
+          from app.models import Node, NodeType, Plan, ProtocolCredential, Subscription, SubscriptionProtocol, User
+          from app.plan_template_selection import replace_plan_nodes, replace_plan_template_protocols
           from app.protocol_account_registry import ALL_PROTOCOL_KEYS
           from app.routers import modern_account_delivery_v1
           from app.routers.subscription_admin_v2 import AdminSubscriptionCreateV2, admin_create_v2
@@ -150,8 +154,18 @@ jobs:
                   price_toman=1000,
                   is_active=True,
               )
-              db.add_all([user, plan]); db.commit(); db.refresh(user); db.refresh(plan)
-              user_id=user.id; plan_id=plan.id
+              node = Node(
+                  name='subscription-create-ci-exit',
+                  node_type=NodeType.EXIT,
+                  country_code='DE',
+                  public_ip='198.51.100.50',
+                  agent_url='http://127.0.0.1:65535',
+              )
+              db.add_all([user, plan, node]); db.flush()
+              replace_plan_template_protocols(db, plan.id, ALL_PROTOCOL_KEYS)
+              replace_plan_nodes(db, plan.id, [node.id])
+              db.commit(); db.refresh(user); db.refresh(plan); db.refresh(node)
+              user_id=user.id; plan_id=plan.id; node_id=node.id
           finally:
               db.close()
 
@@ -188,6 +202,7 @@ jobs:
                   AdminSubscriptionCreateV2(
                       user_id=user_id,
                       plan_id=plan_id,
+                      node_ids=[node_id],
                       protocols=list(ALL_PROTOCOL_KEYS),
                   ),
                   db,
@@ -203,6 +218,7 @@ jobs:
                   AdminSubscriptionCreateV2(
                       user_id=user_id,
                       plan_id=plan_id,
+                      node_ids=[node_id],
                       protocols=['wireguard','hysteria2'],
                   ),
                   db,
@@ -212,11 +228,15 @@ jobs:
               explicit_protocols={row[0] for row in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id==explicit_id).all()}
               assert explicit_protocols == {'wireguard','hysteria2'}
 
+              # The admin/manual creation endpoint intentionally keeps explicit
+              # protocol selection. Store/plan purchase paths default to the Plan
+              # template before reaching the subscription factory.
               try:
                   asyncio.run(admin_create_v2(
                       AdminSubscriptionCreateV2(
                           user_id=user_id,
                           plan_id=plan_id,
+                          node_ids=[node_id],
                           protocols=[],
                       ),
                       db,
@@ -224,7 +244,7 @@ jobs:
               except HTTPException as exc:
                   assert exc.status_code == 422
               else:
-                  raise AssertionError('plan-backed subscription must require explicit protocols')
+                  raise AssertionError('admin create must keep explicit protocol selection')
           finally:
               db.close()
 
@@ -250,9 +270,17 @@ jobs:
           assert '/v1/subscriptions/protocol-catalog' in client
           assert '@router.get("/protocol-catalog")' in backend
           assert 'هنگام ساخت اشتراک حداقل یک پروتکل انتخاب کنید' in backend
-          assert 'plan_protocols' not in factory
-          assert 'planProtocolApi' not in plan_ui
-          assert 'پروتکل در پلن تعریف نمی‌شود' in plan_ui
+
+          # Plan UI is a creation template. Runtime desired-state remains on the
+          # created SubscriptionProtocol / SubscriptionNode snapshot.
+          assert 'Protocols · 15' in plan_ui
+          assert 'Allowed servers' in plan_ui
+          assert 'node_ids' in plan_ui
+          assert 'snapshotted onto each subscription' in plan_ui
+          assert 'allowed_protocols = plan_template_protocols' in factory
+          assert 'plan_template_node_ids' in factory
+          assert 'SubscriptionProtocol(' in factory
+          assert 'SubscriptionNode(' in factory
 
           print('SUBSCRIPTION_PROTOCOL_FRONTEND_CONTRACT_OK')
           PY

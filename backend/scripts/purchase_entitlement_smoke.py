@@ -63,13 +63,23 @@ def main() -> None:
         raise AssertionError("invalid plan duration was accepted")
 
     store = _source("app/routers/store.py")
-    assert "traffic_gb, duration_days = (" in store
+    # Keep these checks semantic instead of depending on whitespace/line-wrap.
     assert "_plan_subscription_terms(plan)" in store
     assert "traffic_gb=traffic_gb" in store
     assert "duration_days=duration_days" in store
+    # Main Store now uses the same canonical Plan creation template as the
+    # admin panel: all 15 protocols are allowed/defaulted through the registry.
+    assert "plan_template_protocols" in store
+    assert "normalize_protocols(payload.protocols)" in store
+    assert "allowed_protocols = plan_template_protocols" in store
+    assert "PLAN_PROTOCOL_FIELDS" not in store
+    # node_ids=[] intentionally delegates to subscription_factory, which
+    # snapshots the Plan's selected server template into SubscriptionNode.
+    assert "node_ids=[]" in store
 
     # Main sales bot uses the exact Store order pipeline, so the same finite
-    # plan terms reach customer-panel checkout and Telegram checkout.
+    # plan terms and protocol/server template reach customer-panel checkout and
+    # Telegram checkout.
     main_bot = _source("app/telegram_purchase_bot.py")
     assert '"/v1/store/orders"' in main_bot
     assert '"plan_id": plan_id' in main_bot
