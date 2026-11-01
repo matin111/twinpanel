@@ -201,7 +201,11 @@ def _queue_fulfilled_order_notification(order: StoreOrder, db: Session) -> None:
     queue_telegram_notification(
         db,
         user_id=int(order.user_id),
-        event_key=f"{event_prefix}:{int(intent.id)}",
+        event_key=(
+            f"{event_prefix}:order:{int(order.id)}:"
+            f"payment:{int(intent.id)}:"
+            f"subscription:{int(order.subscription_id)}"
+        ),
         kind="payment_approved",
         payload={
             "payment_id": int(intent.id),
@@ -225,10 +229,16 @@ def _mark_order_fulfilled(order: StoreOrder, db: Session) -> StoreOrder:
     db.commit()
     db.refresh(order)
 
+    _ensure_fulfilled_order_notification(order, db)
+    return order
+
+
+def _ensure_fulfilled_order_notification(order: StoreOrder, db: Session) -> None:
     # Delivery notification is intentionally best-effort after fulfillment is
     # durably committed. A Telegram queue failure must never roll a paid order
-    # back to provision_failed, while the durable queue remains idempotent by
-    # PaymentIntent-derived event_key for all approval paths.
+    # back to provision_failed. The event key includes order/payment/subscription
+    # identity so migrated databases cannot collide with historical queue rows
+    # that reused a PaymentIntent id.
     try:
         _queue_fulfilled_order_notification(order, db)
         db.commit()
@@ -240,8 +250,6 @@ def _mark_order_fulfilled(order: StoreOrder, db: Session) -> StoreOrder:
             str(exc),
             flush=True,
         )
-
-    return order
 
 
 @router.post("/orders")
@@ -367,6 +375,7 @@ async def _fulfill_paid_order(order_id: int, db: Session) -> dict:
     if not order:
         raise HTTPException(status_code=404, detail="سفارش پیدا نشد")
     if order.status == "fulfilled":
+        _ensure_fulfilled_order_notification(order, db)
         return _order_out(order)
     if order.status not in {"paid", "provisioning", "provision_failed"}:
         raise HTTPException(status_code=409, detail="سفارش هنوز پرداخت تأییدشده ندارد")

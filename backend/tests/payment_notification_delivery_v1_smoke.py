@@ -17,6 +17,12 @@ assert "def _queue_fulfilled_order_notification(" in store_source
 assert 'kind="payment_approved"' in store_source
 assert 'event_prefix = "payment-auto-approved" if auto_verified else "payment-approved"' in store_source
 assert "_queue_fulfilled_order_notification(order, db)" in store_source
+assert 'f"{event_prefix}:order:{int(order.id)}:"' in store_source
+assert 'f"payment:{int(intent.id)}:"' in store_source
+assert 'f"subscription:{int(order.subscription_id)}"' in store_source
+assert "def _ensure_fulfilled_order_notification(" in store_source
+fulfilled_branch = store_source.split('if order.status == "fulfilled":', 1)[1].split('if order.status not in', 1)[0]
+assert "_ensure_fulfilled_order_notification(order, db)" in fulfilled_branch
 
 # Both the direct admin-confirm path and SMS auto-verification must terminate at
 # the same canonical store fulfillment boundary, where the notification is now
