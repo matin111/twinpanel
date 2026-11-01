@@ -15,6 +15,12 @@ from .models_reseller import (
     ResellerSubscription,
     ResellerTrafficTransaction,
 )
+from .protocol_account_registry import (
+    MODERN_PROTOCOL_KEYS,
+    normalize_protocols,
+    plan_protocols,
+    replace_plan_protocols,
+)
 from .reseller_owned_plan_models import ResellerBotPlan
 from .services.subscription_factory import create_subscription_core
 from .services.reseller_traffic_pool import _suspend_reseller_pool
@@ -40,7 +46,7 @@ def is_internal_reseller_plan(plan: Plan | None) -> bool:
     )
 
 
-def enabled_protocols(row: ResellerBotPlan) -> list[str]:
+def _legacy_protocols(row: ResellerBotPlan) -> list[str]:
     return [
         protocol
         for protocol, field in PROTOCOL_FIELDS.items()
@@ -48,9 +54,42 @@ def enabled_protocols(row: ResellerBotPlan) -> list[str]:
     ]
 
 
+def enabled_protocols(
+    row: ResellerBotPlan,
+    *,
+    db: Session | None = None,
+) -> list[str]:
+    # Immutable order snapshots can carry the exact protocol list directly.
+    snapshot_protocols = getattr(row, "protocols", None)
+    if snapshot_protocols is not None:
+        try:
+            values = normalize_protocols(snapshot_protocols)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if values:
+            return values
+
+    # Reseller-owned plans are backed by the canonical PlanProtocol table.
+    if db is not None:
+        backing = db.get(Plan, int(row.backing_plan_id))
+        if backing is not None:
+            explicit = plan_protocols(db, backing)
+            # plan_protocols falls back to the five compatibility flags when an
+            # older plan has no PlanProtocol rows. Add modern protocols for that
+            # legacy case so existing reseller plans gain the new protocols
+            # without a schema migration.
+            from .protocol_account_registry import explicit_plan_protocols
+
+            if explicit_plan_protocols(db, int(backing.id)):
+                return explicit
+
+    # Old reseller plans predate PlanProtocol. Preserve disabled classic flags,
+    # while making every modern protocol available by default.
+    return _legacy_protocols(row) + list(MODERN_PROTOCOL_KEYS)
+
+
 def plan_out(row: ResellerBotPlan) -> dict:
-    # `id` is the reseller-owned CRUD identity. `plan_id` intentionally keeps
-    # the hidden backing Plan id for old discount/order code that stores plan ids.
+    protocols = enabled_protocols(row)
     return {
         "id": int(row.id),
         "reseller_plan_id": int(row.id),
@@ -70,6 +109,7 @@ def plan_out(row: ResellerBotPlan) -> dict:
         "enable_wireguard": bool(row.enable_wireguard),
         "enable_l2tp": bool(row.enable_l2tp),
         "enable_v2ray": bool(row.enable_v2ray),
+        "protocols": protocols,
         "sort_order": int(row.sort_order or 0),
         "is_active": bool(row.is_active),
         "created_at": row.created_at,
@@ -127,6 +167,28 @@ def _compat_price(
     )
 
 
+def _desired_protocols_from_flags(
+    *,
+    enable_cisco: bool,
+    enable_openvpn: bool,
+    enable_wireguard: bool,
+    enable_l2tp: bool,
+    enable_v2ray: bool,
+) -> list[str]:
+    classic = [
+        protocol
+        for protocol, enabled in (
+            ("cisco", enable_cisco),
+            ("openvpn", enable_openvpn),
+            ("wireguard", enable_wireguard),
+            ("l2tp", enable_l2tp),
+            ("v2ray", enable_v2ray),
+        )
+        if bool(enabled)
+    ]
+    return classic + list(MODERN_PROTOCOL_KEYS)
+
+
 def create_owned_plan(
     db: Session,
     *,
@@ -144,16 +206,14 @@ def create_owned_plan(
     sort_order: int,
     is_active: bool,
 ) -> ResellerBotPlan:
-    protocols_enabled = any(
-        (
-            enable_cisco,
-            enable_openvpn,
-            enable_wireguard,
-            enable_l2tp,
-            enable_v2ray,
-        )
+    desired_protocols = _desired_protocols_from_flags(
+        enable_cisco=enable_cisco,
+        enable_openvpn=enable_openvpn,
+        enable_wireguard=enable_wireguard,
+        enable_l2tp=enable_l2tp,
+        enable_v2ray=enable_v2ray,
     )
-    if not protocols_enabled:
+    if not desired_protocols:
         raise HTTPException(
             status_code=422,
             detail="حداقل یک پروتکل باید فعال باشد",
@@ -164,9 +224,6 @@ def create_owned_plan(
         f"{secrets.token_hex(8)}"
     )
 
-    # The backing plan is a hidden schema-compatibility record, not a reseller
-    # availability flag. Keep it active so already-paid/pending historical orders
-    # can still be provisioned after the reseller disables the visible plan.
     backing = Plan(
         name=internal_name,
         description="TwinPanel internal reseller-owned plan",
@@ -183,6 +240,7 @@ def create_owned_plan(
     )
     db.add(backing)
     db.flush()
+    replace_plan_protocols(db, int(backing.id), desired_protocols)
 
     row = ResellerBotPlan(
         reseller_id=int(reseller.id),
@@ -203,8 +261,6 @@ def create_owned_plan(
     )
     db.add(row)
 
-    # Keep existing bot order/discount/payment code compatible while the hidden
-    # backing Plan remains invisible to central Admin/Store plan catalogs.
     db.add(
         ResellerPlanPrice(
             reseller_id=int(reseller.id),
@@ -241,6 +297,18 @@ def sync_owned_plan_backing(
     backing.enable_l2tp = bool(row.enable_l2tp)
     backing.enable_v2ray = bool(row.enable_v2ray)
 
+    replace_plan_protocols(
+        db,
+        int(backing.id),
+        _desired_protocols_from_flags(
+            enable_cisco=bool(row.enable_cisco),
+            enable_openvpn=bool(row.enable_openvpn),
+            enable_wireguard=bool(row.enable_wireguard),
+            enable_l2tp=bool(row.enable_l2tp),
+            enable_v2ray=bool(row.enable_v2ray),
+        ),
+    )
+
     price = _compat_price(
         db,
         int(row.reseller_id),
@@ -268,17 +336,13 @@ def _duplicate_creation(
 ):
     previous = db.scalar(
         select(ResellerTrafficTransaction).where(
-            ResellerTrafficTransaction.idempotency_key
-            == idempotency_key
+            ResellerTrafficTransaction.idempotency_key == idempotency_key
         )
     )
     if not previous:
         return None
 
-    if (
-        previous.reference_type != "subscription"
-        or not previous.reference_id
-    ):
+    if previous.reference_type != "subscription" or not previous.reference_id:
         raise HTTPException(
             status_code=409,
             detail="کلید عملیات قبلاً برای عملیات دیگری استفاده شده است",
@@ -287,8 +351,7 @@ def _duplicate_creation(
     link = db.scalar(
         select(ResellerSubscription).where(
             ResellerSubscription.reseller_id == int(reseller_id),
-            ResellerSubscription.subscription_id
-            == int(previous.reference_id),
+            ResellerSubscription.subscription_id == int(previous.reference_id),
         )
     )
     if not link:
@@ -320,11 +383,7 @@ def create_subscription_from_owned_plan(
     sell_price_toman: int | None = None,
 ) -> dict:
     key = str(idempotency_key or "").strip()
-    duplicate = _duplicate_creation(
-        db,
-        int(reseller.id),
-        key,
-    )
+    duplicate = _duplicate_creation(db, int(reseller.id), key)
     if duplicate:
         return duplicate
 
@@ -336,12 +395,9 @@ def create_subscription_from_owned_plan(
         )
 
     if not reseller_plan.is_active or not backing.is_active:
-        raise HTTPException(
-            status_code=409,
-            detail="پلن نماینده غیرفعال است",
-        )
+        raise HTTPException(status_code=409, detail="پلن نماینده غیرفعال است")
 
-    protocols = enabled_protocols(reseller_plan)
+    protocols = enabled_protocols(reseller_plan, db=db)
     if not protocols:
         raise HTTPException(
             status_code=422,
@@ -398,10 +454,6 @@ def create_subscription_from_owned_plan(
         )
 
         reseller.updated_at = now
-
-        # Account creation/sales are unlimited. If the shared reseller traffic
-        # pool is already exhausted, creation still succeeds but every active
-        # subscription of this reseller is suspended and enforcement is queued.
         if balance_before + credit <= 0:
             _suspend_reseller_pool(db, int(reseller.id))
 
@@ -411,17 +463,10 @@ def create_subscription_from_owned_plan(
 
     except IntegrityError:
         db.rollback()
-        duplicate = _duplicate_creation(
-            db,
-            int(reseller.id),
-            key,
-        )
+        duplicate = _duplicate_creation(db, int(reseller.id), key)
         if duplicate:
             return duplicate
-        raise HTTPException(
-            status_code=409,
-            detail="ثبت اشتراک انجام نشد",
-        )
+        raise HTTPException(status_code=409, detail="ثبت اشتراک انجام نشد")
     except Exception:
         db.rollback()
         raise
@@ -440,9 +485,7 @@ def create_subscription_from_owned_plan(
             if sell_price_toman is None
             else sell_price_toman
         ),
-        "traffic_balance_bytes": int(
-            reseller.traffic_balance_bytes or 0
-        ),
+        "traffic_balance_bytes": int(reseller.traffic_balance_bytes or 0),
         "traffic_available_bytes": max(
             int(reseller.traffic_balance_bytes or 0)
             + int(reseller.traffic_credit_bytes or 0),
