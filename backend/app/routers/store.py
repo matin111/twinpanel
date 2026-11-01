@@ -19,11 +19,13 @@ from ..models import (
     Subscription,
     User,
 )
+from ..payment_models import PaymentIntent
 from ..plan_template_selection import plan_template_protocols
 from ..protocol_account_registry import normalize_protocols
 from ..reseller_owned_plans import is_internal_reseller_plan
 from ..schemas import SubscriptionCreate
 from ..store_models import StoreOrder
+from ..telegram_notify_service import queue_telegram_notification
 from .subscriptions import create_subscription
 from .account_delivery import (
     _public_payload,
@@ -172,6 +174,49 @@ def _existing_delivery_snapshot(order: StoreOrder, db: Session) -> dict | None:
         return None
 
 
+def _queue_fulfilled_order_notification(order: StoreOrder, db: Session) -> None:
+    """Queue main-bot delivery once from the canonical fulfillment boundary."""
+    if not order.subscription_id:
+        return
+
+    intent = (
+        db.query(PaymentIntent)
+        .filter(PaymentIntent.order_id == int(order.id))
+        .order_by(PaymentIntent.id.desc())
+        .first()
+    )
+    if not intent:
+        return
+
+    subscription = db.get(Subscription, int(order.subscription_id))
+    username = (
+        getattr(subscription, "account_username", None)
+        if subscription is not None
+        else None
+    )
+
+    auto_verified = str(getattr(intent, "status", "") or "").lower() == "auto_verified"
+    event_prefix = "payment-auto-approved" if auto_verified else "payment-approved"
+
+    queue_telegram_notification(
+        db,
+        user_id=int(order.user_id),
+        event_key=f"{event_prefix}:{int(intent.id)}",
+        kind="payment_approved",
+        payload={
+            "payment_id": int(intent.id),
+            "order_id": int(order.id),
+            "subscription_id": int(order.subscription_id),
+            "username": username,
+            "amount_toman": int(
+                getattr(intent, "payable_amount_toman", None)
+                or order.amount_toman
+                or 0
+            ),
+        },
+    )
+
+
 def _mark_order_fulfilled(order: StoreOrder, db: Session) -> StoreOrder:
     order.status = "fulfilled"
     if order.fulfilled_at is None:
@@ -179,6 +224,23 @@ def _mark_order_fulfilled(order: StoreOrder, db: Session) -> StoreOrder:
     order.error_text = None
     db.commit()
     db.refresh(order)
+
+    # Delivery notification is intentionally best-effort after fulfillment is
+    # durably committed. A Telegram queue failure must never roll a paid order
+    # back to provision_failed, while the durable queue remains idempotent by
+    # PaymentIntent-derived event_key for all approval paths.
+    try:
+        _queue_fulfilled_order_notification(order, db)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        print(
+            "telegram payment delivery queue failed:",
+            type(exc).__name__,
+            str(exc),
+            flush=True,
+        )
+
     return order
 
 
