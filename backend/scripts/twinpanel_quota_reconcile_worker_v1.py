@@ -44,7 +44,6 @@ async def _main() -> int:
     )
 
     changed: list[dict] = []
-    results: dict[str, dict] = {}
     errors: list[dict] = []
 
     collectors = (
@@ -56,7 +55,6 @@ async def _main() -> int:
     for name, reconcile in collectors:
         try:
             result = await reconcile()
-            results[name] = result
             changed.extend(_changed_items(result))
         except asyncio.CancelledError:
             raise
@@ -71,7 +69,6 @@ async def _main() -> int:
     payload = {
         "ok": not errors,
         "changed": changed,
-        "results": results,
         "errors": errors,
     }
     print(
