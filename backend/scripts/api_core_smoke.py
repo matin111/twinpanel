@@ -179,6 +179,16 @@ def main() -> int:
     )
     exit_id = int(exit_node["id"])
 
+    # Plans snapshot their allowed servers at creation time. This smoke creates
+    # its placeholder nodes afterwards, so explicitly bind them to the plan
+    # before exercising plan-backed subscription creation.
+    request(
+        "PATCH",
+        f"/v1/plans/{plan_id}",
+        token=token,
+        payload={"node_ids": [iran_id, exit_id]},
+    )
+
     tunnel = request(
         "POST",
         "/v1/tunnels/register",
