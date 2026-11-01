@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from ..models import Node, Subscription, SubscriptionNode
+from ..modern_node_parallel_v1 import install_bounded_modern_node_provisioning_v1
 from . import account_delivery as legacy_account_delivery
 from . import reseller_bot_orders as reseller_fulfillment
 from . import store as store_fulfillment
@@ -41,6 +42,7 @@ def install_central_account_delivery_runtime_v3() -> None:
     before the legacy Account Delivery router. These assignments close the
     remaining in-process callers that imported the legacy five-protocol symbol.
     """
+    install_bounded_modern_node_provisioning_v1()
     legacy_account_delivery._nodes = subscription_snapshot_nodes
     legacy_account_delivery.provision_account = provision_account_v1
     store_fulfillment.provision_account = provision_account_v1
