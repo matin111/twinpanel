@@ -19,7 +19,7 @@ const BackupsFullRuntimePage=dynamic(()=>import("./backups-full-runtime").then(m
 const ProvisionRuntimeXrayDomainPage=dynamic(()=>import("./provision-runtime-xray-domain").then(m=>m.ProvisionRuntimeXrayDomainPage));
 const SmsReaderRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.SmsReaderRuntimePage));
 const AdminSmsRelayDownload=dynamic(()=>import("./admin-sms-relay-download").then(m=>m.AdminSmsRelayDownload));
-const MotherAccessRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.MotherAccessRuntimePage));
+const MotherAccessRuntimePage=dynamic(()=>import("./mother-access-runtime-v2").then(m=>m.MotherAccessRuntimeV2));
 const AccountDeliveryRuntimePage=dynamic(()=>import("./admin-infra-runtime").then(m=>m.AccountDeliveryRuntimePage));
 const SupportRuntimePage=dynamic(()=>import("./admin-ops-runtime").then(m=>m.SupportRuntimePage));
 const NotificationsRuntimePage=dynamic(()=>import("./admin-ops-runtime").then(m=>m.NotificationsRuntimePage));
