@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.483",
+  "version": "1.1.0-rc.484",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T03:06:17Z",
+  "released_at": "2026-11-02T03:14:32Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "468b69ad0807882943b0f3cfee785d177c700e08",
+  "source_sha": "e31325d3cd1efa444747508ff856da1800cd70c1",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.483/twinpanel-1.1.0-rc.483-linux-x86_64.tar.gz",
-    "sha256": "d4f6c1e17fd0f07b7546183e25044a2fd633de8c07508868134d0d2ee4f36cff",
-    "size_bytes": 25303567
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.484/twinpanel-1.1.0-rc.484-linux-x86_64.tar.gz",
+    "sha256": "ae65972c65db9c26e7599adadfccc405f5bb88676e04f67750e30dc6265d8fae",
+    "size_bytes": 25304353
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.483 خروجی Multi-Link را اصلاح می‌کند: عنوان Profile از نام کاربری اشتراک می‌آید، Remarks/Tags هر سرور با نام کاربری و نود پر می‌شود، و Mieru برای Karing به‌جای ZIP باینری به‌صورت YAML متنی UTF-8 تحویل داده می‌شود. Template 1 و 2 نیز کنترل متن Modern Protocols را دارند. Provisioning، Mother policy، Tunnel dataplane، Routing، Firewall، Accounting، Quota و Transport behavior تغییری نکرده‌اند. Fix PR #1788 با 6/6 Workflow سبز Merge شد و Release PR #1790 با 9/9 Workflow سبز Merge شد. Source روی SHA immutable 468b69ad0807882943b0f3cfee785d177c700e08 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.483 fixes Multi-Link delivery: profile titles come from the subscription account username, per-server remarks/tags are populated from the username and node naming pipeline, and Mieru is delivered to Karing as UTF-8 YAML instead of a binary ZIP. Templates 1 and 2 also expose the Modern Protocols copy control. Provisioning, Mother policy, tunnel dataplane, routing, firewall, accounting, quota and transport behavior are unchanged. Fix PR #1788 merged with 6/6 green workflows and Release PR #1790 merged with 9/9 green workflows. Source is pinned to immutable SHA 468b69ad0807882943b0f3cfee785d177c700e08."
+    "fa": "TwinPanel 1.1.0-rc.484 ساخت Tunnel مدیریتی را در نودهایی که Agent فعال دارند اما هنگام upgrade به PyPI/DNS دسترسی ندارند مقاوم می‌کند. مسیر عادی bootstrap همچنان اول اجرا می‌شود؛ فقط خطاهای مشخص pip/PyPI/DNS در صورتی recover می‌شوند که twinpanel-agent واقعاً active باشد و venv فعلی بتواند httpx و psutil را import کند. در این حالت Agent upgrade به تعویق می‌افتد، Tunnel Fabric با installer رسمی ensure می‌شود و ساخت Tunnel ادامه پیدا می‌کند. Agent repair/upgrade مستقل، TP27، Routing، Firewall، Accounting، Quota و Dataplane تغییر نکرده‌اند. Fix PR #1792 با تمام Workflowهای مربوط سبز Merge شد و Release PR #1793 با 9/9 Workflow سبز Merge شد. Source روی SHA immutable e31325d3cd1efa444747508ff856da1800cd70c1 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.484 makes managed Tunnel creation resilient on nodes whose Agent is already active but whose opportunistic upgrade cannot reach PyPI/DNS. The canonical bootstrap path still runs first; only recognized pip/PyPI/DNS failures recover when twinpanel-agent is actually active and the current venv can import httpx and psutil. Agent upgrade is then deferred, Tunnel Fabric is ensured through the existing authoritative installer, and Tunnel creation continues. Independent Agent repair/upgrade, TP27, routing, firewall, accounting, quota and dataplane behavior are unchanged. Fix PR #1792 merged with all related workflows green and Release PR #1793 merged with 9/9 workflows green. Source is pinned to immutable SHA e31325d3cd1efa444747508ff856da1800cd70c1."
   }
 }
