@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.524",
+  "version": "1.1.0-rc.525",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T22:03:03Z",
+  "released_at": "2026-11-02T22:09:32Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e7dc764242ccd016a9136530f4fe602e6c642298",
+  "source_sha": "750838221db1cb5055efc45a3eda169b46d1ea01",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.524/twinpanel-1.1.0-rc.524-linux-x86_64.tar.gz",
-    "sha256": "a9ab3fa64354150a99eb814f0a7c25243a82f4b530cd8be27c66984158bf3a29",
-    "size_bytes": 25412852
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.525/twinpanel-1.1.0-rc.525-linux-x86_64.tar.gz",
+    "sha256": "a432f7b1d223813824586634cb925fbc829c2b0c45d7af5e1c51fc3dbe827fab",
+    "size_bytes": 25411499
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.524 مرکز لایسنس را به یک Popup جمع‌وجور با طراحی جدید 2027 تبدیل می‌کند؛ فقط وضعیت، تاریخ انقضا، زمان باقی‌مانده، نسخه پنل، کلید فعال‌سازی و اطلاعات ربات تمدید نمایش داده می‌شود. رابط از Modal واقعی خود پنل و استایل‌های inline پایدار استفاده می‌کند تا در Production بدون وابستگی به Utilityهای Build‌نشده درست رندر شود.",
-    "en": "TwinPanel 1.1.0-rc.524 redesigns the License Center as a compact 2027-style popup showing only status, expiry date, remaining time, panel version, activation key and renewal bot information. It uses the panel's native modal contract and reliable inline styling for consistent production rendering."
+    "fa": "TwinPanel 1.1.0-rc.525 وضعیت active لایسنس را در Popup به‌درستی به‌عنوان فعال نمایش می‌دهد و ظاهر 2027 نسخه قبل را حفظ می‌کند.",
+    "en": "TwinPanel 1.1.0-rc.525 correctly maps the backend active license state to Active in the License popup while keeping the 2027 UI from the previous release."
   }
 }
