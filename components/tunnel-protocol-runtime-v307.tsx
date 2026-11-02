@@ -101,7 +101,10 @@ export function TunnelProtocolRuntimeV307(){
   // TWINPANEL_NEW_NODE_TUNNEL_READINESS_V357
   // Online is the UI eligibility gate; backend SSH/Agent/Fabric preflight remains authoritative.
   const readyIranNodes=useMemo(()=>iranNodes.filter(node=>normalize(node.status)==="online"),[iranNodes]);
-  const readyExitNodes=useMemo(()=>exitNodes.filter(node=>normalize(node.status)==="online"),[exitNodes]);
+  const readyExitNodes=useMemo(()=>exitNodes.filter(node=>{
+    const tunnelNode=node as AdminNode&{is_mother?:boolean;agent_url?:string};
+    return normalize(node.status)==="online"&&!tunnelNode.is_mother&&normalize(tunnelNode.agent_url)!=="local://core";
+  }),[exitNodes]);
   const selectedTunnel=useMemo(()=>tunnels.find(row=>row.id===selectedId)||null,[tunnels,selectedId]);
   const selectedIran=selectedTunnel?nodeMap.get(selectedTunnel.iran_node_id):undefined;
   const selectedExit=selectedTunnel?nodeMap.get(selectedTunnel.exit_node_id):undefined;
