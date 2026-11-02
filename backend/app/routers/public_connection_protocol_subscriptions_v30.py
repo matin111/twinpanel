@@ -182,7 +182,10 @@ _SCRIPT = r"""
       return String(response.headers.get('Profile-Title')||protocol).trim()||protocol;
     }catch(_error){return protocol}
   }
-  function karingHref(url){return 'karing://install-config?url='+encodeURIComponent(url);}
+  function karingHref(url,title){
+    const name=String(title||'').trim();
+    return 'karing://install-config?url='+encodeURIComponent(url)+(name?'&name='+encodeURIComponent(name):'');
+  }
   function notify(message){const toast=document.getElementById('toast');if(!toast)return;toast.textContent=message;toast.classList.add('show');clearTimeout(window.__tpV30Toast);window.__tpV30Toast=setTimeout(()=>toast.classList.remove('show'),1800);}
   function fallbackCopy(value){const area=document.createElement('textarea');area.value=String(value||'');area.setAttribute('readonly','');area.style.position='fixed';area.style.left='-9999px';document.body.appendChild(area);area.focus();area.select();area.setSelectionRange(0,area.value.length);let ok=false;try{ok=document.execCommand('copy')}catch(_error){}area.remove();return ok;}
   async function copy(value){if(navigator.clipboard&&window.isSecureContext){try{await navigator.clipboard.writeText(value);return true}catch(_error){}}return fallbackCopy(value);}
@@ -192,12 +195,12 @@ _SCRIPT = r"""
     const count=panel.querySelectorAll('.server-view').length;
     const url=subscriptionUrl(protocol);
     const card=document.createElement('section');card.className='v30-subscription-card';card.dataset.v30Protocol=protocol;
-    card.innerHTML='<div class="v30-subscription-head"><b>همه سرورها</b><span class="v30-subscription-count">'+count+' سرور</span></div><div class="v30-subscription-actions"><a class="v30-primary v30-karing-all" href="'+karingHref(namedSubscriptionUrl(url,protocol))+'">افزودن همه به Karing</a><button type="button" class="v30-copy-sub">کپی لینک اشتراک</button></div><div class="v30-client-downloads"><a href="'+KARING+'" target="_blank" rel="noopener noreferrer">دانلود Karing</a><a href="'+HIDDIFY+'" target="_blank" rel="noopener noreferrer">دانلود Hiddify</a><a class="v30-client-v2rayn" href="'+V2RAYN+'" target="_blank" rel="noopener noreferrer">دانلود v2rayN</a></div>';
+    card.innerHTML='<div class="v30-subscription-head"><b>همه سرورها</b><span class="v30-subscription-count">'+count+' سرور</span></div><div class="v30-subscription-actions"><a class="v30-primary v30-karing-all" href="'+karingHref(url,protocol)+'">افزودن همه به Karing</a><button type="button" class="v30-copy-sub">کپی لینک اشتراک</button></div><div class="v30-client-downloads"><a href="'+KARING+'" target="_blank" rel="noopener noreferrer">دانلود Karing</a><a href="'+HIDDIFY+'" target="_blank" rel="noopener noreferrer">دانلود Hiddify</a><a class="v30-client-v2rayn" href="'+V2RAYN+'" target="_blank" rel="noopener noreferrer">دانلود v2rayN</a></div>';
     const karing=card.querySelector('.v30-karing-all');
     karing?.addEventListener('click',async(event)=>{
       event.preventDefault();
       const title=await subscriptionIdentity(protocol,url);
-      window.location.href=karingHref(namedSubscriptionUrl(url,title));
+      window.location.href=karingHref(url,title);
     });
     card.querySelector('.v30-copy-sub')?.addEventListener('click',async()=>{
       const title=await subscriptionIdentity(protocol,url);
