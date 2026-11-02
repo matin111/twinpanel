@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.507",
+  "version": "1.1.0-rc.508",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T11:01:53Z",
+  "released_at": "2026-11-02T11:24:42Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "42430c6ba03f498f7c719e7a02e2ed086764cbab",
+  "source_sha": "4c848d74c2dbe6c63043f26387021acee79231b1",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.507/twinpanel-1.1.0-rc.507-linux-x86_64.tar.gz",
-    "sha256": "04b0cfdc2e1b70d4a753f15c286af91bf4a460787a2642b38130d6190c6c31ae",
-    "size_bytes": 25367851
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.508/twinpanel-1.1.0-rc.508-linux-x86_64.tar.gz",
+    "sha256": "dcbb325f893ea5299daa9559f653da3ae772768812600c3240050656d9dd8ef6",
+    "size_bytes": 25365867
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.507 رگرسیون Multi-Link در Public Connect موبایل را بر اساس Audit واقعی سرور اصلاح می‌کند. Root Cause این بود که V51 برای صرفاً نمایش کارت Multi-Link چندین درخواست /multi/{protocol}/meta می‌زد و render را چند بار تکرار می‌کرد؛ روی سرور واقعی این metaها زیر بار timeout می‌شدند و کارت‌های Multi-Link ساخته نمی‌شدند یا ناپدید می‌شدند. در rc.507 نمایش کارت Multi-Link کاملاً از meta-fetch مستقل شده و از state موجود صفحه ساخته می‌شود؛ endpoint اصلی /multi/{protocol} فقط هنگام اقدام صریح کاربر مثل کپی/دانلود/Import صدا زده می‌شود. V52 persistence حفظ شده است. Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting، Quota و Payment تغییری نکرده‌اند. Source روی SHA immutable 42430c6ba03f498f7c719e7a02e2ed086764cbab قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.507 fixes the mobile Public Connect Multi-Link regression based on a real server audit. V51 previously issued repeated /multi/{protocol}/meta requests merely to render Multi-Link cards and repeated the render several times; on the real server those meta requests timed out under load, causing Multi-Link cards to fail to appear or disappear. rc.507 makes Multi-Link card rendering completely independent of meta prefetches and builds cards from existing page state; the real /multi/{protocol} endpoint is only called on explicit user actions such as copy/download/import. V52 persistence remains intact. Provisioning, credentials, tunnel dataplane, routing, firewall, accounting, quota and payment behavior are unchanged. Source is pinned to immutable SHA 42430c6ba03f498f7c719e7a02e2ed086764cbab."
+    "fa": "TwinPanel 1.1.0-rc.508 رگرسیون V2Ray/Xray در Public Connect را اصلاح می‌کند. V41 دیگر server-views مربوط به V2Ray را حذف نمی‌کند؛ جزئیات اتصال‌های هر سرور حفظ می‌شوند و به‌صورت Hidden/Toggle نمایش داده می‌شوند. Multi-Link اختصاصی V2Ray از /v1/connect/{token}/sub استفاده می‌کند و V2Ray دوباره در سطح موبایل قابل نمایش است. سایر پروتکل‌ها، Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting، Quota و Payment تغییری نکرده‌اند. Source روی SHA immutable 4c848d74c2dbe6c63043f26387021acee79231b1 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.508 fixes V2Ray/Xray regressions in Public Connect. V41 no longer removes V2Ray server-views; per-server connection details are preserved behind a hidden/toggle surface. The V2Ray Multi-Link uses the dedicated /v1/connect/{token}/sub endpoint and V2Ray is restored on mobile. Other protocols, provisioning, credentials, tunnel dataplane, routing, firewall, accounting, quota and payments are unchanged. Source is pinned to immutable SHA 4c848d74c2dbe6c63043f26387021acee79231b1."
   }
 }
