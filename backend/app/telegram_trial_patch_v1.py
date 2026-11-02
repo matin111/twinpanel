@@ -8,6 +8,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardBu
 
 
 _INSTALLED = False
+TRIAL_LABEL = "🎁 اکانت تست"
 
 
 def _delivery_link(result: dict[str, Any]) -> str:
@@ -35,16 +36,11 @@ def install() -> None:
     def plans_keyboard_with_trial(plans):
         markup = original_plans_keyboard(plans)
         rows = list(markup.inline_keyboard)
-        for plan in plans[:30]:
-            if not bool(plan.get("trial_enabled")):
-                continue
-            plan_id = int(plan["id"])
-            days = int(plan.get("trial_duration_days") or 1)
-            traffic_mb = int(plan.get("trial_traffic_mb") or 500)
+        if any(bool(plan.get("trial_enabled")) for plan in plans[:30]):
             rows.append([
                 InlineKeyboardButton(
-                    text=f"🎁 تست {days} روز / {traffic_mb}MB",
-                    callback_data=f"trial:claim:{plan_id}",
+                    text=TRIAL_LABEL,
+                    callback_data="trial:claim",
                 )
             ])
         return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -54,14 +50,18 @@ def install() -> None:
 
         async def claim_main_bot_trial(callback):
             try:
-                plan_id = int(str(callback.data).split(":")[2])
+                parts = str(callback.data or "").split(":")
+                payload: dict[str, Any] = {}
+                # Keep old plan-specific callbacks functional for already-sent Telegram messages.
+                if len(parts) > 2 and parts[2].isdigit():
+                    payload["plan_id"] = int(parts[2])
                 session = await session_fn(callback.from_user.id)
                 token = session["access_token"]
                 result = await request_fn(
                     "POST",
                     "/v1/trial/claim",
                     token=token,
-                    payload={"plan_id": plan_id},
+                    payload=payload,
                 )
             except Exception as exc:
                 await callback.answer(str(exc), show_alert=True)
@@ -91,14 +91,15 @@ def install() -> None:
 
         router.callback_query.register(
             claim_main_bot_trial,
-            F.data.startswith("trial:claim:"),
+            F.data.startswith("trial:claim"),
         )
         return router
 
     def reseller_keyboard_with_trial():
         markup = original_reseller_keyboard()
         rows = [list(row) for row in markup.keyboard]
-        rows.append([KeyboardButton(text="🎁 اکانت تست")])
+        if not any(button.text == TRIAL_LABEL for row in rows for button in row):
+            rows.append([KeyboardButton(text=TRIAL_LABEL)])
         return ReplyKeyboardMarkup(resize_keyboard=True, keyboard=rows)
 
     def reseller_build_router_with_trial(reseller_id: int):
@@ -146,7 +147,7 @@ def install() -> None:
 
         router.message.register(
             claim_reseller_trial,
-            F.text == "🎁 اکانت تست",
+            F.text == TRIAL_LABEL,
         )
         return router
 
