@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 
-_MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_HEADER_PARITY_V58"
+_MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_ALL_GROUPS_COLLAPSED_V60"
 
 
 _CSS = r"""
-/* TWINPANEL_PUBLIC_CONNECT_V2RAY_HEADER_PARITY_V58 */
+/* TWINPANEL_PUBLIC_CONNECT_V2RAY_ALL_GROUPS_COLLAPSED_V60 */
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .server-views,
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .v51-single-title,
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .v57-v2ray-server-tabs{
@@ -15,7 +15,7 @@ body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .protocol-panel-head 
   display:flex!important;
 }
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .v54-v2ray-groups{
-  display:block!important;margin:0 12px 14px;
+  display:grid!important;gap:10px;margin:0 12px 14px;
 }
 body.v54-v2ray-restore .v54-v2ray-server{
   border:1px solid var(--line);border-radius:14px;background:var(--surface2);overflow:hidden;
@@ -57,7 +57,7 @@ body.v54-v2ray-restore .v54-v2ray-empty{padding:12px;color:var(--muted);font-siz
 
 
 _SCRIPT = r"""
-<script id="twinpanelPublicConnectV2rayHeaderParityV58">
+<script id="twinpanelPublicConnectV2rayAllGroupsCollapsedV60">
 (function(){
   let timer=null;
 
@@ -168,6 +168,7 @@ _SCRIPT = r"""
     const profiles=Array.isArray(server?.profiles)?server.profiles:[];
     if(profiles.length!==3)return null;
     const card=el('section','v54-v2ray-server');
+    card.dataset.serverIndex=String(index);
     const head=el('div','v54-v2ray-server-head');
     head.setAttribute('role','button');head.setAttribute('tabindex','0');head.setAttribute('aria-expanded','false');
     head.append(el('span','',serverLabel(server,index)),el('span','', '۳ اتصال'));
@@ -184,15 +185,29 @@ _SCRIPT = r"""
     card.append(head,body);return card;
   }
 
-  function renderSelected(tabs,holder,servers,selectedIndex){
-    const index=Math.max(0,Math.min(selectedIndex,servers.length-1));
+  function setActiveTab(tabs,index){
     [...tabs.querySelectorAll('.server-tab')].forEach((tab,tabIndex)=>{
       tab.classList.toggle('active',tabIndex===index);
       tab.setAttribute('aria-selected',tabIndex===index?'true':'false');
     });
+  }
+
+  function openServerFromTab(tabs,holder,index){
+    setActiveTab(tabs,index);
+    const card=holder.querySelector('.v54-v2ray-server[data-server-index="'+index+'"]');
+    if(!card)return;
+    card.classList.add('open');
+    const head=card.querySelector('.v54-v2ray-server-head');
+    if(head)head.setAttribute('aria-expanded','true');
+    card.scrollIntoView({block:'nearest',behavior:'smooth'});
+  }
+
+  function renderAllServers(holder,servers){
     holder.replaceChildren();
-    const card=serverCard(servers[index],index);
-    if(card)holder.appendChild(card);
+    servers.forEach((server,index)=>{
+      const card=serverCard(server,index);
+      if(card)holder.appendChild(card);
+    });
   }
 
   function buildTabs(tabs,holder,servers){
@@ -201,10 +216,11 @@ _SCRIPT = r"""
       const button=el('button','server-tab');
       button.type='button';button.setAttribute('role','tab');button.setAttribute('aria-selected','false');
       button.append(el('span','',serverLabel(server,index)),el('i',''));
-      button.addEventListener('click',()=>renderSelected(tabs,holder,servers,index));
+      button.addEventListener('click',()=>openServerFromTab(tabs,holder,index));
       tabs.appendChild(button);
     });
-    renderSelected(tabs,holder,servers,0);
+    renderAllServers(holder,servers);
+    if(servers.length)setActiveTab(tabs,0);
   }
 
   async function ensureGroups(panel){
@@ -273,7 +289,7 @@ _V51_MULTI_NEW = "return window.location.origin+'/v1/connect/'+encodeURIComponen
 
 
 def refine_public_connection_v2ray_mobile_restore_v54(source: str) -> str:
-    """Render V2Ray server tabs in the canonical protocol header with standard live status dots."""
+    """Render every V2Ray server group below Multi-Link, with each three-profile group collapsed by default."""
     source = str(source or "")
     source = source.replace(_V41_REMOVE_OLD, _V41_REMOVE_NEW)
     source = source.replace(_V51_MULTI_OLD, _V51_MULTI_NEW)
