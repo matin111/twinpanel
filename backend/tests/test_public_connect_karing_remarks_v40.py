@@ -11,8 +11,23 @@ def test_v40_patches_actual_v38_karing_action() -> None:
     assert ".v38-all-card[data-v38-protocol]" in source
     assert 'a[href^="karing://install-config"]' in source
     assert "account+'-'+protocol" in source
-    assert "name='+encodeURIComponent(name)" in source
     assert "document.querySelector('.service')" in source
+
+
+def test_v40_puts_profile_name_on_inner_multilink_url() -> None:
+    source = V40.read_text(encoding="utf-8")
+    assert "deep.searchParams.get('url')" in source
+    assert "parts.inner.searchParams.set('name',name)" in source
+    assert "parts.deep.searchParams.set('url',parts.inner.toString())" in source
+    assert "parts.deep.searchParams.set('name',name)" in source
+    assert "response.headers.get('Profile-Title')" in source
+    assert "fragment -> remarks -> name -> title -> host" in source
+
+
+def test_v40_uses_connect_token_as_deterministic_fallback_identity() -> None:
+    source = V40.read_text(encoding="utf-8")
+    assert "match(/^\\/v1\\/connect\\/([^/]+)/)" in source
+    assert "decodeURIComponent(match[1])" in source
 
 
 def test_v40_wraps_v38_without_changing_composition_order() -> None:
