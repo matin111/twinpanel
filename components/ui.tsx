@@ -21,7 +21,6 @@ const menuGroups=[
     ["نودها","Nodes","/admin/nodes","▦"],
     ["تانل‌ها","Tunnels","/admin/tunnels","⤨"],
     ["مسیرهای هوشمند","Smart Transports","/admin/tunnel-transports","⇄"],
-    ["افزودن سرور","Add Server","/admin/provision","⚡"],
     ["پروتکل‌ها","Protocols","/admin/modern-protocols","◫"],
     ["Outbound","Outbound","/admin/outbounds","↗"],
     ["NetMod DNS","NetMod DNS","/admin/dns-emergency","◉"],
