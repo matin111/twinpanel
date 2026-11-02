@@ -4,6 +4,7 @@ from . import public_connection_all_multilink_v34 as multilink
 from . import public_connection_modern_delivery_v13 as modern_delivery
 from . import public_connection_final_presentation_v37 as final_v37
 from . import public_connection_reference_layout_v38 as reference_v38
+from . import public_connection_v2ray_multilink_action_v44 as v2ray_multilink_action_v44
 from .public_connection_mobile_sheet_v42 import refine_public_connection_mobile_sheet_v42
 from .public_connection_request_backpressure_v1 import (
     refine_public_connection_request_backpressure_v1,
@@ -47,6 +48,11 @@ def _unify_multilink_button_labels(value: str) -> str:
 
 reference_v38._SCRIPT = _unify_multilink_button_labels(reference_v38._SCRIPT)
 final_v37._SCRIPT = _unify_multilink_button_labels(final_v37._SCRIPT)
+v2ray_multilink_action_v44._SCRIPT = (
+    v2ray_multilink_action_v44._SCRIPT
+    .replace("'ارسال همه به v2rayNG'", "'افزودن به v2rayNG'")
+    .replace("'ارسال به v2rayNG'", "'افزودن به v2rayNG'")
+)
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_ACTIONS_V41"
 
