@@ -1,26 +1,18 @@
 from __future__ import annotations
 
 
-_MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_SERVER_TABS_V57"
+_MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_HEADER_PARITY_V58"
 
 
 _CSS = r"""
-/* TWINPANEL_PUBLIC_CONNECT_V2RAY_SERVER_TABS_V57 */
-body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .server-tabs,
-body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .server-views,
-body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .v51-single-title{
+/* TWINPANEL_PUBLIC_CONNECT_V2RAY_HEADER_PARITY_V58 */
+body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .server-views,
+body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .v51-single-title,
+body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .v57-v2ray-server-tabs{
   display:none!important;
 }
-body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .v57-v2ray-server-tabs{
-  display:flex!important;flex-wrap:wrap;justify-content:flex-start;gap:8px;margin:0 12px 10px;direction:ltr;
-}
-body.v54-v2ray-restore .v57-v2ray-server-tab{
-  min-height:32px;display:inline-flex;align-items:center;justify-content:center;padding:0 11px;
-  border:1px solid var(--line);border-radius:10px;background:var(--surface2);color:var(--muted);
-  font:inherit;font-size:11px;font-weight:850;cursor:pointer;
-}
-body.v54-v2ray-restore .v57-v2ray-server-tab.active{
-  border-color:var(--primary);color:var(--text);background:color-mix(in srgb,var(--primary) 12%,var(--surface2));
+body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .protocol-panel-head .server-tabs{
+  display:flex!important;
 }
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .v54-v2ray-groups{
   display:block!important;margin:0 12px 14px;
@@ -35,12 +27,8 @@ body.v54-v2ray-restore .v54-v2ray-server-head{
 body.v54-v2ray-restore .v54-v2ray-server-head span:last-child{
   color:var(--muted);font-size:10px;border:1px solid var(--line);border-radius:999px;padding:3px 8px;
 }
-body.v54-v2ray-restore .v54-v2ray-profiles{
-  display:none!important;border-top:1px solid var(--line)
-}
-body.v54-v2ray-restore .v54-v2ray-server.open > .v54-v2ray-profiles{
-  display:grid!important;
-}
+body.v54-v2ray-restore .v54-v2ray-profiles{display:none!important;border-top:1px solid var(--line)}
+body.v54-v2ray-restore .v54-v2ray-server.open > .v54-v2ray-profiles{display:grid!important}
 body.v54-v2ray-restore .v54-v2ray-profile{
   display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 12px;
   border-bottom:1px solid var(--line);background:var(--surface);
@@ -59,13 +47,7 @@ body.v54-v2ray-restore .v54-v2ray-profile-actions a{
 }
 body.v54-v2ray-restore .v54-v2ray-empty{padding:12px;color:var(--muted);font-size:11px;text-align:center}
 @media(max-width:720px){
-  body.v54-v2ray-restore .protocol-choice[data-v54-v2ray-choice="1"]{
-    display:grid!important;visibility:visible!important;opacity:1!important;
-  }
-  body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .v57-v2ray-server-tabs{
-    overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;
-  }
-  body.v54-v2ray-restore .v57-v2ray-server-tab{flex:0 0 auto}
+  body.v54-v2ray-restore .protocol-choice[data-v54-v2ray-choice="1"]{display:grid!important;visibility:visible!important;opacity:1!important}
   body.v54-v2ray-restore .v54-v2ray-profile{grid-template-columns:1fr}
   body.v54-v2ray-restore .v54-v2ray-profile-actions{justify-content:stretch}
   body.v54-v2ray-restore .v54-v2ray-profile-actions button,
@@ -75,7 +57,7 @@ body.v54-v2ray-restore .v54-v2ray-empty{padding:12px;color:var(--muted);font-siz
 
 
 _SCRIPT = r"""
-<script id="twinpanelPublicConnectV2rayServerTabsV57">
+<script id="twinpanelPublicConnectV2rayHeaderParityV58">
 (function(){
   let timer=null;
 
@@ -187,9 +169,7 @@ _SCRIPT = r"""
     if(profiles.length!==3)return null;
     const card=el('section','v54-v2ray-server');
     const head=el('div','v54-v2ray-server-head');
-    head.setAttribute('role','button');
-    head.setAttribute('tabindex','0');
-    head.setAttribute('aria-expanded','false');
+    head.setAttribute('role','button');head.setAttribute('tabindex','0');head.setAttribute('aria-expanded','false');
     head.append(el('span','',serverLabel(server,index)),el('span','', '۳ اتصال'));
     const toggle=()=>{
       const open=card.classList.toggle('open');
@@ -206,7 +186,7 @@ _SCRIPT = r"""
 
   function renderSelected(tabs,holder,servers,selectedIndex){
     const index=Math.max(0,Math.min(selectedIndex,servers.length-1));
-    [...tabs.querySelectorAll('.v57-v2ray-server-tab')].forEach((tab,tabIndex)=>{
+    [...tabs.querySelectorAll('.server-tab')].forEach((tab,tabIndex)=>{
       tab.classList.toggle('active',tabIndex===index);
       tab.setAttribute('aria-selected',tabIndex===index?'true':'false');
     });
@@ -218,8 +198,9 @@ _SCRIPT = r"""
   function buildTabs(tabs,holder,servers){
     tabs.replaceChildren();
     servers.forEach((server,index)=>{
-      const button=el('button','v57-v2ray-server-tab',serverLabel(server,index));
+      const button=el('button','server-tab');
       button.type='button';button.setAttribute('role','tab');button.setAttribute('aria-selected','false');
+      button.append(el('span','',serverLabel(server,index)),el('i',''));
       button.addEventListener('click',()=>renderSelected(tabs,holder,servers,index));
       tabs.appendChild(button);
     });
@@ -229,9 +210,9 @@ _SCRIPT = r"""
   async function ensureGroups(panel){
     if(panel.dataset.v54GroupsLoaded==='1'||panel.dataset.v54GroupsLoading==='1')return;
     const anchor=panel.querySelector(':scope > .v52-multi-card,:scope > .v51-multi-card');
-    if(!anchor)return;
-    let tabs=panel.querySelector(':scope > .v57-v2ray-server-tabs');
-    if(!tabs){tabs=el('div','v57-v2ray-server-tabs');tabs.setAttribute('role','tablist');anchor.insertAdjacentElement('beforebegin',tabs)}
+    const tabs=panel.querySelector(':scope > .protocol-panel-head .server-tabs');
+    if(!anchor||!tabs)return;
+    panel.querySelectorAll(':scope > .v57-v2ray-server-tabs').forEach(node=>node.remove());
     let holder=panel.querySelector(':scope > .v54-v2ray-groups');
     if(!holder){holder=el('div','v54-v2ray-groups');anchor.insertAdjacentElement('afterend',holder)}
     panel.dataset.v54GroupsLoading='1';
@@ -273,7 +254,7 @@ _SCRIPT = r"""
       if(panel.querySelector('.server-view')){
         panel.classList.add('v24-canonical-panel');panel.classList.remove('v24-empty');
       }
-      panel.querySelectorAll(':scope > .v54-v2ray-config-toggle').forEach(node=>node.remove());
+      panel.querySelectorAll(':scope > .v54-v2ray-config-toggle,:scope > .v57-v2ray-server-tabs').forEach(node=>node.remove());
       ensureGroups(panel);
     });
   }
@@ -292,11 +273,11 @@ _V51_MULTI_NEW = "return window.location.origin+'/v1/connect/'+encodeURIComponen
 
 
 def refine_public_connection_v2ray_mobile_restore_v54(source: str) -> str:
-    """Show exact server-name tabs for V2Ray while keeping configs collapsed by default."""
+    """Render V2Ray server tabs in the canonical protocol header with standard live status dots."""
     source = str(source or "")
     source = source.replace(_V41_REMOVE_OLD, _V41_REMOVE_NEW)
     source = source.replace(_V51_MULTI_OLD, _V51_MULTI_NEW)
     if _MARKER in source:
         return source
     source = source.replace("</style>", _CSS + "\n</style>", 1)
-    return source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
+    return source.replace("</body>", _SCRIPT + "\n</body>", 1)
