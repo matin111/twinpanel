@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.522",
+  "version": "1.1.0-rc.523",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T21:47:11Z",
+  "released_at": "2026-11-02T21:54:49Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7643d681ea9ca7d777984a9e0b200a4deda46ebd",
+  "source_sha": "250fb14dc93182f529f574dc30b749ceedfa1a40",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.522/twinpanel-1.1.0-rc.522-linux-x86_64.tar.gz",
-    "sha256": "fe08b7fd847b7d8d8cd7ad61c2dbaefa8fba59bb90b4b7021f5c102deee660ca",
-    "size_bytes": 25412862
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.523/twinpanel-1.1.0-rc.523-linux-x86_64.tar.gz",
+    "sha256": "07c7d9dd699ce1a2e94d7d0a5ea77aa79b644543886b9ec6df60d0b8bc983d8b",
+    "size_bytes": 25413204
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.522 صفحه لایسنس ادمین را به طراحی اصلی پنل برمی‌گرداند و رابط مدرن، واکنش‌گرا و RTL برای وضعیت لایسنس، انقضا، اعتبارسنجی، فعال‌سازی و تمدید ارائه می‌دهد. همچنین در رابط مدیریت روشن می‌کند که تأیید پرداخت کریپتو بر پایه هش تراکنش، مقصد، مبلغ و تأییدهای شبکه انجام می‌شود و مسیر اصلی به API Key پولی اجباری وابسته نیست. تست Smoke مرکز لایسنس نیز با ساختار جدید Shell هماهنگ شده است.",
-    "en": "TwinPanel 1.1.0-rc.522 restores the admin License Center to the panel's native design system with a modern responsive UI for license status, expiry, validation, activation and renewal. It also clarifies that crypto payment verification is based on transaction hash, destination, amount and network confirmations, with no mandatory paid API key in the primary verification path. The License Center smoke contract is aligned with the new Shell-based UI."
+    "fa": "TwinPanel 1.1.0-rc.523 مرکز لایسنس را دوباره به شکل Popup مدرن و جمع‌وجور روی پنل نمایش می‌دهد. پنل پشت Overlay باقی می‌ماند، Modal در مرکز صفحه باز می‌شود، کارت‌های وضعیت دیگر تمام‌عرض و کشیده نیستند و چیدمان واکنش‌گرا با Scroll داخلی کنترل‌شده دارد. بستن Popup با دکمه یا کلیک روی فضای بیرون انجام می‌شود و تست Smoke نیز ساختار Popup را بررسی می‌کند.",
+    "en": "TwinPanel 1.1.0-rc.523 restores the License Center as a compact modern popup over the admin panel. The panel remains visible behind the overlay, the modal is centered, status cards no longer stretch full-width, responsive layout uses controlled internal scrolling, and the popup can be closed from the close button or the backdrop. Smoke coverage now validates the popup contract."
   }
 }
