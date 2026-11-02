@@ -16,7 +16,11 @@ def test_mother_toggle_filters_customer_delivery_without_disabling_provisioning(
     assert "return _filter_mother_from_delivery(db, payload)" in policy
 
     # Mother must remain part of the immutable SubscriptionNode provisioning
-    # snapshot. The UI toggle controls delivery visibility only.
-    assert "SubscriptionNode.subscription_id == sub.id" in central
-    assert "Node.node_type == NodeType.EXIT" in central
-    assert "mother" not in central.split("def subscription_snapshot_nodes", 1)[1].split("def customer_delivery_item_is_usable", 1)[0].lower().replace("local core/mother", "")
+    # snapshot. Access settings are checked only when building delivery output.
+    snapshot = central.split("def subscription_snapshot_nodes", 1)[1].split(
+        "def customer_delivery_item_is_usable", 1
+    )[0]
+    assert "SubscriptionNode.subscription_id == sub.id" in snapshot
+    assert "Node.node_type == NodeType.EXIT" in snapshot
+    assert "admin_can_use_mother" not in snapshot
+    assert "reseller_can_use_mother" not in snapshot
