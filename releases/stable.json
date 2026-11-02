@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.490",
+  "version": "1.1.0-rc.491",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T05:03:38Z",
+  "released_at": "2026-11-02T05:29:44Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e9b8cbaf75ac019d8fe8759db3dc8a5d5c716089",
+  "source_sha": "c9b65dea27fa6947e54f34980fcebb2c86f3e9c8",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.490/twinpanel-1.1.0-rc.490-linux-x86_64.tar.gz",
-    "sha256": "96d0ffc887be350df71d1cf720b1355eaa182077007aa1fc85795dd1a82257ed",
-    "size_bytes": 25321882
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.491/twinpanel-1.1.0-rc.491-linux-x86_64.tar.gz",
+    "sha256": "6311d686de9bb706dca19fe88599c90a876ed34b53fcdffe46bcb4cf38018dc6",
+    "size_bytes": 25318933
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.490 رفتار سرور مادر و Multi-Link را اصلاح می‌کند: سرور مادر داخل Multi-Link باقی می‌ماند، Toggle دسترسی فقط نمایش سرور تکی را کنترل می‌کند، نام Mother از نام قابل تنظیم خود Node خوانده می‌شود و نام ذخیره‌شده آیتم‌های Multi-Link هنگام خروجی با تنظیمات فعلی Node همگام می‌شود. همچنین Add All در Karing/Hiddify دیگر نام پنل را داخل ملاحظات تزریق نمی‌کند و عنوان canonical endpoint یعنی username-protocol استفاده می‌شود. Fix PR #1815 با 9/9 Workflow سبز Merge شد و Release PR #1816 نیز 9/9 سبز بود. Source روی SHA immutable e9b8cbaf75ac019d8fe8759db3dc8a5d5c716089 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.490 fixes Mother and Multi-Link behavior: Mother stays inside Multi-Link, access toggles control only individual server visibility, the Mother label comes from the editable Node name, and stored Multi-Link item names are refreshed from current Node settings at export time. Karing/Hiddify Add All no longer injects panel branding into remarks and instead relies on the canonical endpoint username-protocol title. Fix PR #1815 merged with 9/9 green workflows and Release PR #1816 also passed 9/9. Source is pinned to immutable SHA e9b8cbaf75ac019d8fe8759db3dc8a5d5c716089."
+    "fa": "TwinPanel 1.1.0-rc.491 شامل اصلاح عنوان canonical پروفایل Karing/Hiddify و رفع خطای اعتبارسنجی قیمت پلن شارژ حجم نمایندگی است. در فرم /admin/reseller-traffic-plans مبنای step قیمت از 1 به 1000 هم‌تراز شد تا مبالغ رُند مثل 2,400,000 تومان بدون پیشنهاد مقادیر ...001 معتبر باشند. Backend و مدل integer تومان، حسابداری نماینده، موجودی حجم و مسیر خرید تغییری نکرده‌اند. Source روی SHA immutable c9b65dea27fa6947e54f34980fcebb2c86f3e9c8 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.491 includes the canonical Karing/Hiddify profile-title fix and fixes reseller traffic recharge plan price validation. The /admin/reseller-traffic-plans price input now aligns its 1000-toman step to a 1000 minimum, so round amounts such as 2,400,000 are valid instead of suggesting values ending in ...001. Backend integer-toman semantics, reseller accounting, traffic balances, and purchase flows are unchanged. Source is pinned to immutable SHA c9b65dea27fa6947e54f34980fcebb2c86f3e9c8."
   }
 }
