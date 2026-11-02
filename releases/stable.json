@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.475",
+  "version": "1.1.0-rc.476",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T01:00:17Z",
+  "released_at": "2026-11-02T01:20:58Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e93fb265c712035fc61d01c6c4534977207bca5b",
+  "source_sha": "bfafbb945d0b4cfacedee9f7285662c06aca58f5",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.475/twinpanel-1.1.0-rc.475-linux-x86_64.tar.gz",
-    "sha256": "ec0fc7221dd88a09f898acd6d782e26b43b531eba5666068b507959df262e95e",
-    "size_bytes": 25244039
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.476/twinpanel-1.1.0-rc.476-linux-x86_64.tar.gz",
+    "sha256": "862d31df6369931f3fa804333cf7abd923dc9471d510f9ca686ff5b9ea885dd0",
+    "size_bytes": 25244676
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.475 سیاست نود اشتراک و نمایش Public Connect را اصلاح می‌کند. سرور مادر/Local Core وقتی دسترسی Mother خاموش است دیگر در Plan fallback، Snapshot اشتراک، ویرایش اشتراک یا Delivery عمومی وارد نمی‌شود؛ ساخت نود جدید نیز Snapshot اشتراک‌های قدیمی را تغییر نمی‌دهد. صفحه اتصال عمومی به‌جای نام‌های داخلی نود مثل TwinPanel Local Core / des / tr / usa نام کشور را نمایش می‌دهد و در مدیریت نود امکان ویرایش نام داخلی و کد کشور اضافه شده است. نصب و Delivery پروتکل‌های Modern همچنان به Tunnel وابسته نیست و Exit مستقیم با SSH/runtime آماده پشتیبانی می‌شود. PR #1757 با 13/13 Workflow سبز Merge شد و Release PR #1759 نیز با 9/9 Workflow سبز Merge شد. Source روی SHA immutable e93fb265c712035fc61d01c6c4534977207bca5b قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.475 fixes subscription node policy and Public Connect server identity. When Mother/Local Core access is disabled it is excluded from plan fallback, subscription snapshots, admin edits, provisioning and public delivery; creating a new node no longer mutates historical subscription snapshots. Public Connect now shows country labels instead of internal node names such as TwinPanel Local Core / des / tr / usa, and the Nodes admin UI can edit the internal node name and country code. Modern protocol installation and delivery remain independent of Tunnel presence and continue to support direct Exit nodes with ready SSH/runtime access. PR #1757 merged with 13/13 green workflows and Release PR #1759 merged with 9/9 green workflows. Source is pinned to immutable SHA e93fb265c712035fc61d01c6c4534977207bca5b."
+    "fa": "TwinPanel 1.1.0-rc.476 نمایش نام نودها در Public Connect و Multi-Link را اصلاح می‌کند. فقط سرور مادر/Local Core می‌تواند بر اساس کشور Label عمومی بگیرد؛ نام Exitهای معمولی مثل usa / tr / des دقیقاً همان نام تنظیم‌شده خودشان باقی می‌ماند و دیگر به نام فارسی کشور تبدیل نمی‌شود. سیاست Mother، Snapshot اشتراک، Modern Protocol، Tunnel، Accounting، Quota و Dataplane در این Release تغییری نکرده‌اند. PR #1762 با 4/4 Workflow سبز Merge شد و Release PR #1764 نیز با 9/9 Workflow سبز Merge شد. Source روی SHA immutable bfafbb945d0b4cfacedee9f7285662c06aca58f5 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.476 corrects public node labels in Public Connect and Multi-Link. Only the Mother/Local Core node may receive a customer-facing country label; normal Exit names such as usa / tr / des now remain exactly as configured and are no longer replaced with translated country names. Mother policy, subscription snapshots, Modern Protocol behavior, Tunnel, Accounting, Quota and protocol dataplane are unchanged in this release. PR #1762 merged with 4/4 green workflows and Release PR #1764 merged with 9/9 green workflows. Source is pinned to immutable SHA bfafbb945d0b4cfacedee9f7285662c06aca58f5."
   }
 }
