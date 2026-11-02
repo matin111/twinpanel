@@ -5,6 +5,7 @@ import {AdminDashboardServerCard} from "./admin-dashboard-server-card";
 import {AdminOperationFeedback} from "./admin-operation-feedback";
 import {LegacyNodesRuntimePage} from "./legacy-nodes-runtime-v2";
 import {LicenseCenter} from "./license-center";
+import {NodeAddModalBridge} from "./node-add-modal-bridge";
 import {RoutedPageClient as BaseRoutedPageClient} from "./routed-page-client";
 import {SmartTransportsRuntimeV27} from "./smart-transports-runtime-v27";
 import {SubscriptionDeliveryPolicyManager} from "./subscription-delivery-policy-manager";
@@ -21,8 +22,8 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(routeKey==="admin/license"){
     return admin(<LicenseCenter/>);
   }
-  if(routeKey==="admin/nodes"||routeKey==="admin/network"){
-    return admin(<LegacyNodesRuntimePage/>);
+  if(routeKey==="admin/nodes"||routeKey==="admin/network"||routeKey==="admin/provision"){
+    return admin(<><LegacyNodesRuntimePage/><NodeAddModalBridge/></>);
   }
   if(routeKey==="admin/tunnels"){
     return admin(<TunnelProtocolRuntimeV307/>);
