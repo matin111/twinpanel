@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.500",
+  "version": "1.1.0-rc.501",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T08:41:25Z",
+  "released_at": "2026-11-02T08:57:59Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7f5c34ecdc0e23d9cf2a0275bfcdec331ad9ce5e",
+  "source_sha": "ec3fb55e12c4ece32a364c054ee4162bcb8ffc26",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.500/twinpanel-1.1.0-rc.500-linux-x86_64.tar.gz",
-    "sha256": "96fe8a646e3d406e953aad4c47a4c50e5801b4fd2180cb90de5b1cf2af9a25ee",
-    "size_bytes": 25326083
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.501/twinpanel-1.1.0-rc.501-linux-x86_64.tar.gz",
+    "sha256": "e58b240527d4199ed2ef89dbbb91307d14470fc8276f3b89ae89473f36600f05",
+    "size_bytes": 25325711
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.500 دو بهبود عملیاتی را منتشر می‌کند: نمودار درآمد داشبورد مدیریت اکنون همان داده مرکزی Sales Analytics را مصرف می‌کند و فروش اشتراک را با خط بنفش و شارژ کیف پول تأییدشده را با خط سبز به‌صورت جدا نمایش می‌دهد؛ همچنین updater بعد از موفقیت کامل Activation و Health، Releaseهای قدیمی را به‌صورت امن prune می‌کند و نسخه فعال و هدف rollback را همیشه محافظت می‌کند تا /opt/twinpanel/releases بدون محدودیت رشد نکند. منطق پرداخت، تأیید شارژ کیف پول، Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting و Quota تغییری نکرده‌اند. Source روی SHA immutable 7f5c34ecdc0e23d9cf2a0275bfcdec331ad9ce5e قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.500 ships two operational improvements: the admin dashboard revenue chart now consumes the same central Sales Analytics data and displays subscription sales in purple and approved wallet top-ups in green as separate series; the updater also prunes stale release directories only after successful activation and health verification, while always protecting the active release and rollback target so /opt/twinpanel/releases cannot grow without bound. Payment approval, wallet crediting, provisioning, credentials, tunnel dataplane, routing, firewall, accounting, and quota behavior are unchanged. Source is pinned to immutable SHA 7f5c34ecdc0e23d9cf2a0275bfcdec331ad9ce5e."
+    "fa": "TwinPanel 1.1.0-rc.501 مسیر واقعی دسکتاپ Public Connect V34 را برای Karing اصلاح می‌کند. دکمه «اتصال به Karing» که Subscription /sub/{protocol} را باز می‌کند اکنون قبل از Launch، Profile-Title همان Subscription را می‌خواند و نام canonical برابر username-protocol را صریحاً داخل پارامتر بیرونی name= قرار می‌دهد؛ اگر Header در دسترس نباشد، از account token + protocol به‌عنوان fallback استفاده می‌شود. بنابراین Karing دیگر نباید دامنه Subscription را در فیلد ملاحظات جایگزین کند. این تغییر فقط Import/Presentation را اصلاح می‌کند و Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting و Quota تغییری نکرده‌اند. Source روی SHA immutable ec3fb55e12c4ece32a364c054ee4162bcb8ffc26 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.501 fixes the actual desktop Public Connect V34 Karing action. The visible 'Connect to Karing' subscription action now resolves the subscription Profile-Title before launch and explicitly passes the canonical username-protocol through Karing's outer name= parameter; if the header is unavailable, account token + protocol is used as fallback. Karing should therefore no longer substitute the subscription host into the Remarks field. This change is limited to import/presentation; provisioning, credentials, tunnel dataplane, routing, firewall, accounting, and quota are unchanged. Source is pinned to immutable SHA ec3fb55e12c4ece32a364c054ee4162bcb8ffc26."
   }
 }
