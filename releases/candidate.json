@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.512",
-  "source_sha": "f68d20a0e96ddce73a570bcd75bbec440905c541",
+  "version": "1.1.0-rc.513",
+  "source_sha": "185235617e2fe29dc77f12789c24824467f27461",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.512 نمایش V2Ray/Xray در Public Connect را اصلاح می‌کند: کشور واقعی هر نود دوباره به‌صورت customer-safe نمایش داده می‌شود و زیر هر کشور سه اتصال واقعی V2Ray/Xray مستقیماً در دسترس است. Multi-Link همچنان به‌عنوان گزینه تجمیعی باقی می‌ماند و جایگزین کشورها/اتصال‌ها نیست. Policy سه‌پروفایلی exact-three و مسیر Reconcile نسخه قبل بدون تغییر حفظ شده‌اند. IP عمومی، Domain، Agent URL و جزئیات زیرساختی همچنان در UI عمومی مخفی می‌مانند. Source روی SHA immutable f68d20a0e96ddce73a570bcd75bbec440905c541 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.512 restores the V2Ray/Xray Public Connect layout: each customer-safe country label is visible again and all three real V2Ray/Xray connections for that country are shown directly. Multi-Link remains available as an aggregate action instead of replacing countries and per-country connections. The exact-three profile policy and reconciliation path from the previous release remain unchanged. Public IPs, domains, agent URLs and other infrastructure details remain hidden from the public UI. Source is pinned to immutable SHA f68d20a0e96ddce73a570bcd75bbec440905c541."
+    "fa": "TwinPanel 1.1.0-rc.513 رفتار نمایش V2Ray/Xray در Public Connect را بهینه می‌کند: هدر کشورها همیشه دیده می‌شود، اما سه کانفیگ هر کشور به‌صورت پیش‌فرض مخفی هستند و کاربر با کلیک روی همان کشور می‌تواند آن‌ها را باز یا بسته کند. ظاهر ردیف‌های کانفیگ، دکمه‌های کپی/ارسال و Multi-Link بدون تغییر باقی مانده‌اند. Policy سه‌پروفایلی exact-three و Reconcile نسخه قبل نیز بدون تغییر حفظ شده‌اند. Source روی SHA immutable 185235617e2fe29dc77f12789c24824467f27461 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.513 refines the V2Ray/Xray Public Connect UX: country headers always remain visible, while the three configs under each country are collapsed by default and can be expanded or collapsed by clicking that country header. Existing config rows, copy/send actions, and Multi-Link remain unchanged. The exact-three profile policy and reconciliation behavior from the previous release are preserved. Source is pinned to immutable SHA 185235617e2fe29dc77f12789c24824467f27461."
   }
 }
