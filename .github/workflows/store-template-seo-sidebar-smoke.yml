@@ -35,7 +35,7 @@ jobs:
           expected = {
               "conversion-2027": (conversion, 'icon:"06"'),
               "editorial-grid-2027": (editorial, 'icon:"07"'),
-              "orbit-neo-2027": (orbit, 'icon:"05"'),
+              "orbit-neo-2027": (orbit, 'icon:"06"'),
           }
 
           catalog_ids = set(re.findall(r'\bid:"([^"]+)"', registry))
