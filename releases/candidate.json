@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.523",
-  "source_sha": "250fb14dc93182f529f574dc30b749ceedfa1a40",
+  "version": "1.1.0-rc.524",
+  "source_sha": "e7dc764242ccd016a9136530f4fe602e6c642298",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.523 مرکز لایسنس را دوباره به شکل Popup مدرن و جمع‌وجور روی پنل نمایش می‌دهد. پنل پشت Overlay باقی می‌ماند، Modal در مرکز صفحه باز می‌شود، کارت‌های وضعیت دیگر تمام‌عرض و کشیده نیستند و چیدمان واکنش‌گرا با Scroll داخلی کنترل‌شده دارد. بستن Popup با دکمه یا کلیک روی فضای بیرون انجام می‌شود و تست Smoke نیز ساختار Popup را بررسی می‌کند.",
-    "en": "TwinPanel 1.1.0-rc.523 restores the License Center as a compact modern popup over the admin panel. The panel remains visible behind the overlay, the modal is centered, status cards no longer stretch full-width, responsive layout uses controlled internal scrolling, and the popup can be closed from the close button or the backdrop. Smoke coverage now validates the popup contract."
+    "fa": "TwinPanel 1.1.0-rc.524 مرکز لایسنس را به یک Popup جمع‌وجور با طراحی جدید 2027 تبدیل می‌کند؛ فقط وضعیت، تاریخ انقضا، زمان باقی‌مانده، نسخه پنل، کلید فعال‌سازی و اطلاعات ربات تمدید نمایش داده می‌شود. رابط از Modal واقعی خود پنل و استایل‌های inline پایدار استفاده می‌کند تا در Production بدون وابستگی به Utilityهای Build‌نشده درست رندر شود.",
+    "en": "TwinPanel 1.1.0-rc.524 redesigns the License Center as a compact 2027-style popup showing only status, expiry date, remaining time, panel version, activation key and renewal bot information. It uses the panel's native modal contract and reliable inline styling for consistent production rendering."
   }
 }
