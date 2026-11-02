@@ -96,7 +96,8 @@ jobs:
       - name: Verify node management modal exposes dedicated Xray domain
         run: |
           set -euo pipefail
-          grep -F 'type NodeModal="manage"|"ssh"|"domain"|"xray-domain"|"protocols"|null;' components/legacy-nodes-exact.tsx
+          grep -F 'type NodeModal=' components/legacy-nodes-exact.tsx
+          grep -F '"manage"|"identity"|"ssh"|"domain"|"xray-domain"|"protocols"|null' components/legacy-nodes-exact.tsx
           grep -F 'const hasDedicatedXrayDomain=Boolean(selected&&selectedRole==="exit");' components/legacy-nodes-exact.tsx
           grep -F 'if(roleOf(selected)==="exit"){' components/legacy-nodes-exact.tsx
           ! grep -F 'selectedRole==="exit"&&selected.enable_v2ray' components/legacy-nodes-exact.tsx

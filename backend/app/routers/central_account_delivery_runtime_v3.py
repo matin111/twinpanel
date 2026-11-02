@@ -1,26 +1,36 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy.orm import Session
 
-from ..models import Node, Subscription, SubscriptionNode
+from ..models import Node, NodeType, Subscription, SubscriptionNode
 from ..modern_node_parallel_v1 import install_bounded_modern_node_provisioning_v1
+from ..mother_access import admin_can_use_mother
 from . import account_delivery as legacy_account_delivery
+from . import node_snapshot_policy_v1 as _node_snapshot_policy_v1  # noqa: F401
+from . import public_country_labels_runtime_v1 as _public_country_labels_runtime_v1  # noqa: F401
 from . import reseller_bot_orders as reseller_fulfillment
+from . import runtime_endpoints as _runtime_endpoints
 from . import store as store_fulfillment
 from .modern_account_delivery_v1 import provision_account_v1
+from .subscription_protocol_lifecycle_v3 import router as _subscription_protocol_lifecycle_v3_router
+
+
+_ORIGINAL_DELIVERY_ITEM_IS_USABLE = legacy_account_delivery._delivery_item_is_usable
 
 
 def subscription_snapshot_nodes(
     db: Session,
     sub: Subscription,
 ) -> list[Node]:
-    """Return only the immutable node snapshot owned by this subscription.
+    """Return customer delivery Exit nodes from this subscription snapshot.
 
-    Plans/subscription creation already persist the selected servers into
-    SubscriptionNode. Account delivery must consume that snapshot rather than
-    expanding an existing subscription to every current global Node.
+    SubscriptionNode is immutable desired-state for customer delivery. Iran
+    nodes are tunnel infrastructure, not account targets. Local Core/Mother is
+    honored only while the explicit mother access setting is enabled.
     """
-    return (
+    query = (
         db.query(Node)
         .join(
             SubscriptionNode,
@@ -28,22 +38,46 @@ def subscription_snapshot_nodes(
         )
         .filter(
             SubscriptionNode.subscription_id == sub.id,
+            Node.node_type == NodeType.EXIT,
             Node.retired_at.is_(None),
         )
-        .order_by(Node.id.asc())
-        .all()
     )
+    if not admin_can_use_mother(db):
+        query = query.filter(Node.agent_url != "local://core")
+    return query.order_by(Node.id.asc()).all()
+
+
+def customer_delivery_item_is_usable(
+    db: Session,
+    protocol: str,
+    item: dict[str, Any],
+) -> bool:
+    """Apply Mother visibility policy to already-stored credentials too."""
+    if isinstance(item, dict):
+        try:
+            node_id = int(item.get("node_id") or 0)
+        except (TypeError, ValueError):
+            node_id = 0
+        if node_id > 0:
+            node = db.get(Node, node_id)
+            if (
+                node is not None
+                and getattr(node, "is_mother", False)
+                and not admin_can_use_mother(db)
+            ):
+                return False
+    return bool(_ORIGINAL_DELIVERY_ITEM_IS_USABLE(db, protocol, item))
 
 
 def install_central_account_delivery_runtime_v3() -> None:
-    """Converge Store and reseller bot fulfillment on one 15-protocol driver.
-
-    The canonical HTTP route is already mounted from modern_account_delivery_v1
-    before the legacy Account Delivery router. These assignments close the
-    remaining in-process callers that imported the legacy five-protocol symbol.
-    """
+    """Converge fulfillment on the snapshot-aware 15-protocol driver."""
+    # runtime_endpoints is included first by app.main. Mount V3 before package
+    # initialization later appends the V2 compatibility route, giving V3 exact
+    # route precedence without rewriting the legacy Account Delivery module.
+    _runtime_endpoints.router.include_router(_subscription_protocol_lifecycle_v3_router)
     install_bounded_modern_node_provisioning_v1()
     legacy_account_delivery._nodes = subscription_snapshot_nodes
+    legacy_account_delivery._delivery_item_is_usable = customer_delivery_item_is_usable
     legacy_account_delivery.provision_account = provision_account_v1
     store_fulfillment.provision_account = provision_account_v1
     reseller_fulfillment.provision_account = provision_account_v1

@@ -5,6 +5,7 @@ import {useEffect,useMemo,useState} from "react";
 import {Badge,Card,Shell,Stat} from "./ui";
 import {adminApi,type AdminNode,type RuntimeRow,type XrayDomainState} from "../lib/admin-api";
 import {legacyAdminApi} from "../lib/legacy-admin-api";
+import {updateNodeIdentity} from "../lib/node-identity-api";
 import {useI18n} from "../lib/i18n";
 
 const s=(value:unknown)=>String(value??"").trim();
@@ -27,7 +28,7 @@ const protocolLabels:Record<(typeof protocolKeys)[number],string>={
 };
 
 type NodeRole="iran"|"exit"|"mother";
-type NodeModal="manage"|"ssh"|"domain"|"xray-domain"|"protocols"|null;
+type NodeModal="manage"|"identity"|"ssh"|"domain"|"xray-domain"|"protocols"|null;
 type ExtendedNode=AdminNode&{is_mother?:boolean;public_domain?:string|null};
 type ProtocolRuntime={
   protocol?:string;
@@ -77,6 +78,7 @@ export function LegacyNodesRuntimePage(){
   const [accessConfigured,setAccessConfigured]=useState(false);
   const [accessLoading,setAccessLoading]=useState(false);
   const [accessDraft,setAccessDraft]=useState({port:22,username:"root",password:""});
+  const [identityDraft,setIdentityDraft]=useState({name:"",country_code:""});
   const [domainDraft,setDomainDraft]=useState("");
   const [xrayDomainDraft,setXrayDomainDraft]=useState("");
   const [xrayDomainMeta,setXrayDomainMeta]=useState<XrayDomainState|null>(null);
@@ -107,8 +109,6 @@ export function LegacyNodesRuntimePage(){
   const selectedDomain=selected?domains.find(row=>n(row.id||row.node_id)===selected.id):null;
   const effectiveDomain=s(selected?.public_domain||selectedDomain?.public_domain||selectedDomain?.domain);
   const selectedProtocols=selected?enabledProtocols(selected):[];
-  // Domain registration must be available before V2Ray/Xray is enabled.
-  // TLS preparation remains gated by the actual protocol/runtime readiness.
   const hasDedicatedXrayDomain=Boolean(selected&&selectedRole==="exit");
 
   const filtered=useMemo(()=>{
@@ -128,10 +128,12 @@ export function LegacyNodesRuntimePage(){
   useEffect(()=>{
     if(!selected){
       setAccessConfigured(false);setAccessLoading(false);setRuntime({});
+      setIdentityDraft({name:"",country_code:""});
       setXrayDomainDraft("");setXrayDomainMeta(null);setXrayDomainLoading(false);
       return;
     }
     let active=true;
+    setIdentityDraft({name:s(selected.name),country_code:s(selected.country_code).toUpperCase()});
     setAccessLoading(true);
     legacyAdminApi.nodeAccess(selected.id).then(result=>{
       if(!active)return;
@@ -171,6 +173,23 @@ export function LegacyNodesRuntimePage(){
     setWarning(pick("برای این عملیات ابتدا دسترسی SSH نود را ثبت کنید.","Register SSH access before this operation."));
     setModal("ssh");
     return false;
+  };
+
+  const saveIdentity=async()=>{
+    if(!selected||busy)return;
+    const name=identityDraft.name.trim();
+    const countryCode=identityDraft.country_code.trim().toUpperCase();
+    if(!name){setError(pick("نام نود را وارد کنید.","Enter a node name."));return;}
+    if(!/^[A-Z]{2,8}$/.test(countryCode)){setError(pick("کد کشور را با حروف انگلیسی وارد کنید؛ مثل DE یا TR.","Enter a country code such as DE or TR."));return;}
+    setBusy("identity");setError("");setWarning("");
+    try{
+      const updated=await updateNodeIdentity(selected.id,{name,country_code:countryCode});
+      setNodes(current=>current.map(row=>row.id===updated.id?{...row,...updated}:row));
+      setIdentityDraft({name:s(updated.name),country_code:s(updated.country_code).toUpperCase()});
+      setModal("manage");
+      setSuccess(pick("نام و کشور نود ذخیره شد.","Node name and country saved."));
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setBusy("");}
   };
 
   const saveAccess=async()=>{
@@ -307,9 +326,9 @@ export function LegacyNodesRuntimePage(){
             <option value="all">{pick("همه","All")}</option><option value="iran">{pick("ایران","Iran")}</option><option value="exit">{pick("خارج","Exit")}</option>
           </select>
         </div>
-        <div className="table"><table><thead><tr><th>{pick("نود","Node")}</th><th>{pick("نوع","Type")}</th><th>IP</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead>
+        <div className="table"><table><thead><tr><th>{pick("نود","Node")}</th><th>{pick("کشور","Country")}</th><th>{pick("نوع","Type")}</th><th>IP</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead>
           <tbody>{filtered.map(node=><tr key={node.id} className={node.id===selectedId&&modal!==null?"is-selected":""}>
-            <td><b>{node.name}</b></td><td>{roleOf(node)}</td><td dir="ltr">{node.public_ip||"—"}</td><td><Badge tone={tone(node.status)}>{node.status||"—"}</Badge></td>
+            <td><b>{node.name}</b></td><td dir="ltr">{node.country_code||"—"}</td><td>{roleOf(node)}</td><td dir="ltr">{node.public_ip||"—"}</td><td><Badge tone={tone(node.status)}>{node.status||"—"}</Badge></td>
             <td><button type="button" className="primary-soft" onClick={()=>openManage(node.id)}>{pick("مدیریت","Manage")}</button></td>
           </tr>)}</tbody>
         </table></div>
@@ -324,6 +343,8 @@ export function LegacyNodesRuntimePage(){
         {warning?<div className="runtime-warning">{warning}</div>:null}
         {success?<div className="runtime-success">{success}</div>:null}
         <div className="runtime-info-list node-manage-info">
+          <div><span>{pick("نام نود","Node name")}</span><b>{selected.name}</b></div>
+          <div><span>{pick("کشور","Country")}</span><b dir="ltr">{selected.country_code||"—"}</b></div>
           <div><span>{pick("نقش","Role")}</span><b>{selectedRole}</b></div>
           <div><span>{pick("دسترسی SSH","SSH access")}</span><Badge tone={accessConfigured?"ok":"warn"}>{accessLoading?"…":accessConfigured?pick("ثبت شده","Saved"):pick("ثبت نشده","Missing")}</Badge></div>
           <div><span>{pick("دامنه عمومی","Public domain")}</span><b dir="ltr">{effectiveDomain||"—"}</b></div>
@@ -331,6 +352,7 @@ export function LegacyNodesRuntimePage(){
           <div><span>{pick("پروتکل‌های فعال","Enabled protocols")}</span><b>{selectedProtocols.length.toLocaleString("fa-IR")}</b></div>
         </div>
         <div className="action-row node-manage-actions">
+          <button type="button" className="primary-soft" onClick={()=>{setIdentityDraft({name:s(selected.name),country_code:s(selected.country_code).toUpperCase()});setError("");setModal("identity");}}>{pick("نام و کشور","Name & country")}</button>
           <button type="button" className="primary-soft" onClick={()=>{setError("");setAccessDraft(current=>({...current,password:""}));setModal("ssh");}}>{pick("دسترسی SSH","SSH access")}</button>
           {selectedRole!=="mother"?<button type="button" className="primary-soft" disabled={Boolean(busy)||accessLoading} onClick={()=>void upgradeAgent()}>{busy==="agent"?"…":pick("به‌روزرسانی Agent","Update Agent")}</button>:null}
           <button type="button" className="primary-soft" onClick={()=>{setDomainDraft(effectiveDomain);setModal("domain");}}>{pick("دامنه عمومی","Public domain")}</button>
@@ -338,6 +360,16 @@ export function LegacyNodesRuntimePage(){
           {selectedRole==="exit"?<button type="button" className="primary" disabled={Boolean(busy)||accessLoading} onClick={()=>void checkProtocols()}>{busy==="health"?"…":pick("بررسی پروتکل‌ها","Check protocols")}</button>:null}
           {selectedRole!=="mother"?<button type="button" className="ghost" disabled={Boolean(busy)} onClick={()=>void toggleMaintenance()}>{selected.status==="maintenance"?pick("خروج از نگهداری","Leave maintenance"):pick("حالت نگهداری","Maintenance")}</button>:null}
           <button type="button" className="danger" disabled={Boolean(busy)} onClick={()=>void deleteNode()}>{pick("حذف نود","Delete node")}</button>
+        </div>
+      </Modal>:null}
+
+      {modal==="identity"&&selected?<Modal title={pick("نام و کشور نود","Node name & country")} sub={selected.public_ip||"—"} onClose={()=>setModal("manage")}>
+        {error?<div className="runtime-error">{error}</div>:null}
+        <div className="runtime-form">
+          <label>{pick("نام نود","Node name")}<input value={identityDraft.name} onChange={event=>setIdentityDraft(current=>({...current,name:event.target.value}))} placeholder={pick("مثلاً آلمان اصلی","e.g. Germany Main")}/></label>
+          <label>{pick("کد کشور","Country code")}<input dir="ltr" maxLength={8} value={identityDraft.country_code} onChange={event=>setIdentityDraft(current=>({...current,country_code:event.target.value.toUpperCase()}))} placeholder="DE"/></label>
+          <small>{pick("در صفحه اشتراک نام کشور نمایش داده می‌شود؛ نام نود فقط برای مدیریت داخلی پنل است.","Public subscription pages show the country label; the node name remains an internal management label.")}</small>
+          <button type="button" className="primary" disabled={Boolean(busy)} onClick={()=>void saveIdentity()}>{busy==="identity"?"…":pick("ذخیره نام و کشور","Save name & country")}</button>
         </div>
       </Modal>:null}
 

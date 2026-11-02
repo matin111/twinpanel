@@ -40,9 +40,11 @@ jobs:
           assert 'UniqueConstraint("plan_id", "node_id"' in model
 
           selection = Path('backend/app/plan_template_selection.py').read_text()
-          assert 'from .models import Node, NodeType' in selection
-          assert selection.count('Node.node_type == NodeType.EXIT') >= 3
-          assert 'invalid, retired, or non-exit server ids' in selection
+          assert 'from .mother_access import admin_can_use_mother' in selection
+          assert 'Node.node_type == NodeType.EXIT' in selection
+          assert 'Node.agent_url != "local://core"' in selection
+          assert 'Node.agent_url.is_(None)' in selection
+          assert 'invalid, retired, non-exit, or disabled mother server ids' in selection
 
           plans = Path('backend/app/routers/plans.py').read_text()
           assert 'plan_template_protocols' in plans
@@ -53,6 +55,7 @@ jobs:
 
           factory = Path('backend/app/services/subscription_factory.py').read_text()
           assert 'allowed_protocols = plan_template_protocols' in factory
+          assert 'eligible_node_ids = all_active_node_ids(db)' in factory
           assert 'allowed_node_ids = (' in factory
           assert 'requested_node_ids = _unique_node_ids' in factory
           assert 'for node in nodes:' in factory

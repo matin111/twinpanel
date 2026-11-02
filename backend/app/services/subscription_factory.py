@@ -16,7 +16,11 @@ from ..models import (
     SubscriptionStatus,
     User,
 )
-from ..plan_template_selection import plan_template_node_ids, plan_template_protocols
+from ..plan_template_selection import (
+    all_active_node_ids,
+    plan_template_node_ids,
+    plan_template_protocols,
+)
 from ..protocol_account_registry import CLASSIC_PROTOCOL_KEYS, normalize_protocols
 from ..quota_models import QuotaDevice
 from ..routers.general_settings import build_subscription_username
@@ -125,20 +129,30 @@ def create_subscription_core(
             detail="حداقل یک پروتکل برای این اشتراک انتخاب کنید",
         )
 
-    all_nodes = (
+    # SubscriptionNode stores customer delivery targets. Iran ingress nodes are
+    # tunnel infrastructure and never belong in that snapshot. The Mother/Local
+    # Core is included only when the central mother-access policy enables it.
+    eligible_node_ids = all_active_node_ids(db)
+    eligible_nodes = (
         db.query(Node)
-        .filter(Node.retired_at.is_(None))
+        .filter(
+            Node.id.in_(eligible_node_ids),
+            Node.retired_at.is_(None),
+        )
         .order_by(Node.id.asc())
         .all()
+        if eligible_node_ids
+        else []
     )
-    nodes_by_id = {int(node.id): node for node in all_nodes}
+    nodes_by_id = {int(node.id): node for node in eligible_nodes}
 
-    # Server desired-state follows the same template -> snapshot contract.
-    # Old plans with no PlanNode rows resolve to every current non-retired node.
+    # Server desired-state follows the same template -> immutable snapshot
+    # contract. Plans constrain the allowed Exit set; manual subscriptions use
+    # all currently eligible Exit nodes when no explicit selection is supplied.
     allowed_node_ids = (
         plan_template_node_ids(db, int(plan.id))
         if plan is not None
-        else list(nodes_by_id)
+        else list(eligible_node_ids)
     )
     requested_node_ids = _unique_node_ids(node_ids or [])
 
@@ -152,7 +166,7 @@ def create_subscription_core(
             raise HTTPException(
                 status_code=422,
                 detail=(
-                    "این سرور در پلن فعال نیست یا بازنشسته شده است: "
+                    "این سرور در پلن فعال نیست، Exit معتبر نیست، بازنشسته شده یا سرور مادر غیرفعال است: "
                     + ", ".join(str(value) for value in invalid)
                 ),
             )
@@ -166,17 +180,12 @@ def create_subscription_core(
     if not nodes:
         raise HTTPException(
             status_code=422,
-            detail="حداقل یک سرور برای این اشتراک انتخاب کنید",
+            detail="حداقل یک سرور خروجی برای این اشتراک انتخاب کنید",
         )
 
-    iran_node = next(
-        (
-            n for n in nodes
-            if n.node_type == NodeType.IRAN
-        ),
-        None,
-    )
-
+    # Iran ingress is derived from the active Tunnel at delivery time. Keep only
+    # one Exit compatibility reference for legacy readers.
+    iran_node = None
     exit_node = next(
         (
             n for n in nodes
