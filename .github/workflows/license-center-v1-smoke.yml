@@ -26,10 +26,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify license center contract
+      - name: Verify minimal license popup contract
         run: |
           grep -Fq 'routeKey==="admin/license"' components/routed-page-client-v2.tsx
           grep -Fq '"/admin/license"' components/ui.tsx
-          grep -Fq '/v1/admin/system/license/activate' components/license-center.tsx || grep -Fq 'license/${action}' components/license-center.tsx
-          grep -Fq 'trial_active' components/license-center.tsx
-          grep -Fq 'license_expired' components/license-center.tsx
+          grep -Fq '/v1/admin/system/license/activate' components/license-center.tsx
+          grep -Fq 'expires_at' components/license-center.tsx
+          grep -Fq 'renewal_bot_url' components/license-center.tsx
+          grep -Fq 'fixed inset-0' components/license-center.tsx
+          grep -Fq 'router.push("/admin")' components/license-center.tsx
