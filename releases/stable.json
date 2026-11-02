@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.503",
+  "version": "1.1.0-rc.504",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T10:04:09Z",
+  "released_at": "2026-11-02T10:13:08Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "1dcb795f97c6967fcb13d4c9ac6b024b2328e9fa",
+  "source_sha": "6c8a0a2b6226962b3fe2fe77805c19141859cd85",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.503/twinpanel-1.1.0-rc.503-linux-x86_64.tar.gz",
-    "sha256": "9919408223c1e8dd719cd2ccfd38b9526fd751afc0e14b65c9e921195f2df6f9",
-    "size_bytes": 25333516
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.504/twinpanel-1.1.0-rc.504-linux-x86_64.tar.gz",
+    "sha256": "eaeeebfb4b9a900f7c8101b568ff411e8e9d34baf5998fee6b4d44a1701f4865",
+    "size_bytes": 25335817
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.503 مشکل ناپدیدشدن Multi-Link در Public Connect را برطرف می‌کند. Root Cause اجرای مجدد V51 در 350ms و 1100ms بود که کارت سالم را قبل از تکمیل درخواست بعدی /multi/{protocol}/meta حذف می‌کرد. V52 اکنون همان DOM سالم V51 را بدون هیچ fetch جدید به Authority پایدار تبدیل می‌کند؛ بنابراین دکمه‌های افزودن همه/کپی همه حفظ می‌شوند و اجرای دیرهنگام V30/V34/V38/V44/V49 یا V51 دیگر کارت فعال را حذف نمی‌کند. V2Ray/Xray نیز داخل همان Multi-Link واحد ۱۳ پروتکل باقی می‌ماند و سطح تکراری قدیمی V2Ray حذف می‌شود. Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting و Quota تغییری نکرده‌اند. Source روی SHA immutable 1dcb795f97c6967fcb13d4c9ac6b024b2328e9fa قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.503 fixes disappearing Multi-Link cards in Public Connect. The root cause was V51 re-running at 350ms and 1100ms and removing an already-working card before the next /multi/{protocol}/meta request completed. V52 now promotes the exact working V51 DOM node into a persistent final authority without any additional fetch, preserving its add-all/copy-all handlers while preventing late V30/V34/V38/V44/V49 or V51 refiners from removing it. V2Ray/Xray remains in the same unified 13-protocol Multi-Link authority and the duplicate legacy V2Ray surface is retired. Provisioning, credentials, tunnel dataplane, routing, firewall, accounting and quota behavior are unchanged. Source is pinned to immutable SHA 1dcb795f97c6967fcb13d4c9ac6b024b2328e9fa."
+    "fa": "TwinPanel 1.1.0-rc.504 برندینگ عمومی پروژه را نوسازی می‌کند: بنر اصلی GitHub با طراحی آبی/نئون و نمایی نزدیک به داشبورد واقعی پنل جایگزین شده، لوگوی مخزن به نشان جدید TwinPanel تغییر کرده و لوگوی پیش‌فرض پنل در /logo.svg نیز با همان نشان جدید به‌روزرسانی شده است. نام پویا و تنظیمات Branding مانند Matin Vpn و لوگوهای سفارشی کاربران بدون تغییر باقی می‌مانند؛ فقط Default TwinPanel mark عوض شده است. هیچ تغییری در Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting، Quota یا Payment ایجاد نشده است. Source روی SHA immutable 6c8a0a2b6226962b3fe2fe77805c19141859cd85 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.504 refreshes the project's public branding: the main GitHub banner is replaced with a dark navy/cyan design that closely mirrors the real admin dashboard, the repository logo uses the new TwinPanel emblem, and the panel's default /logo.svg is updated to the same mark. Dynamic branding such as Matin Vpn and user-configured custom logo URLs remain unchanged; only the default TwinPanel mark is refreshed. Provisioning, credentials, tunnel dataplane, routing, firewall, accounting, quota and payment behavior are unchanged. Source is pinned to immutable SHA 6c8a0a2b6226962b3fe2fe77805c19141859cd85."
   }
 }
