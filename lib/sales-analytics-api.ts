@@ -17,6 +17,8 @@ export type SalesSeriesPoint={
   end_at:string;
   revenue_toman:number;
   sales_count:number;
+  subscription_revenue_toman?:number;
+  wallet_topup_revenue_toman?:number;
 };
 
 export type SalesBreakdownItem={

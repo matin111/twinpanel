@@ -41,12 +41,18 @@ function chartGeometry(series:SalesSeriesPoint[]){
   const plotHeight=height-top-bottom;
   const max=Math.max(1,...series.map(row=>Number(row.revenue_toman||0)));
   const denom=Math.max(1,series.length-1);
-  const points=series.map((row,index)=>{
+  const pointFor=(row:SalesSeriesPoint,index:number,value:number)=>{
     const x=left+(index/denom)*plotWidth;
-    const y=top+plotHeight-(Number(row.revenue_toman||0)/max)*plotHeight;
+    const y=top+plotHeight-(Number(value||0)/max)*plotHeight;
     return {x,y,row,index};
-  });
-  const line=points.map(point=>`${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+  };
+  const points=series.map((row,index)=>pointFor(row,index,Number(row.revenue_toman||0)));
+  const subscriptionPoints=series.map((row,index)=>pointFor(row,index,Number(row.subscription_revenue_toman||0)));
+  const walletPoints=series.map((row,index)=>pointFor(row,index,Number(row.wallet_topup_revenue_toman||0)));
+  const lineOf=(rows:typeof points)=>rows.map(point=>`${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+  const line=lineOf(points);
+  const subscriptionLine=lineOf(subscriptionPoints);
+  const walletLine=lineOf(walletPoints);
   const area=points.length?`${left},${top+plotHeight} ${line} ${left+plotWidth},${top+plotHeight}`:"";
   const ticks=Array.from({length:5},(_,index)=>{
     const ratio=index/4;
@@ -55,7 +61,7 @@ function chartGeometry(series:SalesSeriesPoint[]){
       value:Math.round(max*(1-ratio)),
     };
   });
-  return {width,height,left,right,top,bottom,plotWidth,plotHeight,max,points,line,area,ticks};
+  return {width,height,left,right,top,bottom,plotWidth,plotHeight,max,points,line,area,ticks,subscriptionPoints,walletPoints,subscriptionLine,walletLine};
 }
 
 function sourceLabel(key:string,pick:(fa:string,en:string)=>string){
@@ -131,6 +137,10 @@ function SalesAnalyticsContent({scope}:{scope:"admin"|"reseller"}){
       <div className="sales-card-head">
         <div>
           <h2>{pick("روند درآمد فروش","Sales revenue trend")}</h2>
+          {scope==="admin"&&<div className="sales-chart-legend" aria-label={pick("تفکیک درآمد","Revenue split")}>
+            <span><i className="subscription"/>{pick("فروش اشتراک","Subscription sales")}</span>
+            <span><i className="wallet"/>{pick("شارژ کیف پول","Wallet top-ups")}</span>
+          </div>}
         </div>
         <div className="sales-selected-summary">
           <span><small>{pick("درآمد بازه","Period revenue")}</small><b>{money(data?.selected.revenue_toman||0)}</b></span>
@@ -151,12 +161,17 @@ function SalesAnalyticsContent({scope}:{scope:"admin"|"reseller"}){
             <line x1={chart.left} y1={tick.y} x2={chart.width-chart.right} y2={tick.y} className="sales-grid-line"/>
             <text x={chart.left-12} y={tick.y+5} textAnchor="end" className="sales-axis-label">{compactMoney(tick.value)}</text>
           </g>)}
-          <polygon points={chart.area} fill={`url(#salesArea-${scope})`}/>
-          <polyline points={chart.line} className="sales-chart-line"/>
-          {chart.points.map(point=><g key={point.index}>
-            <rect x={Math.max(chart.left,point.x-14)} y={chart.top} width="28" height={chart.plotHeight} fill="transparent" onMouseEnter={()=>setHoverIndex(point.index)} onPointerEnter={()=>setHoverIndex(point.index)}/>
-            <circle cx={point.x} cy={point.y} r={hoverIndex===point.index?6:3.5} className={hoverIndex===point.index?"sales-chart-point active":"sales-chart-point"}/>
-          </g>)}
+          {scope==="admin"?<>
+            <polyline points={chart.subscriptionLine} className="sales-chart-line subscription"/>
+            <polyline points={chart.walletLine} className="sales-chart-line wallet"/>
+            {chart.subscriptionPoints.map(point=><circle key={`subscription-${point.index}`} cx={point.x} cy={point.y} r={hoverIndex===point.index?5:3} className={hoverIndex===point.index?"sales-chart-point subscription active":"sales-chart-point subscription"}/>)}
+            {chart.walletPoints.map(point=><circle key={`wallet-${point.index}`} cx={point.x} cy={point.y} r={hoverIndex===point.index?5:3} className={hoverIndex===point.index?"sales-chart-point wallet active":"sales-chart-point wallet"}/>)}
+          </>:<>
+            <polygon points={chart.area} fill={`url(#salesArea-${scope})`}/>
+            <polyline points={chart.line} className="sales-chart-line"/>
+            {chart.points.map(point=><circle key={`total-${point.index}`} cx={point.x} cy={point.y} r={hoverIndex===point.index?6:3.5} className={hoverIndex===point.index?"sales-chart-point active":"sales-chart-point"}/>)}
+          </>}
+          {chart.points.map(point=><rect key={`hit-${point.index}`} x={Math.max(chart.left,point.x-14)} y={chart.top} width="28" height={chart.plotHeight} fill="transparent" onMouseEnter={()=>setHoverIndex(point.index)} onPointerEnter={()=>setHoverIndex(point.index)}/>)}
           {xLabelIndexes.map(index=>{
             const point=chart.points[index];
             if(!point)return null;
@@ -167,6 +182,10 @@ function SalesAnalyticsContent({scope}:{scope:"admin"|"reseller"}){
         {activePoint&&<div className="sales-tooltip" style={{left:`${Math.min(88,Math.max(12,(activePoint.x/chart.width)*100))}%`,top:`${Math.max(8,(activePoint.y/chart.height)*100-4)}%`}}>
           <small>{periodLabel(activePoint.row,range)}</small>
           <b>{money(activePoint.row.revenue_toman)}</b>
+          {scope==="admin"&&<>
+            <span className="tooltip-source subscription"><i/>{pick("فروش اشتراک","Subscription sales")}: {money(activePoint.row.subscription_revenue_toman||0)}</span>
+            <span className="tooltip-source wallet"><i/>{pick("شارژ کیف پول","Wallet top-ups")}: {money(activePoint.row.wallet_topup_revenue_toman||0)}</span>
+          </>}
           <span>{activePoint.row.sales_count.toLocaleString("fa-IR")} {pick("فروش","sales")}</span>
         </div>}
       </div>
@@ -210,6 +229,8 @@ function SalesAnalyticsContent({scope}:{scope:"admin"|"reseller"}){
       .sales-card-head.compact{margin-bottom:10px}
       .sales-card-head small{opacity:.56;font-size:11px}
       .sales-card-head h2{font-size:16px;margin:4px 0 0}
+      .sales-chart-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:9px;font-size:11px;opacity:.8}
+      .sales-chart-legend span{display:flex;align-items:center;gap:6px}.sales-chart-legend i{width:18px;height:3px;border-radius:99px;display:block}.sales-chart-legend i.subscription{background:#8b5cf6}.sales-chart-legend i.wallet{background:#10b981}
       .sales-selected-summary{display:grid;grid-template-columns:repeat(3,minmax(125px,1fr));gap:8px}
       .sales-selected-summary span{display:grid;gap:4px;padding:8px 12px;border-radius:11px;background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.12)}
       .sales-selected-summary b{font-size:12px;white-space:nowrap}
@@ -220,10 +241,11 @@ function SalesAnalyticsContent({scope}:{scope:"admin"|"reseller"}){
       .sales-axis-label{fill:currentColor;fill-opacity:.5;font-size:11px;font-family:inherit}
       .sales-x-label{font-size:10px}
       .sales-chart-line{fill:none;stroke:#8b5cf6;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 7px 10px rgba(124,58,237,.2))}
+      .sales-chart-line.subscription{stroke:#8b5cf6}.sales-chart-line.wallet{stroke:#10b981;filter:drop-shadow(0 7px 10px rgba(16,185,129,.16))}
       .sales-chart-point{fill:#8b5cf6;stroke:#fff;stroke-width:2;transition:r .12s ease}
-      .sales-chart-point.active{fill:#7c3aed;stroke-width:3}
-      .sales-tooltip{position:absolute;transform:translate(-50%,-100%);pointer-events:none;z-index:4;display:grid;gap:3px;min-width:145px;padding:10px 12px;border-radius:12px;background:rgba(22,17,36,.95);color:#fff;box-shadow:0 14px 35px rgba(0,0,0,.22);font-size:11px}
-      .sales-tooltip small{opacity:.65}.sales-tooltip b{font-size:13px}.sales-tooltip span{opacity:.72}
+      .sales-chart-point.subscription{fill:#8b5cf6}.sales-chart-point.wallet{fill:#10b981}.sales-chart-point.active{stroke-width:3}
+      .sales-tooltip{position:absolute;transform:translate(-50%,-100%);pointer-events:none;z-index:4;display:grid;gap:4px;min-width:185px;padding:10px 12px;border-radius:12px;background:rgba(22,17,36,.95);color:#fff;box-shadow:0 14px 35px rgba(0,0,0,.22);font-size:11px}
+      .sales-tooltip small{opacity:.65}.sales-tooltip b{font-size:13px}.sales-tooltip span{opacity:.72}.tooltip-source{display:flex;align-items:center;gap:6px}.tooltip-source i{width:7px;height:7px;border-radius:50%;display:block;flex:0 0 auto}.tooltip-source.subscription i{background:#8b5cf6}.tooltip-source.wallet i{background:#10b981}
       .sales-empty{height:300px;display:grid;place-items:center;opacity:.55;font-size:13px}.sales-empty.small{height:auto;min-height:100px}
       .sales-bottom-grid{display:grid;grid-template-columns:1fr;gap:14px}
       .sales-breakdown-list{display:grid;gap:9px}
@@ -233,7 +255,7 @@ function SalesAnalyticsContent({scope}:{scope:"admin"|"reseller"}){
       .sales-rank{width:28px;height:28px;display:grid;place-items:center;border-radius:9px;background:rgba(139,92,246,.09);color:#8b5cf6;font-size:11px;font-weight:700}
       .sales-share-track{grid-column:1/-1;height:4px;border-radius:99px;background:rgba(139,92,246,.08);overflow:hidden}.sales-share-track i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#7c3aed,#a78bfa)}
       @media(max-width:1100px){.sales-period-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sales-card-head{display:grid}.sales-selected-summary{grid-template-columns:repeat(3,1fr)}.sales-bottom-grid{grid-template-columns:1fr}}
-      @media(max-width:680px){.sales-analytics-head{align-items:stretch}.sales-range-switch{width:100%;overflow:auto}.sales-range-switch button{flex:1;white-space:nowrap}.sales-period-grid{grid-template-columns:1fr}.sales-selected-summary{grid-template-columns:1fr}.sales-chart-wrap{min-height:260px}.sales-chart-wrap svg{min-height:250px}.sales-breakdown-row{grid-template-columns:1fr}.sales-breakdown-row strong{padding-inline-start:38px}.sales-share-track{grid-column:1}.sales-card-head{gap:10px}}
+      @media(max-width:680px){.sales-analytics-head{align-items:stretch}.sales-range-switch{width:100%;overflow:auto}.sales-range-switch button{flex:1;white-space:nowrap}.sales-period-grid{grid-template-columns:1fr}.sales-selected-summary{grid-template-columns:1fr}.sales-chart-wrap{min-height:260px}.sales-chart-wrap svg{min-height:250px}.sales-breakdown-row{grid-template-columns:1fr}.sales-breakdown-row strong{padding-inline-start:38px}.sales-share-track{grid-column:1}.sales-card-head{gap:10px}.sales-chart-legend{gap:8px}}
     `}</style>
   </div>;
 }
