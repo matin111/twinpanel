@@ -33,6 +33,9 @@ from .payment_native_amount_fix_v1 import (
 from .telegram_purchase_pro_v1 import (
     install as _install_telegram_purchase_pro_v1,
 )
+from .license_expiry_telegram_v1 import (
+    install as _install_license_expiry_telegram_v1,
+)
 from .classic_node_parallel_v1 import (
     install as _install_classic_node_parallel_v1,
 )
@@ -57,6 +60,7 @@ _install_quota_process_isolation_v1()
 _install_telegram_purchase_delivery_fix_v1()
 _install_payment_native_amount_fix_v1()
 _install_telegram_purchase_pro_v1()
+_install_license_expiry_telegram_v1()
 _install_classic_node_parallel_v1()
 # Convergence, reseller and bot workers import the app package without importing
 # app.main. Install the Mother Local-Core runtime selector here as well so every
