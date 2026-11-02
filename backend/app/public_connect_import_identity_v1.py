@@ -5,15 +5,20 @@ from .routers import public_connection_forward_v34 as forward_v34
 from .routers import public_connection_reference_layout_v38 as reference_v38
 
 
-# TWINPANEL_PUBLIC_CONNECT_IMPORT_IDENTITY_V2
+# TWINPANEL_PUBLIC_CONNECT_IMPORT_IDENTITY_V3
 #
 # The subscription endpoints already publish the canonical customer-facing
-# Profile-Title (`username-protocol`). Karing's install-config scheme does not
-# reliably infer that title when `name=` is omitted and falls back to the host
-# (for example sub.example.com) in the Remarks field. Resolve Profile-Title from
-# the same-origin subscription response and pass it explicitly to Karing/Hiddify.
-# This changes presentation/import identity only; provisioning and credentials
-# are untouched.
+# Profile-Title (`username-protocol`). Karing's add-profile screen derives the
+# Remarks value from the subscription URL itself in this order: fragment,
+# `remarks`, `name`, response title, then host. Passing only `name=` on the
+# outer karing://install-config scheme is therefore not sufficient on all
+# Karing builds and can still fall back to the subscription domain.
+#
+# Resolve Profile-Title from the same-origin subscription response and also
+# carry it as a URL fragment inside the encoded subscription URL. URL fragments
+# are client-side only and are never sent to the subscription server, so this
+# changes presentation/import identity only; provisioning and credentials are
+# untouched.
 
 _HIDDIFY_OLD = "'hiddify://import/'+encodeURI(url)+'#TwinPanel-'+encodeURIComponent(protocol)"
 _HIDDIFY_NEW = "'hiddify://import/'+encodeURI(url)"
@@ -30,7 +35,7 @@ _V38_ALL_NEW = "async function allCard(panel,protocol,url,count,kind){"
 _HIDDIFY_CLEAN = "return 'hiddify://import/'+encodeURI(url);"
 _HIDDIFY_CANONICAL = "return 'hiddify://import/'+encodeURI(url)+'#'+encodeURIComponent(profile);"
 _KARING_CLEAN = "return 'karing://install-config?url='+encodeURIComponent(url);"
-_KARING_CANONICAL = "return 'karing://install-config?url='+encodeURIComponent(url)+'&name='+encodeURIComponent(profile);"
+_KARING_CANONICAL = "const karingUrl=String(url||'').split('#')[0]+'#'+profile;return 'karing://install-config?url='+encodeURIComponent(karingUrl)+'&name='+encodeURIComponent(profile);"
 
 _PROFILE_RESOLVER = """\n    let profile=String(protocol||'vpn');\n    try{\n      const response=await fetch(url,{cache:'no-store'});\n      const header=String(response.headers.get('Profile-Title')||'').trim();\n      if(header)profile=header;\n    }catch(_error){}\n"""
 
