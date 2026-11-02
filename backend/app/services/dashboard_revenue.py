@@ -6,18 +6,21 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ..customer_wallet_models import CustomerWalletTopup
 from ..payment_models import PaymentIntent
 
 
 # TWINPANEL_ADMIN_DASHBOARD_REVENUE_V86
 # Dashboard sales fields are currency amounts, never subscription counters.
-# Only confirmed payment intents contribute to revenue. verified_at is the
-# accounting timestamp; immutable payable amount wins, with base amount kept as
-# compatibility fallback for older intents which predate payable snapshots.
+# Confirmed plan payments and approved customer/reseller-owner wallet top-ups
+# contribute to revenue. Their verification/approval timestamps are the
+# accounting timestamps. Private reseller-bot customer top-ups stay isolated
+# from central admin revenue just like they are hidden from admin payment review.
 CONFIRMED_PAYMENT_STATUSES = (
     "approved",
     "auto_verified",
 )
+RESELLER_PRIVATE_TOPUP_METHOD_PATTERN = "reseller_card:%"
 
 
 def tehran_revenue_boundaries() -> tuple[datetime, datetime, datetime]:
@@ -48,13 +51,13 @@ def tehran_revenue_boundaries() -> tuple[datetime, datetime, datetime]:
 
 
 def confirmed_revenue_since(db: Session, start_at: datetime) -> int:
-    amount = func.coalesce(
+    payment_amount = func.coalesce(
         PaymentIntent.payable_amount_toman,
         PaymentIntent.base_amount_toman,
         0,
     )
-    total = (
-        db.query(func.coalesce(func.sum(amount), 0))
+    payment_total = (
+        db.query(func.coalesce(func.sum(payment_amount), 0))
         .filter(
             PaymentIntent.status.in_(CONFIRMED_PAYMENT_STATUSES),
             PaymentIntent.verified_at.isnot(None),
@@ -62,7 +65,26 @@ def confirmed_revenue_since(db: Session, start_at: datetime) -> int:
         )
         .scalar()
     )
-    return int(total or 0)
+
+    topup_amount = func.coalesce(
+        CustomerWalletTopup.payable_amount_toman,
+        CustomerWalletTopup.amount_toman,
+        0,
+    )
+    topup_total = (
+        db.query(func.coalesce(func.sum(topup_amount), 0))
+        .filter(
+            CustomerWalletTopup.status == "approved",
+            CustomerWalletTopup.approved_at.isnot(None),
+            CustomerWalletTopup.approved_at >= start_at,
+            ~CustomerWalletTopup.method.like(
+                RESELLER_PRIVATE_TOPUP_METHOD_PATTERN
+            ),
+        )
+        .scalar()
+    )
+
+    return int(payment_total or 0) + int(topup_total or 0)
 
 
 def dashboard_revenue(db: Session) -> dict[str, int]:
