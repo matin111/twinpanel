@@ -119,6 +119,16 @@ def _series(events: list[dict], buckets: list[dict]) -> list[dict]:
         end = _utc_naive(bucket["end"])
         rows = [event for event in events if start <= event["at"] < end]
         revenue = sum(int(event["amount"] or 0) for event in rows)
+        subscription_revenue = sum(
+            int(event["amount"] or 0)
+            for event in rows
+            if event.get("revenue_type") == "subscription"
+        )
+        wallet_topup_revenue = sum(
+            int(event["amount"] or 0)
+            for event in rows
+            if event.get("revenue_type") == "wallet_topup"
+        )
         output.append(
             {
                 "key": bucket["key"],
@@ -126,6 +136,8 @@ def _series(events: list[dict], buckets: list[dict]) -> list[dict]:
                 "end_at": end.isoformat() + "Z",
                 "revenue_toman": int(revenue),
                 "sales_count": len(rows),
+                "subscription_revenue_toman": int(subscription_revenue),
+                "wallet_topup_revenue_toman": int(wallet_topup_revenue),
             }
         )
     return output
@@ -186,6 +198,7 @@ def admin_sales_analytics(db: Session, range_name: str = "daily") -> dict:
                 else row.base_amount_toman or 0
             ),
             "source": str(row.method or "unknown"),
+            "revenue_type": "subscription",
         }
         for row in rows
         if row.verified_at is not None
@@ -199,6 +212,7 @@ def admin_sales_analytics(db: Session, range_name: str = "daily") -> dict:
                 else row.amount_toman or 0
             ),
             "source": str(row.method or "unknown"),
+            "revenue_type": "wallet_topup",
         }
         for row in wallet_rows
         if row.approved_at is not None
