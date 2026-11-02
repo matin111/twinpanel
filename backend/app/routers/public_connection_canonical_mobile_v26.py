@@ -18,11 +18,18 @@ from .public_connection_final_presentation_v37 import (
     refine_public_connection_final_presentation_v37,
 )
 from .public_connection_reference_layout_v38 import (
-    refine_public_connection_reference_layout_v38,
+    refine_public_connection_reference_layout_v38 as _refine_public_connection_reference_layout_v38,
 )
 from .public_connection_karing_remarks_v40 import (
     refine_public_connection_karing_remarks_v40,
 )
+
+
+def refine_public_connection_reference_layout_v38(source: str) -> str:
+    """Keep V38 as composition authority, then refine only its Karing remarks."""
+    return refine_public_connection_karing_remarks_v40(
+        _refine_public_connection_reference_layout_v38(source)
+    )
 
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26"
@@ -111,6 +118,4 @@ def refine_public_connection_canonical_mobile_v26(source: str) -> str:
     source = refine_public_connection_forward_v34(source)
     # V37 cleanup remains intact; V38 is the final reference-layout authority.
     source = refine_public_connection_final_presentation_v37(source)
-    source = refine_public_connection_reference_layout_v38(source)
-    # V40 is deliberately last: it patches the actual V38 HA action that Karing opens.
-    return refine_public_connection_karing_remarks_v40(source)
+    return refine_public_connection_reference_layout_v38(source)
