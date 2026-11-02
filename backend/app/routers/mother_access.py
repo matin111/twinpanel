@@ -53,8 +53,8 @@ def _mother_node(db: Session) -> Node:
 def _normalize_public_domain(value: str) -> str:
     domain = str(value or "").strip().lower()
     domain = re.sub(r"^https?://", "", domain).split("/", 1)[0].strip()
-    if ":" in domain and not re.fullmatch(r"\d{1,3}(?:\.\d{1,3}){3}:\d+", domain):
-        domain = domain.split(":", 1)[0]
+    if domain.count(":") == 1:
+        domain = domain.rsplit(":", 1)[0].strip()
     if not domain:
         return ""
     if not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?", domain):
