@@ -105,16 +105,21 @@ jobs:
           print('SMART_TRANSPORT_UI_V25_CONTRACT_OK')
           PY
       - name: Release manifest fallback contract
-        env:
-          PYTHONPATH: backend
         run: |
           python - <<'PY'
           import base64
+          import importlib.util
           import json
+          from pathlib import Path
           from unittest.mock import patch
 
           import httpx
-          from app import release_manifest_v25 as resolver
+
+          path=Path('backend/app/release_manifest_v25.py')
+          spec=importlib.util.spec_from_file_location('release_manifest_v25_contract',path)
+          assert spec and spec.loader
+          resolver=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(resolver)
 
           manifest={
               'schema':3,
@@ -140,7 +145,7 @@ jobs:
                   return FakeResponse(api_payload)
               raise httpx.ConnectError('blocked raw provider')
 
-          with patch('app.release_manifest_v25.httpx.get',side_effect=fake_get):
+          with patch.object(resolver.httpx,'get',side_effect=fake_get):
               result=resolver.release_manifest_v25()
 
           assert result['version']=='9.9.9-rc.25',result
