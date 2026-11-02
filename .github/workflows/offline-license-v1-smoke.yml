@@ -14,6 +14,15 @@ permissions:
 jobs:
   backend-license:
     runs-on: ubuntu-latest
+    env:
+      APP_NAME: TwinPanel-License-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-license-secret-key-ci-license-secret-key-ci-license-secret-key
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      DATABASE_URL: sqlite:///./twinpanel-license-ci.db
+      REDIS_URL: redis://127.0.0.1:6379/0
+      NODE_AGENT_SHARED_SECRET: ci-license-node-agent-shared-secret
+      TWINPANEL_LICENSE_ENFORCE: "0"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
