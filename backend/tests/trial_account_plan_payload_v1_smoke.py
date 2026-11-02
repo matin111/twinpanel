@@ -11,6 +11,10 @@ assert "**trial" in plans
 assert "DEFAULT_TRIAL_TRAFFIC_MB = 500" in service
 assert "trial_enabled:false,trial_duration_days:1,trial_traffic_mb:500" in admin_ui
 assert "trial_enabled?:boolean" in customer_ui
-assert "🎁 دریافت اکانت تست" in customer_ui
+assert "customer-buy-trial-standalone" in customer_ui
+assert "🎁 اکانت تست رایگان" in customer_ui
+assert 'JSON.stringify({})' in customer_ui
+assert "plans.map((plan,index)=>" in customer_ui
+assert "plan.trial_enabled&&" not in customer_ui
 
 print("TRIAL_ACCOUNT_PLAN_PAYLOAD_V1_OK")
