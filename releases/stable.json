@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.481",
+  "version": "1.1.0-rc.482",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T02:34:17Z",
+  "released_at": "2026-11-02T02:37:22Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "37e1757bfa685cf085b925c47b5880e461ceb7d0",
+  "source_sha": "402f5f6df40e778cccc81f07aa14a2f8b0b39347",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.481/twinpanel-1.1.0-rc.481-linux-x86_64.tar.gz",
-    "sha256": "ba7b0100866a934f4ff4ad84d80e78d25c8d1c2aa884512cfa72ac6d87d578c8",
-    "size_bytes": 25299388
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.482/twinpanel-1.1.0-rc.482-linux-x86_64.tar.gz",
+    "sha256": "e25043ac059384aaf89db54b099dc1a14948cd29307c27df6ce8dc192c9bab32",
+    "size_bytes": 25300499
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.481 ساخت Tunnel مدیریتی را اصلاح می‌کند. سرور مادر / TwinPanel Local Core دیگر در فرم Tunnel جدید به‌عنوان Exit قابل انتخاب نیست و Backend نیز قبل از ساخت Pair و اجرای Bootstrap/SSH preflight استفاده از Mother/Local Core به‌عنوان Exit را رد می‌کند. شرط Online نودها و مسیرهای موجود TP27 Fast و Spoof Tunnel بدون تغییر باقی مانده‌اند. Tunnel موجود، Dataplane، Routing، Firewall، Accounting، Quota و Credential generation تغییری نکرده‌اند. Fix PR #1781 با 7/7 Workflow سبز Merge شد و Release PR #1783 با 9/9 Workflow سبز Merge شد. Source روی SHA immutable 37e1757bfa685cf085b925c47b5880e461ceb7d0 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.481 fixes managed Tunnel creation. Mother / TwinPanel Local Core is no longer offered as a New Tunnel Exit candidate, and the backend rejects Mother/Local Core as a managed Exit before pair creation and bootstrap/SSH preflight. Online readiness and the existing TP27 Fast and Spoof Tunnel flows remain unchanged. Existing tunnels, dataplane, routing, firewall, accounting, quota and credential generation are unchanged. Fix PR #1781 merged with 7/7 green workflows and Release PR #1783 merged with 9/9 green workflows. Source is pinned to immutable SHA 37e1757bfa685cf085b925c47b5880e461ceb7d0."
+    "fa": "TwinPanel 1.1.0-rc.482 جداسازی سرور مادر / TwinPanel Local Core از Multi-Link را کامل می‌کند. Mother همچنان یک هدف واقعی Provisioning برای اکانت‌های جدید و قدیمی است و در اتصال تکی همه ۱۵ پروتکل قابل استفاده می‌ماند؛ فقط خروجی HA/Multi-Link هنگام خاموش بودن دسترسی Mother آن را حذف می‌کند. Wrapper قدیمی Central Account Delivery که Mother را از Snapshot اکانت جدید و Public Delivery کلاسیک حذف می‌کرد حذف شده است. Tunnel dataplane، Routing، Firewall، Accounting، Quota، Credential format و Transport behavior تغییری نکرده‌اند. Fix PR #1782 با 4/4 Workflow سبز Merge شد و Release PR #1785 با 9/9 Workflow سبز Merge شد. Source روی SHA immutable 402f5f6df40e778cccc81f07aa14a2f8b0b39347 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.482 completes the Mother / TwinPanel Local Core separation from Multi-Link. Mother remains a real provisioning target for new and historical accounts and stays available as an individual server across all 15 protocols; only HA/Multi-Link removes it when Mother access is disabled. The legacy Central Account Delivery wrapper that removed Mother from new-account snapshots and classic public delivery is no longer applied. Tunnel dataplane, routing, firewall, accounting, quota, credential format and transport behavior are unchanged. Fix PR #1782 merged with 4/4 green workflows and Release PR #1785 merged with 9/9 green workflows. Source is pinned to immutable SHA 402f5f6df40e778cccc81f07aa14a2f8b0b39347."
   }
 }
