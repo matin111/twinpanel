@@ -78,8 +78,17 @@ def _resolve_ready_pair(
     ):
         raise HTTPException(status_code=400, detail="سرور ایران معتبر نیست")
 
-    if exit_node is None or exit_node.node_type != NodeType.EXIT:
-        raise HTTPException(status_code=400, detail="سرور خروجی معتبر نیست")
+    if (
+        exit_node is None
+        or exit_node.node_type != NodeType.EXIT
+        or getattr(exit_node, "is_mother", False)
+        or getattr(exit_node, "agent_url", None) == "local://core"
+        or str(exit_node.public_ip or "").strip() in {"127.0.0.1", "localhost"}
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="سرور مادر/Local Core نمی‌تواند Exit یک Tunnel مدیریتی باشد",
+        )
 
     if _node_status(iran) != NodeStatus.ONLINE.value:
         raise HTTPException(
