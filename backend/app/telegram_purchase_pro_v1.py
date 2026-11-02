@@ -13,6 +13,24 @@ def _money(value) -> str:
         return "0"
 
 
+def _status(value) -> str:
+    mapping = {
+        "pending_payment": "در انتظار پرداخت",
+        "payment_submitted": "ثبت اطلاعات",
+        "awaiting_review": "در انتظار بررسی",
+        "approved": "تأیید شده",
+        "auto_verified": "تأیید خودکار",
+        "paid": "پرداخت شده",
+        "provisioning": "در حال ساخت",
+        "fulfilled": "تکمیل شده",
+        "provision_failed": "خطای ساخت",
+        "rejected": "رد شده",
+        "canceled": "لغو شده",
+    }
+    raw = str(value or "-").strip().lower()
+    return mapping.get(raw, raw or "-")
+
+
 def install() -> None:
     from . import telegram_purchase_bot as shop
 
@@ -115,24 +133,64 @@ def install() -> None:
             result = await session_fn(telegram_id)
             return result["access_token"]
 
+        @router.message(F.text == "🧾 سفارش‌های من")
+        async def my_orders(message):
+            try:
+                token = await user_token(message.from_user.id)
+                rows = await request_fn("GET", "/v1/store/orders/me", token=token)
+            except Exception as exc:
+                await message.answer("❌ " + escape(str(exc)))
+                return
+            rows = list(rows or [])[:8]
+            if not rows:
+                await message.answer("🧾 هنوز سفارشی ثبت نکرده‌اید.")
+                return
+            lines = ["🧾 <b>آخرین سفارش‌های شما</b>", ""]
+            for row in rows:
+                lines.append(
+                    f"• <b>#{int(row.get('id') or 0)}</b> · {escape(_status(row.get('status')))} · "
+                    f"<b>{_money(row.get('amount_toman'))} تومان</b>"
+                )
+            await message.answer("\n".join(lines))
+
+        @router.message(F.text == "💳 پرداخت‌های من")
+        async def my_payments(message):
+            try:
+                token = await user_token(message.from_user.id)
+                rows = await request_fn("GET", "/v1/payments/intents/me", token=token)
+            except Exception as exc:
+                await message.answer("❌ " + escape(str(exc)))
+                return
+            rows = list(rows or [])[:8]
+            if not rows:
+                await message.answer("💳 هنوز پرداختی ثبت نکرده‌اید.")
+                return
+            lines = ["💳 <b>آخرین پرداخت‌های شما</b>", ""]
+            buttons = []
+            for row in rows:
+                intent_id = int(row.get("id") or 0)
+                amount = row.get("payable_amount_toman") or row.get("base_amount_toman") or 0
+                status = str(row.get("status") or "")
+                lines.append(
+                    f"• <b>#{intent_id}</b> · {escape(_status(status))} · <b>{_money(amount)} تومان</b>"
+                )
+                if intent_id and status not in {"approved", "auto_verified", "paid", "rejected"}:
+                    buttons.append([InlineKeyboardButton(text=f"🔄 بررسی پرداخت #{intent_id}", callback_data=f"shop:verify:{intent_id}")])
+            keyboard = InlineKeyboardMarkup(inline_keyboard=buttons) if buttons else None
+            await message.answer("\n".join(lines), reply_markup=keyboard)
+
         @router.callback_query(F.data.startswith("shop:verify:"))
         async def shop_verify_payment(callback):
             try:
                 intent_id = int(callback.data.split(":")[2])
                 token = await user_token(callback.from_user.id)
                 intents = await request_fn("GET", "/v1/payments/intents/me", token=token)
-                intent = next(
-                    (row for row in (intents or []) if int(row.get("id") or 0) == intent_id),
-                    None,
-                )
+                intent = next((row for row in (intents or []) if int(row.get("id") or 0) == intent_id), None)
                 if not intent:
                     raise RuntimeError("پرداخت پیدا نشد")
 
                 status = str(intent.get("status") or "").strip().lower()
                 txid = str(intent.get("txid") or "").strip()
-
-                # Re-submit the same TXID to trigger another idempotent chain
-                # verification pass when confirmations were not ready before.
                 if status not in {"approved", "auto_verified", "paid"} and txid:
                     intent = await request_fn(
                         "POST",
@@ -142,9 +200,8 @@ def install() -> None:
                     )
                     status = str(intent.get("status") or "").strip().lower()
 
-                await callback.answer()
-
                 if status in {"approved", "auto_verified", "paid"}:
+                    await callback.answer("پرداخت تأیید شد ✅")
                     await callback.message.answer(
                         "✅ <b>پرداخت تأیید شد</b>\n\n"
                         "اکانت شما به‌صورت خودکار ساخته و اطلاعات اتصال ارسال می‌شود."
@@ -155,6 +212,7 @@ def install() -> None:
                     await callback.answer("ابتدا TXID را ثبت کنید", show_alert=True)
                     return
 
+                await callback.answer("هنوز در انتظار تأیید شبکه است")
                 await callback.message.answer(
                     "⏳ <b>در حال تأیید شبکه</b>\n\n"
                     "تراکنش پیدا شده اما تأییدهای شبکه هنوز کامل نشده است. "
