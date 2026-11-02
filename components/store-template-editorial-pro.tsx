@@ -5,8 +5,8 @@ import {useState,type ReactNode} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {useBranding} from "../lib/branding";
-import {planProtocols,type StorePlan} from "../lib/store-runtime-api";
-import {STORE_PROTOCOL_CATALOG,storeProtocolMeta} from "../lib/store-protocol-catalog";
+import {type StorePlan} from "../lib/store-runtime-api";
+import {STORE_PROTOCOL_CATALOG} from "../lib/store-protocol-catalog";
 import {
   isStorefrontSectionVisible,
   storefrontText,
@@ -46,6 +46,7 @@ const PROTOCOLS:Record<string,ProtocolMeta>={
 };
 
 const GUIDE_PROTOCOL_ORDER:StoreGuideProtocol[]=["cisco","openvpn","wireguard","l2tp","v2ray"];
+const PLAN_DEVICE_LABELS=["Android","iPhone","Windows","Mac","Linux"] as const;
 
 export function EditorialPro2027Template({settings,themeOptions,plans,loading,error,message,buying,onBuy}:EditorialProProps){
   const {pick,lang}=useI18n();
@@ -104,13 +105,12 @@ export function EditorialPro2027Template({settings,themeOptions,plans,loading,er
   const plansSection=<section className={styles.section} id="plans" key="plans">
     {sectionIntro("01",content("plans_tag"),content("plans_title"),content("plans_description"))}
     {loading?<div className={styles.state}>{pick("در حال دریافت پلن‌های فعال...","Loading active plans...")}</div>:plans.length===0?<div className={styles.state}>{pick("در حال حاضر پلن فعالی برای فروش وجود ندارد.","There are currently no active plans for sale.")}</div>:<div className={styles.planGrid} data-layout={planLayout} data-count={Math.min(plans.length,4)}>{plans.map((plan,index)=>{
-      const protocols=planProtocols(plan);
       const featured=planLayout==="spotlight"&&index===featuredPlanIndex;
       return <article className={`${styles.planCard} ${featured?styles.planFeatured:""}`} key={plan.id}>
         <div className={styles.planTop}><span className={styles.planNumber}>{String(index+1).padStart(2,"0")}</span>{featured&&<span className={styles.recommended}>{option("editorial_recommended_label",pick("انتخاب پیشنهادی","Recommended"))}</span>}</div>
         <div className={styles.planMain}><div className={styles.planName}><small>{pick("اشتراک","Subscription")}</small><h3>{plan.name}</h3>{plan.description&&<p>{plan.description}</p>}</div><div className={styles.price}><strong>{number(plan.price_toman)}</strong><span>{pick("تومان","Toman")}</span></div></div>
         <div className={styles.planFacts}><div><small>{pick("حجم","Traffic")}</small><b>{number(plan.traffic_gb,{maximumFractionDigits:2})} GB</b></div><div><small>{pick("مدت","Duration")}</small><b>{number(plan.duration_days)} {pick("روز","days")}</b></div><div><small>{pick("دستگاه","Devices")}</small><b>{number(plan.device_limit)}</b></div></div>
-        <div className={styles.planBottom}>{showProtocolMarks&&<div className={styles.protocolChips}>{protocols.slice(0,5).map(protocol=><span key={protocol}>{storeProtocolMeta(protocol)?.short||PROTOCOLS[protocol]?.short||protocol}</span>)}</div>}{showPlanBenefits&&<ul className={styles.planBenefits}><li>{content("plan_feature_1")}</li><li>{content("plan_feature_2")}</li><li>{content("plan_feature_3")}</li></ul>}<button className={styles.buyButton} disabled={buying===plan.id} onClick={()=>onBuy(plan)}><span>{buying===plan.id?pick("در حال ثبت سفارش...","Creating order..."):pick("انتخاب این پلن","Choose this plan")}</span><i>↗</i></button></div>
+        <div className={styles.planBottom}>{showProtocolMarks&&<div className={styles.protocolChips}>{PLAN_DEVICE_LABELS.map(device=><span key={device}>{device}</span>)}</div>}{showPlanBenefits&&<ul className={styles.planBenefits}><li>{content("plan_feature_1")}</li><li>{content("plan_feature_2")}</li><li>{content("plan_feature_3")}</li></ul>}<button className={styles.buyButton} disabled={buying===plan.id} onClick={()=>onBuy(plan)}><span>{buying===plan.id?pick("در حال ثبت سفارش...","Creating order..."):pick("انتخاب این پلن","Choose this plan")}</span><i>↗</i></button></div>
       </article>;
     })}</div>}
   </section>;
