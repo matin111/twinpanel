@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.518",
+  "version": "1.1.0-rc.520",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T18:37:02Z",
+  "released_at": "2026-11-02T18:56:45Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d5e944323be3f92b6f7c3cc27ff854b058dce8d1",
+  "source_sha": "8330ee896428516da3f95fae61a6d5cda51ddb0f",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.518/twinpanel-1.1.0-rc.518-linux-x86_64.tar.gz",
-    "sha256": "9552b1e880bafd37337b83c79886f2c26e0ca00a2df44c72c611bd576aed5744",
-    "size_bytes": 25417939
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.520/twinpanel-1.1.0-rc.520-linux-x86_64.tar.gz",
+    "sha256": "bb8d3d030eb562e11b1a04a692ef0862aacee06633f32e2680d463d00c066b41",
+    "size_bytes": 25411263
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.518 هنگام افزودن سرور Exit جدید گزینه «نمایش برای همه کاربران سایت» را اضافه می‌کند. با فعال‌کردن این گزینه، سرور جدید علاوه بر اشتراک‌های Legacy به اشتراک‌های قدیمی دارای Delivery Policy صریح هم اضافه می‌شود، حالت Direct برای نود ایجاد یا فعال می‌شود و برای اشتراک‌های فعال Reconcile اجرا می‌شود تا credentialهای قابل استفاده روی سرور جدید واقعاً Provision شوند. رفتار Auto-Sync قبلی برای اشتراک‌های Legacy حفظ شده و این گزینه برای نودهای Iran/Relay نمایش داده نمی‌شود. این نسخه همچنین UI فعال‌سازی و تمدید لایسنس فقط برای ادمین را از main فعلی شامل می‌شود. Source روی SHA immutable d5e944323be3f92b6f7c3cc27ff854b058dce8d1 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.518 adds a publish-to-all-users option when installing a new Exit node. When enabled, the new server is added not only to legacy subscriptions but also to existing subscriptions with explicit Delivery Policy, direct delivery is created or enabled for the node, and active subscriptions are reconciled so usable credentials are actually provisioned on the new server. Existing legacy auto-sync behavior is preserved, and the option is not shown for Iran/Relay nodes. This version also includes the admin-only license activation and renewal UI already present on current main. Source is pinned to immutable SHA d5e944323be3f92b6f7c3cc27ff854b058dce8d1."
+    "fa": "TwinPanel 1.1.0-rc.520 افزودن سرور را از صفحه جدا حذف می‌کند و آن را داخل صفحه «نودها» به‌صورت Popup/Modal قرار می‌دهد. دکمه «افزودن سرور» بدون خروج از صفحه نودها فرم ثبت سرور، تست SSH، انتخاب Iran/Exit، کشور و ظرفیت را باز می‌کند. برای Exit گزینه «نمایش برای همه کاربران سایت» داخل همان Popup نمایش داده می‌شود و در صورت فعال بودن، سرور جدید بعد از ثبت به اشتراک‌های قبلی نیز Publish می‌شود. Xray baseline برای Exit همچنان از مسیر رسمی Protocol Studio آماده می‌شود. مسیر /admin/provision نیز به صفحه نودها برمی‌گردد و صفحه مستقل افزودن سرور دیگر رندر نمی‌شود. Source روی SHA immutable 8330ee896428516da3f95fae61a6d5cda51ddb0f قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.520 removes the standalone Add Server screen and moves server creation into a popup/modal on the Nodes page. The existing Add Server button now opens the registration form in place with SSH test, Iran/Exit selection, country and capacity fields. Exit nodes show the Show for all site users option in the same modal and, when enabled, publish the newly created server into existing subscriptions. The Exit Xray baseline is still prepared through the canonical Protocol Studio path. /admin/provision now resolves back to the Nodes screen instead of rendering a standalone add-server page. Source is pinned to immutable SHA 8330ee896428516da3f95fae61a6d5cda51ddb0f."
   }
 }
