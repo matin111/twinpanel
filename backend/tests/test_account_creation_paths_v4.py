@@ -9,6 +9,7 @@ STORE = ROOT / "backend/app/routers/store.py"
 RESELLER_BOT = ROOT / "backend/app/routers/reseller_bot_orders.py"
 RESELLER = ROOT / "backend/app/routers/reseller_sale_v2.py"
 UI = ROOT / "components/admin-manual-subscription-create.tsx"
+ROUTER = ROOT / "components/routed-page-client.tsx"
 CLIENT = ROOT / "lib/subscription-create-fast-api.ts"
 
 
@@ -17,6 +18,7 @@ def test_manual_fast_create_uses_degraded_preflight_runtime() -> None:
     central = CENTRAL.read_text(encoding="utf-8")
     fast = FAST.read_text(encoding="utf-8")
     ui = UI.read_text(encoding="utf-8")
+    router = ROUTER.read_text(encoding="utf-8")
     client = CLIENT.read_text(encoding="utf-8")
 
     assert "advisory_subscription_provisioning_preflight" in runtime
@@ -31,6 +33,17 @@ def test_manual_fast_create_uses_degraded_preflight_runtime() -> None:
     assert "_should_suspend_after_background_provisioning" in fast
     assert "createSubscriptionFastV1" in ui
     assert "/v1/subscriptions/admin-create-fast-v1" in client
+
+    # The real admin/subscriptions route must keep the per-account protocol picker.
+    assert 'AdminManualSubscriptionCreate=dynamic(' in router
+    assert '<AdminManualSubscriptionCreate/>' in router
+    assert 'const [protocols,setProtocols]=useState<string[]>([])' in ui
+    assert 'setProtocols(catalogPayload.protocols.filter(item=>item.family==="classic").map(item=>item.key))' in ui
+    assert 'انتخاب همه ۱۵ پروتکل' in ui
+    assert 'پروتکل‌های کلاسیک' in ui
+    assert 'پروتکل‌های جدید' in ui
+    assert 'checked={protocols.includes(item.key)}' in ui
+    assert 'protocols,' in ui
 
 
 def test_direct_reseller_sale_provisions_real_account_and_uses_15_protocol_template() -> None:
@@ -66,5 +79,6 @@ def test_store_and_reseller_bot_share_central_15_protocol_provisioner() -> None:
 def test_release_must_not_hide_db_only_reseller_regression_again() -> None:
     runtime = RUNTIME.read_text(encoding="utf-8")
 
-    assert "direct panel endpoint previously stopped after create_subscription_core()" in runtime
+    assert "direct panel endpoint previously stopped after" in runtime
+    assert "create_subscription_core()" in runtime
     assert "Runtime route precedence" in runtime
