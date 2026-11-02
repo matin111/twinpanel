@@ -23,11 +23,15 @@ from .public_connection_reference_layout_v38 import (
 from .public_connection_karing_remarks_v40 import (
     refine_public_connection_karing_remarks_v40,
 )
+from .public_connection_multilink_authority_v51 import (
+    refine_public_connection_multilink_authority_v51,
+)
 
 
 def refine_public_connection_reference_layout_v38(source: str) -> str:
-    """Keep V38 as presentation authority, then refine only its Karing remarks."""
-    return refine_public_connection_karing_remarks_v40(_v38_refiner(source))
+    """Run the legacy reference stack, then let V51 own final Multi-Link/mobile presentation."""
+    source = refine_public_connection_karing_remarks_v40(_v38_refiner(source))
+    return refine_public_connection_multilink_authority_v51(source)
 
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26"
@@ -114,6 +118,7 @@ def refine_public_connection_canonical_mobile_v26(source: str) -> str:
     # V36 binds the responsive accordion before V34 builds customer actions.
     source = refine_public_connection_mobile_compact_v36(source)
     source = refine_public_connection_forward_v34(source)
-    # V37 cleanup remains intact; V38 is the final reference-layout authority.
+    # V37 cleanup remains intact; V38/V39/V40/V41/V44 execute first and V51
+    # then becomes the single final Multi-Link/mobile-category presentation.
     source = refine_public_connection_final_presentation_v37(source)
     return refine_public_connection_reference_layout_v38(source)
