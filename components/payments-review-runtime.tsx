@@ -121,22 +121,32 @@ export function PaymentsReviewRuntime(){
       orderId:n(row.order_id)||null,
       sourceLabel:pick("خرید اشتراک","Subscription purchase"),
     }));
-    const walletRows=wallets.map(row=>({
-      key:`wallet:${n(row.id)}`,
-      kind:"wallet" as const,
-      id:n(row.id),
-      userId:n(row.user_id),
-      amount:n(row.payable_amount_toman||row.amount_toman),
-      method:s(row.method),
-      status:s(row.status),
-      createdAt:row.created_at,
-      submittedAt:row.submitted_at,
-      hasReceipt:false,
-      txid:s(row.txid),
-      trackingCode:s(row.tracking_code),
-      orderId:null,
-      sourceLabel:pick("شارژ کیف پول","Wallet top-up"),
-    }));
+    const walletRows=wallets.map(row=>{
+      const method=s(row.method);
+      const status=s(row.status);
+      const trackingCode=s(row.tracking_code);
+      // Older wallet-list responses do not expose receipt_uploaded. A submitted
+      // card-to-card top-up with a tracking code is reviewable only after the
+      // customer flow has collected the payment proof, so keep that as a
+      // compatibility fallback until every installed backend returns the flag.
+      const hasReceipt=Boolean(row.receipt_uploaded)||(method==="card_to_card"&&Boolean(trackingCode)&&reviewStatuses.has(status.toLowerCase()));
+      return {
+        key:`wallet:${n(row.id)}`,
+        kind:"wallet" as const,
+        id:n(row.id),
+        userId:n(row.user_id),
+        amount:n(row.payable_amount_toman||row.amount_toman),
+        method,
+        status,
+        createdAt:row.created_at,
+        submittedAt:row.submitted_at,
+        hasReceipt,
+        txid:s(row.txid),
+        trackingCode,
+        orderId:null,
+        sourceLabel:pick("شارژ کیف پول","Wallet top-up"),
+      };
+    });
     return [...purchaseRows,...walletRows].sort((a,b)=>{
       const at=new Date(String(a.createdAt||0)).getTime()||0;
       const bt=new Date(String(b.createdAt||0)).getTime()||0;
@@ -147,7 +157,7 @@ export function PaymentsReviewRuntime(){
   const userMap=useMemo(()=>new Map(users.map(user=>[user.id,user])),[users]);
 
   const pendingRows=rows.filter(row=>!finalStatuses.has(row.status.toLowerCase())&&(reviewStatuses.has(row.status.toLowerCase())||row.hasReceipt));
-  const receiptRows=rows.filter(row=>row.kind==="purchase"&&row.hasReceipt&&!finalStatuses.has(row.status.toLowerCase()));
+  const receiptRows=rows.filter(row=>row.hasReceipt&&!finalStatuses.has(row.status.toLowerCase()));
   const walletPending=rows.filter(row=>row.kind==="wallet"&&reviewStatuses.has(row.status.toLowerCase()));
   const purchasePending=rows.filter(row=>row.kind==="purchase"&&!finalStatuses.has(row.status.toLowerCase())&&(reviewStatuses.has(row.status.toLowerCase())||row.hasReceipt));
 
@@ -219,7 +229,10 @@ export function PaymentsReviewRuntime(){
       const token=getCustomerToken();
       if(!token)throw new Error("AUTH_REQUIRED");
 
-      const response=await fetch(`${API_BASE}/v1/payments/admin/intents/${row.id}/receipt`,{
+      const receiptPath=row.kind==="wallet"
+        ?`/v1/admin/wallet/topups/${row.id}/receipt`
+        :`/v1/payments/admin/intents/${row.id}/receipt`;
+      const response=await fetch(`${API_BASE}${receiptPath}`,{
         headers:{Authorization:`Bearer ${token}`},
         cache:"no-store",
       });
@@ -307,18 +320,21 @@ export function PaymentsReviewRuntime(){
           const status=row.status.toLowerCase();
           const user=userMap.get(row.userId);
           const reviewable=!finalStatuses.has(status)&&(reviewStatuses.has(status)||row.hasReceipt);
-          const proof=row.hasReceipt?pick("رسید ارسال شده","Receipt received"):row.txid?`TXID: ${row.txid.slice(0,12)}…`:row.trackingCode?pick("اطلاعات واریز ثبت شده","Transfer info submitted"):pick("ارسال نشده","Not submitted");
+          const proofCode=row.txid?`TXID: ${row.txid}`:row.trackingCode?`${pick("کد رهگیری","Tracking code")}: ${row.trackingCode}`:"";
           return <tr key={row.key}>
             <td><Badge tone={row.kind==="purchase"?"violet":"warn"}>{row.sourceLabel}</Badge></td>
             <td>#{row.id}{row.orderId?<small style={{display:"block"}}>Order #{row.orderId}</small>:null}</td>
             <td><b>{userName(user,row.userId)}</b><small style={{display:"block"}}>{user?.email||`User #${row.userId}`}</small></td>
             <td>{money(row.amount)}</td>
             <td>{methodLabel(row.method)}</td>
-            <td>{row.hasReceipt?<Badge tone="violet">✓ {proof}</Badge>:<span>{proof}</span>}</td>
+            <td><div style={{display:"grid",gap:6,maxWidth:320}}>
+              {row.hasReceipt&&<Badge tone="violet">✓ {pick("رسید ارسال شده","Receipt received")}</Badge>}
+              {proofCode?<span dir="ltr" style={{display:"block",wordBreak:"break-all",fontSize:11}}>{proofCode}</span>:!row.hasReceipt?<span>{pick("ارسال نشده","Not submitted")}</span>:null}
+            </div></td>
             <td><Badge tone={statusTone(status)}>{statusLabel(status,pick)}</Badge></td>
             <td>{dateText(row.submittedAt||row.createdAt)}</td>
             <td><div className="row-actions">
-              {row.kind==="purchase"&&row.hasReceipt&&<button className="mini-btn" onClick={()=>void openReceipt(row)}>{pick("مشاهده رسید","View receipt")}</button>}
+              {row.hasReceipt&&<button className="mini-btn" onClick={()=>void openReceipt(row)}>{pick("مشاهده رسید","View receipt")}</button>}
               {reviewable&&<button className="mini-btn" disabled={busyKey===row.key} onClick={()=>void approve(row)}>{pick("تأیید","Approve")}</button>}
               {reviewable&&<button className="mini-btn danger" disabled={busyKey===row.key} onClick={()=>reject(row)}>{pick("رد","Reject")}</button>}
             </div></td>
