@@ -4,16 +4,17 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from .models import Node, Subscription
+from .models import Node, NodeProtocolConfig, NodeType, Subscription
 from .models_reseller import ResellerSubscription
 from .mother_access import (
     admin_can_use_mother,
     reseller_can_use_mother,
 )
+from .node_runtime_connection import connect_protocol_runtime, is_local_core
 from .routers import account_delivery
 
 
-# TWINPANEL_MOTHER_SUBSCRIPTION_DELIVERY_POLICY_V108
+# TWINPANEL_MOTHER_SUBSCRIPTION_DELIVERY_POLICY_V109
 #
 # Mother is infrastructure/control-plane state. Keep its Node row, protocol
 # runtime and stored subscription credentials intact, but enforce the existing
@@ -23,9 +24,89 @@ from .routers import account_delivery
 # Reseller-owned subscriptions follow the reseller global + per-reseller policy.
 # This keeps public sublinks, customer connection-info and admin connection-info
 # consistent without deleting credentials when access is temporarily disabled.
+#
+# V109 also closes two protocol-runtime gaps:
+#   * Local Core account provisioning must use the local runtime executor instead
+#     of looking for saved SSH credentials for the controller itself.
+#   * A healthy Modern runtime on a direct Exit remains customer-deliverable when
+#     there is no Iran tunnel, matching the existing direct-classic fallback.
 
 _original_stored_info = account_delivery._stored_info
+_original_ssh_connect_saved = account_delivery.ssh_connect_saved
+_original_delivery_item_is_usable = account_delivery._delivery_item_is_usable
 _applied = False
+
+_MODERN_PROTOCOLS = frozenset(
+    {
+        "hysteria2",
+        "tuic",
+        "anytls",
+        "naive",
+        "shadowtls",
+        "snell",
+        "mieru",
+        "trusttunnel",
+        "amneziawg",
+        "sudoku",
+    }
+)
+
+
+def _status_value(value: Any) -> str:
+    return str(getattr(value, "value", value) or "").strip().lower()
+
+
+async def _runtime_aware_connect_saved(node: Node, db: Session):
+    if is_local_core(node):
+        return await connect_protocol_runtime(node, db)
+    return await _original_ssh_connect_saved(node, db)
+
+
+def _modern_direct_item_is_usable(
+    db: Session,
+    protocol: str,
+    item: dict[str, Any],
+) -> bool:
+    if _original_delivery_item_is_usable(db, protocol, item):
+        return True
+
+    key = str(protocol or "").strip().lower()
+    if key not in _MODERN_PROTOCOLS or not isinstance(item, dict):
+        return False
+
+    try:
+        node_id = int(item.get("node_id") or 0)
+    except (TypeError, ValueError):
+        return False
+    if node_id <= 0:
+        return False
+
+    node = db.get(Node, node_id)
+    if not node:
+        return False
+    if getattr(node, "retired_at", None):
+        return False
+    if not bool(getattr(node, "show_to_users", True)):
+        return False
+    if _status_value(getattr(node, "status", None)) != "online":
+        return False
+    if node.node_type != NodeType.EXIT:
+        return False
+
+    # Existing tunnel-aware delivery remains authoritative. This additive
+    # fallback is only for a direct Exit with no usable Iran ingress.
+    if account_delivery._delivery_active_tunnels(db, node):
+        return False
+
+    cfg = (
+        db.query(NodeProtocolConfig)
+        .filter(
+            NodeProtocolConfig.node_id == node_id,
+            NodeProtocolConfig.protocol == key,
+        )
+        .first()
+    )
+    return bool(cfg and _status_value(getattr(cfg, "status", None)) == "online")
 
 
 def _subscription_can_use_mother(
@@ -152,7 +233,20 @@ def apply_mother_subscription_delivery_policy_v108() -> None:
     if _applied:
         return
 
-    account_delivery._stored_info = (
-        _stored_info_with_mother_policy
-    )
+    account_delivery._stored_info = _stored_info_with_mother_policy
+    account_delivery.ssh_connect_saved = _runtime_aware_connect_saved
+    account_delivery._delivery_item_is_usable = _modern_direct_item_is_usable
+
+    # Public mobile inventory imported the helper by value before self-hosted
+    # runtime hooks are applied. Rebind that local reference as well so desktop
+    # and mobile use the same direct-modern eligibility rule.
+    try:
+        from .routers import public_connection_mobile_server_inventory_v18
+
+        public_connection_mobile_server_inventory_v18._delivery_item_is_usable = (
+            _modern_direct_item_is_usable
+        )
+    except Exception:
+        pass
+
     _applied = True

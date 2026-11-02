@@ -1,6 +1,7 @@
+import asyncio
 from types import SimpleNamespace
 
-from app.models import Node
+from app.models import Node, NodeProtocolConfig, NodeType
 from app import mother_subscription_delivery_policy_v108 as policy
 
 
@@ -16,11 +17,14 @@ class _Query:
 
 
 class _DB:
-    def __init__(self, *, reseller_row=None, nodes=None):
+    def __init__(self, *, reseller_row=None, nodes=None, protocol_config=None):
         self.reseller_row = reseller_row
         self.nodes = nodes or {}
+        self.protocol_config = protocol_config
 
     def query(self, *args, **kwargs):
+        if args and args[0] is NodeProtocolConfig:
+            return _Query(self.protocol_config)
         return _Query(self.reseller_row)
 
     def get(self, model, key):
@@ -33,6 +37,18 @@ def _node(node_id: int, *, mother: bool):
     return SimpleNamespace(
         id=node_id,
         is_mother=mother,
+    )
+
+
+def _runtime_node(node_id: int, *, mother: bool = False):
+    return SimpleNamespace(
+        id=node_id,
+        is_mother=mother,
+        agent_url="local://core" if mother else "https://agent.example.invalid",
+        retired_at=None,
+        show_to_users=True,
+        status="online",
+        node_type=NodeType.EXIT,
     )
 
 
@@ -161,9 +177,71 @@ def test_stored_info_wrapper_filters_only_when_policy_is_disabled():
         policy._subscription_can_use_mother = original_allowed
 
 
+def test_mother_account_delivery_uses_local_runtime_executor():
+    mother = _runtime_node(1, mother=True)
+    remote = _runtime_node(5, mother=False)
+    db = _DB(nodes={1: mother, 5: remote})
+    calls = []
+
+    original_local = policy.connect_protocol_runtime
+    original_remote = policy._original_ssh_connect_saved
+
+    async def local_connect(node, _db):
+        calls.append(("local", int(node.id)))
+        return "LOCAL"
+
+    async def remote_connect(node, _db):
+        calls.append(("remote", int(node.id)))
+        return "REMOTE"
+
+    async def run():
+        policy.connect_protocol_runtime = local_connect
+        policy._original_ssh_connect_saved = remote_connect
+        try:
+            assert await policy._runtime_aware_connect_saved(mother, db) == "LOCAL"
+            assert await policy._runtime_aware_connect_saved(remote, db) == "REMOTE"
+        finally:
+            policy.connect_protocol_runtime = original_local
+            policy._original_ssh_connect_saved = original_remote
+
+    asyncio.run(run())
+    assert calls == [("local", 1), ("remote", 5)]
+
+
+def test_modern_direct_exit_without_tunnel_is_usable_when_runtime_online():
+    exit_node = _runtime_node(5)
+    db = _DB(
+        nodes={5: exit_node},
+        protocol_config=SimpleNamespace(status="online"),
+    )
+
+    original_usable = policy._original_delivery_item_is_usable
+    original_tunnels = policy.account_delivery._delivery_active_tunnels
+    try:
+        policy._original_delivery_item_is_usable = lambda _db, _protocol, _item: False
+        policy.account_delivery._delivery_active_tunnels = lambda _db, _node: []
+        assert policy._modern_direct_item_is_usable(
+            db,
+            "anytls",
+            {"node_id": 5},
+        ) is True
+
+        db.protocol_config = SimpleNamespace(status="offline")
+        assert policy._modern_direct_item_is_usable(
+            db,
+            "anytls",
+            {"node_id": 5},
+        ) is False
+    finally:
+        policy._original_delivery_item_is_usable = original_usable
+        policy.account_delivery._delivery_active_tunnels = original_tunnels
+
+
 if __name__ == "__main__":
     test_direct_subscription_uses_admin_policy()
     test_reseller_subscription_uses_reseller_policy()
     test_hidden_mother_is_removed_without_mutating_stored_payload()
     test_stored_info_wrapper_filters_only_when_policy_is_disabled()
-    print("MOTHER_SUBSCRIPTION_DELIVERY_POLICY_V108_OK")
+    test_mother_account_delivery_uses_local_runtime_executor()
+    test_modern_direct_exit_without_tunnel_is_usable_when_runtime_online()
+    print("MOTHER_SUBSCRIPTION_DELIVERY_POLICY_V109_OK")
