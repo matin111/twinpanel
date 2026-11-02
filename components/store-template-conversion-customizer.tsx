@@ -52,6 +52,7 @@ const PLAN_FIELDS:TextField[]=[
 ];
 const PROTOCOL_FIELDS:TextField[]=[
   {key:"protocols_tag",fa:"برچسب پروتکل‌ها",en:"Protocols tag"},{key:"protocols_title",fa:"عنوان پروتکل‌ها",en:"Protocols title"},{key:"protocols_description",fa:"توضیح پروتکل‌ها",en:"Protocols description",long:true},
+  {key:"modern_protocols_description",fa:"توضیح پروتکل‌های مدرن",en:"Modern protocols description",long:true},
 ];
 const SERVICE_FIELDS:TextField[]=[
   {key:"services_tag",fa:"برچسب خدمات",en:"Services tag"},{key:"services_title",fa:"عنوان خدمات",en:"Services title"},{key:"services_description",fa:"توضیح خدمات",en:"Services description",long:true},
