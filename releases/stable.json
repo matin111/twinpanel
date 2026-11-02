@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.492",
+  "version": "1.1.0-rc.493",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T05:46:58Z",
+  "released_at": "2026-11-02T05:53:30Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7bcf62d289b6fdf5f468cfdaadaf8906ac181128",
+  "source_sha": "858a91ac8b3b8d2ac06e9a41a26b3aececf19b52",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.492/twinpanel-1.1.0-rc.492-linux-x86_64.tar.gz",
-    "sha256": "32426f32c70f85a361a53224ccce5b2ac337546728a6427d4ef2639b52d0762c",
-    "size_bytes": 25319739
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.493/twinpanel-1.1.0-rc.493-linux-x86_64.tar.gz",
+    "sha256": "6d7f692f8b3076b3300f9387bfffbfbb8fb55cc2a0d27478cca52ad7b1e07236",
+    "size_bytes": 25318509
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.492 نمایش رسید و اطلاعات پرداخت شارژ کیف پول را در صفحه مدیریت پرداخت‌ها اصلاح می‌کند. ادمین قبل از تأیید می‌تواند کد رهگیری کامل یا TXID را ببیند و برای شارژ کیف پول نیز دکمه مشاهده رسید را باز کند. شمارنده رسیدهای جدید، رسیدهای کیف پول را هم حساب می‌کند. منطق افزایش موجودی، تأیید/رد، حریم نمایندگی، Provisioning و state transitionهای پرداخت تغییری نکرده‌اند. Source روی SHA immutable 7bcf62d289b6fdf5f468cfdaadaf8906ac181128 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.492 fixes wallet top-up payment evidence in the admin payments review page. Admins can see the full tracking code or TXID before approval, open wallet top-up receipts using the existing admin-safe receipt endpoint, and wallet receipts are included in the new-receipts counter. Wallet crediting, approval/rejection rules, reseller privacy, provisioning, and payment state transitions are unchanged. Source is pinned to immutable SHA 7bcf62d289b6fdf5f468cfdaadaf8906ac181128."
+    "fa": "TwinPanel 1.1.0-rc.493 دکمه‌های Multi-Link و هویت برنامه مقصد را یک‌دست می‌کند. Actionهای دارای Deep Link با قالب «افزودن به <برنامه>» نمایش داده می‌شوند، متن‌های کپی/دانلود بین کارت‌ها هماهنگ شده‌اند و V2Ray/Xray دیگر به Karing/Hiddify نسبت داده نمی‌شود: روی دسکتاپ v2rayN، روی Android v2rayNG و روی iOS V2Box نمایش داده می‌شود. این تغییر فقط لایه ارائه و انتخاب کلاینت را اصلاح می‌کند و Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting و Quota تغییری نکرده‌اند. Source روی SHA immutable 858a91ac8b3b8d2ac06e9a41a26b3aececf19b52 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.493 unifies Multi-Link button wording and destination client identity. Deep-link actions now use an explicit Add to <client> label, copy/download wording is consistent across cards, and V2Ray/Xray is no longer mislabeled as Karing/Hiddify: desktop uses v2rayN, Android uses v2rayNG, and iOS uses V2Box. This release changes presentation and client selection only; provisioning, credentials, tunnel dataplane, routing, firewall, accounting, and quota behavior are unchanged. Source is pinned to immutable SHA 858a91ac8b3b8d2ac06e9a41a26b3aececf19b52."
   }
 }
