@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.495",
-  "source_sha": "09ad515242540b6611fd3773b4030c83d5506d7d",
+  "version": "1.1.0-rc.496",
+  "source_sha": "7e5921601397e7489e437ff998cd8d2fac268bf4",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.495 آمار فروش ادمین را با شارژهای تأییدشده کیف پول همگام می‌کند. شارژ کیف پول فقط پس از status=approved و داشتن approved_at وارد درآمد می‌شود و در فروش امروز، هفته، ماه و سال، نمودار روند درآمد، تعداد فروش موفق، میانگین هر فروش و تفکیک روش پرداخت محاسبه می‌شود. درخواست‌های در انتظار یا ردشده و شارژهای خصوصی reseller_card:* همچنان از درآمد مرکزی ادمین خارج هستند. منطق تأیید/رد شارژ، موجودی کیف پول، Provisioning و Payment state تغییر نکرده است. Source روی SHA immutable 09ad515242540b6611fd3773b4030c83d5506d7d قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.495 aligns admin sales analytics with approved wallet top-ups. Wallet top-ups contribute only after status=approved with approved_at present, and are included in today/week/month/year revenue, revenue charts, successful-sale counts, average sale value, and payment-method breakdown. Pending/rejected requests and private reseller_card:* top-ups remain excluded from central admin revenue. Wallet approval/rejection, balances, provisioning, and payment state transitions are unchanged. Source is pinned to immutable SHA 09ad515242540b6611fd3773b4030c83d5506d7d."
+    "fa": "TwinPanel 1.1.0-rc.496 مشکل ملاحظات Karing در کارت واقعی High Availability صفحه Public Connect را اصلاح می‌کند. اکشن نهایی V38 اکنون قبل از بازشدن Karing پارامتر name را صریحاً به شکل نام کاربری/سرویس + پروتکل می‌سازد؛ برای نمونه MSABT122138-tuic. بنابراین Karing دیگر دامنه اشتراک مثل sub.movifilm.sbs را به‌عنوان ملاحظات جایگزین نمی‌کند. این تغییر فقط لایه Import/Presentation را اصلاح می‌کند و Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting و Quota تغییری نکرده‌اند. Source روی SHA immutable 7e5921601397e7489e437ff998cd8d2fac268bf4 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.496 fixes Karing remarks on the actual High Availability action used by the live Public Connect page. The final V38 action now explicitly sets the Karing name parameter to account/service username plus protocol before opening the app, for example MSABT122138-tuic, preventing Karing from falling back to the subscription host such as sub.movifilm.sbs. This change is limited to import/presentation; provisioning, credentials, tunnel dataplane, routing, firewall, accounting, and quota are unchanged. Source is pinned to immutable SHA 7e5921601397e7489e437ff998cd8d2fac268bf4."
   }
 }
