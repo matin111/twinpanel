@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.479",
+  "version": "1.1.0-rc.480",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T01:58:56Z",
+  "released_at": "2026-11-02T02:11:08Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "8938956b21166666458cc0674d533be2fb84015d",
+  "source_sha": "8597b2291f5e1feb8f6b7bfacac6a22531b5d5b4",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.479/twinpanel-1.1.0-rc.479-linux-x86_64.tar.gz",
-    "sha256": "e3381395fe0c1f98ff0855f27ecda740be45a174cf3140d87f0842acd9240103",
-    "size_bytes": 25299565
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.480/twinpanel-1.1.0-rc.480-linux-x86_64.tar.gz",
+    "sha256": "8df0849cb6456fe8b7bf424b3de853641f1fa38644286d77ee5f1bdf716af9f9",
+    "size_bytes": 25300705
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.479 نمایش کارت پلن در قالب‌های ۱ و ۲ فروشگاه را ساده‌تر و کاربرپسندتر می‌کند. چیپ‌های روی خود کارت پلن به‌جای نام پنج پروتکل، دستگاه‌های Android، iPhone، Windows، Mac و Linux را نمایش می‌دهند. این تغییر فقط نمایشی است؛ داده واقعی پروتکل‌های پلن، بخش معرفی پروتکل‌ها، راهنمای اتصال و قالب ۳ / Orbit بدون تغییر مانده‌اند. Backend، Provisioning، Accounting، Quota، Tunnel، Credential، Routing، Firewall و Protocol Dataplane تغییری نکرده‌اند. PR #1774 با 5/5 Workflow سبز Merge شد و Release PR #1775 نیز با 9/9 Workflow سبز Merge شد. Source روی SHA immutable 8938956b21166666458cc0674d533be2fb84015d قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.479 simplifies the plan-card presentation in Store Templates 1 and 2. The small chips on each plan card now show Android, iPhone, Windows, Mac and Linux instead of five protocol names. This is display-only: the plan's real protocol data, protocol catalog sections, connection guides and Template 3 / Orbit are unchanged. Backend, provisioning, accounting, quota, tunnel, credentials, routing, firewall and protocol dataplane are unchanged. PR #1774 merged with 5/5 green workflows and Release PR #1775 merged with 9/9 green workflows. Source is pinned to immutable SHA 8938956b21166666458cc0674d533be2fb84015d."
+    "fa": "TwinPanel 1.1.0-rc.480 رفتار سرور مادر / TwinPanel Local Core را بین Provisioning و Multi-Link تفکیک می‌کند. Mother همچنان هدف واقعی ساخت اکانت و سرور تکی باقی می‌ماند و Workerهای جداگانه نیز Policy اجرای محلی Mother را هنگام import دریافت می‌کنند، بنابراین پروتکل‌های Modern روی Mother Provision می‌شوند. خاموش بودن دسترسی Mother دیگر SubscriptionNode یا Credentialها را حذف نمی‌کند و فقط Mother را از High Availability / Multi-Link کنار می‌گذارد. تحویل مستقیم Modern روی Exitهای بدون Iran Tunnel نیز حفظ شده است. Tunnel Dataplane، Firewall، Accounting، Quota، Routing و Transport تغییر نکرده‌اند. Fix PR #1778 با 8/8 Workflow سبز Merge شد و Release PR #1779 با 9/9 Workflow سبز Merge شد. Source روی SHA immutable 8597b2291f5e1feb8f6b7bfacac6a22531b5d5b4 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.480 separates Mother / TwinPanel Local Core provisioning from Multi-Link visibility. Mother remains a real account-provisioning and individual-server target, and isolated workers install the Mother local-runtime policy during package import so Modern protocols are provisioned on Mother as well. Disabling Mother access no longer deletes SubscriptionNode membership or credentials; it only excludes Mother from High Availability / Multi-Link aggregation. Direct Modern delivery on Exit nodes without an Iran tunnel remains supported. Tunnel dataplane, firewall, accounting, quota, routing and transport behavior are unchanged. Fix PR #1778 merged with 8/8 green workflows and Release PR #1779 merged with 9/9 green workflows. Source is pinned to immutable SHA 8597b2291f5e1feb8f6b7bfacac6a22531b5d5b4."
   }
 }
