@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from ..database import get_db
+from ..database import SessionLocal, get_db
 from ..deps import require_admin
 from ..models import Node, NodeType, Subscription, SubscriptionNode, SubscriptionStatus
 from ..subscription_delivery_policy_v1 import (
@@ -53,8 +54,6 @@ async def publish_node_to_all_users(
             detail="نمایش برای همه کاربران فقط برای سرور خروجی قابل استفاده است",
         )
 
-    # Publishing means the node must be allowed to appear in user-facing
-    # delivery output once its runtime health is online.
     node.show_to_users = True
 
     explicit_ids = [
@@ -113,8 +112,6 @@ async def publish_node_to_all_users(
             db.add(mode)
             delivery_modes_added += 1
         elif not mode.direct_enabled:
-            # The administrator explicitly requested this node for everyone.
-            # Preserve any existing tunnel choice but guarantee a direct target.
             mode.direct_enabled = True
             delivery_modes_enabled += 1
 
@@ -166,5 +163,122 @@ async def publish_node_to_all_users(
             "سرور برای همه اشتراک‌های قبلی منتشر شد"
             if not reconcile_failed
             else "سرور منتشر شد اما همگام‌سازی بعضی اشتراک‌ها خطا داشت"
+        ),
+    }
+
+
+class BackgroundNodeInstallIn(BaseModel):
+    host: str
+    port: int = Field(default=22, ge=1, le=65535)
+    username: str = "root"
+    password: str
+    name: str
+    node_type: NodeType
+    country_code: str = "IR"
+    capacity_users: int = Field(default=1000, gt=0)
+    install_cisco: bool = False
+    cisco_port: int = Field(default=443, ge=1, le=65535)
+    install_openvpn: bool = False
+    openvpn_port: int = Field(default=1194, ge=1, le=65535)
+    openvpn_transport: str = "udp"
+    install_wireguard: bool = False
+    wireguard_port: int = Field(default=51820, ge=1, le=65535)
+    install_l2tp: bool = False
+    install_v2ray: bool = False
+    xray_port: int = Field(default=8443, ge=1, le=65535)
+    publish_to_all_users: bool = True
+
+
+async def _install_node_in_background(
+    payload: BackgroundNodeInstallIn,
+    request_scope: dict[str, Any],
+) -> None:
+    from .classic_protocol_admin_v1 import (
+        EnsureClassicProtocolIn,
+        ensure_classic_protocol,
+    )
+    from .provision import InstallIn, install_node
+
+    db = SessionLocal()
+    try:
+        request = Request(request_scope)
+        install_payload = InstallIn(
+            **payload.model_dump(exclude={"publish_to_all_users"})
+        )
+        result = await install_node(install_payload, request, db)
+        node_id = int(result.get("node_id") or 0)
+        if not node_id or install_payload.node_type != NodeType.EXIT:
+            return
+
+        try:
+            await ensure_classic_protocol(
+                EnsureClassicProtocolIn(
+                    node_id=node_id,
+                    protocol="v2ray",
+                    port=install_payload.xray_port,
+                ),
+                db=db,
+            )
+        except Exception as exc:
+            print(
+                "TWINPANEL_NODE_BACKGROUND_XRAY_DEGRADED_V1",
+                {"node_id": node_id, "error": str(exc)[:800]},
+                flush=True,
+            )
+
+        if payload.publish_to_all_users:
+            try:
+                await publish_node_to_all_users(node_id=node_id, db=db)
+            except Exception as exc:
+                db.rollback()
+                print(
+                    "TWINPANEL_NODE_BACKGROUND_PUBLISH_DEGRADED_V1",
+                    {"node_id": node_id, "error": str(exc)[:800]},
+                    flush=True,
+                )
+    except Exception as exc:
+        db.rollback()
+        print(
+            "TWINPANEL_NODE_BACKGROUND_INSTALL_FAILED_V1",
+            {
+                "name": payload.name,
+                "host": payload.host,
+                "error": str(exc)[:1200],
+            },
+            flush=True,
+        )
+    finally:
+        db.close()
+
+
+@router.post("/install-background-v1", status_code=202)
+async def install_node_background_v1(
+    payload: BackgroundNodeInstallIn,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    existing = (
+        db.query(Node)
+        .filter(Node.retired_at.is_(None), Node.name == payload.name)
+        .first()
+    )
+    if existing:
+        raise HTTPException(status_code=409, detail="نام سرور قبلاً ثبت شده است")
+
+    background_tasks.add_task(
+        _install_node_in_background,
+        payload,
+        dict(request.scope),
+    )
+    return {
+        "ok": True,
+        "queued": True,
+        "name": payload.name,
+        "host": payload.host,
+        "publish_to_all_users": bool(payload.publish_to_all_users),
+        "message": (
+            "ثبت سرور شروع شد؛ آماده‌سازی و انتشار برای کاربران "
+            "در پس‌زمینه ادامه دارد"
         ),
     }

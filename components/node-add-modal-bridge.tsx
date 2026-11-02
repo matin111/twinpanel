@@ -1,8 +1,9 @@
 "use client";
 
 import {FormEvent,useEffect,useState} from "react";
-import {parityApi,type AnyRow,type ProvisionInstallPayload} from "../lib/admin-parity-api";
-import {legacyAdminApi} from "../lib/legacy-admin-api";
+import {API_BASE} from "../lib/api";
+import {getCustomerToken} from "../lib/customer-api";
+import {parityApi,type ProvisionInstallPayload} from "../lib/admin-parity-api";
 import {useI18n} from "../lib/i18n";
 
 type NodeDraft={host:string;port:number;username:string;password:string;name:string;node_type:"iran"|"exit";country_code:string;capacity_users:number;};
@@ -14,7 +15,7 @@ export function NodeAddModalBridge(){
   const {pick}=useI18n();
   const [open,setOpen]=useState(false);
   const [draft,setDraft]=useState<NodeDraft>(defaultDraft);
-  const [publishToAll,setPublishToAll]=useState(false);
+  const [publishToAll,setPublishToAll]=useState(true);
   const [busy,setBusy]=useState("");
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
@@ -40,26 +41,34 @@ export function NodeAddModalBridge(){
 
   const submit=async(event:FormEvent)=>{
     event.preventDefault();if(busy)return;
+    const token=getCustomerToken();
+    if(!token){setError("AUTH_REQUIRED");return;}
+    const payload={...payloadOf({...draft,host:draft.host.trim(),username:draft.username.trim()||"root",name:draft.name.trim()}),publish_to_all_users:draft.node_type==="exit"?publishToAll:false};
     setBusy("register");setError("");setOk("");
     try{
-      const requestedType=draft.node_type;
-      const output=await parityApi.provisionInstall(payloadOf({...draft,host:draft.host.trim(),username:draft.username.trim()||"root",name:draft.name.trim()})) as AnyRow;
-      const nodeId=Number(output.node_id||0);
-      if(requestedType==="exit"&&nodeId>0){
-        await legacyAdminApi.ensureClassicProtocol({node_id:nodeId,protocol:"v2ray",port:NO_PROTOCOLS.xray_port});
-        if(publishToAll)await parityApi.publishNodeToAllUsers(nodeId);
-      }
-      setOk(pick("سرور با موفقیت اضافه شد.","Server added successfully."));
-      window.location.href="/admin/nodes";
-    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
-    finally{setBusy("");}
+      const response=await fetch(`${API_BASE}/v1/nodes/install-background-v1`,{
+        method:"POST",cache:"no-store",
+        headers:{Authorization:`Bearer ${token}`,"Content-Type":"application/json"},
+        body:JSON.stringify(payload),
+      });
+      const raw=await response.text();
+      if(!response.ok)throw new Error(raw||`API error ${response.status}`);
+      setOpen(false);
+      setOk(pick("ثبت سرور شروع شد؛ آماده‌سازی و نمایش برای همه کاربران در پس‌زمینه ادامه دارد. صفحه را باز نگه ندارید؛ Job روی سرور ادامه می‌یابد.","Server registration started; preparation and publishing to all users continue in the backend."));
+    }catch(reason){
+      setError(reason instanceof Error?reason.message:String(reason));
+    }finally{
+      setBusy("");
+    }
   };
 
-  if(!open)return null;
-  return <div className="runtime-modal" role="dialog" aria-modal="true">
-    <button type="button" className="runtime-modal-bg" aria-label="close" onClick={()=>!busy&&setOpen(false)}/>
+  return <>
+    {!open&&ok?<div className="runtime-success" style={{marginBottom:12}}>{ok}</div>:null}
+    {!open&&error?<div className="runtime-error" style={{marginBottom:12}}>{error}</div>:null}
+    {open?<div className="runtime-modal" role="dialog" aria-modal="true">
+    <button type="button" className="runtime-modal-bg" aria-label="close" onClick={()=>setOpen(false)}/>
     <div className="runtime-modal-card" style={{width:"min(760px,100%)"}}>
-      <div className="card-head"><div><b>{pick("افزودن سرور","Add server")}</b><small>{pick("ثبت نود، SSH و زیرساخت پایه","Node registration, SSH and base infrastructure")}</small></div><button type="button" className="icon-button" disabled={Boolean(busy)} onClick={()=>setOpen(false)}>×</button></div>
+      <div className="card-head"><div><b>{pick("افزودن سرور","Add server")}</b><small>{pick("ثبت نود، SSH و زیرساخت پایه","Node registration, SSH and base infrastructure")}</small></div><button type="button" className="icon-button" onClick={()=>setOpen(false)}>×</button></div>
       {error?<div className="runtime-error">{error}</div>:null}
       {ok?<div className="runtime-success">{ok}</div>:null}
       <form onSubmit={submit}>
@@ -78,5 +87,6 @@ export function NodeAddModalBridge(){
         <div className="action-row"><button type="button" className="ghost" disabled={Boolean(busy)||!draft.host||!draft.password} onClick={()=>void test()}>{busy==="test"?"…":pick("تست SSH","Test SSH")}</button><button className="primary" disabled={Boolean(busy)||!draft.host||!draft.password||!draft.name}>{busy==="register"?pick("در حال ثبت...","Registering..."):pick("ثبت و آماده‌سازی سرور","Register & prepare server")}</button></div>
       </form>
     </div>
-  </div>;
+  </div>:null}
+  </>;
 }
