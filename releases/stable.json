@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.488",
+  "version": "1.1.0-rc.489",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T04:27:48Z",
+  "released_at": "2026-11-02T04:38:59Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "1b75eef46b3f4befb856b7eeef11d703b6748000",
+  "source_sha": "313341907748950cba25de232ab7bc83cc2f56fc",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.488/twinpanel-1.1.0-rc.488-linux-x86_64.tar.gz",
-    "sha256": "c2040d4ce10e49823616dffca1b83fda28015998e4ee56e94277a856fc168e12",
-    "size_bytes": 25311070
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.489/twinpanel-1.1.0-rc.489-linux-x86_64.tar.gz",
+    "sha256": "c83d8e3655b9071d759056eca44a035e6897a6354ad7074061b517ea17f1dc2b",
+    "size_bytes": 25317223
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.488 کارت‌های پلن در صفحه خرید پنل کاربری را با ظاهر پلن‌های فروشگاه یکسان می‌کند و نمایش چیپ‌های پروتکل را از روی کارت‌ها حذف می‌کند. اطلاعات حجم، مدت، تعداد دستگاه، وضعیت فعال، مزیت‌ها و دستگاه‌های پشتیبانی‌شده حفظ شده‌اند و منطق خرید، پرداخت، پروتکل‌های پلن و Provisioning بدون تغییر باقی مانده‌اند. Fix PR #1808 با 5/5 Workflow سبز Merge شد و Release PR #1810 با 9/9 Workflow سبز Merge شد. Source روی SHA immutable 1b75eef46b3f4befb856b7eeef11d703b6748000 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.488 aligns the customer panel purchase plan cards with the storefront presentation and removes visible protocol chips from those cards. Traffic, duration, device count, active status, benefits, and supported-device presentation remain, while purchase, payment, plan protocol capabilities, and provisioning behavior are unchanged. Fix PR #1808 merged with 5/5 green workflows and Release PR #1810 merged with 9/9 green workflows. Source is pinned to immutable SHA 1b75eef46b3f4befb856b7eeef11d703b6748000."
+    "fa": "TwinPanel 1.1.0-rc.489 اصلاحات Public Connect و سرور مادر را یکپارچه می‌کند: عنوان Multi-Link و ملاحظات کانفیگ‌ها بر پایه نام کاربری/پروتکل و نود ساخته می‌شوند، نام پنل از خروجی Import حذف شده، صفحه مستقل سرور مادر به API تنظیمات مرکزی وصل شده و نام، دامنه، دسترسی مدیر/نمایندگان و override نمایندگان را مدیریت می‌کند. سرور مادر برای Provisioning حفظ می‌شود، Toggle فقط نمایش در سرورهای تکی اشتراک را کنترل می‌کند و Mother هرگز وارد Multi-Link نمی‌شود. Fix PR #1809 و PR #1812 Merge شده‌اند؛ Release PR #1813 با 9/9 Workflow سبز Merge شد. Source روی SHA immutable 313341907748950cba25de232ab7bc83cc2f56fc قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.489 consolidates Public Connect and Mother-server fixes: Multi-Link titles and per-node remarks use the subscription username, protocol and node identity instead of panel branding; the dedicated Mother settings page now uses the canonical settings API for name, public domain, admin/reseller visibility and reseller overrides. Mother remains provisioned internally, access toggles control only individual subscription delivery, and Mother never participates in Multi-Link. Fix PR #1809 and PR #1812 are merged; Release PR #1813 merged with 9/9 green workflows. Source is pinned to immutable SHA 313341907748950cba25de232ab7bc83cc2f56fc."
   }
 }
