@@ -111,8 +111,15 @@ def _protocol_subscription_content(token: str, protocol: str, db: Session) -> tu
     return _encode_subscription(uris), protocol, len(uris)
 
 
-@router.get("/{token}/sub/{protocol}", name="public_protocol_subscription_v30")
-def public_protocol_subscription_v30(token: str, protocol: str, db: Session = Depends(get_db)):
+@router.get(
+    "/{token}/sub/{protocol}",
+    name="public_protocol_subscription_v30",
+)
+def public_protocol_subscription_v30(
+    token: str,
+    protocol: str,
+    db: Session = Depends(get_db),
+):
     """Return one standard Base64 subscription feed for all real nodes of a protocol."""
     content, normalized, count = _protocol_subscription_content(token, protocol, db)
     sub = _subscription_from_share_token(token, db)
