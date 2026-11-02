@@ -29,13 +29,17 @@ from .public_connection_multilink_authority_v51 import (
 from .public_connection_multilink_persistence_v52 import (
     refine_public_connection_multilink_persistence_v52,
 )
+from .public_connection_mobile_modern_surface_v53 import (
+    refine_public_connection_mobile_modern_surface_v53,
+)
 
 
 def refine_public_connection_reference_layout_v38(source: str) -> str:
-    """Run legacy presentation, let V51 build Multi-Link, then let V52 keep it stable."""
+    """Run legacy presentation, then final Multi-Link and mobile modern cleanup authorities."""
     source = refine_public_connection_karing_remarks_v40(_v38_refiner(source))
     source = refine_public_connection_multilink_authority_v51(source)
-    return refine_public_connection_multilink_persistence_v52(source)
+    source = refine_public_connection_multilink_persistence_v52(source)
+    return refine_public_connection_mobile_modern_surface_v53(source)
 
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26"
@@ -123,7 +127,7 @@ def refine_public_connection_canonical_mobile_v26(source: str) -> str:
     source = refine_public_connection_mobile_compact_v36(source)
     source = refine_public_connection_forward_v34(source)
     # V37 cleanup remains intact; V38/V39/V40/V41/V44 execute first, V51 builds
-    # the all-protocol card, and V52 promotes that exact DOM node so late timers
-    # cannot remove a working Multi-Link after it has appeared.
+    # the all-protocol card, V52 keeps it stable, and V53 removes misleading raw
+    # credential facts from modern mobile protocol sheets only.
     source = refine_public_connection_final_presentation_v37(source)
     return refine_public_connection_reference_layout_v38(source)
