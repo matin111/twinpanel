@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.516",
-  "source_sha": "489f9340f348926dd3e4be4f17b0a9f15b6c514a",
+  "version": "1.1.0-rc.517",
+  "source_sha": "3a063ba0d8d6ac6d51a98ccc03aa50fb7d85f576",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.516 مدیریت گروهی اشتراک‌ها را روی همان صفحه فعال /admin/subscriptions اصلاح می‌کند. یک دکمه «مدیریت گروهی» کنار کنترل‌های اصلی صفحه نمایش داده می‌شود و چهار عملیات افزایش حجم، کاهش حجم، افزایش روز و کاهش روز را از یک پنجره واحد اجرا می‌کند. عملیات از یک API مرکزی ادمین انجام می‌شود تا صدها درخواست مرورگر ساخته نشود. اشتراک‌های لغوشده رد می‌شوند، حجم/مدت نامحدود حفظ می‌شود، کاهش حجم مصرف واقعی را تغییر نمی‌دهد و پایین‌تر از مصرف واقعی نمی‌رود، و کاهش روز به‌صورت امن Clamp می‌شود. جدول، ویرایش، تمدید، سابلینک، Provisioning، Accounting history، Tunnel و Protocol dataplane بدون تغییر باقی مانده‌اند. Source روی SHA immutable 489f9340f348926dd3e4be4f17b0a9f15b6c514a قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.516 fixes bulk subscription management on the actual active /admin/subscriptions page. A single Bulk Management button is visible beside the page controls and opens one dialog for add traffic, reduce traffic, add days, and reduce days. Operations run through one central admin API instead of hundreds of browser requests. Canceled subscriptions are skipped, unlimited traffic/duration is preserved, traffic reduction never changes actual usage or drops below it, and day reduction is safely clamped. The existing table, edit, renew, sub-link, provisioning, accounting history, tunnel, and protocol dataplane behavior remain unchanged. Source is pinned to immutable SHA 489f9340f348926dd3e4be4f17b0a9f15b6c514a."
+    "fa": "TwinPanel 1.1.0-rc.517 چیدمان تب‌های سرور V2Ray/Xray را با سایر پروتکل‌ها یکسان می‌کند. تب‌های سرور در سمت چپ پنل مثل WireGuard/Cisco/OpenVPN نمایش داده می‌شوند، نام هر تب دقیقاً از Node.name سرور می‌آید، فقط سرور انتخاب‌شده نمایش داده می‌شود و سه کانفیگ آن همچنان به‌صورت پیش‌فرض مخفی می‌مانند تا کاربر بازشان کند. Multi-Link و اکشن‌های کانفیگ بدون تغییر باقی مانده‌اند. Source روی SHA immutable 3a063ba0d8d6ac6d51a98ccc03aa50fb7d85f576 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.517 aligns V2Ray/Xray server tabs with the existing protocol panels. Server tabs are left-aligned like WireGuard/Cisco/OpenVPN, each label comes directly from the server Node.name, only the selected server is rendered, and its three configs remain collapsed by default until the user expands them. Multi-Link and config actions are unchanged. Source is pinned to immutable SHA 3a063ba0d8d6ac6d51a98ccc03aa50fb7d85f576."
   }
 }
