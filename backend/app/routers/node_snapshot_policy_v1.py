@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from ..database import get_db
 from ..models import SubscriptionNode
 from ..schemas import NodeCreate
 from . import nodes as nodes_router_module
@@ -10,7 +12,10 @@ from . import nodes as nodes_router_module
 _ORIGINAL_CREATE_NODE = nodes_router_module.create_node
 
 
-def create_node_snapshot_safe(payload: NodeCreate, db: Session):
+def create_node_snapshot_safe(
+    payload: NodeCreate,
+    db: Session = Depends(get_db),
+):
     """Create infrastructure without attaching it to historical subscriptions.
 
     The legacy create route still contains a compatibility block that inserts a
