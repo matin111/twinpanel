@@ -23,7 +23,7 @@ import {StorefrontAdvancedDesignControls} from "./storefront-advanced-design-lab
 import {StoreTemplateSeoPanel} from "./store-template-seo-panel";
 import styles from "./store-template-orbit-customizer.module.css";
 
-type Tab="design"|"media"|"hero"|"commerce"|"content"|"layout"|"seo";
+type Tab="design"|"media"|"hero"|"commerce"|"modernProtocols"|"content"|"layout"|"seo";
 type TextField={key:string;fa:string;en:string;long?:boolean};
 type ColorField={key:string;fa:string;en:string;fallback:string;helpFa:string;helpEn:string};
 type Choice={value:string;fa:string;en:string;descFa:string;descEn:string};
@@ -33,9 +33,10 @@ const TABS:{id:Tab;fa:string;en:string;icon:string}[]=[
   {id:"media",fa:"تصاویر و بنرها",en:"Media & banners",icon:"▧"},
   {id:"hero",fa:"Hero و بنر",en:"Hero & banner",icon:"01"},
   {id:"commerce",fa:"فروش و پلن‌ها",en:"Commerce",icon:"02"},
-  {id:"content",fa:"محتوای بخش‌ها",en:"Content",icon:"03"},
-  {id:"layout",fa:"چیدمان",en:"Layout",icon:"04"},
-  {id:"seo",fa:"سئو",en:"SEO",icon:"05"},
+  {id:"modernProtocols",fa:"توضیح پروتکل‌های مدرن",en:"Modern protocol copy",icon:"03"},
+  {id:"content",fa:"محتوای بخش‌ها",en:"Content",icon:"04"},
+  {id:"layout",fa:"چیدمان",en:"Layout",icon:"05"},
+  {id:"seo",fa:"سئو",en:"SEO",icon:"06"},
 ];
 
 const COLORS:ColorField[]=[
@@ -80,6 +81,10 @@ const COMMERCE_FIELDS:TextField[]=[
   {key:"protocols_tag",fa:"برچسب پروتکل‌ها",en:"Protocols tag"},
   {key:"protocols_title",fa:"عنوان پروتکل‌ها",en:"Protocols title",long:true},
   {key:"protocols_description",fa:"توضیح پروتکل‌ها",en:"Protocols description",long:true},
+];
+
+const MODERN_PROTOCOL_FIELDS:TextField[]=[
+  {key:"modern_protocols_description",fa:"توضیح پروتکل‌های مدرن",en:"Modern protocols description",long:true},
 ];
 
 const CONTENT_FIELDS:TextField[]=[
@@ -233,6 +238,7 @@ export function OrbitTemplateCustomizer({onClose}:{onClose:()=>void}){
 
         {tab==="hero"&&<><div className={styles.panelHead}><div><h2>{pick("بنر و Hero","Banner & Hero")}</h2></div></div><div className={styles.formGrid}>{renderTextFields(HERO_FIELDS)}</div></>}
         {tab==="commerce"&&<><div className={styles.panelHead}><div><h2>{pick("فروش، پلن و پروتکل","Plans, commerce & protocols")}</h2></div></div><div className={styles.formGrid}>{renderTextFields(COMMERCE_FIELDS)}</div></>}
+        {tab==="modernProtocols"&&<><div className={styles.panelHead}><div><h2>{pick("توضیح پروتکل‌های مدرن","Modern protocols description")}</h2><p>{pick("متن معرفی پروتکل‌های مدرن فروشگاه را از همین بخش ویرایش کنید؛ این مقدار همراه سایر تنظیمات قالب ذخیره می‌شود.","Edit the storefront modern-protocol introduction here. It is saved together with the rest of the theme settings.")}</p></div></div><div className={styles.formGrid}>{renderTextFields(MODERN_PROTOCOL_FIELDS)}</div></>}
         {tab==="content"&&<><div className={styles.panelHead}><div><h2>{pick("امکانات، آموزش، حساب، FAQ و CTA","Features, guides, account, FAQ & CTA")}</h2></div></div><div className={styles.formGrid}>{renderTextFields(CONTENT_FIELDS)}</div></>}
 
         {tab==="layout"&&<>
