@@ -15,8 +15,9 @@ def test_v40_patches_actual_v38_karing_action() -> None:
     assert "document.querySelector('.service')" in source
 
 
-def test_v40_runs_after_reference_layout() -> None:
+def test_v40_wraps_v38_without_changing_composition_order() -> None:
     source = V26.read_text(encoding="utf-8")
-    reference = source.index("source = refine_public_connection_reference_layout_v38(source)")
-    remarks = source.index("return refine_public_connection_karing_remarks_v40(source)")
-    assert reference < remarks
+    assert "def refine_public_connection_reference_layout_v38(source: str) -> str:" in source
+    assert "_refine_public_connection_reference_layout_v38(source)" in source
+    assert "refine_public_connection_karing_remarks_v40(" in source
+    assert "return refine_public_connection_reference_layout_v38(source)" in source
