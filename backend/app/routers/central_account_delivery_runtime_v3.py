@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 
 from ..models import Node, NodeType, Subscription, SubscriptionNode
 from ..modern_node_parallel_v1 import install_bounded_modern_node_provisioning_v1
-from ..mother_access import admin_can_use_mother
 from . import account_delivery as legacy_account_delivery
 from . import node_snapshot_policy_v1 as _node_snapshot_policy_v1  # noqa: F401
 from . import public_country_labels_runtime_v1 as _public_country_labels_runtime_v1  # noqa: F401
@@ -24,13 +23,15 @@ def subscription_snapshot_nodes(
     db: Session,
     sub: Subscription,
 ) -> list[Node]:
-    """Return customer delivery Exit nodes from this subscription snapshot.
+    """Return all customer provisioning Exit nodes from the subscription snapshot.
 
-    SubscriptionNode is immutable desired-state for customer delivery. Iran
-    nodes are tunnel infrastructure, not account targets. Local Core/Mother is
-    honored only while the explicit mother access setting is enabled.
+    SubscriptionNode is immutable desired-state for account provisioning. Iran
+    nodes are tunnel infrastructure, not account targets. Local Core/Mother is a
+    real provisioning target and must remain in this snapshot regardless of the
+    Mother HA/Multi-Link visibility toggle. Public Multi-Link applies its own
+    presentation-only Mother filter at the response boundary.
     """
-    query = (
+    return (
         db.query(Node)
         .join(
             SubscriptionNode,
@@ -41,10 +42,9 @@ def subscription_snapshot_nodes(
             Node.node_type == NodeType.EXIT,
             Node.retired_at.is_(None),
         )
+        .order_by(Node.id.asc())
+        .all()
     )
-    if not admin_can_use_mother(db):
-        query = query.filter(Node.agent_url != "local://core")
-    return query.order_by(Node.id.asc()).all()
 
 
 def customer_delivery_item_is_usable(
@@ -52,20 +52,13 @@ def customer_delivery_item_is_usable(
     protocol: str,
     item: dict[str, Any],
 ) -> bool:
-    """Apply Mother visibility policy to already-stored credentials too."""
-    if isinstance(item, dict):
-        try:
-            node_id = int(item.get("node_id") or 0)
-        except (TypeError, ValueError):
-            node_id = 0
-        if node_id > 0:
-            node = db.get(Node, node_id)
-            if (
-                node is not None
-                and getattr(node, "is_mother", False)
-                and not admin_can_use_mother(db)
-            ):
-                return False
+    """Preserve normal per-server delivery; Multi-Link owns Mother visibility.
+
+    Older revisions applied the Mother access toggle here, which affected every
+    customer delivery surface and also leaked into provisioning eligibility.
+    Mother is now an internal/single-server target unconditionally; only the
+    dedicated Multi-Link boundary may remove it from HA output.
+    """
     return bool(_ORIGINAL_DELIVERY_ITEM_IS_USABLE(db, protocol, item))
 
 
