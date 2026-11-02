@@ -19,13 +19,16 @@ body.v54-v2ray-restore .v54-v2ray-server{
 }
 body.v54-v2ray-restore .v54-v2ray-server-head{
   width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;
-  border:0;background:transparent;font-size:12px;font-weight:900;color:var(--text);text-align:right;
+  border:0;background:transparent;font-size:12px;font-weight:900;color:var(--text);text-align:right;cursor:pointer;
 }
 body.v54-v2ray-restore .v54-v2ray-server-head span:last-child{
   color:var(--muted);font-size:10px;border:1px solid var(--line);border-radius:999px;padding:3px 8px;
 }
 body.v54-v2ray-restore .v54-v2ray-profiles{
-  display:grid!important;border-top:1px solid var(--line)
+  display:none!important;border-top:1px solid var(--line)
+}
+body.v54-v2ray-restore .v54-v2ray-server.open > .v54-v2ray-profiles{
+  display:grid!important;
 }
 body.v54-v2ray-restore .v54-v2ray-profile{
   display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 12px;
@@ -176,7 +179,18 @@ _SCRIPT = r"""
     if(profiles.length!==3)return null;
     const card=el('section','v54-v2ray-server');
     const head=el('div','v54-v2ray-server-head');
+    head.setAttribute('role','button');
+    head.setAttribute('tabindex','0');
+    head.setAttribute('aria-expanded','false');
     head.append(el('span','',countryLabel(server,index)),el('span','', '۳ اتصال'));
+    const toggle=()=>{
+      const open=card.classList.toggle('open');
+      head.setAttribute('aria-expanded',open?'true':'false');
+    };
+    head.addEventListener('click',toggle);
+    head.addEventListener('keydown',event=>{
+      if(event.key==='Enter'||event.key===' '){event.preventDefault();toggle()}
+    });
     const body=el('div','v54-v2ray-profiles');
     profiles.forEach((profile,profileIndex)=>body.appendChild(profileRow(profile,profileIndex)));
     card.append(head,body);return card;
@@ -245,7 +259,7 @@ _V51_MULTI_NEW = "return window.location.origin+'/v1/connect/'+encodeURIComponen
 
 
 def refine_public_connection_v2ray_mobile_restore_v54(source: str) -> str:
-    """Show V2Ray countries and all three connections while preserving the canonical Multi-Link card."""
+    """Show V2Ray country headers with three customer configs collapsed by default."""
     source = str(source or "")
     source = source.replace(_V41_REMOVE_OLD, _V41_REMOVE_NEW)
     source = source.replace(_V51_MULTI_OLD, _V51_MULTI_NEW)
