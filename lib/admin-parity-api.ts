@@ -166,6 +166,7 @@ export const parityApi={
 
   provisionTest:(payload:{host:string;port:number;username:string;password:string})=>request<AnyRow>("/v1/provision/test",{method:"POST",body:JSON.stringify(payload)}),
   provisionInstall:(payload:ProvisionInstallPayload)=>request<AnyRow>("/v1/provision/install",{method:"POST",body:JSON.stringify(payload)}),
+  publishNodeToAllUsers:(nodeId:number)=>request<AnyRow>(`/v1/nodes/${nodeId}/publish-all-users`,{method:"POST"}),
   provisionNodeAccess:(nodeId:number)=>request<AnyRow>(`/v1/provision/node-access/${nodeId}`),
   provisionSaveNodeAccess:(payload:{node_id:number;host:string;port:number;username:string;password:string})=>request<AnyRow>("/v1/provision/save-node-access",{method:"POST",body:JSON.stringify(payload)}),
   provisionProtocolHealth:(nodeId:number,protocol?:string)=>request<AnyRow>("/v1/provision/protocol-health",{method:"POST",body:JSON.stringify({node_id:nodeId,...(protocol?{protocol}:{})})}),
