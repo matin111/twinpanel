@@ -8,6 +8,10 @@ _SCRIPT = r"""
 <script id="twinpanelPublicConnectKaringRemarksV40">
 (function(){
   function accountName(){
+    const match=String(window.location.pathname||'').match(/^\/v1\/connect\/([^/]+)/);
+    if(match){
+      try{return decodeURIComponent(match[1])}catch(_error){return match[1]}
+    }
     const service=document.querySelector('.service');
     const value=String(service?.textContent||'').trim();
     if(value)return value;
@@ -15,12 +19,44 @@ _SCRIPT = r"""
     return title;
   }
 
+  function deepParts(raw){
+    const href=String(raw||'').trim();
+    if(!href)return null;
+    try{
+      const deep=new URL(href);
+      const innerRaw=String(deep.searchParams.get('url')||'').trim();
+      if(!innerRaw)return null;
+      const inner=new URL(innerRaw,window.location.origin);
+      return {deep,inner};
+    }catch(_error){return null}
+  }
+
   function withName(raw,name){
-    let href=String(raw||'').trim();
-    if(!href||!name)return href;
-    href=href.replace(/([?&])name=[^&]*/i,'$1').replace(/[?&]$/,'');
-    const join=href.includes('?')?'&':'?';
-    return href+join+'name='+encodeURIComponent(name);
+    const parts=deepParts(raw);
+    if(!parts||!name)return String(raw||'');
+
+    // Karing's Add Profile dialog derives Remarks from the subscription URL
+    // itself (fragment -> remarks -> name -> title -> host). Therefore the
+    // canonical profile name must live on the inner Multi-Link URL, not only
+    // on the outer karing://install-config deep link.
+    parts.inner.searchParams.set('name',name);
+    parts.deep.searchParams.set('url',parts.inner.toString());
+
+    // Keep the outer name as a compatibility hint for Karing versions that
+    // consume install-config metadata directly.
+    parts.deep.searchParams.set('name',name);
+    return parts.deep.toString();
+  }
+
+  async function canonicalProfile(raw,fallback){
+    const parts=deepParts(raw);
+    if(!parts)return fallback;
+    try{
+      const response=await fetch(parts.inner.toString(),{cache:'no-store'});
+      const header=String(response.headers.get('Profile-Title')||'').trim();
+      if(header)return header;
+    }catch(_error){}
+    return fallback;
   }
 
   function patch(){
@@ -29,12 +65,16 @@ _SCRIPT = r"""
     document.querySelectorAll('.v38-all-card[data-v38-protocol]').forEach(function(card){
       const protocol=String(card.dataset.v38Protocol||'').trim().toLowerCase();
       if(!protocol)return;
-      const profile=account+'-'+protocol;
-      card.querySelectorAll('a[href^="karing://install-config"]').forEach(function(link){
+      const fallback=account+'-'+protocol;
+      card.querySelectorAll('a[href^="karing://install-config"]').forEach(async function(link){
+        if(link.dataset.tpKaringInnerName==='pending')return;
+        link.dataset.tpKaringInnerName='pending';
         const current=link.getAttribute('href')||'';
+        const profile=await canonicalProfile(current,fallback);
         const next=withName(current,profile);
         if(next&&next!==current)link.setAttribute('href',next);
         link.dataset.tpKaringProfile=profile;
+        link.dataset.tpKaringInnerName='ready';
       });
     });
   }
