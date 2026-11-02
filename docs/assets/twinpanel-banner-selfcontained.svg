@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="533" viewBox="0 0 1600 533">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#051426"/><stop offset=".55" stop-color="#071a3b"/><stop offset="1" stop-color="#061022"/></linearGradient>
+    <linearGradient id="neon" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#18e6ff"/><stop offset=".55" stop-color="#2287ff"/><stop offset="1" stop-color="#b03cff"/></linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#091426"/><stop offset="1" stop-color="#0a1020"/></linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="1600" height="533" fill="url(#bg)"/>
+  <path d="M0 355 C170 180 240 90 480 0" fill="none" stroke="#0a75ff" stroke-width="70" opacity=".18"/>
+  <path d="M0 430 C180 260 270 205 520 135" fill="none" stroke="#8b2cff" stroke-width="55" opacity=".16"/>
+  <path d="M1080 0 C1260 85 1420 120 1600 85" fill="none" stroke="#18e6ff" stroke-width="38" opacity=".14"/>
+  <g transform="translate(115 56)">
+    <path d="M66 0h110l-44 32H84L66 0zm55 42h56l-32 23H91l30-23z" fill="#1de2ff"/>
+    <path d="M181 0h85l-21 31h-51l-18 26h48l-21 31h-89L181 0z" fill="#fff"/>
+    <text x="0" y="162" font-family="Arial,DejaVu Sans,sans-serif" font-size="74" font-weight="700" fill="#fff">Twin<tspan fill="url(#neon)">Panel</tspan></text>
+    <text x="0" y="224" font-family="Arial,DejaVu Sans,sans-serif" font-size="34" font-weight="700" fill="#fff" direction="rtl">پنل جامع مدیریت و فروش <tspan fill="#1de2ff">VPN</tspan></text>
+    <g font-family="Arial,DejaVu Sans,sans-serif" font-size="19" fill="#fff" text-anchor="middle">
+      <g transform="translate(0 258)"><rect width="122" height="94" rx="22" fill="#09182d" stroke="#1b69ff"/><circle cx="61" cy="34" r="18" fill="none" stroke="#5aa7ff" stroke-width="2"/><text x="61" y="70" direction="rtl">فروش و اشتراک</text></g>
+      <g transform="translate(140 258)"><rect width="122" height="94" rx="22" fill="#09182d" stroke="#1b69ff"/><circle cx="61" cy="34" r="18" fill="none" stroke="#5aa7ff" stroke-width="2"/><text x="61" y="70" direction="rtl">نمایندگی</text></g>
+      <g transform="translate(280 258)"><rect width="122" height="94" rx="22" fill="#09182d" stroke="#1b69ff"/><circle cx="61" cy="34" r="18" fill="none" stroke="#5aa7ff" stroke-width="2"/><text x="61" y="70" direction="rtl">ربات تلگرام</text></g>
+      <g transform="translate(420 258)"><rect width="122" height="94" rx="22" fill="#09182d" stroke="#1b69ff"/><circle cx="61" cy="34" r="18" fill="none" stroke="#5aa7ff" stroke-width="2"/><text x="61" y="70" direction="rtl">مدیریت نود</text></g>
+      <g transform="translate(560 258)"><rect width="122" height="94" rx="22" fill="#09182d" stroke="#1b69ff"/><circle cx="61" cy="34" r="18" fill="none" stroke="#5aa7ff" stroke-width="2"/><text x="61" y="70" direction="rtl">مدیریت تونل</text></g>
+    </g>
+    <rect x="10" y="384" width="650" height="56" rx="28" fill="#081426" stroke="url(#neon)" stroke-width="2"/>
+    <text x="335" y="420" font-family="Arial,DejaVu Sans,sans-serif" font-size="25" font-weight="700" fill="#fff" text-anchor="middle" direction="rtl">راهکار کامل راه‌اندازی کسب‌وکار VPN با کنترل کامل</text>
+  </g>
+  <g transform="translate(735 34)">
+    <rect x="0" y="0" width="800" height="455" rx="30" fill="#050b16" stroke="url(#neon)" stroke-width="4" filter="url(#glow)"/>
+    <rect x="18" y="18" width="764" height="419" rx="22" fill="url(#panel)"/>
+    <g font-family="Arial,DejaVu Sans,sans-serif" font-size="13" fill="#eef5ff" text-anchor="middle">
+      <text x="705" y="48">Matin Vpn</text><rect x="610" y="27" width="86" height="28" rx="10" fill="#0a1730" stroke="#2478ff"/><text x="653" y="46" direction="rtl">مدیریت⌄</text><text x="560" y="46" direction="rtl">شبکه و زیرساخت</text><text x="465" y="46" direction="rtl">فروش و مالی</text><text x="380" y="46" direction="rtl">ارتباطات</text><text x="302" y="46" direction="rtl">محتوا و برند</text><text x="210" y="46" direction="rtl">سیستم</text><rect x="88" y="26" width="46" height="28" rx="8" fill="#15274d"/><text x="111" y="45">FA</text><rect x="38" y="26" width="46" height="28" rx="8" fill="#0c1729"/><text x="61" y="45">EN</text>
+    </g>
+    <rect x="548" y="72" width="210" height="34" rx="10" fill="#0b1526" stroke="#24365c"/><text x="738" y="94" font-family="Arial,DejaVu Sans,sans-serif" font-size="13" fill="#93a4c2" text-anchor="end" direction="rtl">جستجو در پنل...</text>
+    <rect x="34" y="122" width="724" height="78" rx="18" fill="#0d1630" stroke="#1f2b50"/><text x="730" y="151" font-family="Arial,DejaVu Sans,sans-serif" font-size="14" fill="#a855f7" text-anchor="end" direction="rtl">مرکز فرمان زنده ●</text><text x="730" y="180" font-family="Arial,DejaVu Sans,sans-serif" font-size="28" font-weight="700" fill="#fff" text-anchor="end" direction="rtl">داشبورد مدیریت</text><rect x="50" y="143" width="110" height="38" rx="12" fill="url(#neon)"/><text x="105" y="168" font-family="Arial" font-size="14" font-weight="700" fill="#fff" text-anchor="middle" direction="rtl">بروزرسانی زنده</text><rect x="173" y="143" width="105" height="38" rx="12" fill="#071322" stroke="#24365c"/><text x="225" y="168" font-family="Arial" font-size="14" fill="#fff" text-anchor="middle" direction="rtl">سیستم آنلاین ●</text>
+    <g font-family="Arial,DejaVu Sans,sans-serif"><g transform="translate(34 220)"><rect width="166" height="70" rx="16" fill="#0b1425" stroke="#15d3c5"/><text x="145" y="25" fill="#9fb2d3" font-size="12" text-anchor="end" direction="rtl">نودهای فعال</text><text x="145" y="54" fill="#fff" font-size="28" font-weight="700" text-anchor="end">6 / 6</text></g><g transform="translate(214 220)"><rect width="166" height="70" rx="16" fill="#0b1425" stroke="#f4a500"/><text x="145" y="25" fill="#9fb2d3" font-size="12" text-anchor="end" direction="rtl">فروش امروز</text><text x="145" y="54" fill="#fff" font-size="22" font-weight="700" text-anchor="end" direction="rtl">۵,۱۰۲,۰۴۴ تومان</text></g><g transform="translate(394 220)"><rect width="166" height="70" rx="16" fill="#0b1425" stroke="#1677ff"/><text x="145" y="25" fill="#9fb2d3" font-size="12" text-anchor="end" direction="rtl">اشتراک فعال</text><text x="145" y="54" fill="#fff" font-size="28" font-weight="700" text-anchor="end">413</text></g><g transform="translate(574 220)"><rect width="166" height="70" rx="16" fill="#0b1425" stroke="#8b5cf6"/><text x="145" y="25" fill="#9fb2d3" font-size="12" text-anchor="end" direction="rtl">کل کاربران</text><text x="145" y="54" fill="#fff" font-size="28" font-weight="700" text-anchor="end">7</text></g></g>
+    <rect x="34" y="310" width="706" height="102" rx="16" fill="#091221" stroke="#202b43"/><text x="52" y="337" font-family="Arial" font-size="13" fill="#a8bbd8">Hostname: CLY984318</text><g font-family="Arial,DejaVu Sans,sans-serif" font-size="12" fill="#9fb2d3"><text x="65" y="375">0h</text><text x="150" y="375">Uptime</text><text x="270" y="360">8%</text><text x="270" y="380">7.6 GB / 98 GB</text><text x="450" y="360">33%</text><text x="450" y="380">2.5 GB / 7.6 GB</text><text x="630" y="360">70%</text><text x="630" y="380">4 vCPU</text></g><g stroke="url(#neon)" stroke-width="5" stroke-linecap="round"><line x1="270" y1="394" x2="360" y2="394"/><line x1="450" y1="394" x2="540" y2="394"/><line x1="630" y1="394" x2="716" y2="394"/></g>
+  </g>
+</svg>
