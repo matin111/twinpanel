@@ -3,6 +3,8 @@
 import {FormEvent,useEffect,useMemo,useState} from "react";
 import {Badge,Card,Shell} from "./ui";
 import {adminApi,RuntimeRow} from "../lib/admin-api";
+import {API_BASE} from "../lib/api";
+import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
 
 const s=(value:unknown)=>String(value??"");
@@ -44,6 +46,14 @@ type PlanDraft={
   node_ids:number[];
 };
 
+type TrialSettings={
+  enabled:boolean;
+  duration_days:number;
+  traffic_gb:number;
+  device_limit:number;
+  scope?:string;
+};
+
 const EMPTY_DRAFT:PlanDraft={
   name:"",
   description:"",
@@ -55,6 +65,26 @@ const EMPTY_DRAFT:PlanDraft={
   protocols:[...ALL_PROTOCOLS],
   node_ids:[],
 };
+
+const DEFAULT_TRIAL:TrialSettings={
+  enabled:false,
+  duration_days:1,
+  traffic_gb:1,
+  device_limit:1,
+  scope:"global",
+};
+
+async function trialSettingsRequest(init?:RequestInit):Promise<TrialSettings>{
+  const token=getCustomerToken();
+  if(!token)throw new Error("AUTH_REQUIRED");
+  const headers=new Headers(init?.headers);
+  headers.set("Authorization",`Bearer ${token}`);
+  if(init?.body)headers.set("Content-Type","application/json");
+  const response=await fetch(`${API_BASE}/v1/settings/general/trial-account`,{...init,headers,cache:"no-store"});
+  const payload=await response.json().catch(()=>({})) as TrialSettings&{detail?:string};
+  if(!response.ok)throw new Error(payload.detail||`API error ${response.status}`);
+  return payload;
+}
 
 function Notice({error,ok}:{error:string;ok:string}){
   return <>{error&&<div className="runtime-error">{error}</div>}{ok&&<div className="runtime-success">{ok}</div>}</>;
@@ -74,6 +104,7 @@ export function LegacyPlansRuntimePage(){
   const {pick}=useI18n();
   const [rows,setRows]=useState<RuntimeRow[]>([]);
   const [nodes,setNodes]=useState<RuntimeRow[]>([]);
+  const [trial,setTrial]=useState<TrialSettings>({...DEFAULT_TRIAL});
   const [q,setQ]=useState("");
   const [busy,setBusy]=useState("");
   const [error,setError]=useState("");
@@ -85,9 +116,14 @@ export function LegacyPlansRuntimePage(){
   const load=async()=>{
     setError("");
     try{
-      const [planRows,nodeRows]=await Promise.all([adminApi.plans(),adminApi.nodes()]);
+      const [planRows,nodeRows,trialSettings]=await Promise.all([
+        adminApi.plans(),
+        adminApi.nodes(),
+        trialSettingsRequest(),
+      ]);
       setRows(planRows);
       setNodes(nodeRows as unknown as RuntimeRow[]);
+      setTrial({...DEFAULT_TRIAL,...trialSettings});
     }catch(reason){
       setError(reason instanceof Error?reason.message:String(reason));
     }
@@ -143,6 +179,30 @@ export function LegacyPlansRuntimePage(){
       : current.node_ids.filter(value=>value!==nodeId),
   }));
 
+  const saveTrial=async()=>{
+    if(busy)return;
+    setBusy("trial");
+    setError("");
+    setOk("");
+    try{
+      const saved=await trialSettingsRequest({
+        method:"PUT",
+        body:JSON.stringify({
+          enabled:trial.enabled,
+          duration_days:Math.max(1,Math.min(30,n(trial.duration_days)||1)),
+          traffic_gb:Math.max(1,Math.min(100,n(trial.traffic_gb)||1)),
+          device_limit:Math.max(1,Math.min(10,n(trial.device_limit)||1)),
+        }),
+      });
+      setTrial(saved);
+      setOk(pick("تنظیمات عمومی اکانت تست ذخیره شد","Global trial account settings saved"));
+    }catch(reason){
+      setError(reason instanceof Error?reason.message:String(reason));
+    }finally{
+      setBusy("");
+    }
+  };
+
   const save=async(event:FormEvent)=>{
     event.preventDefault();
     if(busy)return;
@@ -176,12 +236,36 @@ export function LegacyPlansRuntimePage(){
         <div className="page-head">
           <div>
             <h1>{pick("پلن‌ها","Plans")}</h1>
-            <small>{pick("هر پلن می‌تواند هر ۱۵ پروتکل و سرورهای خارج مجاز خودش را داشته باشد. سرورهای ایران فقط برای تانل هستند و در پلن نمایش داده نمی‌شوند.","Each plan can define all 15 protocols and its allowed exit servers. Iran nodes are tunnel-only and are not shown in plans.")}</small>
+            <small>{pick("مدیریت پلن‌های فروش و تنظیم عمومی اکانت تست.","Manage sales plans and the global trial account policy.")}</small>
           </div>
           <button className="primary" onClick={()=>start()}>＋ {pick("پلن جدید","New plan")}</button>
         </div>
 
         <Notice error={error} ok={ok}/>
+
+        <Card>
+          <div className="card-head">
+            <div>
+              <b>{pick("اکانت تست عمومی","Global trial account")}</b>
+              <small>{pick("این تنظیم برای کل پنل است و به هیچ پلن خاصی وابسته نیست.","This policy is global and is not attached to any individual plan.")}</small>
+            </div>
+            <Badge tone={trial.enabled?"ok":"bad"}>{trial.enabled?pick("فعال","Active"):pick("غیرفعال","Inactive")}</Badge>
+          </div>
+
+          <div className="protocol-toggle-grid">
+            <Check label={pick("فعال‌سازی اکانت تست","Enable trial accounts")} checked={trial.enabled} onChange={enabled=>setTrial(current=>({...current,enabled}))}/>
+          </div>
+
+          <div className="setting-grid">
+            <label className="field"><span>{pick("مدت تست (روز)","Trial duration (days)")}</span><input type="number" min={1} max={30} value={trial.duration_days} onChange={event=>setTrial(current=>({...current,duration_days:Number(event.target.value)}))}/></label>
+            <label className="field"><span>{pick("حجم تست (GB)","Trial traffic (GB)")}</span><input type="number" min={1} max={100} value={trial.traffic_gb} onChange={event=>setTrial(current=>({...current,traffic_gb:Number(event.target.value)}))}/></label>
+            <label className="field"><span>{pick("تعداد دستگاه","Device limit")}</span><input type="number" min={1} max={10} value={trial.device_limit} onChange={event=>setTrial(current=>({...current,device_limit:Number(event.target.value)}))}/></label>
+          </div>
+
+          <div className="runtime-modal-actions">
+            <button className="primary" type="button" disabled={!!busy} onClick={()=>void saveTrial()}>{busy==="trial"?"…":pick("ذخیره تنظیمات تست","Save trial settings")}</button>
+          </div>
+        </Card>
 
         <Card>
           <div className="runtime-toolbar">
