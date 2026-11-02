@@ -33,11 +33,21 @@ TEMPLATE_KEY = (
     "subscription_username_template"
 )
 
+TRIAL_ENABLED_KEY = "trial_account_enabled"
+TRIAL_DURATION_DAYS_KEY = "trial_account_duration_days"
+TRIAL_TRAFFIC_GB_KEY = "trial_account_traffic_gb"
+TRIAL_DEVICE_LIMIT_KEY = "trial_account_device_limit"
+
 DEFAULT_PREFIX = "mv"
 
 DEFAULT_TEMPLATE = (
     "{prefix}{sub_id}_{user_id}"
 )
+
+DEFAULT_TRIAL_ENABLED = False
+DEFAULT_TRIAL_DURATION_DAYS = 1
+DEFAULT_TRIAL_TRAFFIC_GB = 1
+DEFAULT_TRIAL_DEVICE_LIMIT = 1
 
 ALLOWED_FIELDS = {
     "prefix",
@@ -58,6 +68,13 @@ class SubscriptionUsernameSettingsIn(
         min_length=1,
         max_length=80,
     )
+
+
+class TrialAccountSettingsIn(BaseModel):
+    enabled: bool = False
+    duration_days: int = Field(default=1, ge=1, le=30)
+    traffic_gb: int = Field(default=1, ge=1, le=100)
+    device_limit: int = Field(default=1, ge=1, le=10)
 
 
 def _runtime_get(
@@ -138,6 +155,52 @@ def _runtime_set(
         )
 
 
+def _runtime_bool(db: Session, key: str, default: bool) -> bool:
+    raw = _runtime_get(db, key, "1" if default else "0").strip().lower()
+    return raw in {"1", "true", "yes", "on", "enabled"}
+
+
+def _runtime_int(db: Session, key: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        value = int(_runtime_get(db, key, str(default)))
+    except Exception:
+        return default
+    return min(max(value, minimum), maximum)
+
+
+def _trial_settings_out(db: Session) -> dict:
+    return {
+        "enabled": _runtime_bool(db, TRIAL_ENABLED_KEY, DEFAULT_TRIAL_ENABLED),
+        "duration_days": _runtime_int(
+            db,
+            TRIAL_DURATION_DAYS_KEY,
+            DEFAULT_TRIAL_DURATION_DAYS,
+            1,
+            30,
+        ),
+        "traffic_gb": _runtime_int(
+            db,
+            TRIAL_TRAFFIC_GB_KEY,
+            DEFAULT_TRIAL_TRAFFIC_GB,
+            1,
+            100,
+        ),
+        "device_limit": _runtime_int(
+            db,
+            TRIAL_DEVICE_LIMIT_KEY,
+            DEFAULT_TRIAL_DEVICE_LIMIT,
+            1,
+            10,
+        ),
+        "scope": "global",
+    }
+
+
+def get_trial_account_settings(db: Session) -> dict:
+    """Canonical runtime reader for every future trial-account issuance path."""
+    return _trial_settings_out(db)
+
+
 def _validate_prefix(
     value: str,
 ) -> str:
@@ -194,7 +257,6 @@ def _validate_template(
             )
         )
 
-    # Every subscription must remain unique.
     if "sub_id" not in fields:
         raise ValueError(
             "الگو باید شامل {sub_id} باشد"
@@ -418,3 +480,29 @@ def update_subscription_username_settings(
     db.commit()
 
     return _settings_out(db)
+
+
+@router.get(
+    "/trial-account",
+    dependencies=[Depends(require_admin)],
+)
+def trial_account_settings(
+    db: Session = Depends(get_db),
+):
+    return _trial_settings_out(db)
+
+
+@router.put(
+    "/trial-account",
+    dependencies=[Depends(require_admin)],
+)
+def update_trial_account_settings(
+    payload: TrialAccountSettingsIn,
+    db: Session = Depends(get_db),
+):
+    _runtime_set(db, TRIAL_ENABLED_KEY, "1" if payload.enabled else "0")
+    _runtime_set(db, TRIAL_DURATION_DAYS_KEY, str(payload.duration_days))
+    _runtime_set(db, TRIAL_TRAFFIC_GB_KEY, str(payload.traffic_gb))
+    _runtime_set(db, TRIAL_DEVICE_LIMIT_KEY, str(payload.device_limit))
+    db.commit()
+    return _trial_settings_out(db)
