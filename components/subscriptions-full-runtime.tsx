@@ -6,8 +6,10 @@ import {adminApi,AdminNode,AdminUser,RuntimeRow} from "../lib/admin-api";
 import {useI18n} from "../lib/i18n";
 
 const GB=1024**3;
+const DAY=86400000;
 const protocolLabels:Record<string,string>={cisco:"Cisco / OpenConnect",openvpn:"OpenVPN",wireguard:"WireGuard",l2tp:"L2TP / IPsec",v2ray:"V2Ray / Xray"};
 const protocolKeys=["cisco","openvpn","wireguard","l2tp","v2ray"];
+type BulkOperation="add_traffic"|"subtract_traffic"|"add_days"|"subtract_days";
 const s=(v:unknown)=>String(v??"");
 const n=(v:unknown)=>{const x=Number(v??0);return Number.isFinite(x)?x:0;};
 const arr=(v:unknown):RuntimeRow[]=>Array.isArray(v)?v.filter(x=>x&&typeof x==="object") as RuntimeRow[]:v&&typeof v==="object"?[v as RuntimeRow]:[];
@@ -28,13 +30,14 @@ export function SubscriptionsFullRuntimePage(){
   const [selectedId,setSelectedId]=useState(0);const [info,setInfo]=useState<RuntimeRow|null>(null);const [q,setQ]=useState("");
   const [loading,setLoading]=useState(true);const [busy,setBusy]=useState("");const [error,setError]=useState("");const [ok,setOk]=useState("");
   const [createOpen,setCreateOpen]=useState(false);const [editOpen,setEditOpen]=useState(false);const [showPassword,setShowPassword]=useState(false);
+  const [bulkOpen,setBulkOpen]=useState(false);const [bulkOperation,setBulkOperation]=useState<BulkOperation>("add_traffic");const [bulkAmount,setBulkAmount]=useState("10");
   const [planId,setPlanId]=useState(0);const [trafficGb,setTrafficGb]=useState(0);const [durationDays,setDurationDays]=useState(30);const [protocols,setProtocols]=useState<string[]>([]);const [accountUsername,setAccountUsername]=useState("");const [accountPassword,setAccountPassword]=useState("");
   const [create,setCreate]=useState({user_id:0,plan_id:0,traffic_gb:"",duration_days:"",username:"",password:"",protocols:["cisco","openvpn","wireguard","l2tp","v2ray"] as string[]});
 
   const load=async()=>{
     setLoading(true);setError("");
     try{
-      const [subs,p,u,ns]=await Promise.all([adminApi.subscriptions(),adminApi.plans(),adminApi.users(),adminApi.nodes()]);
+      const [subs,p,u,ns]=await Promise.all([adminApi.subscriptionsV2(),adminApi.plans(),adminApi.users(),adminApi.nodes()]);
       setRows(subs);setPlans(p);setUsers(u);setNodes(ns);
       setSelectedId(current=>current&&subs.some(x=>n(x.id)===current)?current:(subs[0]?n(subs[0].id):0));
     }catch(e){setError(e instanceof Error?e.message:String(e));}finally{setLoading(false);}
@@ -60,7 +63,7 @@ export function SubscriptionsFullRuntimePage(){
     setPlanId(n(selected.plan_id));
     setTrafficGb(n(selected.traffic_limit_gb)||(n(selected.traffic_limit_bytes)/GB));
     const start=selected.starts_at?new Date(String(selected.starts_at)):null;const end=selected.expires_at?new Date(String(selected.expires_at)):null;
-    setDurationDays(start&&end&&!Number.isNaN(start.getTime())&&!Number.isNaN(end.getTime())?Math.max(1,Math.ceil((end.getTime()-start.getTime())/86400000)):30);
+    setDurationDays(start&&end&&!Number.isNaN(start.getTime())&&!Number.isNaN(end.getTime())?Math.max(1,Math.ceil((end.getTime()-start.getTime())/DAY)):Math.max(1,n(selected.activation_duration_days)||30));
     setProtocols(strArr(selected.protocols));
     setAccountUsername(s(account.username||selected.account_username));
     setAccountPassword(s(account.password));
@@ -69,6 +72,76 @@ export function SubscriptionsFullRuntimePage(){
   const act=async(key:string,label:string,fn:()=>Promise<unknown>,refresh=true)=>{
     if(busy)return;setBusy(key);setError("");setOk("");
     try{await fn();setOk(label);if(refresh)await load();if(selectedId)await loadConnection(selectedId);}catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy("");}
+  };
+
+  const durationFor=(row:RuntimeRow)=>{
+    if(!row.starts_at&&!row.expires_at&&n(row.activation_duration_days)>0)return Math.max(1,n(row.activation_duration_days));
+    const start=row.starts_at?new Date(String(row.starts_at)):null;const end=row.expires_at?new Date(String(row.expires_at)):null;
+    if(start&&end&&!Number.isNaN(start.getTime())&&!Number.isNaN(end.getTime()))return Math.max(1,Math.ceil((end.getTime()-start.getTime())/DAY));
+    return Math.max(1,n(planMap.get(n(row.plan_id))?.duration_days)||30);
+  };
+
+  const runBulk=async()=>{
+    if(busy)return;
+    const amount=Number(bulkAmount);
+    if(!Number.isFinite(amount)||amount<=0){setError(pick("مقدار باید بیشتر از صفر باشد","Amount must be greater than zero"));return;}
+    const isTraffic=bulkOperation==="add_traffic"||bulkOperation==="subtract_traffic";
+    const operationLabel:Record<BulkOperation,string>={
+      add_traffic:pick("افزایش حجم","Add traffic"),subtract_traffic:pick("کاهش حجم","Reduce traffic"),
+      add_days:pick("افزایش روز","Add days"),subtract_days:pick("کاهش روز","Reduce days"),
+    };
+    const unit=isTraffic?"GB":pick("روز","days");
+    if(!window.confirm(pick(`عملیات «${operationLabel[bulkOperation]}» به مقدار ${amount} ${unit} روی همه اشتراک‌های قابل‌ویرایش اعمال شود؟`,`Apply “${operationLabel[bulkOperation]}” by ${amount} ${unit} to all editable subscriptions?`)))return;
+
+    setBusy("bulk");setError("");setOk("");
+    let updated=0,skipped=0,clamped=0,failed=0;
+    const candidates=rows.filter(row=>s(row.status).toLowerCase()!=="canceled");
+
+    const applyOne=async(row:RuntimeRow):Promise<"updated"|"skipped"|"clamped">=>{
+      const id=n(row.id);if(!id)return "skipped";
+      const limitBytes=n(row.traffic_limit_bytes);const usedBytes=n(row.traffic_used_bytes);
+      const currentTraffic=limitBytes/GB;const usedTraffic=usedBytes/GB;
+      const currentDuration=durationFor(row);
+      let nextTraffic=currentTraffic;let nextDuration=currentDuration;let wasClamped=false;
+
+      if(bulkOperation==="add_traffic"||bulkOperation==="subtract_traffic"){
+        if(Boolean(row.traffic_unlimited)||limitBytes<=0)return "skipped";
+        if(bulkOperation==="add_traffic")nextTraffic=currentTraffic+amount;
+        else{
+          const raw=currentTraffic-amount;
+          nextTraffic=Math.max(raw,usedTraffic,0.01);
+          wasClamped=nextTraffic>raw;
+        }
+      }else{
+        if(Boolean(row.duration_unlimited)||(Boolean(row.starts_at)&&!row.expires_at))return "skipped";
+        if(bulkOperation==="add_days")nextDuration=currentDuration+Math.round(amount);
+        else{
+          const raw=currentDuration-Math.round(amount);
+          nextDuration=Math.max(1,raw);
+          wasClamped=nextDuration>raw;
+        }
+      }
+
+      await adminApi.setSubscriptionManualLimits(id,{traffic_gb:Number(nextTraffic.toFixed(4)),duration_days:Math.max(1,Math.round(nextDuration))});
+      return wasClamped?"clamped":"updated";
+    };
+
+    try{
+      for(let i=0;i<candidates.length;i+=8){
+        const batch=candidates.slice(i,i+8);
+        const results=await Promise.allSettled(batch.map(applyOne));
+        for(const result of results){
+          if(result.status==="rejected"){failed+=1;continue;}
+          if(result.value==="skipped")skipped+=1;
+          else if(result.value==="clamped"){updated+=1;clamped+=1;}
+          else updated+=1;
+        }
+      }
+      setOk(pick(`مدیریت گروهی انجام شد: ${updated} بروزرسانی، ${skipped} ردشده، ${clamped} محدودشده${failed?`، ${failed} ناموفق`:""}`,`Bulk update complete: ${updated} updated, ${skipped} skipped, ${clamped} clamped${failed?`, ${failed} failed`:""}`));
+      if(!failed)setBulkOpen(false);
+      await load();
+      if(selectedId)await loadConnection(selectedId);
+    }catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy("");}
   };
 
   const saveEdit=(e:FormEvent)=>{e.preventDefault();if(!selectedId)return;void act("edit",pick("اشتراک ذخیره شد","Subscription saved"),()=>adminApi.editSubscription(selectedId,{plan_id:planId,traffic_gb:trafficGb,node_ids:numArr(selected?.node_ids),protocols,account_username:accountUsername||undefined,account_password:accountPassword||undefined}));};
@@ -83,9 +156,11 @@ export function SubscriptionsFullRuntimePage(){
   const totalLimit=rows.reduce((sum,x)=>sum+n(x.traffic_limit_bytes),0)/GB;
 
   return <Shell active="/admin/subscriptions"><div className="page subs-full">
-    <div className="page-head"><div><h1>{pick("اشتراک‌ها","Subscriptions")}</h1><small>{pick("مدیریت کامل اشتراک و اطلاعات اتصال در یک صفحه","Full subscription management and connection information in one place")}</small></div><div className="action-row"><button className="primary" onClick={()=>setCreateOpen(v=>!v)}>＋ {pick("اشتراک جدید","New subscription")}</button><button className="ghost" disabled={loading} onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button></div></div>
+    <div className="page-head"><div><h1>{pick("اشتراک‌ها","Subscriptions")}</h1><small>{pick("مدیریت کامل اشتراک و اطلاعات اتصال در یک صفحه","Full subscription management and connection information in one place")}</small></div><div className="action-row"><button className="primary" onClick={()=>setCreateOpen(v=>!v)}>＋ {pick("اشتراک جدید","New subscription")}</button><button className="ghost" onClick={()=>setBulkOpen(v=>!v)}>⚙ {pick("مدیریت گروهی","Bulk management")}</button><button className="ghost" disabled={loading} onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button></div></div>
     {error&&<div className="runtime-error">{error}</div>}{ok&&<div className="runtime-success">{ok}</div>}
     <div className="stats dashboard-stats"><Stat label={pick("کل اشتراک‌ها","Total")} value={String(rows.length)}/><Stat label={pick("فعال","Active")} value={String(active)}/><Stat label={pick("حجم تخصیص‌یافته","Allocated traffic")} value={`${totalLimit.toLocaleString("fa-IR",{maximumFractionDigits:1})} GB`}/></div>
+
+    {bulkOpen&&<Card className="runtime-editor"><div className="card-head"><div><b>{pick("مدیریت گروهی اشتراک‌ها","Bulk subscription management")}</b><small>{pick("یک عملیات را انتخاب کنید؛ تغییر روی همه اشتراک‌های قابل‌ویرایش اعمال می‌شود","Choose one operation; the change applies to all editable subscriptions")}</small></div><button type="button" className="mini-btn" onClick={()=>setBulkOpen(false)}>×</button></div><div className="setting-grid"><label className="field"><span>{pick("عملیات","Operation")}</span><select value={bulkOperation} onChange={e=>setBulkOperation(e.target.value as BulkOperation)}><option value="add_traffic">{pick("افزایش حجم همه اشتراک‌ها","Add traffic to all subscriptions")}</option><option value="subtract_traffic">{pick("کاهش حجم همه اشتراک‌ها","Reduce traffic for all subscriptions")}</option><option value="add_days">{pick("افزایش روز همه اشتراک‌ها","Add days to all subscriptions")}</option><option value="subtract_days">{pick("کاهش روز همه اشتراک‌ها","Reduce days for all subscriptions")}</option></select></label><label className="field"><span>{bulkOperation.includes("traffic")?pick("مقدار حجم (GB)","Traffic amount (GB)"):pick("تعداد روز","Number of days")}</span><input type="number" min="0.01" step={bulkOperation.includes("traffic")?"0.1":"1"} value={bulkAmount} onChange={e=>setBulkAmount(e.target.value)}/></label></div><div className="runtime-error" style={{marginTop:12}}>{pick("اشتراک‌های لغوشده تغییر نمی‌کنند. اشتراک نامحدود در عملیات حجم رد می‌شود و کاهش حجم هیچ‌وقت از مصرف واقعی پایین‌تر نمی‌رود.","Canceled subscriptions are not changed. Unlimited subscriptions are skipped for traffic operations, and traffic reduction never goes below actual usage.")}</div><div className="action-row" style={{marginTop:12}}><button className="primary" disabled={busy==="bulk"||!rows.length} onClick={()=>void runBulk()}>{busy==="bulk"?pick("در حال اعمال…","Applying…"):pick("اعمال روی همه اشتراک‌ها","Apply to all subscriptions")}</button><button className="ghost" disabled={busy==="bulk"} onClick={()=>setBulkOpen(false)}>{pick("انصراف","Cancel")}</button></div></Card>}
 
     {createOpen&&<Card className="runtime-editor"><form onSubmit={createSub}><div className="card-head"><div><b>{pick("ساخت اشتراک جدید","Create subscription")}</b><small>{pick("همان اطلاعات پایه پنل قدیمی","Same core account fields as the legacy panel")}</small></div><button type="button" className="mini-btn" onClick={()=>setCreateOpen(false)}>×</button></div><div className="setting-grid"><label className="field"><span>{pick("کاربر","User")}</span><select required value={create.user_id} onChange={e=>setCreate(v=>({...v,user_id:Number(e.target.value)}))}><option value={0}>{pick("انتخاب کاربر","Select user")}</option>{users.filter(x=>x.role!=="admin").map(x=><option key={x.id} value={x.id}>{x.full_name||x.email||`#${x.id}`}</option>)}</select></label><label className="field"><span>{pick("پلن","Plan")}</span><select required value={create.plan_id} onChange={e=>setCreate(v=>({...v,plan_id:Number(e.target.value)}))}><option value={0}>{pick("انتخاب پلن","Select plan")}</option>{plans.map(x=><option key={String(x.id)} value={n(x.id)}>{s(x.name)||`#${x.id}`}</option>)}</select></label><label className="field"><span>{pick("نام کاربری","Username")}</span><input dir="ltr" value={create.username} onChange={e=>setCreate(v=>({...v,username:e.target.value}))}/></label><label className="field"><span>{pick("رمز عبور","Password")}</span><input dir="ltr" value={create.password} onChange={e=>setCreate(v=>({...v,password:e.target.value}))}/></label><label className="field"><span>{pick("حجم GB","Traffic GB")}</span><input type="number" min={0} step="0.1" value={create.traffic_gb} onChange={e=>setCreate(v=>({...v,traffic_gb:e.target.value}))}/></label><label className="field"><span>{pick("مدت روز","Duration days")}</span><input type="number" min={1} value={create.duration_days} onChange={e=>setCreate(v=>({...v,duration_days:e.target.value}))}/></label></div><div className="protocol-toggle-grid">{protocolKeys.map(key=><label className="toggle module-toggle" key={key}><span>{protocolLabels[key]}</span><input type="checkbox" checked={create.protocols.includes(key)} onChange={e=>toggleProtocol(key,e.target.checked,p=>setCreate(v=>({...v,protocols:p})),create.protocols)}/><i/></label>)}</div><button className="primary" disabled={busy==="create"||!create.user_id||!create.plan_id||!create.protocols.length}>{busy==="create"?"…":pick("ساخت اشتراک","Create")}</button></form></Card>}
 
