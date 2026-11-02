@@ -19,7 +19,7 @@ from . import account_delivery
 router = APIRouter(tags=["public-connection-multilink-v7"])
 
 
-# TWINPANEL_PUBLIC_CONNECT_V2RAY_ALL_PROFILES_V55
+# TWINPANEL_PUBLIC_CONNECT_V2RAY_ALL_PROFILES_V56
 #
 # V2Ray/Xray credentials are one item per Exit, but one item must expose exactly
 # three real customer profiles under the active V47 policy. Older subscriptions
@@ -29,8 +29,9 @@ router = APIRouter(tags=["public-connection-multilink-v7"])
 # three-profile credential back to ProtocolCredential; no fake UI duplicates are
 # generated here.
 #
-# Public metadata always uses neutral Server N labels. Real node/country/host
-# names are intentionally not exposed by this UI metadata surface.
+# Public metadata exposes only customer-safe node identity: display name and
+# country code. Public IP, domain, agent URL and other infrastructure details are
+# deliberately not returned.
 
 
 def _subscription_and_payload(token: str, db: Session):
@@ -141,8 +142,23 @@ def _item_v2ray_uris(item: dict[str, Any]) -> list[str]:
     return result if len(result) == 3 else []
 
 
-def _v2ray_profile_groups(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    """Group resolved profiles by credential item while hiding server identity."""
+def _customer_safe_node_meta(db: Session, item: dict[str, Any], index: int) -> tuple[str, str | None]:
+    try:
+        node_id = int(item.get("node_id") or 0)
+    except (TypeError, ValueError):
+        node_id = 0
+
+    node = db.get(Node, node_id) if node_id else None
+    if node is None:
+        return f"سرور {index + 1}", None
+
+    display_name = str(getattr(node, "name", "") or "").strip() or f"سرور {index + 1}"
+    country_code = str(getattr(node, "country_code", "") or "").strip().upper() or None
+    return display_name, country_code
+
+
+def _v2ray_profile_groups(db: Session, payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Group resolved profiles by server and include only customer-safe location metadata."""
 
     groups: list[dict[str, Any]] = []
     for item in _v2ray_items(payload):
@@ -175,10 +191,12 @@ def _v2ray_profile_groups(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 }
             )
 
+        server_name, country_code = _customer_safe_node_meta(db, item, len(groups))
         groups.append(
             {
                 "node_id": item.get("node_id"),
-                "server": f"سرور {len(groups) + 1}",
+                "server": server_name,
+                "country_code": country_code,
                 "profile_count": 3,
                 "profiles": profile_rows,
             }
@@ -187,11 +205,11 @@ def _v2ray_profile_groups(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return groups
 
 
-def _v2ray_uris(payload: dict[str, Any]) -> list[str]:
+def _v2ray_uris(db: Session, payload: dict[str, Any]) -> list[str]:
     result: list[str] = []
     seen: set[str] = set()
 
-    for group in _v2ray_profile_groups(payload):
+    for group in _v2ray_profile_groups(db, payload):
         profiles = group.get("profiles") or []
         for profile in profiles if isinstance(profiles, list) else []:
             if not isinstance(profile, dict):
@@ -206,8 +224,8 @@ def _v2ray_uris(payload: dict[str, Any]) -> list[str]:
 
 async def _subscription_content(token: str, db: Session) -> tuple[str, int, int]:
     payload = await _active_public_payload(token, db)
-    groups = _v2ray_profile_groups(payload)
-    uris = _v2ray_uris(payload)
+    groups = _v2ray_profile_groups(db, payload)
+    uris = _v2ray_uris(db, payload)
 
     if not uris or not groups or len(uris) != len(groups) * 3:
         raise HTTPException(
@@ -235,7 +253,7 @@ async def _subscription_response(token: str, db: Session) -> Response:
 
 async def _subscription_meta_response(token: str, db: Session) -> JSONResponse:
     payload = await _active_public_payload(token, db)
-    groups = _v2ray_profile_groups(payload)
+    groups = _v2ray_profile_groups(db, payload)
     if not groups or any(int(group.get("profile_count") or 0) != 3 for group in groups):
         raise HTTPException(
             status_code=503,
