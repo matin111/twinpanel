@@ -64,12 +64,18 @@ _SCRIPT = r"""
     'openvpn','wireguard','v2ray','hysteria2','tuic','anytls','naive',
     'shadowtls','snell','mieru','trusttunnel','amneziawg','sudoku'
   ]);
+  const BUNDLE=new Set(['openvpn','wireguard','amneziawg']);
   const CLASSIC=new Set(['cisco','openvpn','wireguard','l2tp']);
   const MODERN=new Set([
     'v2ray','hysteria2','tuic','anytls','naive','shadowtls','snell','mieru',
     'trusttunnel','amneziawg','sudoku'
   ]);
   const RECOMMENDED=new Set(['v2ray','wireguard','openvpn','hysteria2','tuic']);
+  const CLIENT={
+    openvpn:'openvpn',wireguard:'wireguard',v2ray:'v2ray',hysteria2:'karing',
+    tuic:'karing',anytls:'karing',naive:'karing',shadowtls:'karing',snell:'hiddify',
+    mieru:'karing',trusttunnel:'trusttunnel',amneziawg:'amneziawg',sudoku:'sudoku'
+  };
   let applyTimer=null;
 
   function normalize(value){
@@ -94,13 +100,24 @@ _SCRIPT = r"""
     return normalize(choice?.dataset?.protocolKey||choice?.dataset?.protocol||'');
   }
 
+  function choiceFor(panel){
+    return [...document.querySelectorAll('.protocol-choice')]
+      .find(item=>String(item.dataset.protocol||'')===String(panel?.id||''))||null;
+  }
+
+  function serverCount(panel){
+    const choice=choiceFor(panel);
+    const text=String(choice?.textContent||'');
+    const match=text.match(/(\d+)\s*سرور/);
+    if(match)return Number(match[1])||0;
+    const tabs=panel?.querySelectorAll?.('.server-tab')?.length||0;
+    if(tabs)return tabs;
+    return panel?.querySelectorAll?.('.server-view')?.length||0;
+  }
+
   function multiUrl(protocol){
     const value=token();if(!value||!MULTI.has(protocol))return'';
     return window.location.origin+'/v1/connect/'+encodeURIComponent(value)+'/multi/'+encodeURIComponent(protocol);
-  }
-
-  function metaUrl(protocol){
-    const url=multiUrl(protocol);return url?url+'/meta':'';
   }
 
   function platform(){
@@ -113,6 +130,20 @@ _SCRIPT = r"""
     if(p==='android')return'v2rayNG';
     if(p==='ios')return'V2Box';
     return'v2rayN';
+  }
+
+  function accountName(){
+    const selectors=['[data-account-username]','[data-username]','.account-username','.user-username','.username'];
+    for(const selector of selectors){
+      const node=document.querySelector(selector);if(!node)continue;
+      const value=String(node.dataset?.accountUsername||node.dataset?.username||node.textContent||'').trim();
+      if(value)return value.replace(/\s+/g,'-');
+    }
+    return token();
+  }
+
+  function profileFor(protocol){
+    return (accountName()||token()||'user')+'-'+protocol;
   }
 
   function fallbackCopy(value){
@@ -141,18 +172,15 @@ _SCRIPT = r"""
     }catch(_error){return String(value||'')}
   }
 
-  async function copyAll(url,kind){
+  async function copyAll(url){
     try{
       const response=await fetch(url,{cache:'no-store'});if(!response.ok)throw new Error(String(response.status));
+      const kind=String(response.headers.get('X-TwinPanel-Multi-Kind')||'').toLowerCase();
       const text=await response.text();
       const payload=kind==='uri'?decodeBase64Utf8(text):text;
       const ok=await copy(payload);
       notify(ok?'همه کانفیگ‌ها کپی شد ✓':'کپی انجام نشد');
     }catch(_error){notify('دریافت همه کانفیگ‌ها انجام نشد')}
-  }
-
-  function profileFrom(response,protocol){
-    return String(response.headers.get('Profile-Title')||token()+'-'+protocol).trim()||(token()+'-'+protocol);
   }
 
   function importHref(client,url,profile){
@@ -171,31 +199,24 @@ _SCRIPT = r"""
   }
 
   function retireOld(panel){
-    panel.querySelectorAll('.v30-subscription-card,.v34-subscription-card,.v37-multi-card,.v38-all-card,.v38-server-list-title,.v51-multi-card,.v51-single-title')
+    panel.querySelectorAll('.v30-subscription-card,.v34-subscription-card,.v37-multi-card,.v38-all-card,.v38-server-list-title,.v51-single-title')
       .forEach(node=>node.remove());
   }
 
   function singleTitle(panel){
-    const views=panel.querySelector('.server-views');if(!views)return;
+    const views=panel.querySelector('.server-views');if(!views||panel.querySelector(':scope > .v51-single-title'))return;
     const title=document.createElement('div');title.className='v51-single-title';title.textContent='سرورهای تکی';
     views.insertAdjacentElement('beforebegin',title);
   }
 
-  async function buildMulti(panel,protocol){
+  function buildMulti(panel,protocol){
     if(!MULTI.has(protocol))return;
-    const url=multiUrl(protocol),meta=metaUrl(protocol);if(!url||!meta)return;
-    let response,payload;
-    try{
-      response=await fetch(meta,{cache:'no-store',headers:{Accept:'application/json'}});
-      if(!response.ok)return;
-      payload=await response.json();
-    }catch(_error){return}
-
-    const count=Number(payload?.node_count||0);if(count<=0)return;
-    const kind=String(payload?.kind||'').toLowerCase();
-    const rawClient=String(payload?.client||'').toLowerCase();
+    if(panel.querySelector(':scope > .v51-multi-card,:scope > .v52-multi-card'))return;
+    const url=multiUrl(protocol);if(!url)return;
+    const count=serverCount(panel);if(count<=0)return;
+    const rawClient=CLIENT[protocol]||'';
     const client=rawClient==='v2ray'?v2rayClient():rawClient;
-    const profile=profileFrom(response,protocol);
+    const profile=profileFor(protocol);
 
     const card=document.createElement('section');card.className='v51-multi-card';card.dataset.v51Protocol=protocol;
     const head=document.createElement('div');head.className='v51-multi-head';
@@ -206,19 +227,19 @@ _SCRIPT = r"""
     title.append(strong,small);head.append(title,counter);
 
     const actions=document.createElement('div');actions.className='v51-multi-actions';
-    const deep=importHref(rawClient,url,profile);
-    if(kind==='bundle'){
+    if(BUNDLE.has(protocol)){
       const download=action('a','دانلود همه کانفیگ‌ها',null,true);download.href=url;download.target='_blank';download.rel='noopener noreferrer';actions.appendChild(download);
       actions.appendChild(action('button','کپی لینک بسته',()=>copy(url).then(ok=>notify(ok?'لینک بسته کپی شد ✓':'کپی انجام نشد')),false));
     }else{
+      const deep=importHref(rawClient,url,profile);
       if(deep){
         const add=action('a','افزودن همه به '+client,null,true);add.href=deep;actions.appendChild(add);
       }else if(rawClient==='v2ray'){
         actions.appendChild(action('button','کپی لینک برای '+client,()=>copy(url).then(ok=>notify(ok?'لینک اشتراک کپی شد ✓':'کپی انجام نشد')),true));
       }else{
-        const open=action('a','باز کردن مولتی‌لینک',null,true);open.href=url;open.target='_blank';open.rel='noopener noreferrer';actions.appendChild(open);
+        actions.appendChild(action('button','کپی لینک مولتی‌لینک',()=>copy(url).then(ok=>notify(ok?'لینک اشتراک کپی شد ✓':'کپی انجام نشد')),true));
       }
-      actions.appendChild(action('button','کپی همه کانفیگ‌ها',()=>copyAll(url,kind),false));
+      actions.appendChild(action('button','کپی همه کانفیگ‌ها',()=>copyAll(url),false));
     }
     card.append(head,actions);
     panel.querySelector('.panel-head')?.insertAdjacentElement('afterend',card);
@@ -261,17 +282,17 @@ _SCRIPT = r"""
     });
   }
 
-  async function apply(){
+  function apply(){
     document.body.classList.add('v51-multilink');document.body.dataset.tpMultilinkAuthority='v51';
     ensureMobileCategories();
-    const panels=[...document.querySelectorAll('.protocol-panel')];
-    for(const panel of panels){
-      const protocol=panelKey(panel);retireOld(panel);await buildMulti(panel,protocol);
-    }
+    document.querySelectorAll('.protocol-panel').forEach(panel=>{
+      const protocol=panelKey(panel);retireOld(panel);buildMulti(panel,protocol);
+    });
   }
 
-  function schedule(){clearTimeout(applyTimer);applyTimer=setTimeout(apply,80)}
-  apply();window.setTimeout(apply,350);window.setTimeout(apply,1100);
+  function schedule(){clearTimeout(applyTimer);applyTimer=setTimeout(apply,40)}
+  apply();
+  window.setTimeout(apply,180);
   window.addEventListener('resize',schedule,{passive:true});
 })();
 </script>
@@ -279,7 +300,7 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_multilink_authority_v51(source: str) -> str:
-    """Final UI authority for all config-bearing protocol Multi-Links and mobile categories."""
+    """Final UI authority for config-bearing protocol Multi-Links without prefetching meta endpoints."""
     if _MARKER in source:
         return source
     source = source.replace("</style>", _CSS + "\n</style>", 1)
