@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 
-_MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_MULTILINK_ANCHOR_V61"
+_MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_HUBV5_PANEL_HEAD_V62"
 
 
 _CSS = r"""
-/* TWINPANEL_PUBLIC_CONNECT_V2RAY_MULTILINK_ANCHOR_V61 */
+/* TWINPANEL_PUBLIC_CONNECT_V2RAY_HUBV5_PANEL_HEAD_V62 */
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .server-views,
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .v51-single-title,
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .v57-v2ray-server-tabs{
   display:none!important;
 }
-body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .protocol-panel-head .server-tabs{
+body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .protocol-panel-head .server-tabs,
+body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .panel-head .server-tabs{
   display:flex!important;
 }
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .v54-v2ray-groups{
@@ -57,7 +58,7 @@ body.v54-v2ray-restore .v54-v2ray-empty{padding:12px;color:var(--muted);font-siz
 
 
 _SCRIPT = r"""
-<script id="twinpanelPublicConnectV2rayMultiLinkAnchorV61">
+<script id="twinpanelPublicConnectV2rayHubV5PanelHeadV62">
 (function(){
   let timer=null;
 
@@ -142,7 +143,7 @@ _SCRIPT = r"""
     if(direct)return direct;
     const children=[...panel.children];
     for(const child of children){
-      if(child.matches('.protocol-panel-head,.server-views,.v51-single-title,.v57-v2ray-server-tabs,.v54-v2ray-groups'))continue;
+      if(child.matches('.protocol-panel-head,.panel-head,.server-views,.v51-single-title,.v57-v2ray-server-tabs,.v54-v2ray-groups'))continue;
       const text=String(child.textContent||'').toLowerCase();
       if(text.includes('multi-link')||text.includes('همه سرورها'))return child;
     }
@@ -264,7 +265,7 @@ _SCRIPT = r"""
   async function ensureGroups(panel){
     if(panel.dataset.v54GroupsLoaded==='1'||panel.dataset.v54GroupsLoading==='1')return;
     const anchor=multiLinkAnchor(panel);
-    const tabs=panel.querySelector(':scope > .protocol-panel-head .server-tabs');
+    const tabs=panel.querySelector(':scope > .protocol-panel-head .server-tabs,:scope > .panel-head .server-tabs');
     if(!tabs)return;
     panel.querySelectorAll(':scope > .v57-v2ray-server-tabs').forEach(node=>node.remove());
     const holder=mountGroupsHolder(panel,anchor);
@@ -325,7 +326,7 @@ _V51_MULTI_NEW = "return window.location.origin+'/v1/connect/'+encodeURIComponen
 
 
 def refine_public_connection_v2ray_mobile_restore_v54(source: str) -> str:
-    """Render all V2Ray server groups below Multi-Link without depending on one wrapper class."""
+    """Render all V2Ray server groups below Multi-Link on both canonical and Hub V5 headers."""
     source = str(source or "")
     source = source.replace(_V41_REMOVE_OLD, _V41_REMOVE_NEW)
     source = source.replace(_V51_MULTI_OLD, _V51_MULTI_NEW)
