@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.502",
+  "version": "1.1.0-rc.503",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T09:38:29Z",
+  "released_at": "2026-11-02T10:04:09Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "8464e755b059ef5e3aaa81bfe0c9c821d0a772d3",
+  "source_sha": "1dcb795f97c6967fcb13d4c9ac6b024b2328e9fa",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.502/twinpanel-1.1.0-rc.502-linux-x86_64.tar.gz",
-    "sha256": "71ee922b0d99bb30d8f243ddd3e69d74a070190a12a8d093944f39592a89fbd9",
-    "size_bytes": 25330204
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.503/twinpanel-1.1.0-rc.503-linux-x86_64.tar.gz",
+    "sha256": "9919408223c1e8dd719cd2ccfd38b9526fd751afc0e14b65c9e921195f2df6f9",
+    "size_bytes": 25333516
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.502 ساختار Public Connect را برای Multi-Link یکپارچه می‌کند. برای هر ۱۳ پروتکل کانفیگ‌دار OpenVPN، WireGuard، V2Ray/Xray، Hysteria2، TUIC، AnyTLS، Naive، ShadowTLS، Snell، Mieru، TrustTunnel، AmneziaWG و Sudoku یک کارت واحد «همه سرورها» از Authority مرکزی /multi/{protocol} ساخته می‌شود؛ کانفیگ‌های URI/sing-box/Karing به‌صورت یک payload ترکیبی قابل کپی هستند و پروتکل‌های فایل‌محور بسته کامل همه کانفیگ‌ها را دانلود می‌کنند. سرورهای تکی جدا زیر Multi-Link باقی می‌مانند، کارت‌های تکراری V30/V34/V38 و سطح اضافی V2Ray حذف می‌شوند و موبایل دسته‌بندی پروتکل‌ها شامل پیشنهادی، VPN کلاسیک، مدرن و همه پروتکل‌ها را مانند دسکتاپ دریافت می‌کند. Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting و Quota تغییری نکرده‌اند. Source روی SHA immutable 8464e755b059ef5e3aaa81bfe0c9c821d0a772d3 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.502 unifies Public Connect Multi-Link presentation. Each of the 13 config-bearing protocols—OpenVPN, WireGuard, V2Ray/Xray, Hysteria2, TUIC, AnyTLS, Naive, ShadowTLS, Snell, Mieru, TrustTunnel, AmneziaWG and Sudoku—gets one authoritative all-servers card backed by /multi/{protocol}; URI/sing-box/Karing deliveries expose one combined payload for copying/import while native file protocols provide one complete all-config bundle. Single-server inventory remains separate below the Multi-Link card, competing V30/V34/V38 cards and the extra V2Ray surface are retired, and mobile now gets protocol categories matching desktop: Recommended, Classic VPN, Modern, and All Protocols. Provisioning, credentials, tunnel dataplane, routing, firewall, accounting and quota behavior are unchanged. Source is pinned to immutable SHA 8464e755b059ef5e3aaa81bfe0c9c821d0a772d3."
+    "fa": "TwinPanel 1.1.0-rc.503 مشکل ناپدیدشدن Multi-Link در Public Connect را برطرف می‌کند. Root Cause اجرای مجدد V51 در 350ms و 1100ms بود که کارت سالم را قبل از تکمیل درخواست بعدی /multi/{protocol}/meta حذف می‌کرد. V52 اکنون همان DOM سالم V51 را بدون هیچ fetch جدید به Authority پایدار تبدیل می‌کند؛ بنابراین دکمه‌های افزودن همه/کپی همه حفظ می‌شوند و اجرای دیرهنگام V30/V34/V38/V44/V49 یا V51 دیگر کارت فعال را حذف نمی‌کند. V2Ray/Xray نیز داخل همان Multi-Link واحد ۱۳ پروتکل باقی می‌ماند و سطح تکراری قدیمی V2Ray حذف می‌شود. Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting و Quota تغییری نکرده‌اند. Source روی SHA immutable 1dcb795f97c6967fcb13d4c9ac6b024b2328e9fa قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.503 fixes disappearing Multi-Link cards in Public Connect. The root cause was V51 re-running at 350ms and 1100ms and removing an already-working card before the next /multi/{protocol}/meta request completed. V52 now promotes the exact working V51 DOM node into a persistent final authority without any additional fetch, preserving its add-all/copy-all handlers while preventing late V30/V34/V38/V44/V49 or V51 refiners from removing it. V2Ray/Xray remains in the same unified 13-protocol Multi-Link authority and the duplicate legacy V2Ray surface is retired. Provisioning, credentials, tunnel dataplane, routing, firewall, accounting and quota behavior are unchanged. Source is pinned to immutable SHA 1dcb795f97c6967fcb13d4c9ac6b024b2328e9fa."
   }
 }
