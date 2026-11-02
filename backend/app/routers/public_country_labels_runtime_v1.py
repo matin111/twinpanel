@@ -51,18 +51,21 @@ _ORIGINAL_MODERN_REFINER = modern_names_v14.refine_public_connection_modern_name
 
 
 def public_node_label(node: Node) -> str:
+    # Only the mother/local-core node gets a customer-facing country label.
+    # Normal Exit nodes must keep their configured node.name exactly as before.
+    if not getattr(node, "is_mother", False):
+        return str(getattr(node, "name", "") or f"Server {int(node.id)}").strip()
+
     code = str(getattr(node, "country_code", "") or "").strip().upper()
     if code in _COUNTRY_LABELS_FA:
         return _COUNTRY_LABELS_FA[code]
     if code and code not in {"XX", "CORE"}:
         return code
-    if getattr(node, "is_mother", False):
-        return "سرور مرکزی"
-    return str(getattr(node, "name", "") or f"Server {int(node.id)}").strip()
+    return "سرور مرکزی"
 
 
 def refine_public_country_labels(source: str, db: Session) -> str:
-    """Replace only customer-facing server labels, never internal node identity."""
+    """Replace only the mother node's customer-facing label; keep Exit names intact."""
     for node in db.query(Node).filter(Node.retired_at.is_(None)).all():
         old = html.escape(str(node.name or ""), quote=True)
         new = html.escape(public_node_label(node), quote=True)
