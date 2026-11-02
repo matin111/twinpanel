@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 
-_MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_ALL_GROUPS_COLLAPSED_V60"
+_MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_MULTILINK_ANCHOR_V61"
 
 
 _CSS = r"""
-/* TWINPANEL_PUBLIC_CONNECT_V2RAY_ALL_GROUPS_COLLAPSED_V60 */
+/* TWINPANEL_PUBLIC_CONNECT_V2RAY_MULTILINK_ANCHOR_V61 */
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .server-views,
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .v51-single-title,
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .v57-v2ray-server-tabs{
@@ -57,7 +57,7 @@ body.v54-v2ray-restore .v54-v2ray-empty{padding:12px;color:var(--muted);font-siz
 
 
 _SCRIPT = r"""
-<script id="twinpanelPublicConnectV2rayAllGroupsCollapsedV60">
+<script id="twinpanelPublicConnectV2rayMultiLinkAnchorV61">
 (function(){
   let timer=null;
 
@@ -133,6 +133,44 @@ _SCRIPT = r"""
   function serverLabel(server,index){
     const exact=String(server?.server||'').trim();
     return exact||('سرور '+(index+1));
+  }
+
+  function multiLinkAnchor(panel){
+    const direct=panel.querySelector(
+      ':scope > .v52-multi-card,:scope > .v51-multi-card,:scope > .multi-link-card,:scope > [data-multi-link]'
+    );
+    if(direct)return direct;
+    const children=[...panel.children];
+    for(const child of children){
+      if(child.matches('.protocol-panel-head,.server-views,.v51-single-title,.v57-v2ray-server-tabs,.v54-v2ray-groups'))continue;
+      const text=String(child.textContent||'').toLowerCase();
+      if(text.includes('multi-link')||text.includes('همه سرورها'))return child;
+    }
+    return null;
+  }
+
+  function recommendationAnchor(panel){
+    return [...panel.children].find(child=>{
+      const text=String(child.textContent||'');
+      return text.includes('برنامه پیشنهادی')||text.includes('دانلود v2rayN');
+    })||null;
+  }
+
+  function mountGroupsHolder(panel,anchor){
+    let holder=panel.querySelector(':scope > .v54-v2ray-groups');
+    if(holder)return holder;
+    holder=el('div','v54-v2ray-groups');
+    if(anchor){
+      anchor.insertAdjacentElement('afterend',holder);
+      return holder;
+    }
+    const recommendation=recommendationAnchor(panel);
+    if(recommendation){
+      recommendation.insertAdjacentElement('beforebegin',holder);
+      return holder;
+    }
+    panel.appendChild(holder);
+    return holder;
   }
 
   function addProfileAction(actions,uri){
@@ -225,12 +263,11 @@ _SCRIPT = r"""
 
   async function ensureGroups(panel){
     if(panel.dataset.v54GroupsLoaded==='1'||panel.dataset.v54GroupsLoading==='1')return;
-    const anchor=panel.querySelector(':scope > .v52-multi-card,:scope > .v51-multi-card');
+    const anchor=multiLinkAnchor(panel);
     const tabs=panel.querySelector(':scope > .protocol-panel-head .server-tabs');
-    if(!anchor||!tabs)return;
+    if(!tabs)return;
     panel.querySelectorAll(':scope > .v57-v2ray-server-tabs').forEach(node=>node.remove());
-    let holder=panel.querySelector(':scope > .v54-v2ray-groups');
-    if(!holder){holder=el('div','v54-v2ray-groups');anchor.insertAdjacentElement('afterend',holder)}
+    const holder=mountGroupsHolder(panel,anchor);
     panel.dataset.v54GroupsLoading='1';
     try{
       const url=metaUrl();if(!url)throw new Error('no meta url');
@@ -244,7 +281,6 @@ _SCRIPT = r"""
       else buildTabs(tabs,holder,servers);
       panel.dataset.v54GroupsLoaded='1';
     }catch(_error){
-      tabs.replaceChildren();
       holder.replaceChildren(el('div','v54-v2ray-empty','نمایش سرورها و اتصال‌های V2Ray در دسترس نیست'));
     }finally{delete panel.dataset.v54GroupsLoading}
   }
@@ -289,7 +325,7 @@ _V51_MULTI_NEW = "return window.location.origin+'/v1/connect/'+encodeURIComponen
 
 
 def refine_public_connection_v2ray_mobile_restore_v54(source: str) -> str:
-    """Render every V2Ray server group below Multi-Link, with each three-profile group collapsed by default."""
+    """Render all V2Ray server groups below Multi-Link without depending on one wrapper class."""
     source = str(source or "")
     source = source.replace(_V41_REMOVE_OLD, _V41_REMOVE_NEW)
     source = source.replace(_V51_MULTI_OLD, _V51_MULTI_NEW)
