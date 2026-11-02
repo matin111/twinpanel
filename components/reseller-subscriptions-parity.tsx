@@ -6,6 +6,7 @@ import {PortalShell} from "./portal-shells";
 import {SubscriptionLinkDeliveryModal} from "./subscription-link-delivery-modal";
 import {resellerApi,ResellerRow} from "../lib/reseller-runtime-api";
 import {createResellerManualSubscription} from "../lib/reseller-manual-subscription-api";
+import {STORE_PROTOCOL_CATALOG} from "../lib/store-protocol-catalog";
 import {useI18n} from "../lib/i18n";
 
 const str=(row:ResellerRow,...keys:string[])=>{for(const key of keys){const value=row?.[key];if(value!==undefined&&value!==null)return String(value);}return "";};
@@ -17,8 +18,8 @@ const gbText=(bytes:number)=>`${gb(bytes).toLocaleString("fa-IR",{maximumFractio
 const dateText=(value:unknown)=>{if(!value)return "—";const d=new Date(String(value));return Number.isNaN(d.getTime())?String(value):d.toLocaleString("fa-IR");};
 const statusTone=(status:string):"ok"|"warn"|"bad"|"violet"=>status==="active"?"ok":["expired","canceled","failed"].includes(status)?"bad":"warn";
 const idempotency=(prefix:string)=>`${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
-const DEFAULT_PROTOCOLS=["cisco","openvpn","wireguard","l2tp","v2ray"];
-const PROTOCOL_LABELS:Record<string,string>={cisco:"Cisco",openvpn:"OpenVPN",wireguard:"WireGuard",l2tp:"L2TP",v2ray:"V2Ray/Xray"};
+const DEFAULT_PROTOCOLS=STORE_PROTOCOL_CATALOG.map(protocol=>protocol.id);
+const PROTOCOL_LABELS:Record<string,string>=Object.fromEntries(STORE_PROTOCOL_CATALOG.map(protocol=>[protocol.id,protocol.name]));
 
 type ExpiryUnit="days"|"months"|"years";
 const expiryPreset=(value:unknown):{value:number;unit:ExpiryUnit}=>{
