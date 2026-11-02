@@ -11,28 +11,33 @@ from sqlalchemy.orm import Session
 
 from .. import xray_public_delivery_runtime as xray_delivery
 from ..database import get_db
-from .account_delivery import _public_payload, _subscription_from_share_token
+from . import account_delivery
 
 
 router = APIRouter(tags=["public-connection-multilink-v7"])
 
 
-# TWINPANEL_PUBLIC_CONNECT_V2RAY_ALL_PROFILES_V49
+# TWINPANEL_PUBLIC_CONNECT_V2RAY_ALL_PROFILES_V51
 #
 # V2Ray/Xray credentials are one item per Exit, but one item can carry several
 # real customer profiles. The legacy V7 subscription flattened only item.uri,
 # which is the selected/recommended profile and silently dropped the remaining
 # profiles. Always resolve the final runtime customer policy instead so the
 # subscription and Public Connect page expose the same ordered profile set.
-# Legacy credentials without usable profiles[] keep their historical item.uri.
+#
+# IMPORTANT: account_delivery._public_payload is runtime-patched after router
+# import. Keep a module reference and resolve the callable at request time;
+# importing the function directly freezes the legacy callable and collapses each
+# Exit back to one item.uri. Public metadata also uses neutral Server N labels so
+# node/country/host names are not exposed by the UI metadata surface.
 
 
 def _active_public_payload(token: str, db: Session) -> dict[str, Any]:
-    sub = _subscription_from_share_token(token, db)
+    sub = account_delivery._subscription_from_share_token(token, db)
     status = str(getattr(sub.status, "value", sub.status)).strip().lower()
     if status != "active":
         raise HTTPException(status_code=403, detail="اشتراک فعال نیست")
-    return _public_payload(db, sub)
+    return account_delivery._public_payload(db, sub)
 
 
 def _item_v2ray_uris(item: dict[str, Any]) -> list[str]:
@@ -62,7 +67,7 @@ def _item_v2ray_uris(item: dict[str, Any]) -> list[str]:
 
 
 def _v2ray_profile_groups(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    """Group resolved profiles by credential item/server for UI and metadata."""
+    """Group resolved profiles by credential item while hiding server identity."""
 
     groups: list[dict[str, Any]] = []
     credentials = payload.get("credentials") or []
@@ -81,22 +86,12 @@ def _v2ray_profile_groups(payload: dict[str, Any]) -> list[dict[str, Any]]:
         if not isinstance(items, list):
             continue
 
-        for index, item in enumerate(items):
+        for item in items:
             if not isinstance(item, dict):
                 continue
             uris = _item_v2ray_uris(item)
             if not uris:
                 continue
-
-            node_id = item.get("node_id")
-            server = str(
-                item.get("node")
-                or item.get("country")
-                or item.get("location")
-                or item.get("server")
-                or item.get("server_ip")
-                or f"Server {index + 1}"
-            ).strip()
 
             profile_rows: list[dict[str, Any]] = []
             resolved_profiles = xray_delivery._customer_profiles(item)
@@ -125,8 +120,8 @@ def _v2ray_profile_groups(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
             groups.append(
                 {
-                    "node_id": node_id,
-                    "server": server,
+                    "node_id": item.get("node_id"),
+                    "server": f"سرور {len(groups) + 1}",
                     "profile_count": len(profile_rows),
                     "profiles": profile_rows,
                 }
@@ -230,10 +225,6 @@ def public_v2ray_subscription_meta_v49(
 
 
 # TWINPANEL_PUBLIC_CONNECT_NEUTRAL_SUB_URL_V50
-# Some public networks inspect plaintext HTTP paths and interfere when protocol
-# product names appear in the URL. Preserve the historical V2Ray routes for
-# compatibility, but expose a neutral canonical feed used by Public Connect and
-# external clients. The payload, policy and credentials are identical.
 @router.get(
     "/{token}/sub",
     name="public_v2ray_subscription_neutral_v50",
