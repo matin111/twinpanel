@@ -14,16 +14,16 @@ from .node_runtime_connection import connect_protocol_runtime, is_local_core
 from .routers import account_delivery
 
 
-# TWINPANEL_MOTHER_SUBSCRIPTION_DELIVERY_POLICY_V113
+# TWINPANEL_MOTHER_SUBSCRIPTION_DELIVERY_POLICY_V114
 #
-# Mother/Local Core has three deliberately separate responsibilities:
+# Mother/Local Core responsibilities are deliberately separated:
 #   1. it is always a protocol runtime/provisioning target,
-#   2. the admin/reseller access toggles control ONLY individual customer delivery,
-#   3. High Availability / Multi-Link NEVER includes Mother.
+#   2. admin/reseller access toggles control individual/single-server delivery,
+#   3. Multi-Link always contains every provisioned usable node, including Mother.
 #
-# Credentials and SubscriptionNode membership are never deleted when visibility is
-# disabled. Re-enabling access therefore exposes the already-provisioned Mother
-# credentials immediately without reprovisioning.
+# Credentials and SubscriptionNode membership are never deleted when single-server
+# visibility is disabled. Multi-Link therefore remains a complete HA profile while
+# the individual Mother tab can still be controlled independently by the toggle.
 
 _original_stored_info = account_delivery._stored_info
 _original_ssh_connect_saved = account_delivery.ssh_connect_saved
@@ -194,36 +194,78 @@ def _stored_info_with_mother_policy(
     return _filter_mother_from_delivery(db, payload)
 
 
-def _install_multilink_filter() -> None:
-    """Mother is never a HA/Multi-Link member, regardless of access toggle."""
+def _refresh_delivery_node_names(
+    db: Session,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    """Refresh stored item labels from current Node settings before Multi-Link export."""
+    credentials = payload.get("credentials")
+    if not isinstance(credentials, list):
+        return payload
+
+    node_cache: dict[int, Node | None] = {}
+    refreshed_credentials: list[dict[str, Any]] = []
+    for credential in credentials:
+        if not isinstance(credential, dict):
+            continue
+        copied = dict(credential)
+        items = credential.get("items")
+        if isinstance(items, list):
+            refreshed_items: list[Any] = []
+            for item in items:
+                if not isinstance(item, dict):
+                    refreshed_items.append(item)
+                    continue
+                row = dict(item)
+                node_id = _item_node_id(row)
+                if node_id:
+                    if node_id not in node_cache:
+                        node_cache[node_id] = db.get(Node, node_id)
+                    node = node_cache[node_id]
+                    if node and not getattr(node, "retired_at", None):
+                        row["node"] = str(getattr(node, "name", "") or f"Server {node_id}").strip()
+                        row["country"] = str(getattr(node, "country_code", "") or row.get("country") or "").strip()
+                refreshed_items.append(row)
+            copied["items"] = refreshed_items
+        refreshed_credentials.append(copied)
+
+    result = dict(payload)
+    result["credentials"] = refreshed_credentials
+    return result
+
+
+def _install_multilink_full_payload() -> None:
+    """Multi-Link always exports all provisioned nodes, including Mother."""
     try:
         from .routers import public_connection_all_multilink_v34 as multi
     except Exception:
         return
 
     current = getattr(multi, "_active", None)
-    if current is None or getattr(current, "_twinpanel_mother_multilink_v113", False):
+    if current is None or getattr(current, "_twinpanel_mother_multilink_v114", False):
         return
 
     original_active = current
 
-    def _active_without_mother(
+    def _active_with_mother(
         token: str,
         db: Session,
     ):
-        sub, payload = original_active(token, db)
-        return sub, _filter_mother_from_delivery(db, payload)
+        # Keep the canonical active-subscription validation from the route, but
+        # replace its single-delivery-filtered payload with the original stored
+        # delivery payload so Mother remains part of HA/Multi-Link.
+        sub, _filtered_payload = original_active(token, db)
+        payload = _original_stored_info(db, sub)
+        return sub, _refresh_delivery_node_names(db, payload)
 
-    setattr(_active_without_mother, "_twinpanel_mother_multilink_v113", True)
-    multi._active = _active_without_mother
+    setattr(_active_with_mother, "_twinpanel_mother_multilink_v114", True)
+    multi._active = _active_with_mother
 
 
 def apply_mother_subscription_delivery_policy_v108() -> None:
     global _applied
 
     if not _applied:
-        # Visibility is enforced only at customer delivery. Provisioning remains
-        # independent and always keeps Mother as an internal target.
         account_delivery._stored_info = _stored_info_with_mother_policy
         account_delivery.ssh_connect_saved = _runtime_aware_connect_saved
         account_delivery._delivery_item_is_usable = _modern_direct_item_is_usable
@@ -239,4 +281,4 @@ def apply_mother_subscription_delivery_policy_v108() -> None:
 
         _applied = True
 
-    _install_multilink_filter()
+    _install_multilink_full_payload()
