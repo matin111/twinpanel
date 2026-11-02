@@ -1,0 +1,36 @@
+name: license-center-v1-smoke
+
+on:
+  pull_request:
+    paths:
+      - "components/license-center.tsx"
+      - "components/routed-page-client-v2.tsx"
+      - "components/ui.tsx"
+      - ".github/workflows/license-center-v1-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify license center contract
+        run: |
+          grep -Fq 'routeKey==="admin/license"' components/routed-page-client-v2.tsx
+          grep -Fq '"/admin/license"' components/ui.tsx
+          grep -Fq '/v1/admin/system/license/activate' components/license-center.tsx || grep -Fq 'license/${action}' components/license-center.tsx
+          grep -Fq 'trial_active' components/license-center.tsx
+          grep -Fq 'license_expired' components/license-center.tsx
