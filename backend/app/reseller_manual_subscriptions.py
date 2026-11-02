@@ -12,6 +12,7 @@ from .models_reseller import (
     ResellerSubscription,
     ResellerTrafficTransaction,
 )
+from .protocol_account_registry import normalize_protocols
 from .services.reseller_traffic_pool import _suspend_reseller_pool
 from .services.subscription_factory import create_subscription_core
 # Importing this module normalizes metadata and repairs legacy PostgreSQL schema
@@ -20,7 +21,6 @@ from . import subscription_plan_schema as _subscription_plan_schema
 
 
 GB = 1024 ** 3
-ALLOWED_PROTOCOLS = {"cisco", "openvpn", "wireguard", "l2tp", "v2ray"}
 
 
 def _duplicate_creation(
@@ -90,18 +90,14 @@ def create_manual_reseller_subscription(
     if duplicate:
         return duplicate
 
-    normalized_protocols: list[str] = []
-    for raw in protocols or []:
-        protocol = str(raw or "").strip().lower()
-        if protocol and protocol not in normalized_protocols:
-            normalized_protocols.append(protocol)
-
-    invalid = [p for p in normalized_protocols if p not in ALLOWED_PROTOCOLS]
-    if invalid:
+    try:
+        normalized_protocols = normalize_protocols(protocols)
+    except ValueError as exc:
         raise HTTPException(
             status_code=422,
-            detail=f"پروتکل پشتیبانی نمی‌شود: {', '.join(invalid)}",
-        )
+            detail=str(exc),
+        ) from exc
+
     if not normalized_protocols:
         raise HTTPException(
             status_code=422,
