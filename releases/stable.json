@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.484",
+  "version": "1.1.0-rc.485",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T03:14:32Z",
+  "released_at": "2026-11-02T03:22:19Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e31325d3cd1efa444747508ff856da1800cd70c1",
+  "source_sha": "c4f2fc97e657d0d71c6c9404fdc9ee2e9e402a17",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.484/twinpanel-1.1.0-rc.484-linux-x86_64.tar.gz",
-    "sha256": "ae65972c65db9c26e7599adadfccc405f5bb88676e04f67750e30dc6265d8fae",
-    "size_bytes": 25304353
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.485/twinpanel-1.1.0-rc.485-linux-x86_64.tar.gz",
+    "sha256": "a2f73e4a35b82c88c6f789756ef7dce9c9aba4b7608d39f48120312445d82df6",
+    "size_bytes": 25303671
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.484 ساخت Tunnel مدیریتی را در نودهایی که Agent فعال دارند اما هنگام upgrade به PyPI/DNS دسترسی ندارند مقاوم می‌کند. مسیر عادی bootstrap همچنان اول اجرا می‌شود؛ فقط خطاهای مشخص pip/PyPI/DNS در صورتی recover می‌شوند که twinpanel-agent واقعاً active باشد و venv فعلی بتواند httpx و psutil را import کند. در این حالت Agent upgrade به تعویق می‌افتد، Tunnel Fabric با installer رسمی ensure می‌شود و ساخت Tunnel ادامه پیدا می‌کند. Agent repair/upgrade مستقل، TP27، Routing، Firewall، Accounting، Quota و Dataplane تغییر نکرده‌اند. Fix PR #1792 با تمام Workflowهای مربوط سبز Merge شد و Release PR #1793 با 9/9 Workflow سبز Merge شد. Source روی SHA immutable e31325d3cd1efa444747508ff856da1800cd70c1 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.484 makes managed Tunnel creation resilient on nodes whose Agent is already active but whose opportunistic upgrade cannot reach PyPI/DNS. The canonical bootstrap path still runs first; only recognized pip/PyPI/DNS failures recover when twinpanel-agent is actually active and the current venv can import httpx and psutil. Agent upgrade is then deferred, Tunnel Fabric is ensured through the existing authoritative installer, and Tunnel creation continues. Independent Agent repair/upgrade, TP27, routing, firewall, accounting, quota and dataplane behavior are unchanged. Fix PR #1792 merged with all related workflows green and Release PR #1793 merged with 9/9 workflows green. Source is pinned to immutable SHA e31325d3cd1efa444747508ff856da1800cd70c1."
+    "fa": "TwinPanel 1.1.0-rc.485 نام‌گذاری Multi-Link را اصلاح می‌کند تا عنوان نمایشی هر اشتراک بر اساس نام کاربری و نام پروتکل باشد؛ برای نمونه msabt122154-mieru یا msabt122154-tuic. Profile-Title، Remark/Fragment لینک‌های URI و عنوان گروه Mieru در Karing همین الگو را می‌گیرند و نام پنل، کشور یا نود در عنوان نمایشی Multi-Link استفاده نمی‌شود. شناسه‌های داخلی چندسروره فقط در جاهایی که کلاینت به یکتایی نیاز دارد یکتا می‌مانند. Provisioning، Mother policy، Tunnel dataplane، Routing، Firewall، Accounting، Quota و Transport behavior تغییری نکرده‌اند. Fix PR #1795 با 6/6 Workflow سبز Merge شد و Release PR #1797 با 9/9 Workflow سبز Merge شد. Source روی SHA immutable c4f2fc97e657d0d71c6c9404fdc9ee2e9e402a17 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.485 fixes Multi-Link naming so each visible subscription title uses the account username and protocol name, for example msabt122154-mieru or msabt122154-tuic. Profile-Title, URI remarks/fragments and the Mieru Karing group title follow this format; panel brand, country and node names are not used in the visible Multi-Link title. Internal multi-server identifiers remain unique only where required by the client. Provisioning, Mother policy, tunnel dataplane, routing, firewall, accounting, quota and transport behavior are unchanged. Fix PR #1795 merged with 6/6 green workflows and Release PR #1797 merged with 9/9 green workflows. Source is pinned to immutable SHA c4f2fc97e657d0d71c6c9404fdc9ee2e9e402a17."
   }
 }
