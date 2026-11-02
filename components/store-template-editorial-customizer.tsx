@@ -67,7 +67,9 @@ const SALES_FIELDS:TextField[]=[
   {key:"plans_tag",fa:"برچسب بخش پلن‌ها",en:"Plans tag"},{key:"plans_title",fa:"عنوان بخش پلن‌ها",en:"Plans headline"},{key:"plans_description",fa:"توضیح بخش پلن‌ها",en:"Plans description",long:true},{key:"plan_feature_1",fa:"مزیت خرید ۱",en:"Purchase benefit 1"},{key:"plan_feature_2",fa:"مزیت خرید ۲",en:"Purchase benefit 2"},{key:"plan_feature_3",fa:"مزیت خرید ۳",en:"Purchase benefit 3"},{key:"editorial_recommended_label",fa:"متن نشان پیشنهادی",en:"Recommended badge"},
 ];
 const PROTOCOL_FIELDS:TextField[]=[
-  {key:"protocols_tag",fa:"پروتکل‌ها — برچسب",en:"Protocols — tag"},{key:"protocols_title",fa:"پروتکل‌ها — عنوان",en:"Protocols — title"},{key:"protocols_description",fa:"پروتکل‌ها — توضیح",en:"Protocols — description",long:true},{key:"editorial_protocol_available_label",fa:"وضعیت هر پروتکل",en:"Protocol availability label"},
+  {key:"protocols_tag",fa:"پروتکل‌ها — برچسب",en:"Protocols — tag"},{key:"protocols_title",fa:"پروتکل‌ها — عنوان",en:"Protocols — title"},{key:"protocols_description",fa:"پروتکل‌ها — توضیح",en:"Protocols — description",long:true},
+  {key:"modern_protocols_description",fa:"توضیح پروتکل‌های مدرن",en:"Modern protocols description",long:true},
+  {key:"editorial_protocol_available_label",fa:"وضعیت هر پروتکل",en:"Protocol availability label"},
 ];
 const SERVICE_FIELDS:TextField[]=[
   {key:"services_tag",fa:"خدمات — برچسب",en:"Services — tag"},{key:"services_title",fa:"خدمات — عنوان",en:"Services — title"},{key:"services_description",fa:"خدمات — توضیح",en:"Services — description",long:true},
