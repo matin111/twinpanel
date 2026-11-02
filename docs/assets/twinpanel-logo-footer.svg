@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="96" viewBox="0 0 180 96" role="img" aria-labelledby="title desc">
+  <title id="title">TwinPanel logo</title>
+  <desc id="desc">TwinPanel blue and white brand mark.</desc>
+  <defs>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#20d8ff"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(18 16)">
+    <path d="M10 18h92l-15 17H39L25 52H0L30 18z" fill="url(#blue)"/>
+    <path d="M49 35h48L73 62H38z" fill="#ffffff"/>
+  </g>
+</svg>
