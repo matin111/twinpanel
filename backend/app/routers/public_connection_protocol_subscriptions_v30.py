@@ -174,6 +174,15 @@ _SCRIPT = r"""
   const normalize=value=>{const p=String(value||'').trim().toLowerCase();return p==='xray'?'v2ray':p;};
   function panelProtocol(panel){const modern=normalize(panel?.dataset?.modernProtocol||'');if(modern)return modern;const choice=[...document.querySelectorAll('.protocol-choice')].find(item=>String(item.dataset.protocol||'')===String(panel?.id||''));return normalize(choice?.dataset?.protocolKey||choice?.dataset?.protocol||'');}
   function subscriptionUrl(protocol){return window.location.origin+'/v1/connect/'+encodeURIComponent(token)+'/sub/'+encodeURIComponent(protocol);}
+  function namedSubscriptionUrl(url,title){const clean=String(url||'').split('#',1)[0];const name=String(title||'').trim();return name?clean+'#'+encodeURIComponent(name):clean;}
+  async function subscriptionIdentity(protocol,url){
+    try{
+      const response=await fetch(url,{cache:'no-store',headers:{Accept:'text/plain'}});
+      if(!response.ok)return protocol;
+      return String(response.headers.get('Profile-Title')||protocol).trim()||protocol;
+    }catch(_error){return protocol}
+  }
+  function karingHref(url){return 'karing://install-config?url='+encodeURIComponent(url);}
   function notify(message){const toast=document.getElementById('toast');if(!toast)return;toast.textContent=message;toast.classList.add('show');clearTimeout(window.__tpV30Toast);window.__tpV30Toast=setTimeout(()=>toast.classList.remove('show'),1800);}
   function fallbackCopy(value){const area=document.createElement('textarea');area.value=String(value||'');area.setAttribute('readonly','');area.style.position='fixed';area.style.left='-9999px';document.body.appendChild(area);area.focus();area.select();area.setSelectionRange(0,area.value.length);let ok=false;try{ok=document.execCommand('copy')}catch(_error){}area.remove();return ok;}
   async function copy(value){if(navigator.clipboard&&window.isSecureContext){try{await navigator.clipboard.writeText(value);return true}catch(_error){}}return fallbackCopy(value);}
@@ -182,10 +191,19 @@ _SCRIPT = r"""
     if(panel.querySelector('.v30-subscription-card'))return;
     const count=panel.querySelectorAll('.server-view').length;
     const url=subscriptionUrl(protocol);
-    const karing='karing://install-config?url='+encodeURIComponent(url);
     const card=document.createElement('section');card.className='v30-subscription-card';card.dataset.v30Protocol=protocol;
-    card.innerHTML='<div class="v30-subscription-head"><b>همه سرورها</b><span class="v30-subscription-count">'+count+' سرور</span></div><div class="v30-subscription-actions"><a class="v30-primary v30-karing-all" href="'+karing+'">افزودن همه به Karing</a><button type="button" class="v30-copy-sub">کپی لینک اشتراک</button></div><div class="v30-client-downloads"><a href="'+KARING+'" target="_blank" rel="noopener noreferrer">دانلود Karing</a><a href="'+HIDDIFY+'" target="_blank" rel="noopener noreferrer">دانلود Hiddify</a><a class="v30-client-v2rayn" href="'+V2RAYN+'" target="_blank" rel="noopener noreferrer">دانلود v2rayN</a></div>';
-    card.querySelector('.v30-copy-sub')?.addEventListener('click',async()=>{notify(await copy(url)?'لینک اشتراک کپی شد ✓':'کپی انجام نشد');});
+    card.innerHTML='<div class="v30-subscription-head"><b>همه سرورها</b><span class="v30-subscription-count">'+count+' سرور</span></div><div class="v30-subscription-actions"><a class="v30-primary v30-karing-all" href="'+karingHref(namedSubscriptionUrl(url,protocol))+'">افزودن همه به Karing</a><button type="button" class="v30-copy-sub">کپی لینک اشتراک</button></div><div class="v30-client-downloads"><a href="'+KARING+'" target="_blank" rel="noopener noreferrer">دانلود Karing</a><a href="'+HIDDIFY+'" target="_blank" rel="noopener noreferrer">دانلود Hiddify</a><a class="v30-client-v2rayn" href="'+V2RAYN+'" target="_blank" rel="noopener noreferrer">دانلود v2rayN</a></div>';
+    const karing=card.querySelector('.v30-karing-all');
+    karing?.addEventListener('click',async(event)=>{
+      event.preventDefault();
+      const title=await subscriptionIdentity(protocol,url);
+      window.location.href=karingHref(namedSubscriptionUrl(url,title));
+    });
+    card.querySelector('.v30-copy-sub')?.addEventListener('click',async()=>{
+      const title=await subscriptionIdentity(protocol,url);
+      const named=namedSubscriptionUrl(url,title);
+      notify(await copy(named)?'لینک اشتراک کپی شد ✓':'کپی انجام نشد');
+    });
     const head=panel.querySelector('.panel-head');if(head)head.insertAdjacentElement('afterend',card);else panel.insertAdjacentElement('afterbegin',card);panel.dataset.v30Subscription='1';
   }
   function collapseMobileServers(panel){if(!window.matchMedia(MOBILE).matches)return;if(panel.querySelector('.v30-single-servers'))return;const views=panel.querySelector('.server-views');if(!views)return;const details=document.createElement('details');details.className='v30-single-servers';const summary=document.createElement('summary');summary.textContent='سرورهای تکی';details.appendChild(summary);views.insertAdjacentElement('beforebegin',details);details.appendChild(views);}
