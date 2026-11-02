@@ -173,6 +173,10 @@ def _fail_created_subscription(
     *,
     reason: str,
 ) -> None:
+    # Provisioning failures can leave the SQLAlchemy session in a failed
+    # transaction state (for example after a PostgreSQL lock timeout).
+    # Always clear that state before attempting failure recovery writes.
+    db.rollback()
     sub = db.get(Subscription, int(subscription_id))
     if sub is None:
         return
@@ -490,10 +494,11 @@ async def create_reseller_manual_subscription(
         username=payload.username,
         password=payload.password,
     )
-    return await _complete_reseller_provisioning(
-        db,
-        result,
-    )
+    # Manual-create owns only the durable subscription transaction. The
+    # reseller UI immediately calls the dedicated provision-account endpoint
+    # after this response, so provisioning here would duplicate the same work
+    # and keep the modal blocked on a long-running request.
+    return result
 
 
 from .reseller_pool_guard_v3 import router as reseller_pool_guard_v3_router
