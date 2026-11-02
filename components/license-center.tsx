@@ -67,14 +67,14 @@ export function LicenseCenter(){
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const license=data?.license||{};
-  const status=String(license.status||"unknown");
+  const status=String(license.status||"unknown").trim().toLowerCase();
   const expiry=license.expires_at||license.trial_expires_at;
   const renewalBot=String(license.renewal_bot_url||"").trim();
 
   const statusLabel=useMemo(()=>{
-    if(["licensed","license_expiring"].includes(status))return pick("فعال","Active");
-    if(["trial_active","trial_expiring"].includes(status))return pick("آزمایشی","Trial");
-    if(["license_expired","trial_expired","revoked","suspended"].includes(status))return pick("منقضی","Expired");
+    if(["active","licensed","license_active","license_expiring"].includes(status))return pick("فعال","Active");
+    if(["trial","trial_active","trial_expiring"].includes(status))return pick("آزمایشی","Trial");
+    if(["expired","license_expired","trial_expired","revoked","suspended"].includes(status))return pick("منقضی","Expired");
     return pick("در انتظار فعال‌سازی","Awaiting activation");
   },[status,pick]);
 
@@ -138,23 +138,23 @@ export function LicenseCenter(){
 
         {renewalBot&&<a href={renewalBot} target="_blank" rel="noreferrer" style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"13px 14px",borderRadius:16,border:"1px solid rgba(41,182,246,.18)",background:"linear-gradient(135deg,rgba(41,182,246,.10),rgba(41,182,246,.025))",color:"var(--text)",textDecoration:"none"}}>
           <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
-            <div style={{width:38,height:38,borderRadius:12,display:"grid",placeItems:"center",background:"#229ED9",color:"white",fontWeight:900}}>TG</div>
+            <div style={{width:38,height:38,borderRadius:12,display:"grid",placeItems:"center",background:"linear-gradient(135deg,#27a7e7,#1d8fd1)",color:"#fff",fontWeight:900}}>TG</div>
             <div style={{minWidth:0}}>
-              <div style={{fontSize:11,color:"var(--muted)"}}>{pick("ربات تمدید","Renewal bot")}</div>
+              <div style={{fontSize:10,color:"var(--muted)",fontWeight:700}}>{pick("ربات تمدید","Renewal bot")}</div>
               <div dir="ltr" style={{fontSize:14,fontWeight:900,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{botName(renewalBot)}</div>
             </div>
           </div>
-          <div style={{fontSize:20,color:"#229ED9"}}>↗</div>
+          <span style={{color:"#27a7e7",fontSize:18}}>↗</span>
         </a>}
 
         {error&&<div className="runtime-error">{error}</div>}
         {notice&&<div className="runtime-message">{notice}</div>}
 
-        <div style={{display:"grid",gap:8,paddingTop:2}}>
-          <label style={{fontSize:11,color:"var(--muted)",fontWeight:700}}>{pick("کلید لایسنس","License key")}</label>
+        <div style={{display:"grid",gap:8}}>
+          <label style={{fontSize:11,color:"var(--muted)"}}>{pick("کلید لایسنس","License key")}</label>
           <div style={{display:"flex",gap:8,alignItems:"stretch"}}>
-            <input dir="ltr" value={licenseKey} onChange={e=>setLicenseKey(e.target.value)} placeholder="TP-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX" style={{flex:1,minWidth:0,borderRadius:13}}/>
-            <button className="primary" type="button" disabled={busy||licenseKey.trim().length<8} onClick={()=>void activate()} style={{borderRadius:13,paddingInline:18}}>{busy?pick("در حال ثبت…","Activating…"):pick("ثبت","Activate")}</button>
+            <input dir="ltr" value={licenseKey} onChange={e=>setLicenseKey(e.target.value)} placeholder="TP-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX" style={{flex:1,minWidth:0}}/>
+            <button className="primary" type="button" disabled={busy||licenseKey.trim().length<8} onClick={()=>void activate()}>{busy?pick("در حال ثبت…","Activating…"):pick("ثبت","Activate")}</button>
           </div>
         </div>
       </section>
