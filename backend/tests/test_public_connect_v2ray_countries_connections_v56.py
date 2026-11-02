@@ -18,21 +18,22 @@ def test_v2ray_meta_restores_customer_safe_server_identity() -> None:
     assert "public_domain" not in source.split("def _customer_safe_node_meta", 1)[1].split("def _v2ray_profile_groups", 1)[0]
 
 
-def test_v2ray_ui_uses_exact_server_name_tabs_and_collapsed_configs() -> None:
+def test_v2ray_ui_uses_canonical_header_tabs_status_dots_and_collapsed_configs() -> None:
     source = V54.read_text(encoding="utf-8")
 
-    assert "TWINPANEL_PUBLIC_CONNECT_V2RAY_SERVER_TABS_V57" in source
-    assert ".v57-v2ray-server-tabs" in source
-    assert ".v57-v2ray-server-tab.active" in source
-    assert "justify-content:flex-start" in source
-    assert "direction:ltr" in source
-    assert "direction:rtl" not in source.split(".v57-v2ray-server-tabs", 1)[1].split("}", 1)[0]
+    assert "TWINPANEL_PUBLIC_CONNECT_V2RAY_HEADER_PARITY_V58" in source
+    assert "const tabs=panel.querySelector(':scope > .protocol-panel-head .server-tabs');" in source
+    assert "panel.querySelectorAll(':scope > .v57-v2ray-server-tabs').forEach(node=>node.remove());" in source
+    assert "button=el('button','server-tab')" in source
+    assert "button.append(el('span','',serverLabel(server,index)),el('i',''));" in source
+    assert ".protocol-panel-head .server-tabs" in source
+    assert "display:flex!important" in source
     assert "const exact=String(server?.server||'').trim();" in source
     assert "countryLabel(server,index)" not in source
     assert "Intl.DisplayNames(['fa'],{type:'region'})" not in source
-    assert "anchor.insertAdjacentElement('beforebegin',tabs)" in source
-    assert ".v54-v2ray-profiles{\n  display:none!important" in source
-    assert ".v54-v2ray-server.open > .v54-v2ray-profiles{\n  display:grid!important" in source
+    assert "anchor.insertAdjacentElement('beforebegin',tabs)" not in source
+    assert ".v54-v2ray-profiles{display:none!important" in source
+    assert ".v54-v2ray-server.open > .v54-v2ray-profiles{display:grid!important" in source
     assert "renderSelected(tabs,holder,servers,index)" in source
     assert "'اتصال '+(index+1)" in source
     assert "'۳ اتصال'" in source
