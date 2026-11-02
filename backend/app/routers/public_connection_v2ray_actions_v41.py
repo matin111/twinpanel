@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from . import public_connection_all_multilink_v34 as multilink
 from . import public_connection_modern_delivery_v13 as modern_delivery
-from . import public_connection_final_presentation_v37 as final_v37
-from . import public_connection_reference_layout_v38 as reference_v38
 from . import public_connection_v2ray_multilink_action_v44 as v2ray_multilink_action_v44
 from .public_connection_mobile_sheet_v42 import refine_public_connection_mobile_sheet_v42
 from .public_connection_request_backpressure_v1 import (
@@ -46,8 +44,9 @@ def _unify_multilink_button_labels(value: str) -> str:
     return source
 
 
-reference_v38._SCRIPT = _unify_multilink_button_labels(reference_v38._SCRIPT)
-final_v37._SCRIPT = _unify_multilink_button_labels(final_v37._SCRIPT)
+# V44 is independent from the V38 -> V39 -> V41 import chain, so its static
+# script can be normalized safely here. V37/V38 are normalized on the rendered
+# source inside the refiner below, avoiding a circular module import.
 v2ray_multilink_action_v44._SCRIPT = (
     v2ray_multilink_action_v44._SCRIPT
     .replace("'ارسال همه به v2rayNG'", "'افزودن به v2rayNG'")
@@ -170,6 +169,9 @@ _SCRIPT = r"""
 
 def refine_public_connection_v2ray_actions_v41(source: str) -> str:
     """Hide the lower V2Ray/Xray config inventory and show one device-appropriate client."""
+    # V37/V38 scripts are already embedded in `source` by the time V41 runs.
+    # Normalize those rendered actions directly instead of importing V38 here.
+    source = _unify_multilink_button_labels(source)
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
