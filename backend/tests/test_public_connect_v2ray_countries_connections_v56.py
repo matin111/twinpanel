@@ -18,10 +18,10 @@ def test_v2ray_meta_restores_customer_safe_server_identity() -> None:
     assert "public_domain" not in source.split("def _customer_safe_node_meta", 1)[1].split("def _v2ray_profile_groups", 1)[0]
 
 
-def test_v2ray_ui_uses_canonical_header_tabs_status_dots_and_collapsed_configs() -> None:
+def test_v2ray_ui_uses_canonical_header_tabs_and_country_click_opens_profiles() -> None:
     source = V54.read_text(encoding="utf-8")
 
-    assert "TWINPANEL_PUBLIC_CONNECT_V2RAY_HEADER_PARITY_V58" in source
+    assert "TWINPANEL_PUBLIC_CONNECT_V2RAY_COUNTRY_CLICK_OPEN_V59" in source
     assert "const tabs=panel.querySelector(':scope > .protocol-panel-head .server-tabs');" in source
     assert "panel.querySelectorAll(':scope > .v57-v2ray-server-tabs').forEach(node=>node.remove());" in source
     assert "button=el('button','server-tab')" in source
@@ -34,7 +34,11 @@ def test_v2ray_ui_uses_canonical_header_tabs_status_dots_and_collapsed_configs()
     assert "anchor.insertAdjacentElement('beforebegin',tabs)" not in source
     assert ".v54-v2ray-profiles{display:none!important" in source
     assert ".v54-v2ray-server.open > .v54-v2ray-profiles{display:grid!important" in source
-    assert "renderSelected(tabs,holder,servers,index)" in source
+    assert "function renderSelected(tabs,holder,servers,selectedIndex,openProfiles)" in source
+    assert "button.addEventListener('click',()=>renderSelected(tabs,holder,servers,index,true));" in source
+    assert "renderSelected(tabs,holder,servers,0,false);" in source
+    assert "serverCard(servers[index],index,Boolean(openProfiles))" in source
+    assert "if(openInitially)card.classList.add('open');" in source
     assert "'اتصال '+(index+1)" in source
     assert "'۳ اتصال'" in source
     assert "classList.toggle('open')" in source
