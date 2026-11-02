@@ -24,6 +24,9 @@ def test_v2ray_ui_uses_exact_server_name_tabs_and_collapsed_configs() -> None:
     assert "TWINPANEL_PUBLIC_CONNECT_V2RAY_SERVER_TABS_V57" in source
     assert ".v57-v2ray-server-tabs" in source
     assert ".v57-v2ray-server-tab.active" in source
+    assert "justify-content:flex-start" in source
+    assert "direction:ltr" in source
+    assert "direction:rtl" not in source.split(".v57-v2ray-server-tabs", 1)[1].split("}", 1)[0]
     assert "const exact=String(server?.server||'').trim();" in source
     assert "countryLabel(server,index)" not in source
     assert "Intl.DisplayNames(['fa'],{type:'region'})" not in source
