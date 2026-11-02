@@ -173,7 +173,7 @@ export function AdminResellerTrafficPlans(){
         <div className="setting-grid">
           <label className="field"><span>{pick("عنوان پلن","Plan title")}</span><input required minLength={2} value={draft.title} onChange={event=>setDraft(value=>({...value,title:event.target.value}))} placeholder={pick("مثلاً 100 گیگ","e.g. 100 GB")}/></label>
           <label className="field"><span>{pick("حجم (GB)","Traffic (GB)")}</span><input required type="number" min={1} step={1} value={draft.traffic_gb} onChange={event=>setDraft(value=>({...value,traffic_gb:event.target.value}))}/></label>
-          <label className="field"><span>{pick("قیمت خرید نماینده (تومان)","Reseller purchase price")}</span><input required type="number" min={1} step={1000} value={draft.price_toman} onChange={event=>setDraft(value=>({...value,price_toman:event.target.value}))}/></label>
+          <label className="field"><span>{pick("قیمت خرید نماینده (تومان)","Reseller purchase price")}</span><input required type="number" min={1000} step={1000} value={draft.price_toman} onChange={event=>setDraft(value=>({...value,price_toman:event.target.value}))}/></label>
           <label className="field"><span>{pick("ترتیب نمایش","Display order")}</span><input type="number" min={0} value={draft.sort_order} onChange={event=>setDraft(value=>({...value,sort_order:event.target.value}))}/></label>
         </div>
         <label className="toggle module-toggle"><span>{pick("فعال","Active")}</span><input type="checkbox" checked={draft.is_active} onChange={event=>setDraft(value=>({...value,is_active:event.target.checked}))}/><i/></label>
