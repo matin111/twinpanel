@@ -23,7 +23,7 @@ import {StorefrontAdvancedDesignControls} from "./storefront-advanced-design-lab
 import {StoreTemplateSeoPanel} from "./store-template-seo-panel";
 import styles from "./store-template-orbit-customizer.module.css";
 
-type Tab="design"|"media"|"hero"|"commerce"|"modernProtocols"|"content"|"layout"|"seo";
+type Tab="design"|"media"|"hero"|"commerce"|"modernProtocols"|"content"|"social"|"layout"|"seo";
 type TextField={key:string;fa:string;en:string;long?:boolean};
 type ColorField={key:string;fa:string;en:string;fallback:string;helpFa:string;helpEn:string};
 type Choice={value:string;fa:string;en:string;descFa:string;descEn:string};
@@ -35,6 +35,7 @@ const TABS:{id:Tab;fa:string;en:string;icon:string}[]=[
   {id:"commerce",fa:"فروش و پلن‌ها",en:"Commerce",icon:"02"},
   {id:"modernProtocols",fa:"توضیح پروتکل‌های مدرن",en:"Modern protocol copy",icon:"03"},
   {id:"content",fa:"محتوای بخش‌ها",en:"Content",icon:"04"},
+  {id:"social",fa:"شبکه‌های اجتماعی",en:"Social networks",icon:"↗"},
   {id:"layout",fa:"چیدمان",en:"Layout",icon:"05"},
   {id:"seo",fa:"سئو",en:"SEO",icon:"06"},
 ];
@@ -85,6 +86,17 @@ const COMMERCE_FIELDS:TextField[]=[
 
 const MODERN_PROTOCOL_FIELDS:TextField[]=[
   {key:"modern_protocols_description",fa:"توضیح پروتکل‌های مدرن",en:"Modern protocols description",long:true},
+];
+
+const SOCIAL_PLATFORMS=[
+  {id:"telegram",fa:"تلگرام",en:"Telegram",placeholder:"https://t.me/username"},
+  {id:"instagram",fa:"اینستاگرام",en:"Instagram",placeholder:"https://instagram.com/username"},
+  {id:"whatsapp",fa:"واتساپ",en:"WhatsApp",placeholder:"https://wa.me/989xxxxxxxxx"},
+] as const;
+const SOCIAL_VISIBILITY_CHOICES:Choice[]=[
+  {value:"inherit",fa:"تنظیم عمومی",en:"Use global setting",descFa:"تا وقتی Override نکنید، وضعیت فعلی تنظیمات عمومی فروشگاه حفظ می‌شود.",descEn:"Keep the current global storefront visibility until overridden."},
+  {value:"show",fa:"نمایش",en:"Show",descFa:"این شبکه در قالب Orbit نمایش داده شود.",descEn:"Show this network in Orbit."},
+  {value:"hide",fa:"مخفی",en:"Hide",descFa:"این شبکه در قالب Orbit نمایش داده نشود.",descEn:"Hide this network in Orbit."},
 ];
 
 const CONTENT_FIELDS:TextField[]=[
@@ -211,7 +223,7 @@ export function OrbitTemplateCustomizer({onClose}:{onClose:()=>void}){
       <div className={styles.actions}><button type="button" onClick={onClose}>{pick("بازگشت","Back")}</button>{tab!=="seo"&&<button type="button" onClick={()=>void reset()} disabled={busy||!hasSaved}>{pick("بازنشانی","Reset")}</button>}<Link href="/store" target="_blank">{pick("مشاهده فروشگاه","Open storefront")} ↗</Link>{tab!=="seo"&&<button type="button" className={styles.primary} disabled={busy} onClick={()=>void save()}>{busy?"…":pick("ذخیره قالب","Save template")}</button>}</div>
     </header>
 
-    <div className={styles.statusBar}><span className={hasSaved?styles.saved:styles.inherit}>{hasSaved?pick("تنظیمات مستقل فعال","Independent settings active"):pick("تنظیمات پیش‌فرض Orbit Neo","Orbit Neo defaults")}</span>{tab!=="seo"&&<div className={styles.locale}><button type="button" className={locale==="fa"?styles.active:""} onClick={()=>setLocale("fa")}>FA</button><button type="button" className={locale==="en"?styles.active:""} onClick={()=>setLocale("en")}>EN</button></div>}</div>
+    <div className={styles.statusBar}><span className={hasSaved?styles.saved:styles.inherit}>{hasSaved?pick("تنظیمات مستقل فعال","Independent settings active"):pick("تنظیمات پیش‌فرض Orbit Neo","Orbit Neo defaults")}</span>{tab!=="seo"&&tab!=="social"&&<div className={styles.locale}><button type="button" className={locale==="fa"?styles.active:""} onClick={()=>setLocale("fa")}>FA</button><button type="button" className={locale==="en"?styles.active:""} onClick={()=>setLocale("en")}>EN</button></div>}</div>
     {error&&<div className={styles.error}>{error}</div>}
     {ok&&<div className={styles.success}>{ok}</div>}
 
@@ -240,6 +252,14 @@ export function OrbitTemplateCustomizer({onClose}:{onClose:()=>void}){
         {tab==="commerce"&&<><div className={styles.panelHead}><div><h2>{pick("فروش، پلن و پروتکل","Plans, commerce & protocols")}</h2></div></div><div className={styles.formGrid}>{renderTextFields(COMMERCE_FIELDS)}</div></>}
         {tab==="modernProtocols"&&<><div className={styles.panelHead}><div><h2>{pick("توضیح پروتکل‌های مدرن","Modern protocols description")}</h2><p>{pick("متن معرفی پروتکل‌های مدرن فروشگاه را از همین بخش ویرایش کنید؛ این مقدار همراه سایر تنظیمات قالب ذخیره می‌شود.","Edit the storefront modern-protocol introduction here. It is saved together with the rest of the theme settings.")}</p></div></div><div className={styles.formGrid}>{renderTextFields(MODERN_PROTOCOL_FIELDS)}</div></>}
         {tab==="content"&&<><div className={styles.panelHead}><div><h2>{pick("امکانات، آموزش، حساب، FAQ و CTA","Features, guides, account, FAQ & CTA")}</h2></div></div><div className={styles.formGrid}>{renderTextFields(CONTENT_FIELDS)}</div></>}
+
+        {tab==="social"&&<>
+          <div className={styles.panelHead}><div><h2>{pick("شبکه‌های اجتماعی","Social networks")}</h2><p>{pick("لینک و وضعیت نمایش تلگرام، اینستاگرام و واتساپ را برای همین قالب تنظیم کنید. حالت «تنظیم عمومی» مقادیر فعلی فروشگاه را حفظ می‌کند.","Configure Telegram, Instagram and WhatsApp for this theme. “Use global setting” preserves the storefront defaults.")}</p></div></div>
+          {SOCIAL_PLATFORMS.map(item=><div key={item.id}>
+            <div className={styles.choiceGrid}><ChoiceField title={pick(`نمایش ${item.fa}`,`Show ${item.en}`)} value={String(draft[`orbit_${item.id}_visibility`]||"inherit")} choices={SOCIAL_VISIBILITY_CHOICES} pick={pick} onChange={value=>setValue(`orbit_${item.id}_visibility`,value)}/></div>
+            <div className={styles.formGrid}><label className={styles.field}><span>{pick(`لینک ${item.fa}`,`${item.en} URL`)}</span><input dir="ltr" type="url" placeholder={item.placeholder} value={String(draft[`orbit_${item.id}_url`]||"")} onChange={event=>setValue(`orbit_${item.id}_url`,event.target.value)}/></label></div>
+          </div>)}
+        </>}
 
         {tab==="layout"&&<>
           <div className={styles.panelHead}><div><h2>{pick("نمایش و ترتیب بخش‌ها","Section visibility & ordering")}</h2></div></div>

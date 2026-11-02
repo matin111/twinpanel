@@ -165,10 +165,23 @@ export function OrbitNeo2027Template({themeOptions,settings,plans,loading,error,
   </section>;
 
   const sections:Record<StorefrontSectionId,ReactNode>={plans:plansSection,protocols:protocolsSection,services:servicesSection,guides:guidesSection,account:accountSection,faq:faqSection};
+  const socialEnabled=(platform:string,fallback:boolean)=>{
+    const mode=themeOptions[`orbit_${platform}_visibility`];
+    if(mode==="show")return true;
+    if(mode==="hide")return false;
+    return fallback;
+  };
+  const socialUrl=(platform:string,fallback:string)=>{
+    const value=themeOptions[`orbit_${platform}_url`];
+    return typeof value==="string"&&value.trim()?value.trim():fallback;
+  };
+  const telegramUrl=socialUrl("telegram",String(settings.telegram_url||""));
+  const instagramUrl=socialUrl("instagram",String(settings.instagram_url||""));
+  const whatsappUrl=socialUrl("whatsapp",String(settings.whatsapp_url||""));
   const social=[
-    settings.show_telegram&&settings.telegram_url?{name:"Telegram",url:settings.telegram_url,mark:"TG"}:null,
-    settings.show_instagram&&settings.instagram_url?{name:"Instagram",url:settings.instagram_url,mark:"IG"}:null,
-    settings.show_whatsapp&&settings.whatsapp_url?{name:"WhatsApp",url:settings.whatsapp_url,mark:"WA"}:null,
+    socialEnabled("telegram",Boolean(settings.show_telegram))&&telegramUrl?{name:"Telegram",url:telegramUrl,mark:"TG"}:null,
+    socialEnabled("instagram",Boolean(settings.show_instagram))&&instagramUrl?{name:"Instagram",url:instagramUrl,mark:"IG"}:null,
+    socialEnabled("whatsapp",Boolean(settings.show_whatsapp))&&whatsappUrl?{name:"WhatsApp",url:whatsappUrl,mark:"WA"}:null,
   ].filter(Boolean) as {name:string;url:string;mark:string}[];
 
   return <div className={styles.root} style={style} data-motion={booleanOption(themeOptions,"orbit_motion",true)?"on":"off"} data-shape={stringOption(themeOptions,"orbit_card_shape","round")} data-header={stringOption(themeOptions,"orbit_header_style","dock")}>
