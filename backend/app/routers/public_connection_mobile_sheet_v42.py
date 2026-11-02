@@ -109,9 +109,9 @@ _CSS = r"""
     margin:0!important;
   }
 
-  /* V41 removes the lower V2Ray server inventory. The fixed V42 sheet must
-     therefore expose the surviving V38/V44 multi-link and client surfaces. */
-  body.v42-mobile-sheet .protocol-panel.v42-sheet-open[data-v41-v2ray="1"] .v38-all-card[data-v38-protocol="v2ray"]{
+  /* V41 removes V2Ray's lower server inventory. V52 is now the canonical
+     all-servers authority, so the mobile sheet must explicitly accept/show it. */
+  body.v42-mobile-sheet .protocol-panel.v42-sheet-open[data-v41-v2ray="1"] .v52-multi-card{
     display:block!important;
     visibility:visible!important;
     opacity:1!important;
@@ -154,7 +154,8 @@ _SCRIPT = r"""
     const v2rayReady=panel.dataset.v41V2ray==='1'||panel.dataset.v41LowerConfigsRemoved==='1';
     if(!v2rayReady)return false;
     return Boolean(
-      panel.querySelector('.v38-all-card[data-v38-protocol="v2ray"]') ||
+      panel.querySelector('.v52-multi-card[data-v52-protocol="v2ray"]') ||
+      panel.querySelector('.v52-multi-card') ||
       panel.querySelector('.v34-client-card')
     );
   }
@@ -268,7 +269,7 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_mobile_sheet_v42(source: str) -> str:
-    """Open selected protocol servers in a mobile bottom-sheet instead of inline below the grid."""
+    """Open selected protocol servers or stable Multi-Link in a mobile bottom sheet."""
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
