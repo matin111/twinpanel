@@ -409,7 +409,8 @@ async def _reseller_delivery_info(
     db: Session,
     subscription_id: int,
 ):
-    from .account_delivery import _stored_info, provision_account
+    from .account_delivery import _stored_info
+    from .modern_account_delivery_v1 import provision_account_v1
 
     sub = db.get(Subscription, subscription_id)
     if not sub:
@@ -429,7 +430,7 @@ async def _reseller_delivery_info(
 
     provision_result = None
     if not has_config and sub.status == SubscriptionStatus.ACTIVE:
-        provision_result = await provision_account(
+        provision_result = await provision_account_v1(
             subscription_id=sub.id,
             db=db,
         )
@@ -460,8 +461,8 @@ async def reseller_provision_account_volume_v2(
     db: Session = Depends(get_db),
 ):
     _owned_link(db, int(reseller.id), subscription_id)
-    from .account_delivery import provision_account
-    return await provision_account(subscription_id=subscription_id, db=db)
+    from .modern_account_delivery_v1 import provision_account_v1
+    return await provision_account_v1(subscription_id=subscription_id, db=db)
 
 
 def _safe_reseller_sale_nodes(
