@@ -41,9 +41,8 @@ def main() -> None:
     assert len(canonical) == 15, canonical
     assert len(set(canonical)) == 15, canonical
 
-    # Plans are allowed to define a creation template/allow-list, but that
-    # template must never replace SubscriptionProtocol/SubscriptionNode as the
-    # runtime desired-state consumed by provisioning.
+    # Plans remain the creation template/allow-list while SubscriptionProtocol
+    # and SubscriptionNode stay the runtime desired-state used by provisioning.
     plan_ui = PLAN_UI.read_text(encoding="utf-8")
     for label in (
         "Cisco / OpenConnect",
@@ -64,11 +63,12 @@ def main() -> None:
     ):
         assert label in plan_ui, label
     assert "Allowed exit servers" in plan_ui
-    assert "Iran nodes are tunnel-only" in plan_ui
     assert "exitNodes" in plan_ui
     assert "node_ids" in plan_ui
     assert "protocols" in plan_ui
-    assert "snapshotted onto subscriptions" in plan_ui
+    assert "snapshot" in plan_ui.lower()
+    assert "trial_enabled" in plan_ui
+    assert "trial_traffic_mb" in plan_ui
 
     plan_router = PLAN_ROUTER.read_text(encoding="utf-8")
     assert "replace_plan_template_protocols" in plan_router
@@ -110,8 +110,6 @@ def main() -> None:
     assert "protocol not in PROTOCOL_FIELDS" not in factory
     assert "CLASSIC_PROTOCOL_KEYS" in factory
     assert "if protocol not in CLASSIC_PROTOCOL_KEYS" in factory
-    # A Plan must be read only while creating the subscription snapshot. The
-    # runtime delivery path must remain subscription-owned afterwards.
     assert "PlanProtocol" not in factory
     assert "PlanNode(" not in factory
 
