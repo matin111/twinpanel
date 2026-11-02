@@ -12,7 +12,7 @@ body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .v51-single-title{
   display:none!important;
 }
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .v57-v2ray-server-tabs{
-  display:flex!important;flex-wrap:wrap;gap:8px;margin:0 12px 10px;direction:rtl;
+  display:flex!important;flex-wrap:wrap;justify-content:flex-start;gap:8px;margin:0 12px 10px;direction:ltr;
 }
 body.v54-v2ray-restore .v57-v2ray-server-tab{
   min-height:32px;display:inline-flex;align-items:center;justify-content:center;padding:0 11px;
