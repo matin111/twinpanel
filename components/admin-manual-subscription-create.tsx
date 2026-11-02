@@ -3,7 +3,7 @@
 import {FormEvent,useEffect,useMemo,useState} from "react";
 import {createPortal} from "react-dom";
 
-import {adminApi,type AdminUser,type RuntimeRow} from "../lib/admin-api";
+import {adminApi,type AdminNode,type AdminUser,type RuntimeRow} from "../lib/admin-api";
 import {createSubscriptionFastV1} from "../lib/subscription-create-fast-api";
 import {subscriptionProtocolApi,type SubscriptionProtocolDefinition} from "../lib/subscription-protocol-api";
 import {useI18n} from "../lib/i18n";
@@ -26,6 +26,7 @@ export function AdminManualSubscriptionCreate(){
   const [open,setOpen]=useState(false);
   const [users,setUsers]=useState<AdminUser[]>([]);
   const [plans,setPlans]=useState<RuntimeRow[]>([]);
+  const [nodes,setNodes]=useState<AdminNode[]>([]);
   const [catalog,setCatalog]=useState<SubscriptionProtocolDefinition[]>([]);
   const [loading,setLoading]=useState(false);
   const [busy,setBusy]=useState(false);
@@ -40,6 +41,7 @@ export function AdminManualSubscriptionCreate(){
   const [username,setUsername]=useState("");
   const [password,setPassword]=useState("");
   const [protocols,setProtocols]=useState<string[]>([]);
+  const [nodeIds,setNodeIds]=useState<number[]>([]);
 
   useEffect(()=>{
     setMounted(true);
@@ -84,6 +86,7 @@ export function AdminManualSubscriptionCreate(){
 
   const classicCatalog=useMemo(()=>catalog.filter(item=>item.family==="classic"),[catalog]);
   const modernCatalog=useMemo(()=>catalog.filter(item=>item.family==="modern"),[catalog]);
+  const exitNodes=useMemo(()=>nodes.filter(node=>String(node.node_type||"").toLowerCase()==="exit"&&String(node.status||"online").toLowerCase()!=="retired"),[nodes]);
 
   const applyPlan=(id:number,planRows=plans)=>{
     setPlanId(id);
@@ -97,11 +100,12 @@ export function AdminManualSubscriptionCreate(){
 
   const openCreate=async()=>{
     setOpen(true);setLoading(true);setError("");setOk("");setSearch("");
-    setUsername("");setPassword("");setProtocols([]);setPlanId(0);
+    setUsername("");setPassword("");setProtocols([]);setNodeIds([]);setPlanId(0);
     try{
-      const [userRows,planRows,catalogPayload]=await Promise.all([
+      const [userRows,planRows,nodeRows,catalogPayload]=await Promise.all([
         adminApi.users(),
         adminApi.plans(),
+        adminApi.nodes(),
         subscriptionProtocolApi.catalog(),
       ]);
 
@@ -111,6 +115,7 @@ export function AdminManualSubscriptionCreate(){
 
       setUsers(userRows);
       setPlans(planRows);
+      setNodes(nodeRows);
       setCatalog(catalogPayload.protocols);
 
       const firstUser=userRows.find(user=>user.role!=="admin"&&user.is_active!==false);
@@ -121,7 +126,8 @@ export function AdminManualSubscriptionCreate(){
       if(firstPlanId)applyPlan(firstPlanId,planRows);
       else{setTraffic("");setDuration("");setDeviceLimit("1");}
 
-      setProtocols(catalogPayload.protocols.filter(item=>item.family==="classic").map(item=>item.key));
+      setProtocols(catalogPayload.protocols.map(item=>item.key));
+      setNodeIds(nodeRows.filter(node=>String(node.node_type||"").toLowerCase()==="exit"&&String(node.status||"online").toLowerCase()!=="retired").map(node=>node.id));
     }catch(reason){
       setError(reason instanceof Error?reason.message:String(reason));
     }finally{
@@ -137,6 +143,9 @@ export function AdminManualSubscriptionCreate(){
 
   const selectAllProtocols=()=>setProtocols(catalog.map(item=>item.key));
   const clearProtocols=()=>setProtocols([]);
+  const toggleNode=(id:number)=>setNodeIds(current=>current.includes(id)?current.filter(item=>item!==id):[...current,id]);
+  const selectAllNodes=()=>setNodeIds(exitNodes.map(node=>node.id));
+  const clearNodes=()=>setNodeIds([]);
 
   const submit=async(event:FormEvent)=>{
     event.preventDefault();
@@ -152,22 +161,24 @@ export function AdminManualSubscriptionCreate(){
     if(deviceValue===null||deviceValue<1||!Number.isInteger(deviceValue)){setError(pick("تعداد اتصال همزمان معتبر نیست","Concurrent device limit is invalid"));return;}
     if(protocols.length===0){setError(pick("حداقل یک پروتکل انتخاب کنید","Select at least one protocol"));return;}
 
+    const payload={
+      user_id:userId,
+      plan_id:planId||null,
+      node_ids:[...nodeIds],
+      protocols:[...protocols],
+      traffic_gb:trafficValue,
+      duration_days:durationValue,
+      device_limit:deviceValue,
+      ...(username.trim()?{username:username.trim()}:{}),
+      ...(password.trim()?{password:password.trim()}:{}),
+    };
+
     setBusy(true);setError("");setOk("");
     try{
-      await createSubscriptionFastV1({
-        user_id:userId,
-        plan_id:planId||null,
-        node_ids:[],
-        protocols,
-        traffic_gb:trafficValue,
-        duration_days:durationValue,
-        device_limit:deviceValue,
-        ...(username.trim()?{username:username.trim()}:{}),
-        ...(password.trim()?{password:password.trim()}:{}),
-      });
-
-      setOk(pick("ساخت اشتراک ثبت شد؛ صدور کانفیگ‌ها در پس‌زمینه ادامه دارد. لیست در حال بروزرسانی است…","Subscription creation started; configs continue provisioning in the background. Refreshing…"));
-      window.setTimeout(()=>window.location.reload(),900);
+      await createSubscriptionFastV1(payload);
+      setOpen(false);
+      setOk(pick("ساخت اشتراک ثبت شد؛ صدور کانفیگ‌ها در پس‌زمینه ادامه دارد.","Subscription creation started; configs continue provisioning in the background."));
+      window.setTimeout(()=>window.location.reload(),1200);
     }catch(reason){
       setError(reason instanceof Error?reason.message:String(reason));
     }finally{
@@ -232,6 +243,19 @@ export function AdminManualSubscriptionCreate(){
 
           {protocolGroup(pick("پروتکل‌های کلاسیک","Classic protocols"),classicCatalog)}
           {protocolGroup(pick("پروتکل‌های جدید","Modern protocols"),modernCatalog)}
+
+          <div className="runtime-choice-section">
+            <div className="card-head">
+              <div><b>{pick("سرورهای این اشتراک","Servers for this subscription")}</b><small>{nodeIds.length}/{exitNodes.length}</small></div>
+              <div className="row-actions">
+                <button type="button" className="ghost" disabled={loading||!exitNodes.length} onClick={selectAllNodes}>{pick("انتخاب همه سرورها","Select all servers")}</button>
+                <button type="button" className="ghost" disabled={loading||!nodeIds.length} onClick={clearNodes}>{pick("لغو انتخاب همه","Clear selection")}</button>
+              </div>
+            </div>
+            <div className="protocol-toggle-grid">
+              {exitNodes.map(node=><label className="toggle module-toggle" key={node.id}><span>{node.name} · {node.country_code||"—"}<small dir="ltr">{node.public_ip||""}</small></span><input type="checkbox" checked={nodeIds.includes(node.id)} onChange={()=>toggleNode(node.id)}/><i/></label>)}
+            </div>
+          </div>
 
           <div className="modalActions">
             <button type="button" className="ghost" disabled={busy} onClick={()=>setOpen(false)}>{pick("انصراف","Cancel")}</button>
