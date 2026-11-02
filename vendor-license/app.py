@@ -80,14 +80,14 @@ def db_session():
 def require_admin(authorization: str | None = Header(default=None)) -> None:
     if not ADMIN_TOKEN:
         raise HTTPException(status_code=503, detail="VENDOR_ADMIN_TOKEN_NOT_CONFIGURED")
-    expected = f"Bearer {ADMIN_TOKEN}"
-    if authorization != expected:
+    if authorization != f"Bearer {ADMIN_TOKEN}":
         raise HTTPException(status_code=401, detail="UNAUTHORIZED")
 
 
 def private_key() -> str:
     try:
-        return open(PRIVATE_KEY_FILE, "r", encoding="utf-8").read()
+        with open(PRIVATE_KEY_FILE, "r", encoding="utf-8") as handle:
+            return handle.read()
     except OSError as exc:
         raise HTTPException(status_code=503, detail="VENDOR_PRIVATE_KEY_MISSING") from exc
 
@@ -96,53 +96,65 @@ def now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def aware(value: datetime) -> datetime:
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
 def iso(value: datetime | None) -> str | None:
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc).isoformat()
+    return aware(value).astimezone(timezone.utc).isoformat() if value is not None else None
 
 
 def normalize_status(item: License) -> str:
     if item.status in {"suspended", "revoked"}:
         return item.status
-    if item.expires_at <= now():
+    expires_at = aware(item.expires_at)
+    if item.edition == "trial":
+        if expires_at <= now():
+            return "trial_expired"
+        if expires_at <= now() + timedelta(days=2):
+            return "trial_expiring"
+        return "trial_active"
+    if expires_at <= now():
         return "license_expired"
-    if item.expires_at <= now() + timedelta(days=7):
+    if expires_at <= now() + timedelta(days=7):
         return "license_expiring"
     return "licensed"
 
 
 def sign_entitlement(item: License) -> str:
-    status = normalize_status(item)
+    expires_at = aware(item.expires_at)
     payload: dict[str, Any] = {
         "iss": ISSUER,
         "aud": AUDIENCE,
         "sub": f"license:{item.id}",
         "iat": int(now().timestamp()),
-        "exp": int(item.expires_at.timestamp()),
-        "status": status,
+        "exp": int(expires_at.timestamp()),
+        "status": normalize_status(item),
         "edition": item.edition,
         "release_channel": item.release_channel,
         "features": item.features or [],
         "installation_id": item.installation_id,
-        "expires_at": iso(item.expires_at),
+        "expires_at": iso(expires_at),
     }
     return jwt.encode(payload, private_key(), algorithm="RS256")
 
 
 def entitlement_response(item: License) -> dict[str, Any]:
-    remaining = max(0, int((item.expires_at - now()).total_seconds()))
-    return {
+    expires_at = aware(item.expires_at)
+    remaining = max(0, int((expires_at - now()).total_seconds()))
+    result = {
         "status": normalize_status(item),
         "edition": item.edition,
         "release_channel": item.release_channel,
-        "expires_at": iso(item.expires_at),
+        "expires_at": iso(expires_at),
         "seconds_remaining": remaining,
         "features": item.features or [],
         "signed_entitlement": sign_entitlement(item),
     }
+    if item.edition == "trial":
+        result["trial_started_at"] = iso(item.starts_at)
+        result["trial_expires_at"] = iso(expires_at)
+    return result
 
 
 def source_ip(request: Request) -> str | None:
@@ -152,7 +164,7 @@ def source_ip(request: Request) -> str | None:
 def validate_binding(item: License, installation_id: str, machine_fingerprint: str, request: Request) -> None:
     if item.status in {"revoked", "suspended"}:
         raise HTTPException(status_code=403, detail=item.status.upper())
-    if item.expires_at <= now():
+    if aware(item.expires_at) <= now():
         raise HTTPException(status_code=402, detail="LICENSE_EXPIRED")
     if item.installation_id and item.installation_id != installation_id:
         raise HTTPException(status_code=409, detail="INSTALLATION_MISMATCH")
@@ -224,21 +236,7 @@ def health():
 
 @app.get("/v1/admin/plans", dependencies=[Depends(require_admin)])
 def list_plans(db: Session = Depends(db_session)):
-    return [
-        {
-            "id": item.id,
-            "name": item.name,
-            "duration_days": item.duration_days,
-            "price": item.price,
-            "max_nodes": item.max_nodes,
-            "max_resellers": item.max_resellers,
-            "edition": item.edition,
-            "release_channel": item.release_channel,
-            "features": item.features or [],
-            "active": item.active,
-        }
-        for item in db.scalars(select(Plan).order_by(Plan.id.desc())).all()
-    ]
+    return [{"id": item.id, "name": item.name, "duration_days": item.duration_days, "price": item.price, "max_nodes": item.max_nodes, "max_resellers": item.max_resellers, "edition": item.edition, "release_channel": item.release_channel, "features": item.features or [], "active": item.active} for item in db.scalars(select(Plan).order_by(Plan.id.desc())).all()]
 
 
 @app.post("/v1/admin/plans", dependencies=[Depends(require_admin)])
@@ -257,22 +255,7 @@ def create_plan(payload: PlanIn, db: Session = Depends(db_session)):
 @app.get("/v1/admin/licenses", dependencies=[Depends(require_admin)])
 def list_licenses(db: Session = Depends(db_session)):
     items = db.scalars(select(License).order_by(License.id.desc())).all()
-    return [
-        {
-            "id": item.id,
-            "license_key": item.license_key,
-            "customer_name": item.customer_name,
-            "plan_id": item.plan_id,
-            "status": normalize_status(item),
-            "server_ip": item.server_ip,
-            "installation_id": item.installation_id,
-            "expires_at": iso(item.expires_at),
-            "edition": item.edition,
-            "features": item.features or [],
-            "notes": item.notes,
-        }
-        for item in items
-    ]
+    return [{"id": item.id, "license_key": item.license_key, "customer_name": item.customer_name, "plan_id": item.plan_id, "status": normalize_status(item), "server_ip": item.server_ip, "installation_id": item.installation_id, "expires_at": iso(item.expires_at), "edition": item.edition, "features": item.features or [], "notes": item.notes} for item in items]
 
 
 @app.post("/v1/admin/licenses/manual", dependencies=[Depends(require_admin)])
@@ -281,29 +264,11 @@ def create_manual_license(payload: ManualLicenseIn, db: Session = Depends(db_ses
     if payload.plan_id and not plan:
         raise HTTPException(status_code=404, detail="PLAN_NOT_FOUND")
     duration = payload.duration_days or (plan.duration_days if plan else 30)
-    item = License(
-        license_key="TP-" + secrets.token_hex(16).upper(),
-        customer_name=payload.customer_name,
-        plan_id=plan.id if plan else None,
-        status="licensed",
-        edition=payload.edition or (plan.edition if plan else "standard"),
-        release_channel=payload.release_channel or (plan.release_channel if plan else "stable"),
-        features=payload.features if payload.features is not None else ((plan.features or []) if plan else []),
-        server_ip=payload.server_ip,
-        installation_id=payload.installation_id,
-        starts_at=now(),
-        expires_at=now() + timedelta(days=duration),
-        notes=payload.notes,
-    )
+    item = License(license_key="TP-" + secrets.token_hex(16).upper(), customer_name=payload.customer_name, plan_id=plan.id if plan else None, status="licensed", edition=payload.edition or (plan.edition if plan else "standard"), release_channel=payload.release_channel or (plan.release_channel if plan else "stable"), features=payload.features if payload.features is not None else ((plan.features or []) if plan else []), server_ip=payload.server_ip, installation_id=payload.installation_id, starts_at=now(), expires_at=now() + timedelta(days=duration), notes=payload.notes)
     db.add(item)
     db.commit()
     db.refresh(item)
-    return {
-        "id": item.id,
-        "license_key": item.license_key,
-        "status": normalize_status(item),
-        "expires_at": iso(item.expires_at),
-    }
+    return {"id": item.id, "license_key": item.license_key, "status": normalize_status(item), "expires_at": iso(item.expires_at)}
 
 
 @app.post("/v1/admin/licenses/{license_id}/renew", dependencies=[Depends(require_admin)])
@@ -311,9 +276,10 @@ def renew_license(license_id: int, payload: RenewIn, db: Session = Depends(db_se
     item = db.get(License, license_id)
     if not item:
         raise HTTPException(status_code=404, detail="LICENSE_NOT_FOUND")
-    base = item.expires_at if item.expires_at > now() else now()
+    current_expiry = aware(item.expires_at)
+    base = current_expiry if current_expiry > now() else now()
     item.expires_at = base + timedelta(days=payload.days)
-    if item.status == "license_expired":
+    if item.status not in {"suspended", "revoked"}:
         item.status = "licensed"
     db.commit()
     return {"id": item.id, "status": normalize_status(item), "expires_at": iso(item.expires_at)}
@@ -360,24 +326,8 @@ def trial(payload: TrialIn, db: Session = Depends(db_session)):
     existing = db.scalar(select(License).where(License.installation_id == payload.installation_id))
     if existing:
         return entitlement_response(existing)
-    item = License(
-        license_key="TRIAL-" + secrets.token_hex(12).upper(),
-        customer_name="Trial",
-        status="licensed",
-        edition="trial",
-        release_channel="stable",
-        features=["trial"],
-        installation_id=payload.installation_id,
-        machine_fingerprint=payload.machine_fingerprint,
-        starts_at=now(),
-        expires_at=now() + timedelta(days=DEFAULT_TRIAL_DAYS),
-        notes="Automatic trial",
-    )
+    item = License(license_key="TRIAL-" + secrets.token_hex(12).upper(), customer_name="Trial", status="licensed", edition="trial", release_channel="stable", features=["trial"], installation_id=payload.installation_id, machine_fingerprint=payload.machine_fingerprint, starts_at=now(), expires_at=now() + timedelta(days=DEFAULT_TRIAL_DAYS), notes="Automatic trial")
     db.add(item)
     db.commit()
     db.refresh(item)
-    result = entitlement_response(item)
-    result["status"] = "trial_active"
-    result["trial_started_at"] = iso(item.starts_at)
-    result["trial_expires_at"] = iso(item.expires_at)
-    return result
+    return entitlement_response(item)
