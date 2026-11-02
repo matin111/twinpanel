@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.473",
+  "version": "1.1.0-rc.474",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T00:20:46Z",
+  "released_at": "2026-11-02T00:28:59Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "f021d007b0bbfaa37671bfa842deb93c7702ff05",
+  "source_sha": "9fc230c1c7eb479297ad35e099fa9d09bfb1cf95",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.473/twinpanel-1.1.0-rc.473-linux-x86_64.tar.gz",
-    "sha256": "25532e9f85bcb298a02871a572ca9deb052df56a6cfac9e35503776fa4e21fa8",
-    "size_bytes": 25222541
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.474/twinpanel-1.1.0-rc.474-linux-x86_64.tar.gz",
+    "sha256": "944dba9b1509f941e1e9983900283c44d99130ffb8e2ab0b7668573828e0c1cc",
+    "size_bytes": 25230164
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.473 فیلد ایمیل صفحه ورود را برای حالت LTR اصلاح می‌کند تا متن روی آیکون نیفتد و برای رمز عبور دکمه نمایش/مخفی‌کردن رمز اضافه می‌کند. آیکون قفل و فاصله‌های ورودی حفظ شده و منطق ورود، 2FA، Remember Me، مسیریابی و Branding بدون تغییر باقی مانده است. PR #1749 با 4/4 Workflow سبز Merge شد و Release PR #1752 نیز با 9/9 Workflow سبز Merge شد. Source روی SHA immutable f021d007b0bbfaa37671bfa842deb93c7702ff05 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.473 fixes LTR email-field spacing on the login page so text no longer overlaps the icon, and adds an accessible show/hide password control. The lock icon and input spacing are preserved, while login, 2FA, Remember Me, routing, and Branding behavior remain unchanged. PR #1749 merged with 4/4 green workflows and Release PR #1752 merged with 9/9 green workflows. Source is pinned to immutable SHA f021d007b0bbfaa37671bfa842deb93c7702ff05."
+    "fa": "TwinPanel 1.1.0-rc.474 ویرایشگر قالب Orbit Neo را اصلاح می‌کند تا «توضیح پروتکل‌های مدرن» به‌جای باکس جداگانه در Sidebar اصلی قالب قرار بگیرد و از همان Draft و دکمه «ذخیره قالب» استفاده کند؛ بنابراین مقدار فارسی/انگلیسی همراه سایر تنظیمات قالب ذخیره می‌شود و ظاهر ادیتور یک‌دست می‌ماند. این Source همچنین تغییر Merge‌شده فرم اشتراک نماینده برای نمایش کامل کاتالوگ ۱۵ پروتکل را شامل می‌شود. PR #1750 و PR #1751 Merge شده‌اند و Release PR #1754 نیز با CI سبز Merge شده است. Source روی SHA immutable 9fc230c1c7eb479297ad35e099fa9d09bfb1cf95 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.474 fixes the Orbit Neo template editor by moving the Modern Protocol Description from a standalone box into the template's main sidebar and binding it to the same draft and Save Template flow, so Persian/English values persist together with the rest of the template settings and the editor remains visually consistent. This source also includes the merged reseller subscription-modal update that exposes the full 15-protocol catalog. PR #1750 and PR #1751 are merged, and Release PR #1754 merged with green CI. Source is pinned to immutable SHA 9fc230c1c7eb479297ad35e099fa9d09bfb1cf95."
   }
 }
