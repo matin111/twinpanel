@@ -1,0 +1,35 @@
+name: Account Creation Paths V4 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/account_creation_runtime_v4.py'
+      - 'backend/app/routers/central_account_delivery_runtime_v3.py'
+      - 'backend/app/routers/subscription_create_fast_v1.py'
+      - 'backend/app/routers/modern_account_delivery_v1.py'
+      - 'backend/app/routers/reseller_sale_v2.py'
+      - 'backend/app/routers/reseller_bot_orders.py'
+      - 'backend/app/routers/store.py'
+      - 'backend/tests/test_account_creation_paths_v4.py'
+      - 'components/admin-manual-subscription-create.tsx'
+      - 'lib/subscription-create-fast-api.ts'
+      - '.github/workflows/account-creation-paths-v4-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile account creation runtime
+        run: |
+          python -m py_compile \
+            backend/app/routers/account_creation_runtime_v4.py \
+            backend/app/routers/central_account_delivery_runtime_v3.py \
+            backend/app/routers/subscription_create_fast_v1.py \
+            backend/app/routers/modern_account_delivery_v1.py
+      - name: Run account creation contract regressions
+        run: python -m pytest -q backend/tests/test_account_creation_paths_v4.py
