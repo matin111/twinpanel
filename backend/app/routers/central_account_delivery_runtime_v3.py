@@ -14,6 +14,7 @@ from . import runtime_endpoints as _runtime_endpoints
 from . import store as store_fulfillment
 from .modern_account_delivery_v1 import provision_account_v1
 from .subscription_protocol_lifecycle_v3 import router as _subscription_protocol_lifecycle_v3_router
+from .trial import router as _trial_router
 
 
 _ORIGINAL_DELIVERY_ITEM_IS_USABLE = legacy_account_delivery._delivery_item_is_usable
@@ -64,6 +65,11 @@ def customer_delivery_item_is_usable(
 
 def install_central_account_delivery_runtime_v3() -> None:
     """Converge fulfillment on the snapshot-aware 15-protocol driver."""
+    # Trial is mounted on the same early runtime router. Importing it also
+    # registers additive plan_trial_settings/trial_claims models before
+    # Base.metadata.create_all runs in app.main.
+    _runtime_endpoints.router.include_router(_trial_router)
+
     # runtime_endpoints is included first by app.main. Mount V3 before package
     # initialization later appends the V2 compatibility route, giving V3 exact
     # route precedence without rewriting the legacy Account Delivery module.
