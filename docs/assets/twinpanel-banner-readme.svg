@@ -36,7 +36,7 @@
 
     <rect x="0" y="0" width="810" height="54" rx="18" fill="#070d17"/>
     <rect x="0" y="36" width="810" height="18" fill="#070d17"/>
-    <text x="770" y="33" text-anchor="end" fill="#ffffff" font-size="16" font-family="Arial, Helvetica, sans-serif" font-weight="700">Matin Vpn</text>
+    <text x="770" y="33" text-anchor="end" fill="#ffffff" font-size="16" font-family="Arial, Helvetica, sans-serif" font-weight="700">TwinPanel</text>
     <circle cx="790" cy="27" r="12" fill="#0d2b49" stroke="#20d8ff"/>
     <text x="790" y="31" text-anchor="middle" fill="#20d8ff" font-size="9" font-family="Arial">TP</text>
 
