@@ -10,7 +10,7 @@ def test_v40_patches_actual_v38_karing_action() -> None:
     assert "TWINPANEL_PUBLIC_CONNECT_KARING_REMARKS_V40" in source
     assert ".v38-all-card[data-v38-protocol]" in source
     assert 'a[href^="karing://install-config"]' in source
-    assert "account+'-'+protocol" in source
+    assert "accountName()+'-'+protocol" in source
     assert "document.querySelector('.service')" in source
 
 
@@ -21,7 +21,15 @@ def test_v40_puts_profile_name_on_inner_multilink_url() -> None:
     assert "parts.deep.searchParams.set('url',parts.inner.toString())" in source
     assert "parts.deep.searchParams.set('name',name)" in source
     assert "response.headers.get('Profile-Title')" in source
-    assert "fragment -> remarks -> name -> title -> host" in source
+
+
+def test_v40_blocks_click_until_named_deep_link_is_ready() -> None:
+    source = V40.read_text(encoding="utf-8")
+    assert "document.addEventListener('click',async function(event)" in source
+    assert "event.preventDefault()" in source
+    assert "event.stopImmediatePropagation()" in source
+    assert "const href=await prepare(link)" in source
+    assert "window.location.href=href" in source
 
 
 def test_v40_uses_connect_token_as_deterministic_fallback_identity() -> None:
