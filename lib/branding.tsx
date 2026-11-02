@@ -83,7 +83,7 @@ export function BrandingProvider({children}:{children:React.ReactNode}){
     root.style.setProperty("--brand-accent",brand.accent);
     root.style.setProperty("--purple",brand.accent);
     root.style.setProperty("--purple2",brand.secondaryColor);
-    document.title=brand.name;
+    if(!document.title.trim()||document.title==="VPN Control 2027"||document.title==="TwinPanel")document.title=brand.name;
 
     let favicon=document.querySelector<HTMLLinkElement>('link[rel~="icon"]');
     if(!favicon){
