@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.505",
+  "version": "1.1.0-rc.506",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T10:34:39Z",
+  "released_at": "2026-11-02T10:52:34Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "3fa7a0a2e5e2e9cf46cb9284c46a8bb79a5d291a",
+  "source_sha": "e5774d9ef0bbb84e513200b5c66468f6add149a2",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.505/twinpanel-1.1.0-rc.505-linux-x86_64.tar.gz",
-    "sha256": "4a11bd8c0158f665e6b2aa9889f2318b4086a5a2dba2f39bd9531c540bc9519e",
-    "size_bytes": 25366712
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.506/twinpanel-1.1.0-rc.506-linux-x86_64.tar.gz",
+    "sha256": "30fdc79b56285bda693ea1494906224c7afb5bac762bd724f7a15e9344dbe768",
+    "size_bytes": 25368255
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.505 رگرسیون‌های Public Connect موبایل را بر اساس Audit واقعی سرور تست اصلاح می‌کند. V2Ray/Xray در Backend و HTML وجود داشت اما V41 لیست سرورهای پایین را حذف می‌کرد و V42 فقط سطح قدیمی V38 را معتبر می‌دانست، در حالی که Authority نهایی Multi-Link از rc.503 به بعد V52 است؛ V42 اکنون V52 Multi-Link را به‌عنوان سطح معتبر موبایل می‌شناسد و دانلود برنامه صحیح v2rayNG/V2Box نیز حفظ می‌شود. برای پروتکل‌های مدرن V2Ray/Xray، Hysteria2، TUIC، AnyTLS، Naive، ShadowTLS، Snell، Mieru، TrustTunnel، AmneziaWG و Sudoku کارت‌های خام Server/Username/Password روی موبایل حذف شده و فقط اکشن/کانفیگ واقعی و Multi-Link نمایش داده می‌شود. اطلاعات دستی واقعی Cisco/L2TP دست‌نخورده باقی می‌ماند. همچنین نوار دسته‌بندی موقت V51 هنگام بازگشت به دسکتاپ پاک می‌شود تا ویندوز فقط یک ردیف دسته‌بندی داشته باشد. Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting و Quota تغییری نکرده‌اند. Source روی SHA immutable 3fa7a0a2e5e2e9cf46cb9284c46a8bb79a5d291a قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.505 fixes Public Connect mobile regressions based on a read-only audit of the real test server. V2Ray/Xray was present in backend HTML, but V41 removed the lower server inventory while V42 only recognized the retired V38 surface even though V52 has been the canonical Multi-Link authority since rc.503; V42 now recognizes the stable V52 Multi-Link and preserves the correct v2rayNG/V2Box client download surface. On mobile, generic raw Server/Username/Password fact cards are removed for modern config-driven protocols V2Ray/Xray, Hysteria2, TUIC, AnyTLS, Naive, ShadowTLS, Snell, Mieru, TrustTunnel, AmneziaWG and Sudoku, leaving real config/client actions and Multi-Link. Valid Cisco/L2TP manual credentials remain unchanged. The transient V51 mobile category bar is also removed when returning to desktop so Windows shows only one category row. Provisioning, credentials, tunnel dataplane, routing, firewall, accounting and quota behavior are unchanged. Source is pinned to immutable SHA 3fa7a0a2e5e2e9cf46cb9284c46a8bb79a5d291a."
+    "fa": "TwinPanel 1.1.0-rc.506 برندینگ عمومی TwinPanel را با فایل‌های تأییدشده نهایی می‌کند. بنر اصلی GitHub با نسخه شارپ و باکیفیت جایگزین شده و لوگوی پیش‌فرض پنل از نشان اصلی TwinPanel استفاده می‌کند؛ نام‌های پویا و لوگوهای سفارشی Branding بدون تغییر باقی می‌مانند. این Release همچنین همه تغییرات موجود در main تا SHA نهایی را شامل می‌شود. هیچ تغییری در Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting، Quota یا Payment ایجاد نشده است. Source روی SHA immutable e5774d9ef0bbb84e513200b5c66468f6add149a2 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.506 finalizes the approved public TwinPanel branding assets. The main GitHub banner is replaced with the sharp high-resolution approved artwork and the panel default branding uses the original TwinPanel mark, while dynamic brand names and user-configured custom logos remain unchanged. This release also contains all main-branch changes up to the pinned source SHA. Provisioning, credentials, tunnel dataplane, routing, firewall, accounting, quota and payment behavior are unchanged. Source is pinned to immutable SHA e5774d9ef0bbb84e513200b5c66468f6add149a2."
   }
 }
