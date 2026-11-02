@@ -224,12 +224,8 @@ export function AdminSubscriptionLiveTable(){
         actions=document.createElement("div");
         actions.className="action-row";
         actions.dataset.subscriptionBulkActions="1";
-        if(create){
-          head.insertBefore(actions,create);
-          actions.appendChild(create);
-        }else{
-          head.appendChild(actions);
-        }
+        head.appendChild(actions);
+        if(create)actions.appendChild(create);
       }
 
       const button=document.createElement("button");
