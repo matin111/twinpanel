@@ -14,22 +14,21 @@ from .node_runtime_connection import connect_protocol_runtime, is_local_core
 from .routers import account_delivery
 
 
-# TWINPANEL_MOTHER_SUBSCRIPTION_DELIVERY_POLICY_V109
+# TWINPANEL_MOTHER_SUBSCRIPTION_DELIVERY_POLICY_V110
 #
-# Mother is infrastructure/control-plane state. Keep its Node row, protocol
-# runtime and stored subscription credentials intact, but enforce the existing
-# Mother access policy at the delivery response boundary.
+# Mother/Local Core has two independent responsibilities:
+#   1. it is always a protocol runtime/provisioning target, and
+#   2. it may be excluded from High Availability / Multi-Link aggregation.
 #
-# Direct/admin subscriptions follow mother.admin_enabled.
-# Reseller-owned subscriptions follow the reseller global + per-reseller policy.
-# This keeps public sublinks, customer connection-info and admin connection-info
-# consistent without deleting credentials when access is temporarily disabled.
+# Never delete or hide Mother credentials at the stored-info boundary. The
+# normal per-server public page must still expose Mother as an individual server
+# when a credential exists. The existing mother access policy now controls only
+# whether Mother participates in Multi-Link aggregation.
 #
-# V109 also closes two protocol-runtime gaps:
-#   * Local Core account provisioning must use the local runtime executor instead
-#     of looking for saved SSH credentials for the controller itself.
-#   * A healthy Modern runtime on a direct Exit remains customer-deliverable when
-#     there is no Iran tunnel, matching the existing direct-classic fallback.
+# V110 also makes the runtime hooks safe for every Python process (API, bot,
+# reseller and convergence worker): Local Core uses the local executor while
+# remote Exit nodes keep saved SSH, and healthy direct Modern Exit runtimes stay
+# delivery-eligible without requiring an Iran tunnel.
 
 _original_stored_info = account_delivery._stored_info
 _original_ssh_connect_saved = account_delivery.ssh_connect_saved
@@ -151,7 +150,10 @@ def _item_is_mother(
 
     return bool(
         node
-        and getattr(node, "is_mother", False)
+        and (
+            getattr(node, "is_mother", False)
+            or is_local_core(node)
+        )
     )
 
 
@@ -216,37 +218,60 @@ def _stored_info_with_mother_policy(
     db: Session,
     sub: Subscription,
 ) -> dict[str, Any]:
-    payload = _original_stored_info(db, sub)
+    # V110: stored/single-server delivery must preserve Mother. Multi-Link has a
+    # dedicated boundary filter installed below.
+    return _original_stored_info(db, sub)
 
-    if _subscription_can_use_mother(db, sub):
-        return payload
 
-    return _filter_mother_from_delivery(
-        db,
-        payload,
-    )
+def _install_multilink_filter() -> None:
+    """Exclude Mother only from HA/Multi-Link when its access toggle is off."""
+    try:
+        from .routers import public_connection_all_multilink_v34 as multi
+    except Exception:
+        return
+
+    current = getattr(multi, "_active", None)
+    if current is None or getattr(current, "_twinpanel_mother_multilink_v110", False):
+        return
+
+    original_active = current
+
+    def _active_without_disabled_mother(
+        token: str,
+        db: Session,
+    ):
+        sub, payload = original_active(token, db)
+        if _subscription_can_use_mother(db, sub):
+            return sub, payload
+        return sub, _filter_mother_from_delivery(db, payload)
+
+    setattr(_active_without_disabled_mother, "_twinpanel_mother_multilink_v110", True)
+    multi._active = _active_without_disabled_mother
 
 
 def apply_mother_subscription_delivery_policy_v108() -> None:
     global _applied
 
-    if _applied:
-        return
+    if not _applied:
+        # Do not replace account_delivery._stored_info. Per-server delivery must
+        # retain Mother credentials even when HA/Multi-Link access is disabled.
+        account_delivery.ssh_connect_saved = _runtime_aware_connect_saved
+        account_delivery._delivery_item_is_usable = _modern_direct_item_is_usable
 
-    account_delivery._stored_info = _stored_info_with_mother_policy
-    account_delivery.ssh_connect_saved = _runtime_aware_connect_saved
-    account_delivery._delivery_item_is_usable = _modern_direct_item_is_usable
+        # Public mobile inventory imported the helper by value before self-hosted
+        # runtime hooks are applied. Rebind that local reference as well so
+        # desktop and mobile use the same direct-modern eligibility rule.
+        try:
+            from .routers import public_connection_mobile_server_inventory_v18
 
-    # Public mobile inventory imported the helper by value before self-hosted
-    # runtime hooks are applied. Rebind that local reference as well so desktop
-    # and mobile use the same direct-modern eligibility rule.
-    try:
-        from .routers import public_connection_mobile_server_inventory_v18
+            public_connection_mobile_server_inventory_v18._delivery_item_is_usable = (
+                _modern_direct_item_is_usable
+            )
+        except Exception:
+            pass
 
-        public_connection_mobile_server_inventory_v18._delivery_item_is_usable = (
-            _modern_direct_item_is_usable
-        )
-    except Exception:
-        pass
+        _applied = True
 
-    _applied = True
+    # This module may be installed once during package import and again after all
+    # public routers are loaded. Always retry the narrow Multi-Link hook.
+    _install_multilink_filter()
