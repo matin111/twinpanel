@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.514",
+  "version": "1.1.0-rc.515",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T17:36:59Z",
+  "released_at": "2026-11-02T17:46:47Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7499227247e5303a3c9518d38db00be60e839ed2",
+  "source_sha": "f06b00badd591bff88b46bdc87a6e4cc044acdcf",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.514/twinpanel-1.1.0-rc.514-linux-x86_64.tar.gz",
-    "sha256": "30356808c8e7e8c2af77cb49a239e3a31003d0f1ba161eb05dab3e1002bb1f94",
-    "size_bytes": 25395232
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.515/twinpanel-1.1.0-rc.515-linux-x86_64.tar.gz",
+    "sha256": "4426477239cef932b34f4a8f851b2a63bf2635b5a747ec7e866ddf0952a37d48",
+    "size_bytes": 25401212
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.514 مدیریت گروهی اشتراک‌ها را اضافه می‌کند. در صفحه اشتراک‌ها یک دکمه «مدیریت گروهی» قرار دارد که از داخل همان پنجره می‌توان برای همه اشتراک‌های قابل‌ویرایش حجم را افزایش یا کاهش داد و روز را افزایش یا کاهش داد. اشتراک‌های لغوشده رد می‌شوند، اشتراک‌های نامحدود در عملیات حجم رد می‌شوند و کاهش حجم هیچ‌وقت سقف را پایین‌تر از مصرف واقعی نمی‌برد. مسیرهای Provisioning، Accounting، Tunnel و Protocol dataplane بدون تغییر باقی مانده‌اند. Source روی SHA immutable 7499227247e5303a3c9518d38db00be60e839ed2 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.514 adds bulk subscription management. The subscriptions page now has one Bulk Management control that can add or reduce traffic and add or reduce days across all editable subscriptions. Canceled subscriptions are skipped, unlimited subscriptions are skipped for traffic operations, and traffic reduction is never allowed below actual usage. Provisioning, accounting, tunnel, and protocol dataplane behavior remain unchanged. Source is pinned to immutable SHA 7499227247e5303a3c9518d38db00be60e839ed2."
+    "fa": "TwinPanel 1.1.0-rc.515 رابط V2Ray/Xray در Public Connect را با WireGuard هماهنگ می‌کند: تب‌های سرورها بالای پنل نمایش داده می‌شوند، نام هر تب مستقیماً از Node.name همان سرور می‌آید، فقط سرور انتخاب‌شده پایین Multi-Link نمایش داده می‌شود و سه کانفیگ آن همچنان به‌صورت پیش‌فرض مخفی هستند و با انتخاب کاربر باز می‌شوند. Multi-Link و اکشن‌های کانفیگ بدون تغییر حفظ شده‌اند. Source روی SHA immutable f06b00badd591bff88b46bdc87a6e4cc044acdcf قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.515 aligns the V2Ray/Xray Public Connect selector with WireGuard: server tabs are shown above the panel, each tab label comes directly from that server's Node.name, only the selected server is rendered below Multi-Link, and its three configs remain collapsed by default until the user expands them. Multi-Link and config actions are preserved unchanged. Source is pinned to immutable SHA f06b00badd591bff88b46bdc87a6e4cc044acdcf."
   }
 }
