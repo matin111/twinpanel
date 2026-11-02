@@ -31,14 +31,16 @@ assert "innerHTML=panel" not in v42
 assert "function hasSheetSurface(panel)" in v42
 assert "panel.querySelector('.server-view')" in v42
 
-# V41 intentionally removes V2Ray server-views. V42 must still recognize and
-# explicitly expose the surviving V38/V44 all-server and client surfaces.
+# V41 intentionally removes V2Ray server-views. V52 is now the canonical
+# all-server authority, so V42 must recognize/show V52 plus the client card.
 assert "panel.dataset.v41V2ray==='1'||panel.dataset.v41LowerConfigsRemoved==='1'" in v42
-assert "panel.querySelector('.v38-all-card[data-v38-protocol=\"v2ray\"]')" in v42
+assert "panel.querySelector('.v52-multi-card[data-v52-protocol=\"v2ray\"]')" in v42
+assert "panel.querySelector('.v52-multi-card')" in v42
 assert "panel.querySelector('.v34-client-card')" in v42
 assert "if(!hasSheetSurface(panel))return;" in v42
-assert '.v42-sheet-open[data-v41-v2ray="1"] .v38-all-card[data-v38-protocol="v2ray"]' in v42
+assert '.v42-sheet-open[data-v41-v2ray="1"] .v52-multi-card' in v42
 assert '.v42-sheet-open[data-v41-v2ray="1"] .v34-client-card' in v42
+assert "v38-all-card[data-v38-protocol=\"v2ray\"]" not in v42
 
 # V42 is the single mobile presentation authority: stale V36/V27/active panels
 # and choices are retired before a new fixed sheet opens.
@@ -59,4 +61,4 @@ for item in forbidden:
     assert item not in v42.lower(), item
     assert item not in backpressure.lower(), item
 
-print("V42 single mobile sheet + V2Ray visibility + request backpressure chain smoke OK")
+print("V42 single mobile sheet + stable V52 V2Ray visibility + request backpressure chain smoke OK")
