@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-labelledby="title desc">
+  <title id="title">TwinPanel control plane banner</title>
+  <desc id="desc">A dark blue TwinPanel promotional banner with a horizontal top navigation and a dashboard inspired by the real admin panel.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#06111f"/>
+      <stop offset="0.55" stop-color="#07182c"/>
+      <stop offset="1" stop-color="#09111f"/>
+    </linearGradient>
+    <linearGradient id="hero" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0b1f38"/>
+      <stop offset="0.5" stop-color="#12345b"/>
+      <stop offset="1" stop-color="#0a1729"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#20d8ff"/>
+      <stop offset="1" stop-color="#6b5cff"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="400" rx="22" fill="url(#bg)"/>
+  <rect x="1" y="1" width="1198" height="398" rx="21" fill="none" stroke="#12345a"/>
+
+  <circle cx="102" cy="54" r="36" fill="#0b2f55" opacity="0.75" filter="url(#glow)"/>
+  <path d="M68 48h68l-12 13H88l-10 12H58l22-25z" fill="#27d8ff"/>
+  <path d="M96 61h35l-18 20H89z" fill="#f6fbff"/>
+  <text x="54" y="107" fill="#ffffff" font-size="28" font-family="Arial, Helvetica, sans-serif" font-weight="700">TwinPanel</text>
+  <text x="54" y="130" fill="#7f96b2" font-size="13" font-family="Arial, Helvetica, sans-serif">Sales • Control • Connect • Operate</text>
+
+  <g transform="translate(350 20)">
+    <rect width="810" height="360" rx="18" fill="#060b14" stroke="#18314f"/>
+
+    <rect x="0" y="0" width="810" height="54" rx="18" fill="#070d17"/>
+    <rect x="0" y="36" width="810" height="18" fill="#070d17"/>
+    <text x="770" y="33" text-anchor="end" fill="#ffffff" font-size="16" font-family="Arial, Helvetica, sans-serif" font-weight="700">Matin Vpn</text>
+    <circle cx="790" cy="27" r="12" fill="#0d2b49" stroke="#20d8ff"/>
+    <text x="790" y="31" text-anchor="middle" fill="#20d8ff" font-size="9" font-family="Arial">TP</text>
+
+    <g font-family="Arial, Helvetica, sans-serif" font-size="11" fill="#a9b8ca">
+      <text x="640" y="33">مدیریت</text>
+      <text x="558" y="33">شبکه و زیرساخت</text>
+      <text x="444" y="33">فروش و مالی</text>
+      <text x="350" y="33">ارتباطات و پشتیبانی</text>
+      <text x="240" y="33">محتوا و برند</text>
+      <text x="150" y="33">سیستم و نگهداری</text>
+    </g>
+    <rect x="618" y="10" width="72" height="34" rx="10" fill="#0a1d34" stroke="#2c6cff"/>
+
+    <rect x="18" y="70" width="774" height="72" rx="18" fill="url(#hero)" stroke="#223d61"/>
+    <circle cx="766" cy="88" r="5" fill="#20d89b"/>
+    <text x="748" y="92" text-anchor="end" fill="#7c8cff" font-size="10" font-family="Arial">مرکز فرمان زنده</text>
+    <text x="748" y="120" text-anchor="end" fill="#ffffff" font-size="24" font-family="Arial, Helvetica, sans-serif" font-weight="700">داشبورد مدیریت</text>
+    <rect x="36" y="92" width="118" height="34" rx="10" fill="url(#accent)"/>
+    <text x="95" y="114" text-anchor="middle" fill="#ffffff" font-size="11" font-family="Arial" font-weight="700">بروزرسانی زنده</text>
+    <rect x="165" y="92" width="88" height="34" rx="10" fill="#0d1827" stroke="#1b334e"/>
+    <circle cx="234" cy="109" r="5" fill="#21d99a"/>
+    <text x="220" y="113" text-anchor="end" fill="#ffffff" font-size="10" font-family="Arial">سیستم آنلاین</text>
+
+    <g font-family="Arial, Helvetica, sans-serif">
+      <rect x="18" y="156" width="145" height="74" rx="14" fill="#0b1220" stroke="#172942"/>
+      <rect x="173" y="156" width="145" height="74" rx="14" fill="#0b1220" stroke="#172942"/>
+      <rect x="328" y="156" width="145" height="74" rx="14" fill="#0b1220" stroke="#172942"/>
+      <rect x="483" y="156" width="145" height="74" rx="14" fill="#0b1220" stroke="#172942"/>
+      <rect x="638" y="156" width="154" height="74" rx="14" fill="#0b1220" stroke="#172942"/>
+
+      <rect x="18" y="156" width="3" height="74" rx="2" fill="#24d8ff"/>
+      <rect x="173" y="156" width="3" height="74" rx="2" fill="#ffb11c"/>
+      <rect x="328" y="156" width="3" height="74" rx="2" fill="#1fd8a3"/>
+      <rect x="483" y="156" width="3" height="74" rx="2" fill="#3b82f6"/>
+      <rect x="638" y="156" width="3" height="74" rx="2" fill="#7c5cff"/>
+
+      <text x="145" y="177" text-anchor="end" fill="#667b95" font-size="9">سلامت نودها</text>
+      <text x="145" y="205" text-anchor="end" fill="#ffffff" font-size="21" font-weight="700">6 / 6</text>
+      <text x="300" y="177" text-anchor="end" fill="#667b95" font-size="9">فروش امروز</text>
+      <text x="300" y="205" text-anchor="end" fill="#ffffff" font-size="18" font-weight="700">۵,۱۰۲,۰۴۴</text>
+      <text x="455" y="177" text-anchor="end" fill="#667b95" font-size="9">آنلاین اکنون</text>
+      <text x="455" y="205" text-anchor="end" fill="#ffffff" font-size="21" font-weight="700">0</text>
+      <text x="610" y="177" text-anchor="end" fill="#667b95" font-size="9">اشتراک فعال</text>
+      <text x="610" y="205" text-anchor="end" fill="#ffffff" font-size="21" font-weight="700">413</text>
+      <text x="774" y="177" text-anchor="end" fill="#667b95" font-size="9">کل کاربران</text>
+      <text x="774" y="205" text-anchor="end" fill="#ffffff" font-size="21" font-weight="700">7</text>
+    </g>
+
+    <rect x="18" y="244" width="774" height="94" rx="16" fill="#0b1220" stroke="#172942"/>
+    <text x="775" y="265" text-anchor="end" fill="#ffffff" font-size="12" font-family="Arial" font-weight="700">سرور</text>
+    <text x="32" y="265" fill="#8ea2bb" font-size="9" font-family="Arial">Hostname • CLY984318</text>
+
+    <g font-family="Arial" font-size="8" fill="#8ea2bb">
+      <text x="36" y="289">Uptime</text>
+      <text x="208" y="289">Disk</text>
+      <text x="399" y="289">RAM</text>
+      <text x="590" y="289">CPU</text>
+    </g>
+    <g>
+      <rect x="36" y="300" width="150" height="7" rx="4" fill="#111d2e"/>
+      <rect x="208" y="300" width="150" height="7" rx="4" fill="#111d2e"/>
+      <rect x="399" y="300" width="150" height="7" rx="4" fill="#111d2e"/>
+      <rect x="590" y="300" width="166" height="7" rx="4" fill="#111d2e"/>
+      <rect x="208" y="300" width="22" height="7" rx="4" fill="url(#accent)"/>
+      <rect x="399" y="300" width="53" height="7" rx="4" fill="url(#accent)"/>
+      <rect x="590" y="300" width="116" height="7" rx="4" fill="url(#accent)"/>
+    </g>
+  </g>
+
+  <text x="54" y="207" fill="#ffffff" font-size="39" font-family="Arial, Helvetica, sans-serif" font-weight="800">One control plane.</text>
+  <text x="54" y="245" fill="#ffffff" font-size="39" font-family="Arial, Helvetica, sans-serif" font-weight="800">Fifteen protocols.</text>
+  <text x="54" y="278" fill="#8ea2bb" font-size="15" font-family="Arial, Helvetica, sans-serif">Self-hosted VPN sales, subscriptions, nodes,</text>
+  <text x="54" y="301" fill="#8ea2bb" font-size="15" font-family="Arial, Helvetica, sans-serif">tunnels, reseller operations and delivery.</text>
+
+  <g font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">
+    <rect x="54" y="329" width="95" height="28" rx="8" fill="#0b2238" stroke="#1d8fff"/>
+    <text x="101" y="347" text-anchor="middle" fill="#7fdfff">15 Protocols</text>
+    <rect x="158" y="329" width="93" height="28" rx="8" fill="#0d1b2b" stroke="#2d465f"/>
+    <text x="204" y="347" text-anchor="middle" fill="#c2cfde">Persian RTL</text>
+    <rect x="260" y="329" width="62" height="28" rx="8" fill="#0d1b2b" stroke="#2d465f"/>
+    <text x="291" y="347" text-anchor="middle" fill="#c2cfde">Next.js</text>
+  </g>
+</svg>
