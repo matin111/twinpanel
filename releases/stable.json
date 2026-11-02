@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.510",
+  "version": "1.1.0-rc.511",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T12:17:55Z",
+  "released_at": "2026-11-02T16:00:29Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "6c87c6e29082275ba80b5bff300d3c85088fc8d2",
+  "source_sha": "6f2758b378cc68db42d192679d0ddc5ec55dbed2",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.510/twinpanel-1.1.0-rc.510-linux-x86_64.tar.gz",
-    "sha256": "7e85718f012b466cfc669f1c1409ce9acccae4d5dd72c3499a383c741a7d3c26",
-    "size_bytes": 25384390
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.511/twinpanel-1.1.0-rc.511-linux-x86_64.tar.gz",
+    "sha256": "6f11929a37160cdb8dc5eb27c2df6149e3869f23553d4b5aec5bc67a29e8bdde",
+    "size_bytes": 25381979
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.510 مسیر V2Ray/Xray Multi-Link را به Runtime واقعی سه‌پروفایلی وصل می‌کند. /sub و /sub/meta دیگر از reference قدیمی payload استفاده نمی‌کنند و برای هر Exit سه کانفیگ واقعی customer-safe مطابق Policy V47 برمی‌گردانند؛ برای اشتراک چهارسروره انتظار 12 کانفیگ واقعی داریم. هویت واقعی سرورها در metadata/UI مخفی می‌ماند و فقط برچسب‌های خنثی سرور 1، سرور 2 و ... نمایش داده می‌شود. گروه‌های هر سرور همچنان پیش‌فرض بسته/Hidden هستند. Provisioning، Credential generation، Tunnel dataplane، Routing، Firewall، Accounting، Quota و Payment تغییری نکرده‌اند. Source روی SHA immutable 6c87c6e29082275ba80b5bff300d3c85088fc8d2 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.510 reconnects the V2Ray/Xray Multi-Link surface to the live three-profile runtime policy. /sub and /sub/meta no longer keep a stale payload reference and now return three real customer-safe configs per Exit under the V47 policy; a four-server subscription is expected to expose 12 real configs. Real server identity remains hidden from public metadata/UI behind neutral Server 1, Server 2, etc. labels, with per-server groups collapsed/hidden by default. Provisioning, credential generation, tunnel dataplane, routing, firewall, accounting, quota and payments are unchanged. Source is pinned to immutable SHA 6c87c6e29082275ba80b5bff300d3c85088fc8d2."
+    "fa": "TwinPanel 1.1.0-rc.511 هم کانفیگ‌های واقعی و هم UI مسیر V2Ray/Xray را اصلاح می‌کند. اشتراک‌های legacy که برای هر Exit فقط یک item.uri ذخیره کرده‌اند، هنگام درخواست /sub یا /sub/meta با Reconcile رسمی Xray به Policy سه‌پروفایلی V47 مهاجرت می‌شوند؛ UUID قبلی حفظ می‌شود و تا زمانی که هر سرور دقیقاً سه پروفایل واقعی نداشته باشد خروجی تک‌کانفیگی تحویل داده نمی‌شود. در UI هر سرور فقط با برچسب خنثی سرور 1، سرور 2 و ... نمایش داده می‌شود، گروه‌ها پیش‌فرض بسته/Hidden هستند و تنها گروه‌های دقیقاً سه‌کانفیگی رندر می‌شوند. برای اشتراک چهارسروره معیار پذیرش 12 کانفیگ واقعی است. Tunnel dataplane، Routing، Firewall، Accounting، Quota، Payment و پروتکل‌های دیگر تغییری نکرده‌اند. Source روی SHA immutable 6f2758b378cc68db42d192679d0ddc5ec55dbed2 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.511 fixes both the real V2Ray/Xray configs and their Public Connect UI. Legacy subscriptions that stored only one item.uri per Exit are reconciled through the existing Xray reconciliation path when /sub or /sub/meta is requested, preserving the UUID and migrating the credential to the V47 exact-three profile policy. The public endpoints fail closed instead of exposing a one-config server until all three real profiles exist. The UI keeps neutral Server 1, Server 2, etc. labels, keeps every server group collapsed/hidden by default, and renders only exact-three groups. Acceptance for a four-server subscription is 12 real configs. Tunnel dataplane, routing, firewall, accounting, quota, payments and other protocols are unchanged. Source is pinned to immutable SHA 6f2758b378cc68db42d192679d0ddc5ec55dbed2."
   }
 }
