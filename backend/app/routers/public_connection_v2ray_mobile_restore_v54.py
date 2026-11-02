@@ -11,30 +11,46 @@ body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .server-views,
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .v51-single-title{
   display:none!important;
 }
-body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"].v54-configs-open .server-tabs{
-  display:flex!important;
+body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .v54-v2ray-groups{
+  display:grid!important;gap:10px;margin:0 12px 14px;
 }
-body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"].v54-configs-open .server-views{
-  display:grid!important;
+body.v54-v2ray-restore .v54-v2ray-server{
+  border:1px solid var(--line);border-radius:14px;background:var(--surface2);overflow:hidden;
 }
-body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"].v54-configs-open .v51-single-title{
-  display:block!important;
+body.v54-v2ray-restore .v54-v2ray-server-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;
+  font-size:12px;font-weight:900;color:var(--text);cursor:pointer;
 }
-body.v54-v2ray-restore .v54-v2ray-config-toggle{
-  width:calc(100% - 24px);min-height:42px;margin:0 12px 12px;padding:9px 12px;
-  border:1px solid var(--line);border-radius:10px;background:var(--surface2);color:var(--text);
-  font:inherit;font-size:12px;font-weight:900;cursor:pointer;
+body.v54-v2ray-restore .v54-v2ray-server-head span:last-child{
+  color:var(--muted);font-size:10px;border:1px solid var(--line);border-radius:999px;padding:3px 8px;
 }
+body.v54-v2ray-restore .v54-v2ray-profiles{display:none;border-top:1px solid var(--line)}
+body.v54-v2ray-restore .v54-v2ray-server.open .v54-v2ray-profiles{display:grid}
+body.v54-v2ray-restore .v54-v2ray-profile{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 12px;
+  border-bottom:1px solid var(--line);background:var(--surface);
+}
+body.v54-v2ray-restore .v54-v2ray-profile:last-child{border-bottom:0}
+body.v54-v2ray-restore .v54-v2ray-profile-info{min-width:0}
+body.v54-v2ray-restore .v54-v2ray-profile-title{
+  display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:850;color:var(--text);
+}
+body.v54-v2ray-restore .v54-v2ray-profile-meta{display:block;margin-top:2px;font-size:10px;color:var(--muted)}
+body.v54-v2ray-restore .v54-v2ray-profile-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+body.v54-v2ray-restore .v54-v2ray-profile-actions button,
+body.v54-v2ray-restore .v54-v2ray-profile-actions a{
+  min-height:34px;display:inline-flex;align-items:center;justify-content:center;padding:0 9px;border:1px solid var(--line);
+  border-radius:10px;background:var(--surface2);color:var(--text);font:inherit;font-size:10px;font-weight:800;text-decoration:none;cursor:pointer;
+}
+body.v54-v2ray-restore .v54-v2ray-empty{padding:12px;color:var(--muted);font-size:11px;text-align:center}
 @media(max-width:720px){
   body.v54-v2ray-restore .protocol-choice[data-v54-v2ray-choice="1"]{
     display:grid!important;visibility:visible!important;opacity:1!important;
   }
-  body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"].v54-configs-open .server-tabs{
-    display:none!important;
-  }
-  body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"].v54-configs-open .server-views{
-    display:grid!important;grid-template-columns:1fr!important;
-  }
+  body.v54-v2ray-restore .v54-v2ray-profile{grid-template-columns:1fr}
+  body.v54-v2ray-restore .v54-v2ray-profile-actions{justify-content:stretch}
+  body.v54-v2ray-restore .v54-v2ray-profile-actions button,
+  body.v54-v2ray-restore .v54-v2ray-profile-actions a{flex:1 1 auto}
 }
 """
 
@@ -62,56 +78,146 @@ _SCRIPT = r"""
     return normalize(choice?.dataset?.protocolKey||choice?.dataset?.protocol||'');
   }
 
-  function ensureToggle(panel){
-    const views=panel.querySelector('.server-views');
-    if(!views)return;
-    let button=panel.querySelector(':scope > .v54-v2ray-config-toggle');
-    if(!button){
-      button=document.createElement('button');
-      button.type='button';
-      button.className='v54-v2ray-config-toggle';
-      button.textContent='مشاهده اتصال‌های هر سرور';
-      button.setAttribute('aria-expanded','false');
-      button.addEventListener('click',()=>{
-        const open=panel.classList.toggle('v54-configs-open');
-        button.textContent=open?'بستن اتصال‌های هر سرور':'مشاهده اتصال‌های هر سرور';
-        button.setAttribute('aria-expanded',open?'true':'false');
-      });
-      const anchor=panel.querySelector(':scope > .v52-multi-card,:scope > .v51-multi-card');
-      if(anchor)anchor.insertAdjacentElement('afterend',button);
-      else panel.querySelector('.panel-head')?.insertAdjacentElement('afterend',button);
+  function token(){
+    const match=String(window.location.pathname||'').match(/^\/v1\/connect\/([^/]+)/);
+    if(!match)return'';
+    try{return decodeURIComponent(match[1])}catch(_error){return match[1]}
+  }
+
+  function metaUrl(){
+    const value=token();
+    return value?window.location.origin+'/v1/connect/'+encodeURIComponent(value)+'/sub/meta':'';
+  }
+
+  function platform(){
+    const explicit=String(document.body?.dataset?.tpPlatform||'').trim().toLowerCase();
+    if(explicit)return explicit;
+    const ua=String(navigator.userAgent||'');
+    if(/android/i.test(ua))return'android';
+    if(/iphone|ipad|ipod/i.test(ua))return'ios';
+    return'windows';
+  }
+
+  function copy(value){
+    const raw=String(value||'');
+    if(!raw)return Promise.resolve(false);
+    if(navigator.clipboard&&window.isSecureContext){
+      return navigator.clipboard.writeText(raw).then(()=>true).catch(()=>fallbackCopy(raw));
     }
+    return Promise.resolve(fallbackCopy(raw));
+  }
+
+  function fallbackCopy(value){
+    const area=document.createElement('textarea');
+    area.value=String(value||'');area.readOnly=true;area.style.position='fixed';area.style.left='-9999px';
+    document.body.appendChild(area);area.select();let ok=false;
+    try{ok=document.execCommand('copy')}catch(_error){}
+    area.remove();return ok;
+  }
+
+  function notify(message){
+    const toast=document.getElementById('toast');
+    if(!toast)return;
+    toast.textContent=message;toast.classList.add('show');
+    clearTimeout(window.__tpV54Toast);window.__tpV54Toast=setTimeout(()=>toast.classList.remove('show'),1500);
+  }
+
+  function el(tag,className,text){
+    const node=document.createElement(tag);
+    if(className)node.className=className;
+    if(text!==undefined)node.textContent=String(text);
+    return node;
+  }
+
+  function addProfileAction(actions,uri){
+    const p=platform();
+    if(p==='android'){
+      const send=el('a','', 'ارسال به v2rayNG');
+      send.href='v2rayng://install-config?url='+encodeURIComponent(uri);
+      send.rel='noopener noreferrer';actions.appendChild(send);
+    }else if(p==='ios'){
+      const send=el('a','', 'ارسال به V2Box');
+      send.href=uri;send.rel='noopener noreferrer';actions.appendChild(send);
+    }
+    const button=el('button','', 'کپی کانفیگ');
+    button.type='button';
+    button.addEventListener('click',async()=>notify(await copy(uri)?'کانفیگ کپی شد ✓':'کپی انجام نشد'));
+    actions.appendChild(button);
+  }
+
+  function profileRow(profile,index){
+    const row=el('div','v54-v2ray-profile');
+    const info=el('div','v54-v2ray-profile-info');
+    info.appendChild(el('b','v54-v2ray-profile-title',String(profile?.title||profile?.id||('Config '+(index+1)))));
+    const metadata=[profile?.transport,profile?.security].map(v=>String(v||'').trim()).filter(Boolean).join(' · ');
+    info.appendChild(el('small','v54-v2ray-profile-meta',metadata||'V2Ray / Xray'));
+    const actions=el('div','v54-v2ray-profile-actions');
+    const uri=String(profile?.uri||'').trim();
+    if(uri)addProfileAction(actions,uri);
+    row.append(info,actions);return row;
+  }
+
+  function serverCard(server,index){
+    const card=el('section','v54-v2ray-server');
+    const head=el('button','v54-v2ray-server-head');head.type='button';
+    const profiles=Array.isArray(server?.profiles)?server.profiles:[];
+    head.append(el('span','',String(server?.server||('Server '+(index+1)))),el('span','',String(profiles.length||server?.profile_count||0)+' کانفیگ'));
+    const body=el('div','v54-v2ray-profiles');
+    profiles.forEach((profile,profileIndex)=>body.appendChild(profileRow(profile,profileIndex)));
+    head.addEventListener('click',()=>card.classList.toggle('open'));
+    card.append(head,body);return card;
+  }
+
+  async function ensureGroups(panel){
+    if(panel.dataset.v54GroupsLoaded==='1'||panel.dataset.v54GroupsLoading==='1')return;
+    const anchor=panel.querySelector(':scope > .v52-multi-card,:scope > .v51-multi-card');
+    if(!anchor)return;
+    let holder=panel.querySelector(':scope > .v54-v2ray-groups');
+    if(!holder){holder=el('div','v54-v2ray-groups');anchor.insertAdjacentElement('afterend',holder)}
+    panel.dataset.v54GroupsLoading='1';
+    try{
+      const url=metaUrl();if(!url)throw new Error('no meta url');
+      const response=await fetch(url,{cache:'no-store',headers:{Accept:'application/json'}});
+      if(!response.ok)throw new Error('meta '+response.status);
+      const payload=await response.json();
+      const servers=Array.isArray(payload?.servers)?payload.servers:[];
+      holder.replaceChildren();
+      if(!servers.length){holder.appendChild(el('div','v54-v2ray-empty','کانفیگ سرورها در دسترس نیست'))}
+      else servers.forEach((server,index)=>holder.appendChild(serverCard(server,index)));
+      panel.dataset.v54GroupsLoaded='1';
+    }catch(_error){
+      holder.replaceChildren(el('div','v54-v2ray-empty','نمایش کانفیگ‌های هر سرور در دسترس نیست'));
+    }finally{delete panel.dataset.v54GroupsLoading}
+  }
+
+  function retireLegacyStandalone(){
+    document.querySelectorAll('.multi-link-card').forEach(card=>{
+      const text=String(card.textContent||'').toLowerCase();
+      if(text.includes('v2ray')||text.includes('xray'))card.remove();
+    });
   }
 
   function apply(){
     document.body.classList.add('v54-v2ray-restore');
+    retireLegacyStandalone();
     document.querySelectorAll('.protocol-panel').forEach(panel=>{
       if(panelKey(panel)!=='v2ray')return;
       panel.dataset.v54V2ray='1';
       const choice=choiceFor(panel);
       if(choice){
-        choice.dataset.v54V2rayChoice='1';
-        choice.hidden=false;
-        choice.removeAttribute('aria-hidden');
-        choice.classList.add('v40-real-protocol');
-        choice.dataset.v51Filtered='0';
+        choice.dataset.v54V2rayChoice='1';choice.hidden=false;choice.removeAttribute('aria-hidden');
+        choice.classList.add('v40-real-protocol');choice.dataset.v51Filtered='0';
       }
       if(panel.querySelector('.server-view')){
-        panel.classList.add('v24-canonical-panel');
-        panel.classList.remove('v24-empty');
+        panel.classList.add('v24-canonical-panel');panel.classList.remove('v24-empty');
       }
-      ensureToggle(panel);
+      panel.querySelectorAll(':scope > .v54-v2ray-config-toggle').forEach(node=>node.remove());
+      ensureGroups(panel);
     });
   }
 
-  apply();
-  window.setTimeout(apply,0);
-  window.setTimeout(apply,180);
-  window.setTimeout(apply,650);
-  window.setTimeout(apply,1500);
-  window.addEventListener('resize',()=>{
-    clearTimeout(timer);timer=window.setTimeout(apply,180);
-  },{passive:true});
+  apply();window.setTimeout(apply,0);window.setTimeout(apply,180);window.setTimeout(apply,650);window.setTimeout(apply,1500);
+  window.addEventListener('resize',()=>{clearTimeout(timer);timer=window.setTimeout(apply,180)},{passive:true});
 })();
 </script>
 """
@@ -124,7 +230,7 @@ _V51_MULTI_NEW = "return window.location.origin+'/v1/connect/'+encodeURIComponen
 
 
 def refine_public_connection_v2ray_mobile_restore_v54(source: str) -> str:
-    """Restore V2Ray mobile visibility, preserve hidden per-server profiles, and use /sub for Multi-Link."""
+    """Restore V2Ray visibility, preserve per-server profiles, and render grouped profiles under the canonical Multi-Link card."""
     source = str(source or "")
     source = source.replace(_V41_REMOVE_OLD, _V41_REMOVE_NEW)
     source = source.replace(_V51_MULTI_OLD, _V51_MULTI_NEW)
