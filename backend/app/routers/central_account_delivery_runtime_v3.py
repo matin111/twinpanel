@@ -12,6 +12,10 @@ from . import public_country_labels_runtime_v1 as _public_country_labels_runtime
 from . import reseller_bot_orders as reseller_fulfillment
 from . import runtime_endpoints as _runtime_endpoints
 from . import store as store_fulfillment
+from .account_creation_runtime_v4 import (
+    install_account_creation_runtime_v4,
+    router as _account_creation_runtime_v4_router,
+)
 from .modern_account_delivery_v1 import provision_account_v1
 from .subscription_protocol_lifecycle_v3 import router as _subscription_protocol_lifecycle_v3_router
 from .trial import router as _trial_router
@@ -65,15 +69,13 @@ def customer_delivery_item_is_usable(
 
 def install_central_account_delivery_runtime_v3() -> None:
     """Converge fulfillment on the snapshot-aware 15-protocol driver."""
-    # Trial is mounted on the same early runtime router. Importing it also
-    # registers additive plan_trial_settings/trial_claims models before
-    # Base.metadata.create_all runs in app.main.
+    # runtime_endpoints is included first by app.main. Mount the corrected account
+    # creation route and Trial API before compatibility routers so both keep exact
+    # route precedence without rewriting historical modules.
+    _runtime_endpoints.router.include_router(_account_creation_runtime_v4_router)
     _runtime_endpoints.router.include_router(_trial_router)
-
-    # runtime_endpoints is included first by app.main. Mount V3 before package
-    # initialization later appends the V2 compatibility route, giving V3 exact
-    # route precedence without rewriting the legacy Account Delivery module.
     _runtime_endpoints.router.include_router(_subscription_protocol_lifecycle_v3_router)
+    install_account_creation_runtime_v4()
     install_bounded_modern_node_provisioning_v1()
     legacy_account_delivery._nodes = subscription_snapshot_nodes
     legacy_account_delivery._delivery_item_is_usable = customer_delivery_item_is_usable
