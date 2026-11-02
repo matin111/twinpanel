@@ -1,0 +1,52 @@
+name: vendor-license-center-v1-smoke
+
+on:
+  pull_request:
+    paths:
+      - "vendor-license/**"
+      - ".github/workflows/vendor-license-center-v1-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  vendor-license:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r vendor-license/requirements.txt
+      - name: Compile service
+        run: python -m py_compile vendor-license/app.py
+      - name: Verify service imports and contracts
+        env:
+          VENDOR_LICENSE_ADMIN_TOKEN: ci-admin-token
+          VENDOR_LICENSE_DATABASE_URL: sqlite:////tmp/vendor-license-ci.db
+        run: |
+          cd vendor-license
+          python - <<'PY'
+          import app
+          paths = {route.path for route in app.app.routes}
+          required = {
+              "/health",
+              "/v1/license/activate",
+              "/v1/license/validate",
+              "/v1/license/trial",
+              "/v1/admin/plans",
+              "/v1/admin/licenses",
+              "/v1/admin/licenses/manual",
+              "/v1/admin/licenses/{license_id}/renew",
+              "/v1/admin/licenses/{license_id}/status",
+          }
+          missing = sorted(required - paths)
+          assert not missing, f"missing routes: {missing}"
+          print("vendor license routes OK")
+          PY
+      - name: Verify private key is never committed
+        run: |
+          test ! -e vendor-license/license-private.pem
+          grep -Fq 'VENDOR_LICENSE_PRIVATE_KEY_FILE' vendor-license/app.py
+          grep -Fq 'VENDOR_LICENSE_ADMIN_TOKEN' vendor-license/app.py
