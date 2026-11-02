@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/twinpanel-banner.svg" alt="TwinPanel — Self-hosted VPN Control Plane" width="100%" />
+  <img src="docs/assets/twinpanel-banner-approved.jpg" alt="TwinPanel — Self-hosted VPN Control Plane" width="100%" />
 </p>
 
 <p align="center">
@@ -452,7 +452,7 @@ The installer prepares PostgreSQL, Redis, Python, Node.js, Nginx and systemd ser
 ---
 
 <p align="center">
-  <img src="docs/assets/twinpanel-logo.svg" alt="TwinPanel logo" width="86" />
+  <img src="docs/assets/twinpanel-logo-original.png" alt="TwinPanel logo" width="86" />
 </p>
 
 <p align="center"><strong>TwinPanel</strong><br/>Sales. Control. Connect. Operate.</p>
