@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.499",
+  "version": "1.1.0-rc.500",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T08:29:49Z",
+  "released_at": "2026-11-02T08:41:25Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "53d1f566517c1e1ac3020d387f5d2f7f97081a83",
+  "source_sha": "7f5c34ecdc0e23d9cf2a0275bfcdec331ad9ce5e",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.499/twinpanel-1.1.0-rc.499-linux-x86_64.tar.gz",
-    "sha256": "4d83e5f1f12683e4685850147a7579a8b91e15ba7e372f7b281aa63ec1acdc34",
-    "size_bytes": 25321992
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.500/twinpanel-1.1.0-rc.500-linux-x86_64.tar.gz",
+    "sha256": "96fe8a646e3d406e953aad4c47a4c50e5801b4fd2180cb90de5b1cf2af9a25ee",
+    "size_bytes": 25326083
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.499 مسیر واقعی V30 Multi-Link را برای Karing اصلاح می‌کند. /sub/{protocol} همچنان یک Subscription استاندارد واحد شامل همه نودهای همان پروتکل است؛ هر کانفیگ داخل Feed نام username-node-protocol را حفظ می‌کند و نام خود پروفایل از Profile-Title برابر username-protocol گرفته می‌شود. دکمه واقعی V30 اکنون Deep Link رسمی Karing را با پارامتر بیرونی &name=<username-protocol> می‌سازد؛ همان پارامتری که SchemeHandler خود Karing مستقیماً به فیلد Remarks می‌دهد. این تغییر فقط Import/Presentation را اصلاح می‌کند و Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting و Quota تغییری نکرده‌اند. Source روی SHA immutable 53d1f566517c1e1ac3020d387f5d2f7f97081a83 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.499 fixes the real V30 Multi-Link path for Karing. /sub/{protocol} remains one standard subscription containing all nodes for that protocol; each config in the feed keeps the username-node-protocol name while the profile identity comes from Profile-Title as username-protocol. The real V30 action now builds Karing's official deep link with the outer &name=<username-protocol> parameter, which Karing's own SchemeHandler passes directly to the Remarks field. This change is limited to import/presentation; provisioning, credentials, tunnel dataplane, routing, firewall, accounting, and quota are unchanged. Source is pinned to immutable SHA 53d1f566517c1e1ac3020d387f5d2f7f97081a83."
+    "fa": "TwinPanel 1.1.0-rc.500 دو بهبود عملیاتی را منتشر می‌کند: نمودار درآمد داشبورد مدیریت اکنون همان داده مرکزی Sales Analytics را مصرف می‌کند و فروش اشتراک را با خط بنفش و شارژ کیف پول تأییدشده را با خط سبز به‌صورت جدا نمایش می‌دهد؛ همچنین updater بعد از موفقیت کامل Activation و Health، Releaseهای قدیمی را به‌صورت امن prune می‌کند و نسخه فعال و هدف rollback را همیشه محافظت می‌کند تا /opt/twinpanel/releases بدون محدودیت رشد نکند. منطق پرداخت، تأیید شارژ کیف پول، Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting و Quota تغییری نکرده‌اند. Source روی SHA immutable 7f5c34ecdc0e23d9cf2a0275bfcdec331ad9ce5e قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.500 ships two operational improvements: the admin dashboard revenue chart now consumes the same central Sales Analytics data and displays subscription sales in purple and approved wallet top-ups in green as separate series; the updater also prunes stale release directories only after successful activation and health verification, while always protecting the active release and rollback target so /opt/twinpanel/releases cannot grow without bound. Payment approval, wallet crediting, provisioning, credentials, tunnel dataplane, routing, firewall, accounting, and quota behavior are unchanged. Source is pinned to immutable SHA 7f5c34ecdc0e23d9cf2a0275bfcdec331ad9ce5e."
   }
 }
