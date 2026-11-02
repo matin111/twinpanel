@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.491",
-  "source_sha": "c9b65dea27fa6947e54f34980fcebb2c86f3e9c8",
+  "version": "1.1.0-rc.492",
+  "source_sha": "7bcf62d289b6fdf5f468cfdaadaf8906ac181128",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.491 شامل اصلاح عنوان canonical پروفایل Karing/Hiddify و رفع خطای اعتبارسنجی قیمت پلن شارژ حجم نمایندگی است. در فرم /admin/reseller-traffic-plans مبنای step قیمت از 1 به 1000 هم‌تراز شد تا مبالغ رُند مثل 2,400,000 تومان بدون پیشنهاد مقادیر ...001 معتبر باشند. Backend و مدل integer تومان، حسابداری نماینده، موجودی حجم و مسیر خرید تغییری نکرده‌اند. Source روی SHA immutable c9b65dea27fa6947e54f34980fcebb2c86f3e9c8 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.491 includes the canonical Karing/Hiddify profile-title fix and fixes reseller traffic recharge plan price validation. The /admin/reseller-traffic-plans price input now aligns its 1000-toman step to a 1000 minimum, so round amounts such as 2,400,000 are valid instead of suggesting values ending in ...001. Backend integer-toman semantics, reseller accounting, traffic balances, and purchase flows are unchanged. Source is pinned to immutable SHA c9b65dea27fa6947e54f34980fcebb2c86f3e9c8."
+    "fa": "TwinPanel 1.1.0-rc.492 نمایش رسید و اطلاعات پرداخت شارژ کیف پول را در صفحه مدیریت پرداخت‌ها اصلاح می‌کند. ادمین قبل از تأیید می‌تواند کد رهگیری کامل یا TXID را ببیند و برای شارژ کیف پول نیز دکمه مشاهده رسید را باز کند. شمارنده رسیدهای جدید، رسیدهای کیف پول را هم حساب می‌کند. منطق افزایش موجودی، تأیید/رد، حریم نمایندگی، Provisioning و state transitionهای پرداخت تغییری نکرده‌اند. Source روی SHA immutable 7bcf62d289b6fdf5f468cfdaadaf8906ac181128 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.492 fixes wallet top-up payment evidence in the admin payments review page. Admins can see the full tracking code or TXID before approval, open wallet top-up receipts using the existing admin-safe receipt endpoint, and wallet receipts are included in the new-receipts counter. Wallet crediting, approval/rejection rules, reseller privacy, provisioning, and payment state transitions are unchanged. Source is pinned to immutable SHA 7bcf62d289b6fdf5f468cfdaadaf8906ac181128."
   }
 }
