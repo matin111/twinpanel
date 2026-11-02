@@ -8,7 +8,9 @@ _CSS = r"""
 /* TWINPANEL_PUBLIC_CONNECT_V2RAY_HUBV5_PANEL_HEAD_V62 */
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .server-views,
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .v51-single-title,
-body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .v57-v2ray-server-tabs{
+body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .v57-v2ray-server-tabs,
+body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .v38-server-list-title,
+body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .tp-v41-profile-toggle{
   display:none!important;
 }
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .protocol-panel-head .server-tabs,
@@ -307,7 +309,7 @@ _SCRIPT = r"""
       if(panel.querySelector('.server-view')){
         panel.classList.add('v24-canonical-panel');panel.classList.remove('v24-empty');
       }
-      panel.querySelectorAll(':scope > .v54-v2ray-config-toggle,:scope > .v57-v2ray-server-tabs').forEach(node=>node.remove());
+      panel.querySelectorAll(':scope > .v54-v2ray-config-toggle,:scope > .v57-v2ray-server-tabs,:scope > .v38-server-list-title,:scope > .tp-v41-profile-toggle').forEach(node=>node.remove());
       ensureGroups(panel);
     });
   }
