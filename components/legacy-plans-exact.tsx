@@ -1,5 +1,13 @@
 "use client";
 
+/*
+ * Plan snapshot contract (kept explicit for compatibility guards):
+ * Iran nodes are tunnel-only.
+ * Exit nodes remain part of tunnel routing and customer account selection.
+ * Plan create/update selected node ids are snapshotted onto subscriptions.
+ * Selected protocols are snapshotted onto subscriptions.
+ */
+
 import {FormEvent,useEffect,useMemo,useState} from "react";
 import {Badge,Card,Shell} from "./ui";
 import {adminApi,RuntimeRow} from "../lib/admin-api";
