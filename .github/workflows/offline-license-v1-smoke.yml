@@ -27,8 +27,7 @@ jobs:
       - name: Compile license runtime
         run: python -m py_compile backend/app/system_release.py
       - name: Run resilience tests
-        working-directory: backend
-        run: pytest -q tests/test_license_resilience.py
+        run: PYTHONPATH=backend pytest -q backend/tests/test_license_resilience.py
       - name: Verify offline-first contract
         run: |
           grep -Fq 'TWINPANEL_LICENSE_IR_API_URL' backend/app/system_release.py
