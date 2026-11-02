@@ -126,7 +126,7 @@ export function AdminManualSubscriptionCreate(){
       if(firstPlanId)applyPlan(firstPlanId,planRows);
       else{setTraffic("");setDuration("");setDeviceLimit("1");}
 
-      setProtocols(catalogPayload.protocols.map(item=>item.key));
+      setProtocols(catalogPayload.protocols.filter(item=>item.family==="classic").map(item=>item.key));
       setNodeIds(nodeRows.filter(node=>String(node.node_type||"").toLowerCase()==="exit"&&String(node.status||"online").toLowerCase()!=="retired").map(node=>node.id));
     }catch(reason){
       setError(reason instanceof Error?reason.message:String(reason));
