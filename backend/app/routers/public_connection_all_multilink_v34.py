@@ -7,6 +7,7 @@ import json
 import re
 import zipfile
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse, Response
@@ -16,7 +17,12 @@ from ..database import get_db
 from .account_delivery import _public_payload, _subscription_from_share_token
 from .public_connection_modern_delivery_v13 import _items, _sudoku_uri
 from .public_connection_modern_import_v15 import _outbound, standard_share_uri
-from .public_connection_modern_names_v14 import _profile_name
+from .public_connection_modern_names_v14 import (
+    _account_name,
+    _named_mieru_karing_yaml,
+    _named_sudoku_uri,
+    _profile_name,
+)
 from .public_connection_modern_delivery_v16 import _resolve_delivery_content
 
 
@@ -126,6 +132,14 @@ def _item_name(item: dict[str, Any], index: int) -> str:
     ).strip()
 
 
+def _named_uri(uri: str, profile: str) -> str:
+    uri = str(uri or "").strip()
+    if "://" not in uri:
+        return ""
+    base = uri.split("#", 1)[0]
+    return base + "#" + quote(str(profile or "user"), safe="")
+
+
 def _share_uri(sub: Any, protocol: str, item: dict[str, Any]) -> str:
     protocol = _normalize(protocol)
     profile = _profile_name(sub, protocol, item)
@@ -136,9 +150,13 @@ def _share_uri(sub: Any, protocol: str, item: dict[str, Any]) -> str:
             return generated
 
     uri = str(item.get("uri") or "").strip()
-    if protocol == "sudoku" and not uri:
-        uri = str(_sudoku_uri(item) or "").strip()
-    return uri if "://" in uri else ""
+    if protocol == "sudoku":
+        named = _named_sudoku_uri(item, profile)
+        if named and "://" in named:
+            return named
+        if not uri:
+            uri = str(_sudoku_uri(item) or "").strip()
+    return _named_uri(uri, profile) if "://" in uri else ""
 
 
 def _all_share_uris(sub: Any, protocol: str, items: list[dict[str, Any]]) -> list[str]:
@@ -155,16 +173,59 @@ def _all_share_uris(sub: Any, protocol: str, items: list[dict[str, Any]]) -> lis
     return rows
 
 
-def _all_outbounds(protocol: str, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _all_outbounds(sub: Any, protocol: str, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for index, item in enumerate(items):
+    for item in items:
         outbound = _outbound(item)
         if not isinstance(outbound, dict):
             return []
         node = copy.deepcopy(outbound)
-        node["tag"] = _item_name(item, index)
+        node["tag"] = _profile_name(sub, protocol, item)
         rows.append(node)
     return rows
+
+
+def _mieru_multi_karing_yaml(sub: Any, items: list[dict[str, Any]]) -> str:
+    proxy_blocks: list[list[str]] = []
+    names: list[str] = []
+    for item in items:
+        profile = _profile_name(sub, "mieru", item)
+        content = _named_mieru_karing_yaml(item, profile)
+        if not content:
+            return ""
+        lines = content.splitlines()
+        try:
+            start = lines.index("proxies:") + 1
+            end = lines.index("proxy-groups:")
+        except ValueError:
+            return ""
+        block = lines[start:end]
+        if not block:
+            return ""
+        proxy_blocks.append(block)
+        names.append(profile)
+
+    if not proxy_blocks:
+        return ""
+
+    q = lambda value: json.dumps(str(value), ensure_ascii=False)
+    group = _account_name(sub)
+    rows = ["proxies:"]
+    for block in proxy_blocks:
+        rows.extend(block)
+    rows.extend([
+        "proxy-groups:",
+        f"  - name: {q(group)}",
+        "    type: select",
+        "    proxies:",
+    ])
+    rows.extend(f"      - {q(name)}" for name in names)
+    rows.extend([
+        "rules:",
+        f"  - MATCH,{group}",
+        "",
+    ])
+    return "\n".join(rows)
 
 
 def _bundle_item(
@@ -239,17 +300,22 @@ def _delivery(
     if uris:
         return "uri", len(uris), sub, items, uris
 
-    outbounds = _all_outbounds(protocol, items)
+    if protocol == "mieru":
+        karing_yaml = _mieru_multi_karing_yaml(sub, items)
+        if karing_yaml:
+            return "karing", len(items), sub, items, karing_yaml
+
+    outbounds = _all_outbounds(sub, protocol, items)
     if outbounds:
         return "singbox", len(outbounds), sub, items, outbounds
 
     return "bundle", len(items), sub, items, None
 
 
-def _headers(protocol: str, kind: str, count: int) -> dict[str, str]:
+def _headers(sub: Any, protocol: str, kind: str, count: int) -> dict[str, str]:
     return {
         "Cache-Control": "no-store",
-        "Profile-Title": f"TwinPanel-{protocol}",
+        "Profile-Title": _account_name(sub),
         "Profile-Update-Interval": "12",
         "X-TwinPanel-Protocol": protocol,
         "X-TwinPanel-Node-Count": str(count),
@@ -265,7 +331,7 @@ def public_protocol_multi_meta_v34(
     db: Session = Depends(get_db),
 ):
     protocol = _normalize(protocol)
-    kind, count, _sub, _items_list, _payload = _delivery(token, protocol, db)
+    kind, count, sub, _items_list, _payload = _delivery(token, protocol, db)
     return JSONResponse(
         {
             "protocol": protocol,
@@ -273,10 +339,10 @@ def public_protocol_multi_meta_v34(
             "kind": kind,
             "node_count": count,
             "client": PROTOCOL_CLIENT.get(protocol),
-            "can_copy_as_subscription": kind in {"uri", "singbox"},
+            "can_copy_as_subscription": kind in {"uri", "singbox", "karing"},
             "is_bundle": kind == "bundle",
         },
-        headers=_headers(protocol, kind, count),
+        headers=_headers(sub, protocol, kind, count),
     )
 
 
@@ -288,13 +354,17 @@ def public_protocol_multi_v34(
 ):
     protocol = _normalize(protocol)
     kind, count, sub, items, payload = _delivery(token, protocol, db)
-    headers = _headers(protocol, kind, count)
+    headers = _headers(sub, protocol, kind, count)
 
     if kind == "uri":
         raw = "\n".join(payload).encode("utf-8")
         content = base64.b64encode(raw).decode("ascii")
         headers["Content-Disposition"] = f'inline; filename="twinpanel-{protocol}-subscription.txt"'
         return Response(content=content, media_type="text/plain; charset=utf-8", headers=headers)
+
+    if kind == "karing":
+        headers["Content-Disposition"] = f'inline; filename="{_safe_name(_account_name(sub), "user")}-{protocol}.yaml"'
+        return Response(content=str(payload), media_type="text/yaml; charset=utf-8", headers=headers)
 
     if kind == "singbox":
         headers["Content-Disposition"] = f'inline; filename="twinpanel-{protocol}-singbox.json"'
