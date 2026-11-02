@@ -132,6 +132,11 @@ def _item_name(item: dict[str, Any], index: int) -> str:
     ).strip()
 
 
+def _multilink_name(sub: Any, protocol: str) -> str:
+    protocol_name = _safe_name(_normalize(protocol), "vpn")
+    return f"{_account_name(sub)}-{protocol_name}"
+
+
 def _named_uri(uri: str, profile: str) -> str:
     uri = str(uri or "").strip()
     if "://" not in uri:
@@ -142,7 +147,7 @@ def _named_uri(uri: str, profile: str) -> str:
 
 def _share_uri(sub: Any, protocol: str, item: dict[str, Any]) -> str:
     protocol = _normalize(protocol)
-    profile = _profile_name(sub, protocol, item)
+    profile = _multilink_name(sub, protocol)
 
     if protocol in {"hysteria2", "tuic", "anytls"}:
         generated = str(standard_share_uri(protocol, item, profile) or "").strip()
@@ -209,7 +214,7 @@ def _mieru_multi_karing_yaml(sub: Any, items: list[dict[str, Any]]) -> str:
         return ""
 
     q = lambda value: json.dumps(str(value), ensure_ascii=False)
-    group = _account_name(sub)
+    group = _multilink_name(sub, "mieru")
     rows = ["proxies:"]
     for block in proxy_blocks:
         rows.extend(block)
@@ -315,7 +320,7 @@ def _delivery(
 def _headers(sub: Any, protocol: str, kind: str, count: int) -> dict[str, str]:
     return {
         "Cache-Control": "no-store",
-        "Profile-Title": _account_name(sub),
+        "Profile-Title": _multilink_name(sub, protocol),
         "Profile-Update-Interval": "12",
         "X-TwinPanel-Protocol": protocol,
         "X-TwinPanel-Node-Count": str(count),
@@ -363,7 +368,7 @@ def public_protocol_multi_v34(
         return Response(content=content, media_type="text/plain; charset=utf-8", headers=headers)
 
     if kind == "karing":
-        headers["Content-Disposition"] = f'inline; filename="{_safe_name(_account_name(sub), "user")}-{protocol}.yaml"'
+        headers["Content-Disposition"] = f'inline; filename="{_safe_name(_multilink_name(sub, protocol), "user-vpn")}.yaml"'
         return Response(content=str(payload), media_type="text/yaml; charset=utf-8", headers=headers)
 
     if kind == "singbox":
