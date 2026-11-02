@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.496",
+  "version": "1.1.0-rc.497",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T06:34:34Z",
+  "released_at": "2026-11-02T07:26:44Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7e5921601397e7489e437ff998cd8d2fac268bf4",
+  "source_sha": "f00419f45fad9148d1df119874c97bbf06b6ad84",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.496/twinpanel-1.1.0-rc.496-linux-x86_64.tar.gz",
-    "sha256": "9ac7fdb9bd2e1901a5e2d26dc47e4e384b0eae7022381775c4f990c6c4a8ff7c",
-    "size_bytes": 25317392
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.497/twinpanel-1.1.0-rc.497-linux-x86_64.tar.gz",
+    "sha256": "2ff1e9d2fc4ee9387653f8ab7ff9822b294440911b08a8c84e4c6dcd4ccc40cc",
+    "size_bytes": 25318453
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.496 مشکل ملاحظات Karing در کارت واقعی High Availability صفحه Public Connect را اصلاح می‌کند. اکشن نهایی V38 اکنون قبل از بازشدن Karing پارامتر name را صریحاً به شکل نام کاربری/سرویس + پروتکل می‌سازد؛ برای نمونه MSABT122138-tuic. بنابراین Karing دیگر دامنه اشتراک مثل sub.movifilm.sbs را به‌عنوان ملاحظات جایگزین نمی‌کند. این تغییر فقط لایه Import/Presentation را اصلاح می‌کند و Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting و Quota تغییری نکرده‌اند. Source روی SHA immutable 7e5921601397e7489e437ff998cd8d2fac268bf4 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.496 fixes Karing remarks on the actual High Availability action used by the live Public Connect page. The final V38 action now explicitly sets the Karing name parameter to account/service username plus protocol before opening the app, for example MSABT122138-tuic, preventing Karing from falling back to the subscription host such as sub.movifilm.sbs. This change is limited to import/presentation; provisioning, credentials, tunnel dataplane, routing, firewall, accounting, and quota are unchanged. Source is pinned to immutable SHA 7e5921601397e7489e437ff998cd8d2fac268bf4."
+    "fa": "TwinPanel 1.1.0-rc.497 مشکل ملاحظات Karing برای Multi-Link واقعی را بر اساس رفتار خود Karing اصلاح می‌کند. Karing نام پروفایل را از URL داخلی اشتراک می‌خواند و در نبود fragment/remarks/name به host برمی‌گردد؛ بنابراین این نسخه name=<username-protocol> را داخل خود URL داخلی /sub/{protocol} قرار می‌دهد و سپس همان URL را در karing://install-config کدگذاری می‌کند. نام بیرونی Karing نیز برای سازگاری حفظ شده است. این تغییر فقط لایه Import/Presentation را اصلاح می‌کند و Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting و Quota تغییری نکرده‌اند. Source روی SHA immutable f00419f45fad9148d1df119874c97bbf06b6ad84 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.497 fixes Karing remarks for the real Multi-Link flow according to Karing's own behavior. Karing derives the profile remark from the inner subscription URL and falls back to the host when fragment/remarks/name are absent, so this release places name=<username-protocol> directly on the inner /sub/{protocol} URL before encoding it into karing://install-config. The outer Karing name is also retained for compatibility. This change is limited to import/presentation; provisioning, credentials, tunnel dataplane, routing, firewall, accounting, and quota are unchanged. Source is pinned to immutable SHA f00419f45fad9148d1df119874c97bbf06b6ad84."
   }
 }
