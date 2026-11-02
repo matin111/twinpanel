@@ -9,6 +9,7 @@ import {useI18n} from "../lib/i18n";
 type StorePlan={
   id:number;
   name:string;
+  description?:string|null;
   duration_days:number;
   traffic_gb:number;
   device_limit:number;
@@ -23,13 +24,7 @@ type StorePlan={
 
 type StoreOrder={id:number};
 
-const protocols=(plan:StorePlan)=>[
-  plan.enable_cisco&&"Cisco / OpenConnect",
-  plan.enable_openvpn&&"OpenVPN",
-  plan.enable_wireguard&&"WireGuard",
-  plan.enable_l2tp&&"L2TP / IPsec",
-  plan.enable_v2ray&&"V2Ray / Xray"
-].filter(Boolean) as string[];
+const planDeviceLabels=["Android","iPhone","Windows","Mac","Linux"] as const;
 
 async function api<T>(path:string,init:RequestInit={},token?:string|null):Promise<T>{
   const headers=new Headers(init.headers);
@@ -89,6 +84,8 @@ function BuyBody(){
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));setBusy(null);}
   };
 
+  const featuredPlanIndex=plans.length>2?Math.floor(plans.length/2):0;
+
   return <div className="page customer-runtime customer-buy-rich">
     <div className="customer-buy-rich-head">
       <div><span>◇</span><h1>{pick("خرید اشتراک","Buy subscription")}</h1></div>
@@ -101,14 +98,17 @@ function BuyBody(){
 
     {!loading&&plans.length>0&&<div className={`customer-buy-rich-grid ${plans.length===1?"single":""}`}>
       {plans.map((plan,index)=>{
-        const enabled=protocols(plan);
+        const featured=index===featuredPlanIndex;
         const free=Number(plan.price_toman||0)===0;
-        return <article className="customer-buy-rich-card" key={plan.id}>
-          <div className="customer-buy-rich-glow"/>
+        return <article className={`customer-buy-rich-card ${featured?"featured":""}`} key={plan.id}>
+          {featured&&<span className="customer-buy-rich-ribbon">{pick("محبوب‌ترین انتخاب","Popular choice")}</span>}
+
           <div className="customer-buy-rich-top">
-            <div><small>#{plan.id}</small><h2>{plan.name}</h2></div>
-            {index===0&&plans.length>1?<Badge tone="violet">{pick("پیشنهادی","Popular")}</Badge>:null}
+            <div><small>{pick("اشتراک VPN","VPN subscription")}</small><h2>{plan.name}</h2></div>
+            <span className="customer-buy-rich-status">{pick("فعال","Active")}</span>
           </div>
+
+          {plan.description&&<p className="customer-buy-rich-desc">{plan.description}</p>}
 
           <div className="customer-buy-rich-price">
             <strong>{free?pick("رایگان","Free"):Number(plan.price_toman).toLocaleString("fa-IR")}</strong>
@@ -116,15 +116,21 @@ function BuyBody(){
           </div>
 
           <div className="customer-buy-rich-facts">
-            <div><i>◷</i><b>{plan.duration_days.toLocaleString("fa-IR")}</b><small>{pick("روز","Days")}</small></div>
-            <div><i>◉</i><b>{plan.traffic_gb.toLocaleString("fa-IR")}</b><small>GB</small></div>
-            <div><i>⌁</i><b>{plan.device_limit.toLocaleString("fa-IR")}</b><small>{pick("دستگاه","Devices")}</small></div>
+            <div><b>{plan.traffic_gb.toLocaleString("fa-IR")} GB</b><small>{pick("حجم","Traffic")}</small></div>
+            <div><b>{plan.duration_days.toLocaleString("fa-IR")}</b><small>{pick("روز","days")}</small></div>
+            <div><b>{plan.device_limit.toLocaleString("fa-IR")}</b><small>{pick("دستگاه","devices")}</small></div>
           </div>
 
-          <div className="customer-buy-rich-protocols">{enabled.map(item=><span key={item}>✓ {item}</span>)}</div>
+          <ul className="customer-buy-rich-list">
+            <li><i>✓</i>{pick("تحویل سریع پس از پرداخت","Fast delivery after payment")}</li>
+            <li><i>✓</i>{pick("قابل استفاده روی دستگاه‌های مختلف","Works across multiple devices")}</li>
+            <li><i>✓</i>{pick("مدیریت اشتراک از پنل کاربری","Manage the subscription from your panel")}</li>
+          </ul>
+
+          <div className="customer-buy-rich-devices">{planDeviceLabels.map(device=><span key={device}>{device}</span>)}</div>
 
           <button type="button" className="customer-buy-rich-action" disabled={busy===plan.id} onClick={()=>void buy(plan)}>
-            {busy===plan.id?"…":pick("خرید و پرداخت","Buy & pay")}
+            {busy===plan.id?pick("در حال ثبت سفارش...","Creating order..."):pick("خرید اشتراک","Buy subscription")}<span>←</span>
           </button>
         </article>;
       })}
