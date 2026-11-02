@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.493",
+  "version": "1.1.0-rc.494",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T05:53:30Z",
+  "released_at": "2026-11-02T06:13:32Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "858a91ac8b3b8d2ac06e9a41a26b3aececf19b52",
+  "source_sha": "190f74fe38f896a8216ce61a5d52152ad7fe85c4",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.493/twinpanel-1.1.0-rc.493-linux-x86_64.tar.gz",
-    "sha256": "6d7f692f8b3076b3300f9387bfffbfbb8fb55cc2a0d27478cca52ad7b1e07236",
-    "size_bytes": 25318509
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.494/twinpanel-1.1.0-rc.494-linux-x86_64.tar.gz",
+    "sha256": "f62ea9fcca29c13c40eb4b249991ead7b3a07896575cc18ff02b3db96352b174",
+    "size_bytes": 25316589
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.493 دکمه‌های Multi-Link و هویت برنامه مقصد را یک‌دست می‌کند. Actionهای دارای Deep Link با قالب «افزودن به <برنامه>» نمایش داده می‌شوند، متن‌های کپی/دانلود بین کارت‌ها هماهنگ شده‌اند و V2Ray/Xray دیگر به Karing/Hiddify نسبت داده نمی‌شود: روی دسکتاپ v2rayN، روی Android v2rayNG و روی iOS V2Box نمایش داده می‌شود. این تغییر فقط لایه ارائه و انتخاب کلاینت را اصلاح می‌کند و Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting و Quota تغییری نکرده‌اند. Source روی SHA immutable 858a91ac8b3b8d2ac06e9a41a26b3aececf19b52 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.493 unifies Multi-Link button wording and destination client identity. Deep-link actions now use an explicit Add to <client> label, copy/download wording is consistent across cards, and V2Ray/Xray is no longer mislabeled as Karing/Hiddify: desktop uses v2rayN, Android uses v2rayNG, and iOS uses V2Box. This release changes presentation and client selection only; provisioning, credentials, tunnel dataplane, routing, firewall, accounting, and quota behavior are unchanged. Source is pinned to immutable SHA 858a91ac8b3b8d2ac06e9a41a26b3aececf19b52."
+    "fa": "TwinPanel 1.1.0-rc.494 مشکل نام ملاحظات Karing برای Multi-Linkهای پروتکل را اصلاح می‌کند. مسیر /sub/{protocol} اکنون عنوان رسمی Profile-Title شامل نام کاربری و پروتکل را می‌گیرد و همان هویت را داخل URL اشتراک ارسالی به Karing قرار می‌دهد؛ در نتیجه Karing دیگر دامنه را به‌عنوان ملاحظات جایگزین نمی‌کند. کپی لینک اشتراک نیز همان URL نام‌گذاری‌شده را می‌دهد. این تغییر فقط لایه Import/Presentation را اصلاح می‌کند و Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting و Quota تغییری نکرده‌اند. Source روی SHA immutable 190f74fe38f896a8216ce61a5d52152ad7fe85c4 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.494 fixes Karing remarks for protocol Multi-Link subscriptions. The /sub/{protocol} path now reads the canonical Profile-Title (account username plus protocol) and embeds that identity in the subscription URL sent to Karing, preventing Karing from falling back to the subscription host/domain as the remarks field. Copy Subscription Link now uses the same named URL. This release changes import/presentation only; provisioning, credentials, tunnel dataplane, routing, firewall, accounting, and quota behavior are unchanged. Source is pinned to immutable SHA 190f74fe38f896a8216ce61a5d52152ad7fe85c4."
   }
 }
