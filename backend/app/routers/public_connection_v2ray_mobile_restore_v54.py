@@ -5,7 +5,7 @@ _MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_MOBILE_RESTORE_V54"
 
 
 _CSS = r"""
-/* TWINPANEL_PUBLIC_CONNECT_V2RAY_MOBILE_RESTORE_V54 */
+/* TWINPANEL_PUBLIC_CONNECT_V2RAY_MOBILE_RESTORE_V55 */
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .server-tabs,
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .server-views,
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .v51-single-title{
@@ -18,14 +18,18 @@ body.v54-v2ray-restore .v54-v2ray-server{
   border:1px solid var(--line);border-radius:14px;background:var(--surface2);overflow:hidden;
 }
 body.v54-v2ray-restore .v54-v2ray-server-head{
-  display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;
-  font-size:12px;font-weight:900;color:var(--text);cursor:pointer;
+  width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;
+  border:0;background:transparent;font-size:12px;font-weight:900;color:var(--text);cursor:pointer;text-align:right;
 }
 body.v54-v2ray-restore .v54-v2ray-server-head span:last-child{
   color:var(--muted);font-size:10px;border:1px solid var(--line);border-radius:999px;padding:3px 8px;
 }
-body.v54-v2ray-restore .v54-v2ray-profiles{display:none;border-top:1px solid var(--line)}
-body.v54-v2ray-restore .v54-v2ray-server.open .v54-v2ray-profiles{display:grid}
+body.v54-v2ray-restore .v54-v2ray-profiles{
+  display:none!important;border-top:1px solid var(--line)
+}
+body.v54-v2ray-restore .v54-v2ray-server.open > .v54-v2ray-profiles{
+  display:grid!important
+}
 body.v54-v2ray-restore .v54-v2ray-profile{
   display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px 12px;
   border-bottom:1px solid var(--line);background:var(--surface);
@@ -158,13 +162,17 @@ _SCRIPT = r"""
   }
 
   function serverCard(server,index){
-    const card=el('section','v54-v2ray-server');
-    const head=el('button','v54-v2ray-server-head');head.type='button';
     const profiles=Array.isArray(server?.profiles)?server.profiles:[];
-    head.append(el('span','',String(server?.server||('Server '+(index+1)))),el('span','',String(profiles.length||server?.profile_count||0)+' کانفیگ'));
+    if(profiles.length!==3)return null;
+    const card=el('section','v54-v2ray-server');
+    const head=el('button','v54-v2ray-server-head');head.type='button';head.setAttribute('aria-expanded','false');
+    head.append(el('span','',String(server?.server||('سرور '+(index+1)))),el('span','', '۳ کانفیگ'));
     const body=el('div','v54-v2ray-profiles');
     profiles.forEach((profile,profileIndex)=>body.appendChild(profileRow(profile,profileIndex)));
-    head.addEventListener('click',()=>card.classList.toggle('open'));
+    head.addEventListener('click',()=>{
+      const open=card.classList.toggle('open');
+      head.setAttribute('aria-expanded',open?'true':'false');
+    });
     card.append(head,body);return card;
   }
 
@@ -182,11 +190,12 @@ _SCRIPT = r"""
       const payload=await response.json();
       const servers=Array.isArray(payload?.servers)?payload.servers:[];
       holder.replaceChildren();
-      if(!servers.length){holder.appendChild(el('div','v54-v2ray-empty','کانفیگ سرورها در دسترس نیست'))}
-      else servers.forEach((server,index)=>holder.appendChild(serverCard(server,index)));
+      const cards=servers.map((server,index)=>serverCard(server,index)).filter(Boolean);
+      if(!cards.length){holder.appendChild(el('div','v54-v2ray-empty','سه کانفیگ هر سرور هنوز آماده نشده'))}
+      else cards.forEach(card=>holder.appendChild(card));
       panel.dataset.v54GroupsLoaded='1';
     }catch(_error){
-      holder.replaceChildren(el('div','v54-v2ray-empty','نمایش کانفیگ‌های هر سرور در دسترس نیست'));
+      holder.replaceChildren(el('div','v54-v2ray-empty','در حال آماده‌سازی سه کانفیگ واقعی هر سرور؛ صفحه را دوباره باز کنید'));
     }finally{delete panel.dataset.v54GroupsLoading}
   }
 
@@ -230,7 +239,7 @@ _V51_MULTI_NEW = "return window.location.origin+'/v1/connect/'+encodeURIComponen
 
 
 def refine_public_connection_v2ray_mobile_restore_v54(source: str) -> str:
-    """Restore V2Ray visibility, preserve per-server profiles, and render grouped profiles under the canonical Multi-Link card."""
+    """Restore V2Ray visibility, preserve per-server profiles, and render exact-three hidden groups under the canonical Multi-Link card."""
     source = str(source or "")
     source = source.replace(_V41_REMOVE_OLD, _V41_REMOVE_NEW)
     source = source.replace(_V51_MULTI_OLD, _V51_MULTI_NEW)
