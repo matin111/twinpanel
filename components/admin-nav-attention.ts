@@ -6,25 +6,13 @@ import {getCustomerToken} from "../lib/customer-api";
 
 const RELEASE_NOTICE_KEY="twinpanel-release-update-available-v1";
 const RELEASE_EVENT="twinpanel:release-status";
+const LICENSE_WARNING_SECONDS=3*86400;
 
-type NotificationItem={
-  route?:string|null;
-  read_at?:string|null;
-  is_read?:boolean;
-};
-
-type NotificationPayload={
-  unread_count?:number;
-  items?:unknown;
-};
-
-type SupportTicket={
-  id?:number;
-  status?:string|null;
-};
-
+type NotificationItem={route?:string|null;read_at?:string|null;is_read?:boolean};
+type NotificationPayload={unread_count?:number;items?:unknown};
+type SupportTicket={id?:number;status?:string|null};
 type PaymentReviewSummary={needs_review?:number};
-type ReleaseStatus={update_available?:boolean};
+type ReleaseStatus={update_available?:boolean;license?:{status?:string|null;seconds_remaining?:number|null}};
 
 type AttentionState={
   paymentReviewCount:number;
@@ -32,27 +20,18 @@ type AttentionState={
   notificationUnreadCount:number;
   unreadRoutes:string[];
   updateAvailable:boolean;
+  licenseExpiring:boolean;
 };
 
 function cachedUpdateAttention(){
-  try{
-    if(typeof window==="undefined")return false;
-    return window.localStorage.getItem(RELEASE_NOTICE_KEY)==="1";
-  }catch{return false;}
+  try{if(typeof window==="undefined")return false;return window.localStorage.getItem(RELEASE_NOTICE_KEY)==="1";}catch{return false;}
 }
-
-function persistUpdateAttention(value:boolean){
-  try{window.localStorage.setItem(RELEASE_NOTICE_KEY,value?"1":"0");}catch{}
-}
+function persistUpdateAttention(value:boolean){try{window.localStorage.setItem(RELEASE_NOTICE_KEY,value?"1":"0");}catch{}}
 
 async function request<T>(path:string):Promise<T>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
-  const response=await fetch(`${API_BASE}${path}`,{
-    headers:{Authorization:`Bearer ${token}`},
-    cache:"no-store",
-    signal:AbortSignal.timeout(5000),
-  });
+  const response=await fetch(`${API_BASE}${path}`,{headers:{Authorization:`Bearer ${token}`},cache:"no-store",signal:AbortSignal.timeout(5000)});
   if(!response.ok)throw new Error(`API ${response.status}`);
   return response.json() as Promise<T>;
 }
@@ -64,6 +43,14 @@ function normalizeRoute(raw:unknown):string|null{
   return `/admin/${value.replace(/^admin\//,"")}`;
 }
 
+function isLicenseExpiring(license:ReleaseStatus["license"]){
+  const status=String(license?.status||"").trim().toLowerCase();
+  const remaining=Number(license?.seconds_remaining);
+  const blocked=["trial_expired","license_expired","revoked","suspended"].includes(status);
+  if(blocked)return true;
+  return Number.isFinite(remaining)&&remaining>=0&&remaining<=LICENSE_WARNING_SECONDS;
+}
+
 export function useAdminNavAttention(_active:string){
   const [state,setState]=useState<AttentionState>(()=>({
     paymentReviewCount:0,
@@ -71,81 +58,24 @@ export function useAdminNavAttention(_active:string){
     notificationUnreadCount:0,
     unreadRoutes:[],
     updateAvailable:cachedUpdateAttention(),
+    licenseExpiring:false,
   }));
 
   useEffect(()=>{
     let alive=true;
 
-    const refreshSupport=async()=>{
-      try{
-        const rows=await request<SupportTicket[]>("/v1/admin/support/tickets?status=open");
-        if(!alive)return;
-        const count=Array.isArray(rows)?rows.filter(row=>String(row?.status||"").toLowerCase()==="open").length:0;
-        setState(current=>({...current,supportNeedsReplyCount:count}));
-      }catch{}
-    };
+    const refreshSupport=async()=>{try{const rows=await request<SupportTicket[]>("/v1/admin/support/tickets?status=open");if(!alive)return;const count=Array.isArray(rows)?rows.filter(row=>String(row?.status||"").toLowerCase()==="open").length:0;setState(current=>({...current,supportNeedsReplyCount:count}));}catch{}};
+    const refreshPayments=async()=>{try{const summary=await request<PaymentReviewSummary>("/v1/payments/admin/review-summary");if(!alive)return;setState(current=>({...current,paymentReviewCount:Math.max(0,Number(summary.needs_review)||0)}));}catch{}};
+    const refreshNotifications=async()=>{try{const payload=await request<NotificationPayload>("/v1/admin/panel-notifications");if(!alive)return;const rows=Array.isArray(payload.items)?payload.items.filter((row):row is NotificationItem=>Boolean(row&&typeof row==="object")):[];const unreadRows=rows.filter(row=>!row.is_read&&!row.read_at);const routes=Array.from(new Set(unreadRows.map(row=>normalizeRoute(row.route)).filter((route):route is string=>Boolean(route))));const unread=Number.isFinite(Number(payload.unread_count))?Math.max(0,Number(payload.unread_count)||0):unreadRows.length;setState(current=>({...current,notificationUnreadCount:unread,unreadRoutes:routes}));}catch{}};
+    const refreshRelease=async()=>{try{const release=await request<ReleaseStatus>("/v1/admin/system/release/status");if(!alive)return;const available=Boolean(release.update_available);persistUpdateAttention(available);setState(current=>({...current,updateAvailable:available,licenseExpiring:isLicenseExpiring(release.license)}));}catch{}};
+    const handleReleaseEvent=(event:Event)=>{const detail=(event as CustomEvent<{updateAvailable?:boolean}>).detail;const available=Boolean(detail?.updateAvailable);persistUpdateAttention(available);setState(current=>({...current,updateAvailable:available}));};
 
-    const refreshPayments=async()=>{
-      try{
-        const summary=await request<PaymentReviewSummary>("/v1/payments/admin/review-summary");
-        if(!alive)return;
-        setState(current=>({...current,paymentReviewCount:Math.max(0,Number(summary.needs_review)||0)}));
-      }catch{}
-    };
-
-    const refreshNotifications=async()=>{
-      try{
-        const payload=await request<NotificationPayload>("/v1/admin/panel-notifications");
-        if(!alive)return;
-        const rows=Array.isArray(payload.items)?payload.items.filter((row):row is NotificationItem=>Boolean(row&&typeof row==="object")):[];
-        const unreadRows=rows.filter(row=>!row.is_read&&!row.read_at);
-        const routes=Array.from(new Set(unreadRows.map(row=>normalizeRoute(row.route)).filter((route):route is string=>Boolean(route))));
-        const unread=Number.isFinite(Number(payload.unread_count))?Math.max(0,Number(payload.unread_count)||0):unreadRows.length;
-        setState(current=>({...current,notificationUnreadCount:unread,unreadRoutes:routes}));
-      }catch{}
-    };
-
-    const refreshRelease=async()=>{
-      try{
-        const release=await request<ReleaseStatus>("/v1/admin/system/release/status");
-        if(!alive)return;
-        const available=Boolean(release.update_available);
-        persistUpdateAttention(available);
-        setState(current=>({...current,updateAvailable:available}));
-      }catch{}
-    };
-
-    const handleReleaseEvent=(event:Event)=>{
-      const detail=(event as CustomEvent<{updateAvailable?:boolean}>).detail;
-      const available=Boolean(detail?.updateAvailable);
-      persistUpdateAttention(available);
-      setState(current=>({...current,updateAvailable:available}));
-    };
-
-    const refreshVisible=()=>{
-      if(document.visibilityState!=="visible")return;
-      void refreshSupport();
-      void refreshPayments();
-      void refreshNotifications();
-      void refreshRelease();
-    };
-
+    const refreshVisible=()=>{if(document.visibilityState!=="visible")return;void refreshSupport();void refreshPayments();void refreshNotifications();void refreshRelease();};
     refreshVisible();
 
-    const fastTimer=window.setInterval(()=>{
-      if(document.visibilityState!=="visible")return;
-      void refreshSupport();
-    },2500);
-
-    const workTimer=window.setInterval(()=>{
-      if(document.visibilityState!=="visible")return;
-      void refreshPayments();
-      void refreshNotifications();
-    },10000);
-
-    const releaseStatusTimer=window.setInterval(()=>{
-      if(document.visibilityState==="visible")void refreshRelease();
-    },30000);
+    const fastTimer=window.setInterval(()=>{if(document.visibilityState!=="visible")return;void refreshSupport();},2500);
+    const workTimer=window.setInterval(()=>{if(document.visibilityState!=="visible")return;void refreshPayments();void refreshNotifications();},10000);
+    const releaseStatusTimer=window.setInterval(()=>{if(document.visibilityState==="visible")void refreshRelease();},30000);
 
     window.addEventListener("focus",refreshVisible);
     window.addEventListener(RELEASE_EVENT,handleReleaseEvent as EventListener);
@@ -163,24 +93,22 @@ export function useAdminNavAttention(_active:string){
   },[]);
 
   const routeSet=useMemo(()=>new Set(state.unreadRoutes),[state.unreadRoutes]);
-
   const hasPathAttention=(href:string)=>{
     if(routeSet.has(href))return true;
     if(href==="/admin/payments"&&state.paymentReviewCount>0)return true;
     if(href==="/admin/support"&&state.supportNeedsReplyCount>0)return true;
     if(href==="/admin/notifications"&&state.notificationUnreadCount>0)return true;
+    if(href==="/admin/license"&&state.licenseExpiring)return true;
     return false;
   };
-
   const countForPath=(href:string)=>{
     if(href==="/admin/payments")return state.paymentReviewCount;
     if(href==="/admin/support")return state.supportNeedsReplyCount;
     if(href==="/admin/notifications")return state.notificationUnreadCount;
     return 0;
   };
-
   const groupHasAttention=(groupName:string,paths:readonly string[])=>{
-    if(groupName==="System & Maintenance"&&state.updateAvailable)return true;
+    if(groupName==="System & Maintenance"&&(state.updateAvailable||state.licenseExpiring))return true;
     return paths.some(path=>hasPathAttention(path));
   };
 
