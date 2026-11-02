@@ -527,7 +527,12 @@ def release_status(refresh_license_state: bool = False) -> dict[str, Any]:
     manifest = release_manifest()
     latest = str(manifest.get("version") or installed).strip()
 
-    license_state = validate_license() if refresh_license_state else load_license_state()
+    # A missing vendor endpoint is a setup state, not a release-check failure.
+    # Once an endpoint is configured, validation errors still propagate normally.
+    if refresh_license_state and _license_endpoints():
+        license_state = validate_license()
+    else:
+        license_state = load_license_state()
     remaining = _seconds_until_expiry(license_state)
     if remaining is not None:
         license_state = dict(license_state)
