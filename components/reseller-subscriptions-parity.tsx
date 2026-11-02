@@ -126,10 +126,11 @@ export function ResellerSubscriptionsParityRuntime(){
       });
       const subscriptionId=Number(result.subscription_id||0);
       if(!subscriptionId)throw new Error(pick("شناسه اشتراک ساخته‌شده دریافت نشد.","Created subscription id was not returned."));
-      await resellerApi.provisionSubscription(subscriptionId);
       setSellOpen(false);
       setSell({traffic_gb:50,duration_days:30,node_ids:[],protocols:[...DEFAULT_PROTOCOLS],username:"",password:""});
       setSaleKey(idempotency("manual-sale"));
+      await load();
+      await resellerApi.provisionSubscription(subscriptionId);
     });
   };
 
