@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.520",
+  "version": "1.1.0-rc.521",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T18:56:45Z",
+  "released_at": "2026-11-02T20:03:56Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "8330ee896428516da3f95fae61a6d5cda51ddb0f",
+  "source_sha": "f4c1982678528c4825ccf1fb33a014c8bd3d5c0c",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.520/twinpanel-1.1.0-rc.520-linux-x86_64.tar.gz",
-    "sha256": "bb8d3d030eb562e11b1a04a692ef0862aacee06633f32e2680d463d00c066b41",
-    "size_bytes": 25411263
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.521/twinpanel-1.1.0-rc.521-linux-x86_64.tar.gz",
+    "sha256": "b54a2423872f97973bc1bf9eeb938240e82f088c05f037df53a46c0d3f30081b",
+    "size_bytes": 25415464
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.520 افزودن سرور را از صفحه جدا حذف می‌کند و آن را داخل صفحه «نودها» به‌صورت Popup/Modal قرار می‌دهد. دکمه «افزودن سرور» بدون خروج از صفحه نودها فرم ثبت سرور، تست SSH، انتخاب Iran/Exit، کشور و ظرفیت را باز می‌کند. برای Exit گزینه «نمایش برای همه کاربران سایت» داخل همان Popup نمایش داده می‌شود و در صورت فعال بودن، سرور جدید بعد از ثبت به اشتراک‌های قبلی نیز Publish می‌شود. Xray baseline برای Exit همچنان از مسیر رسمی Protocol Studio آماده می‌شود. مسیر /admin/provision نیز به صفحه نودها برمی‌گردد و صفحه مستقل افزودن سرور دیگر رندر نمی‌شود. Source روی SHA immutable 8330ee896428516da3f95fae61a6d5cda51ddb0f قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.520 removes the standalone Add Server screen and moves server creation into a popup/modal on the Nodes page. The existing Add Server button now opens the registration form in place with SSH test, Iran/Exit selection, country and capacity fields. Exit nodes show the Show for all site users option in the same modal and, when enabled, publish the newly created server into existing subscriptions. The Exit Xray baseline is still prepared through the canonical Protocol Studio path. /admin/provision now resolves back to the Nodes screen instead of rendering a standalone add-server page. Source is pinned to immutable SHA 8330ee896428516da3f95fae61a6d5cda51ddb0f."
+    "fa": "TwinPanel 1.1.0-rc.521 نمایش گروه‌های V2Ray/Xray زیر Multi-Link را بهبود می‌دهد و همه سرورها را هم‌زمان با کانفیگ‌های جمع‌شده نمایش می‌دهد. همچنین گزینه «افزودن سرور» از منوی بالای «شبکه و زیرساخت» حذف شده است؛ افزودن سرور فقط از صفحه «نودها» و Popup همان صفحه انجام می‌شود. منطق ثبت سرور، تست SSH، انتخاب Iran/Exit و گزینه «نمایش برای همه کاربران سایت» برای Exit بدون تغییر باقی مانده است. Source روی SHA immutable f4c1982678528c4825ccf1fb33a014c8bd3d5c0c قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.521 improves the V2Ray/Xray server-group presentation below Multi-Link, showing all server groups simultaneously with their configs collapsed by default. It also removes the Add Server item from the Network & Infrastructure top navigation; server creation remains available only from the Nodes page popup. Server registration, SSH test, Iran/Exit selection and the Show for all site users option for Exit remain unchanged. Source is pinned to immutable SHA f4c1982678528c4825ccf1fb33a014c8bd3d5c0c."
   }
 }
