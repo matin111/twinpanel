@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.520",
-  "source_sha": "8330ee896428516da3f95fae61a6d5cda51ddb0f",
+  "version": "1.1.0-rc.521",
+  "source_sha": "c4a43951ac421838a12bae832d89ee67f5749167",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.520 افزودن سرور را از صفحه جدا حذف می‌کند و آن را داخل صفحه «نودها» به‌صورت Popup/Modal قرار می‌دهد. دکمه «افزودن سرور» بدون خروج از صفحه نودها فرم ثبت سرور، تست SSH، انتخاب Iran/Exit، کشور و ظرفیت را باز می‌کند. برای Exit گزینه «نمایش برای همه کاربران سایت» داخل همان Popup نمایش داده می‌شود و در صورت فعال بودن، سرور جدید بعد از ثبت به اشتراک‌های قبلی نیز Publish می‌شود. Xray baseline برای Exit همچنان از مسیر رسمی Protocol Studio آماده می‌شود. مسیر /admin/provision نیز به صفحه نودها برمی‌گردد و صفحه مستقل افزودن سرور دیگر رندر نمی‌شود. Source روی SHA immutable 8330ee896428516da3f95fae61a6d5cda51ddb0f قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.520 removes the standalone Add Server screen and moves server creation into a popup/modal on the Nodes page. The existing Add Server button now opens the registration form in place with SSH test, Iran/Exit selection, country and capacity fields. Exit nodes show the Show for all site users option in the same modal and, when enabled, publish the newly created server into existing subscriptions. The Exit Xray baseline is still prepared through the canonical Protocol Studio path. /admin/provision now resolves back to the Nodes screen instead of rendering a standalone add-server page. Source is pinned to immutable SHA 8330ee896428516da3f95fae61a6d5cda51ddb0f."
+    "fa": "TwinPanel 1.1.0-rc.521 نمایش V2Ray/Xray را اصلاح می‌کند: همه سرورها/کشورها به‌صورت همزمان زیر کارت Multi-Link نمایش داده می‌شوند و هر سرور سه کانفیگ واقعی خودش را دارد که به‌صورت پیش‌فرض مخفی هستند و با کلیک روی همان ردیف باز و بسته می‌شوند. تب‌های سرورها داخل هدر پروتکل همراه چراغ وضعیت سبز باقی می‌مانند و نام‌ها از Node.name گرفته می‌شوند. Source روی SHA immutable c4a43951ac421838a12bae832d89ee67f5749167 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.521 fixes the V2Ray/Xray public connection layout: all server/country groups are rendered simultaneously below the Multi-Link card, and each server keeps its three real configs collapsed by default with per-row expand/collapse. Canonical protocol-header server tabs with green status dots remain, and labels continue to come from Node.name. Source is pinned to immutable SHA c4a43951ac421838a12bae832d89ee67f5749167."
   }
 }
