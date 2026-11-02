@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
+from ..customer_wallet_models import CustomerWalletTopup
 from ..models_reseller import ResellerSubscription
 from ..payment_models import PaymentIntent
 from ..reseller_bot_order_models import ResellerBotOrder
@@ -14,6 +15,7 @@ from .dashboard_revenue import CONFIRMED_PAYMENT_STATUSES
 
 TEHRAN = ZoneInfo("Asia/Tehran")
 RANGES = {"daily", "weekly", "monthly", "yearly"}
+RESELLER_PRIVATE_TOPUP_METHOD_PATTERN = "reseller_card:%"
 
 
 def _utc_naive(value: datetime) -> datetime:
@@ -145,6 +147,7 @@ def admin_sales_analytics(db: Session, range_name: str = "daily") -> dict:
     buckets = _bucket_specs(range_name, now_local)
     summary_start = _period_boundaries(now_local)["year"]
     query_start = min(summary_start, buckets[0]["start"])
+    start_utc = _utc_naive(query_start)
     now_utc = _utc_naive(now_local)
 
     rows = (
@@ -152,10 +155,25 @@ def admin_sales_analytics(db: Session, range_name: str = "daily") -> dict:
         .filter(
             PaymentIntent.status.in_(CONFIRMED_PAYMENT_STATUSES),
             PaymentIntent.verified_at.isnot(None),
-            PaymentIntent.verified_at >= _utc_naive(query_start),
+            PaymentIntent.verified_at >= start_utc,
             PaymentIntent.verified_at <= now_utc,
         )
         .order_by(PaymentIntent.verified_at.asc(), PaymentIntent.id.asc())
+        .all()
+    )
+
+    wallet_rows = (
+        db.query(CustomerWalletTopup)
+        .filter(
+            CustomerWalletTopup.status == "approved",
+            CustomerWalletTopup.approved_at.isnot(None),
+            CustomerWalletTopup.approved_at >= start_utc,
+            CustomerWalletTopup.approved_at <= now_utc,
+            ~CustomerWalletTopup.method.like(
+                RESELLER_PRIVATE_TOPUP_METHOD_PATTERN
+            ),
+        )
+        .order_by(CustomerWalletTopup.approved_at.asc(), CustomerWalletTopup.id.asc())
         .all()
     )
 
@@ -172,6 +190,20 @@ def admin_sales_analytics(db: Session, range_name: str = "daily") -> dict:
         for row in rows
         if row.verified_at is not None
     ]
+    events.extend(
+        {
+            "at": row.approved_at,
+            "amount": int(
+                row.payable_amount_toman
+                if row.payable_amount_toman is not None
+                else row.amount_toman or 0
+            ),
+            "source": str(row.method or "unknown"),
+        }
+        for row in wallet_rows
+        if row.approved_at is not None
+    )
+    events.sort(key=lambda item: item["at"])
     series = _series(events, buckets)
 
     selected_start = _utc_naive(buckets[0]["start"])
