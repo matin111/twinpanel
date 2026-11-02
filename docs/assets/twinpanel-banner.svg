@@ -1,52 +1,75 @@
-<svg width="1400" height="420" viewBox="0 0 1400 420" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="bg" x1="90" y1="34" x2="1290" y2="430" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#0B1020"/>
-      <stop offset="0.46" stop-color="#17132D"/>
-      <stop offset="1" stop-color="#241044"/>
-    </linearGradient>
-    <linearGradient id="brand" x1="170" y1="103" x2="382" y2="326" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#A78BFA"/>
-      <stop offset="0.48" stop-color="#7C3AED"/>
-      <stop offset="1" stop-color="#4F46E5"/>
-    </linearGradient>
-    <linearGradient id="line" x1="472" y1="310" x2="1185" y2="310" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#8B5CF6"/>
-      <stop offset="0.55" stop-color="#6366F1"/>
-      <stop offset="1" stop-color="#22D3EE"/>
-    </linearGradient>
-    <filter id="glow" x="44" y="-60" width="1312" height="560" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-      <feGaussianBlur stdDeviation="54"/>
-    </filter>
-  </defs>
+<svg width="1600" height="540" viewBox="0 0 1600 540" fill="none" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <linearGradient id="bg" x1="80" y1="20" x2="1520" y2="520"><stop stop-color="#020817"/><stop offset=".48" stop-color="#061A3F"/><stop offset="1" stop-color="#08102A"/></linearGradient>
+  <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#21F4F6"/><stop offset=".45" stop-color="#079CFB"/><stop offset="1" stop-color="#2548D8"/></linearGradient>
+  <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFFFF"/><stop offset=".35" stop-color="#D7E1F2"/><stop offset=".65" stop-color="#8795AE"/><stop offset="1" stop-color="#F8FBFF"/></linearGradient>
+  <linearGradient id="purple" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#7C3AED"/><stop offset="1" stop-color="#A855F7"/></linearGradient>
+  <linearGradient id="green" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#12D8A0"/><stop offset="1" stop-color="#34D399"/></linearGradient>
+  <filter id="glow"><feGaussianBlur stdDeviation="12" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="12" stdDeviation="20" flood-color="#000" flood-opacity=".45"/></filter>
+</defs>
+<rect width="1600" height="540" rx="30" fill="url(#bg)"/>
+<path d="M0 64C140 26 235 32 350 66C260 98 130 95 0 138V64Z" fill="#0865FF" fill-opacity=".16"/>
+<path d="M0 444C180 390 320 405 472 456C298 500 140 508 0 490V444Z" fill="#0EA5E9" fill-opacity=".08"/>
+<path d="M1128 30c118 0 260 18 392 75" stroke="#139CFB" stroke-opacity=".2" stroke-width="2" stroke-dasharray="4 10"/>
 
-  <rect width="1400" height="420" rx="34" fill="url(#bg)"/>
-  <ellipse cx="1175" cy="95" rx="240" ry="130" fill="#7C3AED" fill-opacity="0.12" filter="url(#glow)"/>
-  <ellipse cx="205" cy="366" rx="190" ry="100" fill="#22D3EE" fill-opacity="0.08" filter="url(#glow)"/>
+<!-- logo -->
+<g transform="translate(110 72)" filter="url(#shadow)">
+  <path d="M25 30H190C194 30 197 34 195 38C180 68 151 83 118 83H53C35 83 25 66 25 30Z" fill="url(#cyan)"/>
+  <path d="M55 93H148C145 115 128 130 105 130H78C64 130 55 118 55 93Z" fill="url(#cyan)"/>
+  <path d="M135 28H264C246 72 217 91 184 91H169V192C169 214 154 231 130 241V83C130 57 131 42 135 28Z" fill="url(#steel)"/>
+  <path d="M180 102H240C229 132 208 147 184 147H176V112C176 107 177 104 180 102Z" fill="url(#steel)"/>
+</g>
+<text x="105" y="352" fill="#F8FAFC" font-family="Tahoma,Arial,sans-serif" font-size="74" font-weight="800">توین پنل</text>
+<text x="109" y="397" fill="#DCE7F7" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="33" font-weight="700" letter-spacing="11">TWIN PANEL</text>
+<text x="105" y="447" fill="#E5E7EB" font-family="Tahoma,Arial,sans-serif" font-size="25" font-weight="600">پنل مدیریت و فروش حرفه‌ای سرویس‌های VPN</text>
 
-  <g opacity="0.22">
-    <path d="M980 74H1286" stroke="#A78BFA"/>
-    <path d="M1018 104H1324" stroke="#A78BFA"/>
-    <path d="M1060 134H1366" stroke="#A78BFA"/>
-    <circle cx="1250" cy="74" r="5" fill="#22D3EE"/>
-    <circle cx="1194" cy="104" r="5" fill="#8B5CF6"/>
-    <circle cx="1308" cy="134" r="5" fill="#6366F1"/>
-  </g>
+<!-- features -->
+<g font-family="Tahoma,Arial,sans-serif" font-size="15" font-weight="700" fill="#E8F2FF">
+ <g transform="translate(105 474)"><rect width="112" height="40" rx="12" fill="#081A36" stroke="#0EA5E9"/><text x="56" y="25" text-anchor="middle">۱۵ پروتکل</text></g>
+ <g transform="translate(227 474)"><rect width="112" height="40" rx="12" fill="#081A36" stroke="#0EA5E9"/><text x="56" y="25" text-anchor="middle">مدیریت کاربران</text></g>
+ <g transform="translate(349 474)"><rect width="112" height="40" rx="12" fill="#081A36" stroke="#0EA5E9"/><text x="56" y="25" text-anchor="middle">فروشگاه</text></g>
+ <g transform="translate(471 474)"><rect width="112" height="40" rx="12" fill="#081A36" stroke="#0EA5E9"/><text x="56" y="25" text-anchor="middle">ربات تلگرام</text></g>
+</g>
 
-  <g transform="translate(118 78)">
-    <rect width="270" height="270" rx="74" fill="url(#brand)"/>
-    <rect x="16" y="16" width="238" height="238" rx="62" stroke="white" stroke-opacity="0.12" stroke-width="2"/>
-    <path d="M61 89C61 76.85 70.85 67 83 67H143C155.15 67 165 76.85 165 89V104H141V94C141 91.79 139.21 90 137 90H89C86.79 90 85 91.79 85 94V138H61V89Z" fill="white"/>
-    <path d="M209 181C209 193.15 199.15 203 187 203H127C114.85 203 105 193.15 105 181V166H129V176C129 178.21 130.79 180 133 180H181C183.21 180 185 178.21 185 176V132H209V181Z" fill="#E9D5FF"/>
-    <path d="M76 134H193C206.807 134 218 145.193 218 159C218 172.807 206.807 184 193 184H151V160H192C193.657 160 195 158.657 195 157C195 155.343 193.657 154 192 154H76C74.343 154 73 155.343 73 157C73 158.657 74.343 160 76 160H120V184H76C62.193 184 51 172.807 51 159C51 145.193 62.193 134 76 134Z" fill="white"/>
-    <circle cx="210" cy="65" r="10" fill="#22D3EE"/>
-  </g>
-
-  <text x="468" y="166" fill="white" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="72" font-weight="800" letter-spacing="3">TWINPANEL</text>
-  <text x="472" y="220" fill="#C4B5FD" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="25" font-weight="600" letter-spacing="1.2">SELF-HOSTED VPN CONTROL PLANE</text>
-  <text x="472" y="270" fill="#CBD5E1" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="22">One panel for users, protocols, nodes, tunnels, sales and operations.</text>
-  <rect x="472" y="308" width="714" height="3" rx="1.5" fill="url(#line)"/>
-  <text x="472" y="353" fill="#94A3B8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="18" letter-spacing="0.7">CONTROL • CONNECT • OPERATE</text>
-
-  <rect x="0.75" y="0.75" width="1398.5" height="418.5" rx="33.25" stroke="white" stroke-opacity="0.07" stroke-width="1.5"/>
+<!-- dashboard -->
+<g transform="translate(665 64)" filter="url(#shadow)">
+ <rect width="850" height="410" rx="24" fill="#08111F" stroke="#09B9FF" stroke-width="3"/>
+ <rect x="18" y="18" width="814" height="52" rx="15" fill="#0C1628"/>
+ <text x="802" y="49" text-anchor="end" fill="#F8FAFC" font-family="Tahoma,Arial,sans-serif" font-size="21" font-weight="800">داشبورد مدیریت</text>
+ <circle cx="28" cy="44" r="7" fill="#22C55E"/><text x="44" y="49" fill="#86EFAC" font-family="Tahoma,Arial,sans-serif" font-size="12">سیستم آنلاین</text>
+ <!-- KPI -->
+ <g font-family="Tahoma,Arial,sans-serif">
+  <g transform="translate(18 84)"><rect width="150" height="72" rx="14" fill="#0B1729" stroke="#155E75"/><text x="132" y="27" text-anchor="end" fill="#94A3B8" font-size="12">سلامت نودها</text><text x="132" y="54" text-anchor="end" fill="#F8FAFC" font-size="24" font-weight="800">6 / 6</text></g>
+  <g transform="translate(180 84)"><rect width="190" height="72" rx="14" fill="#0B1729" stroke="#92400E"/><text x="172" y="27" text-anchor="end" fill="#94A3B8" font-size="12">فروش امروز</text><text x="172" y="54" text-anchor="end" fill="#F8FAFC" font-size="21" font-weight="800">۵,۱۰۲,۰۴۴ تومان</text></g>
+  <g transform="translate(382 84)"><rect width="140" height="72" rx="14" fill="#0B1729" stroke="#065F46"/><text x="122" y="27" text-anchor="end" fill="#94A3B8" font-size="12">آنلاین اکنون</text><text x="122" y="54" text-anchor="end" fill="#F8FAFC" font-size="24" font-weight="800">0</text></g>
+  <g transform="translate(534 84)"><rect width="140" height="72" rx="14" fill="#0B1729" stroke="#1D4ED8"/><text x="122" y="27" text-anchor="end" fill="#94A3B8" font-size="12">اشتراک فعال</text><text x="122" y="54" text-anchor="end" fill="#F8FAFC" font-size="24" font-weight="800">410</text></g>
+  <g transform="translate(686 84)"><rect width="146" height="72" rx="14" fill="#0B1729" stroke="#6D28D9"/><text x="128" y="27" text-anchor="end" fill="#94A3B8" font-size="12">کل کاربران</text><text x="128" y="54" text-anchor="end" fill="#F8FAFC" font-size="24" font-weight="800">7</text></g>
+ </g>
+ <!-- server stats -->
+ <rect x="18" y="170" width="814" height="64" rx="14" fill="#0B1729"/>
+ <text x="812" y="190" text-anchor="end" fill="#E2E8F0" font-family="Tahoma,Arial,sans-serif" font-size="13" font-weight="700">سرور</text>
+ <g font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" fill="#94A3B8">
+  <text x="52" y="206">Uptime</text><text x="52" y="221" fill="#fff" font-weight="700">2h</text>
+  <text x="235" y="206">Disk</text><text x="235" y="221" fill="#fff" font-weight="700">16%</text>
+  <text x="430" y="206">RAM</text><text x="430" y="221" fill="#fff" font-weight="700">36%</text>
+  <text x="625" y="206">CPU</text><text x="625" y="221" fill="#fff" font-weight="700">89%</text>
+ </g>
+ <rect x="265" y="216" width="125" height="5" rx="3" fill="#14233C"/><rect x="265" y="216" width="25" height="5" rx="3" fill="url(#cyan)"/>
+ <rect x="460" y="216" width="125" height="5" rx="3" fill="#14233C"/><rect x="460" y="216" width="45" height="5" rx="3" fill="url(#cyan)"/>
+ <rect x="655" y="216" width="125" height="5" rx="3" fill="#14233C"/><rect x="655" y="216" width="111" height="5" rx="3" fill="url(#purple)"/>
+ <!-- lower cards -->
+ <rect x="18" y="248" width="220" height="144" rx="16" fill="#0B1729"/>
+ <text x="218" y="275" text-anchor="end" fill="#F8FAFC" font-family="Tahoma,Arial,sans-serif" font-size="16" font-weight="800">سلامت عملیاتی</text>
+ <circle cx="111" cy="327" r="39" stroke="#12304A" stroke-width="11"/><circle cx="111" cy="327" r="39" stroke="#19D3A2" stroke-width="11" stroke-dasharray="240 5" transform="rotate(-90 111 327)"/>
+ <text x="111" y="335" text-anchor="middle" fill="#fff" font-family="Inter,Arial" font-size="22" font-weight="800">100%</text>
+ <rect x="252" y="248" width="580" height="144" rx="16" fill="#0B1729"/>
+ <text x="808" y="275" text-anchor="end" fill="#F8FAFC" font-family="Tahoma,Arial,sans-serif" font-size="16" font-weight="800">روند درآمد ۳۰ روز گذشته</text>
+ <path d="M278 363H790" stroke="#1C2A40" stroke-dasharray="5 8"/>
+ <path d="M278 358L680 358L704 302L729 326L754 292L790 318" stroke="url(#purple)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+ <path d="M278 358L742 358L768 279L790 287" stroke="url(#green)" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+</g>
+<path d="M0 530C235 455 430 486 605 532" stroke="#0EA5E9" stroke-opacity=".6" stroke-width="2"/>
+<path d="M1030 530C1240 470 1410 455 1600 396" stroke="#8B5CF6" stroke-opacity=".75" stroke-width="3"/>
+<rect x="1.5" y="1.5" width="1597" height="537" rx="28.5" stroke="#0EA5E9" stroke-opacity=".18" stroke-width="3"/>
 </svg>

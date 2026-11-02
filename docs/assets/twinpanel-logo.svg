@@ -1,22 +1,17 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="bg" x1="64" y1="48" x2="448" y2="464" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#7C3AED"/>
-      <stop offset="0.52" stop-color="#5B21B6"/>
-      <stop offset="1" stop-color="#312E81"/>
-    </linearGradient>
-    <linearGradient id="shine" x1="150" y1="138" x2="366" y2="374" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#D8B4FE"/>
-    </linearGradient>
-    <filter id="shadow" x="32" y="32" width="448" height="448" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#111827" flood-opacity="0.24"/>
-    </filter>
-  </defs>
-  <rect x="48" y="48" width="416" height="416" rx="112" fill="url(#bg)" filter="url(#shadow)"/>
-  <rect x="72" y="72" width="368" height="368" rx="92" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="2"/>
-  <path d="M146 166C146 147.222 161.222 132 180 132H272C290.778 132 306 147.222 306 166V190H270V174C270 170.686 267.314 168 264 168H188C184.686 168 182 170.686 182 174V244H146V166Z" fill="url(#shine)"/>
-  <path d="M366 346C366 364.778 350.778 380 332 380H240C221.222 380 206 364.778 206 346V322H242V338C242 341.314 244.686 344 248 344H324C327.314 344 330 341.314 330 338V268H366V346Z" fill="url(#shine)"/>
-  <path d="M168 238H330C350.987 238 368 255.013 368 276C368 296.987 350.987 314 330 314H270V278H328C330.209 278 332 276.209 332 274C332 271.791 330.209 270 328 270H168C165.791 270 164 271.791 164 274C164 276.209 165.791 278 168 278H232V314H168C147.013 314 130 296.987 130 276C130 255.013 147.013 238 168 238Z" fill="white" fill-opacity="0.96"/>
-  <circle cx="360" cy="152" r="16" fill="#22D3EE"/>
+<defs>
+ <radialGradient id="bg" cx="0" cy="0" r="1" gradientTransform="translate(256 236) rotate(90) scale(260)"><stop stop-color="#092D67"/><stop offset=".62" stop-color="#041738"/><stop offset="1" stop-color="#020817"/></radialGradient>
+ <linearGradient id="cyan" x1="120" y1="90" x2="300" y2="350"><stop stop-color="#23F4F5"/><stop offset=".42" stop-color="#079CFB"/><stop offset="1" stop-color="#173EBD"/></linearGradient>
+ <linearGradient id="steel" x1="220" y1="85" x2="390" y2="330"><stop stop-color="#FFFFFF"/><stop offset=".28" stop-color="#E9EEF7"/><stop offset=".58" stop-color="#8C9AB1"/><stop offset=".78" stop-color="#F7F9FC"/><stop offset="1" stop-color="#7D8BA5"/></linearGradient>
+ <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="11" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect x="24" y="24" width="464" height="464" rx="116" fill="url(#bg)"/>
+<circle cx="256" cy="246" r="183" fill="#0EA5E9" fill-opacity=".05" filter="url(#glow)"/>
+<g filter="url(#glow)">
+ <path d="M104 120H286C290 120 293 124 291 128C273 164 243 181 205 181H140C119 181 104 162 104 120Z" fill="url(#cyan)"/>
+ <path d="M135 193H247C242 223 220 242 189 242H165C147 242 135 227 135 193Z" fill="url(#cyan)"/>
+ <path d="M231 116H410C390 170 354 193 311 193H290V332C290 365 267 392 231 406V184C231 150 231 132 231 116Z" fill="url(#steel)"/>
+ <path d="M308 207H391C376 245 350 265 319 265H301V224C301 216 303 211 308 207Z" fill="url(#steel)"/>
+</g>
+<rect x="25.5" y="25.5" width="461" height="461" rx="114.5" stroke="#2EC7FF" stroke-opacity=".22" stroke-width="3"/>
 </svg>

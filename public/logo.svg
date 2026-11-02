@@ -1,1 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="8" y1="8" x2="56" y2="58"><stop stop-color="#A78BFA"/><stop offset=".55" stop-color="#7C3AED"/><stop offset="1" stop-color="#4F46E5"/></linearGradient></defs><path d="M8 12c0-2 1.6-3.6 3.6-3.6H52c2.7 0 4.4 2.9 3 5.2L35.8 46.8c-1.8 3.1-6.3 3.1-8.1 0L8.5 13.6A3.2 3.2 0 0 1 8 12Z" fill="url(#g)"/><path d="M20 19h24L32 39 20 19Z" fill="#111827" fill-opacity=".72"/></svg>
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+<defs>
+ <linearGradient id="cyan" x1="9" y1="10" x2="38" y2="50"><stop stop-color="#23F4F5"/><stop offset=".45" stop-color="#079CFB"/><stop offset="1" stop-color="#173EBD"/></linearGradient>
+ <linearGradient id="steel" x1="27" y1="8" x2="52" y2="48"><stop stop-color="#FFFFFF"/><stop offset=".32" stop-color="#DCE5F2"/><stop offset=".62" stop-color="#8291A9"/><stop offset=".82" stop-color="#F8FAFC"/><stop offset="1" stop-color="#7D8BA5"/></linearGradient>
+</defs>
+<path d="M7 13H36C36.8 13 37.3 13.8 36.9 14.5C33.9 20 29.1 22.7 23 22.7H12.8C9.5 22.7 7 19.8 7 13Z" fill="url(#cyan)"/>
+<path d="M12 25H29.5C28.6 30 25.2 33 20.6 33H16.8C13.9 33 12 30.6 12 25Z" fill="url(#cyan)"/>
+<path d="M28.1 12.3H56C52.8 20.5 47.2 24.1 40.4 24.1H37.1V45.6C37.1 50.5 33.6 54.4 28.1 56.5V22.8C28.1 17.8 28.1 15.1 28.1 12.3Z" fill="url(#steel)"/>
+<path d="M40 26.3H53C50.6 32 46.6 35 41.7 35H38.8V29C38.8 27.8 39.2 26.8 40 26.3Z" fill="url(#steel)"/>
+</svg>
