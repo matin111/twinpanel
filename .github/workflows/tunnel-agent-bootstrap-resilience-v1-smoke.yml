@@ -1,0 +1,29 @@
+name: Tunnel Agent Bootstrap Resilience V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/tunnel_agent_bootstrap_resilience_v1.py"
+      - "backend/app/__init__.py"
+      - "scripts/tunnel-agent-bootstrap-resilience-v1-smoke.py"
+      - ".github/workflows/tunnel-agent-bootstrap-resilience-v1-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/tunnel_agent_bootstrap_resilience_v1.py"
+      - "backend/app/__init__.py"
+      - "scripts/tunnel-agent-bootstrap-resilience-v1-smoke.py"
+      - ".github/workflows/tunnel-agent-bootstrap-resilience-v1-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile bootstrap resilience patch
+        run: python -m py_compile backend/app/tunnel_agent_bootstrap_resilience_v1.py
+      - name: Run tunnel bootstrap regression
+        run: python scripts/tunnel-agent-bootstrap-resilience-v1-smoke.py

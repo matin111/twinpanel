@@ -33,6 +33,9 @@ from .classic_node_parallel_v1 import (
 from .mother_subscription_delivery_policy_v108 import (
     apply_mother_subscription_delivery_policy_v108 as _apply_mother_runtime_policy_v110,
 )
+from .tunnel_agent_bootstrap_resilience_v1 import (
+    install as _install_tunnel_agent_bootstrap_resilience_v1,
+)
 
 _install_xray_provision_patch()
 _install_xray_grpc_target_isolation_v48()
@@ -48,3 +51,4 @@ _install_classic_node_parallel_v1()
 # app.main. Install the Mother Local-Core runtime selector here as well so every
 # process provisions Modern accounts on Mother through the local executor.
 _apply_mother_runtime_policy_v110()
+_install_tunnel_agent_bootstrap_resilience_v1()
