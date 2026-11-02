@@ -4,6 +4,7 @@ import {AdminAuthGuard} from "./admin-auth-guard";
 import {AdminDashboardServerCard} from "./admin-dashboard-server-card";
 import {AdminOperationFeedback} from "./admin-operation-feedback";
 import {LegacyNodesRuntimePage} from "./legacy-nodes-runtime-v2";
+import {LicenseCenter} from "./license-center";
 import {RoutedPageClient as BaseRoutedPageClient} from "./routed-page-client";
 import {SmartTransportsRuntimeV27} from "./smart-transports-runtime-v27";
 import {SubscriptionDeliveryPolicyManager} from "./subscription-delivery-policy-manager";
@@ -16,6 +17,9 @@ const admin=(node:React.ReactNode)=><AdminAuthGuard><AdminOperationFeedback/>{no
 export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(routeKey==="admin"){
     return <><BaseRoutedPageClient routeKey={routeKey}/><AdminDashboardServerCard/></>;
+  }
+  if(routeKey==="admin/license"){
+    return admin(<LicenseCenter/>);
   }
   if(routeKey==="admin/nodes"||routeKey==="admin/network"){
     return admin(<LegacyNodesRuntimePage/>);

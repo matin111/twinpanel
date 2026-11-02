@@ -48,6 +48,7 @@ const menuGroups=[
     ["برندینگ","Branding","/admin/branding","✦"]
   ]},
   {fa:"سیستم و نگهداری",en:"System & Maintenance",items:[
+    ["لایسنس","License","/admin/license","◇"],
     ["امنیت","Security","/admin/system-health","⌾"],
     ["بکاپ و بازیابی","Backup & Restore","/admin/backups","⟲"],
     ["تنظیمات","Settings","/admin/settings","⚙"]
