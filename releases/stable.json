@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.508",
+  "version": "1.1.0-rc.509",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T11:24:42Z",
+  "released_at": "2026-11-02T11:47:42Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "4c848d74c2dbe6c63043f26387021acee79231b1",
+  "source_sha": "0f9f94f4161670f4cfc17f7d37e0db458873dafe",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.508/twinpanel-1.1.0-rc.508-linux-x86_64.tar.gz",
-    "sha256": "dcbb325f893ea5299daa9559f653da3ae772768812600c3240050656d9dd8ef6",
-    "size_bytes": 25365867
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.509/twinpanel-1.1.0-rc.509-linux-x86_64.tar.gz",
+    "sha256": "7c942915578936788a8ebce9820127428c0f2fe09f922054010840b2e5cbda08",
+    "size_bytes": 25370403
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.508 رگرسیون V2Ray/Xray در Public Connect را اصلاح می‌کند. V41 دیگر server-views مربوط به V2Ray را حذف نمی‌کند؛ جزئیات اتصال‌های هر سرور حفظ می‌شوند و به‌صورت Hidden/Toggle نمایش داده می‌شوند. Multi-Link اختصاصی V2Ray از /v1/connect/{token}/sub استفاده می‌کند و V2Ray دوباره در سطح موبایل قابل نمایش است. سایر پروتکل‌ها، Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting، Quota و Payment تغییری نکرده‌اند. Source روی SHA immutable 4c848d74c2dbe6c63043f26387021acee79231b1 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.508 fixes V2Ray/Xray regressions in Public Connect. V41 no longer removes V2Ray server-views; per-server connection details are preserved behind a hidden/toggle surface. The V2Ray Multi-Link uses the dedicated /v1/connect/{token}/sub endpoint and V2Ray is restored on mobile. Other protocols, provisioning, credentials, tunnel dataplane, routing, firewall, accounting, quota and payments are unchanged. Source is pinned to immutable SHA 4c848d74c2dbe6c63043f26387021acee79231b1."
+    "fa": "TwinPanel 1.1.0-rc.509 چیدمان نهایی V2Ray/Xray در Public Connect را اصلاح می‌کند. زیر کارت canonical Multi-Link، همه سرورهای V2Ray از /sub/meta نمایش داده می‌شوند و برای هر سرور همه پروفایل‌های واقعی customer-safe (معمولاً 3 کانفیگ) به‌صورت گروه بسته/بازشدنی در دسترس‌اند. کارت قدیمی و تکراری V2Ray Subscription پایین صفحه retire می‌شود تا فقط یک Multi-Link باقی بماند. سایر پروتکل‌ها، Provisioning، Credential، Tunnel dataplane، Routing، Firewall، Accounting، Quota و Payment تغییری نکرده‌اند. Source روی SHA immutable 0f9f94f4161670f4cfc17f7d37e0db458873dafe قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.509 finalizes the V2Ray/Xray Public Connect layout. The canonical Multi-Link card now shows all V2Ray servers from /sub/meta and every customer-safe profile for each server (normally 3 configs) in collapsed/expandable server groups. The old duplicate standalone V2Ray subscription card at the bottom is retired so only one Multi-Link surface remains. Other protocols, provisioning, credentials, tunnel dataplane, routing, firewall, accounting, quota and payments are unchanged. Source is pinned to immutable SHA 0f9f94f4161670f4cfc17f7d37e0db458873dafe."
   }
 }
