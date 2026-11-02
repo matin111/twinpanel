@@ -40,7 +40,7 @@ function BuyBody(){
   const [plans,setPlans]=useState<StorePlan[]>([]);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState<number|null>(null);
-  const [trialBusy,setTrialBusy]=useState<number|null>(null);
+  const [trialBusy,setTrialBusy]=useState(false);
   const [error,setError]=useState("");
 
   useEffect(()=>{
@@ -63,26 +63,35 @@ function BuyBody(){
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));setBusy(null);}
   };
 
-  const claimTrial=async(plan:StorePlan)=>{
+  const claimTrial=async()=>{
     if(!token)return;
-    setTrialBusy(plan.id);setError("");
+    setTrialBusy(true);setError("");
     try{
-      const result=await api<TrialResult>("/v1/trial/claim",{method:"POST",body:JSON.stringify({plan_id:plan.id})},token);
+      const result=await api<TrialResult>("/v1/trial/claim",{method:"POST",body:JSON.stringify({})},token);
       if(result.ok)window.location.href=`/panel/subscriptions?trial=${result.subscription_id}`;
-    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));setTrialBusy(null);}
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));setTrialBusy(false);}
   };
 
   const featuredPlanIndex=plans.length>2?Math.floor(plans.length/2):0;
+  const hasTrial=plans.some(plan=>Boolean(plan.trial_enabled));
+  const trialPlan=plans.find(plan=>Boolean(plan.trial_enabled));
 
   return <div className="page customer-runtime customer-buy-rich">
     <div className="customer-buy-rich-head"><div><span>◇</span><h1>{pick("خرید اشتراک","Buy subscription")}</h1></div><Badge tone="violet">{plans.length.toLocaleString("fa-IR")} {pick("پلن","plans")}</Badge></div>
     {error&&<div className="customer-buy-alert error">{error}</div>}
     {loading&&<div className="customer-buy-loading"><span className="customer-loader"/></div>}
+    {!loading&&hasTrial&&<Card className="customer-buy-trial-standalone">
+      <div>
+        <strong>{pick("🎁 اکانت تست رایگان","🎁 Free trial account")}</strong>
+        <p>{pick(`فقط یک‌بار برای هر کاربر${trialPlan?` • ${Number(trialPlan.trial_duration_days||1).toLocaleString("fa-IR")} روز • ${Number(trialPlan.trial_traffic_mb||500).toLocaleString("fa-IR")} مگابایت`:""}`,`One trial per user${trialPlan?` • ${Number(trialPlan.trial_duration_days||1)} day(s) • ${Number(trialPlan.trial_traffic_mb||500)} MB`:""}`)}</p>
+      </div>
+      <button type="button" className="customer-buy-rich-action" disabled={trialBusy||busy!==null} onClick={()=>void claimTrial()}>{trialBusy?pick("در حال ساخت اکانت تست...","Creating trial..."):pick("دریافت اکانت تست","Get trial account")}<span>←</span></button>
+    </Card>}
     {!loading&&plans.length===0&&<Card className="customer-empty"><p>{pick("پلن فعالی وجود ندارد.","No active plans.")}</p></Card>}
 
     {!loading&&plans.length>0&&<div className={`customer-buy-rich-grid ${plans.length===1?"single":""}`}>
       {plans.map((plan,index)=>{
-        const featured=index===featuredPlanIndex;const free=Number(plan.price_toman||0)===0;const hasTrial=Boolean(plan.trial_enabled);
+        const featured=index===featuredPlanIndex;const free=Number(plan.price_toman||0)===0;
         return <article className={`customer-buy-rich-card ${featured?"featured":""}`} key={plan.id}>
           {featured&&<span className="customer-buy-rich-ribbon">{pick("محبوب‌ترین انتخاب","Popular choice")}</span>}
           <div className="customer-buy-rich-top"><div><small>{pick("اشتراک VPN","VPN subscription")}</small><h2>{plan.name}</h2></div><span className="customer-buy-rich-status">{pick("فعال","Active")}</span></div>
@@ -90,12 +99,10 @@ function BuyBody(){
           <div className="customer-buy-rich-price"><strong>{free?pick("رایگان","Free"):Number(plan.price_toman).toLocaleString("fa-IR")}</strong>{!free&&<span>{pick("تومان","Toman")}</span>}</div>
           <div className="customer-buy-rich-facts"><div><b>{plan.traffic_gb.toLocaleString("fa-IR")} GB</b><small>{pick("حجم","Traffic")}</small></div><div><b>{plan.duration_days.toLocaleString("fa-IR")}</b><small>{pick("روز","days")}</small></div><div><b>{plan.device_limit.toLocaleString("fa-IR")}</b><small>{pick("دستگاه","devices")}</small></div></div>
           <ul className="customer-buy-rich-list">
-            {hasTrial&&<li><i>🎁</i><b>{pick(`تست ${Number(plan.trial_duration_days||1).toLocaleString("fa-IR")} روزه با ${Number(plan.trial_traffic_mb||500).toLocaleString("fa-IR")} MB`,`Trial: ${Number(plan.trial_duration_days||1)} day(s), ${Number(plan.trial_traffic_mb||500)} MB`)}</b></li>}
             <li><i>✓</i>{pick("تحویل سریع پس از پرداخت","Fast delivery after payment")}</li><li><i>✓</i>{pick("قابل استفاده روی دستگاه‌های مختلف","Works across multiple devices")}</li><li><i>✓</i>{pick("مدیریت اشتراک از پنل کاربری","Manage the subscription from your panel")}</li>
           </ul>
           <div className="customer-buy-rich-devices">{planDeviceLabels.map(device=><span key={device}>{device}</span>)}</div>
-          {hasTrial&&<button type="button" className="customer-buy-rich-action" disabled={trialBusy===plan.id||busy===plan.id} onClick={()=>void claimTrial(plan)}>{trialBusy===plan.id?pick("در حال ساخت اکانت تست...","Creating trial..."):pick("🎁 دریافت اکانت تست","🎁 Get trial account")}<span>←</span></button>}
-          <button type="button" className="customer-buy-rich-action" disabled={busy===plan.id||trialBusy===plan.id} onClick={()=>void buy(plan)}>{busy===plan.id?pick("در حال ثبت سفارش...","Creating order..."):pick("خرید اشتراک","Buy subscription")}<span>←</span></button>
+          <button type="button" className="customer-buy-rich-action" disabled={busy===plan.id||trialBusy} onClick={()=>void buy(plan)}>{busy===plan.id?pick("در حال ثبت سفارش...","Creating order..."):pick("خرید اشتراک","Buy subscription")}<span>←</span></button>
         </article>;
       })}
     </div>}
