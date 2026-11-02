@@ -7,9 +7,11 @@ PATCH = ROOT / "app" / "public_connect_import_identity_v1.py"
 
 def test_karing_import_carries_canonical_profile_title() -> None:
     source = PATCH.read_text(encoding="utf-8")
-    assert "TWINPANEL_PUBLIC_CONNECT_IMPORT_IDENTITY_V2" in source
+    assert "TWINPANEL_PUBLIC_CONNECT_IMPORT_IDENTITY_V3" in source
     assert "response.headers.get('Profile-Title')" in source
     assert "&name='+encodeURIComponent(profile)" in source
+    assert "String(url||'').split('#')[0]+'#'+profile" in source
+    assert "encodeURIComponent(karingUrl)" in source
     assert "const deep=await importHref(protocol,client,url);" in source
     assert "async function allCard(panel,protocol,url,count,kind){" in source
     assert "'TwinPanel '+protocol" not in source.split("def _canonicalize_import_name", 1)[1]
