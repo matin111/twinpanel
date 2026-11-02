@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.521",
-  "source_sha": "f4c1982678528c4825ccf1fb33a014c8bd3d5c0c",
+  "version": "1.1.0-rc.522",
+  "source_sha": "7643d681ea9ca7d777984a9e0b200a4deda46ebd",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.521 نمایش گروه‌های V2Ray/Xray زیر Multi-Link را بهبود می‌دهد و همه سرورها را هم‌زمان با کانفیگ‌های جمع‌شده نمایش می‌دهد. همچنین گزینه «افزودن سرور» از منوی بالای «شبکه و زیرساخت» حذف شده است؛ افزودن سرور فقط از صفحه «نودها» و Popup همان صفحه انجام می‌شود. منطق ثبت سرور، تست SSH، انتخاب Iran/Exit و گزینه «نمایش برای همه کاربران سایت» برای Exit بدون تغییر باقی مانده است. Source روی SHA immutable f4c1982678528c4825ccf1fb33a014c8bd3d5c0c قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.521 improves the V2Ray/Xray server-group presentation below Multi-Link, showing all server groups simultaneously with their configs collapsed by default. It also removes the Add Server item from the Network & Infrastructure top navigation; server creation remains available only from the Nodes page popup. Server registration, SSH test, Iran/Exit selection and the Show for all site users option for Exit remain unchanged. Source is pinned to immutable SHA f4c1982678528c4825ccf1fb33a014c8bd3d5c0c."
+    "fa": "TwinPanel 1.1.0-rc.522 صفحه لایسنس ادمین را به طراحی اصلی پنل برمی‌گرداند و رابط مدرن، واکنش‌گرا و RTL برای وضعیت لایسنس، انقضا، اعتبارسنجی، فعال‌سازی و تمدید ارائه می‌دهد. همچنین در رابط مدیریت روشن می‌کند که تأیید پرداخت کریپتو بر پایه هش تراکنش، مقصد، مبلغ و تأییدهای شبکه انجام می‌شود و مسیر اصلی به API Key پولی اجباری وابسته نیست. تست Smoke مرکز لایسنس نیز با ساختار جدید Shell هماهنگ شده است.",
+    "en": "TwinPanel 1.1.0-rc.522 restores the admin License Center to the panel's native design system with a modern responsive UI for license status, expiry, validation, activation and renewal. It also clarifies that crypto payment verification is based on transaction hash, destination, amount and network confirmations, with no mandatory paid API key in the primary verification path. The License Center smoke contract is aligned with the new Shell-based UI."
   }
 }
