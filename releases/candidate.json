@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.471",
-  "source_sha": "d621739ad7a775ad8f81151ff9d630fd49a6b5d3",
+  "version": "1.1.0-rc.472",
+  "source_sha": "331714c6dbb0d71019b77be8bb18e91aeef9a2a6",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.471 برای قالب ۳ / Orbit Neo 2027 کنترل مستقل توضیح پروتکل‌های مدرن را اضافه می‌کند. این فیلد بدون Reset کردن سایر تنظیمات ذخیره‌شده قالب و با Merge روی تازه‌ترین payload سرور ذخیره می‌شود؛ خالی‌کردن آن نیز متن نمایشی را حذف می‌کند. Runtime از همین مقدار قابل‌ویرایش استفاده می‌کند و اگر مقداری ذخیره نشده باشد fallback قبلی حفظ می‌شود. PR #1742 با 4/4 Workflow سبز Merge شد و Release PR #1743 نیز با 9/9 Workflow سبز Merge شد. Source روی SHA immutable d621739ad7a775ad8f81151ff9d630fd49a6b5d3 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.471 adds an isolated modern-protocol description control for Template 3 / Orbit Neo 2027. Saving this field merges into the freshest server-side template payload without resetting the rest of the saved template configuration, and clearing it removes the rendered description. The storefront runtime reads this configurable value while preserving the previous fallback when no value has been saved. PR #1742 merged with 4/4 green workflows and Release PR #1743 merged with 9/9 green workflows. Source is pinned to immutable SHA d621739ad7a775ad8f81151ff9d630fd49a6b5d3."
+    "fa": "TwinPanel 1.1.0-rc.472 صفحه ورود و ثبت‌نام عمومی را با طراحی حرفه‌ای و برندمحور بازطراحی می‌کند. نام برند، لوگو، توضیح کوتاه برند، رنگ اصلی و رنگ دوم مستقیماً از Branding پنل خوانده می‌شوند و هیچ نام نصب خاصی داخل صفحه هاردکد نشده است. منطق ورود، 2FA، Remember Me، مسیریابی ادمین/نماینده/کاربر و ثبت‌نام بدون تغییر باقی مانده است. PR #1745 با 16/16 Workflow سبز Merge شد و Release PR #1746 نیز با 9/9 Workflow سبز Merge شد. Source روی SHA immutable 331714c6dbb0d71019b77be8bb18e91aeef9a2a6 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.472 redesigns the public login and registration experience with a professional brand-driven layout. Brand name, logo, tagline, primary color, and secondary color are read directly from the panel Branding settings with no installation-specific brand hard-coded into the page. Login, 2FA, Remember Me, admin/reseller/customer routing, and registration behavior remain unchanged. PR #1745 merged with 16/16 green workflows and Release PR #1746 merged with 9/9 green workflows. Source is pinned to immutable SHA 331714c6dbb0d71019b77be8bb18e91aeef9a2a6."
   }
 }
