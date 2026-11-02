@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -29,12 +31,23 @@ class LicenseActivateIn(BaseModel):
     license_key: str = Field(min_length=8, max_length=256)
 
 
+def _admin_license_state(payload: dict) -> dict:
+    result = dict(payload)
+    result["renewal_bot_url"] = str(
+        os.getenv("TWINPANEL_LICENSE_RENEWAL_BOT_URL", "")
+    ).strip()
+    return result
+
+
 @router.get("/release/status")
 def admin_release_status():
     # Fast path: release_manifest_v25 serves a fresh cache immediately, or a
     # stale last-known-good value while one background refresh runs. Admin page
     # navigation therefore never waits on a slow/filtered GitHub route.
-    return release.release_status(refresh_license_state=False)
+    result = release.release_status(refresh_license_state=False)
+    result = dict(result)
+    result["license"] = _admin_license_state(dict(result.get("license") or {}))
+    return result
 
 
 @router.post("/release/check")
@@ -44,7 +57,10 @@ def admin_release_check():
     # larger slow-network budget before building the response.
     invalidate_release_manifest_cache()
     refresh_release_manifest_cache()
-    return release.release_status(refresh_license_state=True)
+    result = release.release_status(refresh_license_state=True)
+    result = dict(result)
+    result["license"] = _admin_license_state(dict(result.get("license") or {}))
+    return result
 
 
 @router.post("/update")
@@ -68,18 +84,18 @@ def admin_start_update():
 
 @router.get("/license")
 def admin_license_status():
-    return release.load_license_state()
+    return _admin_license_state(release.load_license_state())
 
 
 @router.post("/license/validate")
 def admin_license_validate():
-    return release.validate_license()
+    return _admin_license_state(release.validate_license())
 
 
 @router.post("/license/trial")
 def admin_license_trial():
     try:
-        return release.start_trial()
+        return _admin_license_state(release.start_trial())
     except Exception as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
@@ -87,7 +103,7 @@ def admin_license_trial():
 @router.post("/license/activate")
 def admin_license_activate(payload: LicenseActivateIn):
     try:
-        return release.activate_license(payload.license_key)
+        return _admin_license_state(release.activate_license(payload.license_key))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
