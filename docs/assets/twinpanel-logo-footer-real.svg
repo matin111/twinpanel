@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320" role="img" aria-labelledby="title desc">
+  <title id="title">TwinPanel official logo</title>
+  <desc id="desc">TwinPanel official blue, cyan and silver logo with Persian wordmark and TWIN PANEL text.</desc>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="70%">
+      <stop offset="0" stop-color="#123c78"/>
+      <stop offset="0.42" stop-color="#08265a"/>
+      <stop offset="1" stop-color="#020a2a"/>
+    </radialGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1fe7f0"/>
+      <stop offset="0.48" stop-color="#00b9ee"/>
+      <stop offset="1" stop-color="#0068d9"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1aa8ff"/>
+      <stop offset="1" stop-color="#1737b8"/>
+    </linearGradient>
+    <linearGradient id="silver" x1="0" y1="0" x2="1" y2="0.85">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.25" stop-color="#dfe6f1"/>
+      <stop offset="0.55" stop-color="#8d96a8"/>
+      <stop offset="0.78" stop-color="#f5f7fb"/>
+      <stop offset="1" stop-color="#70798d"/>
+    </linearGradient>
+  </defs>
+  <rect width="320" height="320" rx="24" fill="url(#bg)"/>
+  <g transform="translate(58 74)">
+    <path d="M8 0h110c8 0 13 7 9 14l-10 17c-4 7-10 11-19 11H31C18 42 9 36 5 26L0 12C-3 5 1 0 8 0z" fill="url(#cyan)"/>
+    <path d="M47 50h55v27H72c-12 0-22-4-28-12l-9-11c-2-3 0-4 12-4z" fill="url(#blue)"/>
+    <path d="M115 0h73c8 0 12 6 8 13l-9 16c-5 8-13 13-23 13h-35c-8 0-13 4-13 12v62c0 14-7 24-20 30l-19 9V57c0-33 14-57 38-57z" fill="url(#silver)"/>
+    <path d="M131 54h49c7 0 11 6 7 12l-9 13c-5 7-11 10-20 10h-27V54z" fill="url(#silver)" opacity="0.95"/>
+    <path d="M100 48h18v66c0 19-7 32-22 40V81c0-13 1-23 4-33z" fill="url(#cyan)"/>
+  </g>
+  <text x="160" y="226" text-anchor="middle" fill="#ffffff" font-size="52" font-weight="800" font-family="Tahoma, Arial, sans-serif">توین</text>
+  <text x="160" y="265" text-anchor="middle" fill="#ffffff" font-size="23" font-weight="600" letter-spacing="5" font-family="Arial, Helvetica, sans-serif">TWIN PANEL</text>
+</svg>

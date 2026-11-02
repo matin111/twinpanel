@@ -452,7 +452,7 @@ The installer prepares PostgreSQL, Redis, Python, Node.js, Nginx and systemd ser
 ---
 
 <p align="center">
-  <img src="docs/assets/twinpanel-logo-original.png" alt="TwinPanel logo" width="86" />
+  <img src="docs/assets/twinpanel-logo-footer-real.svg" alt="TwinPanel logo" width="120" />
 </p>
 
 <p align="center"><strong>TwinPanel</strong><br/>Sales. Control. Connect. Operate.</p>
