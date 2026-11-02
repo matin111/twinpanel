@@ -38,8 +38,14 @@ assert "exit_spoof_ip" in UI
 assert "legacyControlApi.createSelectedTunnel" in UI
 assert 'createManagedTunnel({...draft,transport:"auto"' not in UI
 
-# V357 readiness gate must remain intact.
+# V357 readiness remains online-gated and must exclude the controller/Mother
+# from managed Exit candidates before any pair is created or SSH preflight runs.
 assert 'readyIranNodes=useMemo(()=>iranNodes.filter(node=>normalize(node.status)==="online")' in UI
-assert 'readyExitNodes=useMemo(()=>exitNodes.filter(node=>normalize(node.status)==="online")' in UI
+assert 'readyExitNodes=useMemo(()=>exitNodes.filter(node=>{' in UI
+assert '!tunnelNode.is_mother' in UI
+assert 'normalize(tunnelNode.agent_url)!=="local://core"' in UI
+assert 'or getattr(exit_node, "is_mother", False)' in ROUTER
+assert 'or getattr(exit_node, "agent_url", None) == "local://core"' in ROUTER
+assert 'سرور مادر/Local Core نمی‌تواند Exit یک Tunnel مدیریتی باشد' in ROUTER
 
 print("SELECTED_INITIAL_TRANSPORT_V358_SMOKE_OK")
