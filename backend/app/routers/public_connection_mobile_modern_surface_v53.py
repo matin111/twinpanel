@@ -6,7 +6,18 @@ _MARKER = "TWINPANEL_PUBLIC_CONNECT_MOBILE_MODERN_SURFACE_V53"
 
 _CSS = r"""
 /* TWINPANEL_PUBLIC_CONNECT_MOBILE_MODERN_SURFACE_V53 */
+/* V51's category bar is mobile-only. If the viewport returns to desktop after
+   mobile rendering, keep that transient bar hidden so desktop has one category row. */
+body.v53-mobile-modern-clean .v51-mobile-categories,
+body:not(.v53-mobile-modern-clean) .v51-mobile-categories{
+  display:none!important;
+}
+
 @media(max-width:720px){
+  body.v53-mobile-modern-clean .v51-mobile-categories{
+    display:flex!important;
+  }
+
   /* Modern protocols are URI/config driven. Raw generic Server/Username/Password
      fact cards are not valid customer-facing connection instructions for them. */
   body.v53-mobile-modern-clean .protocol-panel[data-v53-modern="1"] .server-view .facts,
@@ -53,8 +64,16 @@ _SCRIPT = r"""
     return normalize(choice?.dataset?.protocolKey||choice?.dataset?.protocol||'');
   }
 
+  function clearMobileCategories(){
+    document.querySelectorAll('.v51-mobile-categories').forEach(node=>node.remove());
+    document.querySelectorAll('.protocol-choice[data-v51-filtered]').forEach(choice=>{
+      delete choice.dataset.v51Filtered;
+    });
+  }
+
   function apply(){
     if(!window.matchMedia(MOBILE).matches){
+      clearMobileCategories();
       document.body.classList.remove('v53-mobile-modern-clean');
       delete document.body.dataset.tpMobileModernSurface;
       document.querySelectorAll('.protocol-panel[data-v53-modern="1"]').forEach(panel=>delete panel.dataset.v53Modern);
@@ -87,7 +106,7 @@ _SCRIPT = r"""
 
 
 def refine_public_connection_mobile_modern_surface_v53(source: str) -> str:
-    """Hide misleading raw fact credentials for modern mobile protocols while preserving real config actions."""
+    """Clean modern mobile protocol sheets and remove transient mobile category UI on desktop."""
     if _MARKER in source:
         return source
     source = source.replace("</style>", _CSS + "\n</style>", 1)
