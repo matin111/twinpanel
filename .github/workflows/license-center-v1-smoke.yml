@@ -26,16 +26,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify modern license popup contract
+      - name: Verify minimal license popup contract
         run: |
           grep -Fq 'routeKey==="admin/license"' components/routed-page-client-v2.tsx
           grep -Fq '"/admin/license"' components/ui.tsx
           grep -Fq '/v1/admin/system/license/activate' components/license-center.tsx
           grep -Fq 'expires_at' components/license-center.tsx
-          grep -Fq 'renewal_bot_url' components/license-center.tsx
-          grep -Fq 'import {Badge,Shell} from "./ui";' components/license-center.tsx
+          grep -Fq 'import {Shell} from "./ui";' components/license-center.tsx
           grep -Fq '<Shell active="/admin/license">' components/license-center.tsx
-          grep -Fq 'fixed inset-0 z-[100]' components/license-center.tsx
-          grep -Fq 'max-w-5xl' components/license-center.tsx
-          grep -Fq 'backdrop-blur-[3px]' components/license-center.tsx
-          grep -Fq 'On-chain verification' components/license-center.tsx
+          grep -Fq 'className="runtime-modal"' components/license-center.tsx
+          grep -Fq 'className="runtime-modal-bg"' components/license-center.tsx
+          grep -Fq 'className="runtime-modal-card"' components/license-center.tsx
+          grep -Fq 'زمان باقی‌مانده' components/license-center.tsx
+          grep -Fq 'تاریخ انقضا' components/license-center.tsx
