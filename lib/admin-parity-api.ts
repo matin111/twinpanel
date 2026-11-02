@@ -106,6 +106,10 @@ export type MotherAccessSettings={
   admin_enabled:boolean;
   reseller_enabled:boolean;
   reseller_overrides:Record<string,boolean>;
+  mother_node_id:number;
+  mother_name:string;
+  mother_public_domain:string;
+  mother_public_ip:string;
 };
 
 export const parityApi={
@@ -183,6 +187,6 @@ export const parityApi={
   smsRevokeDevice:(id:number)=>request<AnyRow>(`/v1/payments/admin/sms-reader/devices/${id}/revoke`,{method:"POST"}),
 
   motherAccess:()=>request<MotherAccessSettings>("/v1/mother-access/admin"),
-  saveMotherAccess:(payload:{admin_enabled:boolean;reseller_enabled:boolean})=>request<AnyRow>("/v1/mother-access/admin",{method:"PUT",body:JSON.stringify(payload)}),
+  saveMotherAccess:(payload:{admin_enabled:boolean;reseller_enabled:boolean;mother_name?:string;public_domain?:string})=>request<AnyRow>("/v1/mother-access/admin",{method:"PUT",body:JSON.stringify(payload)}),
   setResellerMotherAccess:(resellerId:number,enabled:boolean)=>request<AnyRow>(`/v1/mother-access/admin/resellers/${resellerId}`,{method:"PUT",body:JSON.stringify({enabled})})
 };
