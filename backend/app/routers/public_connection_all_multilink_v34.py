@@ -147,7 +147,9 @@ def _named_uri(uri: str, profile: str) -> str:
 
 def _share_uri(sub: Any, protocol: str, item: dict[str, Any]) -> str:
     protocol = _normalize(protocol)
-    profile = _multilink_name(sub, protocol)
+    # The subscription title represents the whole group, while every server
+    # remark must remain individually identifiable inside Karing/Hiddify.
+    profile = _profile_name(sub, protocol, item)
 
     if protocol in {"hysteria2", "tuic", "anytls"}:
         generated = str(standard_share_uri(protocol, item, profile) or "").strip()
@@ -364,7 +366,7 @@ def public_protocol_multi_v34(
     if kind == "uri":
         raw = "\n".join(payload).encode("utf-8")
         content = base64.b64encode(raw).decode("ascii")
-        headers["Content-Disposition"] = f'inline; filename="twinpanel-{protocol}-subscription.txt"'
+        headers["Content-Disposition"] = f'inline; filename="{_safe_name(_multilink_name(sub, protocol), "user-vpn")}-subscription.txt"'
         return Response(content=content, media_type="text/plain; charset=utf-8", headers=headers)
 
     if kind == "karing":
@@ -372,7 +374,7 @@ def public_protocol_multi_v34(
         return Response(content=str(payload), media_type="text/yaml; charset=utf-8", headers=headers)
 
     if kind == "singbox":
-        headers["Content-Disposition"] = f'inline; filename="twinpanel-{protocol}-singbox.json"'
+        headers["Content-Disposition"] = f'inline; filename="{_safe_name(_multilink_name(sub, protocol), "user-vpn")}-singbox.json"'
         return Response(
             content=json.dumps({"outbounds": payload}, ensure_ascii=False, separators=(",", ":")),
             media_type="application/json; charset=utf-8",
@@ -380,7 +382,7 @@ def public_protocol_multi_v34(
         )
 
     blob = _bundle(protocol, sub, items)
-    headers["Content-Disposition"] = f'attachment; filename="twinpanel-{protocol}-all-servers.zip"'
+    headers["Content-Disposition"] = f'attachment; filename="{_safe_name(_multilink_name(sub, protocol), "user-vpn")}-all-servers.zip"'
     return Response(content=blob, media_type="application/zip", headers=headers)
 
 
