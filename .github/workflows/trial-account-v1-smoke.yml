@@ -1,0 +1,46 @@
+name: TwinPanel Trial Account V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/trial_models.py'
+      - 'backend/app/services/trial_service.py'
+      - 'backend/app/routers/trial.py'
+      - 'backend/app/routers/plans.py'
+      - 'backend/app/routers/central_account_delivery_runtime_v3.py'
+      - 'backend/app/telegram_trial_patch_v1.py'
+      - 'backend/app/__init__.py'
+      - 'components/legacy-plans-exact.tsx'
+      - 'components/customer-buy-runtime.tsx'
+      - 'backend/tests/trial_account_*_smoke.py'
+      - '.github/workflows/trial-account-v1-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile Trial backend
+        working-directory: backend
+        run: |
+          python -m py_compile \
+            app/trial_models.py \
+            app/services/trial_service.py \
+            app/routers/trial.py \
+            app/routers/plans.py \
+            app/routers/central_account_delivery_runtime_v3.py \
+            app/telegram_trial_patch_v1.py
+      - name: Run Trial contract regressions
+        working-directory: backend
+        run: |
+          python tests/trial_account_once_v1_smoke.py
+          python tests/trial_account_plan_payload_v1_smoke.py
+          python tests/trial_account_channel_contract_v1_smoke.py
+          python tests/trial_account_no_license_coupling_v1_smoke.py
+          python tests/trial_account_immediate_expiry_v1_smoke.py
+          python tests/trial_account_reseller_link_v1_smoke.py
+          python tests/trial_account_defaults_v1_smoke.py
