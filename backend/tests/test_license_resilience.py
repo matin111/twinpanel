@@ -83,3 +83,31 @@ def test_cached_revocation_stays_blocked(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert state["status"] == "revoked"
     assert state["offline_grace_seconds_remaining"] == 0
+
+
+def test_release_check_is_neutral_when_license_api_is_unconfigured(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    monkeypatch.delenv("TWINPANEL_LICENSE_API_URL", raising=False)
+    monkeypatch.delenv("TWINPANEL_LICENSE_IR_API_URL", raising=False)
+    monkeypatch.setattr(licensing, "LICENSE_STATE_FILE", tmp_path / "license-state.json")
+    monkeypatch.setattr(licensing, "ensure_installation_id", lambda: "test-installation")
+    monkeypatch.setattr(licensing, "current_version", lambda: "1.0.0")
+    monkeypatch.setattr(
+        licensing,
+        "release_manifest",
+        lambda: {"version": "1.0.0", "channel": "stable"},
+    )
+    monkeypatch.setattr(licensing, "load_update_state", lambda: {"state": "idle"})
+
+    def fail_if_validated():
+        raise AssertionError("vendor validation must not run without configured endpoints")
+
+    monkeypatch.setattr(licensing, "validate_license", fail_if_validated)
+
+    status = licensing.release_status(refresh_license_state=True)
+
+    assert status["license"]["status"] == "license_api_missing"
+    assert status["license"]["validation"] == "none"
+    assert status["license"]["enforced"] is False
