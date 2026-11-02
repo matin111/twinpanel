@@ -25,7 +25,7 @@ from .public_connection_karing_remarks_v40 import (
 )
 
 
-def _apply_v38_with_karing_remarks(source: str) -> str:
+def refine_public_connection_reference_layout_v38(source: str) -> str:
     """Keep V38 as presentation authority, then refine only its Karing remarks."""
     return refine_public_connection_karing_remarks_v40(_v38_refiner(source))
 
@@ -116,5 +116,4 @@ def refine_public_connection_canonical_mobile_v26(source: str) -> str:
     source = refine_public_connection_forward_v34(source)
     # V37 cleanup remains intact; V38 is the final reference-layout authority.
     source = refine_public_connection_final_presentation_v37(source)
-    source = _apply_v38_with_karing_remarks(source)
-    return source
+    return refine_public_connection_reference_layout_v38(source)
