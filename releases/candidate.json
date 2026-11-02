@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.518",
-  "source_sha": "d5e944323be3f92b6f7c3cc27ff854b058dce8d1",
+  "version": "1.1.0-rc.519",
+  "source_sha": "5b06b8ffb67b71677006656f429e2d2d0f4d75b0",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.518 هنگام افزودن سرور Exit جدید گزینه «نمایش برای همه کاربران سایت» را اضافه می‌کند. با فعال‌کردن این گزینه، سرور جدید علاوه بر اشتراک‌های Legacy به اشتراک‌های قدیمی دارای Delivery Policy صریح هم اضافه می‌شود، حالت Direct برای نود ایجاد یا فعال می‌شود و برای اشتراک‌های فعال Reconcile اجرا می‌شود تا credentialهای قابل استفاده روی سرور جدید واقعاً Provision شوند. رفتار Auto-Sync قبلی برای اشتراک‌های Legacy حفظ شده و این گزینه برای نودهای Iran/Relay نمایش داده نمی‌شود. این نسخه همچنین UI فعال‌سازی و تمدید لایسنس فقط برای ادمین را از main فعلی شامل می‌شود. Source روی SHA immutable d5e944323be3f92b6f7c3cc27ff854b058dce8d1 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.518 adds a publish-to-all-users option when installing a new Exit node. When enabled, the new server is added not only to legacy subscriptions but also to existing subscriptions with explicit Delivery Policy, direct delivery is created or enabled for the node, and active subscriptions are reconciled so usable credentials are actually provisioned on the new server. Existing legacy auto-sync behavior is preserved, and the option is not shown for Iran/Relay nodes. This version also includes the admin-only license activation and renewal UI already present on current main. Source is pinned to immutable SHA d5e944323be3f92b6f7c3cc27ff854b058dce8d1."
+    "fa": "TwinPanel 1.1.0-rc.519 چیدمان تب‌های سرور V2Ray/Xray را با سایر پروتکل‌ها یکسان می‌کند: تب‌ها داخل همان هدر پروتکل نمایش داده می‌شوند، نشانگر سبز وضعیت مثل WireGuard/Cisco/OpenVPN دارند، نام هر تب دقیقاً از Node.name می‌آید و فقط محتوای سرور انتخاب‌شده نمایش داده می‌شود. سه کانفیگ V2Ray همچنان به‌صورت پیش‌فرض مخفی می‌مانند و Multi-Link بدون تغییر حفظ شده است. Source روی SHA immutable 5b06b8ffb67b71677006656f429e2d2d0f4d75b0 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.519 aligns the V2Ray/Xray server tabs with the canonical protocol header used by the other protocols: tabs are rendered inside the same header row, use the same green live-status indicator as WireGuard/Cisco/OpenVPN, preserve exact Node.name labels, and only the selected server content is shown. The three V2Ray configs remain collapsed by default and Multi-Link behavior is unchanged. Source is pinned to immutable SHA 5b06b8ffb67b71677006656f429e2d2d0f4d75b0."
   }
 }
