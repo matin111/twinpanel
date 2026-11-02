@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import require_admin
-from ..models import Node, SubscriptionNode
 from ..mother_access import (
     admin_can_use_mother,
     get_bool,
@@ -31,24 +30,6 @@ class MotherGlobalSettingsIn(BaseModel):
 
 class MotherResellerAccessIn(BaseModel):
     enabled: bool
-
-
-def _remove_disabled_mother_memberships(db: Session) -> int:
-    mother_ids = [
-        int(row[0])
-        for row in db.query(Node.id).filter(
-            Node.retired_at.is_(None),
-            Node.agent_url == "local://core",
-        ).all()
-    ]
-    if not mother_ids:
-        return 0
-    return int(
-        db.query(SubscriptionNode)
-        .filter(SubscriptionNode.node_id.in_(mother_ids))
-        .delete(synchronize_session=False)
-        or 0
-    )
 
 
 @router.get(
@@ -117,12 +98,9 @@ def update_mother_access_settings(
         payload.reseller_enabled,
     )
 
-    removed_memberships = 0
-    # When Mother is globally disabled for both selling surfaces there is no
-    # legitimate customer snapshot that should still contain Local Core.
-    if not payload.admin_enabled and not payload.reseller_enabled:
-        removed_memberships = _remove_disabled_mother_memberships(db)
-
+    # Mother is always an internal provisioning target. These toggles control
+    # only High Availability / Multi-Link inclusion; disabling HA must never
+    # delete SubscriptionNode membership or stored Mother credentials.
     db.commit()
 
     return {
@@ -131,7 +109,10 @@ def update_mother_access_settings(
             payload.admin_enabled,
         "reseller_enabled":
             payload.reseller_enabled,
-        "removed_mother_memberships": removed_memberships,
+        # Kept for API compatibility with V109. V110 intentionally performs no
+        # destructive membership cleanup.
+        "removed_mother_memberships": 0,
+        "provisioning_preserved": True,
     }
 
 
