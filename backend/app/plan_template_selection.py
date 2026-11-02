@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from .models import Node, NodeType
@@ -24,13 +25,22 @@ def _mother_allowed(db: Session) -> bool:
     return bool(admin_can_use_mother(db))
 
 
+def _exclude_local_core(query):
+    return query.filter(
+        or_(
+            Node.agent_url.is_(None),
+            Node.agent_url != "local://core",
+        )
+    )
+
+
 def _eligible_exit_query(db: Session):
     query = db.query(Node).filter(
         Node.node_type == NodeType.EXIT,
         Node.retired_at.is_(None),
     )
     if not _mother_allowed(db):
-        query = query.filter(Node.agent_url != "local://core")
+        query = _exclude_local_core(query)
     return query
 
 
@@ -45,7 +55,7 @@ def explicit_plan_node_ids(db: Session, plan_id: int) -> list[int]:
         )
     )
     if not _mother_allowed(db):
-        query = query.filter(Node.agent_url != "local://core")
+        query = _exclude_local_core(query)
     return [
         int(row[0])
         for row in query.order_by(PlanNode.id.asc()).all()
