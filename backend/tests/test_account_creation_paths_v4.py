@@ -79,6 +79,9 @@ def test_store_and_reseller_bot_share_central_15_protocol_provisioner() -> None:
 def test_release_must_not_hide_db_only_reseller_regression_again() -> None:
     runtime = RUNTIME.read_text(encoding="utf-8")
 
-    assert "direct panel endpoint previously stopped after" in runtime
-    assert "create_subscription_core()" in runtime
-    assert "Runtime route precedence" in runtime
+    # Guard behavior, not comments: direct reseller sale must execute the
+    # central provisioner and report provisioning completion in its response.
+    assert '@router.post("/v1/reseller/subscriptions/sell")' in runtime
+    assert "sale = reseller_sale_v2._sale_impl(" in runtime
+    assert "await provision_account_v1(" in runtime
+    assert '"provisioning_complete": True' in runtime
