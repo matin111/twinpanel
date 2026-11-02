@@ -24,10 +24,6 @@ from .reseller_sale_v2 import ResellerSaleV2In
 router = APIRouter(tags=["account-creation-runtime-v4"])
 
 
-def _status_value(value: Any) -> str:
-    return str(getattr(value, "value", value) or "").strip().lower()
-
-
 def advisory_subscription_provisioning_preflight(
     db: Session,
     protocols: list[str] | tuple[str, ...],
@@ -82,25 +78,11 @@ def advisory_subscription_provisioning_preflight(
                     .filter(
                         NodeProtocolConfig.node_id.in_(exit_ids),
                         NodeProtocolConfig.protocol == protocol,
+                        NodeProtocolConfig.status == "online",
                     )
                     .all()
                 )
-                if _status_value(getattr(row, "status", None) if hasattr(row, "status") else None)
-                == "online"
             }
-            if not online_ids:
-                online_ids = {
-                    int(row[0])
-                    for row in (
-                        db.query(NodeProtocolConfig.node_id)
-                        .filter(
-                            NodeProtocolConfig.node_id.in_(exit_ids),
-                            NodeProtocolConfig.protocol == protocol,
-                            NodeProtocolConfig.status == "online",
-                        )
-                        .all()
-                    )
-                }
             node_ids = [int(node.id) for node in exits if int(node.id) in online_ids]
         else:
             node_ids = []
