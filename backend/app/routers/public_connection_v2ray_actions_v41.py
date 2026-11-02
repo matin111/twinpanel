@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from . import public_connection_all_multilink_v34 as multilink
 from . import public_connection_modern_delivery_v13 as modern_delivery
+from . import public_connection_v2ray_multilink_action_v44 as v2ray_multilink_action_v44
 from .public_connection_mobile_sheet_v42 import refine_public_connection_mobile_sheet_v42
 from .public_connection_request_backpressure_v1 import (
     refine_public_connection_request_backpressure_v1,
@@ -10,10 +11,47 @@ from .public_connection_v2ray_multilink_v43 import apply_v2ray_multilink_v43
 
 
 apply_v2ray_multilink_v43()
-# Keep backend compatibility metadata unchanged. The final customer-facing
-# client card below is rewritten per device to the V2Ray/Xray client family.
-modern_delivery.CLIENTS["v2ray"] = modern_delivery._KARING
-multilink.PROTOCOL_CLIENT["v2ray"] = "karing"
+
+# TWINPANEL_MULTILINK_CLIENT_BUTTON_UNIFICATION_V1
+# Keep one canonical client identity for V2Ray/Xray everywhere. Previously the
+# customer card was rewritten to v2rayN/v2rayNG/V2Box while backend compatibility
+# metadata still advertised Karing, so Multi-Link labels could name a different
+# app than the visible download card.
+_V2RAY_CLIENTS = {
+    "windows": ("v2rayN", "https://github.com/2dust/v2rayN/releases/latest"),
+    "android": ("v2rayNG", "https://github.com/2dust/v2rayNG/releases/latest"),
+    "ios": ("V2Box", "https://apps.apple.com/us/app/v2box-v2ray-client/id6446814690"),
+    "macos": ("v2rayN", "https://github.com/2dust/v2rayN/releases/latest"),
+}
+modern_delivery.CLIENTS["v2ray"] = _V2RAY_CLIENTS
+multilink.PROTOCOL_CLIENT["v2ray"] = "v2ray"
+
+
+def _unify_multilink_button_labels(value: str) -> str:
+    source = str(value or "")
+    # Explicitly name the actual client whenever a real deep link exists.
+    source = source.replace(
+        "link('افزودن همه',deep,true,'افزودن همه به '+client)",
+        "link('افزودن به '+client,deep,true,'افزودن به '+client)",
+    )
+    source = source.replace(
+        "link('افزودن همه به '+client,deep,true)",
+        "link('افزودن به '+client,deep,true)",
+    )
+    # Keep copy/download wording identical across protocol cards.
+    source = source.replace("'کپی مولتی‌لینک'", "'کپی لینک'")
+    source = source.replace("'دانلود همه'", "'دانلود کانفیگ‌ها'")
+    return source
+
+
+# V44 is independent from the V38 -> V39 -> V41 import chain, so its static
+# script can be normalized safely here. V37/V38 are normalized on the rendered
+# source inside the refiner below, avoiding a circular module import.
+v2ray_multilink_action_v44._SCRIPT = (
+    v2ray_multilink_action_v44._SCRIPT
+    .replace("'ارسال همه به v2rayNG'", "'افزودن به v2rayNG'")
+    .replace("'ارسال به v2rayNG'", "'افزودن به v2rayNG'")
+)
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_ACTIONS_V41"
 
@@ -131,6 +169,9 @@ _SCRIPT = r"""
 
 def refine_public_connection_v2ray_actions_v41(source: str) -> str:
     """Hide the lower V2Ray/Xray config inventory and show one device-appropriate client."""
+    # V37/V38 scripts are already embedded in `source` by the time V41 runs.
+    # Normalize those rendered actions directly instead of importing V38 here.
+    source = _unify_multilink_button_labels(source)
     if _MARKER not in source:
         source = source.replace("</style>", _CSS + "\n</style>", 1)
         source = source.replace("</body>", _SCRIPT + f"\n<!-- {_MARKER} -->\n</body>", 1)
