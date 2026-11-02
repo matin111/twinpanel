@@ -1,0 +1,29 @@
+name: Manual Cutover Peer Key Grace V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/manual_cutover_peer_key_grace_v1.py"
+      - "backend/app/__init__.py"
+      - "scripts/manual-cutover-peer-key-grace-v1-smoke.py"
+      - ".github/workflows/manual-cutover-peer-key-grace-v1-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/manual_cutover_peer_key_grace_v1.py"
+      - "backend/app/__init__.py"
+      - "scripts/manual-cutover-peer-key-grace-v1-smoke.py"
+      - ".github/workflows/manual-cutover-peer-key-grace-v1-smoke.yml"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile peer-key grace patch
+        run: python -m py_compile backend/app/manual_cutover_peer_key_grace_v1.py
+      - name: Run peer-key grace regression
+        run: python scripts/manual-cutover-peer-key-grace-v1-smoke.py
