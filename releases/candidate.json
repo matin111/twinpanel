@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.526",
-  "source_sha": "f7ab11721f6f90f0f3b17a3c57de9ad0fb9ead29",
+  "version": "1.1.0-rc.527",
+  "source_sha": "1145adc5991a154f3d184ab7d9e0d404aeeb2015",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.526 اصلاح رندر گروه‌های V2Ray روی Hub V5 و ترمیم مسیرهای ساخت اکانت را منتشر می‌کند؛ انتخاب ۱۵ پروتکل در ساخت دستی حفظ شده و فروش پنل نماینده، Store و ربات نماینده به Provisioner مرکزی متصل هستند.",
-    "en": "TwinPanel 1.1.0-rc.526 ships the V2Ray Hub V5 group-rendering fix and repaired account-creation paths; manual creation keeps 15-protocol selection while reseller panel sales, Store, and reseller bot fulfillment use the central provisioner."
+    "fa": "TwinPanel 1.1.0-rc.527 قابلیت اکانت تست مستقل را برای پنل کاربر، ربات اصلی و ربات نماینده منتشر می‌کند؛ دریافت تست فقط یک‌بار برای هر کاربر از مسیر مرکزی انجام می‌شود، دکمه تست از کارت‌های پلن جدا شده و اصلاح حذف نوار قدیمی V2Ray نیز در این نسخه قرار دارد.",
+    "en": "TwinPanel 1.1.0-rc.527 publishes the standalone trial-account flow for the customer panel, main Telegram bot, and reseller bot; trial eligibility is enforced centrally once per user, the trial action is no longer duplicated inside plan cards, and the legacy V2Ray top-strip removal is included."
   }
 }
