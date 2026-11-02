@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.525",
+  "version": "1.1.0-rc.526",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T22:09:32Z",
+  "released_at": "2026-11-02T23:13:10Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "750838221db1cb5055efc45a3eda169b46d1ea01",
+  "source_sha": "f7ab11721f6f90f0f3b17a3c57de9ad0fb9ead29",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.525/twinpanel-1.1.0-rc.525-linux-x86_64.tar.gz",
-    "sha256": "a432f7b1d223813824586634cb925fbc829c2b0c45d7af5e1c51fc3dbe827fab",
-    "size_bytes": 25411499
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.526/twinpanel-1.1.0-rc.526-linux-x86_64.tar.gz",
+    "sha256": "f2cf0ee98e9226e1faee1aa61541ba4f89ab7ea3f4644c86a29579fbbb1bcae5",
+    "size_bytes": 25429650
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.525 وضعیت active لایسنس را در Popup به‌درستی به‌عنوان فعال نمایش می‌دهد و ظاهر 2027 نسخه قبل را حفظ می‌کند.",
-    "en": "TwinPanel 1.1.0-rc.525 correctly maps the backend active license state to Active in the License popup while keeping the 2027 UI from the previous release."
+    "fa": "TwinPanel 1.1.0-rc.526 اصلاح رندر گروه‌های V2Ray روی Hub V5 و ترمیم مسیرهای ساخت اکانت را منتشر می‌کند؛ انتخاب ۱۵ پروتکل در ساخت دستی حفظ شده و فروش پنل نماینده، Store و ربات نماینده به Provisioner مرکزی متصل هستند.",
+    "en": "TwinPanel 1.1.0-rc.526 ships the V2Ray Hub V5 group-rendering fix and repaired account-creation paths; manual creation keeps 15-protocol selection while reseller panel sales, Store, and reseller bot fulfillment use the central provisioner."
   }
 }
