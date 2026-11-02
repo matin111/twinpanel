@@ -4,7 +4,7 @@ import {useEffect,useMemo,useState} from "react";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
-import {Badge,Card,Shell} from "./ui";
+import {Badge,Shell} from "./ui";
 
 type LicenseState={
   status?:string;
@@ -90,6 +90,12 @@ export function LicenseCenter(){
 
   useEffect(()=>{void load()},[]);
 
+  const close=()=>{
+    if(typeof window==="undefined")return;
+    if(window.history.length>1)window.history.back();
+    else window.location.href="/admin";
+  };
+
   const activate=async()=>{
     const key=licenseKey.trim();
     if(key.length<8||busy)return;
@@ -103,92 +109,97 @@ export function LicenseCenter(){
     finally{setBusy(false)}
   };
 
+  const statItems=[
+    {icon:"✓",label:pick("وضعیت","Status"),value:statusMeta.label,meta:status},
+    {icon:"◷",label:pick("باقی‌مانده","Remaining"),value:remainingText(license.seconds_remaining,fa),meta:formatDate(expiry,locale)},
+    {icon:"◆",label:pick("نسخه پنل","Panel version"),value:data?.current_version||"—",meta:data?.channel||"—",ltr:true},
+    {icon:"◉",label:pick("اعتبارسنجی","Validation"),value:license.validation||"—",meta:formatDate(license.validated_at,locale)}
+  ];
+
   return <Shell active="/admin/license">
-    <div className="page">
-      <div className="page-head">
-        <div>
-          <h1>{pick("مرکز لایسنس","License Center")}</h1>
-          <p>{pick("فعال‌سازی، وضعیت اعتبار و تمدید لایسنس این نصب.","Activate, inspect and renew the license for this installation.")}</p>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[3px]" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}>
+      <section dir={fa?"rtl":"ltr"} className="w-full max-w-5xl overflow-hidden rounded-[28px] border border-slate-200/80 bg-white shadow-2xl dark:border-white/10 dark:bg-[#111827]">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200/80 px-5 py-4 dark:border-white/10 sm:px-6">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-black text-slate-900 dark:text-white sm:text-2xl">{pick("مرکز لایسنس","License Center")}</h1>
+              <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>
+            </div>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{pick("مدیریت فعال‌سازی، اعتبار و تمدید لایسنس همین نصب","Manage activation, validity and renewal for this installation")}</p>
+          </div>
+          <button type="button" onClick={close} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-slate-50 text-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10 dark:hover:text-white" aria-label={pick("بستن","Close")}>×</button>
         </div>
-        <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>
-      </div>
 
-      <div className="stats-grid">
-        <Card className="stat"><span className="stat-icon">✓</span><div><small>{pick("وضعیت","Status")}</small><b>{statusMeta.label}</b><em>{status}</em></div></Card>
-        <Card className="stat"><span className="stat-icon">◷</span><div><small>{pick("زمان باقی‌مانده","Remaining")}</small><b>{remainingText(license.seconds_remaining,fa)}</b><em>{formatDate(expiry,locale)}</em></div></Card>
-        <Card className="stat"><span className="stat-icon">◆</span><div><small>{pick("نسخه پنل","Panel version")}</small><b dir="ltr">{data?.current_version||"—"}</b><em>{data?.channel||"—"}</em></div></Card>
-        <Card className="stat"><span className="stat-icon">◉</span><div><small>{pick("اعتبارسنجی","Validation")}</small><b>{license.validation||"—"}</b><em>{formatDate(license.validated_at,locale)}</em></div></Card>
-      </div>
-
-      {error&&<div className="notice danger"><b>{pick("خطا","Error")}</b><span>{error}</span></div>}
-      {notice&&<div className="notice success"><b>{pick("انجام شد","Completed")}</b><span>{notice}</span></div>}
-
-      <div className="grid gap-4 lg:grid-cols-[1.35fr_.65fr]">
-        <Card>
-          <div className="mb-5 flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-black">{pick("فعال‌سازی لایسنس","Activate license")}</h2>
-              <p className="mt-1 text-sm opacity-60">{pick("کلید صادرشده را وارد کنید؛ اعتبار روی همین نصب بررسی می‌شود.","Enter the issued key; validation is bound to this installation.")}</p>
-            </div>
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-violet-500/10 text-xl">⌁</div>
-          </div>
-
-          <div className="rounded-2xl border border-violet-400/15 bg-violet-500/[.04] p-4">
-            <label className="mb-2 block text-xs font-bold opacity-55">{pick("کلید لایسنس","License key")}</label>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <input
-                dir="ltr"
-                value={licenseKey}
-                onChange={e=>setLicenseKey(e.target.value)}
-                placeholder="TP-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX"
-                className="min-w-0 flex-1 rounded-xl border border-white/10 bg-black/10 px-4 py-3 font-mono text-sm outline-none focus:border-violet-400/60"
-              />
-              <button className="primary whitespace-nowrap" disabled={busy||licenseKey.trim().length<8} onClick={()=>void activate()}>
-                {busy?pick("در حال ثبت…","Activating…"):pick("ثبت لایسنس","Activate")}
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
-              <div className="text-xs opacity-45">{pick("شناسه نصب","Installation ID")}</div>
-              <div className="mt-2 truncate font-mono text-sm" dir="ltr">{license.installation_id||"—"}</div>
-            </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[.025] p-4">
-              <div className="text-xs opacity-45">{pick("تاریخ انقضا","Expires")}</div>
-              <div className="mt-2 font-bold">{formatDate(expiry,locale)}</div>
-            </div>
-          </div>
-        </Card>
-
-        <div className="space-y-4">
-          <Card>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-black">{pick("تمدید لایسنس","Renew license")}</h2>
-                <p className="mt-1 text-xs opacity-55">{pick("برای خرید یا تمدید وارد ربات رسمی شوید.","Open the official renewal bot to purchase or renew.")}</p>
+        <div className="max-h-[82vh] overflow-y-auto p-5 sm:p-6">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {statItems.map(item=><div key={item.label} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/[.035]">
+              <div className="flex items-start gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-500/10 font-black text-violet-600 dark:text-violet-300">{item.icon}</div>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-slate-400">{item.label}</div>
+                  <div dir={item.ltr?"ltr":undefined} className="mt-1 truncate text-base font-black text-slate-900 dark:text-white">{item.value}</div>
+                  <div className="mt-1 truncate text-[11px] text-slate-400">{item.meta}</div>
+                </div>
               </div>
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-500/10">↗</div>
-            </div>
-            {renewalBot?
-              <a href={renewalBot} target="_blank" rel="noreferrer" className="block rounded-xl bg-emerald-500 px-4 py-3 text-center font-black text-black transition hover:brightness-105">
-                {pick("باز کردن ربات تمدید","Open renewal bot")}
-              </a>
-              :<div className="rounded-xl border border-white/10 px-4 py-3 text-center text-sm opacity-40">{pick("لینک تمدید تنظیم نشده","Renewal link not configured")}</div>}
-          </Card>
+            </div>)}
+          </div>
 
-          <Card>
-            <div className="mb-3 flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-sky-500/10">⛓</div>
-              <div>
-                <h3 className="font-black">{pick("تأیید پرداخت زنجیره‌ای","On-chain verification")}</h3>
-                <p className="text-xs opacity-55">{pick("بدون API Key اجباری","No mandatory API key")}</p>
+          {error&&<div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-200"><b className="ms-2">{pick("خطا:","Error:")}</b>{error}</div>}
+          {notice&&<div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">{notice}</div>}
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-[1.45fr_.75fr]">
+            <div className="rounded-2xl border border-slate-200 p-4 dark:border-white/10 sm:p-5">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-black text-slate-900 dark:text-white">{pick("فعال‌سازی لایسنس","Activate license")}</h2>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{pick("کلید صادرشده را وارد کنید؛ اعتبار روی همین نصب بررسی می‌شود.","Enter the issued key; validation is bound to this installation.")}</p>
+                </div>
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-300">⌁</div>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <input dir="ltr" value={licenseKey} onChange={e=>setLicenseKey(e.target.value)} placeholder="TP-XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX" className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-mono text-sm text-slate-900 outline-none transition focus:border-violet-400 dark:border-white/10 dark:bg-black/10 dark:text-white" />
+                <button className="primary whitespace-nowrap px-5" disabled={busy||licenseKey.trim().length<8} onClick={()=>void activate()}>{busy?pick("در حال ثبت…","Activating…"):pick("ثبت لایسنس","Activate")}</button>
+              </div>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl bg-slate-50 px-4 py-3 dark:bg-white/[.035]">
+                  <div className="text-[11px] text-slate-400">{pick("شناسه نصب","Installation ID")}</div>
+                  <div className="mt-1 truncate font-mono text-xs text-slate-700 dark:text-slate-300" dir="ltr">{license.installation_id||"—"}</div>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-4 py-3 dark:bg-white/[.035]">
+                  <div className="text-[11px] text-slate-400">{pick("تاریخ انقضا","Expires")}</div>
+                  <div className="mt-1 text-sm font-bold text-slate-700 dark:text-slate-200">{formatDate(expiry,locale)}</div>
+                </div>
               </div>
             </div>
-            <p className="text-sm leading-7 opacity-70">{pick("تأیید تراکنش‌های کریپتو با هش تراکنش، مقصد، مبلغ و کانفرم شبکه انجام می‌شود و مسیر اصلی از RPC عمومی شبکه استفاده می‌کند.","Crypto transactions are verified from the transaction hash, destination, amount and network confirmations; the primary path uses public network RPC endpoints.")}</p>
-          </Card>
+
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-slate-200 p-4 dark:border-white/10">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-black text-slate-900 dark:text-white">{pick("تمدید لایسنس","Renew license")}</h3>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{pick("خرید یا تمدید از ربات رسمی","Purchase or renew via the official bot")}</p>
+                  </div>
+                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">↗</span>
+                </div>
+                {renewalBot?<a href={renewalBot} target="_blank" rel="noreferrer" className="mt-4 block rounded-xl bg-emerald-500 px-4 py-2.5 text-center text-sm font-black text-black transition hover:brightness-105">{pick("باز کردن ربات تمدید","Open renewal bot")}</a>:<div className="mt-4 rounded-xl bg-slate-50 px-4 py-2.5 text-center text-xs text-slate-400 dark:bg-white/[.035]">{pick("لینک تمدید تنظیم نشده","Renewal link not configured")}</div>}
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 p-4 dark:border-white/10">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-300">⛓</span>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white">{pick("تأیید پرداخت زنجیره‌ای","On-chain verification")}</h3>
+                    <p className="text-[11px] text-slate-400">{pick("بدون API Key پولی اجباری","No mandatory paid API key")}</p>
+                  </div>
+                </div>
+                <p className="mt-3 text-xs leading-6 text-slate-500 dark:text-slate-400">{pick("بررسی پرداخت با هش تراکنش، مقصد، مبلغ و تأییدهای شبکه انجام می‌شود.","Payments are verified from transaction hash, destination, amount and network confirmations.")}</p>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   </Shell>;
 }
