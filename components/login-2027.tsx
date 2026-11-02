@@ -36,6 +36,20 @@ function AuthArt(){
   </section>;
 }
 
+function PasswordEye({visible,onToggle,label}:{visible:boolean;onToggle:()=>void;label:string}){
+  return <button
+    type="button"
+    onClick={onToggle}
+    aria-label={label}
+    title={label}
+    style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",width:34,height:34,border:0,borderRadius:10,background:"transparent",display:"grid",placeItems:"center",cursor:"pointer",color:"#66738b",zIndex:3,padding:0}}
+  >
+    {visible?
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 4.2A10.9 10.9 0 0 1 12 4c5.5 0 9.5 4.7 10 8-.2 1.3-1 2.8-2.2 4.2"/><path d="M6.2 6.2C3.8 7.7 2.3 10 2 12c.5 3.3 4.5 8 10 8 1.5 0 2.9-.3 4.1-.8"/></svg>
+      :<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>}
+  </button>;
+}
+
 function safeNextForPortal(raw:string|null,portal:"admin"|"reseller"|"customer"){
   if(!raw||!raw.startsWith("/")||raw.startsWith("//"))return null;
   const allowed=portal==="admin"?raw.startsWith("/admin"):portal==="reseller"?raw.startsWith("/reseller"):raw.startsWith("/panel")||raw.startsWith("/store");
@@ -48,6 +62,7 @@ export function LoginPage2027(){
   const searchParams=useSearchParams();
   const [email,setEmail]=useState("");
   const [password,setPassword]=useState("");
+  const [showPassword,setShowPassword]=useState(false);
   const [remember,setRemember]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
@@ -102,8 +117,8 @@ export function LoginPage2027(){
         <h1>{twoFactorToken?pick("تأیید ورود","Verify sign in"):pick("ورود به حساب","Sign in")}</h1>
         <p className="auth-card-subtitle">{twoFactorToken?pick("کد تأیید حساب خود را وارد کنید.","Enter your account verification code."):pick(`دسترسی امن و سریع به پنل مدیریت ${brand.name}`,`Secure, fast access to the ${brand.name} management panel`)}</p>
         {!twoFactorToken&&<>
-          <label className="auth-field"><span>{pick("ایمیل","Email")}</span><div><input dir="ltr" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="user@example.com" required/><i aria-hidden="true">✉</i></div></label>
-          <label className="auth-field"><span>{pick("رمز عبور","Password")}</span><div><input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" required/><i aria-hidden="true">♙</i></div></label>
+          <label className="auth-field"><span>{pick("ایمیل","Email")}</span><div><input dir="ltr" type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="user@example.com" required style={{paddingLeft:48,paddingRight:16,textAlign:"left"}}/><i aria-hidden="true">✉</i></div></label>
+          <label className="auth-field"><span>{pick("رمز عبور","Password")}</span><div><input type={showPassword?"text":"password"} autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" required style={{paddingLeft:48,paddingRight:48}}/><i aria-hidden="true">♙</i><PasswordEye visible={showPassword} onToggle={()=>setShowPassword(value=>!value)} label={showPassword?pick("پنهان کردن رمز عبور","Hide password"):pick("نمایش رمز عبور","Show password")}/></div></label>
           <div className="remember auth-remember"><span><input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)}/> {pick("مرا به خاطر بسپار","Remember me")}</span></div>
         </>}
         {twoFactorToken&&<label className="auth-field"><span>{pick("کد تأیید دو مرحله‌ای","Two-factor code")}</span><div><input dir="ltr" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,"").slice(0,8))} placeholder="000000" required/><i aria-hidden="true">#</i></div></label>}
@@ -155,7 +170,7 @@ export function RegisterPage2027(){
         <h1>{pick("ساخت حساب کاربری","Create customer account")}</h1>
         <p className="auth-card-subtitle">{pick(`حساب خود را برای استفاده از خدمات ${brand.name} ایجاد کنید.`,`Create your account to use ${brand.name} services.`)}</p>
         <label className="auth-field"><span>{pick("نام","Name")}</span><div><input value={name} onChange={e=>setName(e.target.value)} autoComplete="name"/><i aria-hidden="true">◌</i></div></label>
-        <label className="auth-field"><span>{pick("ایمیل","Email")}</span><div><input dir="ltr" type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" placeholder="user@example.com" required/><i aria-hidden="true">✉</i></div></label>
+        <label className="auth-field"><span>{pick("ایمیل","Email")}</span><div><input dir="ltr" type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" placeholder="user@example.com" required style={{paddingLeft:48,paddingRight:16,textAlign:"left"}}/><i aria-hidden="true">✉</i></div></label>
         <label className="auth-field"><span>{pick("رمز عبور","Password")}</span><div><input type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="new-password" placeholder="••••••••" minLength={8} required/><i aria-hidden="true">♙</i></div></label>
         <label className="auth-field"><span>{pick("تکرار رمز عبور","Confirm password")}</span><div><input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} autoComplete="new-password" placeholder="••••••••" minLength={8} required/><i aria-hidden="true">♙</i></div></label>
         <div className="customer-only-note">{pick("این فرم فقط حساب کاربر عادی ایجاد می‌کند.","This form creates customer accounts only.")}</div>
