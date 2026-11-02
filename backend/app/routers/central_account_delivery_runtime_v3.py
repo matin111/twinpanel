@@ -9,8 +9,10 @@ from ..modern_node_parallel_v1 import install_bounded_modern_node_provisioning_v
 from ..mother_access import admin_can_use_mother
 from . import account_delivery as legacy_account_delivery
 from . import reseller_bot_orders as reseller_fulfillment
+from . import runtime_endpoints as _runtime_endpoints
 from . import store as store_fulfillment
 from .modern_account_delivery_v1 import provision_account_v1
+from .subscription_protocol_lifecycle_v3 import router as _subscription_protocol_lifecycle_v3_router
 
 
 _ORIGINAL_DELIVERY_ITEM_IS_USABLE = legacy_account_delivery._delivery_item_is_usable
@@ -48,7 +50,7 @@ def customer_delivery_item_is_usable(
     protocol: str,
     item: dict[str, Any],
 ) -> bool:
-    """Apply Mother visibility policy to already-stored credentials too."""
+    """Apply snapshot and Mother visibility policy to stored credentials too."""
     if isinstance(item, dict):
         try:
             node_id = int(item.get("node_id") or 0)
@@ -56,9 +58,15 @@ def customer_delivery_item_is_usable(
             node_id = 0
         if node_id > 0:
             node = db.get(Node, node_id)
+            if node is None:
+                return False
+            membership = (
+                db.query(SubscriptionNode.id)
+                .filter(SubscriptionNode.node_id == node_id)
+                .first()
+            )
             if (
-                node is not None
-                and getattr(node, "is_mother", False)
+                getattr(node, "is_mother", False)
                 and not admin_can_use_mother(db)
             ):
                 return False
@@ -67,6 +75,10 @@ def customer_delivery_item_is_usable(
 
 def install_central_account_delivery_runtime_v3() -> None:
     """Converge fulfillment on the snapshot-aware 15-protocol driver."""
+    # runtime_endpoints is included first by app.main. Mount V3 before package
+    # initialization later appends the V2 compatibility route, giving V3 exact
+    # route precedence without rewriting the legacy Account Delivery module.
+    _runtime_endpoints.router.include_router(_subscription_protocol_lifecycle_v3_router)
     install_bounded_modern_node_provisioning_v1()
     legacy_account_delivery._nodes = subscription_snapshot_nodes
     legacy_account_delivery._delivery_item_is_usable = customer_delivery_item_is_usable
