@@ -31,8 +31,11 @@ assert 'user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, unique=
 assert "DEFAULT_TRIAL_DURATION_DAYS = 1" in service
 assert "DEFAULT_TRIAL_TRAFFIC_MB = 500" in service
 assert '"trial_scope": "plan"' in service
-assert "trial_enabled" in plans and "trial_traffic_mb" in plans
+assert "plan_trial_payload" in plans
+assert "update_plan_trial_setting" in plans
+assert "**trial" in plans
 assert "اکانت تست عمومی" not in admin_ui
+assert "trial_enabled" in admin_ui
 assert "trial_traffic_mb:500" in admin_ui
 
 # The unique claim is acquired before subscription/provisioning work, making a
