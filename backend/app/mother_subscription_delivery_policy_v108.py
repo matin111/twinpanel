@@ -14,21 +14,20 @@ from .node_runtime_connection import connect_protocol_runtime, is_local_core
 from .routers import account_delivery
 
 
-# TWINPANEL_MOTHER_SUBSCRIPTION_DELIVERY_POLICY_V110
+# TWINPANEL_MOTHER_SUBSCRIPTION_DELIVERY_POLICY_V111
 #
 # Mother/Local Core has two independent responsibilities:
 #   1. it is always a protocol runtime/provisioning target, and
-#   2. it may be excluded from High Availability / Multi-Link aggregation.
+#   2. its public subscription delivery is controlled by the Mother access
+#      toggles for admin-created and reseller-created subscriptions.
 #
-# Never delete or hide Mother credentials at the stored-info boundary. The
-# normal per-server public page must still expose Mother as an individual server
-# when a credential exists. The existing mother access policy now controls only
-# whether Mother participates in Multi-Link aggregation.
+# The visibility toggle must never remove Mother from SubscriptionNode, stop
+# provisioning, or delete stored credentials. It only filters Mother from the
+# customer-facing delivery payload after credentials already exist.
 #
-# V110 also makes the runtime hooks safe for every Python process (API, bot,
-# reseller and convergence worker): Local Core uses the local executor while
-# remote Exit nodes keep saved SSH, and healthy direct Modern Exit runtimes stay
-# delivery-eligible without requiring an Iran tunnel.
+# V111 restores the original Settings contract: turning Mother access off hides
+# Mother from normal subscription delivery and Multi-Link; turning it on exposes
+# it again without reprovisioning the account.
 
 _original_stored_info = account_delivery._stored_info
 _original_ssh_connect_saved = account_delivery.ssh_connect_saved
@@ -115,8 +114,7 @@ def _subscription_can_use_mother(
     reseller_row = (
         db.query(ResellerSubscription.reseller_id)
         .filter(
-            ResellerSubscription.subscription_id
-            == sub.id
+            ResellerSubscription.subscription_id == sub.id
         )
         .first()
     )
@@ -218,20 +216,21 @@ def _stored_info_with_mother_policy(
     db: Session,
     sub: Subscription,
 ) -> dict[str, Any]:
-    # V110: stored/single-server delivery must preserve Mother. Multi-Link has a
-    # dedicated boundary filter installed below.
-    return _original_stored_info(db, sub)
+    payload = _original_stored_info(db, sub)
+    if _subscription_can_use_mother(db, sub):
+        return payload
+    return _filter_mother_from_delivery(db, payload)
 
 
 def _install_multilink_filter() -> None:
-    """Exclude Mother only from HA/Multi-Link when its access toggle is off."""
+    """Apply the same Mother visibility policy to HA/Multi-Link output."""
     try:
         from .routers import public_connection_all_multilink_v34 as multi
     except Exception:
         return
 
     current = getattr(multi, "_active", None)
-    if current is None or getattr(current, "_twinpanel_mother_multilink_v110", False):
+    if current is None or getattr(current, "_twinpanel_mother_multilink_v111", False):
         return
 
     original_active = current
@@ -245,7 +244,7 @@ def _install_multilink_filter() -> None:
             return sub, payload
         return sub, _filter_mother_from_delivery(db, payload)
 
-    setattr(_active_without_disabled_mother, "_twinpanel_mother_multilink_v110", True)
+    setattr(_active_without_disabled_mother, "_twinpanel_mother_multilink_v111", True)
     multi._active = _active_without_disabled_mother
 
 
@@ -253,8 +252,9 @@ def apply_mother_subscription_delivery_policy_v108() -> None:
     global _applied
 
     if not _applied:
-        # Do not replace account_delivery._stored_info. Per-server delivery must
-        # retain Mother credentials even when HA/Multi-Link access is disabled.
+        # Preserve Mother as a provisioning target, but restore the Settings
+        # toggle at the customer-facing stored-info delivery boundary.
+        account_delivery._stored_info = _stored_info_with_mother_policy
         account_delivery.ssh_connect_saved = _runtime_aware_connect_saved
         account_delivery._delivery_item_is_usable = _modern_direct_item_is_usable
 
