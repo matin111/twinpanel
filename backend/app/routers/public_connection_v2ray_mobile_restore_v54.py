@@ -1,18 +1,29 @@
 from __future__ import annotations
 
 
-_MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_MOBILE_RESTORE_V56"
+_MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_SERVER_TABS_V57"
 
 
 _CSS = r"""
-/* TWINPANEL_PUBLIC_CONNECT_V2RAY_MOBILE_RESTORE_V56 */
+/* TWINPANEL_PUBLIC_CONNECT_V2RAY_SERVER_TABS_V57 */
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .server-tabs,
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .server-views,
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .v51-single-title{
   display:none!important;
 }
+body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .v57-v2ray-server-tabs{
+  display:flex!important;flex-wrap:wrap;gap:8px;margin:0 12px 10px;direction:rtl;
+}
+body.v54-v2ray-restore .v57-v2ray-server-tab{
+  min-height:32px;display:inline-flex;align-items:center;justify-content:center;padding:0 11px;
+  border:1px solid var(--line);border-radius:10px;background:var(--surface2);color:var(--muted);
+  font:inherit;font-size:11px;font-weight:850;cursor:pointer;
+}
+body.v54-v2ray-restore .v57-v2ray-server-tab.active{
+  border-color:var(--primary);color:var(--text);background:color-mix(in srgb,var(--primary) 12%,var(--surface2));
+}
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .v54-v2ray-groups{
-  display:grid!important;gap:10px;margin:0 12px 14px;
+  display:block!important;margin:0 12px 14px;
 }
 body.v54-v2ray-restore .v54-v2ray-server{
   border:1px solid var(--line);border-radius:14px;background:var(--surface2);overflow:hidden;
@@ -51,6 +62,10 @@ body.v54-v2ray-restore .v54-v2ray-empty{padding:12px;color:var(--muted);font-siz
   body.v54-v2ray-restore .protocol-choice[data-v54-v2ray-choice="1"]{
     display:grid!important;visibility:visible!important;opacity:1!important;
   }
+  body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .v57-v2ray-server-tabs{
+    overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;
+  }
+  body.v54-v2ray-restore .v57-v2ray-server-tab{flex:0 0 auto}
   body.v54-v2ray-restore .v54-v2ray-profile{grid-template-columns:1fr}
   body.v54-v2ray-restore .v54-v2ray-profile-actions{justify-content:stretch}
   body.v54-v2ray-restore .v54-v2ray-profile-actions button,
@@ -60,7 +75,7 @@ body.v54-v2ray-restore .v54-v2ray-empty{padding:12px;color:var(--muted);font-siz
 
 
 _SCRIPT = r"""
-<script id="twinpanelPublicConnectV2rayMobileRestoreV56">
+<script id="twinpanelPublicConnectV2rayServerTabsV57">
 (function(){
   let timer=null;
 
@@ -133,16 +148,9 @@ _SCRIPT = r"""
     return node;
   }
 
-  function countryLabel(server,index){
-    const code=String(server?.country_code||'').trim().toUpperCase();
-    if(code&&typeof Intl!=='undefined'&&Intl.DisplayNames){
-      try{
-        const label=new Intl.DisplayNames(['fa'],{type:'region'}).of(code);
-        if(label&&label!==code)return label;
-      }catch(_error){}
-    }
-    const name=String(server?.server||'').trim();
-    return name||('سرور '+(index+1));
+  function serverLabel(server,index){
+    const exact=String(server?.server||'').trim();
+    return exact||('سرور '+(index+1));
   }
 
   function addProfileAction(actions,uri){
@@ -182,7 +190,7 @@ _SCRIPT = r"""
     head.setAttribute('role','button');
     head.setAttribute('tabindex','0');
     head.setAttribute('aria-expanded','false');
-    head.append(el('span','',countryLabel(server,index)),el('span','', '۳ اتصال'));
+    head.append(el('span','',serverLabel(server,index)),el('span','', '۳ اتصال'));
     const toggle=()=>{
       const open=card.classList.toggle('open');
       head.setAttribute('aria-expanded',open?'true':'false');
@@ -196,10 +204,34 @@ _SCRIPT = r"""
     card.append(head,body);return card;
   }
 
+  function renderSelected(tabs,holder,servers,selectedIndex){
+    const index=Math.max(0,Math.min(selectedIndex,servers.length-1));
+    [...tabs.querySelectorAll('.v57-v2ray-server-tab')].forEach((tab,tabIndex)=>{
+      tab.classList.toggle('active',tabIndex===index);
+      tab.setAttribute('aria-selected',tabIndex===index?'true':'false');
+    });
+    holder.replaceChildren();
+    const card=serverCard(servers[index],index);
+    if(card)holder.appendChild(card);
+  }
+
+  function buildTabs(tabs,holder,servers){
+    tabs.replaceChildren();
+    servers.forEach((server,index)=>{
+      const button=el('button','v57-v2ray-server-tab',serverLabel(server,index));
+      button.type='button';button.setAttribute('role','tab');button.setAttribute('aria-selected','false');
+      button.addEventListener('click',()=>renderSelected(tabs,holder,servers,index));
+      tabs.appendChild(button);
+    });
+    renderSelected(tabs,holder,servers,0);
+  }
+
   async function ensureGroups(panel){
     if(panel.dataset.v54GroupsLoaded==='1'||panel.dataset.v54GroupsLoading==='1')return;
     const anchor=panel.querySelector(':scope > .v52-multi-card,:scope > .v51-multi-card');
     if(!anchor)return;
+    let tabs=panel.querySelector(':scope > .v57-v2ray-server-tabs');
+    if(!tabs){tabs=el('div','v57-v2ray-server-tabs');tabs.setAttribute('role','tablist');anchor.insertAdjacentElement('beforebegin',tabs)}
     let holder=panel.querySelector(':scope > .v54-v2ray-groups');
     if(!holder){holder=el('div','v54-v2ray-groups');anchor.insertAdjacentElement('afterend',holder)}
     panel.dataset.v54GroupsLoading='1';
@@ -208,14 +240,15 @@ _SCRIPT = r"""
       const response=await fetch(url,{cache:'no-store',headers:{Accept:'application/json'}});
       if(!response.ok)throw new Error('meta '+response.status);
       const payload=await response.json();
-      const servers=Array.isArray(payload?.servers)?payload.servers:[];
-      holder.replaceChildren();
-      const cards=servers.map((server,index)=>serverCard(server,index)).filter(Boolean);
-      if(!cards.length){holder.appendChild(el('div','v54-v2ray-empty','اتصال‌های V2Ray این کشورها هنوز آماده نشده‌اند'))}
-      else cards.forEach(card=>holder.appendChild(card));
+      const servers=(Array.isArray(payload?.servers)?payload.servers:[])
+        .filter(server=>Array.isArray(server?.profiles)&&server.profiles.length===3);
+      tabs.replaceChildren();holder.replaceChildren();
+      if(!servers.length){holder.appendChild(el('div','v54-v2ray-empty','اتصال‌های V2Ray این سرورها هنوز آماده نشده‌اند'))}
+      else buildTabs(tabs,holder,servers);
       panel.dataset.v54GroupsLoaded='1';
     }catch(_error){
-      holder.replaceChildren(el('div','v54-v2ray-empty','نمایش کشورها و اتصال‌های V2Ray در دسترس نیست'));
+      tabs.replaceChildren();
+      holder.replaceChildren(el('div','v54-v2ray-empty','نمایش سرورها و اتصال‌های V2Ray در دسترس نیست'));
     }finally{delete panel.dataset.v54GroupsLoading}
   }
 
@@ -259,7 +292,7 @@ _V51_MULTI_NEW = "return window.location.origin+'/v1/connect/'+encodeURIComponen
 
 
 def refine_public_connection_v2ray_mobile_restore_v54(source: str) -> str:
-    """Show V2Ray country headers with three customer configs collapsed by default."""
+    """Show exact server-name tabs for V2Ray while keeping configs collapsed by default."""
     source = str(source or "")
     source = source.replace(_V41_REMOVE_OLD, _V41_REMOVE_NEW)
     source = source.replace(_V51_MULTI_OLD, _V51_MULTI_NEW)
