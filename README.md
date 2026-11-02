@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/twinpanel-banner.svg" alt="TwinPanel — Self-hosted VPN Control Plane" width="100%" />
+  <img src="docs/assets/twinpanel-banner-hq.webp" alt="TwinPanel — Self-hosted VPN Control Plane" width="100%" />
 </p>
 
 <p align="center">
