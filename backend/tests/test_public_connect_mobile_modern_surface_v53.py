@@ -37,6 +37,16 @@ def test_only_modern_uri_protocols_are_marked_for_cleanup() -> None:
     assert "'wireguard'" not in modern_block
 
 
+def test_mobile_category_bar_is_removed_on_desktop() -> None:
+    source = V53.read_text(encoding="utf-8")
+    assert "function clearMobileCategories()" in source
+    assert "document.querySelectorAll('.v51-mobile-categories').forEach(node=>node.remove())" in source
+    assert "delete choice.dataset.v51Filtered" in source
+    assert "if(!window.matchMedia(MOBILE).matches){" in source
+    assert "clearMobileCategories();" in source
+    assert "body:not(.v53-mobile-modern-clean) .v51-mobile-categories" in source
+
+
 def test_v53_runs_after_multilink_persistence() -> None:
     source = CANONICAL.read_text(encoding="utf-8")
     v52 = source.index("source = refine_public_connection_multilink_persistence_v52(source)")
