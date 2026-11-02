@@ -1,0 +1,1 @@
+High-quality banner image staged for README replacement.
