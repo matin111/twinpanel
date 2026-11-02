@@ -84,6 +84,7 @@ const COMMON_CONTENT_GROUPS:StoreTemplateOptionGroup[]=[
       text("protocols_tag","برچسب بخش","Section tag"),
       text("protocols_title","عنوان بخش","Section title"),
       area("protocols_description","توضیح بخش","Section description"),
+      area("modern_protocols_description","توضیح پروتکل‌های مدرن","Modern protocols description"),
     ],
   },
   {
@@ -249,6 +250,7 @@ const conversionDefaults:StoreTemplateOptionMap={
   plans_tag:"اشتراک‌های VPN",plans_title:"انتخاب اشتراک",plans_description:"حجم، مدت، دستگاه و پروتکل‌ها را قبل از خرید مقایسه کنید.",
   plan_feature_1:"فعال‌سازی سریع بعد از پرداخت",plan_feature_2:"تحویل اطلاعات اتصال داخل پنل",plan_feature_3:"پشتیبانی از پروتکل‌های همان پلن",
   protocols_tag:"پروتکل‌های اتصال",protocols_title:"روش اتصال مناسب شبکه و دستگاهت را انتخاب کن.",protocols_description:"هر پلن می‌تواند چند روش اتصال در اختیار شما قرار دهد.",
+  modern_protocols_description:"پروتکل‌های جدید TwinPanel در کنار گزینه‌های کلاسیک؛ برای هر شبکه مسیر مناسب‌تری در دسترس است.",
   services_tag:"خدمات",services_title:"بعد از خرید همه‌چیز داخل حساب شماست.",services_description:"مدیریت اشتراک، حجم، اتصال و پشتیبانی از یک مسیر واحد.",
   service_1_title:"سرعت بالا",service_1_description:"مسیر بهینه برای استفاده روزمره.",
   service_2_title:"پایداری بالا",service_2_description:"تجربه اتصال پایدار و قابل اتکا.",
@@ -284,6 +286,7 @@ const editorialDefaults:StoreTemplateOptionMap={
   plans_tag:"01 / PLANS",plans_title:"پلنی را انتخاب کن که دقیقاً با مصرفت جور است.",plans_description:"قیمت، حجم، مدت و تعداد دستگاه بدون متن اضافه در کنار هم دیده می‌شوند.",
   plan_feature_1:"تحویل اطلاعات اتصال در حساب",plan_feature_2:"نمایش پروتکل‌های فعال همین پلن",plan_feature_3:"قابل پیگیری از سفارش تا سرویس",
   protocols_tag:"02 / PROTOCOLS",protocols_title:"یک حساب؛ چند مسیر برای اتصال.",protocols_description:"بسته به دستگاه و شرایط شبکه، از روش اتصال مناسب همان لحظه استفاده کنید.",
+  modern_protocols_description:"پروتکل‌های مدرن در کنار روش‌های کلاسیک، انتخاب‌های بیشتری برای سازگاری با شبکه‌ها و دستگاه‌های مختلف فراهم می‌کنند.",
   services_tag:"03 / EXPERIENCE",services_title:"فروشگاه فقط محل خرید نیست؛ نقطه شروع مدیریت سرویس است.",services_description:"هر چیزی که بعد از پرداخت لازم دارید به شکل ساختاریافته در اختیار شماست.",
   service_1_title:"مسیر بهینه",service_1_description:"اتصال با مسیرهای مناسب برای استفاده روزمره.",
   service_2_title:"پایداری عملی",service_2_description:"تمرکز روی تجربه واقعی اتصال، نه فقط عدد و شعار.",
@@ -309,13 +312,13 @@ const editorialDefaults:StoreTemplateOptionMap={
 export const STORE_TEMPLATE_OPTION_DEFINITIONS:Record<string,StoreTemplateOptionDefinition>={
   "conversion-2027":{
     templateId:"conversion-2027",
-    version:1,
+    version:2,
     defaults:conversionDefaults,
     groups:[appearanceGroup(),...COMMON_CONTENT_GROUPS],
   },
   "editorial-grid-2027":{
     templateId:"editorial-grid-2027",
-    version:1,
+    version:2,
     defaults:editorialDefaults,
     groups:[appearanceGroup(),...COMMON_CONTENT_GROUPS],
   },
