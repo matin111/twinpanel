@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 
-_MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_HEADER_PARITY_V58"
+_MARKER = "TWINPANEL_PUBLIC_CONNECT_V2RAY_COUNTRY_CLICK_OPEN_V59"
 
 
 _CSS = r"""
-/* TWINPANEL_PUBLIC_CONNECT_V2RAY_HEADER_PARITY_V58 */
+/* TWINPANEL_PUBLIC_CONNECT_V2RAY_COUNTRY_CLICK_OPEN_V59 */
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .server-views,
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .v51-single-title,
 body.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] > .v57-v2ray-server-tabs{
@@ -57,7 +57,7 @@ body.v54-v2ray-restore .v54-v2ray-empty{padding:12px;color:var(--muted);font-siz
 
 
 _SCRIPT = r"""
-<script id="twinpanelPublicConnectV2rayHeaderParityV58">
+<script id="twinpanelPublicConnectV2rayCountryClickOpenV59">
 (function(){
   let timer=null;
 
@@ -164,13 +164,14 @@ _SCRIPT = r"""
     row.append(info,actions);return row;
   }
 
-  function serverCard(server,index){
+  function serverCard(server,index,openInitially){
     const profiles=Array.isArray(server?.profiles)?server.profiles:[];
     if(profiles.length!==3)return null;
     const card=el('section','v54-v2ray-server');
     const head=el('div','v54-v2ray-server-head');
-    head.setAttribute('role','button');head.setAttribute('tabindex','0');head.setAttribute('aria-expanded','false');
+    head.setAttribute('role','button');head.setAttribute('tabindex','0');head.setAttribute('aria-expanded',openInitially?'true':'false');
     head.append(el('span','',serverLabel(server,index)),el('span','', '۳ اتصال'));
+    if(openInitially)card.classList.add('open');
     const toggle=()=>{
       const open=card.classList.toggle('open');
       head.setAttribute('aria-expanded',open?'true':'false');
@@ -184,14 +185,14 @@ _SCRIPT = r"""
     card.append(head,body);return card;
   }
 
-  function renderSelected(tabs,holder,servers,selectedIndex){
+  function renderSelected(tabs,holder,servers,selectedIndex,openProfiles){
     const index=Math.max(0,Math.min(selectedIndex,servers.length-1));
     [...tabs.querySelectorAll('.server-tab')].forEach((tab,tabIndex)=>{
       tab.classList.toggle('active',tabIndex===index);
       tab.setAttribute('aria-selected',tabIndex===index?'true':'false');
     });
     holder.replaceChildren();
-    const card=serverCard(servers[index],index);
+    const card=serverCard(servers[index],index,Boolean(openProfiles));
     if(card)holder.appendChild(card);
   }
 
@@ -201,10 +202,10 @@ _SCRIPT = r"""
       const button=el('button','server-tab');
       button.type='button';button.setAttribute('role','tab');button.setAttribute('aria-selected','false');
       button.append(el('span','',serverLabel(server,index)),el('i',''));
-      button.addEventListener('click',()=>renderSelected(tabs,holder,servers,index));
+      button.addEventListener('click',()=>renderSelected(tabs,holder,servers,index,true));
       tabs.appendChild(button);
     });
-    renderSelected(tabs,holder,servers,0);
+    renderSelected(tabs,holder,servers,0,false);
   }
 
   async function ensureGroups(panel){
@@ -273,7 +274,7 @@ _V51_MULTI_NEW = "return window.location.origin+'/v1/connect/'+encodeURIComponen
 
 
 def refine_public_connection_v2ray_mobile_restore_v54(source: str) -> str:
-    """Render V2Ray server tabs in the canonical protocol header with standard live status dots."""
+    """Keep V2Ray profiles collapsed initially, then open the selected country's three profiles on tab click."""
     source = str(source or "")
     source = source.replace(_V41_REMOVE_OLD, _V41_REMOVE_NEW)
     source = source.replace(_V51_MULTI_OLD, _V51_MULTI_NEW)
