@@ -5,8 +5,8 @@ import {useState,type ReactNode} from "react";
 import {LanguageSwitch,useI18n} from "../lib/i18n";
 import {ThemeSwitch} from "../lib/theme";
 import {useBranding} from "../lib/branding";
-import {planProtocols,StorePlan} from "../lib/store-runtime-api";
-import {STORE_PROTOCOL_CATALOG,storeProtocolMeta} from "../lib/store-protocol-catalog";
+import {type StorePlan} from "../lib/store-runtime-api";
+import {STORE_PROTOCOL_CATALOG} from "../lib/store-protocol-catalog";
 import {
   StorefrontSectionId,
   StorefrontSettings,
@@ -44,6 +44,7 @@ const protocolMeta:Record<string,ProtocolMeta>={
 };
 
 const guideProtocolOrder:StoreGuideProtocol[]=["cisco","openvpn","wireguard","l2tp","v2ray"];
+const planDeviceLabels=["Android","iPhone","Windows","Mac","Linux"] as const;
 
 function Conversion2027Template({settings,plans,loading,error,message,buying,onBuy}:StoreTemplateProps){
   const {pick,lang}=useI18n();
@@ -93,7 +94,6 @@ function Conversion2027Template({settings,plans,loading,error,message,buying,onB
       <p>{content("plans_description")}</p>
     </div>
     {loading?<div className="tpStoreState">{pick("در حال دریافت پلن‌های فعال...","Loading active plans...")}</div>:plans.length===0?<div className="tpStoreState">{pick("در حال حاضر پلن فعالی برای فروش وجود ندارد.","There are currently no active plans for sale.")}</div>:<div className="tpStorePlanGrid">{plans.map((plan,index)=>{
-      const protocols=planProtocols(plan);
       const featured=index===featuredPlanIndex;
       return <article className={`tpStorePlanCard ${featured?"featured":""}`} key={plan.id}>
         {featured&&<span className="tpStorePlanRibbon">{pick("محبوب‌ترین انتخاب","Popular choice")}</span>}
@@ -106,7 +106,7 @@ function Conversion2027Template({settings,plans,loading,error,message,buying,onB
           <li><i>✓</i>{content("plan_feature_2")}</li>
           <li><i>✓</i>{content("plan_feature_3")}</li>
         </ul>
-        <div className="tpStorePlanProtocols">{protocols.slice(0,5).map(protocol=><span key={protocol}>{storeProtocolMeta(protocol)?.short||protocolMeta[protocol]?.short||protocol}</span>)}</div>
+        <div className="tpStorePlanProtocols">{planDeviceLabels.map(device=><span key={device}>{device}</span>)}</div>
         <button className="tpStoreBuyButton" disabled={buying===plan.id} onClick={()=>onBuy(plan)}>{buying===plan.id?pick("در حال ثبت سفارش...","Creating order..."):pick("خرید اشتراک","Buy subscription")}<span>←</span></button>
       </article>;
     })}</div>}
