@@ -33,6 +33,7 @@ ARTIFACT_FORMAT = 'twinpanel-prebuilt-v1'
 ALLOWED_ARTIFACT_PREFIX = 'https://github.com/matin111/twinpanel/releases/download/'
 MANIFEST_RETRY_ATTEMPTS = 3
 MANIFEST_RETRY_DELAY_SECONDS = 2.0
+RELEASE_RETENTION_COUNT = 3
 STARTED_MONOTONIC = time.monotonic()
 STAGE_SECONDS: dict[str, float] = {}
 
@@ -392,6 +393,76 @@ def rollback(previous: Path | None) -> None:
     tmp.symlink_to(previous)
     tmp.replace(CURRENT)
     restart_services()
+
+
+def prune_old_releases(
+    active: Path,
+    previous: Path | None = None,
+    keep_count: int = RELEASE_RETENTION_COUNT,
+) -> dict[str, object]:
+    """Remove stale version directories only after a successful activation.
+
+    The active release and rollback target are always protected. Cleanup is
+    best-effort: failures are reported in update state but never turn a healthy
+    deployment into a failed deployment.
+    """
+    release_pattern = re.compile(r'^\d+\.\d+\.\d+(?:-[A-Za-z0-9._-]+)?$')
+    try:
+        root = RELEASES.resolve(strict=True)
+    except Exception:
+        return {'kept': [], 'removed': [], 'errors': ['RELEASE_ROOT_UNRESOLVED']}
+
+    protected: set[Path] = set()
+    for path in (active, previous):
+        if path is None:
+            continue
+        try:
+            resolved = path.resolve(strict=True)
+        except Exception:
+            continue
+        if resolved.parent == root:
+            protected.add(resolved)
+
+    releases: list[Path] = []
+    try:
+        entries = list(RELEASES.iterdir())
+    except Exception as exc:
+        return {'kept': sorted(path.name for path in protected), 'removed': [], 'errors': [f'LIST:{type(exc).__name__}']}
+
+    for path in entries:
+        if path.is_symlink() or not path.is_dir() or not release_pattern.fullmatch(path.name):
+            continue
+        try:
+            resolved = path.resolve(strict=True)
+        except Exception:
+            continue
+        if resolved.parent == root:
+            releases.append(resolved)
+
+    releases.sort(key=lambda path: _version_key(path.name), reverse=True)
+    keep = set(protected)
+    target_count = max(int(keep_count or 0), len(keep))
+    for path in releases:
+        if len(keep) >= target_count:
+            break
+        keep.add(path)
+
+    removed: list[str] = []
+    errors: list[str] = []
+    for path in releases:
+        if path in keep:
+            continue
+        try:
+            shutil.rmtree(path)
+            removed.append(path.name)
+        except Exception as exc:
+            errors.append(f'{path.name}:{type(exc).__name__}')
+
+    return {
+        'kept': sorted((path.name for path in keep), key=_version_key),
+        'removed': sorted(removed, key=_version_key),
+        'errors': errors,
+    }
 
 
 def clone_release(repository: str, source_sha: str, target: Path) -> None:
@@ -761,6 +832,7 @@ def main() -> int:
         rollback(previous)
         raise
 
+    retention = prune_old_releases(final, previous)
     save(
         state='completed',
         target_version=version,
@@ -773,6 +845,7 @@ def main() -> int:
         requirements_reused=requirements_reused,
         active_path=str(CURRENT.resolve()),
         active_version=(CURRENT / 'VERSION').read_text(encoding='utf-8').strip(),
+        release_retention=retention,
         completed_at=now(),
     )
     try:
