@@ -1,0 +1,52 @@
+name: TwinPanel GitHub Release Retention
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/github-release-retention.yml
+  workflow_run:
+    workflows:
+      - TwinPanel Publish Prebuilt Release
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+jobs:
+  prune-releases:
+    if: ${{ github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep only the 3 newest GitHub releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t tags < <(
+            gh api --paginate "repos/${REPO}/releases?per_page=100" \
+              --jq '.[].tag_name'
+          )
+
+          echo "Found ${#tags[@]} releases"
+          printf 'Keeping: %s\n' "${tags[@]:0:3}"
+
+          if (( ${#tags[@]} <= 3 )); then
+            echo "Nothing to prune"
+            exit 0
+          fi
+
+          for tag in "${tags[@]:3}"; do
+            echo "Deleting release and tag: ${tag}"
+            release_id="$(gh api "repos/${REPO}/releases/tags/${tag}" --jq '.id')"
+            gh api --method DELETE "repos/${REPO}/releases/${release_id}"
+            gh api --method DELETE "repos/${REPO}/git/refs/tags/${tag}" || true
+          done
+
+          echo "Remaining releases:"
+          gh api "repos/${REPO}/releases?per_page=10" --jq '.[].tag_name'
