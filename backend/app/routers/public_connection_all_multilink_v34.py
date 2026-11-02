@@ -185,6 +185,10 @@ def _all_outbounds(sub: Any, protocol: str, items: list[dict[str, Any]]) -> list
     return rows
 
 
+def _subscription_name(sub: Any, protocol: str) -> str:
+    return f"{_account_name(sub)}-{_normalize(protocol)}"
+
+
 def _mieru_multi_karing_yaml(sub: Any, items: list[dict[str, Any]]) -> str:
     proxy_blocks: list[list[str]] = []
     names: list[str] = []
@@ -209,7 +213,7 @@ def _mieru_multi_karing_yaml(sub: Any, items: list[dict[str, Any]]) -> str:
         return ""
 
     q = lambda value: json.dumps(str(value), ensure_ascii=False)
-    group = _account_name(sub)
+    group = _subscription_name(sub, "mieru")
     rows = ["proxies:"]
     for block in proxy_blocks:
         rows.extend(block)
@@ -315,7 +319,7 @@ def _delivery(
 def _headers(sub: Any, protocol: str, kind: str, count: int) -> dict[str, str]:
     return {
         "Cache-Control": "no-store",
-        "Profile-Title": _account_name(sub),
+        "Profile-Title": _subscription_name(sub, protocol),
         "Profile-Update-Interval": "12",
         "X-TwinPanel-Protocol": protocol,
         "X-TwinPanel-Node-Count": str(count),
@@ -355,19 +359,20 @@ def public_protocol_multi_v34(
     protocol = _normalize(protocol)
     kind, count, sub, items, payload = _delivery(token, protocol, db)
     headers = _headers(sub, protocol, kind, count)
+    subscription_name = _safe_name(_subscription_name(sub, protocol), f"user-{protocol}")
 
     if kind == "uri":
         raw = "\n".join(payload).encode("utf-8")
         content = base64.b64encode(raw).decode("ascii")
-        headers["Content-Disposition"] = f'inline; filename="twinpanel-{protocol}-subscription.txt"'
+        headers["Content-Disposition"] = f'inline; filename="{subscription_name}-subscription.txt"'
         return Response(content=content, media_type="text/plain; charset=utf-8", headers=headers)
 
     if kind == "karing":
-        headers["Content-Disposition"] = f'inline; filename="{_safe_name(_account_name(sub), "user")}-{protocol}.yaml"'
+        headers["Content-Disposition"] = f'inline; filename="{subscription_name}.yaml"'
         return Response(content=str(payload), media_type="text/yaml; charset=utf-8", headers=headers)
 
     if kind == "singbox":
-        headers["Content-Disposition"] = f'inline; filename="twinpanel-{protocol}-singbox.json"'
+        headers["Content-Disposition"] = f'inline; filename="{subscription_name}-singbox.json"'
         return Response(
             content=json.dumps({"outbounds": payload}, ensure_ascii=False, separators=(",", ":")),
             media_type="application/json; charset=utf-8",
@@ -375,7 +380,7 @@ def public_protocol_multi_v34(
         )
 
     blob = _bundle(protocol, sub, items)
-    headers["Content-Disposition"] = f'attachment; filename="twinpanel-{protocol}-all-servers.zip"'
+    headers["Content-Disposition"] = f'attachment; filename="{subscription_name}-all-servers.zip"'
     return Response(content=blob, media_type="application/zip", headers=headers)
 
 
