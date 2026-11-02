@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.517",
-  "source_sha": "3a063ba0d8d6ac6d51a98ccc03aa50fb7d85f576",
+  "version": "1.1.0-rc.518",
+  "source_sha": "d5e944323be3f92b6f7c3cc27ff854b058dce8d1",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.517 چیدمان تب‌های سرور V2Ray/Xray را با سایر پروتکل‌ها یکسان می‌کند. تب‌های سرور در سمت چپ پنل مثل WireGuard/Cisco/OpenVPN نمایش داده می‌شوند، نام هر تب دقیقاً از Node.name سرور می‌آید، فقط سرور انتخاب‌شده نمایش داده می‌شود و سه کانفیگ آن همچنان به‌صورت پیش‌فرض مخفی می‌مانند تا کاربر بازشان کند. Multi-Link و اکشن‌های کانفیگ بدون تغییر باقی مانده‌اند. Source روی SHA immutable 3a063ba0d8d6ac6d51a98ccc03aa50fb7d85f576 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.517 aligns V2Ray/Xray server tabs with the existing protocol panels. Server tabs are left-aligned like WireGuard/Cisco/OpenVPN, each label comes directly from the server Node.name, only the selected server is rendered, and its three configs remain collapsed by default until the user expands them. Multi-Link and config actions are unchanged. Source is pinned to immutable SHA 3a063ba0d8d6ac6d51a98ccc03aa50fb7d85f576."
+    "fa": "TwinPanel 1.1.0-rc.518 هنگام افزودن سرور Exit جدید گزینه «نمایش برای همه کاربران سایت» را اضافه می‌کند. با فعال‌کردن این گزینه، سرور جدید علاوه بر اشتراک‌های Legacy به اشتراک‌های قدیمی دارای Delivery Policy صریح هم اضافه می‌شود، حالت Direct برای نود ایجاد یا فعال می‌شود و برای اشتراک‌های فعال Reconcile اجرا می‌شود تا credentialهای قابل استفاده روی سرور جدید واقعاً Provision شوند. رفتار Auto-Sync قبلی برای اشتراک‌های Legacy حفظ شده و این گزینه برای نودهای Iran/Relay نمایش داده نمی‌شود. این نسخه همچنین UI فعال‌سازی و تمدید لایسنس فقط برای ادمین را از main فعلی شامل می‌شود. Source روی SHA immutable d5e944323be3f92b6f7c3cc27ff854b058dce8d1 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.518 adds a publish-to-all-users option when installing a new Exit node. When enabled, the new server is added not only to legacy subscriptions but also to existing subscriptions with explicit Delivery Policy, direct delivery is created or enabled for the node, and active subscriptions are reconciled so usable credentials are actually provisioned on the new server. Existing legacy auto-sync behavior is preserved, and the option is not shown for Iran/Relay nodes. This version also includes the admin-only license activation and renewal UI already present on current main. Source is pinned to immutable SHA d5e944323be3f92b6f7c3cc27ff854b058dce8d1."
   }
 }
