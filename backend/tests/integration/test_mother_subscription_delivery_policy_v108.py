@@ -37,6 +37,7 @@ def _node(node_id: int, *, mother: bool):
     return SimpleNamespace(
         id=node_id,
         is_mother=mother,
+        agent_url="local://core" if mother else "https://agent.example.invalid",
     )
 
 
@@ -92,7 +93,7 @@ def test_reseller_subscription_uses_reseller_policy():
         policy.reseller_can_use_mother = original_reseller
 
 
-def test_hidden_mother_is_removed_without_mutating_stored_payload():
+def test_multilink_filter_removes_mother_without_mutating_stored_payload():
     db = _DB(
         nodes={
             1: _node(1, mother=True),
@@ -128,13 +129,13 @@ def test_hidden_mother_is_removed_without_mutating_stored_payload():
         {"node_id": 5, "node": "usa"}
     ]
 
-    # The persisted/decrypted payload supplied by account_delivery is not
-    # changed. Re-enabling access can therefore expose Mother again instantly.
+    # Stored/single-server payload remains intact. Only the Multi-Link copy is
+    # filtered, so Mother can still appear as an individual server.
     assert len(payload["credentials"]) == 2
     assert len(payload["credentials"][0]["items"]) == 2
 
 
-def test_stored_info_wrapper_filters_only_when_policy_is_disabled():
+def test_stored_info_preserves_mother_when_multilink_policy_is_disabled():
     db = _DB(
         nodes={
             1: _node(1, mother=True),
@@ -162,10 +163,6 @@ def test_stored_info_wrapper_filters_only_when_policy_is_disabled():
         policy._original_stored_info = lambda _db, _sub: payload
         policy._subscription_can_use_mother = lambda _db, _sub: False
 
-        hidden = policy._stored_info_with_mother_policy(db, sub)
-        assert hidden["credentials"][0]["items"] == [{"node_id": 5}]
-
-        policy._subscription_can_use_mother = lambda _db, _sub: True
         visible = policy._stored_info_with_mother_policy(db, sub)
         assert visible is payload
         assert visible["credentials"][0]["items"] == [
@@ -240,8 +237,8 @@ def test_modern_direct_exit_without_tunnel_is_usable_when_runtime_online():
 if __name__ == "__main__":
     test_direct_subscription_uses_admin_policy()
     test_reseller_subscription_uses_reseller_policy()
-    test_hidden_mother_is_removed_without_mutating_stored_payload()
-    test_stored_info_wrapper_filters_only_when_policy_is_disabled()
+    test_multilink_filter_removes_mother_without_mutating_stored_payload()
+    test_stored_info_preserves_mother_when_multilink_policy_is_disabled()
     test_mother_account_delivery_uses_local_runtime_executor()
     test_modern_direct_exit_without_tunnel_is_usable_when_runtime_online()
-    print("MOTHER_SUBSCRIPTION_DELIVERY_POLICY_V109_OK")
+    print("MOTHER_SUBSCRIPTION_DELIVERY_POLICY_V110_OK")
