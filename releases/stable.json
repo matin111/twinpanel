@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.513",
+  "version": "1.1.0-rc.514",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T17:23:06Z",
+  "released_at": "2026-11-02T17:36:59Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "185235617e2fe29dc77f12789c24824467f27461",
+  "source_sha": "7499227247e5303a3c9518d38db00be60e839ed2",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.513/twinpanel-1.1.0-rc.513-linux-x86_64.tar.gz",
-    "sha256": "f24d7ef9afe517fc7932571851bc12499d6b19883c764c92747d778e7db144c0",
-    "size_bytes": 25387328
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.514/twinpanel-1.1.0-rc.514-linux-x86_64.tar.gz",
+    "sha256": "30356808c8e7e8c2af77cb49a239e3a31003d0f1ba161eb05dab3e1002bb1f94",
+    "size_bytes": 25395232
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.513 رفتار نمایش V2Ray/Xray در Public Connect را بهینه می‌کند: هدر کشورها همیشه دیده می‌شود، اما سه کانفیگ هر کشور به‌صورت پیش‌فرض مخفی هستند و کاربر با کلیک روی همان کشور می‌تواند آن‌ها را باز یا بسته کند. ظاهر ردیف‌های کانفیگ، دکمه‌های کپی/ارسال و Multi-Link بدون تغییر باقی مانده‌اند. Policy سه‌پروفایلی exact-three و Reconcile نسخه قبل نیز بدون تغییر حفظ شده‌اند. Source روی SHA immutable 185235617e2fe29dc77f12789c24824467f27461 قفل شده است.",
-    "en": "TwinPanel 1.1.0-rc.513 refines the V2Ray/Xray Public Connect UX: country headers always remain visible, while the three configs under each country are collapsed by default and can be expanded or collapsed by clicking that country header. Existing config rows, copy/send actions, and Multi-Link remain unchanged. The exact-three profile policy and reconciliation behavior from the previous release are preserved. Source is pinned to immutable SHA 185235617e2fe29dc77f12789c24824467f27461."
+    "fa": "TwinPanel 1.1.0-rc.514 مدیریت گروهی اشتراک‌ها را اضافه می‌کند. در صفحه اشتراک‌ها یک دکمه «مدیریت گروهی» قرار دارد که از داخل همان پنجره می‌توان برای همه اشتراک‌های قابل‌ویرایش حجم را افزایش یا کاهش داد و روز را افزایش یا کاهش داد. اشتراک‌های لغوشده رد می‌شوند، اشتراک‌های نامحدود در عملیات حجم رد می‌شوند و کاهش حجم هیچ‌وقت سقف را پایین‌تر از مصرف واقعی نمی‌برد. مسیرهای Provisioning، Accounting، Tunnel و Protocol dataplane بدون تغییر باقی مانده‌اند. Source روی SHA immutable 7499227247e5303a3c9518d38db00be60e839ed2 قفل شده است.",
+    "en": "TwinPanel 1.1.0-rc.514 adds bulk subscription management. The subscriptions page now has one Bulk Management control that can add or reduce traffic and add or reduce days across all editable subscriptions. Canceled subscriptions are skipped, unlimited subscriptions are skipped for traffic operations, and traffic reduction is never allowed below actual usage. Provisioning, accounting, tunnel, and protocol dataplane behavior remain unchanged. Source is pinned to immutable SHA 7499227247e5303a3c9518d38db00be60e839ed2."
   }
 }
