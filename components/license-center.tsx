@@ -21,6 +21,7 @@ type LicenseState={
   offline_grace_seconds_remaining?:number|null;
   features?:string[];
   enforced?:boolean;
+  renewal_bot_url?:string;
 };
 
 type ReleaseStatus={
@@ -131,6 +132,7 @@ export function LicenseCenter(){
     const map:Record<string,[string,string]>={
       online:["آنلاین و تأییدشده","Online / verified"],
       offline_grace:["مهلت آفلاین","Offline grace"],
+      offline_cache:["اعتبارسنجی آفلاین","Offline cache"],
       server_unreachable:["سرور لایسنس در دسترس نیست","License server unreachable"],
       none:["هنوز اعتبارسنجی نشده","Not validated yet"],
     };
@@ -190,6 +192,7 @@ export function LicenseCenter(){
   const remaining=remainingText(license.seconds_remaining,fa);
   const expiry=license.trial_expires_at||license.expires_at;
   const features=Array.isArray(license.features)?license.features:[];
+  const renewalBot=String(license.renewal_bot_url||"").trim();
 
   return <Shell active="/admin/license">
     <div className="page">
@@ -225,14 +228,21 @@ export function LicenseCenter(){
 
         <Card>
           <div className="section-head"><div><h2>{pick("فعال‌سازی لایسنس","Activate paid license")}</h2><p>{pick("کلید خریداری‌شده را وارد کنید. کاربران، نودها و تنظیمات فعلی بدون تغییر می‌مانند.","Enter a purchased key. Existing users, nodes and configuration remain untouched.")}</p></div></div>
-          <label className="field"><span>{pick("کلید لایسنس","License key")}</span><input dir="ltr" autoComplete="off" value={licenseKey} onChange={event=>setLicenseKey(event.target.value)} placeholder="TP-XXXX-XXXX-XXXX"/></label>
+          <label className="field"><span>{pick("کد لایسنس","License key")}</span><input dir="ltr" autoComplete="off" value={licenseKey} onChange={event=>setLicenseKey(event.target.value)} placeholder="TP-XXXX-XXXX-XXXX"/></label>
           <div className="row-actions">
-            <button type="button" className="primary" disabled={busy==="activate"||licenseKey.trim().length<8} onClick={()=>void run("activate")}>{busy==="activate"?"…":pick("فعال‌سازی روی این سرور","Activate on this server")}</button>
+            <button type="button" className="primary" disabled={busy==="activate"||licenseKey.trim().length<8} onClick={()=>void run("activate")}>{busy==="activate"?"…":pick("ثبت و فعال‌سازی لایسنس","Save & activate license")}</button>
             {canStartTrial&&<button type="button" disabled={busy==="trial"} onClick={()=>void run("trial")}>{busy==="trial"?"…":pick("شروع / بازیابی ۷ روز آزمایشی","Start / recover 7-day trial")}</button>}
           </div>
-          <small>{pick("کلید لایسنس در رابط کاربری نمایش یا ذخیره نمی‌شود؛ Backend آن را فقط برای فعال‌سازی به سرور لایسنس ارسال می‌کند.","The license key is not displayed or persisted by the UI; the backend only forwards it to the license service for activation.")}</small>
+          <small>{pick("کد لایسنس در رابط کاربری نمایش یا ذخیره نمی‌شود؛ Backend آن را فقط برای فعال‌سازی به سرور لایسنس ارسال می‌کند.","The license key is not displayed or persisted by the UI; the backend only forwards it to the license service for activation.")}</small>
         </Card>
       </div>
+
+      {renewalBot&&<Card>
+        <div className="section-head"><div><h2>{pick("خرید و تمدید لایسنس","Buy / renew license")}</h2><p>{pick("این لینک فقط در بخش مدیریت نمایش داده می‌شود و برای کاربران عادی قابل مشاهده نیست.","This link is visible only in the admin area and is never exposed to regular users.")}</p></div></div>
+        <div className="row-actions">
+          <a className="primary" href={renewalBot} target="_blank" rel="noreferrer">{pick("باز کردن ربات خرید و تمدید","Open purchase / renewal bot")}</a>
+        </div>
+      </Card>}
 
       <Card>
         <div className="section-head"><div><h2>{pick("سیاست دسترسی","Access policy")}</h2><p>{pick("قطع موقت سرور لایسنس نباید VPN کاربران را قطع کند.","A temporary license-server outage must not interrupt existing VPN traffic.")}</p></div></div>
