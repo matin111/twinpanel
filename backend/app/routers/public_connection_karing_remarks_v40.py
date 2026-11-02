@@ -34,16 +34,8 @@ _SCRIPT = r"""
   function withName(raw,name){
     const parts=deepParts(raw);
     if(!parts||!name)return String(raw||'');
-
-    // Karing's Add Profile dialog derives Remarks from the subscription URL
-    // itself (fragment -> remarks -> name -> title -> host). Therefore the
-    // canonical profile name must live on the inner Multi-Link URL, not only
-    // on the outer karing://install-config deep link.
     parts.inner.searchParams.set('name',name);
     parts.deep.searchParams.set('url',parts.inner.toString());
-
-    // Keep the outer name as a compatibility hint for Karing versions that
-    // consume install-config metadata directly.
     parts.deep.searchParams.set('name',name);
     return parts.deep.toString();
   }
@@ -59,25 +51,39 @@ _SCRIPT = r"""
     return fallback;
   }
 
+  function protocolFor(link){
+    const card=link.closest('.v38-all-card[data-v38-protocol]');
+    return String(card?.dataset?.v38Protocol||'').trim().toLowerCase();
+  }
+
+  async function prepare(link){
+    const protocol=protocolFor(link);if(!protocol)return link.getAttribute('href')||'';
+    const current=link.getAttribute('href')||'';
+    const fallback=accountName()+'-'+protocol;
+    const profile=await canonicalProfile(current,fallback);
+    const next=withName(current,profile);
+    if(next)link.setAttribute('href',next);
+    link.dataset.tpKaringProfile=profile;
+    link.dataset.tpKaringInnerName='ready';
+    return next||current;
+  }
+
   function patch(){
-    const account=accountName();
-    if(!account)return;
-    document.querySelectorAll('.v38-all-card[data-v38-protocol]').forEach(function(card){
-      const protocol=String(card.dataset.v38Protocol||'').trim().toLowerCase();
-      if(!protocol)return;
-      const fallback=account+'-'+protocol;
-      card.querySelectorAll('a[href^="karing://install-config"]').forEach(async function(link){
-        if(link.dataset.tpKaringInnerName==='pending')return;
-        link.dataset.tpKaringInnerName='pending';
-        const current=link.getAttribute('href')||'';
-        const profile=await canonicalProfile(current,fallback);
-        const next=withName(current,profile);
-        if(next&&next!==current)link.setAttribute('href',next);
-        link.dataset.tpKaringProfile=profile;
-        link.dataset.tpKaringInnerName='ready';
-      });
+    document.querySelectorAll('.v38-all-card[data-v38-protocol] a[href^="karing://install-config"]').forEach(function(link){
+      if(link.dataset.tpKaringInnerName==='ready'||link.dataset.tpKaringInnerName==='pending')return;
+      link.dataset.tpKaringInnerName='pending';
+      prepare(link).catch(function(){link.dataset.tpKaringInnerName='idle'});
     });
   }
+
+  document.addEventListener('click',async function(event){
+    const link=event.target?.closest?.('.v38-all-card[data-v38-protocol] a[href^="karing://install-config"]');
+    if(!link)return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const href=await prepare(link);
+    if(href)window.location.href=href;
+  },true);
 
   patch();
   window.setTimeout(patch,0);
