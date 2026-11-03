@@ -31,11 +31,18 @@ jobs:
           PYTHONPATH: backend
         run: |
           python - <<'PY'
-          from app.wireguard_live_telemetry_v97 import (
-              _client_ip,
-              parse_wireguard_dump,
-              peer_is_live,
+          # Import the standalone parser directly: importing app.__init__
+          # requires the full FastAPI production dependency graph.
+          import importlib.util
+          spec = importlib.util.spec_from_file_location(
+              "wg_live_telemetry",
+              "backend/app/wireguard_live_telemetry_v97.py",
           )
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          _client_ip = module._client_ip
+          parse_wireguard_dump = module.parse_wireguard_dump
+          peer_is_live = module.peer_is_live
 
           assert _client_ip('[Interface]\nAddress = 10.93.0.18/32\n') == '10.93.0.18'
 
