@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.533",
-  "source_sha": "4c29b0e0328377eda28a80940df23b7545bc429b",
+  "version": "1.1.0-rc.534",
+  "source_sha": "87bfa0365bc5d6ff0e3d40cfcacd3c3527f0b6fe",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.533 رابط ساخت دستی اشتراک را اصلاح می‌کند تا انتخاب پروتکل‌ها و سرورها بلافاصله داخل همان پنجره و قبل از فیلدهای اکانت دیده شود. هر ۱۵ پروتکل و همه سرورهای Exit فعال قابل انتخاب هستند، شمارنده انتخاب‌ها همیشه نمایش داده می‌شود، بدون انتخاب سرور ساخت انجام نمی‌شود و مسیر Fast Create همچنان ثبت سریع و Provisioning پس‌زمینه را حفظ می‌کند.",
-    "en": "TwinPanel 1.1.0-rc.533 fixes the manual subscription creation UI so protocol and server selectors are immediately visible in the same dialog before account fields. All 15 protocols and active Exit servers remain selectable, selection counters stay visible, at least one server is required, and the fast-create path continues to return quickly while provisioning proceeds in the background."
+    "fa": "TwinPanel 1.1.0-rc.534 مسیر واقعی دکمه ساخت اشتراک در صفحه ادمین را به یک سازنده واحد وصل می‌کند. پنجره ساخت اکنون هر ۱۵ پروتکل و سرورهای Exit فعال را برای همان اکانت نمایش می‌دهد، node_ids و protocols واقعی را از مسیر Fast Create ارسال می‌کند و Provisioning پس‌زمینه را حفظ می‌کند. سازنده ثانویه قدیمی دست‌نخورده می‌ماند و دیگر دو Modal برای یک دکمه با هم رقابت نمی‌کنند.",
+    "en": "TwinPanel 1.1.0-rc.534 routes the real admin subscriptions create button to one unified creator. The dialog exposes all 15 protocols and active Exit servers for the account, submits real node_ids and protocols through Fast Create, and keeps provisioning in the background. The secondary legacy constructor remains untouched and no longer competes for the same button."
   }
 }
