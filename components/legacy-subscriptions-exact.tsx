@@ -193,9 +193,11 @@ export function LegacySubscriptionsRuntimePage(){
     if(cached)return Promise.resolve(cached);
     const inFlight=linkPending.current.get(id);
     if(inFlight)return inFlight;
-    const request=adminApi.subscriptionShareLink(id).catch(async()=>{
-      // Compatibility with servers that have not deployed the lightweight route.
-      // Normal/current releases use the fast path and never invoke provisioning.
+    const request=adminApi.subscriptionShareLink(id).catch(async(reason)=>{
+      // Only old installations with a missing route use the legacy endpoint.
+      // Never turn a transient error into an expensive provisioning request.
+      const message=reason instanceof Error?reason.message:String(reason);
+      if(!/(not found|api error 404)/i.test(message))throw reason;
       const fallback=await adminApi.subscriptionConnectionInfo(id);
       return {subscription_link:s(fallback.subscription_link)};
     }).then(data=>{
