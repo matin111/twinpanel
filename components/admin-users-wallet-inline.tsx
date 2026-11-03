@@ -184,6 +184,7 @@ export function AdminUsersWalletInline(){
             <div>
               <b>{mode==="debit"?pick("کاهش موجودی کیف پول","Deduct from wallet"):pick("افزایش موجودی کیف پول","Credit user wallet")} #{userId}</b>
               <small>{pick("موجودی فعلی","Current balance")}: {money(currentBalance)}</small>
+              <small>{pick("توجه: این تغییر فقط برای شناسه همین کاربر است. ربات باید به همین حساب متصل باشد.","This change affects only this user ID. The bot must be linked to the same account.")}</small>
             </div>
             <button type="button" className="icon-button" onClick={close}>×</button>
           </div>
