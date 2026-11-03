@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.562",
-  "source_sha": "61bdcac74fe751e03c16a95b6896f26282230827",
+  "version": "1.1.0-rc.563",
+  "source_sha": "5c7bba59f5126f5ddefd7f6bf9bc4132f4890dd7",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.562 رجیستری مشترک ۱۵ پروتکل را برای انتقال کاربران سنایی، مرزبان، ایلان و پاسارگاد فعال می‌کند. ثبت دسته‌ای، حفظ UUID موجود V2Ray، تکمیل پروتکل‌های جاافتاده به‌شکل قابل‌ادامه و نمایش وضعیت واقعی کانفیگ‌ها اضافه شده‌اند. ثبت پروتکل به‌تنهایی به معنای Provision کامل روی نودها نیست.",
-    "en": "TwinPanel 1.1.0-rc.562 unifies Sanaei, Marzban, Eylan and Pasargad imports on canonical 15-protocol snapshots, with bounded batch staging, preserved V2Ray UUIDs, resumable backfill, and honest per-source config readiness status. Remote provisioning remains separate and subject to eligible node capacity."
+    "fa": "TwinPanel rc.563 پردازش Convergence پروتکل‌های مدرن را بدون تغییر رفتار ساخت اکانت، با دریافت گروهی وضعیت پروتکل و Credential (دسته‌های ۵۰۰ تایی) سریع‌تر می‌کند و خواندن محتوای رمزگذاری‌شده برای بررسی تغییر توپولوژی را حذف می‌کند. جلوگیری از تغییر بخش‌های پرداخت، فروشگاه و ربات و حفظ کانفیگ‌های موجود مدنظر است.",
+    "en": "Optimize 15-protocol convergence by batching selected-state and credential lookups in 500-record chunks and fingerprinting credential presence without fetching encrypted blobs. Retain original provisioning and credential reuse paths. No changes to payment, store or bot logic."
   }
 }
