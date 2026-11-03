@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect,useState,type CSSProperties} from "react";
+import {useEffect,useMemo,useState,type CSSProperties} from "react";
 import {getCustomerToken} from "../lib/customer-api";
 import {planProtocols,StorePlan,storeRuntimeApi} from "../lib/store-runtime-api";
 import {useI18n} from "../lib/i18n";
@@ -16,12 +16,14 @@ import {
   type StoreTemplateOptionMap,
 } from "../lib/store-template-options";
 import {loadStoreTemplateSettings} from "../lib/store-template-settings-api";
+import {PlanCategoryTabs,filterPlansByCategory,planCategories,planCategoryCounts} from "./plan-category-tabs";
 import {StorefrontSeoRuntime} from "./storefront-seo-runtime";
 import {StoreTemplateRuntime} from "./store-template-runtime-registry";
 
 export function StoreRuntime2027(){
   const {pick}=useI18n();
   const [plans,setPlans]=useState<StorePlan[]>([]);
+  const [activeCategory,setActiveCategory]=useState("");
   const [settings,setSettings]=useState<StorefrontSettings|null>(null);
   const [templateSettings,setTemplateSettings]=useState<Record<string,Record<string,unknown>>>({});
   const [ready,setReady]=useState(false);
@@ -29,6 +31,11 @@ export function StoreRuntime2027(){
   const [error,setError]=useState("");
   const [buying,setBuying]=useState<number|null>(null);
   const [message,setMessage]=useState("");
+
+  const categories=useMemo(()=>planCategories(plans),[plans]);
+  const categoryCounts=useMemo(()=>planCategoryCounts(plans),[plans]);
+  const selectedCategory=categories.includes(activeCategory)?activeCategory:(categories[0]||"");
+  const visiblePlans=useMemo(()=>filterPlansByCategory(plans,selectedCategory),[plans,selectedCategory]);
 
   const load=async()=>{
     setLoading(true);setReady(false);setError("");
@@ -114,7 +121,7 @@ export function StoreRuntime2027(){
 
   const templateProps={
     settings:effectiveSettings,
-    plans,
+    plans:visiblePlans,
     loading,
     error,
     message,
@@ -125,5 +132,6 @@ export function StoreRuntime2027(){
   return <div data-store-theme-engine="v1" data-store-template-active={templateId} data-store-template-customized={hasTemplateOptions?"true":"false"} style={themeStyle}>
     <StorefrontSeoRuntime settings={effectiveSettings}/>
     <StoreTemplateRuntime templateId={templateId} themeOptions={effectiveOptions} {...templateProps}/>
+    <PlanCategoryTabs categories={categories} active={selectedCategory} onChange={setActiveCategory} counts={categoryCounts} portalToStorePlans/>
   </div>;
 }
