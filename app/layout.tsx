@@ -74,6 +74,7 @@ import "./login-professional.css";
 import "./tunnel-transports-2027.css";
 import "./admin-overlay-fixes.css";
 import "./store-orbit-public-cleanup.css";
+import "./admin-notification-readability.css";
 
 export const metadata:Metadata={title:"VPN Control 2027",description:"VPN management control panel"};
 
