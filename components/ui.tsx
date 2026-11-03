@@ -15,7 +15,8 @@ const menuGroups=[
     ["کاربران","Users","/admin/users","♙"],
     ["اشتراک‌ها","Subscriptions","/admin/subscriptions","▱"],
     ["انتقال اکانت‌ها","Migration Center","/admin/migration-center","⇢"],
-    ["پلن‌ها","Plans","/admin/plans","◈"]
+    ["پلن‌ها","Plans","/admin/plans","◈"],
+    ["اکانت تست","Trial Account","/admin/trial","◇"]
   ]},
   {fa:"شبکه و زیرساخت",en:"Network & Infrastructure",items:[
     ["نودها","Nodes","/admin/nodes","▦"],

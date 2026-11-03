@@ -17,7 +17,6 @@ from ..reseller_owned_plans import (
     is_internal_reseller_plan,
 )
 from ..schemas import PlanCreate, PlanUpdate
-from ..services.trial_service import plan_trial_payload, update_plan_trial_setting
 
 router = APIRouter(prefix="/v1/plans", tags=["plans"])
 
@@ -29,7 +28,6 @@ def _central_plans(db: Session):
 
 
 def _plan_payload(db: Session, plan: Plan) -> dict:
-    trial = plan_trial_payload(db, int(plan.id))
     return {
         "id": int(plan.id),
         "name": plan.name,
@@ -47,7 +45,6 @@ def _plan_payload(db: Session, plan: Plan) -> dict:
         "protocols": plan_template_protocols(db, int(plan.id)),
         "node_ids": plan_template_node_ids(db, int(plan.id)),
         "selection_scope": "plan_template_snapshot",
-        **trial,
     }
 
 
@@ -187,7 +184,6 @@ def create_plan(raw: dict = Body(...), db: Session = Depends(get_db)):
     plan = Plan(**payload.model_dump())
     db.add(plan)
     db.flush()
-    update_plan_trial_setting(db, int(plan.id), raw, creating=True)
     _replace_selection(
         db,
         int(plan.id),
@@ -224,7 +220,6 @@ def update_plan(
     for key, value in values.items():
         setattr(plan, key, value)
 
-    update_plan_trial_setting(db, int(plan.id), raw, creating=False)
     protocols, node_ids = _selection_values(raw, creating=False)
     _replace_selection(
         db,

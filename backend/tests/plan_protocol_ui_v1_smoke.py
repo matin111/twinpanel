@@ -67,8 +67,8 @@ def main() -> None:
     assert "node_ids" in plan_ui
     assert "protocols" in plan_ui
     assert "snapshot" in plan_ui.lower()
-    assert "trial_enabled" in plan_ui
-    assert "trial_traffic_mb" in plan_ui
+    assert "trial_enabled" not in plan_ui
+    assert "trial_traffic_mb" not in plan_ui
 
     plan_router = PLAN_ROUTER.read_text(encoding="utf-8")
     assert "replace_plan_template_protocols" in plan_router
