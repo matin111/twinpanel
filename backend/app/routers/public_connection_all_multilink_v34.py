@@ -75,7 +75,7 @@ PROTOCOL_CLIENT = {
     "tuic": "karing",
     "anytls": "karing",
     "naive": "karing",
-    "shadowtls": "sing-box",
+    "shadowtls": "karing",
     "snell": "hiddify",
     "mieru": "karing",
     "trusttunnel": "trusttunnel",
@@ -192,6 +192,64 @@ def _all_outbounds(sub: Any, protocol: str, items: list[dict[str, Any]]) -> list
     return rows
 
 
+def _shadowtls_multi_karing_yaml(sub: Any, items: list[dict[str, Any]]) -> str:
+    rows = ["proxies:"]
+    names: list[str] = []
+    q = lambda value: json.dumps(str(value), ensure_ascii=False)
+    for item in items:
+        raw = str(item.get("config") or "").strip()
+        if not raw:
+            return ""
+        try:
+            config = json.loads(raw)
+        except Exception:
+            return ""
+        outbounds = config.get("outbounds") if isinstance(config, dict) else None
+        if not isinstance(outbounds, list):
+            return ""
+        ss = next((x for x in outbounds if isinstance(x, dict) and str(x.get("type") or "").lower()=="shadowsocks"), None)
+        st = next((x for x in outbounds if isinstance(x, dict) and str(x.get("type") or "").lower()=="shadowtls"), None)
+        if not isinstance(ss, dict) or not isinstance(st, dict):
+            return ""
+        profile = _profile_name(sub, "shadowtls", item)
+        server = str(st.get("server") or "").strip()
+        try:
+            port = int(st.get("server_port") or 0)
+        except Exception:
+            port = 0
+        method = str(ss.get("method") or "").strip()
+        ss_password = str(ss.get("password") or "")
+        st_password = str(st.get("password") or "")
+        tls = st.get("tls") if isinstance(st.get("tls"), dict) else {}
+        host = str(tls.get("server_name") or "").strip()
+        version = int(st.get("version") or 3)
+        if not server or not (1 <= port <= 65535) or not method or not ss_password or not st_password or not host:
+            return ""
+        names.append(profile)
+        rows.extend([
+            f"  - name: {q(profile)}",
+            "    type: ss",
+            f"    server: {q(server)}",
+            f"    port: {port}",
+            f"    cipher: {q(method)}",
+            f"    password: {q(ss_password)}",
+            "    udp: true",
+            "    plugin: shadow-tls",
+            "    client-fingerprint: chrome",
+            "    plugin-opts:",
+            f"      host: {q(host)}",
+            f"      password: {q(st_password)}",
+            f"      version: {version}",
+        ])
+    if not names:
+        return ""
+    group = _multilink_name(sub, "shadowtls")
+    rows.extend(["proxy-groups:", f"  - name: {q(group)}", "    type: select", "    proxies:"])
+    rows.extend(f"      - {q(name)}" for name in names)
+    rows.extend(["rules:", f"  - MATCH,{group}", ""])
+    return "\n".join(rows)
+
+
 def _mieru_multi_karing_yaml(sub: Any, items: list[dict[str, Any]]) -> str:
     proxy_blocks: list[list[str]] = []
     names: list[str] = []
@@ -303,12 +361,10 @@ def _delivery(
     if protocol in NATIVE_BUNDLE_PROTOCOLS:
         return "bundle", len(items), sub, items, None
 
-    # ShadowTLS is a chained sing-box transport (Shadowsocks -> ShadowTLS).
-    # Karing flattens multi-outbound subscription JSON and exposes the
-    # ShadowTLS transport as a standalone server, which is not connectable.
-    # Deliver the canonical per-node sing-box configs as a ZIP instead.
     if protocol == "shadowtls":
-        return "bundle", len(items), sub, items, None
+        karing_yaml = _shadowtls_multi_karing_yaml(sub, items)
+        if karing_yaml:
+            return "karing", len(items), sub, items, karing_yaml
 
     uris = _all_share_uris(sub, protocol, items)
     if uris:
