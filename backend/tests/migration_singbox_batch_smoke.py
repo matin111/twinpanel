@@ -40,7 +40,8 @@ with tempfile.TemporaryDirectory() as directory:
               "REVOCATION_SENTINEL": "__twinpanel_revoked__",
               "SHADOWTLS_INNER_TAG": "twinpanel-shadowtls-inner",
               "SHADOWTLS_INNER_METHOD": "aes-256-gcm",
-              "SingBoxAccountError": RuntimeError}
+              "SingBoxAccountError": RuntimeError,
+              "SingBoxAccountSecret": Secret}
     exec(compile(ast.Module(body=nodes, type_ignores=[]), str(SOURCE_PATH), "exec"), values)
     batch = values["_batch_mutation_script"]
     secrets = []
