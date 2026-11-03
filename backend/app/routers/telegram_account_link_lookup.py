@@ -223,6 +223,13 @@ def resolve_account_link(
         raise _credential_error(telegram_id)
 
     sub = matches[0]
+    # Credential verification also must not expose a revoked or expired
+    # subscription. Keep the same generic error to prevent enumeration.
+    if sub.status != SubscriptionStatus.ACTIVE or (
+        sub.expires_at is not None and sub.expires_at <= datetime.utcnow()
+    ):
+        raise _credential_error(telegram_id)
+
     expected_password = str(sub.account_password_encrypted or "")
 
     if not expected_password or not hmac.compare_digest(
