@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.528",
+  "version": "1.1.0-rc.529",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T00:07:00Z",
+  "released_at": "2026-11-03T00:21:48Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "8f7a3805da3d74362ac2b1b48c0ecb9a43e83328",
+  "source_sha": "a070f436d4a10515839e5a84e104fbff6ae9a20d",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.528/twinpanel-1.1.0-rc.528-linux-x86_64.tar.gz",
-    "sha256": "7e7bb10dc161307103aef68152e52cbd828c4d87f62eef43354330bc0b692f64",
-    "size_bytes": 25429511
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.529/twinpanel-1.1.0-rc.529-linux-x86_64.tar.gz",
+    "sha256": "b6f3d2514085a8c5a6b8d125012dd73a3d29bf427d4758cb6a5c90224f5d377c",
+    "size_bytes": 25428562
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.528 رگرسیون ساخت اشتراک دستی و افزودن سرور را اصلاح می‌کند؛ انتخاب ۱۵ پروتکل و سرورهای Exit در ساخت دستی دوباره در دسترس است، ساخت اکانت پس از ثبت اولیه در پس‌زمینه ادامه می‌یابد و افزودن سرور نیز بدون قفل‌کردن رابط، آماده‌سازی و انتشار سرور جدید برای اشتراک‌های قبلی را در Backend انجام می‌دهد.",
-    "en": "TwinPanel 1.1.0-rc.528 fixes regressions in manual subscription creation and Add Server; the full 15-protocol and Exit-node selectors are restored, account provisioning continues in the backend after the initial create request, and new server preparation plus publish-to-existing-subscriptions runs without blocking the admin UI."
+    "fa": "TwinPanel 1.1.0-rc.529 مشکل تحویل ندادن اکانت توسط ربات اصلی پس از تأیید پرداخت را اصلاح می‌کند. اگر اشتراک ساخته شده و لینک اتصال معتبر و اطلاعات قابل استفاده داشته باشد، خطای موقت یک پروتکل دیگر سفارش را provision_failed نمی‌کند؛ سفارش fulfilled می‌شود، پیام تحویل رسمی ربات ارسال می‌شود و تکمیل پروتکل‌های باقی‌مانده در پس‌زمینه ادامه پیدا می‌کند.",
+    "en": "TwinPanel 1.1.0-rc.529 fixes main Telegram bot account delivery after payment approval. If a subscription already has a valid subscription link and usable delivery data, a transient protocol provisioning failure no longer strands the order as provision_failed; the order is fulfilled, canonical Telegram delivery is queued, and remaining protocol convergence continues in the background."
   }
 }
