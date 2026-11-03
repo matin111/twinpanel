@@ -105,8 +105,11 @@ export function LegacySubscriptionsRuntimePage(){
     try{
       let subscriptions:RuntimeRow[];
       try{subscriptions=await adminApi.subscriptionsV2();}catch{subscriptions=await adminApi.subscriptions();}
-      const [userRows,planRows,nodeRows]=await Promise.all([adminApi.users(),adminApi.plans(),adminApi.nodes()]);
-      setRows(subscriptions);setUsers(userRows);setPlans(planRows);setNodes(nodeRows);
+      setRows(subscriptions);
+      // Reference data must never block the table.
+      void adminApi.users().then(setUsers).catch(()=>{});
+      void adminApi.plans().then(setPlans).catch(()=>{});
+      void adminApi.nodes().then(setNodes).catch(()=>{});
       setSelected(current=>current?(subscriptions.find(item=>n(item.id)===n(current.id))||current):null);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{if(!silent)setLoading(false);}
