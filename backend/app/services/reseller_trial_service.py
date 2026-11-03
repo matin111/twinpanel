@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from ..models import Plan
 from ..models_reseller import ResellerSubscription
 from ..plan_template_selection import plan_template_node_ids, plan_template_protocols
+from ..reseller_owned_plan_models import ResellerBotPlan
 from ..trial_models import ResellerTrialClaim, ResellerTrialSetting
 from .subscription_factory import create_subscription_core
 from .trial_service import (
@@ -43,6 +44,23 @@ def get_reseller_trial_setting(db: Session, reseller_id: int, *, create: bool = 
     return row
 
 
+def _first_reseller_active_plan(db: Session, reseller_id: int) -> Plan | None:
+    owned = (
+        db.query(ResellerBotPlan)
+        .filter(
+            ResellerBotPlan.reseller_id == int(reseller_id),
+            ResellerBotPlan.is_active.is_(True),
+        )
+        .order_by(ResellerBotPlan.sort_order.asc(), ResellerBotPlan.id.asc())
+        .all()
+    )
+    for row in owned:
+        plan = db.get(Plan, int(row.backing_plan_id))
+        if plan and bool(plan.is_active):
+            return plan
+    return None
+
+
 def reseller_trial_admin_payload(db: Session, reseller_id: int) -> dict:
     row = get_reseller_trial_setting(db, reseller_id, create=True)
     return {
@@ -72,6 +90,11 @@ def update_reseller_trial_setting(db: Session, reseller_id: int, raw: dict) -> d
         row.duration_days = _bounded_int(raw.get("duration_days"), minimum=1, maximum=MAX_TRIAL_DURATION_DAYS, field="مدت اکانت تست نماینده")
     if "traffic_mb" in raw:
         row.traffic_mb = _bounded_int(raw.get("traffic_mb"), minimum=1, maximum=MAX_TRIAL_TRAFFIC_MB, field="حجم اکانت تست نماینده")
+    if row.enabled and not row.template_plan_id:
+        fallback = _first_reseller_active_plan(db, reseller_id)
+        if fallback is None:
+            raise HTTPException(status_code=422, detail="برای فعال‌کردن اکانت تست حداقل یک پلن فعال نمایندگی لازم است")
+        row.template_plan_id = int(fallback.id)
     row.updated_at = datetime.utcnow()
     db.commit()
     return reseller_trial_admin_payload(db, reseller_id)
@@ -101,11 +124,17 @@ def _reseller_trial_template(db: Session, reseller_id: int) -> tuple[Plan, Resel
     setting = get_reseller_trial_setting(db, reseller_id, create=True)
     if not setting.enabled:
         raise HTTPException(status_code=404, detail="اکانت تست ربات نماینده غیرفعال است")
-    if not setting.template_plan_id:
-        raise HTTPException(status_code=409, detail="پلن الگوی اکانت تست ربات نماینده تنظیم نشده است")
-    plan = db.get(Plan, int(setting.template_plan_id))
+
+    plan = db.get(Plan, int(setting.template_plan_id)) if setting.template_plan_id else None
     if not plan or not bool(plan.is_active):
-        raise HTTPException(status_code=409, detail="پلن الگوی اکانت تست ربات نماینده در دسترس نیست")
+        plan = _first_reseller_active_plan(db, reseller_id)
+        if plan is None:
+            raise HTTPException(status_code=409, detail="هیچ پلن فعال نمایندگی برای ساخت اکانت تست وجود ندارد")
+        setting.template_plan_id = int(plan.id)
+        setting.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(setting)
+
     return plan, setting
 
 

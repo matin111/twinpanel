@@ -57,6 +57,12 @@ def reseller_main_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
+                    text="🎁 اکانت تست",
+                    callback_data="rmenu:trial",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
                     text="🏠 داشبورد",
                     callback_data="rmenu:dashboard",
                 ),
@@ -327,9 +333,6 @@ def _policy_router(reseller_id: int) -> Router:
             if created:
                 welcome += "\n\n✅ حساب کاربری شما به‌صورت خودکار ایجاد شد."
 
-            # Telegram keeps a previous ReplyKeyboard on the client until an
-            # explicit ReplyKeyboardRemove is delivered. Remove it first, then
-            # render the current inline menu in a separate message.
             await message.answer(
                 welcome,
                 reply_markup=ReplyKeyboardRemove(),
@@ -401,6 +404,55 @@ def _policy_router(reseller_id: int) -> Router:
         await callback.answer()
         await _send_account(callback.message, int(callback.from_user.id))
 
+    @router.callback_query(F.data == "rmenu:trial")
+    async def inline_trial(callback):
+        db = SessionLocal()
+        try:
+            user = legacy_runtime.linked_user(
+                db,
+                reseller_id,
+                int(callback.from_user.id),
+            )
+            if not user:
+                await callback.answer("ابتدا /start را ارسال کنید", show_alert=True)
+                return
+
+            from .services.reseller_trial_service import claim_reseller_trial_for_user
+
+            result = await claim_reseller_trial_for_user(
+                db,
+                user_id=int(user.id),
+                reseller_id=int(reseller_id),
+            )
+            delivery = result.get("delivery") or {}
+            link = str(
+                delivery.get("subscription_link")
+                or delivery.get("share_url")
+                or result.get("subscription_link")
+                or ""
+            ).strip()
+            lines = [
+                "🎁 <b>اکانت تست نماینده شما فعال شد</b>",
+                "",
+                f"📅 اعتبار: <b>{int(result.get('duration_days') or 1)} روز</b>",
+                f"📦 حجم: <b>{int(result.get('traffic_mb') or 500)} MB</b>",
+                f"🆔 اشتراک: <code>#{int(result.get('subscription_id') or 0)}</code>",
+            ]
+            if link:
+                lines.extend(["", "🔗 <b>لینک اتصال:</b>", f"<code>{escape(link)}</code>"])
+            await callback.answer("اکانت تست ساخته شد")
+            await callback.message.answer(
+                "\n".join(lines),
+                reply_markup=reseller_main_keyboard(),
+            )
+        except Exception as exc:
+            detail = getattr(exc, "detail", str(exc))
+            if isinstance(detail, dict):
+                detail = detail.get("message") or detail.get("code") or str(detail)
+            await callback.answer(str(detail), show_alert=True)
+        finally:
+            db.close()
+
     @router.callback_query(F.data == "rmenu:support")
     async def inline_support(callback):
         await callback.answer()
@@ -459,28 +511,17 @@ def _policy_router(reseller_id: int) -> Router:
 
 def build_router(reseller_id: int) -> Router:
     parent = Router(name=f"reseller-bot-root-owned-{reseller_id}")
-    # Force-membership is parent-level outer middleware, so every child router,
-    # including stale/deep callbacks, is covered before business handlers run.
     install_membership_guard(parent, reseller_id=reseller_id)
     parent.include_router(_policy_router(reseller_id))
-    # The account-link state router must win before generic legacy text handlers.
-    # It only searches subscriptions already owned by this Telegram customer.
     parent.include_router(
         build_subscription_link_router(reseller_id)
     )
-    # Wallet menu/state handlers must win before purchase and legacy handlers.
     parent.include_router(
         build_wallet_menu_router(reseller_id)
     )
-    # Payment callbacks must be owned by the same runtime that renders the
-    # reseller-owned plan. This prevents rpay/rwallet from falling through to
-    # legacy plan handlers with a different data model.
     parent.include_router(
         build_owned_payment_router(reseller_id)
     )
-    # Owned-plan handlers are intentionally registered before the legacy
-    # compatibility router. Renewal handlers remain in source for non-Telegram
-    # compatibility, but policy_router blocks all reseller-bot renewal entrypoints.
     parent.include_router(
         build_owned_plan_router(reseller_id)
     )
@@ -543,18 +584,11 @@ def install_runtime_overrides() -> None:
     legacy_runtime._subscription_detail_keyboard = _subscription_detail_without_renew
     legacy_runtime._run_bot = _run_bot_with_texts
 
-    # Keep every reseller menu source on the same inline layout. The
-    # subscription-link runtime calls its imported wallet_main_keyboard symbol
-    # dynamically, so patch that module-level reference as well.
     wallet_menu_runtime.wallet_main_keyboard = reseller_main_keyboard
     subscription_link_runtime.wallet_main_keyboard = reseller_main_keyboard
     subscription_link_runtime.subscription_link_main_keyboard = reseller_main_keyboard
 
-    # Direct Python callers inside receipt review and legacy wallet code import
-    # this symbol at callback time. Point them to the usage-pool aware approval.
     legacy_orders.approve_order = approve_order_owned_v3
-
-    # Keep internal backing plan ids/names out of reseller-owner receipt texts.
     reseller_bot_review._review_caption = _owned_review_caption
 
 
