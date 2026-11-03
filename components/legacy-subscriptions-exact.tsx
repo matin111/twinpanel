@@ -193,7 +193,12 @@ export function LegacySubscriptionsRuntimePage(){
     if(cached)return Promise.resolve(cached);
     const inFlight=linkPending.current.get(id);
     if(inFlight)return inFlight;
-    const request=adminApi.subscriptionShareLink(id).then(data=>{
+    const request=adminApi.subscriptionShareLink(id).catch(async()=>{
+      // Compatibility with servers that have not deployed the lightweight route.
+      // Normal/current releases use the fast path and never invoke provisioning.
+      const fallback=await adminApi.subscriptionConnectionInfo(id);
+      return {subscription_link:s(fallback.subscription_link)};
+    }).then(data=>{
       const url=s(data.subscription_link);
       if(!url)throw new Error("Subscription link is not available");
       linkCache.current.set(id,url);
