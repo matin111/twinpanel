@@ -160,6 +160,7 @@ export function AdminManualSubscriptionCreate(){
     if(durationValue===null||durationValue<=0||!Number.isInteger(durationValue)){setError(pick("مدت را به روز و بیشتر از صفر وارد کنید","Enter duration in whole days greater than zero"));return;}
     if(deviceValue===null||deviceValue<1||!Number.isInteger(deviceValue)){setError(pick("تعداد اتصال همزمان معتبر نیست","Concurrent device limit is invalid"));return;}
     if(protocols.length===0){setError(pick("حداقل یک پروتکل انتخاب کنید","Select at least one protocol"));return;}
+    if(nodeIds.length===0){setError(pick("حداقل یک سرور انتخاب کنید","Select at least one server"));return;}
 
     const payload={
       user_id:userId,
@@ -207,7 +208,16 @@ export function AdminManualSubscriptionCreate(){
   const modal=open?createPortal(
     <div className="runtime-modal manual-subscription-modal" role="dialog" aria-modal="true" aria-label={pick("ساخت اشتراک","Create subscription")}>
       <button type="button" className="runtime-modal-bg" aria-label="close" onClick={()=>!busy&&setOpen(false)}/>
-      <div className="runtime-modal-card manage-card">
+      <div className="runtime-modal-card manage-card manual-subscription-create-card">
+        <style>{`
+          body > .runtime-modal.manual-subscription-modal > .manual-subscription-create-card{width:min(980px,calc(100vw - 28px))!important;max-height:min(88dvh,880px)!important}
+          body > .runtime-modal.manual-subscription-modal .manual-create-selection-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--surface2)}
+          body > .runtime-modal.manual-subscription-modal .manual-create-selection-summary>div{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+          body > .runtime-modal.manual-subscription-modal .manual-create-selection-summary strong{color:var(--accent);font-size:12px}
+          body > .runtime-modal.manual-subscription-modal .manual-create-selection-summary>small{grid-column:1/-1;color:var(--muted);font-size:10px}
+          @media(min-width:900px){body > .runtime-modal.manual-subscription-modal .protocol-toggle-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
+          @media(max-width:640px){body > .runtime-modal.manual-subscription-modal .manual-create-selection-summary{grid-template-columns:1fr}}
+        `}</style>
         <div className="card-head">
           <div>
             <b>{pick("ساخت اشتراک","Create subscription")}</b>
@@ -224,14 +234,15 @@ export function AdminManualSubscriptionCreate(){
             <label className="field"><span>{pick("جستجوی کاربر","User search")}</span><input value={search} onChange={event=>setSearch(event.target.value)} placeholder={pick("نام، ایمیل یا موبایل…","Name, email or mobile…")}/></label>
             <label className="field"><span>{pick("کاربر","User")}</span><select value={userId} disabled={loading} onChange={event=>setUserId(Number(event.target.value))}><option value={0}>{loading?pick("در حال دریافت…","Loading…"):pick("انتخاب کاربر","Select user")}</option>{filteredUsers.map(user=><option key={user.id} value={user.id}>{user.full_name||user.email||`#${user.id}`} · {user.phone||user.email||"—"}</option>)}</select></label>
             <label className="field"><span>{pick("پلن","Plan")}</span><select value={planId} disabled={loading} onChange={event=>{const id=Number(event.target.value);applyPlan(id);if(!id){setTraffic("");setDuration("");setDeviceLimit("1");}}}><option value={0}>{pick("بدون پلن / دستی","No plan / Manual")}</option>{plans.filter(item=>item.is_active!==false).map(plan=><option key={num(plan.id)} value={num(plan.id)}>{String(plan.name||`#${num(plan.id)}`)}</option>)}</select></label>
-            <label className="field"><span>{pick("حجم GB","Traffic GB")}</span><input required inputMode="decimal" type="number" min={0} step="0.1" value={traffic} onChange={event=>setTraffic(event.target.value)} placeholder={pick("مثلاً 50؛ صفر = نامحدود","e.g. 50; zero = unlimited")}/></label>
-            <label className="field"><span>{pick("مدت روز","Duration days")}</span><input required inputMode="numeric" type="number" min={1} step={1} value={duration} onChange={event=>setDuration(event.target.value)} placeholder={pick("مثلاً 30","e.g. 30")}/></label>
-            <label className="field"><span>{pick("اتصال همزمان","Concurrent devices")}</span><input required inputMode="numeric" type="number" min={1} step={1} value={deviceLimit} onChange={event=>setDeviceLimit(event.target.value)}/></label>
-            <label className="field"><span>{pick("نام کاربری","Username")}</span><input dir="ltr" autoComplete="off" value={username} onChange={event=>setUsername(event.target.value)} placeholder={pick("خالی = خودکار","empty = automatic")}/></label>
-            <label className="field"><span>{pick("رمز عبور","Password")}</span><input dir="ltr" type="text" autoComplete="new-password" value={password} onChange={event=>setPassword(event.target.value)} placeholder={pick("خالی = خودکار","empty = automatic")}/></label>
           </div>
 
-          <div className="runtime-choice-section">
+          <div className="manual-create-selection-summary">
+            <div><b>{pick("پروتکل‌ها","Protocols")}</b><strong>{protocols.length}/15</strong></div>
+            <div><b>{pick("سرورها","Servers")}</b><strong>{nodeIds.length}/{exitNodes.length}</strong></div>
+            <small>{pick("پروتکل‌ها و سرورهای همین اکانت را قبل از ساخت انتخاب کنید.","Choose the protocols and servers for this account before creating it.")}</small>
+          </div>
+
+          <div className="runtime-choice-section manual-create-protocol-head">
             <div className="card-head">
               <div><b>{pick("پروتکل‌های این اشتراک","Protocols for this subscription")}</b><small>{protocols.length}/15</small></div>
               <div className="row-actions">
@@ -255,6 +266,14 @@ export function AdminManualSubscriptionCreate(){
             <div className="protocol-toggle-grid">
               {exitNodes.map(node=><label className="toggle module-toggle" key={node.id}><span>{node.name} · {node.country_code||"—"}<small dir="ltr">{node.public_ip||""}</small></span><input type="checkbox" checked={nodeIds.includes(node.id)} onChange={()=>toggleNode(node.id)}/><i/></label>)}
             </div>
+          </div>
+
+          <div className="setting-grid compact-create-grid manual-create-account-fields">
+            <label className="field"><span>{pick("حجم GB","Traffic GB")}</span><input required inputMode="decimal" type="number" min={0} step="0.1" value={traffic} onChange={event=>setTraffic(event.target.value)} placeholder={pick("مثلاً 50؛ صفر = نامحدود","e.g. 50; zero = unlimited")}/></label>
+            <label className="field"><span>{pick("مدت روز","Duration days")}</span><input required inputMode="numeric" type="number" min={1} step={1} value={duration} onChange={event=>setDuration(event.target.value)} placeholder={pick("مثلاً 30","e.g. 30")}/></label>
+            <label className="field"><span>{pick("اتصال همزمان","Concurrent devices")}</span><input required inputMode="numeric" type="number" min={1} step={1} value={deviceLimit} onChange={event=>setDeviceLimit(event.target.value)}/></label>
+            <label className="field"><span>{pick("نام کاربری","Username")}</span><input dir="ltr" autoComplete="off" value={username} onChange={event=>setUsername(event.target.value)} placeholder={pick("خالی = خودکار","empty = automatic")}/></label>
+            <label className="field"><span>{pick("رمز عبور","Password")}</span><input dir="ltr" type="text" autoComplete="new-password" value={password} onChange={event=>setPassword(event.target.value)} placeholder={pick("خالی = خودکار","empty = automatic")}/></label>
           </div>
 
           <div className="modalActions">
