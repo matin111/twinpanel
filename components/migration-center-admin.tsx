@@ -57,6 +57,13 @@ type EylanStageResult={
   staged_source_ids:string[];
 };
 
+type MigrationProtocolStatus={
+  source:Source;
+  subscriptions:number;
+  fully_provisioned:boolean;
+  protocols:Array<{protocol:string;declared:number;configured:number}>;
+};
+
 type EylanFinalizeResult={
   ok:boolean;
   subscriptions:number;
@@ -127,9 +134,24 @@ export function MigrationCenterAdmin(){
   const [busyProgress,setBusyProgress]=useState<{done:number;total:number}|null>(null);
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
+  const [migrationStatus,setMigrationStatus]=useState<MigrationProtocolStatus|null>(null);
+  const [statusLoading,setStatusLoading]=useState(false);
 
   const readyRecords=useMemo(()=>dryRun?.records.filter(item=>item.ready_for_future_import)??[],[dryRun]);
   const isEylan=source==="eylan";
+
+  const refreshMigrationStatus=async()=>{
+    setStatusLoading(true);
+    setError("");
+    try{
+      const result=await api<MigrationProtocolStatus>(`/v1/admin/migration-center/all-protocols/status?source=${source}`);
+      setMigrationStatus(result);
+    }catch(reason){
+      setError(reason instanceof Error?reason.message:String(reason));
+    }finally{
+      setStatusLoading(false);
+    }
+  };
 
   const runDry=async()=>{
     setError("");setOk("");setDryRun(null);
@@ -321,6 +343,24 @@ export function MigrationCenterAdmin(){
       @keyframes tp-migration-pulse{50%{opacity:.25}}
       @media(prefers-reduced-motion:reduce){.tp-migration-art-ring,.tp-migration-indeterminate span,.tp-migration-art-arrow{animation:none}}
     `}</style>
+    <Card>
+      <div className="card-head">
+        <div><b>{pick("وضعیت واقعی ۱۵ پروتکل","15-protocol provisioning status")}</b>
+          <small>{pick("پروتکل ثبت‌شده با کانفیگ قابل استفاده تفاوت دارد؛ وضعیت را به‌صورت دستی تازه‌سازی کنید.","A selected protocol is not necessarily provisioned. Refresh this status on demand.")}</small>
+        </div>
+        <button className="ghost" onClick={()=>void refreshMigrationStatus()} disabled={statusLoading||busy}>
+          {statusLoading?pick("در حال بررسی...","Checking..."):pick("بررسی وضعیت اتصال","Check provisioning")}
+        </button>
+      </div>
+      {migrationStatus&&migrationStatus.source===source&&
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(135px,1fr))",gap:9}}>
+          {migrationStatus.protocols.map(item=><div key={item.protocol} style={{padding:10,border:"1px solid var(--border,#28354a)",borderRadius:10}}>
+            <small>{item.protocol}</small>
+            <b style={{display:"block",marginTop:4}}>{item.configured.toLocaleString("fa-IR")} / {migrationStatus.subscriptions.toLocaleString("fa-IR")}</b>
+          </div>)}
+        </div>}
+    </Card>
+
     {error&&<div className="runtime-error">{error}</div>}
     {ok&&<div className="runtime-success">{ok}</div>}
 
