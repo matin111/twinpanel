@@ -20,7 +20,7 @@ from ..services.migration_import_v2 import _enc_payload, import_record, legacy_p
 from ..services.migration_v2ray_batch import provision_migrated_v2ray_batch
 from ..services.subscription_factory import create_subscription_core
 from ..protocol_account_registry import ALL_PROTOCOL_KEYS, normalize_protocols
-from ..services.migration_eylan_transfer import ensure_eylan_protocol_snapshots
+from ..services.migration_protocol_snapshots import ensure_migration_protocol_snapshots
 
 
 MigrationSource = Literal["sanaei", "marzban", "pasargad"]
@@ -304,7 +304,7 @@ async def migration_import_batch(
 
         # Snapshot existing imported records as well; never replace their
         # original V2Ray credential or UUID during this step.
-        added_protocols = ensure_eylan_protocol_snapshots(db, list(subscription_uuids))
+        added_protocols = ensure_migration_protocol_snapshots(db, list(subscription_uuids))
         db.commit()
         provision = await provision_migrated_v2ray_batch(db, subscription_uuids)
 
