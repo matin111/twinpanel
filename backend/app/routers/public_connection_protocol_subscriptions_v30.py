@@ -167,7 +167,7 @@ _SCRIPT = r"""
   const token=__TOKEN__;
   const MOBILE='(max-width:720px)';
   const SUPPORTED=new Set(['v2ray','hysteria2','tuic','anytls']);
-  const KARING='https://karing.app/en/quickstart';
+  const KARING='/v1/connect/app-download/karing/'+( /android/i.test(navigator.userAgent)?'android':/mac/i.test(navigator.userAgent)?'macos':/linux/i.test(navigator.userAgent)?'linux':/iPhone|iPad|iPod/i.test(navigator.userAgent)?'ios':'windows');
   const HIDDIFY='https://github.com/hiddify/hiddify-app/releases/latest';
   const V2RAYN='https://github.com/2dust/v2rayN/releases/latest';
   const text=el=>String(el?.textContent||'').trim();
