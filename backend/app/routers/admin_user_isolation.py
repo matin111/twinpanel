@@ -338,6 +338,62 @@ def users_page(
     }
 
 
+@router.get("/users-fast-page")
+def users_fast_page(
+    limit: int = 20,
+    offset: int = 0,
+    q: str = "",
+    db: Session = Depends(get_db),
+):
+    """Fast, reseller-isolated user roster for the interactive admin table.
+
+    Unlike users-page, this does not join or aggregate subscription history
+    before limiting rows. Only public user-profile columns are selected.
+    """
+    limit = max(1, min(int(limit), 100))
+    offset = max(0, int(offset))
+    term = (q or "").strip()
+    query = _visible_users_query(db)
+    if term:
+        pattern = f"%{term}%"
+        conditions = [
+            User.full_name.ilike(pattern),
+            User.email.ilike(pattern),
+            User.phone.ilike(pattern),
+        ]
+        if term.isdigit():
+            conditions.append(User.id == int(term))
+        query = query.filter(or_(*conditions))
+    total = query.order_by(None).count()
+    rows = (
+        query.with_entities(
+            User.id, User.email, User.phone, User.full_name,
+            User.role, User.is_active, User.created_at,
+        )
+        .order_by(User.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": row.id,
+                "email": None if row.email and row.email.endswith("@internal.twinpanel.invalid") else row.email,
+                "phone": row.phone,
+                "full_name": row.full_name,
+                "role": row.role,
+                "is_active": row.is_active,
+                "created_at": row.created_at,
+            }
+            for row in rows
+        ],
+        "total": int(total),
+        "limit": limit,
+        "offset": offset,
+    }
+
+
 @router.get("/users", response_model=list[UserOut])
 def users(db: Session = Depends(get_db)):
     rows = (
