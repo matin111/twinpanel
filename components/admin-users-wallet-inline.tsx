@@ -101,11 +101,15 @@ export function AdminUsersWalletInline(){
   },[]);
 
   useEffect(()=>{
-    void loadBalances();
+    // Render the user table first; wallet balances are secondary data.
+    const walletTimer=window.setTimeout(()=>void loadBalances(),150);
     scan();
+    // Watch only the user table subtree. Observing document.body caused
+    // redundant full-table rescans on unrelated dashboard/header updates.
+    const table=document.querySelector<HTMLElement>(".admin-users-runtime");
     const observer=new MutationObserver(scan);
-    observer.observe(document.body,{childList:true,subtree:true});
-    return()=>observer.disconnect();
+    if(table)observer.observe(table,{childList:true,subtree:true});
+    return()=>{window.clearTimeout(walletTimer);observer.disconnect();};
   },[loadBalances,scan]);
 
   const currentBalance=useMemo(()=>userId?Number(balances[userId]||0):0,[balances,userId]);
