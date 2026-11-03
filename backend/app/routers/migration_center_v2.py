@@ -89,11 +89,8 @@ def _require_canonical_migration_protocols(protocols: list[str]) -> list[str]:
         normalized = normalize_protocols(protocols)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    if set(normalized) != set(ALL_PROTOCOL_KEYS):
-        raise HTTPException(
-            status_code=422,
-            detail="Migration requires the complete canonical 15-protocol registry",
-        )
+    # Legacy clients may still request only V2Ray; accept valid subsets
+    # but always provision/snapshot the complete canonical registry.
     return list(ALL_PROTOCOL_KEYS)
 
 
