@@ -171,22 +171,30 @@ def _mark_presence(
 
     if online:
         if not sessions:
-            result = open_session(
-                db,
-                int(node_id),
-                SessionOpenIn(
-                    session_key=_session_key(
-                        node_id=int(node_id),
+            try:
+                result = open_session(
+                    db,
+                    int(node_id),
+                    SessionOpenIn(
+                        session_key=_session_key(
+                            node_id=int(node_id),
+                            device_id=device_id,
+                            protocol=protocol,
+                            evidence=evidence,
+                        ),
+                        subscription_id=int(device["subscription_id"]),
                         device_id=device_id,
                         protocol=protocol,
-                        evidence=evidence,
+                        client_ip=(str(client_ip).strip()[:64] if client_ip else None),
                     ),
-                    subscription_id=int(device["subscription_id"]),
-                    device_id=device_id,
-                    protocol=protocol,
-                    client_ip=(str(client_ip).strip()[:64] if client_ip else None),
-                ),
-            )
+                )
+            except HTTPException as exc:
+                if exc.status_code != 409 or exc.detail != "concurrent_session_limit":
+                    raise
+                # Another protocol/device already holds the subscription's
+                # authorized session slot. Do not bypass that limit, but also
+                # do not roll back all unrelated users' accounting for this node.
+                return {"opened": 0, "closed": 0}
             opened = 0 if bool(result.get("duplicate")) else 1
             sessions = _active_sessions(
                 db,
@@ -247,17 +255,24 @@ def _activate_from_real_usage_if_needed(
         protocol=protocol,
         evidence=f"usage:{evidence}",
     )
-    open_session(
-        db,
-        int(node_id),
-        SessionOpenIn(
-            session_key=key,
-            subscription_id=int(device["subscription_id"]),
-            device_id=int(device["device_id"]),
-            protocol=protocol,
-            client_ip=(str(client_ip).strip()[:64] if client_ip else None),
-        ),
-    )
+    try:
+        open_session(
+            db,
+            int(node_id),
+            SessionOpenIn(
+                session_key=key,
+                subscription_id=int(device["subscription_id"]),
+                device_id=int(device["device_id"]),
+                protocol=protocol,
+                client_ip=(str(client_ip).strip()[:64] if client_ip else None),
+            ),
+        )
+    except HTTPException as exc:
+        if exc.status_code != 409 or exc.detail != "concurrent_session_limit":
+            raise
+        # Account already at the plan's concurrent-session ceiling:
+        # preserve enforcement and continue collecting other devices.
+        return False
     close_session(
         db,
         int(node_id),
