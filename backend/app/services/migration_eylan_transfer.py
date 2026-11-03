@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from ..migration_import_models import MigrationImportRecord
 from ..models import Subscription, SubscriptionStatus
 from .migration_eylan import EYLAN_SOURCE, duration_days_for_expiry
-from .migration_import_v2 import _enc_payload
+from .migration_import_v2 import _enc_payload, _dec_payload
 from .migration_v2ray_batch import provision_migrated_v2ray_batch
 from .subscription_factory import create_subscription_core
 
@@ -221,9 +221,23 @@ async def finalize_eylan_records(
         if marker.status == "imported":
             existing_imported += 1
             continue
+        # Persist each identity before touching a remote node. A timed-out
+        # finalize can be resumed without creating a different V2Ray UUID on
+        # nodes that succeeded during the previous attempt.
+        payload = _dec_payload(marker.preserved_payload_encrypted)
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=409, detail="Eylan migration payload is unavailable")
+        provision_uuid = payload.get("provision_uuid")
+        try:
+            stable_uuid = str(uuid.UUID(str(provision_uuid))) if provision_uuid else str(uuid.uuid4())
+        except (ValueError, TypeError, AttributeError):
+            stable_uuid = str(uuid.uuid4())
+        if payload.get("provision_uuid") != stable_uuid:
+            payload["provision_uuid"] = stable_uuid
+            marker.preserved_payload_encrypted = _enc_payload(payload)
         marker.status = "provisioning"
         marker_ids.append(int(marker.id))
-        subscription_uuids[int(sub.id)] = str(uuid.uuid4())
+        subscription_uuids[int(sub.id)] = stable_uuid
 
     db.commit()
 
@@ -256,7 +270,9 @@ async def finalize_eylan_records(
         db.commit()
         raise
 
-    final_status = "imported" if int(provision.get("nodes") or 0) > 0 else "failed"
+    # A partial node failure must stay resumable; do not mark it fully imported.
+    provisioned_nodes = int(provision.get("nodes") or 0)
+    final_status = "imported" if provisioned_nodes > 0 and provision.get("ok") else "failed"
     for marker_id in marker_ids:
         marker = db.get(MigrationImportRecord, marker_id)
         if marker is not None:
@@ -266,7 +282,7 @@ async def finalize_eylan_records(
         if sub is not None:
             sub.status = (
                 SubscriptionStatus.ACTIVE
-                if final_status == "imported"
+                if provisioned_nodes > 0
                 else SubscriptionStatus.SUSPENDED
             )
     db.commit()
