@@ -134,6 +134,10 @@ def install_account_link_feature(router, request_fn, session_fn):
     main_runtime = _base._install_main_keyboard_button()
     main_runtime.main_keyboard = _main_menu_keyboard
 
+    from .telegram_subscription_ui_patch_v1 import install as install_subscription_ui
+
+    install_subscription_ui(main_runtime)
+
     @router.callback_query(F.data == RESELLER_REQUEST_CALLBACK)
     async def reseller_request_conditions(
         callback: CallbackQuery,
