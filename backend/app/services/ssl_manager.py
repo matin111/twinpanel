@@ -136,6 +136,24 @@ def _service_locations(
     common = _proxy_headers()
 
     if kind in {"shop", "panel"}:
+        # Eylan backup preview accepts up to 512 MiB compressed archives.
+        # Restrict the higher Nginx body limit to the admin upload endpoint;
+        # all other customer/admin API routes retain the default small limit.
+        migration_upload = ""
+        if kind == "panel":
+            migration_upload = f"""
+    # TWINPANEL_MIGRATION_EYLAN_UPLOAD_V1
+    location = /v1/admin/migration-center/eylan/preview {{
+        client_max_body_size 520m;
+        proxy_pass http://127.0.0.1:8095;
+{common}
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 900s;
+        proxy_read_timeout 900s;
+        proxy_buffering off;
+    }}
+"""
+
         return f"""
     location ~ ^/_next/static/.*\\.css$ {{
         proxy_pass http://{host}:{port};
@@ -144,6 +162,7 @@ def _service_locations(
         add_header Cache-Control "no-cache, no-store, must-revalidate" always;
     }}
 
+{migration_upload}
     location ^~ /v1/ {{
         proxy_pass http://127.0.0.1:8095;
 {common}
