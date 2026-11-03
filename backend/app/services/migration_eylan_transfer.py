@@ -8,9 +8,9 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from ..migration_import_models import MigrationImportRecord
-from ..models import Subscription, SubscriptionStatus, SubscriptionProtocol
-from ..quota_models import QuotaDevice
+from ..models import Subscription, SubscriptionStatus
 from ..protocol_account_registry import ALL_PROTOCOL_KEYS
+from .migration_protocol_snapshots import ensure_migration_protocol_snapshots
 from .migration_eylan import EYLAN_SOURCE, duration_days_for_expiry
 from .migration_import_v2 import _enc_payload
 from .migration_v2ray_batch import provision_migrated_v2ray_batch
@@ -18,43 +18,6 @@ from .subscription_factory import create_subscription_core
 
 
 EYLAN_STAGE_LIMIT = 100
-
-def ensure_eylan_protocol_snapshots(db: Session, subscription_ids: list[int]) -> int:
-    """Idempotently add missing canonical protocols without touching live credentials.
-
-    Staging is desired-state only. A separate bounded provisioner must
-    materialize accounts on nodes; never report readiness from this function.
-    """
-    ids = sorted({int(value) for value in subscription_ids})
-    if not ids:
-        return 0
-    existing = set(
-        (int(sid), str(protocol))
-        for sid, protocol in (
-            db.query(SubscriptionProtocol.subscription_id, SubscriptionProtocol.protocol)
-            .filter(SubscriptionProtocol.subscription_id.in_(ids))
-            .all()
-        )
-    )
-    added = 0
-    for sid in ids:
-        for protocol in ALL_PROTOCOL_KEYS:
-            if (sid, protocol) in existing:
-                continue
-            db.add(SubscriptionProtocol(subscription_id=sid, protocol=protocol))
-            db.add(QuotaDevice(
-                subscription_id=sid,
-                protocol=protocol,
-                device_key=f"subscription:{sid}:{protocol}",
-                credential_public_hash=f"pending-{sid}-{protocol}",
-                status="active",
-            ))
-            added += 1
-    if added:
-        db.flush()
-    return added
-
-
 
 def _naive_datetime(value: datetime | None) -> datetime | None:
     if value is None:
@@ -184,7 +147,7 @@ def stage_eylan_records(
         int(markers_by_source[source_id].subscription_id)
         for source_id in staged_source_ids
     ]
-    enabled_protocol_snapshots = ensure_eylan_protocol_snapshots(db, staged_subscription_ids)
+    enabled_protocol_snapshots = ensure_migration_protocol_snapshots(db, staged_subscription_ids)
     db.commit()
     return {
         "ok": True,
