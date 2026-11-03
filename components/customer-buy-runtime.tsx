@@ -1,13 +1,14 @@
 "use client";
 
-import {useEffect,useState} from "react";
+import {useEffect,useMemo,useState} from "react";
 import {PortalShell} from "./portal-shells";
 import {Badge,Card} from "./ui";
+import {PlanCategoryTabs,filterPlansByCategory,planCategories,planCategoryCounts} from "./plan-category-tabs";
 import {useCustomerSession} from "../lib/customer-session";
 import {useI18n} from "../lib/i18n";
 
 type StorePlan={
-  id:number;name:string;description?:string|null;duration_days:number;traffic_gb:number;device_limit:number;price_toman:number;is_active:boolean;
+  id:number;name:string;description?:string|null;category?:string|null;sort_order?:number;duration_days:number;traffic_gb:number;device_limit:number;price_toman:number;is_active:boolean;
   enable_cisco:boolean;enable_openvpn:boolean;enable_wireguard:boolean;enable_l2tp:boolean;enable_v2ray:boolean;
 };
 type StoreOrder={id:number};
@@ -38,11 +39,17 @@ function BuyBody(){
   const {pick}=useI18n();
   const {token}=useCustomerSession();
   const [plans,setPlans]=useState<StorePlan[]>([]);
+  const [activeCategory,setActiveCategory]=useState("");
   const [trial,setTrial]=useState<TrialStatus|null>(null);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState<number|null>(null);
   const [trialBusy,setTrialBusy]=useState(false);
   const [error,setError]=useState("");
+
+  const categories=useMemo(()=>planCategories(plans),[plans]);
+  const categoryCounts=useMemo(()=>planCategoryCounts(plans),[plans]);
+  const selectedCategory=categories.includes(activeCategory)?activeCategory:(categories[0]||"");
+  const visiblePlans=useMemo(()=>filterPlansByCategory(plans,selectedCategory),[plans,selectedCategory]);
 
   useEffect(()=>{
     let alive=true;
@@ -75,7 +82,7 @@ function BuyBody(){
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));setTrialBusy(false);}
   };
 
-  const featuredPlanIndex=plans.length>2?Math.floor(plans.length/2):0;
+  const featuredPlanIndex=visiblePlans.length>2?Math.floor(visiblePlans.length/2):0;
   const showTrial=Boolean(trial?.enabled&&trial?.configured);
 
   return <div className="page customer-runtime customer-buy-rich">
@@ -90,13 +97,14 @@ function BuyBody(){
       <button type="button" className="customer-buy-rich-action" disabled={trialBusy||busy!==null||!trial?.eligible} onClick={()=>void claimTrial()}>{trial?.already_claimed?pick("قبلاً دریافت شده","Already claimed"):trialBusy?pick("در حال ساخت اکانت تست...","Creating trial..."):pick("دریافت اکانت تست","Get trial account")}<span>←</span></button>
     </Card>}
     {!loading&&plans.length===0&&<Card className="customer-empty"><p>{pick("پلن فعالی وجود ندارد.","No active plans.")}</p></Card>}
+    {!loading&&plans.length>0&&<PlanCategoryTabs categories={categories} active={selectedCategory} onChange={setActiveCategory} counts={categoryCounts}/>} 
 
-    {!loading&&plans.length>0&&<div className={`customer-buy-rich-grid ${plans.length===1?"single":""}`}>
-      {plans.map((plan,index)=>{
+    {!loading&&visiblePlans.length>0&&<div className={`customer-buy-rich-grid ${visiblePlans.length===1?"single":""}`}>
+      {visiblePlans.map((plan,index)=>{
         const featured=index===featuredPlanIndex;const free=Number(plan.price_toman||0)===0;
         return <article className={`customer-buy-rich-card ${featured?"featured":""}`} key={plan.id}>
           {featured&&<span className="customer-buy-rich-ribbon">{pick("محبوب‌ترین انتخاب","Popular choice")}</span>}
-          <div className="customer-buy-rich-top"><div><small>{pick("اشتراک VPN","VPN subscription")}</small><h2>{plan.name}</h2></div><span className="customer-buy-rich-status">{pick("فعال","Active")}</span></div>
+          <div className="customer-buy-rich-top"><div><small>{selectedCategory||pick("اشتراک VPN","VPN subscription")}</small><h2>{plan.name}</h2></div><span className="customer-buy-rich-status">{pick("فعال","Active")}</span></div>
           {plan.description&&<p className="customer-buy-rich-desc">{plan.description}</p>}
           <div className="customer-buy-rich-price"><strong>{free?pick("رایگان","Free"):Number(plan.price_toman).toLocaleString("fa-IR")}</strong>{!free&&<span>{pick("تومان","Toman")}</span>}</div>
           <div className="customer-buy-rich-facts"><div><b>{plan.traffic_gb.toLocaleString("fa-IR")} GB</b><small>{pick("حجم","Traffic")}</small></div><div><b>{plan.duration_days.toLocaleString("fa-IR")}</b><small>{pick("روز","days")}</small></div><div><b>{plan.device_limit.toLocaleString("fa-IR")}</b><small>{pick("دستگاه","devices")}</small></div></div>
