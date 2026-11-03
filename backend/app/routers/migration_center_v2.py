@@ -110,6 +110,56 @@ def _preserved_v2ray_uuid(record: dict[str, Any]) -> str:
         raise ValueError(f"invalid preserved V2Ray UUID: {raw}") from exc
 
 
+class MigrationBackfillIn(BaseModel):
+    source: Literal["sanaei", "marzban", "pasargad", "eylan"]
+    after_id: int = Field(default=0, ge=0)
+    limit: int = Field(default=25, ge=1, le=50)
+
+
+@admin_router.post("/all-protocols/backfill")
+def migration_all_protocols_backfill(
+    payload: MigrationBackfillIn,
+    db: Session = Depends(get_db),
+):
+    """Small, idempotent DB-only backfill for already imported customers.
+
+    This endpoint changes desired-state snapshots only, never remote servers.
+    Convergence/provisioning performs real account materialization separately.
+    The cursor permits resuming a large migration without N+1 API requests.
+    """
+    markers = (
+        db.query(MigrationImportRecord.id, MigrationImportRecord.subscription_id)
+        .filter(
+            MigrationImportRecord.source == payload.source,
+            MigrationImportRecord.id > payload.after_id,
+        )
+        .order_by(MigrationImportRecord.id.asc())
+        .limit(payload.limit)
+        .all()
+    )
+    ids = [int(row.subscription_id) for row in markers]
+    added = ensure_migration_protocol_snapshots(db, ids)
+    db.commit()
+    next_cursor = int(markers[-1].id) if markers else payload.after_id
+    has_more = bool(markers) and (
+        db.query(MigrationImportRecord.id)
+        .filter(
+            MigrationImportRecord.source == payload.source,
+            MigrationImportRecord.id > next_cursor,
+        )
+        .first()
+        is not None
+    )
+    return {
+        "source": payload.source,
+        "processed_subscriptions": len(ids),
+        "added_protocol_snapshots": added,
+        "next_after_id": next_cursor,
+        "has_more": has_more,
+        "remote_provisioning_completed": False,
+    }
+
+
 @admin_router.get("/imports")
 def migration_import_history(db: Session = Depends(get_db)):
     markers = (
