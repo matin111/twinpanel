@@ -4,6 +4,7 @@ from sqlalchemy import (
     BigInteger,
     DateTime,
     ForeignKey,
+    Integer,
     String,
     UniqueConstraint,
     inspect,
@@ -46,6 +47,26 @@ def _allow_duplicate_plan_names() -> None:
 _allow_duplicate_plan_names()
 
 
+def _ensure_plan_sort_order_column() -> None:
+    # TWINPANEL_PLAN_DISPLAY_ORDER_V1
+    # Existing installations already have plan_category_assignments. create_all
+    # cannot add columns, so add the ordering column idempotently when needed.
+    if engine.dialect.name != "postgresql":
+        return
+    with engine.begin() as connection:
+        if not inspect(connection).has_table("plan_category_assignments"):
+            return
+        connection.execute(
+            text(
+                "ALTER TABLE plan_category_assignments "
+                "ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0"
+            )
+        )
+
+
+_ensure_plan_sort_order_column()
+
+
 class PlanCategoryAssignment(Base):
     __tablename__ = "plan_category_assignments"
     __table_args__ = (
@@ -65,6 +86,11 @@ class PlanCategoryAssignment(Base):
         nullable=False,
         default="سایر پلن‌ها",
         index=True,
+    )
+    sort_order: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime,

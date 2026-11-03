@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Body, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -29,22 +30,27 @@ def _normalize_category(value) -> str:
     return (category[:120] if category else DEFAULT_PLAN_CATEGORY)
 
 
-def _plan_category(db: Session, plan_id: int) -> str:
-    row = (
+def _plan_assignment(db: Session, plan_id: int) -> PlanCategoryAssignment | None:
+    return (
         db.query(PlanCategoryAssignment)
         .filter(PlanCategoryAssignment.plan_id == int(plan_id))
         .first()
     )
+
+
+def _plan_sort_order(db: Session, plan_id: int) -> int:
+    row = _plan_assignment(db, plan_id)
+    return int(row.sort_order or 0) if row else 0
+
+
+def _plan_category(db: Session, plan_id: int) -> str:
+    row = _plan_assignment(db, plan_id)
     return _normalize_category(row.category if row else None)
 
 
 def _set_plan_category(db: Session, plan_id: int, category) -> str:
     value = _normalize_category(category)
-    row = (
-        db.query(PlanCategoryAssignment)
-        .filter(PlanCategoryAssignment.plan_id == int(plan_id))
-        .first()
-    )
+    row = _plan_assignment(db, plan_id)
     if row is None:
         row = PlanCategoryAssignment(plan_id=int(plan_id), category=value)
         db.add(row)
@@ -65,6 +71,7 @@ def _plan_payload(db: Session, plan: Plan) -> dict:
         "name": plan.name,
         "description": plan.description,
         "category": _plan_category(db, int(plan.id)),
+        "sort_order": _plan_sort_order(db, int(plan.id)),
         "duration_days": int(plan.duration_days or 0),
         "traffic_gb": int(plan.traffic_gb or 0),
         "device_limit": int(plan.device_limit or 1),
@@ -104,6 +111,7 @@ def _plan_model_raw(raw: dict) -> dict:
     values.pop("protocols", None)
     values.pop("node_ids", None)
     values.pop("category", None)
+    values.pop("sort_order", None)
     return values
 
 
@@ -141,16 +149,46 @@ def list_plans(db: Session = Depends(get_db)):
     rows = (
         _central_plans(db)
         .filter(Plan.is_active.is_(True))
-        .order_by(Plan.id.desc())
         .all()
     )
-    return [_plan_payload(db, plan) for plan in rows]
+    payloads = [_plan_payload(db, plan) for plan in rows]
+    return sorted(payloads, key=lambda item: (int(item.get("sort_order") or 0), -int(item["id"])))
 
 
 @router.get("/admin/all", dependencies=[Depends(require_admin)])
 def admin_list_plans(db: Session = Depends(get_db)):
-    rows = _central_plans(db).order_by(Plan.id.desc()).all()
-    return [_plan_payload(db, plan) for plan in rows]
+    rows = _central_plans(db).all()
+    payloads = [_plan_payload(db, plan) for plan in rows]
+    return sorted(payloads, key=lambda item: (int(item.get("sort_order") or 0), -int(item["id"])))
+
+
+@router.put("/admin/reorder", dependencies=[Depends(require_admin)])
+def reorder_plans(
+    plan_ids: list[int] = Body(embed=True),
+    db: Session = Depends(get_db),
+):
+    normalized = [int(value) for value in plan_ids]
+    if len(normalized) != len(set(normalized)):
+        raise HTTPException(status_code=422, detail="plan_ids contains duplicates")
+
+    valid_ids = {int(row.id) for row in _central_plans(db).all()}
+    if any(plan_id not in valid_ids for plan_id in normalized):
+        raise HTTPException(status_code=422, detail="Unknown plan id in reorder request")
+
+    for position, plan_id in enumerate(normalized, start=1):
+        row = _plan_assignment(db, plan_id)
+        if row is None:
+            row = PlanCategoryAssignment(
+                plan_id=plan_id,
+                category=DEFAULT_PLAN_CATEGORY,
+                sort_order=position,
+            )
+            db.add(row)
+        else:
+            row.sort_order = position
+
+    db.commit()
+    return {"ok": True, "plan_ids": normalized}
 
 
 @router.get("/{plan_id}/protocols", dependencies=[Depends(require_admin)])
@@ -226,6 +264,13 @@ def create_plan(raw: dict = Body(...), db: Session = Depends(get_db)):
     db.add(plan)
     db.flush()
     _set_plan_category(db, int(plan.id), raw.get("category"))
+    assignment = _plan_assignment(db, int(plan.id))
+    if assignment is not None:
+        current_max = max(
+            [int(row.sort_order or 0) for row in db.query(PlanCategoryAssignment).all()]
+            or [0]
+        )
+        assignment.sort_order = current_max + 1
     _replace_selection(
         db,
         int(plan.id),
@@ -283,6 +328,18 @@ def delete_plan(plan_id: int, db: Session = Depends(get_db)):
     plan = db.get(Plan, plan_id)
     if not plan or is_internal_reseller_plan(plan):
         raise HTTPException(status_code=404, detail="پلن پیدا نشد")
-    plan.is_active = False
-    db.commit()
-    return {"ok": True}
+
+    try:
+        db.delete(plan)
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "این پلن سابقه استفاده دارد و حذف فیزیکی آن مجاز نیست. "
+                "برای حفظ اشتراک‌ها و سفارش‌های قبلی، آن را غیرفعال کنید."
+            ),
+        ) from exc
+
+    return {"ok": True, "deleted": True, "plan_id": int(plan_id)}
