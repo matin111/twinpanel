@@ -1,7 +1,8 @@
 import type {Metadata} from "next";
 import {I18nProvider} from "../lib/i18n";
 import {ThemeProvider} from "../lib/theme";
-import {BrandingProvider} from "../lib/branding";
+import {BrandingProvider,DEFAULT_BRANDING,type BrandingConfig} from "../lib/branding";
+import {unstable_cache} from "next/cache";
 import {SupportChatRuntime} from "../components/support-chat-runtime";
 import {ChatOpenBridge} from "../components/chat-open-bridge";
 import {CustomerDeliveryEnhancement} from "../components/customer-delivery-enhancement";
@@ -77,10 +78,48 @@ import "./store-orbit-public-cleanup.css";
 import "./admin-notification-readability.css";
 import "./trial-settings.css";
 
-export const metadata:Metadata={title:"VPN Control 2027",description:"VPN management control panel"};
+// The public login/register pages must start with the saved brand before client
+// hydration. Fetch via the local backend (no user credential required), rather
+// than temporarily showing the hard-coded legacy TwinPanel identity.
+const loadPublicBrand=unstable_cache(async():Promise<BrandingConfig|null>=>{
+  const backend=(process.env.TWINPANEL_BACKEND_URL||"http://127.0.0.1:8095").replace(/\/+$/,"");
+  try{
+    const response=await fetch(`${backend}/v1/settings/branding`,{
+      signal:AbortSignal.timeout(6500),cache:"no-store"
+    });
+    if(!response.ok)return null;
+    const row=await response.json() as Record<string,unknown>;
+    const hex=(value:unknown,fallback:string)=>{
+      const text=String(value||"").trim();
+      return /^#[0-9a-fA-F]{6}$/.test(text)?text.toUpperCase():fallback;
+    };
+    const name=String(row.brand_name||row.site_title||"").trim()||DEFAULT_BRANDING.name;
+    const parts=name.split(/\s+/).filter(Boolean);
+    const shortName=parts.length>1?parts.slice(0,2).map(x=>x[0]).join("").toUpperCase():name.slice(0,2).toUpperCase();
+    return {
+      name,shortName,
+      tagline:String(row.site_description||"").trim(),
+      logoUrl:String(row.logo_url||DEFAULT_BRANDING.logoUrl),
+      faviconUrl:String(row.favicon_url||DEFAULT_BRANDING.faviconUrl),
+      supportLink:String(row.telegram_url||DEFAULT_BRANDING.supportLink),
+      accent:hex(row.primary_color,DEFAULT_BRANDING.accent),
+      secondaryColor:hex(row.secondary_color,DEFAULT_BRANDING.secondaryColor)
+    };
+  }catch{return null;}
+},["twinpanel-public-branding-initial-v1"],{revalidate:30});
 
-export default function RootLayout({children}:{children:React.ReactNode}){
+export async function generateMetadata():Promise<Metadata>{
+  const brand=await loadPublicBrand();
+  return {
+    title:brand?.name||"VPN Control",
+    description:brand?.tagline||"VPN management portal",
+    icons:brand?.faviconUrl?{icon:brand.faviconUrl}:undefined
+  };
+}
+
+export default async function RootLayout({children}:{children:React.ReactNode}){
+  const initialBrand=(await loadPublicBrand())||undefined;
   return <html lang="fa" dir="rtl" data-theme="dark" suppressHydrationWarning>
-    <body><SystemUpdateRecoveryBootstrap/><ThemeProvider><BrandingProvider><I18nProvider>{children}<AdminLogoutControl/><RuntimeVersionConvergence/><PortalTopNavBehavior/><CustomerStoreRedirect/><CustomerDeliveryEnhancement/><SupportChatRuntime/><ChatOpenBridge/></I18nProvider></BrandingProvider></ThemeProvider></body>
+    <body><SystemUpdateRecoveryBootstrap/><ThemeProvider><BrandingProvider initialBrand={initialBrand}><I18nProvider>{children}<AdminLogoutControl/><RuntimeVersionConvergence/><PortalTopNavBehavior/><CustomerStoreRedirect/><CustomerDeliveryEnhancement/><SupportChatRuntime/><ChatOpenBridge/></I18nProvider></BrandingProvider></ThemeProvider></body>
   </html>;
 }
