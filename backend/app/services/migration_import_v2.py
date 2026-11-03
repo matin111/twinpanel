@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..migration_import_models import MigrationImportRecord
 from ..models import Subscription, SubscriptionProtocol, SubscriptionStatus, User
-from ..protocol_account_registry import normalize_protocols
+from ..protocol_account_registry import ALL_PROTOCOL_KEYS, normalize_protocols
+from .migration_protocol_snapshots import ensure_migration_protocol_snapshots
 from .migration_center_v1 import SUPPORTED_SOURCES, normalize_record
 
 
@@ -252,10 +253,15 @@ def import_record(
             target_user_id=target_user_id,
             state=state,
         )
+        added_protocols = ensure_migration_protocol_snapshots(db, [int(existing.subscription_id)])
+        if added_protocols:
+            db.commit()
         return {
             "imported": False,
             "idempotent": True,
             "updated": updated,
+            "added_protocol_snapshots": added_protocols,
+            "other_protocols_pending": True,
             "subscription_id": existing.subscription_id,
             "migration_record_id": existing.id,
             "legacy_url": existing.legacy_url,
@@ -273,13 +279,13 @@ def import_record(
     if not user or not user.is_active:
         raise ValueError("target TwinPanel user is missing or inactive")
 
-    requested_protocols = protocols or ["v2ray"]
+    requested_protocols = protocols or list(ALL_PROTOCOL_KEYS)
     try:
         protocol_values = normalize_protocols(requested_protocols)
     except ValueError as exc:
         raise ValueError(str(exc)) from exc
     if not protocol_values:
-        protocol_values = ["v2ray"]
+        protocol_values = list(ALL_PROTOCOL_KEYS)
 
     legacy_url = normalized.get("legacy_subscription_url")
     token = _legacy_token(legacy_url)
@@ -323,8 +329,7 @@ def import_record(
     db.add(sub)
     db.flush()
 
-    for protocol in protocol_values:
-        db.add(SubscriptionProtocol(subscription_id=sub.id, protocol=protocol))
+    added_protocols = ensure_migration_protocol_snapshots(db, [int(sub.id)])
 
     preserved = {
         "normalized": normalized,
@@ -352,6 +357,8 @@ def import_record(
     return {
         "imported": True,
         "idempotent": False,
+        "added_protocol_snapshots": added_protocols,
+        "other_protocols_pending": True,
         "updated": False,
         "subscription_id": sub.id,
         "migration_record_id": marker.id,
