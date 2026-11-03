@@ -155,6 +155,9 @@ def _styled_main_keyboard() -> ReplyKeyboardMarkup:
                 keyboard_button("🎫 پشتیبانی", styles.support),
                 keyboard_button("👤 حساب من", styles.account),
             ],
+            [
+                keyboard_button("🔗 اتصال حساب", styles.connect),
+            ],
         ],
     )
 
