@@ -245,7 +245,7 @@ _SCRIPT = r"""
       'OpenVPN Connect':['OpenVPN Connect','https://play.google.com/store/apps/details?id=net.openvpn.openvpn'],
       'WireGuard':['WireGuard','https://download.wireguard.com/android-client/com.wireguard.android-1.0.20260315.apk'],
       'Hiddify':['Hiddify','https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Android-universal.apk'],
-      'Karing':['Karing','https://github.com/KaringX/karing/releases/download/v1.2.25.2802/karing_1.2.25.2802_android_arm.apk'],
+      'Karing':['Karing','https://github.com/KaringX/karing/releases/download/v1.2.26.2919/karing_1.2.26.2919_android_arm.apk'],
       'OpenConnect':['Cisco Secure Client','https://play.google.com/store/apps/details?id=com.cisco.anyconnect.vpn.android.avf'],
       'Cisco Secure Client':['Cisco Secure Client','https://play.google.com/store/apps/details?id=com.cisco.anyconnect.vpn.android.avf'],
       'sing-box':['sing-box','https://github.com/SagerNet/sing-box/releases/download/v1.14.4/SFA-1.14.4-arm64-v8a.apk'],
