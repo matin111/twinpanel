@@ -24,6 +24,7 @@ export function AdminSubscriptionCreateUnified(){
   const [nodes,setNodes]=useState<AdminNode[]>([]);
   const [catalog,setCatalog]=useState<SubscriptionProtocolDefinition[]>([]);
   const [userId,setUserId]=useState(0);
+  const [userSearch,setUserSearch]=useState("");
   const [planId,setPlanId]=useState(0);
   const [traffic,setTraffic]=useState("");
   const [duration,setDuration]=useState("");
@@ -34,6 +35,12 @@ export function AdminSubscriptionCreateUnified(){
   const [nodeIds,setNodeIds]=useState<number[]>([]);
 
   const exitNodes=useMemo(()=>nodes.filter(node=>String(node.node_type||"").toLowerCase()==="exit"&&String(node.status||"online").toLowerCase()!=="retired"),[nodes]);
+  const eligibleUsers=useMemo(()=>users.filter(user=>user.role!=="admin"&&user.is_active!==false),[users]);
+  const filteredUsers=useMemo(()=>{
+    const query=userSearch.trim().toLowerCase();
+    if(!query)return eligibleUsers;
+    return eligibleUsers.filter(user=>[user.full_name,user.email,user.phone,`#${user.id}`,String(user.id)].some(value=>String(value||"").toLowerCase().includes(query)));
+  },[eligibleUsers,userSearch]);
 
   const applyPlan=(id:number,rows=plans)=>{
     setPlanId(id);
@@ -46,15 +53,14 @@ export function AdminSubscriptionCreateUnified(){
 
   const openCreate=useCallback(async()=>{
     if(busy)return;
-    setOpen(true);setLoading(true);setError("");setUsername("");setPassword("");
+    setOpen(true);setLoading(true);setError("");setUsername("");setPassword("");setUserSearch("");
     try{
       const [userRows,planRows,nodeRows,catalogPayload]=await Promise.all([adminApi.users(),adminApi.plans(),adminApi.nodes(),subscriptionProtocolApi.catalog()]);
       if(catalogPayload.protocols.length!==15)throw new Error(pick("کاتالوگ ۱۵ پروتکل کامل نیست","The 15-protocol catalog is incomplete"));
       const exits=nodeRows.filter(node=>String(node.node_type||"").toLowerCase()==="exit"&&String(node.status||"online").toLowerCase()!=="retired");
       setUsers(userRows);setPlans(planRows);setNodes(nodeRows);setCatalog(catalogPayload.protocols);
       setUserId(userRows.find(user=>user.role!=="admin"&&user.is_active!==false)?.id||0);
-      const firstPlan=planRows.find(item=>item.is_active!==false)||planRows[0];
-      applyPlan(num(firstPlan?.id),planRows);
+      applyPlan(0,planRows);
       setProtocols(catalogPayload.protocols.filter(item=>item.family==="classic").map(item=>item.key));
       setNodeIds(exits.map(node=>node.id));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
@@ -83,7 +89,6 @@ export function AdminSubscriptionCreateUnified(){
     if(busy||loading)return;
     const trafficValue=clean(traffic),durationValue=clean(duration),deviceValue=clean(deviceLimit);
     if(!userId){setError(pick("کاربر را انتخاب کنید","Select a user"));return;}
-    if(!planId){setError(pick("پلن را انتخاب کنید","Select a plan"));return;}
     if(trafficValue===null||trafficValue<0){setError(pick("حجم معتبر نیست","Invalid traffic"));return;}
     if(durationValue===null||durationValue<=0||!Number.isInteger(durationValue)){setError(pick("مدت معتبر نیست","Invalid duration"));return;}
     if(deviceValue===null||deviceValue<1||!Number.isInteger(deviceValue)){setError(pick("اتصال همزمان معتبر نیست","Invalid device limit"));return;}
@@ -93,7 +98,7 @@ export function AdminSubscriptionCreateUnified(){
     setBusy(true);setError("");
     try{
       const result=await createSubscriptionFastV1({
-        user_id:userId,plan_id:planId,node_ids:[...nodeIds],protocols:[...protocols],
+        user_id:userId,plan_id:planId||null,node_ids:[...nodeIds],protocols:[...protocols],
         traffic_gb:trafficValue,duration_days:durationValue,device_limit:deviceValue,
         ...(username.trim()?{username:username.trim()}:{}),...(password.trim()?{password:password.trim()}:{})
       });
@@ -124,8 +129,8 @@ export function AdminSubscriptionCreateUnified(){
 
           <section style={{...box,padding:12}}>
             <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
-              <label className="field"><span>{pick("کاربر","User")}</span><select value={userId} disabled={loading} onChange={e=>setUserId(Number(e.target.value))}><option value={0}>{pick("انتخاب کاربر","Select user")}</option>{users.filter(user=>user.role!=="admin"&&user.is_active!==false).map(user=><option key={user.id} value={user.id}>{user.full_name||user.email||`#${user.id}`}</option>)}</select></label>
-              <label className="field"><span>{pick("پلن","Plan")}</span><select value={planId} disabled={loading} onChange={e=>applyPlan(Number(e.target.value))}><option value={0}>{pick("انتخاب پلن","Select plan")}</option>{plans.filter(plan=>plan.is_active!==false).map(plan=><option key={num(plan.id)} value={num(plan.id)}>{String(plan.name||`#${num(plan.id)}`)}</option>)}</select></label>
+              <label className="field"><span>{pick("کاربر","User")}</span><input value={userSearch} disabled={loading} onChange={e=>setUserSearch(e.target.value)} placeholder={pick("جستجو با نام، ایمیل یا ID","Search by name, email or ID")}/><select value={userId} disabled={loading} onChange={e=>setUserId(Number(e.target.value))}><option value={0}>{pick("انتخاب کاربر","Select user")}</option>{filteredUsers.map(user=><option key={user.id} value={user.id}>{[user.full_name,user.email,`#${user.id}`].filter(Boolean).join(" · ")}</option>)}</select><small style={{opacity:.55}}>{pick(`${filteredUsers.length} کاربر`,`${filteredUsers.length} users`)}</small></label>
+              <label className="field"><span>{pick("پلن (اختیاری)","Plan (optional)")}</span><select value={planId} disabled={loading} onChange={e=>applyPlan(Number(e.target.value))}><option value={0}>{pick("بدون پلن — ساخت دستی","No plan — manual")}</option>{plans.filter(plan=>plan.is_active!==false).map(plan=><option key={num(plan.id)} value={num(plan.id)}>{String(plan.name||`#${num(plan.id)}`)}</option>)}</select><small style={{opacity:.55}}>{planId?pick("مقادیر پلن قابل ویرایش هستند","Plan values remain editable"):pick("حجم و مدت را دستی وارد کنید","Enter traffic and duration manually")}</small></label>
             </div>
           </section>
 
