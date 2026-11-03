@@ -23,6 +23,7 @@ DEFAULT_BRAND_NAME = "TwinPanel"
 
 class AccountLinkState(StatesGroup):
     username = State()
+    password = State()
 
 
 async def _brand_name(request_fn):
@@ -546,6 +547,23 @@ def install_account_link_feature(
                 )
 
         except Exception as exc:
+            # Most admin-created VPN subscriptions belong to the admin account,
+            # not the customer's Telegram-linked panel user. Never reveal a
+            # private connection link by username alone: request the existing
+            # VPN account password as ownership proof in that case.
+            if "اکانتی با این نام کاربری در حساب شما پیدا نشد" in str(exc):
+                await state.update_data(account_link_username=username)
+                await state.set_state(AccountLinkState.password)
+                await message.answer(
+                    "🔐 <b>تأیید مالکیت اکانت</b>\n\n"
+                    "اگر اکانت توسط مدیر ساخته شده باشد، ممکن است در حساب "
+                    "پنل متصل به تلگرام شما ثبت نشده باشد.\n\n"
+                    "برای دریافت امن لینک، <b>رمز عبور همان اکانت VPN</b> "
+                    "را ارسال کنید. پیام رمز پس از دریافت حذف می‌شود.\n\n"
+                    "اگر رمز را ندارید، از فروشنده دریافت کنید.",
+                    reply_markup=_cancel_keyboard(),
+                )
+                return
             await message.answer(
                 "❌ " + escape(str(exc)) + "\n\n"
                 "نام کاربری اکانت را دوباره وارد کنید.",
@@ -556,6 +574,76 @@ def install_account_link_feature(
         await state.clear()
         await message.answer(
             "✅ <b>لینک اکانت پیدا شد</b>\n\n"
+            f"👤 نام کاربری: <code>{escape(account_username)}</code>\n\n"
+            f"🔗 <code>{escape(link)}</code>\n\n"
+            "این لینک را فقط برای دستگاه‌های خودتان استفاده کنید.",
+            reply_markup=main_runtime.main_keyboard(),
+        )
+
+    @router.message(AccountLinkState.password)
+    async def account_link_password(
+        message: Message,
+        state: FSMContext,
+    ):
+        data = await state.get_data()
+        username = str(data.get("account_link_username") or "").strip()
+        password = str(message.text or "").strip()
+
+        # The password must never remain in visible Telegram chat history when
+        # deletion is permitted; never log or persist it in the FSM/database.
+        try:
+            await message.delete()
+        except Exception:
+            pass
+
+        if not username:
+            await state.clear()
+            await message.answer(
+                "جلسه دریافت لینک منقضی شده است؛ دوباره از منوی دریافت لینک شروع کنید.",
+                reply_markup=main_runtime.main_keyboard(),
+            )
+            return
+        if not password or len(password) > 512:
+            await message.answer(
+                "❌ رمز عبور معتبر اکانت را وارد کنید.",
+                reply_markup=_cancel_keyboard(),
+            )
+            return
+
+        try:
+            result = await request_fn(
+                "POST",
+                "/v1/telegram/account-link/resolve",
+                payload={
+                    "telegram_id": message.from_user.id,
+                    "username": username,
+                    "password": password,
+                },
+                bot_auth=True,
+            )
+            account_username = str(result.get("account_username") or username)
+            link = str(result.get("subscription_link") or "").strip()
+            if not link.startswith(("https://", "http://")):
+                raise RuntimeError("لینک اتصال اکانت هنوز آماده نیست")
+        except Exception as exc:
+            error_text = str(exc)
+            if "تعداد تلاش ناموفق زیاد است" in error_text:
+                await state.clear()
+                await message.answer(
+                    "⏳ تعداد تلاش‌ها بیش از حد مجاز است. بعداً دوباره امتحان کنید.",
+                    reply_markup=main_runtime.main_keyboard(),
+                )
+                return
+            await message.answer(
+                "❌ نام کاربری یا رمز اکانت معتبر نیست، یا اشتراک فعال نیست.\n"
+                "رمز را دوباره وارد کنید یا برای بررسی اکانت با فروشنده تماس بگیرید.",
+                reply_markup=_cancel_keyboard(),
+            )
+            return
+
+        await state.clear()
+        await message.answer(
+            "✅ <b>لینک اکانت تأیید شد</b>\n\n"
             f"👤 نام کاربری: <code>{escape(account_username)}</code>\n\n"
             f"🔗 <code>{escape(link)}</code>\n\n"
             "این لینک را فقط برای دستگاه‌های خودتان استفاده کنید.",
