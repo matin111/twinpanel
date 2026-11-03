@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.531",
-  "source_sha": "323779802fb2f2613dafbea4e7cb3174a4c6fa2e",
+  "version": "1.1.0-rc.532",
+  "source_sha": "107c4633e409e99da3138cb12964214a47529df3",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.531 رگرسیون‌های ساخت و مدیریت اکانت را اصلاح می‌کند: ویرایش پروتکل‌ها و سرورها سریع ثبت می‌شود و Provisioning در پس‌زمینه ادامه دارد، node_ids خالی دیگر Snapshot سرور اکانت را خراب نمی‌کند و سرور جدید با گزینه نمایش برای همه، برای همه اشتراک‌های قبلی غیرلغوشده منتشر و اکانت‌های فعال Reconcile می‌شوند.",
-    "en": "TwinPanel 1.1.0-rc.531 fixes account protocol/server management regressions: protocol and server edits persist quickly while provisioning continues in the background, legacy empty node_ids can no longer damage a subscription server snapshot, and Add Server publish-to-all now deterministically adds the new Exit to every existing non-cancelled subscription and reconciles active accounts."
+    "fa": "TwinPanel 1.1.0-rc.532 تنظیمات اکانت تست را از پلن‌های فروش جدا می‌کند، صفحه مستقل Trial برای ادمین و نماینده اضافه می‌کند، سهمیه ۱ روز / 500MB و محدودیت دریافت یک‌باره را با Ledger مستقل برای سیستم اصلی و هر نماینده اعمال می‌کند و Provisioning را روی مسیر مرکزی مدرن نگه می‌دارد. همچنین قرارداد قدیمی Simple Add Node Smoke با Navigation فعلی همگام شده است.",
+    "en": "TwinPanel 1.1.0-rc.532 separates Trial configuration from sale plans, adds dedicated Trial settings for admins and resellers, enforces the default 1-day / 500MB allowance with independent one-time claim ledgers for the main system and each reseller, and keeps provisioning on the centralized modern delivery path. It also aligns the stale Simple Add Node smoke contract with the current navigation."
   }
 }
