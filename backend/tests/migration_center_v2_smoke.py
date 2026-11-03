@@ -114,7 +114,7 @@ def test_migration_admin_ui_uses_bounded_batch_requests_and_15_protocols() -> No
     assert '"/v1/admin/migration-center/import-batch"' in ui
     assert '"/v1/admin/migration-center/import-staged-batch"' in ui
     assert "ALL_MIGRATION_PROTOCOLS=[" in ui
-    assert "for(let offset=0;offset<group.records.length;offset+=50)" in ui
+    assert "const chunkSize=group.route.endsWith(\"/import-batch\")?250:50;" in ui
     assert "hasPreservedUuid" in ui
     assert "protocols:effectiveProtocols" in ui
     assert "result.provision" in ui
