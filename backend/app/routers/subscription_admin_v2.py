@@ -27,7 +27,7 @@ from ..subscription_override_models import (
     get_subscription_override,
 )
 from ..subscription_plan_schema import ensure_subscription_plan_schema
-from .account_delivery import public_router as account_delivery_public_router
+from .account_delivery import public_router as account_delivery_public_router, _share_url
 from .migration_center_v1 import router as migration_center_v1_router
 from .migration_center_v2 import (
     admin_router as migration_center_v2_admin_router,
@@ -280,6 +280,19 @@ def _fail_created_subscription(
 @router.get("/protocol-catalog")
 def subscription_protocol_catalog():
     return {"protocols": registry_payload()}
+
+
+@router.get("/{subscription_id}/share-link")
+def subscription_share_link(
+    subscription_id: int,
+    db: Session = Depends(get_db),
+):
+    """Return only the signed public link, without credential generation or
+    slow connection-info self-healing. The router requires admin auth."""
+    sub = db.get(Subscription, subscription_id)
+    if sub is None:
+        raise HTTPException(status_code=404, detail="اشتراک پیدا نشد")
+    return {"subscription_link": _share_url(db, sub)}
 
 
 @router.get("/admin-list-v2")

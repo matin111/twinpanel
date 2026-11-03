@@ -61,6 +61,7 @@ export const adminApi={
   provisionSubscription:(id:number)=>request<RuntimeRow>(`/v1/subscriptions/${id}/provision-account`,{method:"POST"}),
   refreshSubscriptionPasswords:(id:number)=>request<RuntimeRow>(`/v1/subscriptions/${id}/refresh-simple-passwords`,{method:"POST"}),
   subscriptionConnectionInfo:(id:number)=>request<RuntimeRow>(`/v1/subscriptions/${id}/connection-info`),
+  subscriptionShareLink:(id:number)=>request<{subscription_link:string}>(`/v1/subscriptions/${id}/share-link`),
   plans:()=>request<RuntimeRow[]>("/v1/plans/admin/all"),
   createPlan:(payload:RuntimeRow)=>request<RuntimeRow>("/v1/plans",{method:"POST",body:JSON.stringify(payload)}),
   updatePlan:(id:number,payload:RuntimeRow)=>request<RuntimeRow>(`/v1/plans/${id}`,{method:"PATCH",body:JSON.stringify(payload)}),
