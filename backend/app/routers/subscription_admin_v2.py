@@ -36,6 +36,7 @@ from .migration_center_v2 import (
 )
 from .subscription_delivery_policy_v1 import DeliveryPolicyIn, put_delivery_policy
 from .subscriptions import subscription_out
+from .runtime_endpoints import _online_subscription_ids
 
 
 # Nested under the already-registered /v1 quota/control router. Keeping this
@@ -312,12 +313,17 @@ def admin_page_v3(
     limit = max(1, min(100, int(limit)))
     offset = max(0, int(offset))
     term = (q or "").strip()
-    allowed = {"all", "active", "expired", "suspended", "pending"}
+    allowed = {"all", "active", "expired", "suspended", "pending", "online"}
     if status not in allowed:
         raise HTTPException(status_code=422, detail="Invalid subscription status")
 
+    # Online means a genuinely live session or recent accepted traffic, not
+    # merely an ACTIVE subscription. Reuse the dashboard's live-state policy.
+    online_ids = _online_subscription_ids(db)
     base = db.query(Subscription)
-    if status != "all":
+    if status == "online":
+        base = base.filter(Subscription.id.in_(online_ids))
+    elif status != "all":
         base = base.filter(cast(Subscription.status, String) == status)
     if term:
         pattern = f"%{term}%"
@@ -342,7 +348,7 @@ def admin_page_v3(
         cast(Subscription.status, String),
         func.count(Subscription.id),
     ).group_by(Subscription.status).all()
-    stats = {"total": 0, "active": 0, "expired": 0, "suspended": 0}
+    stats = {"total": 0, "active": 0, "expired": 0, "suspended": 0, "online": len(online_ids)}
     for key, count in counts:
         stats["total"] += int(count)
         label = str(key).split(".")[-1].lower()
