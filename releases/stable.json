@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.539",
+  "version": "1.1.0-rc.540",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T02:13:09Z",
+  "released_at": "2026-11-03T02:22:09Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "0753e31cf89b6be65d49a95cbb50a14d3b071df8",
+  "source_sha": "8a9fa4139f1d6c747ef2854910d3fd72d3c63095",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.539/twinpanel-1.1.0-rc.539-linux-x86_64.tar.gz",
-    "sha256": "20df8fd434db7489eeb7efdeeb2b406a08750f9683a44efd54b472091da1d533",
-    "size_bytes": 25316297
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.540/twinpanel-1.1.0-rc.540-linux-x86_64.tar.gz",
+    "sha256": "5fe4b9432d1bac478c0c36545bce76b555b72c6fead995dea80e8fbec9225448",
+    "size_bytes": 25319826
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.539 تأخیر ارسال اکانت در ربات اصلی بعد از تأیید پرداخت را کاهش می‌دهد. Fulfillment کامل همه پروتکل‌ها همچنان در پس‌زمینه ادامه پیدا می‌کند، اما به‌محض ثبت اولین Credential فعال و قابل‌استفاده، پیام اصلی اکانت از همان مسیر payment_approved صف می‌شود. Event key واحد order/payment/subscription از ارسال تکراری جلوگیری می‌کند و کندی یا Timeout پروتکل‌های دیگر دیگر ارسال اولیه اکانت را معطل نمی‌کند.",
-    "en": "TwinPanel 1.1.0-rc.539 reduces main Telegram bot account-delivery latency after payment approval. Full multi-protocol fulfillment continues in the background, while the existing payment_approved message is queued as soon as the first active usable credential is committed. The canonical order/payment/subscription event key keeps delivery duplicate-safe, so slow or timing-out remaining protocols no longer block the initial account message."
+    "fa": "TwinPanel 1.1.0-rc.540 همگرایی پروتکل‌های مدرن روی سرور Exit جدید را از ریشه اصلاح می‌کند. انتشار سرور برای کاربران قدیمی دیگر همه اکانت‌ها را Full Reprovision نمی‌کند؛ فقط Pairهای گمشده همان Node برای پروتکل‌های انتخاب‌شده ساخته و با Credential موجود ادغام می‌شوند. همچنین Reconcile مدرن دیگر هنگام SSH روی ردیف Subscription قفل FOR UPDATE نگه نمی‌دارد و از PostgreSQL advisory lock اختصاصی هر اشتراک استفاده می‌کند تا Lock Timeout و جا ماندن TUIC/ShadowTLS و سایر پروتکل‌های مدرن تکرار نشود.",
+    "en": "TwinPanel 1.1.0-rc.540 fixes Modern protocol convergence on newly added Exit nodes at the root. Publishing a new server to existing users no longer fully reprovisions every account; it creates only missing protocol/node pairs and merges them into existing credentials. Modern reconcile also stops holding Subscription FOR UPDATE locks across SSH work and uses a per-subscription PostgreSQL advisory lock, preventing lock-timeout storms and missing TUIC/ShadowTLS or other Modern protocol pairs."
   }
 }
