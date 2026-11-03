@@ -27,7 +27,7 @@ const SystemHealthRuntimePage=dynamic(()=>import("./system-health-runtime").then
 const SubscriptionToolsRuntimePage=dynamic(()=>import("./subscription-tools-runtime").then(m=>m.SubscriptionToolsRuntimePage));
 const LegacySubscriptionsRuntimePage=dynamic(()=>import("./legacy-subscriptions-exact").then(m=>m.LegacySubscriptionsRuntimePage));
 const AdminSubscriptionLiveTable=dynamic(()=>import("./admin-subscription-live-table").then(m=>m.AdminSubscriptionLiveTable));
-const AdminManualSubscriptionCreate=dynamic(()=>import("./admin-manual-subscription-create").then(m=>m.AdminManualSubscriptionCreate));
+const AdminManualSubscriptionCreate=dynamic(()=>import("./admin-subscription-create-unified").then(m=>m.AdminSubscriptionCreateUnified));
 const AdminUsersRuntime=dynamic(()=>import("./admin-users-runtime").then(m=>m.AdminUsersRuntime));
 const LegacyNodesRuntimePage=dynamic(()=>import("./legacy-nodes-exact").then(m=>m.LegacyNodesRuntimePage));
 const LegacyPlansRuntimePage=dynamic(()=>import("./legacy-plans-exact").then(m=>m.LegacyPlansRuntimePage));
