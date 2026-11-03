@@ -35,6 +35,7 @@ def ensure_migration_protocol_snapshots(db: Session, subscription_ids: list[int]
         )
     }
     added = 0
+    added_quota = 0
     for subscription_id in ids:
         for protocol in ALL_PROTOCOL_KEYS:
             if (subscription_id, protocol) not in existing:
@@ -49,6 +50,7 @@ def ensure_migration_protocol_snapshots(db: Session, subscription_ids: list[int]
                     credential_public_hash=f"pending-{subscription_id}-{protocol}",
                     status="active",
                 ))
+                added_quota += 1
     # The generic legacy importer does not invoke create_subscription_core,
     # and historically left SubscriptionNode empty. Install a valid Exit
     # snapshot only when one does not already exist; never widen an explicit
@@ -73,6 +75,6 @@ def ensure_migration_protocol_snapshots(db: Session, subscription_ids: list[int]
         if eligible and sub.exit_node_id is None:
             sub.exit_node_id = eligible[0]
 
-    if added or (missing_nodes and eligible) or quota_keys is not None:
+    if added or added_quota or (missing_nodes and eligible):
         db.flush()
     return added
