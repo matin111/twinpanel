@@ -36,6 +36,9 @@ def install() -> None:
         router = original_create_purchase_router(request_fn, session_fn)
 
         async def claim_main_bot_trial(callback):
+            # Provisioning can take longer than Telegram's callback-query TTL.
+            # Acknowledge immediately and send the final result as a normal message.
+            await callback.answer("در حال ساخت اکانت تست…")
             try:
                 session = await session_fn(callback.from_user.id)
                 token = session["access_token"]
@@ -49,10 +52,9 @@ def install() -> None:
                 detail = getattr(exc, "detail", str(exc))
                 if isinstance(detail, dict):
                     detail = detail.get("message") or detail.get("code") or str(detail)
-                await callback.answer(str(detail), show_alert=True)
+                await callback.message.answer("❌ " + escape(str(detail)))
                 return
 
-            await callback.answer("اکانت تست ساخته شد")
             link = _delivery_link(result)
             sub_id = int(result.get("subscription_id") or 0)
             lines = [
