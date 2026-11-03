@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.563",
+  "version": "1.1.0-rc.564",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T23:13:41Z",
+  "released_at": "2026-11-03T23:52:18Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "5c7bba59f5126f5ddefd7f6bf9bc4132f4890dd7",
+  "source_sha": "25ee462a7b92f6d1fa5e9f167d09f9c7ae7af6ca",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.563/twinpanel-1.1.0-rc.563-linux-x86_64.tar.gz",
-    "sha256": "ace2d1b7446799ac74f44821c7cd82a70b9eec3d51a0f79fb225b7ab788c6582",
-    "size_bytes": 25391195
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.564/twinpanel-1.1.0-rc.564-linux-x86_64.tar.gz",
+    "sha256": "d5110ab5276e26f0ed36e616292a0357f6b093949b582ee2d7108642393019a4",
+    "size_bytes": 25418309
   },
   "notes": {
-    "fa": "TwinPanel rc.563 پردازش Convergence پروتکل‌های مدرن را بدون تغییر رفتار ساخت اکانت، با دریافت گروهی وضعیت پروتکل و Credential (دسته‌های ۵۰۰ تایی) سریع‌تر می‌کند و خواندن محتوای رمزگذاری‌شده برای بررسی تغییر توپولوژی را حذف می‌کند. جلوگیری از تغییر بخش‌های پرداخت، فروشگاه و ربات و حفظ کانفیگ‌های موجود مدنظر است.",
-    "en": "Optimize 15-protocol convergence by batching selected-state and credential lookups in 500-record chunks and fingerprinting credential presence without fetching encrypted blobs. Retain original provisioning and credential reuse paths. No changes to payment, store or bot logic."
+    "fa": "نسخه rc.564 اصلاح ساخت دسته‌ای کانفیگ‌های sing-box برای کاربران منتقل‌شده از ایلان، سنایی، مرزبان و پاسارگاد را اضافه می‌کند. هر دسته روی هر نود با اعتبارسنجی و یک بار Restart اعمال می‌شود. اجرای بک‌فیل خودکار نیست و نیاز به تست قناری و بررسی سلامت API و نودها دارد.",
+    "en": "Release rc.564 includes scoped, resumable sing-box batch credential provisioning for imported accounts, preserving existing credentials and using one validation/restart per node batch. Backfill is opt-in, not automatic, and requires production canary and health verification."
   }
 }
