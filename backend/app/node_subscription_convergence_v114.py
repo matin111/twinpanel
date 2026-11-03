@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 from datetime import datetime
+from collections import defaultdict
+from sqlalchemy import case
 from typing import Any
 
 from .database import SessionLocal
@@ -181,8 +183,8 @@ def _topology_signature() -> str:
                     ProtocolCredential.subscription_id,
                     ProtocolCredential.protocol,
                     ProtocolCredential.is_active,
-                    ProtocolCredential.config_text_encrypted,
-                    ProtocolCredential.secret_encrypted,
+                    case((ProtocolCredential.config_text_encrypted.isnot(None) & (ProtocolCredential.config_text_encrypted != ""), True), else_=False),
+                    case((ProtocolCredential.secret_encrypted.isnot(None) & (ProtocolCredential.secret_encrypted != ""), True), else_=False),
                 )
                 .order_by(
                     ProtocolCredential.subscription_id.asc(),
@@ -290,36 +292,51 @@ async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
             "failed": [],
         }
 
-    active_subscriptions = (
-        db.query(Subscription)
-        .filter(Subscription.status == SubscriptionStatus.ACTIVE)
-        .order_by(Subscription.id.asc())
+    # Bulk-load desired-state and credentials once per node; no N+1 lookups.
+    selected_by_subscription: dict[int, set[str]] = defaultdict(set)
+    for sub_id, protocol in (
+        db.query(SubscriptionProtocol.subscription_id, SubscriptionProtocol.protocol)
+        .filter(SubscriptionProtocol.protocol.in_(list(eligible_protocols)))
         .all()
-    )
+    ):
+        selected_by_subscription[int(sub_id)].add(str(protocol).strip().lower())
+    if not selected_by_subscription:
+        return {
+            "ok": True, "node_id": int(node.id), "provisioned_pairs": 0,
+            "reused_pairs": 0, "skipped_missing_plan": 0, "failed": [],
+        }
+
+    selected_ids = sorted(selected_by_subscription)
+    credentials_by_key: dict[tuple[int, str], ProtocolCredential] = {}
+    active_subscriptions: list[Subscription] = []
+    for offset in range(0, len(selected_ids), 500):
+        group = selected_ids[offset:offset + 500]
+        active_subscriptions.extend(
+            db.query(Subscription)
+            .filter(Subscription.id.in_(group), Subscription.status == SubscriptionStatus.ACTIVE)
+            .all()
+        )
+        for cred in (
+            db.query(ProtocolCredential)
+            .filter(
+                ProtocolCredential.subscription_id.in_(group),
+                ProtocolCredential.protocol.in_(list(eligible_protocols)),
+            )
+            .all()
+        ):
+            credentials_by_key[(int(cred.subscription_id), str(cred.protocol))] = cred
+    active_subscriptions.sort(key=lambda item: int(item.id))
     provisioned_pairs = 0
     reused_pairs = 0
     failed: list[dict[str, Any]] = []
 
     for sub in active_subscriptions:
-        selected = {
-            str(protocol or "").strip().lower()
-            for (protocol,) in (
-                db.query(SubscriptionProtocol.protocol)
-                .filter(SubscriptionProtocol.subscription_id == int(sub.id))
-                .all()
-            )
-        }
-        wanted = _wanted_modern_protocols(selected, eligible_protocols)
+        wanted = _wanted_modern_protocols(
+            selected_by_subscription.get(int(sub.id), set()), eligible_protocols
+        )
 
         for protocol in wanted:
-            cred = (
-                db.query(ProtocolCredential)
-                .filter(
-                    ProtocolCredential.subscription_id == int(sub.id),
-                    ProtocolCredential.protocol == protocol,
-                )
-                .first()
-            )
+            cred = credentials_by_key.get((int(sub.id), protocol))
             stored_items = _credential_items(ad, cred)
             kept_items = [
                 item
@@ -366,15 +383,22 @@ async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
                     }
                 )
 
-            cred = (
-                db.query(ProtocolCredential)
-                .filter(
-                    ProtocolCredential.subscription_id == int(sub.id),
-                    ProtocolCredential.protocol == protocol,
+            if not new_items:
+                continue
+            # On first provisioning, load the freshly inserted credential once.
+            cred = credentials_by_key.get((int(sub.id), protocol))
+            if cred is None:
+                cred = (
+                    db.query(ProtocolCredential)
+                    .filter(
+                        ProtocolCredential.subscription_id == int(sub.id),
+                        ProtocolCredential.protocol == protocol,
+                    )
+                    .first()
                 )
-                .first()
-            )
-            if cred is None or not new_items:
+                if cred is not None:
+                    credentials_by_key[(int(sub.id), protocol)] = cred
+            if cred is None:
                 continue
 
             merged: list[dict[str, Any]] = []
