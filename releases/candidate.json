@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.550",
-  "source_sha": "cfe01e7d07781485c272c8e3c1d114227d04f65b",
+  "version": "1.1.0-rc.551",
+  "source_sha": "bce7ada5b107db2089f83747ccc03b99219877f5",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.550 رنگ‌های ثابت بنفش در بخش خرید پنل کاربری را حذف می‌کند. دکمه اکانت تست، دکمه‌های خرید پلن، Ribbon پیشنهادی، حالت Featured، Hover و Accentهای مرتبط اکنون مستقیماً از رنگ‌های اصلی برند (brand primary/secondary) استفاده می‌کنند تا کل پنل کاربری با برند تنظیم‌شده یکدست باشد. منطق خرید، پرداخت و Provisioning تغییری نکرده است.",
-    "en": "TwinPanel 1.1.0-rc.550 removes fixed violet accents from the customer purchase experience. Trial and plan purchase CTAs, the recommended ribbon, featured state, hover effects and related accents now inherit the configured brand primary/secondary colors for consistent customer-panel branding. Purchase, payment and provisioning behavior are unchanged."
+    "fa": "TwinPanel 1.1.0-rc.551 لایت‌مود صفحه تنظیمات اکانت تست را در پنل اصلی و پنل نماینده اصلاح می‌کند. کارت تنظیمات، عنوان و توضیحات، سوییچ فعال‌سازی، فیلدها و انتخابگرها، خلاصه تنظیم فعلی و هشدارها در حالت روشن اکنون کنتراست و پس‌زمینه مناسب دارند. رنگ فوکوس، چک‌باکس و دکمه ذخیره نیز از رنگ‌های برند استفاده می‌کند و دارک‌مود بدون تغییر باقی می‌ماند.",
+    "en": "TwinPanel 1.1.0-rc.551 fixes light mode for the shared Trial settings experience in both admin and reseller panels. The settings card, headings, helper text, enable toggle, fields/selects, current-settings summary and warnings now use proper light-theme surfaces and contrast. Focus, checkbox and save-button accents inherit brand colors while dark mode remains unchanged."
   }
 }
