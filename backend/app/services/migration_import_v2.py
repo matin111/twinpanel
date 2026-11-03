@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..migration_import_models import MigrationImportRecord
 from ..models import Subscription, SubscriptionProtocol, SubscriptionStatus, User
-from ..protocol_account_registry import normalize_protocols
+from ..protocol_account_registry import ALL_PROTOCOL_KEYS, normalize_protocols
+from .migration_protocol_snapshots import ensure_migration_protocol_snapshots
 from .migration_center_v1 import SUPPORTED_SOURCES, normalize_record
 
 
@@ -186,6 +187,7 @@ def _repair_existing_subscription(
     marker: MigrationImportRecord,
     target_user_id: int,
     state: dict[str, tuple[bool, Any]],
+    commit: bool = True,
 ) -> tuple[Subscription, bool]:
     sub = db.get(Subscription, marker.subscription_id)
     if not sub:
@@ -202,8 +204,11 @@ def _repair_existing_subscription(
             changed = True
 
     if changed:
-        db.commit()
-        db.refresh(marker)
+        if commit:
+            db.commit()
+            db.refresh(marker)
+        else:
+            db.flush()
     return sub, changed
 
 
@@ -219,6 +224,7 @@ def import_record(
     starts_at: datetime | None = None,
     expires_at: datetime | None = None,
     activation_duration_days: int | None = None,
+    commit: bool = True,
 ) -> dict[str, Any]:
     if source not in SUPPORTED_SOURCES:
         raise ValueError(f"unsupported migration source: {source}")
@@ -251,11 +257,22 @@ def import_record(
             marker=existing,
             target_user_id=target_user_id,
             state=state,
+            commit=commit,
         )
+        # Bulk callers stage all records first, then snapshot all protocols
+        # in one query/flush. This avoids 15-protocol N+1 work per import.
+        added_protocols = (
+            ensure_migration_protocol_snapshots(db, [int(existing.subscription_id)])
+            if commit else 0
+        )
+        if commit:
+            db.commit()
         return {
             "imported": False,
             "idempotent": True,
             "updated": updated,
+            "added_protocol_snapshots": added_protocols,
+            "other_protocols_pending": True,
             "subscription_id": existing.subscription_id,
             "migration_record_id": existing.id,
             "legacy_url": existing.legacy_url,
@@ -273,13 +290,14 @@ def import_record(
     if not user or not user.is_active:
         raise ValueError("target TwinPanel user is missing or inactive")
 
-    requested_protocols = protocols or ["v2ray"]
+    requested_protocols = protocols or list(ALL_PROTOCOL_KEYS)
     try:
         protocol_values = normalize_protocols(requested_protocols)
     except ValueError as exc:
         raise ValueError(str(exc)) from exc
-    if not protocol_values:
-        protocol_values = ["v2ray"]
+    # All four migration sources create the same canonical desired-state.
+    # Validate legacy inputs, then always activate the entire registry.
+    protocol_values = list(ALL_PROTOCOL_KEYS)
 
     legacy_url = normalized.get("legacy_subscription_url")
     token = _legacy_token(legacy_url)
@@ -323,8 +341,7 @@ def import_record(
     db.add(sub)
     db.flush()
 
-    for protocol in protocol_values:
-        db.add(SubscriptionProtocol(subscription_id=sub.id, protocol=protocol))
+    added_protocols = ensure_migration_protocol_snapshots(db, [int(sub.id)]) if commit else 0
 
     preserved = {
         "normalized": normalized,
@@ -346,12 +363,17 @@ def import_record(
         status="imported",
     )
     db.add(marker)
-    db.commit()
-    db.refresh(marker)
+    if commit:
+        db.commit()
+        db.refresh(marker)
+    else:
+        db.flush()
 
     return {
         "imported": True,
         "idempotent": False,
+        "added_protocol_snapshots": added_protocols,
+        "other_protocols_pending": True,
         "updated": False,
         "subscription_id": sub.id,
         "migration_record_id": marker.id,

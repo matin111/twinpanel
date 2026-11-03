@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy import func
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -13,12 +14,14 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..migration_import_models import MigrationImportRecord
-from ..models import Subscription, SubscriptionStatus
+from ..models import ProtocolCredential, Subscription, SubscriptionProtocol, SubscriptionStatus
 from ..services.migration_eylan import EYLAN_SOURCE, MAX_ARCHIVE_BYTES, duration_days_for_expiry, preview_eylan_backup
 from ..services.migration_eylan_transfer import EYLAN_STAGE_LIMIT, finalize_eylan_records, stage_eylan_records
 from ..services.migration_import_v2 import _enc_payload, import_record, legacy_payload
 from ..services.migration_v2ray_batch import provision_migrated_v2ray_batch
 from ..services.subscription_factory import create_subscription_core
+from ..protocol_account_registry import ALL_PROTOCOL_KEYS, normalize_protocols
+from ..services.migration_protocol_snapshots import ensure_migration_protocol_snapshots
 
 
 MigrationSource = Literal["sanaei", "marzban", "pasargad"]
@@ -39,7 +42,7 @@ class MigrationImportIn(BaseModel):
     source: MigrationSource
     record: dict[str, Any]
     target_user_id: int
-    protocols: list[str] = Field(default_factory=lambda: ["v2ray"], max_length=20)
+    protocols: list[str] = Field(default_factory=lambda: list(ALL_PROTOCOL_KEYS), max_length=20)
     traffic_limit_bytes: int | None = Field(default=None, ge=0)
     traffic_used_bytes: int | None = Field(default=None, ge=0)
     starts_at: datetime | None = None
@@ -51,7 +54,7 @@ class MigrationBatchImportIn(BaseModel):
     source: MigrationSource
     records: list[dict[str, Any]] = Field(min_length=1, max_length=1000)
     target_user_id: int
-    protocols: list[str] = Field(default_factory=lambda: ["v2ray"], max_length=20)
+    protocols: list[str] = Field(default_factory=lambda: list(ALL_PROTOCOL_KEYS), max_length=20)
 
 
 class EylanImportRecord(BaseModel):
@@ -66,28 +69,30 @@ class EylanImportRecord(BaseModel):
 class EylanImportIn(BaseModel):
     records: list[EylanImportRecord] = Field(min_length=1, max_length=5000)
     target_user_id: int = Field(gt=0)
-    protocols: list[str] = Field(default_factory=lambda: ["v2ray"], min_length=1, max_length=20)
+    protocols: list[str] = Field(default_factory=lambda: list(ALL_PROTOCOL_KEYS), min_length=1, max_length=20)
 
 
 class EylanStageIn(BaseModel):
     records: list[EylanImportRecord] = Field(min_length=1, max_length=EYLAN_STAGE_LIMIT)
     target_user_id: int = Field(gt=0)
-    protocols: list[str] = Field(default_factory=lambda: ["v2ray"], min_length=1, max_length=1)
+    protocols: list[str] = Field(default_factory=lambda: list(ALL_PROTOCOL_KEYS), min_length=1, max_length=20)
 
 
 class EylanFinalizeIn(BaseModel):
     source_ids: list[str] = Field(min_length=1, max_length=5000)
     target_user_id: int = Field(gt=0)
-    protocols: list[str] = Field(default_factory=lambda: ["v2ray"], min_length=1, max_length=1)
+    protocols: list[str] = Field(default_factory=lambda: list(ALL_PROTOCOL_KEYS), min_length=1, max_length=20)
 
 
-def _require_v2ray_only(protocols: list[str]) -> None:
-    normalized = [str(item).strip().lower() for item in protocols if str(item).strip()]
-    if normalized != ["v2ray"]:
-        raise HTTPException(
-            status_code=422,
-            detail="Eylan bulk import currently supports exactly the v2ray protocol",
-        )
+def _require_canonical_migration_protocols(protocols: list[str]) -> list[str]:
+    """Migration must snapshot all supported protocols, not the old V2Ray-only subset."""
+    try:
+        normalized = normalize_protocols(protocols)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    # Legacy clients may still request only V2Ray; accept valid subsets
+    # but always provision/snapshot the complete canonical registry.
+    return list(ALL_PROTOCOL_KEYS)
 
 
 def _preserved_v2ray_uuid(record: dict[str, Any]) -> str:
@@ -101,6 +106,103 @@ def _preserved_v2ray_uuid(record: dict[str, Any]) -> str:
         return str(uuid.UUID(raw))
     except (ValueError, AttributeError) as exc:
         raise ValueError(f"invalid preserved V2Ray UUID: {raw}") from exc
+
+
+class MigrationBackfillIn(BaseModel):
+    source: Literal["sanaei", "marzban", "pasargad", "eylan"]
+    after_id: int = Field(default=0, ge=0)
+    limit: int = Field(default=25, ge=1, le=50)
+
+
+@admin_router.get("/all-protocols/status")
+def migration_all_protocols_status(
+    source: Literal["sanaei", "marzban", "pasargad", "eylan"],
+    db: Session = Depends(get_db),
+):
+    """Read-only summary: declared snapshots vs real usable configuration rows."""
+    total = int(
+        db.query(func.count(MigrationImportRecord.id))
+        .filter(MigrationImportRecord.source == source)
+        .scalar() or 0
+    )
+    snapshots = dict(
+        db.query(SubscriptionProtocol.protocol, func.count(SubscriptionProtocol.id))
+        .join(MigrationImportRecord, MigrationImportRecord.subscription_id == SubscriptionProtocol.subscription_id)
+        .filter(MigrationImportRecord.source == source)
+        .group_by(SubscriptionProtocol.protocol)
+        .all()
+    )
+    ready = dict(
+        db.query(ProtocolCredential.protocol, func.count(ProtocolCredential.id))
+        .join(MigrationImportRecord, MigrationImportRecord.subscription_id == ProtocolCredential.subscription_id)
+        .filter(
+            MigrationImportRecord.source == source,
+            ProtocolCredential.is_active.is_(True),
+            ProtocolCredential.config_text_encrypted.isnot(None),
+            ProtocolCredential.config_text_encrypted != "",
+        )
+        .group_by(ProtocolCredential.protocol)
+        .all()
+    )
+    return {
+        "source": source,
+        "subscriptions": total,
+        "protocols": [
+            {
+                "protocol": key,
+                "declared": int(snapshots.get(key, 0)),
+                "configured": int(ready.get(key, 0)),
+            }
+            for key in ALL_PROTOCOL_KEYS
+        ],
+        "fully_provisioned": bool(total) and all(
+            int(ready.get(key, 0)) == total for key in ALL_PROTOCOL_KEYS
+        ),
+    }
+
+
+@admin_router.post("/all-protocols/backfill")
+def migration_all_protocols_backfill(
+    payload: MigrationBackfillIn,
+    db: Session = Depends(get_db),
+):
+    """Small, idempotent DB-only backfill for already imported customers.
+
+    This endpoint changes desired-state snapshots only, never remote servers.
+    Convergence/provisioning performs real account materialization separately.
+    The cursor permits resuming a large migration without N+1 API requests.
+    """
+    markers = (
+        db.query(MigrationImportRecord.id, MigrationImportRecord.subscription_id)
+        .filter(
+            MigrationImportRecord.source == payload.source,
+            MigrationImportRecord.id > payload.after_id,
+        )
+        .order_by(MigrationImportRecord.id.asc())
+        .limit(payload.limit)
+        .all()
+    )
+    ids = [int(row.subscription_id) for row in markers]
+    added = ensure_migration_protocol_snapshots(db, ids)
+    db.commit()
+    next_cursor = int(markers[-1].id) if markers else payload.after_id
+    has_more = bool(markers) and (
+        db.query(MigrationImportRecord.id)
+        .filter(
+            MigrationImportRecord.source == payload.source,
+            MigrationImportRecord.id > next_cursor,
+        )
+        .first()
+        is not None
+    )
+    return {
+        "source": payload.source,
+        "processed_subscriptions": len(ids),
+        "added_protocol_snapshots": added,
+        "next_after_id": next_cursor,
+        "has_more": has_more,
+        "remote_provisioning_completed": False,
+    }
 
 
 @admin_router.get("/imports")
@@ -149,7 +251,7 @@ async def eylan_preview(file: UploadFile = File(...)):
 
 @admin_router.post("/eylan/stage")
 def eylan_stage(payload: EylanStageIn, db: Session = Depends(get_db)):
-    _require_v2ray_only(payload.protocols)
+    _require_canonical_migration_protocols(payload.protocols)
     try:
         return stage_eylan_records(
             db,
@@ -169,7 +271,7 @@ def eylan_stage(payload: EylanStageIn, db: Session = Depends(get_db)):
 
 @admin_router.post("/eylan/finalize")
 async def eylan_finalize(payload: EylanFinalizeIn, db: Session = Depends(get_db)):
-    _require_v2ray_only(payload.protocols)
+    _require_canonical_migration_protocols(payload.protocols)
     try:
         return await finalize_eylan_records(
             db,
@@ -195,7 +297,7 @@ async def eylan_import(payload: EylanImportIn, db: Session = Depends(get_db)):
     /eylan/finalize request. Keeping this endpoint avoids breaking older clients.
     """
 
-    _require_v2ray_only(payload.protocols)
+    _require_canonical_migration_protocols(payload.protocols)
     if len(payload.records) > EYLAN_STAGE_LIMIT:
         raise HTTPException(
             status_code=422,
@@ -260,6 +362,48 @@ def migration_import(payload: MigrationImportIn, db: Session = Depends(get_db)):
         raise
 
 
+@admin_router.post("/import-staged-batch")
+def migration_import_staged_batch(
+    payload: MigrationBatchImportIn,
+    db: Session = Depends(get_db),
+):
+    """Fast atomic import for exports without a preserved V2Ray UUID.
+
+    Stage canonical 15-protocol desired state. Node convergence does
+    real provisioning separately; no SSH runs on this HTTP request.
+    """
+    _require_canonical_migration_protocols(payload.protocols)
+    if len(payload.records) > 100:
+        raise HTTPException(status_code=422, detail="Use chunks of at most 100 records")
+    try:
+        results: list[dict[str, Any]] = []
+        for record in payload.records:
+            results.append(import_record(
+                db,
+                source=payload.source,
+                record=record,
+                target_user_id=payload.target_user_id,
+                protocols=list(ALL_PROTOCOL_KEYS),
+                commit=False,
+            ))
+        subscription_ids = [int(item["subscription_id"]) for item in results]
+        added_protocols = ensure_migration_protocol_snapshots(db, subscription_ids)
+        db.commit()
+        return {
+            "ok": True,
+            "added_protocol_snapshots": added_protocols,
+            "imported": sum(bool(item["imported"]) for item in results),
+            "existing": sum(bool(item["idempotent"]) for item in results),
+            "subscriptions": len(results),
+            "protocols": list(ALL_PROTOCOL_KEYS),
+            "remote_provisioning_completed": False,
+            "items": results,
+        }
+    except Exception:
+        db.rollback()
+        raise
+
+
 @admin_router.post("/import-batch")
 async def migration_import_batch(
     payload: MigrationBatchImportIn,
@@ -267,12 +411,9 @@ async def migration_import_batch(
 ):
     """Import and provision a V2Ray migration batch without per-account restarts."""
 
-    protocols = [str(item).strip().lower() for item in payload.protocols if str(item).strip()]
-    if protocols != ["v2ray"]:
-        raise HTTPException(
-            status_code=422,
-            detail="Bulk migration provisioning currently supports exactly the v2ray protocol",
-        )
+    protocols = _require_canonical_migration_protocols(payload.protocols)
+    # Preserve original UUIDs in one node transaction. Other protocol
+    # snapshots are queued for bounded provisioning, not silently marked ready.
 
     try:
         preserved_uuids = [_preserved_v2ray_uuid(record) for record in payload.records]
@@ -288,7 +429,8 @@ async def migration_import_batch(
                 source=payload.source,
                 record=record,
                 target_user_id=payload.target_user_id,
-                protocols=["v2ray"],
+                protocols=protocols,
+                commit=False,
             )
             subscription_id = int(result["subscription_id"])
             subscription_uuids[subscription_id] = preserved_uuid
@@ -298,6 +440,11 @@ async def migration_import_batch(
             elif result.get("idempotent"):
                 existing += 1
 
+        # Snapshot existing imported records as well; never replace their
+        # original V2Ray credential or UUID during this step.
+        added_protocols = ensure_migration_protocol_snapshots(db, list(subscription_uuids))
+        # Persist the entire import batch atomically before network work.
+        db.commit()
         provision = await provision_migrated_v2ray_batch(db, subscription_uuids)
 
         return {
@@ -306,6 +453,8 @@ async def migration_import_batch(
             "existing": existing,
             "subscriptions": len(subscription_uuids),
             "provision": provision,
+            "other_protocols_pending": True,
+            "added_protocol_snapshots": added_protocols,
             "items": results,
         }
     except ValueError as exc:
