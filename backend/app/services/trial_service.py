@@ -42,6 +42,15 @@ def get_main_trial_setting(db: Session, *, create: bool = False) -> MainTrialSet
     return row
 
 
+def _first_active_plan(db: Session) -> Plan | None:
+    return (
+        db.query(Plan)
+        .filter(Plan.is_active.is_(True))
+        .order_by(Plan.id.asc())
+        .first()
+    )
+
+
 def main_trial_admin_payload(db: Session) -> dict:
     row = get_main_trial_setting(db, create=True)
     return {
@@ -70,6 +79,11 @@ def update_main_trial_setting(db: Session, raw: dict) -> dict:
         row.duration_days = _bounded_int(raw.get("duration_days"), minimum=1, maximum=MAX_TRIAL_DURATION_DAYS, field="مدت اکانت تست")
     if "traffic_mb" in raw:
         row.traffic_mb = _bounded_int(raw.get("traffic_mb"), minimum=1, maximum=MAX_TRIAL_TRAFFIC_MB, field="حجم اکانت تست")
+    if row.enabled and not row.template_plan_id:
+        fallback = _first_active_plan(db)
+        if fallback is None:
+            raise HTTPException(status_code=422, detail="برای فعال‌کردن اکانت تست حداقل یک پلن فعال لازم است")
+        row.template_plan_id = int(fallback.id)
     row.updated_at = datetime.utcnow()
     db.commit()
     return main_trial_admin_payload(db)
@@ -100,11 +114,17 @@ def _main_trial_template(db: Session) -> tuple[Plan, MainTrialSetting]:
     setting = get_main_trial_setting(db, create=True)
     if not setting.enabled:
         raise HTTPException(status_code=404, detail="اکانت تست اصلی غیرفعال است")
-    if not setting.template_plan_id:
-        raise HTTPException(status_code=409, detail="پلن الگوی اکانت تست اصلی تنظیم نشده است")
-    plan = db.get(Plan, int(setting.template_plan_id))
+
+    plan = db.get(Plan, int(setting.template_plan_id)) if setting.template_plan_id else None
     if not plan or not bool(plan.is_active):
-        raise HTTPException(status_code=409, detail="پلن الگوی اکانت تست اصلی در دسترس نیست")
+        plan = _first_active_plan(db)
+        if plan is None:
+            raise HTTPException(status_code=409, detail="هیچ پلن فعالی برای ساخت اکانت تست اصلی وجود ندارد")
+        setting.template_plan_id = int(plan.id)
+        setting.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(setting)
+
     return plan, setting
 
 
