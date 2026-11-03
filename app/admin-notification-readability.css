@@ -1,3 +1,71 @@
-/* Notification center visuals are intentionally shared across admin, customer,
-   and reseller. Role-specific readability overrides were removed so all three
-   surfaces inherit the same customerNotification* component styles. */
+/* Admin, customer, and reseller notification centers intentionally share one
+   visual system. Keep admin on the exact same dimensions and spacing as the
+   shared customerNotification* styles. */
+.adminNotificationCenter .adminNotificationPopover {
+  width: min(430px, calc(100vw - 28px));
+  max-width: calc(100vw - 28px);
+}
+
+.adminNotificationCenter .adminNotificationPopover header {
+  padding: 15px 16px 13px;
+}
+
+.adminNotificationCenter .adminNotificationPopover .customerNotificationList {
+  gap: 7px;
+  padding: 8px;
+}
+
+.adminNotificationCenter .adminNotificationPopover .customerNotificationList > button {
+  grid-template-columns: 9px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px 12px 11px;
+  border-radius: 14px;
+  border-color: transparent;
+}
+
+.adminNotificationCenter .adminNotificationPopover .customerNotificationList > button > div {
+  gap: 5px;
+}
+
+.adminNotificationCenter .adminNotificationPopover .customerNotificationList > button b {
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.adminNotificationCenter .adminNotificationPopover .customerNotificationList > button p {
+  font-size: 11px;
+  line-height: 1.75;
+  -webkit-line-clamp: 3;
+}
+
+.adminNotificationCenter .adminNotificationPopover .customerNotificationList > button small {
+  margin-top: 0;
+  font-size: 9px;
+  line-height: 1.5;
+  opacity: .82;
+}
+
+.adminNotificationCenter .adminNotificationPopover footer {
+  padding: 10px 12px 12px;
+}
+
+.adminNotificationCenter .adminNotificationPopover footer a {
+  min-height: 34px;
+  font-size: 11px;
+}
+
+@media (max-width: 720px) {
+  .adminNotificationCenter .adminNotificationPopover {
+    width: auto;
+    max-width: none;
+  }
+
+  .adminNotificationCenter .adminNotificationPopover .customerNotificationList {
+    gap: 7px;
+    padding: 8px;
+  }
+
+  .adminNotificationCenter .adminNotificationPopover .customerNotificationList > button {
+    padding: 11px;
+  }
+}
