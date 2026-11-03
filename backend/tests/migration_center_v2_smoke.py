@@ -109,12 +109,43 @@ def test_v2ray_batch_writes_preserved_uuid_to_delivery_credential() -> None:
     assert "db.commit()" in service
 
 
-def test_migration_admin_ui_uses_single_batch_request_for_v2ray() -> None:
+def test_migration_admin_ui_uses_bounded_batch_requests_and_15_protocols() -> None:
     ui = _text(UI_PATH)
     assert '"/v1/admin/migration-center/import-batch"' in ui
-    assert "records:readyRecords" in ui
-    assert 'protocols:["v2ray"]' in ui
-    assert "result.provision.node_restarts" in ui
+    assert '"/v1/admin/migration-center/import-staged-batch"' in ui
+    assert "ALL_MIGRATION_PROTOCOLS=[" in ui
+    assert "for(let offset=0;offset<group.records.length;offset+=50)" in ui
+    assert "hasPreservedUuid" in ui
+    assert "protocols:effectiveProtocols" in ui
+    assert "result.provision" in ui
+
+
+def test_all_four_sources_use_one_15_protocol_registry() -> None:
+    router = _text(ROUTER_PATH)
+    service = _text(SERVICE_PATH)
+    ui = _text(UI_PATH)
+    assert 'MigrationSource = Literal["sanaei", "marzban", "pasargad"]' in router
+    assert 'prefix="/admin/migration-center"' in router
+    assert '"/eylan/stage"' in router
+    assert "from ..protocol_account_registry import ALL_PROTOCOL_KEYS" in router
+    assert "_require_canonical_migration_protocols(payload.protocols)" in router
+    assert "protocol_values = list(ALL_PROTOCOL_KEYS)" in service
+    assert "ensure_migration_protocol_snapshots" in service
+    for key in ("cisco","openvpn","wireguard","l2tp","v2ray","hysteria2",
+                "tuic","anytls","naive","shadowtls","snell","mieru",
+                "trusttunnel","amneziawg","sudoku"):
+        assert f'"{key}"' in ui
+
+
+def test_bulk_import_is_atomic_and_snapshots_do_not_claim_provisioning() -> None:
+    router = _text(ROUTER_PATH)
+    assert '@admin_router.post("/import-staged-batch")' in router
+    assert "commit=False" in router
+    assert "db.commit()" in router
+    assert '"remote_provisioning_completed": False' in router
+    assert '@admin_router.post("/all-protocols/backfill")' in router
+    assert "next_after_id" in router
+    assert "has_more" in router
 
 
 def test_phase2_keeps_legacy_delivery_separate() -> None:
