@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.557",
+  "version": "1.1.0-rc.558",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T19:34:22Z",
+  "released_at": "2026-11-03T20:47:13Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "1a03390f5b08d6c75a0efef2c5c36e6a75dfd255",
+  "source_sha": "e5ab3343acb9757fc105c9f5ca5cd1051db333e6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.557/twinpanel-1.1.0-rc.557-linux-x86_64.tar.gz",
-    "sha256": "b91bfaf5fce6ddd6f4586daf3df844a2f6192cb1405e286b12255da3250c4707",
-    "size_bytes": 25368168
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.558/twinpanel-1.1.0-rc.558-linux-x86_64.tar.gz",
+    "sha256": "54242742a24d16d40b0d0e96cdd9eb90160d5eeb7de7ecb7b7ed4b9b1abfdecf",
+    "size_bytes": 25368735
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.557 دکمه متنی «خواندن همه» اعلان‌ها را در پنجره اعلان‌های ادمین، کاربر و نماینده با یک آیکون چشم مشترک جایگزین می‌کند. ظاهر هماهنگ، دسترس‌پذیری، RTL و نمایش موبایل اصلاح شده و عملکرد خواندن اعلان‌ها حفظ شده است.",
-    "en": "TwinPanel 1.1.0-rc.557 replaces the overflowing mark-all-read text in admin, customer, and reseller notification dropdowns with one accessible eye-only icon button, preserving its behavior and responsive RTL layout."
+    "fa": "TwinPanel 1.1.0-rc.558 سرعت نمایش داشبورد مدیریت را بهبود می‌دهد. آمار اصلی بدون انتظار برای ۷ درخواست و بررسی تمام نودها نمایش داده می‌شود؛ نمودار، اشتراک‌ها، پرداخت‌ها و وضعیت نودها به‌تدریج بارگذاری می‌شوند و درخواست‌های سلامت و پروتکل‌ها کنترل‌شده اجرا می‌شوند.",
+    "en": "TwinPanel 1.1.0-rc.558 progressively renders admin dashboard core metrics without blocking on seven endpoints, defers sales, subscriptions, payments and node details, and bounds node telemetry concurrency."
   }
 }
