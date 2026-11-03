@@ -388,6 +388,123 @@ async def apply_account(
     )
 
 
+def _batch_mutation_script(secrets: list[SingBoxAccountSecret]) -> str:
+    """One safe config rewrite and restart for a bounded set of sing-box users."""
+    if not secrets or len(secrets) > 40:
+        raise SingBoxAccountError("sing-box batch must contain 1..40 accounts")
+    updates = []
+    for secret in secrets:
+        if secret.protocol not in SINGBOX_PROTOCOLS or not secret.username or not secret.password:
+            raise SingBoxAccountError("invalid sing-box account in batch")
+        updates.append({"protocol": secret.protocol, "tag": TAGS[secret.protocol],
+                        "username": secret.username, "record": _user_record(secret)})
+    payload = json.dumps(updates, ensure_ascii=False)
+    return f'''import json, os, secrets, fcntl
+
+CONFIG = {CONFIG_PATH!r}
+STATE = {STATE_PATH!r}
+UPDATES = json.loads({payload!r})
+SENTINEL = {REVOCATION_SENTINEL!r}
+SHADOWTLS_INNER_TAG = {SHADOWTLS_INNER_TAG!r}
+SHADOWTLS_INNER_METHOD = {SHADOWTLS_INNER_METHOD!r}
+
+with open(CONFIG, "r", encoding="utf-8") as handle:
+    doc = json.load(handle)
+inbounds = doc.get("inbounds")
+if not isinstance(inbounds, list):
+    raise SystemExit("managed inbounds are unavailable")
+inner_secret = None
+for operation in UPDATES:
+    protocol = operation["protocol"]
+    inbound = next((row for row in inbounds if isinstance(row, dict)
+                    and row.get("tag") == operation["tag"]
+                    and row.get("type") == protocol), None)
+    if not isinstance(inbound, dict):
+        raise SystemExit("managed inbound not found: " + protocol)
+    key = "username" if protocol == "naive" else "name"
+    users = inbound.get("users")
+    users = list(users) if isinstance(users, list) else []
+    users = [u for u in users if not (isinstance(u, dict) and
+             (str(u.get(key) or "") == operation["username"] or
+              str(u.get(key) or "").startswith(SENTINEL)))]
+    users.append(operation["record"])
+    inbound["users"] = users
+    if protocol == "shadowtls":
+        state = dict(json.load(open(STATE, encoding="utf-8"))) if os.path.exists(STATE) else {{}}
+        shadow = dict(state.get("shadowtls") or {{}})
+        shadow.setdefault("inner_password", secrets.token_urlsafe(32))
+        inner_secret = shadow["inner_password"]
+        inbound["detour"] = SHADOWTLS_INNER_TAG
+        inner = dict(type="shadowsocks", tag=SHADOWTLS_INNER_TAG,
+                     listen="127.0.0.1", method=SHADOWTLS_INNER_METHOD,
+                     password=inner_secret)
+        previous = next((row for row in inbounds if isinstance(row, dict)
+                         and row.get("tag") == SHADOWTLS_INNER_TAG), None)
+        if previous is None:
+            inbounds.append(inner)
+        else:
+            previous.clear()
+            previous.update(inner)
+        state["shadowtls"] = shadow
+
+with open(CONFIG + ".account-new", "w", encoding="utf-8") as handle:
+    json.dump(doc, handle, ensure_ascii=False, indent=2)
+    handle.write("\\n")
+os.chmod(CONFIG + ".account-new", 0o600)
+if inner_secret is not None:
+    with open(STATE + ".account-new", "w", encoding="utf-8") as handle:
+        json.dump(state, handle, ensure_ascii=False, indent=2)
+        handle.write("\\n")
+    os.chmod(STATE + ".account-new", 0o600)
+print("batch_users=" + str(len(UPDATES)))
+'''
+
+
+async def apply_accounts_batch(
+    conn, node: Node, secrets: list[SingBoxAccountSecret],
+) -> list[dict[str, Any]]:
+    """Apply up to 40 independent users with one validate/restart.
+
+    Does not change the existing single-user paths. On validation or restart
+    failure, restore the previous config before returning an error.
+    """
+    script = _batch_mutation_script(secrets)
+    encoded = base64.b64encode(script.encode("utf-8")).decode("ascii")
+    command = (
+        "set -eu; "
+        "exec 9>/run/twinpanel-singbox-batch.lock; flock -x 9; "
+        f"printf '%s' {shlex.quote(encoded)} | base64 -d | python3; "
+        f"/usr/local/bin/twinpanel-sing-box check -c {shlex.quote(CONFIG_PATH + '.account-new')}; "
+        f"backup=$(mktemp {shlex.quote(CONFIG_PATH + '.batch-backup-XXXXXX')}); "
+        f"cp -a {shlex.quote(CONFIG_PATH)} \"$backup\"; "
+        f"mv {shlex.quote(CONFIG_PATH + '.account-new')} {shlex.quote(CONFIG_PATH)}; "
+        f"if ! systemctl restart {SERVICE_NAME}.service; then "
+        f"cp -a \"$backup\" {shlex.quote(CONFIG_PATH)}; "
+        f"systemctl restart {SERVICE_NAME}.service || true; exit 1; fi; "
+        f"systemctl is-active --quiet {SERVICE_NAME}.service; "
+        f"if test -f {shlex.quote(STATE_PATH + '.account-new')}; then "
+        f"mv {shlex.quote(STATE_PATH + '.account-new')} {shlex.quote(STATE_PATH)}; fi; "
+        "rm -f \"$backup\""
+    )
+    await cmd(conn, command, timeout=180)
+    inbounds: dict[str, dict[str, Any]] = {}
+    for protocol in dict.fromkeys(secret.protocol for secret in secrets):
+        inbounds[protocol] = await read_inbound(conn, protocol)
+    results = []
+    for secret in secrets:
+        certificate = None
+        trust_model = None
+        if secret.protocol == "naive":
+            certificate, trust_model = await _naive_tls_trust_material(
+                conn, node, inbounds[secret.protocol]
+            )
+        results.append(client_item(
+            node, secret, inbounds[secret.protocol],
+            tls_certificate=certificate, tls_trust_model=trust_model,
+        ))
+    return results
+
+
 async def remove_account(
     conn,
     protocol: str,
