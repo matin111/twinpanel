@@ -66,7 +66,10 @@ jobs:
           ):
               assert removed not in ui, removed
 
-          assert '["افزودن سرور","Add Server","/admin/provision","⚡"]' in nav
+          # The top navigation was intentionally simplified: Add Server is no
+          # longer a standalone top-nav item, while Protocol Studio remains
+          # directly accessible and is the canonical protocol control surface.
+          assert '["افزودن سرور","Add Server","/admin/provision","⚡"]' not in nav
           assert '["پروتکل‌ها","Protocols","/admin/modern-protocols","◫"]' in nav
 
           print('SIMPLE_ADD_NODE_XRAY_CONVERGENCE_OK')
