@@ -67,7 +67,7 @@ with tempfile.TemporaryDirectory() as directory:
     assert inner["password"]
     assert json.loads(Path(str(state)+".account-new").read_text())["shadowtls"]["inner_password"] == inner["password"]
     try:
-        batch(secrets * 5)
+        batch(secrets * 13)
     except RuntimeError:
         pass
     else:
