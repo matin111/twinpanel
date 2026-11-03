@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import {NotificationReadIconButton} from "./notification-read-icon-button";
 import {useRouter} from "next/navigation";
 import {useEffect,useRef,useState} from "react";
 import {opsApi} from "../lib/admin-ops-api";
@@ -67,7 +68,7 @@ export function AdminNotificationCenter(){
       <span aria-hidden="true">◎</span>{unread>0&&<b>{unread>99?"99+":unread.toLocaleString(locale)}</b>}
     </button>
     {open&&<div className="customerNotificationPopover adminNotificationPopover" role="dialog" aria-label={pick("اعلان‌ها","Notifications")}>
-      <header><div><b>{pick("اعلان‌ها","Notifications")}</b><small>{unread?`${unread.toLocaleString(locale)} ${pick("خوانده‌نشده","unread")}`:pick("همه خوانده شده‌اند","All caught up")}</small></div>{unread>0&&<button type="button" onClick={()=>void markAll()}>{pick("خواندن همه","Mark all read")}</button>}</header>
+      <header><div><b>{pick("اعلان‌ها","Notifications")}</b><small>{unread?`${unread.toLocaleString(locale)} ${pick("خوانده‌نشده","unread")}`:pick("همه خوانده شده‌اند","All caught up")}</small></div>{unread>0&&<NotificationReadIconButton onClick={()=>void markAll()} label={pick("خواندن همه اعلان‌ها","Mark all notifications as read")}/>}</header>
       <div className="customerNotificationList">
         {loading&&items.length===0?<div className="customerNotificationEmpty">{pick("در حال دریافت...","Loading...")}</div>:error&&items.length===0?<div className="customerNotificationEmpty"><span>{pick("دریافت اعلان‌ها ناموفق بود","Could not load notifications")}</span><button type="button" className="ghost" onClick={()=>void load()}>{pick("تلاش دوباره","Retry")}</button></div>:items.length===0?<div className="customerNotificationEmpty">{pick("اعلانی وجود ندارد","No notifications")}</div>:items.slice(0,8).map(item=>{const isUnread=!item.is_read&&!item.read_at;return <button type="button" key={item.id} className={isUnread?"unread":""} onClick={()=>void openItem(item)}><i/><div><b>{notificationTitle(item,lang)}</b><p>{notificationMessage(item,lang)}</p><small>{item.created_at?new Date(item.created_at).toLocaleString(locale):""}</small></div></button>})}
       </div>
