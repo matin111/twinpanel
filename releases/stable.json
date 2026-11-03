@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.541",
+  "version": "1.1.0-rc.542",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T02:35:26Z",
+  "released_at": "2026-11-03T02:43:50Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "3e2969b0809cc593779d0ae6b97a3de03033ae20",
+  "source_sha": "c465c1b2d2834a04c58d9abf7e09d608cf0cf026",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.541/twinpanel-1.1.0-rc.541-linux-x86_64.tar.gz",
-    "sha256": "d9234fc754be2cf1427d6e598df6b9e40dc4979b2c99bfa95a3b0c1175251a3f",
-    "size_bytes": 25318084
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.542/twinpanel-1.1.0-rc.542-linux-x86_64.tar.gz",
+    "sha256": "34bfeff87faca48c45282dbec946329575c40ee25b5f566f5bc5f3adcd422918",
+    "size_bytes": 25318148
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.541 مدیریت رنگ دکمه اکانت تست ربات اصلی را به صفحه مدیریت Telegram اضافه می‌کند. دکمه 🎁 اکانت تست دیگر رنگ hardcode ندارد و رنگ ذخیره‌شده از همان Registry مرکزی دکمه‌ها خوانده می‌شود. پنل ادمین نیز کنترل جداگانه و Preview واقعی ۱۱ دکمه‌ای /start را نمایش می‌دهد؛ رنگ پیش‌فرض اکانت تست برای سازگاری همچنان Primary/آبی است.",
-    "en": "TwinPanel 1.1.0-rc.541 adds admin-managed styling for the main Telegram bot Trial button. The 🎁 Trial Account button no longer uses a hard-coded color and now reads its saved style from the central button-style registry. The admin Telegram page includes a dedicated Trial control and an accurate 11-button /start preview, while keeping Primary/blue as the backward-compatible default."
+    "fa": "TwinPanel 1.1.0-rc.542 مشکل ریشه‌ای اضافه‌نشدن پروتکل‌های مدرن به سرورهای جدید و اکانت‌های قدیمی را حل می‌کند. هنگام افزودن Exit جدید، تنظیمات سالم فعلی پروتکل‌های مدرن از Exitهای موجود به‌عنوان Template گرفته می‌شود، همان Runtimeها با Installer رسمی روی سرور جدید Bootstrap و Health-check می‌شوند و سپس Publish-All V2 عضویت و Credentialهای کلاسیک و مدرن اکانت‌های قبلی را برای همان Node همگرا می‌کند. Smoke اختصاصی CI نیز ترتیب Modern Bootstrap قبل از Publish-All و پوشش هر ۱۰ پروتکل مدرن را قفل می‌کند.",
+    "en": "TwinPanel 1.1.0-rc.542 fixes the root cause that prevented Modern protocols from being added to newly-added Exit nodes and existing subscriptions. Add Server now derives healthy Modern runtime intent from existing Exits, bootstraps those runtimes through the canonical installer, health-checks/persists them, and only then runs Publish-All V2 so old accounts converge both classic and Modern node credentials. Dedicated CI locks the Modern-bootstrap-before-Publish-All lifecycle and all ten Modern registry protocols."
   }
 }
