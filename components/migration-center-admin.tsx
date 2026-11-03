@@ -248,8 +248,11 @@ export function MigrationCenterAdmin(){
       let finished=0;
       let v2rayProvisioned=0;
       for(const group of [{records:preserved,route:"/v1/admin/migration-center/import-batch"}, {records:staged,route:"/v1/admin/migration-center/import-staged-batch"}]){
-        for(let offset=0;offset<group.records.length;offset+=50){
-          const chunk=group.records.slice(offset,offset+50);
+        // Larger V2Ray batches amortize expensive Xray restarts; DB-only
+        // groups stay small to avoid long HTTP requests.
+        const chunkSize=group.route.endsWith("/import-batch")?250:50;
+        for(let offset=0;offset<group.records.length;offset+=chunkSize){
+          const chunk=group.records.slice(offset,offset+chunkSize);
           const result=await api<BatchImportResult|{ok:boolean;imported:number;existing:number;remote_provisioning_completed:false}>(group.route,{
             method:"POST",
             body:JSON.stringify({source,records:chunk,target_user_id:userId,protocols:effectiveProtocols}),
