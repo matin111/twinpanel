@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import logging
 import os
 import re
 import secrets
@@ -64,9 +66,45 @@ def _storage_dir() -> Path:
     return root
 
 
+_public_branding_log = logging.getLogger(__name__)
+
+
+def _persist_public_branding(item: BrandingSettings) -> None:
+    """Atomic public (non-secret) snapshot for SSR login when API is busy."""
+    payload = {
+        "brand_name": item.brand_name,
+        "site_title": item.site_title,
+        "site_description": item.site_description,
+        "logo_url": item.logo_url,
+        "favicon_url": item.favicon_url,
+        "primary_color": item.primary_color,
+        "secondary_color": item.secondary_color,
+        "telegram_url": item.telegram_url,
+    }
+    try:
+        path = Path(os.getenv(
+            "TWINPANEL_PUBLIC_BRANDING_FILE",
+            "/var/lib/twinpanel/branding/public-branding.json",
+        ))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
+        try:
+            temporary.write_text(
+                json.dumps(payload, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            temporary.chmod(0o644)
+            temporary.replace(path)
+        finally:
+            temporary.unlink(missing_ok=True)
+    except OSError:
+        _public_branding_log.warning("Unable to update public branding snapshot", exc_info=True)
+
+
 def _branding_row(db: Session) -> BrandingSettings:
     item = db.query(BrandingSettings).first()
     if item:
+        _persist_public_branding(item)
         return item
 
     item = BrandingSettings(
@@ -78,6 +116,7 @@ def _branding_row(db: Session) -> BrandingSettings:
     db.add(item)
     db.commit()
     db.refresh(item)
+    _persist_public_branding(item)
     return item
 
 
@@ -184,6 +223,7 @@ def update_branding(
 
     db.commit()
     db.refresh(item)
+    _persist_public_branding(item)
     return item
 
 
@@ -251,6 +291,7 @@ async def upload_branding_asset(
     )
     db.commit()
     db.refresh(item)
+    _persist_public_branding(item)
     return item
 
 
@@ -269,4 +310,5 @@ def delete_branding_asset(
     setattr(item, MANAGED_ASSET_FIELDS[kind], None)
     db.commit()
     db.refresh(item)
+    _persist_public_branding(item)
     return item
