@@ -139,7 +139,7 @@
   background: transparent;
   color: var(--text);
   display: grid;
-  grid-template-columns: 9px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 9px;
   align-items: start;
   gap: 10px;
   text-align: start;
@@ -159,6 +159,9 @@
 }
 
 .customerNotificationList > button i {
+  grid-column: 2;
+  grid-row: 1;
+  display: block;
   width: 7px;
   height: 7px;
   margin-top: 7px;
@@ -172,6 +175,9 @@
 }
 
 .customerNotificationList > button > div {
+  grid-column: 1;
+  grid-row: 1;
+  width: 100%;
   display: grid;
   gap: 5px;
   min-width: 0;
@@ -351,7 +357,7 @@ html[data-theme="light"] .customerNotificationBell {
   display: block !important;
 }
 .resellerNotificationCenter .resellerNotificationPopover .customerNotificationList > button {
-  grid-template-columns: 9px minmax(0, 1fr) !important;
+  grid-template-columns: minmax(0, 1fr) 9px !important;
   align-items: start !important;
   text-align: right;
 }
