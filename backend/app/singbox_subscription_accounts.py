@@ -390,8 +390,8 @@ async def apply_account(
 
 def _batch_mutation_script(secrets: list[SingBoxAccountSecret]) -> str:
     """One safe config rewrite and restart for a bounded set of sing-box users."""
-    if not secrets or len(secrets) > 40:
-        raise SingBoxAccountError("sing-box batch must contain 1..40 accounts")
+    if not secrets or len(secrets) > 150:
+        raise SingBoxAccountError("sing-box batch must contain 1..150 accounts")
     updates = []
     for secret in secrets:
         if secret.protocol not in SINGBOX_PROTOCOLS or not secret.username or not secret.password:
