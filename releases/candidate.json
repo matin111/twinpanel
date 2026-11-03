@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.530",
-  "source_sha": "f2b34905b52c286e83a264a78e90648cd208fff1",
+  "version": "1.1.0-rc.531",
+  "source_sha": "323779802fb2f2613dafbea4e7cb3174a4c6fa2e",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.530 تراکنش‌های پرداخت را به اعلان‌های مدیریت اضافه می‌کند. خرید اشتراک و شارژ کیف پول با کاربر، مبلغ، روش پرداخت و وضعیت در همان Dropdown اعلان‌ها نمایش داده می‌شوند، تراکنش‌های اخیر قبلی نیز Backfill می‌شوند، کلیک روی اعلان مستقیم صفحه پرداخت‌ها را باز می‌کند و داده‌های نمایندگی از اعلان‌های ادمین مرکزی جدا می‌مانند.",
-    "en": "TwinPanel 1.1.0-rc.530 adds payment transactions to the admin notification center. Subscription purchases and wallet top-ups now appear in the existing dropdown with user, amount, payment method and status; recent historical transactions are backfilled, notifications link directly to the payments page, and reseller-scoped payment data remains isolated from the central admin feed."
+    "fa": "TwinPanel 1.1.0-rc.531 رگرسیون‌های ساخت و مدیریت اکانت را اصلاح می‌کند: ویرایش پروتکل‌ها و سرورها سریع ثبت می‌شود و Provisioning در پس‌زمینه ادامه دارد، node_ids خالی دیگر Snapshot سرور اکانت را خراب نمی‌کند و سرور جدید با گزینه نمایش برای همه، برای همه اشتراک‌های قبلی غیرلغوشده منتشر و اکانت‌های فعال Reconcile می‌شوند.",
+    "en": "TwinPanel 1.1.0-rc.531 fixes account protocol/server management regressions: protocol and server edits persist quickly while provisioning continues in the background, legacy empty node_ids can no longer damage a subscription server snapshot, and Add Server publish-to-all now deterministically adds the new Exit to every existing non-cancelled subscription and reconciles active accounts."
   }
 }
