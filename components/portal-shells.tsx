@@ -47,7 +47,8 @@ const resellerMenu:MenuItem[]=[
   ["ربات","Bot","/reseller/bot","bell"],
   ["متن‌های ربات","Bot Texts","/reseller/bot-texts","bell"],
   ["اعلان‌ها","Notifications","/reseller/notifications","bell"],
-  ["تنظیمات","Settings","/reseller/settings","profile"]
+  ["تنظیمات","Settings","/reseller/settings","profile"],
+  ["اکانت تست","Trial Account","/reseller/trial","subscription"]
 ];
 
 const customerGroups:MenuGroup[]=[
@@ -59,7 +60,7 @@ const customerGroups:MenuGroup[]=[
 const resellerGroups:MenuGroup[]=[
   {fa:"مدیریت",en:"Management",items:[resellerMenu[0],resellerMenu[1],resellerMenu[6]]},
   {fa:"مالی",en:"Finance",items:[resellerMenu[4],resellerMenu[5],resellerMenu[7]]},
-  {fa:"فروش و ربات",en:"Sales & Bot",items:[resellerMenu[2],resellerMenu[3],resellerMenu[8],resellerMenu[9],resellerMenu[10]]},
+  {fa:"فروش و ربات",en:"Sales & Bot",items:[resellerMenu[2],resellerMenu[3],resellerMenu[8],resellerMenu[9],resellerMenu[10],resellerMenu[13]]},
   {fa:"حساب",en:"Account",items:[resellerMenu[11],resellerMenu[12]]}
 ];
 
@@ -100,217 +101,34 @@ function ResellerIdentity(){
 }
 
 const resellerVisibleCopyReplacements:[string,string][]=[
-  ["اعلان‌های نمایندگی","اعلان‌ها"],
-  ["اعلان جدید نمایندگی","اعلان جدید"],
-  ["مرکز اعلان نمایندگی","مرکز اعلان‌ها"],
-  ["داشبورد نمایندگی","داشبورد فروش"],
-  ["پنل نمایندگی","پنل فروش"],
-  ["ربات نمایندگی","ربات"],
-  ["ربات نماینده","ربات"],
-  ["کیف پول نمایندگی","کیف پول"],
-  ["حجم نمایندگی","حجم حساب"],
-  ["حجم نماینده","حجم حساب"],
-  ["نماینده فروش","حساب فروش"],
-  ["پروفایل نمایندگی","پروفایل فروش"],
-  ["نام نمایندگی","نام فروشگاه"],
-  ["نمایندگی","فروشگاه"],
-  ["نماینده","فروشنده"],
-  ["Reseller notifications","Notifications"],
-  ["Reseller Dashboard","Sales Dashboard"],
-  ["Reseller Bot","Bot"],
-  ["Reseller Wallet","Wallet"],
-  ["Reseller profile","Sales profile"],
-  ["Reseller name","Store name"],
+  ["اعلان‌های نمایندگی","اعلان‌ها"],["اعلان جدید نمایندگی","اعلان جدید"],["مرکز اعلان نمایندگی","مرکز اعلان‌ها"],["داشبورد نمایندگی","داشبورد فروش"],["پنل نمایندگی","پنل فروش"],["ربات نمایندگی","ربات"],["ربات نماینده","ربات"],["کیف پول نمایندگی","کیف پول"],["حجم نمایندگی","حجم حساب"],["حجم نماینده","حجم حساب"],["نماینده فروش","حساب فروش"],["پروفایل نمایندگی","پروفایل فروش"],["نام نمایندگی","نام فروشگاه"],["نمایندگی","فروشگاه"],["نماینده","فروشنده"],["Reseller notifications","Notifications"],["Reseller Dashboard","Sales Dashboard"],["Reseller Bot","Bot"],["Reseller Wallet","Wallet"],["Reseller profile","Sales profile"],["Reseller name","Store name"],
 ];
 
-function normalizeResellerVisibleCopy(value:string){
-  let next=String(value||"");
-  for(const [source,target] of resellerVisibleCopyReplacements)next=next.split(source).join(target);
-  return next;
-}
-
+function normalizeResellerVisibleCopy(value:string){let next=String(value||"");for(const [source,target] of resellerVisibleCopyReplacements)next=next.split(source).join(target);return next;}
 function ResellerVisibleCopyNormalizer(){
-  useEffect(()=>{
-    const root=document.querySelector<HTMLElement>(".reseller-portal-shell");
-    if(!root)return;
-    const normalizeText=(node:Node)=>{
-      if(node.nodeType===Node.TEXT_NODE&&node.nodeValue){
-        const next=normalizeResellerVisibleCopy(node.nodeValue);
-        if(next!==node.nodeValue)node.nodeValue=next;
-      }
-    };
-    const normalizeElement=(element:Element)=>{
-      for(const attr of ["placeholder","title","aria-label"]){
-        const value=element.getAttribute(attr);
-        if(!value)continue;
-        const next=normalizeResellerVisibleCopy(value);
-        if(next!==value)element.setAttribute(attr,next);
-      }
-    };
-    const normalizeTree=(target:Node)=>{
-      normalizeText(target);
-      if(target instanceof Element)normalizeElement(target);
-      const walker=document.createTreeWalker(target,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT);
-      let current:Node|null=walker.nextNode();
-      while(current){
-        normalizeText(current);
-        if(current instanceof Element)normalizeElement(current);
-        current=walker.nextNode();
-      }
-    };
-    normalizeTree(root);
-    const observer=new MutationObserver(records=>{
-      for(const record of records){
-        if(record.type==="characterData")normalizeText(record.target);
-        for(const node of Array.from(record.addedNodes))normalizeTree(node);
-      }
-    });
-    observer.observe(root,{subtree:true,childList:true,characterData:true});
-    return()=>observer.disconnect();
-  },[]);
-  return null;
+  useEffect(()=>{const root=document.querySelector<HTMLElement>(".reseller-portal-shell");if(!root)return;const normalizeText=(node:Node)=>{if(node.nodeType===Node.TEXT_NODE&&node.nodeValue){const next=normalizeResellerVisibleCopy(node.nodeValue);if(next!==node.nodeValue)node.nodeValue=next;}};const normalizeElement=(element:Element)=>{for(const attr of ["placeholder","title","aria-label"]){const value=element.getAttribute(attr);if(!value)continue;const next=normalizeResellerVisibleCopy(value);if(next!==value)element.setAttribute(attr,next);}};const normalizeTree=(target:Node)=>{normalizeText(target);if(target instanceof Element)normalizeElement(target);const walker=document.createTreeWalker(target,NodeFilter.SHOW_ELEMENT|NodeFilter.SHOW_TEXT);let current:Node|null=walker.nextNode();while(current){normalizeText(current);if(current instanceof Element)normalizeElement(current);current=walker.nextNode();}};normalizeTree(root);const observer=new MutationObserver(records=>{for(const record of records){if(record.type==="characterData")normalizeText(record.target);for(const node of Array.from(record.addedNodes))normalizeTree(node);}});observer.observe(root,{subtree:true,childList:true,characterData:true});return()=>observer.disconnect();},[]);return null;
 }
 
-function AccessSkeleton({label}:{label:string}){
-  return <div className="page portal-content-skeleton" aria-busy="true" aria-live="polite">
-    <div className="portal-skeleton-head"><span/><span/></div>
-    <div className="portal-skeleton-stats"><span/><span/><span/><span/></div>
-    <div className="portal-skeleton-card"><span/><span/><span/></div>
-    <small>{label}</small>
-  </div>;
-}
+function AccessSkeleton({label}:{label:string}){return <div className="page portal-content-skeleton" aria-busy="true" aria-live="polite"><div className="portal-skeleton-head"><span/><span/></div><div className="portal-skeleton-stats"><span/><span/><span/><span/></div><div className="portal-skeleton-card"><span/><span/><span/></div><small>{label}</small></div>;}
 
 function CustomerAccessGuard({children}:{children:React.ReactNode}){
-  const {pick}=useI18n();
-  const [ready,setReady]=useState(()=>{const token=getCustomerToken();return Boolean(token&&readPortalAccess(token)?.portal==="customer");});
-  const [error,setError]=useState("");
-  useEffect(()=>{
-    let alive=true;
-    const run=async()=>{
-      const token=getCustomerToken();
-      if(!token){window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);return;}
-      const hadCache=readPortalAccess(token)?.portal==="customer";
-      try{
-        const [account,reseller]=await Promise.all([customerApi.me(token),getResellerProfile(token)]);
-        if(!alive)return;
-        if(!account.is_active){clearCustomerToken();window.location.replace("/login");return;}
-        const portal=String(account.role||"").toLowerCase()==="admin"?"admin":reseller?"reseller":"customer";
-        writePortalAccess(token,portal,account);
-        if(portal!=="customer"){window.location.replace(portal==="admin"?"/admin":"/reseller");return;}
-        setError("");setReady(true);
-      }catch(reason){if(!alive)return;if(hadCache)return;setError(reason instanceof Error?reason.message:String(reason));}
-    };
-    void run();return()=>{alive=false};
-  },[]);
-  if(error)return <div className="page"><div className="auth-gate-card"><b>{pick("بررسی نوع حساب ناموفق بود","Could not verify account type")}</b><small>{error}</small><button className="ghost" onClick={()=>window.location.reload()}>{pick("تلاش دوباره","Retry")}</button></div></div>;
-  if(!ready)return <AccessSkeleton label={pick("در حال آماده‌سازی حساب...","Preparing account...")}/>;
-  return <>{children}</>;
+  const {pick}=useI18n();const [ready,setReady]=useState(()=>{const token=getCustomerToken();return Boolean(token&&readPortalAccess(token)?.portal==="customer");});const [error,setError]=useState("");
+  useEffect(()=>{let alive=true;const run=async()=>{const token=getCustomerToken();if(!token){window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);return;}const hadCache=readPortalAccess(token)?.portal==="customer";try{const [account,reseller]=await Promise.all([customerApi.me(token),getResellerProfile(token)]);if(!alive)return;if(!account.is_active){clearCustomerToken();window.location.replace("/login");return;}const portal=String(account.role||"").toLowerCase()==="admin"?"admin":reseller?"reseller":"customer";writePortalAccess(token,portal,account);if(portal!=="customer"){window.location.replace(portal==="admin"?"/admin":"/reseller");return;}setError("");setReady(true);}catch(reason){if(!alive)return;if(hadCache)return;setError(reason instanceof Error?reason.message:String(reason));}};void run();return()=>{alive=false};},[]);
+  if(error)return <div className="page"><div className="auth-gate-card"><b>{pick("بررسی نوع حساب ناموفق بود","Could not verify account type")}</b><small>{error}</small><button className="ghost" onClick={()=>window.location.reload()}>{pick("تلاش دوباره","Retry")}</button></div></div>;if(!ready)return <AccessSkeleton label={pick("در حال آماده‌سازی حساب...","Preparing account...")}/>;return <>{children}</>;
 }
 
 function ResellerAccessGuard({children}:{children:React.ReactNode}){
-  const {pick}=useI18n();
-  const [ready,setReady]=useState(()=>{const token=getCustomerToken();return Boolean(token&&readPortalAccess(token)?.portal==="reseller");});
-  const [error,setError]=useState("");
-  useEffect(()=>{
-    let alive=true;
-    const run=async()=>{
-      const token=getCustomerToken();
-      if(!token){window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);return;}
-      const hadCache=readPortalAccess(token)?.portal==="reseller";
-      try{
-        const [account,reseller]=await Promise.all([customerApi.me(token),getResellerProfile(token)]);
-        if(!alive)return;
-        if(!account.is_active){clearCustomerToken();window.location.replace("/login");return;}
-        const portal=String(account.role||"").toLowerCase()==="admin"?"admin":reseller?"reseller":"customer";
-        writePortalAccess(token,portal,account);
-        if(portal!=="reseller"){window.location.replace(portal==="admin"?"/admin":"/panel");return;}
-        setError("");setReady(true);
-      }catch(reason){if(!alive)return;if(hadCache)return;setError(reason instanceof Error?reason.message:String(reason));}
-    };
-    void run();return()=>{alive=false};
-  },[]);
-  if(error)return <div className="page"><div className="auth-gate-card"><b>{pick("بررسی دسترسی حساب ناموفق بود","Could not verify account access")}</b><small>{error}</small><button className="ghost" onClick={()=>window.location.reload()}>{pick("تلاش دوباره","Retry")}</button></div></div>;
-  if(!ready)return <AccessSkeleton label={pick("در حال آماده‌سازی حساب...","Preparing account...")}/>;
-  return <>{children}</>;
+  const {pick}=useI18n();const [ready,setReady]=useState(()=>{const token=getCustomerToken();return Boolean(token&&readPortalAccess(token)?.portal==="reseller");});const [error,setError]=useState("");
+  useEffect(()=>{let alive=true;const run=async()=>{const token=getCustomerToken();if(!token){window.location.replace(`/login?next=${encodeURIComponent(window.location.pathname)}`);return;}const hadCache=readPortalAccess(token)?.portal==="reseller";try{const [account,reseller]=await Promise.all([customerApi.me(token),getResellerProfile(token)]);if(!alive)return;if(!account.is_active){clearCustomerToken();window.location.replace("/login");return;}const portal=String(account.role||"").toLowerCase()==="admin"?"admin":reseller?"reseller":"customer";writePortalAccess(token,portal,account);if(portal!=="reseller"){window.location.replace(portal==="admin"?"/admin":"/panel");return;}setError("");setReady(true);}catch(reason){if(!alive)return;if(hadCache)return;setError(reason instanceof Error?reason.message:String(reason));}};void run();return()=>{alive=false};},[]);
+  if(error)return <div className="page"><div className="auth-gate-card"><b>{pick("بررسی دسترسی حساب ناموفق بود","Could not verify account access")}</b><small>{error}</small><button className="ghost" onClick={()=>window.location.reload()}>{pick("تلاش دوباره","Retry")}</button></div></div>;if(!ready)return <AccessSkeleton label={pick("در حال آماده‌سازی حساب...","Preparing account...")}/>;return <>{children}</>;
 }
 
-function PortalMenuLink({item,active,onClick,attention}:{item:MenuItem;active:string;onClick?:()=>void;attention?:NavAttention}){
-  const {pick}=useI18n();
-  const [fa,en,href,icon]=item;
-  const attentionCount=attention?.countForPath(href)||0;
-  const classes=[active===href?"active":"",attentionCount>0?"has-attention":""].filter(Boolean).join(" ");
-  return <a href={href} className={classes} onClick={onClick}>
-    <span className="customer-portal-nav-icon"><PortalIcon name={icon}/></span>
-    <span className="customer-portal-nav-label">{pick(fa,en)}</span>
-    {attentionCount>0&&<span className="portal-nav-attention-count" aria-label={String(attentionCount)}>{attentionCount>99?"99+":attentionCount}</span>}
-    {active===href&&attentionCount===0&&<span className="customer-portal-active-dot"/>}
-  </a>;
-}
+function PortalMenuLink({item,active,onClick,attention}:{item:MenuItem;active:string;onClick?:()=>void;attention?:NavAttention}){const {pick}=useI18n();const [fa,en,href,icon]=item;const attentionCount=attention?.countForPath(href)||0;const classes=[active===href?"active":"",attentionCount>0?"has-attention":""].filter(Boolean).join(" ");return <a href={href} className={classes} onClick={onClick}><span className="customer-portal-nav-icon"><PortalIcon name={icon}/></span><span className="customer-portal-nav-label">{pick(fa,en)}</span>{attentionCount>0&&<span className="portal-nav-attention-count" aria-label={String(attentionCount)}>{attentionCount>99?"99+":attentionCount}</span>}{active===href&&attentionCount===0&&<span className="customer-portal-active-dot"/>}</a>;}
 
-function PortalTopNav({active,type,attention}:{active:string;type:"customer"|"reseller";attention?:NavAttention}){
-  const {pick}=useI18n();
-  const groups=type==="customer"?customerGroups:resellerGroups;
-  return <nav className="customer-portal-topnav" aria-label={type==="customer"?pick("منوی حساب کاربری","Customer navigation"):pick("منوی فروش","Sales navigation")}>
-    {groups.map(group=>{
-      const groupActive=group.items.some(([, ,href])=>href===active);
-      const paths=group.items.map(([, ,href])=>href);
-      const groupAttention=Boolean(attention?.groupHasAttention(paths));
-      const classes=["customer-portal-topnav-group",groupActive?"active":"",groupAttention?"has-attention":""].filter(Boolean).join(" ");
-      return <details className={classes} key={group.fa}>
-        <summary>{pick(group.fa,group.en)} {groupAttention&&<span className="portal-nav-attention-dot"/>}<span>⌄</span></summary>
-        <div className="customer-portal-topnav-menu">
-          {group.items.map(item=><PortalMenuLink key={item[2]} item={item} active={active} attention={attention}/>)}
-        </div>
-      </details>;
-    })}
-  </nav>;
-}
+function PortalTopNav({active,type,attention}:{active:string;type:"customer"|"reseller";attention?:NavAttention}){const {pick}=useI18n();const groups=type==="customer"?customerGroups:resellerGroups;return <nav className="customer-portal-topnav" aria-label={type==="customer"?pick("منوی حساب کاربری","Customer navigation"):pick("منوی فروش","Sales navigation")}>{groups.map(group=>{const groupActive=group.items.some(([, ,href])=>href===active);const paths=group.items.map(([, ,href])=>href);const groupAttention=Boolean(attention?.groupHasAttention(paths));const classes=["customer-portal-topnav-group",groupActive?"active":"",groupAttention?"has-attention":""].filter(Boolean).join(" ");return <details className={classes} key={group.fa}><summary>{pick(group.fa,group.en)} {groupAttention&&<span className="portal-nav-attention-dot"/>}<span>⌄</span></summary><div className="customer-portal-topnav-menu">{group.items.map(item=><PortalMenuLink key={item[2]} item={item} active={active} attention={attention}/>)}</div></details>;})}</nav>;}
 
-function PortalMobileDrawer({active,type,open,close,attention}:{active:string;type:"customer"|"reseller";open:boolean;close:()=>void;attention?:NavAttention}){
-  const {pick}=useI18n();
-  const menu=type==="customer"?customerMenu:resellerMenu;
-  return <>
-    <button type="button" aria-label={pick("بستن منو","Close menu")} className={`customer-portal-mobile-backdrop ${open?"open":""}`} onClick={close}/>
-    <aside className={`customer-portal-sidebar ${open?"open":""} ${type==="reseller"?"reseller-portal-sidebar":""}`}>
-      <div className="customer-portal-brand-row"><div className="customer-portal-brand"><BrandMark/></div><button className="customer-portal-mobile-close" type="button" onClick={close} aria-label={pick("بستن منو","Close menu")}>×</button></div>
-      <div className="customer-portal-section-label">{type==="customer"?pick("حساب کاربری","Customer account"):pick("مرکز فروش","Sales center")}</div>
-      <nav className="customer-portal-nav">{menu.map(item=><PortalMenuLink key={item[2]} item={item} active={active} onClick={close} attention={attention}/>)}</nav>
-      {type==="customer"?<CustomerIdentity/>:<ResellerIdentity/>}
-    </aside>
-  </>;
-}
+function PortalMobileDrawer({active,type,open,close,attention}:{active:string;type:"customer"|"reseller";open:boolean;close:()=>void;attention?:NavAttention}){const {pick}=useI18n();const menu=type==="customer"?customerMenu:resellerMenu;return <><button type="button" aria-label={pick("بستن منو","Close menu")} className={`customer-portal-mobile-backdrop ${open?"open":""}`} onClick={close}/><aside className={`customer-portal-sidebar ${open?"open":""} ${type==="reseller"?"reseller-portal-sidebar":""}`}><div className="customer-portal-brand-row"><div className="customer-portal-brand"><BrandMark/></div><button className="customer-portal-mobile-close" type="button" onClick={close} aria-label={pick("بستن منو","Close menu")}>×</button></div><div className="customer-portal-section-label">{type==="customer"?pick("حساب کاربری","Customer account"):pick("مرکز فروش","Sales center")}</div><nav className="customer-portal-nav">{menu.map(item=><PortalMenuLink key={item[2]} item={item} active={active} onClick={close} attention={attention}/>)}</nav>{type==="customer"?<CustomerIdentity/>:<ResellerIdentity/>}</aside></>;}
 
-function PortalFrame({children,active="",type}:PortalShellProps){
-  const {pick}=useI18n();
-  const [mobileOpen,setMobileOpen]=useState(false);
-  const resellerAttention=useResellerNavAttention(type==="reseller");
-  const attention=type==="reseller"?resellerAttention:undefined;
-  return <div className={`customer-portal-shell ${type==="reseller"?"reseller-portal-shell":""}`}>
-    {type==="reseller"&&<ResellerVisibleCopyNormalizer/>}
-    <main className="customer-portal-main">
-      <header className="customer-portal-header">
-        <div className="customer-portal-primarybar">
-          <div className="customer-portal-header-brand"><BrandMark/></div>
-          <PortalTopNav active={active} type={type} attention={attention}/>
-          <div className="customer-portal-header-actions">
-            {type==="customer"?<CustomerNotificationCenter/>:<ResellerNotificationCenter/>}
-            <LanguageSwitch compact/>
-            <ThemeSwitch compact/>
-            <button className="customer-portal-mobile-toggle" type="button" onClick={()=>setMobileOpen(true)} aria-expanded={mobileOpen} aria-label={pick("باز کردن منو","Open menu")}>☰</button>
-          </div>
-        </div>
-        <div className="customer-portal-utilitybar">
-          <div className="customer-portal-search"><span>⌕</span><input placeholder={type==="customer"?pick("جستجو در حساب...","Search account..."):pick("جستجو در پنل...","Search panel...")}/></div>
-          <div className="customer-portal-top-identity">{type==="customer"?<CustomerIdentity/>:<ResellerIdentity/>}</div>
-        </div>
-        <PortalMobileDrawer active={active} type={type} open={mobileOpen} close={()=>setMobileOpen(false)} attention={attention}/>
-      </header>
-      {children}
-    </main>
-  </div>;
-}
+function PortalFrame({children,active="",type}:PortalShellProps){const {pick}=useI18n();const [mobileOpen,setMobileOpen]=useState(false);const resellerAttention=useResellerNavAttention(type==="reseller");const attention=type==="reseller"?resellerAttention:undefined;return <div className={`customer-portal-shell ${type==="reseller"?"reseller-portal-shell":""}`}>{type==="reseller"&&<ResellerVisibleCopyNormalizer/>}<main className="customer-portal-main"><header className="customer-portal-header"><div className="customer-portal-primarybar"><div className="customer-portal-header-brand"><BrandMark/></div><PortalTopNav active={active} type={type} attention={attention}/><div className="customer-portal-header-actions">{type==="customer"?<CustomerNotificationCenter/>:<ResellerNotificationCenter/>}<LanguageSwitch compact/><ThemeSwitch compact/><button className="customer-portal-mobile-toggle" type="button" onClick={()=>setMobileOpen(true)} aria-expanded={mobileOpen} aria-label={pick("باز کردن منو","Open menu")}>☰</button></div></div><div className="customer-portal-utilitybar"><div className="customer-portal-search"><span>⌕</span><input placeholder={type==="customer"?pick("جستجو در حساب...","Search account..."):pick("جستجو در پنل...","Search panel...")}/></div><div className="customer-portal-top-identity">{type==="customer"?<CustomerIdentity/>:<ResellerIdentity/>}</div></div><PortalMobileDrawer active={active} type={type} open={mobileOpen} close={()=>setMobileOpen(false)} attention={attention}/></header>{children}</main></div>;}
 
-export function PortalShell(props:PortalShellProps){
-  if(props.type==="customer")return <CustomerSessionProvider><PortalFrame {...props}><CustomerAccessGuard>{props.children}</CustomerAccessGuard></PortalFrame></CustomerSessionProvider>;
-  return <PortalFrame {...props}><ResellerAccessGuard>{props.children}</ResellerAccessGuard></PortalFrame>;
-}
+export function PortalShell(props:PortalShellProps){if(props.type==="customer")return <CustomerSessionProvider><PortalFrame {...props}><CustomerAccessGuard>{props.children}</CustomerAccessGuard></PortalFrame></CustomerSessionProvider>;return <PortalFrame {...props}><ResellerAccessGuard>{props.children}</ResellerAccessGuard></PortalFrame>;}
