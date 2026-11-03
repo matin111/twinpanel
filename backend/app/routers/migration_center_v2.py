@@ -386,9 +386,12 @@ def migration_import_staged_batch(
                 protocols=list(ALL_PROTOCOL_KEYS),
                 commit=False,
             ))
+        subscription_ids = [int(item["subscription_id"]) for item in results]
+        added_protocols = ensure_migration_protocol_snapshots(db, subscription_ids)
         db.commit()
         return {
             "ok": True,
+            "added_protocol_snapshots": added_protocols,
             "imported": sum(bool(item["imported"]) for item in results),
             "existing": sum(bool(item["idempotent"]) for item in results),
             "subscriptions": len(results),
