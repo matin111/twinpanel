@@ -1,14 +1,26 @@
 "use client";
 
 import {useEffect,useMemo,useState} from "react";
+import {API_BASE} from "../lib/api";
+import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
 import {resellerApi,ResellerRow} from "../lib/reseller-runtime-api";
 import {PortalShell} from "./portal-shells";
 import {Card} from "./ui";
 
 type TrialSettings={enabled:boolean;template_plan_id:number|null;duration_days:number;traffic_mb:number;scope:string};
-
 type TrialPlan={id:number;title:string};
+
+async function trialRequest<T>(init:RequestInit={}):Promise<T>{
+  const token=getCustomerToken();
+  if(!token)throw new Error("AUTH_REQUIRED");
+  const headers=new Headers(init.headers);
+  headers.set("Authorization",`Bearer ${token}`);
+  if(init.body&&!headers.has("Content-Type"))headers.set("Content-Type","application/json");
+  const response=await fetch(`${API_BASE}/v1/trial/reseller/me`,{...init,headers,cache:"no-store"});
+  if(!response.ok){let detail=`API error ${response.status}`;try{const payload=await response.json() as {detail?:unknown};if(typeof payload.detail==="string")detail=payload.detail;}catch{}throw new Error(detail);}
+  return response.json() as Promise<T>;
+}
 
 function normalizePlans(rows:ResellerRow[]):TrialPlan[]{
   const seen=new Set<number>();
@@ -32,10 +44,10 @@ export function ResellerTrialSettings(){
   const [message,setMessage]=useState("");
   const [error,setError]=useState("");
 
-  useEffect(()=>{let alive=true;Promise.all([resellerApi.trialSettings(),resellerApi.plans()]).then(([trial,rows])=>{if(!alive)return;setSettings(trial as unknown as TrialSettings);setPlans(normalizePlans(rows));}).catch(reason=>alive&&setError(reason instanceof Error?reason.message:String(reason))).finally(()=>alive&&setLoading(false));return()=>{alive=false};},[]);
+  useEffect(()=>{let alive=true;Promise.all([trialRequest<TrialSettings>(),resellerApi.plans()]).then(([trial,rows])=>{if(!alive)return;setSettings(trial);setPlans(normalizePlans(rows));}).catch(reason=>alive&&setError(reason instanceof Error?reason.message:String(reason))).finally(()=>alive&&setLoading(false));return()=>{alive=false};},[]);
 
   const selectedPlan=useMemo(()=>plans.find(row=>row.id===settings?.template_plan_id),[plans,settings?.template_plan_id]);
-  const save=async()=>{if(!settings)return;setSaving(true);setError("");setMessage("");try{const next=await resellerApi.updateTrialSettings({enabled:settings.enabled,template_plan_id:settings.template_plan_id,duration_days:settings.duration_days,traffic_mb:settings.traffic_mb});setSettings(next as unknown as TrialSettings);setMessage(pick("تنظیمات اکانت تست نمایندگی ذخیره شد.","Reseller Trial settings saved."));}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setSaving(false);}};
+  const save=async()=>{if(!settings)return;setSaving(true);setError("");setMessage("");try{const next=await trialRequest<TrialSettings>({method:"PUT",body:JSON.stringify({enabled:settings.enabled,template_plan_id:settings.template_plan_id,duration_days:settings.duration_days,traffic_mb:settings.traffic_mb})});setSettings(next);setMessage(pick("تنظیمات اکانت تست نمایندگی ذخیره شد.","Reseller Trial settings saved."));}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setSaving(false);}};
 
   return <PortalShell type="reseller" active="/reseller/trial"><div className="page"><div className="page-head"><div><h1>{pick("اکانت تست","Trial Account")}</h1><p>{pick("تنظیمات مستقل اکانت تست ربات و نمایندگی","Standalone reseller and bot Trial settings")}</p></div></div>{loading&&<Card><p>{pick("در حال بارگذاری...","Loading...")}</p></Card>}{error&&<div className="customer-buy-alert error">{error}</div>}{message&&<div className="customer-buy-alert">{message}</div>}{settings&&<Card className="trial-settings-card"><div className="trial-settings-intro"><div><h2>{pick("اکانت تست نمایندگی","Reseller Trial Account")}</h2><p>{pick("این تنظیمات از اکانت تست اصلی جداست. هر کاربر برای هر نماینده فقط یک‌بار می‌تواند Trial همان نماینده را دریافت کند.","These settings are separate from the main Trial. A user can claim each reseller Trial only once per reseller.")}</p></div><label className="toggle-row"><input type="checkbox" checked={settings.enabled} onChange={event=>setSettings({...settings,enabled:event.target.checked})}/><span>{pick("فعال بودن اکانت تست نمایندگی","Enable reseller Trial")}</span></label></div><div className="form-grid"><label><span>{pick("پلن الگو","Template Plan")}</span><select value={settings.template_plan_id??""} onChange={event=>setSettings({...settings,template_plan_id:event.target.value?Number(event.target.value):null})}><option value="">{pick("انتخاب پلن الگو","Select template plan")}</option>{plans.map(plan=><option key={plan.id} value={plan.id}>{plan.title}</option>)}</select></label><label><span>{pick("مدت اعتبار (روز)","Duration (days)")}</span><input type="number" min={1} max={30} value={settings.duration_days} onChange={event=>setSettings({...settings,duration_days:Number(event.target.value||1)})}/></label><label><span>{pick("حجم (MB)","Traffic (MB)")}</span><input type="number" min={1} max={10240} value={settings.traffic_mb} onChange={event=>setSettings({...settings,traffic_mb:Number(event.target.value||1)})}/></label></div><div className="trial-settings-summary"><b>{pick("الگوی فعلی:","Current template:")}</b> {selectedPlan?.title||pick("انتخاب نشده","Not selected")}</div><div className="form-actions"><button type="button" className="primary" disabled={saving} onClick={()=>void save()}>{saving?pick("در حال ذخیره...","Saving..."):pick("ذخیره تنظیمات","Save settings")}</button></div></Card>}</div></PortalShell>;
 }
