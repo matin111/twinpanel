@@ -80,10 +80,10 @@ export function LegacySubscriptionsRuntimePage(){
   const [query,setQuery]=useState("");
   const [page,setPage]=useState(0);
   const [matchedTotal,setMatchedTotal]=useState(0);
-  const [globalStats,setGlobalStats]=useState({total:0,active:0,expired:0,suspended:0});
+  const [globalStats,setGlobalStats]=useState({total:0,active:0,expired:0,suspended:0,online:0});
   const pageSize=40;
   const listRequestId=useRef(0);
-  const [status,setStatus]=useState<"all"|"active"|"expired"|"suspended"|"pending">("all");
+  const [status,setStatus]=useState<"all"|"active"|"expired"|"suspended"|"pending"|"online">("all");
   const [modal,setModal]=useState<ModalKind>(null);
   const [selected,setSelected]=useState<RuntimeRow|null>(null);
   const [connection,setConnection]=useState<RuntimeRow|null>(null);
@@ -271,10 +271,39 @@ export function LegacySubscriptionsRuntimePage(){
     <div className="page-head"><div><h1>{pick("اشتراک‌ها","Subscriptions")}</h1><small>{pick("مدیریت اشتراک، تمدید، وضعیت و سابلینک","Subscriptions, renewals, status and public links")}</small></div><button className="primary" onClick={openCreate}>＋ {pick("اشتراک جدید","New subscription")}</button></div>
     <Notice error={error} ok={ok}/>
 
-    <div className="stats dashboard-stats"><Stat label={pick("کل اشتراک‌ها","Total subscriptions")} value={stats.total.toLocaleString("fa-IR")}/><Stat label={pick("اشتراک‌های فعال","Active")} value={stats.active.toLocaleString("fa-IR")}/><Stat label={pick("منقضی","Expired")} value={stats.expired.toLocaleString("fa-IR")}/><Stat label={pick("معلق","Suspended")} value={stats.suspended.toLocaleString("fa-IR")}/></div>
+    <div className="stats dashboard-stats subscription-stat-filters" aria-label={pick("فیلتر اشتراک‌ها بر اساس وضعیت","Filter subscriptions by status")}>
+      {([
+        ["all",pick("کل اشتراک‌ها","Total subscriptions"),stats.total],
+        ["active",pick("اشتراک‌های فعال","Active subscriptions"),stats.active],
+        ["expired",pick("منقضی","Expired"),stats.expired],
+        ["suspended",pick("معلق","Suspended"),stats.suspended],
+        ["online",pick("آنلاین‌ها","Online now"),stats.online??0],
+      ] as const).map(([key,label,count])=>(
+        <button
+          key={key}
+          type="button"
+          className={`subscription-stat-filter ${status===key?"is-selected":""}`}
+          aria-pressed={status===key}
+          title={pick(`نمایش ${label}`,`Show ${label.toLowerCase()}`)}
+          onClick={()=>{setStatus(key);setPage(0);}}
+        >
+          <Stat label={label} value={count.toLocaleString("fa-IR")}/>
+        </button>
+      ))}
+    </div>
+    <style>{`
+      .subscription-stat-filters{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+      .subscription-stat-filter{border:2px solid transparent;border-radius:18px;background:transparent;padding:0;color:inherit;text-align:inherit;cursor:pointer;min-width:0;transition:border-color .2s,transform .2s}
+      .subscription-stat-filter:hover{transform:translateY(-2px);border-color:rgba(59,130,246,.45)}
+      .subscription-stat-filter.is-selected{border-color:#3b82f6}
+      .subscription-stat-filter:focus-visible{outline:3px solid #60a5fa;outline-offset:2px}
+      .subscription-stat-filter .stat{height:100%;margin:0}
+      @media(max-width:850px){.subscription-stat-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+      @media(max-width:420px){.subscription-stat-filters{grid-template-columns:1fr}}
+    `}</style>
 
     <Card>
-      <div className="runtime-toolbar"><label>⌕ <input value={query} onChange={event=>{setQuery(event.target.value);setPage(0);}} placeholder={pick("نام، ایمیل، نام کاربری یا کد اشتراک…","Name, email, username or subscription code…")}/></label><select value={status} onChange={event=>{setStatus(event.target.value as typeof status);setPage(0);}}><option value="all">{pick("همه","All")}</option><option value="active">{pick("فعال","Active")}</option><option value="expired">{pick("منقضی","Expired")}</option><option value="suspended">{pick("معلق","Suspended")}</option><option value="pending">{pick("در انتظار","Pending")}</option></select><button className="ghost" disabled={loading} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button></div>
+      <div className="runtime-toolbar"><label>⌕ <input value={query} onChange={event=>{setQuery(event.target.value);setPage(0);}} placeholder={pick("نام، ایمیل، نام کاربری یا کد اشتراک…","Name, email, username or subscription code…")}/></label><select value={status} onChange={event=>{setStatus(event.target.value as typeof status);setPage(0);}}><option value="all">{pick("همه","All")}</option><option value="active">{pick("فعال","Active")}</option><option value="expired">{pick("منقضی","Expired")}</option><option value="suspended">{pick("معلق","Suspended")}</option><option value="online">{pick("آنلاین‌ها","Online now")}</option><option value="pending">{pick("در انتظار","Pending")}</option></select><button className="ghost" disabled={loading} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button></div>
       {loading&&rows.length===0?<div className="runtime-loading">…</div>:<div className="table"><table><thead><tr><th>{pick("کاربر","User")}</th><th>{pick("پلن","Plan")}</th><th>{pick("نام کاربری","Username")}</th><th>{pick("ترافیک","Traffic")}</th><th>{pick("ساخت","Created")}</th><th>{pick("انقضا","Expires")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map(item=>{const user=userMap.get(n(item.user_id));const plan=planMap.get(n(item.plan_id));return <tr key={n(item.id)}><td><div className="user-cell"><b>{user?.full_name||s(item.customer_name)||`#${item.user_id}`}</b><small dir="ltr">{user?.email||s(item.customer_email)||"—"}</small></div></td><td><div className="user-cell"><b>{s(item.plan_name)||s(plan?.name)||`#${item.plan_id}`}</b><small dir="ltr">MV-{n(item.id)}</small></div></td><td><div className="secret-row"><b dir="ltr">{s(item.account_username)||"—"}</b>{s(item.account_username)&&<button className="mini-btn" onClick={()=>copy(s(item.account_username))}>{pick("کپی","Copy")}</button>}</div></td><td>{trafficCell(item)}</td><td>{formatDate(item.created_at)}</td><td>{expiryCell(item)}</td><td><Badge tone={tone(item.status)}>{statusLabel(item.status)}</Badge></td><td><div className="row-actions"><button className="danger" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button><button disabled={!!busy} onClick={()=>void toggleStatus(item)}>{s(item.status).toLowerCase()==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button><button onClick={()=>openEdit(item)}>{pick("ویرایش","Edit")}</button><button onClick={()=>openExtend(item)}>{pick("تمدید","Renew")}</button><button className="primary-soft" onMouseEnter={()=>prefetchSubscriptionLink(item)} onFocus={()=>prefetchSubscriptionLink(item)} onClick={()=>void openSubscriptionLink(item)}>{pick("سابلینک","Sub-link")}</button></div></td></tr>;})}</tbody></table>{filtered.length===0&&<div className="runtime-empty">{pick("اشتراکی پیدا نشد","No subscriptions found")}</div>}</div>}
     </Card>
     <div className="runtime-toolbar" style={{justifyContent:"space-between",marginTop:12}}>
