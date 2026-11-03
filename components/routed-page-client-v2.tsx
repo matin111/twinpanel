@@ -3,9 +3,11 @@
 import {AdminAuthGuard} from "./admin-auth-guard";
 import {AdminDashboardServerCard} from "./admin-dashboard-server-card";
 import {AdminOperationFeedback} from "./admin-operation-feedback";
+import {AdminTrialSettings} from "./admin-trial-settings";
 import {LegacyNodesRuntimePage} from "./legacy-nodes-runtime-v2";
 import {LicenseCenter} from "./license-center";
 import {NodeAddModalBridge} from "./node-add-modal-bridge";
+import {ResellerTrialSettings} from "./reseller-trial-settings";
 import {RoutedPageClient as BaseRoutedPageClient} from "./routed-page-client";
 import {SmartTransportsRuntimeV27} from "./smart-transports-runtime-v27";
 import {SubscriptionDeliveryPolicyManager} from "./subscription-delivery-policy-manager";
@@ -22,6 +24,9 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(routeKey==="admin/license"){
     return admin(<LicenseCenter/>);
   }
+  if(routeKey==="admin/trial"){
+    return admin(<AdminTrialSettings/>);
+  }
   if(routeKey==="admin/nodes"||routeKey==="admin/network"||routeKey==="admin/provision"){
     return admin(<><LegacyNodesRuntimePage/><NodeAddModalBridge/></>);
   }
@@ -36,6 +41,9 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   }
   if(routeKey==="admin/telegram"){
     return <><BaseRoutedPageClient routeKey={routeKey}/><AdminTelegramButtonStyleSettings/><AdminTelegramMembershipSettings/></>;
+  }
+  if(routeKey==="reseller/trial"){
+    return <ResellerTrialSettings/>;
   }
   if(routeKey==="reseller/bot"){
     return <><BaseRoutedPageClient routeKey={routeKey}/><ResellerTelegramMembershipSettings/></>;
