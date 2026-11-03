@@ -363,18 +363,20 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
         home = "rmenu:home" if self.scope == "reseller" else "main:home"
         back = self._navigation_back(text, self.scope)
         rows = [list(row) for row in markup.inline_keyboard] if markup else []
-        existing = {
-            str(button.callback_data or "")
+        labels = [
+            str(button.text or "")
             for row in rows
             for button in row
-            if button.callback_data
-        }
-        # Existing buttons may be labelled differently; avoid duplicating
-        # a semantically equivalent callback.
+        ]
+        # Preserve any existing navigation regardless of the handler's
+        # callback name. On the first screen Back intentionally also
+        # returns Home, but both requested controls remain visible.
+        has_back = any("بازگشت" in label or "برگشت" in label for label in labels)
+        has_home = any("منوی اصلی" in label for label in labels)
         extra = []
-        if back != home and back not in existing:
+        if not has_back:
             extra.append(InlineKeyboardButton(text="↩️ برگشت", callback_data=back))
-        if home not in existing:
+        if not has_home:
             extra.append(InlineKeyboardButton(text="🏠 منوی اصلی", callback_data=home))
         if not extra:
             return method
