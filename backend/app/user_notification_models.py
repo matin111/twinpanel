@@ -86,3 +86,50 @@ class UserNotification(Base):
         DateTime,
         nullable=True,
     )
+
+
+class SubscriptionExpiryNotificationClaim(Base):
+    """Database claim used to dedupe expiry reminders across workers/replicas."""
+
+    __tablename__ = "subscription_expiry_notification_claims"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True,
+    )
+
+    event_key: Mapped[str] = mapped_column(
+        String(120),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+
+    subscription_id: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+        index=True,
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+
+    stage: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+    )
+
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=datetime.utcnow,
+    )
