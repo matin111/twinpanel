@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -22,6 +23,13 @@ router = APIRouter(
     tags=["node-publish-all-users-v1"],
     dependencies=[Depends(require_admin)],
 )
+
+
+# Keep strong references to detached jobs until they finish.  FastAPI/Starlette
+# BackgroundTasks can keep the request lifecycle open through long SSH/provision
+# work in some middleware paths; these tasks must outlive the HTTP response.
+_NODE_INSTALL_TASKS: set[asyncio.Task[Any]] = set()
+_NODE_INSTALL_PENDING: set[str] = set()
 
 
 @router.post("/{node_id}/publish-all-users")
@@ -228,7 +236,21 @@ async def _install_node_in_background(
 
         if payload.publish_to_all_users:
             try:
-                await publish_node_to_all_users(node_id=node_id, db=db)
+                # publish_node_all_users_v2 patches this global at import time,
+                # so the checkbox path deterministically covers legacy + explicit
+                # subscriptions and reconciles active accounts.
+                result = await publish_node_to_all_users(node_id=node_id, db=db)
+                print(
+                    "TWINPANEL_NODE_BACKGROUND_PUBLISH_DONE_V2",
+                    {
+                        "node_id": node_id,
+                        "subscriptions_seen": result.get("subscriptions_seen"),
+                        "memberships_added": result.get("memberships_added"),
+                        "active_reconciled": result.get("active_subscriptions_reconciled"),
+                        "failed_count": len(result.get("failed") or []),
+                    },
+                    flush=True,
+                )
             except Exception as exc:
                 db.rollback()
                 print(
@@ -248,6 +270,7 @@ async def _install_node_in_background(
             flush=True,
         )
     finally:
+        _NODE_INSTALL_PENDING.discard(payload.name.strip().casefold())
         db.close()
 
 
@@ -255,9 +278,9 @@ async def _install_node_in_background(
 async def install_node_background_v1(
     payload: BackgroundNodeInstallIn,
     request: Request,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
+    name_key = payload.name.strip().casefold()
     existing = (
         db.query(Node)
         .filter(Node.retired_at.is_(None), Node.name == payload.name)
@@ -265,20 +288,29 @@ async def install_node_background_v1(
     )
     if existing:
         raise HTTPException(status_code=409, detail="نام سرور قبلاً ثبت شده است")
+    if name_key in _NODE_INSTALL_PENDING:
+        raise HTTPException(status_code=409, detail="ثبت این سرور در حال انجام است")
 
-    background_tasks.add_task(
-        _install_node_in_background,
-        payload,
-        dict(request.scope),
+    _NODE_INSTALL_PENDING.add(name_key)
+    task = asyncio.create_task(
+        _install_node_in_background(
+            payload,
+            dict(request.scope),
+        ),
+        name=f"node-install:{payload.name}",
     )
+    _NODE_INSTALL_TASKS.add(task)
+    task.add_done_callback(_NODE_INSTALL_TASKS.discard)
+
     return {
         "ok": True,
         "queued": True,
+        "detached": True,
         "name": payload.name,
         "host": payload.host,
         "publish_to_all_users": bool(payload.publish_to_all_users),
         "message": (
-            "ثبت سرور شروع شد؛ آماده‌سازی و انتشار برای کاربران "
-            "در پس‌زمینه ادامه دارد"
+            "ثبت سرور صف شد؛ آماده‌سازی و انتشار برای کاربران "
+            "داخل بک‌اند ادامه دارد"
         ),
     }
