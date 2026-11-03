@@ -137,3 +137,7 @@ print("PROTOCOLS=" + ",".join(protocols))
 print("REVOCATION_SENTINEL=AUTHENTICATED")
 print("REAL_ACCOUNT_RESTORE=PASS")
 print("SHADOWTLS_CHAIN_STATE=PASS")
+
+# Batch mutation must preserve the single-account revoke and add contracts.
+import runpy
+runpy.run_path(str(ROOT / "backend" / "tests" / "migration_singbox_batch_smoke.py"))

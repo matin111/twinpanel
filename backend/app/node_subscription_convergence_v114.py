@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import fcntl
 from datetime import datetime
 from collections import defaultdict
 from sqlalchemy import case
@@ -249,10 +250,27 @@ def _modern_item_is_usable(ad: Any, db, protocol: str, item: dict[str, Any]) -> 
     return bool(cfg and _enum_value(cfg.status) == "online")
 
 
+def _migration_singbox_worker_running() -> bool:
+    """Read-only, fail-open check: do not duplicate the migration batch writes."""
+    try:
+        with open("/run/twinpanel-migration-singbox-batch.lock", "r") as handle:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return True
+            else:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+    except OSError:
+        pass
+    return False
+
+
 async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
     """Add only missing selected Modern credentials for one eligible Exit."""
     from .routers import account_delivery as ad
     from .routers.modern_account_delivery_v1 import _provision_modern_protocol
+    from .routers.modern_account_delivery_v1 import SINGBOX_ACCOUNT_PROTOCOLS
+    from .migration_import_models import MigrationImportRecord
 
     cfg_rows = (
         db.query(NodeProtocolConfig)
@@ -326,6 +344,20 @@ async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
         ):
             credentials_by_key[(int(cred.subscription_id), str(cred.protocol))] = cred
     active_subscriptions.sort(key=lambda item: int(item.id))
+    # Migration batch worker owns only missing sing-box pairs for imported
+    # subscriptions. All existing accounts and standalone protocols retain the
+    # ordinary convergence path, with no double writes or extra restarts.
+    imported_in_batch: set[int] = set()
+    if _migration_singbox_worker_running():
+        imported_in_batch = {
+            int(value) for (value,) in db.query(
+                MigrationImportRecord.subscription_id
+            ).filter(
+                MigrationImportRecord.source.in_(
+                    ["eylan", "sanaei", "marzban", "pasargad"]
+                )
+            ).all()
+        }
     provisioned_pairs = 0
     reused_pairs = 0
     failed: list[dict[str, Any]] = []
@@ -336,6 +368,8 @@ async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
         )
 
         for protocol in wanted:
+            if int(sub.id) in imported_in_batch and protocol in SINGBOX_ACCOUNT_PROTOCOLS:
+                continue
             cred = credentials_by_key.get((int(sub.id), protocol))
             stored_items = _credential_items(ad, cred)
             kept_items = [
