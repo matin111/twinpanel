@@ -81,7 +81,7 @@ for direct in (
     "https://download.wireguard.com/android-client/com.wireguard.android-1.0.20260315.apk",
     "https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Android-universal.apk",
     "https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-iOS.ipa",
-    "https://github.com/KaringX/karing/releases/download/v1.2.25.2802/karing_1.2.25.2802_android_arm.apk",
+    "https://github.com/KaringX/karing/releases/download/v1.2.26.2919/karing_1.2.26.2919_android_arm.apk",
     "https://apps.apple.com/us/app/karing/id6472431552",
     "https://github.com/SagerNet/sing-box/releases/download/v1.14.4/SFA-1.14.4-arm64-v8a.apk",
     "https://apps.apple.com/us/app/sing-box-mt/id6785326793",

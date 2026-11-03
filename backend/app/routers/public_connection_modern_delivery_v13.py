@@ -52,7 +52,7 @@ PROTOCOL_META: dict[str, tuple[str, str, str]] = {
 }
 
 _PLATFORMS = ("windows", "android", "ios", "macos")
-_KARING = {p: ("Karing", "https://karing.app/en/quickstart") for p in _PLATFORMS}
+_KARING = {p: ("Karing", f"/v1/connect/app-download/karing/{p}") for p in _PLATFORMS}
 _HIDDIFY = {
     p: ("Hiddify", "https://hiddify.com/app/How-to-install-Hiddify-app/")
     for p in _PLATFORMS

@@ -250,6 +250,44 @@ def _shadowtls_multi_karing_yaml(sub: Any, items: list[dict[str, Any]]) -> str:
     return "\n".join(rows)
 
 
+def _shadowtls_multi_singbox_json(items: list[dict[str, Any]]) -> str:
+    """Losslessly compose full SS->ShadowTLS pairs for sing-box-aware importers.
+
+    Unlike an isolated ShadowTLS outbound, each Shadowsocks outbound retains
+    its detour to the matching transport.  Do not copy multiple local inbounds,
+    which would duplicate their listen port.
+    """
+    outbounds: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    first_proxy = ""
+    for item in items:
+        try:
+            config = json.loads(str(item.get("config") or ""))
+            candidates = config.get("outbounds", [])
+            ss = next(x for x in candidates if isinstance(x, dict) and x.get("type") == "shadowsocks")
+            st = next(x for x in candidates if isinstance(x, dict) and x.get("type") == "shadowtls")
+            ss_tag = str(ss.get("tag") or "").strip()
+            st_tag = str(st.get("tag") or "").strip()
+            if not ss_tag or not st_tag or ss.get("detour") != st_tag:
+                return ""
+            if ss_tag in seen or st_tag in seen or ss_tag == st_tag:
+                return ""
+            if not (ss.get("method") and ss.get("password") and st.get("server") and st.get("server_port") and st.get("password")):
+                return ""
+            seen.update((ss_tag, st_tag))
+            if not first_proxy:
+                first_proxy = ss_tag
+            outbounds.extend((ss, st))
+        except (ValueError, TypeError, KeyError, StopIteration, AttributeError):
+            return ""
+    if not outbounds:
+        return ""
+    return json.dumps(
+        {"log": {"level": "warn"}, "outbounds": outbounds, "route": {"final": first_proxy}},
+        ensure_ascii=False, indent=2,
+    )
+
+
 def _mieru_multi_karing_yaml(sub: Any, items: list[dict[str, Any]]) -> str:
     proxy_blocks: list[list[str]] = []
     names: list[str] = []
@@ -420,11 +458,22 @@ def public_protocol_multi_meta_v34(
 def public_protocol_multi_v34(
     token: str,
     protocol: str,
+    format: str | None = None,
     db: Session = Depends(get_db),
 ):
     protocol = _normalize(protocol)
     kind, count, sub, items, payload = _delivery(token, protocol, db)
     headers = _headers(sub, protocol, kind, count)
+
+    # Explicitly requested portable sing-box config. Default remains the
+    # existing Karing/Mihomo YAML, so installed subscriptions stay compatible.
+    if protocol == "shadowtls" and str(format or "").lower() == "singbox":
+        content = _shadowtls_multi_singbox_json(items)
+        if not content:
+            raise HTTPException(status_code=409, detail="کانفیگ کامل sing-box آماده نیست")
+        headers["Content-Disposition"] = f'inline; filename="{_safe_name(_multilink_name(sub, protocol), "user-vpn")}-singbox.json"'
+        headers["X-TwinPanel-Multi-Kind"] = "singbox"
+        return Response(content=content, media_type="application/json; charset=utf-8", headers=headers)
 
     if kind == "uri":
         raw = "\n".join(payload).encode("utf-8")

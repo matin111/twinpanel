@@ -45,6 +45,11 @@ _GITHUB: dict[tuple[str, str], GitHubAsset] = {
 
 
 _STATIC: dict[tuple[str, str], str] = {
+    # Verified Karing 1.2.26.2919 assets supplied for each platform.
+    ("karing", "windows"): "https://github.com/KaringX/karing/releases/download/v1.2.26.2919/karing_1.2.26.2919_windows_x64.zip",
+    ("karing", "android"): "https://github.com/KaringX/karing/releases/download/v1.2.26.2919/karing_1.2.26.2919_android_arm.apk",
+    ("karing", "macos"): "https://github.com/KaringX/karing/releases/download/v1.2.26.2919/karing_1.2.26.2919_macos_universal.dmg",
+    ("karing", "linux"): "https://github.com/KaringX/karing/releases/download/v1.2.26.2919/karing_1.2.26.2919_linux_amd64.deb",
     # Apple stores are direct install destinations, not project landing pages.
     ("hiddify", "ios"): "https://apps.apple.com/us/app/hiddify-proxy-vpn/id6596777532?platform=iphone",
     ("karing", "ios"): "https://apps.apple.com/us/app/karing/id6472431552",
