@@ -52,6 +52,7 @@ export function AdminUsersWalletInline(){
   const [hosts,setHosts]=useState<HostRow[]>([]);
   const [balances,setBalances]=useState<Record<number,number>>({});
   const [userId,setUserId]=useState<number|null>(null);
+  const [mode,setMode]=useState<"credit"|"debit">("credit");
   const [amount,setAmount]=useState("");
   const [note,setNote]=useState("");
   const [busy,setBusy]=useState(false);
@@ -109,7 +110,8 @@ export function AdminUsersWalletInline(){
 
   const currentBalance=useMemo(()=>userId?Number(balances[userId]||0):0,[balances,userId]);
 
-  const open=(id:number)=>{
+  const open=(id:number,nextMode:"credit"|"debit")=>{
+    setMode(nextMode);
     setUserId(id);
     setAmount("");
     setNote("");
@@ -130,23 +132,29 @@ export function AdminUsersWalletInline(){
     event.preventDefault();
     if(!userId||busy)return;
 
-    const value=Number(amount.replace(/[^0-9-]/g,""));
+    const value=Number(amount.replace(/[^0-9]/g,""));
     if(!Number.isSafeInteger(value)||value<=0||value>100000000){
-      setError(pick("مبلغ شارژ باید بین ۱ تا ۱۰۰ میلیون تومان باشد.","Credit must be between 1 and 100,000,000 toman."));
+      setError(pick("مبلغ باید بین ۱ تا ۱۰۰ میلیون تومان باشد.","Amount must be between 1 and 100,000,000 toman."));
       return;
     }
+
+    if(mode==="debit"&&value>currentBalance){
+      setError(pick("مبلغ کاهش از موجودی فعلی بیشتر است.","Debit exceeds current wallet balance."));
+      return;
+    }
+    if(mode==="debit"&&!window.confirm(pick(`آیا ${money(value)} از کیف پول کاربر #${userId} کسر شود؟`,`Deduct ${money(value)} from user #${userId}?`)))return;
 
     setBusy(true);setError("");setOk("");
     try{
       const result=await adminRequest<{balance_toman:number}>(`/v1/admin/wallet/wallets/${userId}/adjust`,{
         method:"POST",
         body:JSON.stringify({
-          amount_toman:value,
-          note:note.trim()||"شارژ کیف پول توسط ادمین"
+          amount_toman:mode==="debit"?-value:value,
+          note:note.trim()||(mode==="debit"?"کاهش موجودی توسط ادمین":"شارژ کیف پول توسط ادمین")
         })
       });
       setBalances(current=>({...current,[userId]:Number(result.balance_toman||0)}));
-      setOk(pick("کیف پول شارژ شد؛ موجودی در پنل کاربری و ربات مشترک است.","Wallet credited; balance is shared by user panel and bot."));
+      setOk(mode==="debit"?pick("موجودی با موفقیت کسر شد و در پنل و ربات بروزرسانی می‌شود.","Balance deducted and reflected in panel and bot."):pick("کیف پول شارژ شد؛ موجودی در پنل کاربری و ربات مشترک است.","Wallet credited; balance is shared by user panel and bot."));
       setAmount("");setNote("");
       await loadBalances();
     }catch(e){setError(e instanceof Error?e.message:String(e));}
@@ -155,14 +163,15 @@ export function AdminUsersWalletInline(){
 
   return <>
     {hosts.map(({userId:id,host})=>createPortal(
-      <button
-        type="button"
-        className="ghost"
-        onClick={()=>open(id)}
-        title={pick("افزایش موجودی کیف پول کاربر در پنل و ربات","Credit user wallet for panel and Telegram bot")}
-      >
-        {pick("💰 شارژ کیف پول","💰 Credit wallet")} · {money(Number(balances[id]||0))}
-      </button>,
+      <>
+        <button type="button" className="ghost" onClick={()=>open(id,"credit")} title={pick("افزایش موجودی کیف پول","Credit user wallet")}>
+          {pick("➕ شارژ","➕ Credit")}
+        </button>
+        <button type="button" className="ghost" onClick={()=>open(id,"debit")} title={pick("کاهش موجودی کیف پول","Deduct from wallet")}>
+          {pick("➖ کاهش","➖ Deduct")}
+        </button>
+        <small style={{whiteSpace:"nowrap"}}>{money(Number(balances[id]||0))}</small>
+      </>,
       host,
       `wallet-${id}`
     ))}
@@ -173,8 +182,9 @@ export function AdminUsersWalletInline(){
         <form className="runtime-modal-card" onSubmit={submit}>
           <div className="card-head">
             <div>
-              <b>{pick("افزایش موجودی کیف پول","Credit user wallet")} #{userId}</b>
+              <b>{mode==="debit"?pick("کاهش موجودی کیف پول","Deduct from wallet"):pick("افزایش موجودی کیف پول","Credit user wallet")} #{userId}</b>
               <small>{pick("موجودی فعلی","Current balance")}: {money(currentBalance)}</small>
+              <small>{pick("توجه: این تغییر فقط برای شناسه همین کاربر است. ربات باید به همین حساب متصل باشد.","This change affects only this user ID. The bot must be linked to the same account.")}</small>
             </div>
             <button type="button" className="icon-button" onClick={close}>×</button>
           </div>
@@ -183,7 +193,7 @@ export function AdminUsersWalletInline(){
           {ok&&<div className="runtime-success">{ok}</div>}
 
           <label className="payField">
-            <span>{pick("مبلغ شارژ","Credit amount")}</span>
+            <span>{mode==="debit"?pick("مبلغ کاهش","Debit amount"):pick("مبلغ شارژ","Credit amount")}</span>
             <div className="inputSuffix">
               <input
                 dir="ltr"
@@ -203,13 +213,13 @@ export function AdminUsersWalletInline(){
               rows={3}
               value={note}
               onChange={e=>setNote(e.target.value)}
-              placeholder={pick("مثلاً شارژ هدیه؛ اختیاری","e.g. bonus credit or balance correction; optional")}
+              placeholder={mode==="debit"?pick("مثلاً اصلاح موجودی؛ اختیاری","e.g. balance adjustment; optional"):pick("مثلاً شارژ هدیه؛ اختیاری","e.g. bonus credit; optional")}
             />
           </label>
 
           <div className="runtime-modal-actions">
             <button type="button" className="ghost" onClick={close}>{pick("بستن","Close")}</button>
-            <button className="primary" disabled={busy}>{busy?"…":pick("تأیید و شارژ کیف پول","Confirm wallet credit")}</button>
+            <button className="primary" disabled={busy}>{busy?"…":mode==="debit"?pick("تأیید کاهش موجودی","Confirm deduction"):pick("تأیید و شارژ کیف پول","Confirm wallet credit")}</button>
           </div>
         </form>
       </div>,
