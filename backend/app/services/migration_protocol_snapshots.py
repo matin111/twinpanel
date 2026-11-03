@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import secrets
+
 from sqlalchemy.orm import Session
 
 from ..models import SubscriptionProtocol, SubscriptionNode, Subscription
@@ -75,6 +77,16 @@ def ensure_migration_protocol_snapshots(db: Session, subscription_ids: list[int]
         if eligible and sub.exit_node_id is None:
             sub.exit_node_id = eligible[0]
 
-    if added or added_quota or (missing_nodes and eligible):
+    # Naive/ShadowTLS and the classic login drivers require a shared password.
+    # A V2Ray-only legacy export may not have had one. Generate it once,
+    # preserving any pre-existing username, V2Ray UUID and credentials.
+    passwords_added = 0
+    for subscription_id in ids:
+        sub = db.get(Subscription, subscription_id)
+        if sub is not None and not sub.account_password_encrypted:
+            sub.account_password_encrypted = str(secrets.randbelow(90_000_000) + 10_000_000)
+            passwords_added += 1
+
+    if added or added_quota or passwords_added or (missing_nodes and eligible):
         db.flush()
     return added
