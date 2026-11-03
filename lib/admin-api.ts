@@ -29,6 +29,7 @@ export const adminApi={
   stats:()=>request<AdminStats>("/v1/admin/stats"),
   dashboard:()=>request<DashboardSummary>("/v1/admin/dashboard-summary"),
   users:()=>request<AdminUser[]>("/v1/admin/users"),
+  usersFastPage:(params:{limit:number;offset:number;q:string})=>request<{items:AdminUser[];total:number;limit:number;offset:number}>(`/v1/admin/users-fast-page?limit=${params.limit}&offset=${params.offset}&q=${encodeURIComponent(params.q)}`),
   createUser:(payload:{email:string;phone?:string;password:string;full_name:string})=>request<AdminUser>("/v1/admin/users",{method:"POST",body:JSON.stringify(payload)}),
   updateUser:(id:number,payload:{email?:string;phone?:string;full_name?:string})=>request<AdminUser>(`/v1/admin/users/${id}`,{method:"PATCH",body:JSON.stringify(payload)}),
   deleteUser:(id:number)=>request<{ok:boolean;user_id:number;email:string}>(`/v1/admin/users/${id}`,{method:"DELETE"}),
