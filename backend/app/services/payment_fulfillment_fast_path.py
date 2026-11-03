@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import suppress
 import time
 
 from sqlalchemy.orm import Session
 
 from ..database import SessionLocal
-from ..models import Subscription
+from ..models import ProtocolCredential, Subscription
 from ..payment_models import PaymentIntent
 from ..store_models import StoreOrder
 from ..telegram_notify_service import queue_telegram_notification
@@ -15,6 +16,20 @@ from ..routers.store import _fulfill_paid_order
 
 RECOVERY_INTERVAL_SECONDS = 1.0
 APPROVED_PAYMENT_STATUSES = {"approved", "auto_verified", "paid"}
+EARLY_DELIVERY_POLL_SECONDS = 0.5
+EARLY_DELIVERY_TIMEOUT_SECONDS = 45.0
+
+
+# TWINPANEL_MAIN_BOT_EARLY_ACCOUNT_DELIVERY_V1
+#
+# Full 15-protocol provisioning can spend tens of seconds in SSH/convergence
+# even after the first usable credential already exists. The main Telegram bot
+# should not wait for the slowest protocol before giving the customer the stable
+# subscription link. A separate short-lived DB session watches the order while
+# canonical fulfillment continues, and queues the existing payment_approved
+# event as soon as the first active credential has committed. The canonical
+# order/payment/subscription event key still deduplicates the final fulfillment
+# notification, so this does not create a second customer message.
 
 
 def claim_paid_order(db: Session, order_id: int) -> bool:
@@ -74,6 +89,102 @@ def _queue_ready_notification(
     db.commit()
 
 
+def _credential_ready_for_early_delivery(credential: ProtocolCredential | None) -> bool:
+    if credential is None or not bool(getattr(credential, "is_active", False)):
+        return False
+    config = str(getattr(credential, "config_text_encrypted", None) or "").strip()
+    return bool(config)
+
+
+def _try_queue_early_delivery_once(
+    db: Session,
+    *,
+    intent_id: int,
+    order_id: int,
+    user_id: int,
+    amount_toman: int,
+) -> int | None:
+    """Queue main-bot delivery once the first committed credential is usable."""
+
+    order = db.get(StoreOrder, int(order_id))
+    if order is None or not order.subscription_id:
+        return None
+
+    subscription_id = int(order.subscription_id)
+    credential = (
+        db.query(ProtocolCredential)
+        .filter(
+            ProtocolCredential.subscription_id == subscription_id,
+            ProtocolCredential.is_active.is_(True),
+            ProtocolCredential.config_text_encrypted.isnot(None),
+            ProtocolCredential.config_text_encrypted != "",
+        )
+        .order_by(ProtocolCredential.id.asc())
+        .first()
+    )
+    if not _credential_ready_for_early_delivery(credential):
+        return None
+
+    _queue_ready_notification(
+        db,
+        intent_id=int(intent_id),
+        order_id=int(order_id),
+        user_id=int(user_id),
+        amount_toman=int(amount_toman or 0),
+        subscription_id=subscription_id,
+    )
+    return subscription_id
+
+
+async def _queue_main_bot_when_first_credential_ready(
+    *,
+    intent_id: int,
+    order_id: int,
+    user_id: int,
+    amount_toman: int,
+) -> None:
+    deadline = asyncio.get_running_loop().time() + EARLY_DELIVERY_TIMEOUT_SECONDS
+
+    while asyncio.get_running_loop().time() < deadline:
+        watch_db = SessionLocal()
+        try:
+            subscription_id = _try_queue_early_delivery_once(
+                watch_db,
+                intent_id=int(intent_id),
+                order_id=int(order_id),
+                user_id=int(user_id),
+                amount_toman=int(amount_toman or 0),
+            )
+            if subscription_id:
+                print(
+                    "MAIN_BOT_EARLY_ACCOUNT_DELIVERY",
+                    {
+                        "intent_id": int(intent_id),
+                        "order_id": int(order_id),
+                        "subscription_id": int(subscription_id),
+                    },
+                    flush=True,
+                )
+                return
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            watch_db.rollback()
+            print(
+                "main bot early delivery watcher retry:",
+                {
+                    "intent_id": int(intent_id),
+                    "order_id": int(order_id),
+                    "error": str(exc)[:500],
+                },
+                flush=True,
+            )
+        finally:
+            watch_db.close()
+
+        await asyncio.sleep(EARLY_DELIVERY_POLL_SECONDS)
+
+
 async def fulfill_approved_payment_background(
     *,
     intent_id: int,
@@ -84,11 +195,14 @@ async def fulfill_approved_payment_background(
     """Provision after the approval response has already been sent.
 
     This function owns its own database session. Slow SSH/VPN provisioning can
-    therefore never keep the admin approval HTTP request open.
+    therefore never keep the admin approval HTTP request open. Main-bot account
+    delivery is also watched independently so it can be sent after the first
+    usable credential instead of waiting for every requested protocol.
     """
 
     db = SessionLocal()
     started = time.perf_counter()
+    early_delivery_task: asyncio.Task | None = None
 
     try:
         order = db.get(StoreOrder, int(order_id))
@@ -108,6 +222,16 @@ async def fulfill_approved_payment_background(
 
         if not claim_paid_order(db, int(order_id)):
             return
+
+        early_delivery_task = asyncio.create_task(
+            _queue_main_bot_when_first_credential_ready(
+                intent_id=int(intent_id),
+                order_id=int(order_id),
+                user_id=int(user_id),
+                amount_toman=int(amount_toman or 0),
+            ),
+            name=f"main-bot-early-delivery-{int(order_id)}",
+        )
 
         result = await _fulfill_paid_order(int(order_id), db)
         final_order = db.get(StoreOrder, int(order_id))
@@ -178,6 +302,10 @@ async def fulfill_approved_payment_background(
         )
 
     finally:
+        if early_delivery_task is not None and not early_delivery_task.done():
+            early_delivery_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await early_delivery_task
         db.close()
 
 
