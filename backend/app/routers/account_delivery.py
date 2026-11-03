@@ -2005,19 +2005,6 @@ async def customer_connection_info(
     return _stored_info(db, sub)
 
 
-@router.get("/{subscription_id}/share-link")
-def subscription_share_link(
-    subscription_id: int,
-    db: Session = Depends(get_db),
-):
-    """Fast admin share-link read: avoid credential decryption, QR generation,
-    network provisioning, and L2TP self-healing in connection-info."""
-    sub = db.get(Subscription, subscription_id)
-    if sub is None:
-        raise HTTPException(status_code=404, detail="اشتراک پیدا نشد")
-    return {"subscription_link": _share_url(db, sub)}
-
-
 @router.get("/{subscription_id}/connection-info")
 async def connection_info(
     subscription_id: int,
