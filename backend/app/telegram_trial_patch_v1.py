@@ -21,6 +21,38 @@ def _delivery_link(result: dict[str, Any]) -> str:
     ).strip()
 
 
+def _friendly_trial_error(exc: Exception) -> tuple[str, bool]:
+    detail = getattr(exc, "detail", str(exc))
+    code = ""
+    message = ""
+
+    if isinstance(detail, dict):
+        code = str(detail.get("code") or "").strip()
+        message = str(detail.get("message") or "").strip()
+    else:
+        text = str(detail or "").strip()
+        code = text
+        message = text
+
+    if (
+        "main_trial_already_claimed" in code
+        or "reseller_trial_already_claimed" in code
+        or "main_trial_already_claimed" in message
+        or "reseller_trial_already_claimed" in message
+    ):
+        return (
+            "🎁 <b>اکانت تست قبلاً دریافت شده</b>\n\n"
+            "شما قبلاً از اکانت تست رایگان استفاده کرده‌اید.\n"
+            "برای مشاهده اطلاعات اتصال، از بخش «اشتراک‌های من» استفاده کنید.",
+            True,
+        )
+
+    if message:
+        return "❌ " + escape(message), False
+
+    return "❌ خطا در دریافت اکانت تست. لطفاً دوباره تلاش کنید.", False
+
+
 def install() -> None:
     global _INSTALLED
     if _INSTALLED:
@@ -49,10 +81,18 @@ def install() -> None:
                     payload={},
                 )
             except Exception as exc:
-                detail = getattr(exc, "detail", str(exc))
-                if isinstance(detail, dict):
-                    detail = detail.get("message") or detail.get("code") or str(detail)
-                await callback.message.answer("❌ " + escape(str(detail)))
+                text, already_claimed = _friendly_trial_error(exc)
+                markup = None
+                if already_claimed:
+                    markup = InlineKeyboardMarkup(
+                        inline_keyboard=[[
+                            InlineKeyboardButton(
+                                text="📦 مشاهده اشتراک‌های من",
+                                callback_data="subs:list",
+                            )
+                        ]]
+                    )
+                await callback.message.answer(text, reply_markup=markup)
                 return
 
             link = _delivery_link(result)
@@ -122,10 +162,8 @@ def install() -> None:
                     lines.extend(["", "🔗 <b>لینک اتصال:</b>", f"<code>{escape(link)}</code>"])
                 await message.answer("\n".join(lines), reply_markup=reseller_keyboard_with_trial())
             except Exception as exc:
-                detail = getattr(exc, "detail", str(exc))
-                if isinstance(detail, dict):
-                    detail = detail.get("message") or detail.get("code") or str(detail)
-                await message.answer("❌ " + escape(str(detail)), reply_markup=reseller_keyboard_with_trial())
+                text, _ = _friendly_trial_error(exc)
+                await message.answer(text, reply_markup=reseller_keyboard_with_trial())
             finally:
                 db.close()
 
