@@ -52,7 +52,31 @@ const initialSend:NotificationSendPayload={title:"",message:"",kind:"info",user_
 
 export function NotificationsRuntimePage(){
   const {pick,lang}=useI18n();const [settings,setSettings]=useState<NotificationSettings>(initialNotification);const [history,setHistory]=useState<OpsRow[]>([]);const [panel,setPanel]=useState<OpsRow[]>([]);const [send,setSend]=useState<NotificationSendPayload>(initialSend);const [busy,setBusy]=useState(false);const [loading,setLoading]=useState(true);const [error,setError]=useState("");const [ok,setOk]=useState("");
-  const load=async()=>{setLoading(true);setError("");const result=await Promise.allSettled([opsApi.notificationSettings(),opsApi.notificationHistory(30),opsApi.panelNotifications()]);if(result[0].status==="fulfilled")setSettings(result[0].value);if(result[1].status==="fulfilled")setHistory(asRows(result[1].value,"items","history","notifications"));if(result[2].status==="fulfilled")setPanel(asRows(result[2].value,"items","notifications","results"));const failed=result.find(x=>x.status==="rejected");if(failed&&failed.status==="rejected")setError(failed.reason instanceof Error?failed.reason.message:String(failed.reason));setLoading(false);};useEffect(()=>{void load();},[]);
+  const load=async()=>{
+    setLoading(true);
+    setError("");
+    try{
+      const result=await Promise.allSettled([
+        opsApi.notificationSettings(),
+        opsApi.notificationHistory(30),
+        opsApi.panelNotifications(),
+      ]);
+      if(result[0].status==="fulfilled")setSettings(result[0].value);
+      if(result[1].status==="fulfilled")setHistory(asRows(result[1].value,"items","history","notifications"));
+      if(result[2].status==="fulfilled")setPanel(asRows(result[2].value,"items","notifications","results"));
+      const failures=result.filter((entry):entry is PromiseRejectedResult=>entry.status==="rejected");
+      if(failures.length===3){
+        const raw=failures[0].reason instanceof Error?failures[0].reason.message:String(failures[0].reason);
+        setError(/signal timed out|timeout|aborted/i.test(raw)
+          ?pick("پاسخ سرور با تأخیر مواجه شد. دوباره بروزرسانی کنید.","The server response was delayed. Please refresh.")
+          :raw);
+      }else if(failures.length>0){
+        setError(pick("بخشی از اطلاعات اعلان‌ها دریافت نشد. سایر بخش‌ها نمایش داده شده‌اند؛ برای تلاش مجدد بروزرسانی کنید.","Some notification data could not load. Available sections remain visible; refresh to retry."));
+      }
+    }finally{
+      setLoading(false);
+    }
+  };useEffect(()=>{void load();},[]);
   const act=async(label:string,fn:()=>Promise<unknown>)=>{if(busy)return;setBusy(true);setError("");setOk("");try{await fn();setOk(label);await load();}catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy(false);}};
   const sendSubmit=(e:FormEvent)=>{e.preventDefault();void act(pick("اعلان ارسال شد","Notification sent"),async()=>{await opsApi.sendNotification({...send,title:send.title.trim(),message:send.message.trim(),user_email:send.user_email?.trim()||null});setSend(initialSend);});};
   const unread=panel.filter(x=>!Boolean(x.is_read||x.read_at)).length;
