@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import func, or_, cast, String
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -293,6 +294,67 @@ def subscription_share_link(
     if sub is None:
         raise HTTPException(status_code=404, detail="اشتراک پیدا نشد")
     return {"subscription_link": _share_url(db, sub)}
+
+
+@router.get("/admin-page-v3")
+def admin_page_v3(
+    limit: int = 40,
+    offset: int = 0,
+    q: str = "",
+    status: str = "all",
+    db: Session = Depends(get_db),
+):
+    """Paginated admin subscriptions: enrich only rows in the current page.
+
+    Keep global KPI counts independent from the filtered page. No per-row
+    provisioning, remote node inspection or full-roster serialization.
+    """
+    limit = max(1, min(100, int(limit)))
+    offset = max(0, int(offset))
+    term = (q or "").strip()
+    allowed = {"all", "active", "expired", "suspended", "pending"}
+    if status not in allowed:
+        raise HTTPException(status_code=422, detail="Invalid subscription status")
+
+    base = db.query(Subscription)
+    if status != "all":
+        base = base.filter(cast(Subscription.status, String) == status)
+    if term:
+        pattern = f"%{term}%"
+        base = base.outerjoin(User, User.id == Subscription.user_id).outerjoin(
+            Plan, Plan.id == Subscription.plan_id
+        )
+        conditions = [
+            Subscription.account_username.ilike(pattern),
+            User.full_name.ilike(pattern),
+            User.email.ilike(pattern),
+            Plan.name.ilike(pattern),
+        ]
+        numeric = term.removeprefix("MV-").strip()
+        if numeric.isdigit():
+            conditions.append(Subscription.id == int(numeric))
+        base = base.filter(or_(*conditions))
+    filtered_total = base.order_by(None).count()
+    rows = base.order_by(Subscription.id.desc()).offset(offset).limit(limit).all()
+    context = _bulk_admin_list_context(db, rows)
+
+    counts = db.query(
+        cast(Subscription.status, String),
+        func.count(Subscription.id),
+    ).group_by(Subscription.status).all()
+    stats = {"total": 0, "active": 0, "expired": 0, "suspended": 0}
+    for key, count in counts:
+        stats["total"] += int(count)
+        label = str(key).split(".")[-1].lower()
+        if label in stats:
+            stats[label] += int(count)
+    return {
+        "items": [_enriched_payload_from_context(sub, context) for sub in rows],
+        "total": int(filtered_total),
+        "limit": limit,
+        "offset": offset,
+        "stats": stats,
+    }
 
 
 @router.get("/admin-list-v2")
