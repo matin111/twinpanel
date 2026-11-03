@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy import func
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..migration_import_models import MigrationImportRecord
-from ..models import Subscription, SubscriptionStatus
+from ..models import ProtocolCredential, Subscription, SubscriptionProtocol, SubscriptionStatus
 from ..services.migration_eylan import EYLAN_SOURCE, MAX_ARCHIVE_BYTES, duration_days_for_expiry, preview_eylan_backup
 from ..services.migration_eylan_transfer import EYLAN_STAGE_LIMIT, finalize_eylan_records, stage_eylan_records
 from ..services.migration_import_v2 import _enc_payload, import_record, legacy_payload
@@ -111,6 +112,53 @@ class MigrationBackfillIn(BaseModel):
     source: Literal["sanaei", "marzban", "pasargad", "eylan"]
     after_id: int = Field(default=0, ge=0)
     limit: int = Field(default=25, ge=1, le=50)
+
+
+@admin_router.get("/all-protocols/status")
+def migration_all_protocols_status(
+    source: Literal["sanaei", "marzban", "pasargad", "eylan"],
+    db: Session = Depends(get_db),
+):
+    """Read-only summary: declared snapshots vs real usable configuration rows."""
+    total = int(
+        db.query(func.count(MigrationImportRecord.id))
+        .filter(MigrationImportRecord.source == source)
+        .scalar() or 0
+    )
+    snapshots = dict(
+        db.query(SubscriptionProtocol.protocol, func.count(SubscriptionProtocol.id))
+        .join(MigrationImportRecord, MigrationImportRecord.subscription_id == SubscriptionProtocol.subscription_id)
+        .filter(MigrationImportRecord.source == source)
+        .group_by(SubscriptionProtocol.protocol)
+        .all()
+    )
+    ready = dict(
+        db.query(ProtocolCredential.protocol, func.count(ProtocolCredential.id))
+        .join(MigrationImportRecord, MigrationImportRecord.subscription_id == ProtocolCredential.subscription_id)
+        .filter(
+            MigrationImportRecord.source == source,
+            ProtocolCredential.is_active.is_(True),
+            ProtocolCredential.config_text_encrypted.isnot(None),
+            ProtocolCredential.config_text_encrypted != "",
+        )
+        .group_by(ProtocolCredential.protocol)
+        .all()
+    )
+    return {
+        "source": source,
+        "subscriptions": total,
+        "protocols": [
+            {
+                "protocol": key,
+                "declared": int(snapshots.get(key, 0)),
+                "configured": int(ready.get(key, 0)),
+            }
+            for key in ALL_PROTOCOL_KEYS
+        ],
+        "fully_provisioned": bool(total) and all(
+            int(ready.get(key, 0)) == total for key in ALL_PROTOCOL_KEYS
+        ),
+    }
 
 
 @admin_router.post("/all-protocols/backfill")
