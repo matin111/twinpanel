@@ -26,12 +26,12 @@ const PROTOCOLS=[
 const ALL_PROTOCOLS=PROTOCOLS.map(([key])=>key);
 
 type PlanDraft={
-  name:string;description:string;duration_days:number;traffic_gb:number;device_limit:number;price_toman:number;is_active:boolean;
+  name:string;category:string;description:string;duration_days:number;traffic_gb:number;device_limit:number;price_toman:number;is_active:boolean;
   protocols:string[];node_ids:number[];
 };
 
 const EMPTY_DRAFT:PlanDraft={
-  name:"",description:"",duration_days:30,traffic_gb:50,device_limit:1,price_toman:0,is_active:true,
+  name:"",category:"",description:"",duration_days:30,traffic_gb:50,device_limit:1,price_toman:0,is_active:true,
   protocols:[...ALL_PROTOCOLS],node_ids:[],
 };
 
@@ -66,14 +66,15 @@ export function LegacyPlansRuntimePage(){
   const exitNodes=useMemo(()=>nodes.filter(row=>s(row.node_type).trim().toLowerCase()==="exit"),[nodes]);
   const allNodeIds=useMemo(()=>exitNodes.map(row=>n(row.id)).filter(Boolean),[exitNodes]);
   const nodeNameById=useMemo(()=>new Map(exitNodes.map(row=>[n(row.id),s(row.name)||`#${n(row.id)}`])),[exitNodes]);
-  const filtered=useMemo(()=>{const value=q.trim().toLowerCase();return value?rows.filter(row=>`${row.id??""} ${row.name??""} ${row.description??""}`.toLowerCase().includes(value)):rows;},[rows,q]);
+  const categoryOptions=useMemo(()=>Array.from(new Set(rows.map(row=>s(row.category).trim()).filter(Boolean))),[rows]);
+  const filtered=useMemo(()=>{const value=q.trim().toLowerCase();return value?rows.filter(row=>`${row.id??""} ${row.name??""} ${row.category??""} ${row.description??""}`.toLowerCase().includes(value)):rows;},[rows,q]);
 
   const start=(row?:RuntimeRow)=>{
     if(row){
       setEditing(row);
       const protocols=stringList(row.protocols);const nodeIds=numberList(row.node_ids);const allowedNodeIds=nodeIds.filter(id=>allNodeIds.includes(id));
       setDraft({
-        name:s(row.name),description:s(row.description),duration_days:n(row.duration_days)||30,traffic_gb:n(row.traffic_gb),device_limit:n(row.device_limit)||1,
+        name:s(row.name),category:s(row.category),description:s(row.description),duration_days:n(row.duration_days)||30,traffic_gb:n(row.traffic_gb),device_limit:n(row.device_limit)||1,
         price_toman:n(row.price_toman),is_active:Boolean(row.is_active),protocols:protocols.length?protocols:[...ALL_PROTOCOLS],
         node_ids:allowedNodeIds.length?allowedNodeIds:[...allNodeIds],
       });
@@ -97,16 +98,16 @@ export function LegacyPlansRuntimePage(){
   };
 
   return <Shell active="/admin/plans"><div className="page legacy-plans-page">
-    <div className="page-head"><div><h1>{pick("پلن‌ها","Plans")}</h1><small>{pick("مدیریت پلن‌های فروش، پروتکل‌ها و سرورهای مجاز.","Manage sales plans, protocols and allowed servers.")}</small></div><button className="primary" onClick={()=>start()}>＋ {pick("پلن جدید","New plan")}</button></div>
+    <div className="page-head"><div><h1>{pick("پلن‌ها","Plans")}</h1><small>{pick("مدیریت دسته‌بندی، پلن‌های فروش، پروتکل‌ها و سرورهای مجاز.","Manage categories, sales plans, protocols and allowed servers.")}</small></div><button className="primary" onClick={()=>start()}>＋ {pick("پلن جدید","New plan")}</button></div>
     <Notice error={error} ok={ok}/>
     <Card>
       <div className="runtime-toolbar"><label>⌕ <input value={q} onChange={event=>setQ(event.target.value)} placeholder={pick("جستجوی پلن…","Search plans…")}/></label><button className="ghost" onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button></div>
       <div className="table"><table><thead><tr>
-        <th>{pick("پلن","Plan")}</th><th>{pick("مدت","Duration")}</th><th>{pick("حجم","Traffic")}</th><th>{pick("پروتکل‌ها","Protocols")}</th><th>{pick("سرورهای خارج","Exit servers")}</th><th>{pick("قیمت","Price")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th>
+        <th>{pick("پلن","Plan")}</th><th>{pick("دسته‌بندی","Category")}</th><th>{pick("مدت","Duration")}</th><th>{pick("حجم","Traffic")}</th><th>{pick("پروتکل‌ها","Protocols")}</th><th>{pick("سرورهای خارج","Exit servers")}</th><th>{pick("قیمت","Price")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th>
       </tr></thead><tbody>{filtered.map(row=>{
         const id=n(row.id);const protocols=stringList(row.protocols);const nodeIds=numberList(row.node_ids);
         return <tr key={s(row.id)}>
-          <td><b>{s(row.name)}</b><small>{s(row.description)}</small></td><td>{n(row.duration_days)} {pick("روز","days")}</td><td>{n(row.traffic_gb)} GB · {n(row.device_limit)} {pick("دستگاه","devices")}</td>
+          <td><b>{s(row.name)}</b><small>{s(row.description)}</small></td><td><Badge tone="violet">{s(row.category)||pick("سایر پلن‌ها","Other plans")}</Badge></td><td>{n(row.duration_days)} {pick("روز","days")}</td><td>{n(row.traffic_gb)} GB · {n(row.device_limit)} {pick("دستگاه","devices")}</td>
           <td><b>{protocols.length||15}/15</b><small>{protocols.slice(0,4).join(" · ")}{protocols.length>4?" …":""}</small></td>
           <td><b>{nodeIds.length||allNodeIds.length}</b><small>{nodeIds.slice(0,3).map(nodeId=>nodeNameById.get(nodeId)||`#${nodeId}`).join(" · ")}{nodeIds.length>3?" …":""}</small></td>
           <td>{n(row.price_toman).toLocaleString("fa-IR")} {pick("تومان","Toman")}</td><td><Badge tone={row.is_active?"ok":"bad"}>{row.is_active?pick("فعال","Active"):pick("غیرفعال","Inactive")}</Badge></td>
@@ -119,6 +120,7 @@ export function LegacyPlansRuntimePage(){
       <div className="card-head"><div><b>{editing?pick("ویرایش پلن","Edit plan"):pick("پلن جدید","New plan")}</b><small>{pick("تنظیمات فروش این پلن را مدیریت کنید.","Manage this sales plan.")}</small></div><button type="button" className="icon-button" onClick={()=>setOpen(false)}>×</button></div>
       <div className="setting-grid">
         <label className="field"><span>{pick("نام","Name")}</span><input required value={draft.name} onChange={event=>setDraft(current=>({...current,name:event.target.value}))}/></label>
+        <label className="field"><span>{pick("دسته‌بندی پلن","Plan category")}</span><input list="plan-category-options" maxLength={120} value={draft.category} onChange={event=>setDraft(current=>({...current,category:event.target.value}))} placeholder={pick("مثلاً اقتصادی، ویژه، گیمینگ","e.g. Economy, Premium, Gaming")}/><datalist id="plan-category-options">{categoryOptions.map(category=><option key={category} value={category}/>)}</datalist><small>{pick("اگر خالی باشد داخل «سایر پلن‌ها» قرار می‌گیرد.","Empty categories fall back to Other plans.")}</small></label>
         <label className="field"><span>{pick("توضیحات","Description")}</span><input value={draft.description} onChange={event=>setDraft(current=>({...current,description:event.target.value}))}/></label>
         <label className="field"><span>{pick("مدت روز","Duration days")}</span><input type="number" min={1} value={draft.duration_days} onChange={event=>setDraft(current=>({...current,duration_days:Number(event.target.value)}))}/></label>
         <label className="field"><span>{pick("حجم GB","Traffic GB")}</span><input type="number" min={0} value={draft.traffic_gb} onChange={event=>setDraft(current=>({...current,traffic_gb:Number(event.target.value)}))}/></label>
