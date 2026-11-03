@@ -234,6 +234,43 @@ async def _install_node_in_background(
                 flush=True,
             )
 
+        # TWINPANEL_NEW_NODE_MODERN_BOOTSTRAP_V1
+        # Modern account convergence can only add a new node when that node has
+        # an online Modern runtime.  Clone the current healthy operator intent
+        # (port + preset + settings) onto the new Exit before publishing it to
+        # existing subscriptions.  The helper reuses the canonical V3 installer,
+        # so there is only one implementation for install/health/persistence.
+        try:
+            from ..services.new_node_modern_bootstrap_v1 import (
+                bootstrap_new_exit_modern_protocols,
+            )
+
+            modern_bootstrap = await bootstrap_new_exit_modern_protocols(
+                db=db,
+                node_id=node_id,
+            )
+            print(
+                "TWINPANEL_NODE_BACKGROUND_MODERN_BOOTSTRAP_V1",
+                {
+                    "node_id": node_id,
+                    "attempted": modern_bootstrap.get("attempted"),
+                    "installed": modern_bootstrap.get("installed"),
+                    "failed": modern_bootstrap.get("failed"),
+                    "already_online": modern_bootstrap.get("already_online"),
+                    "skipped_no_template": modern_bootstrap.get("skipped_no_template"),
+                    "skipped_port_conflict": modern_bootstrap.get("skipped_port_conflict"),
+                    "sources": modern_bootstrap.get("sources"),
+                },
+                flush=True,
+            )
+        except Exception as exc:
+            db.rollback()
+            print(
+                "TWINPANEL_NODE_BACKGROUND_MODERN_BOOTSTRAP_DEGRADED_V1",
+                {"node_id": node_id, "error": str(exc)[:1200]},
+                flush=True,
+            )
+
         if payload.publish_to_all_users:
             try:
                 # publish_node_all_users_v2 patches this global at import time,
@@ -247,6 +284,9 @@ async def _install_node_in_background(
                         "subscriptions_seen": result.get("subscriptions_seen"),
                         "memberships_added": result.get("memberships_added"),
                         "active_reconciled": result.get("active_subscriptions_reconciled"),
+                        "classic_pairs_provisioned": result.get("classic_pairs_provisioned"),
+                        "modern_pairs_provisioned": result.get("modern_pairs_provisioned"),
+                        "reused_pairs": result.get("reused_pairs"),
                         "failed_count": len(result.get("failed") or []),
                     },
                     flush=True,
