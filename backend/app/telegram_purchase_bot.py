@@ -82,7 +82,52 @@ def active_plans(rows):
     ]
 
 
-def plans_keyboard(plans):
+DEFAULT_PLAN_CATEGORY = "سایر پلن‌ها"
+
+
+def plan_category(plan):
+    value = " ".join(str(plan.get("category") or "").strip().split())
+    return value or DEFAULT_PLAN_CATEGORY
+
+
+def plan_categories(plans):
+    result = []
+    seen = set()
+    for plan in plans:
+        category = plan_category(plan)
+        if category in seen:
+            continue
+        seen.add(category)
+        result.append(category)
+    return result
+
+
+def categories_keyboard(plans):
+    categories = plan_categories(plans)
+    rows = []
+    for index, category in enumerate(categories[:30]):
+        count = sum(1 for plan in plans if plan_category(plan) == category)
+        rows.append([
+            InlineKeyboardButton(
+                text=(f"📁 {category} ({count})")[:60],
+                callback_data=f"shop:cat:{index}",
+            )
+        ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def category_plans(plans, category_index):
+    categories = plan_categories(plans)
+    if category_index < 0 or category_index >= len(categories):
+        raise RuntimeError("این دسته‌بندی دیگر در دسترس نیست")
+    category = categories[category_index]
+    return category, [
+        plan for plan in plans
+        if plan_category(plan) == category
+    ]
+
+
+def plans_keyboard(plans, *, category_index=None):
     rows = []
 
     for plan in plans[:30]:
@@ -105,6 +150,14 @@ def plans_keyboard(plans):
                 callback_data=(
                     f"shop:plan:{plan_id}"
                 ),
+            )
+        ])
+
+    if category_index is not None:
+        rows.append([
+            InlineKeyboardButton(
+                text="⬅️ بازگشت به دسته‌بندی‌ها",
+                callback_data="shop:list",
             )
         ])
 
@@ -264,7 +317,8 @@ def proof_keyboard(
 
 def plan_text(plan):
     return (
-        f"🛒 <b>{escape(str(plan.get('name') or 'اشتراک'))}</b>\n\n"
+        f"🛒 <b>{escape(str(plan.get('name') or 'اشتراک'))}</b>\n"
+        f"📁 دسته‌بندی: <b>{escape(plan_category(plan))}</b>\n\n"
         f"📦 حجم: "
         f"<b>{int(plan.get('traffic_gb') or 0)} گیگابایت</b>\n"
         f"📅 اعتبار: "
@@ -380,10 +434,8 @@ def create_purchase_router(
 
         await message.answer(
             "🛒 <b>خرید اشتراک</b>\n\n"
-            "پلن موردنظر را انتخاب کنید:",
-            reply_markup=(
-                plans_keyboard(plans)
-            ),
+            "ابتدا دسته‌بندی پلن را انتخاب کنید:",
+            reply_markup=categories_keyboard(plans),
         )
 
     @router.callback_query(
@@ -418,9 +470,31 @@ def create_purchase_router(
 
         await callback.message.edit_text(
             "🛒 <b>خرید اشتراک</b>\n\n"
+            "ابتدا دسته‌بندی پلن را انتخاب کنید:",
+            reply_markup=categories_keyboard(plans),
+        )
+
+    @router.callback_query(
+        F.data.startswith("shop:cat:")
+    )
+    async def shop_category(
+        callback: CallbackQuery,
+    ):
+        try:
+            category_index = int(callback.data.split(":")[2])
+            plans = await load_plans()
+            category, filtered_plans = category_plans(plans, category_index)
+        except Exception as exc:
+            await callback.answer(str(exc), show_alert=True)
+            return
+
+        await callback.answer()
+        await callback.message.edit_text(
+            f"📁 <b>{escape(category)}</b>\n\n"
             "پلن موردنظر را انتخاب کنید:",
-            reply_markup=(
-                plans_keyboard(plans)
+            reply_markup=plans_keyboard(
+                filtered_plans,
+                category_index=category_index,
             ),
         )
 

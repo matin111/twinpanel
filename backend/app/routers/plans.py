@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..models import Plan
+from ..plan_category_models import PlanCategoryAssignment
 from ..plan_template_selection import (
     all_active_node_ids,
     plan_template_node_ids,
@@ -20,6 +21,37 @@ from ..schemas import PlanCreate, PlanUpdate
 
 router = APIRouter(prefix="/v1/plans", tags=["plans"])
 
+DEFAULT_PLAN_CATEGORY = "سایر پلن‌ها"
+
+
+def _normalize_category(value) -> str:
+    category = " ".join(str(value or "").strip().split())
+    return (category[:120] if category else DEFAULT_PLAN_CATEGORY)
+
+
+def _plan_category(db: Session, plan_id: int) -> str:
+    row = (
+        db.query(PlanCategoryAssignment)
+        .filter(PlanCategoryAssignment.plan_id == int(plan_id))
+        .first()
+    )
+    return _normalize_category(row.category if row else None)
+
+
+def _set_plan_category(db: Session, plan_id: int, category) -> str:
+    value = _normalize_category(category)
+    row = (
+        db.query(PlanCategoryAssignment)
+        .filter(PlanCategoryAssignment.plan_id == int(plan_id))
+        .first()
+    )
+    if row is None:
+        row = PlanCategoryAssignment(plan_id=int(plan_id), category=value)
+        db.add(row)
+    else:
+        row.category = value
+    return value
+
 
 def _central_plans(db: Session):
     return db.query(Plan).filter(
@@ -32,6 +64,7 @@ def _plan_payload(db: Session, plan: Plan) -> dict:
         "id": int(plan.id),
         "name": plan.name,
         "description": plan.description,
+        "category": _plan_category(db, int(plan.id)),
         "duration_days": int(plan.duration_days or 0),
         "traffic_gb": int(plan.traffic_gb or 0),
         "device_limit": int(plan.device_limit or 1),
@@ -64,6 +97,14 @@ def _selection_values(raw: dict, *, creating: bool) -> tuple[list[str] | None, l
         raise HTTPException(status_code=422, detail="node_ids must be a list")
 
     return protocols, node_ids
+
+
+def _plan_model_raw(raw: dict) -> dict:
+    values = dict(raw)
+    values.pop("protocols", None)
+    values.pop("node_ids", None)
+    values.pop("category", None)
+    return values
 
 
 def _replace_selection(
@@ -173,7 +214,7 @@ def set_plan_nodes(
 
 @router.post("", dependencies=[Depends(require_admin)])
 def create_plan(raw: dict = Body(...), db: Session = Depends(get_db)):
-    payload = PlanCreate.model_validate(raw)
+    payload = PlanCreate.model_validate(_plan_model_raw(raw))
     if str(payload.name or "").startswith(INTERNAL_PLAN_PREFIX):
         raise HTTPException(
             status_code=422,
@@ -184,6 +225,7 @@ def create_plan(raw: dict = Body(...), db: Session = Depends(get_db)):
     plan = Plan(**payload.model_dump())
     db.add(plan)
     db.flush()
+    _set_plan_category(db, int(plan.id), raw.get("category"))
     _replace_selection(
         db,
         int(plan.id),
@@ -206,7 +248,7 @@ def update_plan(
     if not plan or is_internal_reseller_plan(plan):
         raise HTTPException(status_code=404, detail="پلن پیدا نشد")
 
-    payload = PlanUpdate.model_validate(raw)
+    payload = PlanUpdate.model_validate(_plan_model_raw(raw))
     values = payload.model_dump(exclude_unset=True)
     if (
         "name" in values
@@ -219,6 +261,9 @@ def update_plan(
 
     for key, value in values.items():
         setattr(plan, key, value)
+
+    if "category" in raw:
+        _set_plan_category(db, int(plan.id), raw.get("category"))
 
     protocols, node_ids = _selection_values(raw, creating=False)
     _replace_selection(
