@@ -286,7 +286,7 @@ async def _commit_account_config(conn, script: str) -> None:
     backup = f"{CONFIG_PATH}.bak-account-$(date +%Y%m%d-%H%M%S)"
     await cmd(
         conn,
-        "set -eu; "
+        "set -eu; exec 9>/run/twinpanel-singbox-batch.lock; flock -x 9; "
         f"printf '%s' {shlex.quote(encoded)} | base64 -d | python3; "
         f"/usr/local/bin/twinpanel-sing-box check -c {shlex.quote(CONFIG_PATH + '.account-new')}; "
         f"cp -a {shlex.quote(CONFIG_PATH)} {backup}; "
