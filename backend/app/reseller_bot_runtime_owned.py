@@ -382,7 +382,8 @@ def _policy_router(reseller_id: int) -> Router:
         await _send_account(message, int(message.from_user.id))
 
     @router.callback_query(F.data == "rmenu:home")
-    async def inline_home(callback):
+    async def inline_home(callback, state: FSMContext):
+        await state.clear()
         await callback.answer()
         await callback.message.answer(
             "منوی اصلی",
@@ -395,7 +396,8 @@ def _policy_router(reseller_id: int) -> Router:
         await _send_dashboard(callback.message, int(callback.from_user.id))
 
     @router.callback_query(F.data == "rmenu:buy")
-    async def inline_buy(callback):
+    async def inline_buy(callback, state: FSMContext):
+        await state.clear()
         await callback.answer()
         await _send_purchase(callback.message)
 

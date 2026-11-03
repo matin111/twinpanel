@@ -308,6 +308,79 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
             except Exception:
                 pass
 
+
+    @staticmethod
+    def _navigation_back(text: str, scope: str) -> str:
+        value = unescape(str(text or "")).lower()
+        # The first user-count screen has no prior purchase step.
+        if "ابتدا تعداد کاربری" in value:
+            return "rmenu:home" if scope == "reseller" else "main:home"
+        if scope == "reseller":
+            if "آموزش" in value or "سیستم‌عامل" in value:
+                return "rlearn:g:root"
+            if "دانلود برنامه" in value:
+                return "rlearn:d:root"
+            if any(term in value for term in ("اشتراک‌های من", "اطلاعات اتصال", "لینک اکانت")):
+                return "rsubs:list"
+            if any(term in value for term in ("کیف پول", "گردش حساب", "شارژ موجودی")):
+                return "rwalletmenu:show"
+            if any(term in value for term in ("خرید", "پلن", "پرداخت", "رسید", "تخفیف", "تعداد کاربری")):
+                return "rmenu:buy"
+            return "rmenu:home"
+        if "آموزش" in value or "سیستم‌عامل" in value:
+            return "mlearn:g:root"
+        if "دانلود برنامه" in value:
+            return "mlearn:d:root"
+        if any(term in value for term in ("اشتراک‌های من", "اطلاعات اتصال", "لینک اکانت")):
+            return "subs:list"
+        if any(term in value for term in ("کیف پول", "گردش حساب", "شارژ موجودی")):
+            return "wallet:refresh"
+        if any(term in value for term in ("خرید", "پلن", "پرداخت", "رسید", "تخفیف", "تعداد کاربری")):
+            return "shop:list"
+        return "main:home"
+
+    def _add_navigation(self, method: Any) -> Any:
+        """Provide a safe way out of all inline bot flows.
+
+        Inline keyboards preserve their existing business callbacks. Replies
+        using reply keyboards are left untouched, so they remain usable.
+        Photo/edit captions and receipt prompts are included when Telegram
+        supports an inline reply_markup.
+        """
+        from aiogram.methods import EditMessageCaption, EditMessageText, SendMessage, SendPhoto
+        if not isinstance(method, (SendMessage, SendPhoto, EditMessageText, EditMessageCaption)):
+            return method
+        markup = getattr(method, "reply_markup", None)
+        if markup is not None and not isinstance(markup, InlineKeyboardMarkup):
+            return method
+        text = str(getattr(method, "text", None) or getattr(method, "caption", None) or "")
+        if not text:
+            return method
+        # Moderation controls are admin-facing and must not receive
+        # customer navigation actions.
+        if any(needle in text for needle in ("تأیید و فعال‌سازی", "رد رسید")):
+            return method
+        home = "rmenu:home" if self.scope == "reseller" else "main:home"
+        back = self._navigation_back(text, self.scope)
+        rows = [list(row) for row in markup.inline_keyboard] if markup else []
+        existing = {
+            str(button.callback_data or "")
+            for row in rows
+            for button in row
+            if button.callback_data
+        }
+        # Existing buttons may be labelled differently; avoid duplicating
+        # a semantically equivalent callback.
+        extra = []
+        if back != home and back not in existing:
+            extra.append(InlineKeyboardButton(text="↩️ برگشت", callback_data=back))
+        if home not in existing:
+            extra.append(InlineKeyboardButton(text="🏠 منوی اصلی", callback_data=home))
+        if not extra:
+            return method
+        rows.append(extra)
+        return method.model_copy(update={"reply_markup": InlineKeyboardMarkup(inline_keyboard=rows)})
+
     async def __call__(
         self,
         make_request: Callable[..., Awaitable[Any]],
@@ -327,6 +400,8 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
                     method = method.model_copy(update={"text": rewritten})
                 else:
                     method.text = rewritten
+
+        method = self._add_navigation(method)
 
         result = await make_request(bot, method)
 
