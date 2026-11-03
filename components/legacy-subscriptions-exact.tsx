@@ -1,6 +1,6 @@
 "use client";
 
-import {FormEvent,useEffect,useMemo,useState} from "react";
+import {FormEvent,useEffect,useMemo,useRef,useState} from "react";
 import {QRCodeSVG} from "qrcode.react";
 import {Badge,Card,Shell,Stat} from "./ui";
 import {SubscriptionLinkDeliveryModal} from "./subscription-link-delivery-modal";
@@ -91,6 +91,12 @@ export function LegacySubscriptionsRuntimePage(){
   const [linkModalLink,setLinkModalLink]=useState("");
   const [linkModalLoading,setLinkModalLoading]=useState(false);
   const [linkModalError,setLinkModalError]=useState("");
+  // Share URLs are stable for a subscription; cache and dedupe requests so
+  // opening the modal does not wait for heavyweight connection-info/provisioning.
+  const linkCache=useRef(new Map<number,string>());
+  const linkPending=useRef(new Map<number,Promise<string>>());
+  const linkRequestGeneration=useRef(0);
+
   const [draft,setDraft]=useState<Draft>({user_id:0,plan_id:0,traffic_gb:"",duration_days:"",device_limit:"1",username:"",password:"",protocols:[]});
 
   const load=async(silent=false)=>{
@@ -182,14 +188,43 @@ export function LegacySubscriptionsRuntimePage(){
   };
 
   const loadConnection=async(item:RuntimeRow)=>{setSelected(item);setConnection(null);setModal("connect");setBusy("connection");setError("");try{const data=await adminApi.subscriptionConnectionInfo(n(item.id));setConnection(data);const first=(Array.isArray(data.credentials)?data.credentials:[])[0] as RuntimeRow|undefined;setActiveProtocol(s(first?.protocol)||"cisco");}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}};
+  const getSubscriptionShareLink=(id:number):Promise<string>=>{
+    const cached=linkCache.current.get(id);
+    if(cached)return Promise.resolve(cached);
+    const inFlight=linkPending.current.get(id);
+    if(inFlight)return inFlight;
+    const request=adminApi.subscriptionShareLink(id).then(data=>{
+      const url=s(data.subscription_link);
+      if(!url)throw new Error("Subscription link is not available");
+      linkCache.current.set(id,url);
+      return url;
+    }).finally(()=>{linkPending.current.delete(id);});
+    linkPending.current.set(id,request);
+    return request;
+  };
+  const prefetchSubscriptionLink=(item:RuntimeRow)=>{
+    const id=n(item.id);
+    if(id&&!linkCache.current.has(id))void getSubscriptionShareLink(id).catch(()=>{});
+  };
   const openSubscriptionLink=async(item:RuntimeRow)=>{
     const id=n(item.id);if(!id)return;
-    setLinkModalId(id);setLinkModalLink("");setLinkModalLoading(true);setLinkModalError("");
-    try{const data=await adminApi.subscriptionConnectionInfo(id);setLinkModalLink(s(data.subscription_link));}
-    catch(reason){setLinkModalError(reason instanceof Error?reason.message:String(reason));}
-    finally{setLinkModalLoading(false);}
+    const generation=++linkRequestGeneration.current;
+    const cached=linkCache.current.get(id)||s(item.subscription_link);
+    setLinkModalId(id);
+    setLinkModalLink(cached);
+    setLinkModalLoading(!cached);
+    setLinkModalError("");
+    if(cached)return;
+    try{
+      const url=await getSubscriptionShareLink(id);
+      if(linkRequestGeneration.current===generation)setLinkModalLink(url);
+    }catch(reason){
+      if(linkRequestGeneration.current===generation)setLinkModalError(reason instanceof Error?reason.message:String(reason));
+    }finally{
+      if(linkRequestGeneration.current===generation)setLinkModalLoading(false);
+    }
   };
-  const closeSubscriptionLink=()=>{setLinkModalId(null);setLinkModalLink("");setLinkModalLoading(false);setLinkModalError("");};
+  const closeSubscriptionLink=()=>{linkRequestGeneration.current+=1;setLinkModalId(null);setLinkModalLink("");setLinkModalLoading(false);setLinkModalError("");};
   const provision=async()=>{if(!selected)return;setBusy("provision");setError("");try{await adminApi.provisionSubscription(n(selected.id));setConnection(await adminApi.subscriptionConnectionInfo(n(selected.id)));setOk(pick("اطلاعات اتصال ساخته شد","Connection info provisioned"));}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}};
   const refreshPasswords=async()=>{if(!selected)return;setBusy("passwords");setError("");try{await adminApi.refreshSubscriptionPasswords(n(selected.id));setConnection(await adminApi.subscriptionConnectionInfo(n(selected.id)));setOk(pick("رمز Cisco/L2TP بازسازی شد","Cisco/L2TP password refreshed"));}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}};
 
@@ -211,7 +246,7 @@ export function LegacySubscriptionsRuntimePage(){
 
     <Card>
       <div className="runtime-toolbar"><label>⌕ <input value={query} onChange={event=>setQuery(event.target.value)} placeholder={pick("نام، ایمیل، نام کاربری یا کد اشتراک…","Name, email, username or subscription code…")}/></label><select value={status} onChange={event=>setStatus(event.target.value as typeof status)}><option value="all">{pick("همه","All")}</option><option value="active">{pick("فعال","Active")}</option><option value="expired">{pick("منقضی","Expired")}</option><option value="suspended">{pick("معلق","Suspended")}</option><option value="pending">{pick("در انتظار","Pending")}</option></select><button className="ghost" disabled={loading} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button></div>
-      {loading&&rows.length===0?<div className="runtime-loading">…</div>:<div className="table"><table><thead><tr><th>{pick("کاربر","User")}</th><th>{pick("پلن","Plan")}</th><th>{pick("نام کاربری","Username")}</th><th>{pick("ترافیک","Traffic")}</th><th>{pick("ساخت","Created")}</th><th>{pick("انقضا","Expires")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map(item=>{const user=userMap.get(n(item.user_id));const plan=planMap.get(n(item.plan_id));return <tr key={n(item.id)}><td><div className="user-cell"><b>{user?.full_name||s(item.customer_name)||`#${item.user_id}`}</b><small dir="ltr">{user?.email||s(item.customer_email)||"—"}</small></div></td><td><div className="user-cell"><b>{s(item.plan_name)||s(plan?.name)||`#${item.plan_id}`}</b><small dir="ltr">MV-{n(item.id)}</small></div></td><td><div className="secret-row"><b dir="ltr">{s(item.account_username)||"—"}</b>{s(item.account_username)&&<button className="mini-btn" onClick={()=>copy(s(item.account_username))}>{pick("کپی","Copy")}</button>}</div></td><td>{trafficCell(item)}</td><td>{formatDate(item.created_at)}</td><td>{expiryCell(item)}</td><td><Badge tone={tone(item.status)}>{statusLabel(item.status)}</Badge></td><td><div className="row-actions"><button className="danger" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button><button disabled={!!busy} onClick={()=>void toggleStatus(item)}>{s(item.status).toLowerCase()==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button><button onClick={()=>openEdit(item)}>{pick("ویرایش","Edit")}</button><button onClick={()=>openExtend(item)}>{pick("تمدید","Renew")}</button><button className="primary-soft" onClick={()=>void openSubscriptionLink(item)}>{pick("سابلینک","Sub-link")}</button></div></td></tr>;})}</tbody></table>{filtered.length===0&&<div className="runtime-empty">{pick("اشتراکی پیدا نشد","No subscriptions found")}</div>}</div>}
+      {loading&&rows.length===0?<div className="runtime-loading">…</div>:<div className="table"><table><thead><tr><th>{pick("کاربر","User")}</th><th>{pick("پلن","Plan")}</th><th>{pick("نام کاربری","Username")}</th><th>{pick("ترافیک","Traffic")}</th><th>{pick("ساخت","Created")}</th><th>{pick("انقضا","Expires")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map(item=>{const user=userMap.get(n(item.user_id));const plan=planMap.get(n(item.plan_id));return <tr key={n(item.id)}><td><div className="user-cell"><b>{user?.full_name||s(item.customer_name)||`#${item.user_id}`}</b><small dir="ltr">{user?.email||s(item.customer_email)||"—"}</small></div></td><td><div className="user-cell"><b>{s(item.plan_name)||s(plan?.name)||`#${item.plan_id}`}</b><small dir="ltr">MV-{n(item.id)}</small></div></td><td><div className="secret-row"><b dir="ltr">{s(item.account_username)||"—"}</b>{s(item.account_username)&&<button className="mini-btn" onClick={()=>copy(s(item.account_username))}>{pick("کپی","Copy")}</button>}</div></td><td>{trafficCell(item)}</td><td>{formatDate(item.created_at)}</td><td>{expiryCell(item)}</td><td><Badge tone={tone(item.status)}>{statusLabel(item.status)}</Badge></td><td><div className="row-actions"><button className="danger" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button><button disabled={!!busy} onClick={()=>void toggleStatus(item)}>{s(item.status).toLowerCase()==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button><button onClick={()=>openEdit(item)}>{pick("ویرایش","Edit")}</button><button onClick={()=>openExtend(item)}>{pick("تمدید","Renew")}</button><button className="primary-soft" onMouseEnter={()=>prefetchSubscriptionLink(item)} onFocus={()=>prefetchSubscriptionLink(item)} onClick={()=>void openSubscriptionLink(item)}>{pick("سابلینک","Sub-link")}</button></div></td></tr>;})}</tbody></table>{filtered.length===0&&<div className="runtime-empty">{pick("اشتراکی پیدا نشد","No subscriptions found")}</div>}</div>}
     </Card>
 
     {modal==="create"&&<Modal title={pick("ساخت اشتراک","Create subscription")} onClose={()=>!busy&&setModal(null)} wide>
