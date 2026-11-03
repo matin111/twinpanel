@@ -55,7 +55,7 @@ for required in (
     "v24-canonical-panel",
     ".section-head p",
     ".action-copy",
-    "https://github.com/KaringX/karing/releases/download/v1.2.25.2802/karing_1.2.25.2802_android_arm.apk",
+    "https://github.com/KaringX/karing/releases/download/v1.2.26.2919/karing_1.2.26.2919_android_arm.apk",
     "https://download.wireguard.com/android-client/com.wireguard.android-1.0.20260315.apk",
     "https://github.com/amnezia-vpn/amneziawg-android/releases/download/v3.1.20260814/AmneziaWG-3.1.202060814.apk",
 ):
