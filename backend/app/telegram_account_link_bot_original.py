@@ -375,7 +375,9 @@ def install_account_link_feature(
 
         if callback.message is not None:
             brand_name = escape(await _brand_name(request_fn))
-            await callback.message.edit_text(
+            # Telegram cannot attach ReplyKeyboardMarkup to editMessageText.
+            # Send a fresh main-menu message so navigation works from any page.
+            await callback.message.answer(
                 f"🤖 <b>{brand_name}</b>\n\n"
                 "بخش موردنظر را انتخاب کنید.",
                 reply_markup=main_runtime.main_keyboard(),
