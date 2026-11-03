@@ -135,8 +135,10 @@ def install_account_link_feature(router, request_fn, session_fn):
     main_runtime.main_keyboard = _main_menu_keyboard
 
     from .telegram_subscription_ui_patch_v1 import install as install_subscription_ui
+    from .telegram_expiry_notification_ui_v1 import install as install_expiry_notification_ui
 
     install_subscription_ui(main_runtime)
+    install_expiry_notification_ui(main_runtime)
 
     @router.callback_query(F.data == RESELLER_REQUEST_CALLBACK)
     async def reseller_request_conditions(
