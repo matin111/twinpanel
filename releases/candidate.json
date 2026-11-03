@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.558",
-  "source_sha": "e5ab3343acb9757fc105c9f5ca5cd1051db333e6",
+  "version": "1.1.0-rc.559",
+  "source_sha": "0a4a7fa089c5e6f915977034a5338d727f0f8026",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.558 سرعت نمایش داشبورد مدیریت را بهبود می‌دهد. آمار اصلی بدون انتظار برای ۷ درخواست و بررسی تمام نودها نمایش داده می‌شود؛ نمودار، اشتراک‌ها، پرداخت‌ها و وضعیت نودها به‌تدریج بارگذاری می‌شوند و درخواست‌های سلامت و پروتکل‌ها کنترل‌شده اجرا می‌شوند.",
-    "en": "TwinPanel 1.1.0-rc.558 progressively renders admin dashboard core metrics without blocking on seven endpoints, defers sales, subscriptions, payments and node details, and bounds node telemetry concurrency."
+    "fa": "TwinPanel 1.1.0-rc.559 سرعت صفحه کاربران مدیریت را با صفحه‌بندی سمت سرور (۲۰ کاربر در هر درخواست)، جست‌وجوی سبک و تأخیری، جلوگیری از تداخل پاسخ‌های قدیمی و بارگذاری مستقل کیف پول بهبود می‌دهد. کنترل دسترسی کاربران نمایندگی حفظ شده است.",
+    "en": "TwinPanel 1.1.0-rc.559 speeds up the actual admin users page with a reseller-isolated lightweight 20-row server pagination API, debounced server search, stale-response guards, independent admin identity load, and scoped deferred wallet enrichment."
   }
 }
