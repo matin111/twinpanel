@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.559",
+  "version": "1.1.0-rc.560",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T21:03:58Z",
+  "released_at": "2026-11-03T21:29:55Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "0a4a7fa089c5e6f915977034a5338d727f0f8026",
+  "source_sha": "d7180262df744be33f93096acdd0402cff02a41b",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.559/twinpanel-1.1.0-rc.559-linux-x86_64.tar.gz",
-    "sha256": "b745ad073e5b801761e3c0d5d845bb0ead2f778c1912ad2c15be3379e3a55755",
-    "size_bytes": 25377637
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.560/twinpanel-1.1.0-rc.560-linux-x86_64.tar.gz",
+    "sha256": "f81a6deb98556cd93b3b227418661b6bd49eb2c433911fa06930c68914e833f2",
+    "size_bytes": 25375445
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.559 سرعت صفحه کاربران مدیریت را با صفحه‌بندی سمت سرور (۲۰ کاربر در هر درخواست)، جست‌وجوی سبک و تأخیری، جلوگیری از تداخل پاسخ‌های قدیمی و بارگذاری مستقل کیف پول بهبود می‌دهد. کنترل دسترسی کاربران نمایندگی حفظ شده است.",
-    "en": "TwinPanel 1.1.0-rc.559 speeds up the actual admin users page with a reseller-isolated lightweight 20-row server pagination API, debounced server search, stale-response guards, independent admin identity load, and scoped deferred wallet enrichment."
+    "fa": "TwinPanel 1.1.0-rc.560 توقف صفحه اشتراک‌های ادمین روی حالت بارگذاری را برطرف می‌کند. فهرست اشتراک‌ها به‌محض دریافت پاسخ API نمایش داده می‌شود و دیگر منتظر دریافت کاربران، پلن‌ها و نودها نیست؛ داده‌های جانبی مستقل بارگذاری می‌شوند و درخواست‌های تکراری کاهش یافته‌اند.",
+    "en": "TwinPanel 1.1.0-rc.560 fixes the admin subscriptions list remaining on a loading spinner by rendering rows independently from user, plan and node metadata, fetching enrichment once and reducing repeated background polling."
   }
 }
