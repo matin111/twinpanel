@@ -102,32 +102,72 @@ def plan_categories(plans):
     return result
 
 
-def categories_keyboard(plans):
-    categories = plan_categories(plans)
+def plan_user_count(plan):
+    try:
+        return max(1, int(plan.get("device_limit") or 1))
+    except Exception:
+        return 1
+
+
+def user_counts(plans):
+    return sorted({plan_user_count(plan) for plan in plans})
+
+
+def user_counts_keyboard(plans):
     rows = []
-    for index, category in enumerate(categories[:30]):
-        count = sum(1 for plan in plans if plan_category(plan) == category)
+    for count in user_counts(plans)[:30]:
+        plan_count = sum(1 for plan in plans if plan_user_count(plan) == count)
         rows.append([
             InlineKeyboardButton(
-                text=(f"📁 {category} ({count})")[:60],
-                callback_data=f"shop:cat:{index}",
+                text=(f"👤 {count} کاربره ({plan_count})")[:60],
+                callback_data=f"shop:users:{count}",
             )
         ])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def category_plans(plans, category_index):
-    categories = plan_categories(plans)
+def user_count_plans(plans, count):
+    filtered = [plan for plan in plans if plan_user_count(plan) == int(count)]
+    if not filtered:
+        raise RuntimeError("این تعداد کاربر دیگر در دسترس نیست")
+    return filtered
+
+
+def categories_keyboard(plans, *, user_count=None):
+    filtered = user_count_plans(plans, user_count) if user_count is not None else plans
+    categories = plan_categories(filtered)
+    rows = []
+    for index, category in enumerate(categories[:30]):
+        count = sum(1 for plan in filtered if plan_category(plan) == category)
+        callback_data = (
+            f"shop:ucat:{int(user_count)}:{index}"
+            if user_count is not None
+            else f"shop:cat:{index}"
+        )
+        rows.append([
+            InlineKeyboardButton(
+                text=(f"📁 {category} ({count})")[:60],
+                callback_data=callback_data,
+            )
+        ])
+    if user_count is not None:
+        rows.append([InlineKeyboardButton(text="⬅️ بازگشت به تعداد کاربری", callback_data="shop:list")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def category_plans(plans, category_index, *, user_count=None):
+    filtered = user_count_plans(plans, user_count) if user_count is not None else plans
+    categories = plan_categories(filtered)
     if category_index < 0 or category_index >= len(categories):
         raise RuntimeError("این دسته‌بندی دیگر در دسترس نیست")
     category = categories[category_index]
     return category, [
-        plan for plan in plans
+        plan for plan in filtered
         if plan_category(plan) == category
     ]
 
 
-def plans_keyboard(plans, *, category_index=None):
+def plans_keyboard(plans, *, category_index=None, user_count=None):
     rows = []
 
     for plan in plans[:30]:
@@ -157,7 +197,7 @@ def plans_keyboard(plans, *, category_index=None):
         rows.append([
             InlineKeyboardButton(
                 text="⬅️ بازگشت به دسته‌بندی‌ها",
-                callback_data="shop:list",
+                callback_data=(f"shop:users:{int(user_count)}" if user_count is not None else "shop:list"),
             )
         ])
 
@@ -318,6 +358,7 @@ def proof_keyboard(
 def plan_text(plan):
     return (
         f"🛒 <b>{escape(str(plan.get('name') or 'اشتراک'))}</b>\n"
+        f"👤 تعداد کاربری: <b>{plan_user_count(plan)} کاربر</b>\n"
         f"📁 دسته‌بندی: <b>{escape(plan_category(plan))}</b>\n\n"
         f"📦 حجم: "
         f"<b>{int(plan.get('traffic_gb') or 0)} گیگابایت</b>\n"
@@ -434,8 +475,8 @@ def create_purchase_router(
 
         await message.answer(
             "🛒 <b>خرید اشتراک</b>\n\n"
-            "ابتدا دسته‌بندی پلن را انتخاب کنید:",
-            reply_markup=categories_keyboard(plans),
+            "ابتدا تعداد کاربری را انتخاب کنید:",
+            reply_markup=user_counts_keyboard(plans),
         )
 
     @router.callback_query(
@@ -470,8 +511,51 @@ def create_purchase_router(
 
         await callback.message.edit_text(
             "🛒 <b>خرید اشتراک</b>\n\n"
-            "ابتدا دسته‌بندی پلن را انتخاب کنید:",
-            reply_markup=categories_keyboard(plans),
+            "ابتدا تعداد کاربری را انتخاب کنید:",
+            reply_markup=user_counts_keyboard(plans),
+        )
+
+    @router.callback_query(F.data.startswith("shop:users:"))
+    async def shop_user_count(callback: CallbackQuery):
+        try:
+            count = int(callback.data.split(":")[2])
+            plans = await load_plans()
+            user_count_plans(plans, count)
+        except Exception as exc:
+            await callback.answer(str(exc), show_alert=True)
+            return
+
+        await callback.answer()
+        await callback.message.edit_text(
+            f"👤 <b>{count} کاربره</b>\n\n"
+            "حالا دسته‌بندی پلن را انتخاب کنید:",
+            reply_markup=categories_keyboard(plans, user_count=count),
+        )
+
+    @router.callback_query(F.data.startswith("shop:ucat:"))
+    async def shop_user_category(callback: CallbackQuery):
+        try:
+            parts = callback.data.split(":")
+            count = int(parts[2])
+            category_index = int(parts[3])
+            plans = await load_plans()
+            category, filtered_plans = category_plans(
+                plans, category_index, user_count=count
+            )
+        except Exception as exc:
+            await callback.answer(str(exc), show_alert=True)
+            return
+
+        await callback.answer()
+        await callback.message.edit_text(
+            f"👤 <b>{count} کاربره</b>\n"
+            f"📁 <b>{escape(category)}</b>\n\n"
+            "پلن موردنظر را انتخاب کنید:",
+            reply_markup=plans_keyboard(
+                filtered_plans,
+                category_index=category_index,
+                user_count=count,
+            ),
         )
 
     @router.callback_query(
