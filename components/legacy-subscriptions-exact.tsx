@@ -106,16 +106,23 @@ export function LegacySubscriptionsRuntimePage(){
       let subscriptions:RuntimeRow[];
       try{subscriptions=await adminApi.subscriptionsV2();}catch{subscriptions=await adminApi.subscriptions();}
       setRows(subscriptions);
-      // Reference data must never block the table.
-      void adminApi.users().then(setUsers).catch(()=>{});
-      void adminApi.plans().then(setPlans).catch(()=>{});
-      void adminApi.nodes().then(setNodes).catch(()=>{});
+
       setSelected(current=>current?(subscriptions.find(item=>n(item.id)===n(current.id))||current):null);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{if(!silent)setLoading(false);}
   };
 
-  useEffect(()=>{void load();const timer=window.setInterval(()=>void load(true),15000);return()=>window.clearInterval(timer);},[]);
+  useEffect(()=>{
+    void load();
+    // Supplementary data is fetched only once; it is not required to show subscriptions.
+    void adminApi.users().then(setUsers).catch(()=>{});
+    void adminApi.plans().then(setPlans).catch(()=>{});
+    void adminApi.nodes().then(setNodes).catch(()=>{});
+    const timer=window.setInterval(()=>{
+      if(document.visibilityState==="visible")void load(true);
+    },30000);
+    return()=>window.clearInterval(timer);
+  },[]);
 
   const userMap=useMemo(()=>new Map(users.map(user=>[user.id,user])),[users]);
   const planMap=useMemo(()=>new Map(plans.map(plan=>[n(plan.id),plan])),[plans]);
