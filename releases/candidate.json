@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.563",
-  "source_sha": "5c7bba59f5126f5ddefd7f6bf9bc4132f4890dd7",
+  "version": "1.1.0-rc.564",
+  "source_sha": "9a837e106816500350fededa7a96eedd126d0c49",
   "notes": {
-    "fa": "TwinPanel rc.563 پردازش Convergence پروتکل‌های مدرن را بدون تغییر رفتار ساخت اکانت، با دریافت گروهی وضعیت پروتکل و Credential (دسته‌های ۵۰۰ تایی) سریع‌تر می‌کند و خواندن محتوای رمزگذاری‌شده برای بررسی تغییر توپولوژی را حذف می‌کند. جلوگیری از تغییر بخش‌های پرداخت، فروشگاه و ربات و حفظ کانفیگ‌های موجود مدنظر است.",
-    "en": "Optimize 15-protocol convergence by batching selected-state and credential lookups in 500-record chunks and fingerprinting credential presence without fetching encrypted blobs. Retain original provisioning and credential reuse paths. No changes to payment, store or bot logic."
+    "fa": "ساخت سریع و کنترل‌شده کانفیگ sing-box برای کاربران منتقل‌شده از ایلان، سنایی، مرزبان و پاسارگاد: تا ۱۲۰ Credential در یک دسته با یک‌بار بررسی کانفیگ و راه‌اندازی مجدد، حفظ کاربران موجود، قفل مشترک جلوگیری از تداخل با ساخت عادی و امکان ترمیم از آخرین وضعیت. مسیرهای پرداخت و ربات و کانفیگ‌های قبلی دست‌نخورده می‌مانند.",
+    "en": "Add safe bounded batch sing-box credential provisioning for imported accounts: one validate/restart per batch, node-local transaction lock shared with ordinary account writes, preservation of existing users and credentials, migration-only resumable worker, and convergence coordination. No changes to payment, store or bots."
   }
 }
