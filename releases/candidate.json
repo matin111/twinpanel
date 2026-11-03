@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.555",
-  "source_sha": "18b234f5727ba2049e2402f9951366aefc9b1121",
+  "version": "1.1.0-rc.556",
+  "source_sha": "7627580d246495c145fec2074b0d2d52f1b8d3e5",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.555 چیدمان اعلان‌های ادمین را اصلاح می‌کند: عنوان، توضیح و زمان در ردیف‌های مجزا بدون هم‌پوشانی نمایش داده می‌شوند و اسکرول و راست‌چین در موبایل و دسکتاپ حفظ می‌شود.",
-    "en": "TwinPanel 1.1.0-rc.555 fixes overlapping admin notification titles, descriptions, and timestamps with a stable scoped flex layout while preserving scrolling and RTL/mobile support."
+    "fa": "TwinPanel 1.1.0-rc.556 بازشدن سابلینک در مدیریت اشتراک‌های ادمین را سریع‌تر می‌کند. دریافت URL از مسیر سبک و مجاز جدا از connection-info انجام می‌شود، لینک در مرورگر کش شده و هنگام قرارگیری نشانگر روی دکمه از پیش دریافت می‌شود؛ اطلاعات پروتکل‌ها دیگر برای نمایش ساده سابلینک آماده‌سازی نمی‌شوند.",
+    "en": "TwinPanel 1.1.0-rc.556 speeds up admin subscription-link delivery through an authenticated lightweight API that bypasses expensive connection-info generation, plus in-memory link caching and hover/focus prefetch."
   }
 }
