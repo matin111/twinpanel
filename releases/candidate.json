@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.543",
-  "source_sha": "180a78b95e9d884e6c7c767d83645fa792b20914",
+  "version": "1.1.0-rc.544",
+  "source_sha": "5d3f519070814e0ac2e57f0d4e9f879c71d15778",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.543 دسته‌بندی پلن‌های فروش را به پنل ادمین و ربات اصلی اضافه می‌کند. مدیر هنگام ساخت یا ویرایش هر پلن می‌تواند دسته‌بندی‌هایی مثل اقتصادی، ویژه یا گیمینگ تعیین کند و دسته‌بندی در جدول پلن‌ها نمایش داده می‌شود. ربات اصلی نیز در مسیر خرید ابتدا دسته‌بندی‌ها را همراه تعداد پلن‌های هر دسته نشان می‌دهد و سپس فقط پلن‌های همان دسته را نمایش می‌دهد. پلن‌های قدیمی بدون دسته‌بندی به‌صورت سازگار داخل «سایر پلن‌ها» قرار می‌گیرند.",
-    "en": "TwinPanel 1.1.0-rc.543 adds sales-plan categories to the admin panel and main Telegram bot. Admins can assign categories such as Economy, Premium, or Gaming when creating or editing plans, with the category shown in the plans table. The main bot now presents categories first, including the plan count per category, and then shows only plans from the selected category. Existing uncategorized plans remain compatible under the Other plans fallback category."
+    "fa": "TwinPanel 1.1.0-rc.544 مسیر خرید ربات اصلی را دو مرحله‌ای می‌کند: ابتدا تعداد کاربری بر اساس device_limit پلن (۱ کاربره، ۲ کاربره و ...) و سپس دسته‌بندی فعلی پلن (مثل یک‌ماهه، دوماهه یا سه‌ماهه) نمایش داده می‌شود و بعد فقط پلن‌های منطبق دیده می‌شوند. همچنین محدودیت یکتا بودن نام پلن حذف شده تا چند پلن با نام یکسان اما تعداد کاربر، دسته‌بندی، قیمت یا مشخصات متفاوت قابل ساخت باشند؛ محدودیت قدیمی plans_name_key نیز روی نصب‌های PostgreSQL موجود به‌صورت خودکار و idempotent حذف می‌شود.",
+    "en": "TwinPanel 1.1.0-rc.544 adds a two-level main Telegram purchase hierarchy: user count derived from each plan's device_limit first, then the existing plan category, then matching plans. It also removes the legacy unique plan-name restriction so multiple plans may intentionally share the same display name while differing by user count, category, price, or other attributes. Existing PostgreSQL installations automatically and idempotently drop the legacy plans_name_key constraint."
   }
 }
