@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.536",
+  "version": "1.1.0-rc.537",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T01:45:25Z",
+  "released_at": "2026-11-03T01:55:35Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "97523ae5289ac87d5373a1f1b37d04c4f947c688",
+  "source_sha": "a94587e4fcc014d9923ca8f596d408c08062a597",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.536/twinpanel-1.1.0-rc.536-linux-x86_64.tar.gz",
-    "sha256": "dd88278fcd404ee8c5c5b04780df4a65e6f993dd400c881528c7e8615f7d69e1",
-    "size_bytes": 25309672
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.537/twinpanel-1.1.0-rc.537-linux-x86_64.tar.gz",
+    "sha256": "ec9efa01ba61061619649e2860cfb263b1e19d73115c5a78c4e978fa37a8c511",
+    "size_bytes": 25310005
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.536 ساخت اشتراک دستی را بدون اجبار به انتخاب پلن فعال می‌کند و جستجوی کاربر را به همان پنجره ساخت اشتراک اضافه می‌کند. در حالت بدون پلن، plan_id به صورت null ارسال می‌شود و حجم، مدت و اتصال همزمان به صورت دستی تعیین می‌شوند. جستجوی کاربر روی نام، ایمیل، تلفن و ID انجام می‌شود و مسیر Fast Create و Provisioning پس‌زمینه بدون تغییر باقی می‌مانند.",
-    "en": "TwinPanel 1.1.0-rc.536 allows manual subscription creation without requiring a plan and adds user search to the same unified create dialog. No-plan creation sends plan_id as null while traffic, duration, and device limit are entered manually. User search filters by name, email, phone, and ID, while Fast Create and background provisioning remain unchanged."
+    "fa": "TwinPanel 1.1.0-rc.537 یادآوری انقضای اشتراک را برای ۳ روز، ۲ روز، ۱ روز و روز انقضا فعال می‌کند. اعلان‌ها از مسیر فعلی پنل و صف تلگرام ارسال می‌شوند و با Claim دیتابیسی یکتا، Restart سرویس یا اجرای چند Replica باعث ارسال تکراری یک Reminder نمی‌شود. سازگاری با اعلان‌های انقضای نسخه قبلی نیز حفظ شده است.",
+    "en": "TwinPanel 1.1.0-rc.537 adds subscription expiry reminders at 3 days, 2 days, 1 day, and the expiry day. Notifications continue through the existing panel and Telegram queue paths, while a unique database claim prevents duplicate reminders across service restarts or multiple replicas. Compatibility with legacy expiry notifications is preserved."
   }
 }
