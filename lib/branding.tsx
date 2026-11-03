@@ -17,7 +17,7 @@ export type BrandingConfig={
 export const DEFAULT_BRANDING:BrandingConfig={
   name:"TwinPanel",
   shortName:"TP",
-  tagline:"VPN CONTROL 2027",
+  tagline:"",
   logoUrl:"/logo-original.png",
   faviconUrl:"/logo-original.png",
   supportLink:"https://t.me/support",
@@ -41,7 +41,7 @@ export function configFromBrandingRecord(row:BrandingRecord):BrandingConfig{
   return {
     name,
     shortName:shortNameOf(name),
-    tagline:String(row.site_description||DEFAULT_BRANDING.tagline).trim()||DEFAULT_BRANDING.tagline,
+    tagline:String(row.site_description||"").trim(),
     logoUrl:String(row.logo_url||DEFAULT_BRANDING.logoUrl),
     faviconUrl:String(row.favicon_url||DEFAULT_BRANDING.faviconUrl),
     supportLink:String(row.telegram_url||DEFAULT_BRANDING.supportLink),
@@ -60,9 +60,9 @@ type BrandingContextValue={
 
 const BrandingContext=createContext<BrandingContextValue|null>(null);
 
-export function BrandingProvider({children}:{children:React.ReactNode}){
-  const [brand,setBrand]=useState<BrandingConfig>(DEFAULT_BRANDING);
-  const [ready,setReady]=useState(false);
+export function BrandingProvider({children,initialBrand}:{children:React.ReactNode;initialBrand?:BrandingConfig}){
+  const [brand,setBrand]=useState<BrandingConfig>(initialBrand||DEFAULT_BRANDING);
+  const [ready,setReady]=useState(Boolean(initialBrand));
 
   const reloadBrand=useCallback(async()=>{
     try{
