@@ -116,6 +116,8 @@ export function MigrationCenterAdmin(){
   const [protocols,setProtocols]=useState("v2ray");
   const [dryRun,setDryRun]=useState<DryRunResult|null>(null);
   const [busy,setBusy]=useState(false);
+  const [busyPhase,setBusyPhase]=useState<"preview"|"stage"|"provision"|"import">("preview");
+  const [busyProgress,setBusyProgress]=useState<{done:number;total:number}|null>(null);
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
 
@@ -125,6 +127,8 @@ export function MigrationCenterAdmin(){
   const runDry=async()=>{
     setError("");setOk("");setDryRun(null);
     try{
+      setBusyPhase("preview");
+      setBusyProgress(null);
       setBusy(true);
       let result:DryRunResult;
       if(isEylan){
@@ -142,7 +146,7 @@ export function MigrationCenterAdmin(){
       setDryRun(result);
       setOk(pick("بررسی انجام شد؛ هنوز هیچ تغییری در دیتابیس ثبت نشده است.","Dry-run completed; no database writes were performed."));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
-    finally{setBusy(false);}
+    finally{setBusy(false);setBusyProgress(null);}
   };
 
   const importReady=async()=>{
@@ -152,6 +156,8 @@ export function MigrationCenterAdmin(){
     if(!dryRun||readyRecords.length===0){setError(pick("ابتدا Dry-run بگیرید و رکورد آماده داشته باشید.","Run a dry-run first and make sure at least one record is ready."));return;}
     const protocolList=protocols.split(",").map(item=>item.trim().toLowerCase()).filter(Boolean);
     const effectiveProtocols=protocolList.length?protocolList:["v2ray"];
+    setBusyPhase(isEylan?"stage":"import");
+    setBusyProgress({done:0,total:readyRecords.length});
     setBusy(true);
     try{
       if(isEylan){
@@ -178,9 +184,12 @@ export function MigrationCenterAdmin(){
           existing+=staged.existing;
           alreadyImported+=staged.already_imported;
           const done=Math.min(offset+chunk.length,records.length);
+          setBusyProgress({done,total:records.length});
           setOk(pick(`در حال انتقال ایلان: ${done} از ${records.length} رکورد در دیتابیس آماده شد...`,`Eylan transfer: ${done} of ${records.length} records staged in the database...`));
         }
 
+        setBusyPhase("provision");
+        setBusyProgress(null);
         setOk(pick("رکوردها آماده شدند؛ در حال ساخت یک‌جای V2Ray روی Exitها...","Records staged; provisioning V2Ray once across Exit nodes..."));
         const sourceIds=records.map(item=>item.source_id);
         const finalized=await api<EylanFinalizeResult>("/v1/admin/migration-center/eylan/finalize",{
@@ -197,6 +206,8 @@ export function MigrationCenterAdmin(){
       }
 
       if(effectiveProtocols.length===1&&effectiveProtocols[0]==="v2ray"){
+        setBusyPhase("provision");
+        setBusyProgress(null);
         const result=await api<BatchImportResult>("/v1/admin/migration-center/import-batch",{
           method:"POST",
           body:JSON.stringify({source,records:readyRecords,target_user_id:userId,protocols:["v2ray"]}),
@@ -219,11 +230,26 @@ export function MigrationCenterAdmin(){
         });
         if(result.imported)imported+=1;
         else if(result.idempotent)existing+=1;
+        setBusyProgress({done:imported+existing,total:readyRecords.length});
       }
       setOk(pick(`انتقال تمام شد: ${imported} رکورد جدید، ${existing} رکورد از قبل موجود.`,`Import finished: ${imported} new, ${existing} already imported.`));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
-    finally{setBusy(false);}
+    finally{setBusy(false);setBusyProgress(null);}
   };
+
+  const busyTitle=busyPhase==="preview"
+    ?pick("در حال بررسی فایل بکاپ","Analyzing backup file")
+    :busyPhase==="stage"
+    ?pick("در حال آماده‌سازی رکوردها","Preparing accounts")
+    :busyPhase==="provision"
+    ?pick("در حال ساخت اکانت‌ها روی سرورها","Provisioning accounts on servers")
+    :pick("در حال انتقال اکانت‌ها","Importing accounts");
+  const busyDescription=busyPhase==="preview"
+    ?pick("بکاپ در حال خواندن و استخراج اطلاعات است. هنوز تغییری در حساب‌ها ایجاد نشده.","Reading and validating backup data. No accounts have been changed.")
+    :busyPhase==="provision"
+    ?pick("ساخت و همگام‌سازی روی سرورها ممکن است چند دقیقه طول بکشد.","Provisioning and synchronizing nodes may take several minutes.")
+    :pick("رکوردها در حال ثبت و بررسی هستند. صفحه را باز نگه دارید.","Records are being saved and checked. Keep this page open.");
+  const progressPercent=busyProgress?.total?Math.round(busyProgress.done/busyProgress.total*100):null;
 
   return <Shell active="/admin/migration-center"><div className="page">
     <div className="page-head">
@@ -233,6 +259,53 @@ export function MigrationCenterAdmin(){
       </div>
     </div>
 
+    {busy&&<div role="dialog" aria-modal="true" aria-label={busyTitle} aria-describedby="migration-progress-description" className="tp-migration-overlay" dir="rtl">
+      <div className="tp-migration-progress" role="status" aria-live="polite">
+        <div className="tp-migration-art" aria-hidden="true">
+          <span className="tp-migration-art-ring"/>
+          <svg viewBox="0 0 96 96" width="82" height="82" fill="none" aria-hidden="true">
+            <rect x="9" y="26" width="28" height="40" rx="7" stroke="currentColor" strokeWidth="3" opacity=".75"/>
+            <path d="M18 37h10M18 46h10M18 55h7" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+            <rect x="59" y="26" width="28" height="40" rx="7" stroke="currentColor" strokeWidth="3"/>
+            <path d="M68 37h10M68 46h10M68 55h7" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+            <path d="M40 46h16m-6-6 6 6-6 6" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="tp-migration-art-arrow"/>
+          </svg>
+        </div>
+        <div className="tp-migration-kicker">{pick("مرکز انتقال TwinPanel","TwinPanel Migration Center")}</div>
+        <h2>{busyTitle}</h2>
+        <p id="migration-progress-description">{busyDescription}</p>
+        {progressPercent===null
+          ?<div className="tp-migration-indeterminate" aria-label={pick("عملیات در حال اجراست","Operation in progress")}><span/></div>
+          :<div className="tp-migration-progress-track" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100} aria-label={pick("پیشرفت آماده‌سازی","Preparation progress")}>
+            <span style={{width:`${progressPercent}%`}}/>
+          </div>}
+        <div className="tp-migration-progress-meta">
+          {progressPercent===null
+            ?pick("در حال پردازش...","Processing...")
+            :pick(`${busyProgress!.done.toLocaleString("fa-IR")} از ${busyProgress!.total.toLocaleString("fa-IR")} رکورد · ${progressPercent.toLocaleString("fa-IR")}٪`,`${busyProgress!.done} of ${busyProgress!.total} records · ${progressPercent}%`)}
+        </div>
+        <div className="tp-migration-progress-foot">{pick("تا دریافت نتیجه، این صفحه را نبندید یا رفرش نکنید.","Do not close or refresh this page until a result appears.")}</div>
+      </div>
+    </div>}
+    <style>{`
+      .tp-migration-overlay{position:fixed;inset:0;z-index:99999;background:rgba(3,8,23,.76);backdrop-filter:blur(9px);display:flex;align-items:center;justify-content:center;padding:16px}
+      .tp-migration-progress{width:min(100%,450px);border:1px solid rgba(87,134,244,.3);border-radius:24px;padding:32px 28px;background:linear-gradient(150deg,#14233d,#0b1426 75%);box-shadow:0 28px 100px rgba(0,0,0,.45);color:#f8fafc;text-align:center;direction:rtl}
+      .tp-migration-art{width:116px;height:116px;margin:0 auto 18px;display:grid;place-items:center;position:relative;color:#dbeafe}
+      .tp-migration-art-ring{position:absolute;inset:4px;border-radius:50%;border:3px solid rgba(96,165,250,.15);border-top-color:#38bdf8;border-right-color:#6366f1;animation:tp-migration-spin 1.5s linear infinite}
+      .tp-migration-art-arrow{animation:tp-migration-pulse 1.1s ease-in-out infinite}
+      .tp-migration-kicker{font-size:12px;color:#7dd3fc;font-weight:700;letter-spacing:.02em;margin-bottom:10px}
+      .tp-migration-progress h2{font-size:21px;font-weight:800;margin:0 0 11px;color:#fff}
+      .tp-migration-progress p{font-size:14px;line-height:1.9;color:#bac9e0;margin:0 0 23px}
+      .tp-migration-indeterminate,.tp-migration-progress-track{height:9px;border-radius:50px;background:rgba(148,163,184,.16);overflow:hidden}
+      .tp-migration-indeterminate span{display:block;height:100%;width:36%;border-radius:50px;background:linear-gradient(90deg,#3b82f6,#06b6d4);animation:tp-migration-scan 1.3s ease-in-out infinite}
+      .tp-migration-progress-track span{display:block;height:100%;background:linear-gradient(90deg,#2563eb,#06b6d4);border-radius:50px;transition:width .3s ease}
+      .tp-migration-progress-meta{margin-top:10px;font-size:13px;font-variant-numeric:tabular-nums;color:#bae6fd}
+      .tp-migration-progress-foot{border-top:1px solid rgba(148,163,184,.15);margin-top:24px;padding-top:18px;font-size:12px;line-height:1.8;color:#94a3b8}
+      @keyframes tp-migration-spin{to{transform:rotate(360deg)}}
+      @keyframes tp-migration-scan{0%{transform:translateX(-130%)}50%{transform:translateX(100%)}100%{transform:translateX(330%)}}
+      @keyframes tp-migration-pulse{50%{opacity:.25}}
+      @media(prefers-reduced-motion:reduce){.tp-migration-art-ring,.tp-migration-indeterminate span,.tp-migration-art-arrow{animation:none}}
+    `}</style>
     {error&&<div className="runtime-error">{error}</div>}
     {ok&&<div className="runtime-success">{ok}</div>}
 
