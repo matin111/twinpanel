@@ -28,20 +28,9 @@ def install() -> None:
 
     from . import reseller_bot_runtime, telegram_purchase_bot
 
-    original_plans_keyboard = telegram_purchase_bot.plans_keyboard
     original_create_purchase_router = telegram_purchase_bot.create_purchase_router
     original_reseller_keyboard = reseller_bot_runtime._main_keyboard
     original_reseller_build_router = reseller_bot_runtime.build_router
-
-    def plans_keyboard_with_trial(plans):
-        # Main Trial is standalone. It is not a Plan property anymore.
-        markup = original_plans_keyboard(plans)
-        rows = list(markup.inline_keyboard)
-        if not any(button.text == TRIAL_LABEL for row in rows for button in row):
-            rows.append([
-                InlineKeyboardButton(text=TRIAL_LABEL, callback_data="trial:claim")
-            ])
-        return InlineKeyboardMarkup(inline_keyboard=rows)
 
     def create_purchase_router_with_trial(request_fn, session_fn):
         router = original_create_purchase_router(request_fn, session_fn)
@@ -141,7 +130,6 @@ def install() -> None:
         router.message.register(claim_reseller_trial, F.text == TRIAL_LABEL)
         return router
 
-    telegram_purchase_bot.plans_keyboard = plans_keyboard_with_trial
     telegram_purchase_bot.create_purchase_router = create_purchase_router_with_trial
     reseller_bot_runtime._main_keyboard = reseller_keyboard_with_trial
     reseller_bot_runtime.build_router = reseller_build_router_with_trial
