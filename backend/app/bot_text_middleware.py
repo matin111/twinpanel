@@ -5,18 +5,25 @@ from html import escape
 from typing import Any, Awaitable, Callable
 
 from aiogram.client.session.middlewares.base import BaseRequestMiddleware
+from aiogram.methods import GetMyCommands, SetMyCommands
+from aiogram.types import BotCommand
 
 from .bot_texts import custom_bot_texts
 from .database import SessionLocal
 
 
 class BotTextRequestMiddleware(BaseRequestMiddleware):
-    """Rewrite only static customer-facing copy on outgoing Telegram messages.
+    """Rewrite static copy and keep the Telegram command menu in sync.
 
     Business data (order ids, amounts, cards, usernames, links, callbacks and
     keyboards) is never generated here. The existing bot runtimes remain the
     source of truth for those values; this middleware only replaces explicitly
     configurable text fragments immediately before the Telegram API request.
+
+    Both the main bot and every reseller bot install this middleware. On the
+    first Telegram API request we therefore also make sure ``/start`` exists in
+    the BotFather command menu while preserving every command that may already
+    have been configured for that bot.
     """
 
     def __init__(
@@ -31,6 +38,51 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
         self.cache_seconds = max(0.5, float(cache_seconds))
         self._loaded_at = 0.0
         self._values: dict[str, str] = {}
+        self._commands_sync_attempted = False
+
+    async def _sync_start_command(
+        self,
+        make_request: Callable[..., Awaitable[Any]],
+        bot: Any,
+    ) -> None:
+        if self._commands_sync_attempted:
+            return
+
+        # Command-menu synchronization is a convenience feature and must never
+        # prevent the bot from starting or delivering a customer message.
+        self._commands_sync_attempted = True
+        try:
+            current = list(
+                await make_request(bot, GetMyCommands())
+                or []
+            )
+
+            commands = [
+                BotCommand(
+                    command="start",
+                    description="شروع ربات",
+                )
+            ]
+            commands.extend(
+                item
+                for item in current
+                if str(getattr(item, "command", "")).lower()
+                != "start"
+            )
+
+            # Avoid an unnecessary Telegram write when /start is already first
+            # with the desired Persian description and all other commands match.
+            if current == commands:
+                return
+
+            await make_request(
+                bot,
+                SetMyCommands(commands=commands),
+            )
+        except Exception:
+            # A temporary Bot API failure must not break startup. The command is
+            # retried naturally on the next process start.
+            return
 
     def _load(self) -> dict[str, str]:
         now = time.monotonic()
@@ -203,6 +255,11 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
         bot: Any,
         method: Any,
     ) -> Any:
+        await self._sync_start_command(
+            make_request,
+            bot,
+        )
+
         text = getattr(method, "text", None)
         if isinstance(text, str) and text:
             rewritten = self._rewrite(text)
