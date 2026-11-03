@@ -259,11 +259,14 @@ def import_record(
             state=state,
             commit=commit,
         )
-        added_protocols = ensure_migration_protocol_snapshots(db, [int(existing.subscription_id)])
+        # Bulk callers stage all records first, then snapshot all protocols
+        # in one query/flush. This avoids 15-protocol N+1 work per import.
+        added_protocols = (
+            ensure_migration_protocol_snapshots(db, [int(existing.subscription_id)])
+            if commit else 0
+        )
         if commit:
             db.commit()
-        else:
-            db.flush()
         return {
             "imported": False,
             "idempotent": True,
@@ -338,7 +341,7 @@ def import_record(
     db.add(sub)
     db.flush()
 
-    added_protocols = ensure_migration_protocol_snapshots(db, [int(sub.id)])
+    added_protocols = ensure_migration_protocol_snapshots(db, [int(sub.id)]) if commit else 0
 
     preserved = {
         "normalized": normalized,
