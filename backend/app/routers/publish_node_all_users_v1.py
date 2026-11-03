@@ -25,9 +25,6 @@ router = APIRouter(
 )
 
 
-# Keep strong references to detached jobs until they finish.  FastAPI/Starlette
-# BackgroundTasks can keep the request lifecycle open through long SSH/provision
-# work in some middleware paths; these tasks must outlive the HTTP response.
 _NODE_INSTALL_TASKS: set[asyncio.Task[Any]] = set()
 _NODE_INSTALL_PENDING: set[str] = set()
 
@@ -37,43 +34,24 @@ async def publish_node_to_all_users(
     node_id: int,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    """Publish one new Exit node to every existing subscription.
-
-    Legacy subscriptions are already synchronized by the node provisioner.
-    This endpoint fills the missing explicit Delivery Policy memberships and
-    provisions missing credentials for active subscriptions.
-    """
-
     node = (
         db.query(Node)
-        .filter(
-            Node.id == int(node_id),
-            Node.retired_at.is_(None),
-        )
+        .filter(Node.id == int(node_id), Node.retired_at.is_(None))
         .first()
     )
-
     if not node:
         raise HTTPException(status_code=404, detail="سرور پیدا نشد")
-
     if node.node_type != NodeType.EXIT:
-        raise HTTPException(
-            status_code=409,
-            detail="نمایش برای همه کاربران فقط برای سرور خروجی قابل استفاده است",
-        )
+        raise HTTPException(status_code=409, detail="نمایش برای همه کاربران فقط برای سرور خروجی قابل استفاده است")
 
     node.show_to_users = True
-
     explicit_ids = [
         int(row[0])
-        for row in (
-            db.query(SubscriptionDeliveryPolicyState.subscription_id)
-            .filter(SubscriptionDeliveryPolicyState.mode == "explicit")
-            .order_by(SubscriptionDeliveryPolicyState.subscription_id.asc())
-            .all()
-        )
+        for row in db.query(SubscriptionDeliveryPolicyState.subscription_id)
+        .filter(SubscriptionDeliveryPolicyState.mode == "explicit")
+        .order_by(SubscriptionDeliveryPolicyState.subscription_id.asc())
+        .all()
     ]
-
     memberships_added = 0
     delivery_modes_added = 0
     delivery_modes_enabled = 0
@@ -83,33 +61,19 @@ async def publish_node_to_all_users(
         sub = db.get(Subscription, subscription_id)
         if not sub:
             continue
-
-        membership = (
-            db.query(SubscriptionNode)
-            .filter(
-                SubscriptionNode.subscription_id == sub.id,
-                SubscriptionNode.node_id == node.id,
-            )
-            .first()
-        )
-
+        membership = db.query(SubscriptionNode).filter(
+            SubscriptionNode.subscription_id == sub.id,
+            SubscriptionNode.node_id == node.id,
+        ).first()
         if not membership:
-            membership = SubscriptionNode(
-                subscription_id=sub.id,
-                node_id=node.id,
-            )
+            membership = SubscriptionNode(subscription_id=sub.id, node_id=node.id)
             db.add(membership)
             db.flush()
             memberships_added += 1
-
         mode = db.get(SubscriptionNodeDeliveryMode, membership.id)
-
         if not mode:
             current_modes = explicit_memberships(db, sub.id)
-            next_priority = (
-                max((int(item.priority) for _, item in current_modes), default=0)
-                + 100
-            )
+            next_priority = max((int(item.priority) for _, item in current_modes), default=0) + 100
             mode = SubscriptionNodeDeliveryMode(
                 subscription_node_id=membership.id,
                 direct_enabled=True,
@@ -122,40 +86,24 @@ async def publish_node_to_all_users(
         elif not mode.direct_enabled:
             mode.direct_enabled = True
             delivery_modes_enabled += 1
-
         if sub.status == SubscriptionStatus.ACTIVE:
             active_ids.append(int(sub.id))
 
     db.commit()
-
     reconciled = 0
     reconcile_failed: list[dict[str, Any]] = []
-
     for subscription_id in active_ids:
         sub = db.get(Subscription, subscription_id)
         if not sub:
             continue
-
         try:
             result = await _reconcile_explicit(db, sub)
             reconciled += 1
-
             if not bool(result.get("ok", False)):
-                reconcile_failed.append(
-                    {
-                        "subscription_id": subscription_id,
-                        "errors": result.get("errors", []),
-                        "quota_sync_ok": result.get("quota_sync_ok"),
-                    }
-                )
+                reconcile_failed.append({"subscription_id": subscription_id, "errors": result.get("errors", []), "quota_sync_ok": result.get("quota_sync_ok")})
         except Exception as exc:
             db.rollback()
-            reconcile_failed.append(
-                {
-                    "subscription_id": subscription_id,
-                    "error": str(exc)[:500],
-                }
-            )
+            reconcile_failed.append({"subscription_id": subscription_id, "error": str(exc)[:500]})
 
     return {
         "ok": len(reconcile_failed) == 0,
@@ -167,11 +115,7 @@ async def publish_node_to_all_users(
         "delivery_modes_enabled": delivery_modes_enabled,
         "active_subscriptions_reconciled": reconciled,
         "failed": reconcile_failed,
-        "message": (
-            "سرور برای همه اشتراک‌های قبلی منتشر شد"
-            if not reconcile_failed
-            else "سرور منتشر شد اما همگام‌سازی بعضی اشتراک‌ها خطا داشت"
-        ),
+        "message": "سرور برای همه اشتراک‌های قبلی منتشر شد" if not reconcile_failed else "سرور منتشر شد اما همگام‌سازی بعضی اشتراک‌ها خطا داشت",
     }
 
 
@@ -197,22 +141,14 @@ class BackgroundNodeInstallIn(BaseModel):
     publish_to_all_users: bool = True
 
 
-async def _install_node_in_background(
-    payload: BackgroundNodeInstallIn,
-    request_scope: dict[str, Any],
-) -> None:
-    from .classic_protocol_admin_v1 import (
-        EnsureClassicProtocolIn,
-        ensure_classic_protocol,
-    )
+async def _install_node_in_background(payload: BackgroundNodeInstallIn, request_scope: dict[str, Any]) -> None:
+    from .classic_protocol_admin_v1 import EnsureClassicProtocolIn, ensure_classic_protocol
     from .provision import InstallIn, install_node
 
     db = SessionLocal()
     try:
         request = Request(request_scope)
-        install_payload = InstallIn(
-            **payload.model_dump(exclude={"publish_to_all_users"})
-        )
+        install_payload = InstallIn(**payload.model_dump(exclude={"publish_to_all_users"}))
         result = await install_node(install_payload, request, db)
         node_id = int(result.get("node_id") or 0)
         if not node_id or install_payload.node_type != NodeType.EXIT:
@@ -220,25 +156,35 @@ async def _install_node_in_background(
 
         try:
             await ensure_classic_protocol(
-                EnsureClassicProtocolIn(
-                    node_id=node_id,
-                    protocol="v2ray",
-                    port=install_payload.xray_port,
-                ),
+                EnsureClassicProtocolIn(node_id=node_id, protocol="v2ray", port=install_payload.xray_port),
                 db=db,
             )
         except Exception as exc:
+            print("TWINPANEL_NODE_BACKGROUND_XRAY_DEGRADED_V1", {"node_id": node_id, "error": str(exc)[:800]}, flush=True)
+
+        try:
+            from ..services.new_node_modern_bootstrap_v1 import bootstrap_new_exit_modern_protocols
+            modern_bootstrap = await bootstrap_new_exit_modern_protocols(db=db, node_id=node_id)
             print(
-                "TWINPANEL_NODE_BACKGROUND_XRAY_DEGRADED_V1",
-                {"node_id": node_id, "error": str(exc)[:800]},
+                "TWINPANEL_NODE_BACKGROUND_MODERN_BOOTSTRAP_V1",
+                {
+                    "node_id": node_id,
+                    "attempted": modern_bootstrap.get("attempted"),
+                    "installed": modern_bootstrap.get("installed"),
+                    "failed": modern_bootstrap.get("failed"),
+                    "already_online": modern_bootstrap.get("already_online"),
+                    "skipped_no_template": modern_bootstrap.get("skipped_no_template"),
+                    "skipped_port_conflict": modern_bootstrap.get("skipped_port_conflict"),
+                    "sources": modern_bootstrap.get("sources"),
+                },
                 flush=True,
             )
+        except Exception as exc:
+            db.rollback()
+            print("TWINPANEL_NODE_BACKGROUND_MODERN_BOOTSTRAP_DEGRADED_V1", {"node_id": node_id, "error": str(exc)[:1200]}, flush=True)
 
         if payload.publish_to_all_users:
             try:
-                # publish_node_all_users_v2 patches this global at import time,
-                # so the checkbox path deterministically covers legacy + explicit
-                # subscriptions and reconciles active accounts.
                 result = await publish_node_to_all_users(node_id=node_id, db=db)
                 print(
                     "TWINPANEL_NODE_BACKGROUND_PUBLISH_DONE_V2",
@@ -247,28 +193,19 @@ async def _install_node_in_background(
                         "subscriptions_seen": result.get("subscriptions_seen"),
                         "memberships_added": result.get("memberships_added"),
                         "active_reconciled": result.get("active_subscriptions_reconciled"),
+                        "classic_pairs_provisioned": result.get("classic_pairs_provisioned"),
+                        "modern_pairs_provisioned": result.get("modern_pairs_provisioned"),
+                        "reused_pairs": result.get("reused_pairs"),
                         "failed_count": len(result.get("failed") or []),
                     },
                     flush=True,
                 )
             except Exception as exc:
                 db.rollback()
-                print(
-                    "TWINPANEL_NODE_BACKGROUND_PUBLISH_DEGRADED_V1",
-                    {"node_id": node_id, "error": str(exc)[:800]},
-                    flush=True,
-                )
+                print("TWINPANEL_NODE_BACKGROUND_PUBLISH_DEGRADED_V1", {"node_id": node_id, "error": str(exc)[:800]}, flush=True)
     except Exception as exc:
         db.rollback()
-        print(
-            "TWINPANEL_NODE_BACKGROUND_INSTALL_FAILED_V1",
-            {
-                "name": payload.name,
-                "host": payload.host,
-                "error": str(exc)[:1200],
-            },
-            flush=True,
-        )
+        print("TWINPANEL_NODE_BACKGROUND_INSTALL_FAILED_V1", {"name": payload.name, "host": payload.host, "error": str(exc)[:1200]}, flush=True)
     finally:
         _NODE_INSTALL_PENDING.discard(payload.name.strip().casefold())
         db.close()
@@ -281,24 +218,14 @@ async def install_node_background_v1(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     name_key = payload.name.strip().casefold()
-    existing = (
-        db.query(Node)
-        .filter(Node.retired_at.is_(None), Node.name == payload.name)
-        .first()
-    )
+    existing = db.query(Node).filter(Node.retired_at.is_(None), Node.name == payload.name).first()
     if existing:
         raise HTTPException(status_code=409, detail="نام سرور قبلاً ثبت شده است")
     if name_key in _NODE_INSTALL_PENDING:
         raise HTTPException(status_code=409, detail="ثبت این سرور در حال انجام است")
 
     _NODE_INSTALL_PENDING.add(name_key)
-    task = asyncio.create_task(
-        _install_node_in_background(
-            payload,
-            dict(request.scope),
-        ),
-        name=f"node-install:{payload.name}",
-    )
+    task = asyncio.create_task(_install_node_in_background(payload, dict(request.scope)), name=f"node-install:{payload.name}")
     _NODE_INSTALL_TASKS.add(task)
     task.add_done_callback(_NODE_INSTALL_TASKS.discard)
 
@@ -309,8 +236,5 @@ async def install_node_background_v1(
         "name": payload.name,
         "host": payload.host,
         "publish_to_all_users": bool(payload.publish_to_all_users),
-        "message": (
-            "ثبت سرور صف شد؛ آماده‌سازی و انتشار برای کاربران "
-            "داخل بک‌اند ادامه دارد"
-        ),
+        "message": "ثبت سرور صف شد؛ آماده‌سازی و انتشار برای کاربران داخل بک‌اند ادامه دارد",
     }
