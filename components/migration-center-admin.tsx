@@ -367,7 +367,7 @@ export function MigrationCenterAdmin(){
     <Card>
       <div className="card-head"><div><b>{pick("انتقال جدید","New import")}</b><small>{pick("ابتدا Preview؛ سپس فقط رکوردهای آماده را Import کنید. نتیجه انتقال فقط در همین نشست نمایش داده می‌شود و با رفرش پاک می‌شود.","Preview first, then import only ready records. Import results are shown only for this session and clear on refresh.")}</small></div></div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}>
-        <label><span>{pick("پنل مبدا","Source panel")}</span><select value={source} onChange={event=>{const next=event.target.value as Source;setSource(next);setDryRun(null);setOk("");setError("");if(next==="eylan")setProtocols("v2ray");}} style={{width:"100%"}}>
+        <label><span>{pick("پنل مبدا","Source panel")}</span><select value={source} onChange={event=>{const next=event.target.value as Source;setSource(next);setDryRun(null);setOk("");setError("");}} style={{width:"100%"}}>
           <option value="sanaei">سنایی / 3x-ui</option><option value="marzban">مرزبان</option><option value="pasargad">پاسارگاد</option><option value="eylan">ایلان</option>
         </select></label>
         <label><span>{pick("شناسه کاربر مقصد در TwinPanel","Target TwinPanel user ID")}</span><input type="number" min="1" value={targetUserId} onChange={event=>setTargetUserId(event.target.value)} placeholder="17" style={{width:"100%"}}/></label>
