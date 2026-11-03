@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import {NotificationReadIconButton} from "./notification-read-icon-button";
 import {useEffect,useRef,useState} from "react";
 import {resellerApi} from "../lib/reseller-runtime-api";
 import {useI18n} from "../lib/i18n";
@@ -109,7 +110,7 @@ export function ResellerNotificationCenter(){
           <b>{pick("اعلان‌ها","Notifications")}</b>
           <small>{unread?`${resellerNumber(lang,unread)} ${pick("خوانده‌نشده","unread")}`:pick("همه خوانده شده‌اند","All caught up")}</small>
         </div>
-        {unread>0&&<button type="button" onClick={()=>void markAll()}>{pick("خواندن همه","Mark all read")}</button>}
+        {unread>0&&<NotificationReadIconButton onClick={()=>void markAll()} label={pick("خواندن همه اعلان‌ها","Mark all notifications as read")}/>}
       </header>
 
       <div className="customerNotificationList">

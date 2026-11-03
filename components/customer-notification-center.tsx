@@ -2,6 +2,7 @@
 
 import {useEffect,useRef,useState} from "react";
 import Link from "next/link";
+import {NotificationReadIconButton} from "./notification-read-icon-button";
 import {customerApi,UserNotification} from "../lib/customer-api";
 import {useCustomerSession} from "../lib/customer-session";
 import {useI18n} from "../lib/i18n";
@@ -48,7 +49,7 @@ export function CustomerNotificationCenter(){
       <span>◎</span>{unread>0&&<b>{unread>99?"99+":unread.toLocaleString("fa-IR")}</b>}
     </button>
     {open&&<div className="customerNotificationPopover">
-      <header><div><b>{pick("اعلان‌ها","Notifications")}</b><small>{unread?`${unread.toLocaleString("fa-IR")} ${pick("خوانده‌نشده","unread")}`:pick("همه خوانده شده‌اند","All caught up")}</small></div>{unread>0&&<button type="button" onClick={()=>void markAll()}>{pick("خواندن همه","Mark all read")}</button>}</header>
+      <header><div><b>{pick("اعلان‌ها","Notifications")}</b><small>{unread?`${unread.toLocaleString("fa-IR")} ${pick("خوانده‌نشده","unread")}`:pick("همه خوانده شده‌اند","All caught up")}</small></div>{unread>0&&<NotificationReadIconButton onClick={()=>void markAll()} label={pick("خواندن همه اعلان‌ها","Mark all notifications as read")}/>}</header>
       <div className="customerNotificationList">
         {loading&&items.length===0?<div className="customerNotificationEmpty">{pick("در حال دریافت...","Loading...")}</div>:items.length===0?<div className="customerNotificationEmpty">{pick("اعلانی وجود ندارد","No notifications")}</div>:items.slice(0,8).map(item=><button type="button" key={item.id} className={!item.is_read&&!item.read_at?"unread":""} onClick={()=>void markOne(item)}><i/><div><b>{item.title||pick("اعلان","Notification")}</b><p>{item.message||item.body||"—"}</p><small>{item.created_at?new Date(item.created_at).toLocaleString("fa-IR"):""}</small></div></button>)}
       </div>

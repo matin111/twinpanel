@@ -384,3 +384,60 @@ html[dir="ltr"] .resellerNotificationCenter .resellerNotificationPopover .custom
     max-width: none;
   }
 }
+
+/* One accessible eye-only mark-read control for all three notification roles.
+   Explicit sizing prevents legacy header button text rules from squeezing the icon. */
+.customerNotificationPopover header .notificationReadIconButton {
+  flex: 0 0 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 1px solid rgba(139, 92, 246, .28);
+  border-radius: 11px;
+  background: rgba(139, 92, 246, .11);
+  color: #a78bfa;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.customerNotificationPopover header .notificationReadIconButton svg {
+  display: block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.customerNotificationPopover header .notificationReadIconButton:hover {
+  border-color: rgba(139, 92, 246, .55);
+  background: rgba(139, 92, 246, .2);
+}
+
+.customerNotificationPopover header .notificationReadIconButton:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
+}
+
+.customerNotificationPopover header .notificationReadIconButton:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 430px) {
+  .customerNotificationPopover header:has(.notificationReadIconButton) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    grid-template-columns: none;
+  }
+  .customerNotificationPopover header .notificationReadIconButton {
+    width: 36px;
+    max-width: 36px;
+  }
+}
