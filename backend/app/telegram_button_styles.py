@@ -15,6 +15,7 @@ _ALLOWED = {"default", "primary", "success", "danger"}
 _KEYS = (
     "dashboard",
     "purchase",
+    "trial",
     "subscriptions",
     "account_link",
     "wallet",
@@ -31,6 +32,7 @@ _KEYS = (
 class TelegramButtonStyles:
     dashboard: str = "default"
     purchase: str = "success"
+    trial: str = "primary"
     subscriptions: str = "default"
     account_link: str = "success"
     wallet: str = "success"
