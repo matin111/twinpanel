@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.551",
+  "version": "1.1.0-rc.552",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T15:25:06Z",
+  "released_at": "2026-11-03T15:52:47Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "bce7ada5b107db2089f83747ccc03b99219877f5",
+  "source_sha": "2e64356e83325b7557758974515e4934a48cd417",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.551/twinpanel-1.1.0-rc.551-linux-x86_64.tar.gz",
-    "sha256": "3322b836d6835155f1c206c242f8ddf01d1dfee4aa6e8ef7255e350f61807da4",
-    "size_bytes": 25351295
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.552/twinpanel-1.1.0-rc.552-linux-x86_64.tar.gz",
+    "sha256": "dfad5fe804cbfc3718bc8421f6dcad37e6e7b31b4e490e2f2076d0294189b103",
+    "size_bytes": 25350669
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.551 لایت‌مود صفحه تنظیمات اکانت تست را در پنل اصلی و پنل نماینده اصلاح می‌کند. کارت تنظیمات، عنوان و توضیحات، سوییچ فعال‌سازی، فیلدها و انتخابگرها، خلاصه تنظیم فعلی و هشدارها در حالت روشن اکنون کنتراست و پس‌زمینه مناسب دارند. رنگ فوکوس، چک‌باکس و دکمه ذخیره نیز از رنگ‌های برند استفاده می‌کند و دارک‌مود بدون تغییر باقی می‌ماند.",
-    "en": "TwinPanel 1.1.0-rc.551 fixes light mode for the shared Trial settings experience in both admin and reseller panels. The settings card, headings, helper text, enable toggle, fields/selects, current-settings summary and warnings now use proper light-theme surfaces and contrast. Focus, checkbox and save-button accents inherit brand colors while dark mode remains unchanged."
+    "fa": "TwinPanel 1.1.0-rc.552 رنگ‌های ثابت بنفش در ویجت پشتیبانی آنلاین را حذف می‌کند. حاشیه و Hover لانچر، آیکون پشتیبانی، دکمه‌های شروع و ارسال چت، فوکوس فیلدها و رنگ پیام‌های کاربر اکنون مستقیماً از رنگ‌های اصلی برند پنل استفاده می‌کنند و در لایت‌مود و دارک‌مود هماهنگ باقی می‌مانند.",
+    "en": "TwinPanel 1.1.0-rc.552 removes fixed violet accents from the online support widget. The launcher border and hover state, support icon, start/send buttons, focused fields, and customer message bubbles now inherit the configured panel brand colors in both light and dark themes."
   }
 }
