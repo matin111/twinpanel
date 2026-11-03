@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.560",
+  "version": "1.1.0-rc.561",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T21:29:55Z",
+  "released_at": "2026-11-03T21:54:47Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d7180262df744be33f93096acdd0402cff02a41b",
+  "source_sha": "d4265193334e897807e4f59b1a6b46d7ef51272e",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.560/twinpanel-1.1.0-rc.560-linux-x86_64.tar.gz",
-    "sha256": "f81a6deb98556cd93b3b227418661b6bd49eb2c433911fa06930c68914e833f2",
-    "size_bytes": 25375445
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.561/twinpanel-1.1.0-rc.561-linux-x86_64.tar.gz",
+    "sha256": "1ffa4f4010bd2918ffb17e184d12697ae4ccb352006f7bf9a9861d87ccd065cf",
+    "size_bytes": 25379777
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.560 توقف صفحه اشتراک‌های ادمین روی حالت بارگذاری را برطرف می‌کند. فهرست اشتراک‌ها به‌محض دریافت پاسخ API نمایش داده می‌شود و دیگر منتظر دریافت کاربران، پلن‌ها و نودها نیست؛ داده‌های جانبی مستقل بارگذاری می‌شوند و درخواست‌های تکراری کاهش یافته‌اند.",
-    "en": "TwinPanel 1.1.0-rc.560 fixes the admin subscriptions list remaining on a loading spinner by rendering rows independently from user, plan and node metadata, fetching enrichment once and reducing repeated background polling."
+    "fa": "TwinPanel 1.1.0-rc.561 سرعت صفحه اشتراک‌های ادمین را با دریافت ۴۰ ردیف در هر صفحه از سرور، جست‌وجو و فیلتر سمت پایگاه‌داده و محاسبه مستقل آمار کل بهبود می‌دهد. بارگذاری و رندر همه ۱۹۸۳ اشتراک در هر بازکردن صفحه حذف شده است.",
+    "en": "TwinPanel 1.1.0-rc.561 speeds up admin subscriptions using true 40-row server pagination, server-side search/status filtering, bounded row enrichment and global KPI counts. The UI no longer fetches and renders the entire subscription roster on page entry."
   }
 }
