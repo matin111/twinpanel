@@ -1,4 +1,4 @@
-/* Admin overlay fixes: keep top-nav dropdowns above sticky headers and make notification read state icon-only. */
+/* Admin overlay fixes: keep top-nav dropdowns above sticky headers. Legacy notification overrides removed: all notification centers share the same accessible two-column row layout. */
 .admin-topbar,
 .admin-topbar-inner,
 .admin-topnav,
@@ -35,14 +35,6 @@
   z-index:1040!important;
 }
 
-.customerNotificationPopover header{
-  grid-template-columns:minmax(0,1fr) auto!important;
-}
-
-.customerNotificationPopover header small{
-  display:none!important;
-}
-
 .notificationEyeAction{
   width:36px!important;
   height:36px!important;
@@ -55,11 +47,6 @@
   font-size:16px!important;
   line-height:1!important;
   overflow:visible!important;
-}
-
-.customerNotificationList > button{
-  grid-template-columns:30px minmax(0,1fr)!important;
-  align-items:center!important;
 }
 
 .notificationReadState{
@@ -97,10 +84,6 @@
   color:#16a34a;
   border-color:rgba(22,163,74,.28);
   background:rgba(22,163,74,.08);
-}
-
-.customerNotificationList > button > i{
-  display:none!important;
 }
 
 html[data-theme="light"] .notificationReadState{
