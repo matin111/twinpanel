@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.538",
+  "version": "1.1.0-rc.539",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T02:00:56Z",
+  "released_at": "2026-11-03T02:13:09Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "12728a631d1722fbe5ffda0d302f00e7045117e7",
+  "source_sha": "0753e31cf89b6be65d49a95cbb50a14d3b071df8",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.538/twinpanel-1.1.0-rc.538-linux-x86_64.tar.gz",
-    "sha256": "3092a8d9f8bd6a3d7729cfb84c177b9d57dadaebb4555467b41b8d8e56b06557",
-    "size_bytes": 25310922
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.539/twinpanel-1.1.0-rc.539-linux-x86_64.tar.gz",
+    "sha256": "20df8fd434db7489eeb7efdeeb2b406a08750f9683a44efd54b472091da1d533",
+    "size_bytes": 25316297
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.538 افزودن سرور را غیرمسدودکننده می‌کند: درخواست ادمین سریع 202 می‌گیرد و آماده‌سازی SSH، Xray baseline و انتشار برای کاربران در بک‌اند ادامه پیدا می‌کند. گزینه «نمایش برای همه کاربران سایت» از Publish-All V2 استفاده می‌کند تا سرور خروجی جدید به همه اشتراک‌های قبلی غیرلغوشده اضافه شود و اکانت‌های فعال Reconcile شوند.",
-    "en": "TwinPanel 1.1.0-rc.538 makes Add Server non-blocking: the admin request returns HTTP 202 quickly while SSH preparation, Xray baseline setup, and publishing continue in the backend. The Show for all site users option uses Publish-All V2 so the new Exit node is added to every existing non-cancelled subscription and active accounts are reconciled."
+    "fa": "TwinPanel 1.1.0-rc.539 تأخیر ارسال اکانت در ربات اصلی بعد از تأیید پرداخت را کاهش می‌دهد. Fulfillment کامل همه پروتکل‌ها همچنان در پس‌زمینه ادامه پیدا می‌کند، اما به‌محض ثبت اولین Credential فعال و قابل‌استفاده، پیام اصلی اکانت از همان مسیر payment_approved صف می‌شود. Event key واحد order/payment/subscription از ارسال تکراری جلوگیری می‌کند و کندی یا Timeout پروتکل‌های دیگر دیگر ارسال اولیه اکانت را معطل نمی‌کند.",
+    "en": "TwinPanel 1.1.0-rc.539 reduces main Telegram bot account-delivery latency after payment approval. Full multi-protocol fulfillment continues in the background, while the existing payment_approved message is queued as soon as the first active usable credential is committed. The canonical order/payment/subscription event key keeps delivery duplicate-safe, so slow or timing-out remaining protocols no longer block the initial account message."
   }
 }
