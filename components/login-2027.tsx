@@ -16,7 +16,7 @@ function AuthArt(){
   return <section className="login-art auth-showcase" aria-label={pick("معرفی برند","Brand showcase")}>
     <div className="auth-brand">
       <img src={brand.logoUrl} alt={brand.name}/>
-      <div><b>{brand.name}</b><small>{brand.tagline}</small></div>
+      <div><b>{brand.name}</b>{brand.tagline&&<small>{brand.tagline}</small>}</div>
     </div>
     <div className="auth-visual" aria-hidden="true">
       <span className="auth-float auth-float-wifi">⌁</span>
@@ -108,7 +108,7 @@ export function LoginPage2027(){
   const next=searchParams.get("next");
   const registerHref=next?`/register?next=${encodeURIComponent(next)}`:"/register";
 
-  return <div className="login login2027 auth-page">
+  return <div className="login login2027 auth-page" style={{"--brand-primary":brand.accent,"--brand-secondary":brand.secondaryColor,"--brand-accent":brand.accent} as React.CSSProperties}>
     <AuthArt/>
     <section className="login-form auth-form-side">
       <div className="login-tools auth-tools"><LanguageSwitch/><ThemeSwitch/></div>
@@ -161,7 +161,7 @@ export function RegisterPage2027(){
   const next=searchParams.get("next");
   const loginHref=next?`/login?next=${encodeURIComponent(next)}`:"/login";
 
-  return <div className="login login2027 auth-page">
+  return <div className="login login2027 auth-page" style={{"--brand-primary":brand.accent,"--brand-secondary":brand.secondaryColor,"--brand-accent":brand.accent} as React.CSSProperties}>
     <AuthArt/>
     <section className="login-form auth-form-side">
       <div className="login-tools auth-tools"><LanguageSwitch/><ThemeSwitch/></div>
