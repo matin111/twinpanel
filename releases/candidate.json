@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.538",
-  "source_sha": "12728a631d1722fbe5ffda0d302f00e7045117e7",
+  "version": "1.1.0-rc.539",
+  "source_sha": "24509dcd5d4d110aa4fa4184680bc2c902fb1452",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.538 افزودن سرور را غیرمسدودکننده می‌کند: درخواست ادمین سریع 202 می‌گیرد و آماده‌سازی SSH، Xray baseline و انتشار برای کاربران در بک‌اند ادامه پیدا می‌کند. گزینه «نمایش برای همه کاربران سایت» از Publish-All V2 استفاده می‌کند تا سرور خروجی جدید به همه اشتراک‌های قبلی غیرلغوشده اضافه شود و اکانت‌های فعال Reconcile شوند.",
-    "en": "TwinPanel 1.1.0-rc.538 makes Add Server non-blocking: the admin request returns HTTP 202 quickly while SSH preparation, Xray baseline setup, and publishing continue in the backend. The Show for all site users option uses Publish-All V2 so the new Exit node is added to every existing non-cancelled subscription and active accounts are reconciled."
+    "fa": "TwinPanel 1.1.0-rc.539 دکمه «🎁 اکانت تست» را به منوی اصلی واقعی ربات تلگرام اضافه می‌کند و آن را به مسیر مستقل Trial متصل می‌کند. منطق ساخت اکانت تست دوباره‌نویسی نشده و همان سرویس مستقل Trial با محدودیت دریافت و تنظیمات فعلی استفاده می‌شود.",
+    "en": "TwinPanel 1.1.0-rc.539 adds the prominent Trial Account button to the real production Telegram main menu and routes it to the standalone Trial flow. Trial provisioning is not duplicated and continues to use the existing independent Trial service, eligibility rules, and settings."
   }
 }
