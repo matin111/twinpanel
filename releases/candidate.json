@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.547",
-  "source_sha": "83ac6ff4de81eb08e963903a94aab443c1858a7e",
+  "version": "1.1.0-rc.548",
+  "source_sha": "2ea541d141b5c16d681be1272e836220b850ea91",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.547 نمایش پلن‌ها را در فروشگاه عمومی و بخش خرید پنل کاربری دسته‌بندی می‌کند تا لیست‌های بزرگ و شلوغ قابل مرور باشند. دسته‌بندی و ترتیب از همان تنظیمات مرکزی پلن‌ها و خروجی /v1/plans گرفته می‌شود، پلن‌های بدون دسته در «سایر پلن‌ها» قرار می‌گیرند، تعداد پلن هر دسته نمایش داده می‌شود و فقط پلن‌های دسته انتخاب‌شده دیده می‌شوند. منطق خرید، پرداخت، Snapshot و Provisioning بدون تغییر باقی مانده است.",
-    "en": "TwinPanel 1.1.0-rc.547 adds category-first plan browsing to both the public storefront and the customer purchase panel so large catalogs remain compact and easy to navigate. Categories and ordering come from the existing central plan settings and /v1/plans payload, uncategorized plans fall back to the default category, category counts are shown, and only the selected category is rendered. Purchase, payment, snapshot, and provisioning behavior remain unchanged."
+    "fa": "TwinPanel 1.1.0-rc.548 دسته‌بندی پلن‌ها در فروشگاه عمومی و بخش خرید پنل کاربری را بر اساس تعداد کاربر واقعی هر پلن (device_limit) انجام می‌دهد. دسته‌ها به‌صورت ۱ کاربره، ۲ کاربره، ۳ کاربره و ... با ترتیب عددی نمایش داده می‌شوند و ظاهر انتخاب دسته به کارت‌های حرفه‌ای، ریسپانسیو و هماهنگ با رنگ قالب ارتقا یافته است. هر کارت تعداد پلن‌های موجود را نمایش می‌دهد و فقط پلن‌های همان تعداد کاربر دیده می‌شوند. منطق خرید، پرداخت و Provisioning بدون تغییر باقی مانده است.",
+    "en": "TwinPanel 1.1.0-rc.548 groups plans in the public storefront and customer purchase panel by each plan's real user/device limit. Groups render in numeric order (1-user, 2-user, 3-user, ...), with a redesigned responsive card-style selector that follows the active storefront accent color and shows the available plan count. Only plans for the selected user count are rendered; purchase, payment and provisioning behavior are unchanged."
   }
 }
