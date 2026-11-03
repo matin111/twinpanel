@@ -95,7 +95,9 @@ async def _token(session_fn, telegram_id):
 
 
 async def _wallet_data(request_fn, session_fn, telegram_id):
-    token = await _token(session_fn, telegram_id)
+    auth = await session_fn(telegram_id)
+    token = auth["access_token"]
+    user_id = int((auth.get("user") or {}).get("id") or 0)
     wallet = await request_fn("GET", "/v1/wallet/me", token=token)
     transactions = await request_fn("GET", "/v1/wallet/transactions", token=token)
     topups = await request_fn("GET", "/v1/wallet/topups/me", token=token)
@@ -104,16 +106,18 @@ async def _wallet_data(request_fn, session_fn, telegram_id):
         wallet or {},
         transactions if isinstance(transactions, list) else [],
         topups if isinstance(topups, list) else [],
+        user_id,
     )
 
 
-def wallet_text(wallet, transactions, topups):
+def wallet_text(wallet, transactions, topups, user_id=0):
     balance = int(wallet.get("balance_toman") or 0)
     pending = sum(1 for row in topups if row.get("status") in {"pending_payment", "awaiting_review"})
     approved = sum(1 for row in topups if row.get("status") == "approved")
     lines = [
         "💰 <b>کیف پول</b>",
         "",
+        f"👤 شناسه حساب پنل: <code>#{user_id}</code>" if user_id else "",
         "موجودی قابل استفاده:",
         f"<b>{money(balance)} تومان</b>",
         "",
@@ -161,8 +165,8 @@ def create_wallet_router(request_fn, session_fn):
     router = Router(name="twinpanel-wallet-v2")
 
     async def send_wallet(target, telegram_id, *, edit=False):
-        token, wallet, transactions, topups = await _wallet_data(request_fn, session_fn, telegram_id)
-        text = wallet_text(wallet, transactions, topups)
+        token, wallet, transactions, topups, user_id = await _wallet_data(request_fn, session_fn, telegram_id)
+        text = wallet_text(wallet, transactions, topups, user_id)
         if edit:
             await target.edit_text(text, reply_markup=wallet_keyboard())
         else:
