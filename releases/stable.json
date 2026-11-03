@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.555",
+  "version": "1.1.0-rc.556",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T18:19:27Z",
+  "released_at": "2026-11-03T19:08:44Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "18b234f5727ba2049e2402f9951366aefc9b1121",
+  "source_sha": "7627580d246495c145fec2074b0d2d52f1b8d3e5",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.555/twinpanel-1.1.0-rc.555-linux-x86_64.tar.gz",
-    "sha256": "288148b041d2ed62001ed930f2033e0c4fc6aaf55a5ac6e845272d38eeb1c78e",
-    "size_bytes": 25351537
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.556/twinpanel-1.1.0-rc.556-linux-x86_64.tar.gz",
+    "sha256": "e96719811a364176b545d66842348aa51c45d0401a16ed36d43354facde3ee6e",
+    "size_bytes": 25364618
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.555 چیدمان اعلان‌های ادمین را اصلاح می‌کند: عنوان، توضیح و زمان در ردیف‌های مجزا بدون هم‌پوشانی نمایش داده می‌شوند و اسکرول و راست‌چین در موبایل و دسکتاپ حفظ می‌شود.",
-    "en": "TwinPanel 1.1.0-rc.555 fixes overlapping admin notification titles, descriptions, and timestamps with a stable scoped flex layout while preserving scrolling and RTL/mobile support."
+    "fa": "TwinPanel 1.1.0-rc.556 بازشدن سابلینک در مدیریت اشتراک‌های ادمین را سریع‌تر می‌کند. دریافت URL از مسیر سبک و مجاز جدا از connection-info انجام می‌شود، لینک در مرورگر کش شده و هنگام قرارگیری نشانگر روی دکمه از پیش دریافت می‌شود؛ اطلاعات پروتکل‌ها دیگر برای نمایش ساده سابلینک آماده‌سازی نمی‌شوند.",
+    "en": "TwinPanel 1.1.0-rc.556 speeds up admin subscription-link delivery through an authenticated lightweight API that bypasses expensive connection-info generation, plus in-memory link caching and hover/focus prefetch."
   }
 }
