@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import {Badge,Card,Shell} from "./ui";
 import {adminApi,AdminNode,AdminStats,AdminTunnel,DashboardSummary,RuntimeRow} from "../lib/admin-api";
 import {dashboardPaymentAmount} from "../lib/admin-dashboard-revenue";
@@ -68,50 +68,95 @@ export function AdminDashboardRuntime(){
   const [refreshing,setRefreshing]=useState(false);
   const [error,setError]=useState("");
 
+  const loadGeneration=useRef(0);
+
   const load=async(silent=false)=>{
-    if(silent)setRefreshing(true);else setLoading(true);
+    const generation=++loadGeneration.current;
+    const active=()=>generation===loadGeneration.current;
+    if(silent)setRefreshing(true);
+    else setLoading(true);
     setError("");
-    const result=await Promise.allSettled([
-      adminApi.stats(),adminApi.dashboard(),adminApi.nodes(),adminApi.tunnels(),adminApi.subscriptions(),adminApi.payments(),salesAnalyticsApi.admin("daily")
-    ]);
-    if(result[0].status==="fulfilled")setStats(result[0].value);
-    if(result[1].status==="fulfilled")setSummary(result[1].value);
-    const loadedNodes=result[2].status==="fulfilled"?result[2].value:[];
-    if(result[2].status==="fulfilled")setNodes(loadedNodes);
-    if(result[3].status==="fulfilled")setTunnels(result[3].value);
-    if(result[4].status==="fulfilled")setSubscriptions(result[4].value);
-    if(result[5].status==="fulfilled")setPayments(result[5].value);
-    if(result[6].status==="fulfilled")setSalesAnalytics(result[6].value);
-    const failed=result.find(x=>x.status==="rejected");
-    if(failed&&failed.status==="rejected")setError(failed.reason instanceof Error?failed.reason.message:String(failed.reason));
 
-    if(loadedNodes.length){
-      const healthResults=await Promise.allSettled(loadedNodes.map(node=>adminApi.nodeHealth(node.id)));
-      const healthMap:Record<number,RuntimeRow>={};
-      healthResults.forEach((item,index)=>{if(item.status==="fulfilled")healthMap[loadedNodes[index].id]=item.value;});
-      setNodeHealth(healthMap);
-
-      const protocolResults=await Promise.allSettled(loadedNodes.map(node=>adminApi.nodeProtocols(node.id)));
-      const aggregate:Record<string,{online:boolean;online_nodes:number;reported:boolean}>={};
-      protocolResults.forEach((item,index)=>{
-        if(item.status!=="fulfilled"||!Array.isArray(item.value))return;
-        const nodeOnline=String(loadedNodes[index].status||"").toLowerCase()==="online";
-        for(const raw of item.value as RuntimeRow[]){
-          const key=stringOf(raw,"protocol").toLowerCase();
-          if(!key)continue;
-          const status=stringOf(raw,"status").toLowerCase();
-          const healthy=nodeOnline&&["online","active","ready","healthy","running"].includes(status);
-          const current=aggregate[key]||{online:false,online_nodes:0,reported:false};
-          current.reported=true;
-          if(healthy){current.online=true;current.online_nodes+=1;}
-          aggregate[key]=current;
+    // The first usable numbers must never wait on sales analytics, payment
+    // history, all subscriptions or dozens of remote node probes.
+    let coreSuccess=false;
+    const settleCore=async<T,>(promise:Promise<T>,apply:(value:T)=>void)=>{
+      try{
+        const value=await promise;
+        if(active()){
+          apply(value);
+          coreSuccess=true;
+          setLoading(false);
         }
+      }catch{/* A second core endpoint may still succeed. */}
+    };
+    await Promise.all([
+      settleCore(adminApi.stats(),setStats),
+      settleCore(adminApi.dashboard(),setSummary),
+    ]);
+    if(!active())return;
+    setLoading(false);
+    setRefreshing(false);
+    if(!coreSuccess)setError(pick("دریافت آمار داشبورد ناموفق بود؛ دوباره تلاش کنید.","Could not load dashboard metrics. Please retry."));
+
+    // Secondary cards update independently and cannot block first paint.
+    // Schedule after the core state commits to give the browser a paint.
+    window.setTimeout(()=>{
+      if(!active())return;
+      const run=async<T,>(promise:Promise<T>,apply:(value:T)=>void)=>{
+        try{const value=await promise;if(active())apply(value);}catch{/* Partial data is preferable to a blocked dashboard. */}
+      };
+      void run(adminApi.tunnels(),setTunnels);
+      void run(adminApi.subscriptions(),setSubscriptions);
+      void run(adminApi.payments(),setPayments);
+      void run(salesAnalyticsApi.admin("daily"),setSalesAnalytics);
+
+      void run(adminApi.nodes(),loadedNodes=>{
+        setNodes(loadedNodes);
+        if(!loadedNodes.length)return;
+
+        // Dashboard displays only six node resource cards. Limit remote
+        // telemetry fan-out instead of probing every node at page entry.
+        const visibleNodes=loadedNodes.slice(0,6);
+        void Promise.allSettled(visibleNodes.map(node=>adminApi.nodeHealth(node.id))).then(results=>{
+          if(!active())return;
+          const next:Record<number,RuntimeRow>={};
+          results.forEach((result,index)=>{
+            if(result.status==="fulfilled")next[visibleNodes[index].id]=result.value;
+          });
+          setNodeHealth(next);
+        });
+
+        // Protocol health is a secondary section: cap concurrent requests to
+        // avoid overwhelming the API/server while preserving all-node coverage.
+        void (async()=>{
+          const aggregate:Record<string,{online:boolean;online_nodes:number;reported:boolean}>={};
+          for(let offset=0;offset<loadedNodes.length;offset+=4){
+            if(!active())return;
+            const batch=loadedNodes.slice(offset,offset+4);
+            const results=await Promise.allSettled(batch.map(node=>adminApi.nodeProtocols(node.id)));
+            if(!active())return;
+            results.forEach((result,index)=>{
+              if(result.status!=="fulfilled"||!Array.isArray(result.value))return;
+              const nodeOnline=String(batch[index].status||"").toLowerCase()==="online";
+              for(const raw of result.value as RuntimeRow[]){
+                const key=stringOf(raw,"protocol").toLowerCase();
+                if(!key)continue;
+                const status=stringOf(raw,"status").toLowerCase();
+                const healthy=nodeOnline&&["online","active","ready","healthy","running"].includes(status);
+                const current=aggregate[key]||{online:false,online_nodes:0,reported:false};
+                current.reported=true;
+                if(healthy){current.online=true;current.online_nodes+=1;}
+                aggregate[key]=current;
+              }
+            });
+            setModernProtocols({...aggregate});
+          }
+        })();
       });
-      setModernProtocols(aggregate);
-    }
-    setLoading(false);setRefreshing(false);
+    },100);
   };
-  useEffect(()=>{void load();},[]);
+  useEffect(()=>{void load();return()=>{loadGeneration.current+=1;};},[]);
 
   const protocols=useMemo(()=>PROTOCOLS.map(([key,label])=>{
     const classic=summary?.protocols?.[key];
