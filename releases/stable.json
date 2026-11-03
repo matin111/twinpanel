@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.535",
+  "version": "1.1.0-rc.536",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T01:31:28Z",
+  "released_at": "2026-11-03T01:45:25Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "59e8ababe7e028767d1fe9cecc4c22729b08410b",
+  "source_sha": "97523ae5289ac87d5373a1f1b37d04c4f947c688",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.535/twinpanel-1.1.0-rc.535-linux-x86_64.tar.gz",
-    "sha256": "277d7f860368f1ca18b0ca0471a8d128b19f56a65045856e4746ff6f20cb4371",
-    "size_bytes": 25306743
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.536/twinpanel-1.1.0-rc.536-linux-x86_64.tar.gz",
+    "sha256": "dd88278fcd404ee8c5c5b04780df4a65e6f993dd400c881528c7e8615f7d69e1",
+    "size_bytes": 25309672
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.535 پنجره ساخت اشتراک ادمین را جمع‌وجور و مدرن می‌کند و خرابی دکمه ساخت اکانت را رفع می‌کند. دکمه ساخت اکنون مستقیماً Handler ثبت را اجرا می‌کند و دیگر به Submit ضمنی فرم وابسته نیست. هر ۱۵ پروتکل در Grid سه‌ستونه، سرورهای Exit در Grid دو‌ستونه، تنظیمات اکانت در یک ردیف فشرده و Header/Footer ثابت نمایش داده می‌شوند. Fast Create و Provisioning پس‌زمینه حفظ شده‌اند.",
-    "en": "TwinPanel 1.1.0-rc.535 modernizes and compacts the admin subscription creation dialog and fixes the broken Create Account action. The button now directly invokes the submit handler instead of relying on implicit form submission. All 15 protocols use a three-column grid, Exit servers a two-column grid, account settings a compact row, with sticky header/footer. Fast Create and background provisioning are preserved."
+    "fa": "TwinPanel 1.1.0-rc.536 ساخت اشتراک دستی را بدون اجبار به انتخاب پلن فعال می‌کند و جستجوی کاربر را به همان پنجره ساخت اشتراک اضافه می‌کند. در حالت بدون پلن، plan_id به صورت null ارسال می‌شود و حجم، مدت و اتصال همزمان به صورت دستی تعیین می‌شوند. جستجوی کاربر روی نام، ایمیل، تلفن و ID انجام می‌شود و مسیر Fast Create و Provisioning پس‌زمینه بدون تغییر باقی می‌مانند.",
+    "en": "TwinPanel 1.1.0-rc.536 allows manual subscription creation without requiring a plan and adds user search to the same unified create dialog. No-plan creation sends plan_id as null while traffic, duration, and device limit are entered manually. User search filters by name, email, phone, and ID, while Fast Create and background provisioning remain unchanged."
   }
 }
