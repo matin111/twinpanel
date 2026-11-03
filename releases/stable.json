@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.544",
+  "version": "1.1.0-rc.546",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T03:38:21Z",
+  "released_at": "2026-11-03T04:41:07Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "5d3f519070814e0ac2e57f0d4e9f879c71d15778",
+  "source_sha": "9527aef72a25782fda688940d4f3860d39f40fa2",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.544/twinpanel-1.1.0-rc.544-linux-x86_64.tar.gz",
-    "sha256": "12763868ab0716508d9dd71b3240cec3711653a72bd59a1b6d655aa4594f137d",
-    "size_bytes": 25319628
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.546/twinpanel-1.1.0-rc.546-linux-x86_64.tar.gz",
+    "sha256": "e81c8b47eb91aa583ee1bd749e80f9020642312d52b70b5a931fcd683b708347",
+    "size_bytes": 25329796
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.544 مسیر خرید ربات اصلی را دو مرحله‌ای می‌کند: ابتدا تعداد کاربری بر اساس device_limit پلن (۱ کاربره، ۲ کاربره و ...) و سپس دسته‌بندی فعلی پلن (مثل یک‌ماهه، دوماهه یا سه‌ماهه) نمایش داده می‌شود و بعد فقط پلن‌های منطبق دیده می‌شوند. همچنین محدودیت یکتا بودن نام پلن حذف شده تا چند پلن با نام یکسان اما تعداد کاربر، دسته‌بندی، قیمت یا مشخصات متفاوت قابل ساخت باشند؛ محدودیت قدیمی plans_name_key نیز روی نصب‌های PostgreSQL موجود به‌صورت خودکار و idempotent حذف می‌شود.",
-    "en": "TwinPanel 1.1.0-rc.544 adds a two-level main Telegram purchase hierarchy: user count derived from each plan's device_limit first, then the existing plan category, then matching plans. It also removes the legacy unique plan-name restriction so multiple plans may intentionally share the same display name while differing by user count, category, price, or other attributes. Existing PostgreSQL installations automatically and idempotently drop the legacy plans_name_key constraint."
+    "fa": "TwinPanel 1.1.0-rc.546 مجموعه بهبودهای جدید ربات و پلن‌ها را منتشر می‌کند: نمایش قیمت به‌جای روز در دکمه‌های پلن، چیدمان قابل جابه‌جایی پلن‌ها، حذف واقعی و امن پلن‌های بدون سابقه، ظاهر حرفه‌ای‌تر دکمه‌های مدیریت اشتراک با بازگشت و منوی اصلی، بهبود اکانت تست و تحویل آن پس از Provisioning کند، و تکمیل اعلان انقضا. اعلان‌های ۳/۲/۱ روز و روز انقضا اکنون نام کاربری واقعی اکانت را نمایش می‌دهند و دکمه‌های مستقیم تمدید اشتراک، بازگشت به اشتراک‌ها و منوی اصلی دارند؛ dedupe دیتابیسی قبلی نیز حفظ شده است.",
+    "en": "TwinPanel 1.1.0-rc.546 ships the latest bot and plan UX improvements: plan buttons show price instead of days, plans support persistent reordering, unused plans can be safely hard-deleted, subscription action buttons have improved styling and Back/Home navigation, trial delivery handles slow provisioning, and expiry reminders are now fully actionable. The 3/2/1-day and expiry-day reminders display the real account username and provide direct Renew, Back to subscriptions, and Main Menu buttons while retaining database-backed deduplication."
   }
 }
