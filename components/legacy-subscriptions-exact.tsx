@@ -78,6 +78,11 @@ export function LegacySubscriptionsRuntimePage(){
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
   const [query,setQuery]=useState("");
+  const [page,setPage]=useState(0);
+  const [matchedTotal,setMatchedTotal]=useState(0);
+  const [globalStats,setGlobalStats]=useState({total:0,active:0,expired:0,suspended:0});
+  const pageSize=40;
+  const listRequestId=useRef(0);
   const [status,setStatus]=useState<"all"|"active"|"expired"|"suspended"|"pending">("all");
   const [modal,setModal]=useState<ModalKind>(null);
   const [selected,setSelected]=useState<RuntimeRow|null>(null);
@@ -100,40 +105,47 @@ export function LegacySubscriptionsRuntimePage(){
   const [draft,setDraft]=useState<Draft>({user_id:0,plan_id:0,traffic_gb:"",duration_days:"",device_limit:"1",username:"",password:"",protocols:[]});
 
   const load=async(silent=false)=>{
+    const requestId=++listRequestId.current;
     if(!silent)setLoading(true);
     setError("");
     try{
-      let subscriptions:RuntimeRow[];
-      try{subscriptions=await adminApi.subscriptionsV2();}catch{subscriptions=await adminApi.subscriptions();}
-      setRows(subscriptions);
-
-      setSelected(current=>current?(subscriptions.find(item=>n(item.id)===n(current.id))||current):null);
-    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
-    finally{if(!silent)setLoading(false);}
+      const data=await adminApi.subscriptionsPageV3({limit:pageSize,offset:page*pageSize,q:query.trim(),status});
+      if(requestId!==listRequestId.current)return;
+      setRows(data.items);
+      setMatchedTotal(data.total);
+      setGlobalStats(data.stats);
+      setSelected(current=>current?(data.items.find(item=>n(item.id)===n(current.id))||current):null);
+    }catch(reason){
+      if(requestId===listRequestId.current)setError(reason instanceof Error?reason.message:String(reason));
+    }finally{
+      if(requestId===listRequestId.current&&!silent)setLoading(false);
+    }
   };
 
   useEffect(()=>{
-    void load();
-    // Supplementary data is fetched only once; it is not required to show subscriptions.
-    void adminApi.users().then(setUsers).catch(()=>{});
-    void adminApi.plans().then(setPlans).catch(()=>{});
-    void adminApi.nodes().then(setNodes).catch(()=>{});
-    const timer=window.setInterval(()=>{
+    const timer=window.setTimeout(()=>void load(),query.trim()?250:0);
+    const interval=window.setInterval(()=>{
       if(document.visibilityState==="visible")void load(true);
-    },30000);
-    return()=>window.clearInterval(timer);
+    },45000);
+    return()=>{window.clearTimeout(timer);window.clearInterval(interval);listRequestId.current+=1;};
+  },[page,query,status]);
+
+  useEffect(()=>{
+    // Metadata is supplementary for create/edit forms and never blocks the list.
+    let live=true;
+    void adminApi.users().then(value=>{if(live)setUsers(value);}).catch(()=>{});
+    void adminApi.plans().then(value=>{if(live)setPlans(value);}).catch(()=>{});
+    void adminApi.nodes().then(value=>{if(live)setNodes(value);}).catch(()=>{});
+    return()=>{live=false;};
   },[]);
 
   const userMap=useMemo(()=>new Map(users.map(user=>[user.id,user])),[users]);
   const planMap=useMemo(()=>new Map(plans.map(plan=>[n(plan.id),plan])),[plans]);
   const activePlan=planMap.get(draft.plan_id);
-  const filtered=useMemo(()=>rows.filter(item=>{
-    const q=query.trim().toLowerCase();const user=userMap.get(n(item.user_id));const plan=planMap.get(n(item.plan_id));
-    const matches=!q||`${item.id??""} ${item.account_username??""} ${item.customer_name??""} ${item.customer_email??""} ${user?.full_name??""} ${user?.email??""} ${plan?.name??item.plan_name??""}`.toLowerCase().includes(q);
-    return matches&&(status==="all"||s(item.status).toLowerCase()===status);
-  }),[rows,query,status,userMap,planMap]);
-
-  const stats=useMemo(()=>({total:rows.length,active:rows.filter(item=>s(item.status).toLowerCase()==="active").length,expired:rows.filter(item=>s(item.status).toLowerCase()==="expired").length,suspended:rows.filter(item=>s(item.status).toLowerCase()==="suspended").length}),[rows]);
+  // Search and status are applied by the database before pagination.
+  const filtered=rows;
+  const stats=globalStats;
+  const pageCount=Math.max(1,Math.ceil(matchedTotal/pageSize));
 
   const act=async(key:string,label:string,fn:()=>Promise<unknown>,close=false)=>{
     if(busy)return;setBusy(key);setError("");setOk("");
@@ -262,9 +274,16 @@ export function LegacySubscriptionsRuntimePage(){
     <div className="stats dashboard-stats"><Stat label={pick("کل اشتراک‌ها","Total subscriptions")} value={stats.total.toLocaleString("fa-IR")}/><Stat label={pick("اشتراک‌های فعال","Active")} value={stats.active.toLocaleString("fa-IR")}/><Stat label={pick("منقضی","Expired")} value={stats.expired.toLocaleString("fa-IR")}/><Stat label={pick("معلق","Suspended")} value={stats.suspended.toLocaleString("fa-IR")}/></div>
 
     <Card>
-      <div className="runtime-toolbar"><label>⌕ <input value={query} onChange={event=>setQuery(event.target.value)} placeholder={pick("نام، ایمیل، نام کاربری یا کد اشتراک…","Name, email, username or subscription code…")}/></label><select value={status} onChange={event=>setStatus(event.target.value as typeof status)}><option value="all">{pick("همه","All")}</option><option value="active">{pick("فعال","Active")}</option><option value="expired">{pick("منقضی","Expired")}</option><option value="suspended">{pick("معلق","Suspended")}</option><option value="pending">{pick("در انتظار","Pending")}</option></select><button className="ghost" disabled={loading} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button></div>
+      <div className="runtime-toolbar"><label>⌕ <input value={query} onChange={event=>{setQuery(event.target.value);setPage(0);}} placeholder={pick("نام، ایمیل، نام کاربری یا کد اشتراک…","Name, email, username or subscription code…")}/></label><select value={status} onChange={event=>{setStatus(event.target.value as typeof status);setPage(0);}}><option value="all">{pick("همه","All")}</option><option value="active">{pick("فعال","Active")}</option><option value="expired">{pick("منقضی","Expired")}</option><option value="suspended">{pick("معلق","Suspended")}</option><option value="pending">{pick("در انتظار","Pending")}</option></select><button className="ghost" disabled={loading} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button></div>
       {loading&&rows.length===0?<div className="runtime-loading">…</div>:<div className="table"><table><thead><tr><th>{pick("کاربر","User")}</th><th>{pick("پلن","Plan")}</th><th>{pick("نام کاربری","Username")}</th><th>{pick("ترافیک","Traffic")}</th><th>{pick("ساخت","Created")}</th><th>{pick("انقضا","Expires")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map(item=>{const user=userMap.get(n(item.user_id));const plan=planMap.get(n(item.plan_id));return <tr key={n(item.id)}><td><div className="user-cell"><b>{user?.full_name||s(item.customer_name)||`#${item.user_id}`}</b><small dir="ltr">{user?.email||s(item.customer_email)||"—"}</small></div></td><td><div className="user-cell"><b>{s(item.plan_name)||s(plan?.name)||`#${item.plan_id}`}</b><small dir="ltr">MV-{n(item.id)}</small></div></td><td><div className="secret-row"><b dir="ltr">{s(item.account_username)||"—"}</b>{s(item.account_username)&&<button className="mini-btn" onClick={()=>copy(s(item.account_username))}>{pick("کپی","Copy")}</button>}</div></td><td>{trafficCell(item)}</td><td>{formatDate(item.created_at)}</td><td>{expiryCell(item)}</td><td><Badge tone={tone(item.status)}>{statusLabel(item.status)}</Badge></td><td><div className="row-actions"><button className="danger" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button><button disabled={!!busy} onClick={()=>void toggleStatus(item)}>{s(item.status).toLowerCase()==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button><button onClick={()=>openEdit(item)}>{pick("ویرایش","Edit")}</button><button onClick={()=>openExtend(item)}>{pick("تمدید","Renew")}</button><button className="primary-soft" onMouseEnter={()=>prefetchSubscriptionLink(item)} onFocus={()=>prefetchSubscriptionLink(item)} onClick={()=>void openSubscriptionLink(item)}>{pick("سابلینک","Sub-link")}</button></div></td></tr>;})}</tbody></table>{filtered.length===0&&<div className="runtime-empty">{pick("اشتراکی پیدا نشد","No subscriptions found")}</div>}</div>}
     </Card>
+    <div className="runtime-toolbar" style={{justifyContent:"space-between",marginTop:12}}>
+      <span>{matchedTotal.toLocaleString("fa-IR")} {pick("نتیجه","results")} · {pick("صفحه","Page")} {(page+1).toLocaleString("fa-IR")} / {pageCount.toLocaleString("fa-IR")}</span>
+      <div className="row-actions">
+        <button type="button" className="ghost" disabled={loading||page===0} onClick={()=>setPage(v=>Math.max(0,v-1))}>{pick("قبلی","Previous")}</button>
+        <button type="button" className="ghost" disabled={loading||page+1>=pageCount} onClick={()=>setPage(v=>v+1)}>{pick("بعدی","Next")}</button>
+      </div>
+    </div>
 
     {modal==="create"&&<Modal title={pick("ساخت اشتراک","Create subscription")} onClose={()=>!busy&&setModal(null)} wide>
       <form className="subscription-create-form" onSubmit={createSubscription}>
