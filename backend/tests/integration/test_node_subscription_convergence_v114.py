@@ -114,7 +114,8 @@ def test_nullable_plan_id_remains_signature_safe_but_is_not_delivery_authority()
     assert "db.get(Plan" not in sync_source
     assert "plan_protocols" not in sync_source
     assert "if plan_id is None" not in sync_source
-    assert "_wanted_modern_protocols(selected, eligible_protocols)" in sync_source
+    assert "_wanted_modern_protocols(" in sync_source
+    assert "selected_by_subscription.get(int(sub.id), set()), eligible_protocols" in sync_source
     assert '"skipped_missing_plan": 0' in sync_source
     assert "TWINPANEL_DYNAMIC_SUBSCRIPTION_PROTOCOL_AUTHORITY_V299" in runtime
     assert "manual_null_plan=modern_delivery_enabled" in runtime
@@ -154,7 +155,7 @@ def test_topology_changes_reconverge_classic_and_modern_delivery():
     # Modern delivery follows the same SubscriptionProtocol authority established
     # by PR #891. Runtime readiness + delivery guard still gate each target.
     assert "MODERN_PROTOCOL_KEYS" in runtime
-    assert "_wanted_modern_protocols(selected, eligible_protocols)" in runtime
+    assert "selected_by_subscription.get(int(sub.id), set()), eligible_protocols" in runtime
     assert "selected & eligible_protocols" in runtime
     assert "selected & allowed & eligible_protocols" not in runtime
     assert "_provision_modern_protocol" in runtime
@@ -201,3 +202,19 @@ def test_fresh_l2tp_install_requires_v113_ppp_telemetry_hooks():
     # requests can execute /v1/provision/install.
     assert "apply_l2tp_ppp_convergence_v111()" in dataplane
     assert "apply_self_hosted_runtime()" in main
+
+
+def test_modern_convergence_bulk_reads_are_bounded_and_do_not_replace_credentials():
+    source = _text("backend/app/node_subscription_convergence_v114.py")
+    fn = ast.get_source_segment(
+        source, next(node for node in ast.parse(source).body
+                     if isinstance(node, ast.AsyncFunctionDef)
+                     and node.name == "_sync_modern_node")
+    )
+    assert fn is not None
+    assert "for offset in range(0, len(selected_ids), 500):" in fn
+    assert "credentials_by_key" in fn
+    assert "selected_by_subscription" in fn
+    assert "kept_items + list(new_items)" in fn
+    assert "cred.config_text_encrypted = ad._enc(merged)" in fn
+    assert "db.rollback()" in fn
