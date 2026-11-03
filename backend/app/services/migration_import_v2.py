@@ -187,6 +187,7 @@ def _repair_existing_subscription(
     marker: MigrationImportRecord,
     target_user_id: int,
     state: dict[str, tuple[bool, Any]],
+    commit: bool = True,
 ) -> tuple[Subscription, bool]:
     sub = db.get(Subscription, marker.subscription_id)
     if not sub:
@@ -203,8 +204,11 @@ def _repair_existing_subscription(
             changed = True
 
     if changed:
-        db.commit()
-        db.refresh(marker)
+        if commit:
+            db.commit()
+            db.refresh(marker)
+        else:
+            db.flush()
     return sub, changed
 
 
@@ -220,6 +224,7 @@ def import_record(
     starts_at: datetime | None = None,
     expires_at: datetime | None = None,
     activation_duration_days: int | None = None,
+    commit: bool = True,
 ) -> dict[str, Any]:
     if source not in SUPPORTED_SOURCES:
         raise ValueError(f"unsupported migration source: {source}")
@@ -252,10 +257,13 @@ def import_record(
             marker=existing,
             target_user_id=target_user_id,
             state=state,
+            commit=commit,
         )
         added_protocols = ensure_migration_protocol_snapshots(db, [int(existing.subscription_id)])
-        if added_protocols:
+        if commit and added_protocols:
             db.commit()
+        elif not commit:
+            db.flush()
         return {
             "imported": False,
             "idempotent": True,
@@ -352,8 +360,11 @@ def import_record(
         status="imported",
     )
     db.add(marker)
-    db.commit()
-    db.refresh(marker)
+    if commit:
+        db.commit()
+        db.refresh(marker)
+    else:
+        db.flush()
 
     return {
         "imported": True,
