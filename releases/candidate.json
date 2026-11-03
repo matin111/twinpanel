@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.560",
-  "source_sha": "d7180262df744be33f93096acdd0402cff02a41b",
+  "version": "1.1.0-rc.561",
+  "source_sha": "d4265193334e897807e4f59b1a6b46d7ef51272e",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.560 توقف صفحه اشتراک‌های ادمین روی حالت بارگذاری را برطرف می‌کند. فهرست اشتراک‌ها به‌محض دریافت پاسخ API نمایش داده می‌شود و دیگر منتظر دریافت کاربران، پلن‌ها و نودها نیست؛ داده‌های جانبی مستقل بارگذاری می‌شوند و درخواست‌های تکراری کاهش یافته‌اند.",
-    "en": "TwinPanel 1.1.0-rc.560 fixes the admin subscriptions list remaining on a loading spinner by rendering rows independently from user, plan and node metadata, fetching enrichment once and reducing repeated background polling."
+    "fa": "TwinPanel 1.1.0-rc.561 سرعت صفحه اشتراک‌های ادمین را با دریافت ۴۰ ردیف در هر صفحه از سرور، جست‌وجو و فیلتر سمت پایگاه‌داده و محاسبه مستقل آمار کل بهبود می‌دهد. بارگذاری و رندر همه ۱۹۸۳ اشتراک در هر بازکردن صفحه حذف شده است.",
+    "en": "TwinPanel 1.1.0-rc.561 speeds up admin subscriptions using true 40-row server pagination, server-side search/status filtering, bounded row enrichment and global KPI counts. The UI no longer fetches and renders the entire subscription roster on page entry."
   }
 }
