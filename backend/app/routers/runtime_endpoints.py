@@ -40,7 +40,9 @@ class BotTextsResetIn(BaseModel):
 # with authoritative QuotaSession rows use those directly. Recent accepted
 # traffic is also considered so counter-driven protocols such as Xray can
 # expose a useful live state without inventing permanent sessions.
-_LIVE_ACTIVITY_SECONDS = 30
+# Collector sweeps take 15-90s across remote nodes; 30s caused false
+# offline results between valid positive-traffic observations.
+_LIVE_ACTIVITY_SECONDS = 180
 
 
 def _active_api_domain(db: Session) -> Domain | None:
