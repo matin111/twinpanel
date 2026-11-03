@@ -9,7 +9,7 @@ from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 
 from .database import SessionLocal
-from .models import Subscription, User
+from .models import ProtocolCredential, Subscription, User
 from .telegram_notify_service import queue_telegram_notification
 from .user_notification_models import (
     SubscriptionExpiryNotificationClaim,
@@ -41,15 +41,16 @@ def _stage(expires_at: datetime, now: datetime) -> str | None:
     return None
 
 
-def _notification_text(subscription_id: int, expires_at: datetime, stage: str) -> tuple[str, str, str]:
+def _notification_text(subscription_id: int, expires_at: datetime, stage: str, account_username: str = "") -> tuple[str, str, str]:
     date_text = expires_at.strftime("%Y/%m/%d")
+    username_line = f"\nنام کاربری: {account_username}" if account_username else ""
     if stage == "3d":
-        return ("یادآوری پایان اشتراک", f"اشتراک شماره {subscription_id} در تاریخ {date_text} منقضی می‌شود. کمتر از ۳ روز تا پایان اشتراک باقی مانده است. برای جلوگیری از قطع سرویس، اشتراک خود را تمدید کنید.", "warning")
+        return ("یادآوری پایان اشتراک", f"اشتراک شماره {subscription_id}{username_line}\nتاریخ انقضا: {date_text}\nکمتر از ۳ روز تا پایان اشتراک باقی مانده است. برای جلوگیری از قطع سرویس، اشتراک خود را تمدید کنید.", "warning")
     if stage == "2d":
-        return ("یادآوری پایان اشتراک", f"اشتراک شماره {subscription_id} در تاریخ {date_text} منقضی می‌شود. کمتر از ۲ روز تا پایان اشتراک باقی مانده است. برای جلوگیری از قطع سرویس، اشتراک خود را تمدید کنید.", "warning")
+        return ("یادآوری پایان اشتراک", f"اشتراک شماره {subscription_id}{username_line}\nتاریخ انقضا: {date_text}\nکمتر از ۲ روز تا پایان اشتراک باقی مانده است. برای جلوگیری از قطع سرویس، اشتراک خود را تمدید کنید.", "warning")
     if stage == "1d":
-        return ("اشتراک شما به‌زودی منقضی می‌شود", f"اشتراک شماره {subscription_id} در تاریخ {date_text} منقضی می‌شود. کمتر از ۱ روز تا پایان اشتراک باقی مانده است. برای جلوگیری از قطع سرویس، اشتراک خود را تمدید کنید.", "warning")
-    return ("اشتراک شما منقضی شد", f"اشتراک شماره {subscription_id} منقضی شده است. برای ادامه استفاده از سرویس، اشتراک خود را تمدید کنید.", "error")
+        return ("اشتراک شما به‌زودی منقضی می‌شود", f"اشتراک شماره {subscription_id}{username_line}\nتاریخ انقضا: {date_text}\nکمتر از ۱ روز تا پایان اشتراک باقی مانده است. برای جلوگیری از قطع سرویس، اشتراک خود را تمدید کنید.", "warning")
+    return ("اشتراک شما منقضی شد", f"اشتراک شماره {subscription_id}{username_line}\nمنقضی شده است. برای ادامه استفاده از سرویس، اشتراک خود را تمدید کنید.", "error")
 
 
 def _dedupe_stage(stage: str) -> str:
@@ -96,11 +97,42 @@ def process_subscription_expiry_notifications() -> int:
             if existing:
                 continue
 
-            title, message, kind = _notification_text(int(sub.id), expires_at, stage)
+            account_username = str(getattr(sub, "account_username", "") or "").strip()
+            if not account_username:
+                credential = (
+                    db.query(ProtocolCredential)
+                    .filter(
+                        ProtocolCredential.subscription_id == int(sub.id),
+                        ProtocolCredential.username.isnot(None),
+                        ProtocolCredential.username != "",
+                    )
+                    .order_by(ProtocolCredential.id.asc())
+                    .first()
+                )
+                if credential:
+                    account_username = str(credential.username or "").strip()
+
+            title, message, kind = _notification_text(
+                int(sub.id), expires_at, stage, account_username
+            )
             row = UserNotification(batch_id=batch_id, user_id=user.id, title=title, message=message, kind=kind, telegram_requested=True)
             db.add(row)
             db.flush()
-            queue_telegram_notification(db, user_id=user.id, event_key=event_key, kind="user_notification", payload={"notification_id": row.id, "title": title, "message": message, "kind": kind})
+            queue_telegram_notification(
+                db,
+                user_id=user.id,
+                event_key=event_key,
+                kind="user_notification",
+                payload={
+                    "notification_id": row.id,
+                    "title": title,
+                    "message": message,
+                    "kind": kind,
+                    "subscription_id": int(sub.id),
+                    "account_username": account_username,
+                    "notification_type": "subscription_expiry",
+                },
+            )
             created += 1
 
         db.commit()
