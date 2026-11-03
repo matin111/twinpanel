@@ -75,7 +75,7 @@ PROTOCOL_CLIENT = {
     "tuic": "karing",
     "anytls": "karing",
     "naive": "karing",
-    "shadowtls": "karing",
+    "shadowtls": "sing-box",
     "snell": "hiddify",
     "mieru": "karing",
     "trusttunnel": "trusttunnel",
@@ -301,6 +301,13 @@ def _delivery(
         raise HTTPException(status_code=404, detail="سرور آماده‌ای برای این پروتکل وجود ندارد")
 
     if protocol in NATIVE_BUNDLE_PROTOCOLS:
+        return "bundle", len(items), sub, items, None
+
+    # ShadowTLS is a chained sing-box transport (Shadowsocks -> ShadowTLS).
+    # Karing flattens multi-outbound subscription JSON and exposes the
+    # ShadowTLS transport as a standalone server, which is not connectable.
+    # Deliver the canonical per-node sing-box configs as a ZIP instead.
+    if protocol == "shadowtls":
         return "bundle", len(items), sub, items, None
 
     uris = _all_share_uris(sub, protocol, items)
