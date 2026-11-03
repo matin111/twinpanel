@@ -177,6 +177,30 @@ def _install_button_styles() -> None:
     runtime.connect_keyboard = _styled_connect_keyboard
 
 
+class _RuntimeAsyncioProxy:
+    """Delegate asyncio while shortening only the notification worker idle wait.
+
+    ``telegram_runtime_bot`` currently sleeps exactly 3 seconds at the end of
+    each notification-worker cycle. Replacing the module-local asyncio reference
+    lets the custom runtime lower only that specific delay without changing the
+    stable legacy worker implementation or affecting retry/backoff sleeps here.
+    """
+
+    def __init__(self, module):
+        self._module = module
+
+    async def sleep(self, delay, *args, **kwargs):
+        effective = 0.5 if float(delay) == 3.0 else delay
+        return await self._module.sleep(effective, *args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._module, name)
+
+
+def _install_fast_notification_poll() -> None:
+    runtime.asyncio = _RuntimeAsyncioProxy(asyncio)
+
+
 class TextAwareBot(AiogramBot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -207,6 +231,7 @@ async def main() -> None:
     runtime.Dispatcher = MembershipAwareDispatcher
     _install_internal_api_resilience()
     _install_button_styles()
+    _install_fast_notification_poll()
     await runtime.main()
 
 
