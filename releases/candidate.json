@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.537",
-  "source_sha": "a94587e4fcc014d9923ca8f596d408c08062a597",
+  "version": "1.1.0-rc.538",
+  "source_sha": "12728a631d1722fbe5ffda0d302f00e7045117e7",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.537 یادآوری انقضای اشتراک را برای ۳ روز، ۲ روز، ۱ روز و روز انقضا فعال می‌کند. اعلان‌ها از مسیر فعلی پنل و صف تلگرام ارسال می‌شوند و با Claim دیتابیسی یکتا، Restart سرویس یا اجرای چند Replica باعث ارسال تکراری یک Reminder نمی‌شود. سازگاری با اعلان‌های انقضای نسخه قبلی نیز حفظ شده است.",
-    "en": "TwinPanel 1.1.0-rc.537 adds subscription expiry reminders at 3 days, 2 days, 1 day, and the expiry day. Notifications continue through the existing panel and Telegram queue paths, while a unique database claim prevents duplicate reminders across service restarts or multiple replicas. Compatibility with legacy expiry notifications is preserved."
+    "fa": "TwinPanel 1.1.0-rc.538 افزودن سرور را غیرمسدودکننده می‌کند: درخواست ادمین سریع 202 می‌گیرد و آماده‌سازی SSH، Xray baseline و انتشار برای کاربران در بک‌اند ادامه پیدا می‌کند. گزینه «نمایش برای همه کاربران سایت» از Publish-All V2 استفاده می‌کند تا سرور خروجی جدید به همه اشتراک‌های قبلی غیرلغوشده اضافه شود و اکانت‌های فعال Reconcile شوند.",
+    "en": "TwinPanel 1.1.0-rc.538 makes Add Server non-blocking: the admin request returns HTTP 202 quickly while SSH preparation, Xray baseline setup, and publishing continue in the backend. The Show for all site users option uses Publish-All V2 so the new Exit node is added to every existing non-cancelled subscription and active accounts are reconciled."
   }
 }
