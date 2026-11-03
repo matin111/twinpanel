@@ -42,6 +42,9 @@ from .public_connect_import_identity_v1 import (
 from .tunnel_agent_bootstrap_resilience_v1 import (
     install as _install_tunnel_agent_bootstrap_resilience_v1,
 )
+from .manual_cutover_peer_key_grace_v1 import (
+    install as _install_manual_cutover_peer_key_grace_v1,
+)
 
 _install_xray_provision_patch()
 _install_xray_grpc_target_isolation_v48()
@@ -60,3 +63,4 @@ _install_classic_node_parallel_v1()
 _apply_mother_runtime_policy_v110()
 _install_public_connect_import_identity_v1()
 _install_tunnel_agent_bootstrap_resilience_v1()
+_install_manual_cutover_peer_key_grace_v1()
