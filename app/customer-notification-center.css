@@ -47,15 +47,19 @@
 .customerNotificationPopover {
   position: absolute;
   top: calc(100% + 12px);
-  right: 0;
-  left: auto;
+  right: auto;
+  left: 0;
   width: min(430px, calc(100vw - 28px));
+  max-width: calc(100vw - 28px);
+  box-sizing: border-box;
   border: 1px solid var(--line);
   border-radius: 20px;
   background: var(--surface);
   box-shadow: 0 24px 70px rgba(0, 0, 0, .28);
   z-index: 80;
   overflow: hidden;
+  direction: rtl;
+  text-align: right;
 }
 
 .customerNotificationPopover header {
@@ -81,12 +85,16 @@
   font-size: 13px;
   font-weight: 900;
   line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .customerNotificationPopover header small {
   color: var(--muted);
   font-size: 10px;
   line-height: 1.5;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .customerNotificationPopover header button {
@@ -114,7 +122,8 @@
 
 .customerNotificationList {
   max-height: 420px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   display: grid;
   gap: 7px;
   padding: 8px;
@@ -124,6 +133,7 @@
 .customerNotificationList > button {
   width: 100%;
   min-width: 0;
+  box-sizing: border-box;
   border: 1px solid transparent;
   border-radius: 14px;
   background: transparent;
@@ -165,6 +175,8 @@
   display: grid;
   gap: 5px;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .customerNotificationList > button b {
@@ -174,7 +186,9 @@
   font-size: 12px;
   font-weight: 900;
   line-height: 1.55;
+  white-space: normal;
   overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .customerNotificationList > button p {
@@ -184,17 +198,22 @@
   line-height: 1.75;
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
+  white-space: normal;
   overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .customerNotificationList > button small {
   display: block;
+  min-width: 0;
   color: var(--muted);
   font-size: 9px;
   line-height: 1.5;
   opacity: .82;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .customerNotificationEmpty {
@@ -232,8 +251,10 @@ html[dir="ltr"] .customerNotificationCenter {
 }
 
 html[dir="ltr"] .customerNotificationPopover {
-  right: auto;
-  left: 0;
+  right: 0;
+  left: auto;
+  direction: ltr;
+  text-align: left;
 }
 
 /* Admin notification positioning follows the toolbar edge in each direction.
@@ -266,12 +287,14 @@ html[data-theme="light"] .customerNotificationBell {
 }
 
 @media (max-width: 720px) {
-  .customerNotificationPopover {
+  .customerNotificationPopover,
+  html[dir="ltr"] .customerNotificationPopover {
     position: fixed;
     top: 68px;
     right: 12px;
     left: 12px;
     width: auto;
+    max-width: none;
     max-height: calc(100dvh - 84px);
   }
 
