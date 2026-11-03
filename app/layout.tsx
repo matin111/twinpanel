@@ -3,6 +3,7 @@ import {I18nProvider} from "../lib/i18n";
 import {ThemeProvider} from "../lib/theme";
 import {BrandingProvider,DEFAULT_BRANDING,type BrandingConfig} from "../lib/branding";
 import {unstable_cache} from "next/cache";
+import {readFile} from "node:fs/promises";
 import {SupportChatRuntime} from "../components/support-chat-runtime";
 import {ChatOpenBridge} from "../components/chat-open-bridge";
 import {CustomerDeliveryEnhancement} from "../components/customer-delivery-enhancement";
@@ -82,13 +83,22 @@ import "./trial-settings.css";
 // hydration. Fetch via the local backend (no user credential required), rather
 // than temporarily showing the hard-coded legacy TwinPanel identity.
 const loadPublicBrand=unstable_cache(async():Promise<BrandingConfig|null>=>{
+  // Persisted by the branding API after every save/asset change. Do not
+  // depend on a busy FastAPI worker before drawing the public sign-in page.
+  let row:Record<string,unknown>|null=null;
+  try{
+    const file=process.env.TWINPANEL_PUBLIC_BRANDING_FILE||"/var/lib/twinpanel/branding/public-branding.json";
+    row=JSON.parse(await readFile(file,"utf8")) as Record<string,unknown>;
+  }catch{/* First boot: fall back to the public branding endpoint. */}
   const backend=(process.env.TWINPANEL_BACKEND_URL||"http://127.0.0.1:8095").replace(/\/+$/,"");
   try{
-    const response=await fetch(`${backend}/v1/settings/branding`,{
-      signal:AbortSignal.timeout(6500),cache:"no-store"
-    });
-    if(!response.ok)return null;
-    const row=await response.json() as Record<string,unknown>;
+    if(!row){
+      const response=await fetch(`${backend}/v1/settings/branding`,{
+        signal:AbortSignal.timeout(2500),cache:"no-store"
+      });
+      if(!response.ok)return null;
+      row=await response.json() as Record<string,unknown>;
+    }
     const hex=(value:unknown,fallback:string)=>{
       const text=String(value||"").trim();
       return /^#[0-9a-fA-F]{6}$/.test(text)?text.toUpperCase():fallback;
