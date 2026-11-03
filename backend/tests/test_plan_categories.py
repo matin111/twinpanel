@@ -1,3 +1,4 @@
+from app.models import Plan
 from app.plan_category_models import PlanCategoryAssignment
 from app.routers.plans import DEFAULT_PLAN_CATEGORY, _normalize_category
 from app.telegram_purchase_bot import (
@@ -22,6 +23,17 @@ def test_category_assignment_is_unique_per_plan():
     column = PlanCategoryAssignment.__table__.c.plan_id
     assert column.unique is True
     assert column.nullable is False
+
+
+def test_plan_name_is_not_unique_identity():
+    assert Plan.__table__.c.name.unique is False
+    name_unique_constraints = [
+        constraint
+        for constraint in Plan.__table__.constraints
+        if getattr(constraint, "columns", None)
+        and [column.name for column in constraint.columns] == ["name"]
+    ]
+    assert name_unique_constraints == []
 
 
 def test_main_bot_groups_plans_by_category_with_legacy_fallback():
