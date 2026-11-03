@@ -79,3 +79,10 @@ assert "SOURCES = (" in worker and "MigrationImportRecord.source.in_(SOURCES)" i
 assert "SubscriptionNode.node_id == node.id" in worker
 assert "if any(" in worker and "ad._autosync_item_node_id" in worker
 print("MIGRATION_SINGBOX_BATCH_SMOKE=PASS")
+
+CONVERGENCE_PATH = ROOT / "backend/app/node_subscription_convergence_v114.py"
+convergence = CONVERGENCE_PATH.read_text(encoding="utf-8")
+compile(convergence, str(CONVERGENCE_PATH), "exec")
+assert "_migration_singbox_worker_running()" in convergence
+assert "int(sub.id) in imported_in_batch and protocol in SINGBOX_ACCOUNT_PROTOCOLS" in convergence
+assert "MigrationImportRecord.source.in_(" in convergence
