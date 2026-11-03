@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.557",
-  "source_sha": "1a03390f5b08d6c75a0efef2c5c36e6a75dfd255",
+  "version": "1.1.0-rc.558",
+  "source_sha": "e5ab3343acb9757fc105c9f5ca5cd1051db333e6",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.557 دکمه متنی «خواندن همه» اعلان‌ها را در پنجره اعلان‌های ادمین، کاربر و نماینده با یک آیکون چشم مشترک جایگزین می‌کند. ظاهر هماهنگ، دسترس‌پذیری، RTL و نمایش موبایل اصلاح شده و عملکرد خواندن اعلان‌ها حفظ شده است.",
-    "en": "TwinPanel 1.1.0-rc.557 replaces the overflowing mark-all-read text in admin, customer, and reseller notification dropdowns with one accessible eye-only icon button, preserving its behavior and responsive RTL layout."
+    "fa": "TwinPanel 1.1.0-rc.558 سرعت نمایش داشبورد مدیریت را بهبود می‌دهد. آمار اصلی بدون انتظار برای ۷ درخواست و بررسی تمام نودها نمایش داده می‌شود؛ نمودار، اشتراک‌ها، پرداخت‌ها و وضعیت نودها به‌تدریج بارگذاری می‌شوند و درخواست‌های سلامت و پروتکل‌ها کنترل‌شده اجرا می‌شوند.",
+    "en": "TwinPanel 1.1.0-rc.558 progressively renders admin dashboard core metrics without blocking on seven endpoints, defers sales, subscriptions, payments and node details, and bounds node telemetry concurrency."
   }
 }
