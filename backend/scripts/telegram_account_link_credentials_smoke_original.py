@@ -28,18 +28,19 @@ checks = {
     "expired subscription guard": "Subscription.expires_at > now" in lookup,
     "duplicate fail closed": ".limit(2)" in lookup and "if len(matches) != 1" in lookup,
     "migration restriction removed": "MigrationImportRecord" not in lookup,
-    "main bot owned API": '"/v1/telegram/account-link/resolve-owned"' in bot and "bot_auth=True" in bot,
-    "main bot owned lookup first": '"/v1/telegram/account-link/resolve-owned"' in bot and '"username": username' in bot,
-    "nonowned requires credential": (
-        '"/v1/telegram/account-link/resolve"' in bot
-        and 'AccountLinkState.password' in bot
-        and '"password": password' in bot
-        and 'await state.update_data(account_link_username=username)' in bot
+    "main bot username API": '"/v1/telegram/account-link/resolve-username"' in bot and "bot_auth=True" in bot,
+    "no bot password prompt": 'AccountLinkState.password' not in bot and '"password": password' not in bot,
+    "username-only endpoint bot secret": (
+        '"/account-link/resolve-username"' in lookup
+        and "dependencies=[Depends(bot_guard)]" in lookup
     ),
-    "no username-only global lookup": '"/v1/telegram/account-link/resolve-global"' not in bot,
-    "password message deletion": "await message.delete()" in bot,
-    "inactive credential lookup denied": "sub.status != SubscriptionStatus.ACTIVE" in lookup,
-    "expired credential lookup denied": "sub.expires_at <= datetime.utcnow()" in lookup,
+    "username-only active guard": (
+        "def resolve_username_account_link(" in lookup
+        and "Subscription.status == SubscriptionStatus.ACTIVE" in lookup
+        and "Subscription.expires_at > now" in lookup
+    ),
+    "username-only duplicate fail closed": "if len(matches) != 1:" in lookup,
+    "username-only rate limit": "_USERNAME_SUCCESS_LIMIT = 10" in lookup,
     "generic bot copy": "اکانت مهاجرتی" not in bot and "V2Ray" not in bot,
     "my accounts untouched": '"/v1/subscriptions/me"' not in bot,
     "rc416 compatibility alias": '"/account-link/resolve-migrated"' in lookup,
