@@ -53,8 +53,6 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
         if self._commands_sync_attempted:
             return
 
-        # Command-menu synchronization is a convenience feature and must never
-        # prevent the bot from starting or delivering a customer message.
         self._commands_sync_attempted = True
         try:
             current = list(
@@ -75,8 +73,6 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
                 != "start"
             )
 
-            # Avoid an unnecessary Telegram write when /start is already first
-            # with the desired Persian description and all other commands match.
             if current == commands:
                 return
 
@@ -85,8 +81,6 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
                 SetMyCommands(commands=commands),
             )
         except Exception:
-            # A temporary Bot API failure must not break startup. The command is
-            # retried naturally on the next process start.
             return
 
     def _load(self) -> dict[str, str]:
@@ -102,9 +96,6 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
                 reseller_id=self.reseller_id,
             )
         except Exception:
-            # Copy customization must never break a sale, payment or support
-            # message. On a settings/database read failure the canonical runtime
-            # text is sent unchanged.
             self._values = {}
         finally:
             db.close()
@@ -114,25 +105,17 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
 
     @staticmethod
     def _plain(value: str) -> str:
-        # Custom bot copy is intentionally treated as plain text. This prevents
-        # malformed user-entered HTML from making Telegram reject an otherwise
-        # valid operational message.
         return escape(str(value or "").strip())
 
     def _rewrite(self, text: str) -> str:
         result = str(text)
 
         if self.scope == "reseller":
-            # Preserve the legacy source contract too: old runtimes emitted this
-            # sentence verbatim and the delivery smoke verifies it is stripped.
             result = result.replace(
                 "تعداد فروش محدود نیست؛ مصرف واقعی از حجم نماینده کم می‌شود.\n\n",
                 "",
             )
 
-            # Keep internal reseller role/model names untouched, but never expose
-            # reseller terminology in customer-facing Telegram copy. Centralizing
-            # this at the request middleware also covers legacy child routers.
             replacements = (
                 ("در انتظار تأیید نماینده", "در انتظار تأیید"),
                 ("ربات نمایندگی", "ربات"),
@@ -153,6 +136,13 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
                 "تعداد فروش محدود نیست؛ مصرف واقعی از حجم حساب کم می‌شود.\n\n",
                 "",
             )
+
+        guide = (
+            "🌐 لینک را داخل مرورگر باز کنید، پروتکل موردنظر را انتخاب کنید "
+            "و از سرورهای همان پروتکل داخل برنامه پیشنهادی آن پروتکل استفاده کنید."
+        )
+        if self._extract_subscription_link(result) and guide not in unescape(result):
+            result = guide + "\n\n" + result
 
         values = self._load()
         if not values or not result:
@@ -286,7 +276,6 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
         if now - self._qr_sent_at.get(key, 0.0) < 20.0:
             return
         self._qr_sent_at[key] = now
-        # Keep the cache bounded for long-running bot processes.
         if len(self._qr_sent_at) > 512:
             cutoff = now - 120.0
             self._qr_sent_at = {k: v for k, v in self._qr_sent_at.items() if v >= cutoff}
@@ -310,7 +299,6 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[buttons]),
             )
         except Exception:
-            # QR is a convenience layer and must never break account delivery.
             try:
                 await bot.send_photo(
                     chat_id=chat_id,
