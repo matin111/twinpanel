@@ -172,15 +172,46 @@ _SCRIPT = r"""
     }catch(_error){return String(value||'')}
   }
 
+  function copyDialog(initial){
+    const shade=document.createElement('div');
+    shade.setAttribute('role','dialog');
+    shade.setAttribute('aria-modal','true');
+    shade.setAttribute('aria-label','کپی کانفیگ');
+    Object.assign(shade.style,{position:'fixed',inset:'0',zIndex:'2147483647',background:'rgba(0,0,0,.72)',display:'grid',placeItems:'center',padding:'16px'});
+    const panel=document.createElement('div');
+    Object.assign(panel.style,{width:'min(92vw,650px)',background:'var(--surface,#171a24)',color:'var(--text,#fff)',padding:'18px',borderRadius:'14px',border:'1px solid var(--line,#505464)',display:'grid',gap:'10px',direction:'rtl'});
+    const title=document.createElement('strong');title.textContent='کپی کانفیگ‌ها';
+    const hint=document.createElement('small');hint.textContent='بعد از بارگذاری، روی «کپی» بزنید. اگر مرورگر مجوز نداد از Ctrl+C استفاده کنید.';
+    const area=document.createElement('textarea');area.value=initial||'';area.readOnly=true;area.rows=9;area.setAttribute('aria-label','متن کانفیگ');
+    Object.assign(area.style,{width:'100%',boxSizing:'border-box',direction:'ltr',fontFamily:'monospace',fontSize:'12px',borderRadius:'8px',padding:'10px'});
+    const controls=document.createElement('div');Object.assign(controls.style,{display:'flex',gap:'8px',justifyContent:'flex-start'});
+    const copyButton=document.createElement('button');copyButton.type='button';copyButton.textContent='کپی متن';copyButton.disabled=!initial;
+    const closeButton=document.createElement('button');closeButton.type='button';closeButton.textContent='بستن';
+    copyButton.addEventListener('click',()=>{
+      area.focus();area.select();area.setSelectionRange(0,area.value.length);
+      copy(area.value).then(ok=>{hint.textContent=ok?'متن کپی شد ✓':'متن انتخاب شده است؛ Ctrl+C را فشار دهید.'});
+    });
+    const close=()=>shade.remove();
+    closeButton.addEventListener('click',close);
+    shade.addEventListener('click',event=>{if(event.target===shade)close()});
+    controls.append(copyButton,closeButton);panel.append(title,hint,area,controls);shade.appendChild(panel);document.body.appendChild(shade);
+    return {area,copyButton,hint};
+  }
+
   async function copyAll(url){
+    const dialog=copyDialog('در حال دریافت کانفیگ‌ها...');
     try{
       const response=await fetch(url,{cache:'no-store'});if(!response.ok)throw new Error(String(response.status));
       const kind=String(response.headers.get('X-TwinPanel-Multi-Kind')||'').toLowerCase();
-      const text=await response.text();
-      const payload=kind==='uri'?decodeBase64Utf8(text):text;
-      const ok=await copy(payload);
-      notify(ok?'همه کانفیگ‌ها کپی شد ✓':'کپی انجام نشد');
-    }catch(_error){notify('دریافت همه کانفیگ‌ها انجام نشد')}
+      if(kind==='bundle')throw new Error('bundle is not text');
+      const data=await response.text();
+      const payload=kind==='uri'?decodeBase64Utf8(data):data;
+      dialog.area.value=payload;dialog.copyButton.disabled=!payload;
+      dialog.hint.textContent='کانفیگ آماده است. برای کپی روی «کپی متن» بزنید؛ در صورت محدودیت مرورگر Ctrl+C.';
+    }catch(_error){
+      dialog.area.value='';dialog.copyButton.disabled=true;
+      dialog.hint.textContent='دریافت کانفیگ ممکن نشد؛ لینک اشتراک را کپی کنید یا دوباره تلاش کنید.';
+    }
   }
 
   function importHref(client,url,profile){
@@ -234,6 +265,9 @@ _SCRIPT = r"""
       const deep=importHref(rawClient,url,profile);
       if(deep){
         const add=action('a','افزودن همه به '+client,null,true);add.href=deep;actions.appendChild(add);
+        actions.appendChild(action('button','کپی لینک اشتراک',()=>{
+          copy(url).then(ok=>notify(ok?'لینک اشتراک کپی شد ✓':'کپی خودکار ممکن نشد؛ از نوار آدرس لینک را کپی کنید'));
+        },false));
       }else if(rawClient==='v2ray'){
         actions.appendChild(action('button','کپی لینک برای '+client,()=>copy(url).then(ok=>notify(ok?'لینک اشتراک کپی شد ✓':'کپی انجام نشد')),true));
       }else{
