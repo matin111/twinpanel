@@ -69,7 +69,7 @@ export function AdminUsersWalletInline(){
 
   const scan=useCallback(()=>{
     const found:HostRow[]=[];
-    const rows=document.querySelectorAll<HTMLElement>(".legacy-users-page tbody tr");
+    const rows=document.querySelectorAll<HTMLElement>(".admin-users-runtime tbody tr");
 
     rows.forEach(row=>{
       const first=row.querySelector<HTMLElement>("td:first-child");
@@ -131,8 +131,8 @@ export function AdminUsersWalletInline(){
     if(!userId||busy)return;
 
     const value=Number(amount.replace(/[^0-9-]/g,""));
-    if(!Number.isFinite(value)||value===0){
-      setError(pick("مبلغ تغییر نمی‌تواند صفر باشد.","Adjustment amount cannot be zero."));
+    if(!Number.isSafeInteger(value)||value<=0||value>100000000){
+      setError(pick("مبلغ شارژ باید بین ۱ تا ۱۰۰ میلیون تومان باشد.","Credit must be between 1 and 100,000,000 toman."));
       return;
     }
 
@@ -142,11 +142,11 @@ export function AdminUsersWalletInline(){
         method:"POST",
         body:JSON.stringify({
           amount_toman:value,
-          note:note.trim()||"اصلاح دستی موجودی"
+          note:note.trim()||"شارژ کیف پول توسط ادمین"
         })
       });
       setBalances(current=>({...current,[userId]:Number(result.balance_toman||0)}));
-      setOk(pick("موجودی کاربر بروزرسانی شد.","User balance updated."));
+      setOk(pick("کیف پول شارژ شد؛ موجودی در پنل کاربری و ربات مشترک است.","Wallet credited; balance is shared by user panel and bot."));
       setAmount("");setNote("");
       await loadBalances();
     }catch(e){setError(e instanceof Error?e.message:String(e));}
@@ -159,9 +159,9 @@ export function AdminUsersWalletInline(){
         type="button"
         className="ghost"
         onClick={()=>open(id)}
-        title={pick("افزایش یا کاهش دستی موجودی","Manually adjust wallet balance")}
+        title={pick("افزایش موجودی کیف پول کاربر در پنل و ربات","Credit user wallet for panel and Telegram bot")}
       >
-        {pick("موجودی","Balance")}: {money(Number(balances[id]||0))}
+        {pick("💰 شارژ کیف پول","💰 Credit wallet")} · {money(Number(balances[id]||0))}
       </button>,
       host,
       `wallet-${id}`
@@ -173,7 +173,7 @@ export function AdminUsersWalletInline(){
         <form className="runtime-modal-card" onSubmit={submit}>
           <div className="card-head">
             <div>
-              <b>{pick("اصلاح موجودی کاربر","Adjust user balance")} #{userId}</b>
+              <b>{pick("افزایش موجودی کیف پول","Credit user wallet")} #{userId}</b>
               <small>{pick("موجودی فعلی","Current balance")}: {money(currentBalance)}</small>
             </div>
             <button type="button" className="icon-button" onClick={close}>×</button>
@@ -183,14 +183,14 @@ export function AdminUsersWalletInline(){
           {ok&&<div className="runtime-success">{ok}</div>}
 
           <label className="payField">
-            <span>{pick("مبلغ تغییر","Adjustment amount")}</span>
+            <span>{pick("مبلغ شارژ","Credit amount")}</span>
             <div className="inputSuffix">
               <input
                 dir="ltr"
                 inputMode="numeric"
                 value={amount}
-                onChange={e=>setAmount(e.target.value.replace(/[^0-9-]/g,""))}
-                placeholder="100000 یا -50000"
+                onChange={e=>setAmount(e.target.value.replace(/[^0-9]/g,""))}
+                placeholder="100000"
                 required
               />
               <em>{pick("تومان","toman")}</em>
@@ -203,13 +203,13 @@ export function AdminUsersWalletInline(){
               rows={3}
               value={note}
               onChange={e=>setNote(e.target.value)}
-              placeholder={pick("مثلاً شارژ هدیه یا اصلاح حساب؛ اختیاری","e.g. bonus credit or balance correction; optional")}
+              placeholder={pick("مثلاً شارژ هدیه؛ اختیاری","e.g. bonus credit or balance correction; optional")}
             />
           </label>
 
           <div className="runtime-modal-actions">
             <button type="button" className="ghost" onClick={close}>{pick("بستن","Close")}</button>
-            <button className="primary" disabled={busy}>{busy?"…":pick("ثبت تغییر موجودی","Apply balance change")}</button>
+            <button className="primary" disabled={busy}>{busy?"…":pick("تأیید و شارژ کیف پول","Confirm wallet credit")}</button>
           </div>
         </form>
       </div>,
