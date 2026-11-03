@@ -57,16 +57,17 @@ function Tabs({categories,active,onChange,counts}:Omit<Props,"portalToStorePlans
   return <div
     data-plan-category-tabs="true"
     style={{
-      width:"100%",
+      width:"min(100%,920px)",
+      margin:"0 auto",
       display:"grid",
-      gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",
-      gap:10,
-      margin:"20px 0 26px",
-      padding:8,
-      border:"1px solid rgba(148,163,184,.16)",
-      borderRadius:18,
-      background:"rgba(127,127,127,.045)",
-      backdropFilter:"blur(10px)",
+      gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",
+      gap:12,
+      padding:10,
+      border:"1px solid rgba(148,163,184,.14)",
+      borderRadius:20,
+      background:"rgba(15,23,42,.34)",
+      boxShadow:"0 14px 40px rgba(0,0,0,.12)",
+      backdropFilter:"blur(14px)",
     }}
   >
     {categories.map(category=>{
@@ -80,34 +81,34 @@ function Tabs({categories,active,onChange,counts}:Omit<Props,"portalToStorePlans
         style={{
           position:"relative",
           appearance:"none",
-          minHeight:64,
+          minHeight:72,
           display:"flex",
           alignItems:"center",
-          gap:11,
-          border:selected?"1px solid rgba(255,255,255,.14)":"1px solid rgba(148,163,184,.16)",
-          borderRadius:14,
-          padding:"11px 13px",
+          gap:12,
+          border:selected?"1px solid rgba(255,255,255,.18)":"1px solid rgba(148,163,184,.15)",
+          borderRadius:15,
+          padding:"13px 15px",
           font:"inherit",
           textAlign:"start",
           cursor:"pointer",
           color:selected?"#fff":"inherit",
           background:selected
             ?"linear-gradient(135deg,var(--store-chat-accent,#7c3aed),color-mix(in srgb,var(--store-chat-accent,#7c3aed) 72%,#111827))"
-            :"rgba(255,255,255,.035)",
-          boxShadow:selected?"0 10px 28px color-mix(in srgb,var(--store-chat-accent,#7c3aed) 24%,transparent)":"0 1px 0 rgba(255,255,255,.03) inset",
+            :"rgba(255,255,255,.025)",
+          boxShadow:selected?"0 12px 30px color-mix(in srgb,var(--store-chat-accent,#7c3aed) 28%,transparent)":"0 1px 0 rgba(255,255,255,.03) inset",
           transform:selected?"translateY(-1px)":"none",
           transition:"transform .18s ease,box-shadow .18s ease,border-color .18s ease,background .18s ease",
         }}
       >
         <span style={{
-          width:38,height:38,borderRadius:12,display:"inline-flex",alignItems:"center",justifyContent:"center",flex:"0 0 auto",
-          background:selected?"rgba(255,255,255,.14)":"rgba(127,127,127,.09)",
+          width:42,height:42,borderRadius:13,display:"inline-flex",alignItems:"center",justifyContent:"center",flex:"0 0 auto",
+          background:selected?"rgba(255,255,255,.14)":"rgba(127,127,127,.08)",
           border:"1px solid rgba(255,255,255,.08)",
         }}><UserIcon/></span>
 
-        <span style={{display:"flex",flexDirection:"column",gap:3,minWidth:0,flex:1}}>
-          <strong style={{fontSize:14.5,fontWeight:900,lineHeight:1.25,whiteSpace:"nowrap"}}>{category}</strong>
-          <small style={{fontSize:11.5,opacity:selected?.82:.58,lineHeight:1.2}}>{count.toLocaleString("fa-IR")} پلن موجود</small>
+        <span style={{display:"flex",flexDirection:"column",gap:4,minWidth:0,flex:1}}>
+          <strong style={{fontSize:15.5,fontWeight:900,lineHeight:1.25,whiteSpace:"nowrap"}}>{category}</strong>
+          <small style={{fontSize:11.5,opacity:selected?.84:.6,lineHeight:1.2}}>{count.toLocaleString("fa-IR")} پلن موجود</small>
         </span>
 
         {selected&&<span style={{
@@ -120,16 +121,47 @@ function Tabs({categories,active,onChange,counts}:Omit<Props,"portalToStorePlans
 
 export function PlanCategoryTabs(props:Props){
   const [target,setTarget]=useState<Element|null>(null);
+
   useEffect(()=>{
-    if(!props.portalToStorePlans){setTarget(null);return;}
+    if(!props.portalToStorePlans){
+      setTarget(null);
+      return;
+    }
+
     let frame=0;
+    let mount:HTMLDivElement|null=null;
+
     const locate=()=>{
-      const next=document.querySelector("#plans > :first-child");
-      if(next)setTarget(next);
-      else frame=window.requestAnimationFrame(locate);
+      const plans=document.querySelector("#plans");
+      if(!plans){
+        frame=window.requestAnimationFrame(locate);
+        return;
+      }
+
+      const existing=plans.querySelector<HTMLDivElement>(":scope > [data-plan-category-mount='true']");
+      mount=existing||document.createElement("div");
+
+      if(!existing){
+        mount.dataset.planCategoryMount="true";
+        mount.style.width="100%";
+        mount.style.gridColumn="1 / -1";
+        mount.style.flex="0 0 100%";
+        mount.style.order="-999";
+        mount.style.margin="0 0 34px";
+        mount.style.position="relative";
+        mount.style.zIndex="2";
+        plans.insertBefore(mount,plans.firstChild);
+      }
+
+      setTarget(mount);
     };
+
     locate();
-    return()=>{if(frame)window.cancelAnimationFrame(frame);};
+
+    return()=>{
+      if(frame)window.cancelAnimationFrame(frame);
+      if(mount?.parentElement)mount.parentElement.removeChild(mount);
+    };
   },[props.portalToStorePlans,props.categories.join("|")]);
 
   const tabs=<Tabs categories={props.categories} active={props.active} onChange={props.onChange} counts={props.counts}/>;
