@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.529",
+  "version": "1.1.0-rc.530",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T00:21:48Z",
+  "released_at": "2026-11-03T00:38:13Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "a070f436d4a10515839e5a84e104fbff6ae9a20d",
+  "source_sha": "f2b34905b52c286e83a264a78e90648cd208fff1",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.529/twinpanel-1.1.0-rc.529-linux-x86_64.tar.gz",
-    "sha256": "b6f3d2514085a8c5a6b8d125012dd73a3d29bf427d4758cb6a5c90224f5d377c",
-    "size_bytes": 25428562
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.530/twinpanel-1.1.0-rc.530-linux-x86_64.tar.gz",
+    "sha256": "8ff2bcd4cb4f318d2a432953f88c874c1070acac08d907d99647ccc2d4962922",
+    "size_bytes": 25439986
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.529 مشکل تحویل ندادن اکانت توسط ربات اصلی پس از تأیید پرداخت را اصلاح می‌کند. اگر اشتراک ساخته شده و لینک اتصال معتبر و اطلاعات قابل استفاده داشته باشد، خطای موقت یک پروتکل دیگر سفارش را provision_failed نمی‌کند؛ سفارش fulfilled می‌شود، پیام تحویل رسمی ربات ارسال می‌شود و تکمیل پروتکل‌های باقی‌مانده در پس‌زمینه ادامه پیدا می‌کند.",
-    "en": "TwinPanel 1.1.0-rc.529 fixes main Telegram bot account delivery after payment approval. If a subscription already has a valid subscription link and usable delivery data, a transient protocol provisioning failure no longer strands the order as provision_failed; the order is fulfilled, canonical Telegram delivery is queued, and remaining protocol convergence continues in the background."
+    "fa": "TwinPanel 1.1.0-rc.530 تراکنش‌های پرداخت را به اعلان‌های مدیریت اضافه می‌کند. خرید اشتراک و شارژ کیف پول با کاربر، مبلغ، روش پرداخت و وضعیت در همان Dropdown اعلان‌ها نمایش داده می‌شوند، تراکنش‌های اخیر قبلی نیز Backfill می‌شوند، کلیک روی اعلان مستقیم صفحه پرداخت‌ها را باز می‌کند و داده‌های نمایندگی از اعلان‌های ادمین مرکزی جدا می‌مانند.",
+    "en": "TwinPanel 1.1.0-rc.530 adds payment transactions to the admin notification center. Subscription purchases and wallet top-ups now appear in the existing dropdown with user, amount, payment method and status; recent historical transactions are backfilled, notifications link directly to the payments page, and reseller-scoped payment data remains isolated from the central admin feed."
   }
 }
