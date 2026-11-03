@@ -64,6 +64,13 @@ type EylanFinalizeResult={
   provision:ProvisionResult;
 };
 
+const ALL_MIGRATION_PROTOCOLS=[
+  "cisco","openvpn","wireguard","l2tp","v2ray",
+  "hysteria2","tuic","anytls","naive","shadowtls",
+  "snell","mieru","trusttunnel","amneziawg","sudoku",
+] as const;
+const ALL_PROTOCOLS_CSV=ALL_MIGRATION_PROTOCOLS.join(",");
+
 const EYLAN_STAGE_CHUNK=50;
 
 async function api<T>(path:string,init:RequestInit={}):Promise<T>{
@@ -113,7 +120,7 @@ export function MigrationCenterAdmin(){
   const [raw,setRaw]=useState("");
   const [eylanFile,setEylanFile]=useState<File|null>(null);
   const [targetUserId,setTargetUserId]=useState("");
-  const [protocols,setProtocols]=useState("v2ray");
+  const [protocols,setProtocols]=useState(ALL_PROTOCOLS_CSV);
   const [dryRun,setDryRun]=useState<DryRunResult|null>(null);
   const [busy,setBusy]=useState(false);
   const [busyPhase,setBusyPhase]=useState<"preview"|"stage"|"provision"|"import">("preview");
@@ -155,13 +162,13 @@ export function MigrationCenterAdmin(){
     if(!Number.isInteger(userId)||userId<=0){setError(pick("شناسه کاربر TwinPanel معتبر وارد کنید.","Enter a valid TwinPanel user ID."));return;}
     if(!dryRun||readyRecords.length===0){setError(pick("ابتدا Dry-run بگیرید و رکورد آماده داشته باشید.","Run a dry-run first and make sure at least one record is ready."));return;}
     const protocolList=protocols.split(",").map(item=>item.trim().toLowerCase()).filter(Boolean);
-    const effectiveProtocols=protocolList.length?protocolList:["v2ray"];
+    const effectiveProtocols=protocolList.length?protocolList:[...ALL_MIGRATION_PROTOCOLS];
     setBusyPhase(isEylan?"stage":"import");
     setBusyProgress({done:0,total:readyRecords.length});
     setBusy(true);
     try{
       if(isEylan){
-        if(effectiveProtocols.length!==1||effectiveProtocols[0]!=="v2ray")throw new Error(pick("انتقال گروهی ایلان در این نسخه فقط برای V2Ray فعال است.","Eylan bulk import currently supports V2Ray only."));
+        if(effectiveProtocols.length!==ALL_MIGRATION_PROTOCOLS.length||!ALL_MIGRATION_PROTOCOLS.every(key=>effectiveProtocols.includes(key)))throw new Error(pick("برای انتقال، هر ۱۵ پروتکل باید انتخاب شده باشند.","Select all 15 protocols for migration."));
         const records=readyRecords.map(item=>({
           source_id:String(item.source_id||""),
           username:String(item.username||""),
@@ -178,7 +185,7 @@ export function MigrationCenterAdmin(){
           const chunk=records.slice(offset,offset+EYLAN_STAGE_CHUNK);
           const staged=await api<EylanStageResult>("/v1/admin/migration-center/eylan/stage",{
             method:"POST",
-            body:JSON.stringify({records:chunk,target_user_id:userId,protocols:["v2ray"]}),
+            body:JSON.stringify({records:chunk,target_user_id:userId,protocols:effectiveProtocols}),
           });
           imported+=staged.imported;
           existing+=staged.existing;
@@ -194,29 +201,29 @@ export function MigrationCenterAdmin(){
         const sourceIds=records.map(item=>item.source_id);
         const finalized=await api<EylanFinalizeResult>("/v1/admin/migration-center/eylan/finalize",{
           method:"POST",
-          body:JSON.stringify({source_ids:sourceIds,target_user_id:userId,protocols:["v2ray"]}),
+          body:JSON.stringify({source_ids:sourceIds,target_user_id:userId,protocols:effectiveProtocols}),
         });
         if(!finalized.ok||!finalized.provision.ok){
           const failedNodes=finalized.provision.errors.map(item=>`${item.node}: ${item.error}`).join(" | ");
           setError(pick(`اطلاعات ایلان Stage شد اما Provision همه نودها کامل نشد. ${failedNodes}`,`Eylan records were staged, but provisioning did not complete on every node. ${failedNodes}`));
         }else{
-          setOk(pick(`انتقال ایلان تمام شد: ${imported} جدید، ${existing} موجود (${alreadyImported} قبلاً کامل)، ${finalized.provision.node_restarts} ری‌استارت Xray. بعد از رفرش این نتیجه از صفحه پاک می‌شود.`,`Eylan import finished: ${imported} new, ${existing} existing (${alreadyImported} already complete), ${finalized.provision.node_restarts} Xray restarts. This result clears from the page after refresh.`));
+          setOk(pick(`انتقال ایلان: ${imported} جدید، ${existing} موجود؛ V2Ray اعمال شد (${finalized.provision.node_restarts} ری‌استارت). ساخت ۱۴ پروتکل دیگر هنوز باید تکمیل شود.`,`Eylan import: ${imported} new, ${existing} existing; V2Ray applied (${finalized.provision.node_restarts} Xray restarts). The other 14 protocols are pending provisioning.`));
         }
         return;
       }
 
-      if(effectiveProtocols.length===1&&effectiveProtocols[0]==="v2ray"){
+      if(effectiveProtocols.length===ALL_MIGRATION_PROTOCOLS.length&&ALL_MIGRATION_PROTOCOLS.every(key=>effectiveProtocols.includes(key))){
         setBusyPhase("provision");
         setBusyProgress(null);
         const result=await api<BatchImportResult>("/v1/admin/migration-center/import-batch",{
           method:"POST",
-          body:JSON.stringify({source,records:readyRecords,target_user_id:userId,protocols:["v2ray"]}),
+          body:JSON.stringify({source,records:readyRecords,target_user_id:userId,protocols:effectiveProtocols}),
         });
         if(!result.ok||!result.provision.ok){
           const failedNodes=result.provision.errors.map(item=>`${item.node}: ${item.error}`).join(" | ");
           setError(pick(`انتقال دیتابیس انجام شد اما Provision بعضی نودها کامل نشد. ${failedNodes}`,`Database import completed, but provisioning did not complete on every node. ${failedNodes}`));
         }else{
-          setOk(pick(`انتقال و ساخت روی نودها تمام شد: ${result.imported} رکورد جدید، ${result.existing} رکورد موجود، ${result.provision.node_restarts} ری‌استارت Xray.`,`Import and node provisioning finished: ${result.imported} new, ${result.existing} existing, ${result.provision.node_restarts} Xray restarts.`));
+          setOk(pick(`انتقال ${result.imported} رکورد جدید و ${result.existing} رکورد موجود ثبت شد؛ V2Ray روی نودها اعمال شد (${result.provision.node_restarts} ری‌استارت). ساخت ۱۴ پروتکل دیگر در وضعیت در انتظار است.`,`Import complete: ${result.imported} new, ${result.existing} existing; V2Ray applied (${result.provision.node_restarts} Xray restarts). The other 14 protocols are pending provisioning.`));
         }
         return;
       }
@@ -232,7 +239,7 @@ export function MigrationCenterAdmin(){
         else if(result.idempotent)existing+=1;
         setBusyProgress({done:imported+existing,total:readyRecords.length});
       }
-      setOk(pick(`انتقال تمام شد: ${imported} رکورد جدید، ${existing} رکورد از قبل موجود.`,`Import finished: ${imported} new, ${existing} already imported.`));
+      setOk(pick(`۱۵ پروتکل برای ${imported+existing} اشتراک ثبت شد. آماده‌سازی کانفیگ‌ها روی سرورها باید جداگانه تکمیل شود.`,`15 protocol snapshots registered for ${imported+existing} subscriptions. Node provisioning must still finish separately.`));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy(false);setBusyProgress(null);}
   };
@@ -255,7 +262,7 @@ export function MigrationCenterAdmin(){
     <div className="page-head">
       <div>
         <h1>{pick("مرکز انتقال اکانت‌ها","Migration Center")}</h1>
-        <small>{pick("انتقال کنترل‌شده از سنایی، مرزبان، پاسارگاد و بکاپ ایلان.","Controlled import from Sanaei, Marzban, Pasargad and Eylan backups.")}</small>
+        <small>{pick("انتقال از سنایی، مرزبان، پاسارگاد و ایلان با رجیستری یکسان ۱۵ پروتکل.","Import from Sanaei, Marzban, Pasargad and Eylan with the same 15-protocol registry.")}</small>
       </div>
     </div>
 
@@ -316,7 +323,7 @@ export function MigrationCenterAdmin(){
           <option value="sanaei">سنایی / 3x-ui</option><option value="marzban">مرزبان</option><option value="pasargad">پاسارگاد</option><option value="eylan">ایلان</option>
         </select></label>
         <label><span>{pick("شناسه کاربر مقصد در TwinPanel","Target TwinPanel user ID")}</span><input type="number" min="1" value={targetUserId} onChange={event=>setTargetUserId(event.target.value)} placeholder="17" style={{width:"100%"}}/></label>
-        <label><span>{pick("پروتکل‌ها","Protocols")}</span><input value={protocols} onChange={event=>setProtocols(event.target.value)} disabled={isEylan} placeholder="v2ray,hysteria2" style={{width:"100%"}}/></label>
+        <label><span>{pick("پروتکل‌ها","Protocols")}</span><input value={protocols} onChange={event=>setProtocols(event.target.value)} placeholder={ALL_PROTOCOLS_CSV} style={{width:"100%"}}/></label>
       </div>
 
       {isEylan?<>
