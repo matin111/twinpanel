@@ -9,6 +9,8 @@ import {useI18n} from "../lib/i18n";
 
 const num=(value:unknown)=>{const n=Number(value??0);return Number.isFinite(n)?n:0;};
 const clean=(value:string)=>{const raw=value.trim();if(!raw)return null;const n=Number(raw);return Number.isFinite(n)?n:null;};
+const box={border:"1px solid rgba(148,163,184,.16)",background:"rgba(15,23,42,.46)",borderRadius:16};
+const tinyButton={height:32,padding:"0 11px",borderRadius:10,fontSize:12};
 
 export function AdminSubscriptionCreateUnified(){
   const {pick}=useI18n();
@@ -32,8 +34,6 @@ export function AdminSubscriptionCreateUnified(){
   const [nodeIds,setNodeIds]=useState<number[]>([]);
 
   const exitNodes=useMemo(()=>nodes.filter(node=>String(node.node_type||"").toLowerCase()==="exit"&&String(node.status||"online").toLowerCase()!=="retired"),[nodes]);
-  const classic=useMemo(()=>catalog.filter(item=>item.family==="classic"),[catalog]);
-  const modern=useMemo(()=>catalog.filter(item=>item.family==="modern"),[catalog]);
 
   const applyPlan=(id:number,rows=plans)=>{
     setPlanId(id);
@@ -54,7 +54,7 @@ export function AdminSubscriptionCreateUnified(){
       setUsers(userRows);setPlans(planRows);setNodes(nodeRows);setCatalog(catalogPayload.protocols);
       setUserId(userRows.find(user=>user.role!=="admin"&&user.is_active!==false)?.id||0);
       const firstPlan=planRows.find(item=>item.is_active!==false)||planRows[0];
-      const firstPlanId=num(firstPlan?.id);applyPlan(firstPlanId,planRows);
+      applyPlan(num(firstPlan?.id),planRows);
       setProtocols(catalogPayload.protocols.filter(item=>item.family==="classic").map(item=>item.key));
       setNodeIds(exits.map(node=>node.id));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
@@ -79,8 +79,8 @@ export function AdminSubscriptionCreateUnified(){
   const toggleProtocol=(key:string)=>setProtocols(current=>current.includes(key)?current.filter(item=>item!==key):[...current,key]);
   const toggleNode=(id:number)=>setNodeIds(current=>current.includes(id)?current.filter(item=>item!==id):[...current,id]);
 
-  const submit=async(event:FormEvent)=>{
-    event.preventDefault();if(busy||loading)return;
+  const submitNow=async()=>{
+    if(busy||loading)return;
     const trafficValue=clean(traffic),durationValue=clean(duration),deviceValue=clean(deviceLimit);
     if(!userId){setError(pick("کاربر را انتخاب کنید","Select a user"));return;}
     if(!planId){setError(pick("پلن را انتخاب کنید","Select a plan"));return;}
@@ -89,40 +89,71 @@ export function AdminSubscriptionCreateUnified(){
     if(deviceValue===null||deviceValue<1||!Number.isInteger(deviceValue)){setError(pick("اتصال همزمان معتبر نیست","Invalid device limit"));return;}
     if(!protocols.length){setError(pick("حداقل یک پروتکل انتخاب کنید","Select at least one protocol"));return;}
     if(!nodeIds.length){setError(pick("حداقل یک سرور انتخاب کنید","Select at least one server"));return;}
+
     setBusy(true);setError("");
     try{
-      await createSubscriptionFastV1({user_id:userId,plan_id:planId,node_ids:[...nodeIds],protocols:[...protocols],traffic_gb:trafficValue,duration_days:durationValue,device_limit:deviceValue,...(username.trim()?{username:username.trim()}:{}),...(password.trim()?{password:password.trim()}:{})});
+      const result=await createSubscriptionFastV1({
+        user_id:userId,plan_id:planId,node_ids:[...nodeIds],protocols:[...protocols],
+        traffic_gb:trafficValue,duration_days:durationValue,device_limit:deviceValue,
+        ...(username.trim()?{username:username.trim()}:{}),...(password.trim()?{password:password.trim()}:{})
+      });
+      if(result?.ok===false)throw new Error(result.message||pick("ثبت اکانت انجام نشد","Account creation failed"));
       setOpen(false);
-      window.setTimeout(()=>window.location.reload(),700);
+      window.setTimeout(()=>window.location.reload(),450);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy(false);}
   };
 
+  const submit=(event:FormEvent)=>{event.preventDefault();void submitNow();};
+
   if(!mounted||!open)return null;
-  const group=(title:string,items:SubscriptionProtocolDefinition[])=><div className="runtime-choice-section"><div className="card-head"><b>{title}</b><small>{items.filter(item=>protocols.includes(item.key)).length}/{items.length}</small></div><div className="protocol-toggle-grid">{items.map(item=><label className="toggle module-toggle" key={item.key}><span>{item.title}</span><input type="checkbox" checked={protocols.includes(item.key)} onChange={()=>toggleProtocol(item.key)}/><i/></label>)}</div></div>;
+
+  const choice=(checked:boolean,label:string,sub:string,onToggle:()=>void)=><button type="button" onClick={onToggle} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,minHeight:42,padding:"9px 11px",borderRadius:12,border:checked?"1px solid rgba(124,92,255,.62)":"1px solid rgba(148,163,184,.14)",background:checked?"rgba(109,74,255,.13)":"rgba(15,23,42,.26)",color:"inherit",cursor:"pointer",textAlign:"right"}}><span style={{display:"grid",gap:2,minWidth:0}}><b style={{fontSize:12,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{label}</b>{sub&&<small dir="ltr" style={{fontSize:10,opacity:.58,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{sub}</small>}</span><span aria-hidden="true" style={{width:20,height:20,borderRadius:999,border:checked?"6px solid #7c5cff":"2px solid rgba(148,163,184,.42)",background:checked?"white":"transparent",flex:"0 0 auto"}}/></button>;
 
   return createPortal(<div className="runtime-modal manual-subscription-modal" role="dialog" aria-modal="true">
     <button type="button" className="runtime-modal-bg" onClick={()=>!busy&&setOpen(false)}/>
-    <div className="runtime-modal-card manage-card" style={{width:"min(980px,calc(100vw - 28px))",maxHeight:"88dvh"}}>
-      <div className="card-head"><div><b>{pick("ساخت اشتراک","Create subscription")}</b><small>{pick("پروتکل‌ها و سرورها را برای همین اکانت انتخاب کنید.","Choose protocols and servers for this account.")}</small></div><button type="button" className="icon-button" disabled={busy} onClick={()=>setOpen(false)}>×</button></div>
-      {error&&<div className="runtime-error">{error}</div>}
-      <form className="subscription-create-form" onSubmit={submit}>
-        <div className="setting-grid compact-create-grid">
-          <label className="field"><span>{pick("کاربر","User")}</span><select value={userId} disabled={loading} onChange={e=>setUserId(Number(e.target.value))}><option value={0}>{pick("انتخاب کاربر","Select user")}</option>{users.filter(user=>user.role!=="admin"&&user.is_active!==false).map(user=><option key={user.id} value={user.id}>{user.full_name||user.email||`#${user.id}`}</option>)}</select></label>
-          <label className="field"><span>{pick("پلن","Plan")}</span><select value={planId} disabled={loading} onChange={e=>applyPlan(Number(e.target.value))}><option value={0}>{pick("انتخاب پلن","Select plan")}</option>{plans.filter(plan=>plan.is_active!==false).map(plan=><option key={num(plan.id)} value={num(plan.id)}>{String(plan.name||`#${num(plan.id)}`)}</option>)}</select></label>
+    <div className="runtime-modal-card" style={{width:"min(920px,calc(100vw - 24px))",maxHeight:"86dvh",padding:0,overflow:"hidden",borderRadius:20,boxShadow:"0 28px 80px rgba(0,0,0,.42)"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,padding:"14px 16px",borderBottom:"1px solid rgba(148,163,184,.12)",background:"rgba(15,23,42,.82)",position:"sticky",top:0,zIndex:5}}>
+        <div><b style={{fontSize:16}}>{pick("ساخت اشتراک","Create subscription")}</b><div style={{fontSize:11,opacity:.58,marginTop:3}}>{pick("همه انتخاب‌ها در یک صفحه؛ ساخت اکانت بعد از ثبت در پس‌زمینه ادامه پیدا می‌کند.","Everything in one compact view; provisioning continues in the background.")}</div></div>
+        <button type="button" className="icon-button" disabled={busy} onClick={()=>setOpen(false)}>×</button>
+      </div>
+
+      <form onSubmit={submit} style={{display:"grid",gridTemplateRows:"1fr auto",minHeight:0,maxHeight:"calc(86dvh - 64px)"}}>
+        <div style={{overflowY:"auto",padding:"14px",display:"grid",gap:12}}>
+          {error&&<div className="runtime-error" style={{margin:0}}>{error}</div>}
+
+          <section style={{...box,padding:12}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+              <label className="field"><span>{pick("کاربر","User")}</span><select value={userId} disabled={loading} onChange={e=>setUserId(Number(e.target.value))}><option value={0}>{pick("انتخاب کاربر","Select user")}</option>{users.filter(user=>user.role!=="admin"&&user.is_active!==false).map(user=><option key={user.id} value={user.id}>{user.full_name||user.email||`#${user.id}`}</option>)}</select></label>
+              <label className="field"><span>{pick("پلن","Plan")}</span><select value={planId} disabled={loading} onChange={e=>applyPlan(Number(e.target.value))}><option value={0}>{pick("انتخاب پلن","Select plan")}</option>{plans.filter(plan=>plan.is_active!==false).map(plan=><option key={num(plan.id)} value={num(plan.id)}>{String(plan.name||`#${num(plan.id)}`)}</option>)}</select></label>
+            </div>
+          </section>
+
+          <section style={{...box,padding:12}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10}}><div><b>{pick("پروتکل‌ها","Protocols")}</b><small style={{marginInlineStart:8,opacity:.55}}>{protocols.length}/15</small></div><div style={{display:"flex",gap:6}}><button type="button" className="ghost" style={tinyButton} onClick={()=>setProtocols(catalog.map(item=>item.key))}>{pick("همه","All")}</button><button type="button" className="ghost" style={tinyButton} onClick={()=>setProtocols([])}>{pick("هیچکدام","None")}</button></div></div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:7}}>{catalog.map(item=><div key={item.key}>{choice(protocols.includes(item.key),item.title,item.family==="classic"?pick("کلاسیک","Classic"):pick("مدرن","Modern"),()=>toggleProtocol(item.key))}</div>)}</div>
+          </section>
+
+          <section style={{...box,padding:12}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10}}><div><b>{pick("سرورها","Servers")}</b><small style={{marginInlineStart:8,opacity:.55}}>{nodeIds.length}/{exitNodes.length}</small></div><div style={{display:"flex",gap:6}}><button type="button" className="ghost" style={tinyButton} onClick={()=>setNodeIds(exitNodes.map(node=>node.id))}>{pick("همه","All")}</button><button type="button" className="ghost" style={tinyButton} onClick={()=>setNodeIds([])}>{pick("هیچکدام","None")}</button></div></div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:7}}>{exitNodes.map(node=><div key={node.id}>{choice(nodeIds.includes(node.id),node.name,node.public_ip||node.country_code||"",()=>toggleNode(node.id))}</div>)}</div>
+          </section>
+
+          <section style={{...box,padding:12}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(5,minmax(0,1fr))",gap:9}}>
+              <label className="field"><span>{pick("حجم GB","Traffic GB")}</span><input type="number" min={0} step="0.1" value={traffic} onChange={e=>setTraffic(e.target.value)}/></label>
+              <label className="field"><span>{pick("مدت روز","Days")}</span><input type="number" min={1} step={1} value={duration} onChange={e=>setDuration(e.target.value)}/></label>
+              <label className="field"><span>{pick("اتصال","Devices")}</span><input type="number" min={1} step={1} value={deviceLimit} onChange={e=>setDeviceLimit(e.target.value)}/></label>
+              <label className="field"><span>{pick("نام کاربری","Username")}</span><input dir="ltr" value={username} onChange={e=>setUsername(e.target.value)} placeholder={pick("خودکار","Auto")}/></label>
+              <label className="field"><span>{pick("رمز عبور","Password")}</span><input dir="ltr" value={password} onChange={e=>setPassword(e.target.value)} placeholder={pick("خودکار","Auto")}/></label>
+            </div>
+          </section>
         </div>
-        <div className="card-head"><div><b>{pick("پروتکل‌ها","Protocols")}</b><small>{protocols.length}/15</small></div><div className="row-actions"><button type="button" className="ghost" onClick={()=>setProtocols(catalog.map(item=>item.key))}>{pick("انتخاب همه","Select all")}</button><button type="button" className="ghost" onClick={()=>setProtocols([])}>{pick("لغو همه","Clear all")}</button></div></div>
-        {group(pick("پروتکل‌های کلاسیک","Classic protocols"),classic)}
-        {group(pick("پروتکل‌های جدید","Modern protocols"),modern)}
-        <div className="runtime-choice-section"><div className="card-head"><div><b>{pick("سرورها","Servers")}</b><small>{nodeIds.length}/{exitNodes.length}</small></div><div className="row-actions"><button type="button" className="ghost" onClick={()=>setNodeIds(exitNodes.map(node=>node.id))}>{pick("انتخاب همه","Select all")}</button><button type="button" className="ghost" onClick={()=>setNodeIds([])}>{pick("لغو همه","Clear all")}</button></div></div><div className="protocol-toggle-grid">{exitNodes.map(node=><label className="toggle module-toggle" key={node.id}><span>{node.name}<small dir="ltr">{node.public_ip||node.country_code||""}</small></span><input type="checkbox" checked={nodeIds.includes(node.id)} onChange={()=>toggleNode(node.id)}/><i/></label>)}</div></div>
-        <div className="setting-grid compact-create-grid">
-          <label className="field"><span>{pick("حجم GB","Traffic GB")}</span><input type="number" min={0} step="0.1" value={traffic} onChange={e=>setTraffic(e.target.value)}/></label>
-          <label className="field"><span>{pick("مدت روز","Duration days")}</span><input type="number" min={1} step={1} value={duration} onChange={e=>setDuration(e.target.value)}/></label>
-          <label className="field"><span>{pick("اتصال همزمان","Concurrent devices")}</span><input type="number" min={1} step={1} value={deviceLimit} onChange={e=>setDeviceLimit(e.target.value)}/></label>
-          <label className="field"><span>{pick("نام کاربری","Username")}</span><input dir="ltr" value={username} onChange={e=>setUsername(e.target.value)} placeholder={pick("خالی = خودکار","empty = automatic")}/></label>
-          <label className="field"><span>{pick("رمز عبور","Password")}</span><input dir="ltr" value={password} onChange={e=>setPassword(e.target.value)} placeholder={pick("خالی = خودکار","empty = automatic")}/></label>
+
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,padding:"11px 14px",borderTop:"1px solid rgba(148,163,184,.12)",background:"rgba(15,23,42,.92)",position:"sticky",bottom:0,zIndex:5}}>
+          <small style={{opacity:.55}}>{pick(`${protocols.length} پروتکل • ${nodeIds.length} سرور`,`${protocols.length} protocols • ${nodeIds.length} servers`)}</small>
+          <div style={{display:"flex",gap:8}}><button type="button" className="ghost" disabled={busy} onClick={()=>setOpen(false)}>{pick("انصراف","Cancel")}</button><button type="button" className="primary" disabled={busy||loading} onClick={()=>void submitNow()}>{busy?pick("در حال ثبت…","Submitting…"):pick("ساخت اکانت","Create account")}</button></div>
         </div>
-        <div className="modalActions"><button type="button" className="ghost" disabled={busy} onClick={()=>setOpen(false)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy||loading||!userId||!planId||!protocols.length||!nodeIds.length}>{busy?pick("در حال ثبت…","Submitting…"):pick("ساخت و صدور اکانت","Create & provision")}</button></div>
       </form>
     </div>
   </div>,document.body);
