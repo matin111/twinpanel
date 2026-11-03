@@ -312,6 +312,9 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
     @staticmethod
     def _navigation_back(text: str, scope: str) -> str:
         value = unescape(str(text or "")).lower()
+        # The first user-count screen has no prior purchase step.
+        if "ابتدا تعداد کاربری" in value:
+            return "rmenu:home" if scope == "reseller" else "main:home"
         if scope == "reseller":
             if "آموزش" in value or "سیستم‌عامل" in value:
                 return "rlearn:g:root"
