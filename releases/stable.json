@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.534",
+  "version": "1.1.0-rc.535",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T01:16:37Z",
+  "released_at": "2026-11-03T01:31:28Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "87bfa0365bc5d6ff0e3d40cfcacd3c3527f0b6fe",
+  "source_sha": "59e8ababe7e028767d1fe9cecc4c22729b08410b",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.534/twinpanel-1.1.0-rc.534-linux-x86_64.tar.gz",
-    "sha256": "cce94246b282e1903fe0febcc9e6e63fd27cba1b9af2e1f766ab0505370a0f3a",
-    "size_bytes": 25308951
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.535/twinpanel-1.1.0-rc.535-linux-x86_64.tar.gz",
+    "sha256": "277d7f860368f1ca18b0ca0471a8d128b19f56a65045856e4746ff6f20cb4371",
+    "size_bytes": 25306743
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.534 مسیر واقعی دکمه ساخت اشتراک در صفحه ادمین را به یک سازنده واحد وصل می‌کند. پنجره ساخت اکنون هر ۱۵ پروتکل و سرورهای Exit فعال را برای همان اکانت نمایش می‌دهد، node_ids و protocols واقعی را از مسیر Fast Create ارسال می‌کند و Provisioning پس‌زمینه را حفظ می‌کند. سازنده ثانویه قدیمی دست‌نخورده می‌ماند و دیگر دو Modal برای یک دکمه با هم رقابت نمی‌کنند.",
-    "en": "TwinPanel 1.1.0-rc.534 routes the real admin subscriptions create button to one unified creator. The dialog exposes all 15 protocols and active Exit servers for the account, submits real node_ids and protocols through Fast Create, and keeps provisioning in the background. The secondary legacy constructor remains untouched and no longer competes for the same button."
+    "fa": "TwinPanel 1.1.0-rc.535 پنجره ساخت اشتراک ادمین را جمع‌وجور و مدرن می‌کند و خرابی دکمه ساخت اکانت را رفع می‌کند. دکمه ساخت اکنون مستقیماً Handler ثبت را اجرا می‌کند و دیگر به Submit ضمنی فرم وابسته نیست. هر ۱۵ پروتکل در Grid سه‌ستونه، سرورهای Exit در Grid دو‌ستونه، تنظیمات اکانت در یک ردیف فشرده و Header/Footer ثابت نمایش داده می‌شوند. Fast Create و Provisioning پس‌زمینه حفظ شده‌اند.",
+    "en": "TwinPanel 1.1.0-rc.535 modernizes and compacts the admin subscription creation dialog and fixes the broken Create Account action. The button now directly invokes the submit handler instead of relying on implicit form submission. All 15 protocols use a three-column grid, Exit servers a two-column grid, account settings a compact row, with sticky header/footer. Fast Create and background provisioning are preserved."
   }
 }
