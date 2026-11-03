@@ -7,15 +7,15 @@ import {getCustomerToken} from "../lib/customer-api";
 
 type Style="default"|"primary"|"success"|"danger";
 type Styles={
-  dashboard:Style;purchase:Style;subscriptions:Style;account_link:Style;wallet:Style;
+  dashboard:Style;purchase:Style;trial:Style;subscriptions:Style;account_link:Style;wallet:Style;
   learning:Style;download:Style;reseller_request:Style;support:Style;account:Style;connect:Style;
 };
 
 const DEFAULTS:Styles={
-  dashboard:"default",purchase:"success",subscriptions:"default",account_link:"success",wallet:"success",
+  dashboard:"default",purchase:"success",trial:"primary",subscriptions:"default",account_link:"success",wallet:"success",
   learning:"primary",download:"primary",reseller_request:"success",support:"default",account:"default",connect:"primary",
 };
-const CLEAN:Styles={dashboard:"default",purchase:"default",subscriptions:"default",account_link:"default",wallet:"default",learning:"default",download:"default",reseller_request:"default",support:"default",account:"default",connect:"default"};
+const CLEAN:Styles={dashboard:"default",purchase:"default",trial:"default",subscriptions:"default",account_link:"default",wallet:"default",learning:"default",download:"default",reseller_request:"default",support:"default",account:"default",connect:"default"};
 const OPTIONS:{value:Style;label:string;hint:string}[]=[
   {value:"default",label:"پیش‌فرض",hint:"رنگ خود تلگرام"},
   {value:"primary",label:"آبی",hint:"Primary"},
@@ -23,7 +23,7 @@ const OPTIONS:{value:Style;label:string;hint:string}[]=[
   {value:"danger",label:"قرمز",hint:"Danger"},
 ];
 const MAIN_BUTTONS:{key:keyof Styles;label:string;emoji:string}[]=[
-  {key:"purchase",label:"خرید اشتراک",emoji:"🛒"},{key:"dashboard",label:"داشبورد",emoji:"🏠"},
+  {key:"purchase",label:"خرید اشتراک",emoji:"🛒"},{key:"trial",label:"اکانت تست",emoji:"🎁"},{key:"dashboard",label:"داشبورد",emoji:"🏠"},
   {key:"subscriptions",label:"اشتراک‌های من",emoji:"📦"},{key:"account_link",label:"دریافت لینک اکانت",emoji:"🔗"},
   {key:"wallet",label:"کیف پول",emoji:"💰"},{key:"learning",label:"آموزش",emoji:"📚"},
   {key:"download",label:"دانلود برنامه",emoji:"⬇️"},{key:"reseller_request",label:"درخواست نمایندگی",emoji:"🤝"},
@@ -97,9 +97,10 @@ export function AdminTelegramButtonStyleSettings(){
           </label>)}
         </div>
         <div className="tg-style-preview-wrap">
-          <div className="tg-style-preview-title"><span>پیش‌نمایش منوی واقعی</span><small>همان ۱۰ دکمه /start</small></div>
+          <div className="tg-style-preview-title"><span>پیش‌نمایش منوی واقعی</span><small>همان ۱۱ دکمه /start</small></div>
           <div className="tg-style-preview">
             <button type="button" tabIndex={-1} className={`tg-preview-wide ${cls(styles.purchase)}`}>🛒 خرید اشتراک</button>
+            <button type="button" tabIndex={-1} className={`tg-preview-wide ${cls(styles.trial)}`}>🎁 اکانت تست</button>
             <button type="button" tabIndex={-1} className={cls(styles.dashboard)}>🏠 داشبورد</button>
             <button type="button" tabIndex={-1} className={cls(styles.subscriptions)}>📦 اشتراک‌های من</button>
             <button type="button" tabIndex={-1} className={cls(styles.account_link)}>🔗 دریافت لینک اکانت</button>
@@ -111,7 +112,7 @@ export function AdminTelegramButtonStyleSettings(){
             <button type="button" tabIndex={-1} className={cls(styles.account)}>👤 حساب من</button>
           </div>
           <div className="tg-style-legend"><span className="tg-style-primary">آبی / Primary</span><span className="tg-style-success">سبز / Success</span><span className="tg-style-danger">قرمز / Danger</span><span className="tg-style-default">پیش‌فرض</span></div>
-          <p>تنظیمات این بخش مستقیماً روی منوی ۱۰ دکمه‌ای /start اعمال می‌شود. برای دیدن تغییر در Telegram پس از ذخیره، یک منوی جدید باز کنید.</p>
+          <p>تنظیمات این بخش مستقیماً روی منوی ۱۱ دکمه‌ای /start اعمال می‌شود. برای دیدن تغییر در Telegram پس از ذخیره، یک منوی جدید باز کنید.</p>
         </div>
       </div>
       {message?<div className={message.includes("ذخیره شد")?"runtime-success":"runtime-error"}>{message}</div>:null}

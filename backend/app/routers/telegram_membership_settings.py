@@ -26,6 +26,7 @@ class MembershipSettingsIn(BaseModel):
 class TelegramButtonStylesIn(BaseModel):
     dashboard: ButtonStyle = "default"
     purchase: ButtonStyle = "success"
+    trial: ButtonStyle = "primary"
     subscriptions: ButtonStyle = "default"
     account_link: ButtonStyle = "success"
     wallet: ButtonStyle = "success"
