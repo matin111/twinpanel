@@ -204,8 +204,59 @@ def standard_share_uri(protocol: str, item: dict[str, Any], profile_name: str) -
     return ""
 
 
+def _single_shadowtls_karing_yaml(item: dict[str, Any], profile_name: str) -> str:
+    """One Karing node, never a flattened sing-box Shadowsocks/ShadowTLS chain."""
+    raw = str(item.get("config") or "").strip()
+    try:
+        config = json.loads(raw)
+        outbounds = config.get("outbounds", [])
+        ss = next(x for x in outbounds if isinstance(x, dict) and x.get("type") == "shadowsocks")
+        st = next(x for x in outbounds if isinstance(x, dict) and x.get("type") == "shadowtls")
+        tls = st.get("tls") or {}
+        name = str(profile_name or "ShadowTLS").strip()
+        server = str(st["server"]).strip()
+        port = int(st["server_port"])
+        method = str(ss["method"]).strip()
+        password = str(ss["password"])
+        transport_password = str(st["password"])
+        host = str(tls["server_name"]).strip()
+        version = int(st.get("version", 3))
+        if not (name and server and 1 <= port <= 65535 and method and password and transport_password and host and version == 3):
+            return ""
+    except (ValueError, TypeError, KeyError, StopIteration, AttributeError):
+        return ""
+    q = lambda value: json.dumps(str(value), ensure_ascii=False)
+    return "\n".join([
+        "proxies:",
+        f"  - name: {q(name)}",
+        "    type: ss",
+        f"    server: {q(server)}",
+        f"    port: {port}",
+        f"    cipher: {q(method)}",
+        f"    password: {q(password)}",
+        "    udp: true",
+        "    plugin: shadow-tls",
+        "    client-fingerprint: chrome",
+        "    plugin-opts:",
+        f"      host: {q(host)}",
+        f"      password: {q(transport_password)}",
+        f"      version: {version}",
+        "proxy-groups:",
+        f"  - name: {q(name + '-select')}",
+        "    type: select",
+        "    proxies:",
+        f"      - {q(name)}",
+        "rules:",
+        f"  - MATCH,{name}-select",
+        "",
+    ])
+
+
 def _copy_content(protocol: str, item: dict[str, Any], profile_name: str) -> str:
     protocol = str(protocol or "").strip().lower()
+
+    if protocol == "shadowtls":
+        return _single_shadowtls_karing_yaml(item, profile_name)
 
     standard = standard_share_uri(protocol, item, profile_name)
     if standard:
