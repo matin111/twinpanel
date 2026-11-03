@@ -9,10 +9,10 @@ import {useI18n} from "../lib/i18n";
 type StorePlan={
   id:number;name:string;description?:string|null;duration_days:number;traffic_gb:number;device_limit:number;price_toman:number;is_active:boolean;
   enable_cisco:boolean;enable_openvpn:boolean;enable_wireguard:boolean;enable_l2tp:boolean;enable_v2ray:boolean;
-  trial_enabled?:boolean;trial_duration_days?:number;trial_traffic_mb?:number;
 };
 type StoreOrder={id:number};
 type TrialResult={ok:boolean;subscription_id:number;duration_days:number;traffic_mb:number};
+type TrialStatus={enabled:boolean;configured:boolean;eligible:boolean;already_claimed:boolean;duration_days:number;traffic_mb:number};
 
 const planDeviceLabels=["Android","iPhone","Windows","Mac","Linux"] as const;
 
@@ -38,6 +38,7 @@ function BuyBody(){
   const {pick}=useI18n();
   const {token}=useCustomerSession();
   const [plans,setPlans]=useState<StorePlan[]>([]);
+  const [trial,setTrial]=useState<TrialStatus|null>(null);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState<number|null>(null);
   const [trialBusy,setTrialBusy]=useState(false);
@@ -45,12 +46,14 @@ function BuyBody(){
 
   useEffect(()=>{
     let alive=true;
-    api<StorePlan[]>("/v1/plans")
-      .then(rows=>alive&&setPlans((Array.isArray(rows)?rows:[]).filter(x=>x.is_active)))
+    const planRequest=api<StorePlan[]>("/v1/plans");
+    const trialRequest=token?api<TrialStatus>("/v1/trial/status",{},token):Promise.resolve(null);
+    Promise.all([planRequest,trialRequest])
+      .then(([rows,status])=>{if(!alive)return;setPlans((Array.isArray(rows)?rows:[]).filter(x=>x.is_active));setTrial(status);})
       .catch(reason=>alive&&setError(reason instanceof Error?reason.message:String(reason)))
       .finally(()=>alive&&setLoading(false));
     return()=>{alive=false};
-  },[]);
+  },[token]);
 
   const buy=async(plan:StorePlan)=>{
     if(!token)return;
@@ -73,19 +76,18 @@ function BuyBody(){
   };
 
   const featuredPlanIndex=plans.length>2?Math.floor(plans.length/2):0;
-  const hasTrial=plans.some(plan=>Boolean(plan.trial_enabled));
-  const trialPlan=plans.find(plan=>Boolean(plan.trial_enabled));
+  const showTrial=Boolean(trial?.enabled&&trial?.configured);
 
   return <div className="page customer-runtime customer-buy-rich">
     <div className="customer-buy-rich-head"><div><span>◇</span><h1>{pick("خرید اشتراک","Buy subscription")}</h1></div><Badge tone="violet">{plans.length.toLocaleString("fa-IR")} {pick("پلن","plans")}</Badge></div>
     {error&&<div className="customer-buy-alert error">{error}</div>}
     {loading&&<div className="customer-buy-loading"><span className="customer-loader"/></div>}
-    {!loading&&hasTrial&&<Card className="customer-buy-trial-standalone">
+    {!loading&&showTrial&&<Card className="customer-buy-trial-standalone">
       <div>
         <strong>{pick("🎁 اکانت تست رایگان","🎁 Free trial account")}</strong>
-        <p>{pick(`فقط یک‌بار برای هر کاربر${trialPlan?` • ${Number(trialPlan.trial_duration_days||1).toLocaleString("fa-IR")} روز • ${Number(trialPlan.trial_traffic_mb||500).toLocaleString("fa-IR")} مگابایت`:""}`,`One trial per user${trialPlan?` • ${Number(trialPlan.trial_duration_days||1)} day(s) • ${Number(trialPlan.trial_traffic_mb||500)} MB`:""}`)}</p>
+        <p>{trial?.already_claimed?pick("اکانت تست اصلی قبلاً برای این حساب دریافت شده است.","The main Trial has already been claimed for this account."):pick(`فقط یک‌بار برای هر کاربر • ${Number(trial?.duration_days||1).toLocaleString("fa-IR")} روز • ${Number(trial?.traffic_mb||500).toLocaleString("fa-IR")} مگابایت`,`One trial per user • ${Number(trial?.duration_days||1)} day(s) • ${Number(trial?.traffic_mb||500)} MB`)}</p>
       </div>
-      <button type="button" className="customer-buy-rich-action" disabled={trialBusy||busy!==null} onClick={()=>void claimTrial()}>{trialBusy?pick("در حال ساخت اکانت تست...","Creating trial..."):pick("دریافت اکانت تست","Get trial account")}<span>←</span></button>
+      <button type="button" className="customer-buy-rich-action" disabled={trialBusy||busy!==null||!trial?.eligible} onClick={()=>void claimTrial()}>{trial?.already_claimed?pick("قبلاً دریافت شده","Already claimed"):trialBusy?pick("در حال ساخت اکانت تست...","Creating trial..."):pick("دریافت اکانت تست","Get trial account")}<span>←</span></button>
     </Card>}
     {!loading&&plans.length===0&&<Card className="customer-empty"><p>{pick("پلن فعالی وجود ندارد.","No active plans.")}</p></Card>}
 
@@ -98,9 +100,7 @@ function BuyBody(){
           {plan.description&&<p className="customer-buy-rich-desc">{plan.description}</p>}
           <div className="customer-buy-rich-price"><strong>{free?pick("رایگان","Free"):Number(plan.price_toman).toLocaleString("fa-IR")}</strong>{!free&&<span>{pick("تومان","Toman")}</span>}</div>
           <div className="customer-buy-rich-facts"><div><b>{plan.traffic_gb.toLocaleString("fa-IR")} GB</b><small>{pick("حجم","Traffic")}</small></div><div><b>{plan.duration_days.toLocaleString("fa-IR")}</b><small>{pick("روز","days")}</small></div><div><b>{plan.device_limit.toLocaleString("fa-IR")}</b><small>{pick("دستگاه","devices")}</small></div></div>
-          <ul className="customer-buy-rich-list">
-            <li><i>✓</i>{pick("تحویل سریع پس از پرداخت","Fast delivery after payment")}</li><li><i>✓</i>{pick("قابل استفاده روی دستگاه‌های مختلف","Works across multiple devices")}</li><li><i>✓</i>{pick("مدیریت اشتراک از پنل کاربری","Manage the subscription from your panel")}</li>
-          </ul>
+          <ul className="customer-buy-rich-list"><li><i>✓</i>{pick("تحویل سریع پس از پرداخت","Fast delivery after payment")}</li><li><i>✓</i>{pick("قابل استفاده روی دستگاه‌های مختلف","Works across multiple devices")}</li><li><i>✓</i>{pick("مدیریت اشتراک از پنل کاربری","Manage the subscription from your panel")}</li></ul>
           <div className="customer-buy-rich-devices">{planDeviceLabels.map(device=><span key={device}>{device}</span>)}</div>
           <button type="button" className="customer-buy-rich-action" disabled={busy===plan.id||trialBusy} onClick={()=>void buy(plan)}>{busy===plan.id?pick("در حال ثبت سفارش...","Creating order..."):pick("خرید اشتراک","Buy subscription")}<span>←</span></button>
         </article>;
