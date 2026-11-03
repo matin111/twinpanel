@@ -37,6 +37,13 @@ def _main_menu_keyboard():
             ],
             [
                 inline_button(
+                    "🎁 اکانت تست",
+                    callback_data="trial:claim",
+                    style="primary",
+                )
+            ],
+            [
+                inline_button(
                     "🏠 داشبورد",
                     callback_data="main:dashboard",
                     style=styles.dashboard,
