@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.553",
+  "version": "1.1.0-rc.554",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T17:00:37Z",
+  "released_at": "2026-11-03T17:17:18Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "4183cf34cd54b90de0f6dc1b1faf4b738bab2bcc",
+  "source_sha": "3c6ef03d8ea49acce2cfbe5a13e52c466698bae5",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.553/twinpanel-1.1.0-rc.553-linux-x86_64.tar.gz",
-    "sha256": "3ef89e166aa774ea7eec27ed86b62e97d854825ea68f6c580dded8d47bbaab60",
-    "size_bytes": 25347425
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.554/twinpanel-1.1.0-rc.554-linux-x86_64.tar.gz",
+    "sha256": "c3b579f4a702e103b631bef5bd9aa297228f29edff8f070abfa3391a8e3cefaf",
+    "size_bytes": 25347442
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.553 ظاهر اعلان‌های کاربر، ادمین و نماینده را یکسان می‌کند و جای‌گیری پنجره اعلان‌ها را در صفحات موبایل و دسکتاپ، با پشتیبانی از راست‌به‌چپ، اصلاح می‌کند.",
-    "en": "TwinPanel 1.1.0-rc.553 unifies customer, admin, and reseller notification popovers and fixes responsive RTL dropdown positioning on desktop and mobile."
+    "fa": "TwinPanel 1.1.0-rc.554 مشکل فشرده‌شدن متن اعلان‌ها در ستون بسیار باریک را برطرف می‌کند. قوانین متناقض قدیمی حذف شده‌اند و اعلان‌های کاربری، ادمین و نماینده اکنون چیدمان دو‌ستونه سازگار با موبایل، دسکتاپ و جهت راست‌به‌چپ دارند.",
+    "en": "TwinPanel 1.1.0-rc.554 fixes notification text collapsing into a narrow column by removing obsolete conflicting styles and explicitly placing message text in the flexible grid column across customer, admin and reseller notifications."
   }
 }
