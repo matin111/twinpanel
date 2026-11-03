@@ -339,9 +339,18 @@ def _modern_tunnel_endpoint(
     if iran is None:
         return None
 
-    host = str(account_delivery._node_host(iran) or "").strip()
-    if not host or host in {"127.0.0.1", "localhost"}:
+    # Prefer the customer's per-Exit hostname while retaining the Iran
+    # ingress *port and route*. Operators configure Exit public_domain DNS
+    # to resolve to this Exit's selected Iran ingress; the Iran node's domain
+    # is a separate legacy/V2Ray hostname and should not leak into modern
+    # protocol credentials.
+    ingress_host = str(account_delivery._node_host(iran) or "").strip()
+    if not ingress_host or ingress_host in {"127.0.0.1", "localhost"}:
         raise RuntimeError(f"invalid Iran ingress for node {iran.id}")
+    exit_domain = str(getattr(exit_node, "public_domain", "") or "").strip()
+    host = str(account_delivery._node_host(exit_node) or "").strip() if exit_domain else ingress_host
+    if not host or host in {"127.0.0.1", "localhost"}:
+        raise RuntimeError(f"invalid delivery hostname for Exit {exit_node.id}")
 
     if protocol == "sudoku":
         port = _sudoku_public_port(

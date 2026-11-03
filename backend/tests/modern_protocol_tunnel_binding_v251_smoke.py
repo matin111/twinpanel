@@ -64,6 +64,32 @@ def _encode_tlv(entries: list[tuple[int, bytes]]) -> str:
     return "tt://?" + payload
 
 
+def test_exit_domain_over_iran_hostname() -> None:
+    # Exit domain resolves to the selected Iran ingress but belongs to the
+    # customer's Exit profile. Keep its name, and preserve the tunnel port.
+    exit_node = SimpleNamespace(
+        id=6, public_domain="tunel1.in88.sbs", public_ip="204.10.192.96",
+    )
+    iran = SimpleNamespace(
+        id=2, public_domain="vtray.in88.sbs", public_ip="193.39.9.222",
+    )
+    original = binding._selected_iran_node
+    try:
+        binding._selected_iran_node = lambda db, node: iran
+        assert binding._modern_tunnel_endpoint(None, exit_node, "shadowtls", 21) == (
+            "tunel1.in88.sbs", 33006
+        )
+        assert binding._modern_tunnel_endpoint(None, exit_node, "tuic", 21) == (
+            "tunel1.in88.sbs", 29006
+        )
+        exit_node.public_domain = None
+        assert binding._modern_tunnel_endpoint(None, exit_node, "shadowtls", 21) == (
+            "vtray.in88.sbs", 33006
+        )
+    finally:
+        binding._selected_iran_node = original
+
+
 def test_registry() -> None:
     assert set(binding.MODERN_TUNNEL_PROTOCOLS) == EXPECTED
     assert set(binding.FIXED_PUBLIC_PORT_BASE) == EXPECTED - {"sudoku"}
@@ -256,6 +282,7 @@ def test_legacy_contract_stays_additive() -> None:
 
 def main() -> None:
     test_registry()
+    test_exit_domain_over_iran_hostname()
     test_transport_normalisation()
     test_singbox_rewrite_preserves_tls_identity()
     test_mieru_rewrite()
