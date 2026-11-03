@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.552",
-  "source_sha": "2e64356e83325b7557758974515e4934a48cd417",
+  "version": "1.1.0-rc.553",
+  "source_sha": "4183cf34cd54b90de0f6dc1b1faf4b738bab2bcc",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.552 رنگ‌های ثابت بنفش در ویجت پشتیبانی آنلاین را حذف می‌کند. حاشیه و Hover لانچر، آیکون پشتیبانی، دکمه‌های شروع و ارسال چت، فوکوس فیلدها و رنگ پیام‌های کاربر اکنون مستقیماً از رنگ‌های اصلی برند پنل استفاده می‌کنند و در لایت‌مود و دارک‌مود هماهنگ باقی می‌مانند.",
-    "en": "TwinPanel 1.1.0-rc.552 removes fixed violet accents from the online support widget. The launcher border and hover state, support icon, start/send buttons, focused fields, and customer message bubbles now inherit the configured panel brand colors in both light and dark themes."
+    "fa": "TwinPanel 1.1.0-rc.553 ظاهر اعلان‌های کاربر، ادمین و نماینده را یکسان می‌کند و جای‌گیری پنجره اعلان‌ها را در صفحات موبایل و دسکتاپ، با پشتیبانی از راست‌به‌چپ، اصلاح می‌کند.",
+    "en": "TwinPanel 1.1.0-rc.553 unifies customer, admin, and reseller notification popovers and fixes responsive RTL dropdown positioning on desktop and mobile."
   }
 }
