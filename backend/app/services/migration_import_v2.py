@@ -284,8 +284,9 @@ def import_record(
         protocol_values = normalize_protocols(requested_protocols)
     except ValueError as exc:
         raise ValueError(str(exc)) from exc
-    if not protocol_values:
-        protocol_values = list(ALL_PROTOCOL_KEYS)
+    # All four migration sources create the same canonical desired-state.
+    # Validate legacy inputs, then always activate the entire registry.
+    protocol_values = list(ALL_PROTOCOL_KEYS)
 
     legacy_url = normalized.get("legacy_subscription_url")
     token = _legacy_token(legacy_url)
