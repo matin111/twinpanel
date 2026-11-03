@@ -20,7 +20,9 @@ from .public_connection_v3 import public_connection_page_v3
 router = APIRouter(prefix="/v1/connect", tags=["public-connection-live-v4"])
 
 
-_LIVE_ACTIVITY_SECONDS = 30
+# Collector sweeps take 15-90s across remote nodes; 30s caused false
+# offline results between valid positive-traffic observations.
+_LIVE_ACTIVITY_SECONDS = 180
 
 
 def _iso_utc(value: datetime | None) -> str | None:
