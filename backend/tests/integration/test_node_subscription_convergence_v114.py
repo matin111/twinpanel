@@ -96,7 +96,8 @@ def test_nullable_plan_id_remains_signature_safe_but_is_not_delivery_authority()
     # PR #891 intentionally moved protocol desired-state out of Plan and into
     # SubscriptionProtocol. Manual NULL-plan accounts are valid first-class
     # subscriptions and must receive newly eligible Modern nodes too.
-    assert "Protocol desired-state belongs to the Subscription, never to the Plan." in factory
+    assert "SubscriptionProtocol is the desired-state authority" in runtime
+    assert "SubscriptionProtocol" in factory
     assert wanted_protocols(
         {"hysteria2", "tuic", "cisco"},
         {"tuic", "anytls"},
