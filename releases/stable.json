@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.561",
+  "version": "1.1.0-rc.562",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T21:54:47Z",
+  "released_at": "2026-11-03T22:30:12Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d4265193334e897807e4f59b1a6b46d7ef51272e",
+  "source_sha": "61bdcac74fe751e03c16a95b6896f26282230827",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.561/twinpanel-1.1.0-rc.561-linux-x86_64.tar.gz",
-    "sha256": "1ffa4f4010bd2918ffb17e184d12697ae4ccb352006f7bf9a9861d87ccd065cf",
-    "size_bytes": 25379777
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.562/twinpanel-1.1.0-rc.562-linux-x86_64.tar.gz",
+    "sha256": "980230fb9431697724d28586877dd55b06979119c9c39709b67a5f0f327a08da",
+    "size_bytes": 25390809
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.561 سرعت صفحه اشتراک‌های ادمین را با دریافت ۴۰ ردیف در هر صفحه از سرور، جست‌وجو و فیلتر سمت پایگاه‌داده و محاسبه مستقل آمار کل بهبود می‌دهد. بارگذاری و رندر همه ۱۹۸۳ اشتراک در هر بازکردن صفحه حذف شده است.",
-    "en": "TwinPanel 1.1.0-rc.561 speeds up admin subscriptions using true 40-row server pagination, server-side search/status filtering, bounded row enrichment and global KPI counts. The UI no longer fetches and renders the entire subscription roster on page entry."
+    "fa": "TwinPanel 1.1.0-rc.562 رجیستری مشترک ۱۵ پروتکل را برای انتقال کاربران سنایی، مرزبان، ایلان و پاسارگاد فعال می‌کند. ثبت دسته‌ای، حفظ UUID موجود V2Ray، تکمیل پروتکل‌های جاافتاده به‌شکل قابل‌ادامه و نمایش وضعیت واقعی کانفیگ‌ها اضافه شده‌اند. ثبت پروتکل به‌تنهایی به معنای Provision کامل روی نودها نیست.",
+    "en": "TwinPanel 1.1.0-rc.562 unifies Sanaei, Marzban, Eylan and Pasargad imports on canonical 15-protocol snapshots, with bounded batch staging, preserved V2Ray UUIDs, resumable backfill, and honest per-source config readiness status. Remote provisioning remains separate and subject to eligible node capacity."
   }
 }
