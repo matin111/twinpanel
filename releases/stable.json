@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.546",
+  "version": "1.1.0-rc.547",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T04:41:07Z",
+  "released_at": "2026-11-03T05:02:54Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9527aef72a25782fda688940d4f3860d39f40fa2",
+  "source_sha": "83ac6ff4de81eb08e963903a94aab443c1858a7e",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.546/twinpanel-1.1.0-rc.546-linux-x86_64.tar.gz",
-    "sha256": "e81c8b47eb91aa583ee1bd749e80f9020642312d52b70b5a931fcd683b708347",
-    "size_bytes": 25329796
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.547/twinpanel-1.1.0-rc.547-linux-x86_64.tar.gz",
+    "sha256": "6031a13baa854b943c3bf3b4009aac291405140bfbcfb7f8bcb583e2c5955880",
+    "size_bytes": 25336731
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.546 مجموعه بهبودهای جدید ربات و پلن‌ها را منتشر می‌کند: نمایش قیمت به‌جای روز در دکمه‌های پلن، چیدمان قابل جابه‌جایی پلن‌ها، حذف واقعی و امن پلن‌های بدون سابقه، ظاهر حرفه‌ای‌تر دکمه‌های مدیریت اشتراک با بازگشت و منوی اصلی، بهبود اکانت تست و تحویل آن پس از Provisioning کند، و تکمیل اعلان انقضا. اعلان‌های ۳/۲/۱ روز و روز انقضا اکنون نام کاربری واقعی اکانت را نمایش می‌دهند و دکمه‌های مستقیم تمدید اشتراک، بازگشت به اشتراک‌ها و منوی اصلی دارند؛ dedupe دیتابیسی قبلی نیز حفظ شده است.",
-    "en": "TwinPanel 1.1.0-rc.546 ships the latest bot and plan UX improvements: plan buttons show price instead of days, plans support persistent reordering, unused plans can be safely hard-deleted, subscription action buttons have improved styling and Back/Home navigation, trial delivery handles slow provisioning, and expiry reminders are now fully actionable. The 3/2/1-day and expiry-day reminders display the real account username and provide direct Renew, Back to subscriptions, and Main Menu buttons while retaining database-backed deduplication."
+    "fa": "TwinPanel 1.1.0-rc.547 نمایش پلن‌ها را در فروشگاه عمومی و بخش خرید پنل کاربری دسته‌بندی می‌کند تا لیست‌های بزرگ و شلوغ قابل مرور باشند. دسته‌بندی و ترتیب از همان تنظیمات مرکزی پلن‌ها و خروجی /v1/plans گرفته می‌شود، پلن‌های بدون دسته در «سایر پلن‌ها» قرار می‌گیرند، تعداد پلن هر دسته نمایش داده می‌شود و فقط پلن‌های دسته انتخاب‌شده دیده می‌شوند. منطق خرید، پرداخت، Snapshot و Provisioning بدون تغییر باقی مانده است.",
+    "en": "TwinPanel 1.1.0-rc.547 adds category-first plan browsing to both the public storefront and the customer purchase panel so large catalogs remain compact and easy to navigate. Categories and ordering come from the existing central plan settings and /v1/plans payload, uncategorized plans fall back to the default category, category counts are shown, and only the selected category is rendered. Purchase, payment, snapshot, and provisioning behavior remain unchanged."
   }
 }
