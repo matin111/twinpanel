@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.561",
-  "source_sha": "d4265193334e897807e4f59b1a6b46d7ef51272e",
+  "version": "1.1.0-rc.562",
+  "source_sha": "61bdcac74fe751e03c16a95b6896f26282230827",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.561 سرعت صفحه اشتراک‌های ادمین را با دریافت ۴۰ ردیف در هر صفحه از سرور، جست‌وجو و فیلتر سمت پایگاه‌داده و محاسبه مستقل آمار کل بهبود می‌دهد. بارگذاری و رندر همه ۱۹۸۳ اشتراک در هر بازکردن صفحه حذف شده است.",
-    "en": "TwinPanel 1.1.0-rc.561 speeds up admin subscriptions using true 40-row server pagination, server-side search/status filtering, bounded row enrichment and global KPI counts. The UI no longer fetches and renders the entire subscription roster on page entry."
+    "fa": "TwinPanel 1.1.0-rc.562 رجیستری مشترک ۱۵ پروتکل را برای انتقال کاربران سنایی، مرزبان، ایلان و پاسارگاد فعال می‌کند. ثبت دسته‌ای، حفظ UUID موجود V2Ray، تکمیل پروتکل‌های جاافتاده به‌شکل قابل‌ادامه و نمایش وضعیت واقعی کانفیگ‌ها اضافه شده‌اند. ثبت پروتکل به‌تنهایی به معنای Provision کامل روی نودها نیست.",
+    "en": "TwinPanel 1.1.0-rc.562 unifies Sanaei, Marzban, Eylan and Pasargad imports on canonical 15-protocol snapshots, with bounded batch staging, preserved V2Ray UUIDs, resumable backfill, and honest per-source config readiness status. Remote provisioning remains separate and subject to eligible node capacity."
   }
 }
