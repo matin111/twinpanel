@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.542",
+  "version": "1.1.0-rc.543",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T02:43:50Z",
+  "released_at": "2026-11-03T02:58:38Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "c465c1b2d2834a04c58d9abf7e09d608cf0cf026",
+  "source_sha": "180a78b95e9d884e6c7c767d83645fa792b20914",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.542/twinpanel-1.1.0-rc.542-linux-x86_64.tar.gz",
-    "sha256": "34bfeff87faca48c45282dbec946329575c40ee25b5f566f5bc5f3adcd422918",
-    "size_bytes": 25318148
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.543/twinpanel-1.1.0-rc.543-linux-x86_64.tar.gz",
+    "sha256": "93f3cc11fc209f39ab71a79462d3eef8d77973b575ec6afac400db3a2d818abe",
+    "size_bytes": 25320484
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.542 مشکل ریشه‌ای اضافه‌نشدن پروتکل‌های مدرن به سرورهای جدید و اکانت‌های قدیمی را حل می‌کند. هنگام افزودن Exit جدید، تنظیمات سالم فعلی پروتکل‌های مدرن از Exitهای موجود به‌عنوان Template گرفته می‌شود، همان Runtimeها با Installer رسمی روی سرور جدید Bootstrap و Health-check می‌شوند و سپس Publish-All V2 عضویت و Credentialهای کلاسیک و مدرن اکانت‌های قبلی را برای همان Node همگرا می‌کند. Smoke اختصاصی CI نیز ترتیب Modern Bootstrap قبل از Publish-All و پوشش هر ۱۰ پروتکل مدرن را قفل می‌کند.",
-    "en": "TwinPanel 1.1.0-rc.542 fixes the root cause that prevented Modern protocols from being added to newly-added Exit nodes and existing subscriptions. Add Server now derives healthy Modern runtime intent from existing Exits, bootstraps those runtimes through the canonical installer, health-checks/persists them, and only then runs Publish-All V2 so old accounts converge both classic and Modern node credentials. Dedicated CI locks the Modern-bootstrap-before-Publish-All lifecycle and all ten Modern registry protocols."
+    "fa": "TwinPanel 1.1.0-rc.543 دسته‌بندی پلن‌های فروش را به پنل ادمین و ربات اصلی اضافه می‌کند. مدیر هنگام ساخت یا ویرایش هر پلن می‌تواند دسته‌بندی‌هایی مثل اقتصادی، ویژه یا گیمینگ تعیین کند و دسته‌بندی در جدول پلن‌ها نمایش داده می‌شود. ربات اصلی نیز در مسیر خرید ابتدا دسته‌بندی‌ها را همراه تعداد پلن‌های هر دسته نشان می‌دهد و سپس فقط پلن‌های همان دسته را نمایش می‌دهد. پلن‌های قدیمی بدون دسته‌بندی به‌صورت سازگار داخل «سایر پلن‌ها» قرار می‌گیرند.",
+    "en": "TwinPanel 1.1.0-rc.543 adds sales-plan categories to the admin panel and main Telegram bot. Admins can assign categories such as Economy, Premium, or Gaming when creating or editing plans, with the category shown in the plans table. The main bot now presents categories first, including the plan count per category, and then shows only plans from the selected category. Existing uncategorized plans remain compatible under the Other plans fallback category."
   }
 }
