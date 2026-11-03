@@ -21,7 +21,10 @@ async function request<T>(path:string,init:RequestInit={}):Promise<T>{
   const headers=new Headers(init.headers);
   headers.set("Authorization",`Bearer ${token}`);
   if(init.body&&!headers.has("Content-Type")&&!(init.body instanceof FormData)&&!(init.body instanceof Blob))headers.set("Content-Type","application/json");
-  const response=await fetch(`${API_BASE}${path}`,{...init,headers,cache:"no-store",signal:init.signal??AbortSignal.timeout(5000)});
+  // Some notification queries reconcile payment records before returning.
+  // Use a realistic read budget without retrying mutations (which could duplicate sends).
+  const timeoutMs=init.method&&init.method.toUpperCase()!=="GET"?45000:20000;
+  const response=await fetch(`${API_BASE}${path}`,{...init,headers,cache:"no-store",signal:init.signal??AbortSignal.timeout(timeoutMs)});
   if(!response.ok){
     let payload:unknown=null;try{payload=await response.json();}catch{}
     throw new Error(errorMessage(payload,response.status));
