@@ -26,20 +26,29 @@ def ensure_migration_protocol_snapshots(db: Session, subscription_ids: list[int]
             .all()
         )
     }
+    quota_keys = {
+        (int(subscription_id), str(key))
+        for subscription_id, key in (
+            db.query(QuotaDevice.subscription_id, QuotaDevice.device_key)
+            .filter(QuotaDevice.subscription_id.in_(ids))
+            .all()
+        )
+    }
     added = 0
     for subscription_id in ids:
         for protocol in ALL_PROTOCOL_KEYS:
-            if (subscription_id, protocol) in existing:
-                continue
-            db.add(SubscriptionProtocol(subscription_id=subscription_id, protocol=protocol))
-            db.add(QuotaDevice(
-                subscription_id=subscription_id,
-                protocol=protocol,
-                device_key=f"subscription:{subscription_id}:{protocol}",
-                credential_public_hash=f"pending-{subscription_id}-{protocol}",
-                status="active",
-            ))
-            added += 1
+            if (subscription_id, protocol) not in existing:
+                db.add(SubscriptionProtocol(subscription_id=subscription_id, protocol=protocol))
+                added += 1
+            device_key = f"subscription:{subscription_id}:{protocol}"
+            if (subscription_id, device_key) not in quota_keys:
+                db.add(QuotaDevice(
+                    subscription_id=subscription_id,
+                    protocol=protocol,
+                    device_key=device_key,
+                    credential_public_hash=f"pending-{subscription_id}-{protocol}",
+                    status="active",
+                ))
     # The generic legacy importer does not invoke create_subscription_core,
     # and historically left SubscriptionNode empty. Install a valid Exit
     # snapshot only when one does not already exist; never widen an explicit
@@ -64,6 +73,6 @@ def ensure_migration_protocol_snapshots(db: Session, subscription_ids: list[int]
         if eligible and sub.exit_node_id is None:
             sub.exit_node_id = eligible[0]
 
-    if added or (missing_nodes and eligible):
+    if added or (missing_nodes and eligible) or quota_keys is not None:
         db.flush()
     return added
