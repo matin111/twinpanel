@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.556",
+  "version": "1.1.0-rc.557",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T19:08:44Z",
+  "released_at": "2026-11-03T19:34:22Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7627580d246495c145fec2074b0d2d52f1b8d3e5",
+  "source_sha": "1a03390f5b08d6c75a0efef2c5c36e6a75dfd255",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.556/twinpanel-1.1.0-rc.556-linux-x86_64.tar.gz",
-    "sha256": "e96719811a364176b545d66842348aa51c45d0401a16ed36d43354facde3ee6e",
-    "size_bytes": 25364618
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.557/twinpanel-1.1.0-rc.557-linux-x86_64.tar.gz",
+    "sha256": "b91bfaf5fce6ddd6f4586daf3df844a2f6192cb1405e286b12255da3250c4707",
+    "size_bytes": 25368168
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.556 بازشدن سابلینک در مدیریت اشتراک‌های ادمین را سریع‌تر می‌کند. دریافت URL از مسیر سبک و مجاز جدا از connection-info انجام می‌شود، لینک در مرورگر کش شده و هنگام قرارگیری نشانگر روی دکمه از پیش دریافت می‌شود؛ اطلاعات پروتکل‌ها دیگر برای نمایش ساده سابلینک آماده‌سازی نمی‌شوند.",
-    "en": "TwinPanel 1.1.0-rc.556 speeds up admin subscription-link delivery through an authenticated lightweight API that bypasses expensive connection-info generation, plus in-memory link caching and hover/focus prefetch."
+    "fa": "TwinPanel 1.1.0-rc.557 دکمه متنی «خواندن همه» اعلان‌ها را در پنجره اعلان‌های ادمین، کاربر و نماینده با یک آیکون چشم مشترک جایگزین می‌کند. ظاهر هماهنگ، دسترس‌پذیری، RTL و نمایش موبایل اصلاح شده و عملکرد خواندن اعلان‌ها حفظ شده است.",
+    "en": "TwinPanel 1.1.0-rc.557 replaces the overflowing mark-all-read text in admin, customer, and reseller notification dropdowns with one accessible eye-only icon button, preserving its behavior and responsive RTL layout."
   }
 }
