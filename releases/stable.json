@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.532",
+  "version": "1.1.0-rc.533",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T00:55:45Z",
+  "released_at": "2026-11-03T00:58:28Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "107c4633e409e99da3138cb12964214a47529df3",
+  "source_sha": "4c29b0e0328377eda28a80940df23b7545bc429b",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.532/twinpanel-1.1.0-rc.532-linux-x86_64.tar.gz",
-    "sha256": "0a35a778fe5a32ce0282a8c59c2d05e3c0856ba039f504a1388d8774a1c62c3b",
-    "size_bytes": 25311041
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.533/twinpanel-1.1.0-rc.533-linux-x86_64.tar.gz",
+    "sha256": "824f20dfde645eb53b3ea8c415c99b8e5c58c00cdf8dd2279cf67084763de05a",
+    "size_bytes": 25312704
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.532 تنظیمات اکانت تست را از پلن‌های فروش جدا می‌کند، صفحه مستقل Trial برای ادمین و نماینده اضافه می‌کند، سهمیه ۱ روز / 500MB و محدودیت دریافت یک‌باره را با Ledger مستقل برای سیستم اصلی و هر نماینده اعمال می‌کند و Provisioning را روی مسیر مرکزی مدرن نگه می‌دارد. همچنین قرارداد قدیمی Simple Add Node Smoke با Navigation فعلی همگام شده است.",
-    "en": "TwinPanel 1.1.0-rc.532 separates Trial configuration from sale plans, adds dedicated Trial settings for admins and resellers, enforces the default 1-day / 500MB allowance with independent one-time claim ledgers for the main system and each reseller, and keeps provisioning on the centralized modern delivery path. It also aligns the stale Simple Add Node smoke contract with the current navigation."
+    "fa": "TwinPanel 1.1.0-rc.533 رابط ساخت دستی اشتراک را اصلاح می‌کند تا انتخاب پروتکل‌ها و سرورها بلافاصله داخل همان پنجره و قبل از فیلدهای اکانت دیده شود. هر ۱۵ پروتکل و همه سرورهای Exit فعال قابل انتخاب هستند، شمارنده انتخاب‌ها همیشه نمایش داده می‌شود، بدون انتخاب سرور ساخت انجام نمی‌شود و مسیر Fast Create همچنان ثبت سریع و Provisioning پس‌زمینه را حفظ می‌کند.",
+    "en": "TwinPanel 1.1.0-rc.533 fixes the manual subscription creation UI so protocol and server selectors are immediately visible in the same dialog before account fields. All 15 protocols and active Exit servers remain selectable, selection counters stay visible, at least one server is required, and the fast-create path continues to return quickly while provisioning proceeds in the background."
   }
 }
