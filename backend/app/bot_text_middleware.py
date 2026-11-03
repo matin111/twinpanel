@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import io
+import re
 import time
-from html import escape
+from html import escape, unescape
 from typing import Any, Awaitable, Callable
 
+import qrcode
 from aiogram.client.session.middlewares.base import BaseRequestMiddleware
+from aiogram.types import BufferedInputFile, CopyTextButton, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.methods import GetMyCommands, SetMyCommands
 from aiogram.types import BotCommand
 
@@ -38,6 +42,7 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
         self.cache_seconds = max(0.5, float(cache_seconds))
         self._loaded_at = 0.0
         self._values: dict[str, str] = {}
+        self._qr_sent_at: dict[tuple[str, str], float] = {}
         self._commands_sync_attempted = False
 
     async def _sync_start_command(
@@ -249,6 +254,72 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
 
         return result
 
+    @staticmethod
+    def _extract_subscription_link(text: str) -> str:
+        plain = unescape(str(text or ""))
+        for value in re.findall(r"https?://[^\s<>]+", plain):
+            link = value.rstrip(".,;!?)\"]}")
+            if "/v1/connect/" in link:
+                return link
+        return ""
+
+    @staticmethod
+    def _qr_png(link: str) -> bytes:
+        qr = qrcode.QRCode(
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=8,
+            border=3,
+        )
+        qr.add_data(link)
+        qr.make(fit=True)
+        image = qr.make_image(fill_color="black", back_color="white")
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG", optimize=True)
+        return buffer.getvalue()
+
+    async def _send_subscription_qr(self, bot: Any, chat_id: Any, link: str) -> None:
+        if not chat_id or not link:
+            return
+        key = (str(chat_id), link)
+        now = time.monotonic()
+        if now - self._qr_sent_at.get(key, 0.0) < 20.0:
+            return
+        self._qr_sent_at[key] = now
+        # Keep the cache bounded for long-running bot processes.
+        if len(self._qr_sent_at) > 512:
+            cutoff = now - 120.0
+            self._qr_sent_at = {k: v for k, v in self._qr_sent_at.items() if v >= cutoff}
+        try:
+            buttons = []
+            if link.startswith(("https://", "http://")):
+                buttons.append(InlineKeyboardButton(text="↗️ باز کردن سابلینک", url=link))
+            buttons.append(
+                InlineKeyboardButton(
+                    text="📋 کپی سابلینک",
+                    copy_text=CopyTextButton(text=link),
+                )
+            )
+            await bot.send_photo(
+                chat_id=chat_id,
+                photo=BufferedInputFile(self._qr_png(link), filename="subscription-qr.png"),
+                caption=(
+                    "📱 <b>QR اتصال اکانت</b>\n\n"
+                    "QR را با برنامه کلاینت اسکن کنید یا سابلینک را از دکمه زیر باز/کپی کنید."
+                ),
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[buttons]),
+            )
+        except Exception:
+            # QR is a convenience layer and must never break account delivery.
+            try:
+                await bot.send_photo(
+                    chat_id=chat_id,
+                    photo=BufferedInputFile(self._qr_png(link), filename="subscription-qr.png"),
+                    caption="📱 <b>QR اتصال اکانت</b>",
+                )
+            except Exception:
+                pass
+
     async def __call__(
         self,
         make_request: Callable[..., Awaitable[Any]],
@@ -269,4 +340,16 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
                 else:
                     method.text = rewritten
 
-        return await make_request(bot, method)
+        result = await make_request(bot, method)
+
+        outbound_text = getattr(method, "text", None)
+        if isinstance(outbound_text, str) and outbound_text:
+            link = self._extract_subscription_link(outbound_text)
+            if link:
+                chat_id = getattr(method, "chat_id", None)
+                if chat_id is None:
+                    chat = getattr(result, "chat", None)
+                    chat_id = getattr(chat, "id", None)
+                await self._send_subscription_qr(bot, chat_id, link)
+
+        return result
