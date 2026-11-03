@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.540",
+  "version": "1.1.0-rc.541",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T02:22:09Z",
+  "released_at": "2026-11-03T02:35:26Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "8a9fa4139f1d6c747ef2854910d3fd72d3c63095",
+  "source_sha": "3e2969b0809cc593779d0ae6b97a3de03033ae20",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.540/twinpanel-1.1.0-rc.540-linux-x86_64.tar.gz",
-    "sha256": "5fe4b9432d1bac478c0c36545bce76b555b72c6fead995dea80e8fbec9225448",
-    "size_bytes": 25319826
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.541/twinpanel-1.1.0-rc.541-linux-x86_64.tar.gz",
+    "sha256": "d9234fc754be2cf1427d6e598df6b9e40dc4979b2c99bfa95a3b0c1175251a3f",
+    "size_bytes": 25318084
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.540 همگرایی پروتکل‌های مدرن روی سرور Exit جدید را از ریشه اصلاح می‌کند. انتشار سرور برای کاربران قدیمی دیگر همه اکانت‌ها را Full Reprovision نمی‌کند؛ فقط Pairهای گمشده همان Node برای پروتکل‌های انتخاب‌شده ساخته و با Credential موجود ادغام می‌شوند. همچنین Reconcile مدرن دیگر هنگام SSH روی ردیف Subscription قفل FOR UPDATE نگه نمی‌دارد و از PostgreSQL advisory lock اختصاصی هر اشتراک استفاده می‌کند تا Lock Timeout و جا ماندن TUIC/ShadowTLS و سایر پروتکل‌های مدرن تکرار نشود.",
-    "en": "TwinPanel 1.1.0-rc.540 fixes Modern protocol convergence on newly added Exit nodes at the root. Publishing a new server to existing users no longer fully reprovisions every account; it creates only missing protocol/node pairs and merges them into existing credentials. Modern reconcile also stops holding Subscription FOR UPDATE locks across SSH work and uses a per-subscription PostgreSQL advisory lock, preventing lock-timeout storms and missing TUIC/ShadowTLS or other Modern protocol pairs."
+    "fa": "TwinPanel 1.1.0-rc.541 مدیریت رنگ دکمه اکانت تست ربات اصلی را به صفحه مدیریت Telegram اضافه می‌کند. دکمه 🎁 اکانت تست دیگر رنگ hardcode ندارد و رنگ ذخیره‌شده از همان Registry مرکزی دکمه‌ها خوانده می‌شود. پنل ادمین نیز کنترل جداگانه و Preview واقعی ۱۱ دکمه‌ای /start را نمایش می‌دهد؛ رنگ پیش‌فرض اکانت تست برای سازگاری همچنان Primary/آبی است.",
+    "en": "TwinPanel 1.1.0-rc.541 adds admin-managed styling for the main Telegram bot Trial button. The 🎁 Trial Account button no longer uses a hard-coded color and now reads its saved style from the central button-style registry. The admin Telegram page includes a dedicated Trial control and an accurate 11-button /start preview, while keeping Primary/blue as the backward-compatible default."
   }
 }
