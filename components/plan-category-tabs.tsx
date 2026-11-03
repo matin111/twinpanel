@@ -3,9 +3,9 @@
 import {useEffect,useState} from "react";
 import {createPortal} from "react-dom";
 
-export const DEFAULT_PLAN_CATEGORY="سایر پلن‌ها";
+export const DEFAULT_PLAN_CATEGORY="۱ کاربره";
 
-type CategoryPlan={category?:string|null};
+type CategoryPlan={device_limit?:number|null};
 
 type Props={
   categories:string[];
@@ -15,26 +15,25 @@ type Props={
   portalToStorePlans?:boolean;
 };
 
+function normalizedDeviceLimit(value:unknown){
+  const parsed=Number(value||1);
+  if(!Number.isFinite(parsed)||parsed<1)return 1;
+  return Math.max(1,Math.trunc(parsed));
+}
+
 export function normalizePlanCategory(value:unknown){
-  const category=String(value||"").trim().replace(/\s+/g," ");
-  return category||DEFAULT_PLAN_CATEGORY;
+  const deviceLimit=normalizedDeviceLimit(value);
+  return `${deviceLimit.toLocaleString("fa-IR")} کاربره`;
 }
 
 export function planCategories<T extends CategoryPlan>(plans:T[]){
-  const seen=new Set<string>();
-  const result:string[]=[];
-  for(const plan of plans){
-    const category=normalizePlanCategory(plan.category);
-    if(seen.has(category))continue;
-    seen.add(category);
-    result.push(category);
-  }
-  return result;
+  const limits=[...new Set(plans.map(plan=>normalizedDeviceLimit(plan.device_limit)))].sort((a,b)=>a-b);
+  return limits.map(limit=>normalizePlanCategory(limit));
 }
 
 export function planCategoryCounts<T extends CategoryPlan>(plans:T[]){
   return plans.reduce<Record<string,number>>((result,plan)=>{
-    const category=normalizePlanCategory(plan.category);
+    const category=normalizePlanCategory(plan.device_limit);
     result[category]=(result[category]||0)+1;
     return result;
   },{});
@@ -42,7 +41,7 @@ export function planCategoryCounts<T extends CategoryPlan>(plans:T[]){
 
 export function filterPlansByCategory<T extends CategoryPlan>(plans:T[],category:string){
   if(!category)return plans;
-  return plans.filter(plan=>normalizePlanCategory(plan.category)===category);
+  return plans.filter(plan=>normalizePlanCategory(plan.device_limit)===category);
 }
 
 function Tabs({categories,active,onChange,counts}:Omit<Props,"portalToStorePlans">){
@@ -61,7 +60,7 @@ function Tabs({categories,active,onChange,counts}:Omit<Props,"portalToStorePlans
           color:selected?"#fff":"inherit",background:selected?"var(--store-chat-accent,#7c3aed)":"rgba(127,127,127,.08)",
           boxShadow:selected?"0 8px 24px rgba(124,58,237,.22)":"none",transition:"all .18s ease",
         }}
-      >{category}{counts?.[category]!=null&&<span style={{marginInlineStart:7,opacity:.75,fontSize:".82em"}}>({counts[category]})</span>}</button>;
+      >👤 {category}{counts?.[category]!=null&&<span style={{marginInlineStart:7,opacity:.75,fontSize:".82em"}}>({counts[category]})</span>}</button>;
     })}
   </div>;
 }
