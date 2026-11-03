@@ -39,7 +39,7 @@ def _main_menu_keyboard():
                 inline_button(
                     "🎁 اکانت تست",
                     callback_data="trial:claim",
-                    style="primary",
+                    style=styles.trial,
                 )
             ],
             [
