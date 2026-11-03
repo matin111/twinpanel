@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.529",
-  "source_sha": "a070f436d4a10515839e5a84e104fbff6ae9a20d",
+  "version": "1.1.0-rc.530",
+  "source_sha": "f2b34905b52c286e83a264a78e90648cd208fff1",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.529 مشکل تحویل ندادن اکانت توسط ربات اصلی پس از تأیید پرداخت را اصلاح می‌کند. اگر اشتراک ساخته شده و لینک اتصال معتبر و اطلاعات قابل استفاده داشته باشد، خطای موقت یک پروتکل دیگر سفارش را provision_failed نمی‌کند؛ سفارش fulfilled می‌شود، پیام تحویل رسمی ربات ارسال می‌شود و تکمیل پروتکل‌های باقی‌مانده در پس‌زمینه ادامه پیدا می‌کند.",
-    "en": "TwinPanel 1.1.0-rc.529 fixes main Telegram bot account delivery after payment approval. If a subscription already has a valid subscription link and usable delivery data, a transient protocol provisioning failure no longer strands the order as provision_failed; the order is fulfilled, canonical Telegram delivery is queued, and remaining protocol convergence continues in the background."
+    "fa": "TwinPanel 1.1.0-rc.530 تراکنش‌های پرداخت را به اعلان‌های مدیریت اضافه می‌کند. خرید اشتراک و شارژ کیف پول با کاربر، مبلغ، روش پرداخت و وضعیت در همان Dropdown اعلان‌ها نمایش داده می‌شوند، تراکنش‌های اخیر قبلی نیز Backfill می‌شوند، کلیک روی اعلان مستقیم صفحه پرداخت‌ها را باز می‌کند و داده‌های نمایندگی از اعلان‌های ادمین مرکزی جدا می‌مانند.",
+    "en": "TwinPanel 1.1.0-rc.530 adds payment transactions to the admin notification center. Subscription purchases and wallet top-ups now appear in the existing dropdown with user, amount, payment method and status; recent historical transactions are backfilled, notifications link directly to the payments page, and reseller-scoped payment data remains isolated from the central admin feed."
   }
 }
