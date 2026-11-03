@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.527",
+  "version": "1.1.0-rc.528",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-02T23:46:20Z",
+  "released_at": "2026-11-03T00:07:00Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "1145adc5991a154f3d184ab7d9e0d404aeeb2015",
+  "source_sha": "8f7a3805da3d74362ac2b1b48c0ecb9a43e83328",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.527/twinpanel-1.1.0-rc.527-linux-x86_64.tar.gz",
-    "sha256": "88448f04cb4a1b77dde3a1021312467cc1de200ca4de02890a047368132a527f",
-    "size_bytes": 25431070
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.528/twinpanel-1.1.0-rc.528-linux-x86_64.tar.gz",
+    "sha256": "7e7bb10dc161307103aef68152e52cbd828c4d87f62eef43354330bc0b692f64",
+    "size_bytes": 25429511
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.527 قابلیت اکانت تست مستقل را برای پنل کاربر، ربات اصلی و ربات نماینده منتشر می‌کند؛ دریافت تست فقط یک‌بار برای هر کاربر از مسیر مرکزی انجام می‌شود، دکمه تست از کارت‌های پلن جدا شده و اصلاح حذف نوار قدیمی V2Ray نیز در این نسخه قرار دارد.",
-    "en": "TwinPanel 1.1.0-rc.527 publishes the standalone trial-account flow for the customer panel, main Telegram bot, and reseller bot; trial eligibility is enforced centrally once per user, the trial action is no longer duplicated inside plan cards, and the legacy V2Ray top-strip removal is included."
+    "fa": "TwinPanel 1.1.0-rc.528 رگرسیون ساخت اشتراک دستی و افزودن سرور را اصلاح می‌کند؛ انتخاب ۱۵ پروتکل و سرورهای Exit در ساخت دستی دوباره در دسترس است، ساخت اکانت پس از ثبت اولیه در پس‌زمینه ادامه می‌یابد و افزودن سرور نیز بدون قفل‌کردن رابط، آماده‌سازی و انتشار سرور جدید برای اشتراک‌های قبلی را در Backend انجام می‌دهد.",
+    "en": "TwinPanel 1.1.0-rc.528 fixes regressions in manual subscription creation and Add Server; the full 15-protocol and Exit-node selectors are restored, account provisioning continues in the backend after the initial create request, and new server preparation plus publish-to-existing-subscriptions runs without blocking the admin UI."
   }
 }
