@@ -16,7 +16,7 @@
 }
 
 .adminNotificationCenter .adminNotificationPopover .customerNotificationList > button {
-  grid-template-columns: 9px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 9px;
   gap: 10px;
   padding: 12px 12px 11px;
   border-radius: 14px;
