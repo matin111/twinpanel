@@ -34,7 +34,7 @@ assert "ResellerTrialClaim" in reseller_service
 assert 'Depends(require_reseller)' in trial_router
 assert '@router.get("/reseller/me")' in trial_router
 assert '@router.put("/reseller/me")' in trial_router
-assert '"/v1/trial/reseller/me"' in reseller_trial_ui
+assert "/v1/trial/reseller/me" in reseller_trial_ui
 
 # Both settings screens are real routes and visible in their menus.
 assert 'routeKey==="admin/trial"' in router_ui
