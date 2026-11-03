@@ -314,6 +314,45 @@ def migration_import(payload: MigrationImportIn, db: Session = Depends(get_db)):
         raise
 
 
+@admin_router.post("/import-staged-batch")
+def migration_import_staged_batch(
+    payload: MigrationBatchImportIn,
+    db: Session = Depends(get_db),
+):
+    """Fast atomic import for exports without a preserved V2Ray UUID.
+
+    Stage canonical 15-protocol desired state. Node convergence does
+    real provisioning separately; no SSH runs on this HTTP request.
+    """
+    _require_canonical_migration_protocols(payload.protocols)
+    if len(payload.records) > 100:
+        raise HTTPException(status_code=422, detail="Use chunks of at most 100 records")
+    try:
+        results: list[dict[str, Any]] = []
+        for record in payload.records:
+            results.append(import_record(
+                db,
+                source=payload.source,
+                record=record,
+                target_user_id=payload.target_user_id,
+                protocols=list(ALL_PROTOCOL_KEYS),
+                commit=False,
+            ))
+        db.commit()
+        return {
+            "ok": True,
+            "imported": sum(bool(item["imported"]) for item in results),
+            "existing": sum(bool(item["idempotent"]) for item in results),
+            "subscriptions": len(results),
+            "protocols": list(ALL_PROTOCOL_KEYS),
+            "remote_provisioning_completed": False,
+            "items": results,
+        }
+    except Exception:
+        db.rollback()
+        raise
+
+
 @admin_router.post("/import-batch")
 async def migration_import_batch(
     payload: MigrationBatchImportIn,
@@ -340,6 +379,7 @@ async def migration_import_batch(
                 record=record,
                 target_user_id=payload.target_user_id,
                 protocols=protocols,
+                commit=False,
             )
             subscription_id = int(result["subscription_id"])
             subscription_uuids[subscription_id] = preserved_uuid
@@ -352,6 +392,7 @@ async def migration_import_batch(
         # Snapshot existing imported records as well; never replace their
         # original V2Ray credential or UUID during this step.
         added_protocols = ensure_migration_protocol_snapshots(db, list(subscription_uuids))
+        # Persist the entire import batch atomically before network work.
         db.commit()
         provision = await provision_migrated_v2ray_batch(db, subscription_uuids)
 
