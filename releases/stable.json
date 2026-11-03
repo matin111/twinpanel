@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.548",
+  "version": "1.1.0-rc.549",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-03T05:20:52Z",
+  "released_at": "2026-11-03T05:53:16Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "2ea541d141b5c16d681be1272e836220b850ea91",
+  "source_sha": "f77f6b880ed0dff510e43805e9e0e8dc9b670ef6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.548/twinpanel-1.1.0-rc.548-linux-x86_64.tar.gz",
-    "sha256": "b443df9d5d092214ccebe874e0dd3c9ba4f54eb8ee8507c409133b1dbbfe9e65",
-    "size_bytes": 25342220
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.549/twinpanel-1.1.0-rc.549-linux-x86_64.tar.gz",
+    "sha256": "53fa20a3528c52478f8a6e71724446a86deac70cb0bade8878ed9baeed25df5f",
+    "size_bytes": 25350457
   },
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.548 دسته‌بندی پلن‌ها در فروشگاه عمومی و بخش خرید پنل کاربری را بر اساس تعداد کاربر واقعی هر پلن (device_limit) انجام می‌دهد. دسته‌ها به‌صورت ۱ کاربره، ۲ کاربره، ۳ کاربره و ... با ترتیب عددی نمایش داده می‌شوند و ظاهر انتخاب دسته به کارت‌های حرفه‌ای، ریسپانسیو و هماهنگ با رنگ قالب ارتقا یافته است. هر کارت تعداد پلن‌های موجود را نمایش می‌دهد و فقط پلن‌های همان تعداد کاربر دیده می‌شوند. منطق خرید، پرداخت و Provisioning بدون تغییر باقی مانده است.",
-    "en": "TwinPanel 1.1.0-rc.548 groups plans in the public storefront and customer purchase panel by each plan's real user/device limit. Groups render in numeric order (1-user, 2-user, 3-user, ...), with a redesigned responsive card-style selector that follows the active storefront accent color and shows the available plan count. Only plans for the selected user count are rendered; purchase, payment and provisioning behavior are unchanged."
+    "fa": "TwinPanel 1.1.0-rc.549 جایگذاری و طراحی دسته‌بندی تعداد کاربر در فروشگاه را اصلاح می‌کند. دسته‌ها به‌صورت تمام‌عرض بعد از تیتر بخش پلن‌ها و قبل از گرید پلن‌ها قرار می‌گیرند. قالب ۲ (Editorial) استایل خطی و مینیمال مخصوص خود را دارد و قالب ۳ (Orbit) استایل Control Deck هماهنگ با ساختار خودش. رنگ حالت فعال دیگر بنفش ثابت نیست و مستقیم از رنگ‌های اصلی برند (brand primary/secondary) گرفته می‌شود تا با بقیه دکمه‌های سایت یکدست باشد.",
+    "en": "TwinPanel 1.1.0-rc.549 fixes the placement and design of storefront user-count categories. The selector now spans the full width after the plans heading and before the plan grid. Template 2 (Editorial) gets its own minimal linear treatment while Template 3 (Orbit) gets a matching control-deck treatment. Active category colors no longer use a fixed purple and instead follow the brand primary/secondary colors for consistency with the rest of the storefront controls."
   }
 }
