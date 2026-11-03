@@ -172,45 +172,65 @@ _SCRIPT = r"""
     }catch(_error){return String(value||'')}
   }
 
-  function copyDialog(initial){
+  function copyDialog(label){
     const shade=document.createElement('div');
-    shade.setAttribute('role','dialog');
-    shade.setAttribute('aria-modal','true');
+    shade.setAttribute('role','dialog');shade.setAttribute('aria-modal','true');
     shade.setAttribute('aria-label','کپی کانفیگ');
     Object.assign(shade.style,{position:'fixed',inset:'0',zIndex:'2147483647',background:'rgba(0,0,0,.72)',display:'grid',placeItems:'center',padding:'16px'});
     const panel=document.createElement('div');
     Object.assign(panel.style,{width:'min(92vw,650px)',background:'var(--surface,#171a24)',color:'var(--text,#fff)',padding:'18px',borderRadius:'14px',border:'1px solid var(--line,#505464)',display:'grid',gap:'10px',direction:'rtl'});
-    const title=document.createElement('strong');title.textContent='کپی کانفیگ‌ها';
-    const hint=document.createElement('small');hint.textContent='بعد از بارگذاری، روی «کپی» بزنید. اگر مرورگر مجوز نداد از Ctrl+C استفاده کنید.';
-    const area=document.createElement('textarea');area.value=initial||'';area.readOnly=true;area.rows=9;area.setAttribute('aria-label','متن کانفیگ');
+    const title=document.createElement('strong');title.textContent='کپی '+label;
+    const hint=document.createElement('small');hint.textContent='در حال دریافت کانفیگ‌ها...';
+    const area=document.createElement('textarea');area.value='';area.readOnly=true;area.rows=10;
+    area.setAttribute('aria-label','متن کانفیگ');
     Object.assign(area.style,{width:'100%',boxSizing:'border-box',direction:'ltr',fontFamily:'monospace',fontSize:'12px',borderRadius:'8px',padding:'10px'});
-    const controls=document.createElement('div');Object.assign(controls.style,{display:'flex',gap:'8px',justifyContent:'flex-start'});
-    const copyButton=document.createElement('button');copyButton.type='button';copyButton.textContent='کپی متن';copyButton.disabled=!initial;
+    const controls=document.createElement('div');Object.assign(controls.style,{display:'flex',gap:'8px',justifyContent:'flex-start',flexWrap:'wrap'});
+    const copyButton=document.createElement('button');copyButton.type='button';copyButton.textContent='کپی کانفیگ';copyButton.disabled=true;
+    const downloadButton=document.createElement('button');downloadButton.type='button';downloadButton.textContent='دانلود فایل';downloadButton.disabled=true;
     const closeButton=document.createElement('button');closeButton.type='button';closeButton.textContent='بستن';
+    let filename='vpn-config.txt';
     copyButton.addEventListener('click',()=>{
       area.focus();area.select();area.setSelectionRange(0,area.value.length);
-      copy(area.value).then(ok=>{hint.textContent=ok?'متن کپی شد ✓':'متن انتخاب شده است؛ Ctrl+C را فشار دهید.'});
+      copy(area.value).then(ok=>{hint.textContent=ok?'کانفیگ در کلیپ‌بورد کپی شد ✓':'متن انتخاب شده است؛ Ctrl+C را فشار دهید.'});
+    });
+    downloadButton.addEventListener('click',()=>{
+      if(!area.value)return;
+      const blob=new Blob([area.value],{type:'text/plain;charset=utf-8'});
+      const objectUrl=URL.createObjectURL(blob);
+      const link=document.createElement('a');link.href=objectUrl;link.download=filename;
+      document.body.appendChild(link);link.click();link.remove();
+      setTimeout(()=>URL.revokeObjectURL(objectUrl),1000);
     });
     const close=()=>shade.remove();
     closeButton.addEventListener('click',close);
     shade.addEventListener('click',event=>{if(event.target===shade)close()});
-    controls.append(copyButton,closeButton);panel.append(title,hint,area,controls);shade.appendChild(panel);document.body.appendChild(shade);
-    return {area,copyButton,hint};
+    controls.append(copyButton,downloadButton,closeButton);
+    panel.append(title,hint,area,controls);shade.appendChild(panel);document.body.appendChild(shade);
+    return {area,copyButton,downloadButton,hint,setFilename:value=>{filename=value}};
   }
 
-  async function copyAll(url){
-    const dialog=copyDialog('در حال دریافت کانفیگ‌ها...');
+  async function copyAll(url,format){
+    const isSingbox=format==='singbox';
+    const label=isSingbox?'JSON مخصوص sing-box':format==='yaml'?'YAML مخصوص Clash / Mihomo':'کانفیگ‌ها';
+    // An explicit second click is necessary for Clipboard permission after
+    // asynchronous network fetch. The dialog also supports Ctrl+C and download.
+    const dialog=copyDialog(label);
     try{
-      const response=await fetch(url,{cache:'no-store'});if(!response.ok)throw new Error(String(response.status));
+      const source=isSingbox?url+(url.includes('?')?'&':'?')+'format=singbox':url;
+      const response=await fetch(source,{cache:'no-store'});if(!response.ok)throw new Error(String(response.status));
       const kind=String(response.headers.get('X-TwinPanel-Multi-Kind')||'').toLowerCase();
-      if(kind==='bundle')throw new Error('bundle is not text');
+      if(kind==='bundle')throw new Error('binary bundle cannot be copied as text');
       const data=await response.text();
       const payload=kind==='uri'?decodeBase64Utf8(data):data;
-      dialog.area.value=payload;dialog.copyButton.disabled=!payload;
-      dialog.hint.textContent='کانفیگ آماده است. برای کپی روی «کپی متن» بزنید؛ در صورت محدودیت مرورگر Ctrl+C.';
+      if(!payload)throw new Error('empty payload');
+      if(isSingbox){const parsed=JSON.parse(payload);if(!Array.isArray(parsed.outbounds)||!parsed.outbounds.length)throw new Error('invalid singbox payload')}
+      dialog.area.value=payload;
+      dialog.copyButton.disabled=false;dialog.downloadButton.disabled=false;
+      dialog.setFilename((profileFor('shadowtls')||'vpn')+(isSingbox?'-singbox.json':format==='yaml'?'-clash.yaml':'-config.txt'));
+      dialog.hint.textContent='کانفیگ آماده است؛ «کپی کانفیگ» را بزنید یا فایل را دانلود کنید. اگر کپی خودکار مسدود شد، متن را انتخاب کرده Ctrl+C بزنید.';
     }catch(_error){
-      dialog.area.value='';dialog.copyButton.disabled=true;
-      dialog.hint.textContent='دریافت کانفیگ ممکن نشد؛ لینک اشتراک را کپی کنید یا دوباره تلاش کنید.';
+      dialog.area.value='';dialog.copyButton.disabled=true;dialog.downloadButton.disabled=true;
+      dialog.hint.textContent='دریافت کانفیگ انجام نشد. لینک اشتراک را کپی کنید یا دوباره تلاش کنید.';
     }
   }
 
@@ -273,7 +293,12 @@ _SCRIPT = r"""
       }else{
         actions.appendChild(action('button','کپی لینک مولتی‌لینک',()=>copy(url).then(ok=>notify(ok?'لینک اشتراک کپی شد ✓':'کپی انجام نشد')),true));
       }
-      actions.appendChild(action('button','کپی همه کانفیگ‌ها',()=>copyAll(url),false));
+      if(protocol==='shadowtls'){
+        actions.appendChild(action('button','کپی YAML برای Clash',()=>copyAll(url,'yaml'),false));
+        actions.appendChild(action('button','کپی JSON برای sing-box',()=>copyAll(url,'singbox'),false));
+      }else{
+        actions.appendChild(action('button','کپی همه کانفیگ‌ها',()=>copyAll(url),false));
+      }
     }
     card.append(head,actions);
     panel.querySelector('.panel-head')?.insertAdjacentElement('afterend',card);
