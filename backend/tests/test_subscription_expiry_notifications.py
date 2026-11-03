@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from app.subscription_expiry_notifications import _dedupe_stage, _stage
+from app.subscription_expiry_notifications import _dedupe_stage, _notification_text, _stage
 from app.user_notification_models import SubscriptionExpiryNotificationClaim
 
 
@@ -25,3 +25,14 @@ def test_expiry_claim_event_key_is_database_unique():
     event_key = SubscriptionExpiryNotificationClaim.__table__.c.event_key
     assert event_key.unique is True
     assert event_key.nullable is False
+
+
+def test_expiry_reminder_text_includes_account_username():
+    expires_at = datetime(2026, 11, 4, 12, 0, 0)
+    title, message, kind = _notification_text(2170, expires_at, "1d", "vpn-user-2170")
+
+    assert title == "اشتراک شما به‌زودی منقضی می‌شود"
+    assert "اشتراک شماره 2170" in message
+    assert "نام کاربری: vpn-user-2170" in message
+    assert "2026/11/04" in message
+    assert kind == "warning"
