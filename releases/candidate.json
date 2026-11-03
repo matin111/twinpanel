@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.554",
-  "source_sha": "3c6ef03d8ea49acce2cfbe5a13e52c466698bae5",
+  "version": "1.1.0-rc.555",
+  "source_sha": "18b234f5727ba2049e2402f9951366aefc9b1121",
   "notes": {
-    "fa": "TwinPanel 1.1.0-rc.554 مشکل فشرده‌شدن متن اعلان‌ها در ستون بسیار باریک را برطرف می‌کند. قوانین متناقض قدیمی حذف شده‌اند و اعلان‌های کاربری، ادمین و نماینده اکنون چیدمان دو‌ستونه سازگار با موبایل، دسکتاپ و جهت راست‌به‌چپ دارند.",
-    "en": "TwinPanel 1.1.0-rc.554 fixes notification text collapsing into a narrow column by removing obsolete conflicting styles and explicitly placing message text in the flexible grid column across customer, admin and reseller notifications."
+    "fa": "TwinPanel 1.1.0-rc.555 چیدمان اعلان‌های ادمین را اصلاح می‌کند: عنوان، توضیح و زمان در ردیف‌های مجزا بدون هم‌پوشانی نمایش داده می‌شوند و اسکرول و راست‌چین در موبایل و دسکتاپ حفظ می‌شود.",
+    "en": "TwinPanel 1.1.0-rc.555 fixes overlapping admin notification titles, descriptions, and timestamps with a stable scoped flex layout while preserving scrolling and RTL/mobile support."
   }
 }
