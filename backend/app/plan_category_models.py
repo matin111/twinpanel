@@ -1,9 +1,49 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+    inspect,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .database import Base
+from .database import Base, engine
+from .models import Plan
+
+
+# TWINPANEL_DUPLICATE_PLAN_NAMES_V1
+#
+# Plan names are labels, not identities. Different user-count/category variants
+# may intentionally share the same visible name. Older TwinPanel releases made
+# plans.name UNIQUE, so remove that metadata constraint before create_all and
+# drop the legacy PostgreSQL constraint on existing installations.
+def _allow_duplicate_plan_names() -> None:
+    table = Plan.__table__
+    for constraint in list(table.constraints):
+        if not isinstance(constraint, UniqueConstraint):
+            continue
+        columns = [column.name for column in constraint.columns]
+        if columns == ["name"]:
+            table.constraints.discard(constraint)
+
+    table.c.name.unique = False
+
+    if engine.dialect.name != "postgresql":
+        return
+
+    with engine.begin() as connection:
+        if not inspect(connection).has_table("plans"):
+            return
+        connection.execute(
+            text("ALTER TABLE plans DROP CONSTRAINT IF EXISTS plans_name_key")
+        )
+
+
+_allow_duplicate_plan_names()
 
 
 class PlanCategoryAssignment(Base):
