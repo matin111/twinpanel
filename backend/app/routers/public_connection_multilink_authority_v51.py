@@ -282,7 +282,13 @@ _SCRIPT = r"""
       const download=action('a','دانلود همه کانفیگ‌ها',null,true);download.href=url;download.target='_blank';download.rel='noopener noreferrer';actions.appendChild(download);
       actions.appendChild(action('button','کپی لینک بسته',()=>copy(url).then(ok=>notify(ok?'لینک بسته کپی شد ✓':'کپی انجام نشد')),false));
     }else{
-      const deep=importHref(rawClient,url,profile);
+      // Karing's Clash plugin import can treat ShadowTLS as an isolated
+      // transport. Its native sing-box JSON import preserves each full
+      // Shadowsocks -> ShadowTLS detour pair, verified by a live proxy test.
+      const clientUrl=protocol==='shadowtls'
+        ? url+(url.includes('?')?'&':'?')+'format=singbox'
+        : url;
+      const deep=importHref(rawClient,clientUrl,profile);
       if(deep){
         const add=action('a','افزودن همه به '+client,null,true);add.href=deep;actions.appendChild(add);
         actions.appendChild(action('button','کپی لینک اشتراک',()=>{
