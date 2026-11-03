@@ -1,45 +1,121 @@
-/* Admin, customer, and reseller notification centers intentionally share one
-   visual system. Keep admin on the exact same dimensions and spacing as the
-   shared customerNotification* styles. */
+/* Admin notification rows are a self-contained flex layout.
+   Avoid grid auto-placement / legacy admin overrides that squeezed or overlaid
+   the message and timestamp inside narrow grid tracks. */
 .adminNotificationCenter .adminNotificationPopover {
   width: min(430px, calc(100vw - 28px));
   max-width: calc(100vw - 28px);
+  box-sizing: border-box;
+  direction: rtl;
+  text-align: right;
 }
 
 .adminNotificationCenter .adminNotificationPopover header {
+  display: flex;
+  align-items: center;
   padding: 15px 16px 13px;
 }
 
+.adminNotificationCenter .adminNotificationPopover header > div {
+  min-width: 0;
+}
+
+.adminNotificationCenter .adminNotificationPopover header small {
+  display: block;
+}
+
 .adminNotificationCenter .adminNotificationPopover .customerNotificationList {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   gap: 7px;
   padding: 8px;
+  max-height: min(420px, calc(100dvh - 190px));
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .adminNotificationCenter .adminNotificationPopover .customerNotificationList > button {
-  grid-template-columns: minmax(0, 1fr) 9px;
+  display: flex !important;
+  flex-direction: row;
+  align-items: flex-start !important;
+  justify-content: flex-start;
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  min-height: 64px;
+  box-sizing: border-box;
   gap: 10px;
-  padding: 12px 12px 11px;
+  padding: 12px;
   border-radius: 14px;
-  border-color: transparent;
+  border: 1px solid transparent;
+  text-align: right;
+  direction: rtl;
+}
+
+.adminNotificationCenter .adminNotificationPopover .customerNotificationList > button.unread {
+  border-color: rgba(139, 92, 246, .16);
+}
+
+.adminNotificationCenter .adminNotificationPopover .customerNotificationList > button > i {
+  position: static;
+  display: block !important;
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  margin: 7px 0 0;
 }
 
 .adminNotificationCenter .adminNotificationPopover .customerNotificationList > button > div {
+  position: static;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  flex: 1 1 0%;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  height: auto;
   gap: 5px;
+  overflow: hidden;
+  text-align: right;
 }
 
-.adminNotificationCenter .adminNotificationPopover .customerNotificationList > button b {
+.adminNotificationCenter .adminNotificationPopover .customerNotificationList > button > div > b,
+.adminNotificationCenter .adminNotificationPopover .customerNotificationList > button > div > p,
+.adminNotificationCenter .adminNotificationPopover .customerNotificationList > button > div > small {
+  position: static;
+  float: none;
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  white-space: normal;
+}
+
+.adminNotificationCenter .adminNotificationPopover .customerNotificationList > button > div > b {
+  display: block;
   font-size: 12px;
-  line-height: 1.55;
+  line-height: 1.65;
 }
 
-.adminNotificationCenter .adminNotificationPopover .customerNotificationList > button p {
+.adminNotificationCenter .adminNotificationPopover .customerNotificationList > button > div > p {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
   font-size: 11px;
   line-height: 1.75;
-  -webkit-line-clamp: 3;
+  unicode-bidi: plaintext;
 }
 
-.adminNotificationCenter .adminNotificationPopover .customerNotificationList > button small {
-  margin-top: 0;
+.adminNotificationCenter .adminNotificationPopover .customerNotificationList > button > div > small {
+  display: block;
   font-size: 9px;
   line-height: 1.5;
   opacity: .82;
@@ -54,6 +130,16 @@
   font-size: 11px;
 }
 
+html[dir="ltr"] .adminNotificationCenter .adminNotificationPopover,
+html[dir="ltr"] .adminNotificationCenter .adminNotificationPopover .customerNotificationList > button,
+html[dir="ltr"] .adminNotificationCenter .adminNotificationPopover .customerNotificationList > button > div,
+html[dir="ltr"] .adminNotificationCenter .adminNotificationPopover .customerNotificationList > button > div > b,
+html[dir="ltr"] .adminNotificationCenter .adminNotificationPopover .customerNotificationList > button > div > p,
+html[dir="ltr"] .adminNotificationCenter .adminNotificationPopover .customerNotificationList > button > div > small {
+  direction: ltr;
+  text-align: left;
+}
+
 @media (max-width: 720px) {
   .adminNotificationCenter .adminNotificationPopover {
     width: auto;
@@ -61,8 +147,7 @@
   }
 
   .adminNotificationCenter .adminNotificationPopover .customerNotificationList {
-    gap: 7px;
-    padding: 8px;
+    max-height: calc(100dvh - 210px);
   }
 
   .adminNotificationCenter .adminNotificationPopover .customerNotificationList > button {
