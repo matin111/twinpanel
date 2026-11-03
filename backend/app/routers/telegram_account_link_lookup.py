@@ -158,6 +158,78 @@ def _resolve_owned_subscription(
     }
 
 
+# This endpoint serves accounts provisioned by the administrator, which can
+# remain owned by the administrative TwinPanel user instead of the customer's
+# panel user ID. VPN usernames are the lookup identifiers for this feature.
+# Restrict requests to the authenticated bot and throttle enumeration.
+_USERNAME_SUCCESS_WINDOW_SECONDS = 10 * 60
+_USERNAME_SUCCESS_LIMIT = 10
+_username_successes: dict[int, list[tuple[float, str]]] = defaultdict(list)
+
+
+def _guard_username_lookup(telegram_id: int, username: str) -> None:
+    _guard_attempts(telegram_id)
+    now = time.monotonic()
+    recent = [
+        (at, name)
+        for at, name in _username_successes.get(telegram_id, [])
+        if at >= now - _USERNAME_SUCCESS_WINDOW_SECONDS
+    ]
+    _username_successes[telegram_id] = recent
+    distinct = {name for _, name in recent}
+    if username not in distinct and len(distinct) >= _USERNAME_SUCCESS_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail="تعداد درخواست‌های دریافت لینک زیاد است. چند دقیقه بعد دوباره امتحان کنید.",
+        )
+
+
+@router.post(
+    "/account-link/resolve-username",
+    dependencies=[Depends(bot_guard)],
+)
+def resolve_username_account_link(
+    payload: TelegramOwnedAccountLinkLookupIn,
+    db: Session = Depends(get_db),
+):
+    """Resolve an active unique VPN username across admin-created accounts.
+
+    The bot enforces Telegram chat identity; the private bot secret is required
+    by this endpoint. We never select an arbitrary row if usernames collide.
+    """
+    telegram_id = int(payload.telegram_id)
+    username = str(payload.username or "").strip().casefold()
+    _guard_username_lookup(telegram_id, username)
+    if not username:
+        raise _owned_lookup_error(telegram_id)
+    now = datetime.utcnow()
+    matches = (
+        db.query(Subscription)
+        .filter(
+            func.lower(Subscription.account_username) == username,
+            Subscription.status == SubscriptionStatus.ACTIVE,
+            or_(
+                Subscription.expires_at.is_(None),
+                Subscription.expires_at > now,
+            ),
+        )
+        .order_by(Subscription.id.asc())
+        .limit(2)
+        .all()
+    )
+    if len(matches) != 1:
+        raise _owned_lookup_error(telegram_id)
+    sub = matches[0]
+    link = _public_share_link(db, sub)
+    _clear_failures(telegram_id)
+    _username_successes[telegram_id].append((time.monotonic(), username))
+    return {
+        "ok": True,
+        "account_username": str(sub.account_username or payload.username),
+        "subscription_link": link,
+    }
+
+
 @router.post(
     "/account-link/resolve-owned",
     dependencies=[Depends(bot_guard)],
