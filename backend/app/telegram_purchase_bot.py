@@ -176,16 +176,13 @@ def plans_keyboard(plans, *, category_index=None, user_count=None):
             plan.get("name")
             or f"پلن #{plan_id}"
         )
-        days = int(
-            plan.get("duration_days")
-            or 0
-        )
+        price = money(plan.get("price_toman"))
 
         rows.append([
             InlineKeyboardButton(
                 text=(
                     f"🛒 {name} | "
-                    f"{days} روز"
+                    f"{price} تومان"
                 )[:60],
                 callback_data=(
                     f"shop:plan:{plan_id}"
