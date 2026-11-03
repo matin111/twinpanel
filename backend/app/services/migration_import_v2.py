@@ -260,9 +260,9 @@ def import_record(
             commit=commit,
         )
         added_protocols = ensure_migration_protocol_snapshots(db, [int(existing.subscription_id)])
-        if commit and added_protocols:
+        if commit:
             db.commit()
-        elif not commit:
+        else:
             db.flush()
         return {
             "imported": False,
