@@ -328,6 +328,100 @@ APPS = {
 }
 
 
+
+# Keep the learning/download catalog in step with the shared 15-protocol plan
+# registry, used by both mlearn (main bot) and rlearn (reseller bots).
+from .protocol_account_registry import MODERN_PROTOCOL_KEYS, PROTOCOL_TITLES
+
+
+_MODERN_DOWNLOADS = {
+    "hiddify": "https://github.com/hiddify/hiddify-app/releases",
+    "singbox": "https://sing-box.sagernet.org/clients/",
+    "naive": "https://github.com/klzgrad/naiveproxy/releases",
+    "mieru": "https://github.com/KaringX/karing/releases",
+    "trusttunnel_mobile": "https://github.com/TrustTunnel/TrustTunnelFlutterClient/releases",
+    "trusttunnel_desktop": "https://github.com/TrustTunnel/TrustTunnelClient/releases",
+    "amnezia_android": "https://github.com/amnezia-vpn/amneziawg-android/releases",
+    "amnezia_windows": "https://github.com/amnezia-vpn/amneziawg-windows-client/releases",
+    "amnezia_apple": "https://apps.apple.com/app/amneziawg/id6478942365",
+    "amnezia_linux": "https://amnezia.org/downloads",
+    "surge": "https://nssurge.com/",
+}
+
+_MODERN_APP_CHOICES = {
+    "hysteria2": ("Hiddify", "hiddify"),
+    "tuic": ("Hiddify", "hiddify"),
+    "anytls": ("sing-box", "singbox"),
+    "naive": ("NaiveProxy", "naive"),
+    "shadowtls": ("sing-box", "singbox"),
+    "snell": ("Surge", "surge"),
+    "mieru": ("Karing", "mieru"),
+    "trusttunnel": ("TrustTunnel", "trusttunnel_mobile"),
+    "amneziawg": ("AmneziaWG", "amnezia_android"),
+    "sudoku": ("کلاینت اختصاصی", None),
+}
+
+_MODERN_NOTES = {
+    "hysteria2": "فقط لینک Hysteria2 یا کانفیگ سازگار با برنامه را وارد کنید.",
+    "tuic": "برای TUIC، لینک یا کانفیگ مخصوص همین پروتکل را انتخاب کنید.",
+    "anytls": "کانفیگ سازگار با sing-box را از صفحه پروتکل بردارید؛ لینک خام ممکن است مستقیم وارد نشود.",
+    "naive": "برای NaiveProxy ممکن است واردکردن اطلاعات سرور در فایل تنظیمات یا کلاینت سازگار لازم باشد.",
+    "shadowtls": "ShadowTLS معمولاً به کانفیگ کامل زنجیره/transport نیاز دارد؛ لینک خام را بدون بررسی سازگاری وارد نکنید.",
+    "snell": "Snell برای Surge طراحی شده است. برای این سیستم‌عامل در صورت نبود Surge، برنامه جایگزین تأییدشده معرفی نمی‌شود.",
+    "mieru": "فقط خروجی سازگار با Mieru (مانند Clash/Mihomo یا لینک Mieru) را در برنامه‌ای که از آن پشتیبانی می‌کند وارد کنید.",
+    "trusttunnel": "از فایل یا لینک مخصوص TrustTunnel و کلاینت رسمی آن استفاده کنید؛ لینک عمومی VPN جایگزین آن نیست.",
+    "amneziawg": "کانفیگ AmneziaWG مخصوص همین پروتکل را بگیرید؛ فایل WireGuard معمولی لزوماً معادل آن نیست.",
+    "sudoku": "برای Sudoku کلاینت عمومیِ تأییدشده‌ای در این فهرست موجود نیست؛ از فایل و برنامه معرفی‌شده در صفحه اتصال سرویس استفاده کنید.",
+}
+
+_GUIDE_MODERN = (
+    "1️⃣ سابلینک خود را در مرورگر باز کنید.\n"
+    "2️⃣ بخش «{protocol}» را انتخاب کنید.\n"
+    "3️⃣ یکی از سرورهای فعال همین پروتکل را انتخاب کنید.\n"
+    "4️⃣ لینک، فایل یا اطلاعات اتصال مخصوص آن سرور را بردارید.\n"
+    "5️⃣ برنامه معرفی‌شده را نصب کنید و فقط در صورت پشتیبانی "
+    "از قالب کانفیگ، آن را وارد کنید.\n"
+    "6️⃣ سرور را انتخاب و اتصال را فعال کنید."
+)
+
+
+def _modern_client(protocol: str, os_key: str) -> tuple[str, str | None]:
+    title, download_key = _MODERN_APP_CHOICES[protocol]
+    if protocol == "snell" and os_key not in {"ios", "macos"}:
+        return "Surge (فقط iOS / macOS)", None
+    if protocol == "trusttunnel" and os_key in {"windows", "linux"}:
+        download_key = "trusttunnel_desktop"
+        title = "TrustTunnel Client"
+    if protocol == "amneziawg":
+        download_key = {
+            "android": "amnezia_android",
+            "ios": "amnezia_apple",
+            "macos": "amnezia_apple",
+            "windows": "amnezia_windows",
+            "linux": "amnezia_linux",
+        }[os_key]
+    if protocol == "sudoku":
+        return title, None
+    return title, _MODERN_DOWNLOADS[download_key] if download_key else None
+
+
+for _protocol in MODERN_PROTOCOL_KEYS:
+    _title = PROTOCOL_TITLES[_protocol]
+    GUIDES[_protocol] = _GUIDE_MODERN.format(protocol=_title)
+
+for _os_key, _items in APPS.items():
+    for _protocol in MODERN_PROTOCOL_KEYS:
+        _client_title, _download = _modern_client(_protocol, _os_key)
+        _items.append({
+            "key": _protocol,
+            "title": _client_title,
+            "protocol": PROTOCOL_TITLES[_protocol],
+            "image": None,
+            "download": _download,
+            "notice": _MODERN_NOTES[_protocol],
+        })
+
+
 def _platform_keyboard(
     prefix: str,
     mode: str,
@@ -448,6 +542,9 @@ def _guide_caption(
         "آموزش پیدا نشد.",
     )
 
+    notice = item.get("notice")
+    extra = f"\n\n💡 {notice}" if notice else ""
+
     return (
         f"📚 <b>{item['protocol']}</b>\n"
         f"📱 برنامه: <b>{item['title']}</b>\n"
@@ -456,7 +553,7 @@ def _guide_caption(
         "⚠️ <b>ابتدا سابلینک اشتراک را "
         "در مرورگر باز کنید.</b>\n\n"
 
-        f"{guide}\n\n"
+        f"{guide}{extra}\n\n"
 
         "📌 سرور و اطلاعات اتصال را "
         "همیشه از سابلینک همان اشتراک "
@@ -473,7 +570,11 @@ def _download_caption(
         os_key,
     )
 
+    notice = item.get("notice")
     extra = (
+        "برای این پروتکل روی این سیستم‌عامل لینک دانلود تأییدشده‌ای ارائه نشده است."
+        if notice and not item.get("download")
+        else (
         "برای این روش برنامه جداگانه‌ای "
         "لازم نیست و از تنظیمات VPN "
         "سیستم استفاده می‌شود."
@@ -481,14 +582,16 @@ def _download_caption(
         else
         "برای دریافت برنامه، دکمه دانلود "
         "را بزنید."
+        )
     )
+    note_text = f"\n\n💡 {notice}" if notice else ""
 
     return (
         "⬇️ <b>دانلود برنامه</b>\n\n"
         f"📱 برنامه: <b>{item['title']}</b>\n"
         f"🌐 پروتکل: <b>{item['protocol']}</b>\n"
         f"🖥 سیستم: <b>{platform}</b>\n\n"
-        f"{extra}\n\n"
+        f"{extra}{note_text}\n\n"
         "بعد از نصب، سابلینک اشتراک را "
         "در مرورگر باز کنید و سرور "
         "پروتکل موردنظر را انتخاب کنید."
