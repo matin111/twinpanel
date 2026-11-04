@@ -289,13 +289,14 @@ def install(router, request_fn):
 
     @router.callback_query(F.data.startswith("subimp:refresh:"))
     async def import_refresh(callback: CallbackQuery):
+        await callback.answer()
         sub_id = int((callback.data or "").rsplit(":", 1)[-1])
         try:
             info = await _read_import(callback, sub_id)
         except Exception as exc:
-            await callback.answer(str(exc)[:180], show_alert=True)
+            if callback.message:
+                await callback.message.answer("❌ دریافت اطلاعات اکانت انجام نشد: " + escape(str(exc)[:150]))
             return
-        await callback.answer("اطلاعات بروزرسانی شد.")
         if callback.message:
             try:
                 await callback.message.edit_text(
@@ -309,13 +310,14 @@ def install(router, request_fn):
 
     @router.callback_query(F.data.startswith("subimp:"))
     async def import_detail(callback: CallbackQuery):
+        await callback.answer()
         try:
             sub_id = int((callback.data or "").rsplit(":", 1)[-1])
             info = await _read_import(callback, sub_id)
         except Exception as exc:
-            await callback.answer(str(exc)[:180], show_alert=True)
+            if callback.message:
+                await callback.message.answer("❌ دریافت اطلاعات اکانت انجام نشد: " + escape(str(exc)[:150]))
             return
-        await callback.answer()
         if callback.message:
             await callback.message.edit_text(
                 _details_text(info),
