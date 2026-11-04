@@ -8,6 +8,7 @@ import html
 import io
 import json
 import re
+import ipaddress
 import secrets
 import shlex
 import uuid
@@ -1171,11 +1172,20 @@ async def _wireguard(db: Session, node: Node, sub: Subscription, user: User) -> 
         used=await cmd(conn,"wg show wg-access0 allowed-ips",check=False)
         taken=set()
         for line in used.splitlines():
-            m=re.search(r"10\.93\.0\.(\d+)",line)
-            if m: taken.add(int(m.group(1)))
-        host=next((i for i in range(2,255) if i not in taken),None)
-        if host is None: raise RuntimeError("WireGuard address pool is full")
-        address=f"10.93.0.{host}/32"
+            for value in line.split()[1:]:
+                try:
+                    taken.add(str(ipaddress.ip_interface(value).ip))
+                except ValueError:
+                    continue
+        # Preserve legacy allocations; expand into a disjoint private /21.
+        host=next((f"10.93.0.{i}" for i in range(2,255)
+                   if f"10.93.0.{i}" not in taken),None)
+        if host is None:
+            host=next((str(ip) for ip in ipaddress.ip_network("10.96.0.0/21").hosts()
+                       if str(ip) != "10.96.0.1" and str(ip) not in taken),None)
+        if host is None:
+            raise RuntimeError("WireGuard address pool is full")
+        address=f"{host}/32"
         await cmd(conn,f"wg set wg-access0 peer {shlex.quote(public)} allowed-ips {address}")
         peer=f'''\n[Peer]\nPublicKey = {public}\nAllowedIPs = {address}\n'''
         b64=base64.b64encode(peer.encode()).decode()
