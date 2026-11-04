@@ -1588,14 +1588,11 @@ def security_overview(
         stats = session_stats[sid]
 
         device_limit = max(
-            1,
+            0,
             int(
-                getattr(
-                    plan,
-                    "device_limit",
-                    1,
-                )
-                or 1
+                getattr(plan, "device_limit", 1)
+                if getattr(plan, "device_limit", None) is not None
+                else 1
             ),
         )
 
