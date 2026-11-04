@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.573",
-  "source_sha": "d90335d861c2432202bcd8f7c0b78d8c6cf4fbcf",
+  "version": "1.1.0-rc.574",
+  "source_sha": "3469e822e704bb188a191b5d56c22c880bd739ca",
   "notes": {
-    "fa": "دسته‌بندی مستقل نوع اشتراک پیش از تعداد کاربران در فروشگاه، با آیکن‌های رنگی اشتراک ویتوری، ویژه و سایر انواع. رنگی‌شدن آیکن‌های دسته‌بندی قدیمی تعداد کاربران؛ پشتیبانی از «کاربر نامحدود» برای مقدار صفر در نمایش، ایجاد پلن و محدودیت هم‌زمان دستگاه، با حفظ دسته‌بندی‌های قبلی. اصلاح خطاهای TypeScript و ثبت تکراری دسته‌بندی‌ها. همه ۲۰ تست CI موفق.",
-    "en": "Independent colored subscription type selector before user-count tabs, colored legacy user-count icons, zero=unlimited-user behavior across store/admin/backend with preserved historical categories. Fix TypeScript build and duplicate category assignment in plan create. All 20 feature CI checks passed."
+    "fa": "اصلاح ربات خرید اشتراک: نمایش نوع اشتراک (عمومی، ویژه، ویتوری و موارد دیگر) به عنوان مرحله اول، سپس تعداد کاربر و دسته‌بندی پلن، با ایموجی‌های رنگی و مسیر بازگشت مناسب. اشتراک‌های ویژه فعال در دیتابیس اکنون در منوی ربات قابل انتخاب خواهند بود. حفظ مسیرهای قدیمی برای پیام‌های باز ربات و نمایش کاربر نامحدود برای صفر. ۶ تست CI موفق.",
+    "en": "Telegram store: select subscription type first (premium, V2Ray etc), then user count and legacy category. Distinct colorful emoji for user and category buttons, backwards-compatible callbacks, unlimited user labels. Fix missing premium types in live bot menu. Six CI checks green."
   }
 }
