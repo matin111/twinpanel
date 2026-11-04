@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - "backend/app/telegram_account_link_bot.py"
+      - "backend/app/telegram_subscription_import_bot_v1.py"
+      - "backend/app/routers/telegram_subscription_import_v1.py"
+      - "backend/app/routers/__init__.py"
+      - "backend/scripts/telegram_account_sublink_import_v1_smoke.py"
       - "backend/app/telegram_main_extensions.py"
       - "backend/app/telegram_guides_bot.py"
       - "backend/app/telegram_runtime_bot.py"
@@ -32,6 +36,9 @@ jobs:
             backend/app/telegram_account_link_bot.py \
             backend/app/telegram_main_extensions.py \
             backend/app/telegram_guides_bot.py
+
+      - name: Verify account import URL and bot auth contract
+        run: python backend/scripts/telegram_account_sublink_import_v1_smoke.py
 
       - name: Verify owned main-bot sublink contract
         run: python backend/scripts/main_bot_account_sublink_smoke.py
