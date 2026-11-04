@@ -132,14 +132,15 @@ def fulfill_renewal_order(
         * 1024**3
     )
 
-    sub.traffic_limit_bytes = (
-        old_limit + added_bytes
-    )
+    legacy_unmetered = sub.plan_id is None and old_limit == 0 and old_used > 0
+    baseline_limit = max(old_limit, old_used) if legacy_unmetered else old_limit
+    sub.traffic_limit_bytes = baseline_limit + added_bytes
 
     # TWINPANEL_FIRST_USE_PAID_RENEWAL_V2
     if (
         sub.starts_at is None
         and sub.expires_at is None
+        and not legacy_unmetered
     ):
         # Renewal before first connection:
         # add purchased days without starting clock.
@@ -148,10 +149,7 @@ def fulfill_renewal_order(
             or 0
         )
 
-        if current_days <= 0:
-            current_days = int(
-                plan.duration_days
-            )
+        current_days = max(0, current_days)
 
         sub.activation_duration_days = (
             current_days
@@ -161,6 +159,8 @@ def fulfill_renewal_order(
         )
 
     else:
+        if legacy_unmetered and sub.starts_at is None:
+            sub.starts_at = now
         # If validity has not expired, extend
         # from current expiration date.
         # If already expired, extend from now.
