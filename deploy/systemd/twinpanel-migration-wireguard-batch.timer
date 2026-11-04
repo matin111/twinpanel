@@ -1,0 +1,12 @@
+[Unit]
+Description=Guarded WireGuard migration batch on healthy intervals
+
+[Timer]
+OnActiveSec=2min
+OnUnitInactiveSec=3min
+AccuracySec=15s
+Persistent=false
+Unit=twinpanel-migration-wireguard-batch.service
+
+[Install]
+WantedBy=timers.target

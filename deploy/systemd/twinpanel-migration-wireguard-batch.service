@@ -1,0 +1,19 @@
+[Unit]
+Description=TwinPanel guarded WireGuard credential backfill for active imported subscriptions
+After=network-online.target postgresql.service twinpanel-api.service
+Wants=network-online.target
+ConditionPathExists=/opt/twinpanel/current/backend/scripts/twinpanel_migration_wireguard_batch_v1.py
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/twinpanel/current/backend
+EnvironmentFile=/etc/twinpanel/backend.env
+Environment=MIGRATION_WG_LIMIT_PER_NODE=12
+ExecStart=/opt/twinpanel/venv/bin/python3 -u /opt/twinpanel/current/backend/scripts/twinpanel_migration_wireguard_batch_v1.py
+Nice=15
+CPUWeight=20
+IOWeight=20
+TimeoutStartSec=1200
+SuccessExitStatus=2 3
