@@ -31,6 +31,7 @@ export function SettingsPage2027(){
   const [twoFactorEnabled,setTwoFactorEnabled]=useState(false);
   const [twoFactorSetup,setTwoFactorSetup]=useState<TwoFactorSetup|null>(null);
   const [twoFactorCode,setTwoFactorCode]=useState("");
+  const [showAuthenticatorKey,setShowAuthenticatorKey]=useState(false);
   const [twoFactorDisablePassword,setTwoFactorDisablePassword]=useState("");
   const [twoFactorDisableCode,setTwoFactorDisableCode]=useState("");
   const [l2tp,setL2tp]=useState<L2tpSettings>(emptyL2tp);
@@ -69,7 +70,7 @@ export function SettingsPage2027(){
 
   const saveEmail=async(event:FormEvent)=>{event.preventDefault();if(!begin("email"))return;try{const value=await generalSettingsApi.updateEmail({email:emailDraft.trim(),current_password:emailPassword});setProfile(value);setEmailDraft(value.email||"");setEmailPassword("");setOk(pick("ایمیل مدیر ذخیره شد","Admin email saved"));}catch(e){setFailure(e);}finally{finish();}};
   const savePassword=async(event:FormEvent)=>{event.preventDefault();if(!begin("password"))return;if(newPassword!==confirmPassword){setError(pick("تکرار رمز جدید یکسان نیست.","Password confirmation does not match."));finish();return;}try{await generalSettingsApi.changePassword({current_password:currentPassword,new_password:newPassword});setCurrentPassword("");setNewPassword("");setConfirmPassword("");setOk(pick("رمز عبور تغییر کرد","Password changed"));}catch(e){setFailure(e);}finally{finish();}};
-  const setup2fa=async()=>{if(!begin("2fa-setup"))return;try{setTwoFactorSetup(await generalSettingsApi.twoFactorSetup());setTwoFactorCode("");}catch(e){setFailure(e);}finally{finish();}};
+  const setup2fa=async()=>{if(!begin("2fa-setup"))return;try{setTwoFactorSetup(await generalSettingsApi.twoFactorSetup());setShowAuthenticatorKey(false);setTwoFactorCode("");}catch(e){setFailure(e);}finally{finish();}};
   const enable2fa=async()=>{if(!begin("2fa-enable"))return;try{await generalSettingsApi.twoFactorEnable(twoFactorCode.trim());setTwoFactorEnabled(true);setTwoFactorSetup(null);setTwoFactorCode("");setOk(pick("ورود دومرحله‌ای فعال شد","Two-factor authentication enabled"));}catch(e){setFailure(e);}finally{finish();}};
   const disable2fa=async()=>{if(!begin("2fa-disable"))return;try{await generalSettingsApi.twoFactorDisable({current_password:twoFactorDisablePassword,code:twoFactorDisableCode.trim()});setTwoFactorEnabled(false);setTwoFactorDisablePassword("");setTwoFactorDisableCode("");setOk(pick("ورود دومرحله‌ای غیرفعال شد","Two-factor authentication disabled"));}catch(e){setFailure(e);}finally{finish();}};
   const generatePsk=async()=>{if(!begin("l2tp-generate"))return;try{const value=await generalSettingsApi.generateL2tpPsk();setL2tpDraft(value.psk);setShowPsk(true);}catch(e){setFailure(e);}finally{finish();}};
@@ -86,20 +87,17 @@ export function SettingsPage2027(){
 
     <nav className="settings-compact-tabs" aria-label={pick("دسته‌بندی تنظیمات","Settings categories")}>
       {([
-        ["account",pick("حساب و امنیت","Account & security"),pick("ایمیل، رمز، 2FA و ظاهر","Email, password, 2FA & appearance")],
-        ["network",pick("سرورها و پروتکل‌ها","Servers & protocols"),pick("L2TP و سرور مادر","L2TP & mother server")],
-        ["subscriptions",pick("تنظیمات اشتراک","Subscriptions"),pick("قالب نام کاربری","Username format")],
-      ] as const).map(([id,label,description])=><button key={id} type="button" className={`settings-compact-tab ${activeTab===id?"is-active":""}`} aria-current={activeTab===id?"page":undefined} onClick={()=>setActiveTab(id)}><strong>{label}</strong><small>{description}</small></button>)}
+        ["account",pick("حساب و امنیت","Account & security")],
+        ["network",pick("سرورها و پروتکل‌ها","Servers & protocols")],
+        ["subscriptions",pick("تنظیمات اشتراک","Subscriptions")],
+      ] as const).map(([id,label])=><button key={id} type="button" className={`settings-compact-tab ${activeTab===id?"is-active":""}`} aria-current={activeTab===id?"page":undefined} onClick={()=>setActiveTab(id)}>{label}</button>)}
     </nav>
     {activeTab==="account"&&<section className="settings-compact-section" aria-label={pick("حساب و امنیت","Account & security")}>
-    <div className="module-grid two settings2027-live">
-      <Card><div className="card-head"><b>{pick("حساب مدیر","Admin account")}</b><Badge tone={profile?.is_active?"ok":"warn"}>{profile?.is_active?pick("فعال","Active"):pick("نامشخص","Unknown")}</Badge></div><div className="runtime-info-list"><div><span>{pick("نام","Name")}</span><b>{profile?.full_name||"—"}</b></div><div><span>{pick("نقش","Role")}</span><b dir="ltr">{profile?.role||"—"}</b></div><div><span>ID</span><b dir="ltr">{profile?.id??"—"}</b></div></div><form onSubmit={saveEmail}><label className="field"><span>{pick("ایمیل","Email")}</span><input type="email" dir="ltr" value={emailDraft} onChange={e=>setEmailDraft(e.target.value)} required/></label><label className="field"><span>{pick("رمز فعلی","Current password")}</span><input type="password" value={emailPassword} onChange={e=>setEmailPassword(e.target.value)} required autoComplete="current-password"/></label><button className="primary" disabled={Boolean(busy)}>{busy==="email"?pick("در حال ذخیره...","Saving..."):pick("ذخیره ایمیل","Save email")}</button></form></Card>
-      <Card><div className="card-head"><b>{pick("نمایش پنل","Panel appearance")}</b><Badge tone="violet">{mode.toUpperCase()} · {resolved}</Badge></div><div className="theme-setting-panel"><ThemeSwitch/></div></Card>
-    </div>
-
-    <div className="module-grid two">
-      <Card><div className="card-head"><b>{pick("تغییر رمز عبور","Change password")}</b></div><form onSubmit={savePassword}><label className="field"><span>{pick("رمز فعلی","Current password")}</span><input type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} required autoComplete="current-password"/></label><label className="field"><span>{pick("رمز جدید","New password")}</span><input type="password" minLength={8} value={newPassword} onChange={e=>setNewPassword(e.target.value)} required autoComplete="new-password"/></label><label className="field"><span>{pick("تکرار رمز جدید","Confirm new password")}</span><input type="password" minLength={8} value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} required autoComplete="new-password"/></label><button className="primary" disabled={Boolean(busy)}>{busy==="password"?pick("در حال تغییر...","Changing..."):pick("تغییر رمز","Change password")}</button></form></Card>
-      <Card><div className="card-head"><b>{pick("ورود دومرحله‌ای","Two-factor authentication")}</b><Badge tone={twoFactorEnabled?"ok":"warn"}>{twoFactorEnabled?pick("فعال","Enabled"):pick("غیرفعال","Disabled")}</Badge></div>{!twoFactorEnabled&&<>{!twoFactorSetup?<button className="primary" disabled={Boolean(busy)} onClick={()=>void setup2fa()}>{busy==="2fa-setup"?"…":pick("راه‌اندازی 2FA","Set up 2FA")}</button>:<><label className="field"><span>{pick("کلید Authenticator","Authenticator key")}</span><div className="secret-field"><input dir="ltr" readOnly value={twoFactorSetup.secret}/><button type="button" onClick={()=>void copyText(twoFactorSetup.secret)}>{pick("کپی","Copy")}</button></div></label><label className="field"><span>{pick("کد ۶ رقمی","6-digit code")}</span><input dir="ltr" inputMode="numeric" maxLength={6} value={twoFactorCode} onChange={e=>setTwoFactorCode(e.target.value.replace(/\D/g,""))}/></label><button className="primary" disabled={Boolean(busy)||twoFactorCode.length!==6} onClick={()=>void enable2fa()}>{pick("فعال‌سازی","Enable")}</button></>}</>}{twoFactorEnabled&&<><label className="field"><span>{pick("رمز فعلی","Current password")}</span><input type="password" value={twoFactorDisablePassword} onChange={e=>setTwoFactorDisablePassword(e.target.value)}/></label><label className="field"><span>{pick("کد 2FA","2FA code")}</span><input dir="ltr" inputMode="numeric" maxLength={6} value={twoFactorDisableCode} onChange={e=>setTwoFactorDisableCode(e.target.value.replace(/\D/g,""))}/></label><button className="ghost" disabled={Boolean(busy)||twoFactorDisableCode.length!==6||!twoFactorDisablePassword} onClick={()=>void disable2fa()}>{pick("غیرفعال‌سازی 2FA","Disable 2FA")}</button></>}</Card>
+    <div className="settings-profile-layout">
+      <div className="settings-profile-column"><Card><div className="card-head"><b>{pick("حساب مدیر","Admin account")}</b><Badge tone={profile?.is_active?"ok":"warn"}>{profile?.is_active?pick("فعال","Active"):pick("نامشخص","Unknown")}</Badge></div><div className="runtime-info-list"><div><span>{pick("نام","Name")}</span><b>{profile?.full_name||"—"}</b></div><div><span>{pick("نقش","Role")}</span><b dir="ltr">{profile?.role||"—"}</b></div><div><span>ID</span><b dir="ltr">{profile?.id??"—"}</b></div></div><form onSubmit={saveEmail}><label className="field"><span>{pick("ایمیل","Email")}</span><input type="email" dir="ltr" value={emailDraft} onChange={e=>setEmailDraft(e.target.value)} required/></label><label className="field"><span>{pick("رمز فعلی","Current password")}</span><input type="password" value={emailPassword} onChange={e=>setEmailPassword(e.target.value)} required autoComplete="current-password"/></label><button className="primary" disabled={Boolean(busy)}>{busy==="email"?pick("در حال ذخیره...","Saving..."):pick("ذخیره ایمیل","Save email")}</button></form></Card>
+<Card><div className="card-head"><b>{pick("تغییر رمز عبور","Change password")}</b></div><form onSubmit={savePassword}><label className="field"><span>{pick("رمز فعلی","Current password")}</span><input type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} required autoComplete="current-password"/></label><label className="field"><span>{pick("رمز جدید","New password")}</span><input type="password" minLength={8} value={newPassword} onChange={e=>setNewPassword(e.target.value)} required autoComplete="new-password"/></label><label className="field"><span>{pick("تکرار رمز جدید","Confirm new password")}</span><input type="password" minLength={8} value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} required autoComplete="new-password"/></label><button className="primary" disabled={Boolean(busy)}>{busy==="password"?pick("در حال تغییر...","Changing..."):pick("تغییر رمز","Change password")}</button></form></Card></div>
+      <div className="settings-profile-column"><Card><div className="card-head"><b>{pick("نمایش پنل","Panel appearance")}</b><Badge tone="violet">{mode.toUpperCase()} · {resolved}</Badge></div><div className="theme-setting-panel"><ThemeSwitch/></div></Card>
+<Card><div className="card-head"><b>{pick("ورود دومرحله‌ای","Two-factor authentication")}</b><Badge tone={twoFactorEnabled?"ok":"warn"}>{twoFactorEnabled?pick("فعال","Enabled"):pick("غیرفعال","Disabled")}</Badge></div>{!twoFactorEnabled&&<>{!twoFactorSetup?<button className="primary" disabled={Boolean(busy)} onClick={()=>void setup2fa()}>{busy==="2fa-setup"?"…":pick("راه‌اندازی 2FA","Set up 2FA")}</button>:<><label className="field"><span>{pick("کلید Authenticator","Authenticator key")}</span><div className="secret-field"><input dir="ltr" type={showAuthenticatorKey?"text":"password"} readOnly value={twoFactorSetup.secret}/><button type="button" onClick={()=>setShowAuthenticatorKey(v=>!v)}>{showAuthenticatorKey?pick("پنهان","Hide"):pick("نمایش","Show")}</button><button type="button" onClick={()=>void copyText(twoFactorSetup.secret)}>{pick("کپی","Copy")}</button></div></label><label className="field"><span>{pick("کد ۶ رقمی","6-digit code")}</span><input dir="ltr" inputMode="numeric" maxLength={6} value={twoFactorCode} onChange={e=>setTwoFactorCode(e.target.value.replace(/\D/g,""))}/></label><button className="primary" disabled={Boolean(busy)||twoFactorCode.length!==6} onClick={()=>void enable2fa()}>{pick("فعال‌سازی","Enable")}</button></>}</>}{twoFactorEnabled&&<><label className="field"><span>{pick("رمز فعلی","Current password")}</span><input type="password" value={twoFactorDisablePassword} onChange={e=>setTwoFactorDisablePassword(e.target.value)}/></label><label className="field"><span>{pick("کد 2FA","2FA code")}</span><input dir="ltr" inputMode="numeric" maxLength={6} value={twoFactorDisableCode} onChange={e=>setTwoFactorDisableCode(e.target.value.replace(/\D/g,""))}/></label><button className="ghost" disabled={Boolean(busy)||twoFactorDisableCode.length!==6||!twoFactorDisablePassword} onClick={()=>void disable2fa()}>{pick("غیرفعال‌سازی 2FA","Disable 2FA")}</button></>}</Card></div>
     </div>
 
     </section>}
@@ -121,34 +119,46 @@ export function SettingsPage2027(){
     <Card className="runtime-editor"><div className="card-head"><b>{pick("نام کاربری اشتراک","Subscription username")}</b><button className="ghost" disabled={loading||Boolean(busy)} onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button></div><form onSubmit={saveUsername}><div className="setting-grid"><label className="field"><span>{pick("پیشوند","Prefix")}</span><input dir="ltr" value={username.prefix} onChange={e=>setUsername(s=>({...s,prefix:e.target.value}))} placeholder="mv"/></label><label className="field"><span>{pick("قالب","Template")}</span><input dir="ltr" value={username.template} onChange={e=>setUsername(s=>({...s,template:e.target.value}))} placeholder="{prefix}{sub_id}_{user_id}"/></label></div><div className="runtime-info-list"><div><span>{pick("پیش‌نمایش","Preview")}</span><b dir="ltr">{username.preview||"—"}</b></div><div><span>{pick("متغیرها","Variables")}</span><b dir="ltr">{username.variables?.join(" · ")||"—"}</b></div></div><button className="primary" disabled={Boolean(busy)}>{busy==="username"?pick("در حال ذخیره...","Saving..."):pick("ذخیره قالب","Save format")}</button></form></Card>
     </section>}
     <style>{`
-      .settings-compact {max-width:1440px;margin-inline:auto}
-      .settings-compact-tabs {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 18px;direction:rtl}
-      .settings-compact-tab {appearance:none;border:1px solid var(--border,#263248);border-radius:13px;background:var(--card,#101827);color:inherit;text-align:start;padding:13px 16px;min-height:67px;cursor:pointer;display:flex;flex-direction:column;gap:4px;transition:border-color .15s,background .15s}
-      .settings-compact-tab:hover {border-color:#4f7dca}
-      .settings-compact-tab.is-active {border-color:#387ef5;background:color-mix(in srgb,#2563eb 12%,var(--card,#101827))}
-      .settings-compact-tab strong {font-size:13px;font-weight:750}
-      .settings-compact-tab small {font-size:11px;opacity:.65;font-weight:400}
-      .settings-compact-section {display:grid;gap:14px;min-width:0;direction:rtl}
-      .settings-compact-section .module-grid.two {align-items:start;gap:14px}
-      .settings-compact-section .module-grid.two>* {align-self:start;min-height:0!important;height:auto!important}
-      .settings-compact-section .card {min-height:0}
-      .settings-compact-section .card-head {margin-bottom:12px}
-      .settings-compact-section .field {margin-bottom:9px}
-      .settings-compact-section .field input {min-height:40px}
-      .settings-compact-section form {display:flex;flex-direction:column;gap:8px}
-      .settings-compact-section .runtime-info-list {margin-block:9px}
-      .settings-compact-section .runtime-info-list>div {padding-block:7px}
-      .settings-compact-section .action-row {display:flex;flex-wrap:wrap;gap:8px}
-      .settings-compact-section .theme-setting-panel {padding:8px;min-height:0}
-      .settings-compact-section .module-toggle {padding-block:9px}
-      .settings-compact-section .setting-grid {gap:12px}
-      .settings-compact-section .primary,.settings-compact-section .ghost {max-width:100%}
-      @media(max-width:700px) {
-        .settings-compact-tabs {gap:6px}
-        .settings-compact-tab {padding:10px;min-height:56px}
-        .settings-compact-tab strong {font-size:11px}
-        .settings-compact-tab small {display:none}
-        .settings-compact-section .module-grid.two,.settings-compact-section .setting-grid {grid-template-columns:minmax(0,1fr)}
+      .settings-compact {max-width:1160px;margin-inline:auto;padding-bottom:48px}
+      .settings-compact .page-head {margin-bottom:14px}
+      .settings-compact .page-head h1 {font-size:clamp(23px,2vw,30px);letter-spacing:-.4px}
+      .settings-compact-tabs {display:flex;flex-wrap:wrap;gap:5px;margin:0 0 20px;direction:rtl;background:var(--surface2);border:1px solid var(--line);border-radius:13px;padding:5px;width:fit-content;max-width:100%}
+      .settings-compact-tab {appearance:none;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--muted);font:inherit;font-size:13px;font-weight:650;line-height:1.4;text-align:center;padding:10px 18px;min-height:40px;cursor:pointer;transition:background .16s,color .16s,border-color .16s,box-shadow .16s}
+      .settings-compact-tab:hover {color:var(--text);background:var(--surface)}
+      .settings-compact-tab.is-active {background:var(--surface);color:var(--text);border-color:var(--line);box-shadow:0 2px 7px rgba(10,20,40,.08)}
+      .settings-compact-tab:focus-visible {outline:2px solid var(--purple);outline-offset:2px}
+      .settings-compact-section {display:grid;gap:16px;min-width:0;direction:rtl}
+      .settings-profile-layout {display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;align-items:start}
+      .settings-profile-column {display:flex;flex-direction:column;gap:16px;min-width:0}
+      .settings-compact-section .card {min-width:0;min-height:0!important;height:auto!important;background:var(--surface);border:1px solid var(--line);box-shadow:0 3px 14px rgba(20,30,55,.035);padding:20px;border-radius:16px}
+      .settings-compact-section .card-head {display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px}
+      .settings-compact-section .card-head b {font-size:14px;font-weight:750;color:var(--text)}
+      .settings-compact-section .card-head small {display:block;font-size:11px;line-height:1.8;color:var(--muted);margin-top:5px}
+      .settings-compact-section form {display:flex;flex-direction:column;gap:11px;align-items:stretch}
+      .settings-compact-section .field {display:flex;flex-direction:column;gap:7px;margin:0;min-width:0}
+      .settings-compact-section .field>span {font-size:12px;color:var(--muted);font-weight:550}
+      .settings-compact-section .field input {width:100%;min-height:40px;height:40px;border-radius:9px;padding-inline:12px}
+      .settings-compact-section .runtime-info-list {margin:0 0 15px;display:grid;gap:0}
+      .settings-compact-section .runtime-info-list>div {display:flex;align-items:center;justify-content:space-between;gap:15px;padding:8px 0;border-bottom:1px solid var(--line);min-height:35px}
+      .settings-compact-section .runtime-info-list>div span {color:var(--muted);font-size:12px}
+      .settings-compact-section .runtime-info-list>div b {font-size:12px;overflow-wrap:anywhere}
+      .settings-compact-section .primary,.settings-compact-section .ghost {width:auto!important;align-self:flex-start;min-height:36px;min-width:105px;border-radius:9px;padding:8px 15px;font-size:12px}
+      .settings-compact-section form>.primary {margin-top:3px}
+      .settings-compact-section .action-row {display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:14px}
+      .settings-compact-section .secret-field {display:flex;min-width:0;gap:7px}
+      .settings-compact-section .secret-field input {min-width:0;flex:1}
+      .settings-compact-section .secret-field button {flex-shrink:0}
+      .settings-compact-section .theme-setting-panel {display:flex;justify-content:flex-start;background:var(--surface2);min-height:54px;padding:10px;border-radius:10px}
+      .settings-compact-section .module-toggle {padding:11px 0;border-bottom:1px solid var(--line)}
+      .settings-compact-section .setting-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+      .settings-compact-section .runtime-editor {max-width:100%}
+      @media(max-width:760px){
+        .settings-compact {padding-inline:12px}
+        .settings-compact-tabs {width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;padding:4px}
+        .settings-compact-tab {padding:9px 4px;font-size:11px;min-width:0;overflow-wrap:anywhere}
+        .settings-profile-layout,.settings-compact-section .setting-grid {grid-template-columns:minmax(0,1fr)}
+        .settings-compact-section .card {padding:15px}
+        .settings-compact-section .card-head {align-items:flex-start}
       }
     `}</style>
   </div></Shell>;
