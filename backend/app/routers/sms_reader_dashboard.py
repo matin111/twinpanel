@@ -63,20 +63,9 @@ def admin_sms_reader_dashboard(
         cfg.sms_allowed_senders
     )
 
+    # GET must not mutate payment security settings. A configured reader and
+    # allowlist do not imply that the operator opted into auto-verification.
     migrated = False
-
-    if active_devices and allowed_senders:
-        if not cfg.sms_reader_enabled:
-            cfg.sms_reader_enabled = True
-            migrated = True
-
-        if not cfg.sms_auto_verify:
-            cfg.sms_auto_verify = True
-            migrated = True
-
-        if migrated:
-            cfg.updated_at = datetime.utcnow()
-            db.commit()
 
     pair_codes = (
         db.query(PaymentSmsReaderPairCode)
