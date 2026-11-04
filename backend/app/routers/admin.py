@@ -1588,14 +1588,11 @@ def security_overview(
         stats = session_stats[sid]
 
         device_limit = max(
-            1,
+            0,
             int(
-                getattr(
-                    plan,
-                    "device_limit",
-                    1,
-                )
-                or 1
+                getattr(plan, "device_limit", 1)
+                if getattr(plan, "device_limit", None) is not None
+                else 1
             ),
         )
 
@@ -1634,7 +1631,7 @@ def security_overview(
 
         # Hard rule:
         # simultaneous active devices exceed plan limit.
-        if active_devices > device_limit:
+        if device_limit > 0 and active_devices > device_limit:
             score += 70
             reasons.append(
                 "تعداد دستگاه فعال هم‌زمان "
@@ -1644,7 +1641,8 @@ def security_overview(
 
         # 24h device churn.
         if (
-            recent_devices
+            device_limit > 0
+            and recent_devices
             > max(
                 device_limit + 1,
                 device_limit * 2,

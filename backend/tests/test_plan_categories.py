@@ -83,3 +83,13 @@ def test_main_bot_two_level_keyboard_callbacks_are_stable():
     assert category_keyboard.inline_keyboard[0][0].callback_data == "shop:ucat:2:0"
     assert category_keyboard.inline_keyboard[1][0].callback_data == "shop:ucat:2:1"
     assert category_keyboard.inline_keyboard[-1][0].callback_data == "shop:list"
+
+def test_zero_user_count_is_unlimited_and_not_converted_to_one():
+    unlimited = {"id": 99, "device_limit": 0, "category": "اشتراک ویژه"}
+    normal = {"id": 100, "device_limit": 1, "category": "اشتراک ویتوری"}
+    assert plan_user_count(unlimited) == 0
+    assert user_counts([unlimited, normal]) == [0, 1]
+    keyboard = user_counts_keyboard([unlimited, normal])
+    assert "کاربر نامحدود" in keyboard.inline_keyboard[0][0].text
+    assert keyboard.inline_keyboard[0][0].callback_data == "shop:users:0"
+    assert [p["id"] for p in user_count_plans([unlimited, normal], 0)] == [99]

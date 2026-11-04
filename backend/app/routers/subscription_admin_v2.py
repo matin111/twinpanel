@@ -60,7 +60,7 @@ class AdminSubscriptionCreateV2(BaseModel):
     # Manual mode requires traffic + duration directly. Zero GB means unlimited.
     traffic_gb: float | None = Field(default=None, ge=0, le=100000)
     duration_days: int | None = Field(default=None, ge=1, le=3650)
-    device_limit: int | None = Field(default=None, ge=1, le=1000)
+    device_limit: int | None = Field(default=None, ge=0, le=1000)
 
     username: str | None = Field(default=None, max_length=120)
     password: str | None = Field(default=None, min_length=4, max_length=256)
@@ -206,9 +206,9 @@ def _enriched_payload_from_context(sub: Subscription, context: dict) -> dict:
     ).model_dump(mode="json")
 
     if override is not None and override.device_limit is not None:
-        device_limit = max(int(override.device_limit), 1)
+        device_limit = max(int(override.device_limit), 0)
     elif plan is not None:
-        device_limit = max(int(getattr(plan, "device_limit", 1) or 1), 1)
+        device_limit = max(int(getattr(plan, "device_limit", 1) if getattr(plan, "device_limit", None) is not None else 1), 0)
     else:
         device_limit = 1
 
@@ -437,7 +437,7 @@ async def admin_create_v2(
     device_limit = (
         int(payload.device_limit)
         if payload.device_limit is not None
-        else int(plan.device_limit or 1)
+        else int(plan.device_limit if plan.device_limit is not None else 1)
         if plan is not None
         else 1
     )
@@ -469,7 +469,7 @@ async def admin_create_v2(
     db.add(
         SubscriptionRuntimeOverride(
             subscription_id=sub.id,
-            device_limit=max(1, device_limit),
+            device_limit=max(0, device_limit),
             duration_unlimited=False,
         )
     )

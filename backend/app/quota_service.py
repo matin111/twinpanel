@@ -265,7 +265,7 @@ def open_session(db: Session, node_id: int, data: SessionOpenIn) -> dict:
     if device is None or device.subscription_id != subscription.id or device.status != "active":
         raise HTTPException(status_code=403, detail="device_not_allowed")
     plan = db.get(Plan, subscription.plan_id)
-    max_sessions = max(int(plan.device_limit if plan else 1), 1)
+    max_sessions = max(int(plan.device_limit if plan and plan.device_limit is not None else 1), 0)
     active_count = int(
         db.scalar(
             select(func.count(QuotaSession.id)).where(
@@ -275,7 +275,7 @@ def open_session(db: Session, node_id: int, data: SessionOpenIn) -> dict:
         )
         or 0
     )
-    if active_count >= max_sessions:
+    if max_sessions > 0 and active_count >= max_sessions:
         raise HTTPException(status_code=409, detail="concurrent_session_limit")
 
     # TWINPANEL_FIRST_USE_ACTIVATION_V1

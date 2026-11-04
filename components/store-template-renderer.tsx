@@ -100,7 +100,7 @@ function Conversion2027Template({settings,plans,loading,error,message,buying,onB
         <div className="tpStorePlanTop"><div><small>{pick("اشتراک VPN","VPN subscription")}</small><h3>{plan.name}</h3></div><span className="tpStorePlanStatus">{pick("فعال","Active")}</span></div>
         {plan.description&&<p className="tpStorePlanDesc">{plan.description}</p>}
         <div className="tpStorePlanPrice"><strong>{number(plan.price_toman)}</strong><span>{pick("تومان","Toman")}</span></div>
-        <div className="tpStorePlanFacts"><div><b>{number(plan.traffic_gb,{maximumFractionDigits:2})} GB</b><small>{pick("حجم","Traffic")}</small></div><div><b>{number(plan.duration_days)}</b><small>{pick("روز","days")}</small></div><div><b>{number(plan.device_limit)}</b><small>{pick("دستگاه","devices")}</small></div></div>
+        <div className="tpStorePlanFacts"><div><b>{number(plan.traffic_gb,{maximumFractionDigits:2})} GB</b><small>{pick("حجم","Traffic")}</small></div><div><b>{number(plan.duration_days)}</b><small>{pick("روز","days")}</small></div><div><b>{plan.device_limit===0?pick("کاربر نامحدود","Unlimited users"):number(plan.device_limit)}</b><small>{pick("دستگاه","devices")}</small></div></div>
         <ul className="tpStorePlanList">
           <li><i>✓</i>{content("plan_feature_1")}</li>
           <li><i>✓</i>{content("plan_feature_2")}</li>

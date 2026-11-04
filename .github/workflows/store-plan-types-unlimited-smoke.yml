@@ -1,0 +1,43 @@
+name: Store Plan Types and Unlimited Users Smoke
+
+on:
+  pull_request:
+    paths:
+      - "components/plan-category-tabs.tsx"
+      - "components/store-runtime.tsx"
+      - "components/store-template-*.tsx"
+      - "components/legacy-plans-exact.tsx"
+      - "backend/app/routers/plans.py"
+      - "backend/app/plan_category_models.py"
+      - "lib/store-runtime-api.ts"
+      - "backend/app/schemas.py"
+      - "backend/app/quota_service.py"
+      - "backend/app/quota_service_v2.py"
+      - "backend/app/routers/admin.py"
+      - "backend/app/subscription_override_models.py"
+      - "backend/app/routers/subscription_admin_v2.py"
+      - "backend/app/routers/subscription_create_fast_v1.py"
+      - "backend/app/telegram_purchase_bot.py"
+      - "backend/tests/test_store_plan_types_unlimited_v1.py"
+      - ".github/workflows/store-plan-types-unlimited-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/tests/test_store_plan_types_unlimited_v1.py"
+      - ".github/workflows/store-plan-types-unlimited-smoke.yml"
+
+jobs:
+  store-plan-types:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test runner
+        run: python -m pip install pytest
+      - name: Compile backend code (no DB calls)
+        run: |
+          python -m py_compile backend/app/schemas.py backend/app/plan_category_models.py backend/app/routers/plans.py backend/app/quota_service.py backend/app/quota_service_v2.py backend/app/routers/admin.py backend/app/subscription_override_models.py backend/app/routers/subscription_admin_v2.py backend/app/routers/subscription_create_fast_v1.py backend/app/telegram_purchase_bot.py
+      - name: Run display and quota regression contracts
+        run: python -m pytest -q backend/tests/test_store_plan_types_unlimited_v1.py

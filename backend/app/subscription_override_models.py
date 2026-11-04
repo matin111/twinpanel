@@ -49,9 +49,9 @@ def get_subscription_override(db, subscription_id: int) -> SubscriptionRuntimeOv
 def effective_device_limit(db, subscription, plan=None) -> int:
     override = get_subscription_override(db, subscription.id)
     if override and override.device_limit is not None:
-        return max(int(override.device_limit), 1)
+        return max(int(override.device_limit), 0)
     if plan is not None:
-        return max(int(getattr(plan, "device_limit", 1) or 1), 1)
+        return max(int(getattr(plan, "device_limit", 1) if getattr(plan, "device_limit", None) is not None else 1), 0)
     return 1
 
 

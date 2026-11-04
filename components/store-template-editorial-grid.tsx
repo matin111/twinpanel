@@ -106,7 +106,7 @@ export function EditorialGrid2027Template({settings,plans,loading,error,message,
         <div className={styles.planFacts}>
           <div><small>{pick("حجم","Traffic")}</small><b>{number(plan.traffic_gb,{maximumFractionDigits:2})} GB</b></div>
           <div><small>{pick("مدت","Duration")}</small><b>{number(plan.duration_days)} {pick("روز","days")}</b></div>
-          <div><small>{pick("دستگاه","Devices")}</small><b>{number(plan.device_limit)}</b></div>
+          <div><small>{pick("دستگاه","Devices")}</small><b>{plan.device_limit===0?pick("کاربر نامحدود","Unlimited users"):number(plan.device_limit)}</b></div>
         </div>
         <div className={styles.protocolChips}>{protocols.slice(0,5).map(protocol=><span key={protocol}>{PROTOCOLS[protocol]?.short||protocol}</span>)}</div>
         <ul className={styles.planBenefits}><li>{content("plan_feature_1")}</li><li>{content("plan_feature_2")}</li><li>{content("plan_feature_3")}</li></ul>
