@@ -123,9 +123,9 @@ def install(router, request_fn):
             f"📶 حجم باقی‌مانده: {remaining} گیگابایت\n"
             f"📱 سقف دستگاه: {escape(devices)}\n\n"
             "🔗 ساب‌لینک و QR Code در دکمه زیر با هم نمایش داده می‌شوند.\n\n"
-            "برای تمدید و تغییر رمز این اکانتِ واردشده، "
-            "درخواست به پشتیبانی ارسال می‌شود؛ "
-            "تغییرات بدون تأیید مالک انجام نمی‌شود."
+            "برای تمدید این اکانتِ واردشده، ابتدا مالکیت بررسی می‌شود؛ "
+            "تا زمان تأیید مالک و پرداخت، هیچ تمدیدی انجام نمی‌شود. "
+            "درخواست تغییر رمز نیز از مسیر پشتیبانی بررسی می‌شود."
         )
 
     def _management_keyboard(sub_id):
@@ -136,7 +136,7 @@ def install(router, request_fn):
             )],
             [
                 InlineKeyboardButton(
-                    text="💳 درخواست تمدید", callback_data=f"subimp:ask:renew:{sub_id}",
+                    text="♻️ تمدید اکانت", callback_data=f"subimp:ask:renew:{sub_id}",
                 ),
                 InlineKeyboardButton(
                     text="🔐 درخواست تغییر رمز", callback_data=f"subimp:ask:password:{sub_id}",
