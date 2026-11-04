@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.574",
-  "source_sha": "3469e822e704bb188a191b5d56c22c880bd739ca",
+  "version": "1.1.0-rc.575",
+  "source_sha": "6b1ee60c0a7afbe3b522a16ad586f23d407180c2",
   "notes": {
-    "fa": "اصلاح ربات خرید اشتراک: نمایش نوع اشتراک (عمومی، ویژه، ویتوری و موارد دیگر) به عنوان مرحله اول، سپس تعداد کاربر و دسته‌بندی پلن، با ایموجی‌های رنگی و مسیر بازگشت مناسب. اشتراک‌های ویژه فعال در دیتابیس اکنون در منوی ربات قابل انتخاب خواهند بود. حفظ مسیرهای قدیمی برای پیام‌های باز ربات و نمایش کاربر نامحدود برای صفر. ۶ تست CI موفق.",
-    "en": "Telegram store: select subscription type first (premium, V2Ray etc), then user count and legacy category. Distinct colorful emoji for user and category buttons, backwards-compatible callbacks, unlimited user labels. Fix missing premium types in live bot menu. Six CI checks green."
+    "fa": "پاکسازی آیکن‌های منوی خرید ربات تلگرام: حذف آدمک از گزینه‌های تعداد کاربر با حفظ نشان‌های رنگی، جلوگیری از نمایش الماس تکراری در پوشه‌های دسته‌بندی حرفه‌ای، حفظ مراحل انتخاب نوع اشتراک و تمام پلن‌ها و دکمه‌های خرید. تست‌های PR موفق.",
+    "en": "Telegram shop icon cleanup: remove person emoji from user-count buttons while retaining colored markers, avoid duplicate diamond emojis in already-labeled legacy categories, preserve subscription-type navigation and existing plans. Feature CI passed."
   }
 }
