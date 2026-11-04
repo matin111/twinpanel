@@ -231,7 +231,7 @@ def install(router, request_fn):
                             text="⬅️ مدیریت اکانت", callback_data=f"subimp:{sub_id}",
                         )])
                         await callback.message.edit_text(
-                            "♻️ <b>انتخاب پلن تمدید</b>\\n\\n"
+                            "♻️ <b>انتخاب پلن تمدید</b>\n\n"
                             "برای همین اکانت یک پلن انتخاب کنید. "
                             "حجم و اعتبار پس از پرداخت به همان اشتراک افزوده می‌شود.",
                             reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
@@ -243,12 +243,12 @@ def install(router, request_fn):
             return
         if callback.message:
             await callback.message.edit_text(
-                "♻️ <b>تمدید همین اکانت</b>\\n\\n"
-                "👤 نام کاربری: <code>" + escape(str(info.get("account_username") or "-")) + "</code>\\n"
-                "📋 پلن: <b>" + escape(str(plan.get("name") or "-")) + "</b>\\n"
-                f"➕ حجم: <b>{int(plan.get('traffic_gb') or 0)} گیگابایت</b>\\n"
-                f"➕ اعتبار: <b>{int(plan.get('duration_days') or 0)} روز</b>\\n"
-                f"💳 مبلغ: <b>{int(plan.get('price_toman') or 0):,} تومان</b>\\n\\n"
+                "♻️ <b>تمدید همین اکانت</b>\n\n"
+                "👤 نام کاربری: <code>" + escape(str(info.get("account_username") or "-")) + "</code>\n"
+                "📋 پلن: <b>" + escape(str(plan.get("name") or "-")) + "</b>\n"
+                f"➕ حجم: <b>{int(plan.get('traffic_gb') or 0)} گیگابایت</b>\n"
+                f"➕ اعتبار: <b>{int(plan.get('duration_days') or 0)} روز</b>\n"
+                f"💳 مبلغ: <b>{int(plan.get('price_toman') or 0):,} تومان</b>\n\n"
                 "پس از پرداخت و تأیید، همین اشتراک تمدید می‌شود. "
                 "مالکیت اکانت تغییر نمی‌کند.",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -318,9 +318,9 @@ def install(router, request_fn):
             return
         if callback.message:
             await callback.message.edit_text(
-                "✅ <b>سفارش تمدید همان اکانت ساخته شد</b>\\n\\n"
-                f"شماره سفارش: <b>#{int(order['id'])}</b>\\n"
-                f"مبلغ: <b>{int(order.get('amount_toman') or 0):,} تومان</b>\\n\\n"
+                "✅ <b>سفارش تمدید همان اکانت ساخته شد</b>\n\n"
+                f"شماره سفارش: <b>#{int(order['id'])}</b>\n"
+                f"مبلغ: <b>{int(order.get('amount_toman') or 0):,} تومان</b>\n\n"
                 "روش پرداخت را انتخاب کنید:",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
             )
