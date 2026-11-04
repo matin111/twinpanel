@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.567",
+  "version": "1.1.0-rc.568",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-04T02:42:42Z",
+  "released_at": "2026-11-04T03:45:27Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "fe91da1260c60f66b922fc6ce227fcb0b1b0da8a",
+  "source_sha": "467e2d85de665620acc83a2e2db037b5f151b812",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.567/twinpanel-1.1.0-rc.567-linux-x86_64.tar.gz",
-    "sha256": "8c89dc1b531d206a5fae071a0a6b58d0b46671e0396cc17112622538c00f3d79",
-    "size_bytes": 28191201
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.568/twinpanel-1.1.0-rc.568-linux-x86_64.tar.gz",
+    "sha256": "723c56432aa616db0cda56dafacf44489c51b95f56b61607227f585d8c69c5f6",
+    "size_bytes": 28209907
   },
   "notes": {
-    "fa": "نسخه rc.567 طراحی تنظیمات نماینده را با کارت‌های مستقل پروفایل و امنیت، فرم‌های منظم و جمع‌وجور، راست‌چین واکنش‌گرا، نمایش مناسب تم روشن و تاریک و دکمه‌های یکدست بهبود می‌دهد. منطق ذخیره پروفایل و تغییر رمز بدون تغییر باقی مانده است.",
-    "en": "Release rc.567 redesigns reseller settings with independent compact profile/security cards, responsive RTL forms, theme-aware contrast and consistent actions. Existing profile and password APIs are unchanged."
+    "fa": "نسخه rc.568 فرم ساخت و ویرایش کد تخفیف را به پاپ‌آپ واکنش‌گرای جمع‌وجور تبدیل می‌کند. جدول کدهای تخفیف در صفحه اصلی باقی می‌ماند؛ پنجره دارای فرم دو ستونه، دکمه‌های ذخیره/انصراف، بستن با Escape و سازگاری با موبایل و تم روشن/تاریک است. منطق API و ذخیره کد تخفیف بدون تغییر است.",
+    "en": "Release rc.568 moves discount code creation/editing into a compact responsive dialog with two-column fields, cancel/save actions, Escape/backdrop close, mobile layout and light/dark theme support. The discount list remains on the main page, with existing discount APIs unchanged."
   }
 }
