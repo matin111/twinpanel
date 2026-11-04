@@ -4,13 +4,14 @@ from datetime import datetime
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, EmailStr, Field, model_validator
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import require_admin
-from ..models import User, UserRole
+from ..models import User, UserRole, Subscription, SubscriptionStatus
 from ..models_reseller import (
     Reseller,
     ResellerCustomer,
@@ -332,6 +333,124 @@ def create_reseller_v2(
         "ok": True,
         "reseller": _serialize(db, reseller),
         "message": "نمایندگی ساخته شد",
+    }
+
+
+
+class SubscriptionTransferIn(BaseModel):
+    customer_user_id: int = Field(gt=0)
+
+
+@router.get("/{reseller_id}/transfer-customers")
+def reseller_transfer_customers(
+    reseller_id: int,
+    db: Session = Depends(get_db),
+):
+    """Only previously linked customers and the reseller owner are candidates.
+
+    Do not expose or automatically attach the administrator's user identity
+    when transferring legacy admin-owned subscriptions.
+    """
+    reseller = _get_reseller(db, reseller_id)
+    rows = (
+        db.query(ResellerCustomer.user_id)
+        .filter(ResellerCustomer.reseller_id == reseller.id)
+        .all()
+    )
+    ids = {int(row[0]) for row in rows}
+    ids.add(int(reseller.owner_user_id))
+    users = db.query(User).filter(User.id.in_(ids)).all()
+    return [
+        {
+            "id": int(user.id),
+            "name": user.full_name or user.email or f"#{user.id}",
+            "email": user.email,
+            "is_owner": int(user.id) == int(reseller.owner_user_id),
+        }
+        for user in users
+        if user.is_active and _owner_role(user) != UserRole.ADMIN.value
+    ]
+
+
+@router.post("/{reseller_id}/subscriptions/{subscription_id}/transfer")
+def transfer_subscription_to_reseller(
+    reseller_id: int,
+    subscription_id: int,
+    payload: SubscriptionTransferIn,
+    db: Session = Depends(get_db),
+):
+    """Transfer management rights, never recreate or provision the VPN account.
+
+    The original subscription/credential/usage/expiry records remain intact.
+    Customer assignment is scoped to the selected reseller and explicitly
+    chosen by the administrator. No wallet or traffic balance is charged.
+    """
+    reseller = _get_reseller(db, reseller_id)
+    if not reseller.is_active:
+        raise HTTPException(status_code=409, detail="نمایندگی غیرفعال است")
+    sub = db.query(Subscription).filter(Subscription.id == subscription_id).with_for_update().first()
+    if sub is None:
+        raise HTTPException(status_code=404, detail="اشتراک پیدا نشد")
+    if sub.status == SubscriptionStatus.CANCELED:
+        raise HTTPException(status_code=409, detail="اشتراک لغوشده قابل انتقال نیست")
+
+    customer_id = int(payload.customer_user_id)
+    customer = db.get(User, customer_id)
+    if not customer or not customer.is_active or _owner_role(customer) == UserRole.ADMIN.value:
+        raise HTTPException(status_code=422, detail="مشتری انتخاب‌شده معتبر نیست")
+    linked_customer = (
+        db.query(ResellerCustomer.id)
+        .filter(
+            ResellerCustomer.reseller_id == reseller.id,
+            ResellerCustomer.user_id == customer_id,
+        )
+        .first()
+    )
+    if customer_id != int(reseller.owner_user_id) and not linked_customer:
+        raise HTTPException(
+            status_code=422,
+            detail="ابتدا مشتری را در همین نمایندگی ثبت کنید",
+        )
+
+    existing = (
+        db.query(ResellerSubscription)
+        .filter(ResellerSubscription.subscription_id == sub.id)
+        .with_for_update()
+        .first()
+    )
+    if existing:
+        if existing.reseller_id == reseller.id and existing.customer_user_id == customer_id:
+            return {"ok": True, "already_transferred": True,
+                    "subscription_id": sub.id, "reseller_id": reseller.id,
+                    "customer_user_id": customer_id}
+        raise HTTPException(
+            status_code=409,
+            detail="اشتراک قبلاً به نماینده دیگری یا مشتری متفاوت واگذار شده است",
+        )
+
+    try:
+        if not linked_customer:
+            db.add(ResellerCustomer(reseller_id=reseller.id, user_id=customer_id))
+        db.add(ResellerSubscription(
+            reseller_id=reseller.id,
+            subscription_id=sub.id,
+            customer_user_id=customer_id,
+            buy_price_toman=0,
+            sell_price_toman=0,
+        ))
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="انتقال قبلاً ثبت شده یا هم‌زمان انجام شده است")
+    except Exception:
+        db.rollback()
+        raise
+    return {
+        "ok": True,
+        "subscription_id": sub.id,
+        "reseller_id": reseller.id,
+        "customer_user_id": customer_id,
+        "message": "اشتراک بدون تغییر کانفیگ به پنل نماینده منتقل شد",
     }
 
 
