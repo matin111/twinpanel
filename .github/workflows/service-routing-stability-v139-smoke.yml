@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'backend/app/service_routing_stability_v139.py'
+      - 'backend/tests/test_service_routing_fast_cache_v1.py'
       - 'backend/app/unified_l3_candidate_registry_v79.py'
       - 'backend/app/twinpanel_agent.py.tpl'
       - 'backend/app/unified_l3_core_v49.py'
@@ -35,6 +36,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Validate snapshot caching and drift handling
+        run: python backend/tests/test_service_routing_fast_cache_v1.py
 
       - name: Validate stable service-route reconciliation
         run: |
