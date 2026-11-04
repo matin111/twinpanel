@@ -15,6 +15,7 @@ on:
       - "backend/app/telegram_runtime_bot.py"
       - "backend/app/renewal_service.py"
       - "backend/scripts/imported_paid_renewal_smoke.py"
+      - "backend/scripts/imported_account_password_change_smoke.py"
       - "backend/scripts/main_bot_account_sublink_smoke.py"
       - ".github/workflows/main-bot-account-sublink-smoke.yml"
   workflow_dispatch:
@@ -43,6 +44,9 @@ jobs:
 
       - name: Validate imported account payment and renewal contract
         run: python backend/scripts/imported_paid_renewal_smoke.py
+
+      - name: Validate imported account password security and bot actions
+        run: python backend/scripts/imported_account_password_change_smoke.py
 
       - name: Validate imported account management actions
         run: python backend/scripts/imported_account_management_v2_smoke.py
