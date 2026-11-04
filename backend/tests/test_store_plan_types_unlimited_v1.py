@@ -84,3 +84,24 @@ def test_new_subscription_type_is_independent_of_legacy_category():
     admin = source("components/legacy-plans-exact.tsx")
     assert 'subscription_type:s(row.subscription_type)' in admin
     assert 'value={draft.subscription_type}' in admin
+
+
+def test_legacy_category_icons_have_distinct_colors():
+    tabs = source("components/plan-category-tabs.tsx")
+    assert "function userCountAppearance(category:string,index:number)" in tabs
+    assert "const accent=userCountAppearance(category,index);" in tabs
+    assert "background:accent.background" in tabs
+    assert 'normalizePlanType(plan.subscription_type)===type' in tabs
+    assert 'normalizePlanType(plan.category)===type' not in tabs
+
+
+def test_type_assignment_does_not_duplicate_the_plan_category_row():
+    api = source("backend/app/routers/plans.py")
+    assert (
+        '_set_plan_category(db, int(plan.id), raw.get("category"))\n'
+        "    db.flush()"
+    ) in api
+    assert (
+        '_set_plan_category(db, int(plan.id), raw.get("category"))\n'
+        "        db.flush()"
+    ) in api
