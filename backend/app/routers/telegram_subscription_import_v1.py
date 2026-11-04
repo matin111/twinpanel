@@ -72,7 +72,7 @@ def _extract_token(db: Session, url: str) -> str:
     return match.group(1)
 
 
-def _row(db: Session, sub: Subscription) -> dict:
+def _row(db: Session, sub: Subscription, telegram_id: int | None = None) -> dict:
     from .account_delivery import _share_url
 
     plan = db.get(Plan, sub.plan_id) if sub.plan_id else None
@@ -81,6 +81,8 @@ def _row(db: Session, sub: Subscription) -> dict:
     now = datetime.utcnow()
     expires = sub.expires_at
     days_remaining = max(0, (expires - now).days) if expires else None
+    linked = db.get(TelegramUserLink, telegram_id) if telegram_id is not None else None
+    is_owner = bool(linked and int(sub.user_id) == int(linked.user_id))
     return {
         "id": int(sub.id),
         "account_username": str(sub.account_username or f"account-{sub.id}"),
@@ -95,7 +97,8 @@ def _row(db: Session, sub: Subscription) -> dict:
         "device_limit": int(plan.device_limit) if plan else None,
         "subscription_link": str(_share_url(db, sub)),
         "imported": True,
-        "management_mode": "support_request",
+        "management_mode": "owner_renewal" if is_owner else "support_request",
+        "can_direct_renew": is_owner,
     }
 
 
@@ -118,7 +121,7 @@ def add_import(payload: ImportRequest, db: Session = Depends(get_db)):
     _clear_failures(payload.telegram_id)
     telegram_link = db.get(TelegramUserLink, payload.telegram_id)
     if telegram_link and int(sub.user_id) == int(telegram_link.user_id):
-        return {"ok": True, "already_added": True, "account": _row(db, sub)}
+        return {"ok": True, "already_added": True, "account": _row(db, sub, payload.telegram_id)}
     _ensure_table(db)
     if db.execute(
         select(imported_accounts.c.subscription_id).where(
@@ -126,14 +129,14 @@ def add_import(payload: ImportRequest, db: Session = Depends(get_db)):
             imported_accounts.c.subscription_id == sub.id,
         )
     ).first():
-        return {"ok": True, "already_added": True, "account": _row(db, sub)}
+        return {"ok": True, "already_added": True, "account": _row(db, sub, payload.telegram_id)}
     db.execute(imported_accounts.insert().values(
         telegram_id=payload.telegram_id,
         subscription_id=sub.id,
         created_at=datetime.utcnow(),
     ))
     db.commit()
-    return {"ok": True, "already_added": False, "account": _row(db, sub)}
+    return {"ok": True, "already_added": False, "account": _row(db, sub, payload.telegram_id)}
 
 
 @router.get("/mine/{telegram_id}", dependencies=[Depends(bot_guard)])
@@ -148,7 +151,7 @@ def list_imports(telegram_id: int, db: Session = Depends(get_db)):
         .order_by(imported_accounts.c.created_at.desc())
         .limit(50)
     ).scalars().all()
-    return [_row(db, sub) for sub in rows]
+    return [_row(db, sub, telegram_id) for sub in rows]
 
 
 @router.get("/{telegram_id}/{subscription_id}", dependencies=[Depends(bot_guard)])
@@ -164,7 +167,7 @@ def get_import(telegram_id: int, subscription_id: int, db: Session = Depends(get
     sub = db.get(Subscription, subscription_id)
     if sub is None:
         raise HTTPException(status_code=404, detail="اکانت موجود نیست")
-    return _row(db, sub)
+    return _row(db, sub, telegram_id)
 
 
 @router.delete("/{telegram_id}/{subscription_id}", dependencies=[Depends(bot_guard)])
