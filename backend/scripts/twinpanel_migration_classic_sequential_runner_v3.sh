@@ -2,7 +2,7 @@
 set -uo pipefail
 cd /opt/twinpanel/current/backend || exit 5
 export CLASSIC_DIRECT_NODE_IDS=1,6,7,11
-export CLASSIC_DIRECT_BATCH_PER_NODE=8
+export CLASSIC_DIRECT_BATCH_PER_NODE=24
 export CLASSIC_DIRECT_MAX_CYCLES=240
 for protocol in openvpn cisco l2tp; do
   export CLASSIC_ONLY_PROTOCOL="$protocol"
