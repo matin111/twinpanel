@@ -47,7 +47,17 @@ def _authorized_chat(db: Session, telegram_id: int) -> None:
 def _extract_token(db: Session, url: str) -> str:
     value = str(url or "").strip()
     parts = urlsplit(value)
-    if parts.scheme != "https" or not parts.hostname or parts.username or parts.password or parts.port:
+    try:
+        valid_origin = (
+            parts.scheme == "https"
+            and bool(parts.hostname)
+            and not parts.username
+            and not parts.password
+            and parts.port is None
+        )
+    except ValueError:
+        valid_origin = False
+    if not valid_origin:
         raise HTTPException(status_code=422, detail="لینک باید آدرس HTTPS معتبر سابلینک باشد")
 
     from .account_delivery import subscription_base_url
@@ -80,10 +90,19 @@ def _row(db: Session, sub: Subscription) -> dict:
 def add_import(payload: ImportRequest, db: Session = Depends(get_db)):
     _authorized_chat(db, payload.telegram_id)
     from .account_delivery import _subscription_from_share_token
+    from .telegram_account_link_lookup import (
+        _guard_attempts, _record_failure, _clear_failures,
+    )
 
-    token = _extract_token(db, payload.subscription_link)
-    # Existing verifier handles persistent + signed tokens and rejects expiry.
-    sub = _subscription_from_share_token(token, db)
+    _guard_attempts(payload.telegram_id)
+    try:
+        token = _extract_token(db, payload.subscription_link)
+        # Existing verifier handles persistent + signed tokens and rejects expiry.
+        sub = _subscription_from_share_token(token, db)
+    except HTTPException:
+        _record_failure(payload.telegram_id)
+        raise
+    _clear_failures(payload.telegram_id)
     telegram_link = db.get(TelegramUserLink, payload.telegram_id)
     if telegram_link and int(sub.user_id) == int(telegram_link.user_id):
         return {"ok": True, "already_added": True, "account": _row(db, sub)}
