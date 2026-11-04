@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 
+from sqlalchemy import select
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -10,6 +12,7 @@ from .models import (
 )
 from .renewal_models import (
     SubscriptionRenewalOrder,
+    imported_renewal_authorizations,
 )
 from .store_models import StoreOrder
 
@@ -72,14 +75,23 @@ def fulfill_renewal_order(
             detail="اشتراک تمدیدی پیدا نشد",
         )
 
-    if (
-        int(sub.user_id)
-        != int(order.user_id)
-    ):
-        raise HTTPException(
-            status_code=403,
-            detail="مالکیت اشتراک معتبر نیست",
-        )
+    if int(sub.user_id) != int(order.user_id):
+        # TWINPANEL_IMPORTED_PAID_RENEWAL_V1
+        # The payer may renew a subscription attached to their Telegram
+        # account, but ONLY when this specific paid order carries a grant
+        # recorded during verified sublink import. No ownership is changed.
+        grant = db.execute(
+            select(imported_renewal_authorizations.c.order_id).where(
+                imported_renewal_authorizations.c.order_id == order.id,
+                imported_renewal_authorizations.c.subscription_id == sub.id,
+                imported_renewal_authorizations.c.payer_user_id == order.user_id,
+            )
+        ).first()
+        if grant is None:
+            raise HTTPException(
+                status_code=403,
+                detail="مالکیت اشتراک یا مجوز تمدید پرداختی معتبر نیست",
+            )
 
     plan = db.get(
         Plan,
