@@ -1641,7 +1641,8 @@ def security_overview(
 
         # 24h device churn.
         if (
-            recent_devices
+            device_limit > 0
+            and recent_devices
             > max(
                 device_limit + 1,
                 device_limit * 2,
