@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "backend/app/unified_l3_core_v49.py"
+      - "backend/tests/unified_l3_agent_nonblocking_v1_smoke.py"
       - "backend/app/unified_l3_agent_rollout_v49.py"
       - "backend/app/self_hosted_runtime.py"
       - "backend/app/twinpanel_agent.py.tpl"
@@ -18,6 +19,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify Agent blocking operations leave the event loop
+        run: python backend/tests/unified_l3_agent_nonblocking_v1_smoke.py
 
       - name: Validate Python syntax
         run: |
@@ -64,7 +68,7 @@ jobs:
           start = patched.index("async def reconcile_tunnels(client):")
           end = patched.index("# TWINPANEL_AGENT_ORPHAN_SELF_DISABLE_V1", start)
           reconcile = patched[start:end]
-          real_call = "reconcile_service_routing(\n                items\n            )"
+          real_call = "await asyncio.to_thread(\n            reconcile_service_routing, items\n        )"
           call_at = reconcile.index(real_call)
 
           assert "TWINPANEL_UNIFIED_L3_AGENT_V49" in patched

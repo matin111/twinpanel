@@ -154,10 +154,10 @@ async def reconcile_tunnels(client):
     # V49 phase 1: clean only obsolete legacy WireGuard interfaces, then make
     # every desired carrier converge. Service chains are intentionally left
     # untouched until the selected L3 path has been verified below.
-    cleanup_ok, cleanup_error = (
-        reconcile_tunnel_interfaces(
-            items
-        )
+    # Blocking iproute/iptables and carrier probes must not starve the
+    # asyncio heartbeat task while thousands of rules are being reconciled.
+    cleanup_ok, cleanup_error = await asyncio.to_thread(
+        reconcile_tunnel_interfaces, items
     )
 
     if not cleanup_ok:
@@ -231,12 +231,12 @@ async def reconcile_tunnels(client):
                     )
 
                 if selected == "mtunnel":
-                    ok, err, latency = unified_l3_carrier_probe(
-                        item
+                    ok, err, latency = await asyncio.to_thread(
+                        unified_l3_carrier_probe, item
                     )
                 else:
-                    ok, err, latency = check_ssh_tun(
-                        item
+                    ok, err, latency = await asyncio.to_thread(
+                        check_ssh_tun, item
                     )
 
                 tunnel_ok = ok
@@ -245,12 +245,12 @@ async def reconcile_tunnels(client):
 
             elif "wireguard" in candidates:
 
-                public_key = ensure_keypair(
-                    item["id"]
+                public_key = await asyncio.to_thread(
+                    ensure_keypair, item["id"]
                 )
 
-                ok, err = configure_wireguard(
-                    item
+                ok, err = await asyncio.to_thread(
+                    configure_wireguard, item
                 )
 
                 if ok:
@@ -260,10 +260,8 @@ async def reconcile_tunnels(client):
                         0.6
                     )
 
-                    latency = ping_ms(
-                        item[
-                            "peer_tunnel_ip"
-                        ]
+                    latency = await asyncio.to_thread(
+                        ping_ms, item["peer_tunnel_ip"]
                     )
 
                     tunnel_ok = (
@@ -315,8 +313,8 @@ async def reconcile_tunnels(client):
     route_probe_errors = {}
 
     for item in routed_items:
-        ok, error, route_latency = unified_l3_carrier_probe(
-            item
+        ok, error, route_latency = await asyncio.to_thread(
+            unified_l3_carrier_probe, item
         )
 
         if not ok:
@@ -353,10 +351,8 @@ async def reconcile_tunnels(client):
         )
 
     else:
-        routing_ok, routing_error = (
-            reconcile_service_routing(
-                items
-            )
+        routing_ok, routing_error = await asyncio.to_thread(
+            reconcile_service_routing, items
         )
 
         if not routing_ok:
