@@ -10,6 +10,12 @@ from app.telegram_purchase_bot import (
     user_count_plans,
     user_counts,
     user_counts_keyboard,
+    plan_subscription_type,
+    subscription_types,
+    subscription_type_plans,
+    subscription_types_keyboard,
+    user_count_icon,
+    category_icon,
 )
 
 
@@ -93,3 +99,41 @@ def test_zero_user_count_is_unlimited_and_not_converted_to_one():
     assert "کاربر نامحدود" in keyboard.inline_keyboard[0][0].text
     assert keyboard.inline_keyboard[0][0].callback_data == "shop:users:0"
     assert [p["id"] for p in user_count_plans([unlimited, normal], 0)] == [99]
+
+
+def test_subscription_types_are_first_level_without_changing_existing_categories():
+    plans = [
+        {"id": 1, "name": "Basic", "subscription_type": "اشتراک عمومی", "category": "یک ماهه", "device_limit": 1},
+        {"id": 2, "name": "Special", "subscription_type": "اشتراک ویژه", "category": "یک ماهه", "device_limit": 1},
+        {"id": 3, "name": "Premium", "subscription_type": "اشتراک ویژه", "category": "سه ماهه", "device_limit": 2},
+    ]
+    assert subscription_types(plans) == ["اشتراک عمومی", "اشتراک ویژه"]
+    assert plan_subscription_type({"category": "متفاوت"}) == "اشتراک عمومی"
+    title, selected = subscription_type_plans(plans, 1)
+    assert title == "اشتراک ویژه"
+    assert [plan["id"] for plan in selected] == [2, 3]
+    assert plan_categories(selected) == ["یک ماهه", "سه ماهه"]
+    keyboard = subscription_types_keyboard(plans)
+    assert keyboard.inline_keyboard[0][0].callback_data == "shop:type:0"
+    assert keyboard.inline_keyboard[1][0].callback_data == "shop:type:1"
+    assert "💎" in keyboard.inline_keyboard[1][0].text
+
+
+def test_typed_user_counts_and_colored_legacy_category_buttons_preserve_navigation():
+    plans = [
+        {"id": 36, "subscription_type": "اشتراک ویژه", "category": "💎 پلن حرفه‌ای ۲ ماهه", "device_limit": 1},
+        {"id": 37, "subscription_type": "اشتراک ویژه", "category": "💎 پلن حرفه‌ای ۲ ماهه", "device_limit": 2},
+        {"id": 10, "subscription_type": "اشتراک عمومی", "category": "یک ماهه", "device_limit": 1},
+    ]
+    special_index = subscription_types(plans).index("اشتراک ویژه")
+    _type, special = subscription_type_plans(plans, special_index)
+    assert "🟢" in user_count_icon(1)
+    assert "🔵" in user_count_icon(2)
+    assert "♾️" in user_count_icon(0)
+    assert "📂" in category_icon("یک ماهه", 0)
+    assert "💎" in category_icon("پلن ویژه", 0)
+    typed_users = user_counts_keyboard(special, type_index=special_index)
+    assert typed_users.inline_keyboard[0][0].callback_data == f"shop:tusers:{special_index}:1"
+    typed_categories = categories_keyboard(special, user_count=1, type_index=special_index)
+    assert typed_categories.inline_keyboard[0][0].callback_data == f"shop:tucat:{special_index}:1:0"
+    assert typed_categories.inline_keyboard[-1][0].callback_data == f"shop:type:{special_index}"

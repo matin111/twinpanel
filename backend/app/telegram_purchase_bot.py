@@ -102,6 +102,67 @@ def plan_categories(plans):
     return result
 
 
+DEFAULT_SUBSCRIPTION_TYPE = "اشتراک عمومی"
+COLOR_ICONS = ("🟢", "🔵", "🟣", "🟠", "🔴", "🟡", "🩵", "🩷")
+
+
+def plan_subscription_type(plan):
+    return " ".join(str(plan.get("subscription_type") or "").strip().split()) or DEFAULT_SUBSCRIPTION_TYPE
+
+
+def subscription_types(plans):
+    return list(dict.fromkeys(plan_subscription_type(plan) for plan in plans))
+
+
+def subscription_type_plans(plans, index):
+    types = subscription_types(plans)
+    if index < 0 or index >= len(types):
+        raise RuntimeError("این نوع اشتراک دیگر در دسترس نیست")
+    name = types[index]
+    selected = [plan for plan in plans if plan_subscription_type(plan) == name]
+    if not selected:
+        raise RuntimeError("این نوع اشتراک دیگر در دسترس نیست")
+    return name, selected
+
+
+def subscription_type_icon(name, index=0):
+    lowered = name.casefold()
+    if "ویتوری" in name or "v2ray" in lowered or "xray" in lowered:
+        return "⚡"
+    if "ویژه" in name or "vip" in lowered or "premium" in lowered:
+        return "💎"
+    if "اقتصادی" in name:
+        return "🌱"
+    if "گیم" in name:
+        return "🎮"
+    return ("🛡️", "🌈", "🚀", "🌐")[index % 4]
+
+
+def subscription_types_keyboard(plans):
+    rows = []
+    for index, name in enumerate(subscription_types(plans)[:30]):
+        count = sum(1 for plan in plans if plan_subscription_type(plan) == name)
+        rows.append([
+            InlineKeyboardButton(
+                text=(f"{subscription_type_icon(name, index)} {name} ({count})")[:60],
+                callback_data=f"shop:type:{index}",
+            )
+        ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def user_count_icon(count):
+    return "♾️" if count == 0 else COLOR_ICONS[(count - 1) % len(COLOR_ICONS)] + " 👤"
+
+
+def category_icon(name, index):
+    if "💎" in name or "ویژه" in name or "حرفه" in name:
+        return "💎"
+    if "گیم" in name:
+        return "🎮"
+    return COLOR_ICONS[index % len(COLOR_ICONS)] + " 📂"
+
+
 def plan_user_count(plan):
     try:
         return max(0, int(plan.get("device_limit") if plan.get("device_limit") is not None else 1))
@@ -113,16 +174,21 @@ def user_counts(plans):
     return sorted({plan_user_count(plan) for plan in plans})
 
 
-def user_counts_keyboard(plans):
+def user_counts_keyboard(plans, *, type_index=None):
     rows = []
     for count in user_counts(plans)[:30]:
         plan_count = sum(1 for plan in plans if plan_user_count(plan) == count)
         rows.append([
             InlineKeyboardButton(
-                text=(f"♾️ کاربر نامحدود ({plan_count})" if count == 0 else f"👤 {count} کاربره ({plan_count})")[:60],
-                callback_data=f"shop:users:{count}",
+                text=(f"{user_count_icon(count)} "
+                      f"{'کاربر نامحدود' if count == 0 else str(count) + ' کاربره'} "
+                      f"({plan_count})")[:60],
+                callback_data=(f"shop:tusers:{type_index}:{count}"
+                               if type_index is not None else f"shop:users:{count}"),
             )
         ])
+    if type_index is not None:
+        rows.append([InlineKeyboardButton(text="↩️ بازگشت به نوع اشتراک",callback_data="shop:list")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -133,25 +199,27 @@ def user_count_plans(plans, count):
     return filtered
 
 
-def categories_keyboard(plans, *, user_count=None):
+def categories_keyboard(plans, *, user_count=None, type_index=None):
     filtered = user_count_plans(plans, user_count) if user_count is not None else plans
     categories = plan_categories(filtered)
     rows = []
     for index, category in enumerate(categories[:30]):
         count = sum(1 for plan in filtered if plan_category(plan) == category)
         callback_data = (
-            f"shop:ucat:{int(user_count)}:{index}"
+            f"shop:tucat:{type_index}:{int(user_count)}:{index}"
+            if type_index is not None and user_count is not None
+            else f"shop:ucat:{int(user_count)}:{index}"
             if user_count is not None
             else f"shop:cat:{index}"
         )
         rows.append([
             InlineKeyboardButton(
-                text=(f"📁 {category} ({count})")[:60],
+                text=(f"{category_icon(category,index)} {category} ({count})")[:60],
                 callback_data=callback_data,
             )
         ])
     if user_count is not None:
-        rows.append([InlineKeyboardButton(text="⬅️ بازگشت به تعداد کاربری", callback_data="shop:list")])
+        rows.append([InlineKeyboardButton(text="⬅️ بازگشت به تعداد کاربری", callback_data=(f"shop:type:{type_index}" if type_index is not None else "shop:list"))])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -167,7 +235,7 @@ def category_plans(plans, category_index, *, user_count=None):
     ]
 
 
-def plans_keyboard(plans, *, category_index=None, user_count=None):
+def plans_keyboard(plans, *, category_index=None, user_count=None, type_index=None):
     rows = []
 
     for plan in plans[:30]:
@@ -194,7 +262,7 @@ def plans_keyboard(plans, *, category_index=None, user_count=None):
         rows.append([
             InlineKeyboardButton(
                 text="⬅️ بازگشت به دسته‌بندی‌ها",
-                callback_data=(f"shop:users:{int(user_count)}" if user_count is not None else "shop:list"),
+                callback_data=(f"shop:tusers:{type_index}:{int(user_count)}" if type_index is not None and user_count is not None else f"shop:users:{int(user_count)}" if user_count is not None else "shop:list"),
             )
         ])
 
@@ -355,7 +423,8 @@ def proof_keyboard(
 def plan_text(plan):
     return (
         f"🛒 <b>{escape(str(plan.get('name') or 'اشتراک'))}</b>\n"
-        f"👤 تعداد کاربری: <b>{plan_user_count(plan)} کاربر</b>\n"
+        f"👤 تعداد کاربری: <b>{'نامحدود' if plan_user_count(plan) == 0 else str(plan_user_count(plan)) + ' کاربر'}</b>\n"
+        f"💠 نوع اشتراک: <b>{escape(plan_subscription_type(plan))}</b>\n"
         f"📁 دسته‌بندی: <b>{escape(plan_category(plan))}</b>\n\n"
         f"📦 حجم: "
         f"<b>{int(plan.get('traffic_gb') or 0)} گیگابایت</b>\n"
@@ -472,8 +541,8 @@ def create_purchase_router(
 
         await message.answer(
             "🛒 <b>خرید اشتراک</b>\n\n"
-            "ابتدا تعداد کاربری را انتخاب کنید:",
-            reply_markup=user_counts_keyboard(plans),
+            "ابتدا نوع اشتراک را انتخاب کنید:",
+            reply_markup=subscription_types_keyboard(plans),
         )
 
     @router.callback_query(
@@ -508,8 +577,70 @@ def create_purchase_router(
 
         await callback.message.edit_text(
             "🛒 <b>خرید اشتراک</b>\n\n"
-            "ابتدا تعداد کاربری را انتخاب کنید:",
-            reply_markup=user_counts_keyboard(plans),
+            "ابتدا نوع اشتراک را انتخاب کنید:",
+            reply_markup=subscription_types_keyboard(plans),
+        )
+
+    @router.callback_query(F.data.startswith("shop:type:"))
+    async def shop_subscription_type(callback: CallbackQuery):
+        try:
+            index = int(callback.data.split(":")[2])
+            plans = await load_plans()
+            name, matching = subscription_type_plans(plans, index)
+        except Exception as exc:
+            await callback.answer(str(exc), show_alert=True)
+            return
+
+        await callback.answer()
+        await callback.message.edit_text(
+            f"{subscription_type_icon(name, index)} <b>{escape(name)}</b>\n\n"
+            "تعداد کاربر را انتخاب کنید:",
+            reply_markup=user_counts_keyboard(matching, type_index=index),
+        )
+
+    @router.callback_query(F.data.startswith("shop:tusers:"))
+    async def shop_type_user_count(callback: CallbackQuery):
+        try:
+            _, _, type_index, count = callback.data.split(":")
+            type_index, count = int(type_index), int(count)
+            plans = await load_plans()
+            name, matching = subscription_type_plans(plans, type_index)
+            count_plans = user_count_plans(matching, count)
+        except Exception as exc:
+            await callback.answer(str(exc), show_alert=True)
+            return
+
+        await callback.answer()
+        label = "کاربر نامحدود" if count == 0 else f"{count} کاربره"
+        await callback.message.edit_text(
+            f"{subscription_type_icon(name, type_index)} <b>{escape(name)}</b>\n"
+            f"{user_count_icon(count)} <b>{label}</b>\n\n"
+            "دسته‌بندی پلن را انتخاب کنید:",
+            reply_markup=categories_keyboard(count_plans, user_count=count, type_index=type_index),
+        )
+
+    @router.callback_query(F.data.startswith("shop:tucat:"))
+    async def shop_type_user_category(callback: CallbackQuery):
+        try:
+            _, _, type_index, count, category_index = callback.data.split(":")
+            type_index, count, category_index = int(type_index), int(count), int(category_index)
+            plans = await load_plans()
+            name, matching = subscription_type_plans(plans, type_index)
+            count_plans = user_count_plans(matching, count)
+            category, selected = category_plans(count_plans, category_index, user_count=count)
+        except Exception as exc:
+            await callback.answer(str(exc), show_alert=True)
+            return
+
+        await callback.answer()
+        label = "کاربر نامحدود" if count == 0 else f"{count} کاربره"
+        await callback.message.edit_text(
+            f"{subscription_type_icon(name, type_index)} <b>{escape(name)}</b>\n"
+            f"{user_count_icon(count)} <b>{label}</b>\n"
+            f"{category_icon(category, category_index)} <b>{escape(category)}</b>\n\n"
+            "پلن موردنظر را انتخاب کنید:",
+            reply_markup=plans_keyboard(selected, category_index=category_index,
+                                        user_count=count, type_index=type_index),
         )
 
     @router.callback_query(F.data.startswith("shop:users:"))
