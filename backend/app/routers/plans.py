@@ -23,11 +23,17 @@ from ..schemas import PlanCreate, PlanUpdate
 router = APIRouter(prefix="/v1/plans", tags=["plans"])
 
 DEFAULT_PLAN_CATEGORY = "سایر پلن‌ها"
+DEFAULT_SUBSCRIPTION_TYPE = "اشتراک عمومی"
 
 
 def _normalize_category(value) -> str:
     category = " ".join(str(value or "").strip().split())
     return (category[:120] if category else DEFAULT_PLAN_CATEGORY)
+
+
+def _normalize_subscription_type(value) -> str:
+    name = " ".join(str(value or "").strip().split())
+    return name[:120] if name else DEFAULT_SUBSCRIPTION_TYPE
 
 
 def _plan_assignment(db: Session, plan_id: int) -> PlanCategoryAssignment | None:
@@ -59,6 +65,26 @@ def _set_plan_category(db: Session, plan_id: int, category) -> str:
     return value
 
 
+def _plan_subscription_type(db: Session, plan_id: int) -> str:
+    row = _plan_assignment(db, plan_id)
+    return _normalize_subscription_type(row.subscription_type if row else None)
+
+
+def _set_plan_subscription_type(db: Session, plan_id: int, value) -> str:
+    name = _normalize_subscription_type(value)
+    row = _plan_assignment(db, plan_id)
+    if row is None:
+        row = PlanCategoryAssignment(
+            plan_id=int(plan_id),
+            category=DEFAULT_PLAN_CATEGORY,
+            subscription_type=name,
+        )
+        db.add(row)
+    else:
+        row.subscription_type = name
+    return name
+
+
 def _central_plans(db: Session):
     return db.query(Plan).filter(
         ~Plan.name.startswith(INTERNAL_PLAN_PREFIX)
@@ -71,6 +97,7 @@ def _plan_payload(db: Session, plan: Plan) -> dict:
         "name": plan.name,
         "description": plan.description,
         "category": _plan_category(db, int(plan.id)),
+        "subscription_type": _plan_subscription_type(db, int(plan.id)),
         "sort_order": _plan_sort_order(db, int(plan.id)),
         "duration_days": int(plan.duration_days or 0),
         "traffic_gb": int(plan.traffic_gb or 0),
@@ -111,6 +138,7 @@ def _plan_model_raw(raw: dict) -> dict:
     values.pop("protocols", None)
     values.pop("node_ids", None)
     values.pop("category", None)
+    values.pop("subscription_type", None)
     values.pop("sort_order", None)
     return values
 
@@ -264,6 +292,7 @@ def create_plan(raw: dict = Body(...), db: Session = Depends(get_db)):
     db.add(plan)
     db.flush()
     _set_plan_category(db, int(plan.id), raw.get("category"))
+    _set_plan_subscription_type(db, int(plan.id), raw.get("subscription_type"))
     assignment = _plan_assignment(db, int(plan.id))
     if assignment is not None:
         current_max = max(
@@ -309,6 +338,8 @@ def update_plan(
 
     if "category" in raw:
         _set_plan_category(db, int(plan.id), raw.get("category"))
+    if "subscription_type" in raw:
+        _set_plan_subscription_type(db, int(plan.id), raw.get("subscription_type"))
 
     protocols, node_ids = _selection_values(raw, creating=False)
     _replace_selection(
