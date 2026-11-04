@@ -28,7 +28,9 @@ assert "subimp:ask:password:" in imported
 # Functional check: the helper sends exactly one photo with a caption that
 # contains the same URL encoded in the QR image; no separate link message.
 from aiogram.types import BufferedInputFile
-scope = {}\nexec(compile(shared, '<combined QR>', 'exec'), scope)\nsend_subscription_link_and_qr = scope['send_subscription_link_and_qr']
+scope = {}
+exec(compile(shared, '<combined QR>', 'exec'), scope)
+send_subscription_link_and_qr = scope['send_subscription_link_and_qr']
 
 class FakeMessage:
     def __init__(self):
