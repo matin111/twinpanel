@@ -148,7 +148,6 @@ def subscription_types_keyboard(plans):
                 callback_data=f"shop:type:{index}",
             )
         ])
-    rows.append([InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="shop:home")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
