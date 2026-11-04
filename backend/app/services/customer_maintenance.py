@@ -4,6 +4,11 @@ import asyncio
 import time
 from datetime import datetime
 
+from sqlalchemy import and_, or_
+
+from ..models import Subscription, SubscriptionStatus
+from ..subscription_enforcement import queue_subscription_enforcement
+
 from ..database import SessionLocal
 from ..main_receipt_cleanup import cleanup_receipts_once
 from ..payment_models import PaymentIntent
@@ -27,6 +32,9 @@ from .quota_runtime_reconcile import (
 # subscriptions. A 15-second cadence preserves quota/session semantics while
 # bounding telemetry freshness to at most 15 seconds and freeing the API event
 # loop for interactive admin/user requests.
+STATUS_RECONCILE_INTERVAL_SECONDS = 30.0
+STATUS_RECONCILE_BATCH_SIZE = 25
+
 QUOTA_RUNTIME_INTERVAL_SECONDS = 15.0
 PAYMENT_NOTIFICATION_INTERVAL_SECONDS = 5
 CRYPTO_VERIFY_INTERVAL_SECONDS = 10
@@ -181,6 +189,99 @@ def sync_payment_notifications_once() -> dict:
         db.close()
 
 
+def reconcile_subscription_status_once(*, dry_run: bool = False, batch_size: int = STATUS_RECONCILE_BATCH_SIZE) -> dict:
+    """Bounded, idempotent status reconciliation independent of usage events.
+
+    A user who stops sending telemetry must still expire at the deadline.
+    Nonpositive traffic limits mean UNLIMITED, never exhausted. Treat only
+    currently ACTIVE rows as candidates; never rewrite admin suspensions.
+    Row locks avoid duplicate work across multiple API workers/replicas.
+    Revoke is queued in the same transaction as the state transition.
+    """
+    db = SessionLocal()
+    result = {"checked": 0, "expired": 0, "exhausted": 0, "errors": 0}
+    try:
+        now = datetime.utcnow()
+        condition = or_(
+            and_(Subscription.expires_at.is_not(None), Subscription.expires_at <= now),
+            and_(
+                Subscription.traffic_limit_bytes > 0,
+                Subscription.traffic_used_bytes >= Subscription.traffic_limit_bytes,
+            ),
+        )
+        candidates = (
+            db.query(Subscription.id)
+            .filter(Subscription.status == SubscriptionStatus.ACTIVE, condition)
+            .order_by(Subscription.id.asc())
+            .limit(max(1, min(int(batch_size), 100)))
+            .all()
+        )
+        ids = [int(row[0]) for row in candidates]
+        if dry_run:
+            result["checked"] = len(ids)
+            result["remaining"] = db.query(Subscription.id).filter(
+                Subscription.status == SubscriptionStatus.ACTIVE, condition
+            ).count()
+            return result
+
+        for subscription_id in ids:
+            try:
+                sub = (
+                    db.query(Subscription)
+                    .filter(Subscription.id == subscription_id)
+                    .with_for_update(skip_locked=True)
+                    .first()
+                )
+                if sub is None or sub.status != SubscriptionStatus.ACTIVE:
+                    db.rollback()
+                    continue
+                current = datetime.utcnow()
+                is_expired = bool(sub.expires_at and sub.expires_at <= current)
+                is_exhausted = bool(
+                    int(sub.traffic_limit_bytes or 0) > 0
+                    and int(sub.traffic_used_bytes or 0) >= int(sub.traffic_limit_bytes)
+                )
+                if not is_expired and not is_exhausted:
+                    db.rollback()
+                    continue
+                sub.status = SubscriptionStatus.EXPIRED if is_expired else SubscriptionStatus.SUSPENDED
+                db.flush()
+                queue_subscription_enforcement(
+                    db,
+                    sub,
+                    command_type="revoke_subscription",
+                    reason="scheduled_expiration" if is_expired else "scheduled_quota_exhausted",
+                )
+                db.commit()
+                result["checked"] += 1
+                result["expired" if is_expired else "exhausted"] += 1
+            except Exception as exc:
+                db.rollback()
+                result["errors"] += 1
+                print(
+                    "SUBSCRIPTION_STATUS_RECONCILE_ITEM_ERROR",
+                    {"subscription_id": subscription_id, "error": str(exc)[:500]},
+                    flush=True,
+                )
+        return result
+    finally:
+        db.close()
+
+
+async def _subscription_status_worker() -> None:
+    """Run independently from slow node SSH telemetry and payment pollers."""
+    while True:
+        try:
+            result = await asyncio.to_thread(reconcile_subscription_status_once)
+            if result["expired"] or result["exhausted"] or result["errors"]:
+                print("SUBSCRIPTION_STATUS_RECONCILE", result, flush=True)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            print("subscription status reconcile failed:", str(exc)[:800], flush=True)
+        await asyncio.sleep(STATUS_RECONCILE_INTERVAL_SECONDS)
+
+
 async def _quota_runtime_worker() -> None:
     """Keep real VPN sessions synchronized with the quota ledger."""
 
@@ -267,6 +368,10 @@ async def customer_maintenance_loop() -> None:
     quota_runtime_task = asyncio.create_task(
         _quota_runtime_worker(),
         name="quota-runtime-reconcile",
+    )
+    status_runtime_task = asyncio.create_task(
+        _subscription_status_worker(),
+        name="subscription-status-reconcile",
     )
 
     last_receipt_cleanup = 0.0
@@ -380,8 +485,10 @@ async def customer_maintenance_loop() -> None:
             await asyncio.sleep(PAYMENT_NOTIFICATION_INTERVAL_SECONDS)
 
     finally:
+        status_runtime_task.cancel()
         quota_runtime_task.cancel()
-        try:
-            await quota_runtime_task
-        except asyncio.CancelledError:
-            pass
+        for task in (status_runtime_task, quota_runtime_task):
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
