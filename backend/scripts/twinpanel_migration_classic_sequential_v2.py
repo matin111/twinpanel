@@ -48,56 +48,64 @@ async def one_node(db,node_id):
     succeeded=0
     skipped=0
     failed=0
-    for sub in subs:
-        if succeeded>=PER_NODE:break
-        user=db.get(User,sub.user_id)
-        if not user:continue
-        username=sub.account_username or ad._safe_username(sub,user)
-        password=sub.account_password_encrypted or ad._numeric_secret(8)
-        for protocol in PROTOCOLS:
+    shared_conn=None
+    try:
+        for sub in subs:
             if succeeded>=PER_NODE:break
-            if not bool(getattr(node,'enable_'+protocol,False)):continue
-            cred=db.query(ProtocolCredential).filter(ProtocolCredential.subscription_id==sub.id,ProtocolCredential.protocol==protocol).first()
-            items=ad._autosync_credential_items(cred)
-            if any(ad._autosync_item_node_id(x)==node_id for x in items):
-                skipped+=1
-                continue
-            # Guard repeat at write-time: no credentials for expired or exhausted users.
-            db.refresh(sub)
-            if sub.status!=SubscriptionStatus.ACTIVE or (sub.expires_at and sub.expires_at<=datetime.utcnow()) or (sub.traffic_limit_bytes>0 and sub.traffic_used_bytes>=sub.traffic_limit_bytes):
-                continue
-            if not healthy():
-                print('API_UNHEALTHY_STOP',flush=True)
-                return (2,succeeded)
-            try:
-                if protocol=='cisco':
-                    item=await asyncio.wait_for(ad._cisco(db,node,sub,user,username,password),timeout=90)
-                elif protocol=='l2tp':
-                    item=await asyncio.wait_for(ad._l2tp(db,node,sub,user,username,password),timeout=90)
-                elif protocol=='openvpn':
-                    item=await asyncio.wait_for(ad._openvpn(db,node,sub,user),timeout=180)
-                elif protocol=='wireguard':
-                    item=await asyncio.wait_for(ad._wireguard(db,node,sub,user),timeout=90)
-                else:
-                    raise ValueError("unsupported protocol")
-                if cred is None:
-                    cred=ProtocolCredential(subscription_id=sub.id,protocol=protocol)
-                    db.add(cred)
-                items.append(item)
-                cred.config_text_encrypted=ad._enc(items)
-                cred.is_active=True
-                if protocol in ('cisco','l2tp'):
-                    cred.username=username
-                    cred.secret_encrypted=ad._enc({'password':password})
-                if not sub.account_username:sub.account_username=username
-                if not sub.account_password_encrypted:sub.account_password_encrypted=password
-                db.commit()
-                succeeded+=1
-                print('CLASSIC_DIRECT_COMMITTED',{'node':node_id,'protocol':protocol,'count':succeeded},flush=True)
-            except Exception as e:
-                db.rollback()
-                failed+=1
-                print('CLASSIC_DIRECT_ERROR',{'node':node_id,'protocol':protocol,'type':type(e).__name__},flush=True)
+            user=db.get(User,sub.user_id)
+            if not user:continue
+            username=sub.account_username or ad._safe_username(sub,user)
+            password=sub.account_password_encrypted or ad._numeric_secret(8)
+            for protocol in PROTOCOLS:
+                if succeeded>=PER_NODE:break
+                if not bool(getattr(node,'enable_'+protocol,False)):continue
+                cred=db.query(ProtocolCredential).filter(ProtocolCredential.subscription_id==sub.id,ProtocolCredential.protocol==protocol).first()
+                items=ad._autosync_credential_items(cred)
+                if any(ad._autosync_item_node_id(x)==node_id for x in items):
+                    skipped+=1
+                    continue
+                # Guard repeat at write-time: no credentials for expired or exhausted users.
+                db.refresh(sub)
+                if sub.status!=SubscriptionStatus.ACTIVE or (sub.expires_at and sub.expires_at<=datetime.utcnow()) or (sub.traffic_limit_bytes>0 and sub.traffic_used_bytes>=sub.traffic_limit_bytes):
+                    continue
+                if not healthy():
+                    print('API_UNHEALTHY_STOP',flush=True)
+                    return (2,succeeded)
+                try:
+                    if protocol=='cisco':
+                        item=await asyncio.wait_for(ad._cisco(db,node,sub,user,username,password),timeout=90)
+                    elif protocol=='l2tp':
+                        item=await asyncio.wait_for(ad._l2tp(db,node,sub,user,username,password),timeout=90)
+                    elif protocol=='openvpn':
+                        if shared_conn is None and not ad.is_openvpn_central_pki_enabled(db):
+                            shared_conn=await asyncio.wait_for(ad.ssh_connect_saved(node,db),timeout=30)
+                        item=await asyncio.wait_for(ad._openvpn(db,node,sub,user,reusable_connection=shared_conn),timeout=180)
+                    elif protocol=='wireguard':
+                        item=await asyncio.wait_for(ad._wireguard(db,node,sub,user),timeout=90)
+                    else:
+                        raise ValueError("unsupported protocol")
+                    if cred is None:
+                        cred=ProtocolCredential(subscription_id=sub.id,protocol=protocol)
+                        db.add(cred)
+                    items.append(item)
+                    cred.config_text_encrypted=ad._enc(items)
+                    cred.is_active=True
+                    if protocol in ('cisco','l2tp'):
+                        cred.username=username
+                        cred.secret_encrypted=ad._enc({'password':password})
+                    if not sub.account_username:sub.account_username=username
+                    if not sub.account_password_encrypted:sub.account_password_encrypted=password
+                    db.commit()
+                    succeeded+=1
+                    print('CLASSIC_DIRECT_COMMITTED',{'node':node_id,'protocol':protocol,'count':succeeded},flush=True)
+                except Exception as e:
+                    db.rollback()
+                    failed+=1
+                    print('CLASSIC_DIRECT_ERROR',{'node':node_id,'protocol':protocol,'type':type(e).__name__},flush=True)
+    finally:
+        if shared_conn is not None:
+            shared_conn.close()
+            await shared_conn.wait_closed()
     print('CLASSIC_NODE_DONE',{'node':node_id,'protocol':PROTOCOL,'committed':succeeded,'reused':skipped,'failed':failed},flush=True)
     # Keep committed progress when an occasional per-account DB/SSH error
     # occurs. An all-failure cycle still stops and never advances phases.
