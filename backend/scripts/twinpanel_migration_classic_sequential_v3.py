@@ -145,13 +145,18 @@ async def main():
                 print('CLASSIC_SAFETY_STOP',{'cycle':cycle},flush=True)
                 return 2
             total=0
+            node_errors=[]
             for node_id in NODE_IDS:
                 with SessionLocal() as db:
                     rc,committed=await one_node(db,node_id)
-                    if rc:return rc
+                    if rc:
+                        node_errors.append((node_id,rc))
+                        print('CLASSIC_NODE_RETRY_PENDING',{'node':node_id,'exit':rc},flush=True)
                     total+=committed
                 await asyncio.sleep(1)
-            print('CLASSIC_CYCLE_COMPLETE',{'cycle':cycle,'new_credentials':total},flush=True)
+            print('CLASSIC_CYCLE_COMPLETE',{'cycle':cycle,'new_credentials':total,'node_errors':node_errors},flush=True)
+            if total==0 and node_errors:
+                return 3
             if total==0:
                 print('CLASSIC_DIRECT_DONE',flush=True)
                 return 0
