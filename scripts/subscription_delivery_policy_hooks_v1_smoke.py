@@ -2,11 +2,16 @@
 from __future__ import annotations
 
 import os
+import tempfile
+from pathlib import Path
 
+# Import-time schema inspection now connects to the configured database.
+# Use an isolated file-backed SQLite bootstrap DB, not an absent PostgreSQL
+# listener on port 1. The smoke assertions still use their own in-memory DB.
+_smoke_db_directory = tempfile.TemporaryDirectory(prefix="twinpanel-hooks-smoke-")
 os.environ.setdefault("APP_SECRET_KEY", "subscription-delivery-hooks-v1-smoke-secret")
 os.environ["DATABASE_URL"] = (
-    "postgresql+psycopg2://twinpanel_smoke:twinpanel_smoke@127.0.0.1:1/"
-    "twinpanel_smoke"
+    f"sqlite+pysqlite:///{Path(_smoke_db_directory.name) / 'bootstrap.sqlite3'}"
 )
 os.environ.setdefault("REDIS_URL", "redis://127.0.0.1:6379/15")
 os.environ.setdefault("NODE_AGENT_SHARED_SECRET", "subscription-delivery-hooks-node-secret")
@@ -144,4 +149,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        _smoke_db_directory.cleanup()

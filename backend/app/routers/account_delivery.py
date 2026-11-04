@@ -905,6 +905,8 @@ async def _openvpn(
     node: Node,
     sub: Subscription,
     user: User,
+    *,
+    reusable_connection: Any | None = None,
 ) -> dict[str, Any]:
 
     central_enabled = (
@@ -937,10 +939,12 @@ async def _openvpn(
         # Legacy migration-safe path.
         # تا زمان فعال‌شدن Central PKI همان EasyRSA
         # فعلی Exit بدون تغییر استفاده می‌شود.
-        conn = await ssh_connect_saved(
-            node,
-            db,
-        )
+        conn = reusable_connection
+        if conn is None:
+            conn = await ssh_connect_saved(
+                node,
+                db,
+            )
 
         try:
             cn = f"mv{sub.id}n{node.id}"
@@ -988,8 +992,9 @@ async def _openvpn(
             )
 
         finally:
-            conn.close()
-            await conn.wait_closed()
+            if reusable_connection is None:
+                conn.close()
+                await conn.wait_closed()
 
     transport = _transport(
         db,
