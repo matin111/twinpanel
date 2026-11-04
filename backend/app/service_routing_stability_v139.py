@@ -449,47 +449,53 @@ def _service_routing_rule_map(items, wan_if):
     return desired
 
 
-def _service_routing_matches(desired):
-    # Read-only drift detection. Stable reconciliation performs no mutation,
-    # so packet counters and live flows are preserved across the 12-second
-    # Agent loop.
-    for table, chain in _SERVICE_ROUTING_CHAINS:
-        code, output = ipt(
-            table,
-            "-S",
-            chain,
-        )
+# Cache is an optimization only. Every invocation still reads the LIVE
+# iptables rules (-S) for each chain; the cache never authorizes stale rules.
+_SERVICE_ROUTING_VERIFIED_SNAPSHOT = None
 
+
+def _service_routing_matches(desired):
+    global _SERVICE_ROUTING_VERIFIED_SNAPSHOT
+    # Fast read-only comparison after a complete -C verification. On Iran
+    # nodes with thousands of rules, spawning one iptables -C per rule made
+    # heartbeat and tunnel reports take 2-4 minutes (stale threshold: 60s).
+    observed = {}
+    signature = []
+    for table, chain in _SERVICE_ROUTING_CHAINS:
+        code, output = ipt(table, "-S", chain)
         if code != 0:
+            _SERVICE_ROUTING_VERIFIED_SNAPSHOT = None
             return False
 
         prefix = f"-A {chain} "
+        rules = desired[(table, chain)]
         current_count = sum(
-            1
-            for line in output.splitlines()
-            if line.strip().startswith(
-                prefix
-            )
+            1 for line in output.splitlines()
+            if line.strip().startswith(prefix)
         )
-
-        rules = desired[
-            (table, chain)
-        ]
-
         if current_count != len(rules):
+            _SERVICE_ROUTING_VERIFIED_SNAPSHOT = None
             return False
+        observed[(table, chain)] = output
+        signature.append((table, chain, tuple(tuple(a) for a in rules)))
 
-        for args in rules:
-            code, _ = ipt(
-                table,
-                "-C",
-                chain,
-                *args,
-            )
+    fingerprint = (tuple(signature), tuple(
+        (table, chain, observed[(table, chain)])
+        for table, chain in _SERVICE_ROUTING_CHAINS
+    ))
+    if _SERVICE_ROUTING_VERIFIED_SNAPSHOT == fingerprint:
+        return True
 
+    # Cache miss or any live rule drift: fall back to the old authoritative
+    # per-rule validation. No unknown rule representation is trusted.
+    for table, chain in _SERVICE_ROUTING_CHAINS:
+        for args in desired[(table, chain)]:
+            code, _ = ipt(table, "-C", chain, *args)
             if code != 0:
+                _SERVICE_ROUTING_VERIFIED_SNAPSHOT = None
                 return False
 
+    _SERVICE_ROUTING_VERIFIED_SNAPSHOT = fingerprint
     return True
 
 
