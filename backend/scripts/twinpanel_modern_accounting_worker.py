@@ -34,7 +34,7 @@ from app.services.accounting_device_map_batch_v1 import (
 # accounting semantics while reducing redundant sweeps to a 15-second cadence.
 # This only affects telemetry freshness; provisioning, credentials, sessions,
 # quota limits and protocol dataplane behavior are unchanged.
-ACCOUNTING_RECONCILE_INTERVAL_SECONDS = 15.0
+ACCOUNTING_RECONCILE_INTERVAL_SECONDS = 45.0
 modern_quota_runtime_v314_module.MODERN_ACCOUNTING_INTERVAL_SECONDS = (
     ACCOUNTING_RECONCILE_INTERVAL_SECONDS
 )
