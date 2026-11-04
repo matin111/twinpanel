@@ -31,7 +31,7 @@ def ipt(table, *args):
     if args[0] == "-S":
         return 0, "\n".join(live_rules)
     if args[0] == "-C":
-        return 0, ""
+        return (0, "") if live_rules[-1].endswith("ACCEPT") else (1, "rule missing")
     raise AssertionError("unexpected command")
 ns["ipt"] = ipt
 desired = {("filter", "TP_FWD"): [("-j", "ACCEPT")]}
@@ -44,8 +44,12 @@ assert calls == ["-S"], "stable rules must not spawn per-rule -C processes"
 # A changed live chain must cause full verification and never accept a stale cache.
 live_rules[-1] = "-A TP_FWD -j DROP"
 calls.clear()
+assert not ns["_service_routing_matches"](desired)
+assert calls == ["-S", "-C"], "live rule drift must fail closed"
+live_rules[-1] = "-A TP_FWD -j ACCEPT"
+calls.clear()
 assert ns["_service_routing_matches"](desired)
-assert calls == ["-S", "-C"], "live rule drift must invalidate fast path"
+assert calls == ["-S", "-C"], "restored rules require re-verification"
 calls.clear()
 assert ns["_service_routing_matches"](desired)
 assert calls == ["-S"]
