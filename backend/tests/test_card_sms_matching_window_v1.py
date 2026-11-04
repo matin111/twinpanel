@@ -69,3 +69,39 @@ def test_sms_dashboard_get_never_enables_verification_on_its_own():
     assert "cfg.sms_auto_verify = True" not in dashboard_source
     assert "cfg.sms_reader_enabled = True" not in dashboard_source
     assert "db.commit()" not in dashboard_source
+
+def test_automagen_sender_variants_accept_verified_bank_number():
+    tree = ast.parse(reader_source)
+    helpers = [
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name in {"_canonical_sms_sender", "_allowed_senders"}
+    ]
+    namespace = {}
+    exec(compile(ast.Module(body=helpers, type_ignores=[]), str(READER_PATH), "exec"), namespace)
+    normalize = namespace["_canonical_sms_sender"]
+    allowed = namespace["_allowed_senders"]("+9820004861")
+    assert normalize("9820004861") in allowed
+    assert normalize("+9820004861") in allowed
+    assert normalize("009820004861") in allowed
+    assert normalize("+۹۸۲۰۰۰۴۸۶۱") in allowed
+    assert normalize("+9820004862") not in allowed
+    assert normalize("BANK") not in allowed
+
+
+def test_real_handler_initializes_window_before_unpacking():
+    tree = ast.parse(reader_source)
+    handler = next(
+        node for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_handle_event"
+    )
+    window_assignments = [
+        node for node in ast.walk(handler)
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "window" for target in node.targets)
+    ]
+    assert len(window_assignments) == 1
+    assert isinstance(window_assignments[0].value, ast.Call)
+    assert isinstance(window_assignments[0].value.func, ast.Name)
+    assert window_assignments[0].value.func.id == "_sms_match_window"
+    assert reader_source.index("window = _sms_match_window(now, sms_time)", reader_source.index("async def _handle_event")) < reader_source.index("since, latest = window")
