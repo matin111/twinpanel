@@ -7,6 +7,7 @@ rewrite/restart per node batch instead of one restart per user.
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 import fcntl
 import logging
 import os
@@ -50,6 +51,8 @@ def pending_for_node(db, node):
     }
     if not live:
         return []
+    # Exclude expired imports; align with the platform's current access policy.
+    now_utc = datetime.utcnow()
     subscriptions = (
         db.query(Subscription)
         .join(MigrationImportRecord, MigrationImportRecord.subscription_id == Subscription.id)
@@ -57,6 +60,10 @@ def pending_for_node(db, node):
         .filter(
             MigrationImportRecord.source.in_(SOURCES),
             Subscription.status == SubscriptionStatus.ACTIVE,
+            (Subscription.expires_at.is_(None) | (Subscription.expires_at > now_utc)),
+            # A zero limit means unlimited quota, not an exhausted account.
+            ((Subscription.traffic_limit_bytes <= 0) |
+             (Subscription.traffic_used_bytes < Subscription.traffic_limit_bytes)),
             SubscriptionNode.node_id == node.id,
         )
         .order_by(Subscription.id.asc())
