@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.572",
-  "source_sha": "3a6e4f1753ba9fe93f641aa035b03eb24132997c",
+  "version": "1.1.0-rc.573",
+  "source_sha": "d90335d861c2432202bcd8f7c0b78d8c6cf4fbcf",
   "notes": {
-    "fa": "افزودن منوی کامل مدیریت اکانت‌های متصل‌شده با ساب‌لینک در ربات تلگرام: نمایش اطلاعات اشتراک، حجم و تاریخ انقضا، بروزرسانی، اتصال، درخواست تمدید و تغییر رمز از طریق پشتیبانی با بررسی مالکیت. نمایش ساب‌لینک و QR Code در یک پیام مشترک برای اشتراک‌های اصلی و واردشده. بدون تغییر در پروتکل‌ها، نودها یا تونل‌ها.",
-    "en": "Telegram My Accounts: expanded account management for link-attached subscriptions, read-only live status and usage, ownership-safe support requests for renewal/password changes; unified subscription URL and its matching QR in one photo/caption for both owned and imported accounts. No tunnel, protocol, billing, or credential changes."
+    "fa": "دسته‌بندی مستقل نوع اشتراک پیش از تعداد کاربران در فروشگاه، با آیکن‌های رنگی اشتراک ویتوری، ویژه و سایر انواع. رنگی‌شدن آیکن‌های دسته‌بندی قدیمی تعداد کاربران؛ پشتیبانی از «کاربر نامحدود» برای مقدار صفر در نمایش، ایجاد پلن و محدودیت هم‌زمان دستگاه، با حفظ دسته‌بندی‌های قبلی. اصلاح خطاهای TypeScript و ثبت تکراری دسته‌بندی‌ها. همه ۲۰ تست CI موفق.",
+    "en": "Independent colored subscription type selector before user-count tabs, colored legacy user-count icons, zero=unlimited-user behavior across store/admin/backend with preserved historical categories. Fix TypeScript build and duplicate category assignment in plan create. All 20 feature CI checks passed."
   }
 }
