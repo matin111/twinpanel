@@ -22,6 +22,7 @@ def test_zero_is_preserved_through_plan_validation_and_api():
 def test_zero_removes_quota_concurrency_cap_but_keeps_nonzero_caps():
     quota = source("backend/app/quota_service.py")
     assert "if max_sessions > 0 and active_count >= max_sessions:" in quota
+    assert "if max_sessions > 0 and active_count >= max_sessions:" in source("backend/app/quota_service_v2.py")
     assert "max(int(plan.device_limit if plan and plan.device_limit is not None else 1), 0)" in quota
 
 
@@ -32,6 +33,7 @@ def test_subscriptions_do_not_silently_convert_unlimited_to_one():
     assert "return max(int(override.device_limit), 0)" in override
     assert "device_limit=max(0, device_limit)" in normal
     assert "device_limit=max(0, device_limit)" in fast
+    assert "if device_limit > 0 and active_devices > device_limit:" in source("backend/app/routers/admin.py")
 
 
 def test_type_selection_precedes_user_count_in_storefront():
@@ -64,6 +66,5 @@ def test_admin_can_assign_plan_type_and_zero_user_limit():
 def test_color_icons_per_subscription_type():
     tabs = source("components/plan-category-tabs.tsx")
     assert "planTypeAppearance(name,index)" in tabs
-    assert "اشتراک" not in "missing"
     assert "v2ray|xray" in tabs
     assert "ویژه|vip|premium" in tabs
