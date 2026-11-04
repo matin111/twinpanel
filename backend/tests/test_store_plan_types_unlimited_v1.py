@@ -41,6 +41,7 @@ def test_type_selection_precedes_user_count_in_storefront():
     store = source("components/store-runtime.tsx")
     assert "data-plan-type-tabs" in tabs
     assert tabs.index("data-plan-type-tabs") < tabs.index("data-plan-user-count-tabs")
+    assert "normalizePlanType(plan.subscription_type)" in tabs
     assert "const typedPlans=useMemo(()=>filterPlansByType" in store
     assert "planCategories(typedPlans)" in store
     assert 'deviceLimit===0?"کاربر نامحدود"' in tabs
@@ -68,3 +69,18 @@ def test_color_icons_per_subscription_type():
     assert "planTypeAppearance(name,index)" in tabs
     assert "v2ray|xray" in tabs
     assert "ویژه|vip|premium" in tabs
+
+def test_new_subscription_type_is_independent_of_legacy_category():
+    model = source("backend/app/plan_category_models.py")
+    api = source("backend/app/routers/plans.py")
+    assert "ADD COLUMN IF NOT EXISTS subscription_type VARCHAR(120)" in model
+    assert "subscription_type: Mapped[str]" in model
+    assert '"category": _plan_category(db, int(plan.id))' in api
+    assert '"subscription_type": _plan_subscription_type(db, int(plan.id))' in api
+    assert '_set_plan_category(db, int(plan.id), raw.get("category"))' in api
+    assert '_set_plan_subscription_type(db, int(plan.id), raw.get("subscription_type"))' in api
+    assert 'if "subscription_type" in raw:' in api
+    assert 'values.pop("subscription_type", None)' in api
+    admin = source("components/legacy-plans-exact.tsx")
+    assert 'subscription_type:s(row.subscription_type)' in admin
+    assert 'value={draft.subscription_type}' in admin
