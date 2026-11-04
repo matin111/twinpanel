@@ -12,7 +12,9 @@ import logging
 import os
 import sys
 import time
+from datetime import datetime
 
+from sqlalchemy import or_
 from app.database import SessionLocal
 from app.migration_import_models import MigrationImportRecord
 from app.models import (
@@ -57,6 +59,8 @@ def pending_for_node(db, node):
         .filter(
             MigrationImportRecord.source.in_(SOURCES),
             Subscription.status == SubscriptionStatus.ACTIVE,
+            or_(Subscription.expires_at.is_(None), Subscription.expires_at > datetime.utcnow()),
+            or_(Subscription.traffic_limit_bytes <= 0, Subscription.traffic_used_bytes < Subscription.traffic_limit_bytes),
             SubscriptionNode.node_id == node.id,
         )
         .order_by(Subscription.id.asc())
