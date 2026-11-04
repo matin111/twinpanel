@@ -67,6 +67,24 @@ def _ensure_plan_sort_order_column() -> None:
 _ensure_plan_sort_order_column()
 
 
+def _ensure_subscription_type_column() -> None:
+    # Independent first-level type: V2Ray / premium / etc.
+    # Existing legacy category and user-count selections are preserved.
+    if engine.dialect.name != "postgresql":
+        return
+    with engine.begin() as connection:
+        if not inspect(connection).has_table("plan_category_assignments"):
+            return
+        connection.execute(text(
+            "ALTER TABLE plan_category_assignments "
+            "ADD COLUMN IF NOT EXISTS subscription_type VARCHAR(120) "
+            "NOT NULL DEFAULT 'اشتراک عمومی'"
+        ))
+
+
+_ensure_subscription_type_column()
+
+
 class PlanCategoryAssignment(Base):
     __tablename__ = "plan_category_assignments"
     __table_args__ = (
@@ -85,6 +103,12 @@ class PlanCategoryAssignment(Base):
         String(120),
         nullable=False,
         default="سایر پلن‌ها",
+        index=True,
+    )
+    subscription_type: Mapped[str] = mapped_column(
+        String(120),
+        nullable=False,
+        default="اشتراک عمومی",
         index=True,
     )
     sort_order: Mapped[int] = mapped_column(
