@@ -72,13 +72,17 @@ def fulfill_renewal_order(
             detail="اشتراک تمدیدی پیدا نشد",
         )
 
+    # The renewal row binds the beneficiary account to its real owner.
+    # StoreOrder.user_id identifies the payer, who may be gifting a renewal
+    # through the restricted imported-account flow. Payment never transfers
+    # ownership or account credentials.
     if (
         int(sub.user_id)
-        != int(order.user_id)
+        != int(renewal.user_id)
     ):
         raise HTTPException(
             status_code=403,
-            detail="مالکیت اشتراک معتبر نیست",
+            detail="مالکیت اشتراک تمدیدی معتبر نیست",
         )
 
     plan = db.get(
