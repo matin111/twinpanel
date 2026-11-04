@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import json
 import os
 import sys
@@ -24,6 +25,22 @@ async def _terminate_process(process: asyncio.subprocess.Process) -> None:
     except asyncio.TimeoutError:
         process.kill()
         await process.wait()
+
+
+def _single_protocol_migration_active() -> bool:
+    # Only defer while a real writer holds the exclusive classic migration lock.
+    # No topology signature is updated while deferring, so normal reconciliation
+    # resumes after the migration process releases the lock.
+    try:
+        with open("/run/twinpanel-migration-classic-direct.lock", "a+") as lock:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return True
+            fcntl.flock(lock, fcntl.LOCK_UN)
+    except OSError:
+        return False
+    return False
 
 
 async def _run_reconcile_process() -> dict[str, Any]:
@@ -100,6 +117,9 @@ def install() -> None:
         await asyncio.sleep(runtime._INITIAL_DELAY_SECONDS)
 
         while True:
+            if _single_protocol_migration_active():
+                await asyncio.sleep(45.0)
+                continue
             cycle_failed = False
             stage = "topology_signature"
             try:
