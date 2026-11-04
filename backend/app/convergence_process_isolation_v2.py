@@ -133,7 +133,7 @@ def install() -> None:
                     flush=True,
                 )
 
-            await asyncio.sleep(runtime._RETRY_INTERVAL_SECONDS)
+            await asyncio.sleep(max(runtime._RETRY_INTERVAL_SECONDS, 180.0))
 
     runtime._convergence_loop = _process_isolated_convergence_loop
     _installed = True
