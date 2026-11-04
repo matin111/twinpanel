@@ -123,9 +123,8 @@ def install(router, request_fn):
             f"📶 حجم باقی‌مانده: {remaining} گیگابایت\n"
             f"📱 سقف دستگاه: {escape(devices)}\n\n"
             "🔗 ساب‌لینک و QR Code در دکمه زیر با هم نمایش داده می‌شوند.\n\n"
-            "برای تمدید و تغییر رمز این اکانتِ واردشده، "
-            "درخواست به پشتیبانی ارسال می‌شود؛ "
-            "تغییرات بدون تأیید مالک انجام نمی‌شود."
+            "💳 تمدید اکانت از طریق پرداخت در ربات انجام می‌شود. "
+            "🔐 تغییر رمز با بررسی مالکیت توسط پشتیبانی انجام می‌شود."
         )
 
     def _management_keyboard(sub_id):
@@ -136,7 +135,7 @@ def install(router, request_fn):
             )],
             [
                 InlineKeyboardButton(
-                    text="💳 درخواست تمدید", callback_data=f"subimp:ask:renew:{sub_id}",
+                    text="💳 تمدید اکانت", callback_data=f"subimp:renew:{sub_id}",
                 ),
                 InlineKeyboardButton(
                     text="🔐 درخواست تغییر رمز", callback_data=f"subimp:ask:password:{sub_id}",
@@ -193,10 +192,71 @@ def install(router, request_fn):
                 ]),
             )
 
+    @router.callback_query(F.data.startswith("subimp:renew:"))
+    async def import_renewal_preview(callback: CallbackQuery):
+        try:
+            sub_id = int((callback.data or "").rsplit(":", 1)[-1])
+            info = await _read_import(callback, sub_id)
+            plan = info.get("renew_plan") or {}
+            if not info.get("can_renew") or not plan:
+                raise ValueError("پلن این اشتراک برای تمدید فعال نیست")
+        except Exception as exc:
+            await callback.answer(str(exc)[:180], show_alert=True)
+            return
+        await callback.answer()
+        if callback.message:
+            await callback.message.edit_text(
+                f"💳 <b>تمدید اکانت #{sub_id}</b>\\n\\n"
+                f"پلن: <b>{escape(str(plan.get('name') or '-'))}</b>\\n"
+                f"➕ حجم: <b>{int(plan.get('traffic_gb') or 0)} GB</b>\\n"
+                f"➕ اعتبار: <b>{int(plan.get('duration_days') or 0)} روز</b>\\n"
+                f"💰 مبلغ: <b>{int(plan.get('price_toman') or 0):,} تومان</b>\\n\\n"
+                "پس از پرداخت و تأیید، همین اکانت تمدید می‌شود. اکانت جدید ساخته نمی‌شود.",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="✅ ادامه و پرداخت",
+                        callback_data=f"subimp:renewpay:{sub_id}", style="success",
+                    )],
+                    [InlineKeyboardButton(
+                        text="⬅️ مدیریت اکانت", callback_data=f"subimp:{sub_id}",
+                    )],
+                ]),
+            )
+
+    @router.callback_query(F.data.startswith("subimp:renewpay:"))
+    async def import_renewal_payment(callback: CallbackQuery):
+        try:
+            sub_id = int((callback.data or "").rsplit(":", 1)[-1])
+            info = await _read_import(callback, sub_id)
+            if not info.get("can_renew"):
+                raise ValueError("اشتراک قابل تمدید نیست")
+            order = await request_fn(
+                "POST",
+                f"/v1/telegram/account-import/{callback.from_user.id}/{sub_id}/renew-order",
+                payload={},
+                bot_auth=True,
+            )
+            methods = (await request_fn("GET", "/v1/payments/methods")).get("methods") or []
+            if not methods:
+                raise ValueError("سفارش تمدید ساخته شد ولی روش پرداخت فعالی وجود ندارد")
+            from .telegram_runtime_bot import renewal_payment_methods_keyboard
+        except Exception as exc:
+            await callback.answer(str(exc)[:180], show_alert=True)
+            return
+        await callback.answer()
+        if callback.message:
+            await callback.message.edit_text(
+                "✅ <b>سفارش تمدید ساخته شد</b>\\n\\n"
+                f"شماره سفارش: <b>#{order.get('id')}</b>\\n"
+                f"مبلغ: <b>{int(order.get('amount_toman') or 0):,} تومان</b>\\n\\n"
+                "روش پرداخت را انتخاب کنید:",
+                reply_markup=renewal_payment_methods_keyboard(int(order["id"]), methods),
+            )
+
     @router.callback_query(F.data.startswith("subimp:ask:"))
     async def import_request_prompt(callback: CallbackQuery):
         parts = (callback.data or "").split(":")
-        if len(parts) != 4 or parts[2] not in {"renew", "password"}:
+        if len(parts) != 4 or parts[2] != "password":
             await callback.answer("درخواست نامعتبر است", show_alert=True)
             return
         kind = parts[2]
