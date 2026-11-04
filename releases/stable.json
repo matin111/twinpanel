@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.573",
+  "version": "1.1.0-rc.574",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-04T23:04:41Z",
+  "released_at": "2026-11-04T23:25:17Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d90335d861c2432202bcd8f7c0b78d8c6cf4fbcf",
+  "source_sha": "3469e822e704bb188a191b5d56c22c880bd739ca",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.573/twinpanel-1.1.0-rc.573-linux-x86_64.tar.gz",
-    "sha256": "e2c98f582a151314814c7889acd8c73fa1207a909fbb995dcfcf43989be0d20f",
-    "size_bytes": 28244132
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.574/twinpanel-1.1.0-rc.574-linux-x86_64.tar.gz",
+    "sha256": "c00a1f65afd5b3afdeeb3032fe91b6e2cb1f43fc0d94d88fb753a341352cba6e",
+    "size_bytes": 28256111
   },
   "notes": {
-    "fa": "دسته‌بندی مستقل نوع اشتراک پیش از تعداد کاربران در فروشگاه، با آیکن‌های رنگی اشتراک ویتوری، ویژه و سایر انواع. رنگی‌شدن آیکن‌های دسته‌بندی قدیمی تعداد کاربران؛ پشتیبانی از «کاربر نامحدود» برای مقدار صفر در نمایش، ایجاد پلن و محدودیت هم‌زمان دستگاه، با حفظ دسته‌بندی‌های قبلی. اصلاح خطاهای TypeScript و ثبت تکراری دسته‌بندی‌ها. همه ۲۰ تست CI موفق.",
-    "en": "Independent colored subscription type selector before user-count tabs, colored legacy user-count icons, zero=unlimited-user behavior across store/admin/backend with preserved historical categories. Fix TypeScript build and duplicate category assignment in plan create. All 20 feature CI checks passed."
+    "fa": "اصلاح ربات خرید اشتراک: نمایش نوع اشتراک (عمومی، ویژه، ویتوری و موارد دیگر) به عنوان مرحله اول، سپس تعداد کاربر و دسته‌بندی پلن، با ایموجی‌های رنگی و مسیر بازگشت مناسب. اشتراک‌های ویژه فعال در دیتابیس اکنون در منوی ربات قابل انتخاب خواهند بود. حفظ مسیرهای قدیمی برای پیام‌های باز ربات و نمایش کاربر نامحدود برای صفر. ۶ تست CI موفق.",
+    "en": "Telegram store: select subscription type first (premium, V2Ray etc), then user count and legacy category. Distinct colorful emoji for user and category buttons, backwards-compatible callbacks, unlimited user labels. Fix missing premium types in live bot menu. Six CI checks green."
   }
 }
