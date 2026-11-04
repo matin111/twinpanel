@@ -95,7 +95,13 @@ export function LegacySubscriptionsRuntimePage(){
   const [linkModalId,setLinkModalId]=useState<number|null>(null);
   const [linkModalLink,setLinkModalLink]=useState("");
   const [linkModalLoading,setLinkModalLoading]=useState(false);
-  const [linkModalError,setLinkModalError]=useState("");
+  const [linkModalError,setLinkModalError] = useState("");
+  const [transferOpen,setTransferOpen]=useState(false);
+  const [transferResellers,setTransferResellers]=useState<RuntimeRow[]>([]);
+  const [transferCustomers,setTransferCustomers]=useState<Array<{id:number;name:string;email?:string|null;is_owner:boolean}>>([]);
+  const [transferResellerId,setTransferResellerId]=useState(0);
+  const [transferCustomerId,setTransferCustomerId]=useState(0);
+  const [transferLoading,setTransferLoading]=useState(false);
   // Share URLs are stable for a subscription; cache and dedupe requests so
   // opening the modal does not wait for heavyweight connection-info/provisioning.
   const linkCache=useRef(new Map<number,string>());
@@ -188,6 +194,33 @@ export function LegacySubscriptionsRuntimePage(){
   };
 
   const saveEdit=(event:FormEvent)=>{event.preventDefault();if(!selected)return;const traffic=optionalPositive(draft.traffic_gb);void act("edit",pick("اشتراک و اطلاعات اتصال بروزرسانی شد","Subscription and connection info updated"),()=>adminApi.editSubscription(n(selected.id),{plan_id:draft.plan_id,traffic_gb:traffic||0,node_ids:[],protocols:draft.protocols,account_username:draft.username.trim()||undefined,account_password:draft.password.trim()||undefined}),true);};
+  const openTransfer=async(item:RuntimeRow)=>{
+    setSelected(item);setTransferOpen(true);setTransferLoading(true);
+    setTransferResellerId(0);setTransferCustomerId(0);setTransferCustomers([]);setError("");
+    try{
+      const resellers=await adminApi.resellersForTransfer();
+      setTransferResellers(resellers.filter(row=>row.is_active===true));
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setTransferLoading(false);}
+  };
+  const selectTransferReseller=async(id:number)=>{
+    setTransferResellerId(id);setTransferCustomerId(0);setTransferCustomers([]);
+    if(!id)return;
+    setTransferLoading(true);setError("");
+    try{
+      const customers=await adminApi.resellerTransferCustomers(id);
+      setTransferCustomers(customers);
+      const own=customers.find(customer=>!customer.is_owner&&customer.id===n(selected?.user_id));
+      if(own)setTransferCustomerId(own.id);
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setTransferLoading(false);}
+  };
+  const submitTransfer=()=>{
+    if(!selected||!transferResellerId||!transferCustomerId)return;
+    const reseller=transferResellers.find(row=>n(row.id)===transferResellerId);
+    if(!window.confirm(pick(`اشتراک MV-${n(selected.id)} به نمایندگی «${s(reseller?.name)}» منتقل شود؟ کانفیگ و شناسه اشتراک تغییر نمی‌کنند.`,`Transfer subscription MV-${n(selected.id)} to reseller ${s(reseller?.name)} without changing its VPN configuration?`)))return;
+    void act("transfer",pick("اشتراک در پنل نماینده ثبت شد","Subscription transferred to reseller"),async()=>{await adminApi.transferSubscriptionToReseller(n(selected.id),transferResellerId,transferCustomerId);setTransferOpen(false);});
+  };
   const openExtend=(item:RuntimeRow)=>{setSelected(item);setExtendDays(30);setExtendTraffic(10);setModal("extend");};
   const saveExtend=()=>{if(!selected)return;void act("extend",pick("اشتراک تمدید شد","Subscription extended"),()=>legacyAdminApi.extendSubscription(n(selected.id),{add_days:extendDays,add_traffic_gb:extendTraffic}),true);};
   const toggleStatus=async(item:RuntimeRow)=>{const activate=s(item.status).toLowerCase()!=="active";await act(`status-${item.id}`,activate?pick("اشتراک فعال شد","Subscription activated"):pick("اشتراک معلق شد","Subscription suspended"),()=>adminApi.setSubscriptionActive(n(item.id),activate));};
@@ -304,7 +337,7 @@ export function LegacySubscriptionsRuntimePage(){
 
     <Card>
       <div className="runtime-toolbar"><label>⌕ <input value={query} onChange={event=>{setQuery(event.target.value);setPage(0);}} placeholder={pick("نام، ایمیل، نام کاربری یا کد اشتراک…","Name, email, username or subscription code…")}/></label><select value={status} onChange={event=>{setStatus(event.target.value as typeof status);setPage(0);}}><option value="all">{pick("همه","All")}</option><option value="active">{pick("فعال","Active")}</option><option value="expired">{pick("منقضی","Expired")}</option><option value="suspended">{pick("معلق","Suspended")}</option><option value="online">{pick("آنلاین‌ها","Online now")}</option><option value="pending">{pick("در انتظار","Pending")}</option></select><button className="ghost" disabled={loading} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button></div>
-      {loading&&rows.length===0?<div className="runtime-loading">…</div>:<div className="table"><table><thead><tr><th>{pick("کاربر","User")}</th><th>{pick("پلن","Plan")}</th><th>{pick("نام کاربری","Username")}</th><th>{pick("ترافیک","Traffic")}</th><th>{pick("ساخت","Created")}</th><th>{pick("انقضا","Expires")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map(item=>{const user=userMap.get(n(item.user_id));const plan=planMap.get(n(item.plan_id));return <tr key={n(item.id)}><td><div className="user-cell"><b>{user?.full_name||s(item.customer_name)||`#${item.user_id}`}</b><small dir="ltr">{user?.email||s(item.customer_email)||"—"}</small></div></td><td><div className="user-cell"><b>{s(item.plan_name)||s(plan?.name)||`#${item.plan_id}`}</b><small dir="ltr">MV-{n(item.id)}</small></div></td><td><div className="secret-row"><b dir="ltr">{s(item.account_username)||"—"}</b>{s(item.account_username)&&<button className="mini-btn" onClick={()=>copy(s(item.account_username))}>{pick("کپی","Copy")}</button>}</div></td><td>{trafficCell(item)}</td><td>{formatDate(item.created_at)}</td><td>{expiryCell(item)}</td><td><Badge tone={tone(item.status)}>{statusLabel(item.status)}</Badge></td><td><div className="row-actions"><button className="danger" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button><button disabled={!!busy} onClick={()=>void toggleStatus(item)}>{s(item.status).toLowerCase()==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button><button onClick={()=>openEdit(item)}>{pick("ویرایش","Edit")}</button><button onClick={()=>openExtend(item)}>{pick("تمدید","Renew")}</button><button className="primary-soft" onMouseEnter={()=>prefetchSubscriptionLink(item)} onFocus={()=>prefetchSubscriptionLink(item)} onClick={()=>void openSubscriptionLink(item)}>{pick("سابلینک","Sub-link")}</button></div></td></tr>;})}</tbody></table>{filtered.length===0&&<div className="runtime-empty">{pick("اشتراکی پیدا نشد","No subscriptions found")}</div>}</div>}
+      {loading&&rows.length===0?<div className="runtime-loading">…</div>:<div className="table"><table><thead><tr><th>{pick("کاربر","User")}</th><th>{pick("پلن","Plan")}</th><th>{pick("نام کاربری","Username")}</th><th>{pick("ترافیک","Traffic")}</th><th>{pick("ساخت","Created")}</th><th>{pick("انقضا","Expires")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map(item=>{const user=userMap.get(n(item.user_id));const plan=planMap.get(n(item.plan_id));return <tr key={n(item.id)}><td><div className="user-cell"><b>{user?.full_name||s(item.customer_name)||`#${item.user_id}`}</b><small dir="ltr">{user?.email||s(item.customer_email)||"—"}</small></div></td><td><div className="user-cell"><b>{s(item.plan_name)||s(plan?.name)||`#${item.plan_id}`}</b><small dir="ltr">MV-{n(item.id)}</small></div></td><td><div className="secret-row"><b dir="ltr">{s(item.account_username)||"—"}</b>{s(item.account_username)&&<button className="mini-btn" onClick={()=>copy(s(item.account_username))}>{pick("کپی","Copy")}</button>}</div></td><td>{trafficCell(item)}</td><td>{formatDate(item.created_at)}</td><td>{expiryCell(item)}</td><td><Badge tone={tone(item.status)}>{statusLabel(item.status)}</Badge></td><td><div className="row-actions"><button className="danger" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button><button disabled={!!busy} onClick={()=>void toggleStatus(item)}>{s(item.status).toLowerCase()==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button><button onClick={()=>openEdit(item)}>{pick("ویرایش","Edit")}</button><button onClick={()=>openExtend(item)}>{pick("تمدید","Renew")}</button><button className="ghost" disabled={!!busy} onClick={()=>void openTransfer(item)}>{pick("انتقال به نماینده","Transfer to reseller")}</button><button className="primary-soft" onMouseEnter={()=>prefetchSubscriptionLink(item)} onFocus={()=>prefetchSubscriptionLink(item)} onClick={()=>void openSubscriptionLink(item)}>{pick("سابلینک","Sub-link")}</button></div></td></tr>;})}</tbody></table>{filtered.length===0&&<div className="runtime-empty">{pick("اشتراکی پیدا نشد","No subscriptions found")}</div>}</div>}
     </Card>
     <div className="runtime-toolbar" style={{justifyContent:"space-between",marginTop:12}}>
       <span>{matchedTotal.toLocaleString("fa-IR")} {pick("نتیجه","results")} · {pick("صفحه","Page")} {(page+1).toLocaleString("fa-IR")} / {pageCount.toLocaleString("fa-IR")}</span>
@@ -339,6 +372,25 @@ export function LegacySubscriptionsRuntimePage(){
       <form onSubmit={saveEdit}><div className="setting-grid"><label className="field"><span>{pick("پلن","Plan")}</span><select value={draft.plan_id} onChange={event=>setDraft(current=>({...current,plan_id:Number(event.target.value)}))}>{plans.map(plan=><option key={n(plan.id)} value={n(plan.id)}>{s(plan.name)||`#${plan.id}`}</option>)}</select></label><label className="field"><span>{pick("حجم کل GB","Total traffic GB")}</span><input type="number" min={0} step="0.1" value={draft.traffic_gb} onChange={event=>setDraft(current=>({...current,traffic_gb:event.target.value}))} placeholder={pick("خالی = نامحدود","empty = unlimited")}/></label><label className="field"><span>{pick("نام کاربری","Username")}</span><input dir="ltr" value={draft.username} onChange={event=>setDraft(current=>({...current,username:event.target.value}))}/></label><label className="field"><span>{pick("رمز جدید","New password")}</span><input dir="ltr" autoComplete="new-password" value={draft.password} onChange={event=>setDraft(current=>({...current,password:event.target.value}))} placeholder={pick("خالی = بدون تغییر","empty = unchanged")}/></label></div><div className="manage-section-head"><div><b>{pick("پروتکل‌ها","Protocols")}</b><small>{draft.protocols.length.toLocaleString("fa-IR")} {pick("انتخاب","selected")}</small></div></div><div className="protocol-toggle-grid">{protocolKeys.map(key=>{const modern=!classicProtocolSet.has(key);const supported=modern||nodes.some(node=>node.status==="online"&&Boolean((node as unknown as RuntimeRow)[`enable_${key}`]));const checked=draft.protocols.includes(key);return <label key={key} className="toggle module-toggle compact-toggle"><span>{protocolLabels[key]}<small>{modern?pick("وضعیت Runtime هنگام ذخیره بررسی می‌شود","Runtime readiness is checked on save"):supported?pick("قابل استفاده","Available"):pick("روی سرور آنلاین فعال نیست","Not enabled on an online server")}</small></span><input type="checkbox" disabled={!supported} checked={checked} onChange={event=>setDraft(current=>({...current,protocols:event.target.checked?[...new Set([...current.protocols,key])]:current.protocols.filter(item=>item!==key)}))}/><i/></label>;})}</div><div className="modalActions"><button type="button" className="ghost" onClick={()=>setModal(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy==="edit"||!draft.plan_id||!draft.protocols.length}>{busy==="edit"?"…":pick("ذخیره تغییرات","Save changes")}</button></div></form>
     </Modal>}
 
+    {transferOpen&&selected&&<Modal title={pick("انتقال اشتراک به نماینده","Transfer subscription to reseller")} sub={`MV-${n(selected.id)} · ${s(selected.account_username)}`} onClose={()=>!busy&&setTransferOpen(false)}>
+      <p className="muted">{pick("این انتقال فقط مدیریت اشتراک را به نماینده واگذار می‌کند؛ شناسه، حجم مصرف‌شده، تاریخ انقضا و کانفیگ‌ها تغییر نمی‌کنند. برای اشتراک‌های ساخته‌شده زیر حساب ادمین، یک مشتری از نمایندگی انتخاب کنید؛ حساب ادمین نباید به نماینده اضافه شود.","This transfers management only. Account ID, usage, expiry and configs remain unchanged. For admin-owned accounts, select an existing reseller customer; do not expose the admin identity.")}</p>
+      <div className="setting-grid">
+        <label className="field"><span>{pick("نماینده مقصد","Destination reseller")}</span>
+          <select value={transferResellerId} disabled={transferLoading||!!busy} onChange={event=>void selectTransferReseller(Number(event.target.value))}>
+            <option value={0}>{pick("انتخاب نماینده","Select reseller")}</option>
+            {transferResellers.map(row=><option key={n(row.id)} value={n(row.id)}>{s(row.name)||s(row.brand_name)||`#${row.id}`} · {s(row.code)}</option>)}
+          </select>
+        </label>
+        <label className="field"><span>{pick("مشتری ثبت‌شده در نمایندگی","Reseller customer")}</span>
+          <select value={transferCustomerId} disabled={!transferResellerId||transferLoading||!!busy} onChange={event=>setTransferCustomerId(Number(event.target.value))}>
+            <option value={0}>{pick("انتخاب مشتری","Select customer")}</option>
+            {transferCustomers.map(customer=><option key={customer.id} value={customer.id}>{customer.name}{customer.is_owner?` · ${pick("حساب نماینده","Reseller owner")}`:""}</option>)}
+          </select>
+        </label>
+      </div>
+      {transferResellerId&&!transferLoading&&!transferCustomers.length?<p className="runtime-error">{pick("مشتری فعالی در این نمایندگی وجود ندارد. ابتدا از بخش مشتریان نماینده یک مشتری ایجاد کنید.","No active customer found for this reseller. Create a customer first.")}</p>:null}
+      <div className="modalActions"><button className="ghost" disabled={!!busy} onClick={()=>setTransferOpen(false)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={!!busy||transferLoading||!transferResellerId||!transferCustomerId} onClick={submitTransfer}>{busy==="transfer"?pick("در حال انتقال…","Transferring…"):pick("تأیید انتقال","Confirm transfer")}</button></div>
+    </Modal>}
     {modal==="extend"&&selected&&<Modal title={pick("تمدید اشتراک","Renew subscription")} sub={`MV-${n(selected.id)} · ${expiryCell(selected)}`} onClose={()=>!busy&&setModal(null)}><div className="setting-grid"><label className="field"><span>{pick("روز اضافه","Add days")}</span><input type="number" min={0} value={extendDays} onChange={event=>setExtendDays(Math.max(0,Number(event.target.value)||0))}/></label><label className="field"><span>{pick("حجم اضافه GB","Add traffic GB")}</span><input type="number" min={0} step="0.1" value={extendTraffic} onChange={event=>setExtendTraffic(Math.max(0,Number(event.target.value)||0))}/></label></div><div className="modalActions"><button className="ghost" onClick={()=>setModal(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy==="extend"||(!extendDays&&!extendTraffic)} onClick={saveExtend}>{busy==="extend"?"…":pick("اعمال تمدید","Apply renewal")}</button></div></Modal>}
 
     {modal==="connect"&&selected&&<Modal title={pick("اطلاعات اتصال","Connection information")} sub={`MV-${n(selected.id)}`} onClose={()=>setModal(null)} wide>
