@@ -42,7 +42,7 @@ class Rejected(Exception):
         self.status_code = status_code
 
 ns = {"urlsplit": urlsplit, "re": re, "HTTPException": Rejected}
-exec(snippet, ns)
+exec("from __future__ import annotations\n" + snippet, ns)
 parse = ns["_extract_token"]
 assert parse(None, "https://sub.example.test/v1/connect/valid-abc123") == "valid-abc123"
 assert parse(None, "https://sub.example.test/v1/connect/valid-abc123?platform=karing") == "valid-abc123"
