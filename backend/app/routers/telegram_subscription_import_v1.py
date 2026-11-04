@@ -6,6 +6,7 @@ Importing a subscription never transfers ownership, changes the plan, or
 grants access to customer management/renewal endpoints.
 """
 from datetime import datetime
+import secrets
 from urllib.parse import urlsplit
 import re
 
@@ -16,6 +17,8 @@ from sqlalchemy.orm import Session
 
 from ..database import Base, get_db
 from ..models import Subscription, Plan
+from ..store_models import StoreOrder
+from ..renewal_models import SubscriptionRenewalOrder
 from ..telegram_models import TelegramUserLink
 from .telegram_bot import bot_guard
 
@@ -27,6 +30,10 @@ imported_accounts = Table(
     Column("subscription_id", BigInteger, ForeignKey("subscriptions.id", ondelete="CASCADE"), primary_key=True),
     Column("created_at", DateTime, nullable=False, default=datetime.utcnow),
 )
+
+
+class ImportedRenewOrderRequest(BaseModel):
+    idempotency_key: str | None = Field(default=None, max_length=180)
 
 
 class ImportRequest(BaseModel):
@@ -99,6 +106,18 @@ def _row(db: Session, sub: Subscription, telegram_id: int | None = None) -> dict
         "imported": True,
         "management_mode": "owner_renewal" if is_owner else "support_request",
         "can_direct_renew": is_owner,
+        "can_paid_renew": bool(
+            plan and plan.is_active and
+            str(getattr(sub.status, "value", sub.status)).lower()
+            not in {"pending", "canceled"}
+        ),
+        "renew_plan": {
+            "id": plan.id,
+            "name": plan.name,
+            "traffic_gb": int(plan.traffic_gb or 0),
+            "duration_days": int(plan.duration_days or 0),
+            "price_toman": int(plan.price_toman or 0),
+        } if plan and plan.is_active else None,
     }
 
 
@@ -180,3 +199,80 @@ def remove_import(telegram_id: int, subscription_id: int, db: Session = Depends(
     ))
     db.commit()
     return {"ok": True}
+
+
+@router.post("/{telegram_id}/{subscription_id}/renew-order", dependencies=[Depends(bot_guard)])
+def create_imported_renewal_order(
+    telegram_id: int,
+    subscription_id: int,
+    payload: ImportedRenewOrderRequest,
+    db: Session = Depends(get_db),
+):
+    """Pay for extra days/traffic on an imported account, without ownership transfer."""
+    _authorized_chat(db, telegram_id)
+    _ensure_table(db)
+    imported = db.execute(select(imported_accounts.c.subscription_id).where(
+        imported_accounts.c.telegram_id == telegram_id,
+        imported_accounts.c.subscription_id == subscription_id,
+    )).first()
+    if imported is None:
+        raise HTTPException(status_code=404, detail="اکانت در فهرست شما پیدا نشد")
+
+    payer = db.get(TelegramUserLink, telegram_id)
+    sub = db.get(Subscription, subscription_id)
+    if sub is None:
+        raise HTTPException(status_code=404, detail="اکانت موجود نیست")
+    status = str(getattr(sub.status, "value", sub.status)).lower()
+    if status in {"pending", "canceled"}:
+        raise HTTPException(status_code=409, detail="این اشتراک قابل تمدید نیست")
+    plan = db.get(Plan, sub.plan_id) if sub.plan_id else None
+    if plan is None or not plan.is_active:
+        raise HTTPException(status_code=409, detail="پلن اشتراک برای تمدید فعال نیست")
+
+    # A payer can only purchase a renewal for an account deliberately added
+    # by its share link; this does not authorize changing its owner or secrets.
+    key = payload.idempotency_key or (
+        f"tg-import-renew-{telegram_id}-{subscription_id}-{secrets.token_hex(12)}"
+    )
+    existing = db.query(StoreOrder).filter(
+        StoreOrder.user_id == payer.user_id,
+        StoreOrder.idempotency_key == key,
+    ).first()
+    if existing is not None:
+        linked = db.query(SubscriptionRenewalOrder).filter(
+            SubscriptionRenewalOrder.order_id == existing.id,
+            SubscriptionRenewalOrder.subscription_id == subscription_id,
+        ).first()
+        if linked is None:
+            raise HTTPException(status_code=409, detail="کلید سفارش قبلاً استفاده شده است")
+        from .store import _order_out
+        return _order_out(existing)
+
+    from .customer_subscription_management import _protocols
+    from .store import _order_out
+    order = StoreOrder(
+        user_id=payer.user_id,
+        plan_id=plan.id,
+        amount_toman=int(plan.price_toman or 0),
+        requested_protocols=_protocols(db, sub, plan),
+        status="pending_payment",
+        idempotency_key=key,
+    )
+    try:
+        db.add(order)
+        db.flush()
+        db.add(SubscriptionRenewalOrder(
+            order_id=order.id,
+            subscription_id=sub.id,
+            user_id=sub.user_id,  # beneficiary's real owner, not the payer
+            plan_id=plan.id,
+        ))
+        db.commit()
+        db.refresh(order)
+    except Exception:
+        db.rollback()
+        raise
+    result = _order_out(order)
+    result["renewal"] = True
+    result["renew_subscription_id"] = sub.id
+    return result
