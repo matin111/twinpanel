@@ -44,7 +44,8 @@ ACCESS_TCP_MSS = 1160
 _PROTOCOL_SUBNETS = (
     "10.91.0.0/24",  # Cisco/OpenConnect
     "10.92.0.0/24",  # OpenVPN
-    "10.93.0.0/24",  # WireGuard
+    "10.93.0.0/24",  # WireGuard legacy
+    "10.96.0.0/21",  # WireGuard expansion
     "10.94.0.0/24",  # L2TP
 )
 
