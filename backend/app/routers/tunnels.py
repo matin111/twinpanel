@@ -1068,6 +1068,59 @@ def _select_service_route_tunnel_ids(
             None,
         )
 
+        # TWINPANEL_IRAN_ROUTE_STALE_REPORT_GRACE_V1
+        # A busy Iran Agent can take >60s to reconcile thousands of
+        # service rules; the watchdog then flags a *missing report* as
+        # offline even while the selected physical carrier still works.
+        # Do not respond to that telemetry gap by publishing an empty
+        # service_routes array (which destroys the working route). Keep the
+        # LAST selected route for at most five minutes after a proven
+        # healthy physical transport report, and only while the peer
+        # failures are stale/absent reports rather than fresh hard errors.
+        # No new route is invented, and true explicit failures fail closed.
+        if not usable and current_id is not None:
+            previous = next(
+                (item for item in members
+                 if int(item.id) == int(current_id) and item.is_active),
+                None,
+            )
+            if previous is not None:
+                active_name = str(previous.active_transport or "").strip().lower()
+                active_member = (
+                    db.query(TunnelTransport)
+                    .filter(
+                        TunnelTransport.tunnel_id == int(previous.id),
+                        TunnelTransport.transport == active_name,
+                        TunnelTransport.enabled.is_(True),
+                    )
+                    .first()
+                    if active_name else None
+                )
+                healthy_at = (
+                    active_member.last_healthy_at
+                    if active_member is not None else None
+                )
+                age = (
+                    (now - healthy_at).total_seconds()
+                    if healthy_at is not None else float("inf")
+                )
+                states = (
+                    db.query(TunnelPeerState)
+                    .filter(TunnelPeerState.tunnel_id == int(previous.id))
+                    .all()
+                )
+                fresh_hard_failure = any(
+                    state.updated_at is not None
+                    and (now - state.updated_at).total_seconds()
+                        <= _TUNNEL_REPORT_STALE_SECONDS
+                    and not state.tunnel_reachable
+                    and str(state.last_error or "") != "stale_report"
+                    for state in states
+                )
+                if 0 <= age <= 300 and not fresh_hard_failure:
+                    selected_ids.add(int(previous.id))
+                    continue
+
         # No usable member -> fail closed.
         if not usable:
             if current_id is not None:
