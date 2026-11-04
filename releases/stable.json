@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.571",
+  "version": "1.1.0-rc.572",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-04T09:40:45Z",
+  "released_at": "2026-11-04T22:22:43Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "dd66afc20f1c873d2bafa530c2aaf8219a16b042",
+  "source_sha": "3a6e4f1753ba9fe93f641aa035b03eb24132997c",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.571/twinpanel-1.1.0-rc.571-linux-x86_64.tar.gz",
-    "sha256": "154f710178323c0b8fefadf7009611acd8bc9a82309ff782adb0a1f094482527",
-    "size_bytes": 28217163
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.572/twinpanel-1.1.0-rc.572-linux-x86_64.tar.gz",
+    "sha256": "ab4799eee3c4897c7dc449ef35d778825c835a5164da02597ebd68c9781750f0",
+    "size_bytes": 28233870
   },
   "notes": {
-    "fa": "نسخه rc.571 خطای HTTP 500 در Automagen به‌دلیل متغیر window تعریف‌نشده را رفع می‌کند و تطبیق شماره فرستنده بانک با علامت + یا بدون آن را ایمن می‌سازد. تأیید پیامک‌های قدیمی به‌صورت خودکار انجام نمی‌شود.",
-    "en": "rc.571 fixes Automagen SMS verification HTTP 500 due to missing window assignment and handles numeric bank senders with or without international + prefix. No replay of historical payment SMS."
+    "fa": "افزودن منوی کامل مدیریت اکانت‌های متصل‌شده با ساب‌لینک در ربات تلگرام: نمایش اطلاعات اشتراک، حجم و تاریخ انقضا، بروزرسانی، اتصال، درخواست تمدید و تغییر رمز از طریق پشتیبانی با بررسی مالکیت. نمایش ساب‌لینک و QR Code در یک پیام مشترک برای اشتراک‌های اصلی و واردشده. بدون تغییر در پروتکل‌ها، نودها یا تونل‌ها.",
+    "en": "Telegram My Accounts: expanded account management for link-attached subscriptions, read-only live status and usage, ownership-safe support requests for renewal/password changes; unified subscription URL and its matching QR in one photo/caption for both owned and imported accounts. No tunnel, protocol, billing, or credential changes."
   }
 }
