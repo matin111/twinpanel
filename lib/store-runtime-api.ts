@@ -8,6 +8,7 @@ export type StorePlan={
   name:string;
   description:string|null;
   category?:string|null;
+  subscription_type?:string|null;
   sort_order?:number;
   duration_days:number;
   traffic_gb:number;
