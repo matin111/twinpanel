@@ -123,10 +123,9 @@ def install(router, request_fn):
             f"📶 حجم باقی‌مانده: {remaining} گیگابایت\n"
             f"📱 سقف دستگاه: {escape(devices)}\n\n"
             "🔗 ساب‌لینک و QR Code در دکمه زیر با هم نمایش داده می‌شوند.\n\n"
-            + ("این اکانت متعلق به حساب شماست و تمدید از مسیر پرداخت انجام می‌شود. "
-             if info.get("can_direct_renew") else
-             "برای تمدید اکانت واردشده، ابتدا مالکیت بررسی می‌شود؛ تا زمان تأیید مالک و پرداخت تمدیدی انجام نمی‌شود. ")
-            + "تغییر رمز از مسیر پشتیبانی بررسی می‌شود."
+            "با دکمه تمدید اکانت می‌توانید برای همین اشتراک اعتبار و حجم اضافه خریداری کنید. "
+            "مالکیت اکانت با پرداخت تغییر نمی‌کند. "
+            "تغییر رمز همچنان از مسیر پشتیبانی بررسی می‌شود."
         )
 
     def _management_keyboard(sub_id, info):
@@ -137,10 +136,7 @@ def install(router, request_fn):
             )],
             [
                 InlineKeyboardButton(
-                    text="♻️ تمدید اکانت", callback_data=(
-                        f"subrenew:{sub_id}" if info.get("can_direct_renew")
-                        else f"subimp:ask:renew:{sub_id}"
-                    ),
+                    text="♻️ تمدید اکانت", callback_data=f"subimprenew:{sub_id}",
                 ),
                 InlineKeyboardButton(
                     text="🔐 درخواست تغییر رمز", callback_data=f"subimp:ask:password:{sub_id}",
@@ -197,6 +193,87 @@ def install(router, request_fn):
                 ]),
             )
 
+    async def _show_imported_renewal(callback, sub_id, info=None):
+        await callback.answer()
+        try:
+            info = info or await _read_import(callback, sub_id)
+            if not info.get("can_paid_renew"):
+                raise ValueError("این اشتراک یا پلن آن در حال حاضر قابل تمدید نیست")
+            plan = info.get("renew_plan") or {}
+            if not plan:
+                raise ValueError("پلن تمدید پیدا نشد")
+        except Exception as exc:
+            if callback.message:
+                await callback.message.answer("❌ " + escape(str(exc)[:160]))
+            return
+        if callback.message:
+            await callback.message.edit_text(
+                "♻️ <b>تمدید همین اکانت</b>\\n\\n"
+                "👤 نام کاربری: <code>" + escape(str(info.get("account_username") or "-")) + "</code>\\n"
+                "📋 پلن: <b>" + escape(str(plan.get("name") or "-")) + "</b>\\n"
+                f"➕ حجم: <b>{int(plan.get('traffic_gb') or 0)} گیگابایت</b>\\n"
+                f"➕ اعتبار: <b>{int(plan.get('duration_days') or 0)} روز</b>\\n"
+                f"💳 مبلغ: <b>{int(plan.get('price_toman') or 0):,} تومان</b>\\n\\n"
+                "پس از پرداخت و تأیید، همین اشتراک تمدید می‌شود. "
+                "مالکیت اکانت تغییر نمی‌کند.",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="✅ ادامه و پرداخت",
+                        callback_data=f"subimprenewconfirm:{sub_id}",
+                        style="success",
+                    )],
+                    [InlineKeyboardButton(
+                        text="⬅️ مدیریت اکانت",
+                        callback_data=f"subimp:{sub_id}",
+                    )],
+                ]),
+            )
+
+    @router.callback_query(F.data.startswith("subimprenew:"))
+    async def import_renewal_start(callback: CallbackQuery):
+        sub_id = int((callback.data or "").rsplit(":", 1)[-1])
+        await _show_imported_renewal(callback, sub_id)
+
+    @router.callback_query(F.data.startswith("subimprenewconfirm:"))
+    async def import_renewal_order(callback: CallbackQuery):
+        await callback.answer()
+        try:
+            sub_id = int((callback.data or "").rsplit(":", 1)[-1])
+            import time
+            order = await request_fn(
+                "POST",
+                f"/v1/telegram/account-import/{callback.from_user.id}/{sub_id}/renew-order",
+                bot_auth=True,
+                payload={
+                    "idempotency_key": (
+                        f"tg-import-renew-{callback.from_user.id}-{sub_id}-{int(time.time())}"
+                    ),
+                },
+            )
+            method_data = await request_fn("GET", "/v1/payments/methods")
+            methods = method_data.get("methods") or []
+            buttons = [
+                [InlineKeyboardButton(
+                    text="💳 " + str(method.get("title") or method.get("id")),
+                    callback_data=f"renewpay:{int(order['id'])}:{method['id']}",
+                )]
+                for method in methods if method.get("id")
+            ]
+            if not buttons:
+                raise RuntimeError("روش پرداخت فعالی وجود ندارد؛ سفارش ذخیره شد")
+        except Exception as exc:
+            if callback.message:
+                await callback.message.answer("❌ " + escape(str(exc)[:180]))
+            return
+        if callback.message:
+            await callback.message.edit_text(
+                "✅ <b>سفارش تمدید همان اکانت ساخته شد</b>\\n\\n"
+                f"شماره سفارش: <b>#{int(order['id'])}</b>\\n"
+                f"مبلغ: <b>{int(order.get('amount_toman') or 0):,} تومان</b>\\n\\n"
+                "روش پرداخت را انتخاب کنید:",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+            )
+
     @router.callback_query(F.data.startswith("subimp:ask:"))
     async def import_request_prompt(callback: CallbackQuery):
         parts = (callback.data or "").split(":")
@@ -210,8 +287,8 @@ def install(router, request_fn):
         except Exception as exc:
             await callback.answer(str(exc)[:180], show_alert=True)
             return
-        if kind == "renew" and info.get("can_direct_renew"):
-            await callback.answer("از مسیر تمدید مستقیم اکانت استفاده کنید.", show_alert=True)
+        if kind == "renew":
+            await _show_imported_renewal(callback, sub_id, info)
             return
         await callback.answer()
         title = "تمدید" if kind == "renew" else "تغییر رمز"
@@ -248,8 +325,8 @@ def install(router, request_fn):
         title = "تمدید" if kind == "renew" else "تغییر رمز"
         try:
             info = await _read_import(callback, sub_id)
-            if kind == "renew" and info.get("can_direct_renew"):
-                await callback.answer("از مسیر تمدید مستقیم اکانت استفاده کنید.", show_alert=True)
+            if kind == "renew":
+                await callback.answer("از مدیریت اکانت، گزینه تمدید اکانت را بزنید.", show_alert=True)
                 return
             from .telegram_support_bot import _user_token
             token = await _user_token(request_fn, callback.from_user.id)
