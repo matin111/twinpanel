@@ -144,8 +144,64 @@ export function ResellerSettingsParityV2(){
   useEffect(()=>{void load();},[]);
   const saveProfile=async(event:FormEvent)=>{event.preventDefault();if(busy)return;setBusy(true);setError("");setOk("");try{await resellerApi.updateProfile({name:form.name.trim(),brand_name:form.brand_name.trim()||null,email:form.email.trim(),phone:form.phone.trim()||null,support_text:form.support_text.trim()||null});setOk(pick("تنظیمات ذخیره شد","Settings saved"));await load();}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy(false);}};
   const savePassword=async(event:FormEvent)=>{event.preventDefault();if(password.next!==password.confirm){setError(pick("تکرار رمز جدید یکسان نیست.","New password confirmation does not match."));return;}if(password.next.length<8){setError(pick("رمز جدید حداقل ۸ کاراکتر باشد.","New password must be at least 8 characters."));return;}setBusy(true);setError("");setOk("");try{await resellerApi.changePassword(password.current,password.next);setPassword({current:"",next:"",confirm:""});setOk(pick("رمز عبور تغییر کرد","Password changed"));}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy(false);}};
-  return <PortalShell type="reseller" active="/reseller/settings"><div className="page reseller-parity-page"><div className="page-head"><div><h1>{pick("تنظیمات","Settings")}</h1><small dir="ltr">{str(me,"code")}</small></div></div><Notice error={error} ok={ok}/><div className="module-grid two">
-    <Card><div className="card-head"><b>{pick("پروفایل نمایندگی","Reseller profile")}</b></div><form className="runtime-editor" onSubmit={saveProfile}><label className="field"><span>{pick("نام نمایندگی","Reseller name")}</span><input required minLength={2} value={form.name} onChange={e=>setForm(v=>({...v,name:e.target.value}))}/></label><label className="field"><span>{pick("نام برند","Brand name")}</span><input value={form.brand_name} onChange={e=>setForm(v=>({...v,brand_name:e.target.value}))}/></label><label className="field"><span>Email</span><input required type="email" dir="ltr" value={form.email} onChange={e=>setForm(v=>({...v,email:e.target.value}))}/></label><label className="field"><span>{pick("موبایل","Phone")}</span><input dir="ltr" value={form.phone} onChange={e=>setForm(v=>({...v,phone:e.target.value}))}/></label><label className="field"><span>{pick("متن پشتیبانی","Support text")}</span><textarea rows={4} value={form.support_text} onChange={e=>setForm(v=>({...v,support_text:e.target.value}))}/></label><button className="primary" disabled={busy}>{pick("ذخیره","Save")}</button></form></Card>
-    <Card><div className="card-head"><b>{pick("تغییر رمز عبور","Change password")}</b></div><form className="runtime-editor" onSubmit={savePassword}><label className="field"><span>{pick("رمز فعلی","Current password")}</span><input required type="password" dir="ltr" value={password.current} onChange={e=>setPassword(v=>({...v,current:e.target.value}))}/></label><label className="field"><span>{pick("رمز جدید","New password")}</span><input required minLength={8} type="password" dir="ltr" value={password.next} onChange={e=>setPassword(v=>({...v,next:e.target.value}))}/></label><label className="field"><span>{pick("تکرار رمز جدید","Confirm new password")}</span><input required minLength={8} type="password" dir="ltr" value={password.confirm} onChange={e=>setPassword(v=>({...v,confirm:e.target.value}))}/></label><button className="primary" disabled={busy}>{pick("تغییر رمز","Change password")}</button></form></Card>
-  </div></div></PortalShell>;
+  return <PortalShell type="reseller" active="/reseller/settings">
+    <div className="page reseller-parity-page reseller-settings-modern" dir="rtl">
+      <div className="reseller-settings-heading">
+        <div><h1>{pick("تنظیمات نمایندگی","Reseller settings")}</h1><p>{pick("اطلاعات نمایندگی و امنیت حساب را از این بخش مدیریت کنید.","Manage your reseller profile and account security.")}</p></div>
+        {str(me,"code")&&<span className="reseller-settings-code" dir="ltr">{str(me,"code")}</span>}
+      </div>
+      <Notice error={error} ok={ok}/>
+      <div className="reseller-settings-columns">
+        <Card className="reseller-settings-card">
+          <div className="card-head"><div><b>{pick("اطلاعات نمایندگی","Reseller profile")}</b><small>{pick("مشخصات و راه‌های ارتباطی نمایندگی","Identity and contact information")}</small></div></div>
+          <form className="reseller-settings-form" onSubmit={saveProfile}>
+            <div className="reseller-settings-fields">
+              <label className="field"><span>{pick("نام نمایندگی","Reseller name")}</span><input required minLength={2} autoComplete="organization" value={form.name} onChange={e=>setForm(v=>({...v,name:e.target.value}))}/></label>
+              <label className="field"><span>{pick("نام برند","Brand name")}</span><input value={form.brand_name} onChange={e=>setForm(v=>({...v,brand_name:e.target.value}))}/></label>
+              <label className="field"><span>{pick("ایمیل","Email")}</span><input required type="email" dir="ltr" autoComplete="email" value={form.email} onChange={e=>setForm(v=>({...v,email:e.target.value}))}/></label>
+              <label className="field"><span>{pick("شماره تماس","Phone")}</span><input dir="ltr" type="tel" autoComplete="tel" value={form.phone} onChange={e=>setForm(v=>({...v,phone:e.target.value}))}/></label>
+              <label className="field reseller-settings-full"><span>{pick("متن پشتیبانی","Support text")}</span><textarea rows={3} value={form.support_text} onChange={e=>setForm(v=>({...v,support_text:e.target.value}))}/></label>
+            </div>
+            <div className="reseller-settings-actions"><button type="submit" className="primary" disabled={busy}>{busy?pick("در حال ذخیره...","Saving..."):pick("ذخیره تغییرات","Save changes")}</button></div>
+          </form>
+        </Card>
+        <Card className="reseller-settings-card reseller-settings-security">
+          <div className="card-head"><div><b>{pick("امنیت حساب","Account security")}</b><small>{pick("تغییر رمز ورود به پنل نمایندگی","Update your reseller login password")}</small></div></div>
+          <form className="reseller-settings-form" onSubmit={savePassword}>
+            <label className="field"><span>{pick("رمز عبور فعلی","Current password")}</span><input required type="password" dir="ltr" autoComplete="current-password" value={password.current} onChange={e=>setPassword(v=>({...v,current:e.target.value}))}/></label>
+            <label className="field"><span>{pick("رمز عبور جدید","New password")}</span><input required minLength={8} type="password" dir="ltr" autoComplete="new-password" value={password.next} onChange={e=>setPassword(v=>({...v,next:e.target.value}))}/></label>
+            <label className="field"><span>{pick("تکرار رمز جدید","Confirm password")}</span><input required minLength={8} type="password" dir="ltr" autoComplete="new-password" value={password.confirm} onChange={e=>setPassword(v=>({...v,confirm:e.target.value}))}/></label>
+            <p className="reseller-settings-hint">{pick("برای امنیت بیشتر، از رمز عبور منحصربه‌فرد با حداقل ۸ کاراکتر استفاده کنید.","Use a unique password with at least 8 characters.")}</p>
+            <div className="reseller-settings-actions"><button type="submit" className="primary" disabled={busy}>{busy?pick("در حال انجام...","Working..."):pick("تغییر رمز عبور","Change password")}</button></div>
+          </form>
+        </Card>
+      </div>
+    </div>
+    <style>{`
+      .reseller-settings-modern{max-width:1200px;margin-inline:auto;padding-bottom:45px}
+      .reseller-settings-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 20px;flex-wrap:wrap}
+      .reseller-settings-heading h1{margin:0 0 5px;font-size:clamp(23px,2vw,29px);font-weight:800;color:var(--text)}
+      .reseller-settings-heading p{margin:0;color:var(--muted);font-size:12px;line-height:1.7}
+      .reseller-settings-code{display:inline-flex;align-items:center;background:var(--surface2);border:1px solid var(--line);border-radius:9px;color:var(--muted);padding:7px 12px;font-size:12px;font-weight:650}
+      .reseller-settings-columns{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,0.85fr);gap:16px;align-items:start}
+      .reseller-settings-modern .reseller-settings-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;min-width:0;min-height:0;height:auto;padding:20px;box-shadow:0 3px 14px rgba(20,30,55,.035)}
+      .reseller-settings-modern .card-head{margin-bottom:18px}
+      .reseller-settings-modern .card-head b{font-size:15px;color:var(--text);font-weight:750}
+      .reseller-settings-modern .card-head small{display:block;color:var(--muted);font-size:11px;margin-top:5px}
+      .reseller-settings-form{display:flex;flex-direction:column;gap:13px;min-width:0}
+      .reseller-settings-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+      .reseller-settings-modern .field{display:flex;flex-direction:column;gap:7px;margin:0;min-width:0}
+      .reseller-settings-modern .field span{font-size:12px;color:var(--muted);font-weight:550}
+      .reseller-settings-modern .field input,.reseller-settings-modern .field textarea{width:100%;border:1px solid var(--line);background:var(--surface2);color:var(--text);border-radius:9px;padding:10px 12px;font:inherit;font-size:13px;min-width:0;outline-offset:2px}
+      .reseller-settings-modern .field input{height:41px}
+      .reseller-settings-modern .field textarea{resize:vertical;min-height:78px}
+      .reseller-settings-modern .field input:focus-visible,.reseller-settings-modern .field textarea:focus-visible{outline:2px solid var(--purple)}
+      .reseller-settings-full{grid-column:1/-1}
+      .reseller-settings-hint{margin:0;font-size:11px;color:var(--muted);line-height:1.8}
+      .reseller-settings-actions{display:flex;justify-content:flex-start;padding-top:6px}
+      .reseller-settings-modern .reseller-settings-actions .primary{width:auto!important;min-width:130px;min-height:38px;padding:8px 17px;border-radius:9px;font-size:12px}
+      @media(max-width:850px){.reseller-settings-columns{grid-template-columns:minmax(0,1fr)}}
+      @media(max-width:560px){.reseller-settings-modern{padding-inline:12px}.reseller-settings-modern .reseller-settings-card{padding:15px}.reseller-settings-fields{grid-template-columns:minmax(0,1fr)}}
+    `}</style>
+  </PortalShell>;
 }
