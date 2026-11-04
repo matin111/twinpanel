@@ -13,6 +13,8 @@ on:
       - "backend/app/telegram_main_extensions.py"
       - "backend/app/telegram_guides_bot.py"
       - "backend/app/telegram_runtime_bot.py"
+      - "backend/app/renewal_service.py"
+      - "backend/scripts/imported_paid_renewal_smoke.py"
       - "backend/scripts/main_bot_account_sublink_smoke.py"
       - ".github/workflows/main-bot-account-sublink-smoke.yml"
   workflow_dispatch:
@@ -38,6 +40,9 @@ jobs:
             backend/app/telegram_account_link_bot.py \
             backend/app/telegram_main_extensions.py \
             backend/app/telegram_guides_bot.py
+
+      - name: Validate imported account payment and renewal contract
+        run: python backend/scripts/imported_paid_renewal_smoke.py
 
       - name: Validate imported account management actions
         run: python backend/scripts/imported_account_management_v2_smoke.py
