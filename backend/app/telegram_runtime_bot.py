@@ -378,7 +378,7 @@ def _subscription_button_username(sub):
     )
 
 
-def subscription_list_keyboard(rows):
+def subscription_list_keyboard(rows, imported=None):
     buttons = []
 
     for sub in rows[:30]:
@@ -416,6 +416,23 @@ def subscription_list_keyboard(rows):
             )
         ])
 
+    for imported_account in (imported or [])[:30]:
+        sub_id = int(imported_account["id"])
+        username = str(imported_account.get("account_username") or f"#{sub_id}")
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"🔗 👤 {username}"[:60],
+                callback_data=f"subimp:{sub_id}",
+            )
+        ])
+
+    buttons.append([
+        InlineKeyboardButton(
+            text="➕ افزودن اکانت با ساب‌لینک",
+            callback_data="subimp:add",
+            style="success",
+        )
+    ])
     return InlineKeyboardMarkup(
         inline_keyboard=buttons
     )
@@ -1382,6 +1399,15 @@ async def customer_dashboard(
 
 
 
+async def _imported_subscription_rows(telegram_id):
+    """Linked by a subscription URL, not transferred to the user account."""
+    return await request(
+        "GET",
+        f"/v1/telegram/account-import/mine/{int(telegram_id)}",
+        bot_auth=True,
+    )
+
+
 @router.message(
     F.text == "📦 اشتراک‌های من"
 )
@@ -1407,6 +1433,7 @@ async def subscriptions(
             rows,
             token=token,
         )
+        imported = await _imported_subscription_rows(message.from_user.id)
 
     except Exception as exc:
         await message.answer(
@@ -1415,9 +1442,10 @@ async def subscriptions(
         )
         return
 
-    if not rows:
+    if not rows and not imported:
         await message.answer(
-            "📦 هنوز اشتراکی ندارید."
+            "📦 هنوز اشتراکی ندارید. می‌توانید با ساب‌لینک اکانت اضافه کنید.",
+            reply_markup=subscription_list_keyboard([], []),
         )
         return
 
@@ -1431,13 +1459,13 @@ async def subscriptions(
 
     await message.answer(
         "<b>📦 اشتراک‌های من</b>\n\n"
-        f"تعداد اشتراک‌ها: <b>{len(rows)}</b>\n"
-        f"اشتراک فعال: <b>{active}</b>\n\n"
+        f"تعداد اشتراک‌ها: <b>{len(rows) + len(imported)}</b>\\n"
+        f"اشتراک فعال: <b>{active + sum(1 for item in imported if str(item.get('status')).lower() == 'active')}</b>\\n\\n"
         "برای مدیریت، یک اشتراک را انتخاب کنید.\n\n"
         "🟢 فعال   🟡 در حال اتمام   🔴 اتمام",
         reply_markup=(
             subscription_list_keyboard(
-                rows
+                rows, imported
             )
         ),
     )
@@ -1467,6 +1495,7 @@ async def subscriptions_callback(
             rows,
             token=token,
         )
+        imported = await _imported_subscription_rows(callback.from_user.id)
 
     except Exception as exc:
         await callback.answer(
@@ -1477,9 +1506,10 @@ async def subscriptions_callback(
 
     await callback.answer()
 
-    if not rows:
+    if not rows and not imported:
         await callback.message.edit_text(
-            "📦 هنوز اشتراکی ندارید."
+            "📦 هنوز اشتراکی ندارید. می‌توانید با ساب‌لینک اکانت اضافه کنید.",
+            reply_markup=subscription_list_keyboard([], []),
         )
         return
 
@@ -1493,13 +1523,13 @@ async def subscriptions_callback(
 
     await callback.message.edit_text(
         "<b>📦 اشتراک‌های من</b>\n\n"
-        f"تعداد اشتراک‌ها: <b>{len(rows)}</b>\n"
-        f"اشتراک فعال: <b>{active}</b>\n\n"
+        f"تعداد اشتراک‌ها: <b>{len(rows) + len(imported)}</b>\\n"
+        f"اشتراک فعال: <b>{active + sum(1 for item in imported if str(item.get('status')).lower() == 'active')}</b>\\n\\n"
         "یک اشتراک را انتخاب کنید.\n\n"
         "🟢 فعال   🟡 در حال اتمام   🔴 اتمام",
         reply_markup=(
             subscription_list_keyboard(
-                rows
+                rows, imported
             )
         ),
     )
