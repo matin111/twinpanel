@@ -16,7 +16,7 @@ import {
   type StoreTemplateOptionMap,
 } from "../lib/store-template-options";
 import {loadStoreTemplateSettings} from "../lib/store-template-settings-api";
-import {PlanCategoryTabs,filterPlansByCategory,planCategories,planCategoryCounts} from "./plan-category-tabs";
+import {PlanCategoryTabs,filterPlansByCategory,planCategories,planCategoryCounts,planTypes,planTypeCounts,filterPlansByType} from "./plan-category-tabs";
 import {StorefrontSeoRuntime} from "./storefront-seo-runtime";
 import {StoreTemplateRuntime} from "./store-template-runtime-registry";
 
@@ -24,6 +24,7 @@ export function StoreRuntime2027(){
   const {pick}=useI18n();
   const [plans,setPlans]=useState<StorePlan[]>([]);
   const [activeCategory,setActiveCategory]=useState("");
+  const [activeType,setActiveType]=useState("");
   const [settings,setSettings]=useState<StorefrontSettings|null>(null);
   const [templateSettings,setTemplateSettings]=useState<Record<string,Record<string,unknown>>>({});
   const [ready,setReady]=useState(false);
@@ -32,10 +33,14 @@ export function StoreRuntime2027(){
   const [buying,setBuying]=useState<number|null>(null);
   const [message,setMessage]=useState("");
 
-  const categories=useMemo(()=>planCategories(plans),[plans]);
-  const categoryCounts=useMemo(()=>planCategoryCounts(plans),[plans]);
+  const types=useMemo(()=>planTypes(plans),[plans]);
+  const typeCounts=useMemo(()=>planTypeCounts(plans),[plans]);
+  const selectedType=types.includes(activeType)?activeType:(types[0]||"");
+  const typedPlans=useMemo(()=>filterPlansByType(plans,selectedType),[plans,selectedType]);
+  const categories=useMemo(()=>planCategories(typedPlans),[typedPlans]);
+  const categoryCounts=useMemo(()=>planCategoryCounts(typedPlans),[typedPlans]);
   const selectedCategory=categories.includes(activeCategory)?activeCategory:(categories[0]||"");
-  const visiblePlans=useMemo(()=>filterPlansByCategory(plans,selectedCategory),[plans,selectedCategory]);
+  const visiblePlans=useMemo(()=>filterPlansByCategory(typedPlans,selectedCategory),[typedPlans,selectedCategory]);
 
   const load=async()=>{
     setLoading(true);setReady(false);setError("");
@@ -132,6 +137,6 @@ export function StoreRuntime2027(){
   return <div data-store-theme-engine="v1" data-store-template-active={templateId} data-store-template-customized={hasTemplateOptions?"true":"false"} style={themeStyle}>
     <StorefrontSeoRuntime settings={effectiveSettings}/>
     <StoreTemplateRuntime templateId={templateId} themeOptions={effectiveOptions} {...templateProps}/>
-    <PlanCategoryTabs categories={categories} active={selectedCategory} onChange={setActiveCategory} counts={categoryCounts} portalToStorePlans/>
+    <PlanCategoryTabs categories={categories} active={selectedCategory} onChange={setActiveCategory} counts={categoryCounts} planTypes={types} activeType={selectedType} onTypeChange={value=>{setActiveType(value);setActiveCategory("");}} typeCounts={typeCounts} portalToStorePlans/>
   </div>;
 }
