@@ -91,35 +91,223 @@ def install(router, request_fn):
                 reply_markup=_navigation(),
             )
 
-    @router.callback_query(F.data.startswith("subimp:"))
-    async def import_detail(callback: CallbackQuery):
+    # TWINPANEL_IMPORTED_ACCOUNT_MANAGEMENT_V2
+    def _details_text(info):
+        name = escape(str(info.get("account_username") or "-"))
+        plan = escape(str(info.get("plan_name") or "اشتراک"))
+        status = str(info.get("status") or "-").lower()
+        label = {
+            "active": "🟢 فعال",
+            "expired": "🔴 منقضی",
+            "pending": "🟡 در انتظار",
+            "canceled": "🔴 لغوشده",
+        }.get(status, escape(status))
+        expiry = escape(str(info.get("expires_at") or "نامشخص")[:10])
+        start = escape(str(info.get("starts_at") or "نامشخص")[:10])
+        remaining_days = info.get("days_remaining")
+        days = str(remaining_days) if remaining_days is not None else "نامشخص"
+        limit = escape(str(info.get("traffic_limit_gb", 0)))
+        used = escape(str(info.get("traffic_used_gb", 0)))
+        remaining = escape(str(info.get("traffic_remaining_gb", 0)))
+        devices = str(info.get("device_limit") or "نامشخص")
+        url = escape(str(info.get("subscription_link") or ""))
+        return (
+            "📦 <b>مدیریت اکانت</b>\n\n"
+            f"👤 نام کاربری: <code>{name}</code>\n"
+            f"📋 پلن: <b>{plan}</b>\n"
+            f"📌 وضعیت: {label}\n"
+            f"🗓 شروع: {start}\n"
+            f"📅 انقضا: {expiry}\n"
+            f"⏳ روز باقی‌مانده: {escape(days)}\n"
+            f"📊 مصرف: {used} از {limit} گیگابایت\n"
+            f"📶 حجم باقی‌مانده: {remaining} گیگابایت\n"
+            f"📱 سقف دستگاه: {escape(devices)}\n\n"
+            f"🔗 <b>ساب‌لینک:</b>\n<code>{url}</code>\n\n"
+            "برای تمدید و تغییر رمز این اکانتِ واردشده، "
+            "درخواست به پشتیبانی ارسال می‌شود؛ "
+            "تغییرات بدون تأیید مالک انجام نمی‌شود."
+        )
+
+    def _management_keyboard(sub_id):
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(
+                text="🔗 اطلاعات اتصال", callback_data=f"subimp:link:{sub_id}",
+                style="primary",
+            )],
+            [
+                InlineKeyboardButton(
+                    text="💳 درخواست تمدید", callback_data=f"subimp:ask:renew:{sub_id}",
+                ),
+                InlineKeyboardButton(
+                    text="🔐 درخواست تغییر رمز", callback_data=f"subimp:ask:password:{sub_id}",
+                ),
+            ],
+            [InlineKeyboardButton(
+                text="♻️ بروزرسانی اطلاعات", callback_data=f"subimp:refresh:{sub_id}",
+                style="success",
+            )],
+            [InlineKeyboardButton(
+                text="🎫 پشتیبانی", callback_data="ts:send",
+            )],
+            [InlineKeyboardButton(
+                text="🗑 حذف از فهرست من",
+                callback_data=f"subimp:remove:{sub_id}", style="danger",
+            )],
+            [InlineKeyboardButton(
+                text="⬅️ اکانت‌های من", callback_data="subs:list",
+            )],
+            [InlineKeyboardButton(
+                text="🏠 منوی اصلی", callback_data="main:home", style="primary",
+            )],
+        ])
+
+    async def _read_import(callback, sub_id):
+        return await request_fn(
+            "GET",
+            f"/v1/telegram/account-import/{callback.from_user.id}/{sub_id}",
+            bot_auth=True,
+        )
+
+    @router.callback_query(F.data.startswith("subimp:link:"))
+    async def import_connection(callback: CallbackQuery):
         try:
             sub_id = int((callback.data or "").rsplit(":", 1)[-1])
-            info = await request_fn(
-                "GET",
-                f"/v1/telegram/account-import/{callback.from_user.id}/{sub_id}",
-                bot_auth=True,
-            )
+            info = await _read_import(callback, sub_id)
         except Exception as exc:
             await callback.answer(str(exc)[:180], show_alert=True)
             return
         await callback.answer()
         if callback.message:
-            expiry = str(info.get("expires_at") or "نامشخص")[:10]
             await callback.message.edit_text(
-                "🔗 <b>اکانت افزوده‌شده</b>\n\n"
-                "👤 نام کاربری: <code>" + escape(str(info.get("account_username") or "-")) + "</code>\n"
-                "📌 وضعیت: " + escape(str(info.get("status") or "-")) + "\n"
-                "📅 انقضا: " + escape(expiry) + "\n"
-                "📊 مصرف: " + escape(str(info.get("traffic_used_gb", 0))) + " از " +
-                escape(str(info.get("traffic_limit_gb", 0))) + " گیگابایت\n\n"
-                "🔗 <code>" + escape(str(info.get("subscription_link") or "")) + "</code>",
+                "🔗 <b>اطلاعات اتصال اکانت</b>\n\n"
+                "ساب‌لینک زیر را در مرورگر باز کنید و پروتکل "
+                "موردنظر را انتخاب کنید:\n\n<code>" +
+                escape(str(info.get("subscription_link") or "")) + "</code>",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(
-                        text="🗑 حذف از فهرست من",
-                        callback_data=f"subimp:remove:{sub_id}", style="danger",
+                        text="⬅️ مدیریت اکانت", callback_data=f"subimp:{sub_id}",
                     )],
-                    [InlineKeyboardButton(text="⬅️ اکانت‌های من", callback_data="subs:list")],
-                    [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="main:home", style="primary")],
+                    [InlineKeyboardButton(
+                        text="📦 اکانت‌های من", callback_data="subs:list",
+                    )],
                 ]),
+            )
+
+    @router.callback_query(F.data.startswith("subimp:ask:"))
+    async def import_request_prompt(callback: CallbackQuery):
+        parts = (callback.data or "").split(":")
+        if len(parts) != 4 or parts[2] not in {"renew", "password"}:
+            await callback.answer("درخواست نامعتبر است", show_alert=True)
+            return
+        kind = parts[2]
+        try:
+            sub_id = int(parts[3])
+            info = await _read_import(callback, sub_id)
+        except Exception as exc:
+            await callback.answer(str(exc)[:180], show_alert=True)
+            return
+        await callback.answer()
+        title = "تمدید" if kind == "renew" else "تغییر رمز"
+        if callback.message:
+            await callback.message.edit_text(
+                f"📝 <b>درخواست {title} اکانت</b>\n\n"
+                "نام کاربری: <code>" +
+                escape(str(info.get("account_username") or "-")) + "</code>\n\n"
+                "این اکانت با ساب‌لینک به فهرست شما اضافه شده است. "
+                "درخواست به پشتیبانی ارسال می‌شود و "
+                "بعد از تأیید مالک و شرایط پرداخت بررسی خواهد شد.\n\n"
+                "آیا درخواست ثبت شود؟",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text=f"✅ ثبت درخواست {title}",
+                        callback_data=f"subimp:confirm:{kind}:{sub_id}",
+                        style="success",
+                    )],
+                    [InlineKeyboardButton(
+                        text="❌ انصراف",
+                        callback_data=f"subimp:{sub_id}", style="danger",
+                    )],
+                ]),
+            )
+
+    @router.callback_query(F.data.startswith("subimp:confirm:"))
+    async def import_request_confirm(callback: CallbackQuery):
+        parts = (callback.data or "").split(":")
+        if len(parts) != 4 or parts[2] not in {"renew", "password"}:
+            await callback.answer("درخواست نامعتبر است", show_alert=True)
+            return
+        kind = parts[2]
+        sub_id = int(parts[3])
+        title = "تمدید" if kind == "renew" else "تغییر رمز"
+        try:
+            info = await _read_import(callback, sub_id)
+            from .telegram_support_bot import _user_token
+            token = await _user_token(request_fn, callback.from_user.id)
+            ticket = await request_fn(
+                "POST", "/v1/support/tickets", token=token,
+                payload={
+                    "category": "other",
+                    "subject": f"درخواست {title} اکانت واردشده",
+                    "message": (
+                        f"درخواست {title} برای اکانت افزوده‌شده با ساب‌لینک.\n"
+                        f"شناسه اشتراک: {sub_id}\n"
+                        f"نام کاربری: {info.get('account_username') or '-'}\n"
+                        "لطفاً مالکیت و شرایط پرداخت را بررسی کنید. "
+                        "هیچ تغییری خودکار انجام نشده است."
+                    ),
+                    "source": "telegram",
+                },
+            )
+        except Exception as exc:
+            await callback.answer(str(exc)[:180], show_alert=True)
+            return
+        await callback.answer("درخواست ثبت شد.")
+        if callback.message:
+            await callback.message.edit_text(
+                f"✅ <b>درخواست {title} ثبت شد</b>\n\n"
+                f"شماره درخواست: <b>#{ticket.get('id', '-')}</b>\n"
+                "پشتیبانی پس از بررسی مالکیت پاسخ می‌دهد.",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="⬅️ مدیریت اکانت", callback_data=f"subimp:{sub_id}",
+                    )],
+                    [InlineKeyboardButton(
+                        text="🎫 پشتیبانی", callback_data="ts:send",
+                    )],
+                ]),
+            )
+
+    @router.callback_query(F.data.startswith("subimp:refresh:"))
+    async def import_refresh(callback: CallbackQuery):
+        sub_id = int((callback.data or "").rsplit(":", 1)[-1])
+        try:
+            info = await _read_import(callback, sub_id)
+        except Exception as exc:
+            await callback.answer(str(exc)[:180], show_alert=True)
+            return
+        await callback.answer("اطلاعات بروزرسانی شد.")
+        if callback.message:
+            try:
+                await callback.message.edit_text(
+                    _details_text(info), reply_markup=_management_keyboard(sub_id),
+                )
+            except Exception as exc:
+                # Telegram returns "message is not modified" when counters
+                # did not change. Refresh should not be reported as a failure.
+                if "message is not modified" not in str(exc).lower():
+                    raise
+
+    @router.callback_query(F.data.startswith("subimp:"))
+    async def import_detail(callback: CallbackQuery):
+        try:
+            sub_id = int((callback.data or "").rsplit(":", 1)[-1])
+            info = await _read_import(callback, sub_id)
+        except Exception as exc:
+            await callback.answer(str(exc)[:180], show_alert=True)
+            return
+        await callback.answer()
+        if callback.message:
+            await callback.message.edit_text(
+                _details_text(info),
+                reply_markup=_management_keyboard(sub_id),
             )
