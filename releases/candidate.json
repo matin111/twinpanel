@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.564",
-  "source_sha": "25ee462a7b92f6d1fa5e9f167d09f9c7ae7af6ca",
+  "version": "1.1.0-rc.565",
+  "source_sha": "6a1f66e69faa239ad4d38ea84b3eedcdfd81b60a",
   "notes": {
-    "fa": "نسخه rc.564 اصلاح ساخت دسته‌ای کانفیگ‌های sing-box برای کاربران منتقل‌شده از ایلان، سنایی، مرزبان و پاسارگاد را اضافه می‌کند. هر دسته روی هر نود با اعتبارسنجی و یک بار Restart اعمال می‌شود. اجرای بک‌فیل خودکار نیست و نیاز به تست قناری و بررسی سلامت API و نودها دارد.",
-    "en": "Release rc.564 includes scoped, resumable sing-box batch credential provisioning for imported accounts, preserving existing credentials and using one validation/restart per node batch. Backfill is opt-in, not automatic, and requires production canary and health verification."
+    "fa": "نسخه rc.565 طراحی صفحه تنظیمات سیستم را با تب‌های حساب و امنیت، سرورها و پروتکل‌ها و تنظیمات اشتراک بازآرایی می‌کند. فرم‌ها و کارت‌ها فشرده و واکنش‌گرا شده‌اند؛ منطق ذخیره‌سازی تغییری نکرده است.",
+    "en": "Release rc.565 reorganizes System Settings into account/security, server/protocol and subscription tabs, fixes oversized card heights and tightens responsive form spacing without changing settings APIs."
   }
 }
