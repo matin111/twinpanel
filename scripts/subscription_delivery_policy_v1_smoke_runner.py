@@ -3,15 +3,17 @@ from __future__ import annotations
 
 import os
 import runpy
+import tempfile
 from pathlib import Path
 
-# The production database module configures a PostgreSQL QueuePool at import
-# time. Use a non-routable PostgreSQL DSN so the engine can be constructed with
-# the production pool contract without opening any external connection.
+# app imports subscription_plan_schema, whose import-time inspection opens a
+# database connection. Use a disposable SQLite file: SQLAlchemy's file-backed
+# SQLite QueuePool supports the production pool options, and inspection can
+# connect without relying on an absent PostgreSQL server on port 1.
+_smoke_db_directory = tempfile.TemporaryDirectory(prefix="twinpanel-policy-smoke-")
 os.environ.setdefault("APP_SECRET_KEY", "subscription-delivery-policy-v1-smoke-secret")
 os.environ["DATABASE_URL"] = (
-    "postgresql+psycopg2://twinpanel_smoke:twinpanel_smoke@127.0.0.1:1/"
-    "twinpanel_smoke"
+    f"sqlite+pysqlite:///{Path(_smoke_db_directory.name) / 'bootstrap.sqlite3'}"
 )
 os.environ.setdefault("REDIS_URL", "redis://127.0.0.1:6379/15")
 os.environ.setdefault(
@@ -71,4 +73,7 @@ def _delivery_create_all(*, bind=None, **_kwargs) -> None:
 Base.metadata.create_all = _delivery_create_all
 
 smoke_path = Path(__file__).with_name("subscription_delivery_policy_v1_smoke.py")
-runpy.run_path(str(smoke_path), run_name="__main__")
+try:
+    runpy.run_path(str(smoke_path), run_name="__main__")
+finally:
+    _smoke_db_directory.cleanup()
