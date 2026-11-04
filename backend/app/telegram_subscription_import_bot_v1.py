@@ -233,7 +233,10 @@ def install(router, request_fn):
             order = await request_fn(
                 "POST",
                 f"/v1/telegram/account-import/{callback.from_user.id}/{sub_id}/renew-order",
-                payload={},
+                payload={"idempotency_key": (
+                    f"tg-import-renew-{callback.from_user.id}-{sub_id}-"
+                    f"{callback.message.message_id if callback.message else 0}"
+                )},
                 bot_auth=True,
             )
             methods = (await request_fn("GET", "/v1/payments/methods")).get("methods") or []
