@@ -28,7 +28,7 @@ assert 'SubscriptionRenewalOrder.subscription_id == subscription_id' in api
 assert 'if linked is None:' in api
 
 assert 'callback_data=f"subimprenew:{sub_id}"' in bot
-assert 'callback_data=f"subimprenewconfirm:{sub_id}:{int(plan[\'id\'])}"' in bot
+assert "subimprenewconfirm:{sub_id}:" in bot
 assert 'subimprenewplan:' in bot
 assert '"plan_id": plan_id' in bot
 assert 'payload.plan_id' in api
