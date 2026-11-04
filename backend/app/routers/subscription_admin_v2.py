@@ -324,7 +324,7 @@ def admin_page_v3(
     if status == "online":
         base = base.filter(Subscription.id.in_(online_ids))
     elif status != "all":
-        base = base.filter(cast(Subscription.status, String) == status)
+        base = base.filter(Subscription.status == SubscriptionStatus(status))
     if term:
         pattern = f"%{term}%"
         base = base.outerjoin(User, User.id == Subscription.user_id).outerjoin(
