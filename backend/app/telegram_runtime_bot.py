@@ -1459,8 +1459,8 @@ async def subscriptions(
 
     await message.answer(
         "<b>📦 اشتراک‌های من</b>\n\n"
-        f"تعداد اشتراک‌ها: <b>{len(rows) + len(imported)}</b>\\n"
-        f"اشتراک فعال: <b>{active + sum(1 for item in imported if str(item.get('status')).lower() == 'active')}</b>\\n\\n"
+        f"تعداد اشتراک‌ها: <b>{len(rows) + len(imported)}</b>\n"
+        f"اشتراک فعال: <b>{active + sum(1 for item in imported if str(item.get('status')).lower() == 'active')}</b>\n\n"
         "برای مدیریت، یک اشتراک را انتخاب کنید.\n\n"
         "🟢 فعال   🟡 در حال اتمام   🔴 اتمام",
         reply_markup=(
@@ -1523,8 +1523,8 @@ async def subscriptions_callback(
 
     await callback.message.edit_text(
         "<b>📦 اشتراک‌های من</b>\n\n"
-        f"تعداد اشتراک‌ها: <b>{len(rows) + len(imported)}</b>\\n"
-        f"اشتراک فعال: <b>{active + sum(1 for item in imported if str(item.get('status')).lower() == 'active')}</b>\\n\\n"
+        f"تعداد اشتراک‌ها: <b>{len(rows) + len(imported)}</b>\n"
+        f"اشتراک فعال: <b>{active + sum(1 for item in imported if str(item.get('status')).lower() == 'active')}</b>\n\n"
         "یک اشتراک را انتخاب کنید.\n\n"
         "🟢 فعال   🟡 در حال اتمام   🔴 اتمام",
         reply_markup=(
