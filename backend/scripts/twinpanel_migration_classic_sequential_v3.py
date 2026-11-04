@@ -50,6 +50,18 @@ async def one_node(db,node_id):
                   or_(Subscription.expires_at.is_(None),Subscription.expires_at>now),
                   or_(Subscription.traffic_limit_bytes<=0,Subscription.traffic_used_bytes<Subscription.traffic_limit_bytes))
           .order_by(Subscription.id.asc()).all())
+    # Prefetch credential records once per node (avoid per-user SELECT).
+    subscription_ids = [int(sub.id) for sub in subs]
+    existing_credentials = {
+        int(cred.subscription_id): cred
+        for cred in (
+            db.query(ProtocolCredential)
+            .filter(
+                ProtocolCredential.protocol == PROTOCOL,
+                ProtocolCredential.subscription_id.in_(subscription_ids),
+            ).all()
+        )
+    } if subscription_ids else {}
     succeeded=0
     skipped=0
     failed=0
@@ -57,18 +69,21 @@ async def one_node(db,node_id):
     try:
         for sub in subs:
             if succeeded>=PER_NODE:break
-            user=db.get(User,sub.user_id)
-            if not user:continue
-            username=sub.account_username or ad._safe_username(sub,user)
-            password=sub.account_password_encrypted or ad._numeric_secret(8)
             for protocol in PROTOCOLS:
                 if succeeded>=PER_NODE:break
                 if not bool(getattr(node,'enable_'+protocol,False)):continue
-                cred=db.query(ProtocolCredential).filter(ProtocolCredential.subscription_id==sub.id,ProtocolCredential.protocol==protocol).first()
+                cred=existing_credentials.get(int(sub.id))
                 items=ad._autosync_credential_items(cred)
                 if any(ad._autosync_item_node_id(x)==node_id for x in items):
                     skipped+=1
                     continue
+                # Most migrated users already have this node; only read User,
+                # identity, and current status for an actually missing pair.
+                user=db.get(User,sub.user_id)
+                if not user:
+                    continue
+                username=sub.account_username or ad._safe_username(sub,user)
+                password=sub.account_password_encrypted or ad._numeric_secret(8)
                 # Guard repeat at write-time: no credentials for expired or exhausted users.
                 db.refresh(sub)
                 if sub.status!=SubscriptionStatus.ACTIVE or (sub.expires_at and sub.expires_at<=datetime.utcnow()) or (sub.traffic_limit_bytes>0 and sub.traffic_used_bytes>=sub.traffic_limit_bytes):
@@ -95,6 +110,7 @@ async def one_node(db,node_id):
                     if cred is None:
                         cred=ProtocolCredential(subscription_id=sub.id,protocol=protocol)
                         db.add(cred)
+                        existing_credentials[int(sub.id)]=cred
                     items.append(item)
                     cred.config_text_encrypted=ad._enc(items)
                     cred.is_active=True
