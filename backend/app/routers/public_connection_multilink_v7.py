@@ -11,8 +11,11 @@ from sqlalchemy.orm import Session
 
 from .. import xray_profile_reconcile_v36
 from .. import xray_public_delivery_runtime as xray_delivery
+from .. import subscription_delivery_policy_v1 as delivery_policy
+from .. import xray_customer_profile_policy_v30 as customer_policy
+from .. import mother_subscription_delivery_policy_v108 as mother_policy
 from ..database import get_db
-from ..models import Node
+from ..models import Node, ProtocolCredential
 from . import account_delivery
 
 
@@ -39,7 +42,44 @@ def _subscription_and_payload(token: str, db: Session):
     status = str(getattr(sub.status, "value", sub.status)).strip().lower()
     if status != "active":
         raise HTTPException(status_code=403, detail="اشتراک فعال نیست")
-    return sub, account_delivery._public_payload(db, sub)
+    # A V2Ray-only client poll must not decode every other protocol, produce
+    # unrelated files/QRs, or run synchronous provisioning. Keep explicit
+    # delivery-policy subscriptions on their canonical, policy-aware route.
+    if delivery_policy.is_explicit_policy(db, sub.id):
+        return sub, account_delivery._public_payload(db, sub)
+
+    cred = (
+        db.query(ProtocolCredential)
+        .filter(
+            ProtocolCredential.subscription_id == sub.id,
+            ProtocolCredential.protocol == "v2ray",
+            ProtocolCredential.is_active.is_(True),
+        ).first()
+    )
+    if not cred:
+        return sub, {"credentials": []}
+
+    raw_items = account_delivery._dec(cred.config_text_encrypted)
+    raw_items = (
+        raw_items if isinstance(raw_items, list)
+        else [raw_items] if isinstance(raw_items, dict) else []
+    )
+    can_use_mother = mother_policy._subscription_can_use_mother(db, sub)
+    items = []
+    for raw in raw_items:
+        if not isinstance(raw, dict):
+            continue
+        live = account_delivery._live_client_item(db, sub, "v2ray", raw)
+        if not account_delivery._delivery_item_is_usable(db, "v2ray", live):
+            continue
+        if not can_use_mother and mother_policy._item_is_mother(db, live):
+            continue
+        safe = customer_policy._customer_xray_item_v261(db, live)
+        if safe is not None:
+            items.append(safe)
+    return sub, {
+        "credentials": ([{"protocol": "v2ray", "items": items}] if items else []),
+    }
 
 
 def _v2ray_items(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -74,53 +114,13 @@ def _profile_count(item: dict[str, Any]) -> int:
 
 
 async def _active_public_payload(token: str, db: Session) -> dict[str, Any]:
-    """Return an exact-three V2Ray payload, reconciling legacy rows in place."""
+    """Serve stored, deliverable Xray profiles without remote repair on GET.
 
-    sub, payload = _subscription_and_payload(token, db)
-    missing_nodes: list[Node] = []
-    seen_node_ids: set[int] = set()
-
-    for item in _v2ray_items(payload):
-        if _profile_count(item) == 3:
-            continue
-        try:
-            node_id = int(item.get("node_id") or 0)
-        except (TypeError, ValueError):
-            continue
-        if not node_id or node_id in seen_node_ids:
-            continue
-        node = db.get(Node, node_id)
-        if node is None:
-            continue
-        seen_node_ids.add(node_id)
-        missing_nodes.append(node)
-
-    errors: list[str] = []
-    for node in missing_nodes:
-        try:
-            await xray_profile_reconcile_v36._reconcile_subscription_for_exit(
-                db,
-                sub,
-                node,
-            )
-        except Exception as exc:
-            db.rollback()
-            errors.append(str(exc)[:240])
-
-    if missing_nodes:
-        payload = account_delivery._public_payload(db, sub)
-
-    incomplete = [
-        item
-        for item in _v2ray_items(payload)
-        if _profile_count(item) != 3
-    ]
-    if incomplete:
-        detail = "کانفیگ‌های V2Ray این اشتراک هنوز کامل نشده‌اند"
-        if errors:
-            detail += "؛ آماده‌سازی خودکار ناموفق بود"
-        raise HTTPException(status_code=503, detail=detail)
-
+    HTTP subscription downloads must never initiate SSH provisioning: clients
+    may poll every few seconds, and one incomplete Exit must not block the
+    already-working profiles of other Exits. Repair remains a separate job.
+    """
+    _sub, payload = _subscription_and_payload(token, db)
     return payload
 
 
@@ -139,7 +139,7 @@ def _item_v2ray_uris(item: dict[str, Any]) -> list[str]:
         seen.add(uri)
         result.append(uri)
 
-    return result if len(result) == 3 else []
+    return result
 
 
 def _customer_safe_node_meta(db: Session, item: dict[str, Any], index: int) -> tuple[str, str | None]:
@@ -163,7 +163,7 @@ def _v2ray_profile_groups(db: Session, payload: dict[str, Any]) -> list[dict[str
     groups: list[dict[str, Any]] = []
     for item in _v2ray_items(payload):
         uris = _item_v2ray_uris(item)
-        if len(uris) != 3:
+        if not uris:
             continue
 
         profile_rows: list[dict[str, Any]] = []
@@ -197,7 +197,7 @@ def _v2ray_profile_groups(db: Session, payload: dict[str, Any]) -> list[dict[str
                 "node_id": item.get("node_id"),
                 "server": server_name,
                 "country_code": country_code,
-                "profile_count": 3,
+                "profile_count": len(profile_rows),
                 "profiles": profile_rows,
             }
         )
@@ -225,15 +225,18 @@ def _v2ray_uris(db: Session, payload: dict[str, Any]) -> list[str]:
 async def _subscription_content(token: str, db: Session) -> tuple[str, int, int]:
     payload = await _active_public_payload(token, db)
     groups = _v2ray_profile_groups(db, payload)
-    uris = _v2ray_uris(db, payload)
-
-    if not uris or not groups or len(uris) != len(groups) * 3:
+    uris = list(dict.fromkeys(
+        str(profile.get("uri") or "").strip()
+        for group in groups
+        for profile in group.get("profiles", [])
+        if isinstance(profile, dict) and str(profile.get("uri") or "").strip()
+    ))
+    if not uris:
         raise HTTPException(
             status_code=503,
-            detail="مولتی‌لینک V2Ray هنوز سه کانفیگ کامل برای هر سرور ندارد",
+            detail="هنوز کانفیگ V2Ray قابل دریافت برای این اشتراک وجود ندارد",
         )
-    raw = "\n".join(uris).encode("utf-8")
-    return base64.b64encode(raw).decode("ascii"), len(groups), len(uris)
+    return base64.b64encode("\n".join(uris).encode("utf-8")).decode("ascii"), len(groups), len(uris)
 
 
 async def _subscription_response(token: str, db: Session) -> Response:
@@ -254,16 +257,16 @@ async def _subscription_response(token: str, db: Session) -> Response:
 async def _subscription_meta_response(token: str, db: Session) -> JSONResponse:
     payload = await _active_public_payload(token, db)
     groups = _v2ray_profile_groups(db, payload)
-    if not groups or any(int(group.get("profile_count") or 0) != 3 for group in groups):
+    if not groups:
         raise HTTPException(
             status_code=503,
-            detail="نمایش V2Ray هنوز سه کانفیگ کامل برای هر سرور ندارد",
+            detail="هنوز کانفیگ V2Ray قابل دریافت برای این اشتراک وجود ندارد",
         )
     return JSONResponse(
         {
             "protocol": "v2ray",
             "server_count": len(groups),
-            "profile_count": len(groups) * 3,
+            "profile_count": sum(int(g["profile_count"]) for g in groups),
             "servers": groups,
         },
         headers={"Cache-Control": "no-store"},
