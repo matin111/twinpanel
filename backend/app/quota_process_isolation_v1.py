@@ -97,6 +97,7 @@ def install() -> None:
 
     async def _process_isolated_quota_runtime_worker() -> None:
         while True:
+            cycle_failed = False
             try:
                 result = await _run_quota_reconcile_process()
                 changed = result.get("changed") or []
@@ -107,6 +108,7 @@ def install() -> None:
                         flush=True,
                     )
                 for item in result.get("errors") or []:
+                    cycle_failed = True
                     print(
                         "quota runtime reconcile failed:",
                         f"collector={item.get('collector') or 'unknown'}",
@@ -116,13 +118,14 @@ def install() -> None:
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
+                cycle_failed = True
                 print(
                     "quota runtime process reconcile failed:",
                     f"{type(exc).__name__}:{str(exc)[:800]}",
                     flush=True,
                 )
 
-            await asyncio.sleep(max(runtime.QUOTA_RUNTIME_INTERVAL_SECONDS, 120.0))
+            await asyncio.sleep(120.0 if cycle_failed else runtime.QUOTA_RUNTIME_INTERVAL_SECONDS)
 
     runtime._quota_runtime_worker = _process_isolated_quota_runtime_worker
     _installed = True
