@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.571",
-  "source_sha": "dd66afc20f1c873d2bafa530c2aaf8219a16b042",
+  "version": "1.1.0-rc.572",
+  "source_sha": "3a6e4f1753ba9fe93f641aa035b03eb24132997c",
   "notes": {
-    "fa": "اصلاح اضطراری تأیید خودکار SMS Reader و Automagen: رفع خطای NameError متغیر window که درخواست‌ها را با HTTP 500 متوقف می‌کرد و یکسان‌سازی ایمن قالب‌های شماره فرستنده بانک با و بدون علامت +. حفظ کنترل مبلغ یکتا و محدودیت زمانی و جلوگیری از تأیید دوباره پرداخت‌های قدیمی. تست‌های اختصاصی و عمومی موفق‌اند.",
-    "en": "Emergency Automagen/SMS Reader hotfix: fix undefined window NameError causing HTTP 500 and normalize legitimate bank sender numeric prefixes (+/00/Persian digits) while preserving unique-amount, age-window and replay safety. No historical transactions are automatically approved."
+    "fa": "افزودن منوی کامل مدیریت اکانت‌های متصل‌شده با ساب‌لینک در ربات تلگرام: نمایش اطلاعات اشتراک، حجم و تاریخ انقضا، بروزرسانی، اتصال، درخواست تمدید و تغییر رمز از طریق پشتیبانی با بررسی مالکیت. نمایش ساب‌لینک و QR Code در یک پیام مشترک برای اشتراک‌های اصلی و واردشده. بدون تغییر در پروتکل‌ها، نودها یا تونل‌ها.",
+    "en": "Telegram My Accounts: expanded account management for link-attached subscriptions, read-only live status and usage, ownership-safe support requests for renewal/password changes; unified subscription URL and its matching QR in one photo/caption for both owned and imported accounts. No tunnel, protocol, billing, or credential changes."
   }
 }
