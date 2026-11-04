@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.566",
-  "source_sha": "aafea586f85b36fad0b11c8a9bd6821ebd313c63",
+  "version": "1.1.0-rc.567",
+  "source_sha": "fe91da1260c60f66b922fc6ce227fcb0b1b0da8a",
   "notes": {
-    "fa": "نسخه rc.566 طراحی صفحه تنظیمات سیستم را بهبود می‌دهد: تب‌های خوانا در حالت روشن و تاریک، کارت‌های متعادل بدون فضای خالی، فرم‌های فشرده و واکنش‌گرا و مخفی‌سازی پیش‌فرض کلید Authenticator. APIها و منطق ذخیره‌سازی بدون تغییر هستند.",
-    "en": "Release rc.566 polishes System Settings: legible theme-aware navigation, balanced compact cards without excessive whitespace, responsive forms, and Authenticator key concealed by default. Settings APIs and persistence remain unchanged."
+    "fa": "نسخه rc.567 طراحی تنظیمات نماینده را با کارت‌های مستقل پروفایل و امنیت، فرم‌های منظم و جمع‌وجور، راست‌چین واکنش‌گرا، نمایش مناسب تم روشن و تاریک و دکمه‌های یکدست بهبود می‌دهد. منطق ذخیره پروفایل و تغییر رمز بدون تغییر باقی مانده است.",
+    "en": "Release rc.567 redesigns reseller settings with independent compact profile/security cards, responsive RTL forms, theme-aware contrast and consistent actions. Existing profile and password APIs are unchanged."
   }
 }
