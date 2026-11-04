@@ -122,7 +122,7 @@ def install(router, request_fn):
             f"📊 مصرف: {used} از {limit} گیگابایت\n"
             f"📶 حجم باقی‌مانده: {remaining} گیگابایت\n"
             f"📱 سقف دستگاه: {escape(devices)}\n\n"
-            f"🔗 <b>ساب‌لینک:</b>\n<code>{url}</code>\n\n"
+            "🔗 ساب‌لینک و QR Code در دکمه زیر با هم نمایش داده می‌شوند.\n\n"
             "برای تمدید و تغییر رمز این اکانتِ واردشده، "
             "درخواست به پشتیبانی ارسال می‌شود؛ "
             "تغییرات بدون تأیید مالک انجام نمی‌شود."
@@ -131,7 +131,7 @@ def install(router, request_fn):
     def _management_keyboard(sub_id):
         return InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(
-                text="🔗 اطلاعات اتصال", callback_data=f"subimp:link:{sub_id}",
+                text="🔗 ساب‌لینک + QR Code", callback_data=f"subimp:link:{sub_id}",
                 style="primary",
             )],
             [
@@ -178,11 +178,11 @@ def install(router, request_fn):
             return
         await callback.answer()
         if callback.message:
-            await callback.message.edit_text(
-                "🔗 <b>اطلاعات اتصال اکانت</b>\n\n"
-                "ساب‌لینک زیر را در مرورگر باز کنید و پروتکل "
-                "موردنظر را انتخاب کنید:\n\n<code>" +
-                escape(str(info.get("subscription_link") or "")) + "</code>",
+            from .telegram_subscription_qr_v1 import send_subscription_link_and_qr
+            await send_subscription_link_and_qr(
+                callback.message,
+                str(info.get("subscription_link") or ""),
+                username=str(info.get("account_username") or f"#{sub_id}"),
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(
                         text="⬅️ مدیریت اکانت", callback_data=f"subimp:{sub_id}",

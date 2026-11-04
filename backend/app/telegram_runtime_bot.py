@@ -447,7 +447,7 @@ def subscription_actions_keyboard(info):
     ):
         rows.append([
             InlineKeyboardButton(
-                text="🔗 اطلاعات اتصال",
+                text="🔗 ساب‌لینک + QR Code",
                 callback_data=(
                     f"subconn:{sub_id}"
                 ),
@@ -1617,13 +1617,12 @@ async def subscription_connection(
 
     await callback.answer()
 
-    await callback.message.answer(
-        f"🔗 <b>اطلاعات اتصال اشتراک #{sub_id}</b>\n\n"
-        "لینک زیر شامل اطلاعات اتصال و "
-        "کانفیگ‌های اشتراک شماست:\n\n"
-        f"<code>{escape(link)}</code>\n\n"
-        "این لینک را فقط برای دستگاه‌های "
-        "خودتان استفاده کنید."
+    from .telegram_subscription_qr_v1 import send_subscription_link_and_qr
+
+    await send_subscription_link_and_qr(
+        callback.message,
+        link,
+        username=str(info.get("account_username") or f"#{sub_id}"),
     )
 
 

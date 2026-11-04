@@ -5,6 +5,8 @@ on:
     paths:
       - "backend/app/telegram_account_link_bot.py"
       - "backend/app/telegram_subscription_import_bot_v1.py"
+      - "backend/app/telegram_subscription_qr_v1.py"
+      - "backend/scripts/telegram_combined_sublink_qr_v1_smoke.py"
       - "backend/app/routers/telegram_subscription_import_v1.py"
       - "backend/app/routers/__init__.py"
       - "backend/scripts/telegram_account_sublink_import_v1_smoke.py"
@@ -28,7 +30,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Telegram model dependency
-        run: pip install "aiogram==3.30.0"
+        run: pip install "aiogram==3.30.0" "qrcode[pil]==8.2"
 
       - name: Compile changed bot modules
         run: |
@@ -39,6 +41,9 @@ jobs:
 
       - name: Validate imported account management actions
         run: python backend/scripts/imported_account_management_v2_smoke.py
+
+      - name: Verify unified sublink and QR in one Telegram message
+        run: python backend/scripts/telegram_combined_sublink_qr_v1_smoke.py
 
       - name: Verify account import URL and bot auth contract
         run: python backend/scripts/telegram_account_sublink_import_v1_smoke.py
