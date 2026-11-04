@@ -1634,7 +1634,7 @@ def security_overview(
 
         # Hard rule:
         # simultaneous active devices exceed plan limit.
-        if active_devices > device_limit:
+        if device_limit > 0 and active_devices > device_limit:
             score += 70
             reasons.append(
                 "تعداد دستگاه فعال هم‌زمان "
