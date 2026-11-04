@@ -37,6 +37,9 @@ jobs:
             backend/app/telegram_main_extensions.py \
             backend/app/telegram_guides_bot.py
 
+      - name: Validate imported account management actions
+        run: python backend/scripts/imported_account_management_v2_smoke.py
+
       - name: Verify account import URL and bot auth contract
         run: python backend/scripts/telegram_account_sublink_import_v1_smoke.py
 

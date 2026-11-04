@@ -15,7 +15,7 @@ from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Table, select
 from sqlalchemy.orm import Session
 
 from ..database import Base, get_db
-from ..models import Subscription
+from ..models import Subscription, Plan
 from ..telegram_models import TelegramUserLink
 from .telegram_bot import bot_guard
 
@@ -74,15 +74,28 @@ def _extract_token(db: Session, url: str) -> str:
 
 def _row(db: Session, sub: Subscription) -> dict:
     from .account_delivery import _share_url
+
+    plan = db.get(Plan, sub.plan_id) if sub.plan_id else None
+    limit = int(sub.traffic_limit_bytes or 0)
+    used = int(sub.traffic_used_bytes or 0)
+    now = datetime.utcnow()
+    expires = sub.expires_at
+    days_remaining = max(0, (expires - now).days) if expires else None
     return {
         "id": int(sub.id),
         "account_username": str(sub.account_username or f"account-{sub.id}"),
+        "plan_name": str(plan.name) if plan else "اشتراک",
         "status": getattr(sub.status, "value", str(sub.status)),
-        "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
-        "traffic_limit_gb": round(sub.traffic_limit_bytes / (1024**3), 2),
-        "traffic_used_gb": round(sub.traffic_used_bytes / (1024**3), 2),
+        "starts_at": sub.starts_at.isoformat() if sub.starts_at else None,
+        "expires_at": expires.isoformat() if expires else None,
+        "days_remaining": days_remaining,
+        "traffic_limit_gb": round(limit / (1024**3), 2),
+        "traffic_used_gb": round(used / (1024**3), 2),
+        "traffic_remaining_gb": round(max(0, limit - used) / (1024**3), 2),
+        "device_limit": int(plan.device_limit) if plan else None,
         "subscription_link": str(_share_url(db, sub)),
         "imported": True,
+        "management_mode": "support_request",
     }
 
 
