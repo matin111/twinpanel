@@ -220,7 +220,7 @@ function PlanCard({plan,index,featured,buying,number,pick,copy,onBuy}:{plan:Stor
     <header><span>{String(index+1).padStart(2,"0")}</span>{featured&&<em>{pick("پیشنهادی","Recommended")}</em>}<small>{pick("VPN SUBSCRIPTION","VPN SUBSCRIPTION")}</small></header>
     <div className={styles.planName}><h3>{plan.name}</h3>{plan.description&&<p>{plan.description}</p>}</div>
     <div className={styles.planPrice}><strong>{number(plan.price_toman)}</strong><span>{pick("تومان","Toman")}</span></div>
-    <div className={styles.planFacts}><div><small>{pick("حجم","Traffic")}</small><b>{number(plan.traffic_gb,{maximumFractionDigits:2})} GB</b></div><div><small>{pick("مدت","Duration")}</small><b>{number(plan.duration_days)} {pick("روز","days")}</b></div><div><small>{pick("دستگاه","Devices")}</small><b>{number(plan.device_limit)}</b></div></div>
+    <div className={styles.planFacts}><div><small>{pick("حجم","Traffic")}</small><b>{number(plan.traffic_gb,{maximumFractionDigits:2})} GB</b></div><div><small>{pick("مدت","Duration")}</small><b>{number(plan.duration_days)} {pick("روز","days")}</b></div><div><small>{pick("دستگاه","Devices")}</small><b>{plan.device_limit===0?pick("کاربر نامحدود","Unlimited users"):number(plan.device_limit)}</b></div></div>
     <div className={styles.planBenefits}>{[1,2,3].map(item=><span key={item}>✓ {copy(`plan_feature_${item}`)}</span>)}</div>
     <div className={styles.planProtocols}>{protocols.slice(0,6).map(protocol=><span key={protocol}>{storeProtocolMeta(protocol)?.short||PROTOCOLS[protocol]?.short||protocol}</span>)}</div>
     <button type="button" disabled={buying} onClick={onBuy}>{buying?pick("در حال ثبت سفارش...","Creating order..."):pick("خرید این پلن","Buy this plan")}<span>↗</span></button>
