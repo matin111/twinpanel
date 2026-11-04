@@ -2998,13 +2998,14 @@ async def refresh_simple_passwords(subscription_id: int, db: Session = Depends(g
             cred.is_active = True
             results.append({"protocol": protocol, "username": username, "items": items})
 
-    db.commit()
-
     if not results:
+        db.rollback()
         raise HTTPException(
             status_code=502,
             detail={"message": "بازسازی Cisco/L2TP ناموفق بود", "errors": errors},
         )
+
+    db.commit()
 
     payload = _public_payload(db, sub)
     payload.update(
