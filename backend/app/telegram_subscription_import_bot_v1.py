@@ -14,6 +14,11 @@ class ImportLinkState(StatesGroup):
     link = State()
 
 
+class PasswordChangeState(StatesGroup):
+    current = State()
+    new = State()
+
+
 def _navigation():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📦 اکانت‌های من", callback_data="subs:list", style="primary")],
@@ -125,7 +130,7 @@ def install(router, request_fn):
             "🔗 ساب‌لینک و QR Code در دکمه زیر با هم نمایش داده می‌شوند.\n\n"
             "با دکمه تمدید اکانت می‌توانید برای همین اشتراک اعتبار و حجم اضافه خریداری کنید. "
             "مالکیت اکانت با پرداخت تغییر نمی‌کند. "
-            "تغییر رمز همچنان از مسیر پشتیبانی بررسی می‌شود."
+            "برای تغییر رمز Cisco/L2TP باید رمز فعلی اکانت را تأیید کنید."
         )
 
     def _management_keyboard(sub_id, info):
@@ -139,7 +144,7 @@ def install(router, request_fn):
                     text="♻️ تمدید اکانت", callback_data=f"subimprenew:{sub_id}",
                 ),
                 InlineKeyboardButton(
-                    text="🔐 درخواست تغییر رمز", callback_data=f"subimp:ask:password:{sub_id}",
+                    text="🔐 تغییر رمز اکانت", callback_data=f"subimp:password:{sub_id}",
                 ),
             ],
             [InlineKeyboardButton(
@@ -324,6 +329,107 @@ def install(router, request_fn):
                 "روش پرداخت را انتخاب کنید:",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
             )
+
+    @router.callback_query(F.data.startswith("subimp:password:"))
+    async def import_change_password_start(callback: CallbackQuery, state: FSMContext):
+        await callback.answer()
+        if not callback.message or callback.message.chat.type != "private":
+            return
+        sub_id = int((callback.data or "").rsplit(":", 1)[-1])
+        try:
+            await _read_import(callback, sub_id)
+        except Exception:
+            await callback.message.answer("❌ اکانت در فهرست شما پیدا نشد")
+            return
+        await state.clear()
+        await state.update_data(subscription_id=sub_id)
+        await state.set_state(PasswordChangeState.current)
+        await callback.message.answer(
+            "🔐 <b>تغییر رمز Cisco / L2TP</b>\n\n"
+            "ابتدا رمز فعلی اکانت را بفرستید. صرف داشتن ساب‌لینک برای تغییر رمز کافی نیست.\n"
+            "پیام‌های حاوی رمز پس از دریافت، از گفت‌وگو حذف می‌شوند.\n\n"
+            "برای انصراف /cancel را بفرستید."
+        )
+
+    @router.message(PasswordChangeState.current)
+    async def import_password_current(message: Message, state: FSMContext):
+        if message.chat.type != "private":
+            await state.clear()
+            return
+        value = str(message.text or "").strip()
+        try:
+            await message.delete()
+        except Exception:
+            pass
+        if value == "/cancel":
+            await state.clear()
+            await message.answer("تغییر رمز لغو شد.")
+            return
+        if not value or len(value) > 128:
+            await message.answer("رمز فعلی معتبر نیست؛ دوباره وارد کنید.")
+            return
+        await state.update_data(current_password=value)
+        await state.set_state(PasswordChangeState.new)
+        await message.answer(
+            "🔑 رمز جدید را وارد کنید (۶ تا ۶۴ کاراکتر انگلیسی، بدون فاصله)."
+        )
+
+    @router.message(PasswordChangeState.new)
+    async def import_password_new(message: Message, state: FSMContext):
+        if message.chat.type != "private":
+            await state.clear()
+            return
+        value = str(message.text or "").strip()
+        try:
+            await message.delete()
+        except Exception:
+            pass
+        if value == "/cancel":
+            await state.clear()
+            await message.answer("تغییر رمز لغو شد.")
+            return
+        import re
+        if not re.fullmatch(r"[A-Za-z0-9._@#%+=:-]{6,64}", value):
+            await message.answer("❌ رمز جدید معتبر نیست؛ دوباره وارد کنید.")
+            return
+        data = await state.get_data()
+        sub_id = int(data.get("subscription_id") or 0)
+        old = str(data.get("current_password") or "")
+        await state.clear()
+        if not sub_id or not old:
+            await message.answer("❌ اطلاعات ناقص است؛ از مدیریت اکانت دوباره شروع کنید.")
+            return
+        status_msg = await message.answer("⏳ در حال بروزرسانی رمز روی سرورها...")
+        try:
+            result = await request_fn(
+                "POST",
+                f"/v1/telegram/account-import/{message.from_user.id}/{sub_id}/change-password",
+                payload={"current_password": old, "new_password": value},
+                bot_auth=True,
+            )
+            protocols = ", ".join(result.get("updated_protocols") or [])
+            text_result = (
+                "✅ تغییر رمز انجام شد. پروتکل‌ها: " + escape(protocols)
+                if result.get("ok") else
+                "⚠️ تغییر رمز فقط روی بعضی سرورها انجام شده؛ پشتیبانی را مطلع کنید."
+            )
+            if result.get("warning"):
+                text_result += "\n⚠️ " + escape(str(result["warning"]))
+        except Exception as exc:
+            text_result = "❌ تغییر رمز تأیید نشد: " + escape(str(exc)[:160])
+        await status_msg.edit_text(
+            text_result,
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="⬅️ مدیریت اکانت",
+                    callback_data=f"subimp:{sub_id}",
+                )],
+            ]),
+        )
+
+    @router.callback_query(F.data.startswith("subimp:ask:password:"))
+    async def legacy_password_request(callback: CallbackQuery, state: FSMContext):
+        await import_change_password_start(callback, state)
 
     @router.callback_query(F.data.startswith("subimp:ask:"))
     async def import_request_prompt(callback: CallbackQuery):
