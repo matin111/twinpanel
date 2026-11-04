@@ -58,21 +58,27 @@ def test_stale_report_grace_preserves_only_last_verified_route() -> None:
     source = TUNNELS.read_text(encoding="utf-8")
     election = source.split("def _select_service_route_tunnel_ids(", 1)[1]
     assert_true(
-        "TWINPANEL_IRAN_ROUTE_STALE_REPORT_GRACE_V1" in election,
-        "a bounded stale-report route grace must protect busy Iran agents",
+        "TWINPANEL_IRAN_ROUTE_STALE_REPORT_GRACE_V2" in election,
+        "busy Iran Agent reports must use bounded physical health grace",
     )
     assert_true(
-        "current_id is not None" in election
-        and "active_member.last_healthy_at" in election,
-        "grace must require the previously selected verified carrier",
+        "active_member.last_healthy_at" in election
+        and "0 <= age <= 300" in election,
+        "route grace must require a recent confirmed physical carrier",
     )
     assert_true(
-        "0 <= age <= 300 and not fresh_hard_failure" in election,
-        "grace must be bounded and refuse fresh hard tunnel failures",
+        "current_id is None" in election
+        and "_service_route_selected[key] = int(candidate.id)" in election,
+        "restart with empty election cache must recover proven physical transport",
     )
     assert_true(
-        "selected_ids.add(int(previous.id))" in election,
-        "stale telemetry must not publish an empty route while grace holds",
+        "active_member.status or" in election
+        and "fresh_hard_failure" in election,
+        "new selection must be online and explicit fresh errors fail closed",
+    )
+    assert_true(
+        "selected_ids.add(int(candidate.id))" in election,
+        "stale telemetry must not drop verified selected service route",
     )
 
 
