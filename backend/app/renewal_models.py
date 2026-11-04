@@ -5,6 +5,8 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Column,
+    Table,
 )
 from sqlalchemy.orm import (
     Mapped,
@@ -12,6 +14,16 @@ from sqlalchemy.orm import (
 )
 
 from .database import Base
+
+# An explicit paid-renewal grant for an account that a Telegram user attached
+# by a valid share URL. This NEVER grants a password or ownership change.
+imported_renewal_authorizations = Table(
+    "telegram_imported_renewal_authorizations", Base.metadata,
+    Column("order_id", BigInteger, ForeignKey("store_orders.id", ondelete="CASCADE"), primary_key=True),
+    Column("subscription_id", BigInteger, ForeignKey("subscriptions.id"), nullable=False),
+    Column("payer_user_id", BigInteger, ForeignKey("users.id"), nullable=False),
+    Column("created_at", DateTime, default=datetime.utcnow, nullable=False),
+)
 
 
 class SubscriptionRenewalOrder(Base):
