@@ -30,12 +30,28 @@ router = APIRouter(
 )
 
 
+def _canonical_sms_sender(value: str) -> str:
+    """Normalize phone-number formatting only, not bank sender identities.
+
+    SMS providers may omit the leading + or send an Iranian number with 00
+    international prefix; preserve non-numeric shortcodes exactly.
+    """
+    normalized = str(value or "").strip().casefold().translate(
+        str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789")
+    )
+    if normalized.startswith("00") and normalized[2:].isdigit():
+        normalized = normalized[2:]
+    if normalized.startswith("+") and normalized[1:].isdigit():
+        normalized = normalized[1:]
+    return normalized
+
+
 def _allowed_senders(raw: str | None) -> set[str]:
-    text = str(raw or "").replace("\r", "\n")
+    text = str(raw or "").replace("\\r", "\\n")
     values: set[str] = set()
-    for line in text.split("\n"):
+    for line in text.split("\\n"):
         for part in line.split(","):
-            value = part.strip().casefold()
+            value = _canonical_sms_sender(part)
             if value:
                 values.add(value)
     return values
@@ -89,7 +105,7 @@ async def _handle_event(
     body = payload.message.strip()
     allowed = _allowed_senders(cfg.sms_allowed_senders)
 
-    if sender.casefold() not in allowed:
+    if _canonical_sms_sender(sender) not in allowed:
         db.commit()
         return {
             "ok": True,
@@ -119,7 +135,8 @@ async def _handle_event(
 
     # A delayed bank SMS must not settle a newer order with the same amount.
     # Reject stale/future messages, but retain the event for manual review.
-    if sms_time < now - timedelta(hours=3) or sms_time > now + timedelta(minutes=5):
+    window = _sms_match_window(now, sms_time)
+    if window is None:
         event.status = "outside_verification_window"
         db.commit()
         return {"ok": True, "auto_verified": False, "reason": "outside_verification_window", "amount_toman": amount}
