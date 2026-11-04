@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.572",
+  "version": "1.1.0-rc.573",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-04T22:22:43Z",
+  "released_at": "2026-11-04T23:04:41Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "3a6e4f1753ba9fe93f641aa035b03eb24132997c",
+  "source_sha": "d90335d861c2432202bcd8f7c0b78d8c6cf4fbcf",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.572/twinpanel-1.1.0-rc.572-linux-x86_64.tar.gz",
-    "sha256": "ab4799eee3c4897c7dc449ef35d778825c835a5164da02597ebd68c9781750f0",
-    "size_bytes": 28233870
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.573/twinpanel-1.1.0-rc.573-linux-x86_64.tar.gz",
+    "sha256": "e2c98f582a151314814c7889acd8c73fa1207a909fbb995dcfcf43989be0d20f",
+    "size_bytes": 28244132
   },
   "notes": {
-    "fa": "افزودن منوی کامل مدیریت اکانت‌های متصل‌شده با ساب‌لینک در ربات تلگرام: نمایش اطلاعات اشتراک، حجم و تاریخ انقضا، بروزرسانی، اتصال، درخواست تمدید و تغییر رمز از طریق پشتیبانی با بررسی مالکیت. نمایش ساب‌لینک و QR Code در یک پیام مشترک برای اشتراک‌های اصلی و واردشده. بدون تغییر در پروتکل‌ها، نودها یا تونل‌ها.",
-    "en": "Telegram My Accounts: expanded account management for link-attached subscriptions, read-only live status and usage, ownership-safe support requests for renewal/password changes; unified subscription URL and its matching QR in one photo/caption for both owned and imported accounts. No tunnel, protocol, billing, or credential changes."
+    "fa": "دسته‌بندی مستقل نوع اشتراک پیش از تعداد کاربران در فروشگاه، با آیکن‌های رنگی اشتراک ویتوری، ویژه و سایر انواع. رنگی‌شدن آیکن‌های دسته‌بندی قدیمی تعداد کاربران؛ پشتیبانی از «کاربر نامحدود» برای مقدار صفر در نمایش، ایجاد پلن و محدودیت هم‌زمان دستگاه، با حفظ دسته‌بندی‌های قبلی. اصلاح خطاهای TypeScript و ثبت تکراری دسته‌بندی‌ها. همه ۲۰ تست CI موفق.",
+    "en": "Independent colored subscription type selector before user-count tabs, colored legacy user-count icons, zero=unlimited-user behavior across store/admin/backend with preserved historical categories. Fix TypeScript build and duplicate category assignment in plan create. All 20 feature CI checks passed."
   }
 }
