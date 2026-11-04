@@ -123,12 +123,13 @@ def install(router, request_fn):
             f"📶 حجم باقی‌مانده: {remaining} گیگابایت\n"
             f"📱 سقف دستگاه: {escape(devices)}\n\n"
             "🔗 ساب‌لینک و QR Code در دکمه زیر با هم نمایش داده می‌شوند.\n\n"
-            "برای تمدید این اکانتِ واردشده، ابتدا مالکیت بررسی می‌شود؛ "
-            "تا زمان تأیید مالک و پرداخت، هیچ تمدیدی انجام نمی‌شود. "
-            "درخواست تغییر رمز نیز از مسیر پشتیبانی بررسی می‌شود."
+            ("این اکانت متعلق به حساب شماست و تمدید از مسیر پرداخت انجام می‌شود. "
+             if info.get("can_direct_renew") else
+             "برای تمدید اکانت واردشده، ابتدا مالکیت بررسی می‌شود؛ تا زمان تأیید مالک و پرداخت تمدیدی انجام نمی‌شود. ")
+            + "تغییر رمز از مسیر پشتیبانی بررسی می‌شود."
         )
 
-    def _management_keyboard(sub_id):
+    def _management_keyboard(sub_id, info):
         return InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(
                 text="🔗 ساب‌لینک + QR Code", callback_data=f"subimp:link:{sub_id}",
@@ -136,7 +137,10 @@ def install(router, request_fn):
             )],
             [
                 InlineKeyboardButton(
-                    text="♻️ تمدید اکانت", callback_data=f"subimp:ask:renew:{sub_id}",
+                    text="♻️ تمدید اکانت", callback_data=(
+                        f"subrenew:{sub_id}" if info.get("can_direct_renew")
+                        else f"subimp:ask:renew:{sub_id}"
+                    ),
                 ),
                 InlineKeyboardButton(
                     text="🔐 درخواست تغییر رمز", callback_data=f"subimp:ask:password:{sub_id}",
@@ -206,6 +210,9 @@ def install(router, request_fn):
         except Exception as exc:
             await callback.answer(str(exc)[:180], show_alert=True)
             return
+        if kind == "renew" and info.get("can_direct_renew"):
+            await callback.answer("از مسیر تمدید مستقیم اکانت استفاده کنید.", show_alert=True)
+            return
         await callback.answer()
         title = "تمدید" if kind == "renew" else "تغییر رمز"
         if callback.message:
@@ -241,6 +248,9 @@ def install(router, request_fn):
         title = "تمدید" if kind == "renew" else "تغییر رمز"
         try:
             info = await _read_import(callback, sub_id)
+            if kind == "renew" and info.get("can_direct_renew"):
+                await callback.answer("از مسیر تمدید مستقیم اکانت استفاده کنید.", show_alert=True)
+                return
             from .telegram_support_bot import _user_token
             token = await _user_token(request_fn, callback.from_user.id)
             ticket = await request_fn(
@@ -289,7 +299,7 @@ def install(router, request_fn):
         if callback.message:
             try:
                 await callback.message.edit_text(
-                    _details_text(info), reply_markup=_management_keyboard(sub_id),
+                    _details_text(info), reply_markup=_management_keyboard(sub_id, info),
                 )
             except Exception as exc:
                 # Telegram returns "message is not modified" when counters
@@ -309,5 +319,5 @@ def install(router, request_fn):
         if callback.message:
             await callback.message.edit_text(
                 _details_text(info),
-                reply_markup=_management_keyboard(sub_id),
+                reply_markup=_management_keyboard(sub_id, info),
             )
