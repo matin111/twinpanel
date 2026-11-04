@@ -6,6 +6,8 @@ Importing a subscription never transfers ownership, changes the plan, or
 grants access to customer management/renewal endpoints.
 """
 from datetime import datetime
+import hmac
+import re
 import secrets
 from urllib.parse import urlsplit
 import re
@@ -31,6 +33,11 @@ imported_accounts = Table(
     Column("subscription_id", BigInteger, ForeignKey("subscriptions.id", ondelete="CASCADE"), primary_key=True),
     Column("created_at", DateTime, nullable=False, default=datetime.utcnow),
 )
+
+
+class ImportedPasswordChangeRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=6, max_length=64)
 
 
 class ImportedRenewOrderRequest(BaseModel):
@@ -289,3 +296,68 @@ def create_imported_renewal_order(
     result["renewal"] = True
     result["renew_subscription_id"] = sub.id
     return result
+
+
+@router.post("/{telegram_id}/{subscription_id}/change-password", dependencies=[Depends(bot_guard)])
+async def change_imported_account_password(
+    telegram_id: int,
+    subscription_id: int,
+    payload: ImportedPasswordChangeRequest,
+    db: Session = Depends(get_db),
+):
+    """Change shared Cisco/L2TP password only after proving the current secret.
+
+    A sublink alone never authorizes a credential rotation.
+    """
+    from .telegram_account_link_lookup import _guard_attempts, _record_failure, _clear_failures
+    from ..models import SubscriptionProtocol
+
+    _authorized_chat(db, telegram_id)
+    _ensure_table(db)
+    membership = db.execute(select(imported_accounts.c.subscription_id).where(
+        imported_accounts.c.telegram_id == telegram_id,
+        imported_accounts.c.subscription_id == subscription_id,
+    )).first()
+    if membership is None:
+        raise HTTPException(status_code=404, detail="اکانت در فهرست شما پیدا نشد")
+    _guard_attempts(telegram_id)
+    sub = db.get(Subscription, subscription_id)
+    if sub is None or not hmac.compare_digest(
+        str(sub.account_password_encrypted or "").encode("utf-8"),
+        str(payload.current_password).encode("utf-8"),
+    ):
+        _record_failure(telegram_id)
+        raise HTTPException(status_code=403, detail="رمز فعلی اکانت صحیح نیست")
+    if not re.fullmatch(r"[A-Za-z0-9._@#%+=:-]{6,64}", payload.new_password):
+        raise HTTPException(status_code=422, detail="رمز جدید باید ۶ تا ۶۴ کاراکتر انگلیسی مجاز باشد")
+    if hmac.compare_digest(payload.current_password, payload.new_password):
+        raise HTTPException(status_code=409, detail="رمز جدید باید با رمز فعلی متفاوت باشد")
+    selected = {
+        str(row[0]).lower()
+        for row in db.query(SubscriptionProtocol.protocol).filter(
+            SubscriptionProtocol.subscription_id == sub.id,
+            SubscriptionProtocol.protocol.in_(["cisco", "l2tp"]),
+        ).all()
+    }
+    if not selected:
+        raise HTTPException(status_code=409, detail="تغییر رمز مشترک فقط برای Cisco و L2TP پشتیبانی می‌شود")
+    _clear_failures(telegram_id)
+
+    # Use the existing credential provisioner; never claim that nodes are
+    # updated if provisioning reports a failure.
+    previous = sub.account_password_encrypted
+    sub.account_password_encrypted = payload.new_password
+    db.flush()
+    from .account_delivery import refresh_simple_passwords
+    try:
+        result = await refresh_simple_passwords(subscription_id=sub.id, db=db)
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=502, detail="بروزرسانی رمز سرورها ناموفق بود؛ دوباره تلاش کنید")
+    errors = list(result.get("errors") or [])
+    updated = list(result.get("updated_protocols") or [])
+    return {
+        "ok": bool(result.get("ok") and not errors),
+        "updated_protocols": updated,
+        "warning": "بعضی سرورها هنوز بروزرسانی نشده‌اند" if errors else None,
+    }
