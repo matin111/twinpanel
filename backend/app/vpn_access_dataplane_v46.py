@@ -301,8 +301,8 @@ async def _reconcile_node(node_id: int) -> None:
         )
 
         subnets = sorted(
-            _PROTOCOL_SUBNETS[name]
-            for name in protocols
+            [_PROTOCOL_SUBNETS[name] for name in protocols]
+            + (["10.96.0.0/21"] if "wireguard" in protocols else [])
         )
 
         conn = await ssh_connect_saved(
