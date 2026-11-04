@@ -74,7 +74,7 @@ def _plan_payload(db: Session, plan: Plan) -> dict:
         "sort_order": _plan_sort_order(db, int(plan.id)),
         "duration_days": int(plan.duration_days or 0),
         "traffic_gb": int(plan.traffic_gb or 0),
-        "device_limit": int(plan.device_limit or 1),
+        "device_limit": int(plan.device_limit if plan.device_limit is not None else 1),
         "price_toman": int(plan.price_toman or 0),
         "is_active": bool(plan.is_active),
         "enable_cisco": bool(plan.enable_cisco),
