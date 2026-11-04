@@ -57,7 +57,7 @@ export function planTypeCounts<T extends CategoryPlan>(plans:T[]){
   return plans.reduce<Record<string,number>>((counts,plan)=>{const type=normalizePlanType(plan.subscription_type);counts[type]=(counts[type]||0)+1;return counts;},{});
 }
 export function filterPlansByType<T extends CategoryPlan>(plans:T[],type:string){
-  return type?plans.filter(plan=>normalizePlanType(plan.category)===type):plans;
+  return type?plans.filter(plan=>normalizePlanType(plan.subscription_type)===type):plans;
 }
 function planTypeAppearance(name:string,index:number){
   if(/ویتوری|v2ray|xray|v2/i.test(name))return {symbol:"⚡",accent:"#8b5cf6",tint:"rgba(139,92,246,.18)"};
@@ -66,6 +66,18 @@ function planTypeAppearance(name:string,index:number){
   if(/گیم|gaming|game/i.test(name))return {symbol:"🎮",accent:"#f43f5e",tint:"rgba(244,63,94,.17)"};
   const symbols=["◈","✧","⬡","✿"],accents=["#3b82f6","#d946ef","#14b8a6","#fb923c"];
   return {symbol:symbols[index%symbols.length],accent:accents[index%accents.length],tint:"rgba(148,163,184,.12)"};
+}
+
+function userCountAppearance(category:string,index:number){
+  if(category.includes("نامحدود"))return {color:"#f59e0b",background:"rgba(245,158,11,.18)"};
+  const palette=[
+    {color:"#22c55e",background:"rgba(34,197,94,.18)"},
+    {color:"#38bdf8",background:"rgba(56,189,248,.18)"},
+    {color:"#a78bfa",background:"rgba(167,139,250,.18)"},
+    {color:"#f472b6",background:"rgba(244,114,182,.18)"},
+    {color:"#fb923c",background:"rgba(251,146,60,.18)"},
+  ];
+  return palette[index%palette.length];
 }
 
 function UserIcon(){
@@ -159,14 +171,16 @@ function Tabs({categories,active,onChange,counts,template,planTypes:types,active
       const count=counts?.[category]??0;
       const editorial=template==="editorial";
       const orbit=template==="orbit";
+      const accent=userCountAppearance(category,index);
       return <button key={category} type="button" aria-pressed={selected} onClick={()=>onChange(category)} style={buttonStyle(template,selected)}>
         {editorial&&<span style={{fontSize:10,fontWeight:800,letterSpacing:".12em",opacity:.45,alignSelf:"flex-start",paddingTop:3}}>{String(index+1).padStart(2,"0")}</span>}
         <span style={{
           width:editorial?34:42,height:editorial?34:42,borderRadius:orbit?14:editorial?0:13,
           display:"inline-flex",alignItems:"center",justifyContent:"center",flex:"0 0 auto",
-          background:editorial?"transparent":selected?"rgba(255,255,255,.14)":"rgba(127,127,127,.08)",
-          border:editorial?"0":"1px solid rgba(255,255,255,.08)",
-          color:editorial&&selected?"var(--brand-primary)":"inherit",
+          background:accent.background,
+          border:editorial?"0":"1px solid "+accent.color,
+          color:accent.color,
+          boxShadow:selected?"0 0 0 2px "+accent.background:"none",
         }}><UserIcon/></span>
         <span style={{display:"flex",flexDirection:"column",gap:4,minWidth:0,flex:1}}>
           {orbit&&<small style={{fontSize:9.5,fontWeight:800,letterSpacing:".14em",opacity:.52}}>ACCESS TIER</small>}
