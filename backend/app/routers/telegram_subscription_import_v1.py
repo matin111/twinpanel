@@ -1,0 +1,145 @@
+from __future__ import annotations
+
+"""Telegram-only read-only imports of existing subscriptions by share URL.
+
+Importing a subscription never transfers ownership, changes the plan, or
+grants access to customer management/renewal endpoints.
+"""
+from datetime import datetime
+from urllib.parse import urlsplit
+import hmac
+import re
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Table, select, and_
+from sqlalchemy.orm import Session
+
+from ..database import Base, get_db
+from ..models import Subscription
+from ..telegram_models import TelegramUserLink
+from .telegram_bot import bot_guard
+
+router = APIRouter(prefix="/v1/telegram/account-import", tags=["telegram-account-import"])
+imported_accounts = Table(
+    "telegram_imported_accounts",
+    Base.metadata,
+    Column("telegram_id", BigInteger, primary_key=True),
+    Column("subscription_id", BigInteger, ForeignKey("subscriptions.id", ondelete="CASCADE"), primary_key=True),
+    Column("created_at", DateTime, nullable=False, default=datetime.utcnow),
+)
+
+
+class ImportRequest(BaseModel):
+    telegram_id: int = Field(gt=0)
+    subscription_link: str = Field(min_length=15, max_length=2048)
+
+
+def _ensure_table(db: Session) -> None:
+    # Additive table for a bot feature; no existing subscription schema modified.
+    imported_accounts.create(bind=db.get_bind(), checkfirst=True)
+
+
+def _authorized_chat(db: Session, telegram_id: int) -> None:
+    if db.get(TelegramUserLink, telegram_id) is None:
+        raise HTTPException(status_code=403, detail="ابتدا حساب تلگرام را به پنل متصل کنید")
+
+
+def _extract_token(db: Session, url: str) -> str:
+    value = str(url or "").strip()
+    parts = urlsplit(value)
+    if parts.scheme != "https" or not parts.hostname or parts.username or parts.password or parts.port:
+        raise HTTPException(status_code=422, detail="لینک باید آدرس HTTPS معتبر سابلینک باشد")
+
+    from .account_delivery import subscription_base_url
+    from urllib.parse import urlsplit as parse_base
+    allowed = parse_base(str(subscription_base_url(db) or "")).hostname
+    if not allowed or parts.hostname.lower() != allowed.lower():
+        raise HTTPException(status_code=422, detail="فقط سابلینک معتبر همین پنل پذیرفته می‌شود")
+
+    match = re.fullmatch(r"/v1/connect/([A-Za-z0-9_-]{6,220})/?", parts.path)
+    if not match or parts.fragment:
+        raise HTTPException(status_code=422, detail="لینک اصلی اشتراک را ارسال کنید، نه لینک یک پروتکل")
+    return match.group(1)
+
+
+def _row(db: Session, sub: Subscription) -> dict:
+    from .account_delivery import _share_url
+    return {
+        "id": int(sub.id),
+        "account_username": str(sub.account_username or f"account-{sub.id}"),
+        "status": getattr(sub.status, "value", str(sub.status)),
+        "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+        "traffic_limit_gb": round(sub.traffic_limit_bytes / (1024**3), 2),
+        "traffic_used_gb": round(sub.traffic_used_bytes / (1024**3), 2),
+        "subscription_link": str(_share_url(db, sub)),
+        "imported": True,
+    }
+
+
+@router.post("/add", dependencies=[Depends(bot_guard)])
+def add_import(payload: ImportRequest, db: Session = Depends(get_db)):
+    _authorized_chat(db, payload.telegram_id)
+    from .account_delivery import _subscription_from_share_token
+
+    token = _extract_token(db, payload.subscription_link)
+    # Existing verifier handles persistent + signed tokens and rejects expiry.
+    sub = _subscription_from_share_token(token, db)
+    _ensure_table(db)
+    if db.execute(
+        select(imported_accounts.c.subscription_id).where(
+            imported_accounts.c.telegram_id == payload.telegram_id,
+            imported_accounts.c.subscription_id == sub.id,
+        )
+    ).first():
+        return {"ok": True, "already_added": True, "account": _row(db, sub)}
+    db.execute(imported_accounts.insert().values(
+        telegram_id=payload.telegram_id,
+        subscription_id=sub.id,
+        created_at=datetime.utcnow(),
+    ))
+    db.commit()
+    return {"ok": True, "already_added": False, "account": _row(db, sub)}
+
+
+@router.get("/mine/{telegram_id}", dependencies=[Depends(bot_guard)])
+def list_imports(telegram_id: int, db: Session = Depends(get_db)):
+    _authorized_chat(db, telegram_id)
+    _ensure_table(db)
+    rows = db.execute(
+        select(Subscription).join(
+            imported_accounts,
+            imported_accounts.c.subscription_id == Subscription.id,
+        ).where(imported_accounts.c.telegram_id == telegram_id)
+        .order_by(imported_accounts.c.created_at.desc())
+        .limit(50)
+    ).scalars().all()
+    return [_row(db, sub) for sub in rows]
+
+
+@router.get("/{telegram_id}/{subscription_id}", dependencies=[Depends(bot_guard)])
+def get_import(telegram_id: int, subscription_id: int, db: Session = Depends(get_db)):
+    _authorized_chat(db, telegram_id)
+    _ensure_table(db)
+    found = db.execute(select(imported_accounts.c.subscription_id).where(
+        imported_accounts.c.telegram_id == telegram_id,
+        imported_accounts.c.subscription_id == subscription_id,
+    )).first()
+    if found is None:
+        raise HTTPException(status_code=404, detail="اکانت در فهرست شما پیدا نشد")
+    sub = db.get(Subscription, subscription_id)
+    if sub is None:
+        raise HTTPException(status_code=404, detail="اکانت موجود نیست")
+    return _row(db, sub)
+
+
+@router.delete("/{telegram_id}/{subscription_id}", dependencies=[Depends(bot_guard)])
+def remove_import(telegram_id: int, subscription_id: int, db: Session = Depends(get_db)):
+    _authorized_chat(db, telegram_id)
+    _ensure_table(db)
+    db.execute(imported_accounts.delete().where(
+        imported_accounts.c.telegram_id == telegram_id,
+        imported_accounts.c.subscription_id == subscription_id,
+    ))
+    db.commit()
+    return {"ok": True}
