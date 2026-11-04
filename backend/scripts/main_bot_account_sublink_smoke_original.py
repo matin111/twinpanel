@@ -53,7 +53,7 @@ assert "main_runtime.main_keyboard = _main_menu_keyboard" in wrapper
 assert "live_button_styles()" in wrapper
 assert "callback_data=\"subs:list\"" in wrapper
 assert "callback_data=_base.ACCOUNT_LINK_CALLBACK" in wrapper
-assert "callback_data=\"main:home\"" in wrapper
+assert "MAIN_HOME_CALLBACK" in wrapper
 assert "reseller_request_conditions" in wrapper
 assert "install_subscription_ui(main_runtime)" in wrapper
 
