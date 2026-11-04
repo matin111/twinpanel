@@ -690,6 +690,42 @@ async def _ensure_modern_xray(
     if bool(state.get("tls_enabled")):
         available_profiles.extend([PROFILE_WS, PROFILE_HTTPUPGRADE])
 
+    # Reuse installed Xray listeners instead of rebuilding ports used by sing-box.
+    check_script = (
+        "python3 - <<'PYXRAYCHECK'\n"
+        "import json\n"
+        "doc=json.load(open('/usr/local/etc/xray/config.json'))\n"
+        "tags={str(i.get('tag')):i for i in doc.get('inbounds',[]) "
+        "if isinstance(i,dict)}\n"
+        "required={'vless-in','vless-xhttp-reality','vless-grpc-reality'}\n"
+        "ok=required.issubset(tags) and all("
+        "tags[k].get('protocol')=='vless' for k in required)\n"
+        "print(json.dumps({'ready':bool(ok),"
+        "'base_port':tags.get('vless-in',{}).get('port'),"
+        "'tags':list(tags)}))\n"
+        "PYXRAYCHECK"
+    )
+    raw = await provision.cmd(conn, check_script, check=False)
+    try:
+        installed = json.loads(raw.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        installed = {}
+    if (
+        installed.get("ready")
+        and int(installed.get("base_port") or 0) == base_port
+        and await provision.active(conn, "xray")
+    ):
+        installed_tags = set(installed.get("tags") or [])
+        installed_profiles = [PROFILE_XHTTP, PROFILE_GRPC]
+        if state.get("tls_enabled"):
+            if "vless-ws-tls" in installed_tags:
+                installed_profiles.append(PROFILE_WS)
+            if "vless-httpupgrade-tls" in installed_tags:
+                installed_profiles.append(PROFILE_HTTPUPGRADE)
+        state["available_profiles"] = installed_profiles
+        state["base_port"] = base_port
+        return state
+
     candidate_ports = [base_port] + [
         _target_port(base_port, profile)
         for profile in available_profiles
