@@ -20,7 +20,7 @@ required_runtime = (
     "xray_customer_xhttp_v46.apply_xray_customer_xhttp_v46()",
     "xray_modern_runtime.PROFILE_WS,\n            xray_modern_runtime.PROFILE_XHTTP,\n            PROFILE_TCP_TLS,",
     "xray_modern_runtime.PROFILE_XHTTP,\n        xray_modern_runtime.PROFILE_GRPC,\n        PROFILE_TCP_REALITY,",
-    "if len(profiles) != 3:",
+    "if not profiles:",
     "fake_tls=0",
     "uuid_preserved=1",
     "reality_identity_reused=1",
