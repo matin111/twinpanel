@@ -5,7 +5,7 @@ import {createPortal} from "react-dom";
 
 export const DEFAULT_PLAN_CATEGORY="۱ کاربره";
 
-type CategoryPlan={device_limit?:number|null;category?:string|null};
+type CategoryPlan={device_limit?:number|null;subscription_type?:string|null};
 type TemplateKind="conversion"|"editorial"|"orbit"|"panel";
 
 type Props={
@@ -50,11 +50,11 @@ export function filterPlansByCategory<T extends CategoryPlan>(plans:T[],category
 }
 
 
-export const DEFAULT_PLAN_TYPE="سایر پلن‌ها";
+export const DEFAULT_PLAN_TYPE="اشتراک عمومی";
 export function normalizePlanType(value:unknown){return String(value||"").trim()||DEFAULT_PLAN_TYPE;}
-export function planTypes<T extends CategoryPlan>(plans:T[]){return [...new Set(plans.map(plan=>normalizePlanType(plan.category)))];}
+export function planTypes<T extends CategoryPlan>(plans:T[]){return [...new Set(plans.map(plan=>normalizePlanType(plan.subscription_type)))];}
 export function planTypeCounts<T extends CategoryPlan>(plans:T[]){
-  return plans.reduce<Record<string,number>>((counts,plan)=>{const type=normalizePlanType(plan.category);counts[type]=(counts[type]||0)+1;return counts;},{});
+  return plans.reduce<Record<string,number>>((counts,plan)=>{const type=normalizePlanType(plan.subscription_type);counts[type]=(counts[type]||0)+1;return counts;},{});
 }
 export function filterPlansByType<T extends CategoryPlan>(plans:T[],type:string){
   return type?plans.filter(plan=>normalizePlanType(plan.category)===type):plans;
