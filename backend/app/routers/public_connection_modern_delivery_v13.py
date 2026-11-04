@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import ProtocolCredential, SubscriptionProtocol
-from .account_delivery import _public_payload, _subscription_from_share_token
+from .account_delivery import _public_payload, _subscription_from_share_token, _autosync_credential_items
 
 
 router = APIRouter(tags=["public-connection-modern-delivery-v13"])
@@ -146,10 +146,17 @@ def _credential_state(db: Session, subscription_id: int, protocol: str, *, activ
         .first()
     )
     if cred is None:
-        return "در انتظار ساخت کانفیگ"
+        return (
+            "اطلاعات حساب آماده است؛ فایل اتصال در حال ساخت است"
+            if protocol in CLASSIC_PROTOCOLS
+            else "در انتظار ساخت کانفیگ"
+        )
     if not bool(getattr(cred, "is_active", False)):
         return "پروتکل برای این اشتراک غیرفعال است"
-    return "Credential ساخته شده؛ مسیر Runtime هنوز آماده تحویل نیست"
+    stored_items = _autosync_credential_items(cred)
+    if not stored_items:
+        return "اطلاعات حساب ثبت شده؛ فایل اتصال هنوز ساخته نشده است"
+    return "کانفیگ ثبت شده؛ مسیر اتصال قابل تحویل هنوز تأیید نشده است"
 
 
 def _sudoku_uri(item: dict[str, Any]) -> str:
