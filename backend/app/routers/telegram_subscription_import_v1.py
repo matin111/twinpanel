@@ -7,12 +7,11 @@ grants access to customer management/renewal endpoints.
 """
 from datetime import datetime
 from urllib.parse import urlsplit
-import hmac
 import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Table, select, and_
+from sqlalchemy import BigInteger, Column, DateTime, ForeignKey, Table, select
 from sqlalchemy.orm import Session
 
 from ..database import Base, get_db
@@ -85,6 +84,9 @@ def add_import(payload: ImportRequest, db: Session = Depends(get_db)):
     token = _extract_token(db, payload.subscription_link)
     # Existing verifier handles persistent + signed tokens and rejects expiry.
     sub = _subscription_from_share_token(token, db)
+    telegram_link = db.get(TelegramUserLink, payload.telegram_id)
+    if telegram_link and int(sub.user_id) == int(telegram_link.user_id):
+        return {"ok": True, "already_added": True, "account": _row(db, sub)}
     _ensure_table(db)
     if db.execute(
         select(imported_accounts.c.subscription_id).where(
