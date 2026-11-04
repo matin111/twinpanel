@@ -2256,6 +2256,12 @@ async def sync_installed_node_to_subscriptions(
         .all()
     )
 
+    # Load existing memberships once, instead of a query per subscriber.
+    existing_member_ids = {
+        int(subscription_id)
+        for (subscription_id,) in db.query(SubscriptionNode.subscription_id)
+        .filter(SubscriptionNode.node_id == int(node.id)).all()
+    }
     membership_added = 0
     compatibility_updated = 0
 
@@ -2265,29 +2271,14 @@ async def sync_installed_node_to_subscriptions(
 
     for sub in all_subscriptions:
 
-        membership = (
-            db.query(
-                SubscriptionNode
-            )
-            .filter(
-                SubscriptionNode.subscription_id
-                == sub.id,
-
-                SubscriptionNode.node_id
-                == node.id,
-            )
-            .first()
-        )
-
-        if not membership:
-
+        if int(sub.id) not in existing_member_ids:
             db.add(
                 SubscriptionNode(
                     subscription_id=sub.id,
                     node_id=node.id,
                 )
             )
-
+            existing_member_ids.add(int(sub.id))
             membership_added += 1
 
         if node_type == "exit":
@@ -2412,14 +2403,19 @@ async def sync_installed_node_to_subscriptions(
             "enable_v2ray",
     }
 
+    # Do not provision expired or quota-exhausted accounts.
+    # A zero traffic limit means unlimited, matching the quota service.
+    now_utc = datetime.utcnow()
     active_ids = [
         int(sub.id)
         for sub in all_subscriptions
         if (
-            _autosync_enum_value(
-                sub.status
+            _autosync_enum_value(sub.status) == "active"
+            and (sub.expires_at is None or sub.expires_at > now_utc)
+            and (
+                int(sub.traffic_limit_bytes or 0) <= 0
+                or int(sub.traffic_used_bytes or 0) < int(sub.traffic_limit_bytes)
             )
-            == "active"
         )
     ]
 
