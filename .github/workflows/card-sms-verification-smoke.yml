@@ -1,0 +1,29 @@
+name: Card SMS Auto Verification Safety Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/wallet_sms_reader.py"
+      - "backend/app/routers/sms_reader_dashboard.py"
+      - "backend/tests/test_card_sms_matching_window_v1.py"
+      - ".github/workflows/card-sms-verification-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/routers/wallet_sms_reader.py"
+      - "backend/app/routers/sms_reader_dashboard.py"
+      - "backend/tests/test_card_sms_matching_window_v1.py"
+      - ".github/workflows/card-sms-verification-smoke.yml"
+
+jobs:
+  card-sms-safety:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test runner
+        run: python -m pip install pytest
+      - name: Test bank SMS timing and manual-review guards
+        run: python -m pytest -q backend/tests/test_card_sms_matching_window_v1.py
