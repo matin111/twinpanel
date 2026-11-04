@@ -86,6 +86,7 @@ async def _handle_event(
         }
 
     amount = parse_sms_amount_toman(body)
+    sms_time = parse_received_at(payload.received_at, now)
     message_hash = sha(sender + "\n" + body)
     nonce = f"reader:{device.id}:" + sha(message_id)[:64]
 
@@ -96,12 +97,19 @@ async def _handle_event(
         message_hash=message_hash,
         sender=sender,
         body=body,
-        received_at=parse_received_at(payload.received_at, now),
+        received_at=sms_time,
         parsed_amount_toman=amount,
         status="received",
     )
     db.add(event)
     db.flush()
+
+    # A delayed bank SMS must not settle a newer order with the same amount.
+    # Reject stale/future messages, but retain the event for manual review.
+    if sms_time < now - timedelta(hours=3) or sms_time > now + timedelta(minutes=5):
+        event.status = "outside_verification_window"
+        db.commit()
+        return {"ok": True, "auto_verified": False, "reason": "outside_verification_window", "amount_toman": amount}
 
     if not cfg.sms_auto_verify:
         event.status = "manual_review"
@@ -113,7 +121,8 @@ async def _handle_event(
         db.commit()
         return {"ok": True, "auto_verified": False, "reason": "amount_not_found"}
 
-    since = now - timedelta(hours=3)
+    since = max(now - timedelta(hours=3), sms_time - timedelta(hours=3))
+    latest = sms_time + timedelta(minutes=2)
 
     payment_matches = (
         db.query(PaymentIntent)
@@ -122,6 +131,7 @@ async def _handle_event(
             PaymentIntent.payable_amount_toman == amount,
             PaymentIntent.status.in_(ACTIVE_STATUSES),
             PaymentIntent.created_at >= since,
+            PaymentIntent.created_at <= latest,
         )
         .order_by(PaymentIntent.id.desc())
         .all()
@@ -134,6 +144,7 @@ async def _handle_event(
             CustomerWalletTopup.payable_amount_toman == amount,
             CustomerWalletTopup.status.in_(("pending_payment", "awaiting_review")),
             CustomerWalletTopup.created_at >= since,
+            CustomerWalletTopup.created_at <= latest,
         )
         .order_by(CustomerWalletTopup.id.desc())
         .all()
