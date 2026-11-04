@@ -22,9 +22,18 @@ PROTOCOLS=(PROTOCOL,)
 PER_NODE=int(os.getenv('CLASSIC_DIRECT_BATCH_PER_NODE','3'))
 NODE_IDS=tuple(int(x) for x in os.getenv('CLASSIC_DIRECT_NODE_IDS','6').split(','))
 def healthy():
-    try:
-        with urllib.request.urlopen("http://127.0.0.1:8095/health/ready",timeout=6) as r:return r.status==200
-    except Exception:return False
+    # An overloaded API can miss one readiness probe without being down.
+    # Wait through transient congestion before stopping credential writes.
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen("http://127.0.0.1:8095/health/ready",timeout=7) as r:
+                if r.status == 200:
+                    return True
+        except Exception:
+            pass
+        if attempt < 3:
+            time.sleep(2)
+    return False
 async def one_node(db,node_id):
     node=db.get(Node,node_id)
     now=datetime.utcnow()
