@@ -66,7 +66,7 @@ class PlanCreate(BaseModel):
     description: str | None = Field(default=None, max_length=500)
     duration_days: int = Field(gt=0)
     traffic_gb: int = Field(ge=0)
-    device_limit: int = Field(default=1, gt=0)
+    device_limit: int = Field(default=1, ge=0)
     price_toman: int = Field(ge=0)
     is_active: bool = True
     enable_cisco: bool = True
@@ -81,7 +81,7 @@ class PlanUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=500)
     duration_days: int | None = Field(default=None, gt=0)
     traffic_gb: int | None = Field(default=None, ge=0)
-    device_limit: int | None = Field(default=None, gt=0)
+    device_limit: int | None = Field(default=None, ge=0)
     price_toman: int | None = Field(default=None, ge=0)
     is_active: bool | None = None
     enable_cisco: bool | None = None
