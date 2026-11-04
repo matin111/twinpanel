@@ -10,6 +10,9 @@ on:
       - "backend/app/routers/telegram_subscription_import_v1.py"
       - "backend/app/routers/__init__.py"
       - "backend/scripts/telegram_account_sublink_import_v1_smoke.py"
+      - "backend/app/renewal_service.py"
+      - "backend/app/renewal_models.py"
+      - "backend/scripts/telegram_imported_direct_renewal_v1_smoke.py"
       - "backend/app/telegram_main_extensions.py"
       - "backend/app/telegram_guides_bot.py"
       - "backend/app/telegram_runtime_bot.py"
@@ -41,6 +44,9 @@ jobs:
 
       - name: Validate imported account management actions
         run: python backend/scripts/imported_account_management_v2_smoke.py
+
+      - name: Verify imported paid renewal and browser instructions
+        run: python backend/scripts/telegram_imported_direct_renewal_v1_smoke.py
 
       - name: Verify unified sublink and QR in one Telegram message
         run: python backend/scripts/telegram_combined_sublink_qr_v1_smoke.py
