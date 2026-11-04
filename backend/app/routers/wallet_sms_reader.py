@@ -46,8 +46,7 @@ def _sms_match_window(now: datetime, sms_time: datetime) -> tuple[datetime, date
 
     Allow small clock skew, never settle a new order using a past deposit.
     """
-    window = _sms_match_window(now, sms_time)
-    if window is None:
+    if sms_time < now - timedelta(hours=3) or sms_time > now + timedelta(minutes=5):
         return None
     return (
         max(now - timedelta(hours=3), sms_time - timedelta(hours=3)),
