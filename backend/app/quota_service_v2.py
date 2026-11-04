@@ -88,7 +88,7 @@ def open_session(db: Session, node_id: int, data: SessionOpenIn) -> dict:
         or 0
     )
 
-    if active_count >= max_sessions:
+    if max_sessions > 0 and active_count >= max_sessions:
         raise HTTPException(status_code=409, detail="concurrent_session_limit")
 
     # First successful VPN session starts the clock. V2 unlimited-time
