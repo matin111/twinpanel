@@ -292,6 +292,7 @@ def create_plan(raw: dict = Body(...), db: Session = Depends(get_db)):
     db.add(plan)
     db.flush()
     _set_plan_category(db, int(plan.id), raw.get("category"))
+    db.flush()  # Reuse the category assignment when setting the independent type.
     _set_plan_subscription_type(db, int(plan.id), raw.get("subscription_type"))
     assignment = _plan_assignment(db, int(plan.id))
     if assignment is not None:
@@ -338,6 +339,7 @@ def update_plan(
 
     if "category" in raw:
         _set_plan_category(db, int(plan.id), raw.get("category"))
+        db.flush()  # Prevent a second pending assignment for the same plan.
     if "subscription_type" in raw:
         _set_plan_subscription_type(db, int(plan.id), raw.get("subscription_type"))
 
