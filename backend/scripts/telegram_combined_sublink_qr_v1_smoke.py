@@ -22,7 +22,7 @@ assert "await send_subscription_link_and_qr(" in imported
 assert "🔗 ساب‌لینک + QR Code" in owned
 assert "🔗 ساب‌لینک + QR Code" in imported
 assert "subimp:refresh:" in imported
-assert "subimp:ask:renew:" in imported
+assert "subimp:renew:" in imported
 assert "subimp:ask:password:" in imported
 
 # Functional check: the helper sends exactly one photo with a caption that
