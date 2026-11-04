@@ -125,13 +125,13 @@ def test_typed_user_counts_and_colored_legacy_category_buttons_preserve_navigati
         {"id": 37, "subscription_type": "اشتراک ویژه", "category": "💎 پلن حرفه‌ای ۲ ماهه", "device_limit": 2},
         {"id": 10, "subscription_type": "اشتراک عمومی", "category": "یک ماهه", "device_limit": 1},
     ]
-    _type, special = subscription_type_plans(plans, 0)
+    special_index = subscription_types(plans).index("اشتراک ویژه")
+    _type, special = subscription_type_plans(plans, special_index)
     assert "🟢" in user_count_icon(1)
     assert "🔵" in user_count_icon(2)
     assert "♾️" in user_count_icon(0)
     assert "📂" in category_icon("یک ماهه", 0)
     assert "💎" in category_icon("پلن ویژه", 0)
-    special_index = subscription_types(plans).index("اشتراک ویژه")
     typed_users = user_counts_keyboard(special, type_index=special_index)
     assert typed_users.inline_keyboard[0][0].callback_data == f"shop:tusers:{special_index}:1"
     typed_categories = categories_keyboard(special, user_count=1, type_index=special_index)
