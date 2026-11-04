@@ -125,7 +125,7 @@ def install() -> None:
                     flush=True,
                 )
 
-            await asyncio.sleep(120.0 if cycle_failed else runtime.QUOTA_RUNTIME_INTERVAL_SECONDS)
+            await asyncio.sleep(180.0 if cycle_failed else max(runtime.QUOTA_RUNTIME_INTERVAL_SECONDS, 120.0))
 
     runtime._quota_runtime_worker = _process_isolated_quota_runtime_worker
     _installed = True
