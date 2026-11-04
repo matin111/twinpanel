@@ -1,6 +1,8 @@
 from __future__ import annotations
 from ..services.public_urls import subscription_base_url, shop_base_url
 
+import asyncio
+import fcntl
 import base64
 import hashlib
 import hmac
@@ -1166,7 +1168,28 @@ def _account_country_filename(
 
 async def _wireguard(db: Session, node: Node, sub: Subscription, user: User) -> dict[str, Any]:
     conn=await ssh_connect_saved(node,db)
+    allocation_lock=None
+    local_lock=None
     try:
+        # Serialize peer allocation across API workers and migration jobs.
+        if hasattr(conn, "create_process"):
+            allocation_lock=await conn.create_process(
+                "flock -w 25 /run/twinpanel-wg-allocation.lock "
+                "sh -c 'echo LOCKED; cat >/dev/null'"
+            )
+            ready=await asyncio.wait_for(allocation_lock.stdout.readline(),timeout=30)
+            if ready.strip() != "LOCKED":
+                raise RuntimeError("WireGuard allocation lock unavailable")
+        else:
+            local_lock=open("/run/twinpanel-wg-allocation.lock","a+")
+            for _ in range(250):
+                try:
+                    fcntl.flock(local_lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    await asyncio.sleep(0.1)
+            else:
+                raise RuntimeError("WireGuard allocation lock unavailable")
         private=(await cmd(conn,"wg genkey")).strip()
         public=(await cmd(conn,f"printf '%s' {shlex.quote(private)} | wg pubkey")).strip()
         used=await cmd(conn,"wg show wg-access0 allowed-ips",check=False)
@@ -1226,6 +1249,15 @@ PersistentKeepalive = 25
             "config": config,
         }
     finally:
+        if allocation_lock is not None:
+            try:
+                allocation_lock.stdin.write_eof()
+                await asyncio.wait_for(allocation_lock.wait(), timeout=5)
+            except Exception:
+                allocation_lock.terminate()
+        if local_lock is not None:
+            fcntl.flock(local_lock,fcntl.LOCK_UN)
+            local_lock.close()
         conn.close(); await conn.wait_closed()
 
 
