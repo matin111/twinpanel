@@ -9,7 +9,7 @@ from ..database import SessionLocal, get_db
 from ..deps import require_admin
 from ..models import Node, NodeType, Plan, ProtocolCredential, Subscription, SubscriptionNode, SubscriptionProtocol, User
 from ..plan_template_selection import plan_template_node_ids
-from ..protocol_account_registry import normalize_protocols, plan_protocols
+from ..protocol_account_registry import ALL_PROTOCOL_KEYS, normalize_protocols, plan_protocols
 from ..subscription_enforcement import queue_subscription_enforcement
 from .subscription_protocol_lifecycle_v2 import _resolve_traffic_limit_bytes
 from .subscription_protocol_lifecycle_v3 import (
@@ -102,10 +102,17 @@ async def admin_edit_subscription_fast_v1(
     if user is None:
         raise HTTPException(status_code=404, detail="کاربر پیدا نشد")
 
-    plan_id = int(payload.get("plan_id") or sub.plan_id or 0)
-    plan = db.get(Plan, plan_id)
-    if plan is None or not bool(plan.is_active):
-        raise HTTPException(status_code=404, detail="پلن پیدا نشد")
+    # Imported/manual subscriptions intentionally have no commercial Plan.
+    # A submitted zero is the explicit "manual, keep no plan" selection.
+    requested_plan = payload.get("plan_id", sub.plan_id)
+    plan_id = int(requested_plan or 0)
+    plan = db.get(Plan, plan_id) if plan_id else None
+    if plan is not None and not bool(plan.is_active):
+        raise HTTPException(status_code=422, detail="پلن انتخاب‌شده غیرفعال است")
+    if plan_id and plan is None:
+        raise HTTPException(status_code=404, detail="پلن انتخاب‌شده پیدا نشد")
+    if plan is None and sub.plan_id is not None:
+        raise HTTPException(status_code=422, detail="اشتراک پلن‌دار را نمی‌توان بدون پلن ذخیره کرد")
 
     try:
         protocols = normalize_protocols(payload.get("protocols", []))
@@ -114,7 +121,7 @@ async def admin_edit_subscription_fast_v1(
     if not protocols:
         raise HTTPException(status_code=422, detail="حداقل یک پروتکل انتخاب کنید")
 
-    allowed_protocols = set(plan_protocols(db, plan))
+    allowed_protocols = set(plan_protocols(db, plan)) if plan else set(ALL_PROTOCOL_KEYS)
     not_in_plan = [protocol for protocol in protocols if protocol not in allowed_protocols]
     if not_in_plan:
         raise HTTPException(
@@ -126,8 +133,13 @@ async def admin_edit_subscription_fast_v1(
     requested_node_ids = _unique_node_ids(payload.get("node_ids")) if "node_ids" in payload else []
     # Compatibility: several recent UIs accidentally submitted node_ids: [].
     # Preserve the existing snapshot instead of rejecting the edit or clearing it.
-    desired_node_ids = requested_node_ids or list(old_node_ids)
-    allowed_node_ids = plan_template_node_ids(db, int(plan.id))
+    allowed_node_ids = plan_template_node_ids(db, int(plan.id)) if plan else list(old_node_ids)
+    # Changing the commercial plan is an intentional switch to the new plan's
+    # node snapshot; the old nodes may not be included in the new template.
+    if plan is not None and sub.plan_id != int(plan.id):
+        desired_node_ids = requested_node_ids or list(allowed_node_ids)
+    else:
+        desired_node_ids = requested_node_ids or list(old_node_ids)
     if not desired_node_ids:
         desired_node_ids = list(allowed_node_ids)
     if not desired_node_ids:
@@ -162,6 +174,11 @@ async def admin_edit_subscription_fast_v1(
 
     # Credential rotations need the historical shared-login synchronization.
     # They still run after the HTTP response so the UI never waits on SSH.
+    if (username_changed or password_changed) and plan is None:
+        raise HTTPException(
+            status_code=422,
+            detail="برای تغییر نام کاربری یا رمز اشتراک دستی، ابتدا یک پلن انتخاب کنید",
+        )
     if username_changed or password_changed:
         background_tasks.add_task(
             _legacy_edit_background,
@@ -191,7 +208,7 @@ async def admin_edit_subscription_fast_v1(
     removed_nodes = sorted(old_node_set - desired_node_set)
 
     try:
-        sub.plan_id = int(plan.id)
+        sub.plan_id = int(plan.id) if plan else None
         sub.traffic_limit_bytes = _resolve_traffic_limit_bytes(sub, payload)
         sub.iran_node_id = None
         sub.exit_node_id = int(desired_node_ids[0])
