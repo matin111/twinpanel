@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import tempfile
+from pathlib import Path
 from types import SimpleNamespace
 
 # Match the public CI-only settings already used by api-build.yml. The smoke
@@ -10,9 +12,9 @@ os.environ.setdefault(
     "APP_SECRET_KEY",
     "ci-only-secret-key-ci-only-secret-key-ci-only-secret-key",
 )
-os.environ.setdefault(
-    "DATABASE_URL",
-    "postgresql+psycopg2://twinpanel:twinpanel_test@127.0.0.1:5432/twinpanel",
+_smoke_database_dir = tempfile.TemporaryDirectory(prefix="xray-v261-smoke-")
+os.environ["DATABASE_URL"] = (
+    f"sqlite+pysqlite:///{Path(_smoke_database_dir.name) / 'bootstrap.sqlite3'}"
 )
 os.environ.setdefault(
     "NODE_AGENT_SHARED_SECRET",
@@ -266,4 +268,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    finally:
+        _smoke_database_dir.cleanup()
