@@ -58,12 +58,23 @@ def _subscription_reconcile_guard(subscription_id: int) -> Iterator[bool]:
         conn.close()
 
 
+def _sync_repaired_quota_in_thread(subscription_id: int) -> dict[str, Any]:
+    """Own the DB session and event loop inside a background thread."""
+    from ..services.quota_refresh import sync_subscription_quota_nodes
+
+    db = SessionLocal()
+    try:
+        return asyncio.run(sync_subscription_quota_nodes(db, subscription_id))
+    finally:
+        db.close()
+
+
 async def _reconcile_subscription_modern_accounts_lockfix(
     subscription_id: int,
     *,
     max_protocols: int | None = None,
 ) -> dict[str, Any]:
-    snapshot = legacy._subscription_snapshot(subscription_id)
+    snapshot = await asyncio.to_thread(legacy._subscription_snapshot, subscription_id)
     if snapshot is None:
         return {
             "ok": False,
@@ -248,12 +259,10 @@ async def _reconcile_subscription_modern_accounts_lockfix(
                 db.close()
 
     if result["repaired"]:
-        from ..services.quota_refresh import sync_subscription_quota_nodes
-
-        quota_db = SessionLocal()
         try:
-            result["quota"] = await sync_subscription_quota_nodes(
-                quota_db, int(subscription_id)
+            # Quota DB and credential scans must not block the API event loop.
+            result["quota"] = await asyncio.to_thread(
+                _sync_repaired_quota_in_thread, int(subscription_id)
             )
             if not result["quota"].get("ok"):
                 result["ok"] = False
@@ -271,9 +280,6 @@ async def _reconcile_subscription_modern_accounts_lockfix(
                     "error": f"{type(exc).__name__}:{str(exc)[:700]}",
                 }
             )
-        finally:
-            quota_db.close()
-
     return result
 
 

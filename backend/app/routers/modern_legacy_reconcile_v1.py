@@ -460,8 +460,8 @@ def _next_scan_batch(limit: int = _BACKGROUND_SCAN_LIMIT) -> list[int]:
 
 async def reconcile_legacy_modern_once() -> dict[str, Any] | None:
     async with _reconcile_lock:
-        for subscription_id in _next_scan_batch():
-            snapshot = _subscription_snapshot(subscription_id)
+        for subscription_id in await asyncio.to_thread(_next_scan_batch):
+            snapshot = await asyncio.to_thread(_subscription_snapshot, subscription_id)
             if snapshot is None:
                 continue
             states = dict(snapshot["states"])

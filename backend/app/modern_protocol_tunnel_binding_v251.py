@@ -261,17 +261,17 @@ def _modern_routes_for_exit(db, exit_node: Node, exit_tunnel_ip: str) -> list[di
         })
 
     if "sudoku" in configs:
+        # Compute deterministic port map once per route build, not per user.
+        sudoku_ports = _sudoku_public_port_map(db)
         for subscription_id in _sudoku_desired_subscription_ids(db):
             output.append({
                 "protocol": "sudoku",
                 "profile": f"subscription-{subscription_id}",
                 "subscription_id": int(subscription_id),
                 "exit_node_id": int(exit_node.id),
-                "public_port": _sudoku_public_port(
-                    db,
-                    int(exit_node.id),
-                    int(subscription_id),
-                ),
+                "public_port": sudoku_ports[
+                    (int(exit_node.id), int(subscription_id))
+                ],
                 "target_ip": str(exit_tunnel_ip),
                 "target_port": int(_sudoku_port(int(subscription_id))),
                 "transport": "tcp",
