@@ -9,8 +9,13 @@ import asyncio
 import fcntl
 import logging
 import os
+import sys
 import time
 import urllib.request
+from pathlib import Path
+
+# Support direct execution from backend/scripts with no externally supplied PYTHONPATH.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.node_subscription_convergence_v114 import _eligible_exit_node_ids
 from scripts.twinpanel_migration_singbox_batch import run_one_node
