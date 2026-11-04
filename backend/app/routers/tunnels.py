@@ -1068,45 +1068,61 @@ def _select_service_route_tunnel_ids(
             None,
         )
 
-        # TWINPANEL_IRAN_ROUTE_STALE_REPORT_GRACE_V1
-        # A busy Iran Agent can take >60s to reconcile thousands of
-        # service rules; the watchdog then flags a *missing report* as
-        # offline even while the selected physical carrier still works.
-        # Do not respond to that telemetry gap by publishing an empty
-        # service_routes array (which destroys the working route). Keep the
-        # LAST selected route for at most five minutes after a proven
-        # healthy physical transport report, and only while the peer
-        # failures are stale/absent reports rather than fresh hard errors.
-        # No new route is invented, and true explicit failures fail closed.
-        if not usable and current_id is not None:
+        # TWINPANEL_IRAN_ROUTE_STALE_REPORT_GRACE_V2
+        # An Iran Agent can spend minutes checking a large iptables
+        # ruleset and its peer report expires after 60s. During this
+        # telemetry gap keep a previously selected route, or recover
+        # one after a controller restart, ONLY when its active transport
+        # has an independent, recent, verified healthy observation.
+        # Never override a fresh explicit peer failure. Five-minute
+        # maximum grace keeps real outages from looking healthy forever.
+        if not usable:
             previous = next(
                 (item for item in members
-                 if int(item.id) == int(current_id) and item.is_active),
+                 if current_id is not None
+                 and int(item.id) == int(current_id)
+                 and item.is_active),
                 None,
             )
-            if previous is not None:
-                active_name = str(previous.active_transport or "").strip().lower()
+            candidates = [previous] if previous is not None else (
+                members if current_id is None else []
+            )
+            grace_selected = False
+            for candidate in candidates:
+                if not candidate.is_active:
+                    continue
+                active_name = str(candidate.active_transport or "").strip().lower()
                 active_member = (
                     db.query(TunnelTransport)
                     .filter(
-                        TunnelTransport.tunnel_id == int(previous.id),
+                        TunnelTransport.tunnel_id == int(candidate.id),
                         TunnelTransport.transport == active_name,
                         TunnelTransport.enabled.is_(True),
                     )
                     .first()
                     if active_name else None
                 )
-                healthy_at = (
-                    active_member.last_healthy_at
-                    if active_member is not None else None
-                )
+                if active_member is None:
+                    continue
+                # After restart there is no memory of the last selected
+                # route: only a currently ONLINE physical transport may
+                # seed selection. An existing route can survive a brief
+                # member status lapse if its last good probe is recent.
+                if (
+                    current_id is None
+                    and str(active_member.status or "").lower() != "online"
+                ):
+                    continue
+                healthy_at = active_member.last_healthy_at
                 age = (
                     (now - healthy_at).total_seconds()
                     if healthy_at is not None else float("inf")
                 )
+                if not 0 <= age <= 300:
+                    continue
                 states = (
                     db.query(TunnelPeerState)
-                    .filter(TunnelPeerState.tunnel_id == int(previous.id))
+                    .filter(TunnelPeerState.tunnel_id == int(candidate.id))
                     .all()
                 )
                 fresh_hard_failure = any(
@@ -1117,9 +1133,14 @@ def _select_service_route_tunnel_ids(
                     and str(state.last_error or "") != "stale_report"
                     for state in states
                 )
-                if 0 <= age <= 300 and not fresh_hard_failure:
-                    selected_ids.add(int(previous.id))
+                if fresh_hard_failure:
                     continue
+                _service_route_selected[key] = int(candidate.id)
+                selected_ids.add(int(candidate.id))
+                grace_selected = True
+                break
+            if grace_selected:
+                continue
 
         # No usable member -> fail closed.
         if not usable:
