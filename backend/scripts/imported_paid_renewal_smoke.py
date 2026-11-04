@@ -28,7 +28,13 @@ assert 'SubscriptionRenewalOrder.subscription_id == subscription_id' in api
 assert 'if linked is None:' in api
 
 assert 'callback_data=f"subimprenew:{sub_id}"' in bot
-assert 'callback_data=f"subimprenewconfirm:{sub_id}"' in bot
+assert "subimprenewconfirm:{sub_id}:" in bot
+assert 'subimprenewplan:' in bot
+assert '"plan_id": plan_id' in bot
+assert 'payload.plan_id' in api
+assert 'is_internal_reseller_plan(plan)' in api
+assert 'legacy_unmetered' in fulfill
+assert 'baseline_limit = max(old_limit, old_used)' in fulfill
 assert '"/v1/payments/methods"' in bot
 assert 'callback_data=f"renewpay:{int(order[\'id\'])}:{method[\'id\']}"' in bot
 assert 'await callback.answer()' in bot

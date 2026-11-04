@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from ..database import Base, get_db
 from ..models import Subscription, Plan
+from ..reseller_owned_plans import is_internal_reseller_plan
 from ..store_models import StoreOrder
 from ..renewal_models import SubscriptionRenewalOrder
 from ..telegram_models import TelegramUserLink
@@ -34,6 +35,7 @@ imported_accounts = Table(
 
 class ImportedRenewOrderRequest(BaseModel):
     idempotency_key: str | None = Field(default=None, max_length=180)
+    plan_id: int | None = Field(default=None, gt=0)
 
 
 class ImportRequest(BaseModel):
@@ -90,6 +92,8 @@ def _row(db: Session, sub: Subscription, telegram_id: int | None = None) -> dict
     days_remaining = max(0, (expires - now).days) if expires else None
     linked = db.get(TelegramUserLink, telegram_id) if telegram_id is not None else None
     is_owner = bool(linked and int(sub.user_id) == int(linked.user_id))
+    eligible_status = str(getattr(sub.status, "value", sub.status)).lower() not in {"pending", "canceled"}
+    can_renew_current_plan = bool(plan and plan.is_active and not is_internal_reseller_plan(plan))
     return {
         "id": int(sub.id),
         "account_username": str(sub.account_username or f"account-{sub.id}"),
@@ -106,18 +110,15 @@ def _row(db: Session, sub: Subscription, telegram_id: int | None = None) -> dict
         "imported": True,
         "management_mode": "owner_renewal" if is_owner else "support_request",
         "can_direct_renew": is_owner,
-        "can_paid_renew": bool(
-            plan and plan.is_active and
-            str(getattr(sub.status, "value", sub.status)).lower()
-            not in {"pending", "canceled"}
-        ),
+        "can_paid_renew": eligible_status,
+        "requires_renew_plan_selection": bool(eligible_status and not can_renew_current_plan),
         "renew_plan": {
             "id": plan.id,
             "name": plan.name,
             "traffic_gb": int(plan.traffic_gb or 0),
             "duration_days": int(plan.duration_days or 0),
             "price_toman": int(plan.price_toman or 0),
-        } if plan and plan.is_active else None,
+        } if can_renew_current_plan else None,
     }
 
 
@@ -225,9 +226,21 @@ def create_imported_renewal_order(
     status = str(getattr(sub.status, "value", sub.status)).lower()
     if status in {"pending", "canceled"}:
         raise HTTPException(status_code=409, detail="این اشتراک قابل تمدید نیست")
-    plan = db.get(Plan, sub.plan_id) if sub.plan_id else None
-    if plan is None or not plan.is_active:
-        raise HTTPException(status_code=409, detail="پلن اشتراک برای تمدید فعال نیست")
+    # Imported legacy subscriptions can have no attached plan. Allow the
+    # payer to select a current public plan instead of blocking renewal.
+    attached_plan = db.get(Plan, sub.plan_id) if sub.plan_id else None
+    if payload.plan_id is not None:
+        plan = db.get(Plan, payload.plan_id)
+    else:
+        plan = attached_plan
+    if (
+        plan is None or not plan.is_active
+        or is_internal_reseller_plan(plan)
+        or int(plan.price_toman or 0) <= 0
+        or int(plan.duration_days or 0) <= 0
+        or int(plan.traffic_gb or 0) <= 0
+    ):
+        raise HTTPException(status_code=409, detail="یک پلن تمدید فعال و معتبر انتخاب کنید")
 
     # A payer can only purchase a renewal for an account deliberately added
     # by its share link; this does not authorize changing its owner or secrets.

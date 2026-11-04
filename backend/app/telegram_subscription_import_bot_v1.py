@@ -193,33 +193,68 @@ def install(router, request_fn):
                 ]),
             )
 
-    async def _show_imported_renewal(callback, sub_id, info=None):
+    async def _show_imported_renewal(callback, sub_id, info=None, selected_plan_id=None):
         await callback.answer()
         try:
             info = info or await _read_import(callback, sub_id)
             if not info.get("can_paid_renew"):
-                raise ValueError("این اشتراک یا پلن آن در حال حاضر قابل تمدید نیست")
+                raise ValueError("وضعیت اشتراک اجازه تمدید نمی‌دهد")
             plan = info.get("renew_plan") or {}
-            if not plan:
-                raise ValueError("پلن تمدید پیدا نشد")
+            if selected_plan_id or not plan:
+                plans = await request_fn("GET", "/v1/plans")
+                available = [
+                    item for item in (plans if isinstance(plans, list) else [])
+                    if item.get("is_active")
+                    and int(item.get("price_toman") or 0) > 0
+                    and int(item.get("duration_days") or 0) > 0
+                    and int(item.get("traffic_gb") or 0) > 0
+                ]
+                if selected_plan_id is not None:
+                    plan = next(
+                        (item for item in available if int(item["id"]) == selected_plan_id),
+                        None,
+                    )
+                    if not plan:
+                        raise ValueError("پلن انتخاب‌شده در دسترس نیست")
+                else:
+                    if not available:
+                        raise ValueError("هیچ پلن تمدید فعالی وجود ندارد")
+                    if callback.message:
+                        rows = [
+                            [InlineKeyboardButton(
+                                text=(f"{item['name']} | {item['duration_days']} روز"
+                                      f" | {item['traffic_gb']}GB | {int(item['price_toman']):,} تومان")[:64],
+                                callback_data=f"subimprenewplan:{sub_id}:{int(item['id'])}",
+                            )] for item in available[:40]
+                        ]
+                        rows.append([InlineKeyboardButton(
+                            text="⬅️ مدیریت اکانت", callback_data=f"subimp:{sub_id}",
+                        )])
+                        await callback.message.edit_text(
+                            "♻️ <b>انتخاب پلن تمدید</b>\n\n"
+                            "برای همین اکانت یک پلن انتخاب کنید. "
+                            "حجم و اعتبار پس از پرداخت به همان اشتراک افزوده می‌شود.",
+                            reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
+                        )
+                    return
         except Exception as exc:
             if callback.message:
                 await callback.message.answer("❌ " + escape(str(exc)[:160]))
             return
         if callback.message:
             await callback.message.edit_text(
-                "♻️ <b>تمدید همین اکانت</b>\\n\\n"
-                "👤 نام کاربری: <code>" + escape(str(info.get("account_username") or "-")) + "</code>\\n"
-                "📋 پلن: <b>" + escape(str(plan.get("name") or "-")) + "</b>\\n"
-                f"➕ حجم: <b>{int(plan.get('traffic_gb') or 0)} گیگابایت</b>\\n"
-                f"➕ اعتبار: <b>{int(plan.get('duration_days') or 0)} روز</b>\\n"
-                f"💳 مبلغ: <b>{int(plan.get('price_toman') or 0):,} تومان</b>\\n\\n"
+                "♻️ <b>تمدید همین اکانت</b>\n\n"
+                "👤 نام کاربری: <code>" + escape(str(info.get("account_username") or "-")) + "</code>\n"
+                "📋 پلن: <b>" + escape(str(plan.get("name") or "-")) + "</b>\n"
+                f"➕ حجم: <b>{int(plan.get('traffic_gb') or 0)} گیگابایت</b>\n"
+                f"➕ اعتبار: <b>{int(plan.get('duration_days') or 0)} روز</b>\n"
+                f"💳 مبلغ: <b>{int(plan.get('price_toman') or 0):,} تومان</b>\n\n"
                 "پس از پرداخت و تأیید، همین اشتراک تمدید می‌شود. "
                 "مالکیت اکانت تغییر نمی‌کند.",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(
                         text="✅ ادامه و پرداخت",
-                        callback_data=f"subimprenewconfirm:{sub_id}",
+                        callback_data=f"subimprenewconfirm:{sub_id}:{int(plan['id'])}",
                         style="success",
                     )],
                     [InlineKeyboardButton(
@@ -234,11 +269,25 @@ def install(router, request_fn):
         sub_id = int((callback.data or "").rsplit(":", 1)[-1])
         await _show_imported_renewal(callback, sub_id)
 
+    @router.callback_query(F.data.startswith("subimprenewplan:"))
+    async def import_renewal_plan(callback: CallbackQuery):
+        parts = (callback.data or "").split(":")
+        if len(parts) != 3:
+            await callback.answer("پلن نامعتبر است", show_alert=True)
+            return
+        await _show_imported_renewal(
+            callback, int(parts[1]), selected_plan_id=int(parts[2]),
+        )
+
     @router.callback_query(F.data.startswith("subimprenewconfirm:"))
     async def import_renewal_order(callback: CallbackQuery):
         await callback.answer()
         try:
-            sub_id = int((callback.data or "").rsplit(":", 1)[-1])
+            parts = (callback.data or "").split(":")
+            if len(parts) != 3:
+                raise ValueError("پلن تمدید انتخاب نشده است")
+            sub_id = int(parts[1])
+            plan_id = int(parts[2])
             import time
             order = await request_fn(
                 "POST",
@@ -246,8 +295,10 @@ def install(router, request_fn):
                 bot_auth=True,
                 payload={
                     "idempotency_key": (
-                        f"tg-import-renew-{callback.from_user.id}-{sub_id}-{int(time.time())}"
+                        f"tg-import-renew-{callback.from_user.id}-{sub_id}-"
+                        f"{plan_id}-{int(time.time())}"
                     ),
+                    "plan_id": plan_id,
                 },
             )
             method_data = await request_fn("GET", "/v1/payments/methods")
@@ -267,9 +318,9 @@ def install(router, request_fn):
             return
         if callback.message:
             await callback.message.edit_text(
-                "✅ <b>سفارش تمدید همان اکانت ساخته شد</b>\\n\\n"
-                f"شماره سفارش: <b>#{int(order['id'])}</b>\\n"
-                f"مبلغ: <b>{int(order.get('amount_toman') or 0):,} تومان</b>\\n\\n"
+                "✅ <b>سفارش تمدید همان اکانت ساخته شد</b>\n\n"
+                f"شماره سفارش: <b>#{int(order['id'])}</b>\n"
+                f"مبلغ: <b>{int(order.get('amount_toman') or 0):,} تومان</b>\n\n"
                 "روش پرداخت را انتخاب کنید:",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
             )
