@@ -100,6 +100,7 @@ def install() -> None:
         await asyncio.sleep(runtime._INITIAL_DELAY_SECONDS)
 
         while True:
+            cycle_failed = False
             stage = "topology_signature"
             try:
                 signature = await asyncio.to_thread(runtime._topology_signature)
@@ -126,6 +127,7 @@ def install() -> None:
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
+                cycle_failed = True
                 print(
                     f"{runtime.DYNAMIC_MARKER}_FAILED",
                     f"stage={stage}",
@@ -133,7 +135,7 @@ def install() -> None:
                     flush=True,
                 )
 
-            await asyncio.sleep(max(runtime._RETRY_INTERVAL_SECONDS, 180.0))
+            await asyncio.sleep(180.0 if cycle_failed else runtime._RETRY_INTERVAL_SECONDS)
 
     runtime._convergence_loop = _process_isolated_convergence_loop
     _installed = True
