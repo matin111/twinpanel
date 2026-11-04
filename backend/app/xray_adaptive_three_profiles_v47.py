@@ -578,8 +578,9 @@ def _customer_xray_item_v47(
         if profile_id in by_id
     ]
 
-    # Exact-three contract: fail closed until reconciliation produces all three.
-    if len(profiles) != 3:
+    # Deliver existing customer-policy-approved profiles even when another
+    # listener is missing. Never fabricate profiles or expose unapproved ones.
+    if not profiles:
         return None
 
     selected = profiles[0]
