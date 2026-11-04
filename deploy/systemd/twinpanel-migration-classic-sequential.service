@@ -1,0 +1,26 @@
+[Unit]
+Description=TwinPanel one-protocol-at-a-time classic credential migration (OpenVPN then Cisco then L2TP)
+After=network-online.target postgresql.service twinpanel-api.service
+Wants=network-online.target
+StartLimitIntervalSec=900
+StartLimitBurst=4
+ConditionPathExists=/opt/twinpanel/runtime/classic_protocol_sequential_runner_v1.sh
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/twinpanel/current/backend
+EnvironmentFile=/etc/twinpanel/backend.env
+ExecStart=/bin/bash /opt/twinpanel/runtime/classic_protocol_sequential_runner_v1.sh
+Nice=15
+CPUWeight=20
+IOWeight=20
+Restart=on-failure
+RestartSec=35
+TimeoutStopSec=40
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
