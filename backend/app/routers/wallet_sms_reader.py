@@ -41,6 +41,20 @@ def _allowed_senders(raw: str | None) -> set[str]:
     return values
 
 
+def _sms_match_window(now: datetime, sms_time: datetime) -> tuple[datetime, datetime] | None:
+    """Only match orders existing when a fresh bank SMS was received.
+
+    Allow small clock skew, never settle a new order using a past deposit.
+    """
+    window = _sms_match_window(now, sms_time)
+    if window is None:
+        return None
+    return (
+        max(now - timedelta(hours=3), sms_time - timedelta(hours=3)),
+        min(now, sms_time + timedelta(minutes=2)),
+    )
+
+
 async def _handle_event(
     payload: SmsEventIn,
     device: PaymentSmsReaderDevice,
@@ -121,8 +135,7 @@ async def _handle_event(
         db.commit()
         return {"ok": True, "auto_verified": False, "reason": "amount_not_found"}
 
-    since = max(now - timedelta(hours=3), sms_time - timedelta(hours=3))
-    latest = sms_time + timedelta(minutes=2)
+    since, latest = window
 
     payment_matches = (
         db.query(PaymentIntent)
