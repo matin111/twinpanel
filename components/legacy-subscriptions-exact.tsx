@@ -152,6 +152,13 @@ export function LegacySubscriptionsRuntimePage(){
   const filtered=rows;
   const stats=globalStats;
   const pageCount=Math.max(1,Math.ceil(matchedTotal/pageSize));
+  // Up to ten visible pages, sliding around the current page and clamped to bounds.
+  const pageWindowStart=Math.max(0,Math.min(page-4,pageCount-10));
+  const visiblePages=Array.from({length:Math.min(10,pageCount)},(_,index)=>pageWindowStart+index);
+  const changePage=(next:number)=>{
+    if(loading||next<0||next>=pageCount||next===page)return;
+    setPage(next);
+  };
 
   const act=async(key:string,label:string,fn:()=>Promise<unknown>,close=false)=>{
     if(busy)return;setBusy(key);setError("");setOk("");
@@ -352,10 +359,31 @@ export function LegacySubscriptionsRuntimePage(){
     </Card>
     <div className="runtime-toolbar" style={{justifyContent:"space-between",marginTop:12}}>
       <span>{matchedTotal.toLocaleString("fa-IR")} {pick("نتیجه","results")} · {pick("صفحه","Page")} {(page+1).toLocaleString("fa-IR")} / {pageCount.toLocaleString("fa-IR")}</span>
-      <div className="row-actions">
-        <button type="button" className="ghost" disabled={loading||page===0} onClick={()=>setPage(v=>Math.max(0,v-1))}>{pick("قبلی","Previous")}</button>
-        <button type="button" className="ghost" disabled={loading||page+1>=pageCount} onClick={()=>setPage(v=>v+1)}>{pick("بعدی","Next")}</button>
-      </div>
+      <nav className="subscription-page-navigation" aria-label={pick("صفحه‌بندی اشتراک‌ها","Subscription pagination")}>
+        <button type="button" className="ghost" disabled={loading||page===0} onClick={()=>changePage(page-1)}>{pick("قبلی","Previous")}</button>
+        {pageWindowStart>0&&<span className="subscription-page-ellipsis" aria-hidden="true">…</span>}
+        {visiblePages.map(index=><button
+          type="button"
+          key={index}
+          className={`subscription-page-number ${page===index?"is-active":""}`}
+          aria-label={pick(`صفحه ${index+1}`,`Page ${index+1}`)}
+          aria-current={page===index?"page":undefined}
+          disabled={loading}
+          onClick={()=>changePage(index)}
+        >{(index+1).toLocaleString(pick("fa-IR","en-US"))}</button>)}
+        {pageWindowStart+visiblePages.length<pageCount&&<span className="subscription-page-ellipsis" aria-hidden="true">…</span>}
+        <button type="button" className="ghost" disabled={loading||page+1>=pageCount} onClick={()=>changePage(page+1)}>{pick("بعدی","Next")}</button>
+      </nav>
+      <style>{`
+        .subscription-page-navigation{display:flex;flex-wrap:wrap;align-items:center;gap:6px;direction:rtl}
+        .subscription-page-number{min-width:34px;height:34px;padding:0 7px;border-radius:9px;border:1px solid var(--line,rgba(148,163,184,.2));background:var(--surface2,#111827);color:inherit;cursor:pointer;font:inherit;transition:background .15s,border-color .15s}
+        .subscription-page-number:hover:not(:disabled){border-color:var(--brand-primary,#2563eb);background:color-mix(in srgb,var(--brand-primary,#2563eb) 12%,transparent)}
+        .subscription-page-number.is-active{background:var(--brand-primary,#2563eb);border-color:var(--brand-primary,#2563eb);color:#fff;font-weight:700}
+        .subscription-page-number:focus-visible{outline:2px solid var(--brand-primary,#2563eb);outline-offset:2px}
+        .subscription-page-number:disabled{cursor:wait;opacity:.65}
+        .subscription-page-ellipsis{padding:0 3px;color:var(--muted,#94a3b8)}
+        @media(max-width:700px){.subscription-page-navigation{gap:4px}.subscription-page-number{min-width:30px;height:32px;padding:0 5px}}
+      `}</style>
     </div>
 
     {modal==="create"&&<Modal title={pick("ساخت اشتراک","Create subscription")} onClose={()=>!busy&&setModal(null)} wide>
