@@ -137,3 +137,24 @@ def test_typed_user_counts_and_colored_legacy_category_buttons_preserve_navigati
     typed_categories = categories_keyboard(special, user_count=1, type_index=special_index)
     assert typed_categories.inline_keyboard[0][0].callback_data == f"shop:tucat:{special_index}:1:0"
     assert typed_categories.inline_keyboard[-1][0].callback_data == f"shop:type:{special_index}"
+
+
+def test_count_buttons_have_color_without_person_emoji():
+    plans = [{"id": 1, "device_limit": 1, "category": "ماهانه"},
+             {"id": 2, "device_limit": 2, "category": "ماهانه"},
+             {"id": 3, "device_limit": 0, "category": "ماهانه"}]
+    keyboard = user_counts_keyboard(plans)
+    texts = [row[0].text for row in keyboard.inline_keyboard]
+    assert all("👤" not in text for text in texts)
+    assert any("🟢" in text for text in texts)
+    assert any("♾️" in text for text in texts)
+
+
+def test_legacy_category_diamond_icon_not_duplicated():
+    plans = [{"id": 1, "device_limit": 1, "category": "💎 پلن حرفه‌ای ۲ ماهه"}]
+    keyboard = categories_keyboard(plans, user_count=1)
+    label = keyboard.inline_keyboard[0][0].text
+    assert label.count("💎") == 1
+    assert label.startswith("💎")
+    assert category_icon("💎 پلن حرفه‌ای ۲ ماهه", 0) == ""
+    assert category_icon("پلن حرفه‌ای ۲ ماهه", 0) == "💎"

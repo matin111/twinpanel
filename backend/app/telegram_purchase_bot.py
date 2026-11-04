@@ -152,12 +152,16 @@ def subscription_types_keyboard(plans):
 
 
 def user_count_icon(count):
-    return "♾️" if count == 0 else COLOR_ICONS[(count - 1) % len(COLOR_ICONS)] + " 👤"
+    return "♾️" if count == 0 else COLOR_ICONS[(count - 1) % len(COLOR_ICONS)]
 
 
 def category_icon(name, index):
-    if "💎" in name or "ویژه" in name or "حرفه" in name:
+    if "💎" in name:
+        return ""  # Already present in the category name; avoid duplicate icons.
+    if "ویژه" in name or "حرفه" in name:
         return "💎"
+    if "🎮" in name:
+        return ""
     if "گیم" in name:
         return "🎮"
     return COLOR_ICONS[index % len(COLOR_ICONS)] + " 📂"
@@ -214,7 +218,7 @@ def categories_keyboard(plans, *, user_count=None, type_index=None):
         )
         rows.append([
             InlineKeyboardButton(
-                text=(f"{category_icon(category,index)} {category} ({count})")[:60],
+                text=(f"{category_icon(category,index)} {category} ({count})".strip())[:60],
                 callback_data=callback_data,
             )
         ])
@@ -423,14 +427,14 @@ def proof_keyboard(
 def plan_text(plan):
     return (
         f"🛒 <b>{escape(str(plan.get('name') or 'اشتراک'))}</b>\n"
-        f"👤 تعداد کاربری: <b>{'نامحدود' if plan_user_count(plan) == 0 else str(plan_user_count(plan)) + ' کاربر'}</b>\n"
+        f"🔢 تعداد کاربری: <b>{'نامحدود' if plan_user_count(plan) == 0 else str(plan_user_count(plan)) + ' کاربر'}</b>\n"
         f"💠 نوع اشتراک: <b>{escape(plan_subscription_type(plan))}</b>\n"
         f"📁 دسته‌بندی: <b>{escape(plan_category(plan))}</b>\n\n"
         f"📦 حجم: "
         f"<b>{int(plan.get('traffic_gb') or 0)} گیگابایت</b>\n"
         f"📅 اعتبار: "
         f"<b>{int(plan.get('duration_days') or 0)} روز</b>\n"
-        f"📱 تعداد دستگاه: "
+        f"🔢 تعداد دستگاه: "
         f"<b>{int(plan.get('device_limit') or 0)}</b>\n"
         f"💰 قیمت: "
         f"<b>{money(plan.get('price_toman'))} تومان</b>\n\n"
@@ -655,7 +659,7 @@ def create_purchase_router(
 
         await callback.answer()
         await callback.message.edit_text(
-            f"👤 <b>{count} کاربره</b>\n\n"
+            f"{user_count_icon(count)} <b>{count} کاربره</b>\n\n"
             "حالا دسته‌بندی پلن را انتخاب کنید:",
             reply_markup=categories_keyboard(plans, user_count=count),
         )
@@ -676,7 +680,7 @@ def create_purchase_router(
 
         await callback.answer()
         await callback.message.edit_text(
-            f"👤 <b>{count} کاربره</b>\n"
+            f"{user_count_icon(count)} <b>{count} کاربره</b>\n"
             f"📁 <b>{escape(category)}</b>\n\n"
             "پلن موردنظر را انتخاب کنید:",
             reply_markup=plans_keyboard(
