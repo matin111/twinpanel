@@ -94,7 +94,7 @@ def _persist_subscription(payload: dict[str, Any]) -> tuple[int, list[str], dict
         device_limit = (
             int(request.device_limit)
             if request.device_limit is not None
-            else int(plan.device_limit or 1)
+            else int(plan.device_limit if plan.device_limit is not None else 1)
             if plan is not None
             else 1
         )
@@ -125,7 +125,7 @@ def _persist_subscription(payload: dict[str, Any]) -> tuple[int, list[str], dict
         db.add(
             SubscriptionRuntimeOverride(
                 subscription_id=sub.id,
-                device_limit=max(1, device_limit),
+                device_limit=max(0, device_limit),
                 duration_unlimited=False,
             )
         )
