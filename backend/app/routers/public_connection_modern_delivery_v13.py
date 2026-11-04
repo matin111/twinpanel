@@ -147,16 +147,16 @@ def _credential_state(db: Session, subscription_id: int, protocol: str, *, activ
     )
     if cred is None:
         return (
-            "اطلاعات حساب آماده است؛ فایل اتصال در حال ساخت است"
+            "فایل اتصال هنوز آماده نیست"
             if protocol in CLASSIC_PROTOCOLS
-            else "در انتظار ساخت کانفیگ"
+            else "کانفیگ هنوز آماده نشده است"
         )
     if not bool(getattr(cred, "is_active", False)):
         return "پروتکل برای این اشتراک غیرفعال است"
     stored_items = _autosync_credential_items(cred)
     if not stored_items:
-        return "اطلاعات حساب ثبت شده؛ فایل اتصال هنوز ساخته نشده است"
-    return "کانفیگ ثبت شده؛ مسیر اتصال قابل تحویل هنوز تأیید نشده است"
+        return "فایل اتصال هنوز آماده نیست"
+    return "کانفیگ این پروتکل فعلاً قابل دریافت نیست"
 
 
 def _sudoku_uri(item: dict[str, Any]) -> str:
