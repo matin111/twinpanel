@@ -104,7 +104,7 @@ def plan_categories(plans):
 
 def plan_user_count(plan):
     try:
-        return max(1, int(plan.get("device_limit") or 1))
+        return max(0, int(plan.get("device_limit") if plan.get("device_limit") is not None else 1))
     except Exception:
         return 1
 
@@ -119,7 +119,7 @@ def user_counts_keyboard(plans):
         plan_count = sum(1 for plan in plans if plan_user_count(plan) == count)
         rows.append([
             InlineKeyboardButton(
-                text=(f"👤 {count} کاربره ({plan_count})")[:60],
+                text=(f"♾️ کاربر نامحدود ({plan_count})" if count == 0 else f"👤 {count} کاربره ({plan_count})")[:60],
                 callback_data=f"shop:users:{count}",
             )
         ])
