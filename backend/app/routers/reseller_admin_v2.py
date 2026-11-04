@@ -338,7 +338,7 @@ def create_reseller_v2(
 
 
 class SubscriptionTransferIn(BaseModel):
-    customer_user_id: int = Field(gt=0)
+    customer_user_id: int | None = Field(default=None, gt=0)
 
 
 @router.get("/{reseller_id}/transfer-customers")
@@ -382,8 +382,9 @@ def transfer_subscription_to_reseller(
     """Transfer management rights, never recreate or provision the VPN account.
 
     The original subscription/credential/usage/expiry records remain intact.
-    Customer assignment is scoped to the selected reseller and explicitly
-    chosen by the administrator. No wallet or traffic balance is charged.
+    Customer assignment defaults to the existing original customer when safe,
+    otherwise the reseller owner's account is used as the management contact.
+    No wallet or traffic balance is charged.
     """
     reseller = _get_reseller(db, reseller_id)
     if not reseller.is_active:
@@ -394,7 +395,16 @@ def transfer_subscription_to_reseller(
     if sub.status == SubscriptionStatus.CANCELED:
         raise HTTPException(status_code=409, detail="اشتراک لغوشده قابل انتقال نیست")
 
-    customer_id = int(payload.customer_user_id)
+    # A one-click admin transfer only selects the reseller. Preserve the
+    # original customer for ordinary user-owned subscriptions; never attach
+    # the superadmin identity to any reseller's customer list.
+    original = db.get(User, int(sub.user_id))
+    if payload.customer_user_id is not None:
+        customer_id = int(payload.customer_user_id)
+    elif original and original.is_active and _owner_role(original) != UserRole.ADMIN.value:
+        customer_id = int(original.id)
+    else:
+        customer_id = int(reseller.owner_user_id)
     customer = db.get(User, customer_id)
     if not customer or not customer.is_active or _owner_role(customer) == UserRole.ADMIN.value:
         raise HTTPException(status_code=422, detail="مشتری انتخاب‌شده معتبر نیست")
@@ -406,10 +416,10 @@ def transfer_subscription_to_reseller(
         )
         .first()
     )
-    if customer_id != int(reseller.owner_user_id) and not linked_customer:
+    if payload.customer_user_id is not None and customer_id != int(reseller.owner_user_id) and not linked_customer:
         raise HTTPException(
             status_code=422,
-            detail="ابتدا مشتری را در همین نمایندگی ثبت کنید",
+            detail="مشتری انتخاب‌شده متعلق به این نمایندگی نیست",
         )
 
     existing = (
