@@ -6,6 +6,9 @@ on:
       - "backend/app/telegram_account_link_bot.py"
       - "backend/app/telegram_admin_ops_v1.py"
       - "backend/app/routers/telegram_admin_ops_v1.py"
+      - "backend/app/services/telegram_admin_receipt_push.py"
+      - "backend/app/services/customer_maintenance.py"
+      - "backend/scripts/admin_receipt_push_smoke.py"
       - "backend/scripts/telegram_admin_ops_smoke.py"
       - "components/admin-telegram-legacy-parity.tsx"
       - "backend/app/bot_text_middleware.py"
@@ -54,6 +57,9 @@ jobs:
 
       - name: Verify main home has no redundant navigation buttons
         run: python backend/scripts/main_home_navigation_smoke.py
+
+      - name: Validate direct manual receipt notifications and action buttons
+        run: python backend/scripts/admin_receipt_push_smoke.py
 
       - name: Validate Telegram admin operations and broadcast security
         run: python backend/scripts/telegram_admin_ops_smoke.py
