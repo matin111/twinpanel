@@ -96,6 +96,9 @@ def install() -> None:
     from .services import customer_maintenance as runtime
 
     async def _process_isolated_quota_runtime_worker() -> None:
+        if os.environ.get("TWINPANEL_EXTERNAL_HEAVY_RECONCILE") == "1":
+            await asyncio.Event().wait()
+            return
         while True:
             cycle_failed = False
             try:

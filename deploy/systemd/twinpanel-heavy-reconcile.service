@@ -1,0 +1,23 @@
+[Unit]
+Description=TwinPanel external quota and subscription convergence worker
+After=network-online.target postgresql.service redis-server.service twinpanel-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/twinpanel/current/backend
+EnvironmentFile=/etc/twinpanel/backend.env
+Environment=PYTHONUNBUFFERED=1
+Environment=TWINPANEL_EXTERNAL_HEAVY_RECONCILE=0
+ExecStart=/opt/twinpanel/venv/bin/python3 -u /opt/twinpanel/current/backend/scripts/twinpanel_external_heavy_reconcile_v1.py
+Restart=on-failure
+RestartSec=10
+CPUWeight=20
+CPUQuota=125%
+IOWeight=20
+Nice=10
+TimeoutStopSec=15
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
