@@ -2,8 +2,8 @@
 import Link from "next/link";
 import {useEffect,useState} from "react";
 import {Shell} from "./ui";
-import {cleanNovaBlogEntries,novaEditableEntries,type NovaBlogEntry} from "../lib/nova-articles";
-import {loadStoreTemplateSettings,saveNovaBlogArticles} from "../lib/store-template-settings-api";
+import {NOVA_ARTICLES,novaEditableEntries,type NovaBlogEntry} from "../lib/nova-articles";
+import {loadAdminStoreTemplateSettings,saveNovaBlogArticles} from "../lib/store-template-settings-api";
 import styles from "./nova-blog-manager.module.css";
 
 const TEMPLATE="nova-multipage-2027";
@@ -20,7 +20,7 @@ export function NovaBlogManager(){
  const reload=async()=>{
   setLoading(true);setError("");
   try{
-   const x=await loadStoreTemplateSettings();
+   const x=await loadAdminStoreTemplateSettings();
    setEntries(novaEditableEntries(x.templates?.[TEMPLATE]?.nova_articles));
   }catch(e){setError(e instanceof Error?e.message:String(e));}
   finally{setLoading(false);}
@@ -55,7 +55,9 @@ export function NovaBlogManager(){
  };
  const remove=async()=>{
   if(!originalSlug||!window.confirm("این نوشته حذف شود؟ این عملیات قابل بازگشت نیست."))return;
-  if(await write(entries.filter(x=>x.slug!==originalSlug),"مقاله حذف شد."))create();
+  const original=NOVA_ARTICLES.some(x=>x.slug===originalSlug);
+  const next=original?entries.map(x=>x.slug===originalSlug?{...x,published:false}:x):entries.filter(x=>x.slug!==originalSlug);
+  if(await write(next,original?"مقاله اولیه از سایت مخفی شد.":"مقاله حذف شد."))create();
  };
  return <Shell active="/admin/store-blog"><div className="page" dir="rtl">
   <div className="page-head"><div><h1>مدیریت بلاگ فروشگاه</h1><small>ثبت، ویرایش، پیش‌نویس و انتشار مقاله برای قالب چهارم</small></div>
