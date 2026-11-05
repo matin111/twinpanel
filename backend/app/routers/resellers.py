@@ -4,6 +4,7 @@ import secrets
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr, Field
 from ..security import hash_password
+from ..reseller_tier_policy import valid_tier, tier_entitlements
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -30,6 +31,7 @@ router = APIRouter(
 # ============================================================
 
 class ResellerCreateIn(BaseModel):
+    reseller_tier: str
     password: str = Field(min_length=8, max_length=128)
     name: str = Field(min_length=2, max_length=150)
     code: str | None = Field(default=None, max_length=32)
@@ -40,6 +42,7 @@ class ResellerCreateIn(BaseModel):
 
 
 class ResellerUpdateIn(BaseModel):
+    reseller_tier: str | None = None
     name: str | None = Field(default=None, min_length=2, max_length=150)
     phone: str | None = Field(default=None, max_length=32)
     email: EmailStr | None = None
@@ -147,6 +150,7 @@ def _serialize_reseller(
         ),
 
         "is_active": reseller.is_active,
+        "reseller_tier": valid_tier(reseller.reseller_tier),
 
         "customer_count": customer_count,
         "subscription_count": subscription_count,
@@ -246,6 +250,8 @@ def create_reseller(
     payload: ResellerCreateIn,
     db: Session = Depends(get_db),
 ):
+    tier = valid_tier(payload.reseller_tier)
+    tier_entitlements(db, tier)
     name = payload.name.strip()
     email = str(payload.email).strip().lower()
 
@@ -336,6 +342,7 @@ def create_reseller(
 
         reseller = Reseller(
             owner_user_id=owner.id,
+            reseller_tier=tier,
             code=code,
             name=name,
             phone=phone,
@@ -409,6 +416,9 @@ def update_reseller(
     values = payload.model_dump(
         exclude_unset=True
     )
+    if "reseller_tier" in values:
+        valid_tier(values['reseller_tier'])
+        tier_entitlements(db, values['reseller_tier'])
 
     if "email" in values and values["email"] is not None:
         values["email"] = str(
@@ -834,6 +844,7 @@ class AdminResellerTrafficAdjustIn(BaseModel):
 
 
 class ResellerTrafficPackageIn(BaseModel):
+    reseller_tier: str
     title: str = Field(
         min_length=2,
         max_length=120,
@@ -1012,6 +1023,7 @@ def admin_create_traffic_package(
     payload:ResellerTrafficPackageIn,
     db:Session=Depends(get_db),
 ):
+    valid_tier(payload.reseller_tier)
     row=ResellerTrafficPackage(
         **payload.model_dump()
     )
@@ -1043,6 +1055,7 @@ def admin_update_traffic_package(
             detail="بسته حجم پیدا نشد",
         )
 
+    valid_tier(payload.reseller_tier)
     for key,value in payload.model_dump().items():
         setattr(row,key,value)
 
