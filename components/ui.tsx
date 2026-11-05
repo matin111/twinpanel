@@ -44,6 +44,7 @@ const menuGroups=[
     ["اعلان‌ها","Notifications","/admin/notifications","◎"]
   ]},
   {fa:"محتوا و برند",en:"Content & Brand",items:[
+    ["مدیریت بلاگ","Blog Manager","/admin/store-blog","✎"],
     ["فایل‌های دانلود","Downloads","/admin/downloads","⇩"],
     ["برندینگ","Branding","/admin/branding","✦"]
   ]},
