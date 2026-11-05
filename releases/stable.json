@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.582",
+  "version": "1.1.0-rc.583",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-05T03:33:30Z",
+  "released_at": "2026-11-05T04:03:12Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "24f322aecf5afd1773fcee7abab435e152fabc77",
+  "source_sha": "0bf964ef9b2a9c8bf5fe52ddf67a4fc83c7aba1a",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.582/twinpanel-1.1.0-rc.582-linux-x86_64.tar.gz",
-    "sha256": "8e728d12e58ed9a039eec782628e5cfc863ee0b7f8280c3608a01d6dcf0ea43c",
-    "size_bytes": 28594367
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.583/twinpanel-1.1.0-rc.583-linux-x86_64.tar.gz",
+    "sha256": "45a9285e7b905d8390065e5391d1f847e29d2bdb0e141bc0dd04a132e4f72ee9",
+    "size_bytes": 28617880
   },
   "notes": {
-    "fa": "افزودن قالب اختصاصی چهارم Nova با صفحات مستقل فروش VPN، آی‌پی ثابت، نمایندگی، آموزش تعاملی، سوالات متداول، مقالات و تنظیمات بنر.",
-    "en": "Ship Nova Template 4: multi-page VPN storefront, static IP and reseller pages, interactive guides, FAQs, educational articles and customizable hero banner."
+    "fa": "تکمیل توضیحات فارسی نمایندگی، آی‌پی ثابت، پلن‌ها، آموزش و سوالات متداول قالب چهار؛ افزودن چت آنلاین به همه صفحات و اصلاح نمایش و خرید ۱۵ پروتکل و چیدمان موبایل.",
+    "en": "Complete Nova Template 4 marketing explanations and FAQs, enable online chat on every page, support all 15 plan protocols and improve responsive layout."
   }
 }
