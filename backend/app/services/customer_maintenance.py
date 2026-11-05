@@ -16,6 +16,7 @@ from ..store_models import StoreOrder
 from ..user_notification_models import UserNotification
 from .l2tp_quota_runtime_v113 import reconcile_l2tp_quota_runtime_once
 from .openvpn_quota_runtime_v106 import reconcile_openvpn_quota_runtime_once
+from .telegram_admin_receipt_push import push_manual_receipts_once
 from .payment_automation import (
     activate_existing_sms_auto_verify_once,
     process_pending_crypto_payments_once,
@@ -376,6 +377,7 @@ async def customer_maintenance_loop() -> None:
 
     last_receipt_cleanup = 0.0
     last_crypto_verify = 0.0
+    last_manual_receipt_push = 0.0
     sms_bootstrap_done = False
 
     try:
@@ -444,6 +446,21 @@ async def customer_maintenance_loop() -> None:
                     )
                 finally:
                     last_crypto_verify = now
+
+            if (
+                last_manual_receipt_push == 0.0
+                or now - last_manual_receipt_push >= 30.0
+            ):
+                try:
+                    pushed = await push_manual_receipts_once()
+                    if pushed.get("sent") or pushed.get("failed"):
+                        print("ADMIN_MANUAL_RECEIPT_PUSH", pushed, flush=True)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    print("admin manual receipt push failed:", str(exc), flush=True)
+                finally:
+                    last_manual_receipt_push = now
 
             try:
                 result = await asyncio.to_thread(sync_payment_notifications_once)
