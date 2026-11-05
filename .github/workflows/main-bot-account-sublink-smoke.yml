@@ -9,6 +9,7 @@ on:
       - "backend/app/services/telegram_admin_receipt_push.py"
       - "backend/app/services/customer_maintenance.py"
       - "backend/scripts/admin_receipt_push_smoke.py"
+      - "backend/scripts/admin_receipt_pending_payment_smoke.py"
       - "backend/scripts/telegram_admin_ops_smoke.py"
       - "components/admin-telegram-legacy-parity.tsx"
       - "backend/app/bot_text_middleware.py"
@@ -57,6 +58,9 @@ jobs:
 
       - name: Verify main home has no redundant navigation buttons
         run: python backend/scripts/main_home_navigation_smoke.py
+
+      - name: Verify pending-payment receipts enter direct admin chat queue
+        run: python backend/scripts/admin_receipt_pending_payment_smoke.py
 
       - name: Validate direct manual receipt notifications and action buttons
         run: python backend/scripts/admin_receipt_push_smoke.py

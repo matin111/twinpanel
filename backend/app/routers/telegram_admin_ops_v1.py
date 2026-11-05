@@ -176,22 +176,31 @@ def _admin(db: Session, telegram_id: int) -> User:
     return user
 
 
+# Allow the SMS verifier a short initial opportunity. A pending_payment
+# receipt is NOT a blank payment: receipt upload preserves the original status.
+MANUAL_RECEIPT_GRACE_SECONDS = 20
+
+
 def _manual_purchase(row: PaymentIntent) -> bool:
     submitted = row.receipt_submitted_at or row.submitted_at
     return bool(
         row.receipt_telegram_file_id and _purchase_needs_review(row)
-        and submitted and datetime.utcnow() - submitted >= timedelta(minutes=3)
+        and submitted
+        and datetime.utcnow() - submitted >= timedelta(seconds=MANUAL_RECEIPT_GRACE_SECONDS)
     )
 
 
 def _manual_topup(row: CustomerWalletTopup) -> bool:
     submitted = row.submitted_at or row.created_at
+    status = str(row.status or "").lower()
     return bool(
         row.receipt_file_marker
-        and str(row.status or "").lower() in {
-            "awaiting_review", "payment_submitted", "submitted", "review", "waiting"
+        and status in {
+            "pending_payment", "awaiting_review", "payment_submitted",
+            "submitted", "review", "waiting"
         }
-        and submitted and datetime.utcnow() - submitted >= timedelta(minutes=3)
+        and submitted
+        and datetime.utcnow() - submitted >= timedelta(seconds=MANUAL_RECEIPT_GRACE_SECONDS)
     )
 
 

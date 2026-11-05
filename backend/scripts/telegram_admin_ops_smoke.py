@@ -26,7 +26,7 @@ for required in (
     'datetime.utcnow() > expires',
     'def _manual_purchase(',
     'def _manual_topup(',
-    'timedelta(minutes=3)',
+    'MANUAL_RECEIPT_GRACE_SECONDS = 20',
     'approve_payment_fast(',
     'approve_wallet_topup_v2(',
     'reject_payment(',
