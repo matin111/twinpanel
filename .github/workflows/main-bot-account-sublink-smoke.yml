@@ -24,6 +24,12 @@ on:
       - "backend/app/telegram_main_extensions.py"
       - "backend/app/telegram_guides_bot.py"
       - "backend/app/telegram_runtime_bot.py"
+      - "backend/app/telegram_purchase_bot.py"
+      - "backend/app/routers/customer_wallet.py"
+      - "backend/app/routers/payments.py"
+      - "backend/app/routers/store.py"
+      - "backend/app/services/payment_fulfillment_fast_path.py"
+      - "backend/scripts/main_bot_wallet_checkout_smoke.py"
       - "backend/app/renewal_service.py"
       - "backend/scripts/imported_paid_renewal_smoke.py"
       - "backend/scripts/imported_account_password_change_smoke.py"
@@ -52,6 +58,9 @@ jobs:
             backend/app/telegram_account_link_bot.py \
             backend/app/telegram_main_extensions.py \
             backend/app/telegram_guides_bot.py
+
+      - name: Verify main bot wallet checkout and durable fulfillment
+        run: python backend/scripts/main_bot_wallet_checkout_smoke.py
 
       - name: Verify hidden admin button per recipient
         run: cd backend && python scripts/telegram_admin_home_visibility_smoke.py

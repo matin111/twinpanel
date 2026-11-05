@@ -349,10 +349,24 @@ def recover_interrupted_payment_orders_once() -> dict:
             )
             db.commit()
 
+        # Reclaim wallet provisioning only on process startup. The worker
+        # from the previous API process no longer exists at that point.
+        wallet_ids = [
+            int(row[0]) for row in db.query(StoreOrder.id).filter(
+                StoreOrder.payment_method == "wallet",
+                StoreOrder.status == "provisioning",
+            ).all()
+        ]
+        if wallet_ids:
+            db.query(StoreOrder).filter(StoreOrder.id.in_(wallet_ids)).update(
+                {StoreOrder.status: "paid", StoreOrder.error_text: None},
+                synchronize_session=False,
+            )
+            db.commit()
         return {
             "ok": True,
-            "recovered": len(order_ids),
-            "order_ids": order_ids[:50],
+            "recovered": len(order_ids) + len(wallet_ids),
+            "order_ids": (order_ids + wallet_ids)[:50],
         }
 
     except Exception:
@@ -361,6 +375,37 @@ def recover_interrupted_payment_orders_once() -> dict:
 
     finally:
         db.close()
+
+
+async def fulfill_wallet_order_background(order_id: int) -> None:
+    """Fulfill a wallet-paid store order using a fresh DB session."""
+    db = SessionLocal()
+    try:
+        if not claim_paid_order(db, int(order_id)):
+            return
+        await _fulfill_paid_order(int(order_id), db)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        db.rollback()
+        print("wallet fulfillment error", int(order_id), str(exc)[:400], flush=True)
+    finally:
+        db.close()
+
+
+async def process_wallet_paid_orders_once(limit: int = 10) -> dict:
+    """Durably recover wallet orders not yet claimed after a restart."""
+    db = SessionLocal()
+    try:
+        rows = db.query(StoreOrder.id).filter(
+            StoreOrder.payment_method == "wallet", StoreOrder.status == "paid",
+        ).order_by(StoreOrder.id.asc()).limit(max(1, int(limit))).all()
+        ids = [int(row[0]) for row in rows]
+    finally:
+        db.close()
+    for order_id in ids:
+        await fulfill_wallet_order_background(order_id)
+    return {"seen": len(ids), "processed": len(ids)}
 
 
 async def process_paid_store_orders_once(limit: int = 10) -> dict:
@@ -443,10 +488,11 @@ async def payment_fulfillment_recovery_loop() -> None:
     while True:
         try:
             result = await process_paid_store_orders_once()
-            if result.get("seen"):
+            wallet_result = await process_wallet_paid_orders_once()
+            if result.get("seen") or wallet_result.get("seen"):
                 print(
                     "PAYMENT_FULFILL_RECOVERY",
-                    result,
+                    {"external": result, "wallet": wallet_result},
                     flush=True,
                 )
         except asyncio.CancelledError:

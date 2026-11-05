@@ -386,6 +386,12 @@ def payment_methods_keyboard(
 
     rows.append([
         InlineKeyboardButton(
+            text="💰 پرداخت از کیف پول",
+            callback_data=f"shop:wallet:preview:{order_id}",
+        )
+    ])
+    rows.append([
+        InlineKeyboardButton(
             text="⬅️ بازگشت به پلن‌ها",
             callback_data="shop:list",
         )
@@ -522,11 +528,8 @@ def create_purchase_router(
             else []
         ) or []
 
-        if not methods:
-            raise RuntimeError(
-                "روش پرداخت فعالی وجود ندارد"
-            )
-
+        # Wallet checkout is always a valid method even when external
+        # payment gateways are disabled.
         return methods
 
     @router.message(
@@ -1008,6 +1011,106 @@ def create_purchase_router(
                     methods,
                 )
             ),
+        )
+
+    @router.callback_query(F.data.startswith("shop:wallet:preview:"))
+    async def shop_wallet_preview(callback: CallbackQuery):
+        try:
+            order_id = int(callback.data.rsplit(":", 1)[-1])
+            token = await user_token(callback.from_user.id)
+            orders = await request_fn("GET", "/v1/store/orders/me", token=token)
+            order = next((item for item in orders if int(item.get("id") or 0) == order_id), None)
+            if order is None or order.get("status") != "pending_payment":
+                raise RuntimeError("سفارش برای پرداخت موجود نیست")
+            wallet = await request_fn("GET", "/v1/wallet/me", token=token)
+            balance = int(wallet.get("balance_toman") or 0)
+            amount = int(order.get("amount_toman") or 0)
+            if amount <= 0:
+                raise RuntimeError("مبلغ سفارش نامعتبر است")
+        except Exception as exc:
+            await callback.answer(str(exc)[:180], show_alert=True)
+            return
+        await callback.answer()
+        sufficient = balance >= amount
+        buttons = []
+        if sufficient:
+            buttons.append([InlineKeyboardButton(
+                text="✅ تأیید و پرداخت از کیف پول",
+                callback_data=f"shop:wallet:confirm:{order_id}",
+            )])
+        else:
+            buttons.append([InlineKeyboardButton(
+                text="➕ افزایش موجودی کیف پول",
+                callback_data="wallet:topup",
+            )])
+        buttons.append([InlineKeyboardButton(
+            text="⬅️ بازگشت به روش‌های پرداخت",
+            callback_data=f"shop:wallet:back:{order_id}",
+        )])
+        await callback.message.edit_text(
+            "💰 <b>پرداخت از کیف پول</b>\n\n"
+            f"🧾 سفارش: <b>#{order_id}</b>\n"
+            f"💳 موجودی: <b>{money(balance)} تومان</b>\n"
+            f"🛒 مبلغ نهایی: <b>{money(amount)} تومان</b>\n"
+            f"💵 مانده پس از خرید: <b>{money(max(0, balance-amount))} تومان</b>\n\n"
+            + ("برای کسر مبلغ و ساخت اکانت تأیید کنید."
+               if sufficient else "❌ موجودی کافی نیست؛ کیف پول را شارژ کنید."),
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+        )
+
+    @router.callback_query(F.data.startswith("shop:wallet:back:"))
+    async def shop_wallet_back(callback: CallbackQuery):
+        try:
+            order_id = int(callback.data.rsplit(":", 1)[-1])
+            token = await user_token(callback.from_user.id)
+            orders = await request_fn("GET", "/v1/store/orders/me", token=token)
+            if not any(int(item.get("id") or 0) == order_id for item in orders):
+                raise RuntimeError("سفارش پیدا نشد")
+            methods = await load_payment_methods()
+        except Exception as exc:
+            await callback.answer(str(exc)[:180], show_alert=True)
+            return
+        await callback.answer()
+        await callback.message.edit_text(
+            "💳 <b>انتخاب روش پرداخت</b>\n\nروش پرداخت را انتخاب کنید:",
+            reply_markup=payment_methods_keyboard(order_id, methods),
+        )
+
+    @router.callback_query(F.data.startswith("shop:wallet:confirm:"))
+    async def shop_wallet_confirm(callback: CallbackQuery):
+        try:
+            order_id = int(callback.data.rsplit(":", 1)[-1])
+            token = await user_token(callback.from_user.id)
+            result = await request_fn(
+                "POST", f"/v1/wallet/orders/{order_id}/pay", token=token,
+            )
+        except Exception as exc:
+            await callback.answer(
+                "پرداخت انجام نشد یا ساخت اکانت نیاز به بررسی دارد: " + str(exc)[:125],
+                show_alert=True,
+            )
+            return
+        await callback.answer()
+        order = result.get("order") or {}
+        if order.get("status") == "fulfilled":
+            description = (
+                "✅ <b>پرداخت با کیف پول موفق بود</b>\n\n"
+                f"🧾 سفارش: <b>#{order_id}</b>\n"
+                f"💰 مبلغ از کیف پول کسر شد.\n"
+                "🎉 اکانت ساخته شد؛ از بخش اشتراک‌های من دریافت کنید."
+            )
+        else:
+            description = (
+                "✅ <b>پرداخت ثبت شد</b>\n\n"
+                f"🧾 سفارش: <b>#{order_id}</b>\n"
+                "ساخت اکانت در حال تکمیل است. مبلغ دوباره کسر نمی‌شود."
+            )
+        await callback.message.edit_text(
+            description,
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📦 اشتراک‌های من", callback_data="subs:list")],
+                [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="main:home")],
+            ]),
         )
 
     @router.callback_query(
