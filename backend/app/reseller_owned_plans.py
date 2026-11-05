@@ -60,37 +60,37 @@ def enabled_protocols(
     *,
     db: Session | None = None,
 ) -> list[str]:
-    # Immutable order snapshots can carry the exact protocol list directly.
+    from .protocol_account_registry import explicit_plan_protocols
+
+    # Use the explicit backing-plan snapshot when it exists; old plans retain
+    # their historic classic flags + modern fallback, then are tier-clamped.
+    chosen: list[str] = []
     snapshot_protocols = getattr(row, "protocols", None)
     if snapshot_protocols is not None:
         try:
-            values = normalize_protocols(snapshot_protocols)
+            chosen = normalize_protocols(snapshot_protocols)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-        if values:
-            return values
 
-    # Reseller-owned plans are backed by the canonical PlanProtocol table.
-    if db is not None:
+    if not chosen and db is not None:
         backing = db.get(Plan, int(row.backing_plan_id))
-        if backing is not None:
-            explicit = plan_protocols(db, backing)
-            # plan_protocols falls back to the five compatibility flags when an
-            # older plan has no PlanProtocol rows. Add modern protocols for that
-            # legacy case so existing reseller plans gain the new protocols
-            # without a schema migration.
-            from .protocol_account_registry import explicit_plan_protocols
+        if backing is not None and explicit_plan_protocols(db, int(backing.id)):
+            chosen = plan_protocols(db, backing)
 
-            if explicit_plan_protocols(db, int(backing.id)):
-                return explicit
+    if not chosen:
+        chosen = _legacy_protocols(row) + list(MODERN_PROTOCOL_KEYS)
 
-    # Old reseller plans predate PlanProtocol. Preserve disabled classic flags,
-    # while making every modern protocol available by default.
-    return _legacy_protocols(row) + list(MODERN_PROTOCOL_KEYS)
+    if db is not None:
+        reseller = db.get(Reseller, int(row.reseller_id))
+        if reseller is None:
+            raise HTTPException(status_code=404, detail="نماینده پیدا نشد")
+        permitted = set(tier_entitlements(db, reseller_tier(reseller))["protocols"])
+        chosen = [p for p in chosen if p in permitted]
+    return list(dict.fromkeys(chosen))
 
 
-def plan_out(row: ResellerBotPlan) -> dict:
-    protocols = enabled_protocols(row)
+def plan_out(row: ResellerBotPlan, db: Session | None = None) -> dict:
+    protocols = enabled_protocols(row, db=db)
     return {
         "id": int(row.id),
         "reseller_plan_id": int(row.id),
