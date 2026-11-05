@@ -202,9 +202,11 @@ def create_payment_intent(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    order = db.get(
-        StoreOrder,
-        payload.order_id,
+    order = (
+        db.query(StoreOrder)
+        .filter(StoreOrder.id == payload.order_id)
+        .with_for_update()
+        .first()
     )
 
     if (
@@ -216,10 +218,10 @@ def create_payment_intent(
             detail="سفارش پیدا نشد",
         )
 
-    if order.status == "fulfilled":
+    if order.status != "pending_payment":
         raise HTTPException(
             status_code=409,
-            detail="این سفارش قبلاً تکمیل شده است",
+            detail="این سفارش قبلاً پرداخت شده یا در حال ساخت است",
         )
 
     method = payload.method.strip().lower()
