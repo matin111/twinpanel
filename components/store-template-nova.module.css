@@ -45,3 +45,44 @@
 @media(max-width:980px){.root .explainGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:650px){.root .explainGrid{grid-template-columns:1fr}.root .explainSection>.sectionHead{margin-top:42px}.root .explainCard{padding:22px 20px}}
 @media(prefers-reduced-motion:reduce){.root .explainCard{transition:none}.root .explainCard:hover{transform:none}}
+
+
+/* Nova v4 inner pages: soften the container edge and keep RTL copy away from it. */
+.root .main{width:min(1320px,calc(100% - 64px));max-width:1320px;margin-inline:auto;min-width:0}
+.root .innerHero{
+ position:relative;isolation:isolate;
+ width:100%;min-width:0;overflow:hidden;
+ padding:clamp(76px,8vw,118px) clamp(30px,5.2vw,78px) clamp(64px,6vw,95px);
+ border-radius:0 0 30px 30px;
+ background:linear-gradient(90deg,transparent 0%,rgba(55,41,109,.12) 28%,rgba(43,32,83,.19) 65%,transparent 100%),
+ radial-gradient(ellipse 64% 80% at 65% 18%,rgba(109,67,204,.24),transparent 80%);
+}
+.root .innerHero::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(90deg,#070b1900 0%,#070b1900 83%,#070b19 100%)}
+.root .innerHero h1{max-width:980px;overflow-wrap:break-word;text-wrap:balance}
+.root .innerHero p{max-width:830px;line-height:2.15;overflow-wrap:anywhere}
+.root .innerHero .primary{margin-top:24px}
+.root .sectionHead{padding-inline:clamp(12px,2vw,30px)}
+.root .explainSection>.sectionHead{padding-inline:clamp(12px,2vw,30px);max-width:1050px}
+.root .explainSections{min-width:0}
+.root .innerHeroUseCases{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+.root .innerHeroUseCases span{background:rgba(139,113,250,.14);border:1px solid #8d7bca55;border-radius:999px;color:#d7dcff;padding:9px 16px;font-size:13px;font-weight:600}
+@media(max-width:850px){
+ .root .main{width:calc(100% - 32px)}
+ .root .innerHero{padding:64px 25px 45px;border-radius:0 0 22px 22px}
+ .root .innerHero h1{font-size:clamp(30px,6vw,48px)}
+ .root .innerHero p{font-size:15px}
+}
+@media(max-width:480px){
+ .root .main{width:calc(100% - 20px)}
+ .root .innerHero{padding:52px 18px 36px}
+ .root .innerHero h1{font-size:clamp(28px,8vw,36px);line-height:1.45;letter-spacing:-.3px}
+ .root .innerHeroUseCases span{font-size:12px;padding:8px 11px}
+}
+
+
+/* Protocol-to-app discovery: visually prominent on every tutorial. */
+.root .sublinkNotice{margin:24px 0 28px;padding:22px 25px;border:1px solid #65dce866;border-radius:19px;background:linear-gradient(110deg,#213653e8,#142140dd);box-shadow:0 12px 36px #142b4a33}
+.root .sublinkNotice strong{font-size:17px;line-height:1.7;color:#8feaff}
+.root .sublinkNotice p{margin:10px 0 0;font-size:14px;line-height:2.2;color:#d4e0f5}
+.root .guideSublinkHint{padding:12px 16px;border-right:3px solid #65dce8;background:#1c344d66;border-radius:8px;font-size:14px;line-height:2;color:#d5eaff}
+@media(max-width:640px){.root .sublinkNotice{padding:18px}.root .sublinkNotice p{font-size:13px}}

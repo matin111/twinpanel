@@ -223,12 +223,30 @@ const v2raySystems:Record<StoreGuidePlatform,StoreGuideEntry>={
   ],fixes:["اگر بسته نصب نشد sudo apt --fix-broken install را اجرا و دوباره تلاش کن.","برای TUN ممکن است دسترسی ریشه یا مجوز شبکه لازم باشد."]},
 };
 
+const SUBLINK_APPLICATION_NOTE="داخل ساب‌لینک اشتراک، برای هر پروتکل بخش برنامه مخصوص یا سازگار همان پروتکل قرار دارد. ابتدا ساب‌لینک را در مرورگر باز کنید، پروتکل را انتخاب کنید و لینک برنامه پیشنهادی برای سیستم‌عامل خود را از همان صفحه بگیرید.";
+
+function withSublinkApplicationGuide(entries:Record<StoreGuidePlatform,StoreGuideEntry>):Record<StoreGuidePlatform,StoreGuideEntry>{
+  return Object.fromEntries(
+    Object.entries(entries).map(([platform,entry])=>[
+      platform,
+      {
+        ...entry,
+        steps:[
+          {title:"ابتدا برنامه مخصوص همین پروتکل را از ساب‌لینک پیدا کنید",detail:SUBLINK_APPLICATION_NOTE},
+          ...entry.steps,
+        ],
+        fixes:[SUBLINK_APPLICATION_NOTE,...entry.fixes],
+      },
+    ])
+  ) as Record<StoreGuidePlatform,StoreGuideEntry>;
+}
+
 export const storeGuideContent:Record<StoreGuideProtocol,{summary:string;systems:Record<StoreGuidePlatform,StoreGuideEntry>}>= {
-  cisco:{summary:"برای Cisco/OpenConnect سه مورد از پنل کاربری لازم است: آدرس سرور، نام کاربری و رمز عبور.",systems:ciscoSystems},
-  openvpn:{summary:"برای OpenVPN فایل اختصاصی .ovpn را از پنل کاربری دریافت می‌کنی؛ بعضی پلن‌ها علاوه بر فایل، نام کاربری و رمز هم می‌خواهند.",systems:openvpnSystems},
-  wireguard:{summary:"برای WireGuard فایل اختصاصی .conf یا QR همان سرور را از پنل کاربری می‌گیری و داخل کلاینت رسمی Import می‌کنی.",systems:wireguardSystems},
-  l2tp:{summary:"برای L2TP/IPsec چهار مقدار لازم است: Server، Username، Password و IPsec Pre-Shared Key (Secret).",systems:l2tpSystems},
-  v2ray:{summary:"برای V2Ray/Xray یک لینک اشتراک یا لینک کانفیگ از نوع VLESS/VMess/Trojan از پنل کاربری دریافت می‌کنی.",systems:v2raySystems},
+  cisco:{summary:"برای Cisco/OpenConnect سه مورد از پنل کاربری لازم است: آدرس سرور، نام کاربری و رمز عبور.",systems:withSublinkApplicationGuide(ciscoSystems)},
+  openvpn:{summary:"برای OpenVPN فایل اختصاصی .ovpn را از پنل کاربری دریافت می‌کنی؛ بعضی پلن‌ها علاوه بر فایل، نام کاربری و رمز هم می‌خواهند.",systems:withSublinkApplicationGuide(openvpnSystems)},
+  wireguard:{summary:"برای WireGuard فایل اختصاصی .conf یا QR همان سرور را از پنل کاربری می‌گیری و داخل کلاینت رسمی Import می‌کنی.",systems:withSublinkApplicationGuide(wireguardSystems)},
+  l2tp:{summary:"برای L2TP/IPsec چهار مقدار لازم است: Server، Username، Password و IPsec Pre-Shared Key (Secret).",systems:withSublinkApplicationGuide(l2tpSystems)},
+  v2ray:{summary:"برای V2Ray/Xray یک لینک اشتراک یا لینک کانفیگ از نوع VLESS/VMess/Trojan از پنل کاربری دریافت می‌کنی.",systems:withSublinkApplicationGuide(v2raySystems)},
 };
 
 export function storeGuideAppImage(_platform:StoreGuidePlatform,_protocol:StoreGuideProtocol):string{
