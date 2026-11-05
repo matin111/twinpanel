@@ -1,0 +1,40 @@
+name: Volume Reseller Two Tier Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/models_reseller.py"
+      - "backend/app/reseller_tier_policy.py"
+      - "backend/app/reseller_owned_plans.py"
+      - "backend/app/reseller_manual_subscriptions.py"
+      - "backend/app/routers/reseller_*.py"
+      - "backend/app/routers/resellers.py"
+      - "backend/scripts/reseller_volume_tier_smoke.py"
+      - "components/admin-resellers-legacy-v3.tsx"
+      - "components/admin-parity-runtime.tsx"
+      - "components/reseller-owned-plans.tsx"
+      - ".github/workflows/volume-reseller-two-tiers-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/models_reseller.py"
+      - "backend/app/reseller_tier_policy.py"
+      - "backend/app/reseller_owned_plans.py"
+      - "backend/app/reseller_manual_subscriptions.py"
+      - "backend/app/routers/reseller_*.py"
+      - "backend/app/routers/resellers.py"
+      - "backend/scripts/reseller_volume_tier_smoke.py"
+      - ".github/workflows/volume-reseller-two-tiers-smoke.yml"
+
+jobs:
+  security-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile reseller backend
+        run: python -m compileall -q backend/app/reseller_tier_policy.py backend/app/models_reseller.py backend/app/reseller_owned_plans.py backend/app/reseller_manual_subscriptions.py backend/app/routers/reseller_admin_v2.py backend/app/routers/resellers.py backend/app/routers/reseller_traffic_admin_v2.py backend/app/routers/reseller_traffic_purchase_v3.py backend/app/routers/reseller_portal.py backend/app/routers/reseller_owned_plans.py backend/app/routers/reseller_sale_v2.py backend/app/routers/reseller_subscription_volume_v2.py
+      - name: Check two volume reseller tiers and API security
+        run: python backend/scripts/reseller_volume_tier_smoke.py
