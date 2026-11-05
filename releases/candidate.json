@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.583",
-  "source_sha": "0bf964ef9b2a9c8bf5fe52ddf67a4fc83c7aba1a",
+  "version": "1.1.0-rc.584",
+  "source_sha": "58836572423cc48f4fa00e7006a7cb2846d83864",
   "notes": {
-    "fa": "تکمیل توضیحات فارسی نمایندگی، آی‌پی ثابت، پلن‌ها، آموزش و سوالات متداول قالب چهار؛ افزودن چت آنلاین به همه صفحات و اصلاح نمایش و خرید ۱۵ پروتکل و چیدمان موبایل.",
-    "en": "Complete Nova Template 4 marketing explanations and FAQs, enable online chat on every page, support all 15 plan protocols and improve responsive layout."
+    "fa": "تکمیل راهنمای تمام پروتکل‌ها با تأکید بر برنامه مخصوص هر پروتکل داخل ساب‌لینک؛ اصلاح فاصله و حاشیه سکشن‌های داخلی راست‌چین؛ توضیح کاربرد IP ثابت برای ترید مجاز و مدیریت پیج‌های مهم اینستاگرام.",
+    "en": "Highlight protocol-specific app recommendations inside each subscription link across all guides; fix RTL inner hero edge spacing; explain static IP use for compliant trading and business Instagram accounts."
   }
 }
