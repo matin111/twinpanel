@@ -17,6 +17,8 @@ const customerMenu=[
   ["👤","حساب من","My account"],
 ] as const;
 
+type AdminOperator={telegram_id:number;admin_user_id:number};
+type AdminLinkCode={code:string;expires_at:string};
 type BroadcastTargets={total:number};
 type BroadcastResult={ok:boolean;total:number;sent:number;failed:number;blocked:number};
 
@@ -49,6 +51,8 @@ export function AdminTelegramLegacyPage(){
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
   const [broadcastText,setBroadcastText]=useState("");
+  const [adminLinkCode,setAdminLinkCode]=useState("");
+  const [adminOperators,setAdminOperators]=useState<AdminOperator[]>([]);
   const [broadcastTargets,setBroadcastTargets]=useState<number|null>(null);
   const [broadcastResult,setBroadcastResult]=useState<BroadcastResult|null>(null);
 
@@ -62,6 +66,10 @@ export function AdminTelegramLegacyPage(){
       setStatusLoaded(true);
       setError(e instanceof Error?e.message:String(e));
     }
+    try{
+      const grants=await telegramAdminRequest<{operators:AdminOperator[]}>("/v1/admin/telegram-bot/admin-access/operators");
+      setAdminOperators(grants.operators||[]);
+    }catch{setAdminOperators([]);}
     try{
       const targets=await telegramAdminRequest<BroadcastTargets>("/v1/admin/telegram-bot/broadcast/targets");
       setBroadcastTargets(Number(targets.total||0));
@@ -233,6 +241,44 @@ export function AdminTelegramLegacyPage(){
         <div className="tg-customer-menu">
           {customerMenu.map(item=><article key={item[1]}><i>{item[0]}</i><span><b>{pick(item[1],item[2])}</b></span></article>)}
         </div>
+      </section>
+
+      <section className="tg-legacy-card">
+        <div className="tg-section-head">
+          <div>
+            <small>{pick("دسترسی امن مدیریت","SECURE ADMIN ACCESS")}</small>
+            <h2>{pick("مدیریت پنل از طریق تلگرام","Manage panel from Telegram")}</h2>
+          </div>
+        </div>
+        <p>{pick(
+          "برای فعال‌کردن منوی مدیریت ربات، یک کد یک‌بارمصرف بسازید و آن را فقط در گفت‌وگوی خصوصی با ربات ارسال کنید. کد پس از ۵ دقیقه منقضی می‌شود.",
+          "Create a one-time code and send it privately to your bot. Code expires after 5 minutes."
+        )}</p>
+        <div className="tg-action-row">
+          <button className="primary" disabled={Boolean(busy)} onClick={()=>void act("adminlink",pick("کد اتصال ساخته شد","Link code created"),async()=>{
+            const result=await telegramAdminRequest<AdminLinkCode>("/v1/admin/telegram-bot/admin-access/code",{method:"POST"});
+            setAdminLinkCode(result.code);
+          })}>{pick("ساخت کد اتصال ادمین","Create admin link code")}</button>
+        </div>
+        {adminLinkCode&&<div className="tg-token-panel">
+          <label className="field"><span>{pick("کد یک‌بارمصرف","One-time code")}</span>
+            <input readOnly value={adminLinkCode} dir="ltr" onFocus={e=>e.currentTarget.select()}/>
+          </label>
+          <small dir="ltr">/adminlink {adminLinkCode}</small>
+          <p>{pick("بعد از اتصال، دستور /admin منوی مدیریت را باز می‌کند.","After linking, use /admin to open the management menu.")}</p>
+        </div>}
+        {adminOperators.length>0&&<div className="tg-broadcast-panel">
+          <b>{pick("ادمین‌های تلگرام متصل‌شده","Linked Telegram operators")}</b>
+          {adminOperators.map(operator=><div className="tg-action-row" key={operator.telegram_id}>
+            <span dir="ltr">{operator.telegram_id}</span>
+            <button className="ghost danger" disabled={Boolean(busy)} onClick={()=>void (async()=>{
+              if(!window.confirm(pick("دسترسی این ادمین به ربات لغو شود؟","Revoke this Telegram admin?")))return;
+              await act("revoke",pick("دسترسی ادمین لغو شد","Admin access revoked"),async()=>{
+                await telegramAdminRequest("/v1/admin/telegram-bot/admin-access/operators/"+operator.telegram_id,{method:"DELETE"});
+              });
+            })()}>{pick("لغو دسترسی","Revoke")}</button>
+          </div>)}
+        </div>}
       </section>
 
       <section className="tg-legacy-card">
