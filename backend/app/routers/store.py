@@ -185,7 +185,7 @@ def _queue_fulfilled_order_notification(order: StoreOrder, db: Session) -> None:
         .order_by(PaymentIntent.id.desc())
         .first()
     )
-    if not intent:
+    if not intent and order.payment_method != "wallet":
         return
 
     subscription = db.get(Subscription, int(order.subscription_id))
@@ -197,18 +197,22 @@ def _queue_fulfilled_order_notification(order: StoreOrder, db: Session) -> None:
 
     auto_verified = str(getattr(intent, "status", "") or "").lower() == "auto_verified"
     event_prefix = "payment-auto-approved" if auto_verified else "payment-approved"
+    wallet_payment = order.payment_method == "wallet"
+    event_key = (
+        f"wallet-purchase:order:{int(order.id)}:subscription:{int(order.subscription_id)}"
+        if wallet_payment else
+        f"{event_prefix}:order:{int(order.id)}:"
+        f"payment:{int(intent.id)}:"
+        f"subscription:{int(order.subscription_id)}"
+    )
 
     queue_telegram_notification(
         db,
         user_id=int(order.user_id),
-        event_key=(
-            f"{event_prefix}:order:{int(order.id)}:"
-            f"payment:{int(intent.id)}:"
-            f"subscription:{int(order.subscription_id)}"
-        ),
+        event_key=event_key,
         kind="payment_approved",
         payload={
-            "payment_id": int(intent.id),
+            "payment_id": int(intent.id) if intent else None,
             "order_id": int(order.id),
             "subscription_id": int(order.subscription_id),
             "username": username,
