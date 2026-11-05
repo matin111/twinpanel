@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.582",
-  "source_sha": "24f322aecf5afd1773fcee7abab435e152fabc77",
+  "version": "1.1.0-rc.583",
+  "source_sha": "0bf964ef9b2a9c8bf5fe52ddf67a4fc83c7aba1a",
   "notes": {
-    "fa": "افزودن قالب اختصاصی چهارم Nova با صفحات مستقل فروش VPN، آی‌پی ثابت، نمایندگی، آموزش تعاملی، سوالات متداول، مقالات و تنظیمات بنر.",
-    "en": "Ship Nova Template 4: multi-page VPN storefront, static IP and reseller pages, interactive guides, FAQs, educational articles and customizable hero banner."
+    "fa": "تکمیل توضیحات فارسی نمایندگی، آی‌پی ثابت، پلن‌ها، آموزش و سوالات متداول قالب چهار؛ افزودن چت آنلاین به همه صفحات و اصلاح نمایش و خرید ۱۵ پروتکل و چیدمان موبایل.",
+    "en": "Complete Nova Template 4 marketing explanations and FAQs, enable online chat on every page, support all 15 plan protocols and improve responsive layout."
   }
 }
