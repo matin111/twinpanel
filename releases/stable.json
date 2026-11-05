@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.593",
+  "version": "1.1.0-rc.594",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-05T16:21:18Z",
+  "released_at": "2026-11-05T21:49:06Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "168358a285b1bce96880e0b049fcbc6607b4c403",
+  "source_sha": "0f2f670d4983d2476142152b4f6cabac88c7f99b",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.593/twinpanel-1.1.0-rc.593-linux-x86_64.tar.gz",
-    "sha256": "0c72785a4e9d7cd18d72b91368382fe1928e54becf74af32dbadbcd40dbb3a09",
-    "size_bytes": 28741412
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.594/twinpanel-1.1.0-rc.594-linux-x86_64.tar.gz",
+    "sha256": "8836210dfa53b0643caaaa567a2ad488bb05b3272f7a4515119c3b5d6a0c80d6",
+    "size_bytes": 28758022
   },
   "notes": {
-    "fa": "افزودن پرداخت مستقیم خرید اشتراک از کیف پول در ربات اصلی: نمایش موجودی و مبلغ، تأیید دومرحله‌ای، کسر اتمیک و بدون تکرار، تحویل QR/لینک اکانت توسط Worker قابل بازیابی؛ جلوگیری از پرداخت تکراری روش‌های دیگر.",
-    "en": "Main Telegram bot subscription wallet checkout: balance/price preview, two-step confirmation, idempotent row-locked charge, durable recoverable fulfillment with subscription QR delivery, and prevention of concurrent external payment methods."
+    "fa": "نمایش تصویر شاخص در بالای عنوان کارت‌های بلاگ و بالای عنوان صفحه مقاله؛ طراحی واکنش‌گرا، تصویر جایگزین گرافیکی برای مطالب بدون عکس و حفظ محتوای موجود.",
+    "en": "Show uploaded cover images above article titles on blog listing cards and article pages, with responsive cards and decorative fallback."
   }
 }
