@@ -2564,11 +2564,29 @@ async def _telegram_notification_worker(bot):
                     continue
 
                 try:
-                    await bot.send_message(
-                        chat_id=telegram_id,
-                        text=text,
-                        reply_markup=keyboard,
-                    )
+                    # A successful purchase is delivered as a single
+                    # QR photo with the full account details in its caption.
+                    # Other notification kinds remain ordinary text messages.
+                    if (
+                        row.kind == "payment_approved"
+                        and subscription_link.startswith("https://")
+                    ):
+                        from .telegram_subscription_qr_v1 import (
+                            subscription_qr_photo,
+                        )
+
+                        await bot.send_photo(
+                            chat_id=telegram_id,
+                            photo=subscription_qr_photo(subscription_link),
+                            caption=text,
+                            reply_markup=keyboard,
+                        )
+                    else:
+                        await bot.send_message(
+                            chat_id=telegram_id,
+                            text=text,
+                            reply_markup=keyboard,
+                        )
 
                     row.delivered_at = (
                         datetime.utcnow()

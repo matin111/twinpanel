@@ -8,6 +8,7 @@ APP = Path(__file__).resolve().parents[1] / "app"
 shared = (APP / "telegram_subscription_qr_v1.py").read_text("utf-8")
 owned = (APP / "telegram_runtime_bot.py").read_text("utf-8")
 imported = (APP / "telegram_subscription_import_bot_v1.py").read_text("utf-8")
+purchase_delivery = owned[owned.index('if (\n                    row.kind\n                    == "payment_approved"\n                ):'):]
 
 for content in (shared, owned, imported):
     compile(content, "<telegram QR>", "exec")
@@ -21,6 +22,11 @@ assert "await send_subscription_link_and_qr(" in owned
 assert "await send_subscription_link_and_qr(" in imported
 assert "🔗 ساب‌لینک + QR Code" in owned
 assert "🔗 ساب‌لینک + QR Code" in imported
+assert 'row.kind == "payment_approved"' in purchase_delivery
+assert 'photo=subscription_qr_photo(subscription_link)' in purchase_delivery
+assert 'caption=text' in purchase_delivery
+assert 'await bot.send_photo(' in purchase_delivery
+assert 'await bot.send_message(' in purchase_delivery
 assert "subimp:refresh:" in imported
 assert "subimprenew:" in imported
 assert "subimp:ask:password:" in imported
