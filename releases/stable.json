@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.591",
+  "version": "1.1.0-rc.592",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-05T12:40:46Z",
+  "released_at": "2026-11-05T13:21:11Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e8a87a1cd6243d2b47c557a05a5f34a0bbe4977b",
+  "source_sha": "7752b4316097e87bcbeb355cf90a2c9eff4e4fb8",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.591/twinpanel-1.1.0-rc.591-linux-x86_64.tar.gz",
-    "sha256": "d0ad4e37d8397d09fb7ec332ca038704beba19049e9bb7f8b79a7aef011d775f",
-    "size_bytes": 28727438
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.592/twinpanel-1.1.0-rc.592-linux-x86_64.tar.gz",
+    "sha256": "4cfd189166052314b9d40abaa40d32e5bf54b1de0584499affedbc15ccc49769",
+    "size_bytes": 28784775
   },
   "notes": {
-    "fa": "رفع به‌هم‌ریختگی صفحه مدیریت بلاگ قالب چهار: اصلاح تداخل سایدبار با CSS عمومی پنل، فرم ویرایش تمام‌عرض، نمایش درست لیست مقالات و بهبود موبایل.",
-    "en": "Fix Nova admin blog editor broken layout: isolate article list from global fixed aside styles, restore full width editing form and responsive columns."
+    "fa": "افزودن امکان آپلود تصویر شاخص و درج عکس بین پاراگراف‌های بلاگ قالب چهار؛ پیش‌نمایش و نمایش واکنش‌گرای تصاویر در مقاله؛ فایل‌های JPG، PNG و WebP تا ۸ مگابایت.",
+    "en": "Add uploaded cover and inline images for Nova blog articles, including previews and responsive rendering. Supports JPG/PNG/WebP, max 8 MB per image."
   }
 }
