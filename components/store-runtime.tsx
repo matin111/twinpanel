@@ -1,6 +1,7 @@
 "use client";
 
 import {useEffect,useMemo,useState,type CSSProperties} from "react";
+import {usePathname} from "next/navigation";
 import {getCustomerToken} from "../lib/customer-api";
 import {planProtocols,StorePlan,storeRuntimeApi} from "../lib/store-runtime-api";
 import {useI18n} from "../lib/i18n";
@@ -22,6 +23,7 @@ import {StoreTemplateRuntime} from "./store-template-runtime-registry";
 
 export function StoreRuntime2027(){
   const {pick}=useI18n();
+  const pathname=usePathname()||"/";
   const [plans,setPlans]=useState<StorePlan[]>([]);
   const [activeCategory,setActiveCategory]=useState("");
   const [activeType,setActiveType]=useState("");
@@ -33,13 +35,17 @@ export function StoreRuntime2027(){
   const [buying,setBuying]=useState<number|null>(null);
   const [message,setMessage]=useState("");
 
+  const currentSettings=settings??DEFAULT_STOREFRONT_SETTINGS;
+  const templateId=resolveStoreTemplateId(currentSettings.active_template);
+  const novaServices=templateId==="nova-multipage-2027"&&pathname==="/vpn-services";
+  const novaHome=templateId==="nova-multipage-2027"&&pathname==="/";
   const types=useMemo(()=>planTypes(plans),[plans]);
   const typeCounts=useMemo(()=>planTypeCounts(plans),[plans]);
-  const selectedType=types.includes(activeType)?activeType:(types[0]||"");
+  const selectedType=novaServices||novaHome?(types.includes(activeType)?activeType:""):(types.includes(activeType)?activeType:(types[0]||""));
   const typedPlans=useMemo(()=>filterPlansByType(plans,selectedType),[plans,selectedType]);
   const categories=useMemo(()=>planCategories(typedPlans),[typedPlans]);
   const categoryCounts=useMemo(()=>planCategoryCounts(typedPlans),[typedPlans]);
-  const selectedCategory=categories.includes(activeCategory)?activeCategory:(categories[0]||"");
+  const selectedCategory=novaServices||novaHome?(categories.includes(activeCategory)?activeCategory:""):(categories.includes(activeCategory)?activeCategory:(categories[0]||""));
   const visiblePlans=useMemo(()=>filterPlansByCategory(typedPlans,selectedCategory),[typedPlans,selectedCategory]);
 
   const load=async()=>{
@@ -89,8 +95,6 @@ export function StoreRuntime2027(){
     finally{setBuying(null);}
   };
 
-  const currentSettings=settings??DEFAULT_STOREFRONT_SETTINGS;
-  const templateId=resolveStoreTemplateId(currentSettings.active_template);
   const rawTemplateOptions=templateSettings[templateId]||{};
   const hasTemplateOptions=Object.keys(rawTemplateOptions).length>0;
   const applied=hasTemplateOptions?applyStoreTemplateOptions(currentSettings,templateId,rawTemplateOptions):{settings:currentSettings,options:{} as StoreTemplateOptionMap};
@@ -137,6 +141,6 @@ export function StoreRuntime2027(){
   return <div data-store-theme-engine="v1" data-store-template-active={templateId} data-store-template-customized={hasTemplateOptions?"true":"false"} style={themeStyle}>
     <StorefrontSeoRuntime settings={effectiveSettings}/>
     <StoreTemplateRuntime templateId={templateId} themeOptions={effectiveOptions} {...templateProps}/>
-    <PlanCategoryTabs categories={categories} active={selectedCategory} onChange={setActiveCategory} counts={categoryCounts} planTypes={types} activeType={selectedType} onTypeChange={value=>{setActiveType(value);setActiveCategory("");}} typeCounts={typeCounts} portalToStorePlans/>
+    {(templateId!=="nova-multipage-2027"||novaServices)&&<PlanCategoryTabs categories={categories} active={selectedCategory} onChange={setActiveCategory} counts={categoryCounts} planTypes={types} activeType={selectedType} onTypeChange={value=>{setActiveType(value);setActiveCategory("");}} typeCounts={typeCounts} includeAll={novaServices} portalToStorePlans portalTargetSelector={novaServices?"#nova-service-filters":undefined}/> }
   </div>;
 }
