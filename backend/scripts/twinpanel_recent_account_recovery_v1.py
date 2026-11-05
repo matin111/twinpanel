@@ -48,8 +48,9 @@ def get_incomplete():
             missing=sorted(selected-existing)
             if any(p in recovery.MODERN_PROTOCOL_KEYS for p in missing):
                 candidates.append((id_,len(missing)))
-            if len(candidates)>=MAX_ACCOUNTS:break
-        return candidates
+        # Prioritize the largest missing sets instead of repeatedly starving
+        # older, heavily incomplete new purchases behind nearly finished ones.
+        return sorted(candidates, key=lambda item: (-item[1], item[0]))[:MAX_ACCOUNTS]
     finally:db.close()
 
 async def main():
