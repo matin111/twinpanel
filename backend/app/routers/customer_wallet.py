@@ -22,6 +22,8 @@ from ..deps import (
 )
 from ..models import User
 from ..payment_models import PaymentSettings
+from ..store_models import StoreOrder
+from .store import _fulfill_paid_order, _order_out
 
 
 router = APIRouter(
@@ -250,6 +252,92 @@ def _transaction_out(
         "created_at":
             row.created_at,
     }
+
+
+@router.post("/orders/{order_id}/pay")
+async def pay_store_order_from_wallet(
+    order_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Charge a customer's wallet once and fulfill their own existing order.
+
+    The order row is locked before the wallet row, so retries cannot produce
+    duplicate deductions. Fulfillment errors leave a paid order recoverable.
+    """
+    order = (
+        db.query(StoreOrder)
+        .filter(StoreOrder.id == order_id, StoreOrder.user_id == int(user.id))
+        .with_for_update()
+        .first()
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="سفارش پیدا نشد")
+
+    if order.payment_method == "wallet" and order.status in {
+        "paid", "provisioning", "provision_failed", "fulfilled"
+    }:
+        # A prior debit has already been committed. Never charge again.
+        result = _order_out(order) if order.status == "fulfilled" else None
+        if result is None:
+            result = await _fulfill_paid_order(order_id, db)
+        return {"ok": True, "already_paid": True, "order": result}
+
+    if order.status != "pending_payment":
+        raise HTTPException(status_code=409, detail="این سفارش قابل پرداخت با کیف پول نیست")
+
+    amount = int(order.amount_toman or 0)
+    if amount <= 0:
+        raise HTTPException(status_code=409, detail="مبلغ سفارش برای پرداخت کیف پول معتبر نیست")
+
+    wallet = (
+        db.query(CustomerWallet)
+        .filter(CustomerWallet.user_id == int(user.id))
+        .with_for_update()
+        .first()
+    )
+    balance = int(wallet.balance_toman or 0) if wallet else 0
+    if balance < amount:
+        raise HTTPException(
+            status_code=402,
+            detail=f"موجودی کیف پول کافی نیست (موجودی: {balance:,} تومان؛ مبلغ: {amount:,} تومان)",
+        )
+
+    # An approved payment cannot coexist with a second wallet charge.
+    from ..payment_models import PaymentIntent
+    approved = db.query(PaymentIntent.id).filter(
+        PaymentIntent.order_id == order_id,
+        PaymentIntent.status.in_(["approved", "auto_verified"]),
+    ).first()
+    if approved:
+        raise HTTPException(status_code=409, detail="این سفارش قبلاً پرداخت شده است")
+
+    reference = f"store-order-wallet:{order_id}"
+    prior = db.query(CustomerWalletTransaction.id).filter(
+        CustomerWalletTransaction.user_id == int(user.id),
+        CustomerWalletTransaction.reference == reference,
+    ).first()
+    if prior:
+        raise HTTPException(status_code=409, detail="این سفارش قبلاً از کیف پول کسر شده است")
+
+    wallet.balance_toman = balance - amount
+    wallet.updated_at = datetime.utcnow()
+    db.add(CustomerWalletTransaction(
+        user_id=int(user.id),
+        amount_toman=-amount,
+        kind="purchase",
+        description=f"پرداخت خرید اشتراک - سفارش #{order_id}",
+        reference=reference,
+    ))
+    order.status = "paid"
+    order.payment_method = "wallet"
+    order.payment_reference = reference
+    order.paid_at = datetime.utcnow()
+    db.commit()
+
+    # Do not refund or debit again if asynchronous provisioning fails.
+    result = await _fulfill_paid_order(order_id, db)
+    return {"ok": True, "already_paid": False, "order": result}
 
 
 @router.get("/me")
