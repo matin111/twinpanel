@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.594",
+  "version": "1.1.0-rc.595",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-05T21:49:06Z",
+  "released_at": "2026-11-05T22:27:12Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "0f2f670d4983d2476142152b4f6cabac88c7f99b",
+  "source_sha": "c79e5692682d8d0057297efdb8166b26c68ac24e",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.594/twinpanel-1.1.0-rc.594-linux-x86_64.tar.gz",
-    "sha256": "8836210dfa53b0643caaaa567a2ad488bb05b3272f7a4515119c3b5d6a0c80d6",
-    "size_bytes": 28758022
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.595/twinpanel-1.1.0-rc.595-linux-x86_64.tar.gz",
+    "sha256": "a36e51cd29b79469771404c7ee6af42bb7270e329f343d9df561f07b02738744",
+    "size_bytes": 28765447
   },
   "notes": {
-    "fa": "نمایش تصویر شاخص در بالای عنوان کارت‌های بلاگ و بالای عنوان صفحه مقاله؛ طراحی واکنش‌گرا، تصویر جایگزین گرافیکی برای مطالب بدون عکس و حفظ محتوای موجود.",
-    "en": "Show uploaded cover images above article titles on blog listing cards and article pages, with responsive cards and decorative fallback."
+    "fa": "ویرایش دستی اشتراک با هر ۱۵ پروتکل و دکمه ساخت کانفیگ برای همان اشتراک؛ نگه‌داشتن ساخت خودکار انتقالی‌ها در حالت توقف عملیاتی و تمرکز بازیابی روی اکانت‌های جدید.",
+    "en": "Admin subscription editor supports all 15 protocols and explicit per-account manual provisioning; imported-account bulk backfill stays operationally paused while recent-account recovery remains enabled."
   }
 }
