@@ -1,7 +1,9 @@
 "use client";
 import Link from "next/link";
 import {usePathname} from "next/navigation";
-import {useState} from "react";
+import {useEffect,useState} from "react";
+import {loadStoreTemplateSettings} from "../lib/store-template-settings-api";
+import {NOVA_ARTICLES,novaArticlesWithOverrides} from "../lib/nova-articles";
 import {useBranding} from "../lib/branding";
 import {STORE_PROTOCOL_CATALOG} from "../lib/store-protocol-catalog";
 import {resellerDetailSections,staticIpDetailSections,serviceDetailSections,guidesDetailSections,aboutDetailSections,type NovaDetailSection} from "../lib/nova-marketing-detail-content";
@@ -22,7 +24,7 @@ const faqs=[
 ["آیا IP ثابت برای ترید و مدیریت پیج مهم اینستاگرام مناسب است؟","یک IP خروجی پایدار ممکن است برای مدیریت پیج تجاری یا ورود به ابزارهای مالیِ مجاز از مسیر نسبتاً ثابت مفید باشد. بااین‌حال هیچ تضمینی برای جلوگیری از محدودشدن حساب وجود ندارد؛ قوانین منطقه‌ای و شرایط صرافی یا اینستاگرام، امنیت دستگاه و تأیید دومرحله‌ای را هم رعایت کنید. پیش از خرید، اختصاصی یا مشترک بودن IP و کشور خروجی را بررسی کنید."],
 ["آیا می‌توانم اشتراکم را تمدید کنم؟","اگر تمدید برای محصول شما فعال باشد، از حساب کاربری به بخش اشتراک‌های من بروید و گزینه تمدید را انتخاب کنید. شرایط تمدید، باقی‌ماندن حجم، زمان اعتبار و قیمت مطابق قوانین همان پلن محاسبه می‌شود."],
 ["اگر کانفیگ وصل نشد یا لینک خالی بود چه کنم؟","اول اعتبار و حجم اشتراک و اتصال اینترنت را بررسی کنید. بعد مطمئن شوید برنامه با پروتکل موردنظر سازگار و به‌روز است. لینک اشتراک را در بخش Import مناسب وارد کنید؛ در صورت وجود سرور جایگزین همان پلن را امتحان کنید. برای پیگیری، شناسه سفارش و پیام خطا را بدون ارسال رمز به پشتیبانی بدهید."],
-["آیا اکانت آزمایشی ارائه می‌شود؟","فقط اگر طرح آزمایشی در پنل یا ربات فعال شده باشد می‌توانید طبق شرایط نمایش‌داده‌شده آن را دریافت کنید. اعتبار، حجم و امکان دریافت مجدد ممکن است محدود باشد؛ وجود قابلیت در سامانه به معنی فعال‌بودن دائمی آن نیست."],
+["اکانت تست چیست و چطور دریافت می‌شود؟","اگر قابلیت اکانت تست در پنل یا ربات فعال باشد، می‌توانید با محدودیت زمان و حجم تعیین‌شده یک‌بار آن را دریافت کنید. وجود این قابلیت در پنل به معنی فعال بودن آن برای همه کاربران نیست."],
 ["برای نمایندگی چه ابزارهایی دریافت می‌کنم و هزینه آن چقدر است؟","پس از تأیید درخواست، بسته به سطح دسترسی، پنل نمایندگی، ربات فروش، امکان ثبت سفارش و مدیریت مشتری و حساب اعتباری در اختیار شما قرار می‌گیرد. قیمت همکاری، اعتبار اولیه، محصولات قابل فروش و شرایط تسویه ثابت و عمومی نیستند و باید پیش از فعال‌سازی از مدیریت دریافت شوند."],
 ["چطور درخواست نمایندگی بدهم و فروش را آغاز کنم؟","از صفحه نمایندگی، گزینه درخواست همکاری را انتخاب کنید و حجم تقریبی فروش، نوع مشتریان و راه تماس را اعلام کنید. پس از بررسی شرایط، سطح دسترسی و اعتبار تعیین می‌شود؛ سپس ابزارهای فعال‌شده را دریافت می‌کنید و می‌توانید فروش پلن‌های مجاز را شروع کنید. درآمد یا تعداد فروش تضمین‌شده نیست."],
 ];
@@ -41,6 +43,15 @@ export function NovaMultipageTemplate({plans,loading,error,message,buying,onBuy,
  const {brand}=useBranding();
  const [menuOpen,setMenuOpen]=useState(false);
  const [faqSearch,setFaqSearch]=useState("");
+ const [articles,setArticles]=useState(NOVA_ARTICLES);
+ useEffect(()=>{
+  if(pathname!=="/vpn-blog")return;
+  let mounted=true;
+  void loadStoreTemplateSettings().then(envelope=>{
+   if(mounted)setArticles(novaArticlesWithOverrides(envelope.templates?.["nova-multipage-2027"]?.nova_articles));
+  }).catch(()=>{});
+  return()=>{mounted=false;};
+ },[pathname]);
  const [guidePlatform,setGuidePlatform]=useState<StoreGuidePlatform>("android");
  const [guideProtocol,setGuideProtocol]=useState("wireguard");
  const legacyGuides:StoreGuideProtocol[]=["cisco","openvpn","wireguard","l2tp","v2ray"];
@@ -87,7 +98,7 @@ export function NovaMultipageTemplate({plans,loading,error,message,buying,onBuy,
  <details><summary>رفع مشکلات احتمالی</summary><ul>{guide.fixes.map(f=><li key={f}>{f}</li>)}</ul></details></div>
  <div className={styles.guideMedia}>{guideApp&&<img src={guideApp} alt={"نمای برنامه "+guide.client} loading="lazy"/>}{guideImage&&<img src={guideImage} alt={"تصاویر مراحل اتصال "+guide.client} loading="lazy"/>}</div></div></section></>;
  else if(pathname==="/vpn-faq")content=<><section className={styles.innerHero}><span className={styles.pill}>HELP CENTER</span><h1>{option("nova_faq_title","پاسخ سوالات متداول VPN")}</h1><p>{option("nova_faq_description","از خرید و تمدید گرفته تا پروتکل‌ها، IP ثابت و نمایندگی.")}</p></section><input className={styles.search} placeholder="جست‌وجو در سوالات…" value={faqSearch} onChange={e=>setFaqSearch(e.target.value)}/>{faqBlock(editedFaqs.filter(x=>x.join(" ").includes(faqSearch.trim()))) }</>;
- else if(pathname==="/vpn-blog")content=<><section className={styles.innerHero}><span className={styles.pill}>LEARN & EXPLORE</span><h1>{option("nova_blog_title","مجله آموزش و راهنمای VPN")}</h1><p>{option("nova_blog_description","مطالب کاربردی برای انتخاب سرویس، آشنایی با پروتکل‌ها و رفع مشکلات رایج اتصال.")}</p></section>{heading("راهنمای انتخاب","مطالب پیشنهادی","موضوعات آموزشی و راهنمای خرید؛ بدون ادعای تضمین سرعت یا سازگاری همیشگی.")}<div className={styles.tiles}><Link href="/vpn-blog/vpn-protocol-guide"><strong>{option("nova_blog_featured_1_title","مقایسه روش‌های اتصال")}</strong><span>{option("nova_blog_featured_1_description","آشنایی با پروتکل‌های موجود در سامانه")} ←</span></Link><Link href="/vpn-blog/static-ip-vs-vpn"><strong>{option("nova_blog_featured_2_title","IP ثابت چیست؟")}</strong><span>{option("nova_blog_featured_2_description","کاربردها و محدودیت‌های IP ثابت")} ←</span></Link><Link href="/vpn-blog/how-to-connect-vpn"><strong>{option("nova_blog_featured_3_title","راهنمای راه‌اندازی")}</strong><span>{option("nova_blog_featured_3_description","مراحل دریافت لینک و اتصال")} ←</span></Link></div></>;
+ else if(pathname==="/vpn-blog")content=<><section className={styles.innerHero}><span className={styles.pill}>وبلاگ متین VPN</span><h1>{option("nova_blog_title","وبلاگ و راهنمای VPN")}</h1><p>{option("nova_blog_description","مقاله‌ها و راهنماهای خرید اشتراک، پروتکل‌ها، IP ثابت و روش اتصال.")}</p></section>{heading("مقاله‌های منتشرشده","آخرین مطالب","راهنماهای موجود برای مطالعه و آموزش کاربران.")}<div className={styles.tiles}>{articles.map(article=><Link href={"/vpn-blog/"+article.slug} key={article.slug}><strong>{article.title}</strong><span>{article.description||"مطالعه مقاله"} ←</span></Link>)}</div>{articles.length===0&&<p>هنوز مقاله‌ای منتشر نشده است.</p>}</>;
  else if(pathname==="/vpn-about")content=<><section className={styles.innerHero}><span className={styles.pill}>ABOUT & SUPPORT</span><h1>{option("nova_about_title","درباره")} {brand.name}</h1><p>{option("nova_about_description",brand.tagline||"پلتفرم فروش و مدیریت اشتراک‌های اتصال چندپروتکلی، با تمرکز بر انتخاب روشن و پشتیبانی از کاربران.")}</p><a className={styles.primary} href={support} target={support.startsWith("http")?"_blank":undefined} rel="noopener noreferrer">ارتباط با پشتیبانی ←</a></section><DetailSections sections={aboutDetailSections}/>{heading("آنچه ارائه می‌کنیم","شفافیت در خرید و خدمات","محتوای دقیق محصولات و شرایط تحویل در صفحه هر پلن ارائه می‌شود.")}<div className={styles.features}>{advantages.map(([ic,t,d])=><article key={t}><span>{ic}</span><h3>{t}</h3><p>{d}</p></article>)}</div></>;
  else content=<NovaPremiumHomepage plans={plans} loading={loading} buying={buying} onBuy={onBuy} options={themeOptions} support={support} brandName={brand.name}/>;
  return <div className={styles.root} dir="rtl" style={{"--nova-accent":option("theme_primary","#8b5cf6"),"--nova-cyan":option("theme_secondary","#27c8e8")} as React.CSSProperties}><header className={styles.header}><Link className={styles.brand} href="/"><img src={brand.logoUrl} alt="" /><b>{brand.name}</b></Link><button className={styles.mobileButton} onClick={()=>setMenuOpen(v=>!v)} aria-label="باز کردن فهرست" aria-expanded={menuOpen}>☰</button><nav className={menuOpen?styles.navOpen:styles.nav}>{menus.map(([href,title])=><Link onClick={()=>setMenuOpen(false)} className={pathname===href?styles.current:""} key={href} href={href}>{title}</Link>)}</nav><Link className={styles.account} href="/login">حساب کاربری ↗</Link></header><main className={styles.main}>{content}{error&&<p className={styles.notice} role="alert">{error}</p>}{message&&<p className={styles.notice} role="status">{message}</p>}</main><footer className={styles.footer}><div><b>{brand.name}</b><p>{brand.tagline||"راهکارهای منعطف برای اتصال و مدیریت اشتراک VPN"}</p></div><nav>{menus.map(([href,title])=><Link key={href} href={href}>{title}</Link>)}</nav><p>© {new Date().getFullYear()} · تمامی حقوق محفوظ است.</p></footer></div>;

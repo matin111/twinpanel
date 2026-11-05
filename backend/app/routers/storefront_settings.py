@@ -216,9 +216,29 @@ def _response(item: StorefrontSettings) -> dict[str, Any]:
     return result
 
 
-def _template_response(item: StorefrontSettings) -> dict[str, Any]:
+def _template_response(item: StorefrontSettings, include_drafts: bool = False) -> dict[str, Any]:
+    templates = _stored_template_options(item)
+    if not include_drafts:
+        # The template settings endpoint is public. Never expose the body of an
+        # unpublished blog draft via the public template-options payload.
+        nova = templates.get("nova-multipage-2027")
+        if isinstance(nova, dict) and isinstance(nova.get("nova_articles"), list):
+            defaults = {"vpn-protocol-guide", "static-ip-vs-vpn", "how-to-connect-vpn"}
+            public_articles = []
+            for article in nova["nova_articles"]:
+                if not isinstance(article, dict):
+                    continue
+                if article.get("published") is True:
+                    public_articles.append(article)
+                elif article.get("slug") in defaults:
+                    # A tombstone hides one of the built-in starter articles.
+                    public_articles.append({
+                        "slug": article["slug"], "title": "مخفی", "body": "مخفی",
+                        "published": False,
+                    })
+            nova["nova_articles"] = public_articles
     return {
-        "templates": _stored_template_options(item),
+        "templates": templates,
         "updated_at": item.updated_at.isoformat() if item.updated_at else None,
     }
 
@@ -231,6 +251,16 @@ def public_storefront_settings(db: Session = Depends(get_db)):
 @router.get("/templates")
 def public_storefront_template_settings(db: Session = Depends(get_db)):
     return _template_response(_row(db))
+
+
+@router.get("/templates/private")
+def admin_storefront_template_settings(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="admin_only")
+    return _template_response(_row(db), include_drafts=True)
 
 
 @router.put("")
