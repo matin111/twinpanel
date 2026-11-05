@@ -42,6 +42,7 @@ def _reseller_user_ids(
 @router.get("/me")
 def reseller_me(
     reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
 ):
     return {
         "id": reseller.id,
@@ -67,6 +68,7 @@ def reseller_me(
         ),
         "is_active": reseller.is_active,
         "reseller_tier": reseller_tier(reseller),
+        "tier_entitlements": tier_entitlements(db, reseller_tier(reseller)),
         "support_text": reseller.support_text,
     }
 
