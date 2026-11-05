@@ -1,0 +1,87 @@
+name: Nova Template 4 Live Browser QA
+
+on:
+  push:
+    branches:
+      - test/nova-live-mobile-desktop-qa
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Locate headless Chrome
+        id: chrome
+        shell: bash
+        run: |
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME" ]; then
+            echo "Chrome not preinstalled; browser QA unavailable" >&2
+            exit 1
+          fi
+          echo "binary=$CHROME" >> "$GITHUB_OUTPUT"
+          "$CHROME" --version
+
+      - name: Check all live routes and static assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in / /vpn-services /vpn-static-ip /vpn-reseller /vpn-guides /vpn-faq /vpn-blog /vpn-about /vpn-blog/vpn-protocol-guide /vpn-blog/static-ip-vs-vpn /vpn-blog/how-to-connect-vpn; do
+            code="$(curl -L -sS --retry 2 --max-time 20 -o /dev/null -w '%{http_code}' "https://shop.movifilm.sbs$path")"
+            echo "$path -> $code"
+            test "$code" = 200
+          done
+
+      - name: Render desktop and mobile screenshots
+        shell: bash
+        env:
+          CHROME: ${{ steps.chrome.outputs.binary }}
+        run: |
+          set -euo pipefail
+          mkdir -p nova-qa
+          for spec in "desktop 1440 900" "mobile 390 844"; do
+            read -r device w h <<< "$spec"
+            for page in home vpn-services vpn-reseller vpn-guides vpn-faq; do
+              route="/$page"
+              [ "$page" = home ] && route="/"
+              filename="nova-qa/${device}-${page}.png"
+              "$CHROME" --headless --no-sandbox --disable-dev-shm-usage --disable-gpu \
+                --hide-scrollbars --window-size="${w},${h}" --virtual-time-budget=7000 \
+                --screenshot="$filename" "https://shop.movifilm.sbs$route" > /tmp/chrome.stdout 2> /tmp/chrome.stderr
+              test -s "$filename"
+              file "$filename"
+            done
+          done
+
+      - name: Verify hydrated homepage and reseller copy
+        shell: bash
+        env:
+          CHROME: ${{ steps.chrome.outputs.binary }}
+        run: |
+          set -euo pipefail
+          "$CHROME" --headless --no-sandbox --disable-dev-shm-usage --disable-gpu --virtual-time-budget=7000 \
+            --dump-dom "https://shop.movifilm.sbs/" > nova-qa/home-dom.html 2>/tmp/home-chrome.err
+          "$CHROME" --headless --no-sandbox --disable-dev-shm-usage --disable-gpu --virtual-time-budget=7000 \
+            --dump-dom "https://shop.movifilm.sbs/vpn-reseller" > nova-qa/reseller-dom.html 2>/tmp/reseller-chrome.err
+          python3 - <<'PY'
+          from pathlib import Path
+          home=Path("nova-qa/home-dom.html").read_text()
+          reseller=Path("nova-qa/reseller-dom.html").read_text()
+          assert "nova" in home.lower() or "اتصال حرفه‌ای" in home, "Nova UI did not hydrate"
+          assert "نمایندگی" in reseller, "Reseller content missing"
+          assert 'href="/vpn-services"' in home, "Navigation missing"
+          print("NOVA_LIVE_HYDRATION_OK")
+          PY
+
+      - name: Upload screenshots for visual review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova-template4-desktop-mobile
+          path: nova-qa/
+          if-no-files-found: warn
+          retention-days: 7
