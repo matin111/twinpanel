@@ -346,6 +346,29 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
             return "shop:list"
         return "main:home"
 
+    @staticmethod
+    def _is_verified_admin_chat(chat_id: Any) -> bool:
+        """Use the same explicit, revocable grant as the admin API.
+
+        Fail closed: a linked user alone is not an admin grant.
+        """
+        try:
+            telegram_id = int(chat_id)
+            if telegram_id <= 0:
+                return False
+            import json
+            from .runtime_settings_model import RuntimeSetting
+            from .models import User, UserRole
+            with SessionLocal() as db:
+                grant = db.get(RuntimeSetting, f"telegram.admin.grant.{telegram_id}")
+                if not grant:
+                    return False
+                user_id = int(json.loads(grant.setting_value)["user_id"])
+                user = db.get(User, user_id)
+                return bool(user and user.is_active and user.role == UserRole.ADMIN)
+        except Exception:
+            return False
+
     def _add_navigation(self, method: Any) -> Any:
         """Provide a safe way out of all inline bot flows.
 
@@ -381,6 +404,18 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
             and {"shop:list", "trial:claim", "main:dashboard", "subs:list"}
             <= callbacks
         ):
+            # Per-recipient, live authorization. Never cache administrator
+            # visibility across Telegram chats or show it to resellers.
+            chat_id = getattr(method, "chat_id", None)
+            if self._is_verified_admin_chat(chat_id):
+                if "adm:home" not in callbacks:
+                    rows.append([InlineKeyboardButton(
+                        text="🛠 مدیریت ادمین",
+                        callback_data="adm:home",
+                    )])
+                    return method.model_copy(update={
+                        "reply_markup": InlineKeyboardMarkup(inline_keyboard=rows)
+                    })
             return method
         labels = [
             str(button.text or "")
