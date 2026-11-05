@@ -989,6 +989,15 @@ async def approve_payment(
             detail="پرداخت پیدا نشد",
         )
 
+    # Reject a late manual receipt approval if the same order was paid from
+    # the customer wallet. Double payment must never overwrite wallet status.
+    paid_order = db.get(StoreOrder, row.order_id)
+    if paid_order and paid_order.payment_method == "wallet":
+        raise HTTPException(
+            status_code=409,
+            detail="این سفارش قبلاً از کیف پول پرداخت شده است",
+        )
+
     # TWINPANEL_MAIN_RECEIPT_APPROVE_GUARD_V1
     if (
         row.method == "card_to_card"
