@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import sys
+import time
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,7 +29,8 @@ SOURCES = ("eylan","sanaei","marzban","pasargad")
 PROTOCOLS = ("mieru","trusttunnel","amneziawg","sudoku")
 PROTOCOL = os.environ.get("STANDALONE_RECOVERY_PROTOCOL","").strip().lower()
 STATE_FILE = Path("/var/lib/twinpanel/standalone-migration-recovery.json")
-MAX_ACCOUNTS = max(1,min(2,int(os.environ.get("STANDALONE_RECOVERY_MAX_ACCOUNTS","1"))))
+MAX_ACCOUNTS = max(1,min(8,int(os.environ.get("STANDALONE_RECOVERY_MAX_ACCOUNTS","1"))))
+MAX_RUNTIME_SECONDS = 420
 
 def sync_target_quota_device(subscription_id: int) -> dict:
     """Upsert only the new protocol identity, never rewrite full per-node snapshots.
@@ -80,8 +82,9 @@ def healthy() -> bool:
     if os.getloadavg()[0] > 9:
         return False
     try:
+        start=time.monotonic()
         with urllib.request.urlopen("http://127.0.0.1:8095/health/ready", timeout=4) as r:
-            return r.status == 200
+            return r.status == 200 and time.monotonic()-start < 1.5
     except Exception:
         return False
 
@@ -112,6 +115,7 @@ async def run() -> int:
     global PROTOCOL
     if PROTOCOL and PROTOCOL not in PROTOCOLS:
         raise ValueError("invalid standalone protocol")
+    began=time.monotonic()
     with open("/run/twinpanel-migration-standalone-recovery.lock","a+") as handle:
         try:
             fcntl.flock(handle, fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -144,6 +148,9 @@ async def run() -> int:
         # reconciliation/PG advisory lock path to the desired protocol only.
         legacy._selected_modern_protocols=lambda db, sid: [p for p in orig(db,sid) if p==PROTOCOL]
         for sid in ids:
+            if time.monotonic()-began > MAX_RUNTIME_SECONDS:
+                print("STANDALONE_TIME_BUDGET_STOP",flush=True)
+                break
             if not healthy():
                 print("STANDALONE_STOP_API",flush=True)
                 return 2
