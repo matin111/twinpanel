@@ -1,0 +1,12 @@
+[Unit]
+Description=Retry Classic provisioning for visible Exit nodes
+
+[Timer]
+OnActiveSec=5min
+OnUnitInactiveSec=8min
+AccuracySec=45s
+Persistent=false
+Unit=twinpanel-classic-visible-recovery.service
+
+[Install]
+WantedBy=timers.target
