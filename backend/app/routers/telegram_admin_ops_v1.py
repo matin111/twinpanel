@@ -5,6 +5,9 @@ import base64
 from datetime import datetime, timedelta
 import hashlib
 import logging
+import json
+import secrets
+import hmac
 import asyncio
 import httpx
 import secrets
@@ -20,6 +23,8 @@ from ..database import get_db
 from ..models import Subscription, User, UserRole
 from ..payment_models import PaymentIntent
 from ..telegram_models import TelegramUserLink
+from ..runtime_settings_model import RuntimeSetting
+from ..deps import require_admin
 from .telegram_bot import bot_guard
 from .payment_receipts_local import (
     _is_reseller_bot_internal_user, _purchase_needs_review, _local_path,
@@ -53,11 +58,121 @@ class WalletAdjustIn(ActionIn):
     amount_toman: int = Field(ge=-100_000_000, le=100_000_000)
 
 
+class ClaimIn(BaseModel):
+    telegram_id: int = Field(gt=0)
+    code: str = Field(min_length=25, max_length=80)
+
+
+admin_link_router = APIRouter(
+    prefix="/v1/admin/telegram-bot/admin-access",
+    tags=["telegram-admin-enrollment"],
+    dependencies=[Depends(require_admin)],
+)
+
+
+def _claim_key(code: str) -> str:
+    return "telegram.admin.claim." + hashlib.sha256(code.encode()).hexdigest()
+
+
+def _grant_key(telegram_id: int) -> str:
+    return f"telegram.admin.grant.{int(telegram_id)}"
+
+
+@admin_link_router.post("/code")
+def create_enrollment_code(
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_admin),
+):
+    code = secrets.token_urlsafe(30)
+    key = _claim_key(code)
+    expires = datetime.utcnow() + timedelta(minutes=5)
+    db.add(RuntimeSetting(
+        setting_key=key,
+        setting_value=json.dumps({"user_id": actor.id, "expires": expires.isoformat()}),
+    ))
+    db.commit()
+    audit_log.info("admin_telegram_link_code_created admin=%s", actor.id)
+    return {"code": code, "expires_at": expires.isoformat() + "Z"}
+
+
+@admin_link_router.get("/operators")
+def list_admin_operators(db: Session = Depends(get_db)):
+    rows = db.query(RuntimeSetting).filter(
+        RuntimeSetting.setting_key.like("telegram.admin.grant.%")
+    ).all()
+    result = []
+    for row in rows:
+        try:
+            linked_user_id = int(json.loads(row.setting_value)["user_id"])
+            owner = db.get(User, linked_user_id)
+        except Exception:
+            continue
+        if owner and owner.is_active and owner.role == UserRole.ADMIN:
+            result.append({
+                "telegram_id": int(row.setting_key.rsplit(".", 1)[-1]),
+                "admin_user_id": owner.id,
+            })
+    return {"operators": result}
+
+
+@admin_link_router.delete("/operators/{telegram_id}")
+def revoke_admin_operator(
+    telegram_id: int,
+    db: Session = Depends(get_db),
+    actor: User = Depends(require_admin),
+):
+    row = db.get(RuntimeSetting, _grant_key(telegram_id))
+    if row:
+        db.delete(row)
+        db.commit()
+    audit_log.info("admin_telegram_access_revoked actor=%s telegram=%s", actor.id, telegram_id)
+    return {"ok": True}
+
+
+@router.post("/link")
+def redeem_admin_link(payload: ClaimIn, db: Session = Depends(get_db)):
+    key = _claim_key(payload.code)
+    row = db.query(RuntimeSetting).filter(
+        RuntimeSetting.setting_key == key
+    ).with_for_update().first()
+    if row is None:
+        raise HTTPException(status_code=403, detail="کد اتصال نامعتبر یا استفاده‌شده است")
+    try:
+        details = json.loads(row.setting_value)
+        owner_id = int(details["user_id"])
+        expires = datetime.fromisoformat(details["expires"])
+    except (ValueError, TypeError, KeyError):
+        raise HTTPException(status_code=403, detail="کد اتصال معتبر نیست")
+    owner = db.get(User, owner_id)
+    if datetime.utcnow() > expires or not owner or owner.role != UserRole.ADMIN or not owner.is_active:
+        db.delete(row)
+        db.commit()
+        raise HTTPException(status_code=403, detail="کد اتصال منقضی یا نامعتبر است")
+    grant_key = _grant_key(payload.telegram_id)
+    existing = db.get(RuntimeSetting, grant_key)
+    encoded = json.dumps({"user_id": owner.id})
+    if existing:
+        existing.setting_value = encoded
+    else:
+        db.add(RuntimeSetting(setting_key=grant_key, setting_value=encoded))
+    db.delete(row)
+    db.commit()
+    audit_log.info("admin_telegram_access_granted admin=%s telegram=%s", owner.id, payload.telegram_id)
+    return {"ok": True}
+
+
 def _admin(db: Session, telegram_id: int) -> User:
-    link = db.get(TelegramUserLink, int(telegram_id))
-    user = db.get(User, link.user_id) if link else None
+    grant = db.get(RuntimeSetting, _grant_key(telegram_id))
+    user = None
+    if grant:
+        try:
+            user = db.get(User, int(json.loads(grant.setting_value)["user_id"]))
+        except (ValueError, KeyError, TypeError):
+            user = None
+    if not user:
+        link = db.get(TelegramUserLink, int(telegram_id))
+        user = db.get(User, link.user_id) if link else None
     if not user or not user.is_active or user.role != UserRole.ADMIN:
-        # Same status for unlinked and non-admin users; avoid privilege enumeration.
         raise HTTPException(status_code=403, detail="دسترسی مدیریت مجاز نیست")
     return user
 
