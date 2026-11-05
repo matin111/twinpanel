@@ -637,6 +637,46 @@ def ensure_web_entry_access(target: Path) -> None:
         raise RuntimeError('FRONTEND_ARTIFACT_PERMISSION_INVALID')
 
 
+def ensure_web_cache_access(target: Path) -> None:
+    """Allow the unprivileged web process to update Next.js prerender cache.
+
+    Prebuilt archives are extracted by root. Next.js may regenerate RSC/HTML
+    under .next/server/app and write into .next/cache during runtime. Making
+    only server.js readable is insufficient and causes recurring EACCES after
+    every official release upgrade.
+    """
+    standalone = target / '.next/standalone/.next'
+    cache = standalone / 'cache'
+    cache.mkdir(mode=0o750, parents=True, exist_ok=True)
+    shutil.chown(cache, user='www-data', group='www-data')
+    os.chmod(cache, 0o750)
+
+    app = standalone / 'server/app'
+    if not app.is_dir():
+        raise RuntimeError('FRONTEND_PRERENDER_APP_DIRECTORY_MISSING')
+
+    for current_root, directories, files in os.walk(app):
+        directory = Path(current_root)
+        shutil.chown(directory, group='www-data')
+        os.chmod(directory, (directory.stat().st_mode & 0o777) | 0o270)
+        for name in files:
+            if not name.endswith(('.html', '.rsc', '.meta', '.body')):
+                continue
+            file_path = directory / name
+            shutil.chown(file_path, group='www-data')
+            os.chmod(file_path, (file_path.stat().st_mode & 0o777) | 0o020)
+
+    check = subprocess.run(
+        ['runuser', '-u', 'www-data', '--', 'test', '-w', str(cache)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+        timeout=5,
+    )
+    if check.returncode != 0:
+        raise RuntimeError('FRONTEND_CACHE_PERMISSION_INVALID')
+
+
 def verify_activation(final: Path, version: str) -> None:
     try:
         active = CURRENT.resolve(strict=True)
@@ -786,6 +826,7 @@ def main() -> int:
 
     started = stage_begin()
     ensure_web_entry_access(final)
+    ensure_web_cache_access(final)
     web_port = int(env.get('TWINPANEL_WEB_PORT', '3000') or 3000)
     api_port = int(env.get('TWINPANEL_API_PORT', '8095') or 8095)
     install_web_unit(final, web_port)
