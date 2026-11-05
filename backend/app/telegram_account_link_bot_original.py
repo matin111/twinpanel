@@ -553,13 +553,14 @@ def install_account_link_feature(
             )
             return
 
-        await state.clear()
-        await message.answer(
-            "✅ <b>لینک اکانت پیدا شد</b>\n\n"
-            f"👤 نام کاربری: <code>{escape(account_username)}</code>\n\n"
-            f"🔗 <code>{escape(link)}</code>\n\n"
-            "این لینک را فقط برای دستگاه‌های خودتان استفاده کنید.",
+        from .telegram_subscription_qr_v1 import send_subscription_link_and_qr
+
+        await send_subscription_link_and_qr(
+            message,
+            link,
+            username=account_username,
             reply_markup=main_runtime.main_keyboard(),
         )
+        await state.clear()
 
     return router
