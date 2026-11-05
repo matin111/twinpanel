@@ -64,10 +64,19 @@ export async function loadStoreTemplateSettings():Promise<StoreTemplateSettingsE
   return parseResponse<StoreTemplateSettingsEnvelope>(response);
 }
 
+export async function loadAdminStoreTemplateSettings():Promise<StoreTemplateSettingsEnvelope>{
+  const token=getCustomerToken();
+  if(!token)throw new Error("AUTH_REQUIRED");
+  const response=await fetch(`${API_BASE}/v1/storefront/settings/templates/private`,{
+    headers:{"Authorization":`Bearer ${token}`},cache:"no-store",
+  });
+  return parseResponse<StoreTemplateSettingsEnvelope>(response);
+}
+
 export async function saveStoreTemplateSettings(templateId:string,payload:Record<string,unknown>):Promise<Record<string,unknown>>{
   // Theme customizers save their complete draft. SEO is a separate logical
   // subresource, so always preserve the freshest server-side SEO values.
-  const envelope=await loadStoreTemplateSettings();
+  const envelope=await loadAdminStoreTemplateSettings();
   const current=envelope.templates?.[templateId]||{};
   const next={...payload};
   for(const key of STORE_TEMPLATE_SEO_KEYS){
@@ -136,7 +145,7 @@ export async function deleteStoreTemplateMedia(templateId:string,slot:string):Pr
 }
 
 /** Save blog entries without dropping current SEO, colors or other layout options. */
-export async function saveNovaBlogArticles(articles:Array<Record<string,unknown>>):Promise<Record<string,unknown>>{
+export async function saveNovaBlogArticles(articles:unknown[]):Promise<Record<string,unknown>>{
   const templateId="nova-multipage-2027";
   const envelope=await loadStoreTemplateSettings();
   const current=envelope.templates?.[templateId]||{};
