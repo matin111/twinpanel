@@ -32,6 +32,18 @@ const channels=[
  {icon:"▤",name:"آموزش و دانلود",body:"برنامه سازگار را از ساب‌لینک دریافت و با راهنمای همان پروتکل وصل شوید",link:"/vpn-guides",cta:"آموزش اتصال"},
  {icon:"?",name:"سوالات متداول",body:"پاسخ درباره خرید، تمدید، تحویل لینک، نمایندگی و اتصال",link:"/vpn-faq",cta:"پرسش و پاسخ"}
 ];
+export function NovaResellerTiers({support}:{support:string}){
+ return <section className={styles.resellerTierDetail} aria-label="مقایسه پنل‌های اقتصادی و ویژه">
+  <div className={styles.sectionTitle}><div><span>دو مدل نمایندگی</span><h2>پنل اقتصادی یا پنل ویژه؟</h2><p>دو گروه مجزا با تعرفه، سرورها و پروتکل‌های قابل عرضه متفاوت؛ مدیر اصلی هنگام ایجاد نماینده سطح دسترسی را مشخص می‌کند.</p></div></div>
+  <div className={styles.resellerCards}>{resellerTiers.map(t=><article key={t.id} className={t.id==="economy"?styles.economyCard:styles.specialCard}>
+   <span className={styles.resellerGlyph}>{t.icon}</span><div><small>{t.subtitle}</small><h3>{t.title}</h3>
+   <p className={styles.tierNotice}>فقط پلن‌ها، سرورها و پروتکل‌های مجاز همین سطح قابل فروش‌اند؛ تعرفه همکاری جداگانه تعیین می‌شود.</p>
+   <ul>{t.benefits.map(b=><li key={b}>{b}</li>)}</ul>
+   <a href={support} target={support.startsWith("http")?"_blank":undefined} rel="noopener noreferrer">{t.cta} ←</a>
+   </div></article>)}</div>
+  <p className={styles.tierFoot}>هر دو سطح بر اساس اعتبار نمایندگی عمل می‌کنند؛ قیمت هر گروه، حجم اعتبار و محصولات قابل فروش در پنل مدیریت تنظیم می‌شود.</p>
+ </section>;
+}
 export default function NovaPremiumHomepage({plans,loading,buying,onBuy,options,support,brandName}:Props){
  const option=(key:string,fallback:string)=>typeof options[key]==="string"&&String(options[key]).trim()?String(options[key]):fallback;
  const first=plans[0];
