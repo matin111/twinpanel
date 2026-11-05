@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.587",
-  "source_sha": "5d11aded11469d65a9db9659d449786792a2c3f1",
+  "version": "1.1.0-rc.588",
+  "source_sha": "f88bd4caa624c29a9a05a9de6343b27c2aff9aa0",
   "notes": {
-    "fa": "اصلاح چیدمان صفحه سرویس‌های قالب چهار: جابه‌جایی فیلتر نوع سرویس و تعداد کاربران به بالای گرید پلن‌ها، رفع فضای خالی و نمایش منظم پلن‌های فعال؛ بدون تغییر در اطلاعات خرید.",
-    "en": "Fix Nova Template 4 services page: place plan type and user-count filters above the plan grid, remove misleading empty gap, retain real plans and checkout."
+    "fa": "رفع عدم نمایش تنظیمات دو نوع نمایندگی حجمی در صفحه واقعی مدیریت نمایندگان. انتخاب اجباری نوع اقتصادی ویتوری/ویژه آی‌پی ثابت هنگام ایجاد، ویرایش نوع نماینده و مدیریت بسته‌های خرید حجم تفکیک‌شده با قیمت مستقل؛ حفظ ساختار حجمی و موجودی‌های فعلی.",
+    "en": "Fix the actual /admin/resellers UI to expose tiered volume-reseller controls: mandatory economic V2Ray/premium fixed-IP type on create, editable type on management, and independently priced traffic packages for each tier. Preserve existing volume billing and balances."
   }
 }
