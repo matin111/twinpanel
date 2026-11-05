@@ -1,4 +1,4 @@
-export type NovaArticle={slug:string;title:string;description:string;updated:string;sections:{title:string;paragraphs:string[]}[]};
+export type NovaArticle={slug:string;title:string;description:string;updated:string;coverImage?:string;sections:{title:string;paragraphs:string[]}[]};
 export const NOVA_ARTICLES:NovaArticle[]=[
 {slug:"vpn-protocol-guide",title:"راهنمای انتخاب پروتکل VPN: از OpenVPN تا WireGuard و V2Ray",description:"چه معیارهایی برای انتخاب پروتکل اتصال مهم است و چرا هیچ پروتکلی برای همه شبکه‌ها بهترین نیست؟",updated:"2026-11-05",sections:[
 {title:"چرا انتخاب پروتکل اهمیت دارد؟",paragraphs:["هر پروتکل برای شرایط متفاوتی طراحی شده است. کیفیت اینترنت، محدودیت‌های شبکه، سازگاری برنامه و سرور، نوع دستگاه و نیاز شما می‌تواند نتیجه اتصال را تغییر دهد.","مقایسه را فقط بر اساس ادعای سرعت انجام ندهید. ابتدا بررسی کنید پروتکل واقعاً در پلن شما فعال است و برای سیستم‌عاملتان کلاینت مطمئن وجود دارد."]},
@@ -24,6 +24,7 @@ export function novaArticle(slug:string){return NOVA_ARTICLES.find(article=>arti
 /** Articles saved by the Nova blog editor in storefront template settings.
  * The editor stores text, not HTML; everything is rendered as React text. */
 export type NovaBlogEntry={
+ coverImage?:string;
  slug:string;
  title:string;
  description:string;
@@ -31,6 +32,23 @@ export type NovaBlogEntry={
  updated:string;
  published:boolean;
 };
+// Only images uploaded through the existing authenticated storefront-media route
+// may be embedded in public articles. Do not render arbitrary remote image URLs.
+export const NOVA_BLOG_IMAGE_RE=/^\/v1\/storefront\/settings\/media\/nova-multipage-2027\/blog-[a-zA-Z0-9_-]{8,100}(?:\?v=[a-zA-Z0-9_-]{1,60})?$/;
+export function safeNovaBlogImage(value:unknown):string{
+ const url=String(value||"").trim();
+ return NOVA_BLOG_IMAGE_RE.test(url)?url:"";
+}
+export function novaBlogImageMarker(alt:string,url:string):string{
+ const safe=safeNovaBlogImage(url);
+ return safe?`![${alt.replace(/[\[\]\n\r]/g,"").slice(0,100)||"تصویر مقاله"}](${safe})`:"";
+}
+export function parseNovaBlogImageMarker(value:string):{alt:string;src:string}|null{
+ const match=/^!\[([^\]\r\n]{0,100})\]\(([^)]+)\)$/.exec(value.trim());
+ if(!match)return null;
+ const src=safeNovaBlogImage(match[2]);
+ return src?{alt:match[1]||"تصویر مقاله",src}:null;
+}
 export function cleanNovaBlogEntries(value:unknown):NovaBlogEntry[]{
  if(!Array.isArray(value))return [];
  const seen=new Set<string>();
@@ -42,10 +60,11 @@ export function cleanNovaBlogEntries(value:unknown):NovaBlogEntry[]{
   const title=String(entry.title||"").trim();
   const description=String(entry.description||"").trim();
   const body=String(entry.body||"").trim();
+  const coverImage=safeNovaBlogImage(entry.coverImage);
   if(!/^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/.test(slug)||seen.has(slug)||!title||!body)continue;
   seen.add(slug);
   output.push({
-    slug,title:title.slice(0,180),description:description.slice(0,400),
+    slug,title:title.slice(0,180),description:description.slice(0,400),coverImage,
     body:body.slice(0,5000),
     updated:/^\d{4}-\d{2}-\d{2}$/.test(String(entry.updated||""))?String(entry.updated):"2026-11-05",
     published:entry.published===true,
@@ -61,7 +80,7 @@ export function novaArticlesWithOverrides(value:unknown):NovaArticle[]{
  for(const entry of overrides.filter(x=>x.published)){
   const paragraphs=entry.body.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
   merged.set(entry.slug,{
-   slug:entry.slug,title:entry.title,description:entry.description,updated:entry.updated,
+   slug:entry.slug,title:entry.title,description:entry.description,updated:entry.updated,coverImage:entry.coverImage,
    sections:[{title:"متن مقاله",paragraphs:paragraphs.length?paragraphs:[entry.body]}],
   });
  }
@@ -73,7 +92,7 @@ export function novaEditableEntries(value:unknown):NovaBlogEntry[]{
  const baseline=NOVA_ARTICLES.filter(a=>!existing.has(a.slug)).map(a=>({
   slug:a.slug,title:a.title,description:a.description,
   body:a.sections.map(section=>section.title+"\n"+section.paragraphs.join("\n\n")).join("\n\n"),
-  updated:a.updated,published:true,
+  updated:a.updated,published:true,coverImage:"",
  }));
  return [...overrides,...baseline];
 }
