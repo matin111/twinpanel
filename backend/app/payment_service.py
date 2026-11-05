@@ -16,6 +16,9 @@ _DIGITS = str.maketrans(
 
 def normalize_sms(value: str) -> str:
     value = str(value or "").translate(_DIGITS)
+    # Bank SMS (including Saman) may use Arabic Yeh/Kaf instead of Persian.
+    # Normalize them before matching Rial, deposit and balance keywords.
+    value = value.translate(str.maketrans({"ي": "ی", "ى": "ی", "ك": "ک"}))
     value = value.replace("٬", ",")
     return value
 
