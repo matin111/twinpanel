@@ -7,6 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
+from .telegram_navigation_v1 import show_navigation_page, acknowledge_navigation
 from .telegram_account_link_bot_original import _cancel_keyboard
 
 
@@ -175,13 +176,14 @@ def install(router, request_fn):
 
     @router.callback_query(F.data.startswith("subimp:link:"))
     async def import_connection(callback: CallbackQuery):
+        await acknowledge_navigation(callback)
         try:
             sub_id = int((callback.data or "").rsplit(":", 1)[-1])
             info = await _read_import(callback, sub_id)
         except Exception as exc:
-            await callback.answer(str(exc)[:180], show_alert=True)
+            if callback.message:
+                await callback.message.answer("❌ دریافت لینک اتصال ناموفق بود: " + escape(str(exc)[:150]))
             return
-        await callback.answer()
         if callback.message:
             from .telegram_subscription_qr_v1 import send_subscription_link_and_qr
             await send_subscription_link_and_qr(
@@ -544,7 +546,7 @@ def install(router, request_fn):
 
     @router.callback_query(F.data.startswith("subimp:"))
     async def import_detail(callback: CallbackQuery):
-        await callback.answer()
+        await acknowledge_navigation(callback)
         try:
             sub_id = int((callback.data or "").rsplit(":", 1)[-1])
             info = await _read_import(callback, sub_id)
@@ -553,7 +555,8 @@ def install(router, request_fn):
                 await callback.message.answer("❌ دریافت اطلاعات اکانت انجام نشد: " + escape(str(exc)[:150]))
             return
         if callback.message:
-            await callback.message.edit_text(
+            await show_navigation_page(
+                callback.message,
                 _details_text(info),
                 reply_markup=_management_keyboard(sub_id, info),
             )

@@ -1,0 +1,31 @@
+name: Telegram Navigation Fast Ack Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/telegram_runtime_bot.py"
+      - "backend/app/telegram_subscription_import_bot_v1.py"
+      - "backend/app/telegram_navigation_v1.py"
+      - "backend/tests/test_telegram_navigation_fast_ack_v1.py"
+      - ".github/workflows/telegram-navigation-fast-ack-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/tests/test_telegram_navigation_fast_ack_v1.py"
+      - ".github/workflows/telegram-navigation-fast-ack-smoke.yml"
+
+jobs:
+  navigation:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pytest
+        run: python -m pip install pytest
+      - name: Compile bot modules
+        run: |
+          python -m py_compile backend/app/telegram_runtime_bot.py backend/app/telegram_subscription_import_bot_v1.py backend/app/telegram_navigation_v1.py
+      - name: Fast callback navigation regressions
+        run: python -m pytest -q backend/tests/test_telegram_navigation_fast_ack_v1.py
