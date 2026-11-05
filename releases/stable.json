@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.575",
+  "version": "1.1.0-rc.576",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-04T23:49:51Z",
+  "released_at": "2026-11-05T00:38:17Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "6b1ee60c0a7afbe3b522a16ad586f23d407180c2",
+  "source_sha": "a15bca04b2471edfdd703c3522797a8bdb8e7edb",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.575/twinpanel-1.1.0-rc.575-linux-x86_64.tar.gz",
-    "sha256": "716e1d6ab9887b5663495838f1418c4b924dca082cfee4ef55d874c96bf5fd55",
-    "size_bytes": 28263756
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.576/twinpanel-1.1.0-rc.576-linux-x86_64.tar.gz",
+    "sha256": "feae25b5b4aae2a98fe964a5222b8198e49b61f6b20e37a50dc1eae6c097b472",
+    "size_bytes": 28269464
   },
   "notes": {
-    "fa": "پاکسازی آیکن‌های منوی خرید ربات تلگرام: حذف آدمک از گزینه‌های تعداد کاربر با حفظ نشان‌های رنگی، جلوگیری از نمایش الماس تکراری در پوشه‌های دسته‌بندی حرفه‌ای، حفظ مراحل انتخاب نوع اشتراک و تمام پلن‌ها و دکمه‌های خرید. تست‌های PR موفق.",
-    "en": "Telegram shop icon cleanup: remove person emoji from user-count buttons while retaining colored markers, avoid duplicate diamond emojis in already-labeled legacy categories, preserve subscription-type navigation and existing plans. Feature CI passed."
+    "fa": "افزایش سرعت پاسخ‌دهی ربات و API: حذف پرس‌وجوهای تکراری فهرست پلن‌ها با واکشی گروهی دسته‌بندی‌ها، پروتکل‌ها و سرورها؛ استفاده مجدد از اتصال HTTP داخلی ربات؛ کش سه‌ثانیه‌ای فقط برای جابه‌جایی منوهای خرید و دریافت تازه اطلاعات هنگام تأیید و ایجاد سفارش. بدون تغییر در پرداخت یا فعال‌سازی اشتراک. ۱۳ تست تغییر موفق.",
+    "en": "Telegram-to-controller API performance: batch plan category/protocol/eligible-node reads, reuse bounded local HTTP connection pool, and add a 3-second singleflight cache for purchase-menu navigation only. Plan confirmation always force-refreshes from API. No payment/provisioning changes. 13 feature CI checks passed."
   }
 }
