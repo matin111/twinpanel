@@ -78,6 +78,7 @@ class LinkState(StatesGroup):
 
 class RenewalPaymentState(StatesGroup):
     proof = State()
+    receipt = State()
 
 
 def main_keyboard():
@@ -547,7 +548,7 @@ def renewal_proof_keyboard(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="✅ ثبت اطلاعات پرداخت",
+                    text=("📷 ارسال رسید پرداخت" if method == "card_to_card" else "✅ ثبت TXID پرداخت"),
                     callback_data=(
                         f"renewproof:"
                         f"{intent_id}:"
@@ -1902,18 +1903,17 @@ async def renewal_proof_start(
         payment_method=method,
     )
 
-    await state.set_state(
-        RenewalPaymentState.proof
-    )
-
     await callback.answer()
 
     if method == "card_to_card":
+        await state.set_state(RenewalPaymentState.receipt)
         await callback.message.answer(
-            "کد پیگیری تراکنش کارت‌به‌کارت "
-            "را ارسال کنید."
+            "📷 <b>رسید پرداخت تمدید را ارسال کنید.</b>\n\n"
+            "عکس یا فایل تصویری/PDF قابل قبول است؛ "
+            "کد پیگیری و مشخصات کارت لازم نیست."
         )
     else:
+        await state.set_state(RenewalPaymentState.proof)
         await callback.message.answer(
             "TXID تراکنش USDT را ارسال کنید."
         )
@@ -1939,25 +1939,13 @@ async def renewal_proof_submit(
 
     data = await state.get_data()
 
+    if data.get("payment_method") == "card_to_card":
+        await state.set_state(RenewalPaymentState.receipt)
+        await message.answer("📷 لطفاً عکس یا PDF رسید تمدید را ارسال کنید.")
+        return
+
     try:
-        token = (
-            await _telegram_session_token(
-                message.from_user.id
-            )
-        )
-
-        payload = {}
-
-        if (
-            data.get("payment_method")
-            == "card_to_card"
-        ):
-            payload[
-                "tracking_code"
-            ] = value
-        else:
-            payload["txid"] = value
-
+        token = await _telegram_session_token(message.from_user.id)
         result = await request(
             "POST",
             (
@@ -1965,12 +1953,10 @@ async def renewal_proof_submit(
                 f"{data['intent_id']}/submit"
             ),
             token=token,
-            payload=payload,
+            payload={"txid": value},
         )
 
     except Exception as exc:
-        await state.clear()
-
         await message.answer(
             "❌ "
             + escape(str(exc))
@@ -1987,6 +1973,61 @@ async def renewal_proof_submit(
         f"<b>{escape(str(result.get('status') or 'ثبت شده'))}</b>",
         reply_markup=main_keyboard(),
     )
+
+
+
+@router.message(RenewalPaymentState.receipt)
+async def renewal_receipt_submit(message: Message, state: FSMContext):
+    """Save the renewal receipt against its existing payment intent."""
+    file_id = None
+    if message.photo:
+        file_id = message.photo[-1].file_id
+    elif message.document:
+        mime = str(message.document.mime_type or "").lower()
+        name = str(message.document.file_name or "").lower()
+        if (mime.startswith("image/") or mime == "application/pdf"
+                or name.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf"))):
+            file_id = message.document.file_id
+
+    if not file_id:
+        await message.answer(
+            "❌ رسید معتبر نیست. لطفاً عکس رسید یا فایل PDF ارسال کنید."
+        )
+        return
+
+    data = await state.get_data()
+    if data.get("payment_method") != "card_to_card" or not data.get("intent_id"):
+        await state.clear()
+        await message.answer(
+            "❌ اطلاعات پرداخت تمدید پیدا نشد. لطفاً تمدید را دوباره شروع کنید."
+        )
+        return
+
+    try:
+        token = await _telegram_session_token(message.from_user.id)
+        await request(
+            "POST",
+            f"/v1/payments/intents/{int(data['intent_id'])}/receipt",
+            token=token,
+            payload={"telegram_file_id": file_id},
+        )
+    except Exception as exc:
+        # Keep the state so the same receipt can be retried.
+        await message.answer(
+            "❌ ثبت رسید تمدید ناموفق بود:\n"
+            + escape(str(exc))
+            + "\nلطفاً رسید را دوباره ارسال کنید."
+        )
+        return
+
+    await state.clear()
+    await message.answer(
+        "✅ <b>رسید تمدید ثبت شد</b>\n\n"
+        "وضعیت: <b>در انتظار بررسی</b>\n"
+        "پس از تأیید پرداخت، همین اشتراک تمدید می‌شود.",
+        reply_markup=main_keyboard(),
+    )
+
 
 
 
