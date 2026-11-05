@@ -21,7 +21,7 @@ from ..models_reseller import (
     ResellerWalletTransaction,
 )
 from ..security import hash_password
-from ..reseller_tier_policy import valid_tier, tier_out
+from ..reseller_tier_policy import valid_tier, tier_entitlements
 
 
 router = APIRouter(
@@ -282,7 +282,7 @@ def create_reseller_v2(
 ):
     owner = _resolve_owner(db, payload)
     tier = valid_tier(payload.reseller_tier)
-    tier_out(db, type('TierProbe', (), {'reseller_tier': tier})())
+    tier_entitlements(db, tier)
 
     code = payload.code.strip().upper() if payload.code and payload.code.strip() else _generate_code(db)
     if db.query(Reseller.id).filter(Reseller.code == code).first():
@@ -534,7 +534,7 @@ def update_reseller_management(
             if tier != reseller.reseller_tier:
                 # Explicit admin change applies only to subsequent creations;
                 # existing subscription snapshots and traffic pool remain intact.
-                tier_out(db, type('TierProbe', (), {'reseller_tier': tier})())
+                tier_entitlements(db, tier)
                 reseller.reseller_tier = tier
         reseller.name = name
         reseller.code = code
