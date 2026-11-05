@@ -349,10 +349,24 @@ def recover_interrupted_payment_orders_once() -> dict:
             )
             db.commit()
 
+        # Reclaim wallet provisioning only on process startup. The worker
+        # from the previous API process no longer exists at that point.
+        wallet_ids = [
+            int(row[0]) for row in db.query(StoreOrder.id).filter(
+                StoreOrder.payment_method == "wallet",
+                StoreOrder.status == "provisioning",
+            ).all()
+        ]
+        if wallet_ids:
+            db.query(StoreOrder).filter(StoreOrder.id.in_(wallet_ids)).update(
+                {StoreOrder.status: "paid", StoreOrder.error_text: None},
+                synchronize_session=False,
+            )
+            db.commit()
         return {
             "ok": True,
-            "recovered": len(order_ids),
-            "order_ids": order_ids[:50],
+            "recovered": len(order_ids) + len(wallet_ids),
+            "order_ids": (order_ids + wallet_ids)[:50],
         }
 
     except Exception:
