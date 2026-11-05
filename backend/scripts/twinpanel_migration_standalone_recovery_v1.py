@@ -19,6 +19,8 @@ logging.getLogger("asyncssh").setLevel(logging.WARNING)
 from app.database import SessionLocal
 from app.migration_import_models import MigrationImportRecord
 from app.models import Subscription, SubscriptionProtocol, ProtocolCredential, SubscriptionStatus
+from app.quota_models import QuotaDevice
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.routers import modern_legacy_reconcile_v1 as legacy
 from app.routers import modern_legacy_reconcile_lockfix_v2 as lockfix  # noqa: F401
 
@@ -27,6 +29,52 @@ PROTOCOLS = ("mieru","trusttunnel","amneziawg","sudoku")
 PROTOCOL = os.environ.get("STANDALONE_RECOVERY_PROTOCOL","").strip().lower()
 STATE_FILE = Path("/var/lib/twinpanel/standalone-migration-recovery.json")
 MAX_ACCOUNTS = max(1,min(2,int(os.environ.get("STANDALONE_RECOVERY_MAX_ACCOUNTS","1"))))
+
+def sync_target_quota_device(subscription_id: int) -> dict:
+    """Upsert only the new protocol identity, never rewrite full per-node snapshots.
+
+    Node agents obtain their current quota payload from the API on demand.
+    The separate 45s accounting loop already refreshes protocol telemetry.
+    A legacy complete/inactive quota device must never be reactivated here.
+    """
+    db=SessionLocal()
+    try:
+        credential=db.query(ProtocolCredential).filter(
+            ProtocolCredential.subscription_id==int(subscription_id),
+            ProtocolCredential.protocol==PROTOCOL,
+            ProtocolCredential.is_active.is_(True),
+            ProtocolCredential.config_text_encrypted.isnot(None),
+            ProtocolCredential.secret_encrypted.isnot(None),
+        ).first()
+        if credential is None:
+            return {"ok":False,"reason":"credential_missing"}
+        device=db.query(QuotaDevice).filter(
+            QuotaDevice.subscription_id==int(subscription_id),
+            QuotaDevice.protocol==PROTOCOL,
+        ).order_by(QuotaDevice.id.asc()).first()
+        if device is not None:
+            return {"ok":str(device.status or "").strip().lower()=="active",
+                    "mode":"existing_device"}
+        sid=int(subscription_id)
+        db.execute(pg_insert(QuotaDevice).values(
+            subscription_id=sid,
+            protocol=PROTOCOL,
+            device_key=f"subscription:{sid}:{PROTOCOL}",
+            credential_public_hash=f"legacy-backfill-{sid}-{PROTOCOL}",
+            status="active",
+        ).on_conflict_do_nothing(constraint="uq_quota_device_key"))
+        db.commit()
+        device=db.query(QuotaDevice).filter(
+            QuotaDevice.subscription_id==sid,QuotaDevice.protocol==PROTOCOL,
+        ).order_by(QuotaDevice.id.asc()).first()
+        return {"ok":device is not None and str(device.status or "").strip().lower()=="active",
+                "mode":"targeted_upsert"}
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
 
 def healthy() -> bool:
     if os.getloadavg()[0] > 9:
@@ -88,7 +136,7 @@ async def run() -> int:
         STATE_FILE.write_text(json.dumps(state))
 
         print("STANDALONE_WORK",{"protocol":PROTOCOL,"ids":ids},flush=True)
-        orig=legacy._selected_modern_protocols
+        # Replace the full all-node quota snapshot rebuild with only the new\n        # QuotaDevice registration; canonical API exports stay authoritative.\n        lockfix._sync_repaired_quota_in_thread=sync_target_quota_device\n        orig=legacy._selected_modern_protocols
         # This worker is a separate process. Restrict the existing audited
         # reconciliation/PG advisory lock path to the desired protocol only.
         legacy._selected_modern_protocols=lambda db, sid: [p for p in orig(db,sid) if p==PROTOCOL]
