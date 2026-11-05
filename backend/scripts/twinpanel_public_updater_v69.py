@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import importlib.util
+import base64
+import re
+import urllib.request
 import os
 import sys
 import time
@@ -51,7 +54,51 @@ def _staged_wait_for_healthy(core, urls: dict[str, str], expected_version: str, 
         if not ok:
             return False, [name]
 
+    # /health alone cannot prove the subscription is usable.
+    token = os.environ.get("TWINPANEL_UPDATE_V2RAY_SMOKE_TOKEN", "").strip()
+    if token:
+        started = core.stage_begin()
+        port = int(os.environ.get("TWINPANEL_API_PORT", "8095") or 8095)
+        passed = _wait_for_v2ray_feed_canary(port, token)
+        core.stage_end("v2ray_subscription_smoke", started)
+        if not passed:
+            return False, ["v2ray_subscription"]
     return True, []
+
+
+def _v2ray_feed_canary(api_port: int, token: str) -> bool:
+    """Require matching, usable public V2Ray feeds after a release switch."""
+    if not re.fullmatch(r"[A-Za-z0-9_-]{8,128}", token):
+        return False
+    bodies = []
+    for endpoint in ("sub", "multi/v2ray"):
+        url = f"http://127.0.0.1:{api_port}/v1/connect/{token}/{endpoint}"
+        req = urllib.request.Request(url, headers={"User-Agent": "TwinPanel-Update-Canary/1"})
+        try:
+            with urllib.request.urlopen(req, timeout=6) as response:
+                if response.status != 200:
+                    return False
+                body = response.read(1048577)
+            if not body or len(body) > 1048576:
+                return False
+            decoded = base64.b64decode(body.strip(), validate=True).decode("utf-8")
+            if not any(line.strip().startswith("vless://") for line in decoded.splitlines()):
+                return False
+            bodies.append(decoded.strip())
+        except Exception:
+            return False
+    return len(bodies) == 2 and bodies[0] == bodies[1]
+
+
+def _wait_for_v2ray_feed_canary(api_port: int, token: str) -> bool:
+    for attempt in range(4):
+        if _v2ray_feed_canary(api_port, token):
+            print("UPDATER_V2RAY_SUBSCRIPTION_CANARY_OK", flush=True)
+            return True
+        if attempt < 3:
+            time.sleep(2)
+    print("UPDATER_V2RAY_SUBSCRIPTION_CANARY_FAILED", file=sys.stderr, flush=True)
+    return False
 
 
 def _restore_updater_unit(previous: Path) -> bool:
