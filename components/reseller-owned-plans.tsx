@@ -65,6 +65,7 @@ function planForm(row:ResellerRow):ResellerOwnedPlanPayload{
 export function ResellerOwnedPlansRuntime(){
   const {lang,pick}=useI18n();
   const [rows,setRows]=useState<ResellerRow[]>([]);
+  const [profile,setProfile]=useState<ResellerRow>({});
   const [form,setForm]=useState<ResellerOwnedPlanPayload>(defaults);
   const [editing,setEditing]=useState<number|null>(null);
   const [open,setOpen]=useState(false);
@@ -74,7 +75,7 @@ export function ResellerOwnedPlansRuntime(){
   const editorRef=useRef<HTMLDivElement|null>(null);
   const titleRef=useRef<HTMLInputElement|null>(null);
 
-  const load=async()=>{setError("");try{setRows(await resellerApi.plans());}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}};
+  const load=async()=>{setError("");try{const [plans,me]=await Promise.all([resellerApi.plans(),resellerApi.me()]);setRows(plans);setProfile(me);}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}};
   useEffect(()=>{void load();},[]);
 
   useEffect(()=>{
@@ -86,6 +87,11 @@ export function ResellerOwnedPlansRuntime(){
     return()=>cancelAnimationFrame(frame);
   },[open,editing]);
 
+  const allowedProtocols=new Set(
+    Array.isArray((profile.tier_entitlements as ResellerRow|undefined)?.protocols)
+      ? ((profile.tier_entitlements as ResellerRow).protocols as unknown[]).map(String) : []
+  );
+  const typeName=String(profile.reseller_tier)==="economic_v2ray"?"اقتصادی ویتوری":"ویژه آی‌پی ثابت";
   const active=useMemo(()=>rows.filter(row=>Boolean(row.is_active)).length,[rows]);
   const avg=useMemo(()=>rows.length?Math.round(rows.reduce((sum,row)=>sum+num(row,"sell_price_toman"),0)/rows.length):0,[rows]);
 
@@ -109,7 +115,7 @@ export function ResellerOwnedPlansRuntime(){
       if(editingId)await resellerApi.updatePlan(editingId,payload);else await resellerApi.createPlan(payload);
       await load();
       closeEditor();
-      setOk(editingId?pick(`پلن #${editingId} با موفقیت بروزرسانی شد.`,`Plan #${editingId} updated successfully.`):pick("پلن ربات با ۱۵ پروتکل ساخته شد.","Bot plan created with 15 protocols."));
+      setOk(editingId?pick(`پلن #${editingId} با موفقیت بروزرسانی شد.`,`Plan #${editingId} updated successfully.`):pick("پلن با پروتکل‌های مجاز نمایندگی ساخته شد.","Plan created with allowed reseller protocols."));
     }catch(reason){
       setError(reason instanceof Error?reason.message:String(reason));
       editorRef.current?.scrollIntoView({behavior:"smooth",block:"start"});
@@ -149,7 +155,7 @@ export function ResellerOwnedPlansRuntime(){
     {error&&<div className="runtime-error" role="alert">{error}</div>}{ok&&<div className="runtime-success" role="status">{ok}</div>}
     <div className="stats"><Stat label={pick("کل پلن‌ها","Total plans")} value={resellerNumber(lang,rows.length)}/><Stat label={pick("پلن فعال","Active plans")} value={resellerNumber(lang,active)}/><Stat label={pick("مدل فروش","Sales model")} value={pick("نامحدود","Unlimited")}/><Stat label={pick("میانگین قیمت","Average price")} value={resellerMoney(lang,avg)}/></div>
 
-    {open&&<div ref={editorRef} className="owned-plan-editor-anchor"><Card className="runtime-editor owned-plan-editor"><div className="card-head"><div><b>{editing?pick("ویرایش پلن","Edit plan"):pick("ساخت پلن ربات","Create bot plan")}</b><small>{pick("هر پلن جدید شامل ۱۵ پروتکل TwinPanel است؛ پنج پروتکل کلاسیک قابل خاموش/روشن‌کردن‌اند و ده پروتکل مدرن از Registry مرکزی فعال می‌شوند.","Every new plan includes all 15 TwinPanel protocols; the five classic protocols remain configurable while ten modern protocols come from the central registry.")}</small></div>{editing&&<Badge tone="violet">#{resellerNumber(lang,editing)}</Badge>}</div><form onSubmit={submit}>
+    {open&&<div ref={editorRef} className="owned-plan-editor-anchor"><Card className="runtime-editor owned-plan-editor"><div className="card-head"><div><b>{editing?pick("ویرایش پلن","Edit plan"):pick("ساخت پلن ربات","Create bot plan")}</b><small>{pick("پروتکل‌ها فقط بر اساس سطح نمایندگی و دسته اصلی «${typeName}» فعال می‌شوند.","Every new plan is limited to your reseller tier's authorized protocols and servers.")}</small></div>{editing&&<Badge tone="violet">#{resellerNumber(lang,editing)}</Badge>}</div><form onSubmit={submit}>
       <div className="setting-grid">
         <label className="field"><span>{pick("عنوان پلن","Plan title")}</span><input ref={titleRef} required minLength={2} maxLength={120} value={form.title} onChange={e=>setForm(v=>({...v,title:e.target.value}))}/></label>
         <label className="field"><span>{pick("حجم هر اکانت (GB)","Account traffic (GB)")}</span><input type="number" min={1} max={100000} value={form.traffic_gb} onChange={e=>setForm(v=>({...v,traffic_gb:Number(e.target.value)}))}/></label>
@@ -158,10 +164,10 @@ export function ResellerOwnedPlansRuntime(){
         <label className="field"><span>{pick("قیمت فروش ربات (تومان)","Bot sale price (Toman)")}</span><input type="number" min={0} step={1} value={form.sell_price_toman} onChange={e=>setForm(v=>({...v,sell_price_toman:Number(e.target.value)}))}/></label>
         <label className="field"><span>{pick("ترتیب نمایش","Sort order")}</span><input type="number" min={0} value={form.sort_order} onChange={e=>setForm(v=>({...v,sort_order:Number(e.target.value)}))}/></label>
       </div>
-      <div className="card-head"><b>{pick("پروتکل‌ها · ۱۵ مورد","Protocols · 15")}</b></div>
+      <div className="card-head"><b>{pick("پروتکل‌های مجاز نمایندگی","Allowed reseller protocols")} · {allowedProtocols.size}</b></div>
       <div className="setting-grid owned-plan-protocol-grid">
-        {classicProtocolRows.map(([key,,label])=><label className="field" key={String(key)}><span>{label}</span><input type="checkbox" checked={Boolean(form[key])} onChange={e=>setForm(v=>({...v,[key]:e.target.checked}))}/></label>)}
-        {modernProtocolRows.map(([protocol,label])=><label className="field" key={protocol}><span>{label}</span><input type="checkbox" checked readOnly aria-label={`${label} enabled`}/></label>)}
+        {classicProtocolRows.filter(([,protocol])=>allowedProtocols.has(protocol)).map(([key,,label])=><label className="field" key={String(key)}><span>{label}</span><input type="checkbox" checked={Boolean(form[key])} onChange={e=>setForm(v=>({...v,[key]:e.target.checked}))}/></label>)}
+        {modernProtocolRows.filter(([protocol])=>allowedProtocols.has(protocol)).map(([protocol,label])=><label className="field" key={protocol}><span>{label}</span><input type="checkbox" checked readOnly aria-label={`${label} enabled`}/></label>)}
         <label className="field"><span>{pick("فعال","Active")}</span><input type="checkbox" checked={form.is_active} onChange={e=>setForm(v=>({...v,is_active:e.target.checked}))}/></label>
       </div>
       <div className="action-row"><button type="button" className="ghost" onClick={closeEditor}>{pick("انصراف","Cancel")}</button><button type="submit" className="primary" disabled={busy}>{busy?"…":editing?pick("ذخیره تغییرات","Save changes"):pick("ذخیره پلن","Save plan")}</button></div>
