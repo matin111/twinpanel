@@ -1,0 +1,12 @@
+[Unit]
+Description=Guarded recovery schedule for missing standalone VPN protocols
+
+[Timer]
+OnActiveSec=2min
+OnUnitInactiveSec=45s
+AccuracySec=20s
+Persistent=false
+Unit=twinpanel-migration-standalone-recovery.service
+
+[Install]
+WantedBy=timers.target
