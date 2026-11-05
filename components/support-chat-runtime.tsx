@@ -30,7 +30,7 @@ export function SupportChatRuntime(){
   },[pathname]);
 
   useEffect(()=>{
-    if(mode!=="guest"){
+    if(mode!=="guest"||(pathname||"").startsWith("/vpn-")){
       setStoreThemeReady(true);
       return;
     }
@@ -41,7 +41,7 @@ export function SupportChatRuntime(){
     const observer=new MutationObserver(sync);
     observer.observe(root,{attributes:true,attributeFilter:["data-store-template"]});
     return()=>observer.disconnect();
-  },[mode]);
+  },[mode,pathname]);
 
   if(!mode||token===undefined)return null;
   if(mode==="guest")return storeThemeReady?<SupportChatWidgetV2 key="store-guest-chat" customerToken={null}/>:null;
