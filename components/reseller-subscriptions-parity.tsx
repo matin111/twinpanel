@@ -62,7 +62,7 @@ export function ResellerSubscriptionsParityRuntime(){
   const [saleKey,setSaleKey]=useState(()=>idempotency("manual-sale"));
   const [extendKey,setExtendKey]=useState(()=>idempotency("extend"));
 
-  const [sell,setSell]=useState({traffic_gb:50,duration_days:30,node_ids:[] as number[],protocols:[],username:"",password:""});
+  const [sell,setSell]=useState({traffic_gb:50,duration_days:30,node_ids:[] as number[],protocols:[] as string[],username:"",password:""});
   const [edit,setEdit]=useState({traffic_gb:0,expiry_value:30,expiry_unit:"days" as ExpiryUnit,sell_price_toman:0,account_username:"",account_password:""});
   const [extend,setExtend]=useState({add_traffic_gb:0,add_days:30,charge_toman:0,reset_usage:false});
 
