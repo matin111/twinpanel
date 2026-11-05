@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - "backend/app/telegram_account_link_bot.py"
+      - "backend/app/telegram_admin_ops_v1.py"
+      - "backend/app/routers/telegram_admin_ops_v1.py"
+      - "backend/scripts/telegram_admin_ops_smoke.py"
+      - "components/admin-telegram-legacy-parity.tsx"
       - "backend/app/bot_text_middleware.py"
       - "backend/scripts/main_home_navigation_smoke.py"
       - "backend/app/telegram_subscription_import_bot_v1.py"
@@ -46,6 +50,9 @@ jobs:
 
       - name: Verify main home has no redundant navigation buttons
         run: python backend/scripts/main_home_navigation_smoke.py
+
+      - name: Validate Telegram admin operations and broadcast security
+        run: python backend/scripts/telegram_admin_ops_smoke.py
 
       - name: Validate imported account payment and renewal contract
         run: python backend/scripts/imported_paid_renewal_smoke.py
