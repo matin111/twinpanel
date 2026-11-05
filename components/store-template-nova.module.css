@@ -86,3 +86,16 @@
 .root .sublinkNotice p{margin:10px 0 0;font-size:14px;line-height:2.2;color:#d4e0f5}
 .root .guideSublinkHint{padding:12px 16px;border-right:3px solid #65dce8;background:#1c344d66;border-radius:8px;font-size:14px;line-height:2;color:#d5eaff}
 @media(max-width:640px){.root .sublinkNotice{padding:18px}.root .sublinkNotice p{font-size:13px}}
+
+
+/* Service page: category filters live above the grid, not after its first card. */
+.root .serviceFilters{width:100%;min-width:0;margin:25px 0 25px;padding:17px 20px;background:linear-gradient(145deg,#151d39,#11182d);border:1px solid #9378dd43;border-radius:21px}
+.root .serviceFilters:empty{display:none}
+.root .serviceFilters>div{width:100%;gap:14px}
+.root .serviceFilters [data-plan-type-tabs="true"]{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))!important}
+.root .serviceFilters [data-plan-user-count-tabs="true"]{width:100%!important;max-width:100%;margin:0!important;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))!important}
+.root .plans{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px;align-items:stretch}
+.root .plans>.plan{min-width:0;height:100%}
+.root .plans>.plan .price{overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+@media(max-width:1000px){.root .plans{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.root .plans{grid-template-columns:1fr}.root .serviceFilters{padding:12px}.root .serviceFilters [data-plan-type-tabs="true"],.root .serviceFilters [data-plan-user-count-tabs="true"]{grid-template-columns:repeat(auto-fit,minmax(min(100%,155px),1fr))!important}}
