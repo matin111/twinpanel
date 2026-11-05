@@ -236,6 +236,9 @@ def install_account_link_feature(router, request_fn, session_fn):
     from .telegram_subscription_import_bot_v1 import install as install_subscription_import
     install_subscription_import(router, request_fn)
 
+    from .telegram_admin_ops_v1 import install_telegram_admin_ops
+    install_telegram_admin_ops(router, request_fn)
+
     return result
 
 
