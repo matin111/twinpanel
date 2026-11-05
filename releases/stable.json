@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.581",
+  "version": "1.1.0-rc.582",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-05T02:32:28Z",
+  "released_at": "2026-11-05T03:33:30Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "635d4595b7e05785561ea6143cf0a7e2520c6c33",
+  "source_sha": "24f322aecf5afd1773fcee7abab435e152fabc77",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.581/twinpanel-1.1.0-rc.581-linux-x86_64.tar.gz",
-    "sha256": "2a90218278d64a0302e0cee2669f371adb921cff53742784b370696cc50cebaf",
-    "size_bytes": 28314651
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.582/twinpanel-1.1.0-rc.582-linux-x86_64.tar.gz",
+    "sha256": "8e728d12e58ed9a039eec782628e5cfc863ee0b7f8280c3608a01d6dcf0ea43c",
+    "size_bytes": 28594367
   },
   "notes": {
-    "fa": "رفع نرسیدن رسید کارت‌به‌کارت و شارژ کیف پول به چت ادمین: اضافه‌شدن وضعیت pending_payment به صف اعلان، مهلت کوتاه ۲۰ثانیه‌ای بررسی خودکار، کنترل ۱۰ثانیه‌ای و ارسال عکس رسید با دکمه تأیید و رد، بدون تکرار.",
-    "en": "Fix direct Telegram admin delivery of card-to-card and wallet receipts stuck in pending_payment: include these states, preserve auto-verification priority with 20s grace, scan every 10s, and send receipt attachments with approve/reject buttons and dedupe."
+    "fa": "افزودن قالب اختصاصی چهارم Nova با صفحات مستقل فروش VPN، آی‌پی ثابت، نمایندگی، آموزش تعاملی، سوالات متداول، مقالات و تنظیمات بنر.",
+    "en": "Ship Nova Template 4: multi-page VPN storefront, static IP and reseller pages, interactive guides, FAQs, educational articles and customizable hero banner."
   }
 }
