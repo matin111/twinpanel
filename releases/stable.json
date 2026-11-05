@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.589",
+  "version": "1.1.0-rc.590",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-05T10:23:42Z",
+  "released_at": "2026-11-05T11:27:54Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d77f25fef512803980d2fc22ed06261306d44f0e",
+  "source_sha": "9926426b24391a464300b1d1dc0c9958285cbe89",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.589/twinpanel-1.1.0-rc.589-linux-x86_64.tar.gz",
-    "sha256": "127067a90c628831134e2be070fc1536e906baf86626b607797afab3ab6c303a",
-    "size_bytes": 28675973
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.590/twinpanel-1.1.0-rc.590-linux-x86_64.tar.gz",
+    "sha256": "c07d01fd1bbde648aab780d47261dd1feb6315e9d9af443191c3749e815212c2",
+    "size_bytes": 28714405
   },
   "notes": {
-    "fa": "طراحی جمع‌وجور مدیریت نمایندگی‌ها با پاپ‌آپ‌های واکنش‌گرا برای ایجاد نماینده، بسته‌های حجم اقتصادی و ویژه، و مدیریت کامل نماینده؛ اسکرول داخلی و نمایش خطا در همان پاپ‌آپ؛ بدون تغییر منطق مالی یا موجودی حجم.",
-    "en": "Compact responsive modals for reseller creation, two-tier volume packages, and full reseller management with internal scrolling and in-dialog errors. No changes to financial or traffic balance logic."
+    "fa": "افزودن مدیریت بلاگ قالب چهارم به پنل ادمین: ایجاد، ویرایش، پیش‌نویس، انتشار و مخفی‌سازی مقاله با سئوی مستقل؛ اصلاح عنوان «اکانت تست» در سوالات متداول؛ محافظت از پیش‌نویس‌های منتشرنشده.",
+    "en": "Nova Template 4 blog admin: create, edit, draft, publish and hide articles, SEO metadata, private drafts and correct test-account wording."
   }
 }
