@@ -19,6 +19,7 @@ constant = next(n for n in tree.body
                 if isinstance(n, ast.Assign)
                 and any(isinstance(t, ast.Name) and t.id == "MANUAL_RECEIPT_GRACE_SECONDS" for t in n.targets))
 namespace = {"datetime": datetime, "timedelta": timedelta,
+             "PaymentIntent": object, "CustomerWalletTopup": object,
              "_purchase_needs_review": lambda row: row.status not in ("approved", "auto_verified", "rejected")}
 exec(compile(ast.Module(body=[constant, *functions], type_ignores=[]), "<receipt-guard>", "exec"), namespace)
 time_old = datetime.utcnow() - timedelta(seconds=35)
