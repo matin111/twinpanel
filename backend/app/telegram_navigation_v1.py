@@ -4,6 +4,16 @@ from __future__ import annotations
 from aiogram.exceptions import TelegramBadRequest
 
 
+
+async def acknowledge_navigation(callback):
+    """Best-effort immediate acknowledgement; old callback IDs must not block UI."""
+    try:
+        await callback.answer()
+    except TelegramBadRequest as exc:
+        if "query is too old" not in str(exc).lower() and "query id is invalid" not in str(exc).lower():
+            raise
+
+
 async def show_navigation_page(message, text: str, *, reply_markup=None):
     """Edit only text messages; photo/caption messages need a new text message.
 
