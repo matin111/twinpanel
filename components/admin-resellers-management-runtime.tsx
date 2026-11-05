@@ -14,6 +14,7 @@ type CreateDraft={
   name:string;
   code:string;
   initial_traffic_gb:number;
+  reseller_tier:string;
 };
 
 type ManagementDraft={
@@ -29,13 +30,15 @@ type ManagementDraft={
   owner_password:string;
   reseller_active:boolean;
   owner_active:boolean;
+  reseller_tier:string;
 };
 
-const emptyCreate:CreateDraft={owner_email:"",name:"",code:"",initial_traffic_gb:0};
+const emptyCreate:CreateDraft={owner_email:"",name:"",code:"",initial_traffic_gb:0,reseller_tier:""};
+const tierLabel=(value:string)=>value==="economic_v2ray"?"اقتصادی ویتوری":value==="premium_static_ip"?"ویژه آی‌پی ثابت":"نوع نامشخص";
 const emptyManagement:ManagementDraft={
   name:"",code:"",brand_name:"",email:"",phone:"",support_text:"",
   credit_limit:0,traffic_credit_gb:0,owner_full_name:"",owner_password:"",
-  reseller_active:true,owner_active:true,
+  reseller_active:true,owner_active:true,reseller_tier:"premium_static_ip",
 };
 
 function text(row:AnyRow|undefined,...keys:string[]){
@@ -108,6 +111,9 @@ export function AdminResellersManagementRuntime(){
 
   const [createOpen,setCreateOpen]=useState(false);
   const [createDraft,setCreateDraft]=useState<CreateDraft>(emptyCreate);
+  const [packagesOpen,setPackagesOpen]=useState(false);
+  const [packages,setPackages]=useState<AnyRow[]>([]);
+  const [packageDraft,setPackageDraft]=useState({id:0,title:"",traffic_gb:10,price_toman:0,sort_order:100,is_active:true,reseller_tier:"economic_v2ray"});
 
   const [selectedId,setSelectedId]=useState<number|null>(null);
   const [selected,setSelected]=useState<AnyRow|null>(null);
@@ -182,6 +188,7 @@ export function AdminResellersManagementRuntime(){
         owner_password:"",
         reseller_active:bool(management,"is_active"),
         owner_active:"is_active" in owner?Boolean(owner.is_active):true,
+        reseller_tier:text(management,"reseller_tier")||"premium_static_ip",
       });
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
   };
@@ -200,12 +207,29 @@ export function AdminResellersManagementRuntime(){
           name:createDraft.name.trim()||undefined,
           code:createDraft.code.trim()||undefined,
           initial_traffic_gb:Number(createDraft.initial_traffic_gb||0),
+          reseller_tier:createDraft.reseller_tier,
         }),
       });
       setCreateOpen(false);setCreateDraft(emptyCreate);
     });
   };
 
+  const openPackages=async()=>{
+    setPackagesOpen(true);setError("");
+    try{setPackages(await request<AnyRow[]>("/v1/admin/resellers/traffic-packages/all"));}
+    catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+  };
+  const savePackage=(event:FormEvent)=>{
+    event.preventDefault();
+    if(!packageDraft.title.trim()||packageDraft.traffic_gb<=0||packageDraft.price_toman<=0){setError(pick("مشخصات بسته معتبر نیست.","Invalid traffic package."));return;}
+    void act(pick("بسته حجم ذخیره شد","Traffic package saved"),async()=>{
+      const {id,...data}=packageDraft;
+      await request(id?`/v1/admin/resellers/traffic-packages/${id}`:"/v1/admin/resellers/traffic-packages",{method:id?"PATCH":"POST",body:JSON.stringify(data)});
+      setPackages(await request<AnyRow[]>("/v1/admin/resellers/traffic-packages/all"));
+      setPackageDraft({id:0,title:"",traffic_gb:10,price_toman:0,sort_order:100,is_active:true,reseller_tier:"economic_v2ray"});
+    },false);
+  };
+  const editPackage=(row:AnyRow)=>setPackageDraft({id:num(row,"id"),title:text(row,"title"),traffic_gb:num(row,"traffic_gb"),price_toman:num(row,"price_toman"),sort_order:num(row,"sort_order"),is_active:bool(row,"is_active"),reseller_tier:text(row,"reseller_tier")||"premium_static_ip"});
   const saveManagement=(event:FormEvent)=>{
     event.preventDefault();
     if(!selectedId)return;
@@ -225,6 +249,7 @@ export function AdminResellersManagementRuntime(){
           owner_password:draft.owner_password.trim()||null,
           reseller_active:draft.reseller_active,
           owner_active:draft.owner_active,
+          reseller_tier:draft.reseller_tier,
         }),
       });
       await refreshSelected();
@@ -300,7 +325,7 @@ export function AdminResellersManagementRuntime(){
   ):false;
 
   return <Shell active="/admin/resellers"><div className="page">
-    <div className="page-head"><div><h1>{pick("نمایندگی‌ها","Resellers")}</h1></div><div className="action-row"><button className="ghost" disabled={loading||busy} onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button><button className="primary" onClick={()=>setCreateOpen(value=>!value)}>＋ {pick("نماینده جدید","New reseller")}</button></div></div>
+    <div className="page-head"><div><h1>{pick("نمایندگی‌ها","Resellers")}</h1></div><div className="action-row"><button className="ghost" disabled={busy} onClick={()=>void openPackages()}>{pick("بسته‌های حجم","Traffic packages")}</button><button className="ghost" disabled={loading||busy} onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button><button className="primary" onClick={()=>setCreateOpen(value=>!value)}>＋ {pick("نماینده جدید","New reseller")}</button></div></div>
     <RuntimeMessage error={error} ok={ok}/>
 
     <div className="stats dashboard-stats">
@@ -310,12 +335,28 @@ export function AdminResellersManagementRuntime(){
       <Stat label={pick("اشتراک‌ها","Subscriptions")} value={String(num(stats,"subscriptions"))} icon="▱"/>
     </div>
 
+    {packagesOpen&&<Card className="runtime-editor">
+      <div className="card-head"><div><b>{pick("بسته‌های حجم نمایندگی","Reseller traffic packages")}</b><small>{pick("تعرفه خرید حجم برای هر نوع نمایندگی مستقل است.","Each reseller type has its own traffic pricing.")}</small></div><button type="button" className="mini-btn" onClick={()=>setPackagesOpen(false)}>×</button></div>
+      <form onSubmit={savePackage}>
+        <div className="setting-grid">
+          <label className="field"><span>{pick("نوع بسته حجم","Volume package type")}</span><select required value={packageDraft.reseller_tier} onChange={event=>setPackageDraft(d=>({...d,reseller_tier:event.target.value}))}><option value="economic_v2ray">اقتصادی ویتوری</option><option value="premium_static_ip">ویژه آی‌پی ثابت</option></select></label>
+          <label className="field"><span>{pick("عنوان بسته","Package title")}</span><input required minLength={2} value={packageDraft.title} onChange={event=>setPackageDraft(d=>({...d,title:event.target.value}))}/></label>
+          <label className="field"><span>{pick("حجم (GB)","Traffic (GB)")}</span><input required type="number" min={1} value={packageDraft.traffic_gb} onChange={event=>setPackageDraft(d=>({...d,traffic_gb:Number(event.target.value)}))}/></label>
+          <label className="field"><span>{pick("قیمت (تومان)","Price (Toman)")}</span><input required type="number" min={1} value={packageDraft.price_toman} onChange={event=>setPackageDraft(d=>({...d,price_toman:Number(event.target.value)}))}/></label>
+          <label className="field"><span>{pick("ترتیب نمایش","Sort order")}</span><input type="number" min={0} value={packageDraft.sort_order} onChange={event=>setPackageDraft(d=>({...d,sort_order:Number(event.target.value)}))}/></label>
+        </div>
+        <label className="toggle module-toggle"><span>{pick("بسته فعال باشد","Package enabled")}</span><input type="checkbox" checked={packageDraft.is_active} onChange={event=>setPackageDraft(d=>({...d,is_active:event.target.checked}))}/><i/></label>
+        <div className="action-row"><button className="primary" disabled={busy}>{packageDraft.id?pick("ذخیره ویرایش","Save package"):pick("ایجاد بسته حجم","Create package")}</button>{packageDraft.id>0&&<button type="button" className="ghost" onClick={()=>setPackageDraft({id:0,title:"",traffic_gb:10,price_toman:0,sort_order:100,is_active:true,reseller_tier:"economic_v2ray"})}>{pick("بسته جدید","New package")}</button>}</div>
+      </form>
+      <div className="table"><table><thead><tr><th>{pick("عنوان","Title")}</th><th>{pick("نوع","Type")}</th><th>{pick("حجم","Traffic")}</th><th>{pick("قیمت","Price")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{packages.map(row=><tr key={num(row,"id")}><td>{text(row,"title")}</td><td>{tierLabel(text(row,"reseller_tier"))}</td><td>{gb(num(row,"traffic_gb"))}</td><td>{money(num(row,"price_toman"))}</td><td><Badge tone={bool(row,"is_active")?"ok":"warn"}>{bool(row,"is_active")?pick("فعال","Active"):pick("غیرفعال","Disabled")}</Badge></td><td><button type="button" className="mini-btn" onClick={()=>editPackage(row)}>{pick("ویرایش","Edit")}</button></td></tr>)}</tbody></table></div>
+    </Card>}
     {createOpen&&<Card className="runtime-editor"><form onSubmit={createReseller}>
       <div className="card-head"><div><b>{pick("ساخت نمایندگی","Create reseller")}</b><small>{pick("مالک باید از قبل یک کاربر فعال پنل باشد.","Owner must already be an active panel user.")}</small></div><button type="button" className="mini-btn" onClick={()=>setCreateOpen(false)}>×</button></div>
       <div className="setting-grid">
         <label className="field"><span>{pick("ایمیل کاربر مالک","Owner user email")}</span><input required type="email" dir="ltr" value={createDraft.owner_email} onChange={event=>setCreateDraft(d=>({...d,owner_email:event.target.value}))}/></label>
         <label className="field"><span>{pick("نام نمایندگی","Reseller name")}</span><input value={createDraft.name} onChange={event=>setCreateDraft(d=>({...d,name:event.target.value}))}/></label>
         <label className="field"><span>{pick("کد نمایندگی","Reseller code")}</span><input dir="ltr" placeholder={pick("خالی = ساخت خودکار","Blank = auto generated")} value={createDraft.code} onChange={event=>setCreateDraft(d=>({...d,code:event.target.value}))}/></label>
+        <label className="field"><span>{pick("نوع نمایندگی (اجباری)","Reseller type (required)")}</span><select required value={createDraft.reseller_tier} onChange={event=>setCreateDraft(d=>({...d,reseller_tier:event.target.value}))}><option value="">{pick("انتخاب نوع","Choose type")}</option><option value="economic_v2ray">اقتصادی ویتوری</option><option value="premium_static_ip">ویژه آی‌پی ثابت</option></select></label>
         <label className="field"><span>{pick("حجم اولیه (GB)","Initial traffic (GB)")}</span><input type="number" min={0} step="0.01" value={createDraft.initial_traffic_gb} onChange={event=>setCreateDraft(d=>({...d,initial_traffic_gb:Number(event.target.value)}))}/></label>
       </div>
       <button className="primary" disabled={busy}>{pick("ساخت نماینده","Create reseller")}</button>
@@ -325,7 +366,7 @@ export function AdminResellersManagementRuntime(){
       <div className="card-head"><div><b>{pick("لیست نمایندگان","Reseller list")}</b></div><input className="table-search" value={query} onChange={event=>setQuery(event.target.value)} placeholder={pick("جستجو نام، کد، ایمیل یا تلفن…","Search name, code, email or phone…")}/></div>
       <div className="table"><table><thead><tr><th>{pick("نماینده","Reseller")}</th><th>{pick("کد","Code")}</th><th>{pick("مالک","Owner")}</th><th>{pick("مشتری / اشتراک","Customers / Subs")}</th><th>{pick("حجم","Traffic")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead>
       <tbody>{filtered.map(row=>{const rid=num(row,"id");const owner=(row.owner&&typeof row.owner==="object")?row.owner as AnyRow:{};const active=bool(row,"is_active");return <tr key={rid}>
-        <td><b>{text(row,"name")||`#${rid}`}</b><small>{text(row,"brand_name")||text(row,"email")||"—"}</small></td>
+        <td><b>{text(row,"name")||`#${rid}`}</b><small>{tierLabel(text(row,"reseller_tier"))}</small></td>
         <td dir="ltr">{text(row,"code")||"—"}</td>
         <td><b>{text(owner,"name","email")||`#${text(row,"owner_user_id")}`}</b><small dir="ltr">{text(owner,"email")}</small></td>
         <td>{num(row,"customer_count")} / {num(row,"subscription_count")}</td>
@@ -355,6 +396,7 @@ export function AdminResellersManagementRuntime(){
 
         {tab==="profile"&&<form onSubmit={saveManagement}>
           <div className="setting-grid">
+            <label className="field"><span>{pick("نوع نمایندگی حجمی","Volume reseller type")}</span><select required value={draft.reseller_tier} onChange={event=>setDraft(d=>({...d,reseller_tier:event.target.value}))}><option value="economic_v2ray">اقتصادی ویتوری</option><option value="premium_static_ip">ویژه آی‌پی ثابت</option></select></label>
             <label className="field"><span>{pick("نام نمایندگی","Reseller name")}</span><input required value={draft.name} onChange={event=>setDraft(d=>({...d,name:event.target.value}))}/></label>
             <label className="field"><span>{pick("کد نمایندگی","Reseller code")}</span><input required dir="ltr" value={draft.code} onChange={event=>setDraft(d=>({...d,code:event.target.value}))}/></label>
             <label className="field"><span>{pick("نام برند","Brand name")}</span><input value={draft.brand_name} onChange={event=>setDraft(d=>({...d,brand_name:event.target.value}))}/></label>
