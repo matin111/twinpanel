@@ -24,13 +24,13 @@ export function SupportChatRuntime(){
 
   const mode=useMemo<"guest"|"account"|null>(()=>{
     const path=(pathname||"/").replace(/\/$/,"")||"/";
-    if(path==="/"||path==="/store")return "guest";
+    if(path==="/"||path==="/store"||path.startsWith("/vpn-"))return "guest";
     if(path==="/panel"||path.startsWith("/panel/"))return "account";
     return null;
   },[pathname]);
 
   useEffect(()=>{
-    if(mode!=="guest"){
+    if(mode!=="guest"||(pathname||"").startsWith("/vpn-")){
       setStoreThemeReady(true);
       return;
     }
@@ -41,7 +41,7 @@ export function SupportChatRuntime(){
     const observer=new MutationObserver(sync);
     observer.observe(root,{attributes:true,attributeFilter:["data-store-template"]});
     return()=>observer.disconnect();
-  },[mode]);
+  },[mode,pathname]);
 
   if(!mode||token===undefined)return null;
   if(mode==="guest")return storeThemeReady?<SupportChatWidgetV2 key="store-guest-chat" customerToken={null}/>:null;

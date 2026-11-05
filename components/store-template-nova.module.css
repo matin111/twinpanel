@@ -14,3 +14,34 @@
 .guideMedia{display:grid;gap:15px;align-content:start;justify-items:center}
 .guideMedia img{max-width:100%;max-height:370px;object-fit:contain;background:#070d1d;border:1px solid #ffffff18;border-radius:18px;padding:12px}
 @media(max-width:760px){.customHeroImage{height:300px}.guideDetails{grid-template-columns:1fr}.guideWorkbench{padding:15px}.guideControls label{flex:1 1 170px}}
+
+/* Template 4 must never be cropped by older global storefront rules. */
+.root{position:relative;isolation:isolate;width:100%;max-width:100%;overflow-x:clip;min-width:0}
+.root .main{box-sizing:border-box;max-width:1260px;width:calc(100% - 48px);min-width:0;margin-inline:auto}
+.root .header{max-width:100%;min-width:0}
+.root .header .nav{min-width:0;justify-content:center}
+.root .heroCopy,.root .heroVisual,.root .plan,.root .features article,.root .protocols article{min-width:0}
+.root .protocols .protocolLink{display:block;background:linear-gradient(145deg,#151c34,#0d1429);border:1px solid #ffffff16;border-radius:21px;padding:25px;transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease}
+.root .protocols .protocolLink:hover{transform:translateY(-6px);border-color:#8d77ff88;box-shadow:0 20px 50px #442cb022}
+.root .protocols .protocolLink>span{font-size:27px;color:#8ee3ff}
+.root .protocols .protocolLink h3{font-size:17px;margin:16px 0 10px}
+.root .protocols .protocolLink p{font-size:13px;color:#aab7d1;line-height:1.9}
+@media(max-width:1100px){.root .header{gap:12px}.root .nav{gap:10px}.root .nav a{font-size:12px}}
+@media(max-width:850px){.root .mobileButton{display:block}.root .nav{display:none}.root .navOpen{position:absolute;display:flex;flex-direction:column;top:100%;left:0;right:0;background:#0b1225;padding:15px 22px;z-index:100;box-shadow:0 20px 45px #0008}.root .navOpen a{padding:11px 7px}.root .main{width:calc(100% - 28px)}}
+@media(max-width:420px){.root .header{padding:12px 10px}.root .brand{font-size:15px}.root .brand img{width:32px;height:32px}.root .account{padding:9px;font-size:11px}.root .hero h1{font-size:clamp(29px,9vw,38px)}}
+
+
+/* Long-form, readable product information for reseller / static IP / services. */
+.root .explainSections{display:grid;gap:14px;margin:18px 0 62px}
+.root .explainSection{min-width:0}
+.root .explainSection>.sectionHead{margin-top:62px;max-width:1000px}
+.root .explainSection>.sectionHead p{font-size:15px;line-height:2.25;color:#bfc9e3}
+.root .explainGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px;align-items:stretch}
+.root .explainCard{min-width:0;padding:27px 25px;border:1px solid #8796c12a;border-radius:24px;background:linear-gradient(150deg,#19213be8,#11172ae8);box-shadow:0 18px 38px #00000014;transition:transform .25s ease,border-color .25s ease}
+.root .explainCard:hover{transform:translateY(-4px);border-color:#907aff8a}
+.root .explainCard h3{font-size:18px;line-height:1.7;margin:13px 0 10px;color:#f6f4ff}
+.root .explainCard p{font-size:14px;line-height:2.12;color:#b8c5df;margin:0;overflow-wrap:anywhere}
+.root .explainMarker{display:inline-flex;font-size:12px;font-weight:800;color:#a5eff5;background:#2b587239;border:1px solid #70dae833;border-radius:9px;padding:8px 10px;direction:ltr}
+@media(max-width:980px){.root .explainGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.root .explainGrid{grid-template-columns:1fr}.root .explainSection>.sectionHead{margin-top:42px}.root .explainCard{padding:22px 20px}}
+@media(prefers-reduced-motion:reduce){.root .explainCard{transition:none}.root .explainCard:hover{transform:none}}

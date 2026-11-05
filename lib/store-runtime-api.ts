@@ -20,6 +20,7 @@ export type StorePlan={
   enable_wireguard:boolean;
   enable_l2tp:boolean;
   enable_v2ray:boolean;
+  protocols?:string[];
 };
 
 export type StoreOrderResult={
@@ -71,11 +72,17 @@ export const storeRuntimeApi={
 };
 
 export function planProtocols(plan:StorePlan){
+  // Protocols are a plan-specific snapshot from the current backend. The
+  // five enable_* fields remain only for older API installations.
+  if(Array.isArray(plan.protocols)){
+    const allowed=new Set(["cisco","openvpn","wireguard","l2tp","v2ray",
+      "hysteria2","tuic","anytls","naive","shadowtls","snell",
+      "mieru","trusttunnel","amneziawg","sudoku"]);
+    return [...new Set(plan.protocols.filter(id=>typeof id==="string"&&allowed.has(id)))];
+  }
   return [
-    plan.enable_cisco&&"cisco",
-    plan.enable_openvpn&&"openvpn",
-    plan.enable_wireguard&&"wireguard",
-    plan.enable_l2tp&&"l2tp",
+    plan.enable_cisco&&"cisco",plan.enable_openvpn&&"openvpn",
+    plan.enable_wireguard&&"wireguard",plan.enable_l2tp&&"l2tp",
     plan.enable_v2ray&&"v2ray"
   ].filter(Boolean) as string[];
 }
