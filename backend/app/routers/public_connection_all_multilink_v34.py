@@ -24,6 +24,8 @@ from .public_connection_modern_names_v14 import (
     _profile_name,
 )
 from .public_connection_modern_delivery_v16 import _resolve_delivery_content
+from .public_connection_multilink_v7 import _subscription_and_payload, _v2ray_items, _subscription_content
+from .. import xray_public_delivery_runtime as xray_delivery
 
 
 router = APIRouter(tags=["public-connect-all-multilink-v34"])
@@ -170,6 +172,20 @@ def _all_share_uris(sub: Any, protocol: str, items: list[dict[str, Any]]) -> lis
     rows: list[str] = []
     seen: set[str] = set()
     for item in items:
+        if protocol == "v2ray":
+            profiles = xray_delivery._customer_profiles(item)
+            if profiles:
+                for profile in profiles:
+                    uri = str(profile.get("uri") or "").strip()
+                    if not uri or "://" not in uri:
+                        continue
+                    label = _profile_name(sub, protocol, item)
+                    label += "-" + _safe_name(profile.get("id"), "profile")
+                    named = _named_uri(uri, label)
+                    if named and named not in seen:
+                        seen.add(named)
+                        rows.append(named)
+                continue
         uri = _share_uri(sub, protocol, item)
         if not uri:
             return []
@@ -391,8 +407,13 @@ def _delivery(
     if protocol not in MULTI_PROTOCOLS:
         raise HTTPException(status_code=404, detail="مولتی‌لینک برای این پروتکل ارائه نمی‌شود")
 
-    sub, payload = _active(token, db)
-    items = _protocol_items(payload, protocol)
+    # Poll only the requested Xray credentials: never deserialize or reconcile
+    # all unrelated protocols when a client refreshes its V2Ray subscription.
+    if protocol == "v2ray":
+        sub, payload = _subscription_and_payload(token, db)
+    else:
+        sub, payload = _active(token, db)
+    items = _v2ray_items(payload) if protocol == "v2ray" else _protocol_items(payload, protocol)
     if not items:
         raise HTTPException(status_code=404, detail="سرور آماده‌ای برای این پروتکل وجود ندارد")
 
@@ -439,6 +460,18 @@ def public_protocol_multi_meta_v34(
     db: Session = Depends(get_db),
 ):
     protocol = _normalize(protocol)
+    if protocol == "v2ray":
+        # One canonical feed for /sub, /multi/v2ray and metadata.
+        _content, server_count, count = _subscription_content(token, db)
+        sub = _subscription_from_share_token(token, db)
+        kind = "uri"
+        return JSONResponse(
+            {"protocol": protocol, "title": PROTOCOL_TITLES[protocol],
+             "kind": kind, "node_count": count, "server_count": server_count,
+             "client": PROTOCOL_CLIENT.get(protocol),
+             "can_copy_as_subscription": True, "is_bundle": False},
+            headers=_headers(sub, protocol, kind, count),
+        )
     kind, count, sub, _items_list, _payload = _delivery(token, protocol, db)
     return JSONResponse(
         {
@@ -462,6 +495,16 @@ def public_protocol_multi_v34(
     db: Session = Depends(get_db),
 ):
     protocol = _normalize(protocol)
+    if protocol == "v2ray":
+        content, server_count, count = _subscription_content(token, db)
+        sub = _subscription_from_share_token(token, db)
+        headers = _headers(sub, protocol, "uri", count)
+        headers["X-TwinPanel-Server-Count"] = str(server_count)
+        headers["X-TwinPanel-Profile-Count"] = str(count)
+        headers["Content-Disposition"] = (
+            f'inline; filename="{_safe_name(_multilink_name(sub, protocol), "user-vpn")}-subscription.txt"'
+        )
+        return Response(content=content, media_type="text/plain; charset=utf-8", headers=headers)
     kind, count, sub, items, payload = _delivery(token, protocol, db)
     headers = _headers(sub, protocol, kind, count)
 

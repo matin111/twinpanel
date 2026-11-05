@@ -113,7 +113,7 @@ def _profile_count(item: dict[str, Any]) -> int:
     )
 
 
-async def _active_public_payload(token: str, db: Session) -> dict[str, Any]:
+def _active_public_payload(token: str, db: Session) -> dict[str, Any]:
     """Serve stored, deliverable Xray profiles without remote repair on GET.
 
     HTTP subscription downloads must never initiate SSH provisioning: clients
@@ -139,6 +139,13 @@ def _item_v2ray_uris(item: dict[str, Any]) -> list[str]:
         seen.add(uri)
         result.append(uri)
 
+    # Legacy accounts can retain a single VLESS URI without profiles[].
+    # Serve that stored URI until independent provisioning builds real profiles;
+    # do not synthesize unavailable transports during HTTP GET.
+    if not result and not isinstance(item.get("profiles"), list):
+        uri = str(item.get("uri") or "").strip()
+        if uri.startswith("vless://"):
+            result.append(uri)
     return result
 
 
@@ -222,8 +229,8 @@ def _v2ray_uris(db: Session, payload: dict[str, Any]) -> list[str]:
     return result
 
 
-async def _subscription_content(token: str, db: Session) -> tuple[str, int, int]:
-    payload = await _active_public_payload(token, db)
+def _subscription_content(token: str, db: Session) -> tuple[str, int, int]:
+    payload = _active_public_payload(token, db)
     groups = _v2ray_profile_groups(db, payload)
     uris = list(dict.fromkeys(
         str(profile.get("uri") or "").strip()
@@ -239,8 +246,8 @@ async def _subscription_content(token: str, db: Session) -> tuple[str, int, int]
     return base64.b64encode("\n".join(uris).encode("utf-8")).decode("ascii"), len(groups), len(uris)
 
 
-async def _subscription_response(token: str, db: Session) -> Response:
-    content, server_count, profile_count = await _subscription_content(token, db)
+def _subscription_response(token: str, db: Session) -> Response:
+    content, server_count, profile_count = _subscription_content(token, db)
     return Response(
         content=content,
         media_type="text/plain; charset=utf-8",
@@ -254,8 +261,8 @@ async def _subscription_response(token: str, db: Session) -> Response:
     )
 
 
-async def _subscription_meta_response(token: str, db: Session) -> JSONResponse:
-    payload = await _active_public_payload(token, db)
+def _subscription_meta_response(token: str, db: Session) -> JSONResponse:
+    payload = _active_public_payload(token, db)
     groups = _v2ray_profile_groups(db, payload)
     if not groups:
         raise HTTPException(
@@ -277,24 +284,24 @@ async def _subscription_meta_response(token: str, db: Session) -> JSONResponse:
     "/{token}/subscription/v2ray",
     name="public_v2ray_subscription_v7",
 )
-async def public_v2ray_subscription_v7(
+def public_v2ray_subscription_v7(
     token: str,
     db: Session = Depends(get_db),
 ):
     """Return a base64 feed containing exactly three real profiles per server."""
-    return await _subscription_response(token, db)
+    return _subscription_response(token, db)
 
 
 @router.get(
     "/{token}/subscription/v2ray/meta",
     name="public_v2ray_subscription_meta_v49",
 )
-async def public_v2ray_subscription_meta_v49(
+def public_v2ray_subscription_meta_v49(
     token: str,
     db: Session = Depends(get_db),
 ):
     """Expose grouped exact-three metadata for the Public Connect UI."""
-    return await _subscription_meta_response(token, db)
+    return _subscription_meta_response(token, db)
 
 
 # TWINPANEL_PUBLIC_CONNECT_NEUTRAL_SUB_URL_V50
@@ -302,32 +309,32 @@ async def public_v2ray_subscription_meta_v49(
     "/{token}/sub",
     name="public_v2ray_subscription_neutral_v50",
 )
-async def public_v2ray_subscription_neutral_v50(
+def public_v2ray_subscription_neutral_v50(
     token: str,
     db: Session = Depends(get_db),
 ):
-    return await _subscription_response(token, db)
+    return _subscription_response(token, db)
 
 
 @router.get(
     "/{token}/sub/meta",
     name="public_v2ray_subscription_neutral_meta_v50",
 )
-async def public_v2ray_subscription_neutral_meta_v50(
+def public_v2ray_subscription_neutral_meta_v50(
     token: str,
     db: Session = Depends(get_db),
 ):
-    return await _subscription_meta_response(token, db)
+    return _subscription_meta_response(token, db)
 
 
 @router.get("/{token}/subscription/v2ray/qr")
-async def public_v2ray_subscription_qr_v7(
+def public_v2ray_subscription_qr_v7(
     token: str,
     request: Request,
     db: Session = Depends(get_db),
 ):
     """QR contains the neutral stable subscription URL, not duplicated data."""
-    await _subscription_content(token, db)
+    _subscription_content(token, db)
     subscription_url = str(
         request.url_for("public_v2ray_subscription_neutral_v50", token=token)
     )
