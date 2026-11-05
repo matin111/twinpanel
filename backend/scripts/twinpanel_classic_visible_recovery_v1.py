@@ -18,7 +18,7 @@ from pathlib import Path
 
 from sqlalchemy import or_
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, "/opt/twinpanel/current/backend" if Path("/opt/twinpanel/current/backend/app").exists() else str(Path(__file__).resolve().parents[1]))
 logging.getLogger("asyncssh").setLevel(logging.WARNING)
 
 from app.database import SessionLocal
