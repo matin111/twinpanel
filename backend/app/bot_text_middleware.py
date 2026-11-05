@@ -363,6 +363,18 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
         home = "rmenu:home" if self.scope == "reseller" else "main:home"
         back = self._navigation_back(text, self.scope)
         rows = [list(row) for row in markup.inline_keyboard] if markup else []
+        # The actual main menu already is the navigation destination.
+        # Avoid appending redundant Back/Home controls to this keyboard.
+        callbacks = {
+            str(button.callback_data or "")
+            for row in rows for button in row
+        }
+        if (
+            self.scope != "reseller"
+            and {"shop:list", "trial:claim", "main:dashboard", "subs:list"}
+            <= callbacks
+        ):
+            return method
         labels = [
             str(button.text or "")
             for row in rows
