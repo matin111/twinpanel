@@ -65,11 +65,11 @@ export function NovaBlogManager(){
   {error&&<div className="runtime-error" role="alert">{error}</div>}
   {success&&<div className="runtime-success" role="status">{success}</div>}
   <div className={styles.layout}>
-   <aside className={styles.sidebar}><div className={styles.sidebarHead}><strong>مقاله‌ها</strong><button type="button" onClick={create} disabled={busy}>+ مقاله جدید</button></div>
+   <div className={styles.sidebar} role="region" aria-label="فهرست مقاله‌ها"><div className={styles.sidebarHead}><strong>مقاله‌ها</strong><button type="button" onClick={create} disabled={busy}>+ مقاله جدید</button></div>
     {loading?<p>در حال دریافت مقاله‌ها…</p>:entries.length===0?<p>هنوز مقاله‌ای ثبت نشده است.</p>:entries.map(entry=><button type="button" className={originalSlug===entry.slug?styles.activeEntry:styles.entry} key={entry.slug} onClick={()=>select(entry)} disabled={busy}>
      <b>{entry.title}</b><small>{entry.published?"منتشر شده":"پیش‌نویس"} · {entry.updated}</small>
     </button>)}
-   </aside>
+   </div>
    <section className={styles.editor}><h2>{originalSlug?"ویرایش مقاله":"نوشتن مقاله جدید"}</h2>
     <label>عنوان مقاله<input maxLength={180} value={current.title} onChange={e=>setCurrent(x=>({...x,title:e.target.value}))} placeholder="مثلاً: آموزش استفاده از IP ثابت"/></label>
     <label>شناسه لاتین در آدرس سایت (Slug)<input dir="ltr" maxLength={80} value={current.slug} onChange={e=>setCurrent(x=>({...x,slug:e.target.value.toLowerCase()}))} placeholder="static-ip-guide"/></label>

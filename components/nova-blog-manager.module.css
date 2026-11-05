@@ -1,14 +1,15 @@
-.layout{display:grid;grid-template-columns:minmax(240px,300px) minmax(0,1fr);gap:18px;align-items:start;margin-top:20px}
-.sidebar,.editor{border:1px solid #7785b34d;border-radius:18px;padding:19px;background:var(--surface,#17213b);min-width:0}
+.layout{display:grid;grid-template-columns:minmax(240px,300px) minmax(0,1fr);direction:rtl;gap:18px;align-items:start;margin-top:20px;width:100%;min-width:0}
+.sidebar,.editor{position:relative;width:100%;max-width:100%;right:auto;left:auto;top:auto;bottom:auto;z-index:auto;overflow:visible;border:1px solid #7785b34d;border-radius:18px;padding:19px;background:var(--surface,#17213b);min-width:0}
+.sidebar{display:flex;flex-direction:column;gap:0;min-width:0;align-self:start}
 .sidebarHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px}
 .sidebarHead button{padding:9px 12px;border:1px solid #9b82f2;border-radius:9px;background:#6c3cff;color:white;cursor:pointer}
 .entry,.activeEntry{display:flex;flex-direction:column;gap:8px;width:100%;text-align:right;border:1px solid #7785b33a;border-radius:12px;background:transparent;color:inherit;padding:13px;margin:8px 0;cursor:pointer}
 .activeEntry{border-color:#a38cff;background:#6e54ca33}
 .entry small,.activeEntry small{color:#b7c2d9}
-.editor{display:grid;gap:14px}
+.editor{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;min-width:0}
 .editor h2{margin:0 0 8px;font-size:21px}
-.editor label{display:grid;gap:7px;font-weight:650;font-size:13px}
-.editor input:not([type=checkbox]),.editor textarea{background:#0b1227;color:#eef1ff;border:1px solid #8492c466;border-radius:11px;padding:12px 14px;font:inherit;line-height:1.9;width:100%;min-width:0}
+.editor label{display:grid;grid-template-columns:minmax(0,1fr);gap:7px;font-weight:650;font-size:13px;min-width:0}
+.editor input:not([type=checkbox]),.editor textarea{display:block;max-width:100%;background:#0b1227;color:#eef1ff;border:1px solid #8492c466;border-radius:11px;padding:12px 14px;font:inherit;line-height:1.9;width:100%;min-width:0}
 .editor input:focus,.editor textarea:focus{outline:2px solid #8e75ff}
 .publish{display:flex!important;align-items:center;gap:10px;font-size:14px!important}
 .publish input{width:20px;height:20px}
@@ -16,4 +17,4 @@
 .actions button,.actions a{padding:11px 18px}
 .caption,.note{color:#aab7d4;font-size:12px;line-height:2}
 .note{margin-top:15px}
-@media(max-width:820px){.layout{grid-template-columns:1fr}.sidebar{max-height:290px;overflow:auto}.editor{padding:14px}}
+@media(max-width:820px){.layout{grid-template-columns:minmax(0,1fr)}.sidebar{max-height:290px;overflow:auto}.editor{padding:14px}}
