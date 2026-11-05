@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import base64
-from datetime import datetime
+from datetime import datetime, timedelta
+import hashlib
+import logging
 import asyncio
 import httpx
 import secrets
@@ -33,6 +35,8 @@ from .subscriptions import suspend_subscription, activate_subscription
 from .telegram_manager import _broadcast_target_ids, load_bot_token
 
 
+audit_log = logging.getLogger('twinpanel.telegram.admin_ops')
+
 router = APIRouter(
     prefix="/v1/telegram/admin-ops",
     tags=["telegram-admin-ops"],
@@ -56,6 +60,25 @@ def _admin(db: Session, telegram_id: int) -> User:
         # Same status for unlinked and non-admin users; avoid privilege enumeration.
         raise HTTPException(status_code=403, detail="دسترسی مدیریت مجاز نیست")
     return user
+
+
+def _manual_purchase(row: PaymentIntent) -> bool:
+    submitted = row.receipt_submitted_at or row.submitted_at
+    return bool(
+        row.receipt_telegram_file_id and _purchase_needs_review(row)
+        and submitted and datetime.utcnow() - submitted >= timedelta(minutes=3)
+    )
+
+
+def _manual_topup(row: CustomerWalletTopup) -> bool:
+    submitted = row.submitted_at or row.created_at
+    return bool(
+        row.receipt_file_marker
+        and str(row.status or "").lower() in {
+            "awaiting_review", "payment_submitted", "submitted", "review", "waiting"
+        }
+        and submitted and datetime.utcnow() - submitted >= timedelta(minutes=3)
+    )
 
 
 def _purchase(db: Session, intent_id: int) -> PaymentIntent:
@@ -91,7 +114,7 @@ def pending_review(telegram_id: int, db: Session = Depends(get_db)):
     rows = db.query(PaymentIntent).order_by(PaymentIntent.id.desc()).limit(500).all()
     purchases = [
         _summary(db, row) for row in rows
-        if _purchase_needs_review(row)
+        if _manual_purchase(row)
         and not _is_reseller_bot_internal_user(db, row.user_id)
     ][:20]
     wallet_rows = db.query(CustomerWalletTopup).filter(
@@ -105,7 +128,7 @@ def pending_review(telegram_id: int, db: Session = Depends(get_db)):
             "status": row.status,
             "amount_toman": int(row.payable_amount_toman or 0),
             "has_receipt": bool(row.receipt_file_marker),
-        } for row in wallet_rows if not _is_reseller_scoped_topup(row)
+        } for row in wallet_rows if _manual_topup(row) and not _is_reseller_scoped_topup(row)
     ][:20]
     return {"purchases": purchases, "wallet_topups": topups}
 
@@ -120,15 +143,15 @@ def receipt_detail(
         row = _purchase(db, item_id)
         payload = _summary(db, row)
         marker = str(row.receipt_telegram_file_id or "").strip()
-        payload["can_approve"] = _purchase_needs_review(row)
+        payload["can_approve"] = _manual_purchase(row)
     elif kind == "wallet":
         row = db.get(CustomerWalletTopup, item_id)
-        if not row or _is_reseller_scoped_topup(row):
-            raise HTTPException(status_code=404, detail="درخواست شارژ پیدا نشد")
+        if not row or _is_reseller_scoped_topup(row) or not _manual_topup(row):
+            raise HTTPException(status_code=404, detail="درخواست شارژ در صف بازبینی نیست")
         marker = str(row.receipt_file_marker or "").strip()
         payload = {"id": row.id, "status": row.status, "user_id": row.user_id,
                    "amount_toman": int(row.payable_amount_toman or 0),
-                   "can_approve": row.status in {"awaiting_review", "payment_submitted", "submitted", "review", "waiting"}}
+                   "can_approve": _manual_topup(row)}
     else:
         raise HTTPException(status_code=404, detail="نوع رسید نامعتبر است")
     payload["kind"] = kind
@@ -154,19 +177,20 @@ async def approve_receipt(
     actor = _admin(db, payload.telegram_id)
     if kind == "purchase":
         row = _purchase(db, item_id)
-        if not _purchase_needs_review(row):
+        if not _manual_purchase(row):
             raise HTTPException(status_code=409, detail="این پرداخت دیگر در صف بازبینی نیست")
         if not row.receipt_telegram_file_id:
             raise HTTPException(status_code=409, detail="رسید قابل مشاهده‌ای ثبت نشده است")
         result = await approve_payment_fast(item_id, background_tasks, db)
     elif kind == "wallet":
         row = db.get(CustomerWalletTopup, item_id)
-        if not row or _is_reseller_scoped_topup(row) or not row.receipt_file_marker:
+        if not row or _is_reseller_scoped_topup(row) or not _manual_topup(row):
             raise HTTPException(status_code=404, detail="رسید معتبر پیدا نشد")
         result = approve_wallet_topup_v2(item_id, db)
     else:
         raise HTTPException(status_code=404, detail="نوع رسید نامعتبر است")
     # Existing fulfillment and transaction handlers are the financial source of truth.
+    audit_log.info("receipt_approved actor=%s kind=%s item=%s", actor.id, kind, item_id)
     return {"ok": True, "admin_user_id": actor.id, "item_id": item_id,
             "result": result}
 
@@ -175,10 +199,10 @@ async def approve_receipt(
 def reject_receipt(
     kind: str, item_id: int, payload: ActionIn, db: Session = Depends(get_db),
 ):
-    _admin(db, payload.telegram_id)
+    actor = _admin(db, payload.telegram_id)
     if kind == "purchase":
         row = _purchase(db, item_id)
-        if not _purchase_needs_review(row):
+        if not _manual_purchase(row):
             raise HTTPException(status_code=409, detail="پرداخت دیگر قابل رد نیست")
         result = reject_payment(item_id, {"reason": payload.reason}, db)
     elif kind == "wallet":
@@ -189,6 +213,7 @@ def reject_receipt(
         )
     else:
         raise HTTPException(status_code=404, detail="نوع رسید نامعتبر است")
+    audit_log.info("receipt_rejected actor=%s kind=%s item=%s", actor.id, kind, item_id)
     return {"ok": True, "result": result}
 
 
@@ -241,6 +266,7 @@ def admin_adjust_wallet(
         user_id, AdminAdjustIn(amount_toman=payload.amount_toman,
                                 note=f"[Telegram admin {actor.id}] {payload.reason}"), db
     )
+    audit_log.info("wallet_adjust actor=%s user=%s amount=%s", actor.id, user_id, payload.amount_toman)
     return result
 
 
@@ -249,14 +275,18 @@ def manage_subscription(
     subscription_id: int, action: str, payload: ActionIn,
     db: Session = Depends(get_db),
 ):
-    _admin(db, payload.telegram_id)
+    actor = _admin(db, payload.telegram_id)
     sub = db.get(Subscription, subscription_id)
     if not sub or _is_reseller_scoped_user(db, sub.user_id):
         raise HTTPException(status_code=404, detail="اشتراک پیدا نشد")
     if action == "suspend":
-        return suspend_subscription(subscription_id, db)
-    if action == "activate":
-        return activate_subscription(subscription_id, db)
+        result = suspend_subscription(subscription_id, db)
+    elif action == "activate":
+        result = activate_subscription(subscription_id, db)
+    else:
+        raise HTTPException(status_code=404, detail="عملیات نامعتبر است")
+    audit_log.info("subscription_action actor=%s subscription=%s action=%s", actor.id, subscription_id, action)
+    return result
     raise HTTPException(status_code=404, detail="عملیات نامعتبر است")
 
 
@@ -329,4 +359,5 @@ async def broadcast_send(
     _broadcast_drafts.pop(payload.nonce, None)
     targets = _broadcast_target_ids(db)
     background_tasks.add_task(_deliver_broadcast, draft["text"], targets)
+    audit_log.info("broadcast_started actor=%s recipients=%s sha256=%s", actor.id, len(targets), hashlib.sha256(draft["text"].encode("utf-8")).hexdigest())
     return {"ok": True, "queued": len(targets)}
