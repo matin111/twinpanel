@@ -1,0 +1,10 @@
+[Unit]
+Description=Retry incomplete modern accounts after API restarts
+[Timer]
+OnActiveSec=3min
+OnUnitInactiveSec=4min
+AccuracySec=30s
+Persistent=false
+Unit=twinpanel-recent-account-recovery.service
+[Install]
+WantedBy=timers.target
