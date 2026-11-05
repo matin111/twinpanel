@@ -78,3 +78,11 @@
  .root .innerHero h1{font-size:clamp(28px,8vw,36px);line-height:1.45;letter-spacing:-.3px}
  .root .innerHeroUseCases span{font-size:12px;padding:8px 11px}
 }
+
+
+/* Protocol-to-app discovery: visually prominent on every tutorial. */
+.root .sublinkNotice{margin:24px 0 28px;padding:22px 25px;border:1px solid #65dce866;border-radius:19px;background:linear-gradient(110deg,#213653e8,#142140dd);box-shadow:0 12px 36px #142b4a33}
+.root .sublinkNotice strong{font-size:17px;line-height:1.7;color:#8feaff}
+.root .sublinkNotice p{margin:10px 0 0;font-size:14px;line-height:2.2;color:#d4e0f5}
+.root .guideSublinkHint{padding:12px 16px;border-right:3px solid #65dce8;background:#1c344d66;border-radius:8px;font-size:14px;line-height:2;color:#d5eaff}
+@media(max-width:640px){.root .sublinkNotice{padding:18px}.root .sublinkNotice p{font-size:13px}}
