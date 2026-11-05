@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.579",
-  "source_sha": "9ce40012853d90ae36a423bccf82e107cbb44ce4",
+  "version": "1.1.0-rc.580",
+  "source_sha": "0086e800e1cf2e0e2fd590d641592728d834ec1c",
   "notes": {
-    "fa": "بهبود ناوبری ربات تلگرام: حذف دکمه برگشت ساختگی از صفحات اصلی بدون والد مانند اشتراک‌های من و کیف پول؛ حفظ دکمه برگشت در مراحل واقعی چندصفحه‌ای و حفظ منوی اصلی. رفع خطای message is not modified هنگام بروزرسانی کیف پول با پاسخ فوری به کلیک و ویرایش امن پیام. بدون تغییر موجودی کیف پول یا پرداخت‌ها. ۹ تست CI موفق.",
-    "en": "Telegram: remove automatically guessed Back buttons from root pages such as My Subscriptions and Wallet; preserve screen-owned Back and Home. Fix wallet refresh callback with immediate acknowledgement and idempotent editing so Telegram message-is-not-modified does not cause a popup. No payment or wallet balance changes. Nine feature CI checks passed."
+    "fa": "انتشار رسمی قابلیت ارسال مستقیم رسیدهای تأییدنشده به چت خصوصی ادمین با تصویر رسید، اطلاعات پرداخت و دکمه‌های تأیید و رد دومرحله‌ای؛ بررسی دوره‌ای، جلوگیری از اعلان تکراری و کنترل مجوز ادمین. اصلاح ماندگار در بسته GitHub به‌جای Patch موقت سرور.",
+    "en": "Official release of direct manual-receipt notifications to authorized Telegram admins with receipt attachment, payment details and two-step approve/reject buttons; periodic checks, deduplication and strict admin authorization. Persistent GitHub-built package instead of server hotfix."
   }
 }
