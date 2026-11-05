@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.592",
-  "source_sha": "7752b4316097e87bcbeb355cf90a2c9eff4e4fb8",
+  "version": "1.1.0-rc.593",
+  "source_sha": "168358a285b1bce96880e0b049fcbc6607b4c403",
   "notes": {
-    "fa": "افزودن امکان آپلود تصویر شاخص و درج عکس بین پاراگراف‌های بلاگ قالب چهار؛ پیش‌نمایش و نمایش واکنش‌گرای تصاویر در مقاله؛ فایل‌های JPG، PNG و WebP تا ۸ مگابایت.",
-    "en": "Add uploaded cover and inline images for Nova blog articles, including previews and responsive rendering. Supports JPG/PNG/WebP, max 8 MB per image."
+    "fa": "افزودن پرداخت مستقیم خرید اشتراک از کیف پول در ربات اصلی: نمایش موجودی و مبلغ، تأیید دومرحله‌ای، کسر اتمیک و بدون تکرار، تحویل QR/لینک اکانت توسط Worker قابل بازیابی؛ جلوگیری از پرداخت تکراری روش‌های دیگر.",
+    "en": "Main Telegram bot subscription wallet checkout: balance/price preview, two-step confirmation, idempotent row-locked charge, durable recoverable fulfillment with subscription QR delivery, and prevention of concurrent external payment methods."
   }
 }
