@@ -2,6 +2,7 @@
 import ast
 from html import unescape
 from pathlib import Path
+from textwrap import dedent
 
 BASE = Path(__file__).resolve().parents[2]
 
@@ -18,7 +19,7 @@ def test_auto_back_on_first_purchase_screen_goes_home_not_same_page():
     function_source = ast.get_source_segment(src, fn)
     # Run the self-contained static helper without connecting to the database.
     ns = {"unescape": unescape}
-    exec(function_source.replace("@staticmethod\n", ""), ns)
+    exec(dedent(function_source), ns)
     back = ns["_navigation_back"]
     assert back("🛒 خرید اشتراک\n\nابتدا نوع اشتراک را انتخاب کنید:", "admin") == "main:home"
     assert back("اشتراک عمومی\nتعداد کاربر را انتخاب کنید:", "admin") == "shop:list"
