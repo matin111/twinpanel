@@ -4,6 +4,7 @@ import secrets
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Depends,
     HTTPException,
 )
@@ -23,7 +24,8 @@ from ..deps import (
 from ..models import User
 from ..payment_models import PaymentSettings
 from ..store_models import StoreOrder
-from .store import _fulfill_paid_order, _order_out
+from .store import _order_out
+from ..services.payment_fulfillment_fast_path import fulfill_wallet_order_background
 
 
 router = APIRouter(
@@ -257,6 +259,7 @@ def _transaction_out(
 @router.post("/orders/{order_id}/pay")
 async def pay_store_order_from_wallet(
     order_id: int,
+    background_tasks: BackgroundTasks,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -278,10 +281,13 @@ async def pay_store_order_from_wallet(
         "paid", "provisioning", "provision_failed", "fulfilled"
     }:
         # A prior debit has already been committed. Never charge again.
-        result = _order_out(order) if order.status == "fulfilled" else None
-        if result is None:
-            result = await _fulfill_paid_order(order_id, db)
-        return {"ok": True, "already_paid": True, "order": result}
+        if order.status == "provision_failed":
+            order.status = "paid"
+            order.error_text = None
+            db.commit()
+        if order.status == "paid":
+            background_tasks.add_task(fulfill_wallet_order_background, order_id)
+        return {"ok": True, "already_paid": True, "order": _order_out(order)}
 
     if order.status != "pending_payment":
         raise HTTPException(status_code=409, detail="این سفارش قابل پرداخت با کیف پول نیست")
@@ -343,9 +349,10 @@ async def pay_store_order_from_wallet(
     order.paid_at = datetime.utcnow()
     db.commit()
 
-    # Do not refund or debit again if asynchronous provisioning fails.
-    result = await _fulfill_paid_order(order_id, db)
-    return {"ok": True, "already_paid": False, "order": result}
+    # Return immediately. Provisioning may exceed the Telegram API timeout;
+    # the durable worker also rescans paid wallet orders after a restart.
+    background_tasks.add_task(fulfill_wallet_order_background, order_id)
+    return {"ok": True, "already_paid": False, "order": _order_out(order)}
 
 
 @router.get("/me")
