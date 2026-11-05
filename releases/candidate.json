@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.591",
-  "source_sha": "e8a87a1cd6243d2b47c557a05a5f34a0bbe4977b",
+  "version": "1.1.0-rc.592",
+  "source_sha": "7752b4316097e87bcbeb355cf90a2c9eff4e4fb8",
   "notes": {
-    "fa": "رفع به‌هم‌ریختگی صفحه مدیریت بلاگ قالب چهار: اصلاح تداخل سایدبار با CSS عمومی پنل، فرم ویرایش تمام‌عرض، نمایش درست لیست مقالات و بهبود موبایل.",
-    "en": "Fix Nova admin blog editor broken layout: isolate article list from global fixed aside styles, restore full width editing form and responsive columns."
+    "fa": "افزودن امکان آپلود تصویر شاخص و درج عکس بین پاراگراف‌های بلاگ قالب چهار؛ پیش‌نمایش و نمایش واکنش‌گرای تصاویر در مقاله؛ فایل‌های JPG، PNG و WebP تا ۸ مگابایت.",
+    "en": "Add uploaded cover and inline images for Nova blog articles, including previews and responsive rendering. Supports JPG/PNG/WebP, max 8 MB per image."
   }
 }
