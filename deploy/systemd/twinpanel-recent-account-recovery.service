@@ -9,7 +9,7 @@ EnvironmentFile=/etc/twinpanel/backend.env
 Environment=PYTHONUNBUFFERED=1
 Environment=RECENT_RECOVERY_MAX_ACCOUNTS=2
 Environment=RECENT_RECOVERY_MAX_PROTOCOLS=2
-ExecStart=/opt/twinpanel/venv/bin/python3 -u /opt/twinpanel/runtime/twinpanel_recent_account_recovery_v1.py
+ExecStart=/opt/twinpanel/venv/bin/python3 -u /opt/twinpanel/current/backend/scripts/twinpanel_recent_account_recovery_v1.py
 Nice=15
 CPUWeight=10
 CPUQuota=60%
