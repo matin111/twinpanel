@@ -7,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
-from .telegram_navigation_v1 import show_navigation_page
+from .telegram_navigation_v1 import show_navigation_page, acknowledge_navigation
 from .telegram_account_link_bot_original import _cancel_keyboard
 
 
@@ -176,7 +176,7 @@ def install(router, request_fn):
 
     @router.callback_query(F.data.startswith("subimp:link:"))
     async def import_connection(callback: CallbackQuery):
-        await callback.answer()
+        await acknowledge_navigation(callback)
         try:
             sub_id = int((callback.data or "").rsplit(":", 1)[-1])
             info = await _read_import(callback, sub_id)
