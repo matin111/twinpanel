@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..reseller_tier_policy import reseller_tier, check_package_tier
+from ..reseller_tier_policy import reseller_tier, check_package_tier, tier_entitlements
 from ..deps import require_reseller
 from ..models import Plan, Subscription, User
 from ..services.subscription_factory import create_subscription_core
@@ -3060,6 +3060,7 @@ def reseller_server_options_v61(
     db: Session =
         Depends(get_db),
 ):
+    tier_node_ids = set(tier_entitlements(db, reseller_tier(reseller))["node_ids"])
 
     from ..models import (
         Node,
@@ -3090,6 +3091,8 @@ def reseller_server_options_v61(
     result=[]
 
     for node in rows:
+        if int(node.id) not in tier_node_ids:
+            continue
 
         if (
             node.current_users
