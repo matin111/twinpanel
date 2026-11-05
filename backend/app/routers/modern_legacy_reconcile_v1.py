@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -516,6 +517,11 @@ async def modern_legacy_reconcile_loop() -> None:
 
 @asynccontextmanager
 async def _lifespan(_app):
+    # Dedicated systemd workers own heavy provisioning and retries. Do not
+    # run SSH/service restarts inside the interactive API event loop.
+    if os.environ.get("TWINPANEL_EXTERNAL_MODERN_RECONCILE") == "1":
+        yield
+        return
     task = asyncio.create_task(
         modern_legacy_reconcile_loop(),
         name="modern-legacy-account-reconcile-v1",
