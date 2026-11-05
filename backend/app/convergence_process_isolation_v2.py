@@ -114,6 +114,9 @@ def install() -> None:
     from . import node_subscription_convergence_v114 as runtime
 
     async def _process_isolated_convergence_loop() -> None:
+        if os.environ.get("TWINPANEL_EXTERNAL_HEAVY_RECONCILE") == "1":
+            await asyncio.Event().wait()
+            return
         await asyncio.sleep(runtime._INITIAL_DELAY_SECONDS)
 
         while True:
