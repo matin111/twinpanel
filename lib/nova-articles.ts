@@ -34,17 +34,17 @@ export type NovaBlogEntry={
 };
 // Only images uploaded through the existing authenticated storefront-media route
 // may be embedded in public articles. Do not render arbitrary remote image URLs.
-export const NOVA_BLOG_IMAGE_RE=/^\\/v1\\/storefront\\/settings\\/media\\/nova-multipage-2027\\/blog-[a-zA-Z0-9_-]{8,100}(?:\\?v=[a-zA-Z0-9_-]{1,60})?$/;
+export const NOVA_BLOG_IMAGE_RE=/^\/v1\/storefront\/settings\/media\/nova-multipage-2027\/blog-[a-zA-Z0-9_-]{8,100}(?:\?v=[a-zA-Z0-9_-]{1,60})?$/;
 export function safeNovaBlogImage(value:unknown):string{
  const url=String(value||"").trim();
  return NOVA_BLOG_IMAGE_RE.test(url)?url:"";
 }
 export function novaBlogImageMarker(alt:string,url:string):string{
  const safe=safeNovaBlogImage(url);
- return safe?`![${alt.replace(/[\\[\\]\\n\\r]/g,"").slice(0,100)||"تصویر مقاله"}](${safe})`:"";
+ return safe?`![${alt.replace(/[\[\]\n\r]/g,"").slice(0,100)||"تصویر مقاله"}](${safe})`:"";
 }
 export function parseNovaBlogImageMarker(value:string):{alt:string;src:string}|null{
- const match=/^!\\[([^\\]\\r\\n]{0,100})\\]\\(([^)]+)\\)$/.exec(value.trim());
+ const match=/^!\[([^\]\r\n]{0,100})\]\(([^)]+)\)$/.exec(value.trim());
  if(!match)return null;
  const src=safeNovaBlogImage(match[2]);
  return src?{alt:match[1]||"تصویر مقاله",src}:null;
