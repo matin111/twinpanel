@@ -55,15 +55,56 @@ def _staged_wait_for_healthy(core, urls: dict[str, str], expected_version: str, 
             return False, [name]
 
     # /health alone cannot prove the subscription is usable.
-    token = os.environ.get("TWINPANEL_UPDATE_V2RAY_SMOKE_TOKEN", "").strip()
-    if token:
+    test_subscription_id = os.environ.get(
+        "TWINPANEL_UPDATE_V2RAY_SMOKE_SUBSCRIPTION_ID", ""
+    ).strip()
+    if test_subscription_id:
         started = core.stage_begin()
         port = int(os.environ.get("TWINPANEL_API_PORT", "8095") or 8095)
-        passed = _wait_for_v2ray_feed_canary(port, token)
+        passed = _wait_for_v2ray_feed_canary_by_id(port, test_subscription_id)
         core.stage_end("v2ray_subscription_smoke", started)
         if not passed:
             return False, ["v2ray_subscription"]
     return True, []
+
+
+def _lookup_v2ray_canary_token(subscription_id: str) -> str | None:
+    """Resolve a test subscription in the currently activated release.
+
+    Never persist or log the private share token: only its numeric record ID
+    is configured in the updater's systemd Environment= drop-in.
+    """
+    if not re.fullmatch(r"[1-9][0-9]{0,9}", subscription_id):
+        return None
+    current_backend = "/opt/twinpanel/current/backend"
+    if current_backend not in sys.path:
+        sys.path.insert(0, current_backend)
+    from app.database import SessionLocal
+    from app.models import Subscription
+
+    with SessionLocal() as db:
+        sub = db.get(Subscription, int(subscription_id))
+        if sub is None:
+            return None
+        if str(getattr(sub.status, "value", sub.status) or "").lower() != "active":
+            return None
+        token = str(sub.share_code or "").strip()
+        return token if re.fullmatch(r"[A-Za-z0-9_-]{8,128}", token) else None
+
+
+def _wait_for_v2ray_feed_canary_by_id(api_port: int, subscription_id: str) -> bool:
+    for attempt in range(4):
+        try:
+            token = _lookup_v2ray_canary_token(subscription_id)
+            if token and _v2ray_feed_canary(api_port, token):
+                print("UPDATER_V2RAY_SUBSCRIPTION_CANARY_OK", flush=True)
+                return True
+        except Exception:
+            pass
+        if attempt < 3:
+            time.sleep(2)
+    print("UPDATER_V2RAY_SUBSCRIPTION_CANARY_FAILED", file=sys.stderr, flush=True)
+    return False
 
 
 def _v2ray_feed_canary(api_port: int, token: str) -> bool:
