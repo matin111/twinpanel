@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.585",
+  "version": "1.1.0-rc.586",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-05T04:56:52Z",
+  "released_at": "2026-11-05T05:18:25Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "165b25a786ea07e54861cb518d096ffa9d53b800",
+  "source_sha": "d7547cbf081b9dd063975bc2d53a325529ee186a",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.585/twinpanel-1.1.0-rc.585-linux-x86_64.tar.gz",
-    "sha256": "70f80e9bc9f6adb9b98ee7e458902f3e854f60aaa27b601bc302144cc89cdc52",
-    "size_bytes": 28664077
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.586/twinpanel-1.1.0-rc.586-linux-x86_64.tar.gz",
+    "sha256": "fb60049be9beedf93d71c7f2a74e7adcd8935833a5600e698287b5af59ddd2e8",
+    "size_bytes": 28664992
   },
   "notes": {
-    "fa": "بازطراحی کامل صفحه اصلی قالب چهار با تصویر اختصاصی سرورها، انیمیشن، خرید سریع واقعی و کارت‌های جدید؛ معرفی دو پنل نمایندگی اقتصادی و ویژه؛ اصلاح مجوز کش Next.js در آپدیتر.",
-    "en": "Premium Nova Template 4 homepage with original server illustration, animated benefits, dynamic quick purchase and featured plans, economic and special reseller tiers, and updater Next.js cache permission fix."
+    "fa": "حذف متن‌های عمومی، تکراری و نامرتبط از صفحه اصلی قالب چهار؛ حفظ خدمات واقعی شامل خرید اشتراک، پروتکل‌های فعال، IP ثابت، دو پنل نمایندگی اقتصادی و ویژه و راهنمای اتصال.",
+    "en": "Clean Nova Template 4 homepage of repetitive generic advertising, preserving real VPN plan purchases, protocol catalog, static IP, economic/special reseller tiers and guides."
   }
 }
