@@ -4,7 +4,7 @@ import secrets
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr, Field
 from ..security import hash_password
-from ..reseller_tier_policy import valid_tier, tier_entitlements
+from ..reseller_tier_policy import valid_tier, tier_entitlements, assert_plan_tier, reseller_tier, TIER_LABELS
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -667,8 +667,11 @@ def admin_reseller_plans(
         reseller_id,
     )
 
+    from ..plan_category_models import PlanCategoryAssignment
     plans = (
         db.query(Plan)
+        .join(PlanCategoryAssignment, PlanCategoryAssignment.plan_id == Plan.id)
+        .filter(PlanCategoryAssignment.subscription_type == TIER_LABELS[reseller_tier(reseller)])
         .order_by(Plan.id.desc())
         .all()
     )
@@ -756,6 +759,9 @@ def admin_set_reseller_plan(
             status_code=404,
             detail="پلن پیدا نشد",
         )
+
+    if payload.is_active:
+        assert_plan_tier(db, reseller, int(plan.id))
 
     if (
         payload.is_active
