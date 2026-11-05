@@ -91,7 +91,7 @@ export async function saveStoreTemplateSettings(templateId:string,payload:Record
 export async function saveStoreTemplateSeo(templateId:string,payload:StoreTemplateSeoSettings):Promise<Record<string,unknown>>{
   // Merge SEO into the freshest complete template payload so SEO saves cannot
   // erase visual/content settings changed by the template customizer.
-  const envelope=await loadStoreTemplateSettings();
+  const envelope=await loadAdminStoreTemplateSettings();
   const current=envelope.templates?.[templateId]||{};
   const next={...current};
   for(const key of STORE_TEMPLATE_SEO_KEYS){
@@ -101,7 +101,7 @@ export async function saveStoreTemplateSeo(templateId:string,payload:StoreTempla
 }
 
 export async function resetStoreTemplateSeo(templateId:string):Promise<Record<string,unknown>>{
-  const envelope=await loadStoreTemplateSettings();
+  const envelope=await loadAdminStoreTemplateSettings();
   const current=envelope.templates?.[templateId]||{};
   const next={...current};
   for(const key of STORE_TEMPLATE_SEO_KEYS)delete next[key];
@@ -147,7 +147,7 @@ export async function deleteStoreTemplateMedia(templateId:string,slot:string):Pr
 /** Save blog entries without dropping current SEO, colors or other layout options. */
 export async function saveNovaBlogArticles(articles:unknown[]):Promise<Record<string,unknown>>{
   const templateId="nova-multipage-2027";
-  const envelope=await loadStoreTemplateSettings();
+  const envelope=await loadAdminStoreTemplateSettings();
   const current=envelope.templates?.[templateId]||{};
   return putStoreTemplateSettings(templateId,{...current,nova_articles:articles});
 }
