@@ -36,6 +36,7 @@ from app.routers import modern_account_delivery_v1 as modern
 CLASSICS = ("cisco", "openvpn", "wireguard", "v2ray")
 NODE_TIMEOUT = 75
 MAX_ATTEMPTS = 2
+MAX_VISITS = 4
 
 
 def healthy() -> bool:
@@ -98,7 +99,9 @@ def candidates() -> list[int]:
             .limit(200)
             .all()
         )
-        return [int(value) for (value,) in ids]
+        found = [int(value) for (value,) in ids]
+        target = int(os.environ.get("CLASSIC_RECOVERY_TARGET_ID", "0"))
+        return [sid for sid in found if sid == target] if target else found
     finally:
         db.close()
 
@@ -131,13 +134,18 @@ async def repair_one(subscription_id: int) -> str:
             if not username or not password:
                 return "identity_incomplete"
 
-            for protocol in CLASSICS:
+            allowed = tuple(x.strip() for x in os.environ.get("CLASSIC_RECOVERY_PROTOCOLS", ",".join(CLASSICS)).split(",") if x.strip() in CLASSICS)
+            for protocol in allowed:
                 if protocol not in selected:
                     continue
                 cred = db.query(ProtocolCredential).filter_by(
                     subscription_id=sub.id, protocol=protocol
                 ).first()
                 old_items = _stored_items(cred)
+                if protocol == "cisco" and cred is not None and cred.secret_encrypted:
+                    old_secret = ad._dec(cred.secret_encrypted)
+                    if not isinstance(old_secret, dict) or str(old_secret.get("password") or "") != password:
+                        return "identity_mismatch"
                 if cred is not None and not old_items and cred.config_text_encrypted:
                     return "partial_credential_manual_review"
                 saved_ids = {int(item.get("node_id") or 0) for item in old_items}
@@ -211,14 +219,17 @@ async def main() -> int:
             print("CLASSIC_RECOVERY_SAFETY_STOP", flush=True)
             return 2
         recovered = 0
+        visits = 0
         for subscription_id in candidates():
             if not healthy():
                 print("CLASSIC_RECOVERY_SAFETY_STOP", flush=True)
                 return 2
             outcome = await repair_one(subscription_id)
+            if outcome not in ("complete", "inactive", "expired", "exhausted", "imported"):
+                visits += 1
             if outcome == "repaired":
                 recovered += 1
-            if recovered >= MAX_ATTEMPTS:
+            if recovered >= MAX_ATTEMPTS or visits >= MAX_VISITS:
                 break
         print("CLASSIC_RECOVERY_CYCLE", recovered, flush=True)
         return 0
