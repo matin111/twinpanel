@@ -1,8 +1,23 @@
 """Regression: admin button visibility must depend on the current recipient grant."""
+import ast
 from pathlib import Path
+from typing import Any
 from aiogram.methods import SendMessage
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from app.bot_text_middleware import BotTextRequestMiddleware
+
+# Extract only the pure presentation method: this CI environment does not
+# initialize the live application database, settings, or node runtimes.
+source = (Path(__file__).resolve().parents[1] / "app" / "bot_text_middleware.py").read_text()
+module = ast.parse(source)
+cls = next(node for node in module.body if isinstance(node, ast.ClassDef) and node.name == "BotTextRequestMiddleware")
+func = next(node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name == "_add_navigation")
+namespace = {"Any": Any, "InlineKeyboardButton": InlineKeyboardButton, "InlineKeyboardMarkup": InlineKeyboardMarkup}
+exec(compile(ast.Module(body=[func], type_ignores=[]), "<admin-home>", "exec"), namespace)
+
+class BotTextRequestMiddleware:
+    def __init__(self, scope): self.scope=scope
+    _add_navigation=namespace["_add_navigation"]
+    _navigation_back=staticmethod(lambda text, scope: "main:home")
 
 home_callbacks=["shop:list","trial:claim","main:dashboard","subs:list"]
 home_markup=InlineKeyboardMarkup(inline_keyboard=[
