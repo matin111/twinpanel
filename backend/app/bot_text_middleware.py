@@ -370,7 +370,7 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
             return False
 
     def _add_navigation(self, method: Any) -> Any:
-        """Provide a safe way out of all inline bot flows.
+        """Offer an optional Home action without inventing Back destinations.
 
         Inline keyboards preserve their existing business callbacks. Replies
         using reply keyboards are left untouched, so they remain usable.
@@ -391,7 +391,6 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
         if any(needle in text for needle in ("تأیید و فعال‌سازی", "رد رسید")):
             return method
         home = "rmenu:home" if self.scope == "reseller" else "main:home"
-        back = self._navigation_back(text, self.scope)
         rows = [list(row) for row in markup.inline_keyboard] if markup else []
         # The actual main menu already is the navigation destination.
         # Avoid appending redundant Back/Home controls to this keyboard.
@@ -422,18 +421,10 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
             for row in rows
             for button in row
         ]
-        # Preserve any existing navigation regardless of the handler's
-        # callback name. On the first screen Back intentionally also
-        # returns Home, but both requested controls remain visible.
-        # An explicit parent link (e.g. "⬅️ مدیریت اکانت") is already Back.
-        # Do not append a second auto-generated Back that guesses the wrong page.
-        has_back = any("بازگشت" in label or "برگشت" in label or
-                       label.lstrip().startswith(("⬅️ مدیریت", "↩️ مدیریت", "⬅️ اکانت‌های من"))
-                       for label in labels)
+        # Screen owners must supply a Back button only when a real parent exists.
+        # Guessing one from message text caused root-screen self-loops.
         has_home = any("منوی اصلی" in label for label in labels)
         extra = []
-        if not has_back:
-            extra.append(InlineKeyboardButton(text="↩️ برگشت", callback_data=back))
         if not has_home:
             extra.append(InlineKeyboardButton(text="🏠 منوی اصلی", callback_data=home))
         if not extra:

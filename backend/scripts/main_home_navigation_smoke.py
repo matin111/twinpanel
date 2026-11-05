@@ -1,4 +1,4 @@
-"""Confirm that only the main bot home menu skips redundant navigation."""
+"""Confirm Home remains available without an invented Back action."""
 import ast
 from pathlib import Path
 from typing import Any
@@ -27,5 +27,12 @@ sub=SendMessage(chat_id=123,text="اطلاعات اشتراک",reply_markup=Inli
 ]))
 sub_result=stub._add_navigation(sub)
 buttons=[b.callback_data for row in sub_result.reply_markup.inline_keyboard for b in row]
-assert "main:home" in buttons and len(buttons)==3,buttons
+assert buttons == ["subrenew:1", "main:home"], buttons
+assert "↩️ برگشت" not in [b.text for row in sub_result.reply_markup.inline_keyboard for b in row]
+explicit = SendMessage(chat_id=123, text="مدیریت اکانت", reply_markup=InlineKeyboardMarkup(
+    inline_keyboard=[[InlineKeyboardButton(text="⬅️ بازگشت", callback_data="subs:list")]]
+))
+explicit_result = stub._add_navigation(explicit)
+explicit_buttons = [b.callback_data for row in explicit_result.reply_markup.inline_keyboard for b in row]
+assert explicit_buttons == ["subs:list", "main:home"], explicit_buttons
 print("MAIN_HOME_NO_REDUNDANT_NAV=PASS")

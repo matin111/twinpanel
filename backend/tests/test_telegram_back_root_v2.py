@@ -28,7 +28,10 @@ def test_auto_back_on_first_purchase_screen_goes_home_not_same_page():
 
 def test_qr_explicit_management_back_prevents_wrong_generated_back():
     src = source("backend/app/bot_text_middleware.py")
-    assert 'label.lstrip().startswith(("⬅️ مدیریت", "↩️ مدیریت", "⬅️ اکانت‌های من"))' in src
+    # Explicit management Back stays in its screen-specific keyboard; the
+    # global middleware never invents another Back beside it.
+    assert 'extra.append(InlineKeyboardButton(text="↩️ برگشت"' not in src
+    assert 'extra.append(InlineKeyboardButton(text="🏠 منوی اصلی"' in src
 
 
 def test_shop_list_acknowledges_immediately_and_can_handle_idempotent_edit():
