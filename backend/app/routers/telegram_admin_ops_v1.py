@@ -3,6 +3,10 @@ from __future__ import annotations
 
 import base64
 from datetime import datetime
+import asyncio
+import httpx
+import secrets
+import time
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -24,8 +28,9 @@ from .wallet_admin_v2 import (
 )
 from .customer_wallet import AdminAdjustIn
 from .payment_approval_fast import approve_payment_fast
-from .payments import reject_payment, PaymentRejectIn
+from .payments import reject_payment
 from .subscriptions import suspend_subscription, activate_subscription
+from .telegram_manager import _broadcast_target_ids, load_bot_token
 
 
 router = APIRouter(
@@ -175,7 +180,7 @@ def reject_receipt(
         row = _purchase(db, item_id)
         if not _purchase_needs_review(row):
             raise HTTPException(status_code=409, detail="پرداخت دیگر قابل رد نیست")
-        result = reject_payment(item_id, PaymentRejectIn(reason=payload.reason), db)
+        result = reject_payment(item_id, {"reason": payload.reason}, db)
     elif kind == "wallet":
         from .customer_wallet import AdminRejectIn
         from .wallet_admin_v2 import reject_wallet_topup_v2
@@ -253,3 +258,75 @@ def manage_subscription(
     if action == "activate":
         return activate_subscription(subscription_id, db)
     raise HTTPException(status_code=404, detail="عملیات نامعتبر است")
+
+
+class BroadcastDraftIn(BaseModel):
+    telegram_id: int = Field(gt=0)
+    text: str = Field(min_length=1, max_length=4000)
+
+
+class BroadcastConfirmIn(BaseModel):
+    telegram_id: int = Field(gt=0)
+    nonce: str = Field(min_length=16, max_length=100)
+
+
+# An authenticated draft has a short life and can be sent exactly once.
+# This in-process map deliberately fails closed after worker restarts.
+_broadcast_drafts: dict[str, dict] = {}
+_BROADCAST_WINDOW = 300
+
+
+@router.post("/broadcast/preview")
+def broadcast_preview(payload: BroadcastDraftIn, db: Session = Depends(get_db)):
+    actor = _admin(db, payload.telegram_id)
+    now = time.monotonic()
+    for key, value in list(_broadcast_drafts.items()):
+        if now - value["created"] > _BROADCAST_WINDOW:
+            _broadcast_drafts.pop(key, None)
+    nonce = secrets.token_urlsafe(24)
+    total = len(_broadcast_target_ids(db))
+    _broadcast_drafts[nonce] = {
+        "actor": int(actor.id), "telegram_id": int(payload.telegram_id),
+        "text": payload.text.strip(), "created": now, "total": total,
+    }
+    return {"nonce": nonce, "total": total, "preview": payload.text.strip()}
+
+
+async def _deliver_broadcast(text: str, targets: list[int]) -> None:
+    # Existing panel sends at the same conservative rate. BackgroundTasks
+    # keeps the Telegram callback responsive; failed recipients do not block others.
+    try:
+        token = load_bot_token()
+    except Exception:
+        return
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        for telegram_id in targets:
+            try:
+                await client.post(url, json={
+                    "chat_id": int(telegram_id), "text": text,
+                    "disable_web_page_preview": True,
+                })
+            except httpx.HTTPError:
+                pass
+            await asyncio.sleep(0.045)
+
+
+@router.post("/broadcast/send")
+async def broadcast_send(
+    payload: BroadcastConfirmIn, background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    actor = _admin(db, payload.telegram_id)
+    draft = _broadcast_drafts.get(payload.nonce)
+    if (
+        not draft or int(draft["actor"]) != int(actor.id)
+        or int(draft["telegram_id"]) != int(payload.telegram_id)
+        or time.monotonic() - draft["created"] > _BROADCAST_WINDOW
+    ):
+        raise HTTPException(status_code=409, detail="پیش‌نمایش منقضی شده؛ دوباره شروع کنید")
+    # Pop before scheduling prevents repeated callback delivery.
+    _broadcast_drafts.pop(payload.nonce, None)
+    targets = _broadcast_target_ids(db)
+    background_tasks.add_task(_deliver_broadcast, draft["text"], targets)
+    return {"ok": True, "queued": len(targets)}
