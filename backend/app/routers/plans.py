@@ -1,10 +1,16 @@
+from collections import defaultdict
+
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import require_admin
-from ..models import Plan
+from ..models import Plan, Node, NodeType
+from ..mother_access import admin_can_use_mother
+from ..plan_node_models import PlanNode
+from ..plan_protocol_models import PlanProtocol
 from ..plan_category_models import PlanCategoryAssignment
 from ..plan_template_selection import (
     all_active_node_ids,
@@ -91,14 +97,83 @@ def _central_plans(db: Session):
     )
 
 
-def _plan_payload(db: Session, plan: Plan) -> dict:
+def _batch_plan_snapshots(db: Session, plans: list[Plan]) -> dict[int, dict]:
+    """Read plan category, protocols and eligible nodes in O(1) queries.
+
+    Legacy individual-plan endpoints keep their existing selectors. List routes
+    use this read-only snapshot to avoid three category queries, one protocol
+    query, and multiple node/access queries per plan.
+    """
+    ids = [int(plan.id) for plan in plans]
+    if not ids:
+        return {}
+
+    assignments = {
+        int(row.plan_id): row
+        for row in db.query(PlanCategoryAssignment)
+        .filter(PlanCategoryAssignment.plan_id.in_(ids)).all()
+    }
+    protocol_sets = defaultdict(set)
+    for plan_id, protocol in (
+        db.query(PlanProtocol.plan_id, PlanProtocol.protocol)
+        .filter(PlanProtocol.plan_id.in_(ids)).all()
+    ):
+        protocol_sets[int(plan_id)].add(str(protocol).strip().lower())
+
+    # Perform the eligibility / mother-access check only once per response.
+    allowed_mother = bool(admin_can_use_mother(db))
+    eligible = [
+        Node.node_type == NodeType.EXIT,
+        Node.retired_at.is_(None),
+    ]
+    if not allowed_mother:
+        eligible.append(or_(Node.agent_url.is_(None), Node.agent_url != "local://core"))
+
+    eligible_nodes = [
+        int(node_id) for (node_id,) in
+        db.query(Node.id).filter(*eligible).order_by(Node.id.asc()).all()
+    ]
+    explicit_nodes = defaultdict(list)
+    for plan_id, node_id in (
+        db.query(PlanNode.plan_id, PlanNode.node_id)
+        .join(Node, Node.id == PlanNode.node_id)
+        .filter(PlanNode.plan_id.in_(ids), *eligible)
+        .order_by(PlanNode.id.asc()).all()
+    ):
+        explicit_nodes[int(plan_id)].append(int(node_id))
+
+    result = {}
+    for plan_id in ids:
+        category = assignments.get(plan_id)
+        present = protocol_sets[plan_id]
+        result[plan_id] = {
+            "category": _normalize_category(category.category if category else None),
+            "subscription_type": _normalize_subscription_type(
+                category.subscription_type if category else None
+            ),
+            "sort_order": int(category.sort_order or 0) if category else 0,
+            "protocols": [key for key in ALL_PROTOCOL_KEYS if key in present]
+                or list(ALL_PROTOCOL_KEYS),
+            "node_ids": explicit_nodes[plan_id] or eligible_nodes,
+        }
+    return result
+
+
+def _plan_payload(db: Session, plan: Plan, snapshot: dict | None = None) -> dict:
+    snapshot = snapshot or {
+        "category": _plan_category(db, int(plan.id)),
+        "subscription_type": _plan_subscription_type(db, int(plan.id)),
+        "sort_order": _plan_sort_order(db, int(plan.id)),
+        "protocols": plan_template_protocols(db, int(plan.id)),
+        "node_ids": plan_template_node_ids(db, int(plan.id)),
+    }
     return {
         "id": int(plan.id),
         "name": plan.name,
         "description": plan.description,
-        "category": _plan_category(db, int(plan.id)),
-        "subscription_type": _plan_subscription_type(db, int(plan.id)),
-        "sort_order": _plan_sort_order(db, int(plan.id)),
+        "category": snapshot["category"],
+        "subscription_type": snapshot["subscription_type"],
+        "sort_order": snapshot["sort_order"],
         "duration_days": int(plan.duration_days or 0),
         "traffic_gb": int(plan.traffic_gb or 0),
         "device_limit": int(plan.device_limit if plan.device_limit is not None else 1),
@@ -109,8 +184,8 @@ def _plan_payload(db: Session, plan: Plan) -> dict:
         "enable_wireguard": bool(plan.enable_wireguard),
         "enable_l2tp": bool(plan.enable_l2tp),
         "enable_v2ray": bool(plan.enable_v2ray),
-        "protocols": plan_template_protocols(db, int(plan.id)),
-        "node_ids": plan_template_node_ids(db, int(plan.id)),
+        "protocols": snapshot["protocols"],
+        "node_ids": snapshot["node_ids"],
         "selection_scope": "plan_template_snapshot",
     }
 
@@ -179,14 +254,16 @@ def list_plans(db: Session = Depends(get_db)):
         .filter(Plan.is_active.is_(True))
         .all()
     )
-    payloads = [_plan_payload(db, plan) for plan in rows]
+    snapshots = _batch_plan_snapshots(db, rows)
+    payloads = [_plan_payload(db, plan, snapshots[int(plan.id)]) for plan in rows]
     return sorted(payloads, key=lambda item: (int(item.get("sort_order") or 0), -int(item["id"])))
 
 
 @router.get("/admin/all", dependencies=[Depends(require_admin)])
 def admin_list_plans(db: Session = Depends(get_db)):
     rows = _central_plans(db).all()
-    payloads = [_plan_payload(db, plan) for plan in rows]
+    snapshots = _batch_plan_snapshots(db, rows)
+    payloads = [_plan_payload(db, plan, snapshots[int(plan.id)]) for plan in rows]
     return sorted(payloads, key=lambda item: (int(item.get("sort_order") or 0), -int(item["id"])))
 
 
