@@ -22,6 +22,7 @@ from .protocol_account_registry import (
     replace_plan_protocols,
 )
 from .reseller_owned_plan_models import ResellerBotPlan
+from .reseller_tier_policy import tier_entitlements, allowed_nodes, reseller_tier
 from .services.subscription_factory import create_subscription_core
 from .services.reseller_traffic_pool import _suspend_reseller_pool
 
@@ -59,37 +60,37 @@ def enabled_protocols(
     *,
     db: Session | None = None,
 ) -> list[str]:
-    # Immutable order snapshots can carry the exact protocol list directly.
+    from .protocol_account_registry import explicit_plan_protocols
+
+    # Use the explicit backing-plan snapshot when it exists; old plans retain
+    # their historic classic flags + modern fallback, then are tier-clamped.
+    chosen: list[str] = []
     snapshot_protocols = getattr(row, "protocols", None)
     if snapshot_protocols is not None:
         try:
-            values = normalize_protocols(snapshot_protocols)
+            chosen = normalize_protocols(snapshot_protocols)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-        if values:
-            return values
 
-    # Reseller-owned plans are backed by the canonical PlanProtocol table.
-    if db is not None:
+    if not chosen and db is not None:
         backing = db.get(Plan, int(row.backing_plan_id))
-        if backing is not None:
-            explicit = plan_protocols(db, backing)
-            # plan_protocols falls back to the five compatibility flags when an
-            # older plan has no PlanProtocol rows. Add modern protocols for that
-            # legacy case so existing reseller plans gain the new protocols
-            # without a schema migration.
-            from .protocol_account_registry import explicit_plan_protocols
+        if backing is not None and explicit_plan_protocols(db, int(backing.id)):
+            chosen = plan_protocols(db, backing)
 
-            if explicit_plan_protocols(db, int(backing.id)):
-                return explicit
+    if not chosen:
+        chosen = _legacy_protocols(row) + list(MODERN_PROTOCOL_KEYS)
 
-    # Old reseller plans predate PlanProtocol. Preserve disabled classic flags,
-    # while making every modern protocol available by default.
-    return _legacy_protocols(row) + list(MODERN_PROTOCOL_KEYS)
+    if db is not None:
+        reseller = db.get(Reseller, int(row.reseller_id))
+        if reseller is None:
+            raise HTTPException(status_code=404, detail="نماینده پیدا نشد")
+        permitted = set(tier_entitlements(db, reseller_tier(reseller))["protocols"])
+        chosen = [p for p in chosen if p in permitted]
+    return list(dict.fromkeys(chosen))
 
 
-def plan_out(row: ResellerBotPlan) -> dict:
-    protocols = enabled_protocols(row)
+def plan_out(row: ResellerBotPlan, db: Session | None = None) -> dict:
+    protocols = enabled_protocols(row, db=db)
     return {
         "id": int(row.id),
         "reseller_plan_id": int(row.id),
@@ -213,10 +214,12 @@ def create_owned_plan(
         enable_l2tp=enable_l2tp,
         enable_v2ray=enable_v2ray,
     )
+    permitted = set(tier_entitlements(db, reseller_tier(reseller))["protocols"])
+    desired_protocols = [p for p in desired_protocols if p in permitted]
     if not desired_protocols:
         raise HTTPException(
             status_code=422,
-            detail="حداقل یک پروتکل باید فعال باشد",
+            detail="هیچ پروتکل مجازی برای این نوع نمایندگی باقی نمانده است",
         )
 
     internal_name = (
@@ -297,16 +300,20 @@ def sync_owned_plan_backing(
     backing.enable_l2tp = bool(row.enable_l2tp)
     backing.enable_v2ray = bool(row.enable_v2ray)
 
+    reseller = db.get(Reseller, int(row.reseller_id))
+    if reseller is None:
+        raise HTTPException(status_code=404, detail="نماینده پیدا نشد")
+    permitted = set(tier_entitlements(db, reseller_tier(reseller))["protocols"])
     replace_plan_protocols(
         db,
         int(backing.id),
-        _desired_protocols_from_flags(
+        [p for p in _desired_protocols_from_flags(
             enable_cisco=bool(row.enable_cisco),
             enable_openvpn=bool(row.enable_openvpn),
             enable_wireguard=bool(row.enable_wireguard),
             enable_l2tp=bool(row.enable_l2tp),
             enable_v2ray=bool(row.enable_v2ray),
-        ),
+        ) if p in permitted],
     )
 
     price = _compat_price(
@@ -397,7 +404,9 @@ def create_subscription_from_owned_plan(
     if not reseller_plan.is_active or not backing.is_active:
         raise HTTPException(status_code=409, detail="پلن نماینده غیرفعال است")
 
-    protocols = enabled_protocols(reseller_plan, db=db)
+    selected_protocols = enabled_protocols(reseller_plan, db=db)
+    permitted = set(tier_entitlements(db, reseller_tier(reseller))["protocols"])
+    protocols = [p for p in selected_protocols if p in permitted]
     if not protocols:
         raise HTTPException(
             status_code=422,
@@ -415,7 +424,7 @@ def create_subscription_from_owned_plan(
             plan_id=int(backing.id),
             traffic_bytes=int(reseller_plan.traffic_gb) * GB,
             duration_days=int(reseller_plan.duration_days),
-            node_ids=[int(x) for x in (node_ids or [])],
+            node_ids=allowed_nodes(db, reseller, node_ids),
             protocols=protocols,
             username=(str(username).strip() if username else None),
             password=(str(password).strip() if password else None),

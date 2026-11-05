@@ -79,7 +79,10 @@ jobs:
 
           from app.main import app
           from app.database import SessionLocal, engine
-          from app.models import Node, NodeType, Subscription, SubscriptionProtocol, User
+          from app.models import Node, NodeType, Plan, Subscription, SubscriptionProtocol, User
+          from app.plan_category_models import PlanCategoryAssignment
+          from app.plan_protocol_models import PlanProtocol
+          from app.plan_node_models import PlanNode
           from app.models_reseller import Reseller, ResellerSubscription
           from app.reseller_manual_subscriptions import create_manual_reseller_subscription
           from app.security import hash_password
@@ -112,7 +115,24 @@ jobs:
                   public_ip='198.51.100.60',
                   agent_url='http://127.0.0.1:65535',
               )
-              db.add_all([reseller,node]); db.commit(); db.refresh(reseller); db.refresh(node)
+              # Two-tier reseller provisioning requires a real active public
+              # plan with an explicit category + entitlement template.
+              plan=Plan(
+                  name='reseller-manual-ci-premium-plan',
+                  duration_days=30,traffic_gb=25,device_limit=1,
+                  price_toman=15000,is_active=True,
+                  enable_cisco=True,enable_wireguard=True,enable_v2ray=True,
+              )
+              db.add_all([reseller,node,plan]);db.flush()
+              db.add(PlanCategoryAssignment(
+                  plan_id=plan.id, category='CI', subscription_type='اشتراک ویژه آی پی ثابت'
+              ))
+              db.add_all([
+                  PlanProtocol(plan_id=plan.id,protocol=key)
+                  for key in ('cisco','wireguard','v2ray')
+              ])
+              db.add(PlanNode(plan_id=plan.id,node_id=node.id))
+              db.commit(); db.refresh(reseller); db.refresh(node)
               node_id=node.id
 
               result=create_manual_reseller_subscription(

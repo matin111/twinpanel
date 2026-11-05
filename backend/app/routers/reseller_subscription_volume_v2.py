@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..reseller_tier_policy import tier_entitlements, reseller_tier
 from ..deps import require_reseller
 from ..models import (
     Node,
@@ -126,6 +127,8 @@ def reseller_server_options_volume_v2(
         include_mother=True,
     )
 
+    permitted = set(tier_entitlements(db, reseller_tier(reseller))["node_ids"])
+    rows = [node for node in rows if int(node.id) in permitted]
     return {
         "can_use_mother": bool(mother_allowed),
         "nodes": [

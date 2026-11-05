@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify all 15 reseller plan protocols are visible
+      - name: Verify 15 protocol registry and tier-authorized reseller visibility
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -23,6 +23,6 @@ jobs:
           ]
           missing = [p for p in protocols if p not in text]
           assert not missing, f'missing protocol labels: {missing}'
-          assert 'Protocols · 15' in text
+          # All 15 labels remain in the central registry, but only the\n          # tier-authorized subset may be rendered to a reseller.\n          assert 'allowedProtocols.has(protocol)' in text\n          assert 'resellerApi.me()' in text\n          assert 'Allowed reseller protocols' in text
           assert 'visibleProtocols(row)' in text
           PY

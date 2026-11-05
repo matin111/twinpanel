@@ -151,7 +151,10 @@ jobs:
         run: |
           python - <<'PY'
           from app.database import SessionLocal
-          from app.models import User
+          from app.models import User, Node, NodeType, Plan
+          from app.plan_category_models import PlanCategoryAssignment
+          from app.plan_node_models import PlanNode
+          from app.plan_protocol_models import PlanProtocol
           from app.models_reseller import Reseller, ResellerPlanPrice
           from app.reseller_owned_plan_models import ResellerBotPlan
           from app.reseller_owned_plans import INTERNAL_PLAN_PREFIX, create_owned_plan, plan_out
@@ -176,6 +179,29 @@ jobs:
                   is_active=True,
               )
               db.add(reseller)
+              db.flush()
+              # The new tier policy requires a canonical public-plan allowlist.
+              # Use a real category/exit/protocol template in this CI database.
+              node = Node(
+                  name="ci-owned-premium-exit", node_type=NodeType.EXIT,
+                  country_code="DE", public_ip="198.51.100.61",
+                  agent_url="http://127.0.0.1:65534",
+              )
+              plan = Plan(
+                  name="ci-owned-premium-template", duration_days=30,
+                  traffic_gb=50, device_limit=1, price_toman=1000,
+                  is_active=True,
+              )
+              db.add_all([node,plan]); db.flush()
+              db.add(PlanCategoryAssignment(
+                  plan_id=plan.id, category="CI",
+                  subscription_type="اشتراک ویژه آی پی ثابت",
+              ))
+              db.add(PlanNode(plan_id=plan.id,node_id=node.id))
+              db.add_all([
+                  PlanProtocol(plan_id=plan.id,protocol=key)
+                  for key in ("cisco","openvpn","wireguard","l2tp","v2ray")
+              ])
               db.flush()
               before = int(reseller.traffic_balance_bytes or 0)
               row = create_owned_plan(

@@ -13,6 +13,7 @@ from .models_reseller import (
     ResellerTrafficTransaction,
 )
 from .protocol_account_registry import normalize_protocols
+from .reseller_tier_policy import allowed_protocols, allowed_nodes
 from .services.reseller_traffic_pool import _suspend_reseller_pool
 from .services.subscription_factory import create_subscription_core
 # Importing this module normalizes metadata and repairs legacy PostgreSQL schema
@@ -98,11 +99,8 @@ def create_manual_reseller_subscription(
             detail=str(exc),
         ) from exc
 
-    if not normalized_protocols:
-        raise HTTPException(
-            status_code=422,
-            detail="حداقل یک پروتکل را انتخاب کنید",
-        )
+    # Never trust protocol selections sent by panel, bot or direct API.
+    normalized_protocols = allowed_protocols(db, reseller, normalized_protocols)
 
     traffic = float(traffic_gb or 0)
     days = int(duration_days or 0)
@@ -122,7 +120,7 @@ def create_manual_reseller_subscription(
             plan_id=None,
             traffic_bytes=int(round(traffic * GB)),
             duration_days=days,
-            node_ids=[int(x) for x in (node_ids or []) if int(x) > 0],
+            node_ids=allowed_nodes(db, reseller, node_ids),
             protocols=normalized_protocols,
             username=(str(username).strip() if username else None),
             password=(str(password).strip() if password else None),

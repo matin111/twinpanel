@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..reseller_tier_policy import check_package_tier
 from ..deps import require_reseller
 from ..models_reseller import (
     Reseller,
@@ -66,6 +67,7 @@ def buy_traffic_and_restore(
     if not package or not package.is_active:
         raise HTTPException(status_code=404, detail="بسته حجم پیدا نشد")
 
+    check_package_tier(reseller, package)
     price = int(package.price_toman or 0)
     wallet = int(reseller.wallet_balance or 0)
     wallet_credit = int(reseller.credit_limit or 0)

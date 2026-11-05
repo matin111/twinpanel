@@ -82,6 +82,12 @@ class Reseller(Base):
         nullable=False,
     )
 
+    # Volume-only entitlement, fixed by admin at reseller creation.
+    # Existing resellers default to premium for backward compatibility.
+    reseller_tier: Mapped[str] = mapped_column(
+        String(32), default="premium_static_ip", nullable=False,
+    )
+
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
@@ -579,6 +585,11 @@ class ResellerTrafficPackage(Base):
         nullable=False,
     )
 
+    # Each volume package belongs to exactly one reseller entitlement.
+    reseller_tier: Mapped[str] = mapped_column(
+        String(32), default="premium_static_ip", nullable=False,
+    )
+
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
@@ -603,3 +614,26 @@ class ResellerTrafficPackage(Base):
         onupdate=datetime.utcnow,
         nullable=False,
     )
+
+
+# Additive schema upgrade: retain existing volume wallets, sales, and packages.
+# Called when reseller models are imported before the application routes start.
+def _ensure_reseller_tier_columns() -> None:
+    from sqlalchemy import inspect, text
+    from .database import engine
+    if engine.dialect.name != "postgresql":
+        return
+    with engine.begin() as conn:
+        if inspect(conn).has_table("resellers"):
+            conn.execute(text(
+                "ALTER TABLE resellers ADD COLUMN IF NOT EXISTS reseller_tier "
+                "VARCHAR(32) NOT NULL DEFAULT 'premium_static_ip'"
+            ))
+        if inspect(conn).has_table("reseller_traffic_packages"):
+            conn.execute(text(
+                "ALTER TABLE reseller_traffic_packages ADD COLUMN IF NOT EXISTS reseller_tier "
+                "VARCHAR(32) NOT NULL DEFAULT 'premium_static_ip'"
+            ))
+
+
+_ensure_reseller_tier_columns()

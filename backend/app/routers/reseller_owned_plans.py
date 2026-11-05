@@ -304,7 +304,7 @@ def list_owned_plans(
         )
         .all()
     )
-    return [plan_out(row) for row in rows]
+    return [plan_out(row, db=db) for row in rows]
 
 
 @router.post("/owned-plans")
@@ -332,7 +332,7 @@ def create_reseller_owned_plan(
     )
     db.commit()
     db.refresh(row)
-    return plan_out(row)
+    return plan_out(row, db=db)
 
 
 @router.patch("/owned-plans/{plan_id}")
@@ -385,7 +385,7 @@ def update_reseller_owned_plan(
     sync_owned_plan_backing(db, row)
     db.commit()
     db.refresh(row)
-    return plan_out(row)
+    return plan_out(row, db=db)
 
 
 @router.delete("/plans/{plan_id}")

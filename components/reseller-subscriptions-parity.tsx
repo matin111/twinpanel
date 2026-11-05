@@ -46,6 +46,7 @@ export function ResellerSubscriptionsParityRuntime(){
   const {pick}=useI18n();
   const [subs,setSubs]=useState<ResellerRow[]>([]);
   const [serverOptions,setServerOptions]=useState<ResellerRow>({});
+  const [tierProfile,setTierProfile]=useState<ResellerRow>({});
   const [q,setQ]=useState("");
   const [statusFilter,setStatusFilter]=useState("all");
   const [busy,setBusy]=useState(false);
@@ -61,7 +62,7 @@ export function ResellerSubscriptionsParityRuntime(){
   const [saleKey,setSaleKey]=useState(()=>idempotency("manual-sale"));
   const [extendKey,setExtendKey]=useState(()=>idempotency("extend"));
 
-  const [sell,setSell]=useState({traffic_gb:50,duration_days:30,node_ids:[] as number[],protocols:[...DEFAULT_PROTOCOLS],username:"",password:""});
+  const [sell,setSell]=useState({traffic_gb:50,duration_days:30,node_ids:[] as number[],protocols:[] as string[],username:"",password:""});
   const [edit,setEdit]=useState({traffic_gb:0,expiry_value:30,expiry_unit:"days" as ExpiryUnit,sell_price_toman:0,account_username:"",account_password:""});
   const [extend,setExtend]=useState({add_traffic_gb:0,add_days:30,charge_toman:0,reset_usage:false});
 
@@ -69,10 +70,12 @@ export function ResellerSubscriptionsParityRuntime(){
     setError("");
     const result=await Promise.allSettled([
       resellerApi.subscriptions(),
-      resellerApi.serverOptions()
+      resellerApi.serverOptions(),
+      resellerApi.me()
     ]);
     if(result[0].status==="fulfilled")setSubs(result[0].value);
     if(result[1].status==="fulfilled")setServerOptions(result[1].value);
+    if(result[2].status==="fulfilled")setTierProfile(result[2].value);
     const failed=result.find(x=>x.status==="rejected");
     if(failed&&failed.status==="rejected")setError(failed.reason instanceof Error?failed.reason.message:String(failed.reason));
   };
@@ -84,9 +87,12 @@ export function ResellerSubscriptionsParityRuntime(){
   const selectedServerCount=selectableNodeIds.filter(id=>sell.node_ids.includes(id)).length;
   const allServersSelected=selectableNodeIds.length>0&&selectedServerCount===selectableNodeIds.length;
   const toggleAllServers=()=>setSell(current=>({...current,node_ids:allServersSelected?[]:selectableNodeIds}));
-  const selectedProtocolCount=DEFAULT_PROTOCOLS.filter(protocol=>sell.protocols.includes(protocol)).length;
-  const allProtocolsSelected=selectedProtocolCount===DEFAULT_PROTOCOLS.length;
-  const toggleAllProtocols=()=>setSell(current=>({...current,protocols:allProtocolsSelected?[]:[...DEFAULT_PROTOCOLS]}));
+  const tierEntitlements=tierProfile.tier_entitlements as ResellerRow|undefined;
+  const permittedProtocols=Array.isArray(tierEntitlements?.protocols)?(tierEntitlements.protocols as string[]):[];
+  const tierProtocols=DEFAULT_PROTOCOLS.filter(protocol=>permittedProtocols.includes(protocol));
+  const selectedProtocolCount=tierProtocols.filter(protocol=>sell.protocols.includes(protocol)).length;
+  const allProtocolsSelected=tierProtocols.length>0&&selectedProtocolCount===tierProtocols.length;
+  const toggleAllProtocols=()=>setSell(current=>({...current,protocols:allProtocolsSelected?[]:[...tierProtocols]}));
   const toggleProtocol=(protocol:string)=>setSell(current=>({...current,protocols:current.protocols.includes(protocol)?current.protocols.filter(item=>item!==protocol):[...current.protocols,protocol]}));
   const statuses=useMemo(()=>Array.from(new Set(subs.map(row=>str(row,"status")).filter(Boolean))),[subs]);
   const filtered=useMemo(()=>subs.filter(row=>{
@@ -106,14 +112,14 @@ export function ResellerSubscriptionsParityRuntime(){
 
   const openSale=()=>{
     setSaleKey(idempotency("manual-sale"));
-    setSell({traffic_gb:50,duration_days:30,node_ids:[],protocols:[...DEFAULT_PROTOCOLS],username:"",password:""});
+    setSell({traffic_gb:50,duration_days:30,node_ids:[],protocols:[...tierProtocols],username:"",password:""});
     setError("");setOk("");setSellOpen(true);
   };
 
   const submitSale=(event:FormEvent)=>{
     event.preventDefault();
     if(sell.traffic_gb<=0||sell.duration_days<=0){setError(pick("حجم و مدت باید بیشتر از صفر باشند.","Traffic and duration must be greater than zero."));return;}
-    if(!sell.protocols.length){setError(pick("حداقل یک پروتکل را انتخاب کنید.","Select at least one protocol."));return;}
+    if(!sell.protocols.length||sell.protocols.some(protocol=>!tierProtocols.includes(protocol))){setError(pick("پروتکل‌های مجاز نمایندگی را انتخاب کنید.","Select only authorized reseller protocols."));return;}
     void act(pick("اشتراک ساخته و روی سرورها فعال شد","Subscription created and provisioned"),async()=>{
       const result=await createResellerManualSubscription({
         traffic_gb:Number(sell.traffic_gb),
@@ -127,7 +133,7 @@ export function ResellerSubscriptionsParityRuntime(){
       const subscriptionId=Number(result.subscription_id||0);
       if(!subscriptionId)throw new Error(pick("شناسه اشتراک ساخته‌شده دریافت نشد.","Created subscription id was not returned."));
       setSellOpen(false);
-      setSell({traffic_gb:50,duration_days:30,node_ids:[],protocols:[...DEFAULT_PROTOCOLS],username:"",password:""});
+      setSell({traffic_gb:50,duration_days:30,node_ids:[],protocols:[...tierProtocols],username:"",password:""});
       setSaleKey(idempotency("manual-sale"));
       await load();
       await resellerApi.provisionSubscription(subscriptionId);
@@ -226,7 +232,7 @@ export function ResellerSubscriptionsParityRuntime(){
         {!filtered.length&&<Empty>{pick("اشتراکی با این فیلتر پیدا نشد.","No subscription matches this filter.")}</Empty>}
       </Card>
 
-      {sellOpen&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>!busy&&setSellOpen(false)}/><form className="runtime-modal-card reseller-sub-modal" onSubmit={submitSale}><div className="card-head"><div><b>{pick("ساخت اشتراک جدید","Create new subscription")}</b><small>{pick("بدون انتخاب مشتری یا پلن؛ حجم، مدت، پروتکل و در صورت نیاز سرورها را مشخص کنید.","No customer or plan selection is required; set traffic, duration, protocols and optional servers.")}</small></div><button className="icon-button" type="button" onClick={()=>setSellOpen(false)}>×</button></div><div className="setting-grid"><label className="field"><span>{pick("حجم اشتراک GB","Subscription traffic GB")}</span><input type="number" min={0.01} step="0.01" required value={sell.traffic_gb} onChange={e=>setSell(s=>({...s,traffic_gb:Number(e.target.value)}))}/></label><label className="field"><span>{pick("مدت اعتبار (روز)","Validity (days)")}</span><input type="number" min={1} max={3650} step={1} required value={sell.duration_days} onChange={e=>setSell(s=>({...s,duration_days:Number(e.target.value)}))}/></label><label className="field"><span>{pick("نام کاربری دلخواه (اختیاری)","Custom username (optional)")}</span><input dir="ltr" value={sell.username} onChange={e=>setSell(s=>({...s,username:e.target.value}))}/></label><label className="field"><span>{pick("رمز دلخواه (اختیاری)","Custom password (optional)")}</span><input dir="ltr" type="password" minLength={4} value={sell.password} onChange={e=>setSell(s=>({...s,password:e.target.value}))}/></label></div><div className="runtime-choice-section"><b>{pick("پروتکل‌ها","Protocols")}</b><small>{pick("حداقل یک پروتکل را برای اکانت فعال نگه دارید.","Keep at least one protocol enabled for the account.")}</small><div className="action-row"><button className="mini-btn" type="button" onClick={toggleAllProtocols}>{allProtocolsSelected?pick("لغو انتخاب همه","Clear all"):pick("انتخاب همه","Select all")}</button><Badge tone="violet">{selectedProtocolCount}/{DEFAULT_PROTOCOLS.length}</Badge></div><div className="protocol-toggle-grid">{DEFAULT_PROTOCOLS.map(protocol=><label className="toggle module-toggle" key={protocol}><span>{PROTOCOL_LABELS[protocol]}</span><input type="checkbox" checked={sell.protocols.includes(protocol)} onChange={()=>toggleProtocol(protocol)}/><i/></label>)}</div></div><div className="reseller-volume-note"><b>{pick("ساخت دستی نماینده","Manual reseller creation")}</b><small>{pick("تعداد ساخت نامحدود است و هیچ حجمی هنگام ساخت رزرو نمی‌شود؛ فقط مصرف واقعی کاربران از حجم نماینده کم می‌شود.","Creation count is unlimited and no traffic is reserved at creation; only real customer usage drains the reseller pool.")}</small></div>{nodes.length>0&&<div className="runtime-choice-section"><b>{pick("سرور خروجی مقصد","Exit destination")}</b><small>{pick("اگر سروری انتخاب نشود، بهترین سرور خروجی سالم به‌صورت خودکار انتخاب می‌شود.","Leave empty to select the best healthy exit automatically.")}</small><div className="action-row"><button className="mini-btn" type="button" onClick={toggleAllServers}>{allServersSelected?pick("لغو انتخاب همه","Clear all"):pick("انتخاب همه","Select all")}</button><Badge tone="violet">{selectedServerCount}/{selectableNodeIds.length}</Badge></div><div className="protocol-toggle-grid">{nodes.map((node,index)=>{const id=Number(node.id||0),checked=sell.node_ids.includes(id);return <label className="toggle module-toggle" key={id||index}><span>{str(node,"name")||`#${id}`}{Boolean(node.is_mother)?` · ${pick("مادر","Mother")}`:""}</span><input type="checkbox" checked={checked} onChange={e=>setSell(s=>({...s,node_ids:e.target.checked?[...s.node_ids,id]:s.node_ids.filter(x=>x!==id)}))}/><i/></label>})}</div></div>}<div className="runtime-modal-actions"><button className="ghost" type="button" onClick={()=>setSellOpen(false)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy||sell.traffic_gb<=0||sell.duration_days<=0||sell.protocols.length===0}>{busy?"…":pick("ساخت و فعال‌سازی","Create & provision")}</button></div></form></div>}
+      {sellOpen&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>!busy&&setSellOpen(false)}/><form className="runtime-modal-card reseller-sub-modal" onSubmit={submitSale}><div className="card-head"><div><b>{pick("ساخت اشتراک جدید","Create new subscription")}</b><small>{pick("بدون انتخاب مشتری یا پلن؛ حجم، مدت، پروتکل و در صورت نیاز سرورها را مشخص کنید.","No customer or plan selection is required; set traffic, duration, protocols and optional servers.")}</small></div><button className="icon-button" type="button" onClick={()=>setSellOpen(false)}>×</button></div><div className="setting-grid"><label className="field"><span>{pick("حجم اشتراک GB","Subscription traffic GB")}</span><input type="number" min={0.01} step="0.01" required value={sell.traffic_gb} onChange={e=>setSell(s=>({...s,traffic_gb:Number(e.target.value)}))}/></label><label className="field"><span>{pick("مدت اعتبار (روز)","Validity (days)")}</span><input type="number" min={1} max={3650} step={1} required value={sell.duration_days} onChange={e=>setSell(s=>({...s,duration_days:Number(e.target.value)}))}/></label><label className="field"><span>{pick("نام کاربری دلخواه (اختیاری)","Custom username (optional)")}</span><input dir="ltr" value={sell.username} onChange={e=>setSell(s=>({...s,username:e.target.value}))}/></label><label className="field"><span>{pick("رمز دلخواه (اختیاری)","Custom password (optional)")}</span><input dir="ltr" type="password" minLength={4} value={sell.password} onChange={e=>setSell(s=>({...s,password:e.target.value}))}/></label></div><div className="runtime-choice-section"><b>{pick("پروتکل‌ها","Protocols")}</b><small>{pick("حداقل یک پروتکل را برای اکانت فعال نگه دارید.","Keep at least one protocol enabled for the account.")}</small><div className="action-row"><button className="mini-btn" type="button" onClick={toggleAllProtocols}>{allProtocolsSelected?pick("لغو انتخاب همه","Clear all"):pick("انتخاب همه","Select all")}</button><Badge tone="violet">{selectedProtocolCount}/{tierProtocols.length}</Badge></div><div className="protocol-toggle-grid">{tierProtocols.map(protocol=><label className="toggle module-toggle" key={protocol}><span>{PROTOCOL_LABELS[protocol]}</span><input type="checkbox" checked={sell.protocols.includes(protocol)} onChange={()=>toggleProtocol(protocol)}/><i/></label>)}</div></div><div className="reseller-volume-note"><b>{pick("ساخت دستی نماینده","Manual reseller creation")}</b><small>{pick("تعداد ساخت نامحدود است و هیچ حجمی هنگام ساخت رزرو نمی‌شود؛ فقط مصرف واقعی کاربران از حجم نماینده کم می‌شود.","Creation count is unlimited and no traffic is reserved at creation; only real customer usage drains the reseller pool.")}</small></div>{nodes.length>0&&<div className="runtime-choice-section"><b>{pick("سرور خروجی مقصد","Exit destination")}</b><small>{pick("اگر سروری انتخاب نشود، بهترین سرور خروجی سالم به‌صورت خودکار انتخاب می‌شود.","Leave empty to select the best healthy exit automatically.")}</small><div className="action-row"><button className="mini-btn" type="button" onClick={toggleAllServers}>{allServersSelected?pick("لغو انتخاب همه","Clear all"):pick("انتخاب همه","Select all")}</button><Badge tone="violet">{selectedServerCount}/{selectableNodeIds.length}</Badge></div><div className="protocol-toggle-grid">{nodes.map((node,index)=>{const id=Number(node.id||0),checked=sell.node_ids.includes(id);return <label className="toggle module-toggle" key={id||index}><span>{str(node,"name")||`#${id}`}{Boolean(node.is_mother)?` · ${pick("مادر","Mother")}`:""}</span><input type="checkbox" checked={checked} onChange={e=>setSell(s=>({...s,node_ids:e.target.checked?[...s.node_ids,id]:s.node_ids.filter(x=>x!==id)}))}/><i/></label>})}</div></div>}<div className="runtime-modal-actions"><button className="ghost" type="button" onClick={()=>setSellOpen(false)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy||sell.traffic_gb<=0||sell.duration_days<=0||sell.protocols.length===0}>{busy?"…":pick("ساخت و فعال‌سازی","Create & provision")}</button></div></form></div>}
 
       {editRow&&<div className="runtime-modal" role="dialog" aria-modal="true"><button className="runtime-modal-bg" type="button" onClick={()=>!busy&&setEditRow(null)}/><form className="runtime-modal-card reseller-sub-modal" onSubmit={submitEdit}><div className="card-head"><div><b>{pick("ویرایش اشتراک","Edit subscription")} #{str(editRow,"id")}</b><small>{str(editRow,"customer_name")}</small></div><button className="icon-button" type="button" onClick={()=>setEditRow(null)}>×</button></div><div className="setting-grid"><label className="field"><span>{pick("حجم کل GB","Total traffic GB")}</span><input type="number" min={0.01} step="0.01" value={edit.traffic_gb} onChange={e=>setEdit(v=>({...v,traffic_gb:Number(e.target.value)}))}/></label><label className="field"><span>{pick("مدت اعتبار از امروز","Validity from today")}</span><div className="reseller-expiry-duration"><input type="number" min={1} step={1} required value={edit.expiry_value} onChange={e=>setEdit(v=>({...v,expiry_value:Number(e.target.value)}))}/><select value={edit.expiry_unit} onChange={e=>setEdit(v=>({...v,expiry_unit:e.target.value as ExpiryUnit}))}><option value="days">{pick("روز","Days")}</option><option value="months">{pick("ماه","Months")}</option><option value="years">{pick("سال","Years")}</option></select></div></label><label className="field"><span>{pick("قیمت فروش","Sell price")}</span><input type="number" min={0} value={edit.sell_price_toman} onChange={e=>setEdit(v=>({...v,sell_price_toman:Number(e.target.value)}))}/></label><label className="field"><span>{pick("نام کاربری","Username")}</span><input dir="ltr" value={edit.account_username} onChange={e=>setEdit(v=>({...v,account_username:e.target.value}))}/></label><label className="field"><span>{pick("رمز جدید (اختیاری)","New password (optional)")}</span><input dir="ltr" value={edit.account_password} onChange={e=>setEdit(v=>({...v,account_password:e.target.value}))} placeholder={pick("خالی = بدون تغییر","Empty = keep current")}/></label></div><div className="runtime-modal-actions"><button className="ghost" type="button" onClick={()=>setEditRow(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy||edit.expiry_value<1}>{pick("ذخیره تغییرات","Save changes")}</button></div></form></div>}
 

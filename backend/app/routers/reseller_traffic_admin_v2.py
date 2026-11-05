@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..reseller_tier_policy import valid_tier
 from ..deps import require_admin
 from ..models_reseller import (
     Reseller,
@@ -53,6 +54,7 @@ def list_reseller_traffic_packages_v2(
         {
             "id": int(row.id),
             "title": row.title,
+            "reseller_tier": valid_tier(row.reseller_tier),
             "traffic_gb": int(row.traffic_gb or 0),
             "price_toman": int(row.price_toman or 0),
             "is_active": bool(row.is_active),

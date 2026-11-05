@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..reseller_tier_policy import reseller_tier, check_package_tier, tier_entitlements, allowed_nodes, allowed_protocols
 from ..deps import require_reseller
 from ..models import Plan, Subscription, User
 from ..services.subscription_factory import create_subscription_core
@@ -41,6 +42,7 @@ def _reseller_user_ids(
 @router.get("/me")
 def reseller_me(
     reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
 ):
     return {
         "id": reseller.id,
@@ -65,6 +67,8 @@ def reseller_me(
             reseller.credit_limit
         ),
         "is_active": reseller.is_active,
+        "reseller_tier": reseller_tier(reseller),
+        "tier_entitlements": tier_entitlements(db, reseller_tier(reseller)),
         "support_text": reseller.support_text,
     }
 
@@ -741,6 +745,12 @@ def reseller_sell_subscription(
     GB = 1024 ** 3
 
 
+    # The old sale endpoint may still be invoked by legacy clients and bots.
+    # Reject forged nodes/protocols before the compatibility selection path.
+    payload.node_ids = allowed_nodes(db, reseller, payload.node_ids)
+    if payload.protocols:
+        allowed_protocols(db, reseller, payload.protocols)
+
     # RESELLER_MOTHER_ACCESS_GUARD_V61
     from ..models import (
         Node as _AccessNode,
@@ -1149,6 +1159,8 @@ def reseller_sell_subscription(
             detail="پروتکل قابل استفاده‌ای وجود ندارد",
         )
 
+    # Apply type restriction even to protocols selected automatically.
+    requested_protocols = allowed_protocols(db, reseller, requested_protocols)
     # --------------------------------------------------------
     # Validate protocols against selected nodes
     # --------------------------------------------------------
@@ -2769,7 +2781,8 @@ def reseller_traffic_packages(
     rows=(
         db.query(ResellerTrafficPackage)
         .filter(
-            ResellerTrafficPackage.is_active.is_(True)
+            ResellerTrafficPackage.is_active.is_(True),
+            ResellerTrafficPackage.reseller_tier == reseller_tier(reseller),
         )
         .order_by(
             ResellerTrafficPackage.sort_order.asc(),
@@ -2784,6 +2797,7 @@ def reseller_traffic_packages(
             "title":row.title,
             "traffic_gb":row.traffic_gb,
             "price_toman":row.price_toman,
+            "reseller_tier":row.reseller_tier,
         }
         for row in rows
     ]
@@ -2822,6 +2836,7 @@ def reseller_buy_traffic(
             detail="بسته حجم پیدا نشد",
         )
 
+    check_package_tier(reseller, package)
     price=int(
         package.price_toman
         or 0
@@ -3055,6 +3070,7 @@ def reseller_server_options_v61(
     db: Session =
         Depends(get_db),
 ):
+    tier_node_ids = set(tier_entitlements(db, reseller_tier(reseller))["node_ids"])
 
     from ..models import (
         Node,
@@ -3085,6 +3101,8 @@ def reseller_server_options_v61(
     result=[]
 
     for node in rows:
+        if int(node.id) not in tier_node_ids:
+            continue
 
         if (
             node.current_users

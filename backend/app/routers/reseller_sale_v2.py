@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..reseller_tier_policy import assert_plan_tier, allowed_protocols, allowed_nodes, tier_entitlements, reseller_tier
 from ..deps import require_reseller
 from ..models import (
     Node,
@@ -360,6 +361,10 @@ def _resolve_nodes(
         )
     )
 
+    permitted_ids = set(tier_entitlements(db, reseller_tier(reseller))["node_ids"])
+    if any(node_id not in permitted_ids for node_id in requested_ids):
+        raise HTTPException(status_code=403, detail="سرور خارج از سطح نمایندگی است")
+
     if requested_ids:
         nodes = (
             db.query(Node)
@@ -435,7 +440,8 @@ def _resolve_nodes(
         node
         for node in candidates
         if (
-            int(node.current_users or 0)
+            int(node.id) in permitted_ids
+            and int(node.current_users or 0)
             < int(node.capacity_users or 0)
             and not bool(
                 getattr(
@@ -566,22 +572,20 @@ def _sale_impl(
         )
     )
 
+    assert_plan_tier(db, reseller, int(plan.id))
+
     user = _resolve_customer(
         db,
         reseller,
         payload,
     )
 
-    protocols = _resolve_protocols(
-        plan,
-        payload,
+    protocols = allowed_protocols(
+        db, reseller, _resolve_protocols(plan, payload)
     )
 
-    nodes = _resolve_nodes(
-        db,
-        reseller,
-        payload,
-    )
+    # Explicit and auto-selected nodes are checked inside _resolve_nodes.
+    nodes = _resolve_nodes(db, reseller, payload)
 
     traffic_gb = int(
         plan.traffic_gb or 0
