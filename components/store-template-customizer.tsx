@@ -14,6 +14,8 @@ import {
 } from "../lib/store-template-options";
 import {
   loadStoreTemplateSettings,
+  uploadStoreTemplateMedia,
+  deleteStoreTemplateMedia,
   resetStoreTemplateSettings,
   saveStoreTemplateSettings,
 } from "../lib/store-template-settings-api";
@@ -58,6 +60,7 @@ export function StoreTemplateCustomizer({templateId,onClose}:Props){
   const [hasSavedCustomization,setHasSavedCustomization]=useState(false);
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState(false);
+  const [mediaBusy,setMediaBusy]=useState(false);
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
 
@@ -105,6 +108,28 @@ export function StoreTemplateCustomizer({templateId,onClose}:Props){
       window.setTimeout(()=>setOk(""),3000);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy(false);}
+  };
+
+  const isNova=templateId==="nova-multipage-2027";
+  const uploadNovaImage=async(file:File|null)=>{
+    if(!file||mediaBusy||!isNova)return;
+    setMediaBusy(true);setError("");setOk("");
+    try{
+      const response=await uploadStoreTemplateMedia(templateId,"nova_hero_image",file);
+      setDraft(current=>({...current,nova_hero_image:response.url}));
+      setOk("تصویر بنر آپلود شد. برای فعال‌شدن آدرس، ذخیره قالب را هم بزنید.");
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setMediaBusy(false);}
+  };
+  const deleteNovaImage=async()=>{
+    if(mediaBusy||!isNova)return;
+    setMediaBusy(true);setError("");setOk("");
+    try{
+      await deleteStoreTemplateMedia(templateId,"nova_hero_image");
+      setDraft(current=>({...current,nova_hero_image:""}));
+      setOk("تصویر بنر حذف شد؛ تنظیمات قالب را ذخیره کنید.");
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setMediaBusy(false);}
   };
 
   const removeCustomization=async()=>{
@@ -178,6 +203,13 @@ export function StoreTemplateCustomizer({templateId,onClose}:Props){
     {ok&&<div className={styles.success}>{ok}</div>}
     {loading?<div className={styles.loading}>{pick("در حال دریافت تنظیمات قالب...","Loading template settings...")}</div>:<>
       <div className={styles.toolbar}><div className={styles.locale}><button type="button" className={locale==="fa"?styles.active:""} onClick={()=>setLocale("fa")}>FA</button><button type="button" className={locale==="en"?styles.active:""} onClick={()=>setLocale("en")}>EN</button></div><small>Theme settings schema v{definition.version}</small></div>
+      {isNova&&<div className={styles.group} style={{marginBottom:24}}>
+        <div className={styles.groupHead}><b>مدیریت عکس و بنر اختصاصی قالب چهار</b><p>فایل JPG، PNG یا WebP با حداکثر ۸ مگابایت. تصویر فقط برای قالب چهار ذخیره می‌شود.</p></div>
+        <div className={styles.fields}>
+          <label className={styles.field}><span>آپلود تصویر اصلی بنر</span><input aria-label="آپلود تصویر بنر" type="file" accept="image/jpeg,image/png,image/webp" disabled={mediaBusy} onChange={e=>void uploadNovaImage(e.target.files?.[0]||null)}/></label>
+          {typeof draft.nova_hero_image==="string"&&draft.nova_hero_image&&<div className={styles.field}><b>پیش‌نمایش تصویر</b><img src={draft.nova_hero_image} alt="پیش‌نمایش بنر" style={{maxWidth:"100%",height:220,objectFit:"contain"}}/><button type="button" disabled={mediaBusy} onClick={()=>void deleteNovaImage()}>حذف تصویر</button></div>}
+        </div>
+      </div>}
       <div className={styles.groups}>{definition.groups.map(group=><section className={styles.group} key={group.id}><div className={styles.groupHead}><b>{pick(group.fa,group.en)}</b>{(group.descriptionFa||group.descriptionEn)&&<p>{pick(group.descriptionFa||"",group.descriptionEn||"")}</p>}</div><div className={styles.fields}>{group.fields.map(renderField)}</div></section>)}</div>
     </>}
   </section>;
