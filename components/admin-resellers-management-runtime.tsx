@@ -335,6 +335,21 @@ export function AdminResellersManagementRuntime(){
       <Stat label={pick("اشتراک‌ها","Subscriptions")} value={String(num(stats,"subscriptions"))} icon="▱"/>
     </div>
 
+    {packagesOpen&&<Card className="runtime-editor">
+      <div className="card-head"><div><b>{pick("بسته‌های حجم نمایندگی","Reseller traffic packages")}</b><small>{pick("تعرفه خرید حجم برای هر نوع نمایندگی مستقل است.","Each reseller type has its own traffic pricing.")}</small></div><button type="button" className="mini-btn" onClick={()=>setPackagesOpen(false)}>×</button></div>
+      <form onSubmit={savePackage}>
+        <div className="setting-grid">
+          <label className="field"><span>{pick("نوع بسته حجم","Volume package type")}</span><select required value={packageDraft.reseller_tier} onChange={event=>setPackageDraft(d=>({...d,reseller_tier:event.target.value}))}><option value="economic_v2ray">اقتصادی ویتوری</option><option value="premium_static_ip">ویژه آی‌پی ثابت</option></select></label>
+          <label className="field"><span>{pick("عنوان بسته","Package title")}</span><input required minLength={2} value={packageDraft.title} onChange={event=>setPackageDraft(d=>({...d,title:event.target.value}))}/></label>
+          <label className="field"><span>{pick("حجم (GB)","Traffic (GB)")}</span><input required type="number" min={1} value={packageDraft.traffic_gb} onChange={event=>setPackageDraft(d=>({...d,traffic_gb:Number(event.target.value)}))}/></label>
+          <label className="field"><span>{pick("قیمت (تومان)","Price (Toman)")}</span><input required type="number" min={1} value={packageDraft.price_toman} onChange={event=>setPackageDraft(d=>({...d,price_toman:Number(event.target.value)}))}/></label>
+          <label className="field"><span>{pick("ترتیب نمایش","Sort order")}</span><input type="number" min={0} value={packageDraft.sort_order} onChange={event=>setPackageDraft(d=>({...d,sort_order:Number(event.target.value)}))}/></label>
+        </div>
+        <label className="toggle module-toggle"><span>{pick("بسته فعال باشد","Package enabled")}</span><input type="checkbox" checked={packageDraft.is_active} onChange={event=>setPackageDraft(d=>({...d,is_active:event.target.checked}))}/><i/></label>
+        <div className="action-row"><button className="primary" disabled={busy}>{packageDraft.id?pick("ذخیره ویرایش","Save package"):pick("ایجاد بسته حجم","Create package")}</button>{packageDraft.id>0&&<button type="button" className="ghost" onClick={()=>setPackageDraft({id:0,title:"",traffic_gb:10,price_toman:0,sort_order:100,is_active:true,reseller_tier:"economic_v2ray"})}>{pick("بسته جدید","New package")}</button>}</div>
+      </form>
+      <div className="table"><table><thead><tr><th>{pick("عنوان","Title")}</th><th>{pick("نوع","Type")}</th><th>{pick("حجم","Traffic")}</th><th>{pick("قیمت","Price")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{packages.map(row=><tr key={num(row,"id")}><td>{text(row,"title")}</td><td>{tierLabel(text(row,"reseller_tier"))}</td><td>{gb(num(row,"traffic_gb"))}</td><td>{money(num(row,"price_toman"))}</td><td><Badge tone={bool(row,"is_active")?"ok":"warn"}>{bool(row,"is_active")?pick("فعال","Active"):pick("غیرفعال","Disabled")}</Badge></td><td><button type="button" className="mini-btn" onClick={()=>editPackage(row)}>{pick("ویرایش","Edit")}</button></td></tr>)}</tbody></table></div>
+    </Card>}
     {createOpen&&<Card className="runtime-editor"><form onSubmit={createReseller}>
       <div className="card-head"><div><b>{pick("ساخت نمایندگی","Create reseller")}</b><small>{pick("مالک باید از قبل یک کاربر فعال پنل باشد.","Owner must already be an active panel user.")}</small></div><button type="button" className="mini-btn" onClick={()=>setCreateOpen(false)}>×</button></div>
       <div className="setting-grid">
