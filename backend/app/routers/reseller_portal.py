@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..reseller_tier_policy import reseller_tier, check_package_tier
 from ..deps import require_reseller
 from ..models import Plan, Subscription, User
 from ..services.subscription_factory import create_subscription_core
@@ -65,6 +66,7 @@ def reseller_me(
             reseller.credit_limit
         ),
         "is_active": reseller.is_active,
+        "reseller_tier": reseller_tier(reseller),
         "support_text": reseller.support_text,
     }
 
@@ -2769,7 +2771,8 @@ def reseller_traffic_packages(
     rows=(
         db.query(ResellerTrafficPackage)
         .filter(
-            ResellerTrafficPackage.is_active.is_(True)
+            ResellerTrafficPackage.is_active.is_(True),
+            ResellerTrafficPackage.reseller_tier == reseller_tier(reseller),
         )
         .order_by(
             ResellerTrafficPackage.sort_order.asc(),
@@ -2784,6 +2787,7 @@ def reseller_traffic_packages(
             "title":row.title,
             "traffic_gb":row.traffic_gb,
             "price_toman":row.price_toman,
+            "reseller_tier":row.reseller_tier,
         }
         for row in rows
     ]
@@ -2822,6 +2826,7 @@ def reseller_buy_traffic(
             detail="بسته حجم پیدا نشد",
         )
 
+    check_package_tier(reseller, package)
     price=int(
         package.price_toman
         or 0
