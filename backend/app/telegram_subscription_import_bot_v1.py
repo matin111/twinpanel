@@ -546,7 +546,7 @@ def install(router, request_fn):
 
     @router.callback_query(F.data.startswith("subimp:"))
     async def import_detail(callback: CallbackQuery):
-        await callback.answer()
+        await acknowledge_navigation(callback)
         try:
             sub_id = int((callback.data or "").rsplit(":", 1)[-1])
             info = await _read_import(callback, sub_id)
