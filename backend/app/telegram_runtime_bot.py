@@ -22,6 +22,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
 )
 
+from .telegram_navigation_v1 import show_navigation_page
 from .routers.telegram_manager import load_bot_token
 from .telegram_learning_center import register_learning_handlers
 
@@ -1471,12 +1472,28 @@ async def subscriptions(
     )
 
 
+@router.callback_query(F.data == "main:home")
+async def main_home_callback(callback: CallbackQuery, state: FSMContext):
+    """Always provide a local, prompt Home response, including from QR photos."""
+    await callback.answer()
+    await state.clear()
+    if callback.message:
+        # Reply keyboards can't be attached to an editMessageText response.
+        # Sending the canonical main keyboard is instant and works from photos.
+        await callback.message.answer(
+            "🏠 <b>منوی اصلی</b>\n\nبخش موردنظر را از دکمه‌های زیر انتخاب کنید.",
+            reply_markup=main_keyboard(),
+        )
+
+
 @router.callback_query(
     F.data == "subs:list"
 )
 async def subscriptions_callback(
     callback: CallbackQuery,
 ):
+    # Telegram callback acknowledgements expire quickly; never await API first.
+    await callback.answer()
     try:
         token = (
             await _telegram_session_token(
@@ -1498,16 +1515,12 @@ async def subscriptions_callback(
         imported = await _imported_subscription_rows(callback.from_user.id)
 
     except Exception as exc:
-        await callback.answer(
-            str(exc),
-            show_alert=True,
-        )
+        if callback.message:
+            await callback.message.answer("❌ دریافت فهرست اکانت‌ها ناموفق بود: " + escape(str(exc)[:150]))
         return
 
-    await callback.answer()
-
     if not rows and not imported:
-        await callback.message.edit_text(
+        await show_navigation_page(callback.message, 
             "📦 هنوز اشتراکی ندارید. می‌توانید با ساب‌لینک اکانت اضافه کنید.",
             reply_markup=subscription_list_keyboard([], []),
         )
@@ -1521,7 +1534,7 @@ async def subscriptions_callback(
         ).lower() == "active"
     )
 
-    await callback.message.edit_text(
+    await show_navigation_page(callback.message, 
         "<b>📦 اشتراک‌های من</b>\n\n"
         f"تعداد اشتراک‌ها: <b>{len(rows) + len(imported)}</b>\n"
         f"اشتراک فعال: <b>{active + sum(1 for item in imported if str(item.get('status')).lower() == 'active')}</b>\n\n"
