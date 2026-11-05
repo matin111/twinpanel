@@ -1,0 +1,17 @@
+[Unit]
+Description=TwinPanel recover missing visible Exit Classic credentials
+After=network-online.target postgresql.service twinpanel-api.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/twinpanel/current/backend
+EnvironmentFile=/etc/twinpanel/backend.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/twinpanel/venv/bin/python3 -u /opt/twinpanel/current/backend/scripts/twinpanel_classic_visible_recovery_v1.py
+TimeoutStartSec=600
+SuccessExitStatus=2 3
+Nice=15
+CPUWeight=10
+CPUQuota=50%
+IOWeight=10
