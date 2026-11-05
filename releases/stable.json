@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.588",
+  "version": "1.1.0-rc.589",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-05T10:00:52Z",
+  "released_at": "2026-11-05T10:23:42Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "f88bd4caa624c29a9a05a9de6343b27c2aff9aa0",
+  "source_sha": "d77f25fef512803980d2fc22ed06261306d44f0e",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.588/twinpanel-1.1.0-rc.588-linux-x86_64.tar.gz",
-    "sha256": "5ba81f399cd1d769026e041e4f72c2e454d687354aad31c64a6ee9b9e55b908a",
-    "size_bytes": 28674428
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.589/twinpanel-1.1.0-rc.589-linux-x86_64.tar.gz",
+    "sha256": "127067a90c628831134e2be070fc1536e906baf86626b607797afab3ab6c303a",
+    "size_bytes": 28675973
   },
   "notes": {
-    "fa": "رفع عدم نمایش تنظیمات دو نوع نمایندگی حجمی در صفحه واقعی مدیریت نمایندگان. انتخاب اجباری نوع اقتصادی ویتوری/ویژه آی‌پی ثابت هنگام ایجاد، ویرایش نوع نماینده و مدیریت بسته‌های خرید حجم تفکیک‌شده با قیمت مستقل؛ حفظ ساختار حجمی و موجودی‌های فعلی.",
-    "en": "Fix the actual /admin/resellers UI to expose tiered volume-reseller controls: mandatory economic V2Ray/premium fixed-IP type on create, editable type on management, and independently priced traffic packages for each tier. Preserve existing volume billing and balances."
+    "fa": "طراحی جمع‌وجور مدیریت نمایندگی‌ها با پاپ‌آپ‌های واکنش‌گرا برای ایجاد نماینده، بسته‌های حجم اقتصادی و ویژه، و مدیریت کامل نماینده؛ اسکرول داخلی و نمایش خطا در همان پاپ‌آپ؛ بدون تغییر منطق مالی یا موجودی حجم.",
+    "en": "Compact responsive modals for reseller creation, two-tier volume packages, and full reseller management with internal scrolling and in-dialog errors. No changes to financial or traffic balance logic."
   }
 }
