@@ -305,12 +305,20 @@ async def pay_store_order_from_wallet(
 
     # An approved payment cannot coexist with a second wallet charge.
     from ..payment_models import PaymentIntent
-    approved = db.query(PaymentIntent.id).filter(
+    # Do not switch to wallet after an external payment was initiated:
+    # a late bank/SMS/crypto approval could otherwise count twice.
+    external_payment = db.query(PaymentIntent.id).filter(
         PaymentIntent.order_id == order_id,
-        PaymentIntent.status.in_(["approved", "auto_verified"]),
+        PaymentIntent.status.in_([
+            "pending_payment", "payment_submitted", "awaiting_review",
+            "approved", "auto_verified",
+        ]),
     ).first()
-    if approved:
-        raise HTTPException(status_code=409, detail="این سفارش قبلاً پرداخت شده است")
+    if external_payment:
+        raise HTTPException(
+            status_code=409,
+            detail="برای این سفارش پرداخت دیگری شروع شده؛ برای پرداخت با کیف پول سفارش جدید بسازید",
+        )
 
     reference = f"store-order-wallet:{order_id}"
     prior = db.query(CustomerWalletTransaction.id).filter(
