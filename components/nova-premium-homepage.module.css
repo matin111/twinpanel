@@ -87,3 +87,11 @@
 @media(max-width:800px){.hero{grid-template-columns:1fr;padding:30px 0;min-height:0}.heroCopy,.heroArt,.quickBuy{grid-column:1;grid-row:auto}.heroArt{height:330px}.serverIllustration{width:min(100%,540px);max-height:380px}.heroCopy h1{font-size:clamp(30px,6vw,44px)}.quickBuy{width:100%}.resellerCards{grid-template-columns:1fr}.bottomBanner{flex-direction:column;align-items:flex-start}.trustBar{justify-content:flex-start}}
 @media(max-width:530px){.heroCopy{padding:0}.heroCopy>p{font-size:13px}.heroBenefits span{font-size:10px}.heroArt{height:270px}.serverIllustration{max-height:300px}.artBubbleTop,.artBubbleBottom{font-size:9px;padding:7px}.quickBuy{padding:18px}.perkGrid,.serviceCards{grid-template-columns:1fr}.resellerBand{padding:18px}.section{margin-top:52px}.sectionTitle{align-items:flex-start;flex-direction:column}.featuredPlans{grid-template-columns:1fr}.bottomBanner{padding:21px}.bottomBanner h2{font-size:19px}}
 @media(prefers-reduced-motion:reduce){.home *, .home *:before, .home *:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+.resellerTierDetail{margin:22px 0 44px;padding:26px;border-radius:25px;border:1px solid #806be262;background:linear-gradient(145deg,#151c38,#17172f);box-shadow:0 18px 48px #0003}
+.resellerTierDetail .sectionTitle{margin-bottom:22px}
+.resellerTierDetail .resellerCards{grid-template-columns:repeat(2,minmax(0,1fr))}
+.resellerTierDetail .economyCard,.resellerTierDetail .specialCard{min-height:270px;padding:26px}
+.tierNotice{line-height:2;font-size:12px;color:#afbedb;margin:8px 0 14px}
+.tierFoot{color:#aebbd8;font-size:12px;line-height:2;margin:18px 0 0}
+@media(max-width:750px){.resellerTierDetail .resellerCards{grid-template-columns:1fr}.resellerTierDetail{padding:16px}}
