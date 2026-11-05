@@ -1,0 +1,8 @@
+# Optional updater drop-in, installed at:
+# /etc/systemd/system/twinpanel-updater.service.d/50-v2ray-sub-canary.conf
+# Replace 1 with an ACTIVE subscription that has working, deliverable V2Ray
+# credentials. Only the numeric ID is configured. Never persist share tokens.
+# The updater resolves the current share token from the activated database and
+# requires /sub and /multi/v2ray to return matching non-empty VLESS feeds.
+[Service]
+Environment=TWINPANEL_UPDATE_V2RAY_SMOKE_SUBSCRIPTION_ID=1
