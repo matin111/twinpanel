@@ -1,12 +1,17 @@
 import type {Metadata} from "next";
 import Link from "next/link";
 import {notFound} from "next/navigation";
-import {NOVA_ARTICLES,novaArticle} from "../../../lib/nova-articles";
+import {novaArticlesWithOverrides} from "../../../lib/nova-articles";
+import {getStorefrontSeoContext} from "../../../lib/storefront-seo-server";
 import styles from "../../../components/store-template-nova-article.module.css";
-export const dynamicParams=false;
-export function generateStaticParams(){return NOVA_ARTICLES.map(article=>({slug:article.slug}));}
+export const dynamic="force-dynamic";
+async function findArticle(slug:string){
+ const ctx=await getStorefrontSeoContext();
+ if(ctx.activeTemplate!=="nova-multipage-2027")return null;
+ return novaArticlesWithOverrides(ctx.templateValues.nova_articles).find(a=>a.slug===slug)||null;
+}
 export async function generateMetadata({params}:{params:Promise<{slug:string}>}):Promise<Metadata>{
- const article=novaArticle((await params).slug);
+ const article=await findArticle((await params).slug);
  return article?{title:article.title,description:article.description,robots:{index:true,follow:true}}:{title:"مطلب یافت نشد",robots:{index:false}};
 }
 export default async function Page({params}:{params:Promise<{slug:string}>}){
