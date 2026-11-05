@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.575",
-  "source_sha": "6b1ee60c0a7afbe3b522a16ad586f23d407180c2",
+  "version": "1.1.0-rc.576",
+  "source_sha": "a15bca04b2471edfdd703c3522797a8bdb8e7edb",
   "notes": {
-    "fa": "پاکسازی آیکن‌های منوی خرید ربات تلگرام: حذف آدمک از گزینه‌های تعداد کاربر با حفظ نشان‌های رنگی، جلوگیری از نمایش الماس تکراری در پوشه‌های دسته‌بندی حرفه‌ای، حفظ مراحل انتخاب نوع اشتراک و تمام پلن‌ها و دکمه‌های خرید. تست‌های PR موفق.",
-    "en": "Telegram shop icon cleanup: remove person emoji from user-count buttons while retaining colored markers, avoid duplicate diamond emojis in already-labeled legacy categories, preserve subscription-type navigation and existing plans. Feature CI passed."
+    "fa": "افزایش سرعت پاسخ‌دهی ربات و API: حذف پرس‌وجوهای تکراری فهرست پلن‌ها با واکشی گروهی دسته‌بندی‌ها، پروتکل‌ها و سرورها؛ استفاده مجدد از اتصال HTTP داخلی ربات؛ کش سه‌ثانیه‌ای فقط برای جابه‌جایی منوهای خرید و دریافت تازه اطلاعات هنگام تأیید و ایجاد سفارش. بدون تغییر در پرداخت یا فعال‌سازی اشتراک. ۱۳ تست تغییر موفق.",
+    "en": "Telegram-to-controller API performance: batch plan category/protocol/eligible-node reads, reuse bounded local HTTP connection pool, and add a 3-second singleflight cache for purchase-menu navigation only. Plan confirmation always force-refreshes from API. No payment/provisioning changes. 13 feature CI checks passed."
   }
 }
