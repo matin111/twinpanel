@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.584",
+  "version": "1.1.0-rc.585",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-05T04:22:49Z",
+  "released_at": "2026-11-05T04:56:52Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "58836572423cc48f4fa00e7006a7cb2846d83864",
+  "source_sha": "165b25a786ea07e54861cb518d096ffa9d53b800",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.584/twinpanel-1.1.0-rc.584-linux-x86_64.tar.gz",
-    "sha256": "635784175332d0e7fce7f316bbfca36fd0beffe1ca6002959f11ed8fdbe6e5e2",
-    "size_bytes": 28624568
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.585/twinpanel-1.1.0-rc.585-linux-x86_64.tar.gz",
+    "sha256": "70f80e9bc9f6adb9b98ee7e458902f3e854f60aaa27b601bc302144cc89cdc52",
+    "size_bytes": 28664077
   },
   "notes": {
-    "fa": "تکمیل راهنمای تمام پروتکل‌ها با تأکید بر برنامه مخصوص هر پروتکل داخل ساب‌لینک؛ اصلاح فاصله و حاشیه سکشن‌های داخلی راست‌چین؛ توضیح کاربرد IP ثابت برای ترید مجاز و مدیریت پیج‌های مهم اینستاگرام.",
-    "en": "Highlight protocol-specific app recommendations inside each subscription link across all guides; fix RTL inner hero edge spacing; explain static IP use for compliant trading and business Instagram accounts."
+    "fa": "بازطراحی کامل صفحه اصلی قالب چهار با تصویر اختصاصی سرورها، انیمیشن، خرید سریع واقعی و کارت‌های جدید؛ معرفی دو پنل نمایندگی اقتصادی و ویژه؛ اصلاح مجوز کش Next.js در آپدیتر.",
+    "en": "Premium Nova Template 4 homepage with original server illustration, animated benefits, dynamic quick purchase and featured plans, economic and special reseller tiers, and updater Next.js cache permission fix."
   }
 }
