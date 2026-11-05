@@ -7,6 +7,7 @@ import {ConversionPro2027Template} from "./store-template-conversion-pro";
 import {EditorialFooterSocial} from "./store-template-editorial-footer-social";
 import {EditorialPro2027Template} from "./store-template-editorial-pro";
 import {OrbitNeoPolishedTemplate} from "./store-template-orbit-polished";
+import {NovaMultipageTemplate} from "./store-template-nova";
 import {StoreProtocolCatalogLayer} from "./store-protocol-catalog-layer";
 import {StorefrontAdvancedDesignRuntime} from "./storefront-advanced-design-runtime";
 import editorialBridge from "./store-template-editorial-theme-bridge.module.css";
@@ -42,6 +43,7 @@ function editorialThemeStyle(options:StoreTemplateOptionMap){
 }
 
 const STORE_TEMPLATE_RUNTIME_RENDERERS:Record<string,StoreTemplateRuntimeRenderer>={
+  "nova-multipage-2027":({templateId:_,themeOptions,...props})=><NovaMultipageTemplate themeOptions={themeOptions} {...props}/>,
   "conversion-2027":({templateId:_,themeOptions,...props})=><ConversionPro2027Template themeOptions={themeOptions} {...props}/>,
   "editorial-grid-2027":({templateId:_,themeOptions,...props})=><div className={editorialBridge.themeBridge} style={editorialThemeStyle(themeOptions)}><EditorialPro2027Template themeOptions={themeOptions} {...props}/><EditorialFooterSocial settings={props.settings}/></div>,
   "orbit-neo-2027":({templateId:_,themeOptions,...props})=><OrbitNeoPolishedTemplate themeOptions={themeOptions} {...props}/>,
@@ -58,6 +60,6 @@ export function StoreTemplateRuntime(props:StoreThemeRuntimeProps){
   const runtimeProps={...props,templateId:resolved};
   return <StorefrontAdvancedDesignRuntime templateId={resolved} themeOptions={props.themeOptions}>
     {renderer(runtimeProps)}
-    <StoreProtocolCatalogLayer templateId={resolved} themeOptions={props.themeOptions}/>
+    {resolved!=="nova-multipage-2027"&&<StoreProtocolCatalogLayer templateId={resolved} themeOptions={props.themeOptions}/>}
   </StorefrontAdvancedDesignRuntime>;
 }

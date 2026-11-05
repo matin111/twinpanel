@@ -39,6 +39,13 @@ export const STORE_TEMPLATE_CATALOG:readonly StoreTemplateDefinition[]=[
     supportsLight:true,
   },
   {
+    id:"nova-multipage-2027",
+    nameFa:"قالب چهار",nameEn:"Template 4",
+    descriptionFa:"قالب اختصاصی چندصفحه‌ای برای فروش VPN، آی‌پی ثابت، نمایندگی، آموزش و سوالات متداول.",
+    descriptionEn:"Premium multi-page VPN storefront with reseller, guides and FAQ.",
+    version:"1.0.0",author:"TwinPanel",builtIn:true,supportsDark:true,supportsLight:false,
+  },
+  {
     id:"orbit-neo-2027",
     nameFa:"قالب سه",
     nameEn:"Template 3",
