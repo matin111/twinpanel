@@ -1,3 +1,4 @@
+import asyncio
 import time
 from html import escape
 
@@ -462,20 +463,30 @@ def create_purchase_router(
             "access_token"
         ]
 
-    async def load_plans():
-        rows = await request_fn(
-            "GET",
-            "/v1/plans",
-        )
+    # Menu-only cache: avoid a full database query on every rapid back/next
+    # click. Payment and plan confirmation always force a fresh server read.
+    plans_cache = {"value": None, "expires_at": 0.0}
+    plans_lock = asyncio.Lock()
 
-        return active_plans(
-            rows
-            if isinstance(rows, list)
-            else []
-        )
+    async def load_plans(*, force_refresh=False):
+        now = time.monotonic()
+        if (not force_refresh and plans_cache["value"] is not None
+                and now < plans_cache["expires_at"]):
+            return plans_cache["value"]
+
+        async with plans_lock:
+            now = time.monotonic()
+            if (not force_refresh and plans_cache["value"] is not None
+                    and now < plans_cache["expires_at"]):
+                return plans_cache["value"]
+            rows = await request_fn("GET", "/v1/plans")
+            plans = active_plans(rows if isinstance(rows, list) else [])
+            plans_cache["value"] = plans
+            plans_cache["expires_at"] = time.monotonic() + 3.0
+            return plans
 
     async def find_plan(plan_id):
-        plans = await load_plans()
+        plans = await load_plans(force_refresh=True)
 
         plan = next(
             (
