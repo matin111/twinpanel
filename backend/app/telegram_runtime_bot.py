@@ -1554,6 +1554,7 @@ async def subscriptions_callback(
 async def subscription_detail(
     callback: CallbackQuery,
 ):
+    await callback.answer()
     try:
         sub_id = int(
             callback.data.split(":")[1]
@@ -1567,15 +1568,11 @@ async def subscription_detail(
         )
 
     except Exception as exc:
-        await callback.answer(
-            str(exc),
-            show_alert=True,
-        )
+        if callback.message:
+            await callback.message.answer("❌ دریافت اطلاعات اشتراک ناموفق بود: " + escape(str(exc)[:150]))
         return
 
-    await callback.answer()
-
-    await callback.message.edit_text(
+    await show_navigation_page(callback.message, 
         _subscription_text(info),
         reply_markup=(
             subscription_actions_keyboard(
@@ -1591,6 +1588,7 @@ async def subscription_detail(
 async def subscription_connection(
     callback: CallbackQuery,
 ):
+    await callback.answer()
     try:
         sub_id = int(
             callback.data.split(":")[1]
@@ -1622,13 +1620,9 @@ async def subscription_connection(
             )
 
     except Exception as exc:
-        await callback.answer(
-            str(exc),
-            show_alert=True,
-        )
+        if callback.message:
+            await callback.message.answer("❌ دریافت لینک اتصال ناموفق بود: " + escape(str(exc)[:150]))
         return
-
-    await callback.answer()
 
     from .telegram_subscription_qr_v1 import send_subscription_link_and_qr
 
