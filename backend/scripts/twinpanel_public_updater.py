@@ -658,7 +658,7 @@ def ensure_web_cache_access(target: Path) -> None:
     for current_root, directories, files in os.walk(app):
         directory = Path(current_root)
         shutil.chown(directory, group='www-data')
-        os.chmod(directory, (directory.stat().st_mode & 0o777) | 0o270)
+        os.chmod(directory, (directory.stat().st_mode & 0o777) | 0o2030)
         for name in files:
             if not name.endswith(('.html', '.rsc', '.meta', '.body')):
                 continue
