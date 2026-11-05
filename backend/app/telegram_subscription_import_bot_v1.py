@@ -317,44 +317,13 @@ def install(router, request_fn):
             if selected_plan_id is None:
                 await _show_renewal_step(callback, sub_id)
                 return
-            plan = info.get("renew_plan") or {}
-            if selected_plan_id is not None:
-                plans = await request_fn("GET", "/v1/plans")
-                available = [
-                    item for item in (plans if isinstance(plans, list) else [])
-                    if item.get("is_active")
-                    and int(item.get("price_toman") or 0) > 0
-                    and int(item.get("duration_days") or 0) > 0
-                    and int(item.get("traffic_gb") or 0) > 0
-                ]
-                if selected_plan_id is not None:
-                    plan = next(
-                        (item for item in available if int(item["id"]) == selected_plan_id),
-                        None,
-                    )
-                    if not plan:
-                        raise ValueError("پلن انتخاب‌شده در دسترس نیست")
-                else:
-                    if not available:
-                        raise ValueError("هیچ پلن تمدید فعالی وجود ندارد")
-                    if callback.message:
-                        rows = [
-                            [InlineKeyboardButton(
-                                text=(f"{item['name']} | {item['duration_days']} روز"
-                                      f" | {item['traffic_gb']}GB | {int(item['price_toman']):,} تومان")[:64],
-                                callback_data=f"subimprenewplan:{sub_id}:{int(item['id'])}",
-                            )] for item in available[:40]
-                        ]
-                        rows.append([InlineKeyboardButton(
-                            text="⬅️ مدیریت اکانت", callback_data=f"subimp:{sub_id}",
-                        )])
-                        await callback.message.edit_text(
-                            "♻️ <b>انتخاب پلن تمدید</b>\n\n"
-                            "برای همین اکانت یک پلن انتخاب کنید. "
-                            "حجم و اعتبار پس از پرداخت به همان اشتراک افزوده می‌شود.",
-                            reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
-                        )
-                    return
+            plans = await _renewal_catalog(callback, sub_id)
+            plan = next(
+                (item for item in plans if int(item["id"]) == selected_plan_id),
+                None,
+            )
+            if not plan:
+                raise ValueError("پلن انتخاب‌شده در دسترس نیست")
         except Exception as exc:
             if callback.message:
                 await callback.message.answer("❌ " + escape(str(exc)[:160]))
