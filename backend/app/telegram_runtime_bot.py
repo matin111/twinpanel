@@ -22,7 +22,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
 )
 
-from .telegram_navigation_v1 import show_navigation_page
+from .telegram_navigation_v1 import show_navigation_page, acknowledge_navigation
 from .routers.telegram_manager import load_bot_token
 from .telegram_learning_center import register_learning_handlers
 
@@ -1475,7 +1475,7 @@ async def subscriptions(
 @router.callback_query(F.data == "main:home")
 async def main_home_callback(callback: CallbackQuery, state: FSMContext):
     """Always provide a local, prompt Home response, including from QR photos."""
-    await callback.answer()
+    await acknowledge_navigation(callback)
     await state.clear()
     if callback.message:
         # Reply keyboards can't be attached to an editMessageText response.
@@ -1493,7 +1493,7 @@ async def subscriptions_callback(
     callback: CallbackQuery,
 ):
     # Telegram callback acknowledgements expire quickly; never await API first.
-    await callback.answer()
+    await acknowledge_navigation(callback)
     try:
         token = (
             await _telegram_session_token(
@@ -1554,7 +1554,7 @@ async def subscriptions_callback(
 async def subscription_detail(
     callback: CallbackQuery,
 ):
-    await callback.answer()
+    await acknowledge_navigation(callback)
     try:
         sub_id = int(
             callback.data.split(":")[1]
@@ -1588,7 +1588,7 @@ async def subscription_detail(
 async def subscription_connection(
     callback: CallbackQuery,
 ):
-    await callback.answer()
+    await acknowledge_navigation(callback)
     try:
         sub_id = int(
             callback.data.split(":")[1]
