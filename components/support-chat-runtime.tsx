@@ -24,7 +24,7 @@ export function SupportChatRuntime(){
 
   const mode=useMemo<"guest"|"account"|null>(()=>{
     const path=(pathname||"/").replace(/\/$/,"")||"/";
-    if(path==="/"||path==="/store")return "guest";
+    if(path==="/"||path==="/store"||path.startsWith("/vpn-"))return "guest";
     if(path==="/panel"||path.startsWith("/panel/"))return "account";
     return null;
   },[pathname]);
