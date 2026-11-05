@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.586",
-  "source_sha": "d7547cbf081b9dd063975bc2d53a325529ee186a",
+  "version": "1.1.0-rc.587",
+  "source_sha": "5d11aded11469d65a9db9659d449786792a2c3f1",
   "notes": {
-    "fa": "حذف متن‌های عمومی، تکراری و نامرتبط از صفحه اصلی قالب چهار؛ حفظ خدمات واقعی شامل خرید اشتراک، پروتکل‌های فعال، IP ثابت، دو پنل نمایندگی اقتصادی و ویژه و راهنمای اتصال.",
-    "en": "Clean Nova Template 4 homepage of repetitive generic advertising, preserving real VPN plan purchases, protocol catalog, static IP, economic/special reseller tiers and guides."
+    "fa": "اصلاح چیدمان صفحه سرویس‌های قالب چهار: جابه‌جایی فیلتر نوع سرویس و تعداد کاربران به بالای گرید پلن‌ها، رفع فضای خالی و نمایش منظم پلن‌های فعال؛ بدون تغییر در اطلاعات خرید.",
+    "en": "Fix Nova Template 4 services page: place plan type and user-count filters above the plan grid, remove misleading empty gap, retain real plans and checkout."
   }
 }
