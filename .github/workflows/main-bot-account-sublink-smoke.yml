@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "backend/app/telegram_account_link_bot.py"
+      - "backend/app/bot_text_middleware.py"
+      - "backend/scripts/main_home_navigation_smoke.py"
       - "backend/app/telegram_subscription_import_bot_v1.py"
       - "backend/app/telegram_subscription_qr_v1.py"
       - "backend/scripts/telegram_combined_sublink_qr_v1_smoke.py"
@@ -41,6 +43,9 @@ jobs:
             backend/app/telegram_account_link_bot.py \
             backend/app/telegram_main_extensions.py \
             backend/app/telegram_guides_bot.py
+
+      - name: Verify main home has no redundant navigation buttons
+        run: python backend/scripts/main_home_navigation_smoke.py
 
       - name: Validate imported account payment and renewal contract
         run: python backend/scripts/imported_paid_renewal_smoke.py
