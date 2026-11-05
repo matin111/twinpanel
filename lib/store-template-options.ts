@@ -310,6 +310,11 @@ const editorialDefaults:StoreTemplateOptionMap={
 };
 
 export const STORE_TEMPLATE_OPTION_DEFINITIONS:Record<string,StoreTemplateOptionDefinition>={
+  "nova-multipage-2027":{
+    templateId:"nova-multipage-2027",version:1,
+    defaults:{theme_primary:"#8b5cf6",theme_secondary:"#27c8e8",nova_eyebrow:"تجربه اتصال هوشمند و چندپروتکلی",nova_hero_title:"اتصال حرفه‌ای،",nova_hero_highlight:"انتخاب آزادانه.",nova_hero_description:"از میان سرویس‌های متنوع انتخاب کنید. خرید و مدیریت اشتراک از یک حساب انجام می‌شود."},
+    groups:[appearanceGroup(),{id:"nova-hero",fa:"بنر اصلی قالب چهار",en:"Nova hero",fields:[text("nova_eyebrow","متن کوچک بنر","Hero eyebrow"),text("nova_hero_title","عنوان بنر","Hero title"),text("nova_hero_highlight","عنوان رنگی بنر","Highlighted title"),area("nova_hero_description","متن توضیحی بنر","Hero description")]}],
+  },
   "conversion-2027":{
     templateId:"conversion-2027",
     version:2,
