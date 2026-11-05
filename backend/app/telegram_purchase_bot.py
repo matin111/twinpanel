@@ -528,11 +528,8 @@ def create_purchase_router(
             else []
         ) or []
 
-        if not methods:
-            raise RuntimeError(
-                "روش پرداخت فعالی وجود ندارد"
-            )
-
+        # Wallet checkout is always a valid method even when external
+        # payment gateways are disabled.
         return methods
 
     @router.message(
