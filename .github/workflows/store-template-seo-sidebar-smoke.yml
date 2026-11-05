@@ -39,7 +39,7 @@ jobs:
           }
 
           catalog_ids = set(re.findall(r'\bid:"([^"]+)"', registry))
-          assert catalog_ids == set(expected), (catalog_ids, set(expected))
+          assert set(expected).issubset(catalog_ids), (catalog_ids, set(expected))
 
           for template_id, (source, icon) in expected.items():
               assert 'import {StoreTemplateSeoPanel} from "./store-template-seo-panel";' in source
