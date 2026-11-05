@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.588",
-  "source_sha": "f88bd4caa624c29a9a05a9de6343b27c2aff9aa0",
+  "version": "1.1.0-rc.589",
+  "source_sha": "d77f25fef512803980d2fc22ed06261306d44f0e",
   "notes": {
-    "fa": "رفع عدم نمایش تنظیمات دو نوع نمایندگی حجمی در صفحه واقعی مدیریت نمایندگان. انتخاب اجباری نوع اقتصادی ویتوری/ویژه آی‌پی ثابت هنگام ایجاد، ویرایش نوع نماینده و مدیریت بسته‌های خرید حجم تفکیک‌شده با قیمت مستقل؛ حفظ ساختار حجمی و موجودی‌های فعلی.",
-    "en": "Fix the actual /admin/resellers UI to expose tiered volume-reseller controls: mandatory economic V2Ray/premium fixed-IP type on create, editable type on management, and independently priced traffic packages for each tier. Preserve existing volume billing and balances."
+    "fa": "طراحی جمع‌وجور مدیریت نمایندگی‌ها با پاپ‌آپ‌های واکنش‌گرا برای ایجاد نماینده، بسته‌های حجم اقتصادی و ویژه، و مدیریت کامل نماینده؛ اسکرول داخلی و نمایش خطا در همان پاپ‌آپ؛ بدون تغییر منطق مالی یا موجودی حجم.",
+    "en": "Compact responsive modals for reseller creation, two-tier volume packages, and full reseller management with internal scrolling and in-dialog errors. No changes to financial or traffic balance logic."
   }
 }
