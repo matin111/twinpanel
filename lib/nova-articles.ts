@@ -20,3 +20,60 @@ export const NOVA_ARTICLES:NovaArticle[]=[
 ]}
 ];
 export function novaArticle(slug:string){return NOVA_ARTICLES.find(article=>article.slug===slug)||null;}
+
+/** Articles saved by the Nova blog editor in storefront template settings.
+ * The editor stores text, not HTML; everything is rendered as React text. */
+export type NovaBlogEntry={
+ slug:string;
+ title:string;
+ description:string;
+ body:string;
+ updated:string;
+ published:boolean;
+};
+export function cleanNovaBlogEntries(value:unknown):NovaBlogEntry[]{
+ if(!Array.isArray(value))return [];
+ const seen=new Set<string>();
+ const output:NovaBlogEntry[]=[];
+ for(const raw of value.slice(0,40)){
+  if(!raw||typeof raw!=="object"||Array.isArray(raw))continue;
+  const entry=raw as Record<string,unknown>;
+  const slug=String(entry.slug||"").trim().toLowerCase();
+  const title=String(entry.title||"").trim();
+  const description=String(entry.description||"").trim();
+  const body=String(entry.body||"").trim();
+  if(!/^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/.test(slug)||seen.has(slug)||!title||!body)continue;
+  seen.add(slug);
+  output.push({
+    slug,title:title.slice(0,180),description:description.slice(0,400),
+    body:body.slice(0,5000),
+    updated:/^\d{4}-\d{2}-\d{2}$/.test(String(entry.updated||""))?String(entry.updated):"2026-11-05",
+    published:entry.published===true,
+  });
+ }
+ return output;
+}
+export function novaArticlesWithOverrides(value:unknown):NovaArticle[]{
+ const overrides=cleanNovaBlogEntries(value);
+ const hidden=new Set(overrides.filter(x=>!x.published).map(x=>x.slug));
+ const original=NOVA_ARTICLES.filter(x=>!hidden.has(x.slug));
+ const merged=new Map<string,NovaArticle>(original.map(x=>[x.slug,x]));
+ for(const entry of overrides.filter(x=>x.published)){
+  const paragraphs=entry.body.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
+  merged.set(entry.slug,{
+   slug:entry.slug,title:entry.title,description:entry.description,updated:entry.updated,
+   sections:[{title:"متن مقاله",paragraphs:paragraphs.length?paragraphs:[entry.body]}],
+  });
+ }
+ return [...merged.values()];
+}
+export function novaEditableEntries(value:unknown):NovaBlogEntry[]{
+ const overrides=cleanNovaBlogEntries(value);
+ const existing=new Set(overrides.map(x=>x.slug));
+ const baseline=NOVA_ARTICLES.filter(a=>!existing.has(a.slug)).map(a=>({
+  slug:a.slug,title:a.title,description:a.description,
+  body:a.sections.map(section=>section.title+"\n"+section.paragraphs.join("\n\n")).join("\n\n"),
+  updated:a.updated,published:true,
+ }));
+ return [...overrides,...baseline];
+}
