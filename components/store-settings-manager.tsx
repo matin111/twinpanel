@@ -60,6 +60,7 @@ export function StoreSettingsManager(){
         <small>{pick("قالب فروشگاه را انتخاب و مدیریت کنید.","Choose and manage the storefront template.")}</small>
       </div>
       <div className="action-row">
+        <Link className="ghost" href="/admin/store-blog">مدیریت بلاگ و مقاله‌ها</Link>
         <Link className="ghost" href="/store" target="_blank">{pick("مشاهده فروشگاه","Open storefront")} ↗</Link>
         <button className="ghost" onClick={()=>void load()} disabled={loading||busy}>{pick("بازخوانی","Reload")}</button>
       </div>
@@ -75,7 +76,7 @@ export function StoreSettingsManager(){
           <b>{pick("قالب‌های فروشگاه","Storefront templates")}</b>
           <p>{pick("قالب دلخواه را فعال کنید یا وارد شخصی‌سازی شوید.","Activate a template or open its customization page.")}</p>
         </div>
-        <Badge tone="violet">{pick("سه قالب نصب‌شده",`${STORE_TEMPLATE_CATALOG.length} installed`)}</Badge>
+        <Badge tone="violet">{pick("چهار قالب نصب‌شده",`${STORE_TEMPLATE_CATALOG.length} installed`)}</Badge>
       </Card>
 
       {unknownTemplate&&<div className="runtime-warning">{pick(`قالب ذخیره‌شده «${settings.active_template}» در این نسخه نصب نیست؛ فروشگاه از قالب پیش‌فرض استفاده می‌کند.`,`Saved template “${settings.active_template}” is not installed in this version; the storefront falls back to the default template.`)}</div>}
