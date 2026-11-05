@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..reseller_tier_policy import assert_plan_tier, allowed_protocols, allowed_nodes
+from ..reseller_tier_policy import assert_plan_tier, allowed_protocols, allowed_nodes, tier_entitlements, reseller_tier
 from ..deps import require_reseller
 from ..models import (
     Node,
@@ -361,6 +361,10 @@ def _resolve_nodes(
         )
     )
 
+    permitted_ids = set(tier_entitlements(db, reseller_tier(reseller))["node_ids"])
+    if any(node_id not in permitted_ids for node_id in requested_ids):
+        raise HTTPException(status_code=403, detail="سرور خارج از سطح نمایندگی است")
+
     if requested_ids:
         nodes = (
             db.query(Node)
@@ -436,7 +440,8 @@ def _resolve_nodes(
         node
         for node in candidates
         if (
-            int(node.current_users or 0)
+            int(node.id) in permitted_ids
+            and int(node.current_users or 0)
             < int(node.capacity_users or 0)
             and not bool(
                 getattr(
@@ -579,17 +584,8 @@ def _sale_impl(
         db, reseller, _resolve_protocols(plan, payload)
     )
 
-    # Resolve the reseller tier first; a forged node ID cannot escape the
-    # category even when it is a valid global Exit.
-    permitted_node_ids = allowed_nodes(
-        db, reseller, getattr(payload, "node_ids", None)
-    )
-    from types import SimpleNamespace
-    scoped = SimpleNamespace(**{
-        **(payload.model_dump() if hasattr(payload, "model_dump") else vars(payload)),
-        "node_ids": permitted_node_ids,
-    })
-    nodes = _resolve_nodes(db, reseller, scoped)
+    # Explicit and auto-selected nodes are checked inside _resolve_nodes.
+    nodes = _resolve_nodes(db, reseller, payload)
 
     traffic_gb = int(
         plan.traffic_gb or 0
