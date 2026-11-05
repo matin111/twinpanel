@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..reseller_tier_policy import assert_plan_tier, allowed_protocols, allowed_nodes
 from ..deps import require_reseller
 from ..models import (
     Node,
@@ -566,22 +567,29 @@ def _sale_impl(
         )
     )
 
+    assert_plan_tier(db, reseller, int(plan.id))
+
     user = _resolve_customer(
         db,
         reseller,
         payload,
     )
 
-    protocols = _resolve_protocols(
-        plan,
-        payload,
+    protocols = allowed_protocols(
+        db, reseller, _resolve_protocols(plan, payload)
     )
 
-    nodes = _resolve_nodes(
-        db,
-        reseller,
-        payload,
+    # Resolve the reseller tier first; a forged node ID cannot escape the
+    # category even when it is a valid global Exit.
+    permitted_node_ids = allowed_nodes(
+        db, reseller, getattr(payload, "node_ids", None)
     )
+    from types import SimpleNamespace
+    scoped = SimpleNamespace(**{
+        **(payload.model_dump() if hasattr(payload, "model_dump") else vars(payload)),
+        "node_ids": permitted_node_ids,
+    })
+    nodes = _resolve_nodes(db, reseller, scoped)
 
     traffic_gb = int(
         plan.traffic_gb or 0
