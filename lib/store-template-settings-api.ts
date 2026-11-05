@@ -74,6 +74,8 @@ export async function saveStoreTemplateSettings(templateId:string,payload:Record
     if(hasOwn(current,key))next[key]=current[key];
     else delete next[key];
   }
+  // Blog posts are maintained by a separate editor; visual saves must not erase them.
+  if(hasOwn(current,"nova_articles"))next.nova_articles=current.nova_articles;
   return putStoreTemplateSettings(templateId,next);
 }
 
@@ -131,4 +133,12 @@ export async function deleteStoreTemplateMedia(templateId:string,slot:string):Pr
     cache:"no-store",
   });
   return parseResponse<Record<string,unknown>>(response);
+}
+
+/** Save blog entries without dropping current SEO, colors or other layout options. */
+export async function saveNovaBlogArticles(articles:Array<Record<string,unknown>>):Promise<Record<string,unknown>>{
+  const templateId="nova-multipage-2027";
+  const envelope=await loadStoreTemplateSettings();
+  const current=envelope.templates?.[templateId]||{};
+  return putStoreTemplateSettings(templateId,{...current,nova_articles:articles});
 }
