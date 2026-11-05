@@ -169,9 +169,8 @@ def _admin(db: Session, telegram_id: int) -> User:
             user = db.get(User, int(json.loads(grant.setting_value)["user_id"]))
         except (ValueError, KeyError, TypeError):
             user = None
-    if not user:
-        link = db.get(TelegramUserLink, int(telegram_id))
-        user = db.get(User, link.user_id) if link else None
+    # Explicit panel authorization is required even if this Telegram ID
+    # already happens to be linked to a panel admin user.
     if not user or not user.is_active or user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="دسترسی مدیریت مجاز نیست")
     return user
@@ -437,7 +436,7 @@ def broadcast_preview(payload: BroadcastDraftIn, db: Session = Depends(get_db)):
     return {"nonce": nonce, "total": total, "preview": payload.text.strip()}
 
 
-async def _deliver_broadcast(text: str, targets: list[int]) -> None:
+async def _deliver_broadcast(text: str, targets: list[int], admin_chat_id: int) -> None:
     # Existing panel sends at the same conservative rate. BackgroundTasks
     # keeps the Telegram callback responsive; failed recipients do not block others.
     try:
@@ -445,16 +444,36 @@ async def _deliver_broadcast(text: str, targets: list[int]) -> None:
     except Exception:
         return
     url = f"https://api.telegram.org/bot{token}/sendMessage"
+    sent = failed = blocked = 0
     async with httpx.AsyncClient(timeout=15.0) as client:
         for telegram_id in targets:
             try:
-                await client.post(url, json={
+                response = await client.post(url, json={
                     "chat_id": int(telegram_id), "text": text,
                     "disable_web_page_preview": True,
                 })
+                if response.status_code == 200:
+                    sent += 1
+                else:
+                    failed += 1
+                    if response.status_code == 403:
+                        blocked += 1
             except httpx.HTTPError:
-                pass
+                failed += 1
             await asyncio.sleep(0.045)
+        try:
+            await client.post(url, json={
+                "chat_id": int(admin_chat_id),
+                "text": (
+                    "📢 گزارش ارسال همگانی\\n"
+                    f"✅ ارسال‌شده: {sent}\\n"
+                    f"❌ ناموفق: {failed}\\n"
+                    f"🚫 مسدودشده: {blocked}"
+                ),
+            })
+        except httpx.HTTPError:
+            pass
+    audit_log.info("broadcast_completed sent=%s failed=%s blocked=%s", sent, failed, blocked)
 
 
 @router.post("/broadcast/send")
@@ -473,6 +492,6 @@ async def broadcast_send(
     # Pop before scheduling prevents repeated callback delivery.
     _broadcast_drafts.pop(payload.nonce, None)
     targets = _broadcast_target_ids(db)
-    background_tasks.add_task(_deliver_broadcast, draft["text"], targets)
+    background_tasks.add_task(_deliver_broadcast, draft["text"], targets, payload.telegram_id)
     audit_log.info("broadcast_started actor=%s recipients=%s sha256=%s", actor.id, len(targets), hashlib.sha256(draft["text"].encode("utf-8")).hexdigest())
     return {"ok": True, "queued": len(targets)}
