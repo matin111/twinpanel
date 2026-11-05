@@ -24,6 +24,8 @@ from .public_connection_modern_names_v14 import (
     _profile_name,
 )
 from .public_connection_modern_delivery_v16 import _resolve_delivery_content
+from .public_connection_multilink_v7 import _subscription_and_payload, _v2ray_items
+from .. import xray_public_delivery_runtime as xray_delivery
 
 
 router = APIRouter(tags=["public-connect-all-multilink-v34"])
@@ -170,6 +172,20 @@ def _all_share_uris(sub: Any, protocol: str, items: list[dict[str, Any]]) -> lis
     rows: list[str] = []
     seen: set[str] = set()
     for item in items:
+        if protocol == "v2ray":
+            profiles = xray_delivery._customer_profiles(item)
+            if profiles:
+                for profile in profiles:
+                    uri = str(profile.get("uri") or "").strip()
+                    if not uri or "://" not in uri:
+                        continue
+                    label = _profile_name(sub, protocol, item)
+                    label += "-" + _safe_name(profile.get("id"), "profile")
+                    named = _named_uri(uri, label)
+                    if named and named not in seen:
+                        seen.add(named)
+                        rows.append(named)
+                continue
         uri = _share_uri(sub, protocol, item)
         if not uri:
             return []
@@ -391,8 +407,13 @@ def _delivery(
     if protocol not in MULTI_PROTOCOLS:
         raise HTTPException(status_code=404, detail="مولتی‌لینک برای این پروتکل ارائه نمی‌شود")
 
-    sub, payload = _active(token, db)
-    items = _protocol_items(payload, protocol)
+    # Poll only the requested Xray credentials: never deserialize or reconcile
+    # all unrelated protocols when a client refreshes its V2Ray subscription.
+    if protocol == "v2ray":
+        sub, payload = _subscription_and_payload(token, db)
+    else:
+        sub, payload = _active(token, db)
+    items = _v2ray_items(payload) if protocol == "v2ray" else _protocol_items(payload, protocol)
     if not items:
         raise HTTPException(status_code=404, detail="سرور آماده‌ای برای این پروتکل وجود ندارد")
 
