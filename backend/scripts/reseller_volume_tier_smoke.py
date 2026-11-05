@@ -24,6 +24,7 @@ sources = {
     "ui_admin": root.parent / "components/admin-resellers-legacy-v3.tsx",
     "ui_alt": root.parent / "components/admin-parity-runtime.tsx",
     "ui_plans": root.parent / "components/reseller-owned-plans.tsx",
+    "ui_manual": root.parent / "components/reseller-subscriptions-parity.tsx",
 }
 text = {k:v.read_text(encoding="utf-8") for k,v in sources.items()}
 for key in sources:
@@ -56,6 +57,8 @@ assert "tier_entitlements(db, reseller_tier(reseller))" in text["servers"]
 assert "reseller_tier" in text["ui_admin"] and "reseller_tier" in text["ui_alt"]
 assert "packageDraft.reseller_tier" in text["ui_admin"]
 assert "allowedProtocols.has(protocol)" in text["ui_plans"]
+assert "tierProtocols.map(protocol" in text["ui_manual"]
+assert "resellerApi.me()" in text["ui_manual"]
 
 class HTTPException(Exception):
     def __init__(self, status_code, detail):
