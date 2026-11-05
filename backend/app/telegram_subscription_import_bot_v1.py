@@ -7,6 +7,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
+from .telegram_navigation_v1 import show_navigation_page
 from .telegram_account_link_bot_original import _cancel_keyboard
 
 
@@ -553,7 +554,8 @@ def install(router, request_fn):
                 await callback.message.answer("❌ دریافت اطلاعات اکانت انجام نشد: " + escape(str(exc)[:150]))
             return
         if callback.message:
-            await callback.message.edit_text(
+            await show_navigation_page(
+                callback.message,
                 _details_text(info),
                 reply_markup=_management_keyboard(sub_id, info),
             )
