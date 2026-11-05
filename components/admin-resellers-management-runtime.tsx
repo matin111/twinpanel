@@ -14,6 +14,7 @@ type CreateDraft={
   name:string;
   code:string;
   initial_traffic_gb:number;
+  reseller_tier:string;
 };
 
 type ManagementDraft={
@@ -29,9 +30,11 @@ type ManagementDraft={
   owner_password:string;
   reseller_active:boolean;
   owner_active:boolean;
+  reseller_tier:string;
 };
 
-const emptyCreate:CreateDraft={owner_email:"",name:"",code:"",initial_traffic_gb:0};
+const emptyCreate:CreateDraft={owner_email:"",name:"",code:"",initial_traffic_gb:0,reseller_tier:""};
+const tierLabel=(value:string)=>value==="economic_v2ray"?"اقتصادی ویتوری":value==="premium_static_ip"?"ویژه آی‌پی ثابت":"نوع نامشخص";
 const emptyManagement:ManagementDraft={
   name:"",code:"",brand_name:"",email:"",phone:"",support_text:"",
   credit_limit:0,traffic_credit_gb:0,owner_full_name:"",owner_password:"",
@@ -182,6 +185,7 @@ export function AdminResellersManagementRuntime(){
         owner_password:"",
         reseller_active:bool(management,"is_active"),
         owner_active:"is_active" in owner?Boolean(owner.is_active):true,
+        reseller_tier:text(management,"reseller_tier")||"premium_static_ip",
       });
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
   };
@@ -200,6 +204,7 @@ export function AdminResellersManagementRuntime(){
           name:createDraft.name.trim()||undefined,
           code:createDraft.code.trim()||undefined,
           initial_traffic_gb:Number(createDraft.initial_traffic_gb||0),
+          reseller_tier:createDraft.reseller_tier,
         }),
       });
       setCreateOpen(false);setCreateDraft(emptyCreate);
@@ -225,6 +230,7 @@ export function AdminResellersManagementRuntime(){
           owner_password:draft.owner_password.trim()||null,
           reseller_active:draft.reseller_active,
           owner_active:draft.owner_active,
+          reseller_tier:draft.reseller_tier,
         }),
       });
       await refreshSelected();
@@ -325,7 +331,7 @@ export function AdminResellersManagementRuntime(){
       <div className="card-head"><div><b>{pick("لیست نمایندگان","Reseller list")}</b></div><input className="table-search" value={query} onChange={event=>setQuery(event.target.value)} placeholder={pick("جستجو نام، کد، ایمیل یا تلفن…","Search name, code, email or phone…")}/></div>
       <div className="table"><table><thead><tr><th>{pick("نماینده","Reseller")}</th><th>{pick("کد","Code")}</th><th>{pick("مالک","Owner")}</th><th>{pick("مشتری / اشتراک","Customers / Subs")}</th><th>{pick("حجم","Traffic")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead>
       <tbody>{filtered.map(row=>{const rid=num(row,"id");const owner=(row.owner&&typeof row.owner==="object")?row.owner as AnyRow:{};const active=bool(row,"is_active");return <tr key={rid}>
-        <td><b>{text(row,"name")||`#${rid}`}</b><small>{text(row,"brand_name")||text(row,"email")||"—"}</small></td>
+        <td><b>{text(row,"name")||`#${rid}`}</b><small>{tierLabel(text(row,"reseller_tier"))}</small></td>
         <td dir="ltr">{text(row,"code")||"—"}</td>
         <td><b>{text(owner,"name","email")||`#${text(row,"owner_user_id")}`}</b><small dir="ltr">{text(owner,"email")}</small></td>
         <td>{num(row,"customer_count")} / {num(row,"subscription_count")}</td>
