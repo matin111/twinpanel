@@ -4,6 +4,8 @@ from datetime import datetime
 from html import escape
 
 from aiogram import F, Router
+
+from .telegram_navigation_v1 import acknowledge_navigation, show_navigation_page
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
@@ -168,7 +170,7 @@ def create_wallet_router(request_fn, session_fn):
         token, wallet, transactions, topups, user_id = await _wallet_data(request_fn, session_fn, telegram_id)
         text = wallet_text(wallet, transactions, topups, user_id)
         if edit:
-            await target.edit_text(text, reply_markup=wallet_keyboard())
+            await show_navigation_page(target, text, reply_markup=wallet_keyboard())
         else:
             await target.answer(text, reply_markup=wallet_keyboard())
         return token
@@ -196,12 +198,13 @@ def create_wallet_router(request_fn, session_fn):
 
     @router.callback_query(F.data == "wallet:refresh")
     async def wallet_refresh(callback: CallbackQuery, state: FSMContext):
+        await acknowledge_navigation(callback)
         await state.clear()
         try:
             await send_wallet(callback.message, callback.from_user.id, edit=True)
-            await callback.answer()
         except Exception as exc:
-            await callback.answer(str(exc), show_alert=True)
+            if callback.message:
+                await callback.message.answer("❌ بروزرسانی کیف پول ناموفق بود: " + escape(str(exc)[:150]))
 
     @router.callback_query(F.data == "wallet:topup")
     async def wallet_topup(callback: CallbackQuery, state: FSMContext):
