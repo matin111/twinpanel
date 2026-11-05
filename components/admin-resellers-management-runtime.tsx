@@ -160,7 +160,7 @@ export function AdminResellersManagementRuntime(){
 
   const openManage=async(id:number)=>{
     if(!id)return;
-    setSelectedId(id);setSelected(null);setError("");setOk("");setTab("profile");
+    setSelectedId(id);setSelected(null);setCreateOpen(false);setPackagesOpen(false);setError("");setOk("");setTab("profile");
     try{
       const [management,walletTx,trafficTx,planRows,motherSettings]=await Promise.all([
         request<AnyRow>(`/v1/admin/resellers/${id}/management`),
@@ -215,7 +215,7 @@ export function AdminResellersManagementRuntime(){
   };
 
   const openPackages=async()=>{
-    setPackagesOpen(true);setError("");
+    setPackagesOpen(true);setCreateOpen(false);setSelectedId(null);setSelected(null);setError("");setOk("");
     try{setPackages(await request<AnyRow[]>("/v1/admin/resellers/traffic-packages/all"));}
     catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
   };
@@ -325,7 +325,7 @@ export function AdminResellersManagementRuntime(){
   ):false;
 
   return <Shell active="/admin/resellers"><div className="page">
-    <div className="page-head"><div><h1>{pick("نمایندگی‌ها","Resellers")}</h1></div><div className="action-row"><button className="ghost" disabled={busy} onClick={()=>void openPackages()}>{pick("بسته‌های حجم","Traffic packages")}</button><button className="ghost" disabled={loading||busy} onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button><button className="primary" onClick={()=>setCreateOpen(value=>!value)}>＋ {pick("نماینده جدید","New reseller")}</button></div></div>
+    <div className="page-head"><div><h1>{pick("نمایندگی‌ها","Resellers")}</h1></div><div className="action-row"><button className="ghost" disabled={busy} onClick={()=>void openPackages()}>{pick("بسته‌های حجم","Traffic packages")}</button><button className="ghost" disabled={loading||busy} onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button><button className="primary" onClick={()=>{setCreateOpen(true);setPackagesOpen(false);setSelectedId(null);setSelected(null);setError("");setOk("");}}>＋ {pick("نماینده جدید","New reseller")}</button></div></div>
     <RuntimeMessage error={error} ok={ok}/>
 
     <div className="stats dashboard-stats">
@@ -335,8 +335,8 @@ export function AdminResellersManagementRuntime(){
       <Stat label={pick("اشتراک‌ها","Subscriptions")} value={String(num(stats,"subscriptions"))} icon="▱"/>
     </div>
 
-    {packagesOpen&&<Card className="runtime-editor">
-      <div className="card-head"><div><b>{pick("بسته‌های حجم نمایندگی","Reseller traffic packages")}</b><small>{pick("تعرفه خرید حجم برای هر نوع نمایندگی مستقل است.","Each reseller type has its own traffic pricing.")}</small></div><button type="button" className="mini-btn" onClick={()=>setPackagesOpen(false)}>×</button></div>
+    {packagesOpen&&<div className="runtime-modal" role="dialog" aria-modal="true" aria-label="بسته‌های حجم نمایندگی"><button type="button" className="runtime-modal-bg" aria-label="بستن" onClick={()=>!busy&&setPackagesOpen(false)}/><div className="runtime-modal-card reseller-packages-admin-card" style={{width:"min(760px,calc(100vw - 24px))",maxHeight:"88vh",overflowY:"auto"}}><RuntimeMessage error={error} ok={ok}/>
+      <div className="card-head"><div><b>{pick("بسته‌های حجم نمایندگی","Reseller traffic packages")}</b><small>{pick("تعرفه خرید حجم برای هر نوع نمایندگی مستقل است.","Each reseller type has its own traffic pricing.")}</small></div><button type="button" className="mini-btn" disabled={busy} onClick={()=>setPackagesOpen(false)}>×</button></div>
       <form onSubmit={savePackage}>
         <div className="setting-grid">
           <label className="field"><span>{pick("نوع بسته حجم","Volume package type")}</span><select required value={packageDraft.reseller_tier} onChange={event=>setPackageDraft(d=>({...d,reseller_tier:event.target.value}))}><option value="economic_v2ray">اقتصادی ویتوری</option><option value="premium_static_ip">ویژه آی‌پی ثابت</option></select></label>
@@ -349,9 +349,9 @@ export function AdminResellersManagementRuntime(){
         <div className="action-row"><button className="primary" disabled={busy}>{packageDraft.id?pick("ذخیره ویرایش","Save package"):pick("ایجاد بسته حجم","Create package")}</button>{packageDraft.id>0&&<button type="button" className="ghost" onClick={()=>setPackageDraft({id:0,title:"",traffic_gb:10,price_toman:0,sort_order:100,is_active:true,reseller_tier:"economic_v2ray"})}>{pick("بسته جدید","New package")}</button>}</div>
       </form>
       <div className="table"><table><thead><tr><th>{pick("عنوان","Title")}</th><th>{pick("نوع","Type")}</th><th>{pick("حجم","Traffic")}</th><th>{pick("قیمت","Price")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{packages.map(row=><tr key={num(row,"id")}><td>{text(row,"title")}</td><td>{tierLabel(text(row,"reseller_tier"))}</td><td>{gb(num(row,"traffic_gb"))}</td><td>{money(num(row,"price_toman"))}</td><td><Badge tone={bool(row,"is_active")?"ok":"warn"}>{bool(row,"is_active")?pick("فعال","Active"):pick("غیرفعال","Disabled")}</Badge></td><td><button type="button" className="mini-btn" onClick={()=>editPackage(row)}>{pick("ویرایش","Edit")}</button></td></tr>)}</tbody></table></div>
-    </Card>}
-    {createOpen&&<Card className="runtime-editor"><form onSubmit={createReseller}>
-      <div className="card-head"><div><b>{pick("ساخت نمایندگی","Create reseller")}</b><small>{pick("مالک باید از قبل یک کاربر فعال پنل باشد.","Owner must already be an active panel user.")}</small></div><button type="button" className="mini-btn" onClick={()=>setCreateOpen(false)}>×</button></div>
+    </div></div>}
+    {createOpen&&<div className="runtime-modal reseller-create-simple" role="dialog" aria-modal="true" aria-label="ساخت نماینده"><button type="button" className="runtime-modal-bg" aria-label="بستن" onClick={()=>!busy&&setCreateOpen(false)}/><div className="runtime-modal-card reseller-simple-card" style={{width:"min(620px,calc(100vw - 24px))",maxHeight:"88vh",overflowY:"auto"}}><RuntimeMessage error={error} ok={ok}/><form onSubmit={createReseller}>
+      <div className="card-head"><div><b>{pick("ساخت نمایندگی","Create reseller")}</b><small>{pick("مالک باید از قبل یک کاربر فعال پنل باشد.","Owner must already be an active panel user.")}</small></div><button type="button" className="mini-btn" disabled={busy} onClick={()=>setCreateOpen(false)}>×</button></div>
       <div className="setting-grid">
         <label className="field"><span>{pick("ایمیل کاربر مالک","Owner user email")}</span><input required type="email" dir="ltr" value={createDraft.owner_email} onChange={event=>setCreateDraft(d=>({...d,owner_email:event.target.value}))}/></label>
         <label className="field"><span>{pick("نام نمایندگی","Reseller name")}</span><input value={createDraft.name} onChange={event=>setCreateDraft(d=>({...d,name:event.target.value}))}/></label>
@@ -360,7 +360,7 @@ export function AdminResellersManagementRuntime(){
         <label className="field"><span>{pick("حجم اولیه (GB)","Initial traffic (GB)")}</span><input type="number" min={0} step="0.01" value={createDraft.initial_traffic_gb} onChange={event=>setCreateDraft(d=>({...d,initial_traffic_gb:Number(event.target.value)}))}/></label>
       </div>
       <button className="primary" disabled={busy}>{pick("ساخت نماینده","Create reseller")}</button>
-    </form></Card>}
+    </form></div></div>}
 
     <Card>
       <div className="card-head"><div><b>{pick("لیست نمایندگان","Reseller list")}</b></div><input className="table-search" value={query} onChange={event=>setQuery(event.target.value)} placeholder={pick("جستجو نام، کد، ایمیل یا تلفن…","Search name, code, email or phone…")}/></div>
@@ -376,8 +376,8 @@ export function AdminResellersManagementRuntime(){
       </tr>;})}</tbody></table></div>
     </Card>
 
-    {selectedId&&<Card className="runtime-editor">
-      <div className="card-head"><div><b>{pick("مدیریت کامل نماینده","Full reseller management")}{selected?` · ${text(selected,"name")}`:""}</b><small>{selected?`${text(selected,"code")} · #${selectedId}`:pick("در حال دریافت اطلاعات…","Loading…")}</small></div><div className="action-row"><button className="ghost" onClick={()=>void refreshSelected()}>{pick("بروزرسانی","Refresh")}</button><button className="mini-btn" onClick={()=>{setSelectedId(null);setSelected(null);}}>×</button></div></div>
+    {selectedId&&<div className="runtime-modal" role="dialog" aria-modal="true" aria-label="مدیریت نماینده"><button type="button" className="runtime-modal-bg" aria-label="بستن" onClick={()=>!busy&&(setSelectedId(null),setSelected(null))}/><div className="runtime-modal-card reseller-management-modal" style={{width:"min(990px,calc(100vw - 24px))",maxHeight:"90vh",overflowY:"auto"}}><RuntimeMessage error={error} ok={ok}/>
+      <div className="card-head"><div><b>{pick("مدیریت کامل نماینده","Full reseller management")}{selected?` · ${text(selected,"name")}`:""}</b><small>{selected?`${text(selected,"code")} · #${selectedId}`:pick("در حال دریافت اطلاعات…","Loading…")}</small></div><div className="action-row"><button className="ghost" onClick={()=>void refreshSelected()}>{pick("بروزرسانی","Refresh")}</button><button className="mini-btn" disabled={busy} onClick={()=>{setSelectedId(null);setSelected(null);}}>×</button></div></div>
 
       {selected&&<>
         <div className="stats dashboard-stats">
@@ -440,6 +440,6 @@ export function AdminResellersManagementRuntime(){
           <Card><div className="card-head"><div><b>{pick("کنترل‌های مدیریتی","Administrative controls")}</b></div></div><div className="action-row"><button className="ghost" onClick={()=>toggleReseller(selectedId)}>{bool(selected,"is_active")?pick("تعلیق نمایندگی","Suspend reseller"):pick("فعال‌سازی نمایندگی","Activate reseller")}</button><button className="danger" onClick={()=>deleteReseller(selectedId)}>{pick("حذف نمایندگی","Delete reseller")}</button></div><small>{pick("حذف در صورت وجود اشتراک ثبت‌شده توسط Backend مسدود می‌شود.","Backend blocks deletion when reseller subscriptions exist.")}</small></Card>
         </div>}
       </>}
-    </Card>}
+    </div></div>}
   </div></Shell>;
 }
