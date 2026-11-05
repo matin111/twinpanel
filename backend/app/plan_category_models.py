@@ -82,12 +82,11 @@ def _ensure_subscription_type_column() -> None:
         if not inspect(connection).has_table("plan_category_assignments"):
             return
         if not any(c["name"] == "subscription_type" for c in inspect(connection).get_columns("plan_category_assignments")):
-        connection.execute(text(
-            "ALTER TABLE plan_category_assignments "
-            "ADD COLUMN IF NOT EXISTS subscription_type VARCHAR(120) "
-            "NOT NULL DEFAULT 'اشتراک عمومی'"
-        ))
-
+            connection.execute(text(
+                "ALTER TABLE plan_category_assignments "
+                "ADD COLUMN IF NOT EXISTS subscription_type VARCHAR(120) "
+                "NOT NULL DEFAULT 'اشتراک عمومی'"
+            ))
 
 _ensure_subscription_type_column()
 
