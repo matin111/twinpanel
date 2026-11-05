@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from sqlalchemy.orm import Session
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ..models import Node, ProtocolCredential, SubscriptionNode
 from ..protocol_identity import is_openvpn_central_pki_enabled
@@ -58,15 +59,40 @@ def _quota_device_for_credential(
             return None
         return device
 
-    device = QuotaDevice(
-        subscription_id=int(credential.subscription_id),
-        protocol=source_protocol,
-        device_key=f"subscription:{int(credential.subscription_id)}:{source_protocol}",
-        credential_public_hash=f"legacy-backfill-{int(credential.subscription_id)}-{source_protocol}",
-        status="active",
-    )
-    db.add(device)
+    # Multiple quota and provisioning workers can discover the same missing
+    # device concurrently. Insert atomically; a uniqueness collision must not
+    # poison the SQLAlchemy transaction used for quota enforcement.
+    sub_id = int(credential.subscription_id)
+    key = f"subscription:{sub_id}:{source_protocol}"
+    if db.get_bind().dialect.name == "postgresql":
+        stmt = pg_insert(QuotaDevice).values(
+            subscription_id=sub_id,
+            protocol=source_protocol,
+            device_key=key,
+            credential_public_hash=f"legacy-backfill-{sub_id}-{source_protocol}",
+            status="active",
+        ).on_conflict_do_nothing(constraint="uq_quota_device_key")
+        db.execute(stmt)
+    else:
+        # Preserve the existing behavior for SQLite-backed local tests.
+        db.add(QuotaDevice(
+            subscription_id=sub_id,
+            protocol=source_protocol,
+            device_key=key,
+            credential_public_hash=f"legacy-backfill-{sub_id}-{source_protocol}",
+            status="active",
+        ))
     db.flush()
+    device = (
+        db.query(QuotaDevice)
+        .filter(
+            QuotaDevice.subscription_id == sub_id,
+            QuotaDevice.device_key == key,
+        )
+        .first()
+    )
+    if device is None or str(device.status or "").strip().lower() != "active":
+        return None
     return device
 
 

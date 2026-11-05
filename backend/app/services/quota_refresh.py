@@ -78,10 +78,15 @@ async def sync_subscription_quota_nodes(
             continue
 
         try:
-            generated = sync_node_config(
-                db,
-                node_id,
-            )
+            # An optional QuotaDevice backfill may hit PostgreSQL's short
+            # lock_timeout while another quota collector owns the same key.
+            # Keep that failure inside a SAVEPOINT so remaining Exit nodes can
+            # still be reconciled instead of inheriting a poisoned transaction.
+            with db.begin_nested():
+                generated = sync_node_config(
+                    db,
+                    node_id,
+                )
 
             ok = bool(
                 isinstance(generated, dict)
