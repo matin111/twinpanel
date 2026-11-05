@@ -21,6 +21,7 @@ from ..models_reseller import (
     ResellerWalletTransaction,
 )
 from ..security import hash_password
+from ..reseller_tier_policy import valid_tier, tier_out
 
 
 router = APIRouter(
@@ -38,6 +39,7 @@ class ResellerCreateV2In(BaseModel):
     name: str | None = Field(default=None, max_length=150)
     code: str | None = Field(default=None, max_length=32)
     initial_traffic_gb: float = Field(default=0, ge=0, le=1_000_000)
+    reseller_tier: str
 
     @model_validator(mode="after")
     def require_owner(self):
@@ -59,6 +61,7 @@ class ResellerManagementUpdateIn(BaseModel):
     owner_password: str | None = Field(default=None, min_length=8, max_length=128)
     reseller_active: bool = True
     owner_active: bool = True
+    reseller_tier: str | None = None
 
 
 def _generate_code(db: Session) -> str:
@@ -178,6 +181,7 @@ def _serialize(db: Session, reseller: Reseller) -> dict:
         "created_at": reseller.created_at,
         "updated_at": reseller.updated_at,
         "pricing_model": "volume_only",
+        "reseller_tier": valid_tier(reseller.reseller_tier),
         "subscription_creation_limit": None,
     }
 
@@ -277,6 +281,8 @@ def create_reseller_v2(
     db: Session = Depends(get_db),
 ):
     owner = _resolve_owner(db, payload)
+    tier = valid_tier(payload.reseller_tier)
+    tier_out(db, type('TierProbe', (), {'reseller_tier': tier})())
 
     code = payload.code.strip().upper() if payload.code and payload.code.strip() else _generate_code(db)
     if db.query(Reseller.id).filter(Reseller.code == code).first():
@@ -293,6 +299,7 @@ def create_reseller_v2(
     try:
         reseller = Reseller(
             owner_user_id=owner.id,
+            reseller_tier=tier,
             code=code,
             name=name,
             phone=owner.phone,
@@ -522,6 +529,13 @@ def update_reseller_management(
             raise HTTPException(status_code=409, detail="این شماره موبایل قبلاً ثبت شده است")
 
     try:
+        if payload.reseller_tier is not None:
+            tier = valid_tier(payload.reseller_tier)
+            if tier != reseller.reseller_tier:
+                # Explicit admin change applies only to subsequent creations;
+                # existing subscription snapshots and traffic pool remain intact.
+                tier_out(db, type('TierProbe', (), {'reseller_tier': tier})())
+                reseller.reseller_tier = tier
         reseller.name = name
         reseller.code = code
         reseller.brand_name = brand_name
