@@ -3,6 +3,8 @@ import time
 from html import escape
 
 from aiogram import F, Router
+
+from .telegram_navigation_v1 import show_navigation_page, acknowledge_navigation
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
@@ -567,6 +569,7 @@ def create_purchase_router(
         callback: CallbackQuery,
         state: FSMContext,
     ):
+        await acknowledge_navigation(callback)
         await state.clear()
 
         try:
@@ -575,22 +578,18 @@ def create_purchase_router(
             )
             plans = await load_plans()
         except Exception as exc:
-            await callback.answer(
-                str(exc),
-                show_alert=True,
-            )
+            if callback.message:
+                await callback.message.answer("❌ دریافت منوی خرید ناموفق بود: " + escape(str(exc)[:150]))
             return
 
-        await callback.answer()
-
         if not plans:
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 "در حال حاضر پلن فعالی "
                 "برای خرید وجود ندارد."
             )
             return
 
-        await callback.message.edit_text(
+        await show_navigation_page(callback.message, 
             "🛒 <b>خرید اشتراک</b>\n\n"
             "ابتدا نوع اشتراک را انتخاب کنید:",
             reply_markup=subscription_types_keyboard(plans),

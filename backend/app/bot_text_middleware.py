@@ -313,8 +313,15 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
     def _navigation_back(text: str, scope: str) -> str:
         value = unescape(str(text or "")).lower()
         # The first user-count screen has no prior purchase step.
-        if "ابتدا تعداد کاربری" in value:
+        if "ابتدا تعداد کاربری" in value or "ابتدا نوع اشتراک را انتخاب کنید" in value:
             return "rmenu:home" if scope == "reseller" else "main:home"
+        # First-level selection must go back to the main menu, never itself.
+        # A back callback to shop:list on the shop:list page produces Telegram's
+        # "message is not modified" error and looks like a dead button.
+        if scope != "reseller" and "تعداد کاربر را انتخاب کنید" in value:
+            return "shop:list"
+        if scope != "reseller" and "دسته‌بندی پلن را انتخاب کنید" in value:
+            return "shop:list"
         if scope == "reseller":
             if "آموزش" in value or "سیستم‌عامل" in value:
                 return "rlearn:g:root"
@@ -383,7 +390,11 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
         # Preserve any existing navigation regardless of the handler's
         # callback name. On the first screen Back intentionally also
         # returns Home, but both requested controls remain visible.
-        has_back = any("بازگشت" in label or "برگشت" in label for label in labels)
+        # An explicit parent link (e.g. "⬅️ مدیریت اکانت") is already Back.
+        # Do not append a second auto-generated Back that guesses the wrong page.
+        has_back = any("بازگشت" in label or "برگشت" in label or
+                       label.lstrip().startswith(("⬅️ مدیریت", "↩️ مدیریت", "⬅️ اکانت‌های من"))
+                       for label in labels)
         has_home = any("منوی اصلی" in label for label in labels)
         extra = []
         if not has_back:
