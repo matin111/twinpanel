@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.576",
-  "source_sha": "a15bca04b2471edfdd703c3522797a8bdb8e7edb",
+  "version": "1.1.0-rc.577",
+  "source_sha": "cd35eb15bab56285e645c061b9da182bfbd464a6",
   "notes": {
-    "fa": "افزایش سرعت پاسخ‌دهی ربات و API: حذف پرس‌وجوهای تکراری فهرست پلن‌ها با واکشی گروهی دسته‌بندی‌ها، پروتکل‌ها و سرورها؛ استفاده مجدد از اتصال HTTP داخلی ربات؛ کش سه‌ثانیه‌ای فقط برای جابه‌جایی منوهای خرید و دریافت تازه اطلاعات هنگام تأیید و ایجاد سفارش. بدون تغییر در پرداخت یا فعال‌سازی اشتراک. ۱۳ تست تغییر موفق.",
-    "en": "Telegram-to-controller API performance: batch plan category/protocol/eligible-node reads, reuse bounded local HTTP connection pool, and add a 3-second singleflight cache for purchase-menu navigation only. Plan confirmation always force-refreshes from API. No payment/provisioning changes. 13 feature CI checks passed."
+    "fa": "رفع قطعی مسیرهای ناوبری ربات تلگرام: اتصال واقعی دکمه منوی اصلی main:home، پاسخ فوری به کلیک‌های اکانت‌های من و مدیریت اکانت/QR پیش از فراخوانی API، نمایش منوی متنی صحیح هنگام بازگشت از پیام عکس QR، ادامه ناوبری در صورت منقضی‌شدن Callback تلگرام. هیچ تغییری در پرداخت، تمدید، ساخت اشتراک یا دیتابیس کاربران ندارد. ۷ تست CI موفق.",
+    "en": "Telegram bot navigation hotfix: implement main:home callback, acknowledge account-list/detail/QR clicks before API, safely navigate from QR photo to text menus, and tolerate expired callback query IDs. No changes to payments, renewal or account database. All seven feature CI checks passed."
   }
 }
