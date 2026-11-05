@@ -15,7 +15,7 @@ export async function generateMetadata({params}:{params:Promise<{slug:string}>})
  return article?{title:article.title,description:article.description,robots:{index:true,follow:true}}:{title:"مطلب یافت نشد",robots:{index:false}};
 }
 export default async function Page({params}:{params:Promise<{slug:string}>}){
- const article=novaArticle((await params).slug);
+ const article=await findArticle((await params).slug);
  if(!article)notFound();
  return <main className={styles.page} dir="rtl"><header className={styles.header}><Link href="/">خانه</Link><span>/</span><Link href="/vpn-blog">مجله آموزشی</Link></header><article className={styles.article}>
  <span className={styles.label}>راهنمای تخصصی VPN</span>
