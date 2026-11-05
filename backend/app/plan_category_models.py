@@ -39,9 +39,14 @@ def _allow_duplicate_plan_names() -> None:
     with engine.begin() as connection:
         if not inspect(connection).has_table("plans"):
             return
-        connection.execute(
-            text("ALTER TABLE plans DROP CONSTRAINT IF EXISTS plans_name_key")
-        )
+        exists = connection.execute(text(
+            "SELECT 1 FROM pg_constraint "
+            "WHERE conrelid = 'plans'::regclass AND conname = 'plans_name_key'"
+        )).scalar()
+        if exists:
+            connection.execute(
+                text("ALTER TABLE plans DROP CONSTRAINT IF EXISTS plans_name_key")
+            )
 
 
 _allow_duplicate_plan_names()
@@ -56,12 +61,13 @@ def _ensure_plan_sort_order_column() -> None:
     with engine.begin() as connection:
         if not inspect(connection).has_table("plan_category_assignments"):
             return
-        connection.execute(
-            text(
-                "ALTER TABLE plan_category_assignments "
-                "ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0"
+        if not any(c["name"] == "sort_order" for c in inspect(connection).get_columns("plan_category_assignments")):
+            connection.execute(
+                text(
+                    "ALTER TABLE plan_category_assignments "
+                    "ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0"
+                )
             )
-        )
 
 
 _ensure_plan_sort_order_column()
@@ -75,12 +81,12 @@ def _ensure_subscription_type_column() -> None:
     with engine.begin() as connection:
         if not inspect(connection).has_table("plan_category_assignments"):
             return
-        connection.execute(text(
-            "ALTER TABLE plan_category_assignments "
-            "ADD COLUMN IF NOT EXISTS subscription_type VARCHAR(120) "
-            "NOT NULL DEFAULT 'اشتراک عمومی'"
-        ))
-
+        if not any(c["name"] == "subscription_type" for c in inspect(connection).get_columns("plan_category_assignments")):
+            connection.execute(text(
+                "ALTER TABLE plan_category_assignments "
+                "ADD COLUMN IF NOT EXISTS subscription_type VARCHAR(120) "
+                "NOT NULL DEFAULT 'اشتراک عمومی'"
+            ))
 
 _ensure_subscription_type_column()
 
