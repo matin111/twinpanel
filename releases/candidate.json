@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.584",
-  "source_sha": "58836572423cc48f4fa00e7006a7cb2846d83864",
+  "version": "1.1.0-rc.585",
+  "source_sha": "35134b3e29b60ea98eb16fe2cbd486cc57e399bb",
   "notes": {
-    "fa": "تکمیل راهنمای تمام پروتکل‌ها با تأکید بر برنامه مخصوص هر پروتکل داخل ساب‌لینک؛ اصلاح فاصله و حاشیه سکشن‌های داخلی راست‌چین؛ توضیح کاربرد IP ثابت برای ترید مجاز و مدیریت پیج‌های مهم اینستاگرام.",
-    "en": "Highlight protocol-specific app recommendations inside each subscription link across all guides; fix RTL inner hero edge spacing; explain static IP use for compliant trading and business Instagram accounts."
+    "fa": "افزودن دو سطح نمایندگی حجمی اقتصادی ویتوری و ویژه آی‌پی ثابت، انتخاب اجباری سطح توسط مدیر، بسته‌های حجم و قیمت مستقل برای هر سطح، محدودیت سرورها و پروتکل‌ها در پنل و ربات و همه مسیرهای API، با حفظ موجودی حجمی و اکانت‌های قبلی.",
+    "en": "Two volume-only reseller tiers: economic V2Ray and premium fixed IP, mandatory admin selection, separately priced tier-specific GB packages, backend-enforced server and protocol permissions across panel, bot and API; preserve existing usage pools and subscriptions."
   }
 }
