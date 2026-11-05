@@ -623,15 +623,22 @@ def _ensure_reseller_tier_columns() -> None:
     from .database import engine
     if engine.dialect.name != "postgresql":
         return
+    # ALTER TABLE takes ACCESS EXCLUSIVE even for IF NOT EXISTS; avoid
+    # blocking API startup on active reseller transactions when already upgraded.
     with engine.begin() as conn:
-        if inspect(conn).has_table("resellers"):
+        inspector = inspect(conn)
+        for table_name in ("resellers", "reseller_traffic_packages"):
+            if not inspector.has_table(table_name):
+                continue
+            exists = conn.execute(text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_schema = current_schema() "
+                "AND table_name = :table AND column_name = 'reseller_tier'"
+            ), {"table": table_name}).scalar()
+            if exists:
+                continue
             conn.execute(text(
-                "ALTER TABLE resellers ADD COLUMN IF NOT EXISTS reseller_tier "
-                "VARCHAR(32) NOT NULL DEFAULT 'premium_static_ip'"
-            ))
-        if inspect(conn).has_table("reseller_traffic_packages"):
-            conn.execute(text(
-                "ALTER TABLE reseller_traffic_packages ADD COLUMN IF NOT EXISTS reseller_tier "
+                f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS reseller_tier "
                 "VARCHAR(32) NOT NULL DEFAULT 'premium_static_ip'"
             ))
 
