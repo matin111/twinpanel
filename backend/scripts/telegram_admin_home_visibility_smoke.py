@@ -18,6 +18,7 @@ class BotTextRequestMiddleware:
     def __init__(self, scope): self.scope=scope
     _add_navigation=namespace["_add_navigation"]
     _navigation_back=staticmethod(lambda text, scope: "main:home")
+    _is_verified_admin_chat=staticmethod(lambda chat: False)
 
 home_callbacks=["shop:list","trial:claim","main:dashboard","subs:list"]
 home_markup=InlineKeyboardMarkup(inline_keyboard=[
