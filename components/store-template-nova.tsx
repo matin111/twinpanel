@@ -3,7 +3,6 @@ import Link from "next/link";
 import {usePathname} from "next/navigation";
 import {useState} from "react";
 import {useBranding} from "../lib/branding";
-import {STORE_PROTOCOL_CATALOG} from "../lib/store-protocol-catalog";
 import type {StoreTemplateOptionMap} from "../lib/store-template-options";
 import type {StoreTemplateProps} from "./store-template-renderer";
 import styles from "./store-template-nova.module.css";
