@@ -233,7 +233,7 @@ def install(router, request_fn):
             rows = []
             title = ""
             if step == "type":
-                title = "♻️ <b>تمدید اکانت</b>\\n\\nابتدا نوع اشتراک را انتخاب کنید:"
+                title = "♻️ <b>تمدید اکانت</b>\n\nابتدا نوع اشتراک را انتخاب کنید:"
                 for i, name in enumerate(types):
                     rows.append([InlineKeyboardButton(
                         text=f"{subscription_type_icon(name, i)} {name}",
@@ -246,7 +246,7 @@ def install(router, request_fn):
                 typed = [p for p in plans if plan_subscription_type(p) == types[type_index]]
                 counts = sorted({plan_user_count(p) for p in typed})
                 if step == "users":
-                    title = f"♻️ <b>{escape(types[type_index])}</b>\\n\\nتعداد کاربر را انتخاب کنید:"
+                    title = f"♻️ <b>{escape(types[type_index])}</b>\n\nتعداد کاربر را انتخاب کنید:"
                     for n in counts:
                         rows.append([InlineKeyboardButton(
                             text=f"{user_count_icon(n)} {'کاربر نامحدود' if n == 0 else str(n) + ' کاربر'}",
@@ -259,7 +259,7 @@ def install(router, request_fn):
                     selected = [p for p in typed if plan_user_count(p) == user_count]
                     categories = list(dict.fromkeys(plan_category(p) for p in selected))
                     if step == "category":
-                        title = "📂 <b>دسته‌بندی پلن تمدید</b>\\n\\nدسته‌بندی را انتخاب کنید:"
+                        title = "📂 <b>دسته‌بندی پلن تمدید</b>\n\nدسته‌بندی را انتخاب کنید:"
                         for i, name in enumerate(categories):
                             rows.append([InlineKeyboardButton(
                                 text=f"{category_icon(name, i)} {name}".strip(),
@@ -274,9 +274,9 @@ def install(router, request_fn):
                         if start >= len(matching):
                             raise ValueError("صفحه پلن معتبر نیست")
                         title = (
-                            "♻️ <b>انتخاب پلن تمدید</b>\\n"
+                            "♻️ <b>انتخاب پلن تمدید</b>\n"
                             f"📂 {escape(categories[category_index])} | "
-                            f"{'نامحدود' if user_count == 0 else str(user_count)} کاربر\\n\\n"
+                            f"{'نامحدود' if user_count == 0 else str(user_count)} کاربر\n\n"
                             "حجم و اعتبار پس از تأیید پرداخت به همین اکانت افزوده می‌شود."
                         )
                         for p in matching[start:start + 12]:
