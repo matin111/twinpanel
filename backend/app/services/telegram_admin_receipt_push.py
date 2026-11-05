@@ -48,12 +48,16 @@ def _admin_chats(db) -> list[int]:
 
 
 def _candidates(db):
+    # Receipt uploads leave payment status as pending_payment until a
+    # verifier or administrator acts. They must still enter the chat queue.
+    statuses = ["pending_payment", "awaiting_review", "payment_submitted",
+                "submitted", "review", "waiting"]
     orders = db.query(PaymentIntent).filter(
-        PaymentIntent.status.in_(["awaiting_review", "payment_submitted", "submitted", "review", "waiting"]),
+        PaymentIntent.status.in_(statuses),
         PaymentIntent.receipt_telegram_file_id.isnot(None),
     ).order_by(PaymentIntent.id.desc()).limit(150).all()
     topups = db.query(CustomerWalletTopup).filter(
-        CustomerWalletTopup.status.in_(["awaiting_review", "payment_submitted", "submitted", "review", "waiting"]),
+        CustomerWalletTopup.status.in_(statuses),
         CustomerWalletTopup.receipt_file_marker.isnot(None),
     ).order_by(CustomerWalletTopup.id.desc()).limit(150).all()
     return (
