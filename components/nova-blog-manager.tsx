@@ -2,7 +2,7 @@
 import Link from "next/link";
 import {useEffect,useRef,useState} from "react";
 import {Shell} from "./ui";
-import {NOVA_ARTICLES,novaEditableEntries,novaBlogImageMarker,safeNovaBlogImage,type NovaBlogEntry} from "../lib/nova-articles";
+import {NOVA_ARTICLES,novaEditableEntries,novaBlogImageMarker,parseNovaBlogImageMarker,safeNovaBlogImage,type NovaBlogEntry} from "../lib/nova-articles";
 import {loadAdminStoreTemplateSettings,saveNovaBlogArticles,uploadStoreTemplateMedia} from "../lib/store-template-settings-api";
 import styles from "./nova-blog-manager.module.css";
 
@@ -49,6 +49,7 @@ export function NovaBlogManager(){
   if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>8*1024*1024||file.size===0){
    setError("فرمت تصویر باید JPG، PNG یا WebP و حجم آن حداکثر ۸ مگابایت باشد.");return;
   }
+  const insertionPoint=bodyRef.current?.selectionStart??current.body.length;
   setUploading(target);setError("");setSuccess("");
   try{
    const slot="blog-"+crypto.randomUUID().replace(/-/g,"");
@@ -58,8 +59,7 @@ export function NovaBlogManager(){
    if(target==="cover"){
     setCurrent(x=>({...x,coverImage:url}));
    }else{
-    const field=bodyRef.current;
-    const pos=field?.selectionStart??current.body.length;
+    const pos=insertionPoint;
     const marker=novaBlogImageMarker(file.name.replace(/\.[^.]+$/,""),url);
     setCurrent(x=>{
      const point=Math.min(pos,x.body.length);
@@ -116,6 +116,7 @@ export function NovaBlogManager(){
     </div>
     {safeNovaBlogImage(current.coverImage)&&<div className={styles.coverPreview}><img src={current.coverImage} alt="تصویر شاخص مقاله" loading="lazy"/><button type="button" onClick={()=>setCurrent(x=>({...x,coverImage:""}))}>حذف تصویر شاخص</button></div>}
     <label>متن مقاله<textarea ref={bodyRef} rows={15} maxLength={5000} value={current.body} onChange={e=>setCurrent(x=>({...x,body:e.target.value}))} placeholder="متن مقاله را بنویسید؛ نشانگر را در محل موردنظر قرار دهید و دکمه افزودن عکس داخل متن را بزنید."/></label>
+    {current.body.split(/\n\s*\n/).map((block,index)=>({index,image:parseNovaBlogImageMarker(block)})).filter(x=>x.image).length>0&&<div className={styles.inlinePreview}><b>تصاویر داخل این مقاله</b>{current.body.split(/\n\s*\n/).map((block,index)=>({index,image:parseNovaBlogImageMarker(block)})).filter(x=>x.image).map(x=><img key={x.index} src={x.image!.src} alt={x.image!.alt} loading="lazy" title={x.image!.alt}/>)}</div>}
     <div className={styles.caption}>متن امن و عکس‌های بارگذاری‌شده (بدون HTML) · {current.body.length.toLocaleString("fa-IR")} از ۵۰۰۰ کاراکتر</div>
     <label className={styles.publish}><input type="checkbox" checked={current.published} onChange={e=>setCurrent(x=>({...x,published:e.target.checked}))}/> انتشار در سایت (در صورت خاموش بودن، پیش‌نویس باقی می‌ماند)</label>
     <div className={styles.actions}><button type="button" className="primary" disabled={busy||loading||uploading!==null} onClick={()=>void save()}>{busy?"در حال ذخیره…":"ذخیره مقاله"}</button>
