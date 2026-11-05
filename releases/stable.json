@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.577",
+  "version": "1.1.0-rc.578",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-05T00:58:14Z",
+  "released_at": "2026-11-05T01:15:06Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "cd35eb15bab56285e645c061b9da182bfbd464a6",
+  "source_sha": "35350a6d784ffdd076eae07b5df6a745014989aa",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.577/twinpanel-1.1.0-rc.577-linux-x86_64.tar.gz",
-    "sha256": "c1980f9f0f170f7e27c5cf87f54fe29ee5555cb5e109e356edf40ba4c75f8741",
-    "size_bytes": 28278272
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.578/twinpanel-1.1.0-rc.578-linux-x86_64.tar.gz",
+    "sha256": "a5b6cb3cb686f0bbf07d294cd383a1f435ecc8dccb864c8bf188bf69e628dfc2",
+    "size_bytes": 28306547
   },
   "notes": {
-    "fa": "رفع قطعی مسیرهای ناوبری ربات تلگرام: اتصال واقعی دکمه منوی اصلی main:home، پاسخ فوری به کلیک‌های اکانت‌های من و مدیریت اکانت/QR پیش از فراخوانی API، نمایش منوی متنی صحیح هنگام بازگشت از پیام عکس QR، ادامه ناوبری در صورت منقضی‌شدن Callback تلگرام. هیچ تغییری در پرداخت، تمدید، ساخت اشتراک یا دیتابیس کاربران ندارد. ۷ تست CI موفق.",
-    "en": "Telegram bot navigation hotfix: implement main:home callback, acknowledge account-list/detail/QR clicks before API, safely navigate from QR photo to text menus, and tolerate expired callback query IDs. No changes to payments, renewal or account database. All seven feature CI checks passed."
+    "fa": "رفع دکمه برگشت ربات تلگرام پس از rc.577: جلوگیری از حلقه خودارجاع shop:list در اولین صفحه خرید، برگشت صحیح به منوی اصلی، جلوگیری از دکمه بازگشت تکراری در پیام QR با دکمه مدیریت اکانت، پاسخ فوری به Callback و مدیریت امن پیام تغییریافته یا تکراری. ۱۱ تست CI اصلاح موفق.",
+    "en": "Telegram Back hotfix: correct first purchase screen's auto Back parent to main:home instead of shop:list self-loop; respect explicit QR account-management Back; acknowledge root shop callback before API; handle Telegram message-is-not-modified safely. Eleven feature CI checks passed."
   }
 }
