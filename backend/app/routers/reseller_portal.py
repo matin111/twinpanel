@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..reseller_tier_policy import reseller_tier, check_package_tier, tier_entitlements
+from ..reseller_tier_policy import reseller_tier, check_package_tier, tier_entitlements, allowed_nodes, allowed_protocols
 from ..deps import require_reseller
 from ..models import Plan, Subscription, User
 from ..services.subscription_factory import create_subscription_core
@@ -745,6 +745,12 @@ def reseller_sell_subscription(
     GB = 1024 ** 3
 
 
+    # The old sale endpoint may still be invoked by legacy clients and bots.
+    # Reject forged nodes/protocols before the compatibility selection path.
+    payload.node_ids = allowed_nodes(db, reseller, payload.node_ids)
+    if payload.protocols:
+        allowed_protocols(db, reseller, payload.protocols)
+
     # RESELLER_MOTHER_ACCESS_GUARD_V61
     from ..models import (
         Node as _AccessNode,
@@ -1153,6 +1159,8 @@ def reseller_sell_subscription(
             detail="پروتکل قابل استفاده‌ای وجود ندارد",
         )
 
+    # Apply type restriction even to protocols selected automatically.
+    requested_protocols = allowed_protocols(db, reseller, requested_protocols)
     # --------------------------------------------------------
     # Validate protocols against selected nodes
     # --------------------------------------------------------
