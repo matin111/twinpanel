@@ -214,6 +214,22 @@ export function AdminResellersManagementRuntime(){
     });
   };
 
+  const openPackages=async()=>{
+    setPackagesOpen(true);setError("");
+    try{setPackages(await request<AnyRow[]>("/v1/admin/resellers/traffic-packages/all"));}
+    catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+  };
+  const savePackage=(event:FormEvent)=>{
+    event.preventDefault();
+    if(!packageDraft.title.trim()||packageDraft.traffic_gb<=0||packageDraft.price_toman<=0){setError(pick("مشخصات بسته معتبر نیست.","Invalid traffic package."));return;}
+    void act(pick("بسته حجم ذخیره شد","Traffic package saved"),async()=>{
+      const {id,...data}=packageDraft;
+      await request(id?`/v1/admin/resellers/traffic-packages/${id}`:"/v1/admin/resellers/traffic-packages",{method:id?"PATCH":"POST",body:JSON.stringify(data)});
+      setPackages(await request<AnyRow[]>("/v1/admin/resellers/traffic-packages/all"));
+      setPackageDraft({id:0,title:"",traffic_gb:10,price_toman:0,sort_order:100,is_active:true,reseller_tier:"economic_v2ray"});
+    },false);
+  };
+  const editPackage=(row:AnyRow)=>setPackageDraft({id:num(row,"id"),title:text(row,"title"),traffic_gb:num(row,"traffic_gb"),price_toman:num(row,"price_toman"),sort_order:num(row,"sort_order"),is_active:bool(row,"is_active"),reseller_tier:text(row,"reseller_tier")||"premium_static_ip"});
   const saveManagement=(event:FormEvent)=>{
     event.preventDefault();
     if(!selectedId)return;
