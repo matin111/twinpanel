@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.590",
-  "source_sha": "9926426b24391a464300b1d1dc0c9958285cbe89",
+  "version": "1.1.0-rc.591",
+  "source_sha": "e8a87a1cd6243d2b47c557a05a5f34a0bbe4977b",
   "notes": {
-    "fa": "افزودن مدیریت بلاگ قالب چهارم به پنل ادمین: ایجاد، ویرایش، پیش‌نویس، انتشار و مخفی‌سازی مقاله با سئوی مستقل؛ اصلاح عنوان «اکانت تست» در سوالات متداول؛ محافظت از پیش‌نویس‌های منتشرنشده.",
-    "en": "Nova Template 4 blog admin: create, edit, draft, publish and hide articles, SEO metadata, private drafts and correct test-account wording."
+    "fa": "رفع به‌هم‌ریختگی صفحه مدیریت بلاگ قالب چهار: اصلاح تداخل سایدبار با CSS عمومی پنل، فرم ویرایش تمام‌عرض، نمایش درست لیست مقالات و بهبود موبایل.",
+    "en": "Fix Nova admin blog editor broken layout: isolate article list from global fixed aside styles, restore full width editing form and responsive columns."
   }
 }
