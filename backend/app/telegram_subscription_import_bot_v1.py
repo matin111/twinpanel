@@ -200,50 +200,130 @@ def install(router, request_fn):
                 ]),
             )
 
+
+    # Reuse the purchase catalog's three filters, while keeping the original
+    # imported subscription and payment/renew-order flow unchanged.
+    from .telegram_purchase_bot import (
+        plan_subscription_type, plan_category, plan_user_count,
+        subscription_type_icon, category_icon, user_count_icon,
+    )
+
+    async def _renewal_catalog(callback, sub_id):
+        info = await _read_import(callback, sub_id)
+        if not info.get("can_paid_renew"):
+            raise ValueError("وضعیت اشتراک اجازه تمدید نمی‌دهد")
+        response = await request_fn("GET", "/v1/plans")
+        plans = [
+            p for p in (response if isinstance(response, list) else [])
+            if p.get("is_active")
+            and int(p.get("price_toman") or 0) > 0
+            and int(p.get("duration_days") or 0) > 0
+            and int(p.get("traffic_gb") or 0) > 0
+        ]
+        if not plans:
+            raise ValueError("پلن تمدید فعالی وجود ندارد")
+        return plans
+
+    async def _show_renewal_step(callback, sub_id, step="type",
+                                 type_index=None, user_count=None,
+                                 category_index=None, page=0):
+        try:
+            plans = await _renewal_catalog(callback, sub_id)
+            types = list(dict.fromkeys(plan_subscription_type(p) for p in plans))
+            rows = []
+            title = ""
+            if step == "type":
+                title = "♻️ <b>تمدید اکانت</b>\n\nابتدا نوع اشتراک را انتخاب کنید:"
+                for i, name in enumerate(types):
+                    rows.append([InlineKeyboardButton(
+                        text=f"{subscription_type_icon(name, i)} {name}",
+                        callback_data=f"subimprtype:{sub_id}:{i}",
+                    )])
+                back = f"subimp:{sub_id}"
+            else:
+                if type_index is None or not 0 <= type_index < len(types):
+                    raise ValueError("نوع اشتراک دیگر در دسترس نیست")
+                typed = [p for p in plans if plan_subscription_type(p) == types[type_index]]
+                counts = sorted({plan_user_count(p) for p in typed})
+                if step == "users":
+                    title = f"♻️ <b>{escape(types[type_index])}</b>\n\nتعداد کاربر را انتخاب کنید:"
+                    for n in counts:
+                        rows.append([InlineKeyboardButton(
+                            text=f"{user_count_icon(n)} {'کاربر نامحدود' if n == 0 else str(n) + ' کاربر'}",
+                            callback_data=f"subimprusers:{sub_id}:{type_index}:{n}",
+                        )])
+                    back = f"subimprenew:{sub_id}"
+                else:
+                    if user_count not in counts:
+                        raise ValueError("تعداد کاربر دیگر در دسترس نیست")
+                    selected = [p for p in typed if plan_user_count(p) == user_count]
+                    categories = list(dict.fromkeys(plan_category(p) for p in selected))
+                    if step == "category":
+                        title = "📂 <b>دسته‌بندی پلن تمدید</b>\n\nدسته‌بندی را انتخاب کنید:"
+                        for i, name in enumerate(categories):
+                            rows.append([InlineKeyboardButton(
+                                text=f"{category_icon(name, i)} {name}".strip(),
+                                callback_data=f"subimprcat:{sub_id}:{type_index}:{user_count}:{i}",
+                            )])
+                        back = f"subimprtype:{sub_id}:{type_index}"
+                    elif step == "plans":
+                        if category_index is None or not 0 <= category_index < len(categories):
+                            raise ValueError("دسته‌بندی دیگر در دسترس نیست")
+                        matching = [p for p in selected if plan_category(p) == categories[category_index]]
+                        start = max(0, page) * 12
+                        if start >= len(matching):
+                            raise ValueError("صفحه پلن معتبر نیست")
+                        title = (
+                            "♻️ <b>انتخاب پلن تمدید</b>\n"
+                            f"📂 {escape(categories[category_index])} | "
+                            f"{'نامحدود' if user_count == 0 else str(user_count)} کاربر\n\n"
+                            "حجم و اعتبار پس از تأیید پرداخت به همین اکانت افزوده می‌شود."
+                        )
+                        for p in matching[start:start + 12]:
+                            rows.append([InlineKeyboardButton(
+                                text=(f"{p['name']} | {p['duration_days']} روز | "
+                                      f"{p['traffic_gb']}GB | {int(p['price_toman']):,} تومان")[:64],
+                                callback_data=f"subimprenewplan:{sub_id}:{int(p['id'])}",
+                            )])
+                        navigation = []
+                        if page > 0:
+                            navigation.append(InlineKeyboardButton(
+                                text="⬅️ قبلی",
+                                callback_data=f"subimprpage:{sub_id}:{type_index}:{user_count}:{category_index}:{page-1}",
+                            ))
+                        if start + 12 < len(matching):
+                            navigation.append(InlineKeyboardButton(
+                                text="بعدی ➡️",
+                                callback_data=f"subimprpage:{sub_id}:{type_index}:{user_count}:{category_index}:{page+1}",
+                            ))
+                        if navigation:
+                            rows.append(navigation)
+                        back = f"subimprusers:{sub_id}:{type_index}:{user_count}"
+                    else:
+                        raise ValueError("مرحله انتخاب پلن معتبر نیست")
+            rows.append([InlineKeyboardButton(text="⬅️ بازگشت", callback_data=back)])
+            await callback.message.edit_text(
+                title, reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
+            )
+        except Exception as exc:
+            await callback.message.answer("❌ " + escape(str(exc)[:160]))
+
     async def _show_imported_renewal(callback, sub_id, info=None, selected_plan_id=None):
         await callback.answer()
         try:
             info = info or await _read_import(callback, sub_id)
             if not info.get("can_paid_renew"):
                 raise ValueError("وضعیت اشتراک اجازه تمدید نمی‌دهد")
-            plan = info.get("renew_plan") or {}
-            if selected_plan_id or not plan:
-                plans = await request_fn("GET", "/v1/plans")
-                available = [
-                    item for item in (plans if isinstance(plans, list) else [])
-                    if item.get("is_active")
-                    and int(item.get("price_toman") or 0) > 0
-                    and int(item.get("duration_days") or 0) > 0
-                    and int(item.get("traffic_gb") or 0) > 0
-                ]
-                if selected_plan_id is not None:
-                    plan = next(
-                        (item for item in available if int(item["id"]) == selected_plan_id),
-                        None,
-                    )
-                    if not plan:
-                        raise ValueError("پلن انتخاب‌شده در دسترس نیست")
-                else:
-                    if not available:
-                        raise ValueError("هیچ پلن تمدید فعالی وجود ندارد")
-                    if callback.message:
-                        rows = [
-                            [InlineKeyboardButton(
-                                text=(f"{item['name']} | {item['duration_days']} روز"
-                                      f" | {item['traffic_gb']}GB | {int(item['price_toman']):,} تومان")[:64],
-                                callback_data=f"subimprenewplan:{sub_id}:{int(item['id'])}",
-                            )] for item in available[:40]
-                        ]
-                        rows.append([InlineKeyboardButton(
-                            text="⬅️ مدیریت اکانت", callback_data=f"subimp:{sub_id}",
-                        )])
-                        await callback.message.edit_text(
-                            "♻️ <b>انتخاب پلن تمدید</b>\n\n"
-                            "برای همین اکانت یک پلن انتخاب کنید. "
-                            "حجم و اعتبار پس از پرداخت به همان اشتراک افزوده می‌شود.",
-                            reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
-                        )
-                    return
+            if selected_plan_id is None:
+                await _show_renewal_step(callback, sub_id)
+                return
+            plans = await _renewal_catalog(callback, sub_id)
+            plan = next(
+                (item for item in plans if int(item["id"]) == selected_plan_id),
+                None,
+            )
+            if not plan:
+                raise ValueError("پلن انتخاب‌شده در دسترس نیست")
         except Exception as exc:
             if callback.message:
                 await callback.message.answer("❌ " + escape(str(exc)[:160]))
@@ -275,6 +355,44 @@ def install(router, request_fn):
     async def import_renewal_start(callback: CallbackQuery):
         sub_id = int((callback.data or "").rsplit(":", 1)[-1])
         await _show_imported_renewal(callback, sub_id)
+
+    @router.callback_query(F.data.startswith("subimprtype:"))
+    async def import_renewal_type(callback: CallbackQuery):
+        await callback.answer()
+        try:
+            _, sub, type_id = (callback.data or "").split(":")
+            await _show_renewal_step(callback, int(sub), "users", int(type_id))
+        except (TypeError, ValueError):
+            await callback.message.answer("❌ نوع اشتراک نامعتبر است")
+
+    @router.callback_query(F.data.startswith("subimprusers:"))
+    async def import_renewal_users(callback: CallbackQuery):
+        await callback.answer()
+        try:
+            _, sub, type_id, users = (callback.data or "").split(":")
+            await _show_renewal_step(callback, int(sub), "category", int(type_id), int(users))
+        except (TypeError, ValueError):
+            await callback.message.answer("❌ تعداد کاربر نامعتبر است")
+
+    @router.callback_query(F.data.startswith("subimprcat:"))
+    async def import_renewal_category(callback: CallbackQuery):
+        await callback.answer()
+        try:
+            _, sub, type_id, users, cat = (callback.data or "").split(":")
+            await _show_renewal_step(callback, int(sub), "plans",
+                                     int(type_id), int(users), int(cat))
+        except (TypeError, ValueError):
+            await callback.message.answer("❌ دسته‌بندی نامعتبر است")
+
+    @router.callback_query(F.data.startswith("subimprpage:"))
+    async def import_renewal_page(callback: CallbackQuery):
+        await callback.answer()
+        try:
+            _, sub, type_id, users, cat, page = (callback.data or "").split(":")
+            await _show_renewal_step(callback, int(sub), "plans",
+                                     int(type_id), int(users), int(cat), int(page))
+        except (TypeError, ValueError):
+            await callback.message.answer("❌ صفحه پلن نامعتبر است")
 
     @router.callback_query(F.data.startswith("subimprenewplan:"))
     async def import_renewal_plan(callback: CallbackQuery):
