@@ -14,3 +14,18 @@
 .guideMedia{display:grid;gap:15px;align-content:start;justify-items:center}
 .guideMedia img{max-width:100%;max-height:370px;object-fit:contain;background:#070d1d;border:1px solid #ffffff18;border-radius:18px;padding:12px}
 @media(max-width:760px){.customHeroImage{height:300px}.guideDetails{grid-template-columns:1fr}.guideWorkbench{padding:15px}.guideControls label{flex:1 1 170px}}
+
+/* Template 4 must never be cropped by older global storefront rules. */
+.root{position:relative;isolation:isolate;width:100%;max-width:100%;overflow-x:clip;min-width:0}
+.root .main{box-sizing:border-box;max-width:1260px;width:calc(100% - 48px);min-width:0;margin-inline:auto}
+.root .header{max-width:100%;min-width:0}
+.root .header .nav{min-width:0;justify-content:center}
+.root .heroCopy,.root .heroVisual,.root .plan,.root .features article,.root .protocols article{min-width:0}
+.root .protocols .protocolLink{display:block;background:linear-gradient(145deg,#151c34,#0d1429);border:1px solid #ffffff16;border-radius:21px;padding:25px;transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease}
+.root .protocols .protocolLink:hover{transform:translateY(-6px);border-color:#8d77ff88;box-shadow:0 20px 50px #442cb022}
+.root .protocols .protocolLink>span{font-size:27px;color:#8ee3ff}
+.root .protocols .protocolLink h3{font-size:17px;margin:16px 0 10px}
+.root .protocols .protocolLink p{font-size:13px;color:#aab7d1;line-height:1.9}
+@media(max-width:1100px){.root .header{gap:12px}.root .nav{gap:10px}.root .nav a{font-size:12px}}
+@media(max-width:850px){.root .mobileButton{display:block}.root .nav{display:none}.root .navOpen{position:absolute;display:flex;flex-direction:column;top:100%;left:0;right:0;background:#0b1225;padding:15px 22px;z-index:100;box-shadow:0 20px 45px #0008}.root .navOpen a{padding:11px 7px}.root .main{width:calc(100% - 28px)}}
+@media(max-width:420px){.root .header{padding:12px 10px}.root .brand{font-size:15px}.root .brand img{width:32px;height:32px}.root .account{padding:9px;font-size:11px}.root .hero h1{font-size:clamp(29px,9vw,38px)}}
