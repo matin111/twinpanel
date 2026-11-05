@@ -93,9 +93,28 @@ def _resolve_internal_api_base() -> str:
     ).rstrip("/")
 
 
-def _install_internal_api_resilience() -> None:
+def _install_internal_api_resilience(client: httpx.AsyncClient) -> None:
     runtime.API_BASE = _resolve_internal_api_base()
-    original_request = runtime.request
+
+    async def pooled_request(method, path, *, token=None, bot_auth=False, payload=None):
+        headers = {}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        if bot_auth:
+            headers["X-Telegram-Bot-Secret"] = runtime.BOT_SECRET
+        response = await client.request(
+            method, runtime.API_BASE + path, headers=headers, json=payload,
+        )
+        try:
+            data = response.json()
+        except ValueError:
+            data = {}
+        if response.status_code >= 400:
+            detail = data.get("detail") if isinstance(data, dict) else None
+            raise RuntimeError(str(detail or "خطای پنل"))
+        return data
+
+    original_request = pooled_request
 
     async def resilient_request(
         method,
@@ -232,10 +251,16 @@ async def main() -> None:
     # every router included by runtime.main(), not just runtime.router.
     runtime.Bot = TextAwareBot
     runtime.Dispatcher = MembershipAwareDispatcher
-    _install_internal_api_resilience()
-    _install_button_styles()
-    _install_fast_notification_poll()
-    await runtime.main()
+    # Reuse a single internal-API connection pool instead of opening a new
+    # TCP/httpx client for every menu click, subscription lookup or payment.
+    # Scope it to the bot runtime and close it cleanly on shutdown.
+    limits = httpx.Limits(max_connections=30, max_keepalive_connections=15,
+                          keepalive_expiry=30.0)
+    async with httpx.AsyncClient(timeout=20.0, limits=limits, trust_env=False) as client:
+        _install_internal_api_resilience(client)
+        _install_button_styles()
+        _install_fast_notification_poll()
+        await runtime.main()
 
 
 if __name__ == "__main__":
