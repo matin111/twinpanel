@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.578",
-  "source_sha": "35350a6d784ffdd076eae07b5df6a745014989aa",
+  "version": "1.1.0-rc.579",
+  "source_sha": "9ce40012853d90ae36a423bccf82e107cbb44ce4",
   "notes": {
-    "fa": "رفع دکمه برگشت ربات تلگرام پس از rc.577: جلوگیری از حلقه خودارجاع shop:list در اولین صفحه خرید، برگشت صحیح به منوی اصلی، جلوگیری از دکمه بازگشت تکراری در پیام QR با دکمه مدیریت اکانت، پاسخ فوری به Callback و مدیریت امن پیام تغییریافته یا تکراری. ۱۱ تست CI اصلاح موفق.",
-    "en": "Telegram Back hotfix: correct first purchase screen's auto Back parent to main:home instead of shop:list self-loop; respect explicit QR account-management Back; acknowledge root shop callback before API; handle Telegram message-is-not-modified safely. Eleven feature CI checks passed."
+    "fa": "بهبود ناوبری ربات تلگرام: حذف دکمه برگشت ساختگی از صفحات اصلی بدون والد مانند اشتراک‌های من و کیف پول؛ حفظ دکمه برگشت در مراحل واقعی چندصفحه‌ای و حفظ منوی اصلی. رفع خطای message is not modified هنگام بروزرسانی کیف پول با پاسخ فوری به کلیک و ویرایش امن پیام. بدون تغییر موجودی کیف پول یا پرداخت‌ها. ۹ تست CI موفق.",
+    "en": "Telegram: remove automatically guessed Back buttons from root pages such as My Subscriptions and Wallet; preserve screen-owned Back and Home. Fix wallet refresh callback with immediate acknowledgement and idempotent editing so Telegram message-is-not-modified does not cause a popup. No payment or wallet balance changes. Nine feature CI checks passed."
   }
 }
