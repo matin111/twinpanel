@@ -14,6 +14,7 @@ class Stub:
     scope="main"
     _navigation_back=staticmethod(lambda text,scope:"main:home")
     _add_navigation=namespace["_add_navigation"]
+    _is_verified_admin_chat=staticmethod(lambda chat_id: False)
 stub=Stub()
 home_callbacks=["shop:list","trial:claim","main:dashboard","subs:list","wallet:refresh"]
 home=SendMessage(chat_id=123,text="خوش آمدید",reply_markup=InlineKeyboardMarkup(inline_keyboard=[
