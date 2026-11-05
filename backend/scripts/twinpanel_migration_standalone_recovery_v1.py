@@ -136,7 +136,10 @@ async def run() -> int:
         STATE_FILE.write_text(json.dumps(state))
 
         print("STANDALONE_WORK",{"protocol":PROTOCOL,"ids":ids},flush=True)
-        # Replace the full all-node quota snapshot rebuild with only the new\n        # QuotaDevice registration; canonical API exports stay authoritative.\n        lockfix._sync_repaired_quota_in_thread=sync_target_quota_device\n        orig=legacy._selected_modern_protocols
+        # Register only the new QuotaDevice; full node quota exports are
+        # generated on demand by the API and accounting service.
+        lockfix._sync_repaired_quota_in_thread = sync_target_quota_device
+        orig = legacy._selected_modern_protocols
         # This worker is a separate process. Restrict the existing audited
         # reconciliation/PG advisory lock path to the desired protocol only.
         legacy._selected_modern_protocols=lambda db, sid: [p for p in orig(db,sid) if p==PROTOCOL]
