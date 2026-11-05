@@ -22,6 +22,7 @@ from .protocol_account_registry import (
     replace_plan_protocols,
 )
 from .reseller_owned_plan_models import ResellerBotPlan
+from .reseller_tier_policy import tier_entitlements, allowed_nodes, reseller_tier
 from .services.subscription_factory import create_subscription_core
 from .services.reseller_traffic_pool import _suspend_reseller_pool
 
@@ -213,10 +214,12 @@ def create_owned_plan(
         enable_l2tp=enable_l2tp,
         enable_v2ray=enable_v2ray,
     )
+    permitted = set(tier_entitlements(db, reseller_tier(reseller))["protocols"])
+    desired_protocols = [p for p in desired_protocols if p in permitted]
     if not desired_protocols:
         raise HTTPException(
             status_code=422,
-            detail="حداقل یک پروتکل باید فعال باشد",
+            detail="هیچ پروتکل مجازی برای این نوع نمایندگی باقی نمانده است",
         )
 
     internal_name = (
@@ -297,16 +300,20 @@ def sync_owned_plan_backing(
     backing.enable_l2tp = bool(row.enable_l2tp)
     backing.enable_v2ray = bool(row.enable_v2ray)
 
+    reseller = db.get(Reseller, int(row.reseller_id))
+    if reseller is None:
+        raise HTTPException(status_code=404, detail="نماینده پیدا نشد")
+    permitted = set(tier_entitlements(db, reseller_tier(reseller))["protocols"])
     replace_plan_protocols(
         db,
         int(backing.id),
-        _desired_protocols_from_flags(
+        [p for p in _desired_protocols_from_flags(
             enable_cisco=bool(row.enable_cisco),
             enable_openvpn=bool(row.enable_openvpn),
             enable_wireguard=bool(row.enable_wireguard),
             enable_l2tp=bool(row.enable_l2tp),
             enable_v2ray=bool(row.enable_v2ray),
-        ),
+        ) if p in permitted],
     )
 
     price = _compat_price(
@@ -397,7 +404,9 @@ def create_subscription_from_owned_plan(
     if not reseller_plan.is_active or not backing.is_active:
         raise HTTPException(status_code=409, detail="پلن نماینده غیرفعال است")
 
-    protocols = enabled_protocols(reseller_plan, db=db)
+    selected_protocols = enabled_protocols(reseller_plan, db=db)
+    permitted = set(tier_entitlements(db, reseller_tier(reseller))["protocols"])
+    protocols = [p for p in selected_protocols if p in permitted]
     if not protocols:
         raise HTTPException(
             status_code=422,
@@ -415,7 +424,7 @@ def create_subscription_from_owned_plan(
             plan_id=int(backing.id),
             traffic_bytes=int(reseller_plan.traffic_gb) * GB,
             duration_days=int(reseller_plan.duration_days),
-            node_ids=[int(x) for x in (node_ids or [])],
+            node_ids=allowed_nodes(db, reseller, node_ids),
             protocols=protocols,
             username=(str(username).strip() if username else None),
             password=(str(password).strip() if password else None),
