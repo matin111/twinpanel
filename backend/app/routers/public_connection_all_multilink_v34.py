@@ -24,7 +24,7 @@ from .public_connection_modern_names_v14 import (
     _profile_name,
 )
 from .public_connection_modern_delivery_v16 import _resolve_delivery_content
-from .public_connection_multilink_v7 import _subscription_and_payload, _v2ray_items
+from .public_connection_multilink_v7 import _subscription_and_payload, _v2ray_items, _subscription_content
 from .. import xray_public_delivery_runtime as xray_delivery
 
 
@@ -460,6 +460,18 @@ def public_protocol_multi_meta_v34(
     db: Session = Depends(get_db),
 ):
     protocol = _normalize(protocol)
+    if protocol == "v2ray":
+        # One canonical feed for /sub, /multi/v2ray and metadata.
+        _content, server_count, count = _subscription_content(token, db)
+        sub = _subscription_from_share_token(token, db)
+        kind = "uri"
+        return JSONResponse(
+            {"protocol": protocol, "title": PROTOCOL_TITLES[protocol],
+             "kind": kind, "node_count": count, "server_count": server_count,
+             "client": PROTOCOL_CLIENT.get(protocol),
+             "can_copy_as_subscription": True, "is_bundle": False},
+            headers=_headers(sub, protocol, kind, count),
+        )
     kind, count, sub, _items_list, _payload = _delivery(token, protocol, db)
     return JSONResponse(
         {
@@ -483,6 +495,16 @@ def public_protocol_multi_v34(
     db: Session = Depends(get_db),
 ):
     protocol = _normalize(protocol)
+    if protocol == "v2ray":
+        content, server_count, count = _subscription_content(token, db)
+        sub = _subscription_from_share_token(token, db)
+        headers = _headers(sub, protocol, "uri", count)
+        headers["X-TwinPanel-Server-Count"] = str(server_count)
+        headers["X-TwinPanel-Profile-Count"] = str(count)
+        headers["Content-Disposition"] = (
+            f'inline; filename="{_safe_name(_multilink_name(sub, protocol), "user-vpn")}-subscription.txt"'
+        )
+        return Response(content=content, media_type="text/plain; charset=utf-8", headers=headers)
     kind, count, sub, items, payload = _delivery(token, protocol, db)
     headers = _headers(sub, protocol, kind, count)
 
