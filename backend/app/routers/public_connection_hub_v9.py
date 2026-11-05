@@ -325,9 +325,20 @@ _V9_SCRIPT_TEMPLATE = r"""
         const filename=safeName(download.dataset.filename,key+'-'+(index+1)+'.'+extension);
         const url=fileUrl(key,index);
         const dl=actionLink('download','دانلود فایل واقعی',url);dl.download=filename;
-        const phone=actionButton('phone',key==='openvpn'?'باز کردن با OpenVPN Connect':'باز کردن با WireGuard');
-        phone.addEventListener('click',()=>sendRealFile(url,filename,key));
-        row.append(dl,phone);
+        if(key==='openvpn'){
+          // OpenVPN Connect's documented profile-import URL scheme.
+          // It fetches the existing HTTPS .ovpn endpoint directly; unlike
+          // navigator.share, this does not depend on browser file sharing.
+          const profileUrl=new URL(url,location.href).href;
+          const importUrl='openvpn://import-profile/'+profileUrl;
+          const phone=actionLink('phone','وارد کردن مستقیم در OpenVPN Connect',importUrl);
+          phone.addEventListener('click',()=>notify('اگر برنامه باز نشد، فایل .ovpn را دانلود و از بخش Import File در OpenVPN Connect انتخاب کنید.'));
+          row.append(dl,phone);
+        }else{
+          const phone=actionButton('phone','باز کردن با WireGuard');
+          phone.addEventListener('click',()=>sendRealFile(url,filename,key));
+          row.append(dl,phone);
+        }
       }else if((key==='v2ray'||key==='xray')&&direct){
         const uri=direct.getAttribute('href')||'';
         const copy=actionButton('copy','کپی کانفیگ');copy.addEventListener('click',async()=>notify(await copyText(uri)?'کانفیگ کپی شد':'کپی انجام نشد'));
