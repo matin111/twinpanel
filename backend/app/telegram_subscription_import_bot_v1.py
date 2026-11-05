@@ -176,13 +176,14 @@ def install(router, request_fn):
 
     @router.callback_query(F.data.startswith("subimp:link:"))
     async def import_connection(callback: CallbackQuery):
+        await callback.answer()
         try:
             sub_id = int((callback.data or "").rsplit(":", 1)[-1])
             info = await _read_import(callback, sub_id)
         except Exception as exc:
-            await callback.answer(str(exc)[:180], show_alert=True)
+            if callback.message:
+                await callback.message.answer("❌ دریافت لینک اتصال ناموفق بود: " + escape(str(exc)[:150]))
             return
-        await callback.answer()
         if callback.message:
             from .telegram_subscription_qr_v1 import send_subscription_link_and_qr
             await send_subscription_link_and_qr(
