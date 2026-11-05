@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.584",
-  "source_sha": "58836572423cc48f4fa00e7006a7cb2846d83864",
+  "version": "1.1.0-rc.585",
+  "source_sha": "165b25a786ea07e54861cb518d096ffa9d53b800",
   "notes": {
-    "fa": "تکمیل راهنمای تمام پروتکل‌ها با تأکید بر برنامه مخصوص هر پروتکل داخل ساب‌لینک؛ اصلاح فاصله و حاشیه سکشن‌های داخلی راست‌چین؛ توضیح کاربرد IP ثابت برای ترید مجاز و مدیریت پیج‌های مهم اینستاگرام.",
-    "en": "Highlight protocol-specific app recommendations inside each subscription link across all guides; fix RTL inner hero edge spacing; explain static IP use for compliant trading and business Instagram accounts."
+    "fa": "بازطراحی کامل صفحه اصلی قالب چهار با تصویر اختصاصی سرورها، انیمیشن، خرید سریع واقعی و کارت‌های جدید؛ معرفی دو پنل نمایندگی اقتصادی و ویژه؛ اصلاح مجوز کش Next.js در آپدیتر.",
+    "en": "Premium Nova Template 4 homepage with original server illustration, animated benefits, dynamic quick purchase and featured plans, economic and special reseller tiers, and updater Next.js cache permission fix."
   }
 }
