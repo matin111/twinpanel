@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="660" viewBox="0 0 920 660" fill="none" role="img" aria-labelledby="title desc">
+<title id="title">سرورهای شبکه جهانی متین VPN</title><desc id="desc">تصویر گرافیکی سرورهای درخشان، کره زمین و سپر محافظ بنفش</desc>
+<defs>
+<radialGradient id="back"><stop stop-color="#7554ff" stop-opacity=".52"/><stop offset=".6" stop-color="#42208a" stop-opacity=".12"/><stop offset="1" stop-color="#090e25" stop-opacity="0"/></radialGradient>
+<linearGradient id="tower" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3e62ae"/><stop offset=".42" stop-color="#151a44"/><stop offset="1" stop-color="#080b25"/></linearGradient>
+<linearGradient id="shield" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e7b7ff"/><stop offset=".25" stop-color="#ad64f7"/><stop offset=".7" stop-color="#6531d2"/><stop offset="1" stop-color="#4820ad"/></linearGradient>
+<linearGradient id="beam" x1="0" x2="1"><stop stop-color="#5bd7ff" stop-opacity="0"/><stop offset=".5" stop-color="#ad69ff"/><stop offset="1" stop-color="#5bd7ff" stop-opacity="0"/></linearGradient>
+<filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="11"/></filter>
+<filter id="smallGlow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="4"/></filter>
+<pattern id="dots" patternUnits="userSpaceOnUse" width="18" height="18"><circle cx="8" cy="8" r="1.45" fill="#aa89ff" opacity=".65"/></pattern>
+</defs>
+<ellipse cx="476" cy="310" rx="402" ry="306" fill="url(#back)"/>
+<circle cx="486" cy="272" r="240" stroke="#8956e7" stroke-opacity=".36" stroke-width="2"/>
+<circle cx="486" cy="272" r="211" fill="#27145b" fill-opacity=".28" stroke="#ac75ff" stroke-opacity=".24"/>
+<circle cx="486" cy="272" r="204" fill="url(#dots)" opacity=".55"/>
+<g stroke="#b084ff" stroke-opacity=".3"><ellipse cx="486" cy="272" rx="99" ry="211"/><ellipse cx="486" cy="272" rx="171" ry="211"/><path d="M280 272H692M310 184H662M310 362H662"/></g>
+<ellipse cx="475" cy="325" rx="405" ry="125" stroke="#a261ff" stroke-width="4" transform="rotate(-16 475 325)" opacity=".9"/>
+<ellipse cx="475" cy="325" rx="405" ry="125" stroke="#b75dff" stroke-width="19" transform="rotate(-16 475 325)" opacity=".38" filter="url(#glow)"/>
+<path d="M76 502c152-91 284-89 428-36 132 49 264 41 342-9" stroke="url(#beam)" stroke-width="5"/>
+<g transform="translate(160 400)"><ellipse cx="325" cy="165" rx="285" ry="58" fill="#9c56ff" opacity=".38" filter="url(#glow)"/><ellipse cx="325" cy="147" rx="276" ry="61" fill="#141a45" stroke="#9467ff" stroke-width="7"/><ellipse cx="325" cy="138" rx="256" ry="48" fill="#252655" stroke="#b57aff" stroke-width="2"/><ellipse cx="325" cy="161" rx="237" ry="34" fill="#a576ff" opacity=".16"/></g>
+<g transform="translate(270 180)"><rect width="157" height="311" rx="16" fill="url(#tower)" stroke="#6483d7" stroke-width="3"/><rect x="18" y="29" width="120" height="42" rx="9" fill="#0c1637" stroke="#6847b8"/><rect x="18" y="87" width="120" height="42" rx="9" fill="#0c1637" stroke="#6847b8"/><rect x="18" y="145" width="120" height="42" rx="9" fill="#0c1637" stroke="#6847b8"/><rect x="18" y="203" width="120" height="42" rx="9" fill="#0c1637" stroke="#6847b8"/><rect x="18" y="261" width="120" height="29" rx="8" fill="#0c1637" stroke="#6847b8"/>
+<g fill="#67e2ff"><rect x="32" y="45" width="62" height="6" rx="3"/><rect x="32" y="103" width="62" height="6" rx="3"/><rect x="32" y="161" width="62" height="6" rx="3"/><rect x="32" y="219" width="62" height="6" rx="3"/><rect x="32" y="273" width="62" height="5" rx="2"/></g>
+<g fill="#b88aff"><circle cx="118" cy="50" r="5"/><circle cx="118" cy="108" r="5"/><circle cx="118" cy="166" r="5"/><circle cx="118" cy="224" r="5"/></g></g>
+<g transform="translate(431 130)"><rect width="159" height="350" rx="18" fill="url(#tower)" stroke="#8f7df0" stroke-width="3"/><rect x="15" y="25" width="128" height="48" rx="9" fill="#0b1537" stroke="#6a54c2"/><rect x="15" y="91" width="128" height="48" rx="9" fill="#0b1537" stroke="#6a54c2"/><rect x="15" y="157" width="128" height="48" rx="9" fill="#0b1537" stroke="#6a54c2"/><rect x="15" y="223" width="128" height="48" rx="9" fill="#0b1537" stroke="#6a54c2"/><rect x="15" y="289" width="128" height="43" rx="9" fill="#0b1537" stroke="#6a54c2"/>
+<g fill="#61d9ff"><rect x="33" y="44" width="67" height="7" rx="3"/><rect x="33" y="110" width="67" height="7" rx="3"/><rect x="33" y="176" width="67" height="7" rx="3"/><rect x="33" y="242" width="67" height="7" rx="3"/><rect x="33" y="306" width="67" height="7" rx="3"/></g><g fill="#bb8bfa"><circle cx="120" cy="49" r="5"/><circle cx="120" cy="115" r="5"/><circle cx="120" cy="181" r="5"/><circle cx="120" cy="247" r="5"/><circle cx="120" cy="311" r="5"/></g></g>
+<g transform="translate(594 223)"><rect width="129" height="270" rx="17" fill="url(#tower)" stroke="#6974d8" stroke-width="3"/><g fill="#11183c" stroke="#6550aa"><rect x="15" y="26" width="99" height="45" rx="8"/><rect x="15" y="86" width="99" height="45" rx="8"/><rect x="15" y="146" width="99" height="45" rx="8"/><rect x="15" y="206" width="99" height="45" rx="8"/></g><g fill="#63ddff"><path d="M30 46h55v6H30zm0 60h55v6H30zm0 60h55v6H30zm0 60h55v6H30z"/></g></g>
+<path d="M475 245l121 46-11 145c-17 67-61 103-110 129-59-27-103-69-121-129l-11-145 132-46z" fill="#9854ff" opacity=".5" filter="url(#glow)"/>
+<path d="M475 225l123 46-13 162c-20 66-61 104-110 131-53-27-102-66-121-131l-12-162 133-46z" fill="url(#shield)" stroke="#e9c5ff" stroke-width="8"/>
+<path d="M475 245l101 39-10 145c-16 48-49 83-91 108-42-25-76-60-91-108l-10-145 101-39z" fill="#311174" stroke="#b883ff" stroke-width="3"/>
+<path d="M423 385l31 28 70-85" stroke="#f4e5ff" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+<g fill="#a9efff"><circle cx="220" cy="194" r="7"/><circle cx="729" cy="129" r="7"/><circle cx="773" cy="370" r="6"/><circle cx="152" cy="330" r="5"/></g>
+<g fill="#a9efff" opacity=".65" filter="url(#smallGlow)"><circle cx="220" cy="194" r="18"/><circle cx="729" cy="129" r="17"/><circle cx="773" cy="370" r="17"/></g>
+</svg>
