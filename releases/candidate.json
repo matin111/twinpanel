@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.577",
-  "source_sha": "cd35eb15bab56285e645c061b9da182bfbd464a6",
+  "version": "1.1.0-rc.578",
+  "source_sha": "35350a6d784ffdd076eae07b5df6a745014989aa",
   "notes": {
-    "fa": "رفع قطعی مسیرهای ناوبری ربات تلگرام: اتصال واقعی دکمه منوی اصلی main:home، پاسخ فوری به کلیک‌های اکانت‌های من و مدیریت اکانت/QR پیش از فراخوانی API، نمایش منوی متنی صحیح هنگام بازگشت از پیام عکس QR، ادامه ناوبری در صورت منقضی‌شدن Callback تلگرام. هیچ تغییری در پرداخت، تمدید، ساخت اشتراک یا دیتابیس کاربران ندارد. ۷ تست CI موفق.",
-    "en": "Telegram bot navigation hotfix: implement main:home callback, acknowledge account-list/detail/QR clicks before API, safely navigate from QR photo to text menus, and tolerate expired callback query IDs. No changes to payments, renewal or account database. All seven feature CI checks passed."
+    "fa": "رفع دکمه برگشت ربات تلگرام پس از rc.577: جلوگیری از حلقه خودارجاع shop:list در اولین صفحه خرید، برگشت صحیح به منوی اصلی، جلوگیری از دکمه بازگشت تکراری در پیام QR با دکمه مدیریت اکانت، پاسخ فوری به Callback و مدیریت امن پیام تغییریافته یا تکراری. ۱۱ تست CI اصلاح موفق.",
+    "en": "Telegram Back hotfix: correct first purchase screen's auto Back parent to main:home instead of shop:list self-loop; respect explicit QR account-management Back; acknowledge root shop callback before API; handle Telegram message-is-not-modified safely. Eleven feature CI checks passed."
   }
 }
