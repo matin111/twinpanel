@@ -75,7 +75,7 @@ from .outbound_performance_v268_guard import router as _outbound_performance_v26
 from .outbound_performance_v268 import router as _outbound_performance_v268_router
 from .telegram_account_link_lookup import router as _telegram_account_link_lookup_router
 from .telegram_subscription_import_v1 import router as _telegram_subscription_import_v1_router
-from .telegram_admin_ops_v1 import router as _telegram_admin_ops_v1_router
+from .telegram_admin_ops_v1 import router as _telegram_admin_ops_v1_router, admin_link_router as _telegram_admin_link_router
 from .telegram_membership_settings import router as _telegram_membership_settings_router
 from .subscription_create_fast_v1 import router as _subscription_create_fast_v1_router
 from . import reseller_bot_delivery_runtime_v2 as _reseller_bot_delivery_runtime_v2  # noqa: F401
@@ -115,6 +115,7 @@ _runtime_endpoints.router.include_router(_publish_node_all_users_v1_router)
 _runtime_endpoints.router.include_router(_telegram_account_link_lookup_router)
 _runtime_endpoints.router.include_router(_telegram_subscription_import_v1_router)
 _runtime_endpoints.router.include_router(_telegram_admin_ops_v1_router)
+_runtime_endpoints.router.include_router(_telegram_admin_link_router)
 _runtime_endpoints.router.include_router(_telegram_membership_settings_router)
 _runtime_endpoints.router.include_router(_subscription_hard_delete_v1_router)
 _runtime_endpoints.router.include_router(_modern_enforcement_runtime_v1_router)
