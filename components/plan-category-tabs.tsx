@@ -14,6 +14,8 @@ type Props={
   onChange:(category:string)=>void;
   counts?:Record<string,number>;
   portalToStorePlans?:boolean;
+  portalTargetSelector?:string;
+  includeAll?:boolean;
   planTypes?:string[];
   activeType?:string;
   onTypeChange?:(type:string)=>void;
@@ -142,10 +144,11 @@ function buttonStyle(template:TemplateKind,selected:boolean):CSSProperties{
   };
 }
 
-function Tabs({categories,active,onChange,counts,template,planTypes:types,activeType,onTypeChange,typeCounts}:{categories:string[];active:string;onChange:(category:string)=>void;counts?:Record<string,number>;template:TemplateKind;planTypes?:string[];activeType?:string;onTypeChange?:(type:string)=>void;typeCounts?:Record<string,number>}){
+function Tabs({categories,active,onChange,counts,template,planTypes:types,activeType,onTypeChange,typeCounts,includeAll}:{categories:string[];active:string;onChange:(category:string)=>void;counts?:Record<string,number>;template:TemplateKind;planTypes?:string[];activeType?:string;onTypeChange?:(type:string)=>void;typeCounts?:Record<string,number>;includeAll?:boolean}){
   if(categories.length<=1&&(types?.length||0)<=1)return null;
   return <div data-plan-category-tabs="true" data-template={template} style={{display:"flex",flexDirection:"column",gap:16}}>
     {(types?.length||0)>1&&<div data-plan-type-tabs="true" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:12}}>
+      {includeAll&&<button type="button" aria-pressed={!activeType} onClick={()=>onTypeChange?.("")} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:9,minHeight:70,borderRadius:16,padding:"12px 15px",font:"inherit",fontWeight:800,fontSize:14,cursor:"pointer",color:"#eef0ff",border:!activeType?"1px solid #a18aff":"1px solid #7c88bd66",background:!activeType?"linear-gradient(115deg,#6e45d8,#37318c)":"#1a2440"}}><span aria-hidden="true">▦</span> همه سرویس‌ها</button>}
       {types!.map((name,index)=>{
         const appearance=planTypeAppearance(name,index);
         const selected=name===activeType;
@@ -166,6 +169,7 @@ function Tabs({categories,active,onChange,counts,template,planTypes:types,active
       })}
     </div>}
     {categories.length>1&&<div data-plan-user-count-tabs="true" style={shellStyle(template)}>
+    {includeAll&&<button type="button" aria-pressed={!active} onClick={()=>onChange("")} style={buttonStyle(template,!active)}><span aria-hidden="true" style={{width:42,height:42,display:"grid",placeItems:"center",borderRadius:12,color:"#cfb8ff",background:"#754ff344",fontSize:23}}>▦</span><span style={{display:"flex",flexDirection:"column",gap:5,minWidth:0,flex:1}}><strong style={{fontSize:15}}>همه کاربران</strong><small style={{fontSize:11,opacity:.7}}>{Object.values(counts||{}).reduce((sum,count)=>sum+count,0).toLocaleString("fa-IR")} پلن موجود</small></span></button>}
     {categories.map((category,index)=>{
       const selected=category===active;
       const count=counts?.[category]??0;
@@ -202,13 +206,22 @@ export function PlanCategoryTabs(props:Props){
     if(!props.portalToStorePlans){setTarget(null);setTemplate("panel");return;}
     let frame=0;
     let mount:HTMLDivElement|null=null;
+    let ownMount=false;
     const locate=()=>{
+      if(props.portalTargetSelector){
+        const slot=document.querySelector<HTMLDivElement>(props.portalTargetSelector);
+        if(!slot){frame=window.requestAnimationFrame(locate);return;}
+        setTemplate("panel");
+        setTarget(slot);
+        return;
+      }
       const plans=document.querySelector("#plans");
       if(!plans){frame=window.requestAnimationFrame(locate);return;}
       setTemplate(detectTemplate(plans));
       const existing=plans.querySelector<HTMLDivElement>(":scope > [data-plan-category-mount='true']");
       mount=existing||document.createElement("div");
       if(!existing){
+        ownMount=true;
         mount.dataset.planCategoryMount="true";
         mount.style.width="100%";
         mount.style.gridColumn="1 / -1";
@@ -226,11 +239,11 @@ export function PlanCategoryTabs(props:Props){
     locate();
     return()=>{
       if(frame)window.cancelAnimationFrame(frame);
-      if(mount?.parentElement)mount.parentElement.removeChild(mount);
+      if(ownMount&&mount?.parentElement)mount.parentElement.removeChild(mount);
     };
-  },[props.portalToStorePlans,props.categories.join("|")]);
+  },[props.portalToStorePlans,props.portalTargetSelector,props.categories.join("|")]);
 
-  const tabs=<Tabs categories={props.categories} active={props.active} onChange={props.onChange} counts={props.counts} template={template} planTypes={props.planTypes} activeType={props.activeType} onTypeChange={props.onTypeChange} typeCounts={props.typeCounts}/>
+  const tabs=<Tabs categories={props.categories} active={props.active} onChange={props.onChange} counts={props.counts} template={template} planTypes={props.planTypes} activeType={props.activeType} onTypeChange={props.onTypeChange} typeCounts={props.typeCounts} includeAll={props.includeAll}/>
   if(props.portalToStorePlans)return target?createPortal(tabs,target):null;
   return tabs;
 }
