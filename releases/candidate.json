@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.594",
-  "source_sha": "0f2f670d4983d2476142152b4f6cabac88c7f99b",
+  "version": "1.1.0-rc.595",
+  "source_sha": "c79e5692682d8d0057297efdb8166b26c68ac24e",
   "notes": {
-    "fa": "نمایش تصویر شاخص در بالای عنوان کارت‌های بلاگ و بالای عنوان صفحه مقاله؛ طراحی واکنش‌گرا، تصویر جایگزین گرافیکی برای مطالب بدون عکس و حفظ محتوای موجود.",
-    "en": "Show uploaded cover images above article titles on blog listing cards and article pages, with responsive cards and decorative fallback."
+    "fa": "ویرایش دستی اشتراک با هر ۱۵ پروتکل و دکمه ساخت کانفیگ برای همان اشتراک؛ نگه‌داشتن ساخت خودکار انتقالی‌ها در حالت توقف عملیاتی و تمرکز بازیابی روی اکانت‌های جدید.",
+    "en": "Admin subscription editor supports all 15 protocols and explicit per-account manual provisioning; imported-account bulk backfill stays operationally paused while recent-account recovery remains enabled."
   }
 }
