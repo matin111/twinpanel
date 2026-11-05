@@ -64,4 +64,4 @@ def test_sub_and_qr_callbacks_acknowledge_before_slow_api():
         (imported, "import_connection"),
     ):
         body = ast.get_source_segment(src, _function(src, func_name))
-        assert body.index("await callback.answer()") < body.index("await _" if func_name == "import_connection" else "try:")
+        assert body.index("await callback.answer()") < body.index("try:")
