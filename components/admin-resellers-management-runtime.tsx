@@ -111,6 +111,9 @@ export function AdminResellersManagementRuntime(){
 
   const [createOpen,setCreateOpen]=useState(false);
   const [createDraft,setCreateDraft]=useState<CreateDraft>(emptyCreate);
+  const [packagesOpen,setPackagesOpen]=useState(false);
+  const [packages,setPackages]=useState<AnyRow[]>([]);
+  const [packageDraft,setPackageDraft]=useState({id:0,title:"",traffic_gb:10,price_toman:0,sort_order:100,is_active:true,reseller_tier:"economic_v2ray"});
 
   const [selectedId,setSelectedId]=useState<number|null>(null);
   const [selected,setSelected]=useState<AnyRow|null>(null);
@@ -306,7 +309,7 @@ export function AdminResellersManagementRuntime(){
   ):false;
 
   return <Shell active="/admin/resellers"><div className="page">
-    <div className="page-head"><div><h1>{pick("نمایندگی‌ها","Resellers")}</h1></div><div className="action-row"><button className="ghost" disabled={loading||busy} onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button><button className="primary" onClick={()=>setCreateOpen(value=>!value)}>＋ {pick("نماینده جدید","New reseller")}</button></div></div>
+    <div className="page-head"><div><h1>{pick("نمایندگی‌ها","Resellers")}</h1></div><div className="action-row"><button className="ghost" disabled={busy} onClick={()=>void openPackages()}>{pick("بسته‌های حجم","Traffic packages")}</button><button className="ghost" disabled={loading||busy} onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button><button className="primary" onClick={()=>setCreateOpen(value=>!value)}>＋ {pick("نماینده جدید","New reseller")}</button></div></div>
     <RuntimeMessage error={error} ok={ok}/>
 
     <div className="stats dashboard-stats">
@@ -322,6 +325,7 @@ export function AdminResellersManagementRuntime(){
         <label className="field"><span>{pick("ایمیل کاربر مالک","Owner user email")}</span><input required type="email" dir="ltr" value={createDraft.owner_email} onChange={event=>setCreateDraft(d=>({...d,owner_email:event.target.value}))}/></label>
         <label className="field"><span>{pick("نام نمایندگی","Reseller name")}</span><input value={createDraft.name} onChange={event=>setCreateDraft(d=>({...d,name:event.target.value}))}/></label>
         <label className="field"><span>{pick("کد نمایندگی","Reseller code")}</span><input dir="ltr" placeholder={pick("خالی = ساخت خودکار","Blank = auto generated")} value={createDraft.code} onChange={event=>setCreateDraft(d=>({...d,code:event.target.value}))}/></label>
+        <label className="field"><span>{pick("نوع نمایندگی (اجباری)","Reseller type (required)")}</span><select required value={createDraft.reseller_tier} onChange={event=>setCreateDraft(d=>({...d,reseller_tier:event.target.value}))}><option value="">{pick("انتخاب نوع","Choose type")}</option><option value="economic_v2ray">اقتصادی ویتوری</option><option value="premium_static_ip">ویژه آی‌پی ثابت</option></select></label>
         <label className="field"><span>{pick("حجم اولیه (GB)","Initial traffic (GB)")}</span><input type="number" min={0} step="0.01" value={createDraft.initial_traffic_gb} onChange={event=>setCreateDraft(d=>({...d,initial_traffic_gb:Number(event.target.value)}))}/></label>
       </div>
       <button className="primary" disabled={busy}>{pick("ساخت نماینده","Create reseller")}</button>
@@ -361,6 +365,7 @@ export function AdminResellersManagementRuntime(){
 
         {tab==="profile"&&<form onSubmit={saveManagement}>
           <div className="setting-grid">
+            <label className="field"><span>{pick("نوع نمایندگی حجمی","Volume reseller type")}</span><select required value={draft.reseller_tier} onChange={event=>setDraft(d=>({...d,reseller_tier:event.target.value}))}><option value="economic_v2ray">اقتصادی ویتوری</option><option value="premium_static_ip">ویژه آی‌پی ثابت</option></select></label>
             <label className="field"><span>{pick("نام نمایندگی","Reseller name")}</span><input required value={draft.name} onChange={event=>setDraft(d=>({...d,name:event.target.value}))}/></label>
             <label className="field"><span>{pick("کد نمایندگی","Reseller code")}</span><input required dir="ltr" value={draft.code} onChange={event=>setDraft(d=>({...d,code:event.target.value}))}/></label>
             <label className="field"><span>{pick("نام برند","Brand name")}</span><input value={draft.brand_name} onChange={event=>setDraft(d=>({...d,brand_name:event.target.value}))}/></label>
