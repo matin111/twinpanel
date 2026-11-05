@@ -66,6 +66,39 @@ def install_telegram_admin_ops(router, request_fn):
             reply_markup=_home(),
         )
 
+    @router.message(Command("adminlink"))
+    async def admin_link_command(message: Message, state: FSMContext):
+        if message.chat.type != "private":
+            return
+        await state.clear()
+        pieces = (message.text or "").strip().split(maxsplit=1)
+        code = pieces[1].strip() if len(pieces) == 2 else ""
+        try:
+            await message.delete()
+        except Exception:
+            pass
+        if not (25 <= len(code) <= 80):
+            await message.answer(
+                "کد اتصال را از صفحه تنظیمات ربات در پنل ادمین دریافت کنید. "
+                "سپس /adminlink و کد را در گفت‌وگوی خصوصی ارسال کنید."
+            )
+            return
+        try:
+            result = await request_fn(
+                "POST", "/v1/telegram/admin-ops/link",
+                bot_auth=True,
+                payload={"telegram_id": message.from_user.id, "code": code},
+            )
+            if not result.get("ok"):
+                raise ValueError("کد اتصال تأیید نشد")
+            await message.answer(
+                "✅ دسترسی ادمین تلگرام فعال شد. برای مدیریت /admin را بزنید."
+            )
+        except Exception as exc:
+            await message.answer(
+                "❌ اتصال انجام نشد: " + escape(str(exc)[:120])
+            )
+
     @router.message(Command("admin"))
     async def admin_command(message: Message, state: FSMContext):
         if message.chat.type != "private":
