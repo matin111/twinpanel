@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.580",
+  "version": "1.1.0-rc.581",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-05T02:14:59Z",
+  "released_at": "2026-11-05T02:32:28Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "0086e800e1cf2e0e2fd590d641592728d834ec1c",
+  "source_sha": "635d4595b7e05785561ea6143cf0a7e2520c6c33",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.580/twinpanel-1.1.0-rc.580-linux-x86_64.tar.gz",
-    "sha256": "2ff71632d7a308885ee089f0bc08bdeee17ff40d479d28f8cd8f1fc24598cd82",
-    "size_bytes": 28314092
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.581/twinpanel-1.1.0-rc.581-linux-x86_64.tar.gz",
+    "sha256": "2a90218278d64a0302e0cee2669f371adb921cff53742784b370696cc50cebaf",
+    "size_bytes": 28314651
   },
   "notes": {
-    "fa": "انتشار رسمی قابلیت ارسال مستقیم رسیدهای تأییدنشده به چت خصوصی ادمین با تصویر رسید، اطلاعات پرداخت و دکمه‌های تأیید و رد دومرحله‌ای؛ بررسی دوره‌ای، جلوگیری از اعلان تکراری و کنترل مجوز ادمین. اصلاح ماندگار در بسته GitHub به‌جای Patch موقت سرور.",
-    "en": "Official release of direct manual-receipt notifications to authorized Telegram admins with receipt attachment, payment details and two-step approve/reject buttons; periodic checks, deduplication and strict admin authorization. Persistent GitHub-built package instead of server hotfix."
+    "fa": "رفع نرسیدن رسید کارت‌به‌کارت و شارژ کیف پول به چت ادمین: اضافه‌شدن وضعیت pending_payment به صف اعلان، مهلت کوتاه ۲۰ثانیه‌ای بررسی خودکار، کنترل ۱۰ثانیه‌ای و ارسال عکس رسید با دکمه تأیید و رد، بدون تکرار.",
+    "en": "Fix direct Telegram admin delivery of card-to-card and wallet receipts stuck in pending_payment: include these states, preserve auto-verification priority with 20s grace, scan every 10s, and send receipt attachments with approve/reject buttons and dedupe."
   }
 }
