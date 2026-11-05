@@ -64,3 +64,20 @@ def test_invalid_token_does_not_make_request():
     with patch.object(module.urllib.request, "urlopen") as request:
         assert not module._v2ray_feed_canary(8095, "../../wrong")
         request.assert_not_called()
+
+
+def test_canary_subscription_id_not_secret_in_config():
+    module = _module()
+    with patch.object(module, "_lookup_v2ray_canary_token", return_value="private-token") as lookup:
+        with patch.object(module, "_v2ray_feed_canary", return_value=True) as check:
+            assert module._wait_for_v2ray_feed_canary_by_id(8095, "3768")
+            lookup.assert_called_once_with("3768")
+            check.assert_called_once_with(8095, "private-token")
+
+
+def test_invalid_subscription_id_is_rejected_before_database_access():
+    module = _module()
+    with patch.object(module, "sys") as sy:
+        assert module._lookup_v2ray_canary_token("../secret") is None
+        assert module._lookup_v2ray_canary_token("0") is None
+        sy.path.insert.assert_not_called()
