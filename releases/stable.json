@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.590",
+  "version": "1.1.0-rc.591",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-05T11:27:54Z",
+  "released_at": "2026-11-05T12:40:46Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9926426b24391a464300b1d1dc0c9958285cbe89",
+  "source_sha": "e8a87a1cd6243d2b47c557a05a5f34a0bbe4977b",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.590/twinpanel-1.1.0-rc.590-linux-x86_64.tar.gz",
-    "sha256": "c07d01fd1bbde648aab780d47261dd1feb6315e9d9af443191c3749e815212c2",
-    "size_bytes": 28714405
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.591/twinpanel-1.1.0-rc.591-linux-x86_64.tar.gz",
+    "sha256": "d0ad4e37d8397d09fb7ec332ca038704beba19049e9bb7f8b79a7aef011d775f",
+    "size_bytes": 28727438
   },
   "notes": {
-    "fa": "افزودن مدیریت بلاگ قالب چهارم به پنل ادمین: ایجاد، ویرایش، پیش‌نویس، انتشار و مخفی‌سازی مقاله با سئوی مستقل؛ اصلاح عنوان «اکانت تست» در سوالات متداول؛ محافظت از پیش‌نویس‌های منتشرنشده.",
-    "en": "Nova Template 4 blog admin: create, edit, draft, publish and hide articles, SEO metadata, private drafts and correct test-account wording."
+    "fa": "رفع به‌هم‌ریختگی صفحه مدیریت بلاگ قالب چهار: اصلاح تداخل سایدبار با CSS عمومی پنل، فرم ویرایش تمام‌عرض، نمایش درست لیست مقالات و بهبود موبایل.",
+    "en": "Fix Nova admin blog editor broken layout: isolate article list from global fixed aside styles, restore full width editing form and responsive columns."
   }
 }
