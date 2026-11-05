@@ -38,7 +38,7 @@ const tierLabel=(value:string)=>value==="economic_v2ray"?"اقتصادی ویت�
 const emptyManagement:ManagementDraft={
   name:"",code:"",brand_name:"",email:"",phone:"",support_text:"",
   credit_limit:0,traffic_credit_gb:0,owner_full_name:"",owner_password:"",
-  reseller_active:true,owner_active:true,
+  reseller_active:true,owner_active:true,reseller_tier:"premium_static_ip",
 };
 
 function text(row:AnyRow|undefined,...keys:string[]){
