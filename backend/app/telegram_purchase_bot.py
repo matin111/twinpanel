@@ -1048,11 +1048,11 @@ def create_purchase_router(
             callback_data=f"shop:wallet:back:{order_id}",
         )])
         await callback.message.edit_text(
-            "💰 <b>پرداخت از کیف پول</b>\\n\\n"
-            f"🧾 سفارش: <b>#{order_id}</b>\\n"
-            f"💳 موجودی: <b>{money(balance)} تومان</b>\\n"
-            f"🛒 مبلغ نهایی: <b>{money(amount)} تومان</b>\\n"
-            f"💵 مانده پس از خرید: <b>{money(max(0, balance-amount))} تومان</b>\\n\\n"
+            "💰 <b>پرداخت از کیف پول</b>\n\n"
+            f"🧾 سفارش: <b>#{order_id}</b>\n"
+            f"💳 موجودی: <b>{money(balance)} تومان</b>\n"
+            f"🛒 مبلغ نهایی: <b>{money(amount)} تومان</b>\n"
+            f"💵 مانده پس از خرید: <b>{money(max(0, balance-amount))} تومان</b>\n\n"
             + ("برای کسر مبلغ و ساخت اکانت تأیید کنید."
                if sufficient else "❌ موجودی کافی نیست؛ کیف پول را شارژ کنید."),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
@@ -1072,7 +1072,7 @@ def create_purchase_router(
             return
         await callback.answer()
         await callback.message.edit_text(
-            "💳 <b>انتخاب روش پرداخت</b>\\n\\nروش پرداخت را انتخاب کنید:",
+            "💳 <b>انتخاب روش پرداخت</b>\n\nروش پرداخت را انتخاب کنید:",
             reply_markup=payment_methods_keyboard(order_id, methods),
         )
 
@@ -1094,15 +1094,15 @@ def create_purchase_router(
         order = result.get("order") or {}
         if order.get("status") == "fulfilled":
             description = (
-                "✅ <b>پرداخت با کیف پول موفق بود</b>\\n\\n"
-                f"🧾 سفارش: <b>#{order_id}</b>\\n"
-                f"💰 مبلغ از کیف پول کسر شد.\\n"
+                "✅ <b>پرداخت با کیف پول موفق بود</b>\n\n"
+                f"🧾 سفارش: <b>#{order_id}</b>\n"
+                f"💰 مبلغ از کیف پول کسر شد.\n"
                 "🎉 اکانت ساخته شد؛ از بخش اشتراک‌های من دریافت کنید."
             )
         else:
             description = (
-                "✅ <b>پرداخت ثبت شد</b>\\n\\n"
-                f"🧾 سفارش: <b>#{order_id}</b>\\n"
+                "✅ <b>پرداخت ثبت شد</b>\n\n"
+                f"🧾 سفارش: <b>#{order_id}</b>\n"
                 "ساخت اکانت در حال تکمیل است. مبلغ دوباره کسر نمی‌شود."
             )
         await callback.message.edit_text(
