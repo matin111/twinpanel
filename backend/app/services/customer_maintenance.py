@@ -449,7 +449,7 @@ async def customer_maintenance_loop() -> None:
 
             if (
                 last_manual_receipt_push == 0.0
-                or now - last_manual_receipt_push >= 30.0
+                or now - last_manual_receipt_push >= 10.0
             ):
                 try:
                     pushed = await push_manual_receipts_once()
