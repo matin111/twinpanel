@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.592",
+  "version": "1.1.0-rc.593",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-05T13:21:11Z",
+  "released_at": "2026-11-05T16:21:18Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7752b4316097e87bcbeb355cf90a2c9eff4e4fb8",
+  "source_sha": "168358a285b1bce96880e0b049fcbc6607b4c403",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.592/twinpanel-1.1.0-rc.592-linux-x86_64.tar.gz",
-    "sha256": "4cfd189166052314b9d40abaa40d32e5bf54b1de0584499affedbc15ccc49769",
-    "size_bytes": 28784775
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.593/twinpanel-1.1.0-rc.593-linux-x86_64.tar.gz",
+    "sha256": "0c72785a4e9d7cd18d72b91368382fe1928e54becf74af32dbadbcd40dbb3a09",
+    "size_bytes": 28741412
   },
   "notes": {
-    "fa": "افزودن امکان آپلود تصویر شاخص و درج عکس بین پاراگراف‌های بلاگ قالب چهار؛ پیش‌نمایش و نمایش واکنش‌گرای تصاویر در مقاله؛ فایل‌های JPG، PNG و WebP تا ۸ مگابایت.",
-    "en": "Add uploaded cover and inline images for Nova blog articles, including previews and responsive rendering. Supports JPG/PNG/WebP, max 8 MB per image."
+    "fa": "افزودن پرداخت مستقیم خرید اشتراک از کیف پول در ربات اصلی: نمایش موجودی و مبلغ، تأیید دومرحله‌ای، کسر اتمیک و بدون تکرار، تحویل QR/لینک اکانت توسط Worker قابل بازیابی؛ جلوگیری از پرداخت تکراری روش‌های دیگر.",
+    "en": "Main Telegram bot subscription wallet checkout: balance/price preview, two-step confirmation, idempotent row-locked charge, durable recoverable fulfillment with subscription QR delivery, and prevention of concurrent external payment methods."
   }
 }
