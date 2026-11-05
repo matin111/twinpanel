@@ -514,23 +514,25 @@ def create_purchase_router(
         return plan
 
     async def load_payment_methods():
-        method_data = await request_fn(
-            "GET",
-            "/v1/payments/methods",
-        )
+        # External gateways are optional. A temporary failure in the payment
+        # methods API must not hide the independent wallet checkout button.
+        try:
+            method_data = await request_fn(
+                "GET",
+                "/v1/payments/methods",
+            )
+        except Exception:
+            return []
 
         methods = (
             method_data.get("methods")
-            if isinstance(
-                method_data,
-                dict,
-            )
+            if isinstance(method_data, dict)
             else []
         ) or []
 
-        # Wallet checkout is always a valid method even when external
-        # payment gateways are disabled.
-        return methods
+        # The wallet checkout button is appended by payment_methods_keyboard,
+        # even when no external payment method is available.
+        return methods if isinstance(methods, list) else []
 
     @router.message(
         F.text == "🛒 خرید اشتراک"
@@ -798,9 +800,6 @@ def create_purchase_router(
                 },
             )
 
-            methods = (
-                await load_payment_methods()
-            )
         except Exception as exc:
             await callback.answer(
                 str(exc),
