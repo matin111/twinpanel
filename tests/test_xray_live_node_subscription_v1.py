@@ -59,6 +59,26 @@ class LiveXrayUriTests(unittest.TestCase):
         query=dict(parse_qsl(urlsplit(result).query))
         self.assertEqual((query["sni"],query["path"],query["pbk"],query["sid"]),("new.example","/xhttp-validated","pub","short"))
 
+    def test_remote_xray_apply_script_parses_before_deployment(self):
+        admin_source = SOURCE.parent.parent / "xray_modern_admin.py"
+        admin_tree = ast.parse(admin_source.read_text(encoding="utf-8"))
+        script = next(
+            node.value.value for node in admin_tree.body
+            if isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name) and target.id == "_XRAY_REALITY_APPLY_SCRIPT" for target in node.targets)
+            and isinstance(node.value, ast.Constant)
+        )
+        for key, value in {
+            "__TARGET__": repr("example.org:443"),
+            "__NAME__": repr("example.org"),
+            "__WS_PATH__": repr("/ws-validated"),
+            "__XHTTP_PATH__": repr("/xhttp-validated"),
+            "__TCP_TLS_SNI__": repr("tls.example.org"),
+            "__WS_TLS_SNI__": repr("tls.example.org"),
+        }.items():
+            script = script.replace(key, value)
+        ast.parse(script)
+
     def test_connection_domain_alias_changes_host_not_credentials(self):
         raw="vless://uuid-example@old-ingress.example:24007?type=xhttp&security=reality&pbk=publickey&sid=shortid"
         updated=apply_uri(raw,{"inbound_applied":{"xhttp_reality":{"connection_domain":"alias.example"}}})
