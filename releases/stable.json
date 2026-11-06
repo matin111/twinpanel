@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.607",
+  "version": "1.1.0-rc.608",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T05:03:08Z",
+  "released_at": "2026-11-06T05:51:52Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d0094144df3d020a0eab3dae1df129243fcb5ac1",
+  "source_sha": "c18314021f26f5b122dc67f1dce2843fed9e8599",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.607/twinpanel-1.1.0-rc.607-linux-x86_64.tar.gz",
-    "sha256": "9a1c0f4aa6dd5da015ecd89e96f26d27d38184e25b6f10eb570de241e441646d",
-    "size_bytes": 28877323
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.608/twinpanel-1.1.0-rc.608-linux-x86_64.tar.gz",
+    "sha256": "b3f5b33aed27e872bf7298bbb003c06cc6f5c35c0cd44afd9bd4869a28bbd890",
+    "size_bytes": 28887497
   },
   "notes": {
-    "fa": "تکمیل ارتقای پایدار Agent همه نودها با نشانگر اجباری V140 و V258؛ رفع Offline اشتباه ناشی از هزاران بررسی تکی iptables و رفع گیرکردن نصب در virtualenv منتقل‌شده/عدم دسترسی PyPI. حفظ کامل SOCKS5 پروتکل شانزدهم، قابلیت‌های قبلی V2Ray، تونل‌ها و اصلاحات rc.606.",
-    "en": "Durable all-node Agent rollout requiring both V140 fast firewall snapshots and V258 active transport authority; installer uses venv python -m pip only when dependencies are missing, avoiding broken pip shebangs and unnecessary downloads. Preserves rc.606 SOCKS5 16th protocol and all existing features."
+    "fa": "حذف gRPC منسوخ از V2Ray/Xray؛ حذف ساخت Inbound و مسیر gRPC، حذف ساب‌لینک‌های gRPC قدیمی بدون ساخت مجدد کاربران، حفظ WS/TLS، XHTTP/REALITY و TCP/TLS، ابزار پاک‌سازی ایمن با بکاپ و بازگشت در صورت خطا برای نودهای موجود. حفظ تمام امکانات rc.607 از جمله SOCKS5 و اصلاح Agent.",
+    "en": "Remove retired V2Ray gRPC from new Xray listeners, routes, customer subscriptions, admin and profile requirements. Legacy gRPC URIs filtered without UUID rotation; safe backed-up validated cleanup for existing nodes. Preserve WS/TLS, XHTTP/REALITY, TCP/TLS, SOCKS5 and rc.607 Agent fixes."
   }
 }
