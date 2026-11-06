@@ -3,7 +3,7 @@
 
 Default is read-only. Only --apply can write credentials. Deliberately limited
 to one Exit + one protocol family, with bounded batches and API health gates.
-No Xray/V2Ray, no migrated-account global queue and no all-node restarts.
+V2Ray uses missing-only idempotent hot sync (never Xray restart); no global queue or all-node restarts.
 """
 from __future__ import annotations
 
