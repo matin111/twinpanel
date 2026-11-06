@@ -62,10 +62,8 @@ def eligible_count(db, node_id: int, protocol: str, subscription_id: int | None 
     now = datetime.utcnow()
     query = (
         db.query(func.count(func.distinct(Subscription.id)))
-        .join(MigrationImportRecord, MigrationImportRecord.subscription_id == Subscription.id)
         .join(SubscriptionNode, SubscriptionNode.subscription_id == Subscription.id)
         .filter(
-            MigrationImportRecord.source.in_(SOURCES),
             SubscriptionNode.node_id == node_id,
             Subscription.status == SubscriptionStatus.ACTIVE,
             or_(Subscription.expires_at.is_(None), Subscription.expires_at > now),
@@ -75,6 +73,14 @@ def eligible_count(db, node_id: int, protocol: str, subscription_id: int | None 
             ),
         )
     )
+    if protocol != "v2ray":
+        # Classic/standalone imported-account migration remains scoped.
+        # Xray hot-client repair also covers recent manual and bot users
+        # already entitled to the newly published Exit.
+        query = query.join(
+            MigrationImportRecord,
+            MigrationImportRecord.subscription_id == Subscription.id,
+        ).filter(MigrationImportRecord.source.in_(SOURCES))
     if subscription_id is not None:
         query = query.filter(Subscription.id == int(subscription_id))
     if protocol != "singbox":
