@@ -616,7 +616,7 @@ def _validated_editor_settings(payload: InboundEditorDraft) -> dict[str, str]:
         server_name = hostname(entry.get("server_name"))
         connection_domain = hostname(entry.get("connection_domain"))
         path = str(entry.get("path") or "").strip()
-        if path and (not path.startswith("/") or len(path) > 256 or any(c in path for c in "\\r\\n\\x00")):
+        if path and (not path.startswith("/") or len(path) > 256 or any(ord(char) < 32 for char in path)):
             raise HTTPException(status_code=422, detail=f"Invalid inbound path: {key}")
         target = str(entry.get("target") or "").strip().lower()
         if target:
