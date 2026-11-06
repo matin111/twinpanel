@@ -57,7 +57,7 @@ PROTOCOL_CATALOG: dict[str, dict[str, Any]] = {
         "tls": False,
         "recommended_for": ["browser", "proxy", "tcp"],
         "warnings": ["unencrypted_proxy_requires_authenticated_clients"],
-        "formats": {"share": True, "clash": False, "sing_box": True, "xray": False},
+        "formats": {"share": False, "clash": False, "sing_box": True, "xray": False},
         "platforms": ["android", "ios", "windows", "macos", "linux"],
         "presets": {
             "recommended": {"network": "tcp"},
