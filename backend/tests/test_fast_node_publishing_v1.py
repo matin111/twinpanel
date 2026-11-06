@@ -12,6 +12,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base
 from app.models import Node, NodeStatus, NodeType
+from app.node_auto_backfill_job_models_v1 import NodeAutoBackfillJobV1
+from app.services.node_auto_backfill_queue_v1 import job_status
 from app.routers.publish_node_all_users_v2 import publish_node_to_all_users_v2
 
 
@@ -24,7 +26,7 @@ class SetBasedPublishContracts(unittest.TestCase):
             "sqlite://", connect_args={"check_same_thread": False},
             poolclass=StaticPool,
         )
-        Base.metadata.create_all(self.engine, tables=[Node.__table__])
+        Base.metadata.create_all(self.engine, tables=[Node.__table__, NodeAutoBackfillJobV1.__table__])
         with self.engine.begin() as conn:
             conn.exec_driver_sql("""
                 CREATE TABLE subscriptions (
@@ -128,6 +130,12 @@ class SetBasedPublishContracts(unittest.TestCase):
         self.assertEqual(out["delivery_modes_enabled"], 1)
         self.assertEqual(out["public_plans_added"], 0)
         self.assertEqual(out["active_subscriptions_reconciled"], 0)
+        self.assertTrue(out["auto_backfill_queued"])
+        self.assertEqual(out["auto_backfill_state"], "queued")
+        self.assertEqual(job_status(self.db,101)["phase"], "singbox")
+        self.assertEqual(
+            self.scalar("SELECT COUNT(*) FROM node_auto_backfill_jobs_v1 WHERE node_id=101"),1,
+        )
         self.assertEqual(
             self.scalar("SELECT COUNT(*) FROM subscription_nodes WHERE node_id=101"), 2,
         )
@@ -146,6 +154,9 @@ class SetBasedPublishContracts(unittest.TestCase):
         self.assertEqual(out2["memberships_added"], 0)
         self.assertEqual(out2["delivery_modes_added"], 0)
         self.assertEqual(out2["public_plans_added"], 0)
+        self.assertEqual(
+            self.scalar("SELECT COUNT(*) FROM node_auto_backfill_jobs_v1 WHERE node_id=101"), 1,
+        )
         self.assertEqual(
             self.scalar("SELECT COUNT(*) FROM subscription_nodes WHERE node_id=101"), 2,
         )
