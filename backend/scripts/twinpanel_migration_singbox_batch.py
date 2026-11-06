@@ -40,7 +40,7 @@ def _status(value):
     return str(getattr(value, "value", value) or "").lower()
 
 
-def pending_for_node(db, node):
+def pending_for_node(db, node, *, subscription_id: int | None = None):
     live = {
         str(r.protocol)
         for r in db.query(NodeProtocolConfig).filter(
@@ -52,7 +52,7 @@ def pending_for_node(db, node):
     }
     if not live:
         return []
-    subscriptions = (
+    subscription_query = (
         db.query(Subscription)
         .join(MigrationImportRecord, MigrationImportRecord.subscription_id == Subscription.id)
         .join(SubscriptionNode, SubscriptionNode.subscription_id == Subscription.id)
@@ -63,9 +63,10 @@ def pending_for_node(db, node):
             or_(Subscription.traffic_limit_bytes <= 0, Subscription.traffic_used_bytes < Subscription.traffic_limit_bytes),
             SubscriptionNode.node_id == node.id,
         )
-        .order_by(Subscription.id.asc())
-        .all()
     )
+    if subscription_id is not None:
+        subscription_query = subscription_query.filter(Subscription.id == int(subscription_id))
+    subscriptions = subscription_query.order_by(Subscription.id.asc()).all()
     if not subscriptions:
         return []
     ids = [s.id for s in subscriptions]
@@ -115,7 +116,7 @@ def pending_for_node(db, node):
     return work
 
 
-async def run_one_node(node_id):
+async def run_one_node(node_id, *, subscription_id: int | None = None):
     db = SessionLocal()
     try:
         node = db.query(Node).filter(
@@ -126,7 +127,7 @@ async def run_one_node(node_id):
         ).first()
         if node is None:
             return 0
-        work = pending_for_node(db, node)
+        work = pending_for_node(db, node, subscription_id=subscription_id)
         if not work:
             return 0
         secrets = []
