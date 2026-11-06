@@ -28,7 +28,7 @@ MULTI_PROTOCOLS = (
 CANONICAL_PROTOCOLS = (
     "cisco", "openvpn", "wireguard", "l2tp", "v2ray",
     "hysteria2", "tuic", "anytls", "naive", "shadowtls",
-    "snell", "mieru", "trusttunnel", "amneziawg", "sudoku", "socks5",
+    "snell", "socks5", "mieru", "trusttunnel", "amneziawg", "sudoku",
 )
 
 
