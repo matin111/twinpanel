@@ -268,6 +268,10 @@ fi
 if [[ -f "$RELEASE_ROOT/deploy/systemd/twinpanel-backup.service" ]]; then
   install -m 644 "$RELEASE_ROOT/deploy/systemd/twinpanel-backup.service" /etc/systemd/system/twinpanel-backup.service
 fi
+if [[ -f "$RELEASE_ROOT/deploy/systemd/twinpanel-node-auto-backfill.service" && -f "$RELEASE_ROOT/deploy/systemd/twinpanel-node-auto-backfill.timer" ]]; then
+  install -m 644 "$RELEASE_ROOT/deploy/systemd/twinpanel-node-auto-backfill.service" /etc/systemd/system/twinpanel-node-auto-backfill.service
+  install -m 644 "$RELEASE_ROOT/deploy/systemd/twinpanel-node-auto-backfill.timer" /etc/systemd/system/twinpanel-node-auto-backfill.timer
+fi
 if [[ -f "$RELEASE_ROOT/deploy/systemd/twinpanel-backup.timer" ]]; then
   install -m 644 "$RELEASE_ROOT/deploy/systemd/twinpanel-backup.timer" /etc/systemd/system/twinpanel-backup.timer
 fi
@@ -299,6 +303,9 @@ nginx -t
 
 systemctl daemon-reload
 systemctl enable --now twinpanel-api.service twinpanel-web.service
+if systemctl cat twinpanel-node-auto-backfill.timer >/dev/null 2>&1; then
+  systemctl enable --now twinpanel-node-auto-backfill.timer
+fi
 if systemctl cat twinpanel-backup.timer >/dev/null 2>&1; then
   systemctl enable --now twinpanel-backup.timer
 fi
