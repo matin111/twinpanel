@@ -709,7 +709,7 @@ async def _ensure_modern_xray(
 
     available_profiles = [PROFILE_XHTTP]
     if bool(state.get("tls_enabled")):
-        available_profiles.extend([PROFILE_WS, PROFILE_HTTPUPGRADE])
+        available_profiles.append(PROFILE_WS)
 
     # Reuse installed Xray listeners instead of rebuilding ports used by sing-box.
     check_script = (
@@ -741,8 +741,6 @@ async def _ensure_modern_xray(
         if state.get("tls_enabled"):
             if "vless-ws-tls" in installed_tags:
                 installed_profiles.append(PROFILE_WS)
-            if "vless-httpupgrade-tls" in installed_tags:
-                installed_profiles.append(PROFILE_HTTPUPGRADE)
         state["available_profiles"] = installed_profiles
         state["base_port"] = base_port
         return state
@@ -855,38 +853,6 @@ async def _ensure_modern_xray(
             }
         )
 
-    if PROFILE_HTTPUPGRADE in available_profiles:
-        inbounds.append(
-            {
-                "tag": "vless-httpupgrade-tls",
-                "listen": "0.0.0.0",
-                "port": _target_port(base_port, PROFILE_HTTPUPGRADE),
-                "protocol": "vless",
-                "settings": {
-                    "clients": [],
-                    "decryption": "none",
-                },
-                "streamSettings": {
-                    "network": "httpupgrade",
-                    "security": "tls",
-                    "httpupgradeSettings": {
-                        "path": str(state["httpupgrade_path"]),
-                        "host": str(state["tls_domain"]),
-                    },
-                    "tlsSettings": {
-                        "serverName": str(state["tls_domain"]),
-                        "minVersion": "1.2",
-                        "alpn": ["http/1.1"],
-                        "certificates": [
-                            {
-                                "certificateFile": str(state["managed_cert"]),
-                                "keyFile": str(state["managed_key"]),
-                            }
-                        ],
-                    },
-                },
-            }
-        )
 
     inbounds.append(
         {
@@ -1142,8 +1108,6 @@ async def _xray_account_modern(
         if PROFILE_WS in available:
             order.append(PROFILE_WS)
         order.append(PROFILE_XHTTP)
-        if PROFILE_HTTPUPGRADE in available:
-            order.append(PROFILE_HTTPUPGRADE)
 
         profiles = []
         for profile in order:
@@ -1341,7 +1305,6 @@ def _service_routes_modern(
     for profile in (
         PROFILE_XHTTP,
         PROFILE_WS,
-        PROFILE_HTTPUPGRADE,
     ):
         public_port = _public_port(exit_node.id, profile)
         key = ("v2ray", public_port)
@@ -1621,7 +1584,7 @@ def apply_xray_modern_runtime() -> None:
 
     print(
         "TWINPANEL_XRAY_MODERN_RUNTIME_V2_ACTIVE "
-        "profiles=websocket_tls,xhttp_reality,httpupgrade_tls "
+        "profiles=websocket_tls,xhttp_reality "
         "legacy_plain_preserved=1 transport_ui_hidden=1",
         flush=True,
     )

@@ -72,10 +72,10 @@ jobs:
                                   values=[elt.value for elt in arg.elts if isinstance(elt,ast.Constant)]
                           hidden=set(values)
 
-          # Customer delivery remains exactly the approved TLS-only contract.
-          assert public_order == ('websocket_tls','httpupgrade_tls','PROFILE_TCP_TLS'), public_order
+          # Customer delivery uses the three approved VLESS profiles (WS TLS, XHTTP REALITY, TCP TLS).
+          assert public_order == ('websocket_tls','xhttp_reality','PROFILE_TCP_TLS'), public_order
           assert hidden is not None
-          assert {'legacy','xhttp_reality','grpc_reality','tcp_simple'} <= hidden
+          assert {'legacy','grpc_reality','tcp_simple'} <= hidden
           assert 'VLESS TCP TLS' in policy_text
           assert 'grpc_reality=internal_only' in policy_text
 

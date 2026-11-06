@@ -42,7 +42,6 @@ _PROFILE_LABELS = {
     "websocket_tls": "WebSocket TLS",
     "xhttp_reality": "XHTTP Reality",
     "tcp_simple": "TCP ساده",
-    "httpupgrade_tls": "HTTPUpgrade TLS",
 }
 
 # Customer delivery policy for restricted Iranian networks.
