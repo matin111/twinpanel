@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.610",
-  "source_sha": "0fdffb955d3d2fffad49c9303b9291e342cd7641",
+  "version": "1.1.0-rc.611",
+  "source_sha": "21516448e88bc569b1b5be1d52a1f528bb5e7485",
   "notes": {
-    "fa": "اصلاح جلوگیری از ری‌استارت غیرضروری Xray در همگام‌سازی اکانت‌های V2Ray بدون تغییر UUID و کانفیگ کاربران؛ حفظ مجوز فایل‌ها و همه امکانات rc.609.",
-    "en": "Avoid unnecessary Xray config rewrites and service restarts during unchanged VLESS account reconciliation; preserve file permissions, UUIDs and all rc.609 features."
+    "fa": "اصلاح پایدار راه‌اندازی Worker همگام‌سازی پس از آپدیت و Rollback؛ جلوگیری از خطاهای worker_missing و حفظ اصلاح Xray بدون ری‌استارت غیرضروری کاربران موجود در rc.610. تنظیمات نودها، تونل‌ها و سایر پروتکل‌ها تغییر نکرده‌اند.",
+    "en": "Restart release-bound heavy reconcile worker with API/web on upgrade and rollback to prevent missing convergence/quota worker scripts after release activation. Retains rc.610 no-op Xray sync and unchanged tunnel/protocol settings."
   }
 }
