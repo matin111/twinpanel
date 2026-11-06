@@ -20,6 +20,18 @@ ROUTES = {
     "us-ws": dict(port=26011, target_port=9444,
                   device="tpvx32", local="10.243.0.129",
                   peer="10.243.0.130"),
+    "de-xhttp": dict(port=24007, target_port=9447,
+                  device="tpvx30", local="10.243.0.121",
+                  peer="10.243.0.122"),
+    "de-tcp": dict(port=28007, target_port=9446,
+                  device="tpvx30", local="10.243.0.121",
+                  peer="10.243.0.122"),
+    "us-xhttp": dict(port=24011, target_port=9447,
+                  device="tpvx32", local="10.243.0.129",
+                  peer="10.243.0.130"),
+    "us-tcp": dict(port=28011, target_port=9446,
+                  device="tpvx32", local="10.243.0.129",
+                  peer="10.243.0.130"),
 }
 
 
