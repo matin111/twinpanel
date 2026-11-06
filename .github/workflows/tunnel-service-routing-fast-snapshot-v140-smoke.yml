@@ -1,0 +1,22 @@
+name: Tunnel Agent fast routing snapshot V140 smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/service_routing_stability_v139.py"
+      - "tests/test_tunnel_service_routing_snapshot_v140.py"
+      - ".github/workflows/tunnel-service-routing-fast-snapshot-v140-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  route-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Syntax validate routing patch
+        run: python -m py_compile backend/app/service_routing_stability_v139.py
+      - name: Regression tests of kernel snapshots and drift detection
+        run: python -m unittest discover -s tests -p test_tunnel_service_routing_snapshot_v140.py -v
