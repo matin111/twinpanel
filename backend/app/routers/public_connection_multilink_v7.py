@@ -243,13 +243,13 @@ def _apply_live_xray_uri(uri: str, settings: dict[str, Any]) -> str:
             "tls": "tls_server_name",
         }.get(security)
         sni = settings.get(key) if key else None
-        if not sni:
-            return uri
-        updated = [(k, sni if k == "sni" else v) for k, v in params]
-        if not any(k == "sni" for k, _ in updated):
-            updated.append(("sni", sni))
-        if security == "tls":
-            updated = [(k, sni if k == "host" else v) for k, v in updated]
+        updated = list(params)
+        if sni:
+            updated = [(k, sni if k == "sni" else v) for k, v in updated]
+            if not any(k == "sni" for k, _ in updated):
+                updated.append(("sni", sni))
+            if security == "tls":
+                updated = [(k, sni if k == "host" else v) for k, v in updated]
         transport = next((v.lower() for k, v in params if k == "type"), "")
         key_by_type = {"ws": "ws_tls", "xhttp": "xhttp_reality"}
         profile_key = key_by_type.get(transport)
