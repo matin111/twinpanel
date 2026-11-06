@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.629",
+  "version": "1.1.0-rc.630",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T22:55:14Z",
+  "released_at": "2026-11-06T23:37:56Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "21bcec820dca18c1f630075027f2c228d8ecb878",
+  "source_sha": "0263c4ba98d189c99141b5fec302b2e656f32422",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.629/twinpanel-1.1.0-rc.629-linux-x86_64.tar.gz",
-    "sha256": "aa6c40c46deafb140d1e9834626636bda975ea08a808584d031f81cf7ea6be08",
-    "size_bytes": 28997575
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.630/twinpanel-1.1.0-rc.630-linux-x86_64.tar.gz",
+    "sha256": "f235f3103b81a890d11ab0419c309c89603cc80bd6b08b1c01efe1d68ad022fe",
+    "size_bytes": 29000767
   },
   "notes": {
-    "fa": "نمایش خودکار پرچم کشور واقعی نود در نام نمایشی کانفیگ‌های همه پروتکل‌ها، شامل نودهای جدید؛ بدون تغییر نام فایل‌های حساس یا اطلاعات اتصال.",
-    "en": "Automatically derive country emoji flags from live node country codes for public protocol remarks and new nodes; leave native filenames and VPN connection details unchanged."
+    "fa": "کاهش سربار ساخت V2Ray در مدیریت مرکزی با استفاده مجدد از SSH هر دسته و ثبت صحیح پیشرفت جزئی هنگام خطا؛ حفظ UUID، سرویس‌های فعال و کنترل سلامت، بدون ری‌استارت Xray.",
+    "en": "Centralized V2Ray batch SSH session reuse and safe backfill partial-progress accounting/diagnostics. Preserve existing UUIDs and hot-user APIs without Xray restarts."
   }
 }
