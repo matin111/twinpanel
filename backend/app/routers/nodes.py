@@ -333,6 +333,26 @@ async def delete_node(
             detail="سرور مادر قابل حذف نیست",
         )
 
+    # Never tear down an old enrollment while a replacement enrollment
+    # for the same machine is active. Remote paths and services are shared.
+    replacement = (
+        db.query(Node)
+        .filter(
+            Node.id != node_id,
+            Node.retired_at.is_(None),
+            Node.public_ip == node.public_ip,
+        )
+        .first()
+    )
+    if replacement is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "این IP با نود فعال دیگری مشترک است؛ پاک‌سازی Runtime "
+                "می‌تواند نود جدید را قطع کند. ابتدا وضعیت نود جدید را بررسی کنید."
+            ),
+        )
+
     original_name = str(node.name)
     now = datetime.utcnow()
 
@@ -510,10 +530,30 @@ async def delete_node(
         # Remove active membership/configuration.
         # -------------------------------------------------
 
+        # Delivery modes reference SubscriptionNode, so drop their
+        # child rows before removing the membership. Do not touch global
+        # subscriptions or credentials for other Exits.
+        db.execute(
+            text("""
+                DELETE FROM subscription_node_delivery_modes
+                WHERE subscription_node_id IN (
+                    SELECT id FROM subscription_nodes
+                    WHERE node_id = :node_id
+                )
+            """),
+            {"node_id": node_id},
+        )
+
         db.query(SubscriptionNode).filter(
             SubscriptionNode.node_id == node_id
         ).delete(
             synchronize_session=False
+        )
+
+        # Plan-level node selection is also node-scoped configuration.
+        db.execute(
+            text("DELETE FROM plan_nodes WHERE node_id = :node_id"),
+            {"node_id": node_id},
         )
 
         db.query(NodeProtocolConfig).filter(
@@ -590,6 +630,13 @@ async def delete_node(
             params,
         )
 
+        # Live health telemetry belongs to this deleted Node, not to
+        # historical billing/usage data.
+        db.execute(
+            text("DELETE FROM node_telemetry WHERE node_id = :node_id"),
+            params,
+        )
+
         # -------------------------------------------------
         # Optional / legacy outbounds.
         # -------------------------------------------------
@@ -630,25 +677,20 @@ async def delete_node(
             "removed_items": 0
         }
 
-        try:
-            from .account_delivery import (
-                remove_node_from_delivery_credentials,
-            )
+        from .account_delivery import (
+            remove_node_from_delivery_credentials,
+        )
 
-            delivery_cleanup = (
-                remove_node_from_delivery_credentials(
-                    db,
-                    node_id,
-                )
-            )
-
-        except Exception:
-            # Runtime cleanup and retirement must not be
-            # rolled back merely because an old credential
-            # payload cannot be rewritten.
-            delivery_cleanup = {
-                "removed_items": 0
-            }
+        # This must be strict. Returning success with stale delivery
+        # entries still visible is worse than leaving a retryable failed
+        # cleanup job. On failure the transaction rolls back and the Node
+        # remains unretired.
+        delivery_cleanup = remove_node_from_delivery_credentials(
+            db,
+            node_id,
+        )
+        if not delivery_cleanup.get("ok"):
+            raise RuntimeError("node_delivery_cleanup_incomplete")
 
         # -------------------------------------------------
         # NodeAccess is deliberately LAST.
