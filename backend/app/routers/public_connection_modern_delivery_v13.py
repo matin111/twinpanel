@@ -12,6 +12,8 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..services.central_modern_connection_lookup_v1 import applied_modern_connection
+from ..services.central_connection_projection_v1 import project_singbox_item
 from ..models import ProtocolCredential, SubscriptionProtocol
 from .account_delivery import _public_payload, _subscription_from_share_token, _autosync_credential_items
 
@@ -380,6 +382,12 @@ def public_modern_config_v13(
     if protocol not in MODERN_PROTOCOLS:
         raise HTTPException(status_code=404, detail="پروتکل پشتیبانی نمی‌شود")
     item = _ready_modern_item(token, protocol, node_id, db)
+    connection = applied_modern_connection(db, protocol, node_id)
+    if connection is not None:
+        try:
+            item = project_singbox_item(protocol, item, connection)
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(status_code=409, detail="تنظیمات اتصال این نود ناسازگار است") from exc
     config = str(item.get("config") or "").strip()
     if not config:
         raise HTTPException(status_code=404, detail="کانفیگ آماده نیست")

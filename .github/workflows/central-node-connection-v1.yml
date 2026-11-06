@@ -1,0 +1,67 @@
+name: Central Node Connection V1 Contracts
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/node_connection_settings_models_v1.py"
+      - "backend/app/services/central_connection_projection_v1.py"
+      - "backend/app/services/central_modern_connection_lookup_v1.py"
+      - "backend/app/routers/admin_node_connection_settings_v1.py"
+      - "backend/app/routers/public_connection_protocol_subscriptions_v30.py"
+      - "backend/app/routers/public_connection_modern_import_v15.py"
+      - "backend/app/routers/public_connection_modern_delivery_v13.py"
+      - "backend/app/routers/public_connection_modern_delivery_v16.py"
+      - "backend/app/main.py"
+      - "backend/app/routers/modern_account_delivery_v1.py"
+      - "backend/app/routers/subscription_create_fast_v1.py"
+      - "backend/tests/test_new_account_singbox_node_batch_v1.py"
+      - "backend/tests/test_central*"
+      - ".github/workflows/central-node-connection-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: backend
+      APP_SECRET_KEY: github-test-secret-not-production
+      DATABASE_URL: sqlite:///./central-connection-ci.sqlite3
+      NODE_AGENT_SHARED_SECRET: github-test-agent-secret
+      TWINPANEL_CENTRAL_MODERN_DELIVERY_V1: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend test dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -r backend/requirements.txt pytest
+      - name: Compile changed modules
+        run: |
+          python -m py_compile \
+            backend/app/node_connection_settings_models_v1.py \
+            backend/app/services/central_connection_projection_v1.py \
+            backend/app/services/central_modern_connection_lookup_v1.py \
+            backend/app/routers/admin_node_connection_settings_v1.py \
+            backend/app/routers/public_connection_protocol_subscriptions_v30.py \
+            backend/app/routers/public_connection_modern_import_v15.py \
+            backend/app/routers/public_connection_modern_delivery_v13.py \
+            backend/app/routers/public_connection_modern_delivery_v16.py \
+            backend/app/main.py \
+            backend/app/routers/modern_account_delivery_v1.py \
+            backend/app/routers/subscription_create_fast_v1.py
+      - name: Focused central connection regressions
+        run: |
+          python -m pytest -q \
+            backend/tests/test_central_connection_projection_v1.py \
+            backend/tests/test_central_modern_uri_contract_v1.py \
+            backend/tests/test_central_modern_delivery_contract_v1.py \
+            backend/tests/test_central_modern_lookup_safety_v1.py \
+            backend/tests/test_central_node_applied_endpoint_v1.py \
+            backend/tests/test_new_account_singbox_node_batch_v1.py

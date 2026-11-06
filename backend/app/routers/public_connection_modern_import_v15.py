@@ -18,6 +18,7 @@ from .public_connection_modern_delivery_v13 import (
     _sudoku_uri,
 )
 from .public_connection_modern_names_v14 import _profile_name
+from ..services.central_connection_projection_v1 import project_singbox_item
 
 
 # Karing 1.2.25 supports the first cohort below. Newer 1.2.26 builds also add
@@ -100,11 +101,24 @@ def _tls_params(outbound: dict[str, Any]) -> list[tuple[str, str]]:
     return params
 
 
-def standard_share_uri(protocol: str, item: dict[str, Any], profile_name: str) -> str:
+def standard_share_uri(
+    protocol: str,
+    item: dict[str, Any],
+    profile_name: str,
+    *,
+    applied_connection: dict[str, Any] | None = None,
+) -> str:
+    """Build the URI from a projected snapshot when explicitly provided.
+
+    The caller must supply only connection settings confirmed applied on the
+    node. No implicit lookup or guess based on an unrelated node domain.
+    """
     protocol = str(protocol or "").strip().lower()
     if protocol not in STANDARD_SHARE_PROTOCOLS:
         return ""
 
+    if applied_connection is not None:
+        item = project_singbox_item(protocol, item, applied_connection)
     outbound = _outbound(item)
     if not isinstance(outbound, dict):
         return ""
