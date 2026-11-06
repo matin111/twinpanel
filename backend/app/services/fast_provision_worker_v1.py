@@ -29,9 +29,17 @@ HEARTBEAT_SECONDS = 30.0
 def _eligible_new_subscription(sub: Subscription | None) -> bool:
     if sub is None or sub.status != SubscriptionStatus.ACTIVE:
         return False
-    now = datetime.utcnow()
-    if sub.expires_at is not None and sub.expires_at <= now:
-        return False
+    expires_at = sub.expires_at
+    if expires_at is not None:
+        # Existing databases can contain either naive UTC or timezone-aware
+        # timestamps; both must be comparable without a worker crash.
+        now = (
+            datetime.now(expires_at.tzinfo)
+            if expires_at.tzinfo is not None and expires_at.utcoffset() is not None
+            else datetime.utcnow()
+        )
+        if expires_at <= now:
+            return False
     limit = int(sub.traffic_limit_bytes or 0)
     if limit > 0 and int(sub.traffic_used_bytes or 0) >= limit:
         return False
