@@ -43,6 +43,13 @@ def _persist_subscription(payload: dict[str, Any]) -> tuple[int, list[str], dict
 
     db = SessionLocal()
     try:
+        # Never create a DB-only ACTIVE subscription when the central worker
+        # is intentionally disabled. Refuse before writing any account row.
+        if not fast_provision_queue_enabled():
+            raise HTTPException(
+                status_code=503,
+                detail="ساخت مرکزی موقتاً غیرفعال است؛ اشتراکی ثبت نشد",
+            )
         request = AdminSubscriptionCreateV2(**payload)
         preflight = assert_subscription_provisioning_ready(db, request.protocols)
 
@@ -139,8 +146,7 @@ def _persist_subscription(payload: dict[str, Any]) -> tuple[int, list[str], dict
         # When enabled, enqueue in the SAME transaction as the new account;
         # a process crash between HTTP response and worker startup cannot
         # silently lose a paid/new subscription provisioning request.
-        if fast_provision_queue_enabled():
-            enqueue_new_subscription(db, int(sub.id), requested_protocols)
+        enqueue_new_subscription(db, int(sub.id), requested_protocols)
 
         if request.delivery_policy is not None:
             put_delivery_policy(
@@ -263,15 +269,9 @@ async def admin_create_fast_v1(
     """Create immediately, then finish provisioning in the backend."""
 
     subscription_id, requested_protocols, preflight = _persist_subscription(dict(payload))
-    # Legacy behavior stays untouched when the durable worker is disabled.
-    # Otherwise the committed DB job is claimed by the recovery worker.
-    durable_queued = fast_provision_queue_enabled()
-    if not durable_queued:
-        background_tasks.add_task(
-            _provision_subscription_background,
-            subscription_id,
-            requested_protocols,
-        )
+    # The job was atomically committed with the subscription; never
+    # schedule ephemeral FastAPI tasks for manual-account delivery.
+    durable_queued = True
 
     return {
         "ok": True,
