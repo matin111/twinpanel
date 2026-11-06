@@ -81,7 +81,7 @@ jobs:
           sudo install -d -m 700 /var/lib/twinpanel-backups
           sudo chown -R "$(id -u):$(id -g)" /etc/twinpanel /var/lib/twinpanel-backups
 
-      - name: Verify explicit per-subscription 15-protocol creation
+      - name: Verify explicit per-subscription 16-protocol creation
         working-directory: backend
         run: |
           python - <<'PY'
@@ -100,7 +100,7 @@ jobs:
           from app.security import hash_password
 
           assert app.title
-          assert len(ALL_PROTOCOL_KEYS) == 15
+          assert len(ALL_PROTOCOL_KEYS) == 16
           assert Subscription.__table__.c.plan_id.nullable is True
           assert inspect(engine).get_columns('subscriptions')
 
