@@ -47,6 +47,7 @@ MULTI_PROTOCOLS = (
     "trusttunnel",
     "amneziawg",
     "sudoku",
+    "socks5",
 )
 
 # Native clients consume files, not a synthetic share URI. Their one public URL
@@ -67,6 +68,7 @@ PROTOCOL_TITLES = {
     "trusttunnel": "TrustTunnel",
     "amneziawg": "AmneziaWG",
     "sudoku": "Sudoku",
+    "socks5": "SOCKS5 Proxy",
 }
 
 PROTOCOL_CLIENT = {
@@ -83,6 +85,7 @@ PROTOCOL_CLIENT = {
     "trusttunnel": "trusttunnel",
     "amneziawg": "amneziawg",
     "sudoku": "sudoku",
+    "socks5": "singbox",
 }
 
 
