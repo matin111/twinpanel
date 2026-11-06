@@ -83,6 +83,8 @@ class BBRScopeTest(unittest.TestCase):
         helper = SCRIPT.read_text(encoding="utf-8")
         self.assertNotIn('sysctl -w net.ipv4.tcp_congestion_control', helper)
         self.assertNotIn('"tag": "vless-in"', json.dumps(module.PUBLIC))
+        self.assertIn("time.monotonic() + timeout", helper)
+        self.assertIn("time.sleep(0.4)", helper)
 
 
 if __name__ == "__main__":
