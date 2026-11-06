@@ -68,9 +68,35 @@ def test_imported_backfill_preserves_per_plan_protocol_entitlements():
 def test_one_node_per_run_and_no_secret_logging():
     wrapper = (BASE / "scripts/twinpanel_existing_node_backfill_v1.py").read_text()
     ast.parse(wrapper)
-    assert "run_one_node(node_id)" in wrapper
-    assert "one_node(db, node_id)" in wrapper
+    assert "run_one_node(node_id, subscription_id=subscription_id)" in wrapper
+    assert "one_node(db, node_id, subscription_id=subscription_id)" in wrapper
     assert "health_guard(args.max_load)" in wrapper
     assert "fcntl.LOCK_EX | fcntl.LOCK_NB" in wrapper
     assert "DRY_RUN_ONLY_NO_CREDENTIAL_WRITES" in wrapper
     assert "str(exc)" not in wrapper
+    assert 'logging.getLogger("asyncssh").setLevel(logging.WARNING)' in wrapper
+
+
+def test_single_subscription_canary_is_opt_in_and_validated():
+    args = parse_args(["--node-id", "13", "--protocol", "singbox", "--subscription-id", "3594"])
+    assert args.subscription_id == 3594
+    assert args.apply is False
+    for invalid in ("0", "-13"):
+        with pytest.raises(SystemExit):
+            parse_args(["--node-id", "13", "--protocol", "singbox", "--subscription-id", invalid])
+    scoped = parse_args([
+        "--node-id", "13", "--protocol", "singbox", "--subscription-id", "3594",
+        "--apply", "--confirm-node-id", "13", "--max-pairs", "1",
+    ])
+    assert scoped.apply and scoped.subscription_id == 3594 and scoped.max_pairs == 1
+
+
+def test_target_scope_is_applied_to_singbox_and_classic_queries():
+    singbox = (BASE / "scripts/twinpanel_migration_singbox_batch.py").read_text()
+    classic = (BASE / "scripts/twinpanel_migration_classic_sequential_v3.py").read_text()
+    wrapper = (BASE / "scripts/twinpanel_existing_node_backfill_v1.py").read_text()
+    assert "Subscription.id == int(subscription_id)" in singbox
+    assert "Subscription.id==int(subscription_id)" in classic
+    assert "subscription_id=subscription_id" in singbox
+    assert "one_node(db, node_id, subscription_id=subscription_id)" in wrapper
+    assert "eligible_count(db, args.node_id, args.protocol, args.subscription_id)" in wrapper
