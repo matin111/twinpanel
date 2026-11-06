@@ -670,8 +670,8 @@ def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
         "defaults": {
             "connection_domain": default_domain,
             "tls_server_name": default_domain,
-            "reality_server_name": "www.varzesh3.com",
-            "reality_target": "www.varzesh3.com:443",
+            "reality_server_name": str(values.get("reality_server_name") or ""),
+            "reality_target": str(values.get("reality_target") or ""),
             "transport": "tcp",
             "security": "tls",
             "inbounds": {
@@ -681,11 +681,11 @@ def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
                 },
                 "ws_tls": {
                     "connection_domain": default_domain, "server_name": default_domain,
-                    "path": "/", "target": "", "transport": "ws", "security": "tls",
+                    "path": str(((values.get("inbound_applied") or {}).get("ws_tls") or {}).get("path") or ""), "target": "", "transport": "ws", "security": "tls",
                 },
                 "xhttp_reality": {
-                    "connection_domain": default_domain, "server_name": "www.varzesh3.com",
-                    "path": "/", "target": "www.varzesh3.com:443",
+                    "connection_domain": default_domain, "server_name": str(values.get("reality_server_name") or ""),
+                    "path": str(((values.get("inbound_applied") or {}).get("xhttp_reality") or {}).get("path") or ""), "target": str(values.get("reality_target") or ""),
                     "transport": "xhttp", "security": "reality",
                 },
             },
