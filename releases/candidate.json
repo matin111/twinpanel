@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.615",
-  "source_sha": "cf52982a64c5f12a22d3a1d68ec0324fb95f6df0",
+  "version": "1.1.0-rc.616",
+  "source_sha": "5da7808565e49c56570d82196d4026e3a0d7e49d",
   "notes": {
-    "fa": "رفع خطای فرم ساخت دستی اکانت پس از افزایش تعداد پروتکل‌ها به ۱۶: حذف شرط ثابت ۱۵ پروتکل، نمایش صحیح کاربران، نودها و فهرست واقعی پروتکل‌ها بدون تغییر کانفیگ‌های موجود.",
-    "en": "Fix manual admin subscription creation broken by the 16-protocol registry: accept the live nonempty catalog instead of a hardcoded count and restore selectable users, nodes and protocols without touching existing accounts."
+    "fa": "ساخت اکانت دستی از مسیر صف پایدار مدیریت مرکزی به‌صورت پیش‌فرض و ثبت Job در همان تراکنش اشتراک؛ جلوگیری از ثبت اشتراک بدون صف در صورت غیرفعال‌سازی اضطراری. بدون تغییر نودها یا تنظیمات V2Ray.",
+    "en": "Always-on central durable queue for manual subscriptions, transactional job enqueue, fail-before-create on explicit emergency disable; preserves existing nodes and V2Ray."
   }
 }
