@@ -82,9 +82,10 @@ def main() -> None:
     assert "PATH_FAILURE_THRESHOLD" in threshold
 
     attempt_order = _function_source(repair_source, "_attempt_order")
-    assert 'current == "gre-native"' in attempt_order
-    assert 'return fou + [("gre-native", None)]' in attempt_order
-    assert 'current == "gre-fou"' in attempt_order
+    # V307 recovery must not switch a formerly fast GRE-native route to FoU
+    # merely because ICMP stays up on the slower UDP-encapsulated carrier.
+    assert 'return [("gre-native", None)] + [("gre-fou", value) for value in ports]' in attempt_order
+    assert 'return fou + [("gre-native", None)]' not in attempt_order
     assert (
         "ports = [value for value in ports if value != current_port] + [current_port]"
         in attempt_order
