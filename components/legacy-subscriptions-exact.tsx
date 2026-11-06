@@ -98,6 +98,11 @@ export function LegacySubscriptionsRuntimePage(){
   const [linkModalLoading,setLinkModalLoading]=useState(false);
   const [linkModalError,setLinkModalError] = useState("");
   const [transferOpen,setTransferOpen]=useState(false);
+  const [transferMode,setTransferMode]=useState<"user"|"reseller">("reseller");
+  const [transferUserId,setTransferUserId]=useState(0);
+  const [transferUserSearch,setTransferUserSearch]=useState("");
+  const [transferUserMatches,setTransferUserMatches]=useState<AdminUser[]>([]);
+  const [resellerFilterId,setResellerFilterId]=useState(0);
   const [transferResellers,setTransferResellers]=useState<RuntimeRow[]>([]);
   const [transferCustomers,setTransferCustomers]=useState<Array<{id:number;name:string;email?:string|null;is_owner:boolean}>>([]);
   const [transferResellerId,setTransferResellerId]=useState(0);
@@ -116,7 +121,7 @@ export function LegacySubscriptionsRuntimePage(){
     if(!silent)setLoading(true);
     setError("");
     try{
-      const data=await adminApi.subscriptionsPageV3({limit:pageSize,offset:page*pageSize,q:query.trim(),status});
+      const data=await adminApi.subscriptionsPageV3({limit:pageSize,offset:page*pageSize,q:query.trim(),status,reseller_id:resellerFilterId});
       if(requestId!==listRequestId.current)return;
       setRows(data.items);
       setMatchedTotal(data.total);
@@ -135,7 +140,7 @@ export function LegacySubscriptionsRuntimePage(){
       if(document.visibilityState==="visible")void load(true);
     },45000);
     return()=>{window.clearTimeout(timer);window.clearInterval(interval);listRequestId.current+=1;};
-  },[page,query,status]);
+  },[page,query,status,resellerFilterId]);
 
   useEffect(()=>{
     // Metadata is supplementary for create/edit forms and never blocks the list.
@@ -143,6 +148,7 @@ export function LegacySubscriptionsRuntimePage(){
     void adminApi.users().then(value=>{if(live)setUsers(value);}).catch(()=>{});
     void adminApi.plans().then(value=>{if(live)setPlans(value);}).catch(()=>{});
     void adminApi.nodes().then(value=>{if(live)setNodes(value);}).catch(()=>{});
+    void adminApi.resellersForTransfer().then(value=>{if(live)setTransferResellers(value);}).catch(()=>{});
     return()=>{live=false;};
   },[]);
 
@@ -215,13 +221,25 @@ export function LegacySubscriptionsRuntimePage(){
   };
   const openTransfer=async(item:RuntimeRow)=>{
     setSelected(item);setTransferOpen(true);setTransferLoading(true);
+    setTransferMode("reseller");setTransferUserId(0);setTransferUserSearch("");
     setTransferResellerId(0);setTransferCustomerId(0);setTransferCustomers([]);setError("");
     try{
       const resellers=await adminApi.resellersForTransfer();
-      setTransferResellers(resellers.filter(row=>row.is_active===true));
+      setTransferResellers(resellers);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setTransferLoading(false);}
   };
+
+  useEffect(()=>{
+    if(!transferOpen||transferMode!=="user")return;
+    let live=true;
+    const timer=window.setTimeout(()=>{
+      void adminApi.usersFastPage({limit:50,offset:0,q:transferUserSearch.trim()})
+        .then(result=>{if(live)setTransferUserMatches(result.items.filter(user=>user.role!=="admin"&&user.is_active!==false));})
+        .catch(reason=>{if(live)setError(reason instanceof Error?reason.message:String(reason));});
+    },transferUserSearch.trim()?300:0);
+    return()=>{live=false;window.clearTimeout(timer);};
+  },[transferOpen,transferMode,transferUserSearch]);
   const selectTransferReseller=async(id:number)=>{
     setTransferResellerId(id);setTransferCustomerId(0);setTransferCustomers([]);
     if(!id)return;
@@ -235,10 +253,24 @@ export function LegacySubscriptionsRuntimePage(){
     finally{setTransferLoading(false);}
   };
   const submitTransfer=()=>{
-    if(!selected||!transferResellerId||!transferCustomerId)return;
+    if(!selected)return;
+    if(transferMode==="user"){
+      if(!transferUserId)return;
+      const user=transferUserMatches.find(item=>item.id===transferUserId);
+      if(!window.confirm(pick(`مالکیت اشتراک MV-${n(selected.id)} به «${user?.full_name||user?.email||transferUserId}» منتقل شود؟ دسترسی نماینده قبلی قطع می‌شود ولی کانفیگ تغییر نمی‌کند.`,`Transfer ownership of MV-${n(selected.id)} to ${user?.full_name||user?.email||transferUserId}? Previous reseller management is detached; VPN configs stay unchanged.`)))return;
+      void act("transfer",pick("مالکیت اکانت به کاربر منتقل شد","Subscription ownership transferred"),async()=>{
+        await adminApi.transferSubscriptionToUser(n(selected.id),transferUserId);
+        setTransferOpen(false);
+      });
+      return;
+    }
+    if(!transferResellerId||!transferCustomerId)return;
     const reseller=transferResellers.find(row=>n(row.id)===transferResellerId);
-    if(!window.confirm(pick(`اشتراک MV-${n(selected.id)} به نمایندگی «${s(reseller?.name)}» منتقل شود؟ کانفیگ و شناسه اشتراک تغییر نمی‌کنند.`,`Transfer subscription MV-${n(selected.id)} to reseller ${s(reseller?.name)} without changing its VPN configuration?`)))return;
-    void act("transfer",pick("اشتراک در پنل نماینده ثبت شد","Subscription transferred to reseller"),async()=>{await adminApi.transferSubscriptionToReseller(n(selected.id),transferResellerId,transferCustomerId);setTransferOpen(false);});
+    if(!window.confirm(pick(`مالکیت اشتراک MV-${n(selected.id)} به مشتری انتخاب‌شده و مدیریت آن به نمایندگی «${s(reseller?.name)}» منتقل شود؟ کانفیگ و شناسه اشتراک تغییر نمی‌کنند.`,`Transfer ownership and management of MV-${n(selected.id)} to reseller ${s(reseller?.name)} and its selected customer? VPN configuration stays unchanged.`)))return;
+    void act("transfer",pick("مالکیت و مدیریت اشتراک منتقل شد","Subscription ownership and management transferred"),async()=>{
+      await adminApi.transferSubscriptionToReseller(n(selected.id),transferResellerId,transferCustomerId);
+      setTransferOpen(false);
+    });
   };
   const openExtend=(item:RuntimeRow)=>{setSelected(item);setExtendDays(30);setExtendTraffic(10);setModal("extend");};
   const saveExtend=()=>{if(!selected)return;void act("extend",pick("اشتراک تمدید شد","Subscription extended"),()=>legacyAdminApi.extendSubscription(n(selected.id),{add_days:extendDays,add_traffic_gb:extendTraffic}),true);};
