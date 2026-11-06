@@ -500,7 +500,9 @@ async def _reconcile_bounded_exit_nodes_once() -> dict:
             pass
         return {"ok": True, "nodes": []}
 
-    signature = [node_ids, len(eligible_ids), eligible_ids[0], eligible_ids[-1]]
+    # New purchases must not reset a long-running scan back to account 0.
+    # Track them and request another pass after the current one finishes.
+    signature = [node_ids]
     try:
         checkpoint = json.loads(_BATCH_CHECKPOINT.read_text())
         if checkpoint.get("signature") != signature:
@@ -511,6 +513,8 @@ async def _reconcile_bounded_exit_nodes_once() -> dict:
     node_index = max(0, int(checkpoint.get("node_index") or 0))
     offset = max(0, int(checkpoint.get("offset") or 0))
     had_errors = bool(checkpoint.get("had_errors", False))
+    started_count = int(checkpoint.get("started_count") or len(eligible_ids))
+    started_newest = int(checkpoint.get("started_newest") or eligible_ids[0])
     if node_index >= len(node_ids):
         node_index, offset, had_errors = 0, 0, False
 
@@ -564,11 +568,20 @@ async def _reconcile_bounded_exit_nodes_once() -> dict:
             _BATCH_CHECKPOINT.unlink(missing_ok=True)
         except OSError:
             pass
-        return {"ok": not had_errors, "nodes": [node_result], "batch_complete": True}
+        changed_while_scanning = (
+            started_count != len(eligible_ids)
+            or started_newest != eligible_ids[0]
+        )
+        return {
+            "ok": not had_errors and not changed_while_scanning,
+            "nodes": [node_result], "batch_complete": True,
+            "new_accounts_during_scan": changed_while_scanning,
+        }
 
     new_checkpoint = {
         "signature": signature, "node_index": node_index,
         "offset": offset, "had_errors": had_errors,
+        "started_count": started_count, "started_newest": started_newest,
     }
     _BATCH_CHECKPOINT.parent.mkdir(parents=True, exist_ok=True)
     target = _BATCH_CHECKPOINT.with_suffix(".tmp")
