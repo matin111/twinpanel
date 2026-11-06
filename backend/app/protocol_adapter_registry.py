@@ -124,7 +124,7 @@ CLASSIC_PROTOCOL_REGISTRY: dict[str, dict[str, Any]] = {
         "fields": [_field("port", "Base Port", "Base port", "number", minimum=1, maximum=65535,
             help_fa="پروفایل‌های Xray موجود از Runtime فعلی TwinPanel استفاده می‌کنند.",
             help_en="Existing Xray profiles remain owned by the current TwinPanel runtime.")],
-        "managed_not_editable": ["profiles", "xhttp_reality", "grpc_reality", "websocket_tls", "httpupgrade_tls", "reality", "sni", "fingerprint", "flow", "transport_specific_settings"],
+        "managed_not_editable": ["profiles", "xhttp_reality", "websocket_tls", "httpupgrade_tls", "reality", "sni", "fingerprint", "flow", "transport_specific_settings"],
     },
 }
 

@@ -220,19 +220,6 @@ def _build_uri(
             ]
         )
 
-    elif profile == PROFILE_GRPC:
-        query.extend(
-            [
-                ("security", "reality"),
-                ("type", "grpc"),
-                ("serviceName", str(state["grpc_service"])),
-                ("sni", str(state["reality_server_name"])),
-                ("fp", "chrome"),
-                ("pbk", str(state["reality_password"])),
-                ("sid", str(state["short_id_grpc"])),
-            ]
-        )
-
     elif profile == PROFILE_WS:
         domain = str(state.get("tls_domain") or "").strip()
         if not domain:
@@ -388,22 +375,10 @@ def stable_path(key, prefix):
 
 
 short_id_xhttp = stable_hex("short_id_xhttp", 8)
-short_id_grpc = stable_hex("short_id_grpc", 8)
-if short_id_grpc == short_id_xhttp:
-    short_id_grpc = secrets.token_hex(8)
 
 xhttp_path = stable_path("xhttp_path", "xh")
 ws_path = stable_path("ws_path", "ws")
 httpupgrade_path = stable_path("httpupgrade_path", "hu")
-
-grpc_service = str(state.get("grpc_service") or "").strip()
-if (
-    not grpc_service
-    or len(grpc_service) > 80
-    or not all(c.isalnum() or c in "-_" for c in grpc_service)
-):
-    grpc_service = "tpgrpc-" + secrets.token_hex(8)
-
 
 tls_enabled = False
 source_cert = ""
@@ -487,9 +462,7 @@ state = {{
     "tls_sni_tcp": str(state.get("tls_sni_tcp") or ""),
     "tls_sni_ws": str(state.get("tls_sni_ws") or ""),
     "short_id_xhttp": short_id_xhttp,
-    "short_id_grpc": short_id_grpc,
     "xhttp_path": xhttp_path,
-    "grpc_service": grpc_service,
     "ws_path": ws_path,
     "httpupgrade_path": httpupgrade_path,
     "tls_enabled": tls_enabled,
@@ -693,7 +666,7 @@ async def _ensure_modern_xray(
     if not private_key:
         raise RuntimeError("REALITY private key is empty")
 
-    available_profiles = [PROFILE_XHTTP, PROFILE_GRPC]
+    available_profiles = [PROFILE_XHTTP]
     if bool(state.get("tls_enabled")):
         available_profiles.extend([PROFILE_WS, PROFILE_HTTPUPGRADE])
 
@@ -704,7 +677,7 @@ async def _ensure_modern_xray(
         "doc=json.load(open('/usr/local/etc/xray/config.json'))\n"
         "tags={str(i.get('tag')):i for i in doc.get('inbounds',[]) "
         "if isinstance(i,dict)}\n"
-        "required={'vless-in','vless-xhttp-reality','vless-grpc-reality'}\n"
+        "required={'vless-in','vless-xhttp-reality'}\n"
         "ok=required.issubset(tags) and all("
         "tags[k].get('protocol')=='vless' for k in required)\n"
         "print(json.dumps({'ready':bool(ok),"
@@ -723,7 +696,7 @@ async def _ensure_modern_xray(
         and await provision.active(conn, "xray")
     ):
         installed_tags = set(installed.get("tags") or [])
-        installed_profiles = [PROFILE_XHTTP, PROFILE_GRPC]
+        installed_profiles = [PROFILE_XHTTP]
         if state.get("tls_enabled"):
             if "vless-ws-tls" in installed_tags:
                 installed_profiles.append(PROFILE_WS)
@@ -804,28 +777,6 @@ async def _ensure_modern_xray(
                 "realitySettings": {
                     **reality_common,
                     "shortIds": [str(state["short_id_xhttp"])],
-                },
-            },
-        },
-        {
-            "tag": "vless-grpc-reality",
-            "listen": "0.0.0.0",
-            "port": _target_port(base_port, PROFILE_GRPC),
-            "protocol": "vless",
-            "settings": {
-                "clients": [],
-                "decryption": "none",
-            },
-            "streamSettings": {
-                "network": "grpc",
-                "security": "reality",
-                "grpcSettings": {
-                    "serviceName": str(state["grpc_service"]),
-                    "multiMode": False,
-                },
-                "realitySettings": {
-                    **reality_common,
-                    "shortIds": [str(state["short_id_grpc"])],
                 },
             },
         },
@@ -1074,7 +1025,6 @@ async def _existing_ok_modern(conn, protocol: str, settings):
     for candidate in (
         base_port,
         _target_port(base_port, PROFILE_XHTTP),
-        _target_port(base_port, PROFILE_GRPC),
     ):
         if not await provision.listener(conn, candidate, "tcp"):
             return False
@@ -1146,7 +1096,6 @@ async def _xray_account_modern(
         order.append(PROFILE_XHTTP)
         if PROFILE_HTTPUPGRADE in available:
             order.append(PROFILE_HTTPUPGRADE)
-        order.append(PROFILE_GRPC)
 
         profiles = []
         for profile in order:
@@ -1343,7 +1292,6 @@ def _service_routes_modern(
 
     for profile in (
         PROFILE_XHTTP,
-        PROFILE_GRPC,
         PROFILE_WS,
         PROFILE_HTTPUPGRADE,
     ):
@@ -1625,7 +1573,7 @@ def apply_xray_modern_runtime() -> None:
 
     print(
         "TWINPANEL_XRAY_MODERN_RUNTIME_V2_ACTIVE "
-        "profiles=websocket_tls,xhttp_reality,httpupgrade_tls,grpc_reality "
+        "profiles=websocket_tls,xhttp_reality,httpupgrade_tls "
         "legacy_plain_preserved=1 transport_ui_hidden=1",
         flush=True,
     )

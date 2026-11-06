@@ -17,7 +17,6 @@ _runtime_applied = False
 _XRAY_PROFILE_TITLES = {
     "legacy": "V2Ray / Xray",
     "xhttp_reality": "XHTTP Reality",
-    "grpc_reality": "gRPC Reality",
     "websocket_tls": "WebSocket TLS",
     "httpupgrade_tls": "HTTPUpgrade TLS",
 }
@@ -268,7 +267,6 @@ async def tunnel_service_connections_admin(
         "l2tp": 40,
         "legacy": 50,
         "xhttp_reality": 51,
-        "grpc_reality": 52,
         "websocket_tls": 53,
         "httpupgrade_tls": 54,
     }

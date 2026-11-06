@@ -19,12 +19,12 @@ from .routers import account_delivery, public_connection_v3
 # original _public_payload, and its legacy renderer only consumes item.uri.
 #
 # Modern credentials already carry item.profiles[] with a dedicated URI for
-# WebSocket TLS / XHTTP REALITY / HTTPUpgrade TLS / gRPC REALITY. V4 keeps one
+# WebSocket TLS / XHTTP REALITY / TCP TLS. V4 keeps one
 # server/country tab per Xray node and renders the customer-safe profiles for
 # that node inside the same server view. For Iran-facing delivery WebSocket TLS
 # is preferred, XHTTP REALITY is the modern no-domain fallback, and the already
 # preserved legacy VLESS TCP listener is exposed as a simple compatibility
-# fallback. gRPC remains intentionally hidden from the customer page.
+# fallback. Deprecated gRPC is not provisioned or delivered.
 # Internal listeners/routes are not removed by this UI runtime, so operational
 # rollback remains possible without reprovisioning.
 #
@@ -43,7 +43,6 @@ _PROFILE_LABELS = {
     "xhttp_reality": "XHTTP Reality",
     "tcp_simple": "TCP ساده",
     "httpupgrade_tls": "HTTPUpgrade TLS",
-    "grpc_reality": "gRPC Reality",
 }
 
 # Customer delivery policy for restricted Iranian networks.
@@ -51,7 +50,7 @@ _PROFILE_LABELS = {
 #   1. WebSocket TLS when a dedicated Xray domain/certificate is ready.
 #   2. XHTTP REALITY as the modern no-domain fallback.
 #   3. Legacy VLESS TCP as a simple compatibility fallback.
-# gRPC is deliberately not exposed to end users.
+# Deprecated gRPC is rejected from customer delivery.
 _PUBLIC_PROFILE_ORDER = (
     "websocket_tls",
     "xhttp_reality",
