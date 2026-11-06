@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.622",
-  "source_sha": "6d1b04e5d56956358a46345104c82c4924c0e66b",
+  "version": "1.1.0-rc.623",
+  "source_sha": "9e37866d01658e0feb56a045cb6e4837ef472a27",
   "notes": {
-    "fa": "اصلاح جستجوی کاربران موجود برای انتقال اشتراک به نماینده، جلوگیری از ساخت کاربر تکراری، مدیریت قفل هم‌زمان دیتابیس، و اصلاح سازگاری ساب‌لینک V2Ray با تولید بدون QR.",
-    "en": "Reseller transfer existing user search, atomic linking without duplicate account, transient lock handling; V47 runtime QR-free subscription feed compatibility to pass post-update canary."
+    "fa": "رفع تغییر ناخواسته دامنه V2Ray به دامنه عمومی تونل. استفاده از xray_domain اختصاصی هر نود برای WS/TLS، XHTTP/REALITY و TCP/TLS فقط پس از تأیید اینکه DNS به همان سرور ورودی ایران اشاره می‌کند. حفظ کامل پورت، SNI، کانفیگ‌ها، کاربران، تونل‌ها و سایر پروتکل‌ها.",
+    "en": "Respect the dedicated Xray domain in public VLESS subscription links instead of generic tunnel hostnames, only after verifying matching ingress DNS A/AAAA. Preserve all existing ports, UUIDs, TLS/REALITY parameters, tunnel routes, other VPN protocols and customer accounts."
   }
 }
