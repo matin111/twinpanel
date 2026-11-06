@@ -756,6 +756,8 @@ async def select_modern_transport_manual(
     tunnel_id: int,
     transport: str,
     db: Session = Depends(get_db),
+    *,
+    acceptance_timeout_seconds: float = 30.0,
 ):
     name = str(transport or "").strip().lower()
     if name not in ACTIVE_SPECS:
@@ -885,6 +887,7 @@ async def select_modern_transport_manual(
             tunnel,
             name=name,
             started_at=cutover_started_at,
+            timeout_seconds=acceptance_timeout_seconds,
         )
     )
 

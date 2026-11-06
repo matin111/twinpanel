@@ -2459,14 +2459,20 @@ async def sync_installed_node_to_subscriptions(
             "enable_v2ray",
     }
 
+    # Imported subscriptions retain their node membership but must not enter
+    # automatic Classic provisioning. Admin Edit/Provision stays explicit.
+    from ..migration_import_models import MigrationImportRecord
+    imported_ids = {
+        int(value) for (value,) in db.query(
+            MigrationImportRecord.subscription_id
+        ).all()
+    }
     active_ids = [
         int(sub.id)
         for sub in all_subscriptions
         if (
-            _autosync_enum_value(
-                sub.status
-            )
-            == "active"
+            _autosync_enum_value(sub.status) == "active"
+            and int(sub.id) not in imported_ids
         )
     ]
 
