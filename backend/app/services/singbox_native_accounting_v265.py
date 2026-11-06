@@ -24,7 +24,7 @@ from .quota_node_sync import build_node_devices
 
 
 SINGBOX_ACCOUNTING_PROTOCOLS = frozenset(
-    {"hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"}
+    {"hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"}
 )
 SINGBOX_ACCOUNTING_INTERVAL_SECONDS = 5.0
 SINGBOX_ACCOUNTING_LOCK = Path("/run/twinpanel-singbox-quota-v265.lock")
@@ -691,7 +691,7 @@ def apply_singbox_snapshot(
         row for row in rows
         if isinstance(row, dict)
         and str(row.get("inbound") or "").strip() == expected_tag
-        and str(row.get("inbound_type") or "").strip().lower() == protocol
+        and str(row.get("inbound_type") or "").strip().lower() == ("socks" if protocol == "socks5" else protocol)
         and str(row.get("user") or "").strip()
     ]
     closed_retained = sum(1 for row in rows if _safe_int(row.get("closed_at_ms")) > 0)
