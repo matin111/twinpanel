@@ -301,18 +301,37 @@ def install_telegram_admin_ops(router, request_fn):
         )
         await _finalize_receipt_message(callback.message, detail)
         if origin_id is not None and kind in ("purchase", "wallet"):
+            # Update the original pushed receipt too, without deleting the
+            # attachment. Only execute after the financial API reports success.
+            updated = (
+                f"{status}\n"
+                f"نوع: {escape(kind)} | شناسه: {item_id}\n"
+                "بررسی نهایی انجام شده؛ این رسید دیگر قابل اقدام نیست."
+            )
             try:
-                original = await callback.bot.edit_message_reply_markup(
+                await callback.bot.edit_message_caption(
                     chat_id=callback.message.chat.id,
                     message_id=origin_id,
+                    caption=updated,
                     reply_markup=None,
                 )
             except Exception:
-                pass
-            # The originating receipt may be a photo or text. Telegram does
-            # not provide a fetch-message API; edit the known message ID using
-            # the original callback message's text/caption only at preview time.
-            # Remove all prior action buttons regardless of its media type.
+                try:
+                    await callback.bot.edit_message_text(
+                        chat_id=callback.message.chat.id,
+                        message_id=origin_id,
+                        text=updated,
+                        reply_markup=None,
+                    )
+                except Exception:
+                    try:
+                        await callback.bot.edit_message_reply_markup(
+                            chat_id=callback.message.chat.id,
+                            message_id=origin_id,
+                            reply_markup=None,
+                        )
+                    except Exception:
+                        pass
         await callback.message.answer(
             detail,
             reply_markup=_buttons([("🧾 صف رسیدهای جدید", "adm:review")],
