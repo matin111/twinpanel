@@ -35,6 +35,23 @@ export function XrayInboundEditorInProtocol({nodeId}:{nodeId:number}){
     finally{setBusy(false);}
   };
 
+  const apply=async()=>{
+    if(!draft||busy)return;
+    setBusy(true);setError("");setNotice("");
+    try{
+      // Save the visible draft first; the server then validates the exact version.
+      await adminApi.saveXrayInboundDraft(nodeId,draft);
+      const result=await adminApi.applyXrayInboundDraft(nodeId);
+      const updated=await adminApi.xrayInboundEditor(nodeId);
+      setState(updated);setDraft(updated.draft||updated.defaults);
+      setNotice(pick(
+        "اعمال و تست REALITY موفق بود؛ ساب‌لینک‌ها از SNI جدید استفاده می‌کنند. TLS و Transport تغییر نکردند.",
+        "REALITY apply and test passed; subscription SNI is updated. TLS and transport were not changed."
+      )+" · "+result.reality_server_name);
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setBusy(false);}
+  };
+
   const field=(key:keyof Pick<XrayInboundDraft,"connection_domain"|"tls_server_name"|"reality_server_name"|"reality_target">,label:string,placeholder:string)=>(
     <div className={styles.field} key={key}>
       <label>{label}</label>
@@ -71,8 +88,11 @@ export function XrayInboundEditorInProtocol({nodeId}:{nodeId:number}){
         <button type="button" className={styles.primaryButton} disabled={busy} onClick={()=>void save()}>
           {busy?"…":pick("ذخیره پیش‌نویس","Save draft")}
         </button>
+        <button type="button" className={styles.secondaryButton} disabled={busy} onClick={()=>void apply()}>
+          {busy?"…":pick("اعمال و تست REALITY","Apply & test REALITY")}
+        </button>
       </div>
-      <div className={styles.warningBox}>{pick("این مرحله فقط ویرایش و ذخیره امن را فعال می‌کند. تا زمانی که اعمال روی Xray و اعتبارسنجی اتصال ساخته نشود، تغییرات ساب‌لینک‌ها منتشر نمی‌شوند.","This stage saves a draft only. Changes are not published until coordinated Xray apply and validation are available.")}</div>
+      <div className={styles.warningBox}>{pick("اعمال فعلاً فقط REALITY SNI و مقصد را روی Xray و ساب‌لینک‌ها هماهنگ می‌کند. دامنه اتصال، TLS و نوع Transport فقط پیش‌نویس می‌مانند.","Apply synchronizes REALITY SNI and target with Xray and subscriptions. Connection domain, TLS and transport remain drafts.")}</div>
     </>}
   </section>;
 }
