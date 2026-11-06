@@ -45,7 +45,7 @@ class ClaimedProvisionJob:
     requested_protocols: tuple[str, ...]
     lease_token: str
     attempts: int
-    origin: str
+    origin: str = "admin_new"
 
 
 def enqueue_new_subscription(
