@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.601",
+  "version": "1.1.0-rc.602",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T02:46:37Z",
+  "released_at": "2026-11-06T02:56:28Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d46d3c0c3fd1487b302f9132677aaa5587e8d8af",
+  "source_sha": "79ff8a60deba6e61382937e0549fb16f01dda604",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.601/twinpanel-1.1.0-rc.601-linux-x86_64.tar.gz",
-    "sha256": "b3a13347dd901c84812184d8e1fbeb8a869b3693226ef36266a3ba986b02798a",
-    "size_bytes": 28796278
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.602/twinpanel-1.1.0-rc.602-linux-x86_64.tar.gz",
+    "sha256": "2bc7c080ae57215e1d790edf14bb6a9fe8ef6aeec5f5a3f7523fd91e04763c33",
+    "size_bytes": 28804628
   },
   "notes": {
-    "fa": "اصلاح مدیریت V2Ray/Xray برای ویرایش مستقل سه Inbound: TCP+TLS، WebSocket+TLS و XHTTP+REALITY. پیش‌نویس هر نوع جدا ذخیره می‌شود؛ اعمال زنده فقط برای مقصد و SNI REALITY پس از تست فعال است. کانفیگ‌های کاربران و ریمارک نام کاربری و پرچم حفظ می‌شوند.",
-    "en": "Three independent V2Ray inbound editors: TCP TLS, WebSocket TLS and XHTTP REALITY. Per-profile validated drafts; verified REALITY target/SNI applies independently. User credentials and username/flag remarks are preserved."
+    "fa": "حذف کامل داده‌ها و Runtimeهای اختصاصی نود، حفظ سوابق اشتراک و کیف‌پول، جلوگیری از پاک‌سازی نود جایگزین هم-IP، و رفع هنگ هنگام افزودن نود با انتشار غیربلوکه و ساخت مرحله‌ای اکانت‌های جدید.",
+    "en": "Strict scoped node retirement cleanup and shared-IP replacement safety, plus nonblocking node enrollment/publish; only new active accounts auto-provision in bounded batches while migrated subscriptions remain manual-only."
   }
 }
