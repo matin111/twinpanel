@@ -78,7 +78,12 @@ def _subscription_and_payload(token: str, db: Session):
             continue
         if not can_use_mother and mother_policy._item_is_mother(db, live):
             continue
-        safe = customer_policy._customer_xray_item_v261(db, live)
+        # Text-only /sub and /multi/v2ray never consume QR assets; generating
+        # nine large SVGs per poll stalls subscription updates and may cause
+        # client-side timeouts. Full customer Connection Info retains QR.
+        safe = customer_policy._customer_xray_item_v261(
+            db, live, include_qr=False,
+        )
         if safe is not None:
             items.append(safe)
     return sub, {
