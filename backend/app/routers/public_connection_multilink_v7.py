@@ -5,7 +5,7 @@ import io
 import json
 import re
 from typing import Any
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 import qrcode
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -243,7 +243,26 @@ def _apply_live_xray_uri(uri: str, settings: dict[str, str]) -> str:
         return uri
 
 
-def _v2ray_profile_groups(db: Session, payload: dict[str, Any]) -> list[dict[str, Any]]:
+def _v2ray_country_flag(country_code: str | None) -> str:
+    code = str(country_code or "").strip().upper()
+    if len(code) != 2 or not code.isalpha() or not code.isascii():
+        return "🌐"
+    return "".join(chr(0x1F1E6 + ord(ch) - ord("A")) for ch in code)
+
+
+def _v2ray_remark_uri(uri: str, username: str, country_code: str | None) -> str:
+    """Only customer username + destination flag. All URI parameters stay intact."""
+    if not uri.startswith("vless://"):
+        return uri
+    try:
+        parts = urlsplit(uri)
+        label = f"{username.strip()} {_v2ray_country_flag(country_code)}".strip()
+        return urlunsplit(parts._replace(fragment=quote(label, safe="")))
+    except (TypeError, ValueError):
+        return uri
+
+
+def _v2ray_profile_groups(db: Session, payload: dict[str, Any], username: str = "" ) -> list[dict[str, Any]]:
     """Group resolved profiles by server and include only customer-safe location metadata."""
 
     groups: list[dict[str, Any]] = []
@@ -254,14 +273,20 @@ def _v2ray_profile_groups(db: Session, payload: dict[str, Any]) -> list[dict[str
         except (TypeError, ValueError):
             node_id = 0
         node_settings = live_settings.get(node_id, {})
-        uris = [_apply_live_xray_uri(uri, node_settings) for uri in _item_v2ray_uris(item)]
+        _, country_code = _customer_safe_node_meta(db, item, len(groups))
+        uris = [
+            _v2ray_remark_uri(_apply_live_xray_uri(uri, node_settings), username, country_code)
+            if username else _apply_live_xray_uri(uri, node_settings)
+            for uri in _item_v2ray_uris(item)
+        ]
         if not uris:
             continue
 
         profile_rows: list[dict[str, Any]] = []
         resolved_profiles = xray_delivery._customer_profiles(item)
         by_uri = {
-            _apply_live_xray_uri(str(profile.get("uri") or "").strip(), node_settings): profile
+            (_v2ray_remark_uri(_apply_live_xray_uri(str(profile.get("uri") or "").strip(), node_settings), username, country_code)
+             if username else _apply_live_xray_uri(str(profile.get("uri") or "").strip(), node_settings)): profile
             for profile in resolved_profiles
             if isinstance(profile, dict)
             and str(profile.get("uri") or "").strip()
@@ -315,8 +340,9 @@ def _v2ray_uris(db: Session, payload: dict[str, Any]) -> list[str]:
 
 
 def _subscription_content(token: str, db: Session) -> tuple[str, int, int]:
-    payload = _active_public_payload(token, db)
-    groups = _v2ray_profile_groups(db, payload)
+    sub, payload = _subscription_and_payload(token, db)
+    username = str(getattr(sub, "account_username", None) or getattr(sub, "username", None) or f"user{sub.id}")
+    groups = _v2ray_profile_groups(db, payload, username)
     uris = list(dict.fromkeys(
         str(profile.get("uri") or "").strip()
         for group in groups
