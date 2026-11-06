@@ -1067,6 +1067,49 @@ if [ -f "$MANAGED/v2ray" ]; then
 
     rm -f "$MANAGED/v2ray"
 fi
+
+# -------------------------------------------------
+# TwinPanel-owned modern protocol services
+# Do not stop generic system services, unrelated VPN units or
+# shared packages. A Node is a dedicated remote host; clean only
+# units and directories installed in the TwinPanel namespace.
+# -------------------------------------------------
+for UNIT in \
+  twinpanel-sing-box.service \
+  twinpanel-sudoku.service \
+  twinpanel-trusttunnel.service \
+  twinpanel-amneziawg.service \
+  twinpanel-amneziawg-egress.service \
+  twinpanel-modern-tls-renew.service \
+  twinpanel-modern-tls-renew.timer
+do
+    systemctl disable --now "$UNIT" >/dev/null 2>&1 || true
+    rm -f "/etc/systemd/system/$UNIT"
+done
+
+for UNIT_FILE in /etc/systemd/system/twinpanel-sudoku-sub-*.service; do
+    [ -f "$UNIT_FILE" ] || continue
+    UNIT=$(basename "$UNIT_FILE")
+    systemctl disable --now "$UNIT" >/dev/null 2>&1 || true
+    rm -f "$UNIT_FILE"
+done
+
+# The Mieru server uses a generic unit name. Never touch it unless
+# its TwinPanel-owned standalone configuration exists on this Node.
+if [ -d /etc/twinpanel/standalone/mieru ]; then
+    systemctl disable --now mita.service >/dev/null 2>&1 || true
+fi
+
+rm -rf \
+  /etc/twinpanel/standalone \
+  /etc/twinpanel/sing-box
+
+# Only managed artifacts, not software packages or system accounts.
+rm -f "$MANAGED/anytls" "$MANAGED/naive" \
+  "$MANAGED/shadowtls" "$MANAGED/mieru" \
+  "$MANAGED/snell" "$MANAGED/trusttunnel" \
+  "$MANAGED/hysteria2" "$MANAGED/tuic" \
+  "$MANAGED/sudoku" "$MANAGED/amneziawg"
 """
 
     controller_key_cleanup = ""
