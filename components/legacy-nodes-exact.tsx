@@ -7,6 +7,7 @@ import {adminApi,type AdminNode,type RuntimeRow,type XrayDomainState} from "../l
 import {legacyAdminApi} from "../lib/legacy-admin-api";
 import {updateNodeIdentity} from "../lib/node-identity-api";
 import {useI18n} from "../lib/i18n";
+import {NodeAutoBackfillPanel} from "./node-auto-backfill-panel";
 
 const s=(value:unknown)=>String(value??"").trim();
 const n=(value:unknown)=>{const parsed=Number(value??0);return Number.isFinite(parsed)?parsed:0;};
@@ -351,6 +352,7 @@ export function LegacyNodesRuntimePage(){
           {hasDedicatedXrayDomain?<div><span>{pick("دامنه Xray","Xray domain")}</span><b dir="ltr">{xrayDomainLoading?"…":xrayDomainMeta?.xray_domain||"—"}</b></div>:null}
           <div><span>{pick("پروتکل‌های فعال","Enabled protocols")}</span><b>{selectedProtocols.length.toLocaleString("fa-IR")}</b></div>
         </div>
+        {selectedRole==="exit"?<NodeAutoBackfillPanel nodeId={selected.id}/>:null}
         <div className="action-row node-manage-actions">
           <button type="button" className="primary-soft" onClick={()=>{setIdentityDraft({name:s(selected.name),country_code:s(selected.country_code).toUpperCase()});setError("");setModal("identity");}}>{pick("نام و کشور","Name & country")}</button>
           <button type="button" className="primary-soft" onClick={()=>{setError("");setAccessDraft(current=>({...current,password:""}));setModal("ssh");}}>{pick("دسترسی SSH","SSH access")}</button>
