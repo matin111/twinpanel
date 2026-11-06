@@ -119,6 +119,7 @@ expected = {{
         "decryption": "none",
     }},
     "streamSettings": {{
+        "sockopt": {{"tcpCongestion": "bbr"}},
         "network": "tcp",
         "security": "tls",
         "tlsSettings": {{
