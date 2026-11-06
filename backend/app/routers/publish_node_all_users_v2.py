@@ -33,8 +33,8 @@ async def publish_node_to_all_users_v2(
     """Publish an Exit in O(1) SQL statements, never O(number of accounts) SSH.
 
     The user explicitly opts in by pressing "Show for all site users".
-    Existing user memberships and new public-plan entitlements are created
-    atomically. Never start bulk provisioning, restart services or mutate
+    Existing eligible subscription memberships and direct route policies
+    are updated atomically. Never start bulk provisioning, restart services or mutate
     existing credentials in the API request.
     """
     node = (
@@ -59,7 +59,10 @@ async def publish_node_to_all_users_v2(
                 INSERT INTO subscription_nodes (subscription_id,node_id,created_at)
                 SELECT s.id,:node_id,:now
                 FROM subscriptions s
-                WHERE s.status != 'CANCELED'
+                WHERE s.status = 'ACTIVE'
+                  AND (s.expires_at IS NULL OR s.expires_at > :now)
+                  AND (s.traffic_limit_bytes <= 0
+                       OR s.traffic_used_bytes < s.traffic_limit_bytes)
                   AND NOT EXISTS (
                     SELECT 1 FROM subscription_nodes sn
                     WHERE sn.subscription_id=s.id AND sn.node_id=:node_id
@@ -104,27 +107,10 @@ async def publish_node_to_all_users_v2(
                   )
             """), params,
         )
-        # "Show for all" also applies to future *public* plan purchases, not
-        # internal reseller templates. Plan memberships are distinct from
-        # already purchased subscription snapshots.
-        plans = db.execute(
-            text("""
-                INSERT INTO plan_nodes (plan_id,node_id,created_at)
-                SELECT p.id,:node_id,:now FROM plans p
-                WHERE p.is_active=TRUE
-                  AND substr(p.name,1,:reserved_length) != :reserved_prefix
-                  AND NOT EXISTS (
-                    SELECT 1 FROM plan_nodes pn
-                    WHERE pn.plan_id=p.id AND pn.node_id=:node_id
-                  )
-                ON CONFLICT (plan_id,node_id) DO NOTHING
-            """),
-            {
-                **params,
-                "reserved_prefix": "__tp_reseller__",
-                "reserved_length": len("__tp_reseller__"),
-            },
-        )
+        # IMPORTANT: Do not mutate plan_nodes here. Different public plans
+        # (including economic/premium tiers) have separate node entitlements.
+        # The admin selects nodes for future buyers in the Plan editor.
+        # 'Publish to all users' applies to already-purchased, eligible accounts.
         db.commit()
     except Exception:
         db.rollback()
@@ -139,7 +125,7 @@ async def publish_node_to_all_users_v2(
         {
             "node_id": int(node.id),
             "memberships_added": added,
-            "public_plans_added": max(0, int(plans.rowcount or 0)),
+            "public_plans_added": 0,
         },
         flush=True,
     )
@@ -150,15 +136,16 @@ async def publish_node_to_all_users_v2(
         "memberships_added": added,
         "delivery_modes_added": max(0, int(explicit.rowcount or 0)),
         "delivery_modes_enabled": max(0, int(reenabled.rowcount or 0)),
-        "public_plans_added": max(0, int(plans.rowcount or 0)),
+        "public_plans_added": 0,
         "active_subscriptions_reconciled": 0,
         "classic_pairs_provisioned": 0,
         "modern_pairs_provisioned": 0,
         "active_memberships_awaiting_background_sync": None,
         "failed": [],
         "message": (
-            "نود ثبت و برای کاربران و پلن‌های عمومی منتشر شد؛ "
-            "کانفیگ اکانت‌های جدید توسط Worker و اکانت‌های انتقالی فقط با دستور ادمین ساخته می‌شوند"
+            "نود برای اشتراک‌های فعال موجود ثبت شد؛ "
+            "افزودن نود به پلن‌های فروش باید با انتخاب ادمین در ویرایش پلن انجام شود. "
+            "کانفیگ اکانت‌های انتقالی فقط با دستور دستی ساخته می‌شود"
         ),
     }
 
