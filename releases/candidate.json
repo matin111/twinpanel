@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.607",
-  "source_sha": "d0094144df3d020a0eab3dae1df129243fcb5ac1",
+  "version": "1.1.0-rc.608",
+  "source_sha": "b8586170bf849a4f32f54f91673e1e4677756872",
   "notes": {
-    "fa": "تکمیل ارتقای پایدار Agent همه نودها با نشانگر اجباری V140 و V258؛ رفع Offline اشتباه ناشی از هزاران بررسی تکی iptables و رفع گیرکردن نصب در virtualenv منتقل‌شده/عدم دسترسی PyPI. حفظ کامل SOCKS5 پروتکل شانزدهم، قابلیت‌های قبلی V2Ray، تونل‌ها و اصلاحات rc.606.",
-    "en": "Durable all-node Agent rollout requiring both V140 fast firewall snapshots and V258 active transport authority; installer uses venv python -m pip only when dependencies are missing, avoiding broken pip shebangs and unnecessary downloads. Preserves rc.606 SOCKS5 16th protocol and all existing features."
+    "fa": "حذف gRPC منسوخ از V2Ray/Xray؛ حذف ساخت Inbound و مسیر gRPC، حذف ساب‌لینک‌های gRPC قدیمی بدون ساخت مجدد کاربران، حفظ WS/TLS، XHTTP/REALITY و TCP/TLS، ابزار پاک‌سازی ایمن با بکاپ و بازگشت در صورت خطا برای نودهای موجود. حفظ تمام امکانات rc.607 از جمله SOCKS5 و اصلاح Agent.",
+    "en": "Remove retired V2Ray gRPC from new Xray listeners, routes, customer subscriptions, admin and profile requirements. Legacy gRPC URIs filtered without UUID rotation; safe backed-up validated cleanup for existing nodes. Preserve WS/TLS, XHTTP/REALITY, TCP/TLS, SOCKS5 and rc.607 Agent fixes."
   }
 }
