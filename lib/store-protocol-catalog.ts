@@ -1,4 +1,4 @@
-export type StoreProtocolCategory="classic"|"recommended"|"camouflage"|"standalone";
+export type StoreProtocolCategory="classic"|"recommended"|"camouflage"|"standalone"|"proxy";
 
 export type StoreProtocolMeta={
   id:string;
