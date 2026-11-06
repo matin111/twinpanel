@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.621",
+  "version": "1.1.0-rc.622",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T20:54:24Z",
+  "released_at": "2026-11-06T21:05:05Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "a975401288ccbc70fae2b4ce6129bc4a2c14a87c",
+  "source_sha": "6d1b04e5d56956358a46345104c82c4924c0e66b",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.621/twinpanel-1.1.0-rc.621-linux-x86_64.tar.gz",
-    "sha256": "c3a1a07b26de1536788f8339dd3d0374dd7a5125a2c210db0650462b24f2e2fb",
-    "size_bytes": 28971227
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.622/twinpanel-1.1.0-rc.622-linux-x86_64.tar.gz",
+    "sha256": "1f03e5e7b021ba4a2d57edef636d39d4aeae13900450086db4fed17559643df5",
+    "size_bytes": 28972488
   },
   "notes": {
-    "fa": "اصلاح جستجوی کاربران موجود هنگام انتقال اشتراک به نماینده، اتصال خودکار حساب موجود بدون ساخت کاربر تکراری و مدیریت خطای قفل دیتابیس در انتقال مالکیت.",
-    "en": "Fix reseller subscription transfer: search existing site users, atomically link existing accounts without duplication, and handle transient row-lock contention with bounded retries."
+    "fa": "اصلاح جستجوی کاربران موجود برای انتقال اشتراک به نماینده، جلوگیری از ساخت کاربر تکراری، مدیریت قفل هم‌زمان دیتابیس، و اصلاح سازگاری ساب‌لینک V2Ray با تولید بدون QR.",
+    "en": "Reseller transfer existing user search, atomic linking without duplicate account, transient lock handling; V47 runtime QR-free subscription feed compatibility to pass post-update canary."
   }
 }
