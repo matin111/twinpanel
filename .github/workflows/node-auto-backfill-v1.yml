@@ -1,0 +1,28 @@
+name: Durable Node Backfill Queue V1
+on:
+  pull_request:
+    paths:
+      - "backend/app/node_backfill_job_models_v1.py"
+      - "backend/app/services/node_auto_backfill_v1.py"
+      - "backend/scripts/twinpanel_node_auto_backfill_v1.py"
+      - "backend/tests/test_node_auto_backfill_v1.py"
+      - ".github/workflows/node-auto-backfill-v1.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PYTHONPATH: backend
+      DATABASE_URL: sqlite:///./node-backfill-ci.sqlite3
+      APP_SECRET_KEY: dummy-ci-only-key
+      NODE_AGENT_SHARED_SECRET: dummy-ci-only-agent-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r backend/requirements.txt pytest
+      - run: python -m pytest -q backend/tests/test_node_auto_backfill_v1.py backend/tests/test_existing_node_backfill_v1.py
