@@ -14,6 +14,7 @@ import {
 import {useI18n} from "../lib/i18n";
 import {Badge, PageHead, Shell} from "./ui";
 import styles from "./protocol-command-center.module.css";
+import {XrayInboundEditorInProtocol} from "./xray-inbound-editor-in-protocol";
 
 
 type OptionDef={value:string;label_fa:string;label_en:string};
@@ -625,6 +626,7 @@ export function ProtocolCommandCenter(){
               <div className={styles.sectionHead}><div><strong>{pick("Xray Domain & TLS","Xray Domain & TLS")}</strong><small>{pick("دامنه اختصاصی بدون تغییر دامنه عمومی نود","Dedicated domain without changing the node public domain")}</small></div><button className={styles.secondaryButton} onClick={()=>void openDomain()} disabled={!!busy}>{busy===`domain:${selectedNode.id}`?"…":domainOpen?pick("بارگذاری مجدد","Reload"):pick("باز کردن","Open")}</button></div>
               {domainOpen?<><div className={styles.formGrid}><div className={`${styles.field} ${styles.fieldWide}`}><label>{pick("دامنه Xray","Xray domain")}</label><input dir="ltr" value={domainDraft} onChange={event=>setDomainDraft(event.target.value)} placeholder="xray.example.com"/></div></div><div className={styles.tlsMeta}><span>{pick("Effective","Effective")}: <b dir="ltr">{domainMeta?.effective_xray_domain||"—"}</b></span><Badge tone={domainMeta?.tls_enabled?"ok":"warn"}>{domainMeta?.tls_enabled?"TLS READY":"TLS CHECK"}</Badge></div><div className={styles.actionRow}><button className={styles.secondaryButton} disabled={!!busy} onClick={()=>void saveDomain(false)}>{busy==="domain-save"?"…":pick("ذخیره","Save")}</button><button className={styles.primaryButton} disabled={!!busy||!domainDraft.trim()} onClick={()=>void saveDomain(true)}>{busy==="domain-prepare"?"…":pick("ذخیره و آماده‌سازی TLS","Save & prepare TLS")}</button></div></>:null}
             </section>:null}
+            {protocol==="v2ray"&&selectedRow.installed?<XrayInboundEditorInProtocol nodeId={selectedNode.id}/>:null}
           </>;
         })():null}
 

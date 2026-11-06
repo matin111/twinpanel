@@ -2,10 +2,18 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from types import ModuleType
 
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
+
+# This smoke validates the pure registry contract. Avoid executing app/__init__.py,
+# which boots unrelated FastAPI/Xray application dependencies on the lightweight
+# GitHub Actions runner. Relative imports inside the registry still resolve.
+app_package = ModuleType("app")
+app_package.__path__ = [str(ROOT / "backend" / "app")]
+sys.modules.setdefault("app", app_package)
 
 from app.protocol_adapter_registry import (  # noqa: E402
     CLASSIC_ADAPTER,
