@@ -1,5 +1,5 @@
 [Unit]
-Description=TwinPanel V2Ray-only Germany WS VXLAN NAT canary
+Description=TwinPanel V2Ray-only Germany/USA VLESS TCP-only VXLAN routing canaries
 After=network-online.target twinpanel-agent.service
 Wants=network-online.target
 
@@ -7,4 +7,8 @@ Wants=network-online.target
 Type=oneshot
 ExecStart=/usr/bin/python3 /usr/local/sbin/tp-v2ray-only-vxlan-canary-v1 apply --profile=de-ws
 ExecStart=/usr/bin/python3 /usr/local/sbin/tp-v2ray-only-vxlan-canary-v1 apply --profile=us-ws
+ExecStart=/usr/bin/python3 /usr/local/sbin/tp-v2ray-only-vxlan-canary-v1 apply --profile=de-xhttp
+ExecStart=/usr/bin/python3 /usr/local/sbin/tp-v2ray-only-vxlan-canary-v1 apply --profile=de-tcp
+ExecStart=/usr/bin/python3 /usr/local/sbin/tp-v2ray-only-vxlan-canary-v1 apply --profile=us-xhttp
+ExecStart=/usr/bin/python3 /usr/local/sbin/tp-v2ray-only-vxlan-canary-v1 apply --profile=us-tcp
 TimeoutStartSec=20
