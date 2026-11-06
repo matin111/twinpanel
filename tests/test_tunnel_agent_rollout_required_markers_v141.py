@@ -44,6 +44,9 @@ class RolloutMarkerTests(unittest.TestCase):
         source = (ROOT / "backend/app/routers/provision.py").read_text(encoding="utf-8")
         self.assertIn("/opt/twinpanel-agent/venv/bin/python -m pip install", source)
         self.assertNotIn("/opt/twinpanel-agent/venv/bin/pip install", source)
+        self.assertNotIn("/opt/twinpanel-agent/venv/bin/python -m pip install --upgrade pip", source)
+        self.assertIn('"import httpx,psutil', source)
+        self.assertIn("--timeout 15 --retries 2", source)
 
     def test_no_unmarked_agent_is_accepted(self):
         command = self.ns["_marker_probe_command"]()
