@@ -10,10 +10,11 @@ root = Path(__file__).resolve().parents[1]
 adaptive = (root / "app" / "xray_adaptive_three_profiles_v47.py").read_text("utf-8")
 reconcile = (root / "app" / "xray_profile_reconcile_v36.py").read_text("utf-8")
 migration = (root / "scripts" / "twinpanel_migration_classic_sequential_v3.py").read_text("utf-8")
+scoped = (root / "scripts" / "twinpanel_existing_node_backfill_v1.py").read_text("utf-8")
 jobs = (root / "app" / "services" / "node_auto_backfill_v1.py").read_text("utf-8")
 runner = (root / "scripts" / "twinpanel_node_auto_backfill_v1.py").read_text("utf-8")
 for name, source in (("adaptive", adaptive), ("reconcile", reconcile),
-                     ("migration", migration), ("jobs", jobs), ("runner", runner)):
+                     ("migration", migration), ("jobs", jobs), ("runner", runner), ("scoped", scoped)):
     compile(source, name + ".py", "exec")
 
 
@@ -41,6 +42,9 @@ assert 'if _required_profiles_v47(node) <= ready_profiles:' in migration
 assert 'items=[' in migration and 'item if ad._autosync_item_node_id(x)==node_id else x' in migration
 assert 'client_id=str(uuid.UUID(client_id))' in migration
 assert 'repair_missing_v2ray_jobs(db)' in runner
+assert "if PROTOCOL != 'v2ray':" in migration
+assert 'if protocol != "v2ray":' in scoped
+assert 'if protocol != "singbox":' in scoped
 assert 'db.get(NodeBackfillJobV1, (int(node_id), "v2ray"))' in jobs
 assert 'or not node.enable_v2ray' in jobs
 print("NODE_XRAY_MISSING_PROFILES_REGRESSION=PASS")
