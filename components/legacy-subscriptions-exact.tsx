@@ -459,7 +459,7 @@ export function LegacySubscriptionsRuntimePage(){
             {transferUserMatches.map(user=><option key={user.id} value={user.id}>{user.full_name||user.email||`#${user.id}`} · {user.email||`#${user.id}`}</option>)}
           </select></label>
         </div>:
-      <div className="setting-grid">
+      <><div className="setting-grid">
         <label className="field"><span>{pick("نماینده مقصد","Destination reseller")}</span>
           <select value={transferResellerId} disabled={transferLoading||!!busy} onChange={event=>void selectTransferReseller(Number(event.target.value))}>
             <option value={0}>{pick("انتخاب نماینده","Select reseller")}</option>
