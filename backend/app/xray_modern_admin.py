@@ -1046,5 +1046,5 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
         "ok": True, "node_id": int(node_id),
         "applied_fields": ["reality_server_name", "reality_target"] + (["ws_path"] if ws_path else []) + (["xhttp_path"] if xhttp_path else []) + (["tcp_tls_sni"] if tcp_tls_sni else []) + (["ws_tls_sni"] if ws_tls_sni else []) + (["connection_domain"] if alias_changes else []),
         "reality_server_name": name,
-        "note": "TLS, connection domain and transport remain unchanged.",
+        "note": "Validated TLS SNI, paths and same-ingress DNS aliases applied; transport types unchanged.",
     }
