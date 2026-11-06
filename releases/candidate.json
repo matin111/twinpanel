@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.629",
-  "source_sha": "21bcec820dca18c1f630075027f2c228d8ecb878",
+  "version": "1.1.0-rc.630",
+  "source_sha": "0263c4ba98d189c99141b5fec302b2e656f32422",
   "notes": {
-    "fa": "نمایش خودکار پرچم کشور واقعی نود در نام نمایشی کانفیگ‌های همه پروتکل‌ها، شامل نودهای جدید؛ بدون تغییر نام فایل‌های حساس یا اطلاعات اتصال.",
-    "en": "Automatically derive country emoji flags from live node country codes for public protocol remarks and new nodes; leave native filenames and VPN connection details unchanged."
+    "fa": "کاهش سربار ساخت V2Ray در مدیریت مرکزی با استفاده مجدد از SSH هر دسته و ثبت صحیح پیشرفت جزئی هنگام خطا؛ حفظ UUID، سرویس‌های فعال و کنترل سلامت، بدون ری‌استارت Xray.",
+    "en": "Centralized V2Ray batch SSH session reuse and safe backfill partial-progress accounting/diagnostics. Preserve existing UUIDs and hot-user APIs without Xray restarts."
   }
 }
