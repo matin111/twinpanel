@@ -120,6 +120,7 @@ import json
 import os
 import secrets
 import uuid
+import copy
 
 CONFIG = {CONFIG_PATH!r}
 STATE = {STATE_PATH!r}
@@ -144,6 +145,7 @@ with open(CONFIG, "r", encoding="utf-8") as handle:
     doc = json.load(handle)
 if not isinstance(doc, dict):
     raise SystemExit("sing-box config is not an object")
+original_doc = copy.deepcopy(doc)
 
 inbounds = doc.get("inbounds")
 if not isinstance(inbounds, list):
@@ -164,6 +166,7 @@ if not isinstance(inbound, dict):
 users = inbound.get("users")
 if not isinstance(users, list):
     users = []
+installed_users = list(users)
 
 key = "username" if PROTOCOL == "naive" else "name"
 users = [
@@ -208,6 +211,16 @@ if not users:
         )]
 
 inbound["users"] = users
+if RECORD is not None:
+    old_matches = [u for u in installed_users if isinstance(u, dict)
+                   and str(u.get(key) or "") == USERNAME]
+    old_revoked = any(
+        isinstance(u, dict) and str(u.get(key) or "").startswith(SENTINEL)
+        for u in installed_users
+    )
+    # A replay of the same credential must not reorder an inbound's users.
+    if len(old_matches) == 1 and old_matches[0] == RECORD and not old_revoked:
+        inbound["users"] = installed_users
 
 if PROTOCOL == "shadowtls":
     state = load_json(STATE, {{}})
@@ -251,6 +264,10 @@ if PROTOCOL == "shadowtls":
     os.replace(STATE + ".account-new", STATE)
     os.chmod(STATE, 0o600)
 
+if doc == original_doc:
+    print("account_unchanged=1")
+    raise SystemExit(0)
+
 with open(CONFIG + ".account-new", "w", encoding="utf-8") as handle:
     json.dump(doc, handle, ensure_ascii=False, indent=2)
     handle.write("\\n")
@@ -287,7 +304,10 @@ async def _commit_account_config(conn, script: str) -> None:
     await cmd(
         conn,
         "set -eu; exec 9>/run/twinpanel-singbox-batch.lock; flock -x 9; "
-        f"printf '%s' {shlex.quote(encoded)} | base64 -d | python3; "
+        f"result=$(printf '%s' {shlex.quote(encoded)} | base64 -d | python3); "
+        "if [ \"$result\" = 'account_unchanged=1' ]; then "
+        f"systemctl is-active --quiet {SERVICE_NAME}.service || systemctl restart {SERVICE_NAME}.service; "
+        "else "
         f"/usr/local/bin/twinpanel-sing-box check -c {shlex.quote(CONFIG_PATH + '.account-new')}; "
         f"cp -a {shlex.quote(CONFIG_PATH)} {backup}; "
         f"mv {shlex.quote(CONFIG_PATH + '.account-new')} {shlex.quote(CONFIG_PATH)}; "
@@ -297,6 +317,7 @@ async def _commit_account_config(conn, script: str) -> None:
         f"  systemctl restart {SERVICE_NAME}.service || true; "
         f"  exit 1; "
         f"fi; "
+        "fi; "
         f"systemctl is-active --quiet {SERVICE_NAME}.service",
         timeout=120,
     )
@@ -399,7 +420,7 @@ def _batch_mutation_script(secrets: list[SingBoxAccountSecret]) -> str:
         updates.append({"protocol": secret.protocol, "tag": TAGS[secret.protocol],
                         "username": secret.username, "record": _user_record(secret)})
     payload = json.dumps(updates, ensure_ascii=False)
-    return f'''import json, os, secrets, fcntl
+    return f'''import json, os, secrets, fcntl, copy
 
 CONFIG = {CONFIG_PATH!r}
 STATE = {STATE_PATH!r}
@@ -410,6 +431,7 @@ SHADOWTLS_INNER_METHOD = {SHADOWTLS_INNER_METHOD!r}
 
 with open(CONFIG, "r", encoding="utf-8") as handle:
     doc = json.load(handle)
+original_doc = copy.deepcopy(doc)
 inbounds = doc.get("inbounds")
 if not isinstance(inbounds, list):
     raise SystemExit("managed inbounds are unavailable")
@@ -424,11 +446,18 @@ for operation in UPDATES:
     key = "username" if protocol == "naive" else "name"
     users = inbound.get("users")
     users = list(users) if isinstance(users, list) else []
-    users = [u for u in users if not (isinstance(u, dict) and
-             (str(u.get(key) or "") == operation["username"] or
-              str(u.get(key) or "").startswith(SENTINEL)))]
-    users.append(operation["record"])
-    inbound["users"] = users
+    matching = [u for u in users if isinstance(u, dict) and
+                str(u.get(key) or "") == operation["username"]]
+    revoked = any(isinstance(u, dict) and
+                  str(u.get(key) or "").startswith(SENTINEL) for u in users)
+    # Do not reorder an existing identical credential: it would cause a
+    # needless restart even though authentication is unchanged.
+    if len(matching) != 1 or matching[0] != operation["record"] or revoked:
+        users = [u for u in users if not (isinstance(u, dict) and
+                 (str(u.get(key) or "") == operation["username"] or
+                  str(u.get(key) or "").startswith(SENTINEL)))]
+        users.append(operation["record"])
+        inbound["users"] = users
     if protocol == "shadowtls":
         state = dict(json.load(open(STATE, encoding="utf-8"))) if os.path.exists(STATE) else {{}}
         shadow = dict(state.get("shadowtls") or {{}})
@@ -446,6 +475,12 @@ for operation in UPDATES:
             previous.clear()
             previous.update(inner)
         state["shadowtls"] = shadow
+
+# No-op: do not touch the node config or service; the SSH shell checks
+# this marker under the per-node flock before skipping a restart.
+if doc == original_doc:
+    print("batch_unchanged=1")
+    raise SystemExit(0)
 
 with open(CONFIG + ".account-new", "w", encoding="utf-8") as handle:
     json.dump(doc, handle, ensure_ascii=False, indent=2)
@@ -473,7 +508,12 @@ async def apply_accounts_batch(
     command = (
         "set -eu; "
         "exec 9>/run/twinpanel-singbox-batch.lock; flock -x 9; "
-        f"printf '%s' {shlex.quote(encoded)} | base64 -d | python3; "
+        f"result=$(printf '%s' {shlex.quote(encoded)} | base64 -d | python3); "
+        "if [ \"$result\" = 'batch_unchanged=1' ]; then "
+        # Keep the running service untouched on no-op. If the service has
+        # stopped, start it even if its installed credential set is correct.
+        f"systemctl is-active --quiet {SERVICE_NAME}.service || systemctl restart {SERVICE_NAME}.service; "
+        "else "
         f"/usr/local/bin/twinpanel-sing-box check -c {shlex.quote(CONFIG_PATH + '.account-new')}; "
         f"backup=$(mktemp {shlex.quote(CONFIG_PATH + '.batch-backup-XXXXXX')}); "
         f"cp -a {shlex.quote(CONFIG_PATH)} \"$backup\"; "
@@ -481,10 +521,11 @@ async def apply_accounts_batch(
         f"if ! systemctl restart {SERVICE_NAME}.service; then "
         f"cp -a \"$backup\" {shlex.quote(CONFIG_PATH)}; "
         f"systemctl restart {SERVICE_NAME}.service || true; exit 1; fi; "
-        f"systemctl is-active --quiet {SERVICE_NAME}.service; "
         f"if test -f {shlex.quote(STATE_PATH + '.account-new')}; then "
         f"mv {shlex.quote(STATE_PATH + '.account-new')} {shlex.quote(STATE_PATH)}; fi; "
-        "rm -f \"$backup\""
+        "rm -f \"$backup\"; "
+        "fi; "
+        f"systemctl is-active --quiet {SERVICE_NAME}.service"
     )
     await cmd(conn, command, timeout=180)
     inbounds: dict[str, dict[str, Any]] = {}

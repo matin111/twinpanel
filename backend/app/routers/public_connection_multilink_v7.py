@@ -175,7 +175,7 @@ def _customer_safe_node_meta(db: Session, item: dict[str, Any], index: int) -> t
 _HOSTNAME = re.compile(r"^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$")
 
 
-def _live_xray_settings(db: Session, payload: dict[str, Any]) -> dict[int, dict[str, str]]:
+def _live_xray_settings(db: Session, payload: dict[str, Any]) -> dict[int, dict[str, Any]]:
     ids = set()
     for item in _v2ray_items(payload):
         try:
@@ -195,7 +195,7 @@ def _live_xray_settings(db: Session, payload: dict[str, Any]) -> dict[int, dict[
         ),
         {"node_ids": sorted(ids)},
     ).all()
-    result: dict[int, dict[str, str]] = {}
+    result: dict[int, dict[str, Any]] = {}
     for node_id, raw in rows:
         try:
             settings = json.loads(raw) if isinstance(raw, str) else raw
@@ -213,12 +213,33 @@ def _live_xray_settings(db: Session, payload: dict[str, Any]) -> dict[int, dict[
                 and all(len(label) <= 63 for label in hostname.split("."))
             ):
                 override[key] = hostname
+        applied = settings.get("inbound_applied")
+        if isinstance(applied, dict):
+            safe_paths = {}
+            for profile_key in ("tcp_tls", "ws_tls", "xhttp_reality"):
+                entry = applied.get(profile_key)
+                if not isinstance(entry, dict):
+                    continue
+                properties: dict[str, str] = {}
+                path = str(entry.get("path") or "").strip()
+                if path.startswith("/") and 8 <= len(path) <= 120 and not any(c.isspace() for c in path):
+                    properties["path"] = path
+                server_name = str(entry.get("server_name") or "").strip().lower()
+                if server_name and _HOSTNAME.fullmatch(server_name):
+                    properties["server_name"] = server_name
+                connection_domain = str(entry.get("connection_domain") or "").strip().lower()
+                if connection_domain and _HOSTNAME.fullmatch(connection_domain):
+                    properties["connection_domain"] = connection_domain
+                if properties:
+                    safe_paths[profile_key] = properties
+            if safe_paths:
+                override["inbound_applied"] = safe_paths
         if override:
             result[int(node_id)] = override
     return result
 
 
-def _apply_live_xray_uri(uri: str, settings: dict[str, str]) -> str:
+def _apply_live_xray_uri(uri: str, settings: dict[str, Any]) -> str:
     """Patch only public TLS/REALITY SNI; never touch UUID, keys or route."""
     if not settings or not uri.startswith("vless://"):
         return uri
@@ -231,14 +252,38 @@ def _apply_live_xray_uri(uri: str, settings: dict[str, str]) -> str:
             "tls": "tls_server_name",
         }.get(security)
         sni = settings.get(key) if key else None
-        if not sni:
-            return uri
-        updated = [(k, sni if k == "sni" else v) for k, v in params]
-        if not any(k == "sni" for k, _ in updated):
-            updated.append(("sni", sni))
-        if security == "tls":
-            updated = [(k, sni if k == "host" else v) for k, v in updated]
-        return urlunsplit(parsed._replace(query=urlencode(updated)))
+        transport = next((v.lower() for k, v in params if k == "type"), "")
+        key_by_type = {"tcp": "tcp_tls", "ws": "ws_tls", "xhttp": "xhttp_reality"}
+        profile_key = key_by_type.get(transport)
+        applied = settings.get("inbound_applied") or {}
+        profile_settings = applied.get(profile_key) if profile_key and isinstance(applied, dict) else None
+        if isinstance(profile_settings, dict) and profile_settings.get("server_name"):
+            sni = profile_settings["server_name"]
+        updated = list(params)
+        if sni:
+            updated = [(k, sni if k == "sni" else v) for k, v in updated]
+            if not any(k == "sni" for k, _ in updated):
+                updated.append(("sni", sni))
+            if security == "tls":
+                updated = [(k, sni if k == "host" else v) for k, v in updated]
+        if profile_key and isinstance(profile_settings, dict):
+            path = str(profile_settings.get("path") or "").strip()
+            if path.startswith("/") and 8 <= len(path) <= 120:
+                updated = [(k, path if k == "path" else v) for k, v in updated]
+                if not any(k == "path" for k, _ in updated):
+                    updated.append(("path", path))
+        authority = parsed.netloc
+        if isinstance(profile_settings, dict):
+            connection_domain = str(profile_settings.get("connection_domain") or "")
+            if connection_domain and _HOSTNAME.fullmatch(connection_domain):
+                try:
+                    userinfo, _ = authority.rsplit("@", 1)
+                    original_port = parsed.port
+                    if original_port is not None:
+                        authority = f"{userinfo}@{connection_domain}:{original_port}"
+                except (ValueError, TypeError):
+                    pass
+        return urlunsplit(parsed._replace(netloc=authority, query=urlencode(updated)))
     except (TypeError, ValueError):
         return uri
 
