@@ -58,6 +58,12 @@ class LiveXrayUriTests(unittest.TestCase):
         query=dict(parse_qsl(urlsplit(result).query))
         self.assertEqual((query["sni"],query["path"],query["pbk"],query["sid"]),("new.example","/xhttp-validated","pub","short"))
 
+    def test_connection_domain_alias_changes_host_not_credentials(self):
+        raw="vless://uuid-example@old-ingress.example:24007?type=xhttp&security=reality&pbk=publickey&sid=shortid"
+        updated=apply_uri(raw,{"inbound_applied":{"xhttp_reality":{"connection_domain":"alias.example"}}})
+        self.assertEqual(urlsplit(updated).netloc,"uuid-example@alias.example:24007")
+        self.assertEqual(urlsplit(updated).query,urlsplit(raw).query)
+
     def test_only_username_and_country_flag_in_remark(self):
         raw = "vless://user-secret@iran.example:24007?security=reality&pbk=key&sid=12#old-transport"
         changed = remark_uri(raw, "ali222", "DE")
