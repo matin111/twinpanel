@@ -51,11 +51,9 @@ def _profile_ids(item: dict[str, Any] | None) -> set[str]:
 
 
 def _effective_domain(node: Node) -> str:
-    return str(
-        getattr(node, "xray_domain", None)
-        or getattr(node, "public_domain", None)
-        or ""
-    ).strip().lower()
+    # Keep profile-completeness checks aligned with V47 delivery policy:
+    # tunnel public_domain is not a dedicated Xray TLS domain.
+    return str(getattr(node, "xray_domain", None) or "").strip().lower()
 
 
 def _required_profiles(node: Node) -> set[str]:
