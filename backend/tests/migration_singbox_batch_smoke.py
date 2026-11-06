@@ -83,6 +83,57 @@ print("MIGRATION_SINGBOX_BATCH_SMOKE=PASS")
 CONVERGENCE_PATH = ROOT / "backend/app/node_subscription_convergence_v114.py"
 convergence = CONVERGENCE_PATH.read_text(encoding="utf-8")
 compile(convergence, str(CONVERGENCE_PATH), "exec")
+# The convergence worker was redesigned after the original batch migration
+# smoke: imported accounts now require explicit manual provisioning across all
+# Modern protocols, not only sing-box accounts while the importer holds a lock.
+# Assert the actual AST guard so a formatting change cannot silently bypass it.
+convergence_tree = ast.parse(convergence, filename=str(CONVERGENCE_PATH))
+modern_sync = next(
+    item for item in convergence_tree.body
+    if isinstance(item, ast.AsyncFunctionDef) and item.name == "_sync_modern_node"
+)
+protocol_loops = [
+    item for item in ast.walk(modern_sync)
+    if isinstance(item, ast.For)
+    and isinstance(item.target, ast.Name) and item.target.id == "protocol"
+    and isinstance(item.iter, ast.Name) and item.iter.id == "wanted"
+]
+assert len(protocol_loops) == 1, "missing Modern protocol provisioning loop"
+skip_imported = [
+    item for item in protocol_loops[0].body
+    if isinstance(item, ast.If)
+    and isinstance(item.test, ast.Compare)
+    and len(item.test.ops) == 1
+    and isinstance(item.test.ops[0], ast.In)
+    and any(isinstance(comparator, ast.Name) and comparator.id == "imported_ids"
+            for comparator in item.test.comparators)
+    and any(isinstance(stmt, ast.Continue) for stmt in item.body)
+]
+assert skip_imported, "imported accounts must be skipped before provisioning"
+modern_source = ast.get_source_segment(convergence, modern_sync) or ""
+assert "MigrationImportRecord.subscription_id" in modern_source, (
+    "Modern auto-convergence must identify imported subscriptions"
+)
+
+bounded_sync = next(
+    item for item in convergence_tree.body
+    if isinstance(item, ast.AsyncFunctionDef)
+    and item.name == "_reconcile_bounded_exit_nodes_once"
+)
+bounded_source = ast.get_source_segment(convergence, bounded_sync) or ""
+assert "MigrationImportRecord.subscription_id" in bounded_source, (
+    "bounded convergence must identify imported subscriptions"
+)
+assert any(
+    isinstance(item, ast.UnaryOp) and isinstance(item.op, ast.Invert)
+    and isinstance(item.operand, ast.Call)
+    and isinstance(item.operand.func, ast.Attribute)
+    and item.operand.func.attr == "in_"
+    and ast.unparse(item.operand.func.value) == "Subscription.id"
+    and any(isinstance(arg, ast.Name) and arg.id == "imported"
+            for arg in item.operand.args)
+    for item in ast.walk(bounded_sync)
+), "imported subscriptions must be excluded from bounded auto-convergence"
+
 assert "_migration_singbox_worker_running()" in convergence
-assert "int(sub.id) in imported_in_batch and protocol in SINGBOX_ACCOUNT_PROTOCOLS" in convergence
-assert "MigrationImportRecord.source.in_(" in convergence
+print("MIGRATION_MANUAL_PROVISION_EXCLUSION=PASS")
