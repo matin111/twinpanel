@@ -305,6 +305,11 @@ def existing_units() -> list[str]:
         'twinpanel-web.service',
         'twinpanel-reseller-bots.service',
         'twinpanel-bot.service',
+        # This long-lived worker imports sibling scripts by resolved release path.
+        # Leaving it running across a symlink switch points at the previous
+        # release; pruning the old release then causes worker_missing errors.
+        # Restart it in the same transaction as API/web on upgrade and rollback.
+        'twinpanel-heavy-reconcile.service',
     ):
         if subprocess.run(
             ['systemctl', 'cat', unit],
