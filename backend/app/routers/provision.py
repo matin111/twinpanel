@@ -1344,8 +1344,8 @@ async def _install_or_upgrade_agent(
         "assert httpx.__version__ == '0.28.1'; "
         "assert psutil.__version__ == '7.0.0'\" "
         ">/dev/null 2>&1; then "
-        "/opt/twinpanel-agent/venv/bin/pip install --upgrade pip >/dev/null && "
-        "/opt/twinpanel-agent/venv/bin/pip install "
+        "/opt/twinpanel-agent/venv/bin/python -m pip install --upgrade pip >/dev/null && "
+        "/opt/twinpanel-agent/venv/bin/python -m pip install "
         "httpx==0.28.1 psutil==7.0.0 >/dev/null; "
         "fi",
         timeout=600,
