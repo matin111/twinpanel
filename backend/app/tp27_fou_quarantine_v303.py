@@ -199,8 +199,13 @@ def _attempt_order(cfg: dict[str, Any]) -> list[tuple[str, int | None]]:
         else:
             fresh.append(candidate)
 
-    # Keep V265's current-port-last behavior. Recently failed historical ports
-    # remain available, but only after fresh alternatives have been attempted.
+    # Preserve the order of non-FoU candidates supplied by V265. In
+    # particular, V307 puts GRE-native first: the FoU quarantine wrapper must
+    # not inadvertently move that working high-throughput carrier to the end.
+    # Among FoU fallbacks, keep fresh ports ahead of soft-quarantined ports and
+    # the current (possibly degraded) FoU port last.
+    if base and base[0][0] == "gre-native":
+        return non_fou + fresh + quarantined + current
     return fresh + quarantined + current + non_fou
 
 
