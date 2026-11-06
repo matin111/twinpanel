@@ -517,7 +517,7 @@ async def _reconcile_bounded_exit_nodes_once() -> dict:
     node_id = node_ids[node_index]
     # Older Exits usually have no missing credentials. Scan them in larger
     # slices; keep the newest Exit small to bound SSH work and API load.
-    limit = 4 if node_index == 0 else 20
+    limit = 2 if node_index == 0 else 20
     account_ids = set(eligible_ids[offset:offset + limit])
     db = SessionLocal()
     try:
