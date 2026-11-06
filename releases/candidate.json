@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.620",
-  "source_sha": "4783c3dd769e8ff2e2a7754d9bc141636d84b3f0",
+  "version": "1.1.0-rc.621",
+  "source_sha": "548d840f9a14d576badc8f1519cd5c33b809e4e8",
   "notes": {
-    "fa": "انتقال مالکیت واقعی اکانت به کاربر یا نماینده از همان صفحه اشتراک‌ها؛ ثبت هم‌زمان مالک و مدیریت نمایندگی؛ فیلتر اشتراک‌ها بر اساس هر نماینده یا بدون نماینده؛ ترمیم انتقال‌های قدیمی بدون تغییر کانفیگ، حجم و تاریخ انقضا.",
-    "en": "True subscription ownership transfers to users and reseller customers, atomic reseller mapping, SQL-side reseller/unassigned filters before pagination, guarded repair for historical management-only transfers. No VPN configuration or quota mutations."
+    "fa": "رفع ساخت اشتراک دستی با حجم یا روز خالی: مقدار خالی یا صفر معادل نامحدود، ثبت فلگ زمان نامحدود در بک‌اند و نمایش راهنمای واضح در فرم، بدون تغییر اکانت‌های موجود.",
+    "en": "Allow blank/zero traffic and days as unlimited for manual admin subscription creation, persist unlimited-duration override, add inline form guidance, preserve existing accounts."
   }
 }
