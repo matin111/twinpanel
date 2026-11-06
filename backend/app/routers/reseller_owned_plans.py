@@ -27,6 +27,10 @@ from ..reseller_owned_plans import (
 from ..services.subscription_provision_preflight_v1 import (
     assert_subscription_provisioning_ready,
 )
+from ..services.fast_provision_queue_v1 import (
+    fast_provision_commerce_enabled,
+    provision_job_status,
+)
 from ..subscription_enforcement import queue_subscription_enforcement
 
 
@@ -470,7 +474,22 @@ async def create_reseller_subscription(
         username=payload.username,
         password=payload.password,
         sell_price_toman=0,
+        queue_origin="reseller_owned" if fast_provision_commerce_enabled() else None,
     )
+    # A newly created owned-plan account has already been transactionally
+    # queued; returning now avoids keeping the reseller request open over SSH.
+    # Idempotency retries read the existing job instead of provisioning twice.
+    job = (
+        provision_job_status(db, int(result["subscription_id"]))
+        if fast_provision_commerce_enabled() else None
+    )
+    if job is not None and job["origin"] == "reseller_owned":
+        return {
+            **result,
+            "queued": job["state"] in {"queued", "retry", "running"},
+            "provisioning_complete": job["state"] == "done",
+            "provisioning_status": job["state"],
+        }
     return await _complete_reseller_provisioning(
         db,
         result,
