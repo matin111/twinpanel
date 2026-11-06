@@ -39,7 +39,7 @@ from .xray_tcp_tls_v39 import (
 # route inventory. Admin inventory is metadata-only and never exposes UUIDs,
 # passwords, REALITY keys, paths or other customer credentials.
 #
-# gRPC Reality, XHTTP Reality and tcp_simple remain internal-only listeners and
+# gRPC Reality and tcp_simple remain internal-only listeners and
 # are not returned by either customer delivery or ordinary admin route cards.
 #
 # V261 closes two production gaps without changing the 14 non-Xray protocols:
@@ -74,7 +74,7 @@ HIDDEN_ROUTED_PROFILES = frozenset(
 # protocol runtime range (8444..8452). Keep public ports stable and move only
 # the three customer TLS listeners to an Xray-private target range:
 #   WebSocket TLS    9444
-#   HTTPUpgrade TLS  9445
+#   HTTPUpgrade TLS  9445 (retired; no new listeners or routes)
 #   TCP TLS          9446
 TLS_TARGET_OFFSETS_V261 = {
     xray_modern_runtime.PROFILE_WS: 1001,
@@ -98,7 +98,7 @@ def _required_profiles_v30(node) -> set[str]:
     if not domain:
         # No TLS identity means there is no customer-safe Xray profile to
         # materialize yet. Once a domain is saved, completeness is reevaluated
-        # and reconciliation will build all three TLS profiles.
+        # and reconciliation will build the three approved VLESS profiles.
         return set()
 
     return set(PUBLIC_PROFILE_ORDER)
