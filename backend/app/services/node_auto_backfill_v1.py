@@ -10,8 +10,9 @@ from sqlalchemy.orm import Session
 from ..models import Node, NodeStatus, NodeType
 from ..node_backfill_job_models_v1 import NodeBackfillJobV1
 
-# Only supported imported-account workers. V2Ray/REALITY remains untouched.
-FAMILIES = ("singbox", "openvpn", "cisco", "wireguard", "l2tp")
+# Imported-account missing-only workers. V2Ray uses existing hot-client sync;
+# never changes inbound definitions, REALITY, SNI, or restarts Xray.
+FAMILIES = ("singbox", "openvpn", "cisco", "wireguard", "l2tp", "v2ray")
 LEASE_MINUTES = 12
 MAX_ATTEMPTS = 8
 
