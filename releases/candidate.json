@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.598",
-  "source_sha": "734557a543b79973d853edacdf877da3b02b835a",
+  "version": "1.1.0-rc.599",
+  "source_sha": "34f18ca47d208a01aa960bf0e7aa7eb63c860ea6",
   "notes": {
-    "fa": "رفع خطای ساخت تانل جدید در مرحله انتظار کلید سمت مقابل با حفظ تأیید اتصال دوطرفه و Rollback؛ اصلاحات همگام‌سازی امن نود جدید و توقف ساخت خودکار انتقالی‌ها حفظ شد.",
-    "en": "Fix premature selected-tunnel rollback on transient waiting_peer_key during initial agent bootstrap; keep strict two-sided health acceptance, rollback and imported-account auto-provision pause."
+    "fa": "رفع خطای Timeout همگام‌سازی نود جدید با ساخت مرحله‌ای فقط برای اکانت‌های فعال غیرانتقالی و رفع Rollback زودهنگام هنگام ساخت تانل تازه با حفظ بررسی دوطرفه و بازگشت ایمن. تانل‌های فعلی و اکانت‌های انتقالی بدون تغییر.",
+    "en": "Checkpointed bounded new-Exit account backfill for active non-imported subscriptions plus bounded initial dual-agent tunnel bootstrap grace. Existing tunnels, imported-account automatic provisioning guard and strict cutover acceptance remain unchanged."
   }
 }
