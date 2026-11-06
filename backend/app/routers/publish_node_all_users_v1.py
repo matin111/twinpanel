@@ -15,7 +15,6 @@ from ..subscription_delivery_policy_v1 import (
     SubscriptionNodeDeliveryMode,
     explicit_memberships,
 )
-from .subscription_delivery_policy_v1 import _reconcile_explicit
 
 
 router = APIRouter(
@@ -89,33 +88,30 @@ async def publish_node_to_all_users(
         if sub.status == SubscriptionStatus.ACTIVE:
             active_ids.append(int(sub.id))
 
+    # Node enrollment must remain responsive. Rebuilding every active
+    # subscription inside this HTTP request can monopolize the API for
+    # minutes and starve the node heartbeat. Memberships are committed now;
+    # the separately supervised, checkpointed convergence worker handles
+    # eligible NEW accounts in bounded batches. Imported accounts remain
+    # manual-only, as configured by the operator.
     db.commit()
-    reconciled = 0
-    reconcile_failed: list[dict[str, Any]] = []
-    for subscription_id in active_ids:
-        sub = db.get(Subscription, subscription_id)
-        if not sub:
-            continue
-        try:
-            result = await _reconcile_explicit(db, sub)
-            reconciled += 1
-            if not bool(result.get("ok", False)):
-                reconcile_failed.append({"subscription_id": subscription_id, "errors": result.get("errors", []), "quota_sync_ok": result.get("quota_sync_ok")})
-        except Exception as exc:
-            db.rollback()
-            reconcile_failed.append({"subscription_id": subscription_id, "error": str(exc)[:500]})
-
+    print(
+        "TWINPANEL_NODE_PUBLISH_NONBLOCKING_V601",
+        {"node_id": int(node.id), "active_memberships": len(active_ids)},
+        flush=True,
+    )
     return {
-        "ok": len(reconcile_failed) == 0,
+        "ok": True,
         "node_id": int(node.id),
         "node_name": node.name,
         "explicit_subscriptions": len(explicit_ids),
         "memberships_added": memberships_added,
         "delivery_modes_added": delivery_modes_added,
         "delivery_modes_enabled": delivery_modes_enabled,
-        "active_subscriptions_reconciled": reconciled,
-        "failed": reconcile_failed,
-        "message": "سرور برای همه اشتراک‌های قبلی منتشر شد" if not reconcile_failed else "سرور منتشر شد اما همگام‌سازی بعضی اشتراک‌ها خطا داشت",
+        "active_subscriptions_reconciled": 0,
+        "active_memberships_awaiting_background_sync": len(active_ids),
+        "failed": [],
+        "message": "نود برای کاربران ثبت شد؛ ساخت کانفیگ اکانت‌های جدید به‌صورت مرحله‌ای انجام می‌شود و اکانت‌های انتقالی فقط دستی هستند",
     }
 
 
