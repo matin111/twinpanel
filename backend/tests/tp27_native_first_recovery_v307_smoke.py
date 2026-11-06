@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -21,6 +22,7 @@ def _isolated_function(path: Path, name: str, variables: dict):
     )
     isolated = ast.Module(body=[function], type_ignores=[])
     namespace = dict(variables)
+    namespace.setdefault("Any", Any)
     exec(compile(isolated, str(path), "exec"), namespace)
     return namespace[name]
 
