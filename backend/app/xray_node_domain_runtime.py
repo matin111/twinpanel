@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from functools import lru_cache
+import ipaddress
+import socket
+import time
 from typing import Any
 
 from fastapi import Depends, HTTPException
@@ -23,11 +27,11 @@ from .routers import account_delivery
 # V2 closed the historical-subscription gap: preparing a dedicated TLS domain
 # starts the existing V36/V41 reconcile pipeline in the background.
 #
-# V3 closes the direct-delivery authority gap. The dedicated Xray domain was
-# already used for certificate/SNI preparation, but direct customer TLS links
-# could still publish Node.public_domain or the Exit IP as their VLESS authority.
-# Only direct TLS Xray authorities are converged to xray_domain. Iran-tunnel
-# authorities and non-TLS/REALITY profiles intentionally remain unchanged.
+# V4 also honors the explicitly configured per-Exit Xray public authority
+# for tunneled VLESS profiles, but ONLY if its DNS resolves to the very same
+# ingress address(es) as the live tunnel endpoint. This preserves the tunnel,
+# prevents accidental direct-Exit bypass, and leaves other VPN protocols alone.
+# Direct TLS behavior from V3 remains unchanged.
 
 _runtime_applied = False
 _original_node_payload = None
@@ -122,6 +126,46 @@ def _dedicated_direct_tls_authority(
     return domain
 
 
+@lru_cache(maxsize=512)
+def _resolved_host_ips(host: str, bucket: int) -> frozenset[str]:
+    """Short-lived DNS verification cache: no request-wide network writes.
+
+    DNS failure fails closed to the existing tunnel authority. IPv6 results
+    are included so a dual-stack dedicated hostname cannot bypass ingress.
+    """
+    del bucket
+    try:
+        return frozenset(
+            str(ipaddress.ip_address(info[4][0]))
+            for info in socket.getaddrinfo(
+                str(host).strip().lower(),
+                None,
+                type=socket.SOCK_STREAM,
+            )
+        )
+    except (OSError, ValueError):
+        return frozenset()
+
+
+def _verified_tunnel_xray_domain(node: Node, tunnel_host: str) -> str:
+    """Prefer the configured V2Ray domain only if it reaches the same ingress.
+
+    Works for WS/TLS, XHTTP/REALITY and TCP/TLS alike. Port selection and
+    every transport parameter remain in the original tunnel resolver.
+    """
+    current_host = str(tunnel_host or "").strip().lower()
+    dedicated = _stored_xray_domain(node)
+    if not dedicated or not current_host or dedicated == current_host:
+        return str(tunnel_host)
+    # Refresh DNS evidence every five minutes, not per profile or request.
+    bucket = int(time.monotonic() // 300)
+    ingress_ips = _resolved_host_ips(current_host, bucket)
+    dedicated_ips = _resolved_host_ips(dedicated, bucket)
+    if ingress_ips and dedicated_ips and dedicated_ips.issubset(ingress_ips):
+        return dedicated
+    return str(tunnel_host)
+
+
 def _profile_endpoint_with_dedicated_domain(
     db: Session,
     node: Node,
@@ -137,21 +181,20 @@ def _profile_endpoint_with_dedicated_domain(
         profile,
     )
 
-    if not _profile_uses_tls(profile):
-        return host, int(port)
-
     try:
         expected_public_port = xray_modern_runtime._public_port(
             int(node.id),
             profile,
         )
     except Exception:
-        return host, int(port)
+        expected_public_port = None
 
-    # A public per-node profile port means the original resolver selected the
-    # Iran ingress. Replacing that host with the Exit domain would bypass the
-    # tunnel, so the authority must remain untouched.
-    if int(port) == int(expected_public_port):
+    # Tunnel authority can use the dedicated Xray domain ONLY if it resolves
+    # to the same ingress as the selected Iran tunnel. REALITY is included.
+    if expected_public_port is not None and int(port) == int(expected_public_port):
+        return _verified_tunnel_xray_domain(node, host), int(port)
+
+    if not _profile_uses_tls(profile):
         return host, int(port)
 
     return (
@@ -189,10 +232,11 @@ def _customer_profile_endpoint_with_dedicated_domain(
             profile,
             host,
         )
+    elif mode == "tunnel":
+        host = _verified_tunnel_xray_domain(node, host)
 
-    # Legacy/no-mode delivery delegates to xray_modern_runtime._profile_endpoint,
-    # which is already wrapped above and therefore gets the same direct-only
-    # behavior without duplicating tunnel detection here.
+    # Legacy/no-mode delivery delegates to the already-wrapped Modern
+    # endpoint resolver. Explicit tunnel delivery keeps its ORIGINAL port.
     return host, int(port)
 
 
