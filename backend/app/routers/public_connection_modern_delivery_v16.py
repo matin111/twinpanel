@@ -12,6 +12,8 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..services.central_modern_connection_lookup_v1 import applied_modern_connection
+from ..services.central_connection_projection_v1 import project_singbox_item
 from .account_delivery import _public_payload, _subscription_from_share_token
 from .public_connection_modern_delivery_v13 import (
     MODERN_PROTOCOLS,
@@ -164,6 +166,12 @@ def public_modern_config_v16(
 
     sub = _subscription_from_share_token(token, db)
     item = _ready_modern_item(token, protocol, node_id, db)
+    connection = applied_modern_connection(db, protocol, node_id)
+    if connection is not None:
+        try:
+            item = project_singbox_item(protocol, item, connection)
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(status_code=409, detail="تنظیمات اتصال این نود ناسازگار است") from exc
     profile_name = _profile_name(sub, protocol, item)
     resolved = _resolve_delivery_content(protocol, item, profile_name)
     if resolved is None:
