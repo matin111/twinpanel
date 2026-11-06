@@ -73,7 +73,7 @@ FAKE_XRAY = textwrap.dedent('''\\
             print("User ID:",state[tag][email]);sys.exit(0)
         sys.exit(1)
     sys.exit(2)
-''')
+''').lstrip()
 FAKE_SYSTEMCTL = '#!/bin/sh\n[ "$1" = is-active ] && exit 0\nexit 1\n'
 
 
