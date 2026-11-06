@@ -8,6 +8,11 @@ from ..database import SessionLocal
 from ..deps import require_admin
 from ..models import Plan, Subscription
 from ..services.subscription_factory import create_subscription_core
+from ..services.fast_provision_queue_v1 import (
+    enqueue_new_subscription,
+    fast_provision_queue_enabled,
+    provision_job_status,
+)
 from ..services.subscription_provision_preflight_v1 import (
     assert_subscription_provisioning_ready,
 )
@@ -131,6 +136,12 @@ def _persist_subscription(payload: dict[str, Any]) -> tuple[int, list[str], dict
         )
         db.flush()
 
+        # When enabled, enqueue in the SAME transaction as the new account;
+        # a process crash between HTTP response and worker startup cannot
+        # silently lose a paid/new subscription provisioning request.
+        if fast_provision_queue_enabled():
+            enqueue_new_subscription(db, int(sub.id), requested_protocols)
+
         if request.delivery_policy is not None:
             put_delivery_policy(
                 subscription_id=sub.id,
@@ -252,17 +263,39 @@ async def admin_create_fast_v1(
     """Create immediately, then finish provisioning in the backend."""
 
     subscription_id, requested_protocols, preflight = _persist_subscription(dict(payload))
-    background_tasks.add_task(
-        _provision_subscription_background,
-        subscription_id,
-        requested_protocols,
-    )
+    # Legacy behavior stays untouched when the durable worker is disabled.
+    # Otherwise the committed DB job is claimed by the recovery worker.
+    durable_queued = fast_provision_queue_enabled()
+    if not durable_queued:
+        background_tasks.add_task(
+            _provision_subscription_background,
+            subscription_id,
+            requested_protocols,
+        )
 
     return {
         "ok": True,
         "queued": True,
+        "durable_queue": durable_queued,
         "subscription_id": subscription_id,
         "provisioning_complete": False,
         "preflight": preflight,
         "message": "اشتراک ثبت شد؛ صدور کانفیگ‌ها در پس‌زمینه ادامه دارد",
     }
+
+
+@router.get("/{subscription_id}/fast-provision-status-v1")
+def fast_provision_status_v1(subscription_id: int):
+    """Read-only admin status; no SSH or provisioning side effects."""
+    db = SessionLocal()
+    try:
+        if db.get(Subscription, int(subscription_id)) is None:
+            raise HTTPException(status_code=404, detail="اشتراک پیدا نشد")
+        status = provision_job_status(db, subscription_id)
+        return status or {
+            "subscription_id": int(subscription_id),
+            "state": "not_queued",
+            "durable_queue_enabled": fast_provision_queue_enabled(),
+        }
+    finally:
+        db.close()
