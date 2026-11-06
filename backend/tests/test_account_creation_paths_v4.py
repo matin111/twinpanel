@@ -28,7 +28,8 @@ def test_manual_fast_create_uses_degraded_preflight_runtime() -> None:
     assert "install_account_creation_runtime_v4()" in central
 
     assert '@router.post("/admin-create-fast-v1", status_code=202)' in fast
-    assert "background_tasks.add_task(" in fast
+    assert "background_tasks.add_task(" not in fast
+    assert "enqueue_new_subscription(db, int(sub.id), requested_protocols)" in fast
     assert "_provision_subscription_background" in fast
     assert "_should_suspend_after_background_provisioning" in fast
     assert "createSubscriptionFastV1" in ui
