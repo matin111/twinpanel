@@ -92,21 +92,23 @@ def _protocol_uris_from_payload(
             continue
         for item in _items(credential):
             uri = ""
+            projected = False
             if db is not None and protocol != "v2ray":
                 connection = applied_modern_connection(db, protocol, item.get("node_id"))
                 if connection is not None:
+                    projected = True
                     try:
-                        # The new URI is generated from the projected client
-                        # outbound; no old stored URI is returned on success.
                         uri = standard_share_uri(
                             protocol, item, _profile_name(sub, protocol, item),
                             applied_connection=connection,
                         )
                     except (ValueError, TypeError):
-                        # Incompatible imported client config: keep the
-                        # previous behavior rather than break delivery.
-                        uri = ""
-            if not uri:
+                        # Fail closed on incompatible config: never return a
+                        # stale URI when central settings were selected.
+                        continue
+            if projected and not uri:
+                continue
+            if not projected:
                 uri = _item_share_uri(sub, protocol, item)
             if not uri or uri in seen:
                 continue
