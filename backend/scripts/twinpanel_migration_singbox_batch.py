@@ -40,7 +40,7 @@ def _status(value):
     return str(getattr(value, "value", value) or "").lower()
 
 
-def pending_for_node(db, node, *, subscription_id: int | None = None):
+def pending_for_node(db, node, *, subscription_id: int | None = None, include_native: bool = False):
     live = {
         str(r.protocol)
         for r in db.query(NodeProtocolConfig).filter(
@@ -54,16 +54,18 @@ def pending_for_node(db, node, *, subscription_id: int | None = None):
         return []
     subscription_query = (
         db.query(Subscription)
-        .join(MigrationImportRecord, MigrationImportRecord.subscription_id == Subscription.id)
         .join(SubscriptionNode, SubscriptionNode.subscription_id == Subscription.id)
         .filter(
-            MigrationImportRecord.source.in_(SOURCES),
             Subscription.status == SubscriptionStatus.ACTIVE,
             or_(Subscription.expires_at.is_(None), Subscription.expires_at > datetime.utcnow()),
             or_(Subscription.traffic_limit_bytes <= 0, Subscription.traffic_used_bytes < Subscription.traffic_limit_bytes),
             SubscriptionNode.node_id == node.id,
         )
     )
+    if not include_native:
+        subscription_query = subscription_query.join(
+            MigrationImportRecord, MigrationImportRecord.subscription_id == Subscription.id,
+        ).filter(MigrationImportRecord.source.in_(SOURCES))
     if subscription_id is not None:
         subscription_query = subscription_query.filter(Subscription.id == int(subscription_id))
     subscriptions = subscription_query.order_by(Subscription.id.asc()).all()
@@ -116,7 +118,7 @@ def pending_for_node(db, node, *, subscription_id: int | None = None):
     return work
 
 
-async def run_one_node(node_id, *, subscription_id: int | None = None):
+async def run_one_node(node_id, *, subscription_id: int | None = None, include_native: bool = False):
     db = SessionLocal()
     try:
         node = db.query(Node).filter(
@@ -127,7 +129,7 @@ async def run_one_node(node_id, *, subscription_id: int | None = None):
         ).first()
         if node is None:
             return 0
-        work = pending_for_node(db, node, subscription_id=subscription_id)
+        work = pending_for_node(db, node, subscription_id=subscription_id, include_native=include_native)
         if not work:
             return 0
         secrets = []
