@@ -24,6 +24,7 @@ from .protocol_account_registry import (
 from .reseller_owned_plan_models import ResellerBotPlan
 from .reseller_tier_policy import tier_entitlements, allowed_nodes, reseller_tier
 from .services.subscription_factory import create_subscription_core
+from .services.fast_provision_queue_v1 import enqueue_new_subscription
 from .services.reseller_traffic_pool import _suspend_reseller_pool
 
 
@@ -374,6 +375,8 @@ def _duplicate_creation(
         "traffic_balance_bytes": int(previous.balance_after or 0),
         "traffic_reserved_from_reseller": False,
         "pricing_model": "usage_pool",
+        "queued": queue_origin is not None,
+        "provisioning_complete": False if queue_origin else None,
     }
 
 
@@ -388,7 +391,16 @@ def create_subscription_from_owned_plan(
     username: str | None = None,
     password: str | None = None,
     sell_price_toman: int | None = None,
+    queue_origin: str | None = None,
+    defer_commit: bool = False,
 ) -> dict:
+    """Build reseller sale; optionally queue atomically with the sale ledger.
+
+    defer_commit is used only by approved bot orders: the order-to-subscription
+    link is committed in the same transaction so no worker can claim early.
+    """
+    if defer_commit and queue_origin != "reseller_bot_owned":
+        raise ValueError("deferred commit requires bot queue origin")
     key = str(idempotency_key or "").strip()
     duplicate = _duplicate_creation(db, int(reseller.id), key)
     if duplicate:
@@ -466,9 +478,17 @@ def create_subscription_from_owned_plan(
         if balance_before + credit <= 0:
             _suspend_reseller_pool(db, int(reseller.id))
 
-        db.commit()
-        db.refresh(subscription)
-        db.refresh(reseller)
+        if queue_origin is not None:
+            # Atomically enqueue with subscription/reseller accounting.
+            enqueue_new_subscription(
+                db, int(subscription.id), protocols, origin=queue_origin,
+            )
+        if defer_commit:
+            db.flush()
+        else:
+            db.commit()
+            db.refresh(subscription)
+            db.refresh(reseller)
 
     except IntegrityError:
         db.rollback()
