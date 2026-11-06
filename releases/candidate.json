@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.596",
-  "source_sha": "389edb6f93174763c12212e547cfe1dc389514f6",
+  "version": "1.1.0-rc.597",
+  "source_sha": "b57523f2f349b32c78b1cddc95f60fece66e9181",
   "notes": {
-    "fa": "بهبود پایداری مدیریت نودها: بستن تراکنش‌های دیتابیس پیش از عملیات SSH نصب/حذف/Health و جلوگیری از نصب هم‌زمان پروتکل‌های مدرن روی یک نود. ساختار VPN کاربران بدون تغییر.",
-    "en": "Reliability improvements: end DB transactions before remote modern-protocol operations and serialize concurrent installs per node. VPN dataplane and credentials unchanged."
+    "fa": "رفع همگام‌سازی نود جدید برای اکانت‌های غیرانتقالی، توقف ساخت خودکار پروتکل‌های انتقالی با حفظ عضویت نود، و افزایش فرصت تأیید ایمن دوطرفه Agent برای تانل تازه بدون تغییر مسیرهای موجود.",
+    "en": "Safely converge new exit nodes for non-imported accounts; keep migrated users manual-only with node memberships intact; longer strict bidirectional agent acceptance on first tunnel cutover, preserving existing routes and rollback."
   }
 }
