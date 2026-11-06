@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.599",
+  "version": "1.1.0-rc.600",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T02:00:27Z",
+  "released_at": "2026-11-06T02:31:35Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "34f18ca47d208a01aa960bf0e7aa7eb63c860ea6",
+  "source_sha": "0be427b5dcb24cfe0efb6123fef8fcb8e439ffea",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.599/twinpanel-1.1.0-rc.599-linux-x86_64.tar.gz",
-    "sha256": "7a8104e0e2b979ebf4e819b3b35e281becd0f9e5c1f95d244a8fa1afc45e7400",
-    "size_bytes": 28771873
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.600/twinpanel-1.1.0-rc.600-linux-x86_64.tar.gz",
+    "sha256": "bec07779a134ffa393c6b771eb3bba64e7e157b885e92e0d1f433f1094b502d1",
+    "size_bytes": 28792222
   },
   "notes": {
-    "fa": "رفع خطای Timeout همگام‌سازی نود جدید با ساخت مرحله‌ای فقط برای اکانت‌های فعال غیرانتقالی و رفع Rollback زودهنگام هنگام ساخت تانل تازه با حفظ بررسی دوطرفه و بازگشت ایمن. تانل‌های فعلی و اکانت‌های انتقالی بدون تغییر.",
-    "en": "Checkpointed bounded new-Exit account backfill for active non-imported subscriptions plus bounded initial dual-agent tunnel bootstrap grace. Existing tunnels, imported-account automatic provisioning guard and strict cutover acceptance remain unchanged."
+    "fa": "ویرایشگر V2Ray در مدیریت پروتکل‌ها، اعمال امن و اعتبارسنجی REALITY روی نود، انتشار زنده SNI در ساب‌لینک‌ها بدون بازسازی اکانت و ریمارک فقط نام کاربری و پرچم کشور. تنظیمات TLS و Transport فعلاً در مرحله پیش‌نویس باقی می‌مانند.",
+    "en": "V2Ray per-node editor in Protocol Library, verified REALITY target/SNI apply with rollback, live subscription SNI and username plus flag-only remarks. TLS/transport changes remain draft-only."
   }
 }
