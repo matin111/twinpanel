@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from contextlib import suppress
 import time
 
@@ -18,6 +19,52 @@ RECOVERY_INTERVAL_SECONDS = 1.0
 APPROVED_PAYMENT_STATUSES = {"approved", "auto_verified", "paid"}
 EARLY_DELIVERY_POLL_SECONDS = 0.5
 EARLY_DELIVERY_TIMEOUT_SECONDS = 45.0
+
+# TWINPANEL_PAYMENT_PROVISION_EVENTLOOP_ISOLATION_V1
+# Approved payments may provision all selected protocols for several minutes.
+# The provisioning coroutine contains synchronous SQLAlchemy/SSH/bootstrap work:
+# running it directly in the API event loop starves even GET /health. This
+# opt-in isolates the whole job in another Python thread with its own asyncio
+# loop and its OWN database session. Do not share SQLAlchemy sessions across
+# threads or modify the payment claim semantics.
+def _payment_isolated_provision_enabled() -> bool:
+    return os.getenv("TWINPANEL_PAYMENT_PROVISION_ISOLATED_V1", "").strip().lower() in {
+        "1", "true", "yes",
+    }
+
+
+def _fulfill_paid_order_in_worker_thread(order_id: int) -> dict:
+    async def _execute() -> dict:
+        worker_db = SessionLocal()
+        try:
+            return await _fulfill_paid_order(int(order_id), worker_db)
+        finally:
+            worker_db.close()
+
+    return asyncio.run(_execute())
+
+
+async def _fulfill_paid_order_without_blocking_api(
+    order_id: int, existing_db: Session,
+) -> dict:
+    """Retain the legacy path unless explicitly enabled for a canary."""
+    if not _payment_isolated_provision_enabled():
+        return await _fulfill_paid_order(int(order_id), existing_db)
+
+    task = asyncio.create_task(
+        asyncio.to_thread(_fulfill_paid_order_in_worker_thread, int(order_id)),
+        name=f"payment-isolated-provision-{int(order_id)}",
+    )
+    try:
+        return await asyncio.shield(task)
+    except asyncio.CancelledError:
+        # Thread executors cannot cancel running work. Let the existing paid
+        # order finish (or a forced process exit stop it) before recovery on
+        # next startup can reclaim it. Never mark an in-flight order fulfilled.
+        with suppress(Exception):
+            await asyncio.shield(task)
+        raise
+
 
 
 # TWINPANEL_MAIN_BOT_EARLY_ACCOUNT_DELIVERY_V1
@@ -233,7 +280,10 @@ async def fulfill_approved_payment_background(
             name=f"main-bot-early-delivery-{int(order_id)}",
         )
 
-        result = await _fulfill_paid_order(int(order_id), db)
+        result = await _fulfill_paid_order_without_blocking_api(int(order_id), db)
+        # The isolated worker committed using its own DB session. Force the
+        # caller to fetch the latest status before payment notification.
+        db.expire_all()
         final_order = db.get(StoreOrder, int(order_id))
         subscription_id = (
             final_order.subscription_id
@@ -383,7 +433,7 @@ async def fulfill_wallet_order_background(order_id: int) -> None:
     try:
         if not claim_paid_order(db, int(order_id)):
             return
-        await _fulfill_paid_order(int(order_id), db)
+        await _fulfill_paid_order_without_blocking_api(int(order_id), db)
     except asyncio.CancelledError:
         raise
     except Exception as exc:
