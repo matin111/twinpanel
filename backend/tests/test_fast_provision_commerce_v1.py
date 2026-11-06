@@ -84,7 +84,7 @@ class ResellerBotCompletionContracts(unittest.TestCase):
         bot_send = AsyncMock(return_value=True)
         with patch("app.services.fast_provision_commerce_completion_v1.SessionLocal",
                    return_value=db), \
-             patch("app.discount_service.redeem_discount_for_order") as redeem, \
+             patch("app.services.fast_provision_commerce_completion_v1.redeem_discount_for_order") as redeem, \
              patch("app.routers.reseller_bot_orders._stored_info",
                    return_value={"account": {"username": "test-user"}}), \
              patch("app.routers.reseller_bot_orders._send_order_delivery_to_telegram",
