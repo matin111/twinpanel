@@ -79,6 +79,17 @@ class V2RayNoGrpcTests(unittest.TestCase):
             [],
         )
 
+    def test_cleanup_preserves_xray_file_ownership_and_mode(self):
+        source = MIGRATION.read_text(encoding="utf-8")
+        self.assertIn("def _clone_permissions(", source)
+        self.assertIn("stat.S_IMODE(metadata.st_mode)", source)
+        self.assertIn("_clone_permissions(stage_config, config_stat)", source)
+        self.assertIn("_clone_permissions(stage_state, state_stat)", source)
+        self.assertIn("_clone_permissions(CONFIG, config_stat)", source)
+        self.assertIn("_clone_permissions(STATE, state_stat)", source)
+        self.assertIn('raise RuntimeError("Xray is not active;', source)
+        self.assertIn('raise RuntimeError("Xray config changed during cleanup staging")', source)
+
     def test_migration_validates_config_and_preserves_other_inbounds(self):
         source = MIGRATION.read_text(encoding="utf-8")
         ast.parse(source)
