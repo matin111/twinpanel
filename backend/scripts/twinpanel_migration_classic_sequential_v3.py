@@ -87,6 +87,9 @@ async def one_node(db,node_id,*,subscription_id: int | None = None):
                     if protocol != "v2ray":
                         skipped+=1
                         continue
+                    if not isinstance(existing_item,dict):
+                        failed+=1
+                        continue
                     # A new Exit may have one VLESS profile but still miss
                     # its required companion profile. Never count such a
                     # partial node as complete or rotate its UUID.
