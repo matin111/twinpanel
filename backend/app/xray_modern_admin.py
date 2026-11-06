@@ -570,6 +570,7 @@ class InboundEditorDraft(BaseModel):
     reality_target: str | None = None
     transport: str = "tcp"
     security: str = "tls"
+    inbounds: dict[str, dict[str, str]] | None = None
 
 
 def _validated_editor_settings(payload: InboundEditorDraft) -> dict[str, str]:
@@ -598,7 +599,47 @@ def _validated_editor_settings(payload: InboundEditorDraft) -> dict[str, str]:
         if target.count(":") != 1 or not target.endswith(":443"):
             raise HTTPException(status_code=422, detail="REALITY target must be hostname:443")
         hostname(target.rsplit(":", 1)[0])
+    inbounds: dict[str, dict[str, str]] = {}
+    for key, expected_transport, expected_security in (
+        ("tcp_tls", "tcp", "tls"),
+        ("ws_tls", "ws", "tls"),
+        ("xhttp_reality", "xhttp", "reality"),
+    ):
+        entry = (payload.inbounds or {}).get(key) or {}
+        if not isinstance(entry, dict):
+            raise HTTPException(status_code=422, detail=f"Invalid inbound {key}")
+        if entry and (
+            str(entry.get("transport") or expected_transport) != expected_transport
+            or str(entry.get("security") or expected_security) != expected_security
+        ):
+            raise HTTPException(status_code=422, detail=f"Inbound {key} transport/security mismatch")
+        server_name = hostname(entry.get("server_name"))
+        connection_domain = hostname(entry.get("connection_domain"))
+        path = str(entry.get("path") or "").strip()
+        if path and (not path.startswith("/") or len(path) > 256 or any(ord(char) < 32 for char in path)):
+            raise HTTPException(status_code=422, detail=f"Invalid inbound path: {key}")
+        target = str(entry.get("target") or "").strip().lower()
+        if target:
+            if key != "xhttp_reality" or not target.endswith(":443") or target.count(":") != 1:
+                raise HTTPException(status_code=422, detail=f"Invalid REALITY target: {key}")
+            hostname(target.rsplit(":", 1)[0])
+        if key == "xhttp_reality" and server_name and target and target != server_name + ":443":
+            raise HTTPException(status_code=422, detail="REALITY serverName and target must match")
+        inbounds[key] = {
+            "connection_domain": connection_domain,
+            "server_name": server_name,
+            "path": path,
+            "target": target,
+            "transport": expected_transport,
+            "security": expected_security,
+        }
+    if payload.inbounds and inbounds["xhttp_reality"]["server_name"]:
+        # Maintain compatibility with existing verified REALITY Apply endpoint.
+        payload.reality_server_name = inbounds["xhttp_reality"]["server_name"]
+        payload.reality_target = inbounds["xhttp_reality"]["target"]
+
     return {
+        "inbounds": inbounds,
         "connection_domain": hostname(payload.connection_domain),
         "tls_server_name": hostname(payload.tls_server_name),
         "reality_server_name": hostname(payload.reality_server_name),
@@ -633,6 +674,21 @@ def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
             "reality_target": "www.varzesh3.com:443",
             "transport": "tcp",
             "security": "tls",
+            "inbounds": {
+                "tcp_tls": {
+                    "connection_domain": default_domain, "server_name": default_domain,
+                    "path": "", "target": "", "transport": "tcp", "security": "tls",
+                },
+                "ws_tls": {
+                    "connection_domain": default_domain, "server_name": default_domain,
+                    "path": "/", "target": "", "transport": "ws", "security": "tls",
+                },
+                "xhttp_reality": {
+                    "connection_domain": default_domain, "server_name": "www.varzesh3.com",
+                    "path": "/", "target": "www.varzesh3.com:443",
+                    "transport": "xhttp", "security": "reality",
+                },
+            },
         },
         "draft": values.get("draft") if isinstance(values.get("draft"), dict) else None,
         "applied": {
