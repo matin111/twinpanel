@@ -6,6 +6,8 @@ import fcntl
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -4054,7 +4056,13 @@ def desired_tunnels(
         })
 
     db.commit()
-    return output
+    # Large service-route payloads can contain thousands of nested entries.
+    # This is a synchronous FastAPI endpoint, already running in the request
+    # threadpool. Encode here and return a Response: otherwise FastAPI
+    # recursively jsonable_encodes this output on uvicorn's event-loop thread,
+    # stalling all other endpoints, including /health and the admin UI.
+    # Keep the exact JSONResponse encoder and wire format used previously.
+    return JSONResponse(content=jsonable_encoder(output))
 
 
 @router.post("/{tunnel_id}/node/{node_id}/report")
