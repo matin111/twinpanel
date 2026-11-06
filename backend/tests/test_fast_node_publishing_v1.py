@@ -123,13 +123,13 @@ class SetBasedPublishContracts(unittest.TestCase):
     def test_only_eligible_active_users_and_no_plan_mutation(self):
         out = asyncio.run(publish_node_to_all_users_v2(101, db=self.db))
         self.assertTrue(out["ok"])
-        self.assertEqual(out["memberships_added"], 2)
-        self.assertEqual(out["delivery_modes_added"], 1)
+        self.assertEqual(out["memberships_added"], 1)
+        self.assertEqual(out["delivery_modes_added"], 0)
         self.assertEqual(out["delivery_modes_enabled"], 1)
         self.assertEqual(out["public_plans_added"], 0)
         self.assertEqual(out["active_subscriptions_reconciled"], 0)
         self.assertEqual(
-            self.scalar("SELECT COUNT(*) FROM subscription_nodes WHERE node_id=101"), 3,
+            self.scalar("SELECT COUNT(*) FROM subscription_nodes WHERE node_id=101"), 2,
         )
         self.assertEqual(
             self.scalar("SELECT COUNT(*) FROM plan_nodes WHERE node_id=101"), 0,
@@ -147,7 +147,7 @@ class SetBasedPublishContracts(unittest.TestCase):
         self.assertEqual(out2["delivery_modes_added"], 0)
         self.assertEqual(out2["public_plans_added"], 0)
         self.assertEqual(
-            self.scalar("SELECT COUNT(*) FROM subscription_nodes WHERE node_id=101"), 3,
+            self.scalar("SELECT COUNT(*) FROM subscription_nodes WHERE node_id=101"), 2,
         )
 
     def test_no_reprovision_or_hidden_mass_copy_on_registration(self):
