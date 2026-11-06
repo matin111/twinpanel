@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.619",
-  "source_sha": "ca0f9ea48494b07a07dc1a6137bacecefe996769",
+  "version": "1.1.0-rc.620",
+  "source_sha": "4783c3dd769e8ff2e2a7754d9bc141636d84b3f0",
   "notes": {
-    "fa": "رفع خطای ویرایش اکانت‌های قدیمی با نودهای از پیش تخصیص‌یافته خارج از قالب فعلی پلن، بدون مجازکردن نود تازه خارج از پلن؛ همراه با تمام بهبودهای rc.618 برای سلامت API و پنل. بدون تغییر کانفیگ کاربران، تنظیمات نود یا V2Ray.",
-    "en": "Fix legacy subscriptions failing admin edits when an existing Exit node is no longer in the plan template; allow unchanged assigned nodes only, never new out-of-plan nodes, and preserve all rc.618 API responsiveness improvements."
+    "fa": "انتقال مالکیت واقعی اکانت به کاربر یا نماینده از همان صفحه اشتراک‌ها؛ ثبت هم‌زمان مالک و مدیریت نمایندگی؛ فیلتر اشتراک‌ها بر اساس هر نماینده یا بدون نماینده؛ ترمیم انتقال‌های قدیمی بدون تغییر کانفیگ، حجم و تاریخ انقضا.",
+    "en": "True subscription ownership transfers to users and reseller customers, atomic reseller mapping, SQL-side reseller/unassigned filters before pagination, guarded repair for historical management-only transfers. No VPN configuration or quota mutations."
   }
 }
