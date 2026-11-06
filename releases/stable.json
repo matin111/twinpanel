@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.606",
+  "version": "1.1.0-rc.607",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T04:46:14Z",
+  "released_at": "2026-11-06T05:03:08Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "cacc7e4b7832fe8f6cfcdddb945b90516b80e785",
+  "source_sha": "d0094144df3d020a0eab3dae1df129243fcb5ac1",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.606/twinpanel-1.1.0-rc.606-linux-x86_64.tar.gz",
-    "sha256": "d11873b3617514d2b72f3b72ea6f8fdc480bae0c319ec4005293dd4eba88cd74",
-    "size_bytes": 28848249
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.607/twinpanel-1.1.0-rc.607-linux-x86_64.tar.gz",
+    "sha256": "9a1c0f4aa6dd5da015ecd89e96f26d27d38184e25b6f10eb570de241e441646d",
+    "size_bytes": 28877323
   },
   "notes": {
-    "fa": "افزودن SOCKS5 به‌عنوان پروتکل شانزدهم با احراز هویت نام کاربری و رمز اختصاصی هر اشتراک، کنترل مصرف و انقضا، انتخاب در پلن‌ها و نمایش تنظیمات اتصال؛ حفظ پروتکل‌های قبلی و اصلاحات پایدار تونل نسخه rc.605.",
-    "en": "Adds authenticated per-subscription SOCKS5 as the 16th protocol with quota and expiry enforcement, plan selection, and connection details, while preserving existing 15 protocols and rc.605 tunnel fixes."
+    "fa": "تکمیل ارتقای پایدار Agent همه نودها با نشانگر اجباری V140 و V258؛ رفع Offline اشتباه ناشی از هزاران بررسی تکی iptables و رفع گیرکردن نصب در virtualenv منتقل‌شده/عدم دسترسی PyPI. حفظ کامل SOCKS5 پروتکل شانزدهم، قابلیت‌های قبلی V2Ray، تونل‌ها و اصلاحات rc.606.",
+    "en": "Durable all-node Agent rollout requiring both V140 fast firewall snapshots and V258 active transport authority; installer uses venv python -m pip only when dependencies are missing, avoiding broken pip shebangs and unnecessary downloads. Preserves rc.606 SOCKS5 16th protocol and all existing features."
   }
 }
