@@ -67,6 +67,7 @@ def enqueue_published_node(db: Session, node_id: int) -> NodeAutoBackfillJobV1:
         job.phase = PHASES[0]
         job.consecutive_errors = 0
         job.last_error = None
+        job.pause_requested = False
         job.run_after = datetime.utcnow()
         job.updated_at = datetime.utcnow()
     return job
@@ -92,6 +93,13 @@ def claim_job(db: Session, *, now: datetime | None = None) -> ClaimedNodeBackfil
     )
     if job is None:
         db.rollback()
+        return None
+    if job.pause_requested:
+        job.state = "paused"
+        job.lease_until = None
+        job.lease_token = None
+        job.updated_at = now
+        db.commit()
         return None
     node = db.get(Node, int(job.node_id))
     if (
@@ -182,6 +190,8 @@ def finish_batch(
         else:
             job.state = "queued"
         job.run_after = now + timedelta(seconds=3)
+    if job.pause_requested:
+        job.state = "paused"
     db.commit()
     return True
 
@@ -190,11 +200,13 @@ def pause_job(db: Session, node_id: int) -> dict | None:
     job = db.get(NodeAutoBackfillJobV1, int(node_id))
     if job is None:
         return None
-    # The ongoing batch (if any) completes, but a fresh batch will never be
-    # claimed. Its completed credentials stay intact and idempotent.
-    job.state = "paused"
-    job.lease_token = None
-    job.lease_until = None
+    # A running subprocess can finish its current batch and commit
+    # checkpoint state. Stop claiming any subsequent work.
+    job.pause_requested = True
+    if job.state != "running":
+        job.state = "paused"
+        job.lease_token = None
+        job.lease_until = None
     job.updated_at = datetime.utcnow()
     db.commit()
     return job_status(db, node_id)
@@ -207,7 +219,9 @@ def resume_job(db: Session, node_id: int) -> dict:
     job = db.get(NodeAutoBackfillJobV1, int(node_id))
     if job is None:
         job = enqueue_published_node(db, node_id)
-    elif job.state not in {"running", "queued"}:
+    else:
+        job.pause_requested = False
+    if job is not None and job.state not in {"running", "queued"}:
         job.state = "queued"
         if job.phase not in PHASES:
             job.phase = PHASES[0]
@@ -230,7 +244,7 @@ def job_status(db: Session, node_id: int) -> dict | None:
     return {
         "node_id": int(job.node_id),
         "node_name": node.name if node else str(node_id),
-        "state": job.state,
+        "state": "pausing" if job.pause_requested and job.state == "running" else job.state,
         "phase": job.phase,
         "phases": list(PHASES),
         "completed_pairs": int(job.completed_pairs),
