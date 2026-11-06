@@ -192,7 +192,6 @@ def render(item):
         # silently enables an unauthenticated public proxy.
         base["type"] = "socks"
         base["users"] = [{{"username": "twinpanel-bootstrap", "password": seed["password"]}}]
-        base["network"] = "tcp"
 
     elif name == "naive":
         base["users"] = [{{"username": "twinpanel-bootstrap", "password": seed["password"]}}]
