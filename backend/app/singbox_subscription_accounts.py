@@ -251,6 +251,12 @@ if PROTOCOL == "shadowtls":
     os.replace(STATE + ".account-new", STATE)
     os.chmod(STATE, 0o600)
 
+# No-op: do not touch the node config or service; the SSH shell checks
+# this marker under the per-node flock before skipping a restart.
+if doc == original_doc:
+    print("batch_unchanged=1")
+    raise SystemExit(0)
+
 with open(CONFIG + ".account-new", "w", encoding="utf-8") as handle:
     json.dump(doc, handle, ensure_ascii=False, indent=2)
     handle.write("\\n")
@@ -399,7 +405,7 @@ def _batch_mutation_script(secrets: list[SingBoxAccountSecret]) -> str:
         updates.append({"protocol": secret.protocol, "tag": TAGS[secret.protocol],
                         "username": secret.username, "record": _user_record(secret)})
     payload = json.dumps(updates, ensure_ascii=False)
-    return f'''import json, os, secrets, fcntl
+    return f'''import json, os, secrets, fcntl, copy
 
 CONFIG = {CONFIG_PATH!r}
 STATE = {STATE_PATH!r}
@@ -410,6 +416,7 @@ SHADOWTLS_INNER_METHOD = {SHADOWTLS_INNER_METHOD!r}
 
 with open(CONFIG, "r", encoding="utf-8") as handle:
     doc = json.load(handle)
+original_doc = copy.deepcopy(doc)
 inbounds = doc.get("inbounds")
 if not isinstance(inbounds, list):
     raise SystemExit("managed inbounds are unavailable")
@@ -424,11 +431,18 @@ for operation in UPDATES:
     key = "username" if protocol == "naive" else "name"
     users = inbound.get("users")
     users = list(users) if isinstance(users, list) else []
-    users = [u for u in users if not (isinstance(u, dict) and
-             (str(u.get(key) or "") == operation["username"] or
-              str(u.get(key) or "").startswith(SENTINEL)))]
-    users.append(operation["record"])
-    inbound["users"] = users
+    matching = [u for u in users if isinstance(u, dict) and
+                str(u.get(key) or "") == operation["username"]]
+    revoked = any(isinstance(u, dict) and
+                  str(u.get(key) or "").startswith(SENTINEL) for u in users)
+    # Do not reorder an existing identical credential: it would cause a
+    # needless restart even though authentication is unchanged.
+    if len(matching) != 1 or matching[0] != operation["record"] or revoked:
+        users = [u for u in users if not (isinstance(u, dict) and
+                 (str(u.get(key) or "") == operation["username"] or
+                  str(u.get(key) or "").startswith(SENTINEL)))]
+        users.append(operation["record"])
+        inbound["users"] = users
     if protocol == "shadowtls":
         state = dict(json.load(open(STATE, encoding="utf-8"))) if os.path.exists(STATE) else {{}}
         shadow = dict(state.get("shadowtls") or {{}})
