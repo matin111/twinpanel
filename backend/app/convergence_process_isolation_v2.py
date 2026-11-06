@@ -124,12 +124,14 @@ def install() -> None:
                 await asyncio.sleep(45.0)
                 continue
             cycle_failed = False
+            batch_pending = False
             stage = "topology_signature"
             try:
                 signature = await asyncio.to_thread(runtime._topology_signature)
                 if signature != runtime._last_topology_signature:
                     stage = "reconcile_process"
                     result = await _run_reconcile_process()
+                    batch_pending = bool(result.get("batch_pending"))
                     changed = [
                         item
                         for item in result.get("nodes", [])
@@ -158,7 +160,14 @@ def install() -> None:
                     flush=True,
                 )
 
-            await asyncio.sleep(180.0 if cycle_failed else max(runtime._RETRY_INTERVAL_SECONDS, 90.0))
+            # Small, checkpointed batches can progress promptly without the
+            # previous all-accounts 300s timeout or any interactive API restart.
+            # Failures retain the original conservative cooldown.
+            await asyncio.sleep(
+                180.0 if cycle_failed else
+                15.0 if batch_pending else
+                max(runtime._RETRY_INTERVAL_SECONDS, 90.0)
+            )
 
     runtime._convergence_loop = _process_isolated_convergence_loop
     _installed = True
