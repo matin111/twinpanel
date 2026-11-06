@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.604",
-  "source_sha": "96f32632098e2a7dc7228e8135878edf93ca2d16",
+  "version": "1.1.0-rc.605",
+  "source_sha": "19bb1fab37ea37df1b7012050af722aa3b9c7a6c",
   "notes": {
-    "fa": "رفع قطع‌و‌وصل موقت مسیر تونل هنگام نوسان گزارش سلامت: در صورت فعال‌بودن نود و سلامت تازه و مستقل حامل فیزیکی، مسیر کاربران تا ۷۵ ثانیه در برابر خطای موقت پایش حفظ می‌شود؛ حذف عمدی تونل، خرابی پایدار و نبود مسیر معتبر همچنان fail-closed باقی می‌مانند. سازگار با تمام نودها و حفظ تنظیمات V2Ray نسخه قبل.",
-    "en": "Stabilize selected service routes against brief tunnel peer-report health flaps. Hold only previously selected active routes with recently healthy ONLINE physical carrier, at most 75 seconds; deliberate disable, absent routes, stale carrier and sustained outage still fail closed. Existing V2Ray and other services are preserved."
+    "fa": "رفع ریشه‌ای Offline اشتباه تونل‌ها: Agent نودهای ایران و خروجی دیگر هزاران دستور تکی iptables -C اجرا نمی‌کند؛ به‌جای آن تطبیق سریع، معتبر و خواندنی وضعیت فایروال انجام می‌شود. تغییر واقعی قوانین همچنان به شکل تراکنشی و قابل راستی‌آزمایی باقی می‌ماند. Agentهای فعلی در فرایند Rollout نسخه جدید به‌روزرسانی می‌شوند. حفظ قابلیت‌های نسخه rc.604.",
+    "en": "Root fix for false tunnel OFFLINE: replace thousands of per-rule iptables -C subprocesses with constant-number verified live chain snapshots; retain atomic iptables-restore and fail-closed drift checks. New V140 rollout marker upgrades existing Iran/exit Agents; preserves rc.604 features."
   }
 }
