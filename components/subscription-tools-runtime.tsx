@@ -33,6 +33,7 @@ const protocolOptions=[
   ["shadowtls","ShadowTLS"],
   ["mieru","Mieru"],
   ["snell","Snell"],
+  ["socks5","SOCKS5 Proxy"],
   ["trusttunnel","TrustTunnel"],
   ["hysteria2","Hysteria2"],
   ["tuic","TUIC"],
