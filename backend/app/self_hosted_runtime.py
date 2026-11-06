@@ -33,6 +33,7 @@ from .unified_l3_agent_rollout_v49 import (
     apply_unified_l3_agent_rollout_v49,
 )
 from . import xray_modern_runtime
+from .xray_hot_client_sync_v1 import apply_xray_hot_client_sync_v1
 from .xray_modern_config_compat_v45 import (
     apply_xray_modern_config_compat_v45,
 )
@@ -293,6 +294,10 @@ def apply_self_hosted_runtime(
     apply_xray_reconcile_infra_v41()
     apply_xray_customer_profile_policy_v30()
     apply_xray_adaptive_three_profiles_v47()
+
+    # Hot VLESS credential provisioning: no global Xray restarts on purchases.
+    # Keep the original public routes and other VPN protocols unchanged.
+    apply_xray_hot_client_sync_v1()
 
     # ------------------------------------------------------------
     # Service Connections V30

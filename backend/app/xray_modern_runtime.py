@@ -1116,14 +1116,14 @@ async def _xray_account_modern(
         if int(sync_result.get("updated_inbounds") or 0) < 3:
             raise RuntimeError("Xray client sync did not cover all VLESS inbounds")
         if bool(sync_result.get("changed")):
-            await provision.cmd(
-                conn,
-                (
-                    "/usr/local/bin/xray run -test "
-                    "-config /usr/local/etc/xray/config.json"
-                ),
-            )
-            await provision.cmd(conn, "systemctl restart xray")
+            # The hot client script must have already updated the running
+            # Xray HandlerService AND persisted the config. Never disconnect
+            # thousands of active users to add one credential.
+            if not bool(sync_result.get("hot_applied")):
+                raise RuntimeError(
+                    "Xray credential change was not hot-applied; "
+                    "global Xray restart is forbidden for account provisioning"
+                )
 
         if not await provision.active(conn, "xray"):
             raise RuntimeError("Xray service did not remain active")
