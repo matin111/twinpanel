@@ -19,7 +19,7 @@ required_runtime = (
     '("type", "tcp")',
     "xray_customer_xhttp_v46.apply_xray_customer_xhttp_v46()",
     "xray_modern_runtime.PROFILE_WS,\n            xray_modern_runtime.PROFILE_XHTTP,\n            PROFILE_TCP_TLS,",
-    "xray_modern_runtime.PROFILE_XHTTP,\n        xray_modern_runtime.PROFILE_GRPC,\n        PROFILE_TCP_REALITY,",
+    "xray_modern_runtime.PROFILE_XHTTP,\n        PROFILE_TCP_REALITY,",
     "if not profiles:",
     "fake_tls=0",
     "uuid_preserved=1",
@@ -34,6 +34,8 @@ if "TCP_REALITY_PUBLIC_BASE = 29000" in runtime:
     raise SystemExit("V47 collides with TUIC public range")
 if "TCP_REALITY_PUBLIC_BASE = 40000" in runtime:
     raise SystemExit("V47 collides with Sudoku public range")
+if "xray_modern_runtime.PROFILE_GRPC" in runtime:
+    raise SystemExit("V47 must never deliver or require retired gRPC")
 if '"id": "tcp_simple"' in runtime:
     raise SystemExit("V47 must not synthesize plaintext tcp_simple")
 
