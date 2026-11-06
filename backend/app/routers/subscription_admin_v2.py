@@ -17,7 +17,9 @@ from ..models import (
     SubscriptionProtocol,
     SubscriptionStatus,
     User,
+    UserRole,
 )
+from ..models_reseller import Reseller, ResellerSubscription
 from ..protocol_account_registry import normalize_protocols, registry_payload
 from ..schemas import SubscriptionOut
 from ..services.subscription_factory import create_subscription_core
@@ -64,6 +66,10 @@ class AdminSubscriptionCreateV2(BaseModel):
 
     username: str | None = Field(default=None, max_length=120)
     password: str | None = Field(default=None, min_length=4, max_length=256)
+
+
+class SubscriptionOwnerTransferIn(BaseModel):
+    user_id: int = Field(gt=0)
 
 
 def _canonical_protocols(values: list[str]) -> list[str]:
@@ -118,6 +124,7 @@ def _bulk_admin_list_context(db: Session, rows: list[Subscription]) -> dict:
             "overrides": {},
             "node_ids": {},
             "protocols": {},
+            "resellers": {},
         }
 
     subscription_ids = [int(sub.id) for sub in rows]
@@ -161,12 +168,31 @@ def _bulk_admin_list_context(db: Session, rows: list[Subscription]) -> dict:
     ):
         protocols[int(subscription_id)].append(str(protocol))
 
+    reseller_links = {
+        int(subscription_id): {
+            "reseller_id": int(reseller_id),
+            "reseller_name": str(reseller_name),
+            "reseller_customer_user_id": int(customer_user_id),
+        }
+        for subscription_id, reseller_id, reseller_name, customer_user_id in (
+            db.query(
+                ResellerSubscription.subscription_id,
+                ResellerSubscription.reseller_id,
+                Reseller.name,
+                ResellerSubscription.customer_user_id,
+            )
+            .join(Reseller, Reseller.id == ResellerSubscription.reseller_id)
+            .filter(ResellerSubscription.subscription_id.in_(subscription_ids))
+            .all()
+        )
+    }
     return {
         "users": users,
         "plans": plans,
         "overrides": overrides,
         "node_ids": dict(node_ids),
         "protocols": dict(protocols),
+        "resellers": reseller_links,
     }
 
 
@@ -214,6 +240,11 @@ def _enriched_payload_from_context(sub: Subscription, context: dict) -> dict:
 
     base.update(
         {
+            **context["resellers"].get(int(sub.id), {
+                "reseller_id": None,
+                "reseller_name": None,
+                "reseller_customer_user_id": None,
+            }),
             "creation_mode": "plan" if sub.plan_id is not None else "manual",
             "plan_name": plan.name if plan is not None else "دستی",
             "activation_duration_days": int(
@@ -297,12 +328,61 @@ def subscription_share_link(
     return {"subscription_link": _share_url(db, sub)}
 
 
+@router.post("/{subscription_id}/transfer-user")
+def transfer_subscription_to_user(
+    subscription_id: int,
+    payload: SubscriptionOwnerTransferIn,
+    db: Session = Depends(get_db),
+):
+    """Admin-only direct ownership transfer, without touching VPN credentials.
+
+    Detaches free management-only reseller assignment. Paid reseller sales are
+    protected from losing their accounting attribution.
+    """
+    sub = db.query(Subscription).filter(
+        Subscription.id == int(subscription_id)
+    ).with_for_update().first()
+    if sub is None:
+        raise HTTPException(status_code=404, detail="اشتراک پیدا نشد")
+    if sub.status == SubscriptionStatus.CANCELED:
+        raise HTTPException(status_code=409, detail="اشتراک لغوشده قابل انتقال نیست")
+    user = db.get(User, int(payload.user_id))
+    if not user or not user.is_active or user.role == UserRole.ADMIN:
+        raise HTTPException(status_code=422, detail="کاربر مقصد معتبر نیست")
+    reseller_link = db.query(ResellerSubscription).filter(
+        ResellerSubscription.subscription_id == sub.id
+    ).with_for_update().first()
+    if reseller_link and (
+        reseller_link.buy_price_toman or reseller_link.sell_price_toman
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="برای خروج اشتراک خریداری‌شده از نمایندگی، ابتدا تسویه حساب انجام دهید",
+        )
+    if int(sub.user_id) == int(user.id) and not reseller_link:
+        return {"ok": True, "already_transferred": True,
+                "subscription_id": sub.id, "owner_user_id": user.id,
+                "reseller_id": None}
+    try:
+        if reseller_link:
+            db.delete(reseller_link)
+        sub.user_id = int(user.id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return {"ok": True, "subscription_id": int(sub.id),
+            "owner_user_id": int(user.id), "reseller_id": None,
+            "message": "مالکیت اکانت به کاربر منتقل شد؛ کانفیگ و حجم تغییر نکردند"}
+
+
 @router.get("/admin-page-v3")
 def admin_page_v3(
     limit: int = 40,
     offset: int = 0,
     q: str = "",
     status: str = "all",
+    reseller_id: int = 0,
     db: Session = Depends(get_db),
 ):
     """Paginated admin subscriptions: enrich only rows in the current page.
@@ -316,11 +396,22 @@ def admin_page_v3(
     allowed = {"all", "active", "expired", "suspended", "pending", "online"}
     if status not in allowed:
         raise HTTPException(status_code=422, detail="Invalid subscription status")
+    if reseller_id < -1:
+        raise HTTPException(status_code=422, detail="Invalid reseller filter")
 
     # Online means a genuinely live session or recent accepted traffic, not
     # merely an ACTIVE subscription. Reuse the dashboard's live-state policy.
     online_ids = _online_subscription_ids(db)
     base = db.query(Subscription)
+    # Apply reseller filtering BEFORE count, offset and limit. Never paginate
+    # the global roster and filter only the current browser page.
+    assigned_ids = db.query(ResellerSubscription.subscription_id)
+    if reseller_id > 0:
+        base = base.filter(Subscription.id.in_(
+            assigned_ids.filter(ResellerSubscription.reseller_id == reseller_id)
+        ))
+    elif reseller_id == -1:
+        base = base.filter(~Subscription.id.in_(assigned_ids))
     if status == "online":
         base = base.filter(Subscription.id.in_(online_ids))
     elif status != "all":
