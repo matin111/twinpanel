@@ -90,7 +90,7 @@ def _user_record(secret: SingBoxAccountSecret) -> dict[str, str]:
             "uuid": secret.uuid,
             "password": secret.password,
         }
-    if secret.protocol == "naive":
+    if secret.protocol in {"naive", "socks5"}:
         return {
             "username": secret.username,
             "password": secret.password,
@@ -154,7 +154,7 @@ inbound = next(
         item for item in inbounds
         if isinstance(item, dict)
         and item.get("tag") == TAG
-        and item.get("type") == PROTOCOL
+        and item.get("type") == ("socks" if PROTOCOL == "socks5" else PROTOCOL)
     ),
     None,
 )
@@ -165,7 +165,7 @@ users = inbound.get("users")
 if not isinstance(users, list):
     users = []
 
-key = "username" if PROTOCOL == "naive" else "name"
+key = "username" if PROTOCOL in ("naive", "socks5") else "name"
 users = [
     item for item in users
     if not (
@@ -191,7 +191,7 @@ if not users:
             uuid=str(uuid.uuid4()),
             password=sentinel_password,
         )]
-    elif PROTOCOL == "naive":
+    elif PROTOCOL in ("naive", "socks5"):
         users = [dict(
             username=SENTINEL,
             password=sentinel_password,
@@ -418,10 +418,10 @@ for operation in UPDATES:
     protocol = operation["protocol"]
     inbound = next((row for row in inbounds if isinstance(row, dict)
                     and row.get("tag") == operation["tag"]
-                    and row.get("type") == protocol), None)
+                    and row.get("type") == ("socks" if protocol == "socks5" else protocol)), None)
     if not isinstance(inbound, dict):
         raise SystemExit("managed inbound not found: " + protocol)
-    key = "username" if protocol == "naive" else "name"
+    key = "username" if protocol in ("naive", "socks5") else "name"
     users = inbound.get("users")
     users = list(users) if isinstance(users, list) else []
     users = [u for u in users if not (isinstance(u, dict) and
@@ -616,7 +616,14 @@ def client_outbound(
         "server_port": listen_port,
     }
 
-    if protocol == "hysteria2":
+    if protocol == "socks5":
+        out["type"] = "socks"
+        out["version"] = "5"
+        out["username"] = secret.username
+        out["password"] = secret.password
+        out["network"] = "tcp"
+
+    elif protocol == "hysteria2":
         out["password"] = secret.password
         if isinstance(inbound.get("obfs"), dict):
             out["obfs"] = dict(inbound["obfs"])
