@@ -61,7 +61,7 @@ export const adminApi={
   subscriptions:()=>request<RuntimeRow[]>("/v1/subscriptions"),
   subscriptionsV2:()=>request<RuntimeRow[]>("/v1/subscriptions/admin-list-v2"),
   resellersForTransfer:()=>request<RuntimeRow[]>("/v1/admin/resellers"),
-  resellerTransferCustomers:(resellerId:number)=>request<Array<{id:number;name:string;email?:string|null;is_owner:boolean}>>(`/v1/admin/resellers/${resellerId}/transfer-customers`),
+  resellerTransferCustomers:(resellerId:number,q="")=>request<Array<{id:number;name:string;email?:string|null;is_owner:boolean}>>(`/v1/admin/resellers/${resellerId}/transfer-customers?q=${encodeURIComponent(q)}`),
   transferSubscriptionToReseller:(subscriptionId:number,resellerId:number,customerUserId:number)=>request<{ok:boolean;subscription_id:number;reseller_id:number;owner_user_id:number}>(`/v1/admin/resellers/${resellerId}/subscriptions/${subscriptionId}/transfer`,{method:"POST",body:JSON.stringify({customer_user_id:customerUserId})}),
   transferSubscriptionToUser:(subscriptionId:number,userId:number)=>request<{ok:boolean;subscription_id:number;owner_user_id:number;reseller_id:null}>(`/v1/subscriptions/${subscriptionId}/transfer-user`,{method:"POST",body:JSON.stringify({user_id:userId})}),
   subscriptionsPageV3:(params:{limit:number;offset:number;q:string;status:string;reseller_id?:number})=>request<{items:RuntimeRow[];total:number;stats:{total:number;active:number;expired:number;suspended:number;online:number}}>(`/v1/subscriptions/admin-page-v3?limit=${params.limit}&offset=${params.offset}&q=${encodeURIComponent(params.q)}&status=${encodeURIComponent(params.status)}&reseller_id=${params.reseller_id??0}`),
