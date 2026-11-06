@@ -681,3 +681,168 @@ def save_xray_inbound_editor_draft(
     )
     db.commit()
     return {"ok": True, "node_id": int(node_id), "draft": draft, "applied": False}
+
+
+# TWINPANEL_XRAY_INBOUND_EDITOR_APPLY_V1
+# Apply only REALITY target/SNI after validating against the active Xray.
+# Existing connection routes, keys, credentials, and TLS profiles stay intact.
+_XRAY_REALITY_APPLY_SCRIPT = r'''
+import json
+import ssl
+import socket
+import os
+import shutil
+import subprocess
+import fcntl
+from pathlib import Path
+
+root = Path("/usr/local/etc/xray")
+config_path = root / "config.json"
+state_path = root / "twinpanel-modern-state.json"
+target = __TARGET__
+name = __NAME__
+lock = open("/run/lock/twinpanel-xray-inbound-editor.lock", "a+")
+fcntl.flock(lock, fcntl.LOCK_EX)
+host, port = target.rsplit(":", 1)
+if host != name or port != "443":
+    raise RuntimeError("REALITY target and serverName must match")
+with socket.create_connection((host, 443), timeout=7) as sock:
+    with ssl.create_default_context().wrap_socket(sock, server_hostname=name) as tls:
+        if tls.version() != "TLSv1.3":
+            raise RuntimeError("REALITY target requires TLS 1.3")
+config = json.loads(config_path.read_text())
+state = json.loads(state_path.read_text())
+inbounds = [
+    entry for entry in config.get("inbounds", [])
+    if entry.get("tag") in ("vless-xhttp-reality", "vless-grpc-reality")
+]
+if len(inbounds) != 2:
+    raise RuntimeError("Missing required REALITY inbounds")
+for entry in inbounds:
+    settings = entry["streamSettings"]
+    if settings.get("security") != "reality":
+        raise RuntimeError("REALITY inbound security mismatch")
+    reality = settings["realitySettings"]
+    if not reality.get("privateKey") or not reality.get("shortIds"):
+        raise RuntimeError("Existing REALITY keys are missing")
+    reality["target"] = target
+    reality["serverNames"] = [name]
+state["reality_target"] = target
+state["reality_server_name"] = name
+stamp = str(os.getpid())
+backups = []
+stages = []
+try:
+    for path, doc in ((config_path, config), (state_path, state)):
+        backup = path.with_name(path.name + ".pre-inbound-apply-" + stamp)
+        shutil.copy2(path, backup)
+        os.chmod(backup, 0o600)
+        backups.append((path, backup))
+        stage = path.with_name(path.stem + ".inbound-" + stamp + ".json")
+        stage.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n")
+        os.chmod(stage, 0o600)
+        stages.append(stage)
+    result = subprocess.run(
+        ["/usr/local/bin/xray", "run", "-test", "-config", str(stages[0])],
+        capture_output=True, text=True, timeout=15
+    )
+    if result.returncode:
+        raise RuntimeError("Xray configuration validation failed: " + result.stderr[-400:])
+    for (path, _), stage in zip(backups, stages):
+        os.replace(stage, path)
+    subprocess.run(["systemctl", "restart", "xray"], check=True, timeout=20)
+    state_check = subprocess.run(["systemctl", "is-active", "--quiet", "xray"], timeout=10)
+    if state_check.returncode:
+        raise RuntimeError("Xray did not become active")
+    new_config = json.loads(config_path.read_text())
+    assert all(
+        x["streamSettings"]["realitySettings"]["serverNames"] == [name]
+        for x in new_config["inbounds"] if x.get("tag") in
+        ("vless-xhttp-reality", "vless-grpc-reality")
+    )
+except Exception:
+    for path, backup in backups:
+        if backup.exists():
+            os.replace(backup, path)
+    subprocess.run(["systemctl", "restart", "xray"], capture_output=True, timeout=20)
+    raise
+finally:
+    for stage in stages:
+        stage.unlink(missing_ok=True)
+print(json.dumps({"ok": True, "reality_server_name": name, "reality_target": target}))
+'''
+
+
+@router.post("/nodes/{node_id}/inbound-editor/apply")
+async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
+    import asyncio
+    import base64
+
+    node = _node_or_404(db, node_id)
+    row = db.execute(
+        text(
+            "SELECT settings_json FROM modern_protocol_settings "
+            "WHERE node_id=:node_id AND protocol='v2ray'"
+        ), {"node_id": int(node_id)}
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=409, detail="No saved inbound draft")
+    settings = json.loads(row)
+    draft = settings.get("draft")
+    if not isinstance(draft, dict):
+        raise HTTPException(status_code=409, detail="No valid inbound draft")
+    candidate = _validated_editor_settings(InboundEditorDraft(**draft))
+    # Current production supports these TLS and REALITY profiles, not an
+    # arbitrary transport conversion. Reject rather than publishing broken URIs.
+    if (candidate["transport"], candidate["security"]) not in {
+        ("tcp", "tls"), ("ws", "tls"), ("httpupgrade", "tls"),
+        ("xhttp", "reality"), ("grpc", "reality"),
+    }:
+        raise HTTPException(status_code=422, detail="Transport/security not provisioned")
+    name = candidate["reality_server_name"]
+    target = candidate["reality_target"]
+    if not name or not target or target != name + ":443":
+        raise HTTPException(status_code=422, detail="REALITY name and target must match on :443")
+
+    conn = await account_delivery.ssh_connect_saved(node, db)
+    try:
+        script = _XRAY_REALITY_APPLY_SCRIPT.replace(
+            "__TARGET__", json.dumps(target)
+        ).replace("__NAME__", json.dumps(name))
+        encoded = base64.b64encode(script.encode("utf-8")).decode("ascii")
+        command = (
+            "python3 -c "
+            + shlex.quote("import base64;exec(base64.b64decode(" + repr(encoded) + "))")
+        )
+        result = await provision.cmd(conn, command, timeout=55)
+        report = json.loads(result.splitlines()[-1])
+        if not report.get("ok"):
+            raise RuntimeError("REALITY verification did not succeed")
+    finally:
+        conn.close()
+        await conn.wait_closed()
+
+    # Publish the verified server settings atomically to the central feed.
+    # Only the REALITY field is enabled: TLS, domain routing and transport
+    # remain drafts until corresponding server-side apply is implemented.
+    settings["reality_server_name"] = name
+    settings["reality_target"] = target
+    settings["last_verified_at"] = datetime.utcnow().isoformat() + "Z"
+    db.execute(
+        text(
+            "UPDATE modern_protocol_settings SET settings_json=:settings, "
+            "updated_at=:now WHERE node_id=:node_id AND protocol='v2ray'"
+        ),
+        {
+            "node_id": int(node_id),
+            "settings": json.dumps(settings, ensure_ascii=False),
+            "now": datetime.utcnow(),
+        },
+    )
+    db.commit()
+    return {
+        "ok": True, "node_id": int(node_id),
+        "applied_fields": ["reality_server_name", "reality_target"],
+        "reality_server_name": name,
+        "note": "TLS, connection domain and transport remain unchanged.",
+    }
