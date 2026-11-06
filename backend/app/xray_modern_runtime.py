@@ -780,6 +780,8 @@ async def _ensure_modern_xray(
                 },
             },
         },
+    ]
+
     if PROFILE_WS in available_profiles:
         inbounds.append(
             {
