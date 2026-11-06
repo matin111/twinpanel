@@ -99,7 +99,9 @@ async def _terminate_batch(proc: asyncio.subprocess.Process) -> None:
 
 async def _run_subprocess(claim: ClaimedNodeBackfill) -> tuple[int, int | None]:
     """Return (exit code, committed pairs), never raw stdout or credentials."""
-    batch_size = BATCH_PAIRS if claim.phase == "singbox" else 3
+    batch_size = BATCH_PAIRS if claim.phase == "singbox" else (
+        1 if claim.phase == "v2ray" else 3
+    )
     proc = await asyncio.create_subprocess_exec(
         sys.executable, str(BACKFILL_SCRIPT),
         "--node-id", str(claim.node_id),
