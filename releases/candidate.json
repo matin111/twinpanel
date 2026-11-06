@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.617",
-  "source_sha": "66b0bac99f48dc9b8a4789f26ebd2e524957c353",
+  "version": "1.1.0-rc.618",
+  "source_sha": "bb93235e42f5fcb802f925377b7588ef1c9bad2c",
   "notes": {
-    "fa": "اتصال بازسازی کانفیگ‌های ناقص V2Ray کاربران قدیمی به صف پایدار مدیریت مرکزی، حفظ UUID و استفاده از Hot Sync بدون راه‌اندازی مجدد Xray؛ اجرای محدود و کنترل‌شده همراه با فیلتر اشتراک‌های فعال.",
-    "en": "Durable central V2Ray missing-only node backfill for active imported subscriptions, preserve customer UUID, reuse Xray hot client sync without global restart, bounded scoped worker."
+    "fa": "رفع هنگ پنل با انتقال محاسبه سنگین سهمیه از رشته اصلی API و پردازش JSON حجیم Agent در Threadpool؛ حفظ کامل منطق سهمیه، ساخت اکانت، اتصال نودها و تمام ویژگی‌های نسخه rc.617. بدون تغییر تونل‌ها، دیتابیس، Xray و پروتکل‌های VPN.",
+    "en": "Fix API/UI stalls by moving heavy quota snapshots off the Uvicorn event loop and serializing Agent tunnel desired-state in the request thread. Preserve all quota rules, response JSON, subscriptions, and rc.617 fixes. No changes to VPN tunnels, Xray or other protocols."
   }
 }
