@@ -111,7 +111,8 @@ def test_v2ray_missing_only_uses_existing_uuid_and_no_restart():
     assert "cred.config_text_encrypted and not items" in classic
     assert "len(known)>1" in classic
     assert "client_id=next(iter(known)) if known else str(uuid.uuid4())" in classic
-    assert "ad._xray(db,node,sub,user,client_id)" in classic
+    assert "reusable_connection=shared_conn" in classic
+    assert "ad._xray(" in classic
     assert "V2Ray UUID changed unexpectedly" in classic
     assert "Xray live user add failed for inbound" in hot
     assert "global_restart=forbidden" in hot
