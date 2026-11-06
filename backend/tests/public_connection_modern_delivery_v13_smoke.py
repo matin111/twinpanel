@@ -44,12 +44,13 @@ assert modern == (
     "naive",
     "shadowtls",
     "snell",
+    "socks5",
     "mieru",
     "trusttunnel",
     "amneziawg",
     "sudoku",
 )
-assert len(set(classic + modern)) == 15
+assert len(set(classic + modern)) == 16
 
 # Desired state comes from SubscriptionProtocol. A selected-but-not-yet-ready
 # protocol remains visible as pending instead of silently disappearing.
