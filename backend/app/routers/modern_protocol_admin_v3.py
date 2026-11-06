@@ -468,7 +468,7 @@ async def health(
         # Complete all SSH calls before opening a database write transaction.
         try:
             pin = await asyncio.wait_for(certificate_pin(conn), timeout=15)
-        except (asyncio.TimeoutError, Exception):
+        except Exception:
             pin = None
         for key, result in results.items():
             _save_status(db, node, key, result)
