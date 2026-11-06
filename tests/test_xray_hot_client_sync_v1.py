@@ -36,7 +36,7 @@ def make_script(client_id: str, email: str) -> str:
     return script
 
 
-FAKE_XRAY = textwrap.dedent('''\\
+FAKE_XRAY = textwrap.dedent('''\
     #!/usr/bin/env python3
     import json, os, sys
     from pathlib import Path
