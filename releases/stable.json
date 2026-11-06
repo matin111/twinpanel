@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.618",
+  "version": "1.1.0-rc.619",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T19:07:58Z",
+  "released_at": "2026-11-06T19:18:15Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "bb93235e42f5fcb802f925377b7588ef1c9bad2c",
+  "source_sha": "ca0f9ea48494b07a07dc1a6137bacecefe996769",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.618/twinpanel-1.1.0-rc.618-linux-x86_64.tar.gz",
-    "sha256": "132ff1e6c528125f64f7ce4c9aa170f832775193cadb2cd46340095b558afc6c",
-    "size_bytes": 28951514
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.619/twinpanel-1.1.0-rc.619-linux-x86_64.tar.gz",
+    "sha256": "0cbbea5e19c3cc424fd09f720715e4f78f04b8d7bfa0faf55bef0fd19f97ca34",
+    "size_bytes": 28956076
   },
   "notes": {
-    "fa": "رفع هنگ پنل با انتقال محاسبه سنگین سهمیه از رشته اصلی API و پردازش JSON حجیم Agent در Threadpool؛ حفظ کامل منطق سهمیه، ساخت اکانت، اتصال نودها و تمام ویژگی‌های نسخه rc.617. بدون تغییر تونل‌ها، دیتابیس، Xray و پروتکل‌های VPN.",
-    "en": "Fix API/UI stalls by moving heavy quota snapshots off the Uvicorn event loop and serializing Agent tunnel desired-state in the request thread. Preserve all quota rules, response JSON, subscriptions, and rc.617 fixes. No changes to VPN tunnels, Xray or other protocols."
+    "fa": "رفع خطای ویرایش اکانت‌های قدیمی با نودهای از پیش تخصیص‌یافته خارج از قالب فعلی پلن، بدون مجازکردن نود تازه خارج از پلن؛ همراه با تمام بهبودهای rc.618 برای سلامت API و پنل. بدون تغییر کانفیگ کاربران، تنظیمات نود یا V2Ray.",
+    "en": "Fix legacy subscriptions failing admin edits when an existing Exit node is no longer in the plan template; allow unchanged assigned nodes only, never new out-of-plan nodes, and preserve all rc.618 API responsiveness improvements."
   }
 }
