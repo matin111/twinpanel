@@ -280,10 +280,15 @@ async def create_selected_tunnel_v358(
 
             # Reuse V257/V289 fresh full-L3 probe + post-switch Agent
             # acceptance + rollback authority. No custom cutover is invented.
+            # A new pair has to be discovered, reconciled and reported by
+            # *both* Agents. Give this first convergence longer than a
+            # switch between two already-known carriers; never waive
+            # bidirectional Data Plane acceptance or rollback.
             selection_result = await select_modern_transport_manual(
                 tunnel_id,
                 selected,
                 db,
+                acceptance_timeout_seconds=90.0,
             )
 
             db.expire_all()
