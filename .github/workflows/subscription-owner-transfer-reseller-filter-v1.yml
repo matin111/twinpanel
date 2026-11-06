@@ -1,0 +1,33 @@
+name: Subscription Owner Transfer and Reseller Filter V1
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/reseller_admin_v2.py'
+      - 'backend/app/routers/subscription_admin_v2.py'
+      - 'backend/scripts/twinpanel_reconcile_reseller_transfer_owners_v1.py'
+      - 'backend/tests/test_subscription_owner_transfer_reseller_filter_v1.py'
+      - 'components/legacy-subscriptions-exact.tsx'
+      - 'lib/admin-api.ts'
+      - '.github/workflows/subscription-owner-transfer-reseller-filter-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install backend runtime and test runner
+        run: python -m pip install --disable-pip-version-check -r backend/requirements.txt pytest
+      - name: Compile ownership and filtering routes
+        run: |
+          python -m py_compile backend/app/routers/subscription_admin_v2.py
+          python -m py_compile backend/app/routers/reseller_admin_v2.py
+          python -m py_compile backend/scripts/twinpanel_reconcile_reseller_transfer_owners_v1.py
+      - name: Test actual transfer and SQL paginated filtering
+        env:
+          PYTHONPATH: backend
+        run: python -m pytest -q backend/tests/test_subscription_owner_transfer_reseller_filter_v1.py
