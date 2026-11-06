@@ -56,7 +56,11 @@ def main() -> None:
     assert "--system-site-packages" in source
     assert "--disable-pip-version-check install --retries 2 --timeout 15" in source
     assert "pip install --upgrade pip >/dev/null" not in source
-    assert "pip install --upgrade pip >/dev/null" in legacy
+    # The legacy Agent installer now has the same offline-safe behavior.
+    assert "pip install --upgrade pip >/dev/null" not in legacy
+    assert "/opt/twinpanel-agent/venv/bin/python -m pip install " in legacy
+    assert '--timeout 15 --retries 2' in legacy
+    assert '"import httpx,psutil' in legacy
 
     # Exit authority is preserved by delegation to the V70-captured base paths.
     assert "if payload.node_type != NodeType.IRAN:" in source
