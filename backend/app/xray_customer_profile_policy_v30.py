@@ -53,7 +53,7 @@ _runtime_applied = False
 
 PUBLIC_PROFILE_ORDER = (
     "websocket_tls",
-    "httpupgrade_tls",
+    "xhttp_reality",
     PROFILE_TCP_TLS,
 )
 PUBLIC_PROFILE_IDS = frozenset(PUBLIC_PROFILE_ORDER)
@@ -65,7 +65,6 @@ ADMIN_ROUTE_PROFILE_IDS = frozenset(ADMIN_ROUTE_PROFILE_ORDER)
 HIDDEN_ROUTED_PROFILES = frozenset(
     {
         "legacy",
-        "xhttp_reality",
         "grpc_reality",
         "tcp_simple",
     }
@@ -79,7 +78,6 @@ HIDDEN_ROUTED_PROFILES = frozenset(
 #   TCP TLS          9446
 TLS_TARGET_OFFSETS_V261 = {
     xray_modern_runtime.PROFILE_WS: 1001,
-    xray_modern_runtime.PROFILE_HTTPUPGRADE: 1002,
     PROFILE_TCP_TLS: 1003,
 }
 
@@ -439,7 +437,6 @@ async def _service_connections_v30(
         "l2tp": 40,
         "legacy": 50,
         "websocket_tls": 51,
-        "httpupgrade_tls": 52,
         PROFILE_TCP_TLS: 53,
     }
     filtered.sort(
@@ -530,7 +527,7 @@ def apply_xray_customer_profile_policy_v30() -> None:
     print(
         "TWINPANEL_XRAY_CUSTOMER_PROFILE_POLICY_V30_ACTIVE "
         "websocket_tls=public "
-        "httpupgrade_tls=public "
+        "xhttp_reality=public "
         "tcp_tls=public "
         "grpc_reality=internal_only "
         "xhttp_reality=internal_only "
