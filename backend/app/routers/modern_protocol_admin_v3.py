@@ -360,7 +360,12 @@ async def install(
             },
         )
 
-    conn = await connect_protocol_runtime(node, db)
+    execution = "local" if getattr(node, "is_mother", False) else "ssh"
+    conn = await asyncio.wait_for(connect_protocol_runtime(node, db), timeout=20)
+    # Installing runtime packages over SSH can take minutes. Do not hold a
+    # PostgreSQL transaction open throughout that external operation.
+    db.expunge(node)
+    db.commit()
     try:
         try:
             result = await apply_profiles(conn, node, profiles)
@@ -397,7 +402,7 @@ async def install(
         return {
             "ok": not failed,
             "node_id": node.id,
-            "execution": "local" if getattr(node, "is_mother", False) else "ssh",
+            "execution": execution,
             "core": result.get("core", {}),
             "protocols": result["protocols"],
             "warnings": warning_map,
@@ -498,7 +503,12 @@ async def remove(
     if key not in SINGBOX_PROTOCOLS:
         raise HTTPException(status_code=409, detail="Runtime adapter این پروتکل فعال نیست")
 
-    conn = await connect_protocol_runtime(node, db)
+    execution = "local" if getattr(node, "is_mother", False) else "ssh"
+    conn = await asyncio.wait_for(connect_protocol_runtime(node, db), timeout=20)
+    # Removal is remote I/O too: preserve the ORM data but close its read
+    # transaction before waiting on SSH or systemd.
+    db.expunge(node)
+    db.commit()
     try:
         try:
             result = await remove_profile(conn, key)
@@ -523,7 +533,7 @@ async def remove(
         return {
             **result,
             "node_id": node.id,
-            "execution": "local" if getattr(node, "is_mother", False) else "ssh",
+            "execution": execution,
         }
     finally:
         conn.close()
