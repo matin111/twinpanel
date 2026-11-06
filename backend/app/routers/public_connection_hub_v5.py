@@ -55,6 +55,14 @@ def _items(cred: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _server_name(item: dict[str, Any], node_names: dict[int, str], index: int) -> str:
+    from .public_connection_modern_names_v14 import _country_flag
+    code = str(item.get("country_code") or "").strip().upper()
+    if len(code) == 2 and code.isascii() and code.isalpha():
+        try:
+            node_id = int(item.get("node_id") or 0)
+        except (ValueError, TypeError):
+            node_id = 0
+        return f"{_country_flag(code)} · {node_id or index + 1}"
     try:
         node_id = int(item.get("node_id") or 0)
     except (TypeError, ValueError):
