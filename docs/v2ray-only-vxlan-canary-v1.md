@@ -1,13 +1,20 @@
-# Isolated V2Ray WS canary — Iran 9 / Germany 7 / USA 11
+# Isolated V2Ray TCP-only ingress routes — Iran 9 / Germany 7 / USA 11
 
-This is **opt-in**, not an installer default. It is scoped only to public TCP
-ports **26007** and **26011** (VLESS WS/TLS) on the audited Iran 9 ingress. Other public
-V2Ray ports and every other protocol keep the panel's managed tunnel rules.
+This is **opt-in**, not an installer default. It only overrides these public
+TCP ports of the audited Iran 9 ingress:
 
-## Apply on the audited Iran ingress only
+- Germany: 24007 (VLESS XHTTP REALITY), 26007 (WS/TLS), 28007 (TCP/TLS)
+- USA: 24011 (VLESS XHTTP REALITY), 26011 (WS/TLS), 28011 (TCP/TLS)
 
-After validating `10.243.0.121/30` on `tpvx30` (peer `10.243.0.122`)
-and `10.243.0.129/30` on `tpvx32` (peer `10.243.0.130`), install:
+**All other ports, including UDP 28007/28011, Cisco, OpenVPN, WireGuard,
+all other VPN protocols, and every Agent-managed GRE/transport rule remain
+unchanged.** Xray is not restarted. Existing conntrack connections are not
+removed. Do not enable on an unaudited node.
+
+## Apply only on the audited Iran 9 ingress
+
+Verify `10.243.0.121/30` on `tpvx30` (peer `10.243.0.122`)
+and `10.243.0.129/30` on `tpvx32` (peer `10.243.0.130`).
 
 ```bash
 install -m 750 backend/scripts/v2ray_only_vxlan_canary_v1.py /usr/local/sbin/tp-v2ray-only-vxlan-canary-v1
@@ -16,18 +23,20 @@ install -m 644 backend/scripts/systemd/tp-v2ray-only-vxlan-canary.timer /etc/sys
 systemctl daemon-reload
 systemctl start tp-v2ray-only-vxlan-canary.service
 systemctl enable --now tp-v2ray-only-vxlan-canary.timer
-python3 /usr/local/sbin/tp-v2ray-only-vxlan-canary-v1 status
+for profile in de-ws de-xhttp de-tcp us-ws us-xhttp us-tcp; do
+  python3 /usr/local/sbin/tp-v2ray-only-vxlan-canary-v1 status --profile="$profile"
+done
 ```
 
-## Explicit rollback (does not restart Xray or other VPN protocols)
+## Explicit rollback (no Xray or tunnel restart)
 
 ```bash
 systemctl disable --now tp-v2ray-only-vxlan-canary.timer
-python3 /usr/local/sbin/tp-v2ray-only-vxlan-canary-v1 remove --profile=de-ws
-python3 /usr/local/sbin/tp-v2ray-only-vxlan-canary-v1 remove --profile=us-ws
+for profile in de-ws de-xhttp de-tcp us-ws us-xhttp us-tcp; do
+  python3 /usr/local/sbin/tp-v2ray-only-vxlan-canary-v1 remove --profile="$profile"
+done
 ```
 
-The script only inserts/removes its exact NAT overrides in the parent
-PREROUTING/POSTROUTING chains; it does not flush any Agent-managed chains.
-Existing conntrack sessions are left intact. The underlying Agent and GRE
-rules remain unchanged. Never apply the script on an unaudited node.
+The script only inserts/removes its exact-match TCP NAT overrides ahead of
+the Agent-managed parent chain jumps. It neither flushes those chains nor
+changes any tunnel configuration or TCP congestion settings.
