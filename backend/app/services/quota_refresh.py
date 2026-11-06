@@ -145,9 +145,10 @@ def _sync_subscription_quota_nodes_blocking(
 # Exit-node snapshot. Never run that synchronous CPU/DB workload on uvicorn's
 # event-loop thread, where it can stall *all* requests including /health.
 #
-# A dedicated small pool avoids consuming Starlette/AnyIO's request thread pool.
+# A single worker preserves the previous serial mutation ordering and avoids
+# consuming Starlette/AnyIO's request thread pool.
 _QUOTA_SYNC_EXECUTOR = ThreadPoolExecutor(
-    max_workers=2,
+    max_workers=1,
     thread_name_prefix="tp-quota-sync",
 )
 
