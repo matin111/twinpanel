@@ -196,6 +196,32 @@ def finish_batch(
     return True
 
 
+def defer_job(
+    db: Session, claim: ClaimedNodeBackfill, *,
+    reason: str = "waiting_for_healthy_panel", delay_seconds: int = 60,
+) -> bool:
+    """Transient load, updater or another migration lock is not a failure."""
+    now = datetime.utcnow()
+    changed = (
+        db.query(NodeAutoBackfillJobV1)
+        .filter(
+            NodeAutoBackfillJobV1.node_id == claim.node_id,
+            NodeAutoBackfillJobV1.lease_token == claim.lease_token,
+            NodeAutoBackfillJobV1.state == "running",
+        )
+        .update({
+            NodeAutoBackfillJobV1.state: "retry",
+            NodeAutoBackfillJobV1.run_after: now + timedelta(seconds=max(10, delay_seconds)),
+            NodeAutoBackfillJobV1.lease_until: None,
+            NodeAutoBackfillJobV1.lease_token: None,
+            NodeAutoBackfillJobV1.last_error: reason[:120],
+            NodeAutoBackfillJobV1.updated_at: now,
+        }, synchronize_session=False)
+    )
+    db.commit()
+    return changed == 1
+
+
 def pause_job(db: Session, node_id: int) -> dict | None:
     job = db.get(NodeAutoBackfillJobV1, int(node_id))
     if job is None:
