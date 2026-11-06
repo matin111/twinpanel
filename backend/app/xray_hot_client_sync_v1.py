@@ -98,14 +98,17 @@ def _sync():
         if len(matches) > 1:
             raise RuntimeError("duplicate VLESS account email in " + tag)
         previous = dict(matches[0]) if matches else None
-        if (previous is not None
-            and str(previous.get("id") or "") == CLIENT_ID
-            and int(previous.get("level") or 0) == 0):
-            continue
-        clients[:] = [c for c in clients if str(c.get("email") or "") != EMAIL]
+        if previous is not None:
+            if (str(previous.get("id") or "") == CLIENT_ID
+                and int(previous.get("level") or 0) == 0):
+                continue
+            # Rotations need a separate user-scoped maintenance workflow.
+            # Never remove an active customer's UUID during provisioning:
+            # a failed re-add would break that one customer's connections.
+            raise RuntimeError("VLESS UUID rotation requires explicit user-scoped migration")
         client = {"id": CLIENT_ID, "email": EMAIL, "level": 0}
         clients.append(client)
-        updated.append((tag, port, previous, client))
+        updated.append((tag, port, client))
 
     if found < 3:
         raise RuntimeError("modern Xray VLESS inbounds incomplete")
@@ -140,13 +143,9 @@ def _sync():
         # restarting Xray to rescue one new subscription.
         applied = []
         try:
-            for tag, port, previous, client in updated:
-                event = {"tag": tag, "port": port, "previous": previous,
-                         "removed": False, "added": False}
+            for tag, port, client in updated:
+                event = {"tag": tag, "added": False}
                 applied.append(event)
-                if previous is not None:
-                    _api_remove(tag, EMAIL)
-                    event["removed"] = True
                 _api_add(tag, port, client)
                 event["added"] = True
                 _api_confirm(tag, EMAIL, CLIENT_ID)
@@ -161,8 +160,6 @@ def _sync():
                 try:
                     if event["added"]:
                         _api_remove(event["tag"], EMAIL)
-                    if event["removed"] and event["previous"] is not None:
-                        _api_add(event["tag"], event["port"], event["previous"])
                 except Exception:
                     rollback_errors.append(event["tag"])
             if rollback_errors:
