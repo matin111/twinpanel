@@ -134,7 +134,7 @@ def main() -> None:
                 require(expected == wide_expected, f"{protocol}: narrow Windows changed OS semantics")
             checked += 1
 
-    require(checked == 60, f"expected 60 acceptance policy rows, got {checked}")
+    require(checked == 64, f"expected 64 acceptance policy rows, got {checked}")
     require("MutationObserver" not in v34, "V34 must remain observer-free")
     require("کپی کانفیگ" not in v34, "ambiguous copy-config label returned")
     require("mobile-send-btn" in v34, "Windows mobile-send legacy action is not hidden")
