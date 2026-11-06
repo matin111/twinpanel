@@ -340,6 +340,25 @@ def restart_services() -> None:
         )
 
 
+def install_node_auto_backfill_timer(release: Path) -> None:
+    """Install durable worker units from the exact verified, pinned release.
+
+    Existing client configs, legacy worker units, and V2Ray services are not
+    touched. systemd starts one timer, not an API-local background job.
+    """
+    names = ("twinpanel-node-auto-backfill.service", "twinpanel-node-auto-backfill.timer")
+    for name in names:
+        source = release / "deploy/systemd" / name
+        if not source.is_file():
+            return  # old releases have no automatic-node-backfill feature
+        target = Path("/etc/systemd/system") / name
+        if not same_file(source, target):
+            shutil.copyfile(source, target)
+            target.chmod(0o644)
+    run(["systemctl", "daemon-reload"], timeout=20)
+    run(["systemctl", "enable", "--now", "twinpanel-node-auto-backfill.timer"], timeout=20)
+
+
 def health_ok(url: str, expected_version: str) -> bool:
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'TwinPanel-Update-Health/3'})
@@ -868,6 +887,7 @@ def main() -> int:
         verify_activation(final, version)
         if not health_ok_all:
             raise RuntimeError('POST_UPDATE_HEALTH_VERSION_FAILED:' + ','.join(pending))
+        install_node_auto_backfill_timer(final)
     except Exception:
         save(
             state='rollback',

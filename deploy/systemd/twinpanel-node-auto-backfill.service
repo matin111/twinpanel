@@ -1,0 +1,21 @@
+[Unit]
+Description=TwinPanel durable new-Exit credential backfill (one bounded batch)
+After=network-online.target postgresql.service twinpanel-api.service
+Wants=network-online.target
+ConditionPathExists=/opt/twinpanel/current/backend/scripts/twinpanel_node_auto_backfill_v1.py
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/twinpanel/current/backend
+EnvironmentFile=/etc/twinpanel/backend.env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/opt/twinpanel/current/backend
+ExecStart=/opt/twinpanel/venv/bin/python3 -u /opt/twinpanel/current/backend/scripts/twinpanel_node_auto_backfill_v1.py
+Nice=15
+CPUWeight=10
+CPUQuota=55%
+IOWeight=10
+TimeoutStartSec=420
+SuccessExitStatus=2
+StandardOutput=journal
+StandardError=journal

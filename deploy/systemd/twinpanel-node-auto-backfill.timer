@@ -1,0 +1,12 @@
+[Unit]
+Description=TwinPanel automatic retry of node backfill queue
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=30s
+AccuracySec=12s
+Persistent=false
+Unit=twinpanel-node-auto-backfill.service
+
+[Install]
+WantedBy=timers.target
