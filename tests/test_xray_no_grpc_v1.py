@@ -2,6 +2,7 @@
 import ast
 import re
 from pathlib import Path
+from typing import Any
 from types import SimpleNamespace
 from urllib.parse import parse_qsl, urlsplit
 import unittest
@@ -57,6 +58,7 @@ class V2RayNoGrpcTests(unittest.TestCase):
             and node.name in {"_is_deprecated_grpc_uri", "_item_v2ray_uris"}
         ]
         ns = {
+            "Any": Any,
             "parse_qsl": parse_qsl,
             "urlsplit": urlsplit,
             "xray_delivery": SimpleNamespace(
