@@ -10,7 +10,6 @@ import ast
 import asyncio
 import fcntl
 import os
-import re
 import sys
 import uuid
 from datetime import datetime, timedelta
@@ -247,13 +246,18 @@ async def _run_child(node_id: int, protocol: str) -> int:
     )
     try:
         data, _ = await asyncio.wait_for(child.communicate(), timeout=BATCH_TIMEOUT_SECONDS)
-    except asyncio.TimeoutError:
-        child.terminate()
-        try:
-            await asyncio.wait_for(child.wait(), timeout=8)
-        except asyncio.TimeoutError:
-            child.kill()
-            await child.wait()
+    except (asyncio.TimeoutError, asyncio.CancelledError) as exc:
+        # A cancelled API worker must not leave an SSH provisioning child
+        # orphaned while a replacement worker takes over the expired lease.
+        if child.returncode is None:
+            child.terminate()
+            try:
+                await asyncio.wait_for(child.wait(), timeout=8)
+            except asyncio.TimeoutError:
+                child.kill()
+                await child.wait()
+        if isinstance(exc, asyncio.CancelledError):
+            raise
         raise RuntimeError("batch_timeout") from None
     if child.returncode != 0:
         raise RuntimeError("batch_failed")
@@ -272,26 +276,34 @@ def _updater_running() -> bool:
         return True
 
 
-async def _run_claim(node_id: int, stage_index: int) -> tuple[str, int, str | None]:
+def _preflight(node_id: int) -> str | None:
+    """Run blocking health checks/ORM outside the one-worker FastAPI loop."""
     from urllib.request import urlopen
     if _updater_running():
-        return "retry", 0, "updater_active"
+        return "updater_active"
     if os.getloadavg()[0] > 7:
-        return "retry", 0, "high_server_load"
+        return "high_server_load"
     try:
         with urlopen("http://127.0.0.1:8095/health/ready", timeout=4) as response:
             if response.status != 200:
-                return "retry", 0, "api_unhealthy"
+                return "api_unhealthy"
     except Exception:
-        return "retry", 0, "api_unhealthy"
+        return "api_unhealthy"
     with SessionLocal() as db:
         node = db.get(Node, int(node_id))
         if node is None or node.retired_at is not None:
-            return "cancelled", 0, "node_deleted"
+            return "node_deleted"
         if node.node_type != NodeType.EXIT:
-            return "cancelled", 0, "not_exit"
+            return "not_exit"
         if node.status != NodeStatus.ONLINE or not node.show_to_users:
-            return "retry", 0, "node_not_ready"
+            return "node_not_ready"
+    return None
+
+
+async def _run_claim(node_id: int, stage_index: int) -> tuple[str, int, str | None]:
+    check = await asyncio.to_thread(_preflight, node_id)
+    if check:
+        return ("cancelled" if check in {"node_deleted", "not_exit"} else "retry"), 0, check
     if stage_index >= len(PROTOCOL_STAGES):
         return "done", 0, None
     try:
