@@ -134,7 +134,7 @@ class BackgroundNodeInstallIn(BaseModel):
     install_l2tp: bool = False
     install_v2ray: bool = False
     xray_port: int = Field(default=8443, ge=1, le=65535)
-    publish_to_all_users: bool = True
+    publish_to_all_users: bool = False
 
 
 async def _install_node_in_background(payload: BackgroundNodeInstallIn, request_scope: dict[str, Any]) -> None:
