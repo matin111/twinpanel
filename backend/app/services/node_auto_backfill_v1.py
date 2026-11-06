@@ -190,6 +190,11 @@ def finish_claim(
     row.updated_at = now
     row.last_batch = count
     if error_code:
+        # Earlier cycles can commit credentials before a later cycle fails.
+        # Count the successfully reported cycles exactly once under this
+        # lease; the next claim remains missing-only/idempotent.
+        if count:
+            row.completed_pairs = int(row.completed_pairs or 0) + count
         row.error_code = str(error_code)[:96]
         if int(row.attempts) >= MAX_ATTEMPTS:
             row.state = "failed"
