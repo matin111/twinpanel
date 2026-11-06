@@ -362,6 +362,16 @@ def _repair_meta(
         out.pop("fou_port", None)
     else:
         out["fou_port"] = int(fou_port)
+
+    # Benchmarks describe one exact carrier profile. A successful repair that
+    # switches FoU -> GRE-native (or back) must invalidate the prior profile's
+    # throughput; merge_meta_preserving_smart_auto retains existing SmartAuto
+    # keys, so explicitly set throughput=None to override stale values.
+    if str(existing.get("selected_profile") or "") != profile:
+        state = out.get("smart_auto_v21")
+        state = dict(state) if isinstance(state, dict) else {}
+        state["throughput"] = None
+        out["smart_auto_v21"] = state
     return out
 
 
