@@ -42,6 +42,16 @@ class CentralModernDeliveryTests(unittest.TestCase):
         uri = _protocol_uris_from_payload(self.sub, self.payload, "anytls", db=object())[0]
         self.assertIn("old.example.org:443", uri)
 
+    @patch("app.routers.public_connection_protocol_subscriptions_v30.applied_modern_connection")
+    def test_incompatible_projection_does_not_leak_stale_uri(self, lookup):
+        lookup.return_value = {"host": "new.example.org", "port": 8443}
+        payload = {"credentials": [{"protocol": "anytls", "items": [
+            {"node_id": 12, "uri": "anytls://secret@old.example.org:443/"}
+        ]}]}
+        self.assertEqual(
+            _protocol_uris_from_payload(self.sub, payload, "anytls", db=object()), []
+        )
+
     def test_v2ray_bypasses_projection(self):
         payload = {"credentials": [{"protocol": "v2ray", "items": [
             {"uri": "vless://example@old.example.org:443#old"}
