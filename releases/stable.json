@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.625",
+  "version": "1.1.0-rc.626",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T22:19:26Z",
+  "released_at": "2026-11-06T22:21:55Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "1cda38f9a7b3e57697013840a658244d1aeeddc4",
+  "source_sha": "26f61fb6905f58553932da3ecb93523190e7c98c",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.625/twinpanel-1.1.0-rc.625-linux-x86_64.tar.gz",
-    "sha256": "0f20c6e775618845a859d3445b8e15462b3d902e21a44ca5f4614cd7df524e27",
-    "size_bytes": 28990038
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.626/twinpanel-1.1.0-rc.626-linux-x86_64.tar.gz",
+    "sha256": "9cd9ae6353748015320bd2f997ea8f776d62ed9cba1de34cbb8a10dfc1988923",
+    "size_bytes": 28988707
   },
   "notes": {
-    "fa": "رفع نرسیدن پروفایل TCP REALITY نودهای جدید به مسیر عمومی ایران؛ اتصال درست افزونه Xray بعد از V87 و قبل از Unified L3 V49، با حفظ تمامی اصلاحات V2Ray و صف مدیریت مرکزی rc.624.",
-    "en": "Fix missing public TCP REALITY ingress on newly published Exits: attach Xray service route after V87/V251 and before Unified L3 V49, preserving the rc.624 central provisioning and V2Ray repairs."
+    "fa": "حذف دائمی HTTPUpgrade از تولید Inbound و لینک‌های V2Ray در تمام نودها؛ حفظ WebSocket TLS، XHTTP REALITY و TCP TLS، همراه با اصلاحات مسیر TCP REALITY نسخه قبلی؛ بدون تغییر تانل‌ها و سایر پروتکل‌ها.",
+    "en": "Permanently retire VLESS HTTPUpgrade from Xray inbound provisioning, new-node route generation and customer subscription delivery; preserve WebSocket TLS, XHTTP REALITY, TCP TLS and previous TCP REALITY ingress corrections. No changes to shared tunnels or other protocols."
   }
 }
