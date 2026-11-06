@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.603",
+  "version": "1.1.0-rc.604",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T03:23:21Z",
+  "released_at": "2026-11-06T04:17:59Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "f48ec316e4bc5ef32a800e0cdc00c0f6e9a0d657",
+  "source_sha": "96f32632098e2a7dc7228e8135878edf93ca2d16",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.603/twinpanel-1.1.0-rc.603-linux-x86_64.tar.gz",
-    "sha256": "43c6bd78c37827ce915c368db12e4ab7a0a9fe22ac81bbb204170ee520286408",
-    "size_bytes": 28809687
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.604/twinpanel-1.1.0-rc.604-linux-x86_64.tar.gz",
+    "sha256": "e3fd2fa6bac648b94299d761c902dc78997e496481250b84b3823078abaab954",
+    "size_bytes": 28818797
   },
   "notes": {
-    "fa": "تکمیل پایدار مدیریت V2Ray: اعمال و اعتبارسنجی SNI هر سه Inbound و گواهی TLS، مسیرهای WebSocket/XHTTP، مقصد REALITY، تغییر دامنه با DNS هم‌مقصد، حفظ تنظیمات در Reconcile و آپدیت ساب‌لینک تمام کاربران بدون بازسازی UUID؛ قابلیت‌های قبلی نود و تانل حفظ می‌شوند.",
-    "en": "Durable verified V2Ray controls: per-inbound TLS SNI with certificate checks, WS/XHTTP paths, REALITY target, same-ingress DNS connection aliases, reconcile-persistent settings, immediate server-side subscription updates without UUID reprovisioning. Prior node and tunnel fixes preserved."
+    "fa": "رفع قطع‌و‌وصل موقت مسیر تونل هنگام نوسان گزارش سلامت: در صورت فعال‌بودن نود و سلامت تازه و مستقل حامل فیزیکی، مسیر کاربران تا ۷۵ ثانیه در برابر خطای موقت پایش حفظ می‌شود؛ حذف عمدی تونل، خرابی پایدار و نبود مسیر معتبر همچنان fail-closed باقی می‌مانند. سازگار با تمام نودها و حفظ تنظیمات V2Ray نسخه قبل.",
+    "en": "Stabilize selected service routes against brief tunnel peer-report health flaps. Hold only previously selected active routes with recently healthy ONLINE physical carrier, at most 75 seconds; deliberate disable, absent routes, stale carrier and sustained outage still fail closed. Existing V2Ray and other services are preserved."
   }
 }
