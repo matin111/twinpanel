@@ -109,7 +109,7 @@ async def publish_node_to_all_users(
         "delivery_modes_added": delivery_modes_added,
         "delivery_modes_enabled": delivery_modes_enabled,
         "active_subscriptions_reconciled": 0,
-        "active_subscriptions_queued": len(active_ids),
+        "active_memberships_awaiting_background_sync": len(active_ids),
         "failed": [],
         "message": "نود برای کاربران ثبت شد؛ ساخت کانفیگ اکانت‌های جدید به‌صورت مرحله‌ای انجام می‌شود و اکانت‌های انتقالی فقط دستی هستند",
     }
