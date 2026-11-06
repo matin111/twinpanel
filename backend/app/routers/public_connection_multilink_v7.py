@@ -262,7 +262,7 @@ def _v2ray_remark_uri(uri: str, username: str, country_code: str | None) -> str:
         return uri
 
 
-def _v2ray_profile_groups(db: Session, payload: dict[str, Any], username: str = "" ) -> list[dict[str, Any]]:
+def _v2ray_profile_groups(db: Session, payload: dict[str, Any], username: str = "") -> list[dict[str, Any]]:
     """Group resolved profiles by server and include only customer-safe location metadata."""
 
     groups: list[dict[str, Any]] = []
@@ -373,8 +373,9 @@ def _subscription_response(token: str, db: Session) -> Response:
 
 
 def _subscription_meta_response(token: str, db: Session) -> JSONResponse:
-    payload = _active_public_payload(token, db)
-    groups = _v2ray_profile_groups(db, payload)
+    sub, payload = _subscription_and_payload(token, db)
+    username = str(getattr(sub, "account_username", None) or getattr(sub, "username", None) or f"user{sub.id}")
+    groups = _v2ray_profile_groups(db, payload, username)
     if not groups:
         raise HTTPException(
             status_code=503,
