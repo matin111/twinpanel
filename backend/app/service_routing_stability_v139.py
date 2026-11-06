@@ -762,6 +762,9 @@ def apply_service_routing_stability_v139() -> None:
     rollout._AGENT_MARKER = (
         AGENT_MARKER
     )
+    # The candidate registry later promotes the active-transport marker.
+    # Preserve this independent required marker so V140 rolls out anyway.
+    rollout._AGENT_REQUIRED_MARKERS.add(AGENT_MARKER)
 
     # Fail closed during controller startup if the current renderer no longer
     # satisfies the patch contract.
