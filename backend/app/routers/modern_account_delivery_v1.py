@@ -490,9 +490,107 @@ async def _provision_classic_protocol(
     return items, errors
 
 
+async def _provision_new_singbox_node_batches(
+    ad: Any,
+    db: Session,
+    sub: Subscription,
+    protocols: list[str],
+    nodes: list[Node],
+) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, str]]] | None:
+    """Provision a *new* account's sing-box protocols once per node.
+
+    Never touches imported or partially provisioned subscriptions: any existing
+    sing-box credential forces the original per-protocol path. Each node has a
+    single config validation and restart, instead of one per user/protocol.
+    """
+    selected = list(dict.fromkeys(p for p in protocols if p in SINGBOX_ACCOUNT_PROTOCOLS))
+    if len(selected) < 2:
+        return None
+    if db.query(ProtocolCredential.id).filter(
+        ProtocolCredential.subscription_id == sub.id,
+        ProtocolCredential.protocol.in_(selected),
+    ).first() is not None:
+        return None
+
+    from ..singbox_subscription_accounts import apply_accounts_batch, secret_to_dict
+
+    credentials = {p: _get_credential(db, sub.id, p) for p in selected}
+    secrets = {p: _singbox_secret(ad, credentials[p], p, sub) for p in selected}
+    items_by_protocol: dict[str, list[dict[str, Any]]] = {p: [] for p in selected}
+    errors: list[dict[str, str]] = []
+
+    for node in nodes:
+        ready = []
+        for p in selected:
+            cfg = _modern_runtime_config(db, node, p)
+            if cfg is not None and _status_value(cfg.status) == "online":
+                ready.append(p)
+            else:
+                errors.append({
+                    "protocol": p, "node": str(node.name),
+                    "error": "Protocol runtime is not online on this server",
+                })
+        if not ready:
+            continue
+
+        async def apply_node_batch() -> list[dict[str, Any]]:
+            conn = None
+            try:
+                conn = await ad.ssh_connect_saved(node, db)
+                return await apply_accounts_batch(
+                    conn, node, [secrets[p] for p in ready]
+                )
+            finally:
+                if conn is not None:
+                    conn.close()
+                    await conn.wait_closed()
+
+        try:
+            # A single bounded operation per node; never retry with N separate
+            # restarts after failure. Convergence can retry missing pairs later.
+            delivered = await await_hard_timeout(
+                apply_node_batch(),
+                timeout_seconds=180.0,
+                wait_for_cancel=True,
+            )
+            if len(delivered) != len(ready):
+                raise RuntimeError("sing-box node batch item count mismatch")
+            for p, item in zip(ready, delivered):
+                if p in SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS:
+                    item = _bind_unique_client_tags(
+                        item, node=node, protocol=p, username=secrets[p].username
+                    )
+                items_by_protocol[p].append(item)
+        except asyncio.TimeoutError:
+            for p in ready:
+                errors.append({
+                    "protocol": p, "node": str(node.name),
+                    "error": "Sing-box node batch timed out",
+                })
+        except Exception as exc:
+            for p in ready:
+                errors.append({
+                    "protocol": p, "node": str(node.name),
+                    "error": f"Sing-box node batch failed: {str(exc)[:700]}",
+                })
+
+    for p, items in items_by_protocol.items():
+        if not items:
+            continue
+        cred = credentials[p]
+        cred.username = _credential_identity(p, secrets[p])
+        cred.secret_encrypted = ad._enc(secret_to_dict(secrets[p]))
+        cred.config_text_encrypted = ad._enc(items)
+        cred.is_active = True
+
+    return items_by_protocol, errors
+
+
 async def _provision_account_v1_locked(
     subscription_id: int,
     db: Session,
+    *,
+    prefer_new_singbox_batch: bool = False,
 ):
     from . import account_delivery as ad
 
@@ -543,8 +641,26 @@ async def _provision_account_v1_locked(
 
     results: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
+    grouped: dict[str, list[dict[str, Any]]] | None = None
+    if prefer_new_singbox_batch:
+        batched = await _provision_new_singbox_node_batches(
+            ad, db, sub, protocols, nodes,
+        )
+        if batched is not None:
+            grouped, grouped_errors = batched
+            errors.extend(grouped_errors)
 
     for protocol in protocols:
+        if grouped is not None and protocol in grouped:
+            items = grouped[protocol]
+            if items:
+                cred = _get_credential(db, sub.id, protocol)
+                results.append({
+                    "protocol": protocol,
+                    "username": cred.username,
+                    "items": items,
+                })
+            continue
         if protocol in MODERN_ACCOUNT_PROTOCOLS:
             items, protocol_errors = await _provision_modern_protocol(
                 ad,
@@ -653,5 +769,24 @@ async def provision_account_v1(
 
     try:
         return await _provision_account_v1_locked(subscription_id, db)
+    finally:
+        guard.release()
+
+
+async def provision_new_account_fast_v1(subscription_id: int, db: Session):
+    """Internal fast-create path; never used by migration backfill workers."""
+    guard = SubscriptionProvisioningGuard(subscription_id)
+    if not guard.acquire():
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "subscription_provisioning_in_progress",
+                "subscription_id": subscription_id,
+            },
+        )
+    try:
+        return await _provision_account_v1_locked(
+            subscription_id, db, prefer_new_singbox_batch=True,
+        )
     finally:
         guard.release()
