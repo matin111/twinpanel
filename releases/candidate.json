@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.600",
-  "source_sha": "0be427b5dcb24cfe0efb6123fef8fcb8e439ffea",
+  "version": "1.1.0-rc.601",
+  "source_sha": "d46d3c0c3fd1487b302f9132677aaa5587e8d8af",
   "notes": {
-    "fa": "ویرایشگر V2Ray در مدیریت پروتکل‌ها، اعمال امن و اعتبارسنجی REALITY روی نود، انتشار زنده SNI در ساب‌لینک‌ها بدون بازسازی اکانت و ریمارک فقط نام کاربری و پرچم کشور. تنظیمات TLS و Transport فعلاً در مرحله پیش‌نویس باقی می‌مانند.",
-    "en": "V2Ray per-node editor in Protocol Library, verified REALITY target/SNI apply with rollback, live subscription SNI and username plus flag-only remarks. TLS/transport changes remain draft-only."
+    "fa": "اصلاح مدیریت V2Ray/Xray برای ویرایش مستقل سه Inbound: TCP+TLS، WebSocket+TLS و XHTTP+REALITY. پیش‌نویس هر نوع جدا ذخیره می‌شود؛ اعمال زنده فقط برای مقصد و SNI REALITY پس از تست فعال است. کانفیگ‌های کاربران و ریمارک نام کاربری و پرچم حفظ می‌شوند.",
+    "en": "Three independent V2Ray inbound editors: TCP TLS, WebSocket TLS and XHTTP REALITY. Per-profile validated drafts; verified REALITY target/SNI applies independently. User credentials and username/flag remarks are preserved."
   }
 }
