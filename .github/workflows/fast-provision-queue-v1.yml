@@ -9,6 +9,7 @@ on:
       - "backend/app/routers/subscription_create_fast_v1.py"
       - "backend/app/main.py"
       - "backend/tests/test_fast_provision_queue_v1.py"
+      - "backend/tests/test_fast_provision_worker_v1.py"
       - ".github/workflows/fast-provision-queue-v1.yml"
   workflow_dispatch:
 
@@ -43,6 +44,6 @@ jobs:
             backend/app/routers/subscription_create_fast_v1.py \
             backend/app/main.py
       - name: Verify durable queue contracts
-        run: python -m pytest -q backend/tests/test_fast_provision_queue_v1.py
+        run: python -m pytest -q backend/tests/test_fast_provision_queue_v1.py backend/tests/test_fast_provision_worker_v1.py
       - name: Existing fast create smoke contracts
         run: python -m pytest -q backend/tests/test_subscription_create_completion_v1.py backend/tests/test_subscription_create_stuck_spinner_v1.py
