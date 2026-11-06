@@ -12,7 +12,7 @@ const money=(value:number)=>`${Number(value||0).toLocaleString("fa-IR")} توم�
 const PROTOCOLS=[
   ["cisco","Cisco / OpenConnect"],["openvpn","OpenVPN"],["wireguard","WireGuard"],["l2tp","L2TP / IPsec"],["v2ray","V2Ray / Xray"],
   ["hysteria2","Hysteria2"],["tuic","TUIC v5"],["anytls","AnyTLS"],["naive","NaiveProxy"],["shadowtls","ShadowTLS v3"],
-  ["snell","Snell"],["mieru","Mieru"],["trusttunnel","TrustTunnel"],["amneziawg","AmneziaWG"],["sudoku","Sudoku"]
+  ["snell","Snell"],["mieru","Mieru"],["trusttunnel","TrustTunnel"],["amneziawg","AmneziaWG"],["sudoku","Sudoku"],["socks5","SOCKS5 Proxy"]
 ] as const;
 const valueOf=(row:RuntimeRow,...keys:string[])=>{for(const key of keys){const value=row[key];if(value!==undefined&&value!==null)return value;}return undefined;};
 const stringOf=(row:RuntimeRow,...keys:string[])=>String(valueOf(row,...keys)??"");
