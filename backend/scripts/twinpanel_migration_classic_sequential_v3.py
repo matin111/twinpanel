@@ -151,8 +151,20 @@ async def one_node(db,node_id,*,subscription_id: int | None = None):
                         client_id=str(uuid.UUID(client_id))
                         # Existing hot sync updates only this client and
                         # forbids Xray restart or inbound/REALITY replacement.
+                        # Reuse this node's SSH session across the bounded
+                        # batch; hot HandlerService updates remain user-scoped
+                        # and never restart Xray or rotate a UUID.
+                        if shared_conn is not None and shared_conn.is_closing():
+                            shared_conn = None
+                        if shared_conn is None:
+                            shared_conn=await asyncio.wait_for(
+                                ad.ssh_connect_saved(node, db), timeout=30,
+                            )
                         item=await asyncio.wait_for(
-                            ad._xray(db,node,sub,user,client_id),timeout=90)
+                            ad._xray(
+                                db,node,sub,user,client_id,
+                                reusable_connection=shared_conn,
+                            ),timeout=90)
                         if str(item.get('uuid') or '') != client_id:
                             raise ValueError('V2Ray UUID changed unexpectedly')
                     else:
