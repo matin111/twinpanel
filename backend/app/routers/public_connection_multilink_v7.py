@@ -175,7 +175,7 @@ def _customer_safe_node_meta(db: Session, item: dict[str, Any], index: int) -> t
 _HOSTNAME = re.compile(r"^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$")
 
 
-def _live_xray_settings(db: Session, payload: dict[str, Any]) -> dict[int, dict[str, str]]:
+def _live_xray_settings(db: Session, payload: dict[str, Any]) -> dict[int, dict[str, Any]]:
     ids = set()
     for item in _v2ray_items(payload):
         try:
@@ -195,7 +195,7 @@ def _live_xray_settings(db: Session, payload: dict[str, Any]) -> dict[int, dict[
         ),
         {"node_ids": sorted(ids)},
     ).all()
-    result: dict[int, dict[str, str]] = {}
+    result: dict[int, dict[str, Any]] = {}
     for node_id, raw in rows:
         try:
             settings = json.loads(raw) if isinstance(raw, str) else raw
@@ -213,12 +213,24 @@ def _live_xray_settings(db: Session, payload: dict[str, Any]) -> dict[int, dict[
                 and all(len(label) <= 63 for label in hostname.split("."))
             ):
                 override[key] = hostname
+        applied = settings.get("inbound_applied")
+        if isinstance(applied, dict):
+            safe_paths = {}
+            for profile_key in ("ws_tls", "xhttp_reality"):
+                entry = applied.get(profile_key)
+                if not isinstance(entry, dict):
+                    continue
+                path = str(entry.get("path") or "").strip()
+                if path.startswith("/") and 8 <= len(path) <= 120 and not any(c.isspace() for c in path):
+                    safe_paths[profile_key] = {"path": path}
+            if safe_paths:
+                override["inbound_applied"] = safe_paths
         if override:
             result[int(node_id)] = override
     return result
 
 
-def _apply_live_xray_uri(uri: str, settings: dict[str, str]) -> str:
+def _apply_live_xray_uri(uri: str, settings: dict[str, Any]) -> str:
     """Patch only public TLS/REALITY SNI; never touch UUID, keys or route."""
     if not settings or not uri.startswith("vless://"):
         return uri
@@ -238,6 +250,18 @@ def _apply_live_xray_uri(uri: str, settings: dict[str, str]) -> str:
             updated.append(("sni", sni))
         if security == "tls":
             updated = [(k, sni if k == "host" else v) for k, v in updated]
+        transport = next((v.lower() for k, v in params if k == "type"), "")
+        key_by_type = {"ws": "ws_tls", "xhttp": "xhttp_reality"}
+        profile_key = key_by_type.get(transport)
+        applied = settings.get("inbound_applied") or {}
+        if profile_key and isinstance(applied, dict):
+            profile_settings = applied.get(profile_key)
+            if isinstance(profile_settings, dict):
+                path = str(profile_settings.get("path") or "").strip()
+                if path.startswith("/") and 8 <= len(path) <= 120:
+                    updated = [(k, path if k == "path" else v) for k, v in updated]
+                    if not any(k == "path" for k, _ in updated):
+                        updated.append(("path", path))
         return urlunsplit(parsed._replace(query=urlencode(updated)))
     except (TypeError, ValueError):
         return uri
