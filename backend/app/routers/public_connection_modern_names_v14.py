@@ -64,10 +64,13 @@ def _profile_name(sub: Any, protocol: str, item: dict[str, Any]) -> str:
     # Customer-visible profile name only. Preserve ASCII-safe download stems
     # for OpenVPN, WireGuard, AmneziaWG and the client-specific file parsers.
     username = _account_name(sub)
-    flag = _country_flag(item.get("country_code"))
     node_id = int(item.get("node_id") or 0)
     protocol_name = _safe_component(protocol, "vpn")
-    return f"{username} {flag} {protocol_name}-{node_id}"
+    code = str(item.get("country_code") or "").strip().upper()
+    if len(code) == 2 and code.isascii() and code.isalpha():
+        return f"{username} {_country_flag(code)} {protocol_name}-{node_id}"
+    # Legacy/missing node metadata: never guess another country's flag.
+    return f"{username}-{_node_name(item)}-{protocol_name}-{node_id}"
 
 
 def _download_stem(sub: Any, protocol: str, item: dict[str, Any]) -> str:
