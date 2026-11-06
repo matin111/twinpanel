@@ -242,8 +242,8 @@ def _build_uri(
             [
                 ("security", "tls"),
                 ("type", "ws"),
-                ("sni", domain),
-                ("host", domain),
+                ("sni", str(state.get("tls_sni_ws") or domain)),
+                ("host", str(state.get("tls_sni_ws") or domain)),
                 ("path", str(state["ws_path"])),
                 ("fp", "chrome"),
                 ("alpn", "http/1.1"),
@@ -484,6 +484,8 @@ state = {{
     "reality_password": password,
     "reality_target": reality_target,
     "reality_server_name": reality_server_name,
+    "tls_sni_tcp": str(state.get("tls_sni_tcp") or ""),
+    "tls_sni_ws": str(state.get("tls_sni_ws") or ""),
     "short_id_xhttp": short_id_xhttp,
     "short_id_grpc": short_id_grpc,
     "xhttp_path": xhttp_path,
@@ -847,7 +849,7 @@ async def _ensure_modern_xray(
                         "path": str(state["ws_path"]),
                     },
                     "tlsSettings": {
-                        "serverName": str(state["tls_domain"]),
+                        "serverName": str(state.get("tls_sni_ws") or state["tls_domain"]),
                         "minVersion": "1.2",
                         "alpn": ["http/1.1"],
                         "certificates": [
