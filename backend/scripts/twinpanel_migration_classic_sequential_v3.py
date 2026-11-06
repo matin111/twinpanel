@@ -39,10 +39,10 @@ def healthy():
         if attempt < 3:
             time.sleep(2)
     return False
-async def one_node(db,node_id):
+async def one_node(db,node_id,*,subscription_id: int | None = None):
     node=db.get(Node,node_id)
     now=datetime.utcnow()
-    subs=(db.query(Subscription).join(MigrationImportRecord, MigrationImportRecord.subscription_id==Subscription.id)
+    eligible_query=(db.query(Subscription).join(MigrationImportRecord, MigrationImportRecord.subscription_id==Subscription.id)
           .join(SubscriptionNode, SubscriptionNode.subscription_id==Subscription.id)
           .join(SubscriptionProtocol, SubscriptionProtocol.subscription_id==Subscription.id)
           .filter(MigrationImportRecord.source.in_(SOURCES),
@@ -50,8 +50,10 @@ async def one_node(db,node_id):
                   SubscriptionNode.node_id==node_id,
                   Subscription.status==SubscriptionStatus.ACTIVE,
                   or_(Subscription.expires_at.is_(None),Subscription.expires_at>now),
-                  or_(Subscription.traffic_limit_bytes<=0,Subscription.traffic_used_bytes<Subscription.traffic_limit_bytes))
-          .order_by(Subscription.id.asc()).all())
+                  or_(Subscription.traffic_limit_bytes<=0,Subscription.traffic_used_bytes<Subscription.traffic_limit_bytes)))
+    if subscription_id is not None:
+        eligible_query=eligible_query.filter(Subscription.id==int(subscription_id))
+    subs=eligible_query.order_by(Subscription.id.asc()).all()
     # Prefetch credential records once per node (avoid per-user SELECT).
     subscription_ids = [int(sub.id) for sub in subs]
     existing_credentials = {
