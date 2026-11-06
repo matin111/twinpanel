@@ -10,7 +10,7 @@ import {useI18n} from "../lib/i18n";
 
 const GB=1024**3;
 const classicProtocolKeys=["cisco","openvpn","wireguard","l2tp","v2ray"] as const;
-const modernProtocolKeys=["hysteria2","tuic","anytls","naive","shadowtls","snell","mieru","trusttunnel","amneziawg","sudoku"] as const;
+const modernProtocolKeys=["hysteria2","tuic","anytls","naive","shadowtls","snell","mieru","trusttunnel","amneziawg","sudoku","socks5"] as const;
 const protocolKeys=[...classicProtocolKeys,...modernProtocolKeys] as const;
 const classicProtocolSet=new Set<string>(classicProtocolKeys);
 const protocolLabels:Record<string,string>={
@@ -28,7 +28,8 @@ const protocolLabels:Record<string,string>={
   mieru:"Mieru",
   trusttunnel:"TrustTunnel",
   amneziawg:"AmneziaWG",
-  sudoku:"Sudoku"
+  sudoku:"Sudoku",
+  socks5:"SOCKS5 Proxy"
 };
 
 const s=(value:unknown)=>String(value??"");
