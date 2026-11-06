@@ -16,6 +16,9 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..models import Node, NodeType
+from ..services.node_auto_backfill_queue_v1 import (
+    enqueue_published_node, job_status, pause_job, recent_jobs, resume_job,
+)
 from . import modern_legacy_reconcile_lockfix_v2 as _modern_lockfix  # noqa: F401
 from . import publish_node_all_users_v1 as legacy_publish
 
@@ -111,6 +114,9 @@ async def publish_node_to_all_users_v2(
         # (including economic/premium tiers) have separate node entitlements.
         # The admin selects nodes for future buyers in the Plan editor.
         # 'Publish to all users' applies to already-purchased, eligible accounts.
+        # Transactional enqueue: no gap between new memberships and durable
+        # provisioning status. The worker performs network operations later.
+        auto_job = enqueue_published_node(db, int(node.id))
         db.commit()
     except Exception:
         db.rollback()
@@ -137,6 +143,9 @@ async def publish_node_to_all_users_v2(
         "delivery_modes_added": max(0, int(explicit.rowcount or 0)),
         "delivery_modes_enabled": max(0, int(reenabled.rowcount or 0)),
         "public_plans_added": 0,
+        "auto_backfill_queued": True,
+        "auto_backfill_state": auto_job.state,
+        "auto_backfill_status_url": f"/v1/nodes/{int(node.id)}/backfill-status",
         "active_subscriptions_reconciled": 0,
         "classic_pairs_provisioned": 0,
         "modern_pairs_provisioned": 0,
@@ -145,7 +154,8 @@ async def publish_node_to_all_users_v2(
         "message": (
             "نود برای اشتراک‌های فعال موجود ثبت شد؛ "
             "افزودن نود به پلن‌های فروش باید با انتخاب ادمین در ویرایش پلن انجام شود. "
-            "کانفیگ اکانت‌های انتقالی فقط با دستور دستی ساخته می‌شود"
+            "ساخت کانفیگ‌های ناقص کاربران قدیمی خودکار و مرحله‌ای در صف پایدار ادامه می‌یابد؛ "
+            "پیشرفت از بخش وضعیت نودها قابل مشاهده است"
         ),
     }
 
@@ -156,6 +166,42 @@ async def publish_node_to_all_users_route_v2(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     return await publish_node_to_all_users_v2(node_id=node_id, db=db)
+
+
+@router.get("/backfill-jobs")
+def list_node_auto_backfill_jobs(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Small, cheap dashboard snapshot. Never computes 2k configs on GET."""
+    return {"jobs": recent_jobs(db)}
+
+
+@router.get("/{node_id}/backfill-status")
+def node_auto_backfill_status(
+    node_id: int, db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    state = job_status(db, node_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="صفی برای این نود ثبت نشده است")
+    return state
+
+
+@router.post("/{node_id}/backfill-pause")
+def node_auto_backfill_pause(
+    node_id: int, db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    state = pause_job(db, node_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="کار بازسازی پیدا نشد")
+    return state
+
+
+@router.post("/{node_id}/backfill-resume")
+def node_auto_backfill_resume(
+    node_id: int, db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    try:
+        return resume_job(db, node_id)
+    except ValueError:
+        raise HTTPException(status_code=409, detail="برای ساخت کانفیگ، نود باید فعال و قابل نمایش باشد")
 
 
 # The detached installer resolves the V1 global at runtime. Preserve its
