@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import copy
 import ipaddress
+import re
 from typing import Any, Mapping
 
 SUPPORTED_PROTOCOLS = frozenset({
@@ -28,13 +29,30 @@ def _valid_host(value: Any) -> str:
     host = str(value or "").strip()
     if not host or len(host) > 253 or any(c in host for c in "/\\?#@ \t\r\n"):
         raise ConnectionProjectionError("invalid connection host")
-    # IPv6 is allowed as an unbracketed IP literal in sing-box JSON.
-    try:
-        ipaddress.ip_address(host.strip("[]"))
-    except ValueError:
-        if host.startswith("[") or host.endswith("]") or ".." in host:
+    # IPv6 bracket syntax is valid only for an actual IPv6 address.
+    if host.startswith("[") or host.endswith("]"):
+        if not (host.startswith("[") and host.endswith("]")):
             raise ConnectionProjectionError("invalid connection host")
-    return host.strip("[]")
+        try:
+            ipaddress.IPv6Address(host[1:-1])
+        except ValueError as exc:
+            raise ConnectionProjectionError("invalid connection host") from exc
+        return host[1:-1]
+    try:
+        ipaddress.ip_address(host)
+        return host
+    except ValueError:
+        pass
+    # Neither a URL with :port nor arbitrary text is an allowed DNS host.
+    if ":" in host or host.endswith("."):
+        raise ConnectionProjectionError("invalid connection host")
+    labels = host.split(".")
+    if not all(
+        len(part) <= 63 and re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", part)
+        for part in labels
+    ):
+        raise ConnectionProjectionError("invalid connection host")
+    return host.lower()
 
 
 def _valid_port(value: Any) -> int:
