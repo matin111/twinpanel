@@ -1,0 +1,24 @@
+name: Subscription Admin Edit Legacy Nodes V1
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/subscription_admin_edit_fast_v1.py'
+      - 'backend/tests/test_subscription_admin_edit_existing_nodes_v1.py'
+      - '.github/workflows/subscription-admin-edit-legacy-nodes-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test runner
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Validate backend edit and run regression tests
+        run: |
+          python -m py_compile backend/app/routers/subscription_admin_edit_fast_v1.py
+          python -m pytest -q backend/tests/test_subscription_admin_edit_existing_nodes_v1.py

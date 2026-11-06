@@ -80,6 +80,19 @@ async def _legacy_edit_background(subscription_id: int, payload: dict[str, Any])
         db.close()
 
 
+def _invalid_edit_node_ids(
+    desired_node_ids: list[int],
+    allowed_node_ids: list[int],
+    old_node_ids: list[int],
+    *,
+    same_plan: bool,
+) -> list[int]:
+    """Grandfather unchanged existing Exit assignments, never new plan exclusions."""
+    allowed = set(allowed_node_ids)
+    old = set(old_node_ids) if same_plan else set()
+    return [node_id for node_id in desired_node_ids if node_id not in allowed and node_id not in old]
+
+
 @router.patch("/v1/subscriptions/{subscription_id}/admin-edit", status_code=202)
 async def admin_edit_subscription_fast_v1(
     subscription_id: int,
@@ -145,7 +158,16 @@ async def admin_edit_subscription_fast_v1(
     if not desired_node_ids:
         raise HTTPException(status_code=422, detail="حداقل یک سرور خروجی انتخاب کنید")
 
-    invalid_nodes = [node_id for node_id in desired_node_ids if node_id not in allowed_node_ids]
+    # An unchanged subscription/plan can retain previously allocated Exit
+    # nodes even when a plan template was subsequently narrowed. Do not grant
+    # any new out-of-plan node, and enforce the new template on plan changes.
+    # Existing nodes are still checked below for Exit type and retirement.
+    same_plan = (plan is None and sub.plan_id is None) or (
+        plan is not None and sub.plan_id == int(plan.id)
+    )
+    invalid_nodes = _invalid_edit_node_ids(
+        desired_node_ids, allowed_node_ids, old_node_ids, same_plan=same_plan,
+    )
     if invalid_nodes:
         raise HTTPException(
             status_code=422,
