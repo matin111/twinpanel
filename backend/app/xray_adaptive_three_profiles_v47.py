@@ -462,7 +462,7 @@ def _required_profiles_v47(node: Node) -> set[str]:
         }
     return {
         xray_modern_runtime.PROFILE_XHTTP,
-        xray_modern_runtime.PROFILE_GRPC,
+
         PROFILE_TCP_REALITY,
     }
 
@@ -488,7 +488,7 @@ def _customer_order_for_item(item: dict[str, Any]) -> tuple[str, ...]:
 
     return (
         xray_modern_runtime.PROFILE_XHTTP,
-        xray_modern_runtime.PROFILE_GRPC,
+
         PROFILE_TCP_REALITY,
     )
 
@@ -536,7 +536,7 @@ def _customer_xray_item_v47(
         if _effective_domain(node)
         else (
             xray_modern_runtime.PROFILE_XHTTP,
-            xray_modern_runtime.PROFILE_GRPC,
+
             PROFILE_TCP_REALITY,
         )
     )
@@ -630,7 +630,7 @@ def _admin_profile_rows_v47(node, base_port: int) -> list[dict[str, Any]]:
         if _effective_domain(node)
         else (
             xray_modern_runtime.PROFILE_XHTTP,
-            xray_modern_runtime.PROFILE_GRPC,
+
             PROFILE_TCP_REALITY,
         )
     )
@@ -714,7 +714,7 @@ def apply_xray_adaptive_three_profiles_v47() -> None:
             *policy_v30.ADMIN_ROUTE_PROFILE_IDS,
             PROFILE_TCP_REALITY,
             xray_modern_runtime.PROFILE_XHTTP,
-            xray_modern_runtime.PROFILE_GRPC,
+
         }
     )
 
@@ -722,7 +722,7 @@ def apply_xray_adaptive_three_profiles_v47() -> None:
     print(
         "TWINPANEL_XRAY_ADAPTIVE_THREE_PROFILES_V47_ACTIVE "
         "tls_ready=websocket_tls,xhttp_reality,tcp_tls "
-        "no_tls=xhttp_reality,grpc_reality,tcp_reality "
+        "no_tls=xhttp_reality,tcp_reality "
         "tcp_reality_target_offset=1005 "
         "tcp_reality_public_base=38000 "
         "uuid_preserved=1 reality_identity_reused=1 fake_tls=0",
