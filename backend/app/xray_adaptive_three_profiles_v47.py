@@ -511,6 +511,8 @@ def _customer_profiles_v47(item: dict[str, Any]) -> list[dict[str, Any]]:
 def _customer_xray_item_v47(
     db,
     item: dict[str, Any],
+    *,
+    include_qr: bool = True,
 ) -> dict[str, Any] | None:
     raw_profiles = item.get("profiles")
     if not isinstance(raw_profiles, list):
@@ -566,7 +568,12 @@ def _customer_xray_item_v47(
             host,
             int(port),
         )
-        profile["qr"] = account_delivery._qr_data_uri(profile["uri"])
+        if include_qr:
+            profile["qr"] = account_delivery._qr_data_uri(profile["uri"])
+        else:
+            # /sub and /multi/v2ray only require VLESS URI strings.
+            # Avoid generating expensive SVG QR images on the event path.
+            profile.pop("qr", None)
         by_id[profile_id] = profile
 
     profiles = [
@@ -587,7 +594,10 @@ def _customer_xray_item_v47(
     result["server_ip"] = selected["server"]
     result["port"] = int(selected["port"])
     result["uri"] = selected["uri"]
-    result["qr"] = selected["qr"]
+    if include_qr:
+        result["qr"] = selected["qr"]
+    else:
+        result.pop("qr", None)
     result["profile"] = str(selected.get("id") or "")
 
     for key in ("sni", "security", "transport"):
