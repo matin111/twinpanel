@@ -44,7 +44,9 @@ async def one_node(db,node_id):
     now=datetime.utcnow()
     subs=(db.query(Subscription).join(MigrationImportRecord, MigrationImportRecord.subscription_id==Subscription.id)
           .join(SubscriptionNode, SubscriptionNode.subscription_id==Subscription.id)
+          .join(SubscriptionProtocol, SubscriptionProtocol.subscription_id==Subscription.id)
           .filter(MigrationImportRecord.source.in_(SOURCES),
+                  SubscriptionProtocol.protocol==PROTOCOL,
                   SubscriptionNode.node_id==node_id,
                   Subscription.status==SubscriptionStatus.ACTIVE,
                   or_(Subscription.expires_at.is_(None),Subscription.expires_at>now),
