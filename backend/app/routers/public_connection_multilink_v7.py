@@ -128,8 +128,21 @@ def _active_public_payload(token: str, db: Session) -> dict[str, Any]:
     return payload
 
 
+def _is_deprecated_grpc_uri(uri: str) -> bool:
+    """Reject previously stored gRPC links without rewriting customer UUIDs."""
+    if not uri.startswith("vless://"):
+        return False
+    try:
+        return any(
+            key.lower() == "type" and value.lower() == "grpc"
+            for key, value in parse_qsl(urlsplit(uri).query, keep_blank_values=True)
+        )
+    except (TypeError, ValueError):
+        return False
+
+
 def _item_v2ray_uris(item: dict[str, Any]) -> list[str]:
-    """Return exactly three real customer-safe URIs in active policy order."""
+    """Return customer-safe non-gRPC URIs in active policy order."""
 
     result: list[str] = []
     seen: set[str] = set()
@@ -138,7 +151,7 @@ def _item_v2ray_uris(item: dict[str, Any]) -> list[str]:
         if not isinstance(profile, dict):
             continue
         uri = str(profile.get("uri") or "").strip()
-        if not uri or "://" not in uri or uri in seen:
+        if not uri or "://" not in uri or uri in seen or _is_deprecated_grpc_uri(uri):
             continue
         seen.add(uri)
         result.append(uri)
@@ -148,7 +161,7 @@ def _item_v2ray_uris(item: dict[str, Any]) -> list[str]:
     # do not synthesize unavailable transports during HTTP GET.
     if not result and not isinstance(item.get("profiles"), list):
         uri = str(item.get("uri") or "").strip()
-        if uri.startswith("vless://"):
+        if uri.startswith("vless://") and not _is_deprecated_grpc_uri(uri):
             result.append(uri)
     return result
 
