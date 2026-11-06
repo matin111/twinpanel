@@ -89,6 +89,10 @@ def pending_for_node(db, node):
     for sub in subscriptions:
         for protocol in sorted(live):
             key = (int(sub.id), protocol)
+            # A node publication must not silently widen the user's purchased
+            # protocol entitlement. Only provision selected plan snapshots.
+            if key not in selected:
+                continue
             # Imported active accounts are already bound to their selected Exit nodes.
             # A missing protocol snapshot must not block provisioning missing
             # sing-box credentials; do not alter plans, nodes or existing credentials.
