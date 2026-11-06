@@ -24,7 +24,8 @@ ROOT = Path("/usr/local/etc/xray")
 CONFIG = ROOT / "config.json"
 STATE = ROOT / "twinpanel-modern-state.json"
 RETIRED_TAG = "vless-grpc-reality"
-REQUIRED_TAGS = {"vless-xhttp-reality", "vless-ws-tls", "vless-tcp-tls"}
+REQUIRED_TAGS = {"vless-xhttp-reality"}
+COMPANION_TAGS = {"vless-ws-tls", "vless-tcp-tls", "vless-tcp-reality"}
 
 
 def _validate_file(path: Path) -> None:
@@ -47,7 +48,7 @@ def run(*, apply: bool) -> dict[str, object]:
         retired = [x for x in inbounds if isinstance(x, dict) and x.get("tag") == RETIRED_TAG]
         if not retired:
             return {"changed": False, "retired": 0}
-        if len(retired) != 1 or not REQUIRED_TAGS.issubset(tags):
+        if len(retired) != 1 or not REQUIRED_TAGS.issubset(tags) or not tags.intersection(COMPANION_TAGS):
             raise RuntimeError("gRPC removal refused: unsafe or incomplete V2Ray node")
         new_config = dict(config)
         new_config["inbounds"] = [
