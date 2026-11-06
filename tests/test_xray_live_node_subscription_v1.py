@@ -1,5 +1,6 @@
 """Focused regression checks for dynamically rendered V2Ray subscriptions."""
 import ast
+import re
 from pathlib import Path
 import unittest
 from typing import Any
@@ -9,7 +10,7 @@ SOURCE = Path(__file__).resolve().parents[1] / "backend/app/routers/public_conne
 tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
 functions = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in {"_apply_live_xray_uri", "_v2ray_country_flag", "_v2ray_remark_uri"}]
 assert len(functions) == 3
-scope = {"Any": Any, "parse_qsl": parse_qsl, "quote": quote, "urlencode": urlencode, "urlsplit": urlsplit, "urlunsplit": urlunsplit}
+scope = {"Any": Any, "_HOSTNAME": re.compile(r"^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"), "parse_qsl": parse_qsl, "quote": quote, "urlencode": urlencode, "urlsplit": urlsplit, "urlunsplit": urlunsplit}
 exec(compile(ast.Module(body=functions, type_ignores=[]), str(SOURCE), "exec"), scope)
 apply_uri = scope["_apply_live_xray_uri"]
 remark_uri = scope["_v2ray_remark_uri"]
