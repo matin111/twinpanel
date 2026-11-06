@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.610",
+  "version": "1.1.0-rc.611",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T15:28:54Z",
+  "released_at": "2026-11-06T15:48:22Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "0fdffb955d3d2fffad49c9303b9291e342cd7641",
+  "source_sha": "21516448e88bc569b1b5be1d52a1f528bb5e7485",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.610/twinpanel-1.1.0-rc.610-linux-x86_64.tar.gz",
-    "sha256": "9ca2b28f83f78a1e7d8bfd7ef3e74ec2c31c518d3a5ed2cf2b9eef23b8403245",
-    "size_bytes": 28907043
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.611/twinpanel-1.1.0-rc.611-linux-x86_64.tar.gz",
+    "sha256": "569694cfc88ea0867cfe670bb42956a95c7b5a366b0550c698d37401b12ac969",
+    "size_bytes": 28908866
   },
   "notes": {
-    "fa": "اصلاح جلوگیری از ری‌استارت غیرضروری Xray در همگام‌سازی اکانت‌های V2Ray بدون تغییر UUID و کانفیگ کاربران؛ حفظ مجوز فایل‌ها و همه امکانات rc.609.",
-    "en": "Avoid unnecessary Xray config rewrites and service restarts during unchanged VLESS account reconciliation; preserve file permissions, UUIDs and all rc.609 features."
+    "fa": "اصلاح پایدار راه‌اندازی Worker همگام‌سازی پس از آپدیت و Rollback؛ جلوگیری از خطاهای worker_missing و حفظ اصلاح Xray بدون ری‌استارت غیرضروری کاربران موجود در rc.610. تنظیمات نودها، تونل‌ها و سایر پروتکل‌ها تغییر نکرده‌اند.",
+    "en": "Restart release-bound heavy reconcile worker with API/web on upgrade and rollback to prevent missing convergence/quota worker scripts after release activation. Retains rc.610 no-op Xray sync and unchanged tunnel/protocol settings."
   }
 }
