@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
 from sqlalchemy.orm import Session
 
 from ..models import (
@@ -10,7 +13,7 @@ from ..models import (
 from .quota_node_sync import sync_node_config
 
 
-async def sync_subscription_quota_nodes(
+def _sync_subscription_quota_nodes_blocking(
     db: Session,
     subscription_id: int,
     extra_node_ids=None,
@@ -136,3 +139,46 @@ async def sync_subscription_quota_nodes(
         "nodes": results,
         "mode": "agent-pull",
     }
+
+
+# Quota device scans may decode every active credential while rebuilding an
+# Exit-node snapshot. Never run that synchronous CPU/DB workload on uvicorn's
+# event-loop thread, where it can stall *all* requests including /health.
+#
+# A dedicated small pool avoids consuming Starlette/AnyIO's request thread pool.
+_QUOTA_SYNC_EXECUTOR = ThreadPoolExecutor(
+    max_workers=2,
+    thread_name_prefix="tp-quota-sync",
+)
+
+
+async def sync_subscription_quota_nodes(
+    db: Session,
+    subscription_id: int,
+    extra_node_ids=None,
+):
+    """Preserve canonical quota logic, DB transaction and return contract.
+
+    The request-scoped SQLAlchemy Session is used SEQUENTIALLY: the caller
+    awaits this routine while the dedicated worker owns the Session.
+    Cancellation must wait for worker completion before allowing dependency
+    teardown to close that Session. No DB schema, quota or device semantics
+    are modified by this scheduling change.
+    """
+    future = asyncio.get_running_loop().run_in_executor(
+        _QUOTA_SYNC_EXECUTOR,
+        _sync_subscription_quota_nodes_blocking,
+        db,
+        int(subscription_id),
+        extra_node_ids,
+    )
+    try:
+        return await asyncio.shield(future)
+    except asyncio.CancelledError:
+        # shield() keeps the sync worker running; do not close the caller's
+        # DB Session while the worker is still using it, even on timeout.
+        try:
+            await asyncio.shield(future)
+        except Exception:
+            pass
+        raise
