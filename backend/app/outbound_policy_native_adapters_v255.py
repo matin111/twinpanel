@@ -15,6 +15,7 @@ NATIVE_POLICY_INBOUND_TAGS: dict[str, str] = {
     "anytls": "twinpanel-anytls-in",
     "naive": "twinpanel-naive-in",
     "snell": "twinpanel-snell-in",
+    "socks5": "twinpanel-socks5-in",
     # ShadowTLS v3 is only camouflage. Authenticated payload traffic is
     # detoured into this dedicated managed inner Shadowsocks inbound.
     "shadowtls": "twinpanel-shadowtls-inner",
