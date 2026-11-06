@@ -99,7 +99,7 @@ def test_transient_defer_does_not_consume_retry_budget(db):
     enqueue_published_node(db, 191)
     db.commit()
     claim = claim_job(db)
-    assert defer_job(db, claim, "panel_updating", delay_seconds=45)
+    assert defer_job(db, claim, reason="panel_updating", delay_seconds=45)
     assert job_status(db, 191)["consecutive_errors"] == 0
     assert job_status(db, 191)["state"] == "retry"
 
