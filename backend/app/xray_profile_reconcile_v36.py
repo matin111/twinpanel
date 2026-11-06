@@ -61,7 +61,6 @@ def _effective_domain(node: Node) -> str:
 def _required_profiles(node: Node) -> set[str]:
     required = {
         xray_modern_runtime.PROFILE_XHTTP,
-        xray_modern_runtime.PROFILE_GRPC,
     }
     if _effective_domain(node):
         required.update(
