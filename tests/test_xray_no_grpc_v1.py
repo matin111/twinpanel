@@ -1,6 +1,11 @@
 """Regression guard: gRPC is neither provisioned nor delivered by V2Ray."""
 import ast
+import json
+import os
 import re
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 from types import SimpleNamespace
@@ -98,6 +103,60 @@ class V2RayNoGrpcTests(unittest.TestCase):
         self.assertIn("_clone_permissions(STATE, state_stat)", source)
         self.assertIn('raise RuntimeError("Xray is not active;', source)
         self.assertIn('raise RuntimeError("Xray config changed during cleanup staging")', source)
+
+    def test_xray_client_sync_skips_unchanged_credentials_without_file_write(self):
+        source = RUNTIME.read_text(encoding="utf-8")
+        sync_function = _function(RUNTIME, "_client_sync_script")
+        ns = {}
+        exec(compile(ast.Module(body=[sync_function], type_ignores=[]), str(RUNTIME), "exec"), ns)
+        make_script = ns["_client_sync_script"]
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp) / "config.json"
+            template = {
+                "inbounds": [
+                    {
+                        "tag": f"vless-{index}",
+                        "protocol": "vless",
+                        "settings": {
+                            "clients": [{"id": "other", "email": "other@example", "level": 0}]
+                        },
+                    }
+                    for index in range(3)
+                ] + [{"tag": "api", "protocol": "dokodemo-door"}],
+            }
+            config.write_text(json.dumps(template), encoding="utf-8")
+            os.chmod(config, 0o640)
+            path_to_patch = 'path = Path("/usr/local/etc/xray/config.json")'
+
+            def run_sync(uuid):
+                script = make_script(uuid, "mv-3594@twinpanel")
+                self.assertIn(path_to_patch, script)
+                script = script.replace(path_to_patch, f"path = Path({str(config)!r})", 1)
+                result = subprocess.run(
+                    [sys.executable, "-c", script],
+                    check=True, capture_output=True, text=True, timeout=10,
+                )
+                return json.loads(result.stdout.strip().splitlines()[-1])
+
+            self.assertTrue(run_sync("first-uuid")["changed"])
+            first_data = config.read_bytes()
+            first_mtime = config.stat().st_mtime_ns
+            self.assertFalse(run_sync("first-uuid")["changed"])
+            self.assertEqual(config.read_bytes(), first_data)
+            self.assertEqual(config.stat().st_mtime_ns, first_mtime)
+            self.assertEqual(config.stat().st_mode & 0o777, 0o640)
+
+            self.assertTrue(run_sync("new-uuid")["changed"])
+            new_config = json.loads(config.read_text(encoding="utf-8"))
+            for inbound in new_config["inbounds"][:3]:
+                matches = [
+                    x for x in inbound["settings"]["clients"]
+                    if x["email"] == "mv-3594@twinpanel"
+                ]
+                self.assertEqual(len(matches), 1)
+                self.assertEqual(matches[0]["id"], "new-uuid")
+            self.assertEqual(new_config["inbounds"][-1], template["inbounds"][-1])
+            self.assertIn('if bool(sync_result.get("changed")):', source)
 
     def test_migration_validates_config_and_preserves_other_inbounds(self):
         source = MIGRATION.read_text(encoding="utf-8")

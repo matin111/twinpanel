@@ -566,14 +566,24 @@ print("preserved_clients=", len(clients_by_id))
 
 
 def _client_sync_script(client_id: str, email: str) -> str:
+    """Build a node-local, idempotent VLESS client sync.
+
+    An already present UUID/email must never rewrite config or restart Xray.
+    Actual changes are staged atomically with original owner/group/mode kept.
+    """
     return f'''
 import json
+import os
+import stat
+import tempfile
+from pathlib import Path
 
-path = "/usr/local/etc/xray/config.json"
-with open(path, "r", encoding="utf-8") as handle:
+path = Path("/usr/local/etc/xray/config.json")
+with path.open("r", encoding="utf-8") as handle:
     doc = json.load(handle)
 
 found = 0
+changed = False
 for inbound in doc.get("inbounds", []):
     if (
         not isinstance(inbound, dict)
@@ -582,6 +592,22 @@ for inbound in doc.get("inbounds", []):
         continue
 
     clients = inbound.setdefault("settings", {{}}).setdefault("clients", [])
+    if not isinstance(clients, list):
+        raise RuntimeError("invalid Xray VLESS client list")
+    matching = [
+        item for item in clients
+        if isinstance(item, dict)
+        and str(item.get("email") or "") == {email!r}
+    ]
+    if (
+        len(matching) == 1
+        and len(clients) == sum(isinstance(item, dict) for item in clients)
+        and str(matching[0].get("id") or "") == {client_id!r}
+        and int(matching[0].get("level") or 0) == 0
+    ):
+        found += 1
+        continue
+
     clients[:] = [
         item
         for item in clients
@@ -596,17 +622,32 @@ for inbound in doc.get("inbounds", []):
         "level": 0,
     }})
     found += 1
+    changed = True
 
 if found < 3:
     raise RuntimeError("modern Xray inbounds are incomplete")
 
-with open(path, "w", encoding="utf-8") as handle:
-    json.dump(doc, handle, ensure_ascii=False, indent=2)
-    handle.write("\\n")
+if changed:
+    metadata = path.stat()
+    staged = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", prefix="tp-xray-client-",
+            suffix=".json", dir=str(path.parent), delete=False,
+        ) as handle:
+            staged = Path(handle.name)
+            json.dump(doc, handle, ensure_ascii=False, indent=2)
+            handle.write("\\n")
+        os.chown(staged, metadata.st_uid, metadata.st_gid)
+        os.chmod(staged, stat.S_IMODE(metadata.st_mode))
+        os.replace(staged, path)
+        staged = None
+    finally:
+        if staged is not None:
+            staged.unlink(missing_ok=True)
 
-print("updated_inbounds=", found)
+print(json.dumps({{"changed": changed, "updated_inbounds": found}}, separators=(",", ":")))
 '''
-
 
 async def _ensure_modern_xray(
     conn,
@@ -1064,18 +1105,25 @@ async def _xray_account_modern(
         sync_script = _client_sync_script(client_id, email)
         sync_b64 = base64.b64encode(sync_script.encode()).decode()
 
-        await provision.cmd(
+        sync_raw = await provision.cmd(
             conn,
             f"printf '%s' {shlex.quote(sync_b64)} | base64 -d | python3",
         )
-        await provision.cmd(
-            conn,
-            (
-                "/usr/local/bin/xray run -test "
-                "-config /usr/local/etc/xray/config.json"
-            ),
-        )
-        await provision.cmd(conn, "systemctl restart xray")
+        try:
+            sync_result = json.loads(sync_raw.strip().splitlines()[-1])
+        except (ValueError, IndexError) as exc:
+            raise RuntimeError("Xray client sync result is invalid") from exc
+        if int(sync_result.get("updated_inbounds") or 0) < 3:
+            raise RuntimeError("Xray client sync did not cover all VLESS inbounds")
+        if bool(sync_result.get("changed")):
+            await provision.cmd(
+                conn,
+                (
+                    "/usr/local/bin/xray run -test "
+                    "-config /usr/local/etc/xray/config.json"
+                ),
+            )
+            await provision.cmd(conn, "systemctl restart xray")
 
         if not await provision.active(conn, "xray"):
             raise RuntimeError("Xray service did not remain active")
