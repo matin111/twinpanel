@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.595",
-  "source_sha": "c79e5692682d8d0057297efdb8166b26c68ac24e",
+  "version": "1.1.0-rc.596",
+  "source_sha": "389edb6f93174763c12212e547cfe1dc389514f6",
   "notes": {
-    "fa": "ویرایش دستی اشتراک با هر ۱۵ پروتکل و دکمه ساخت کانفیگ برای همان اشتراک؛ نگه‌داشتن ساخت خودکار انتقالی‌ها در حالت توقف عملیاتی و تمرکز بازیابی روی اکانت‌های جدید.",
-    "en": "Admin subscription editor supports all 15 protocols and explicit per-account manual provisioning; imported-account bulk backfill stays operationally paused while recent-account recovery remains enabled."
+    "fa": "بهبود پایداری مدیریت نودها: بستن تراکنش‌های دیتابیس پیش از عملیات SSH نصب/حذف/Health و جلوگیری از نصب هم‌زمان پروتکل‌های مدرن روی یک نود. ساختار VPN کاربران بدون تغییر.",
+    "en": "Reliability improvements: end DB transactions before remote modern-protocol operations and serialize concurrent installs per node. VPN dataplane and credentials unchanged."
   }
 }
