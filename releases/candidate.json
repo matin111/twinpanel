@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.613",
-  "source_sha": "37d32a026e9f843cd150f4fade74d0d3f3398b44",
+  "version": "1.1.0-rc.614",
+  "source_sha": "a37da94e40ab5a63292d1a80a6d812da508e96c7",
   "notes": {
-    "fa": "انتشار رسمی اصلاحات جدید TwinPanel شامل ثبت وضعیت نهایی رسیدهای تأیید یا ردشده در ربات ادمین و حذف دکمه‌های تکراری، حفظ فایل رسید، و تمام تغییرات ادغام‌شده پس از rc.612. بسته از سورس دقیق GitHub ساخته می‌شود تا اصلاحات در آپدیت بعدی حذف نشوند.",
-    "en": "Official release including Telegram admin receipt decision finalization, retiring stale approval/rejection buttons while retaining receipt evidence, and all merged changes since rc.612. Build from pinned GitHub source to preserve fixes across updates."
+    "fa": "نسخه رسمی صف پایدار ساخت کانفیگ نود جدید برای اشتراک‌های قدیمی: ثبت خودکار صف پس از انتشار نود، ساخت مرحله‌ای خارج از API، اولویت خریدهای جدید، نمایش پیشرفت و تلاش مجدد از مدیریت نود، با حفظ اصلاحات جدید Xray و محدودیت‌های پلن.",
+    "en": "Official durable new-Exit credential backfill after admin publication, with supervised bounded background worker, retry/progress in node management and priority for new paid accounts, preserving all merged Xray fixes and plan entitlements."
   }
 }
