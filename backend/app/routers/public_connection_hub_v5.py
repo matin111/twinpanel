@@ -279,8 +279,10 @@ def public_connection_hub_v5(token: str, db: Session = Depends(get_db)):
         if getattr(node, "id", None) is not None
     }
 
-    brand_name = str(getattr(branding, "brand_name", None) or "TwinPanel").strip() or "TwinPanel"
-    brand_mark = next((ch.upper() for ch in brand_name if not ch.isspace()), "T")
+    # Public subscription pages have a neutral label; do not disclose the
+    # configurable admin/storefront brand in the public header or page title.
+    brand_name = "Connection"
+    brand_mark = "C"
     primary = safe_color(getattr(branding, "primary_color", None), "#8B5CF6")
     secondary = safe_color(getattr(branding, "secondary_color", None), "#6D28D9")
     customer = str((getattr(user, "full_name", None) or getattr(user, "email", None) or "کاربر") if user else "کاربر")
