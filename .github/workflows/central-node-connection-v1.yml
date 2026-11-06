@@ -12,6 +12,9 @@ on:
       - "backend/app/routers/public_connection_modern_delivery_v13.py"
       - "backend/app/routers/public_connection_modern_delivery_v16.py"
       - "backend/app/main.py"
+      - "backend/app/routers/modern_account_delivery_v1.py"
+      - "backend/app/routers/subscription_create_fast_v1.py"
+      - "backend/tests/test_new_account_singbox_node_batch_v1.py"
       - "backend/tests/test_central*"
       - ".github/workflows/central-node-connection-v1.yml"
   workflow_dispatch:
@@ -50,7 +53,9 @@ jobs:
             backend/app/routers/public_connection_modern_import_v15.py \
             backend/app/routers/public_connection_modern_delivery_v13.py \
             backend/app/routers/public_connection_modern_delivery_v16.py \
-            backend/app/main.py
+            backend/app/main.py \
+            backend/app/routers/modern_account_delivery_v1.py \
+            backend/app/routers/subscription_create_fast_v1.py
       - name: Focused central connection regressions
         run: |
           python -m pytest -q \
@@ -58,4 +63,5 @@ jobs:
             backend/tests/test_central_modern_uri_contract_v1.py \
             backend/tests/test_central_modern_delivery_contract_v1.py \
             backend/tests/test_central_modern_lookup_safety_v1.py \
-            backend/tests/test_central_node_applied_endpoint_v1.py
+            backend/tests/test_central_node_applied_endpoint_v1.py \
+            backend/tests/test_new_account_singbox_node_batch_v1.py
