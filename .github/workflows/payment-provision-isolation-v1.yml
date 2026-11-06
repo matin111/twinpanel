@@ -1,0 +1,38 @@
+name: Payment Provision Event Loop Isolation V1
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/services/payment_fulfillment_fast_path.py"
+      - "backend/tests/test_payment_provision_eventloop_isolation_v1.py"
+      - ".github/workflows/payment-provision-isolation-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      APP_SECRET_KEY: isolation-ci-only-key
+      DATABASE_URL: sqlite:///./payment-isolation-ci.sqlite3
+      NODE_AGENT_SHARED_SECRET: isolation-ci-only-agent-key
+      PYTHONPATH: backend
+      TWINPANEL_PAYMENT_PROVISION_ISOLATED_V1: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install API dependencies
+        run: python -m pip install --disable-pip-version-check -r backend/requirements.txt pytest
+      - name: Compile changed worker and test
+        run: |
+          python -m py_compile backend/app/services/payment_fulfillment_fast_path.py
+          python -m py_compile backend/tests/test_payment_provision_eventloop_isolation_v1.py
+      - name: Verify isolation, session ownership, legacy fallback, and cancellation
+        run: python -m pytest -q backend/tests/test_payment_provision_eventloop_isolation_v1.py
