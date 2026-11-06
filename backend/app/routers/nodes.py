@@ -159,28 +159,10 @@ def create_node(payload: NodeCreate, db: Session = Depends(get_db)):
     db.add(node)
     db.flush()
 
-    # TWINPANEL_NEW_NODE_AUTO_ALL_SUBSCRIPTIONS_V1
-    #
-    # Every newly created Node immediately belongs to every
-    # existing subscription. This also preserves compatibility
-    # with quota/enforcement code that still uses SubscriptionNode.
-    subscription_ids = [
-        int(row[0])
-        for row in (
-            db.query(Subscription.id)
-            .order_by(Subscription.id.asc())
-            .all()
-        )
-    ]
-
-    for subscription_id in subscription_ids:
-        db.add(
-            SubscriptionNode(
-                subscription_id=subscription_id,
-                node_id=node.id,
-            )
-        )
-
+    # New-node registration is infrastructure-only. Do NOT fan out thousands
+    # of SubscriptionNode rows before returning the HTTP response. An explicit
+    # "publish to all" action is responsible for attaching existing users.
+    # It must not start per-account provisioning on this request path.
     db.commit()
     db.refresh(node)
     return node
