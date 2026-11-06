@@ -1339,13 +1339,14 @@ async def _install_or_upgrade_agent(
         conn,
         "if [ ! -x /opt/twinpanel-agent/venv/bin/python ]; then "
         "python3 -m venv /opt/twinpanel-agent/venv; fi && "
+        # Avoid re-downloading dependencies on every Agent-only rollout.
+        # Existing compatible installations remain in use; upgrade is only
+        # required when one of the runtime modules is missing.
         "if ! /opt/twinpanel-agent/venv/bin/python -c "
-        "\"import httpx,psutil; "
-        "assert httpx.__version__ == '0.28.1'; "
-        "assert psutil.__version__ == '7.0.0'\" "
+        "\"import httpx,psutil\" "
         ">/dev/null 2>&1; then "
-        "/opt/twinpanel-agent/venv/bin/python -m pip install --upgrade pip >/dev/null && "
         "/opt/twinpanel-agent/venv/bin/python -m pip install "
+        "--disable-pip-version-check --timeout 15 --retries 2 "
         "httpx==0.28.1 psutil==7.0.0 >/dev/null; "
         "fi",
         timeout=600,
