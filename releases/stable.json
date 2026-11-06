@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.628",
+  "version": "1.1.0-rc.629",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T22:44:39Z",
+  "released_at": "2026-11-06T22:55:14Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "a538c1918c9ad70b485150a35d0c9595c42dd73b",
+  "source_sha": "21bcec820dca18c1f630075027f2c228d8ecb878",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.628/twinpanel-1.1.0-rc.628-linux-x86_64.tar.gz",
-    "sha256": "2c02c8f3f40a3d1ec05ce28125f50009bf20a505fadb524c3070861e6065cf67",
-    "size_bytes": 28990437
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.629/twinpanel-1.1.0-rc.629-linux-x86_64.tar.gz",
+    "sha256": "aa6c40c46deafb140d1e9834626636bda975ea08a808584d031f81cf7ea6be08",
+    "size_bytes": 28997575
   },
   "notes": {
-    "fa": "افزایش سرعت و یکپارچگی صف ساخت اکانت‌های انتقالی با مدیریت مرکزی: اجرای حداکثر سه دسته ۲۰تایی در یک Worker، حفظ اولویت خریدهای جدید بین دسته‌ها، ثبت درست پیشرفت و جلوگیری از ساخت دوباره Credential و تغییر UUID.",
-    "en": "Improve migrated-account central backfill throughput via up to 3 bounded 20-pair cycles per worker, preserving paid/new-account priority between cycles, correct progress accounting, and existing credentials/UUID."
+    "fa": "نمایش خودکار پرچم کشور واقعی نود در نام نمایشی کانفیگ‌های همه پروتکل‌ها، شامل نودهای جدید؛ بدون تغییر نام فایل‌های حساس یا اطلاعات اتصال.",
+    "en": "Automatically derive country emoji flags from live node country codes for public protocol remarks and new nodes; leave native filenames and VPN connection details unchanged."
   }
 }
