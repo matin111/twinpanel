@@ -336,6 +336,8 @@ async def _xray_account_modern_v47(
     sub,
     user,
     client_id: str,
+    *,
+    reusable_connection=None,
 ):
     assert _original_xray_account_modern is not None
 
@@ -345,6 +347,7 @@ async def _xray_account_modern_v47(
         sub,
         user,
         client_id,
+        reusable_connection=reusable_connection,
     )
 
     if _effective_domain(node):
