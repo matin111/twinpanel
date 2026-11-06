@@ -56,7 +56,7 @@ export function AdminSubscriptionCreateUnified(){
     setOpen(true);setLoading(true);setError("");setUsername("");setPassword("");setUserSearch("");
     try{
       const [userRows,planRows,nodeRows,catalogPayload]=await Promise.all([adminApi.users(),adminApi.plans(),adminApi.nodes(),subscriptionProtocolApi.catalog()]);
-      if(catalogPayload.protocols.length!==15)throw new Error(pick("کاتالوگ ۱۵ پروتکل کامل نیست","The 15-protocol catalog is incomplete"));
+      if(!Array.isArray(catalogPayload.protocols)||catalogPayload.protocols.length===0)throw new Error(pick("کاتالوگ پروتکل‌ها دریافت نشد","Protocol catalog could not be loaded"));
       const exits=nodeRows.filter(node=>String(node.node_type||"").toLowerCase()==="exit"&&String(node.status||"online").toLowerCase()!=="retired");
       setUsers(userRows);setPlans(planRows);setNodes(nodeRows);setCatalog(catalogPayload.protocols);
       setUserId(userRows.find(user=>user.role!=="admin"&&user.is_active!==false)?.id||0);

@@ -109,8 +109,8 @@ export function AdminManualSubscriptionCreate(){
         subscriptionProtocolApi.catalog(),
       ]);
 
-      if(catalogPayload.protocols.length!==15){
-        throw new Error(pick("کاتالوگ ۱۵ پروتکل کامل نیست","The 15-protocol catalog is incomplete"));
+      if(!Array.isArray(catalogPayload.protocols)||catalogPayload.protocols.length===0){
+        throw new Error(pick("کاتالوگ پروتکل‌ها دریافت نشد","Protocol catalog could not be loaded"));
       }
 
       setUsers(userRows);
