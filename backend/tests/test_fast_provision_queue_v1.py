@@ -5,11 +5,12 @@ dialect and live-node canary; these unit tests verify state transitions.
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import unittest
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -116,6 +117,31 @@ class DurableProvisionQueueContracts(unittest.TestCase):
         self.assertTrue(_eligible_new_subscription(sub))
         sub.expires_at = datetime.now(timezone.utc) - timedelta(seconds=10)
         self.assertFalse(_eligible_new_subscription(sub))
+
+
+class DurableFastCreateRoutingTests(unittest.TestCase):
+    def test_opt_in_persistent_job_does_not_schedule_transient_background_task(self):
+        from app.routers import subscription_create_fast_v1 as route
+        background = MagicMock()
+        with patch.object(route, "_persist_subscription",
+                          return_value=(501, ["anytls"], {"ok": True})), \
+             patch.object(route, "fast_provision_queue_enabled", return_value=True):
+            result = asyncio.run(route.admin_create_fast_v1({}, background))
+        self.assertTrue(result["queued"])
+        self.assertTrue(result["durable_queue"])
+        background.add_task.assert_not_called()
+
+    def test_flag_off_preserves_existing_fast_background_create(self):
+        from app.routers import subscription_create_fast_v1 as route
+        background = MagicMock()
+        with patch.object(route, "_persist_subscription",
+                          return_value=(502, ["anytls"], {"ok": True})), \
+             patch.object(route, "fast_provision_queue_enabled", return_value=False):
+            result = asyncio.run(route.admin_create_fast_v1({}, background))
+        self.assertTrue(result["queued"])
+        self.assertFalse(result["durable_queue"])
+        background.add_task.assert_called_once()
+        self.assertEqual(background.add_task.call_args.args[1], 502)
 
 
 if __name__ == "__main__":
