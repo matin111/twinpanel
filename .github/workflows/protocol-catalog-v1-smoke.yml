@@ -71,7 +71,7 @@ jobs:
 
           expected_ready = {
               'hysteria2', 'tuic', 'anytls', 'naive', 'shadowtls', 'snell',
-              'mieru', 'trusttunnel', 'amneziawg', 'sudoku',
+              'mieru', 'trusttunnel', 'amneziawg', 'sudoku', 'socks5',
           }
           ready = {key for key, item in PROTOCOL_CATALOG.items() if item['runtime_status'] == 'ready'}
           assert expected_ready == ready, (expected_ready, ready)
