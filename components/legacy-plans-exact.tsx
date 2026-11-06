@@ -21,7 +21,7 @@ const numberList=(value:unknown)=>Array.isArray(value)?value.map(item=>Number(it
 const PROTOCOLS=[
   ["cisco","Cisco / OpenConnect"],["openvpn","OpenVPN"],["wireguard","WireGuard"],["l2tp","L2TP / IPsec"],["v2ray","V2Ray / Xray"],
   ["hysteria2","Hysteria2"],["tuic","TUIC"],["anytls","AnyTLS"],["naive","NaiveProxy"],["shadowtls","ShadowTLS"],
-  ["snell","Snell"],["mieru","Mieru"],["trusttunnel","TrustTunnel"],["amneziawg","AmneziaWG"],["sudoku","Sudoku"],
+  ["snell","Snell"],["mieru","Mieru"],["trusttunnel","TrustTunnel"],["amneziawg","AmneziaWG"],["sudoku","Sudoku"],["socks5","SOCKS5 Proxy"],
 ] as const;
 const ALL_PROTOCOLS=PROTOCOLS.map(([key])=>key);
 
