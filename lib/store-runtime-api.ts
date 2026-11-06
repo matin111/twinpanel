@@ -77,7 +77,7 @@ export function planProtocols(plan:StorePlan){
   if(Array.isArray(plan.protocols)){
     const allowed=new Set(["cisco","openvpn","wireguard","l2tp","v2ray",
       "hysteria2","tuic","anytls","naive","shadowtls","snell",
-      "mieru","trusttunnel","amneziawg","sudoku"]);
+      "mieru","trusttunnel","amneziawg","sudoku","socks5"]);
     return [...new Set(plan.protocols.filter(id=>typeof id==="string"&&allowed.has(id)))];
   }
   return [
