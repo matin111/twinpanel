@@ -189,7 +189,15 @@ def main(argv: list[str] | None = None) -> int:
                 }, flush=True)
                 if rc != 0:
                     return rc
-                health_guard(args.max_load)
+                # The previous cycle's writes were already committed.
+                # If load/API health deteriorates afterward, yield to the
+                # supervisor with a successful partial batch; a future timer
+                # resumes the missing-only work. Do not lose this progress.
+                try:
+                    health_guard(args.max_load)
+                except RuntimeError:
+                    print("NODE_BACKFILL_YIELD_AFTER_PROGRESS", flush=True)
+                    break
                 if count == 0:
                     break
                 time.sleep(2)

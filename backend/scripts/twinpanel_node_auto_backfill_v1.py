@@ -71,6 +71,26 @@ def parsed_pair_count(stdout: str) -> int | None:
     return total
 
 
+def sanitized_backfill_error(stdout: str, exit_code: int) -> str:
+    """Only disclose an exception *class* from the worker's safe markers.
+
+    Never publish captured SSH output, credential payloads, or exception text.
+    """
+    markers = re.findall(
+        r"^NODE_BACKFILL_SAFETY_STOP\s+(\{[^\n]+\})$",
+        stdout, flags=re.MULTILINE,
+    )
+    if markers:
+        try:
+            value = ast.literal_eval(markers[-1])
+            kind = str(value.get("error_type") or "")
+            if re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,40}", kind):
+                return f"BACKFILL_SAFETY_{kind}"
+        except (ValueError, SyntaxError, TypeError, AttributeError):
+            pass
+    return f"BACKFILL_EXIT_{int(exit_code)}"
+
+
 def execute_one(node_id: int, protocol: str) -> tuple[int, str | None]:
     cmd = [
         sys.executable,
@@ -97,7 +117,7 @@ def execute_one(node_id: int, protocol: str) -> tuple[int, str | None]:
         return 0, "BACKFILL_START_ERROR"
     count = parsed_pair_count(proc.stdout or "")
     if proc.returncode != 0:
-        return (count or 0), f"BACKFILL_EXIT_{proc.returncode}"
+        return (count or 0), sanitized_backfill_error(proc.stdout or "", proc.returncode)
     if count is None:
         return 0, "BACKFILL_PROGRESS_UNCONFIRMED"
     return count, None
