@@ -44,11 +44,11 @@ assert modern == (
     "naive",
     "shadowtls",
     "snell",
+    "socks5",
     "mieru",
     "trusttunnel",
     "amneziawg",
     "sudoku",
-    "socks5",
 )
 assert len(set(classic + modern)) == 16
 
