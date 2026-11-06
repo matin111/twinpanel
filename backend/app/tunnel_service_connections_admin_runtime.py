@@ -18,7 +18,6 @@ _XRAY_PROFILE_TITLES = {
     "legacy": "V2Ray / Xray",
     "xhttp_reality": "XHTTP Reality",
     "websocket_tls": "WebSocket TLS",
-    "httpupgrade_tls": "HTTPUpgrade TLS",
 }
 
 _PROTOCOL_TITLES = {
@@ -80,7 +79,7 @@ def _connection_health(
     if not isinstance(listeners, dict):
         listeners = {}
 
-    if profile in {"websocket_tls", "httpupgrade_tls"}:
+    if profile in {"websocket_tls"}:
         if not bool(xray_health.get("tls_enabled")):
             return False, False, "tls_domain_unavailable"
 
@@ -268,7 +267,6 @@ async def tunnel_service_connections_admin(
         "legacy": 50,
         "xhttp_reality": 51,
         "websocket_tls": 53,
-        "httpupgrade_tls": 54,
     }
     connections.sort(
         key=lambda item: (
