@@ -26,13 +26,14 @@ from .routers import provision
 # MSS=1200 policy, Exit egress, protocol services and failover behavior.
 # ============================================================
 
-AGENT_MARKER = "TWINPANEL_SERVICE_ROUTING_STABILITY_V139"
+AGENT_MARKER = "TWINPANEL_SERVICE_ROUTING_FAST_SNAPSHOT_V140"
 
 _runtime_applied = False
 _original_make_agent = None
 
 
 _AGENT_ROUTING_V139 = r'''# TWINPANEL_SERVICE_ROUTING_STABILITY_V139
+# TWINPANEL_SERVICE_ROUTING_FAST_SNAPSHOT_V140
 
 _SERVICE_ROUTING_CHAINS = (
     ("nat", "TP_DNAT"),
@@ -779,6 +780,6 @@ def apply_service_routing_stability_v139() -> None:
         "steady_state_writes=0 "
         "publish=iptables_restore_noflush "
         "verify_after_commit=1 "
-        "rollout_marker=v139",
+        "rollout_marker=v140 fast_snapshot=1 no_per_rule_check=1",
         flush=True,
     )
