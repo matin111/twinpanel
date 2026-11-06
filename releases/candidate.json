@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.621",
-  "source_sha": "a975401288ccbc70fae2b4ce6129bc4a2c14a87c",
+  "version": "1.1.0-rc.622",
+  "source_sha": "6d1b04e5d56956358a46345104c82c4924c0e66b",
   "notes": {
-    "fa": "اصلاح جستجوی کاربران موجود هنگام انتقال اشتراک به نماینده، اتصال خودکار حساب موجود بدون ساخت کاربر تکراری و مدیریت خطای قفل دیتابیس در انتقال مالکیت.",
-    "en": "Fix reseller subscription transfer: search existing site users, atomically link existing accounts without duplication, and handle transient row-lock contention with bounded retries."
+    "fa": "رفع ناسازگاری V47 و جلوگیری از خطای 500 ساب‌لینک V2Ray؛ سرعت بیشتر دریافت اشتراک با حذف ساخت QRهای غیرضروری در خروجی متنی، بدون تغییر کانفیگ، UUID، TLS، قوانین سهمیه یا پروتکل‌های دیگر. QRهای پنل کاربری حفظ شده‌اند. همراه با سایر اصلاحات rc.621.",
+    "en": "Fix live V47 QR-free V2Ray subscription compatibility and prevent 500s, reduce expensive SVG generation during text-only /sub and multi/v2ray polling; preserve customer QR UI, URI identities, TLS, quotas, tunnels, all other protocols and rc.621 changes."
   }
 }
