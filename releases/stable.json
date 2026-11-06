@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.597",
+  "version": "1.1.0-rc.598",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T00:55:00Z",
+  "released_at": "2026-11-06T01:12:21Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b57523f2f349b32c78b1cddc95f60fece66e9181",
+  "source_sha": "734557a543b79973d853edacdf877da3b02b835a",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.597/twinpanel-1.1.0-rc.597-linux-x86_64.tar.gz",
-    "sha256": "fc8323953b4c979cb8d9517609406a93c029f3667735552549fe595968361f7c",
-    "size_bytes": 28765687
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.598/twinpanel-1.1.0-rc.598-linux-x86_64.tar.gz",
+    "sha256": "4f6311d9062d51bedbe76b1c5d8757576dceeb8a22132f0332ea3095faada650",
+    "size_bytes": 28765505
   },
   "notes": {
-    "fa": "رفع همگام‌سازی نود جدید برای اکانت‌های غیرانتقالی، توقف ساخت خودکار پروتکل‌های انتقالی با حفظ عضویت نود، و افزایش فرصت تأیید ایمن دوطرفه Agent برای تانل تازه بدون تغییر مسیرهای موجود.",
-    "en": "Safely converge new exit nodes for non-imported accounts; keep migrated users manual-only with node memberships intact; longer strict bidirectional agent acceptance on first tunnel cutover, preserving existing routes and rollback."
+    "fa": "رفع خطای ساخت تانل جدید در مرحله انتظار کلید سمت مقابل با حفظ تأیید اتصال دوطرفه و Rollback؛ اصلاحات همگام‌سازی امن نود جدید و توقف ساخت خودکار انتقالی‌ها حفظ شد.",
+    "en": "Fix premature selected-tunnel rollback on transient waiting_peer_key during initial agent bootstrap; keep strict two-sided health acceptance, rollback and imported-account auto-provision pause."
   }
 }
