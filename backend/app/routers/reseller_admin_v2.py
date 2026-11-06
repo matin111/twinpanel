@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 import secrets
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from pydantic import BaseModel, EmailStr, Field, model_validator
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -394,7 +395,28 @@ def transfer_subscription_to_reseller(
     reseller = _get_reseller(db, reseller_id)
     if not reseller.is_active:
         raise HTTPException(status_code=409, detail="نمایندگی غیرفعال است")
-    sub = db.query(Subscription).filter(Subscription.id == subscription_id).with_for_update().first()
+    # Provisioning can hold this subscription row during slow remote node I/O.
+    # Retry a bounded, non-blocking lock acquisition rather than leak a DB 500.
+    sub = None
+    for attempt in range(6):
+        try:
+            sub = (
+                db.query(Subscription)
+                .filter(Subscription.id == subscription_id)
+                .with_for_update(nowait=True)
+                .first()
+            )
+            break
+        except OperationalError as exc:
+            db.rollback()
+            if getattr(getattr(exc, "orig", None), "pgcode", None) != "55P03":
+                raise
+            if attempt == 5:
+                raise HTTPException(
+                    status_code=409,
+                    detail="این اشتراک در حال پردازش است؛ کمی بعد انتقال را دوباره امتحان کنید",
+                ) from exc
+            time.sleep(0.3 * (attempt + 1))
     if sub is None:
         raise HTTPException(status_code=404, detail="اشتراک پیدا نشد")
     if sub.status == SubscriptionStatus.CANCELED:
