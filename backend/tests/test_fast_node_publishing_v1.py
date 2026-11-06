@@ -27,7 +27,12 @@ class SetBasedPublishContracts(unittest.TestCase):
         Base.metadata.create_all(self.engine, tables=[Node.__table__])
         with self.engine.begin() as conn:
             conn.exec_driver_sql("""
-                CREATE TABLE subscriptions (id INTEGER PRIMARY KEY, status TEXT NOT NULL)
+                CREATE TABLE subscriptions (
+                    id INTEGER PRIMARY KEY, status TEXT NOT NULL,
+                    expires_at TIMESTAMP,
+                    traffic_limit_bytes BIGINT NOT NULL DEFAULT 100,
+                    traffic_used_bytes BIGINT NOT NULL DEFAULT 0
+                )
             """)
             conn.exec_driver_sql("""
                 CREATE TABLE subscription_nodes (
@@ -70,7 +75,14 @@ class SetBasedPublishContracts(unittest.TestCase):
             """)
             conn.exec_driver_sql(
                 "INSERT INTO subscriptions (id,status) VALUES "
-                "(1,'ACTIVE'),(2,'CANCELED'),(3,'SUSPENDED'),(4,'ACTIVE')"
+                "(1,'ACTIVE'),(2,'CANCELED'),(3,'SUSPENDED'),(4,'ACTIVE'),"
+                "(5,'ACTIVE'),(6,'ACTIVE'),(7,'EXPIRED')" 
+            )
+            conn.exec_driver_sql(
+                "UPDATE subscriptions SET expires_at='2026-01-01 00:00:00' WHERE id=5"
+            )
+            conn.exec_driver_sql(
+                "UPDATE subscriptions SET traffic_used_bytes=traffic_limit_bytes WHERE id=6"
             )
             conn.exec_driver_sql(
                 "INSERT INTO subscription_delivery_policy_state (subscription_id,mode)"
@@ -108,19 +120,19 @@ class SetBasedPublishContracts(unittest.TestCase):
     def scalar(self, sql):
         return self.db.execute(text(sql)).scalar()
 
-    def test_set_based_publish_and_repeat_are_idempotent(self):
+    def test_only_eligible_active_users_and_no_plan_mutation(self):
         out = asyncio.run(publish_node_to_all_users_v2(101, db=self.db))
         self.assertTrue(out["ok"])
         self.assertEqual(out["memberships_added"], 2)
         self.assertEqual(out["delivery_modes_added"], 1)
         self.assertEqual(out["delivery_modes_enabled"], 1)
-        self.assertEqual(out["public_plans_added"], 2)
+        self.assertEqual(out["public_plans_added"], 0)
         self.assertEqual(out["active_subscriptions_reconciled"], 0)
         self.assertEqual(
             self.scalar("SELECT COUNT(*) FROM subscription_nodes WHERE node_id=101"), 3,
         )
         self.assertEqual(
-            self.scalar("SELECT COUNT(*) FROM plan_nodes WHERE node_id=101"), 2,
+            self.scalar("SELECT COUNT(*) FROM plan_nodes WHERE node_id=101"), 0,
         )
         self.assertEqual(
             self.scalar("SELECT direct_enabled FROM subscription_node_delivery_modes "
@@ -156,6 +168,8 @@ class SetBasedPublishContracts(unittest.TestCase):
         self.assertNotIn("for sub in subscriptions", publish)
         self.assertIn("ON CONFLICT (subscription_id,node_id) DO NOTHING", publish)
         self.assertIn("public_plans_added", publish)
+        self.assertNotIn("INSERT INTO plan_nodes", publish)
+        self.assertIn("s.traffic_used_bytes < s.traffic_limit_bytes", publish)
         ui = (ROOT.parent / "components/node-add-modal-bridge.tsx").read_text()
         self.assertIn("useState(false)", ui)
 
