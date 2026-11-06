@@ -11,6 +11,7 @@ on:
       - "backend/app/transport_candidates/tp27_fast.py"
       - "backend/tests/tp27_self_repair_v265_smoke.py"
       - "backend/tests/tp27_native_first_recovery_v307_smoke.py"
+      - "backend/tests/tp27_tcp_capacity_health_v307_smoke.py"
       - "backend/tests/tp27_self_repair_metadata_v270_smoke.py"
       - "backend/tests/tp27_repair_owner_cooldown_smoke.py"
       - "components/tunnel-transport-runtime.tsx"
@@ -29,6 +30,7 @@ on:
       - "backend/app/transport_candidates/tp27_fast.py"
       - "backend/tests/tp27_self_repair_v265_smoke.py"
       - "backend/tests/tp27_native_first_recovery_v307_smoke.py"
+      - "backend/tests/tp27_tcp_capacity_health_v307_smoke.py"
       - "backend/tests/tp27_self_repair_metadata_v270_smoke.py"
       - "backend/tests/tp27_repair_owner_cooldown_smoke.py"
       - "components/tunnel-transport-runtime.tsx"
@@ -53,6 +55,9 @@ jobs:
 
       - name: Verify native-first GRE recovery order and FoU quarantine
         run: python backend/tests/tp27_native_first_recovery_v307_smoke.py
+
+      - name: Verify bounded TCP capacity diagnosis
+        run: python backend/tests/tp27_tcp_capacity_health_v307_smoke.py
 
 
       - name: Run TP27 self-repair metadata persistence smoke
