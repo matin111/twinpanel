@@ -462,7 +462,6 @@ def _required_profiles_v47(node: Node) -> set[str]:
         }
     return {
         xray_modern_runtime.PROFILE_XHTTP,
-
         PROFILE_TCP_REALITY,
     }
 
@@ -488,7 +487,6 @@ def _customer_order_for_item(item: dict[str, Any]) -> tuple[str, ...]:
 
     return (
         xray_modern_runtime.PROFILE_XHTTP,
-
         PROFILE_TCP_REALITY,
     )
 
@@ -536,7 +534,6 @@ def _customer_xray_item_v47(
         if _effective_domain(node)
         else (
             xray_modern_runtime.PROFILE_XHTTP,
-
             PROFILE_TCP_REALITY,
         )
     )
@@ -630,7 +627,6 @@ def _admin_profile_rows_v47(node, base_port: int) -> list[dict[str, Any]]:
         if _effective_domain(node)
         else (
             xray_modern_runtime.PROFILE_XHTTP,
-
             PROFILE_TCP_REALITY,
         )
     )
@@ -714,7 +710,6 @@ def apply_xray_adaptive_three_profiles_v47() -> None:
             *policy_v30.ADMIN_ROUTE_PROFILE_IDS,
             PROFILE_TCP_REALITY,
             xray_modern_runtime.PROFILE_XHTTP,
-
         }
     )
 
