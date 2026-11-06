@@ -194,6 +194,50 @@ async def _diagnose_with_connections(ci, ce, rt: dict[str, Any]) -> dict:
     }
 
 
+# A successful ICMP snapshot establishes reachability, not TCP capacity.
+# The explicit admin health action already writes measured throughput using the
+# actual tunnel IPs. Read that bounded, persisted sample here rather than
+# generating network load during every 30-second background diagnosis.
+THROUGHPUT_MAX_SAMPLE_AGE_SECONDS = 15 * 60
+THROUGHPUT_CRITICAL_Mbps = 3.0
+
+
+def _tcp_throughput_health(
+    cfg: dict[str, Any],
+    *,
+    now_epoch: float | None = None,
+) -> dict[str, Any]:
+    state = cfg.get("smart_auto_v21")
+    sample = state.get("throughput") if isinstance(state, dict) else None
+    if not isinstance(sample, dict):
+        return {"status": "unknown", "confirmed_slow": False}
+
+    try:
+        down = float(sample["download_mbps"])
+        up = float(sample["upload_mbps"])
+        measured = float(sample["measured_at_epoch"])
+    except (TypeError, ValueError, KeyError):
+        return {"status": "unknown", "confirmed_slow": False}
+    if not (0 <= down < 10_000 and 0 <= up < 10_000 and measured > 0):
+        return {"status": "unknown", "confirmed_slow": False}
+
+    now = float(now_epoch if now_epoch is not None else datetime.utcnow().timestamp())
+    age = now - measured
+    # Historic SmartAuto scores must not drive a destructive repair: tunnel
+    # #6 previously had a high score stored from weeks before the FoU slowdown.
+    fresh = 0 <= age <= THROUGHPUT_MAX_SAMPLE_AGE_SECONDS
+    slow = bool(fresh and max(down, up) < THROUGHPUT_CRITICAL_Mbps)
+    return {
+        "status": "slow" if slow else "measured" if fresh else "stale",
+        "confirmed_slow": slow,
+        "download_mbps": round(down, 3),
+        "upload_mbps": round(up, 3),
+        "sample_age_seconds": round(max(0.0, age), 1),
+        "sample_max_age_seconds": THROUGHPUT_MAX_SAMPLE_AGE_SECONDS,
+        "source": str(sample.get("source") or "unknown"),
+    }
+
+
 async def diagnose_tp27(tunnel_id: int, db: Session) -> dict:
     """Read-only carrier diagnosis. No interface, firewall or route mutation."""
 
@@ -239,6 +283,10 @@ async def diagnose_tp27(tunnel_id: int, db: Session) -> dict:
             "repaired_profile": repair_state.get("selected_profile"),
             "cooldown_remaining_seconds": _cooldown_remaining(row),
             "carrier": carrier,
+            "tcp_throughput": _tcp_throughput_health(cfg),
+            "performance_degraded": bool(_tcp_throughput_health(cfg)["confirmed_slow"]),
+            # Keep ICMP carrier reachability separate from performance. A slow
+            # result does not authorize background destructive recovery.
             "healthy": bool(carrier["healthy"]),
         }
     finally:
@@ -379,7 +427,12 @@ async def _repair_tp27_locked(
         await asyncio.gather(prerequisites(ci), prerequisites(ce))
 
         before = await _diagnose_with_connections(ci, ce, rt)
-        if bool(before["healthy"]) and not force_rebuild:
+        # A recent manual benchmark proving both directions very slow must not
+        # be dismissed as "already healthy" merely because ICMP responds.
+        # Only explicit API repair reaches this non-force branch; the manager
+        # continues to require its existing failure hysteresis/cooldown.
+        quality = _tcp_throughput_health(cfg)
+        if bool(before["healthy"]) and not force_rebuild and not quality["confirmed_slow"]:
             row.status = "online"
             row.last_error = None
             row.last_healthy_at = datetime.utcnow()
