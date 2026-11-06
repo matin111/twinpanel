@@ -26,6 +26,7 @@ MODERN_PROTOCOLS = (
     "naive",
     "shadowtls",
     "snell",
+    "socks5",
     "mieru",
     "trusttunnel",
     "amneziawg",
@@ -45,6 +46,7 @@ PROTOCOL_META: dict[str, tuple[str, str, str]] = {
     "naive": ("NaiveProxy", "N", "#5b21b6"),
     "shadowtls": ("ShadowTLS", "ST", "#9333ea"),
     "snell": ("Snell", "S", "#a855f7"),
+    "socks5": ("SOCKS5 Proxy", "S5", "#38bdf8"),
     "mieru": ("Mieru", "M", "#8b5cf6"),
     "trusttunnel": ("TrustTunnel", "TT", "#7c3aed"),
     "amneziawg": ("AmneziaWG", "AW", "#6d28d9"),
@@ -75,6 +77,7 @@ CLIENTS: dict[str, dict[str, tuple[str, str]]] = {
     "anytls": _KARING,
     "naive": _KARING,
     "shadowtls": _KARING,
+    "socks5": {p: ("SOCKS5-compatible client", "https://sing-box.sagernet.org/configuration/outbound/socks/") for p in _PLATFORMS},
     "snell": {
         "windows": ("sing-box Desktop", "https://github.com/SagerNet/sing-box-for-desktop/releases/latest"),
         "android": ("sing-box", "https://github.com/SagerNet/sing-box/releases/latest"),
