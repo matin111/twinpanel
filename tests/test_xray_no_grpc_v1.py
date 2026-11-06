@@ -79,6 +79,15 @@ class V2RayNoGrpcTests(unittest.TestCase):
             [],
         )
 
+    def test_inbound_editor_preserves_live_file_mode_and_owner(self):
+        source = ADMIN.read_text(encoding="utf-8")
+        self.assertIn("original_modes[path] = metadata", source)
+        self.assertIn("os.chown(stage, metadata.st_uid, metadata.st_gid)", source)
+        self.assertIn("os.chmod(stage, stat.S_IMODE(metadata.st_mode))", source)
+        self.assertIn("os.chown(path, metadata.st_uid, metadata.st_gid)", source)
+        self.assertIn("os.chmod(path, stat.S_IMODE(metadata.st_mode))", source)
+        self.assertIn("Xray must be active before applying an inbound edit", source)
+
     def test_cleanup_preserves_xray_file_ownership_and_mode(self):
         source = MIGRATION.read_text(encoding="utf-8")
         self.assertIn("def _clone_permissions(", source)
