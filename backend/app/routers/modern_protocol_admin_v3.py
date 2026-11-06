@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import datetime
 from typing import Any
@@ -359,7 +360,12 @@ async def install(
             },
         )
 
-    conn = await connect_protocol_runtime(node, db)
+    execution = "local" if getattr(node, "is_mother", False) else "ssh"
+    conn = await asyncio.wait_for(connect_protocol_runtime(node, db), timeout=20)
+    # Installing runtime packages over SSH can take minutes. Do not hold a
+    # PostgreSQL transaction open throughout that external operation.
+    db.expunge(node)
+    db.commit()
     try:
         try:
             result = await apply_profiles(conn, node, profiles)
@@ -396,7 +402,7 @@ async def install(
         return {
             "ok": not failed,
             "node_id": node.id,
-            "execution": "local" if getattr(node, "is_mother", False) else "ssh",
+            "execution": execution,
             "core": result.get("core", {}),
             "protocols": result["protocols"],
             "warnings": warning_map,
@@ -429,14 +435,27 @@ async def health(
             detail={"message": "Runtime adapter unavailable", "protocols": unavailable},
         )
 
-    conn = await connect_protocol_runtime(node, db)
+    # Snapshot ORM values before network I/O. A remote node can be slow or
+    # unresponsive; it must not hold an open PostgreSQL transaction meanwhile.
+    ports = {
+        key: int(rows[key].port) if key in rows and rows[key].port
+        else int(PROTOCOL_CATALOG[key]["default_port"])
+        for key in protocols
+    }
+    execution = "local" if getattr(node, "is_mother", False) else "ssh"
+    conn = await asyncio.wait_for(connect_protocol_runtime(node, db), timeout=20)
+    # The SSH connector has read NodeAccess by now. Detach node so accessing its
+    # ID in _save_status won't implicitly start another transaction.
+    db.expunge(node)
+    db.commit()
     try:
         results: dict[str, Any] = {}
         for key in protocols:
-            row = rows.get(key)
-            port = int(row.port) if row and row.port else int(PROTOCOL_CATALOG[key]["default_port"])
+            port = ports[key]
             try:
-                result = await profile_health(conn, key, port)
+                result = await asyncio.wait_for(
+                    profile_health(conn, key, port), timeout=15
+                )
             except Exception as exc:
                 result = {
                     "ok": False,
@@ -444,16 +463,25 @@ async def health(
                     "port": port,
                     "transport": PROTOCOL_CATALOG[key]["transport"],
                     "service": PROTOCOL_CATALOG[key]["core"],
-                    "error": str(exc),
+                    "error": (
+                        "health_check_timeout"
+                        if isinstance(exc, asyncio.TimeoutError)
+                        else str(exc)
+                    ),
                 }
             results[key] = result
+        # Complete all SSH calls before opening a database write transaction.
+        try:
+            pin = await asyncio.wait_for(certificate_pin(conn), timeout=15)
+        except Exception:
+            pin = None
+        for key, result in results.items():
             _save_status(db, node, key, result)
-        pin = await certificate_pin(conn)
         db.commit()
         return {
             "ok": all(item.get("ok") for item in results.values()),
-            "node_id": node.id,
-            "execution": "local" if getattr(node, "is_mother", False) else "ssh",
+            "node_id": node_id,
+            "execution": execution,
             "certificate_public_key_sha256": pin,
             "protocols": results,
         }
@@ -475,7 +503,12 @@ async def remove(
     if key not in SINGBOX_PROTOCOLS:
         raise HTTPException(status_code=409, detail="Runtime adapter این پروتکل فعال نیست")
 
-    conn = await connect_protocol_runtime(node, db)
+    execution = "local" if getattr(node, "is_mother", False) else "ssh"
+    conn = await asyncio.wait_for(connect_protocol_runtime(node, db), timeout=20)
+    # Removal is remote I/O too: preserve the ORM data but close its read
+    # transaction before waiting on SSH or systemd.
+    db.expunge(node)
+    db.commit()
     try:
         try:
             result = await remove_profile(conn, key)
@@ -500,7 +533,7 @@ async def remove(
         return {
             **result,
             "node_id": node.id,
-            "execution": "local" if getattr(node, "is_mother", False) else "ssh",
+            "execution": execution,
         }
     finally:
         conn.close()
