@@ -487,7 +487,12 @@ async def apply_accounts_batch(
     command = (
         "set -eu; "
         "exec 9>/run/twinpanel-singbox-batch.lock; flock -x 9; "
-        f"printf '%s' {shlex.quote(encoded)} | base64 -d | python3; "
+        f"result=$(printf '%s' {shlex.quote(encoded)} | base64 -d | python3); "
+        "if [ \"$result\" = 'batch_unchanged=1' ]; then "
+        # Keep the running service untouched on no-op. If the service has
+        # stopped, start it even if its installed credential set is correct.
+        f"systemctl is-active --quiet {SERVICE_NAME}.service || systemctl restart {SERVICE_NAME}.service; "
+        "else "
         f"/usr/local/bin/twinpanel-sing-box check -c {shlex.quote(CONFIG_PATH + '.account-new')}; "
         f"backup=$(mktemp {shlex.quote(CONFIG_PATH + '.batch-backup-XXXXXX')}); "
         f"cp -a {shlex.quote(CONFIG_PATH)} \"$backup\"; "
@@ -495,10 +500,11 @@ async def apply_accounts_batch(
         f"if ! systemctl restart {SERVICE_NAME}.service; then "
         f"cp -a \"$backup\" {shlex.quote(CONFIG_PATH)}; "
         f"systemctl restart {SERVICE_NAME}.service || true; exit 1; fi; "
-        f"systemctl is-active --quiet {SERVICE_NAME}.service; "
         f"if test -f {shlex.quote(STATE_PATH + '.account-new')}; then "
         f"mv {shlex.quote(STATE_PATH + '.account-new')} {shlex.quote(STATE_PATH)}; fi; "
-        "rm -f \"$backup\""
+        "rm -f \"$backup\"; "
+        "fi; "
+        f"systemctl is-active --quiet {SERVICE_NAME}.service"
     )
     await cmd(conn, command, timeout=180)
     inbounds: dict[str, dict[str, Any]] = {}
