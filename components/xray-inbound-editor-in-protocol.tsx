@@ -132,8 +132,8 @@ export function XrayInboundEditorInProtocol({nodeId}:{nodeId:number}){
         </button>
       </div>
       <div className={styles.warningBox}>
-        {pick("تغییر SNIهای TLS فقط با گواهی معتبر، و تغییر Path و REALITY فقط پس از اعتبارسنجی اعمال می‌شوند. تغییر دامنه اتصال و Transport فعلاً در وضعیت موجود باقی می‌مانند.",
-          "TLS SNI requires a matching certificate; paths and REALITY require validation. Connection domain and transport remain unchanged.")}
+        {pick("تغییر SNIهای TLS فقط با گواهی معتبر، و تغییر Path و REALITY فقط پس از اعتبارسنجی اعمال می‌شوند. تغییر دامنه اتصال فقط در صورت یکسان بودن IP مقصد DNS اعمال می‌شود؛ تغییر Transport بین سه نوع موجود از طریق تب‌ها انجام می‌شود.",
+          "TLS SNI requires a matching certificate; paths and REALITY require validation. Connection-domain aliases are applied only when DNS resolves to the existing ingress. Available transports are managed in their separate inbound tabs.")}
       </div>
     </>}
   </section>;
