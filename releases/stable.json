@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.624",
+  "version": "1.1.0-rc.625",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T21:54:32Z",
+  "released_at": "2026-11-06T22:19:26Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "295076ef2992fbe7e476a25e33534e28e11eb7ef",
+  "source_sha": "1cda38f9a7b3e57697013840a658244d1aeeddc4",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.624/twinpanel-1.1.0-rc.624-linux-x86_64.tar.gz",
-    "sha256": "53631231953a062b89bc085c81c2bc93aa347decc2954a1f3d55a5fb34983a04",
-    "size_bytes": 28985226
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.625/twinpanel-1.1.0-rc.625-linux-x86_64.tar.gz",
+    "sha256": "0f20c6e775618845a859d3445b8e15462b3d902e21a44ca5f4614cd7df524e27",
+    "size_bytes": 28990038
   },
   "notes": {
-    "fa": "رفع ناقص‌ماندن V2Ray روی نودهای جدید: جداسازی دامنه Xray از دامنه تانل، تکمیل پروفایل REALITY با UUID ثابت، بازیابی خودکار صف جاافتاده V2Ray و ساخت برای اکانت‌های فعال جدید و انتقالی؛ بدون تغییر سایر پروتکل‌ها.",
-    "en": "Fix missing V2Ray profiles on newly published Exits: dedicated Xray domain selection, REALITY profile repair with preserved UUID, automatic recovery of missing V2Ray backfill jobs, and support for active new/imported accounts."
+    "fa": "رفع نرسیدن پروفایل TCP REALITY نودهای جدید به مسیر عمومی ایران؛ اتصال درست افزونه Xray بعد از V87 و قبل از Unified L3 V49، با حفظ تمامی اصلاحات V2Ray و صف مدیریت مرکزی rc.624.",
+    "en": "Fix missing public TCP REALITY ingress on newly published Exits: attach Xray service route after V87/V251 and before Unified L3 V49, preserving the rc.624 central provisioning and V2Ray repairs."
   }
 }
