@@ -294,8 +294,8 @@ import subprocess
 from pathlib import Path
 
 domain = {domain!r}
-reality_target = {XRAY_REALITY_TARGET!r}
-reality_server_name = {XRAY_REALITY_SERVER_NAME!r}
+default_reality_target = {XRAY_REALITY_TARGET!r}
+default_reality_server_name = {XRAY_REALITY_SERVER_NAME!r}
 
 state_path = Path(
     "/usr/local/etc/xray/twinpanel-modern-state.json"
@@ -307,6 +307,11 @@ if state_path.exists():
         state = json.loads(state_path.read_text(encoding="utf-8"))
     except Exception as exc:
         raise RuntimeError("invalid Xray modern state: " + repr(exc))
+
+# The node's verified runtime values are authoritative. Reconciliation must
+# never reset an admin-applied REALITY target/SNI to global process defaults.
+reality_target = str(state.get("reality_target") or default_reality_target)
+reality_server_name = str(state.get("reality_server_name") or default_reality_server_name)
 
 
 def parse_x25519(output):
