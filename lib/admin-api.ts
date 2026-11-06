@@ -12,6 +12,9 @@ export type RuntimeRow=Record<string,unknown>;
 export type PaymentReviewSummary={needs_review:number;purchase_review:number;receipt_review:number;wallet_review:number;generated_at?:string};
 export type XrayDomainState={ok?:boolean;node_id?:number;xray_domain?:string|null;effective_xray_domain?:string|null;legacy_public_domain_fallback?:boolean;public_domain?:string|null;tls_enabled?:boolean;available_profiles?:string[];message?:string};
 
+export type XrayInboundDraft={connection_domain:string;tls_server_name:string;reality_server_name:string;reality_target:string;transport:string;security:string};
+export type XrayInboundEditorState={node_id:number;defaults:XrayInboundDraft;draft:XrayInboundDraft|null;applied:Partial<XrayInboundDraft>;transports:string[];securities:string[];requires_apply:boolean;message?:string};
+
 const READ_CACHE_TTL_MS=4000;
 const readCache=new Map<string,{expires:number;promise:Promise<unknown>}>();
 const TRANSIENT_GET_STATUSES=new Set([502,503,504]);
@@ -42,6 +45,8 @@ export const adminApi={
   xrayDomain:(id:number)=>request<XrayDomainState>(`/v1/xray-modern-admin/nodes/${id}/xray-domain`),
   saveXrayDomain:(id:number,domain:string)=>request<XrayDomainState>(`/v1/xray-modern-admin/nodes/${id}/xray-domain`,{method:"PUT",body:JSON.stringify({domain})}),
   prepareXrayDomain:(id:number,issueCertificate=true)=>request<XrayDomainState>(`/v1/xray-modern-admin/nodes/${id}/xray-domain/prepare`,{method:"POST",body:JSON.stringify({issue_certificate:issueCertificate})}),
+  xrayInboundEditor:(id:number)=>request<XrayInboundEditorState>(`/v1/xray-modern-admin/nodes/${id}/inbound-editor`),
+  saveXrayInboundDraft:(id:number,payload:XrayInboundDraft)=>request<{ok:boolean;node_id:number;draft:XrayInboundDraft;applied:false}>(`/v1/xray-modern-admin/nodes/${id}/inbound-editor`,{method:"PUT",body:JSON.stringify(payload)}),
   deleteNode:async(id:number)=>{try{return await request<RuntimeRow>(`/v1/nodes/${id}`,{method:"DELETE"});}catch(error){const message=error instanceof Error?error.message:String(error);const unreachablePreflight=/(حذف شروع نشد|دسترسی SSH یکی از نودهای لازم|api error 424)/i.test(message);if(unreachablePreflight){const confirmed=globalThis.confirm("دسترسی SSH نود برقرار نیست و پاک‌سازی Runtime روی سرور انجام نمی‌شود. نود فقط از پنل حذف شود؟");if(!confirmed)throw error;return request<RuntimeRow>(`/v1/nodes/${id}/force-retire`,{method:"POST"});}if(!/(پاک.?سازی|runtime|حذف را دوباره|api error 409|api error 500)/i.test(message))throw error;return request<RuntimeRow>(`/v1/nodes/${id}/force-retire`,{method:"POST"});}},
   tunnels:()=>request<AdminTunnel[]>("/v1/tunnels"),
   createTunnel:(payload:{iran_node_id:number;exit_node_id:number;transport:string;priority:number;is_active:boolean})=>request<AdminTunnel>("/v1/tunnels",{method:"POST",body:JSON.stringify(payload)}),
