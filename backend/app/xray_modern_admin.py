@@ -544,7 +544,7 @@ async def prepare_xray_node(
                 "پروفایل‌های امن Xray آماده شدند"
                 if runtime.get("tls_enabled")
                 else (
-                    "XHTTP REALITY و gRPC REALITY آماده شدند؛ "
+                    "XHTTP REALITY آماده شد؛ "
                     "برای WebSocket TLS باید دامنه و SSL معتبر تنظیم شود"
                 )
             ),
