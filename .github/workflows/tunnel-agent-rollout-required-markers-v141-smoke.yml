@@ -1,0 +1,23 @@
+name: Tunnel Agent required-marker rollout V141 smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/unified_l3_agent_rollout_v49.py"
+      - "backend/app/service_routing_stability_v139.py"
+      - "tests/test_tunnel_agent_rollout_required_markers_v141.py"
+      - ".github/workflows/tunnel-agent-rollout-required-markers-v141-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  required-markers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Syntax-check Agent rollout code
+        run: python -m py_compile backend/app/unified_l3_agent_rollout_v49.py backend/app/service_routing_stability_v139.py
+      - name: Verify all required Agent markers remain enforced
+        run: python -m unittest discover -s tests -p test_tunnel_agent_rollout_required_markers_v141.py -v
