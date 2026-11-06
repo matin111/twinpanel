@@ -20,7 +20,7 @@ from .. import subscription_enforcement as enforcement
 logger = logging.getLogger(__name__)
 
 SINGBOX_MODERN_PROTOCOLS = frozenset(
-    {"hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"}
+    {"hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"}
 )
 STANDALONE_MODERN_PROTOCOLS = frozenset(
     {"mieru", "trusttunnel", "amneziawg", "sudoku"}

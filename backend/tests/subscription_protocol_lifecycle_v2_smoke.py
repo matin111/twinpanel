@@ -39,9 +39,9 @@ modern = values["MODERN_PROTOCOL_KEYS"]
 all_protocols = classic + modern
 
 assert len(classic) == 5, classic
-assert len(modern) == 10, modern
-assert len(all_protocols) == 15, all_protocols
-assert len(set(all_protocols)) == 15, all_protocols
+assert len(modern) == 11, modern
+assert len(all_protocols) == 16, all_protocols
+assert len(set(all_protocols)) == 16, all_protocols
 
 assert '@router.patch("/v1/subscriptions/{subscription_id}/admin-edit")' in lifecycle_text
 assert "normalize_protocols(" in lifecycle_text

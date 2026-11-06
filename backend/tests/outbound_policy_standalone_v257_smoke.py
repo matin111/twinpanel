@@ -55,8 +55,8 @@ def state_with(**modes: str) -> dict:
 
 def test_inventory_is_fifteen_of_fifteen_route_ready() -> None:
     keys = [str(item["key"]) for item in _PROTOCOLS]
-    assert len(keys) == 15
-    assert len(set(keys)) == 15
+    assert len(keys) == 16
+    assert len(set(keys)) == 16
     assert set(keys) == set(ALL_PROTOCOL_KEYS)
     assert all(bool(item.get("policy_supported")) for item in _PROTOCOLS)
     assert all(item.get("reason") is None for item in _PROTOCOLS)
@@ -204,8 +204,8 @@ def test_payload_reports_fifteen_supported_and_installed_truthfully() -> None:
         default_tag="direct",
         installed_map=installed,
     )
-    assert len(rows) == 15
-    assert sum(1 for row in rows if row["policy_supported"]) == 15
+    assert len(rows) == 16
+    assert sum(1 for row in rows if row["policy_supported"]) == 16
     assert all(row["installed"] is True for row in rows)
     assert all(row["reason"] is None for row in rows)
 
@@ -237,7 +237,7 @@ def main() -> None:
     for test in tests:
         test()
         print(f"PASS {test.__name__}")
-    print(f"PASS total={len(tests)} route_ready=15/15")
+    print(f"PASS total={len(tests)} route_ready=16/16")
 
 
 if __name__ == "__main__":

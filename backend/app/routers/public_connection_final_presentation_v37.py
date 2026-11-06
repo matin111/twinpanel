@@ -66,7 +66,7 @@ _SCRIPT = r"""
 (function(){
   const MULTI=new Set([
     'openvpn','wireguard','v2ray','hysteria2','tuic','anytls','naive',
-    'shadowtls','snell','mieru','trusttunnel','amneziawg','sudoku'
+    'shadowtls','snell','socks5','mieru','trusttunnel','amneziawg','sudoku'
   ]);
   const NATIVE_BUNDLES=new Set(['openvpn','wireguard','amneziawg']);
   const text=node=>String(node?.textContent||'').trim();

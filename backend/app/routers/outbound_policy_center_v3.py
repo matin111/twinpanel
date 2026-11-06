@@ -53,7 +53,7 @@ KERNEL_POLICY_SPECS: dict[str, dict[str, Any]] = {
 }
 
 _NATIVE_POLICY_ORDER: tuple[str, ...] = (
-    "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell",
+    "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5",
 )
 _KERNEL_POLICY_ORDER: tuple[str, ...] = (
     "cisco", "openvpn", "wireguard", "l2tp", "amneziawg",

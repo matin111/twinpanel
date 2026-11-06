@@ -11,6 +11,7 @@ const categoryLabel:Record<Exclude<StoreProtocolCategory,"classic">,{fa:string;e
   recommended:{fa:"پیشنهادی مدرن",en:"Modern recommended"},
   camouflage:{fa:"استتار و سازگاری",en:"Camouflage & compatibility"},
   standalone:{fa:"Runtime مستقل",en:"Standalone runtime"},
+  proxy:{fa:"پروکسی",en:"Proxy"},
 };
 
 const DEFAULT_MODERN_DESCRIPTION_FA="پروتکل‌های جدید TwinPanel در کنار گزینه‌های کلاسیک؛ برای هر شبکه مسیر مناسب‌تری در دسترس است.";

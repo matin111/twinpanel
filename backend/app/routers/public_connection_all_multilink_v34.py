@@ -43,6 +43,7 @@ MULTI_PROTOCOLS = (
     "naive",
     "shadowtls",
     "snell",
+    "socks5",
     "mieru",
     "trusttunnel",
     "amneziawg",
@@ -67,6 +68,7 @@ PROTOCOL_TITLES = {
     "trusttunnel": "TrustTunnel",
     "amneziawg": "AmneziaWG",
     "sudoku": "Sudoku",
+    "socks5": "SOCKS5 Proxy",
 }
 
 PROTOCOL_CLIENT = {
@@ -83,6 +85,7 @@ PROTOCOL_CLIENT = {
     "trusttunnel": "trusttunnel",
     "amneziawg": "amneziawg",
     "sudoku": "sudoku",
+    "socks5": "singbox",
 }
 
 

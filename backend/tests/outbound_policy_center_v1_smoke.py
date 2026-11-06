@@ -23,7 +23,7 @@ from app.routers.outbound_policy_center_v2 import (
 )
 
 ROUTE_READY = {
-    "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell",
+    "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5",
     "cisco", "openvpn", "wireguard", "l2tp", "v2ray",
 }
 PENDING = {"mieru", "trusttunnel", "amneziawg", "sudoku"}
@@ -62,8 +62,8 @@ def xray_doc() -> dict:
 
 def test_inventory_is_full_and_truthful() -> None:
     keys = [str(item["key"]) for item in _PROTOCOLS]
-    assert len(keys) == 15
-    assert len(set(keys)) == 15
+    assert len(keys) == 16
+    assert len(set(keys)) == 16
     assert set(keys) == set(ALL_PROTOCOL_KEYS)
     assert {str(x["key"]) for x in _PROTOCOLS if x.get("policy_supported")} == ROUTE_READY
 
@@ -254,8 +254,8 @@ def test_payload_reports_eleven_supported_without_faking_pending_cores() -> None
         installed_map=installed,
     )
     by_key = {row["key"]: row for row in rows}
-    assert len(rows) == 15
-    assert sum(1 for row in rows if row["policy_supported"]) == 11
+    assert len(rows) == 16
+    assert sum(1 for row in rows if row["policy_supported"]) == 12
     assert all(by_key[key]["installed"] is True for key in ROUTE_READY)
     assert all(by_key[key]["installed"] is None for key in PENDING)
     assert all(by_key[key]["reason"] == "runtime_core_pending" for key in PENDING)

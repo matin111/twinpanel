@@ -27,7 +27,8 @@ const modernProtocolRows:[string,string][]=[
   ["mieru","Mieru"],
   ["trusttunnel","TrustTunnel"],
   ["amneziawg","AmneziaWG"],
-  ["sudoku","Sudoku"]
+  ["sudoku","Sudoku"],
+  ["socks5","SOCKS5 Proxy"]
 ];
 const protocolLabels=new Map<string,string>([
   ...classicProtocolRows.map(([,protocol,label])=>[protocol,label] as [string,string]),

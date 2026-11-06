@@ -53,7 +53,7 @@ _SCRIPT = r"""
 (function(){
   const MULTI=new Set([
     'openvpn','wireguard','v2ray','hysteria2','tuic','anytls','naive',
-    'shadowtls','snell','mieru','trusttunnel','amneziawg','sudoku'
+    'shadowtls','snell','socks5','mieru','trusttunnel','amneziawg','sudoku'
   ]);
   let observer=null;
   let cleanupTimer=null;

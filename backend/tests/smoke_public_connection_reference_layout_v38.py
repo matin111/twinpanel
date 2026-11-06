@@ -9,7 +9,7 @@ V38 = ROOT / "backend/app/routers/public_connection_reference_layout_v38.py"
 
 EXPECTED_MULTI = {
     "openvpn", "wireguard", "v2ray", "hysteria2", "tuic", "anytls", "naive",
-    "shadowtls", "snell", "mieru", "trusttunnel", "amneziawg", "sudoku",
+    "shadowtls", "snell", "socks5", "mieru", "trusttunnel", "amneziawg", "sudoku",
 }
 EXPECTED_SUBSCRIPTIONS = {"v2ray", "hysteria2", "tuic", "anytls"}
 

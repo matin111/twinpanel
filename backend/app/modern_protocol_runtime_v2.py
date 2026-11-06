@@ -187,6 +187,12 @@ def render(item):
         if rows:
             base["padding_scheme"] = rows
 
+    elif name == "socks5":
+        # sing-box uses type=socks (NOT socks5). An empty users list
+        # silently enables an unauthenticated public proxy.
+        base["type"] = "socks"
+        base["users"] = [{{"username": "twinpanel-bootstrap", "password": seed["password"]}}]
+
     elif name == "naive":
         base["users"] = [{{"username": "twinpanel-bootstrap", "password": seed["password"]}}]
         # sing-box uses an omitted network field for TCP+UDP.

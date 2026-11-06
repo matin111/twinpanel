@@ -25,6 +25,7 @@ MODERN_PROTOCOLS = frozenset(
         "naive",
         "shadowtls",
         "snell",
+        "socks5",
         "mieru",
         "trusttunnel",
         "amneziawg",

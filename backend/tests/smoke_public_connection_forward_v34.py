@@ -23,12 +23,12 @@ MOUNT = ROOT / "backend/app/routers/public_connection_forward_mount_v34.py"
 PROVEN_SUBSCRIPTIONS = ("v2ray", "hysteria2", "tuic", "anytls")
 MULTI_PROTOCOLS = (
     "openvpn", "wireguard", "v2ray", "hysteria2", "tuic", "anytls", "naive",
-    "shadowtls", "snell", "mieru", "trusttunnel", "amneziawg", "sudoku",
+    "shadowtls", "snell", "socks5", "mieru", "trusttunnel", "amneziawg", "sudoku",
 )
 CANONICAL_PROTOCOLS = (
     "cisco", "openvpn", "wireguard", "l2tp", "v2ray",
     "hysteria2", "tuic", "anytls", "naive", "shadowtls",
-    "snell", "mieru", "trusttunnel", "amneziawg", "sudoku",
+    "snell", "socks5", "mieru", "trusttunnel", "amneziawg", "sudoku",
 )
 
 
@@ -114,7 +114,7 @@ def main() -> None:
 
     classic = assigned_tuple(v13, "CLASSIC_PROTOCOLS")
     modern = assigned_tuple(v13, "MODERN_PROTOCOLS")
-    require(classic + modern == CANONICAL_PROTOCOLS, "15-protocol inventory drifted")
+    require(classic + modern == CANONICAL_PROTOCOLS, "16-protocol inventory drifted")
 
     # V11 remains client/platform authority. Responsive layout itself is V36-owned.
     require("body.dataset.tpPlatform=platform" in v11, "V11 platform data attribute missing")

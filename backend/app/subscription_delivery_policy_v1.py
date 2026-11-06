@@ -117,6 +117,7 @@ def protocol_capabilities() -> list[dict[str, Any]]:
         "naive": ("username_password", "per_user"),
         "shadowtls": ("password", "per_user"),
         "snell": ("user_key_shared_server_psk", "per_user"),
+        "socks5": ("username_password", "per_user"),
         "mieru": ("username_password", "per_user"),
         "trusttunnel": ("username_password", "per_user"),
         "amneziawg": ("peer", "per_peer"),

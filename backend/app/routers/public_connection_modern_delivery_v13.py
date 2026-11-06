@@ -28,6 +28,7 @@ MODERN_PROTOCOLS = (
     "naive",
     "shadowtls",
     "snell",
+    "socks5",
     "mieru",
     "trusttunnel",
     "amneziawg",
@@ -47,6 +48,7 @@ PROTOCOL_META: dict[str, tuple[str, str, str]] = {
     "naive": ("NaiveProxy", "N", "#5b21b6"),
     "shadowtls": ("ShadowTLS", "ST", "#9333ea"),
     "snell": ("Snell", "S", "#a855f7"),
+    "socks5": ("SOCKS5 Proxy", "S5", "#38bdf8"),
     "mieru": ("Mieru", "M", "#8b5cf6"),
     "trusttunnel": ("TrustTunnel", "TT", "#7c3aed"),
     "amneziawg": ("AmneziaWG", "AW", "#6d28d9"),
@@ -77,6 +79,7 @@ CLIENTS: dict[str, dict[str, tuple[str, str]]] = {
     "anytls": _KARING,
     "naive": _KARING,
     "shadowtls": _KARING,
+    "socks5": {p: ("SOCKS5-compatible client", "https://sing-box.sagernet.org/configuration/outbound/socks/") for p in _PLATFORMS},
     "snell": {
         "windows": ("sing-box Desktop", "https://github.com/SagerNet/sing-box-for-desktop/releases/latest"),
         "android": ("sing-box", "https://github.com/SagerNet/sing-box/releases/latest"),
@@ -226,6 +229,9 @@ def _modern_action(token: str, protocol: str, item: dict[str, Any]) -> str:
 
     if uri:
         primary = f'<a class="primary-btn v13-open-uri" href="{_h(uri)}">باز کردن در برنامه</a>'
+    elif protocol == "socks5":
+        # SOCKS5 can be used natively in apps without a config-import flow.
+        primary = f'<a class="primary-btn" href="{_h(config_path)}">دانلود کانفیگ SOCKS5</a>'
     elif config_format == "sing-box" and protocol != "snell":
         primary = (
             f'<button class="primary-btn v13-karing-import" type="button" '
@@ -239,8 +245,25 @@ def _modern_action(token: str, protocol: str, item: dict[str, Any]) -> str:
     else:
         primary = f'<a class="primary-btn" href="{_h(config_path)}">دانلود کانفیگ</a>'
 
+    socks5_details = ""
+    if protocol == "socks5":
+        outbound = item.get("outbound") if isinstance(item.get("outbound"), dict) else {}
+        host = str(outbound.get("server") or item.get("server") or "")
+        port = str(outbound.get("server_port") or item.get("port") or "")
+        username = str(outbound.get("username") or "")
+        password = str(outbound.get("password") or "")
+        if host and port and username and password:
+            socks5_details = (
+                '<div class="v13-socks5-credentials" dir="ltr">'
+                f'<div>SOCKS5: {_h(host)}:{_h(port)}</div>'
+                f'<div>Username: {_h(username)}</div>'
+                f'<div>Password: {_h(password)}</div>'
+                '</div><small>SOCKS5 به‌تنهایی ترافیک را رمزگذاری نمی‌کند.</small>'
+            )
+
     return (
         f'<div class="v13-modern-action" data-v13-protocol="{_h(protocol)}">'
+        f'{socks5_details}'
         f'<div class="v13-action-buttons">{primary}'
         f'<a class="v13-secondary" href="{_h(config_path)}">دانلود فایل</a>'
         f'{_client_links(protocol)}</div></div>'

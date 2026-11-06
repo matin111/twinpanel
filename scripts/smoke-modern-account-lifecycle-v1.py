@@ -19,9 +19,9 @@ QUOTA_SYNC = ROOT / "backend/app/services/quota_node_sync.py"
 EXPECTED_ALL = {
     "cisco", "openvpn", "wireguard", "l2tp", "v2ray",
     "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell",
-    "mieru", "trusttunnel", "amneziawg", "sudoku",
+    "mieru", "trusttunnel", "amneziawg", "sudoku", "socks5",
 }
-EXPECTED_SINGBOX = {"hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"}
+EXPECTED_SINGBOX = {"hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"}
 EXPECTED_STANDALONE = {"mieru", "trusttunnel", "amneziawg", "sudoku"}
 
 
@@ -67,7 +67,7 @@ def main() -> None:
     modern = set(literal_assignment(REGISTRY, "MODERN_PROTOCOL_KEYS"))
     assert classic | modern == EXPECTED_ALL
     assert classic.isdisjoint(modern)
-    assert len(classic) == 5 and len(modern) == 10
+    assert len(classic) == 5 and len(modern) == 11
 
     route_singbox = set(literal_assignment(ROUTE, "SINGBOX_ACCOUNT_PROTOCOLS"))
     route_standalone = set(literal_assignment(ROUTE, "STANDALONE_ACCOUNT_PROTOCOLS"))
@@ -130,10 +130,10 @@ def main() -> None:
     assert set(factory_fields) == classic
 
     print("MODERN_ACCOUNT_LIFECYCLE_V1_OK")
-    print("canonical_protocols=15")
-    print("modern_account_drivers=10")
-    print("controller_enforcement=10")
-    print("quota_contract=10_fail_closed")
+    print("canonical_protocols=16")
+    print("modern_account_drivers=11")
+    print("controller_enforcement=11")
+    print("quota_contract=11_fail_closed")
     print("sales_gate=fail_closed_until_native_quota")
 
 

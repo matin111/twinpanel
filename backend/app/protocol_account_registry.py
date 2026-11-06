@@ -27,6 +27,7 @@ MODERN_PROTOCOL_KEYS = (
     "trusttunnel",
     "amneziawg",
     "sudoku",
+    "socks5",
 )
 
 ALL_PROTOCOL_KEYS = CLASSIC_PROTOCOL_KEYS + MODERN_PROTOCOL_KEYS
@@ -63,6 +64,7 @@ PROTOCOL_TITLES = {
     "trusttunnel": "TrustTunnel",
     "amneziawg": "AmneziaWG",
     "sudoku": "Sudoku",
+    "socks5": "SOCKS5 Proxy",
 }
 
 

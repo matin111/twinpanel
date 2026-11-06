@@ -11,7 +11,7 @@ V37 = ROOT / "backend/app/routers/public_connection_final_presentation_v37.py"
 
 EXPECTED_MULTI = {
     "openvpn", "wireguard", "v2ray", "hysteria2", "tuic", "anytls", "naive",
-    "shadowtls", "snell", "mieru", "trusttunnel", "amneziawg", "sudoku",
+    "shadowtls", "snell", "socks5", "mieru", "trusttunnel", "amneziawg", "sudoku",
 }
 
 
