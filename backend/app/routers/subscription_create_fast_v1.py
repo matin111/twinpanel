@@ -179,9 +179,11 @@ async def _provision_subscription_background(
             return
 
         try:
-            from .modern_account_delivery_v1 import provision_account_v1
+            from .modern_account_delivery_v1 import provision_new_account_fast_v1
 
-            provisioning = await provision_account_v1(
+            # New accounts use one sing-box batch per node. Existing-account
+            # repair, migration and explicit reprovision keep their old paths.
+            provisioning = await provision_new_account_fast_v1(
                 subscription_id=subscription_id,
                 db=db,
             )
