@@ -99,6 +99,33 @@ class V2RayNoGrpcTests(unittest.TestCase):
         self.assertIn('raise RuntimeError("Xray is not active;', source)
         self.assertIn('raise RuntimeError("Xray config changed during cleanup staging")', source)
 
+    def test_live_stored_vless_profiles_use_real_ingress_ports(self):
+        helper = _function(ADAPTIVE, "_verified_stored_tunnel_endpoint_v47")
+        ns = {
+            "Any": Any,
+            "urlsplit": urlsplit,
+            "xray_modern_runtime": SimpleNamespace(
+                PROFILE_WS="websocket_tls", PROFILE_XHTTP="xhttp_reality"
+            ),
+            "PROFILE_TCP_TLS": "tcp_tls",
+        }
+        exec(compile(ast.Module(body=[helper], type_ignores=[]), str(ADAPTIVE), "exec"), ns)
+        resolve = ns["_verified_stored_tunnel_endpoint_v47"]
+        live = {"server": "vtray.in88.sbs"}
+        for profile, base in (
+            ("websocket_tls", 26000),
+            ("xhttp_reality", 24000),
+            ("tcp_tls", 28000),
+        ):
+            saved = {"uri": f"vless://customer@vtray.in88.sbs:{base + 6}?type=ws"}
+            self.assertEqual(resolve(live, saved, profile, 6), ("vtray.in88.sbs", base + 6))
+            self.assertIsNone(resolve({"server": "other.example"}, saved, profile, 6))
+            self.assertIsNone(resolve({"server": "vtray.in88.sbs", "delivery_mode": "direct"}, saved, profile, 6))
+            self.assertIsNone(resolve(live, {"uri": f"vless://customer@vtray.in88.sbs:{base + 7}"}, profile, 6))
+        self.assertIsNone(
+            resolve(live, {"uri": "vless://customer@vtray.in88.sbs:25006?type=grpc"}, "grpc_reality", 6)
+        )
+
     def test_migration_validates_config_and_preserves_other_inbounds(self):
         source = MIGRATION.read_text(encoding="utf-8")
         ast.parse(source)
