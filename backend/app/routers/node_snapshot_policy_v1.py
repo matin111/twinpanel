@@ -4,7 +4,6 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import SubscriptionNode
 from ..schemas import NodeCreate
 from . import nodes as nodes_router_module
 
@@ -16,21 +15,13 @@ def create_node_snapshot_safe(
     payload: NodeCreate,
     db: Session = Depends(get_db),
 ):
-    """Create infrastructure without attaching it to historical subscriptions.
+    """Keep the compatibility entry point without duplicate DB writes.
 
-    The legacy create route still contains a compatibility block that inserts a
-    new Node into every SubscriptionNode snapshot. Snapshots are immutable
-    desired-state, so remove only those just-created memberships before the
-    request returns. New subscriptions and explicit admin edits select the node
-    normally through PlanNode/node_ids.
+    The real create_node now inserts *only* the new Node. Publishing existing
+    memberships is an explicit separate action. Never insert all subscription
+    snapshots just to delete them before returning the response.
     """
-    node = _ORIGINAL_CREATE_NODE(payload, db)
-    db.query(SubscriptionNode).filter(
-        SubscriptionNode.node_id == int(node.id)
-    ).delete(synchronize_session=False)
-    db.commit()
-    db.refresh(node)
-    return node
+    return _ORIGINAL_CREATE_NODE(payload, db)
 
 
 def install_node_snapshot_policy_v1() -> None:
