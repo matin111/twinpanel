@@ -30,6 +30,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--node-id", type=int, required=True)
     parser.add_argument("--subscription-id", type=int, help="Optional single active imported subscription for targeted canary")
     parser.add_argument("--protocol", choices=PROTOCOLS, required=True)
+    parser.add_argument("--include-native", action="store_true", help="Reconcile both imported and native account snapshots; selected protocols only")
     parser.add_argument("--apply", action="store_true", help="Enable real writes (OFF by default)")
     parser.add_argument("--confirm-node-id", type=int, help="Required exact node ID for --apply")
     parser.add_argument("--max-pairs", type=int, default=5)
@@ -55,17 +56,15 @@ def api_healthy() -> bool:
         return False
 
 
-def eligible_count(db, node_id: int, protocol: str, subscription_id: int | None = None) -> int:
+def eligible_count(db, node_id: int, protocol: str, subscription_id: int | None = None, include_native: bool = False) -> int:
     from sqlalchemy import func, or_
     from app.migration_import_models import MigrationImportRecord
     from app.models import Subscription, SubscriptionNode, SubscriptionProtocol, SubscriptionStatus
     now = datetime.utcnow()
     query = (
         db.query(func.count(func.distinct(Subscription.id)))
-        .join(MigrationImportRecord, MigrationImportRecord.subscription_id == Subscription.id)
         .join(SubscriptionNode, SubscriptionNode.subscription_id == Subscription.id)
         .filter(
-            MigrationImportRecord.source.in_(SOURCES),
             SubscriptionNode.node_id == node_id,
             Subscription.status == SubscriptionStatus.ACTIVE,
             or_(Subscription.expires_at.is_(None), Subscription.expires_at > now),
@@ -75,6 +74,10 @@ def eligible_count(db, node_id: int, protocol: str, subscription_id: int | None 
             ),
         )
     )
+    if not include_native:
+        query = query.join(
+            MigrationImportRecord, MigrationImportRecord.subscription_id == Subscription.id,
+        ).filter(MigrationImportRecord.source.in_(SOURCES))
     if subscription_id is not None:
         query = query.filter(Subscription.id == int(subscription_id))
     if protocol != "singbox":
@@ -104,12 +107,13 @@ def health_guard(max_load: float) -> None:
 
 async def apply_cycle(
     node_id: int, protocol: str, max_pairs: int, subscription_id: int | None = None,
+    include_native: bool = False,
 ) -> tuple[int, int]:
     if protocol == "singbox":
         # Same lock that the existing standalone migration worker uses.
         os.environ["MIGRATION_SINGBOX_BATCH_SIZE"] = str(max_pairs)
         from scripts.twinpanel_migration_singbox_batch import run_one_node
-        count = await run_one_node(node_id, subscription_id=subscription_id)
+        count = await run_one_node(node_id, subscription_id=subscription_id, include_native=include_native)
         return (0, int(count))
 
     os.environ["CLASSIC_ONLY_PROTOCOL"] = protocol
@@ -118,7 +122,7 @@ async def apply_cycle(
     from app.database import SessionLocal
     from scripts.twinpanel_migration_classic_sequential_v3 import one_node
     with SessionLocal() as db:
-        code, count = await one_node(db, node_id, subscription_id=subscription_id)
+        code, count = await one_node(db, node_id, subscription_id=subscription_id, include_native=include_native)
     return int(code), int(count)
 
 
@@ -134,11 +138,12 @@ def main(argv: list[str] | None = None) -> int:
         pass
     with SessionLocal() as db:
         node = ensure_node(db, args.node_id)
-        eligible = eligible_count(db, args.node_id, args.protocol, args.subscription_id)
+        eligible = eligible_count(db, args.node_id, args.protocol, args.subscription_id, args.include_native)
         print("NODE_BACKFILL_SCOPE", {
             "node_id": int(node.id),
             "node_name": node.name,
             "subscription_id": args.subscription_id,
+            "include_native": bool(args.include_native),
             "protocol": args.protocol,
             "eligible_imported_accounts": eligible,
             "write_enabled": args.apply,
@@ -165,7 +170,7 @@ def main(argv: list[str] | None = None) -> int:
         for cycle in range(args.max_cycles):
             try:
                 health_guard(args.max_load)
-                rc, count = asyncio.run(apply_cycle(args.node_id, args.protocol, args.max_pairs, args.subscription_id))
+                rc, count = asyncio.run(apply_cycle(args.node_id, args.protocol, args.max_pairs, args.subscription_id, args.include_native))
                 total += count
                 print("NODE_BACKFILL_CYCLE", {
                     "node_id": args.node_id, "protocol": args.protocol,

@@ -60,6 +60,7 @@ from .subscription_protocol_lifecycle_v2 import router as _subscription_protocol
 from .subscription_hard_delete_v1 import router as _subscription_hard_delete_v1_router
 from .subscription_bulk_admin_v1 import router as _subscription_bulk_admin_v1_router
 from .publish_node_all_users_v2 import router as _publish_node_all_users_v2_router
+from ..node_auto_backfill_v1 import router as _node_auto_backfill_v1_router
 from .publish_node_all_users_v1 import router as _publish_node_all_users_v1_router
 from .dns_emergency import router as _dns_emergency_router
 from .dns_emergency_iran import router as _dns_emergency_iran_router
@@ -111,6 +112,7 @@ from .manual_authority_v193 import router as _manual_authority_v193_router
 _runtime_endpoints.router.include_router(_subscription_create_fast_v1_router)
 _runtime_endpoints.router.include_router(_subscription_bulk_admin_v1_router)
 _runtime_endpoints.router.include_router(_publish_node_all_users_v2_router)
+_runtime_endpoints.router.include_router(_node_auto_backfill_v1_router)
 _runtime_endpoints.router.include_router(_publish_node_all_users_v1_router)
 _runtime_endpoints.router.include_router(_telegram_account_link_lookup_router)
 _runtime_endpoints.router.include_router(_telegram_subscription_import_v1_router)

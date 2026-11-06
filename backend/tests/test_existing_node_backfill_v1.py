@@ -68,8 +68,8 @@ def test_imported_backfill_preserves_per_plan_protocol_entitlements():
 def test_one_node_per_run_and_no_secret_logging():
     wrapper = (BASE / "scripts/twinpanel_existing_node_backfill_v1.py").read_text()
     ast.parse(wrapper)
-    assert "run_one_node(node_id, subscription_id=subscription_id)" in wrapper
-    assert "one_node(db, node_id, subscription_id=subscription_id)" in wrapper
+    assert "run_one_node(node_id, subscription_id=subscription_id, include_native=include_native)" in wrapper
+    assert "one_node(db, node_id, subscription_id=subscription_id, include_native=include_native)" in wrapper
     assert "health_guard(args.max_load)" in wrapper
     assert "fcntl.LOCK_EX | fcntl.LOCK_NB" in wrapper
     assert "DRY_RUN_ONLY_NO_CREDENTIAL_WRITES" in wrapper
@@ -98,5 +98,5 @@ def test_target_scope_is_applied_to_singbox_and_classic_queries():
     assert "Subscription.id == int(subscription_id)" in singbox
     assert "Subscription.id==int(subscription_id)" in classic
     assert "subscription_id=subscription_id" in singbox
-    assert "one_node(db, node_id, subscription_id=subscription_id)" in wrapper
-    assert "eligible_count(db, args.node_id, args.protocol, args.subscription_id)" in wrapper
+    assert "one_node(db, node_id, subscription_id=subscription_id, include_native=include_native)" in wrapper
+    assert "eligible_count(db, args.node_id, args.protocol, args.subscription_id, args.include_native)" in wrapper

@@ -6,6 +6,7 @@ import {Badge,Card,Shell,Stat} from "./ui";
 import {adminApi,type AdminNode,type RuntimeRow,type XrayDomainState} from "../lib/admin-api";
 import {legacyAdminApi} from "../lib/legacy-admin-api";
 import {useI18n} from "../lib/i18n";
+import {NodeAutoBackfillPanel} from "./node-auto-backfill-panel";
 
 const s=(value:unknown)=>String(value??"").trim();
 const n=(value:unknown)=>{const parsed=Number(value??0);return Number.isFinite(parsed)?parsed:0;};
@@ -340,6 +341,7 @@ export function LegacyNodesRuntimePage(){
         <div className="runtime-warning">
           {pick("Health، Repair، Port و تنظیمات حرفه‌ای پروتکل‌ها از مرکز «پروتکل‌ها» مدیریت می‌شود. هویت دامنه Xray / V2Ray متعلق به خود Exit Server است و از همین بخش مدیریت می‌شود.","Protocol health, repair, ports and advanced settings remain in Protocols. Xray / V2Ray domain identity belongs to the Exit server and is managed here.")}
         </div>
+        {selectedRole==="exit"?<NodeAutoBackfillPanel nodeId={selected.id}/>:null}
         <div className="action-row node-manage-actions">
           <a className="primary" href={`/admin/modern-protocols?node=${selected.id}`}>{pick("مدیریت پروتکل‌ها","Manage protocols")}</a>
           <button type="button" className="primary-soft" onClick={()=>{setError("");setAccessDraft(current=>({...current,password:""}));setModal("ssh");}}>{pick("دسترسی SSH","SSH access")}</button>
