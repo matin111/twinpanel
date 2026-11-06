@@ -251,12 +251,6 @@ if PROTOCOL == "shadowtls":
     os.replace(STATE + ".account-new", STATE)
     os.chmod(STATE, 0o600)
 
-# No-op: do not touch the node config or service; the SSH shell checks
-# this marker under the per-node flock before skipping a restart.
-if doc == original_doc:
-    print("batch_unchanged=1")
-    raise SystemExit(0)
-
 with open(CONFIG + ".account-new", "w", encoding="utf-8") as handle:
     json.dump(doc, handle, ensure_ascii=False, indent=2)
     handle.write("\\n")
@@ -460,6 +454,12 @@ for operation in UPDATES:
             previous.clear()
             previous.update(inner)
         state["shadowtls"] = shadow
+
+# No-op: do not touch the node config or service; the SSH shell checks
+# this marker under the per-node flock before skipping a restart.
+if doc == original_doc:
+    print("batch_unchanged=1")
+    raise SystemExit(0)
 
 with open(CONFIG + ".account-new", "w", encoding="utf-8") as handle:
     json.dump(doc, handle, ensure_ascii=False, indent=2)
