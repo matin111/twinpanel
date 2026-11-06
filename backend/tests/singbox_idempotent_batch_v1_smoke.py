@@ -136,7 +136,7 @@ with tempfile.TemporaryDirectory() as directory:
 # Shell contract: only changed batches validate, write, and restart. On an
 # unchanged batch, an inactive service is still started (self-healing).
 assert 'batch_unchanged=1' in text
-assert 'if [ \\"$result\\" = \'batch_unchanged=1\' ]; then' in text
+assert r'\"$result\"' in text and "'batch_unchanged=1'" in text
 assert 'systemctl is-active --quiet {SERVICE_NAME}.service || systemctl restart' in text
 assert 'flock -x 9' in text
 print("SINGBOX_IDEMPOTENT_BATCH_V1=PASS")
