@@ -13,6 +13,7 @@ from .account_delivery import _public_payload, _subscription_from_share_token
 from .public_connection_modern_delivery_v13 import _items
 from .public_connection_modern_import_v15 import standard_share_uri
 from .public_connection_modern_names_v14 import _account_name, _profile_name
+from ..services.central_modern_connection_lookup_v1 import applied_modern_connection
 
 
 router = APIRouter(tags=["public-connection-protocol-subscriptions-v30"])
@@ -72,7 +73,10 @@ def _item_share_uri(sub: Any, protocol: str, item: dict[str, Any]) -> str:
     return _stored_uri(protocol, item)
 
 
-def _protocol_uris_from_payload(sub: Any, payload: dict[str, Any], protocol: str) -> list[str]:
+def _protocol_uris_from_payload(
+    sub: Any, payload: dict[str, Any], protocol: str,
+    db: Session | None = None,
+) -> list[str]:
     protocol = _normalize_protocol(protocol)
     if protocol not in SUPPORTED_PROTOCOLS:
         return []
@@ -87,7 +91,23 @@ def _protocol_uris_from_payload(sub: Any, payload: dict[str, Any], protocol: str
         if _normalize_protocol(credential.get("protocol")) != protocol:
             continue
         for item in _items(credential):
-            uri = _item_share_uri(sub, protocol, item)
+            uri = ""
+            if db is not None and protocol != "v2ray":
+                connection = applied_modern_connection(db, protocol, item.get("node_id"))
+                if connection is not None:
+                    try:
+                        # The new URI is generated from the projected client
+                        # outbound; no old stored URI is returned on success.
+                        uri = standard_share_uri(
+                            protocol, item, _profile_name(sub, protocol, item),
+                            applied_connection=connection,
+                        )
+                    except (ValueError, TypeError):
+                        # Incompatible imported client config: keep the
+                        # previous behavior rather than break delivery.
+                        uri = ""
+            if not uri:
+                uri = _item_share_uri(sub, protocol, item)
             if not uri or uri in seen:
                 continue
             seen.add(uri)
@@ -105,7 +125,7 @@ def _protocol_subscription_content(token: str, protocol: str, db: Session) -> tu
     if protocol not in SUPPORTED_PROTOCOLS:
         raise HTTPException(status_code=404, detail="برای این پروتکل لینک اشتراک مشترک ارائه نمی‌شود")
     sub, payload = _active_subscription_payload(token, db)
-    uris = _protocol_uris_from_payload(sub, payload, protocol)
+    uris = _protocol_uris_from_payload(sub, payload, protocol, db=db)
     if not uris:
         raise HTTPException(status_code=404, detail="لینک اشتراک این پروتکل هنوز آماده نیست")
     return _encode_subscription(uris), protocol, len(uris)
