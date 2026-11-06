@@ -59,10 +59,14 @@ required_start = v47_source.index("def _required_profiles_v47")
 required_end = v47_source.index("def _customer_order_for_item", required_start)
 required_source = v47_source[required_start:required_end]
 assert "xray_modern_runtime.PROFILE_XHTTP" in required_source
-assert "xray_modern_runtime.PROFILE_GRPC" in required_source
+# gRPC offset remains compatibility metadata for legacy imports only; no
+# production subscription is allowed to require that retired transport.
+assert "xray_modern_runtime.PROFILE_GRPC" not in required_source
+modern_source = Path("app/xray_modern_runtime.py").read_text(encoding="utf-8")
+assert '"tag": "vless-grpc-reality"' not in modern_source
 assert "PROFILE_TCP_REALITY" in required_source
 
 print(
-    "XRAY_GRPC_TARGET_ISOLATION_V48_OK "
+    "XRAY_GRPC_TARGET_ISOLATION_V48_LEGACY_COMPAT_ONLY_OK "
     "targets=9447,9448,9449 modern_reserved=8444-8452"
 )
