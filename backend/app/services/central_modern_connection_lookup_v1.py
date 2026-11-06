@@ -12,6 +12,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from ..models import Node, NodeProtocolConfig, Tunnel
+from ..node_connection_settings_models_v1 import NodeProtocolAppliedEndpoint
 from .central_connection_projection_v1 import SINGBOX_OUTBOUNDS, _valid_host, _valid_port
 
 
@@ -55,9 +56,19 @@ def applied_modern_connection(
     ).first()
     if tunnel is not None:
         return None
-    host = getattr(node, "public_domain", None) or getattr(node, "public_ip", None)
+    # The centrally edited values must be explicitly confirmed after being
+    # applied on this node. Never switch customers just because a domain or
+    # port field on Node/NodeProtocolConfig changed.
+    endpoint = db.get(NodeProtocolAppliedEndpoint, (node_id, protocol))
+    if endpoint is None or not endpoint.is_applied:
+        return None
     try:
-        resolved = {"host": _valid_host(host), "port": _valid_port(cfg.port)}
+        resolved = {
+            "host": _valid_host(endpoint.host),
+            "port": _valid_port(endpoint.port),
+        }
+        if endpoint.sni:
+            resolved["sni"] = _valid_host(endpoint.sni)
     except (TypeError, ValueError):
         return None
     return resolved
