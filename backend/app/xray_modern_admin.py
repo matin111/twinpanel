@@ -757,6 +757,8 @@ config_path = root / "config.json"
 state_path = root / "twinpanel-modern-state.json"
 target = __TARGET__
 name = __NAME__
+ws_path = __WS_PATH__
+xhttp_path = __XHTTP_PATH__
 lock = open("/run/lock/twinpanel-xray-inbound-editor.lock", "a+")
 fcntl.flock(lock, fcntl.LOCK_EX)
 host, port = target.rsplit(":", 1)
@@ -785,6 +787,19 @@ for entry in inbounds:
     reality["serverNames"] = [name]
 state["reality_target"] = target
 state["reality_server_name"] = name
+# Apply path changes to matching listeners and persisted state, preserving UUIDs.
+if ws_path:
+    matches = [entry for entry in config["inbounds"] if entry.get("tag") == "vless-ws-tls"]
+    if len(matches) != 1 or matches[0].get("streamSettings", {}).get("network") != "ws":
+        raise RuntimeError("WebSocket TLS inbound missing")
+    matches[0]["streamSettings"]["wsSettings"]["path"] = ws_path
+    state["ws_path"] = ws_path
+if xhttp_path:
+    matches = [entry for entry in config["inbounds"] if entry.get("tag") == "vless-xhttp-reality"]
+    if len(matches) != 1:
+        raise RuntimeError("XHTTP REALITY inbound missing")
+    matches[0]["streamSettings"]["xhttpSettings"]["path"] = xhttp_path
+    state["xhttp_path"] = xhttp_path
 stamp = str(os.getpid())
 backups = []
 stages = []
@@ -857,6 +872,16 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
         raise HTTPException(status_code=422, detail="Transport/security not provisioned")
     name = candidate["reality_server_name"]
     target = candidate["reality_target"]
+    inbounds = candidate.get("inbounds") or {}
+    ws_profile = inbounds.get("ws_tls") or {}
+    xhttp_profile = inbounds.get("xhttp_reality") or {}
+    ws_path = str(ws_profile.get("path") or "")
+    xhttp_path = str(xhttp_profile.get("path") or "")
+    # Published path changes require a valid, non-root path. The node keeps
+    # its existing path if no explicit value was supplied.
+    for path_value in (ws_path, xhttp_path):
+        if path_value and (path_value == "/" or len(path_value) < 8):
+            raise HTTPException(status_code=422, detail="Use a unique path of at least 8 characters")
     if not name or not target or target != name + ":443":
         raise HTTPException(status_code=422, detail="REALITY name and target must match on :443")
 
@@ -864,7 +889,9 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
     try:
         script = _XRAY_REALITY_APPLY_SCRIPT.replace(
             "__TARGET__", json.dumps(target)
-        ).replace("__NAME__", json.dumps(name))
+        ).replace("__NAME__", json.dumps(name)).replace(
+            "__WS_PATH__", json.dumps(ws_path)
+        ).replace("__XHTTP_PATH__", json.dumps(xhttp_path))
         encoded = base64.b64encode(script.encode("utf-8")).decode("ascii")
         command = (
             "python3 -c "
@@ -883,6 +910,11 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
     # remain drafts until corresponding server-side apply is implemented.
     settings["reality_server_name"] = name
     settings["reality_target"] = target
+    settings["inbound_applied"] = {
+        **(settings.get("inbound_applied") or {}),
+        "ws_tls": {"path": ws_path} if ws_path else (settings.get("inbound_applied") or {}).get("ws_tls", {}),
+        "xhttp_reality": {"path": xhttp_path, "server_name": name, "target": target},
+    }
     settings["last_verified_at"] = datetime.utcnow().isoformat() + "Z"
     db.execute(
         text(
@@ -898,7 +930,7 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
     db.commit()
     return {
         "ok": True, "node_id": int(node_id),
-        "applied_fields": ["reality_server_name", "reality_target"],
+        "applied_fields": ["reality_server_name", "reality_target"] + (["ws_path"] if ws_path else []) + (["xhttp_path"] if xhttp_path else []),
         "reality_server_name": name,
         "note": "TLS, connection domain and transport remain unchanged.",
     }
