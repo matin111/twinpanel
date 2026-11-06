@@ -39,6 +39,7 @@ SINGBOX_ACCOUNT_PROTOCOLS = frozenset(
         "naive",
         "shadowtls",
         "snell",
+        "socks5",
     }
 )
 SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS = frozenset({"naive", "shadowtls"})
