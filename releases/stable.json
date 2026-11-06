@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.622",
+  "version": "1.1.0-rc.623",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T21:05:05Z",
+  "released_at": "2026-11-06T21:43:45Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "6d1b04e5d56956358a46345104c82c4924c0e66b",
+  "source_sha": "9e37866d01658e0feb56a045cb6e4837ef472a27",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.622/twinpanel-1.1.0-rc.622-linux-x86_64.tar.gz",
-    "sha256": "1f03e5e7b021ba4a2d57edef636d39d4aeae13900450086db4fed17559643df5",
-    "size_bytes": 28972488
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.623/twinpanel-1.1.0-rc.623-linux-x86_64.tar.gz",
+    "sha256": "1d305b67acb43d11a91baa34d6ced5974fdd29460c11cd57ca732504d20eb4bc",
+    "size_bytes": 28978532
   },
   "notes": {
-    "fa": "اصلاح جستجوی کاربران موجود برای انتقال اشتراک به نماینده، جلوگیری از ساخت کاربر تکراری، مدیریت قفل هم‌زمان دیتابیس، و اصلاح سازگاری ساب‌لینک V2Ray با تولید بدون QR.",
-    "en": "Reseller transfer existing user search, atomic linking without duplicate account, transient lock handling; V47 runtime QR-free subscription feed compatibility to pass post-update canary."
+    "fa": "رفع تغییر ناخواسته دامنه V2Ray به دامنه عمومی تونل. استفاده از xray_domain اختصاصی هر نود برای WS/TLS، XHTTP/REALITY و TCP/TLS فقط پس از تأیید اینکه DNS به همان سرور ورودی ایران اشاره می‌کند. حفظ کامل پورت، SNI، کانفیگ‌ها، کاربران، تونل‌ها و سایر پروتکل‌ها.",
+    "en": "Respect the dedicated Xray domain in public VLESS subscription links instead of generic tunnel hostnames, only after verifying matching ingress DNS A/AAAA. Preserve all existing ports, UUIDs, TLS/REALITY parameters, tunnel routes, other VPN protocols and customer accounts."
   }
 }
