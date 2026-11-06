@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from ..models import Node, NodeType
 from ..node_auto_backfill_job_models_v1 import NodeAutoBackfillJobV1
 
-PHASES = ("singbox", "openvpn", "cisco", "wireguard", "l2tp")
+PHASES = ("singbox", "openvpn", "cisco", "wireguard", "l2tp", "v2ray")
 LEASE_SECONDS = 540
 BATCH_PAIRS = 45
 RETRY_SECONDS = 60
@@ -281,7 +281,7 @@ def job_status(db: Session, node_id: int) -> dict | None:
         "run_after": job.run_after.isoformat() if job.run_after else None,
         "updated_at": job.updated_at.isoformat() if job.updated_at else None,
         "supported_protocols_only": True,
-        "message": "فقط پروتکل‌های قابل ساخت با Worker فعلی؛ پروتکل‌های دیگر جداگانه نیاز به تکمیل دارند",
+        "message": "بازسازی خودکار شامل sing-box، Classic و V2Ray/Xray است؛ بقیه پروتکل‌ها فقط بعد از افزودن Driver اختصاصی آماده می‌شوند",
     }
 
 
