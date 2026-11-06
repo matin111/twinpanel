@@ -864,9 +864,24 @@ async def _xray(db: Session, node: Node, sub: Subscription, user: User, client_i
     conn = await ssh_connect_saved(node, db)
     try:
         email = f"mv-{sub.id}@twinpanel"
-        py = f'''import json\np='/usr/local/etc/xray/config.json'\nd=json.load(open(p))\nclients=d['inbounds'][0]['settings'].setdefault('clients',[])\nclients[:]=[c for c in clients if c.get('email')!={email!r}]\nclients.append({{'id':{client_id!r},'email':{email!r}}})\njson.dump(d,open(p,'w'),indent=2)\n'''
-        b64=base64.b64encode(py.encode()).decode()
-        await cmd(conn, f"printf '%s' {shlex.quote(b64)} | base64 -d | python3 && systemctl restart xray")
+        # Reseller/legacy account creation must use the same live VLESS
+        # HandlerService API as the modern panel. A purchase must never
+        # restart Xray or overwrite existing customer UUIDs.
+        from ..xray_hot_client_sync_v1 import hot_client_sync_script
+
+        py = hot_client_sync_script(client_id, email)
+        b64 = base64.b64encode(py.encode()).decode()
+        raw = await cmd(
+            conn, f"printf '%s' {shlex.quote(b64)} | base64 -d | python3"
+        )
+        try:
+            result = json.loads(raw.strip().splitlines()[-1])
+        except (IndexError, ValueError) as exc:
+            raise RuntimeError("VLESS hot sync result is invalid") from exc
+        if int(result.get("updated_inbounds") or 0) < 3:
+            raise RuntimeError("VLESS hot sync left inbounds incomplete")
+        if result.get("changed") and not result.get("hot_applied"):
+            raise RuntimeError("VLESS hot sync was not applied to live Xray")
         host, port = _tunnel_access_endpoint(
             db,
             node,
