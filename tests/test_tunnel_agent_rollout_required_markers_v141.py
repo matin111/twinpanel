@@ -40,6 +40,11 @@ class RolloutMarkerTests(unittest.TestCase):
         script = (ROOT / "backend/app/service_routing_stability_v139.py").read_text(encoding="utf-8")
         self.assertIn("rollout._AGENT_REQUIRED_MARKERS.add(AGENT_MARKER)", script)
 
+    def test_agent_installer_uses_interpreter_pip_not_relocated_entrypoint(self):
+        source = (ROOT / "backend/app/routers/provision.py").read_text(encoding="utf-8")
+        self.assertIn("/opt/twinpanel-agent/venv/bin/python -m pip install", source)
+        self.assertNotIn("/opt/twinpanel-agent/venv/bin/pip install", source)
+
     def test_no_unmarked_agent_is_accepted(self):
         command = self.ns["_marker_probe_command"]()
         for marker in ("TWINPANEL_ACTIVE_TRANSPORT_AUTHORITY_V258", "TWINPANEL_SERVICE_ROUTING_FAST_SNAPSHOT_V140"):
