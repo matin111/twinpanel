@@ -3,7 +3,7 @@
 
 Default is read-only. Only --apply can write credentials. Deliberately limited
 to one Exit + one protocol family, with bounded batches and API health gates.
-No Xray/V2Ray, no migrated-account global queue and no all-node restarts.
+Xray is a separate single-account-per-batch phase; no global account restart.
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-PROTOCOLS = ("singbox", "openvpn", "cisco", "wireguard", "l2tp")
+PROTOCOLS = ("singbox", "openvpn", "cisco", "wireguard", "l2tp", "v2ray")
 SOURCES = ("eylan", "sanaei", "marzban", "pasargad")
 
 
@@ -77,7 +77,27 @@ def eligible_count(db, node_id: int, protocol: str, subscription_id: int | None 
     )
     if subscription_id is not None:
         query = query.filter(Subscription.id == int(subscription_id))
-    if protocol != "singbox":
+    if protocol == "v2ray":
+        # Xray also repairs older native subscriptions whose plan includes the
+        # newly published Exit. Its own worker enforces the same canonical gate.
+        query = (
+            db.query(func.count(func.distinct(Subscription.id)))
+            .join(SubscriptionNode, SubscriptionNode.subscription_id == Subscription.id)
+            .join(SubscriptionProtocol, SubscriptionProtocol.subscription_id == Subscription.id)
+            .filter(
+                SubscriptionNode.node_id == node_id,
+                SubscriptionProtocol.protocol == "v2ray",
+                Subscription.status == SubscriptionStatus.ACTIVE,
+                or_(Subscription.expires_at.is_(None), Subscription.expires_at > now),
+                or_(
+                    Subscription.traffic_limit_bytes <= 0,
+                    Subscription.traffic_used_bytes < Subscription.traffic_limit_bytes,
+                ),
+            )
+        )
+        if subscription_id is not None:
+            query = query.filter(Subscription.id == int(subscription_id))
+    elif protocol != "singbox":
         query = query.join(
             SubscriptionProtocol, SubscriptionProtocol.subscription_id == Subscription.id
         ).filter(SubscriptionProtocol.protocol == protocol)
@@ -111,6 +131,14 @@ async def apply_cycle(
         from scripts.twinpanel_migration_singbox_batch import run_one_node
         count = await run_one_node(node_id, subscription_id=subscription_id)
         return (0, int(count))
+
+    if protocol == "v2ray":
+        from scripts.twinpanel_existing_node_xray_backfill_v1 import run_one_node
+        # Xray modifies three inbounds and can restart once per customer.
+        # Bound this phase independently from the fast sing-box batch limit.
+        return await run_one_node(
+            node_id, max_pairs=min(3, max_pairs), subscription_id=subscription_id,
+        )
 
     os.environ["CLASSIC_ONLY_PROTOCOL"] = protocol
     os.environ["CLASSIC_DIRECT_BATCH_PER_NODE"] = str(max_pairs)
@@ -151,10 +179,10 @@ def main(argv: list[str] | None = None) -> int:
 
     # A real existing-account backfill is explicitly confirmed and tightly
     # bounded. Never start it inside FastAPI or during node HTTP publishing.
-    lock_name = (
-        "/run/twinpanel-migration-singbox-batch.lock" if args.protocol == "singbox"
-        else "/run/twinpanel-migration-classic-direct.lock"
-    )
+    lock_name = {
+        "singbox": "/run/twinpanel-migration-singbox-batch.lock",
+        "v2ray": "/run/twinpanel-migration-v2ray-backfill.lock",
+    }.get(args.protocol, "/run/twinpanel-migration-classic-direct.lock")
     with open(lock_name, "a+") as lock:
         try:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
