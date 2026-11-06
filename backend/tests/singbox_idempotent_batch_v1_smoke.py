@@ -21,9 +21,9 @@ tree = ast.parse(text)
 nodes = [
     node for node in tree.body
     if isinstance(node, ast.FunctionDef)
-    and node.name in {"_batch_mutation_script", "_user_record"}
+    and node.name in {"_batch_mutation_script", "_mutation_script", "_user_record"}
 ]
-assert len(nodes) == 2
+assert len(nodes) == 3
 
 
 @dataclass
@@ -49,7 +49,7 @@ def generate(path: Path, state: Path):
         "SingBoxAccountError": RuntimeError, "SingBoxAccountSecret": Secret,
     }
     exec(compile(ast.Module(body=nodes, type_ignores=[]), str(SOURCE), "exec"), ns)
-    return ns["_batch_mutation_script"]
+    return ns
 
 
 def execute(script: str) -> str:
@@ -74,7 +74,7 @@ with tempfile.TemporaryDirectory() as directory:
         ]} for p in protocols
     ]}
     cfg.write_text(json.dumps(config), encoding="utf-8")
-    batch = generate(cfg, state)
+    batch = generate(cfg, state)["_batch_mutation_script"]
     secrets = [
         Secret(p, "tp-sub-51", "secret-51",
                uuid="11111111-2222-3333-4444-555555555555",
@@ -133,9 +133,47 @@ with tempfile.TemporaryDirectory() as directory:
     assert next(u for u in inbound["users"] if u["name"] == "tp-sub-51")["password"] == "secret-52"
     assert changed["inbounds"][1]["users"] == json.loads(cfg.read_text())["inbounds"][1]["users"]
 
+# The existing single-account provisioner also must skip an identical
+# reapply, including ShadowTLS's private inner runtime state.
+with tempfile.TemporaryDirectory() as directory:
+    root = Path(directory)
+    cfg = root / "single.json"
+    state = root / "single-state.json"
+    gen = generate(cfg, state)["_mutation_script"]
+    for protocol in protocols:
+        cfg.write_text(json.dumps({"inbounds": [{
+            "type": protocol, "tag": tags[protocol], "users": [
+                {"username" if protocol == "naive" else "name": "unrelated", "password": "keep"},
+            ],
+        }]}), encoding="utf-8")
+        record = (
+            {"username": "tp-sub-52", "password": "password"}
+            if protocol == "naive" else
+            {"name": "tp-sub-52", "uuid": "11111111-2222-3333-4444-555555555555", "password": "password"}
+            if protocol == "tuic" else
+            {"name": "tp-sub-52", "userkey": "key"}
+            if protocol == "snell" else
+            {"name": "tp-sub-52", "password": "password"}
+        )
+        out = execute(gen(protocol, "tp-sub-52", record))
+        assert "account_users=2" in out, (protocol, out)
+        staged = Path(str(cfg) + ".account-new")
+        assert staged.exists(), protocol
+        staged.replace(cfg)
+        snapshot = cfg.read_bytes()
+        out = execute(gen(protocol, "tp-sub-52", record))
+        assert out == "account_unchanged=1", (protocol, out)
+        assert not staged.exists(), protocol
+        assert cfg.read_bytes() == snapshot, protocol
+        # Existing user identities and server-side bootstrap remain intact.
+        data = json.loads(snapshot)
+        inbound = next(i for i in data["inbounds"] if i.get("tag") == tags[protocol])
+        assert inbound["users"][0].get("name", inbound["users"][0].get("username")) == "unrelated"
+
 # Shell contract: only changed batches validate, write, and restart. On an
 # unchanged batch, an inactive service is still started (self-healing).
 assert 'batch_unchanged=1' in text
+assert 'account_unchanged=1' in text
 assert r'\"$result\"' in text and "'batch_unchanged=1'" in text
 assert 'systemctl is-active --quiet {SERVICE_NAME}.service || systemctl restart' in text
 assert 'flock -x 9' in text
