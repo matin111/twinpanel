@@ -20,35 +20,13 @@ sys.path.insert(0, str(BACKEND))
 
 from app.database import SessionLocal
 from app.services.node_auto_backfill_v1 import claim_next, finish_claim, repair_missing_v2ray_jobs
+from app.services.central_backfill_priority_v1 import new_account_work_has_priority
 from scripts.twinpanel_existing_node_backfill_v1 import api_healthy
 
 LOCK_PATH = "/run/twinpanel-node-auto-backfill-v1.lock"
 PAIR_LIMIT = 20
+CYCLES_PER_BATCH = 3  # Reuse interpreter/SSH setup across bounded cycles (max 60 pairs)
 EXEC_TIMEOUT = 350
-
-
-def new_account_work_has_priority() -> bool:
-    """Pause old-account backfill while fresh paid/new account work is active."""
-    from app.database import SessionLocal
-    from app.store_models import StoreOrder
-    from app.reseller_bot_order_models import ResellerBotOrder
-    from app.fast_provision_job_models_v1 import FastProvisionJobV1
-
-    cutoff = datetime.utcnow() - timedelta(minutes=45)
-    with SessionLocal() as db:
-        if db.query(StoreOrder.id).filter(
-            StoreOrder.status == "provisioning",
-            StoreOrder.created_at >= cutoff,
-        ).first():
-            return True
-        if db.query(ResellerBotOrder.id).filter(
-            ResellerBotOrder.status == "provisioning",
-            ResellerBotOrder.created_at >= cutoff,
-        ).first():
-            return True
-        return bool(db.query(FastProvisionJobV1.subscription_id).filter(
-            FastProvisionJobV1.state.in_(("queued", "running", "retry")),
-        ).first())
 
 
 def safe_to_start() -> bool:
@@ -78,16 +56,19 @@ def safe_to_start() -> bool:
 def parsed_pair_count(stdout: str) -> int | None:
     # Parse only sanitized, known progress marker from the existing runner.
     matches = re.findall(r"^NODE_BACKFILL_CYCLE\s+(\{[^\n]+\})$", stdout, flags=re.MULTILINE)
-    if not matches:
+    if not matches or len(matches) > CYCLES_PER_BATCH:
         return None
+    total = 0
     try:
-        row = ast.literal_eval(matches[-1])
-        count = int(row["new_pairs"])
+        for raw in matches:
+            row = ast.literal_eval(raw)
+            count = int(row["new_pairs"])
+            if count < 0 or count > PAIR_LIMIT:
+                return None
+            total += count
     except (ValueError, TypeError, KeyError, SyntaxError):
         return None
-    if count < 0 or count > PAIR_LIMIT:
-        return None
-    return count
+    return total
 
 
 def execute_one(node_id: int, protocol: str) -> tuple[int, str | None]:
@@ -97,7 +78,7 @@ def execute_one(node_id: int, protocol: str) -> tuple[int, str | None]:
         "--node-id", str(node_id),
         "--protocol", str(protocol),
         "--apply", "--confirm-node-id", str(node_id),
-        "--max-pairs", str(PAIR_LIMIT), "--max-cycles", "1",
+        "--max-pairs", str(PAIR_LIMIT), "--max-cycles", str(CYCLES_PER_BATCH),
         "--max-load", "7",
     ]
     try:
