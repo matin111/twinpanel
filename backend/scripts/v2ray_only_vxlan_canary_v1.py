@@ -87,8 +87,13 @@ def ensure_priority(dnat: list[str]) -> None:
     if not active:
         raise RuntimeError("PREROUTING unexpectedly empty")
     expected_port = "--dport " + str(dnat[dnat.index("--dport") + 1])
-    if expected_port not in active[0]:
-        # Move only the already-installed canary rule ahead of managed jumps.
+    positions = [i for i, line in enumerate(active) if expected_port in line]
+    managed = [i for i, line in enumerate(active) if "-j TP_DNAT" in line]
+    if len(positions) != 1 or not managed:
+        raise RuntimeError("V2Ray canary NAT placement ambiguous")
+    if positions[0] >= min(managed):
+        # Only restore priority over Agent jumps; never churn the relative
+        # order of two healthy V2Ray-only canary routes every minute.
         update("PREROUTING", "-D", dnat)
         update("PREROUTING", "-I", ["1", *dnat])
 
