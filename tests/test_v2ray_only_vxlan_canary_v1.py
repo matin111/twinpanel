@@ -14,13 +14,15 @@ class V2RayOnlyVXLANCanaryTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location("vxlan_canary", SCRIPT)
         m = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(m)
-        self.assertEqual(set(m.ROUTES), {"de-ws"})
+        self.assertEqual(set(m.ROUTES), {"de-ws", "us-ws"})
         route = m.ROUTES["de-ws"]
         self.assertEqual(route["port"], 26007)
         self.assertEqual(route["target_port"], 9444)
         self.assertEqual(route["device"], "tpvx30")
         self.assertEqual(route["local"], "10.243.0.121")
         self.assertEqual(route["peer"], "10.243.0.122")
+        us = m.ROUTES["us-ws"]
+        self.assertEqual((us["port"], us["target_port"], us["device"], us["local"], us["peer"]), (26011, 9444, "tpvx32", "10.243.0.129", "10.243.0.130"))
         dnat, snat = m.rules(route)
         self.assertEqual(dnat[-2:], ["--to-destination", "10.243.0.122:9444"])
         self.assertIn("--ctorigdstport", snat)
