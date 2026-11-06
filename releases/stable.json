@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.616",
+  "version": "1.1.0-rc.617",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T18:37:31Z",
+  "released_at": "2026-11-06T18:55:18Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "5da7808565e49c56570d82196d4026e3a0d7e49d",
+  "source_sha": "66b0bac99f48dc9b8a4789f26ebd2e524957c353",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.616/twinpanel-1.1.0-rc.616-linux-x86_64.tar.gz",
-    "sha256": "cbe12a1b99c289e2cce9477fca76d8ec21b9410e04ab8483f2c885092c170966",
-    "size_bytes": 28945821
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.617/twinpanel-1.1.0-rc.617-linux-x86_64.tar.gz",
+    "sha256": "2972579f4a5cb039315d429f71417cc46e1e8715695e885fcc5d5bd5c65041b8",
+    "size_bytes": 28947817
   },
   "notes": {
-    "fa": "ساخت اکانت دستی از مسیر صف پایدار مدیریت مرکزی به‌صورت پیش‌فرض و ثبت Job در همان تراکنش اشتراک؛ جلوگیری از ثبت اشتراک بدون صف در صورت غیرفعال‌سازی اضطراری. بدون تغییر نودها یا تنظیمات V2Ray.",
-    "en": "Always-on central durable queue for manual subscriptions, transactional job enqueue, fail-before-create on explicit emergency disable; preserves existing nodes and V2Ray."
+    "fa": "اتصال بازسازی کانفیگ‌های ناقص V2Ray کاربران قدیمی به صف پایدار مدیریت مرکزی، حفظ UUID و استفاده از Hot Sync بدون راه‌اندازی مجدد Xray؛ اجرای محدود و کنترل‌شده همراه با فیلتر اشتراک‌های فعال.",
+    "en": "Durable central V2Ray missing-only node backfill for active imported subscriptions, preserve customer UUID, reuse Xray hot client sync without global restart, bounded scoped worker."
   }
 }
