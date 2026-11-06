@@ -29,6 +29,7 @@ _PROTOCOL_TO_QUOTA = {
     "naiveproxy": "naive",
     "shadowtls": "shadowtls",
     "snell": "snell",
+    "socks5": "socks5",
     "mieru": "mieru",
     "trusttunnel": "trusttunnel",
     "amneziawg": "amneziawg",
