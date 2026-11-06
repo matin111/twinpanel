@@ -52,11 +52,11 @@ _original_admin_status_remote = None
 def _effective_domain(node: Node | None) -> str:
     if node is None:
         return ""
-    return str(
-        getattr(node, "xray_domain", None)
-        or getattr(node, "public_domain", None)
-        or ""
-    ).strip().lower()
+    # The node's public_domain can be an Iran-tunnel host shared with other
+    # Exits. It is not proof of a dedicated TLS Xray endpoint/certificate.
+    # Only explicit xray_domain enables WS/TCP TLS profiles. New Exits without
+    # one must use the existing XHTTP/TCP REALITY path instead.
+    return str(getattr(node, "xray_domain", None) or "").strip().lower()
 
 
 def _tcp_reality_target_port(base_port: int) -> int:
