@@ -23,6 +23,7 @@ from . import storefront_settings_models  # TWINPANEL_STOREFRONT_CMS_V74
 from . import two_factor_models
 from . import runtime_settings_model
 from . import node_connection_settings_models_v1  # additive per-node modern endpoint table
+from . import fast_provision_job_models_v1  # additive durable new-account queue table
 from . import download_asset_models
 from . import subscription_delivery_policy_v1
 from .payment_crypto_schema import ensure_payment_crypto_schema
@@ -64,6 +65,8 @@ from .xray_modern_admin import router as xray_modern_admin_router
 from .admin_notification_service import notification_watch_loop
 from .services.customer_maintenance import customer_maintenance_loop
 from .services.payment_fulfillment_fast_path import payment_fulfillment_recovery_loop
+from .services.fast_provision_queue_v1 import fast_provision_queue_enabled
+from .services.fast_provision_worker_v1 import fast_provision_recovery_loop
 from .services.payment_market_rates import payment_market_loop
 from .services.wallet_payment_automation import wallet_payment_automation_loop
 from .license_guard import LicenseMutationGuardMiddleware
@@ -163,6 +166,13 @@ async def lifespan(app: FastAPI):
         payment_fulfillment_recovery_loop(),
         name="payment-fulfillment-recovery",
     )
+    # Opt-in only. Idle DB polling is disabled on existing installations.
+    fast_provision_task = (
+        asyncio.create_task(
+            fast_provision_recovery_loop(), name="fast-new-account-worker-v1"
+        )
+        if fast_provision_queue_enabled() else None
+    )
     payment_market_task = asyncio.create_task(
         payment_market_loop(),
         name="payment-market-rates",
@@ -184,6 +194,8 @@ async def lifespan(app: FastAPI):
         notification_task.cancel()
         customer_maintenance_task.cancel()
         payment_fulfillment_task.cancel()
+        if fast_provision_task is not None:
+            fast_provision_task.cancel()
         payment_market_task.cancel()
         wallet_payment_task.cancel()
         license_validation_task.cancel()
@@ -193,10 +205,13 @@ async def lifespan(app: FastAPI):
             notification_task,
             customer_maintenance_task,
             payment_fulfillment_task,
+            fast_provision_task,
             payment_market_task,
             wallet_payment_task,
             license_validation_task,
         ):
+            if task is None:
+                continue
             try:
                 await task
             except asyncio.CancelledError:
