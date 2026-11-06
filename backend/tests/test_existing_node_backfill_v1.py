@@ -99,4 +99,4 @@ def test_target_scope_is_applied_to_singbox_and_classic_queries():
     assert "Subscription.id==int(subscription_id)" in classic
     assert "subscription_id=subscription_id" in singbox
     assert "one_node(db, node_id, subscription_id=subscription_id, include_native=include_native)" in wrapper
-    assert "eligible_count(db, args.node_id, args.protocol, args.subscription_id)" in wrapper
+    assert "eligible_count(db, args.node_id, args.protocol, args.subscription_id, args.include_native)" in wrapper
