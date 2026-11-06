@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -111,6 +111,10 @@ class DurableProvisionQueueContracts(unittest.TestCase):
         self.assertFalse(_eligible_new_subscription(sub))
         sub.status = SubscriptionStatus.ACTIVE
         sub.expires_at = datetime.utcnow() - timedelta(seconds=10)
+        self.assertFalse(_eligible_new_subscription(sub))
+        sub.expires_at = datetime.now(timezone.utc) + timedelta(seconds=60)
+        self.assertTrue(_eligible_new_subscription(sub))
+        sub.expires_at = datetime.now(timezone.utc) - timedelta(seconds=10)
         self.assertFalse(_eligible_new_subscription(sub))
 
 
