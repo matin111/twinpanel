@@ -13,31 +13,15 @@ PATCH_MARKER = "TWINPANEL_XRAY_PROVISION_SCRIPT_FIX_V1"
 
 
 def _build_xray_mutation_script(email: str, client_id: str) -> str:
-    """Build a syntactically valid Python mutation script for Xray clients.
+    """Use one safe, no-restart mutation contract for every account worker.
 
-    The legacy implementation embedded literal ``\\n`` sequences in the
-    generated program. Python interpreted those as line-continuation
-    characters and failed with SyntaxError before Xray could be restarted.
-    Keep this builder small and independently testable so the regression is
-    locked down without touching Xray's dataplane design.
+    This wrapper is retained because the legacy import-hook executes in
+    reseller bot processes as well as the API. Never rewrite only inbound[0]
+    or invoke a global Xray restart for a new customer.
     """
-    return "\n".join(
-        [
-            "import json",
-            "p='/usr/local/etc/xray/config.json'",
-            "with open(p) as f:",
-            "    d=json.load(f)",
-            "clients=d['inbounds'][0]['settings'].setdefault('clients', [])",
-            (
-                "clients[:]=[c for c in clients "
-                f"if isinstance(c, dict) and c.get('email')!={email!r}]"
-            ),
-            f"clients.append({{'id': {client_id!r}, 'email': {email!r}}})",
-            "with open(p, 'w') as f:",
-            "    json.dump(d, f, indent=2)",
-            "",
-        ]
-    )
+    from .xray_hot_client_sync_v1 import hot_client_sync_script
+
+    return hot_client_sync_script(client_id, email)
 
 
 def _patch_account_delivery(module: ModuleType) -> None:
@@ -60,14 +44,15 @@ def _patch_account_delivery(module: ModuleType) -> None:
             compile(script, "<twinpanel-xray-mutation>", "exec")
 
             encoded = module.base64.b64encode(script.encode()).decode()
-            await module.cmd(
+            raw = await module.cmd(
                 conn,
-                (
-                    "printf '%s' "
-                    + shlex.quote(encoded)
-                    + " | base64 -d | python3 && systemctl restart xray"
-                ),
+                "printf '%s' " + shlex.quote(encoded) + " | base64 -d | python3",
             )
+            result = module.json.loads(raw.strip().splitlines()[-1])
+            if int(result.get("updated_inbounds") or 0) < 3:
+                raise RuntimeError("legacy VLESS hot sync did not cover all inbounds")
+            if result.get("changed") and not result.get("hot_applied"):
+                raise RuntimeError("legacy VLESS credentials not hot-applied")
 
             host, port = module._tunnel_access_endpoint(db, node, "v2ray")
             username_part = module._download_filename_part(
