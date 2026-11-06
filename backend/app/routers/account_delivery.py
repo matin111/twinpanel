@@ -2015,6 +2015,27 @@ def _stored_info(
                 final_payload,
         })
 
+    # Attach the authoritative country code to delivery-only item metadata.
+    # Stored credentials, hosts, ports, file contents and UUIDs are unchanged.
+    visible_ids = {
+        int(item.get("node_id") or 0)
+        for cred in data
+        for item in (cred.get("items") if isinstance(cred.get("items"), list) else [cred.get("items")])
+        if isinstance(item, dict) and str(item.get("node_id") or "").isdigit()
+    }
+    country_by_id = {
+        int(node.id): str(node.country_code or "").strip().upper()
+        for node in db.query(Node).filter(Node.id.in_(visible_ids)).all()
+    } if visible_ids else {}
+    for cred in data:
+        items = cred.get("items")
+        for item in (items if isinstance(items, list) else [items]):
+            if not isinstance(item, dict):
+                continue
+            code = country_by_id.get(int(item.get("node_id") or 0))
+            if code:
+                item["country_code"] = code
+
     return {
         "subscription_id":
             sub.id,
