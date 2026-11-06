@@ -120,6 +120,7 @@ import json
 import os
 import secrets
 import uuid
+import copy
 
 CONFIG = {CONFIG_PATH!r}
 STATE = {STATE_PATH!r}
@@ -144,6 +145,7 @@ with open(CONFIG, "r", encoding="utf-8") as handle:
     doc = json.load(handle)
 if not isinstance(doc, dict):
     raise SystemExit("sing-box config is not an object")
+original_doc = copy.deepcopy(doc)
 
 inbounds = doc.get("inbounds")
 if not isinstance(inbounds, list):
@@ -164,6 +166,7 @@ if not isinstance(inbound, dict):
 users = inbound.get("users")
 if not isinstance(users, list):
     users = []
+installed_users = list(users)
 
 key = "username" if PROTOCOL == "naive" else "name"
 users = [
@@ -208,6 +211,16 @@ if not users:
         )]
 
 inbound["users"] = users
+if RECORD is not None:
+    old_matches = [u for u in installed_users if isinstance(u, dict)
+                   and str(u.get(key) or "") == USERNAME]
+    old_revoked = any(
+        isinstance(u, dict) and str(u.get(key) or "").startswith(SENTINEL)
+        for u in installed_users
+    )
+    # A replay of the same credential must not reorder an inbound's users.
+    if len(old_matches) == 1 and old_matches[0] == RECORD and not old_revoked:
+        inbound["users"] = installed_users
 
 if PROTOCOL == "shadowtls":
     state = load_json(STATE, {{}})
@@ -250,6 +263,10 @@ if PROTOCOL == "shadowtls":
         handle.write("\\n")
     os.replace(STATE + ".account-new", STATE)
     os.chmod(STATE, 0o600)
+
+if doc == original_doc:
+    print("account_unchanged=1")
+    raise SystemExit(0)
 
 with open(CONFIG + ".account-new", "w", encoding="utf-8") as handle:
     json.dump(doc, handle, ensure_ascii=False, indent=2)
