@@ -486,8 +486,36 @@ def _service_routing_matches(desired):
     if _SERVICE_ROUTING_VERIFIED_SNAPSHOT == fingerprint:
         return True
 
-    # Cache miss or any live rule drift: fall back to the old authoritative
-    # per-rule validation. No unknown rule representation is trusted.
+    # Compare the complete, ordered LIVE -S rules with the exact desired
+    # argument vectors, using shell tokenization only to normalize quoting.
+    # This eliminates thousands of subprocesses on first convergence after a
+    # topology change. It is strictly fail-closed: any normalization, alias,
+    # parse failure or difference falls back to the original per-rule -C
+    # verification. Never infer correctness from rule counts alone.
+    import shlex
+    try:
+        exact = True
+        for table, chain in _SERVICE_ROUTING_CHAINS:
+            live = [
+                shlex.split(line.strip())
+                for line in observed[(table, chain)].splitlines()
+                if line.strip().startswith(f"-A {chain} ")
+            ]
+            expected = [
+                ["-A", chain, *(str(arg) for arg in args)]
+                for args in desired[(table, chain)]
+            ]
+            if live != expected:
+                exact = False
+                break
+        if exact:
+            _SERVICE_ROUTING_VERIFIED_SNAPSHOT = fingerprint
+            return True
+    except (ValueError, TypeError):
+        pass
+
+    # Cache miss or live drift with no exact match: retain the historical
+    # authoritative per-rule verification. Unknown formats cannot fast-pass.
     for table, chain in _SERVICE_ROUTING_CHAINS:
         for args in desired[(table, chain)]:
             code, _ = ipt(table, "-C", chain, *args)
