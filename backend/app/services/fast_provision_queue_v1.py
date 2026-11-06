@@ -82,10 +82,15 @@ def enqueue_new_subscription(
 def claim_next_job(db: Session, *, now: datetime | None = None) -> ClaimedProvisionJob | None:
     """Claim one high-priority job without holding a transaction during SSH."""
     now = now or datetime.utcnow()
+    allowed_origins = (
+        tuple(sorted(SUPPORTED_NEW_ORIGINS))
+        if fast_provision_commerce_enabled()
+        else ("admin_new",)
+    )
     row = (
         db.query(FastProvisionJobV1)
         .filter(
-            FastProvisionJobV1.origin.in_(tuple(sorted(SUPPORTED_NEW_ORIGINS))),
+            FastProvisionJobV1.origin.in_(allowed_origins),
             or_(
                 and_(
                     FastProvisionJobV1.state.in_(("queued", "retry")),
