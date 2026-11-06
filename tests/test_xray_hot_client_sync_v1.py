@@ -108,8 +108,8 @@ class HotVlessClientSyncTest(unittest.TestCase):
             env = {**os.environ, "PATH": str(root) + os.pathsep + os.environ.get("PATH",""),
                    "FAKE_XRAY_STATE": str(state)}
 
-            def execute(identifier, **changes):
-                script = make_script(identifier, email)
+            def execute(identifier, mail=None, **changes):
+                script = make_script(identifier, mail or email)
                 script = script.replace("/usr/local/etc/xray/config.json", str(path))
                 script = script.replace("/run/twinpanel-xray-hot-user.lock", str(lock))
                 script = script.replace("/usr/local/bin/xray", str(xray))
@@ -141,23 +141,37 @@ class HotVlessClientSyncTest(unittest.TestCase):
             self.assertEqual(path.stat().st_mtime_ns, mtime)
 
             second_id = str(uuid.uuid4())
-            failed = execute(second_id, FAKE_XRAY_FAIL_TAG=tags[2])
+            # A changed UUID is forbidden during ordinary purchase provision.
+            # Keep original user's live and disk identity intact.
+            rotation = execute(second_id)
+            self.assertNotEqual(rotation.returncode, 0)
+            self.assertIn("UUID rotation requires", rotation.stderr)
+            self.assertEqual(path.read_bytes(), saved)
+            self.assertEqual(json.loads(state.read_text()), {
+                tag: {email: first_id} for tag in tags
+            })
+
+            # A failure on inbound 3 must roll back additions on 1 and 2.
+            second_email = "mv-new@example.invalid"
+            failed = execute(second_id, second_email, FAKE_XRAY_FAIL_TAG=tags[2])
             self.assertNotEqual(failed.returncode, 0)
             self.assertEqual(path.read_bytes(), saved)
             self.assertEqual(json.loads(state.read_text()), {
                 tag: {email: first_id} for tag in tags
             })
-            success = execute(second_id)
+
+            success = execute(second_id, second_email)
             self.assertEqual(success.returncode, 0, success.stderr[-650:])
             self.assertEqual(json.loads(state.read_text()), {
-                tag: {email: second_id} for tag in tags
+                tag: {email: first_id, second_email: second_id} for tag in tags
             })
             current = json.loads(path.read_text())
             self.assertEqual(current["inbounds"][-1], doc["inbounds"][-1])
             self.assertEqual(current["outbounds"], doc["outbounds"])
             for inbound in current["inbounds"][:-1]:
                 self.assertEqual(
-                    [u["id"] for u in inbound["settings"]["clients"] if u["email"] == email],
+                    [u["id"] for u in inbound["settings"]["clients"]
+                     if u["email"] == second_email],
                     [second_id],
                 )
 
