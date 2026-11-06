@@ -3,7 +3,8 @@ from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import create_engine
+from sqlalchemy import BigInteger, create_engine
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -20,6 +21,12 @@ from app.routers.reseller_admin_v2 import (
 from app.routers.subscription_admin_v2 import (
     SubscriptionOwnerTransferIn, transfer_subscription_to_user, admin_page_v3,
 )
+
+
+@compiles(BigInteger, "sqlite")
+def _sqlite_bigint(type_, compiler, **kwargs):
+    # PostgreSQL BIGSERIAL PK semantics for in-memory SQLite tests.
+    return "INTEGER"
 
 
 def sample_db():
