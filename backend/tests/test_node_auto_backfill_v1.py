@@ -43,7 +43,7 @@ def test_enqueue_is_idempotent_and_includes_safe_v2ray():
         assert len(a) == len(b) == 6
         assert set(x.protocol for x in b) == set(FAMILIES)
         assert "v2ray" in FAMILIES and not set(FAMILIES).intersection({"xray", "reality"})
-        assert db.query(NodeBackfillJobV1).count() == 5
+        assert db.query(NodeBackfillJobV1).count() == 6
         status = job_status(db, 13)
         assert status["queued"] and status["completed_pairs"] == 0
     finally:
