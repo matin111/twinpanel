@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.608",
-  "source_sha": "c18314021f26f5b122dc67f1dce2843fed9e8599",
+  "version": "1.1.0-rc.609",
+  "source_sha": "878e4dca2cf09cd23718d7acb1af881cd7d4b7e8",
   "notes": {
-    "fa": "حذف gRPC منسوخ از V2Ray/Xray؛ حذف ساخت Inbound و مسیر gRPC، حذف ساب‌لینک‌های gRPC قدیمی بدون ساخت مجدد کاربران، حفظ WS/TLS، XHTTP/REALITY و TCP/TLS، ابزار پاک‌سازی ایمن با بکاپ و بازگشت در صورت خطا برای نودهای موجود. حفظ تمام امکانات rc.607 از جمله SOCKS5 و اصلاح Agent.",
-    "en": "Remove retired V2Ray gRPC from new Xray listeners, routes, customer subscriptions, admin and profile requirements. Legacy gRPC URIs filtered without UUID rotation; safe backed-up validated cleanup for existing nodes. Preserve WS/TLS, XHTTP/REALITY, TCP/TLS, SOCKS5 and rc.607 Agent fixes."
+    "fa": "حذف کامل gRPC قدیمی از Xray نودهای موجود و ساب‌لینک‌ها؛ جلوگیری از قطع سرویس پس از تغییر Inbound یا پاک‌سازی با حفظ مجوز/مالکیت فایل‌ها و اعتبارسنجی قبل از Restart. حفظ UUID، کلیدهای REALITY، WS/TLS، XHTTP/REALITY و پروتکل‌های دیگر. ادامه تمام امکانات rc.608.",
+    "en": "Retire legacy gRPC from Xray nodes and customer subscriptions. Preserve file ownership/permissions during inbound edits and cleanup, preflight active Xray, validate staged configs and rollback safely. Retain UUIDs, REALITY identities, WS/TLS, XHTTP/REALITY and all other rc.608 features."
   }
 }
