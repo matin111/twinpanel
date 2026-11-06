@@ -15,7 +15,7 @@ if not BACKEND_ROOT.exists():
     BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 from app.database import SessionLocal
-from app.models import Node, Subscription, SubscriptionNode, SubscriptionStatus, ProtocolCredential, User
+from app.models import Node, Subscription, SubscriptionNode, SubscriptionProtocol, SubscriptionStatus, ProtocolCredential, User
 from app.migration_import_models import MigrationImportRecord
 from app.routers import account_delivery as ad
 from sqlalchemy import or_
