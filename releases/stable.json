@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.620",
+  "version": "1.1.0-rc.621",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T19:50:33Z",
+  "released_at": "2026-11-06T20:54:24Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "4783c3dd769e8ff2e2a7754d9bc141636d84b3f0",
+  "source_sha": "a975401288ccbc70fae2b4ce6129bc4a2c14a87c",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.620/twinpanel-1.1.0-rc.620-linux-x86_64.tar.gz",
-    "sha256": "97f1f39be67760cee9bf36fe0c2d404c0f33f2354db1183772e81c36d892ffb1",
-    "size_bytes": 28967331
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.621/twinpanel-1.1.0-rc.621-linux-x86_64.tar.gz",
+    "sha256": "c3a1a07b26de1536788f8339dd3d0374dd7a5125a2c210db0650462b24f2e2fb",
+    "size_bytes": 28971227
   },
   "notes": {
-    "fa": "انتقال مالکیت واقعی اکانت به کاربر یا نماینده از همان صفحه اشتراک‌ها؛ ثبت هم‌زمان مالک و مدیریت نمایندگی؛ فیلتر اشتراک‌ها بر اساس هر نماینده یا بدون نماینده؛ ترمیم انتقال‌های قدیمی بدون تغییر کانفیگ، حجم و تاریخ انقضا.",
-    "en": "True subscription ownership transfers to users and reseller customers, atomic reseller mapping, SQL-side reseller/unassigned filters before pagination, guarded repair for historical management-only transfers. No VPN configuration or quota mutations."
+    "fa": "اصلاح جستجوی کاربران موجود هنگام انتقال اشتراک به نماینده، اتصال خودکار حساب موجود بدون ساخت کاربر تکراری و مدیریت خطای قفل دیتابیس در انتقال مالکیت.",
+    "en": "Fix reseller subscription transfer: search existing site users, atomically link existing accounts without duplication, and handle transient row-lock contention with bounded retries."
   }
 }
