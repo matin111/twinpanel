@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.628",
-  "source_sha": "a538c1918c9ad70b485150a35d0c9595c42dd73b",
+  "version": "1.1.0-rc.629",
+  "source_sha": "21bcec820dca18c1f630075027f2c228d8ecb878",
   "notes": {
-    "fa": "افزایش سرعت و یکپارچگی صف ساخت اکانت‌های انتقالی با مدیریت مرکزی: اجرای حداکثر سه دسته ۲۰تایی در یک Worker، حفظ اولویت خریدهای جدید بین دسته‌ها، ثبت درست پیشرفت و جلوگیری از ساخت دوباره Credential و تغییر UUID.",
-    "en": "Improve migrated-account central backfill throughput via up to 3 bounded 20-pair cycles per worker, preserving paid/new-account priority between cycles, correct progress accounting, and existing credentials/UUID."
+    "fa": "نمایش خودکار پرچم کشور واقعی نود در نام نمایشی کانفیگ‌های همه پروتکل‌ها، شامل نودهای جدید؛ بدون تغییر نام فایل‌های حساس یا اطلاعات اتصال.",
+    "en": "Automatically derive country emoji flags from live node country codes for public protocol remarks and new nodes; leave native filenames and VPN connection details unchanged."
   }
 }
