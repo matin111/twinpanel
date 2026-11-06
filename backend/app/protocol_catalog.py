@@ -46,6 +46,30 @@ def _option(value: str, fa: str, en: str) -> dict[str, str]:
 # Runtime adapters may support only a subset; the catalog deliberately exposes
 # adapter readiness instead of pretending an unavailable protocol is usable.
 PROTOCOL_CATALOG: dict[str, dict[str, Any]] = {
+    "socks5": {
+        "title": "SOCKS5 Proxy",
+        "category": "proxy",
+        "core": "sing-box",
+        "adapter": "sing-box",
+        "runtime_status": "ready",
+        "transport": "tcp",
+        "default_port": 10808,
+        "tls": False,
+        "recommended_for": ["browser", "proxy", "tcp"],
+        "warnings": ["unencrypted_proxy_requires_authenticated_clients"],
+        "formats": {"share": True, "clash": False, "sing_box": True, "xray": False},
+        "platforms": ["android", "ios", "windows", "macos", "linux"],
+        "presets": {
+            "recommended": {"network": "tcp"},
+            "compatibility": {"network": "tcp"},
+            "performance": {"network": "tcp"},
+        },
+        "fields": [
+            _field("network", "شبکه SOCKS5", "SOCKS5 network", "select",
+                options=[_option("tcp", "فقط TCP (پیشنهادی)", "TCP only (recommended)")],
+                help_fa="SOCKS5 رمزنگاری ندارد؛ احراز هویت برای هر اشتراک اجباری است."),
+        ],
+    },
     "hysteria2": {
         "title": "Hysteria2",
         "category": "recommended",
