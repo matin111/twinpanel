@@ -23,7 +23,7 @@ sys.path.insert(0, str(ROOT))
 
 from app.database import SessionLocal
 from app.models import (Node, ProtocolCredential, Subscription, SubscriptionNode,
-                        SubscriptionProtocol, SubscriptionStatus)
+                        SubscriptionProtocol, SubscriptionStatus, User)
 from app.routers import account_delivery as ad
 from app.xray_bulk_hot_sync_pilot_v1 import bulk_hot_sync_script
 
@@ -86,13 +86,16 @@ async def run(node_id: int, limit: int, apply: bool):
         }), flush=True)
         if not apply or not chosen:
             return
+        if node_id != 13:
+            raise RuntimeError("pilot apply restricted to canary node 13")
         from app.services.central_backfill_priority_v1 import new_account_work_has_priority
         if new_account_work_has_priority():
             raise RuntimeError("paid/new-account provisioning has priority")
         if len(chosen) > 10:
             raise RuntimeError("pilot limit exceeded")
-        # No DB writes. Existing durable queue publishes the ready clients
-        # after the canary, without touching other Exit credentials.
+        # The live batch is followed by a bounded, idempotent central commit
+        # for the SAME selected subscriptions. An API success without a
+        # durable credential must never be reported as complete.
         payload = bulk_hot_sync_script([(ident, mail) for _, ident, mail in chosen])
         command = "printf %s " + shlex.quote(
             base64.b64encode(payload.encode("utf8")).decode("ascii")
@@ -109,11 +112,53 @@ async def run(node_id: int, limit: int, apply: bool):
             if not outcome.get("ok") or (outcome.get("changed")
                                        and not outcome.get("hot_applied")):
                 raise RuntimeError("bulk hot apply not confirmed")
+            saved = 0
+            for sid, ident, _mail in chosen:
+                # Re-read every entitlement after network operations. Stale,
+                # exhausted, suspended or already-present rows are skipped.
+                db.expire_all()
+                sub = db.get(Subscription, sid)
+                cred = (db.query(ProtocolCredential)
+                        .filter(ProtocolCredential.subscription_id == sid,
+                                ProtocolCredential.protocol == "v2ray").one_or_none())
+                if (sub is None or cred is None or
+                        sub.status != SubscriptionStatus.ACTIVE or
+                        (sub.expires_at is not None
+                         and sub.expires_at <= datetime.utcnow()) or
+                        (sub.traffic_limit_bytes > 0
+                         and sub.traffic_used_bytes >= sub.traffic_limit_bytes)):
+                    continue
+                current = ad._autosync_credential_items(cred)
+                if any(ad._autosync_item_node_id(x) == node_id for x in current):
+                    continue
+                known = {str(i.get("uuid") or "").strip()
+                         for i in current if isinstance(i, dict)}
+                if known != {ident}:
+                    continue
+                user = db.get(User, sub.user_id)
+                if user is None:
+                    continue
+                try:
+                    item = await asyncio.wait_for(
+                        ad._xray(db, node, sub, user, ident,
+                                 reusable_connection=conn), timeout=65)
+                    if str(item.get("uuid") or "") != ident:
+                        raise RuntimeError("unexpected Xray UUID change")
+                    current.append(item)
+                    cred.config_text_encrypted = ad._enc(current)
+                    cred.is_active = True
+                    db.commit()
+                    saved += 1
+                except Exception:
+                    db.rollback()
+                    raise RuntimeError("bulk applied but durable publish incomplete; "
+                                       "idempotent repair required")
             print("BULK_XRAY_PILOT_RESULT", json.dumps({
                 "node_id": node_id, "selected": len(chosen),
                 "hot_applied": bool(outcome.get("hot_applied")),
                 "users_added_total_across_inbounds": int(outcome.get("users_added") or 0),
-                "next": "existing_missing_only_backfill",
+                "centrally_published": saved,
+                "next": "verify_subscriptions_and_canary",
             }), flush=True)
         finally:
             conn.close()
