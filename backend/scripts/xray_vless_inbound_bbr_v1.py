@@ -18,6 +18,7 @@ import socket
 import stat
 import subprocess
 import tempfile
+import time
 from datetime import datetime, timezone
 
 CONFIG = Path("/usr/local/etc/xray/config.json")
@@ -78,14 +79,25 @@ def is_active() -> bool:
     ).returncode == 0
 
 
-def check_listeners(ports: dict[str, int]) -> bool:
-    for port in ports.values():
-        try:
-            with socket.create_connection(("127.0.0.1", port), timeout=3):
-                pass
-        except OSError:
+def check_listeners(ports: dict[str, int], timeout: float = 18) -> bool:
+    """Wait for Xray's asynchronous listeners to bind after systemd restart."""
+    deadline = time.monotonic() + timeout
+    while True:
+        ready = is_active()
+        for port in ports.values():
+            if not ready:
+                break
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=1):
+                    pass
+            except OSError:
+                ready = False
+                break
+        if ready:
+            return True
+        if time.monotonic() >= deadline:
             return False
-    return True
+        time.sleep(0.4)
 
 
 def run(apply: bool) -> None:
@@ -129,7 +141,7 @@ def run(apply: bool) -> None:
         stage = None
         try:
             command("systemctl", "restart", "xray", timeout=25)
-            if not is_active() or not check_listeners(ports):
+            if not check_listeners(ports):
                 raise RuntimeError("Xray health/listener check failed")
         except Exception:
             # Restore original config atomically, then bring back original Xray.
