@@ -227,6 +227,9 @@ def _live_xray_settings(db: Session, payload: dict[str, Any]) -> dict[int, dict[
                 server_name = str(entry.get("server_name") or "").strip().lower()
                 if server_name and _HOSTNAME.fullmatch(server_name):
                     properties["server_name"] = server_name
+                connection_domain = str(entry.get("connection_domain") or "").strip().lower()
+                if connection_domain and _HOSTNAME.fullmatch(connection_domain):
+                    properties["connection_domain"] = connection_domain
                 if properties:
                     safe_paths[profile_key] = properties
             if safe_paths:
@@ -269,7 +272,18 @@ def _apply_live_xray_uri(uri: str, settings: dict[str, Any]) -> str:
                 updated = [(k, path if k == "path" else v) for k, v in updated]
                 if not any(k == "path" for k, _ in updated):
                     updated.append(("path", path))
-        return urlunsplit(parsed._replace(query=urlencode(updated)))
+        authority = parsed.netloc
+        if isinstance(profile_settings, dict):
+            connection_domain = str(profile_settings.get("connection_domain") or "")
+            if connection_domain and _HOSTNAME.fullmatch(connection_domain):
+                try:
+                    userinfo, _ = authority.rsplit("@", 1)
+                    original_port = parsed.port
+                    if original_port is not None:
+                        authority = f"{userinfo}@{connection_domain}:{original_port}"
+                except (ValueError, TypeError):
+                    pass
+        return urlunsplit(parsed._replace(netloc=authority, query=urlencode(updated)))
     except (TypeError, ValueError):
         return uri
 
