@@ -1874,6 +1874,47 @@ def _delivery_item_is_usable(
     return True
 
 
+def _attach_node_country_codes(db: Session, credentials: list[dict[str, Any]]) -> None:
+    """Enrich public delivery metadata from the live node registry each request.
+
+    Newly provisioned Exit nodes automatically get their current country flag in
+    customer-visible names on the first eligible subscription refresh. No flag
+    table, migration, per-node backfill or credential rewrite is necessary.
+    """
+    items = [
+        item
+        for credential in credentials
+        for item in (
+            credential.get("items")
+            if isinstance(credential.get("items"), list)
+            else [credential.get("items")]
+        )
+        if isinstance(item, dict)
+    ]
+    node_ids: set[int] = set()
+    for item in items:
+        try:
+            node_id = int(item.get("node_id") or 0)
+        except (TypeError, ValueError):
+            continue
+        if node_id > 0:
+            node_ids.add(node_id)
+    if not node_ids:
+        return
+    codes = {
+        int(node.id): str(node.country_code or "").strip().upper()
+        for node in db.query(Node).filter(Node.id.in_(node_ids)).all()
+    }
+    for item in items:
+        try:
+            node_id = int(item.get("node_id") or 0)
+        except (TypeError, ValueError):
+            continue
+        code = codes.get(node_id)
+        if code:
+            item["country_code"] = code
+
+
 def _stored_info(
     db: Session,
     sub: Subscription,
@@ -2014,6 +2055,8 @@ def _stored_info(
             "items":
                 final_payload,
         })
+
+    _attach_node_country_codes(db, data)
 
     return {
         "subscription_id":
