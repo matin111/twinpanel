@@ -125,7 +125,7 @@ def _sync():
         ) as stream:
             stage = Path(stream.name)
             json.dump(doc, stream, ensure_ascii=False, indent=2)
-            stream.write("\\n")
+            stream.write("\n")
         os.chown(stage, metadata.st_uid, metadata.st_gid)
         os.chmod(stage, stat.S_IMODE(metadata.st_mode))
         validate = _run([XRAY, "run", "-test", "-config", str(stage)], timeout=22)
