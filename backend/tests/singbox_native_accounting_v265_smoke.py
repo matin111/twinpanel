@@ -18,6 +18,7 @@ def main() -> None:
         "naive",
         "shadowtls",
         "snell",
+        "socks5",
     }
     assert native.SINGBOX_ACCOUNTING_PROTOCOLS == expected
     assert native.SINGBOX_API_LISTEN == "127.0.0.1"
