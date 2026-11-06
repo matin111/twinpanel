@@ -21,6 +21,10 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Install Python backend dependencies for import smoke
+        run: |
+          python -m pip install --disable-pip-version-check -r backend/requirements.txt
+
       - name: Run OpenVPN runtime regression smoke
         working-directory: backend
         run: PYTHONPATH=. python scripts/openvpn_runtime_v1_smoke.py
