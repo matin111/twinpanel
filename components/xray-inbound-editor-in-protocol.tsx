@@ -1,98 +1,140 @@
 "use client";
 
 import {useEffect,useState} from "react";
-import {adminApi,type XrayInboundDraft,type XrayInboundEditorState} from "../lib/admin-api";
+import {
+  adminApi,type XrayInboundDraft,type XrayInboundEditorState,
+  type XrayInboundKey,type XrayInboundProfile,
+} from "../lib/admin-api";
 import {useI18n} from "../lib/i18n";
 import styles from "./protocol-command-center.module.css";
+
+const INBOUNDS:ReadonlyArray<{key:XrayInboundKey;label:string;detail:string}>= [
+  {key:"tcp_tls",label:"VLESS · TCP + TLS",detail:"TCP / TLS"},
+  {key:"ws_tls",label:"VLESS · WebSocket + TLS",detail:"WS / TLS"},
+  {key:"xhttp_reality",label:"VLESS · XHTTP + REALITY",detail:"XHTTP / REALITY"},
+];
 
 export function XrayInboundEditorInProtocol({nodeId}:{nodeId:number}){
   const {pick}=useI18n();
   const [state,setState]=useState<XrayInboundEditorState|null>(null);
   const [draft,setDraft]=useState<XrayInboundDraft|null>(null);
-  const [busy,setBusy]=useState(false);
+  const [selected,setSelected]=useState<XrayInboundKey>("tcp_tls");
+  const [busy,setBusy]=useState("");
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
 
   useEffect(()=>{
     let active=true;
-    setState(null);setDraft(null);setError("");setNotice("");
+    setState(null);setDraft(null);setError("");setNotice("");setSelected("tcp_tls");
     adminApi.xrayInboundEditor(nodeId).then(value=>{
       if(!active)return;
-      setState(value);setDraft(value.draft||value.defaults);
+      setState(value);
+      setDraft({
+        ...value.defaults,...(value.draft||{}),
+        inbounds:{
+          ...value.defaults.inbounds,
+          ...(value.draft?.inbounds||{}),
+        } as Record<XrayInboundKey,XrayInboundProfile>,
+      });
     }).catch(reason=>{if(active)setError(reason instanceof Error?reason.message:String(reason));});
     return()=>{active=false;};
   },[nodeId]);
 
+  const profile=draft?.inbounds?.[selected];
+  const edit=(key:keyof XrayInboundProfile,value:string)=>{
+    setDraft(current=>{
+      if(!current?.inbounds?.[selected])return current;
+      const inbounds={...current.inbounds,[selected]:{...current.inbounds[selected],[key]:value}};
+      const reality=inbounds.xhttp_reality;
+      return {
+        ...current,inbounds,
+        reality_server_name:reality.server_name,
+        reality_target:reality.target,
+      };
+    });
+    setNotice("");
+  };
+
   const save=async()=>{
     if(!draft||busy)return;
-    setBusy(true);setError("");setNotice("");
+    setBusy("save");setError("");setNotice("");
     try{
       await adminApi.saveXrayInboundDraft(nodeId,draft);
-      const updated=await adminApi.xrayInboundEditor(nodeId);
-      setState(updated);setDraft(updated.draft||updated.defaults);
-      setNotice(pick("تنظیمات به‌عنوان پیش‌نویس ذخیره شد؛ هنوز روی سرور یا ساب‌لینک اعمال نشده است.","Saved as a draft; the server and subscription links are unchanged."));
+      setNotice(pick("تنظیمات هر سه Inbound جداگانه ذخیره شد؛ هنوز روی سرور اعمال نشده‌اند.","All three inbound drafts saved independently; no server changes applied."));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
-    finally{setBusy(false);}
+    finally{setBusy("");}
   };
 
   const apply=async()=>{
-    if(!draft||busy)return;
-    setBusy(true);setError("");setNotice("");
+    if(!draft||busy||selected!=="xhttp_reality")return;
+    setBusy("apply");setError("");setNotice("");
     try{
-      // Save the visible draft first; the server then validates the exact version.
       await adminApi.saveXrayInboundDraft(nodeId,draft);
       const result=await adminApi.applyXrayInboundDraft(nodeId);
       const updated=await adminApi.xrayInboundEditor(nodeId);
-      setState(updated);setDraft(updated.draft||updated.defaults);
+      setState(updated);
       setNotice(pick(
-        "اعمال و تست REALITY موفق بود؛ ساب‌لینک‌ها از SNI جدید استفاده می‌کنند. TLS و Transport تغییر نکردند.",
-        "REALITY apply and test passed; subscription SNI is updated. TLS and transport were not changed."
+        "مقصد و SNI مربوط به REALITY اعمال و تست شدند؛ دو Inbound نوع TLS تغییر نکردند.",
+        "REALITY target and SNI applied and tested; TLS inbounds were unchanged."
       )+" · "+result.reality_server_name);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
-    finally{setBusy(false);}
+    finally{setBusy("");}
   };
 
-  const field=(key:keyof Pick<XrayInboundDraft,"connection_domain"|"tls_server_name"|"reality_server_name"|"reality_target">,label:string,placeholder:string)=>(
-    <div className={styles.field} key={key}>
+  const field=(key:keyof XrayInboundProfile,label:string,placeholder:string)=>(
+    <div className={styles.field}>
       <label>{label}</label>
-      <input dir="ltr" value={draft?.[key]||""} placeholder={placeholder}
-        onChange={event=>setDraft(current=>current?{...current,[key]:event.target.value}:current)}/>
+      <input dir="ltr" value={profile?.[key]||""} placeholder={placeholder}
+        onChange={event=>edit(key,event.target.value)}/>
     </div>
   );
 
   return <section className={styles.drawerSection}>
     <div className={styles.sectionHead}><div>
-      <strong>{pick("Inbound ویتوری · تنظیمات پیشرفته","V2Ray inbound · Advanced settings")}</strong>
-      <small>{pick("مانند سنایی؛ تنظیمات مستقل برای هر نود خروجی","3x-ui-style settings for each exit node")}</small>
+      <strong>{pick("ویرایش سه Inbound ویتوری","Edit three V2Ray inbounds")}</strong>
+      <small>{pick("هر اتصال تنظیمات اختصاصی دارد؛ تغییر یک Inbound بقیه را عوض نمی‌کند.","Each inbound has its own settings; editing one does not modify the others.")}</small>
     </div></div>
     {error?<div className={styles.errorBox}>{error}</div>:null}
     {notice?<div className={styles.successBox}>{notice}</div>:null}
-    {!draft?<div className={styles.readonlyRow}><span>{pick("دریافت تنظیمات...","Loading settings...")}</span></div>:<>
+    {!draft||!profile?<div className={styles.readonlyRow}><span>{pick("در حال خواندن تنظیمات...","Loading inbounds...")}</span></div>:<>
+      <div className={styles.presetGrid}>
+        {INBOUNDS.map(item=><button key={item.key} type="button"
+          className={`${styles.presetButton} ${selected===item.key?styles.presetButtonActive:""}`}
+          disabled={Boolean(busy)} onClick={()=>{setSelected(item.key);setError("");setNotice("");}}>
+          {item.label}
+        </button>)}
+      </div>
+      <div className={styles.sectionHead}><div>
+        <strong>{INBOUNDS.find(item=>item.key===selected)?.label}</strong>
+        <small>{pick("تنظیمات همین Inbound","Settings for this inbound")}</small>
+      </div></div>
       <div className={styles.formGrid}>
         {field("connection_domain",pick("دامنه اتصال","Connection domain"),"v2ray.example.com")}
-        {field("tls_server_name","TLS / SNI","v2ray.example.com")}
-        {field("reality_server_name","REALITY / SNI","www.varzesh3.com")}
-        {field("reality_target",pick("مقصد REALITY","REALITY target"),"www.varzesh3.com:443")}
-        <div className={styles.field}><label>Transport</label>
-          <select value={draft.transport} onChange={event=>setDraft(current=>current?{...current,transport:event.target.value}:current)}>
-            {(state?.transports||["tcp","ws","xhttp","grpc","httpupgrade"]).map(item=><option key={item} value={item}>{item.toUpperCase()}</option>)}
-          </select>
+        {field("server_name",selected==="xhttp_reality"?"REALITY / SNI":"TLS / SNI",
+          selected==="xhttp_reality"?"www.varzesh3.com":"v2ray.example.com")}
+        {selected!=="tcp_tls"?field("path",pick("مسیر","Path"),"/"):null}
+        {selected==="xhttp_reality"?field("target",pick("مقصد REALITY","REALITY target"),"www.varzesh3.com:443"):null}
+        <div className={styles.field}>
+          <label>Transport</label>
+          <input dir="ltr" value={profile.transport.toUpperCase()} disabled readOnly/>
         </div>
-        <div className={styles.field}><label>{pick("نوع امنیت","Security")}</label>
-          <select value={draft.security} onChange={event=>setDraft(current=>current?{...current,security:event.target.value}:current)}>
-            {(state?.securities||["tls","reality"]).map(item=><option key={item} value={item}>{item.toUpperCase()}</option>)}
-          </select>
+        <div className={styles.field}>
+          <label>{pick("امنیت","Security")}</label>
+          <input dir="ltr" value={profile.security.toUpperCase()} disabled readOnly/>
         </div>
       </div>
       <div className={styles.actionRow}>
-        <button type="button" className={styles.primaryButton} disabled={busy} onClick={()=>void save()}>
-          {busy?"…":pick("ذخیره پیش‌نویس","Save draft")}
+        <button type="button" className={styles.primaryButton} disabled={Boolean(busy)} onClick={()=>void save()}>
+          {busy==="save"?"…":pick("ذخیره تنظیمات سه Inbound","Save inbound drafts")}
         </button>
-        <button type="button" className={styles.secondaryButton} disabled={busy} onClick={()=>void apply()}>
-          {busy?"…":pick("اعمال و تست REALITY","Apply & test REALITY")}
-        </button>
+        {selected==="xhttp_reality"?<button type="button" className={styles.secondaryButton} disabled={Boolean(busy)} onClick={()=>void apply()}>
+          {busy==="apply"?"…":pick("اعمال و تست REALITY","Apply & test REALITY")}
+        </button>:null}
       </div>
-      <div className={styles.warningBox}>{pick("اعمال فعلاً فقط REALITY SNI و مقصد را روی Xray و ساب‌لینک‌ها هماهنگ می‌کند. دامنه اتصال، TLS و نوع Transport فقط پیش‌نویس می‌مانند.","Apply synchronizes REALITY SNI and target with Xray and subscriptions. Connection domain, TLS and transport remain drafts.")}</div>
+      <div className={styles.warningBox}>
+        {pick("تغییر TLS، مسیر و دامنه اتصال فعلاً فقط پیش‌نویس است. اعمال REALITY فقط مقصد و SNI آن را پس از اعتبارسنجی روی سرور و ساب‌لینک هماهنگ می‌کند.",
+          "TLS, path and connection-domain changes are drafts only. REALITY apply updates only its target and SNI after validation.")}
+      </div>
     </>}
   </section>;
 }
