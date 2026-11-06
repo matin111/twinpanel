@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import base64
 import io
+import json
+import re
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import qrcode
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .. import xray_profile_reconcile_v36
@@ -164,19 +168,100 @@ def _customer_safe_node_meta(db: Session, item: dict[str, Any], index: int) -> t
     return display_name, country_code
 
 
+# TWINPANEL_XRAY_LIVE_NODE_SUBSCRIPTION_V1
+# Per-user credentials are immutable here. An explicit node-level setting
+# changes the next subscription response, with no SSH/provisioning on GET.
+# The corresponding server-side REALITY inbound must be updated first.
+_HOSTNAME = re.compile(r"^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$")
+
+
+def _live_xray_settings(db: Session, payload: dict[str, Any]) -> dict[int, dict[str, str]]:
+    ids = set()
+    for item in _v2ray_items(payload):
+        try:
+            node_id = int(item.get("node_id") or 0)
+        except (ValueError, TypeError):
+            continue
+        if node_id > 0:
+            ids.add(node_id)
+    if not ids:
+        return {}
+
+    # One bulk database lookup, independent of account and profile counts.
+    rows = db.execute(
+        text(
+            "SELECT node_id, settings_json FROM modern_protocol_settings "
+            "WHERE protocol = 'v2ray' AND node_id = ANY(:node_ids)"
+        ),
+        {"node_ids": sorted(ids)},
+    ).all()
+    result: dict[int, dict[str, str]] = {}
+    for node_id, raw in rows:
+        try:
+            settings = json.loads(raw) if isinstance(raw, str) else raw
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(settings, dict):
+            continue
+        override = {}
+        for key in ("reality_server_name", "tls_server_name"):
+            hostname = str(settings.get(key) or "").lower().strip()
+            if (
+                hostname
+                and _HOSTNAME.fullmatch(hostname)
+                and ".." not in hostname
+                and all(len(label) <= 63 for label in hostname.split("."))
+            ):
+                override[key] = hostname
+        if override:
+            result[int(node_id)] = override
+    return result
+
+
+def _apply_live_xray_uri(uri: str, settings: dict[str, str]) -> str:
+    """Patch only public TLS/REALITY SNI; never touch UUID, keys or route."""
+    if not settings or not uri.startswith("vless://"):
+        return uri
+    try:
+        parsed = urlsplit(uri)
+        params = parse_qsl(parsed.query, keep_blank_values=True)
+        security = next((value.lower() for key, value in params if key == "security"), "")
+        key = {
+            "reality": "reality_server_name",
+            "tls": "tls_server_name",
+        }.get(security)
+        sni = settings.get(key) if key else None
+        if not sni:
+            return uri
+        updated = [(k, sni if k == "sni" else v) for k, v in params]
+        if not any(k == "sni" for k, _ in updated):
+            updated.append(("sni", sni))
+        if security == "tls":
+            updated = [(k, sni if k == "host" else v) for k, v in updated]
+        return urlunsplit(parsed._replace(query=urlencode(updated)))
+    except (TypeError, ValueError):
+        return uri
+
+
 def _v2ray_profile_groups(db: Session, payload: dict[str, Any]) -> list[dict[str, Any]]:
     """Group resolved profiles by server and include only customer-safe location metadata."""
 
     groups: list[dict[str, Any]] = []
+    live_settings = _live_xray_settings(db, payload)
     for item in _v2ray_items(payload):
-        uris = _item_v2ray_uris(item)
+        try:
+            node_id = int(item.get("node_id") or 0)
+        except (TypeError, ValueError):
+            node_id = 0
+        node_settings = live_settings.get(node_id, {})
+        uris = [_apply_live_xray_uri(uri, node_settings) for uri in _item_v2ray_uris(item)]
         if not uris:
             continue
 
         profile_rows: list[dict[str, Any]] = []
         resolved_profiles = xray_delivery._customer_profiles(item)
         by_uri = {
-            str(profile.get("uri") or "").strip(): profile
+            _apply_live_xray_uri(str(profile.get("uri") or "").strip(), node_settings): profile
             for profile in resolved_profiles
             if isinstance(profile, dict)
             and str(profile.get("uri") or "").strip()
