@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import json
 import re
 import shlex
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .database import get_db
@@ -550,3 +553,131 @@ async def prepare_xray_node(
     finally:
         conn.close()
         await conn.wait_closed()
+
+
+# TWINPANEL_XRAY_ADMIN_INBOUND_EDITOR_V1
+# 3x-ui-inspired controls: one node-level draft for all future subscriptions.
+# Saving does NOT activate settings; actual server apply + health check must
+# precede publishing any SNI overrides. Never mutate per-user credentials here.
+_XRAY_TRANSPORTS = frozenset({"tcp", "ws", "xhttp", "grpc", "httpupgrade"})
+_XRAY_SECURITIES = frozenset({"tls", "reality"})
+
+
+class InboundEditorDraft(BaseModel):
+    connection_domain: str | None = None
+    tls_server_name: str | None = None
+    reality_server_name: str | None = None
+    reality_target: str | None = None
+    transport: str = "tcp"
+    security: str = "tls"
+
+
+def _validated_editor_settings(payload: InboundEditorDraft) -> dict[str, str]:
+    def hostname(value: str | None) -> str:
+        raw = str(value or "").strip().lower()
+        if not raw:
+            return ""
+        if len(raw) > 253 or ".." in raw or any(len(x) > 63 for x in raw.split(".")):
+            raise HTTPException(status_code=422, detail="Invalid domain length")
+        if not _DOMAIN_RE.fullmatch(raw):
+            raise HTTPException(status_code=422, detail="Invalid domain")
+        return raw
+
+    transport = payload.transport.strip().lower()
+    security = payload.security.strip().lower()
+    if transport not in _XRAY_TRANSPORTS or security not in _XRAY_SECURITIES:
+        raise HTTPException(status_code=422, detail="Unsupported transport/security")
+    if security == "reality" and transport not in {"xhttp", "grpc", "tcp"}:
+        raise HTTPException(status_code=422, detail="REALITY transport is incompatible")
+    if security == "tls" and transport == "grpc":
+        # The current TwinPanel gRPC inbound is REALITY-only.
+        raise HTTPException(status_code=422, detail="TLS gRPC not provisioned")
+
+    target = str(payload.reality_target or "").strip().lower()
+    if target:
+        if target.count(":") != 1 or not target.endswith(":443"):
+            raise HTTPException(status_code=422, detail="REALITY target must be hostname:443")
+        hostname(target.rsplit(":", 1)[0])
+    return {
+        "connection_domain": hostname(payload.connection_domain),
+        "tls_server_name": hostname(payload.tls_server_name),
+        "reality_server_name": hostname(payload.reality_server_name),
+        "reality_target": target,
+        "transport": transport,
+        "security": security,
+    }
+
+
+@router.get("/nodes/{node_id}/inbound-editor")
+def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
+    node = _node_or_404(db, node_id)
+    row = db.execute(
+        text(
+            "SELECT settings_json FROM modern_protocol_settings "
+            "WHERE node_id=:node_id AND protocol='v2ray'"
+        ), {"node_id": int(node_id)}
+    ).scalar_one_or_none()
+    try:
+        values = json.loads(row) if row else {}
+    except (ValueError, TypeError):
+        values = {}
+    if not isinstance(values, dict):
+        values = {}
+    default_domain = str(getattr(node, "xray_domain", None) or getattr(node, "public_domain", None) or "")
+    return {
+        "node_id": int(node.id),
+        "defaults": {
+            "connection_domain": default_domain,
+            "tls_server_name": default_domain,
+            "reality_server_name": "www.varzesh3.com",
+            "reality_target": "www.varzesh3.com:443",
+            "transport": "tcp",
+            "security": "tls",
+        },
+        "draft": values.get("draft") if isinstance(values.get("draft"), dict) else None,
+        "applied": {
+            key: values[key] for key in ("reality_server_name", "tls_server_name")
+            if isinstance(values.get(key), str)
+        },
+        "transports": sorted(_XRAY_TRANSPORTS),
+        "securities": sorted(_XRAY_SECURITIES),
+        "requires_apply": True,
+        "message": "Saving a draft never modifies Xray or customer links.",
+    }
+
+
+@router.put("/nodes/{node_id}/inbound-editor")
+def save_xray_inbound_editor_draft(
+    node_id: int,
+    payload: InboundEditorDraft,
+    db: Session = Depends(get_db),
+):
+    _node_or_404(db, node_id)
+    draft = _validated_editor_settings(payload)
+    # Merge with existing applied data, never replace it on a draft edit.
+    row = db.execute(
+        text(
+            "SELECT settings_json FROM modern_protocol_settings "
+            "WHERE node_id=:node_id AND protocol='v2ray' FOR UPDATE"
+        ), {"node_id": int(node_id)}
+    ).scalar_one_or_none()
+    try:
+        settings = json.loads(row) if row else {}
+    except (ValueError, TypeError):
+        settings = {}
+    if not isinstance(settings, dict):
+        settings = {}
+    settings["draft"] = draft
+    data = json.dumps(settings, ensure_ascii=False, separators=(",", ":"))
+    db.execute(
+        text(
+            "INSERT INTO modern_protocol_settings "
+            "(node_id, protocol, preset_name, settings_json, schema_version, created_at, updated_at) "
+            "VALUES (:node_id, 'v2ray', 'custom', :settings, 1, :now, :now) "
+            "ON CONFLICT (node_id, protocol) DO UPDATE SET "
+            "settings_json=EXCLUDED.settings_json, updated_at=EXCLUDED.updated_at"
+        ),
+        {"node_id": int(node_id), "settings": data, "now": datetime.utcnow()},
+    )
+    db.commit()
+    return {"ok": True, "node_id": int(node_id), "draft": draft, "applied": False}
