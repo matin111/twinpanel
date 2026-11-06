@@ -1058,10 +1058,13 @@ async def _xray_account_modern(
     sub: Subscription,
     user: User,
     client_id: str,
+    *,
+    reusable_connection: Any | None = None,
 ) -> dict[str, Any]:
     from .routers import account_delivery, provision
 
-    conn = await account_delivery.ssh_connect_saved(node, db)
+    owns_connection = reusable_connection is None
+    conn = reusable_connection if reusable_connection is not None else await account_delivery.ssh_connect_saved(node, db)
 
     try:
         base_port = account_delivery._port(db, node.id, "v2ray")
@@ -1164,8 +1167,9 @@ async def _xray_account_modern(
         }
 
     finally:
-        conn.close()
-        await conn.wait_closed()
+        if owns_connection:
+            conn.close()
+            await conn.wait_closed()
 
 
 def _live_client_item_modern(
