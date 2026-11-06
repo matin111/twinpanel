@@ -304,7 +304,10 @@ async def _commit_account_config(conn, script: str) -> None:
     await cmd(
         conn,
         "set -eu; exec 9>/run/twinpanel-singbox-batch.lock; flock -x 9; "
-        f"printf '%s' {shlex.quote(encoded)} | base64 -d | python3; "
+        f"result=$(printf '%s' {shlex.quote(encoded)} | base64 -d | python3); "
+        "if [ \"$result\" = 'account_unchanged=1' ]; then "
+        f"systemctl is-active --quiet {SERVICE_NAME}.service || systemctl restart {SERVICE_NAME}.service; "
+        "else "
         f"/usr/local/bin/twinpanel-sing-box check -c {shlex.quote(CONFIG_PATH + '.account-new')}; "
         f"cp -a {shlex.quote(CONFIG_PATH)} {backup}; "
         f"mv {shlex.quote(CONFIG_PATH + '.account-new')} {shlex.quote(CONFIG_PATH)}; "
@@ -314,6 +317,7 @@ async def _commit_account_config(conn, script: str) -> None:
         f"  systemctl restart {SERVICE_NAME}.service || true; "
         f"  exit 1; "
         f"fi; "
+        "fi; "
         f"systemctl is-active --quiet {SERVICE_NAME}.service",
         timeout=120,
     )
