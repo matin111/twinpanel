@@ -344,20 +344,13 @@ async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
         ):
             credentials_by_key[(int(cred.subscription_id), str(cred.protocol))] = cred
     active_subscriptions.sort(key=lambda item: int(item.id))
-    # Migration batch worker owns only missing sing-box pairs for imported
-    # subscriptions. All existing accounts and standalone protocols retain the
-    # ordinary convergence path, with no double writes or extra restarts.
-    imported_in_batch: set[int] = set()
-    if _migration_singbox_worker_running():
-        imported_in_batch = {
-            int(value) for (value,) in db.query(
-                MigrationImportRecord.subscription_id
-            ).filter(
-                MigrationImportRecord.source.in_(
-                    ["eylan", "sanaei", "marzban", "pasargad"]
-                )
-            ).all()
-        }
+    # Imported subscriptions are manual-provision only. Their membership on
+    # a new Exit stays intact, but no automatic credential backfill runs.
+    imported_ids: set[int] = {
+        int(value) for (value,) in db.query(
+            MigrationImportRecord.subscription_id
+        ).all()
+    }
     provisioned_pairs = 0
     reused_pairs = 0
     failed: list[dict[str, Any]] = []
@@ -368,7 +361,7 @@ async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
         )
 
         for protocol in wanted:
-            if int(sub.id) in imported_in_batch and protocol in SINGBOX_ACCOUNT_PROTOCOLS:
+            if int(sub.id) in imported_ids:
                 continue
             cred = credentials_by_key.get((int(sub.id), protocol))
             stored_items = _credential_items(ad, cred)
