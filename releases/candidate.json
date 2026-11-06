@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.609",
-  "source_sha": "878e4dca2cf09cd23718d7acb1af881cd7d4b7e8",
+  "version": "1.1.0-rc.610",
+  "source_sha": "0fdffb955d3d2fffad49c9303b9291e342cd7641",
   "notes": {
-    "fa": "حذف کامل gRPC قدیمی از Xray نودهای موجود و ساب‌لینک‌ها؛ جلوگیری از قطع سرویس پس از تغییر Inbound یا پاک‌سازی با حفظ مجوز/مالکیت فایل‌ها و اعتبارسنجی قبل از Restart. حفظ UUID، کلیدهای REALITY، WS/TLS، XHTTP/REALITY و پروتکل‌های دیگر. ادامه تمام امکانات rc.608.",
-    "en": "Retire legacy gRPC from Xray nodes and customer subscriptions. Preserve file ownership/permissions during inbound edits and cleanup, preflight active Xray, validate staged configs and rollback safely. Retain UUIDs, REALITY identities, WS/TLS, XHTTP/REALITY and all other rc.608 features."
+    "fa": "اصلاح جلوگیری از ری‌استارت غیرضروری Xray در همگام‌سازی اکانت‌های V2Ray بدون تغییر UUID و کانفیگ کاربران؛ حفظ مجوز فایل‌ها و همه امکانات rc.609.",
+    "en": "Avoid unnecessary Xray config rewrites and service restarts during unchanged VLESS account reconciliation; preserve file permissions, UUIDs and all rc.609 features."
   }
 }
