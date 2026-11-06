@@ -36,7 +36,7 @@ def ipt(table, *args):
 ns["ipt"] = ipt
 desired = {("filter", "TP_FWD"): [("-j", "ACCEPT")]}
 assert ns["_service_routing_matches"](desired)
-assert calls.count("-C") == 1, calls
+assert calls == ["-S"], "exact live rule match should avoid first per-rule -C"
 calls.clear()
 assert ns["_service_routing_matches"](desired)
 assert calls == ["-S"], "stable rules must not spawn per-rule -C processes"
@@ -49,7 +49,7 @@ assert calls == ["-S", "-C"], "live rule drift must fail closed"
 live_rules[-1] = "-A TP_FWD -j ACCEPT"
 calls.clear()
 assert ns["_service_routing_matches"](desired)
-assert calls == ["-S", "-C"], "restored rules require re-verification"
+assert calls == ["-S"], "exact restored live rules should avoid per-rule -C"
 calls.clear()
 assert ns["_service_routing_matches"](desired)
 assert calls == ["-S"]
