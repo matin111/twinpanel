@@ -685,6 +685,12 @@ async def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
             conn.close()
             await conn.wait_closed()
     default_domain = str(getattr(node, "xray_domain", None) or getattr(node, "public_domain", None) or "")
+    applied_profiles = values.get("inbound_applied") or {}
+    if not isinstance(applied_profiles, dict):
+        applied_profiles = {}
+    tcp_applied = applied_profiles.get("tcp_tls") or {}
+    ws_applied = applied_profiles.get("ws_tls") or {}
+    xhttp_applied = applied_profiles.get("xhttp_reality") or {}
     return {
         "node_id": int(node.id),
         "defaults": {
@@ -696,15 +702,18 @@ async def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
             "security": "tls",
             "inbounds": {
                 "tcp_tls": {
-                    "connection_domain": default_domain, "server_name": str(runtime_state.get("tls_domain") or default_domain),
+                    "connection_domain": str(tcp_applied.get("connection_domain") or default_domain),
+                    "server_name": str(runtime_state.get("tls_sni_tcp") or tcp_applied.get("server_name") or runtime_state.get("tls_domain") or default_domain),
                     "path": "", "target": "", "transport": "tcp", "security": "tls",
                 },
                 "ws_tls": {
-                    "connection_domain": default_domain, "server_name": str(runtime_state.get("tls_domain") or default_domain),
+                    "connection_domain": str(ws_applied.get("connection_domain") or default_domain),
+                    "server_name": str(runtime_state.get("tls_sni_ws") or ws_applied.get("server_name") or runtime_state.get("tls_domain") or default_domain),
                     "path": str(runtime_state.get("ws_path") or ((values.get("inbound_applied") or {}).get("ws_tls") or {}).get("path") or ""), "target": "", "transport": "ws", "security": "tls",
                 },
                 "xhttp_reality": {
-                    "connection_domain": default_domain, "server_name": str(runtime_state.get("reality_server_name") or values.get("reality_server_name") or ""),
+                    "connection_domain": str(xhttp_applied.get("connection_domain") or default_domain),
+                    "server_name": str(runtime_state.get("reality_server_name") or values.get("reality_server_name") or ""),
                     "path": str(runtime_state.get("xhttp_path") or ((values.get("inbound_applied") or {}).get("xhttp_reality") or {}).get("path") or ""), "target": str(runtime_state.get("reality_target") or values.get("reality_target") or ""),
                     "transport": "xhttp", "security": "reality",
                 },
