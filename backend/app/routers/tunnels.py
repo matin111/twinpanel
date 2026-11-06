@@ -1198,6 +1198,8 @@ def _select_service_route_tunnel_ids(
                         f"hold_seconds={_SERVICE_ROUTE_TRANSIENT_HOLD_SECONDS}",
                         flush=True,
                     )
+                if not fresh_hard_failure:
+                    _service_route_unusable_since.pop(key, None)
                 _service_route_selected[key] = int(candidate.id)
                 selected_ids.add(int(candidate.id))
                 grace_selected = True
