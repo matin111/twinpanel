@@ -13,6 +13,7 @@ from ..database import get_db
 from ..deps import require_admin
 from ..models import Node, NodeProtocolConfig
 from ..modern_protocol_models import ModernProtocolSetting
+from ..modern_node_install_lock import NodeInstallBusy, exclusive_node_install
 from ..modern_protocol_runtime import certificate_pin
 from ..modern_protocol_dispatch import (
     SINGBOX_PROTOCOLS,
@@ -368,7 +369,12 @@ async def install(
     db.commit()
     try:
         try:
-            result = await apply_profiles(conn, node, profiles)
+            async with exclusive_node_install(node_id):
+                result = await apply_profiles(conn, node, profiles)
+        except NodeInstallBusy as exc:
+            # Another request is already installing this node. Do not mark
+            # healthy profiles as failed because the server is merely busy.
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         except Exception as exc:
             for key in protocols:
                 _, _, _, port = resolved_by_key[key]
