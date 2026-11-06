@@ -108,7 +108,7 @@ jobs:
           assert callable(activate_singbox_capabilities)
           assert callable(singbox_native_accounting_loop)
           assert SINGBOX_ACCOUNTING_PROTOCOLS == {
-              "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell, "socks5"
+              "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"
           }
           print("SINGBOX_NATIVE_ACCOUNTING_APP_IMPORT=PASS")
           print("MODERN_ACCOUNTING_V314_IMPORT=PASS")
