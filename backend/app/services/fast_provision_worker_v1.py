@@ -144,6 +144,20 @@ async def run_one_fast_provision_job() -> bool:
             # subscription with a falsely terminal job status.
             state = "retry"
             error = "worker_exception"
+
+        if job.origin == "reseller_bot_owned" and state in {
+            "done", "degraded", "failed", "cancelled",
+        }:
+            from .fast_provision_commerce_completion_v1 import finalize_reseller_bot_job
+            try:
+                await finalize_reseller_bot_job(job, state, error)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                # A job must not be marked done before its paid order status is
+                # made durable. Retry the handoff without exposing any secrets.
+                state = "retry"
+                error = "bot_order_handoff_" + type(exc).__name__
     finally:
         heartbeat.cancel()
         try:

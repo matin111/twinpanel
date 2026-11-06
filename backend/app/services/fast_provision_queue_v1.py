@@ -19,6 +19,18 @@ from ..fast_provision_job_models_v1 import FastProvisionJobV1
 
 LEASE_SECONDS = 180
 MAX_ATTEMPTS = 4
+# Business-created NEW subscriptions only. Renewals and imported accounts
+# never enter through the commerce adapter.
+SUPPORTED_NEW_ORIGINS = frozenset({
+    "admin_new", "reseller_owned", "reseller_bot_owned",
+})
+
+
+def fast_provision_commerce_enabled() -> bool:
+    """Separate opt-in; activating the admin queue alone changes no commerce."""
+    return fast_provision_queue_enabled() and os.getenv(
+        "TWINPANEL_FAST_PROVISION_COMMERCE_V1", ""
+    ).lower().strip() in {"1", "true", "yes"}
 
 
 def fast_provision_queue_enabled() -> bool:
@@ -33,10 +45,13 @@ class ClaimedProvisionJob:
     requested_protocols: tuple[str, ...]
     lease_token: str
     attempts: int
+    origin: str = "admin_new"
 
 
 def enqueue_new_subscription(
     db: Session, subscription_id: int, protocols: list[str],
+    *,
+    origin: str = "admin_new",
 ) -> FastProvisionJobV1:
     """Insert before the subscription transaction commits (no independent commit).
 
@@ -48,9 +63,11 @@ def enqueue_new_subscription(
     ))
     if not normalized or subscription_id <= 0:
         raise ValueError("new subscription queue requires id and protocols")
+    if origin not in SUPPORTED_NEW_ORIGINS:
+        raise ValueError("unsupported new subscription queue origin")
     job = FastProvisionJobV1(
         subscription_id=int(subscription_id),
-        origin="admin_new",
+        origin=origin,
         priority=100,
         requested_protocols_json=json.dumps(normalized, separators=(",", ":")),
         state="queued",
@@ -65,10 +82,15 @@ def enqueue_new_subscription(
 def claim_next_job(db: Session, *, now: datetime | None = None) -> ClaimedProvisionJob | None:
     """Claim one high-priority job without holding a transaction during SSH."""
     now = now or datetime.utcnow()
+    allowed_origins = (
+        tuple(sorted(SUPPORTED_NEW_ORIGINS))
+        if fast_provision_commerce_enabled()
+        else ("admin_new",)
+    )
     row = (
         db.query(FastProvisionJobV1)
         .filter(
-            FastProvisionJobV1.origin == "admin_new",
+            FastProvisionJobV1.origin.in_(allowed_origins),
             or_(
                 and_(
                     FastProvisionJobV1.state.in_(("queued", "retry")),
@@ -113,6 +135,7 @@ def claim_next_job(db: Session, *, now: datetime | None = None) -> ClaimedProvis
         requested_protocols=tuple(protocols),
         lease_token=row.lease_token,
         attempts=row.attempts,
+        origin=row.origin,
     )
     db.commit()
     return claimed
@@ -190,6 +213,14 @@ def provision_job_status(db: Session, subscription_id: int) -> dict | None:
     return {
         "subscription_id": int(job.subscription_id),
         "state": job.state,
+        "origin": job.origin,
+        "queued_at": job.created_at.isoformat() if job.created_at else None,
+        "elapsed_ms": (
+            max(0, int((job.updated_at - job.created_at).total_seconds() * 1000))
+            if job.created_at and job.updated_at
+            and job.state in {"done", "degraded", "failed", "cancelled"}
+            else None
+        ),
         "attempts": int(job.attempts),
         "priority": int(job.priority),
         "requested_protocols": json.loads(job.requested_protocols_json),

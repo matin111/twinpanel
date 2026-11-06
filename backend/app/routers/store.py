@@ -26,6 +26,7 @@ from ..reseller_owned_plans import is_internal_reseller_plan
 from ..schemas import SubscriptionCreate
 from ..store_models import StoreOrder
 from ..telegram_notify_service import queue_telegram_notification
+from ..services.fast_provision_queue_v1 import fast_provision_commerce_enabled
 from .subscriptions import create_subscription
 from .account_delivery import (
     _public_payload,
@@ -385,6 +386,9 @@ async def _fulfill_paid_order(order_id: int, db: Session) -> dict:
         raise HTTPException(status_code=409, detail="سفارش هنوز پرداخت تأییدشده ندارد")
 
     try:
+        # The existing payment-order recovery loop remains authoritative.
+        # Only fresh purchases opt into faster node-batched provisioning.
+        new_purchase_subscription = not bool(order.subscription_id)
         order.status = "provisioning"
         order.error_text = None
         db.commit()
@@ -423,7 +427,13 @@ async def _fulfill_paid_order(order_id: int, db: Session) -> dict:
                 "recovered_existing_delivery": True,
             }
 
-        provision_result = await provision_account(int(order.subscription_id), db)
+        if fast_provision_commerce_enabled() and new_purchase_subscription:
+            from .modern_account_delivery_v1 import provision_new_account_fast_v1
+            provision_result = await provision_new_account_fast_v1(
+                int(order.subscription_id), db,
+            )
+        else:
+            provision_result = await provision_account(int(order.subscription_id), db)
         if not isinstance(provision_result, dict):
             raise RuntimeError("invalid account provisioning response")
 

@@ -20,6 +20,10 @@ from ..reseller_owned_plans import (
     create_subscription_from_owned_plan,
     owned_plan_by_backing,
 )
+from ..services.fast_provision_queue_v1 import (
+    fast_provision_commerce_enabled,
+    provision_job_status,
+)
 from ..reseller_telegram_models import ResellerTelegramLink
 from . import reseller_bot_orders as legacy
 from .customer_wallet import _wallet
@@ -359,6 +363,18 @@ async def approve_order_owned_v3(
     if row.status == "fulfilled":
         return legacy.order_out(db, row)
 
+    # Repeated approval while a durable job is executing must never create or
+    # provision the subscription a second time.
+    if row.status == "provisioning" and row.subscription_id:
+        existing_job = provision_job_status(db, int(row.subscription_id))
+        if existing_job and existing_job["origin"] == "reseller_bot_owned":
+            return {
+                **legacy.order_out(db, row),
+                "queued": True,
+                "provisioning_complete": False,
+                "provisioning_status": existing_job["state"],
+            }
+
     if row.status not in {"awaiting_review", "provision_failed", "paid"}:
         raise HTTPException(
             status_code=409,
@@ -412,6 +428,12 @@ async def approve_order_owned_v3(
                 idempotency_key=str(row.sale_idempotency_key),
                 node_ids=list(row.node_ids or []),
                 sell_price_toman=int(row.sell_price_toman),
+                # Commit subscription, queue entry, and order link atomically.
+                queue_origin=(
+                    "reseller_bot_owned"
+                    if fast_provision_commerce_enabled() else None
+                ),
+                defer_commit=fast_provision_commerce_enabled(),
             )
 
             subscription_id = int(sale["subscription_id"])
@@ -429,6 +451,16 @@ async def approve_order_owned_v3(
             db.commit()
 
         subscription_id = int(row.subscription_id)
+        new_job = provision_job_status(db, subscription_id) if fast_provision_commerce_enabled() else None
+        if new_job is not None and new_job["origin"] == "reseller_bot_owned":
+            # Paid order remains provisioning. Worker will mark it fulfilled
+            # and deliver Telegram link ONLY after actual credential readiness.
+            return {
+                **legacy.order_out(db, row),
+                "queued": True,
+                "provisioning_complete": False,
+                "provisioning_status": new_job["state"],
+            }
 
         # Account delivery owns its per-node/per-protocol deadlines. A single
         # outer deadline here used to cancel healthy 15-protocol provisioning
