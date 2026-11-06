@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.623",
-  "source_sha": "9e37866d01658e0feb56a045cb6e4837ef472a27",
+  "version": "1.1.0-rc.624",
+  "source_sha": "295076ef2992fbe7e476a25e33534e28e11eb7ef",
   "notes": {
-    "fa": "رفع تغییر ناخواسته دامنه V2Ray به دامنه عمومی تونل. استفاده از xray_domain اختصاصی هر نود برای WS/TLS، XHTTP/REALITY و TCP/TLS فقط پس از تأیید اینکه DNS به همان سرور ورودی ایران اشاره می‌کند. حفظ کامل پورت، SNI، کانفیگ‌ها، کاربران، تونل‌ها و سایر پروتکل‌ها.",
-    "en": "Respect the dedicated Xray domain in public VLESS subscription links instead of generic tunnel hostnames, only after verifying matching ingress DNS A/AAAA. Preserve all existing ports, UUIDs, TLS/REALITY parameters, tunnel routes, other VPN protocols and customer accounts."
+    "fa": "رفع ناقص‌ماندن V2Ray روی نودهای جدید: جداسازی دامنه Xray از دامنه تانل، تکمیل پروفایل REALITY با UUID ثابت، بازیابی خودکار صف جاافتاده V2Ray و ساخت برای اکانت‌های فعال جدید و انتقالی؛ بدون تغییر سایر پروتکل‌ها.",
+    "en": "Fix missing V2Ray profiles on newly published Exits: dedicated Xray domain selection, REALITY profile repair with preserved UUID, automatic recovery of missing V2Ray backfill jobs, and support for active new/imported accounts."
   }
 }
