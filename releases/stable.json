@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.614",
+  "version": "1.1.0-rc.615",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T17:54:23Z",
+  "released_at": "2026-11-06T18:12:13Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "a37da94e40ab5a63292d1a80a6d812da508e96c7",
+  "source_sha": "cf52982a64c5f12a22d3a1d68ec0324fb95f6df0",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.614/twinpanel-1.1.0-rc.614-linux-x86_64.tar.gz",
-    "sha256": "6400165345234e752c883e8d86ea17e836bcbbcc008994fa270d4283ae9ecf2b",
-    "size_bytes": 28946219
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.615/twinpanel-1.1.0-rc.615-linux-x86_64.tar.gz",
+    "sha256": "dd3768d08a14d26022fc6ca735e9b1e0fd92328bab5246b405bd6c89eded9d0a",
+    "size_bytes": 28946153
   },
   "notes": {
-    "fa": "نسخه رسمی صف پایدار ساخت کانفیگ نود جدید برای اشتراک‌های قدیمی: ثبت خودکار صف پس از انتشار نود، ساخت مرحله‌ای خارج از API، اولویت خریدهای جدید، نمایش پیشرفت و تلاش مجدد از مدیریت نود، با حفظ اصلاحات جدید Xray و محدودیت‌های پلن.",
-    "en": "Official durable new-Exit credential backfill after admin publication, with supervised bounded background worker, retry/progress in node management and priority for new paid accounts, preserving all merged Xray fixes and plan entitlements."
+    "fa": "رفع خطای فرم ساخت دستی اکانت پس از افزایش تعداد پروتکل‌ها به ۱۶: حذف شرط ثابت ۱۵ پروتکل، نمایش صحیح کاربران، نودها و فهرست واقعی پروتکل‌ها بدون تغییر کانفیگ‌های موجود.",
+    "en": "Fix manual admin subscription creation broken by the 16-protocol registry: accept the live nonempty catalog instead of a hardcoded count and restore selectable users, nodes and protocols without touching existing accounts."
   }
 }
