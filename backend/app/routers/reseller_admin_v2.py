@@ -386,11 +386,10 @@ def transfer_subscription_to_reseller(
     payload: SubscriptionTransferIn,
     db: Session = Depends(get_db),
 ):
-    """Transfer management rights, never recreate or provision the VPN account.
+    """Transfer real ownership plus reseller management without reprovisioning.
 
-    The original subscription/credential/usage/expiry records remain intact.
-    Customer assignment is scoped to the selected reseller and explicitly
-    chosen by the administrator. No wallet or traffic balance is charged.
+    Subscription identity, credentials, usage and expiry are unchanged.
+    Both ownership and reseller mapping are committed atomically.
     """
     reseller = _get_reseller(db, reseller_id)
     if not reseller.is_active:
@@ -425,26 +424,38 @@ def transfer_subscription_to_reseller(
         .with_for_update()
         .first()
     )
-    if existing:
-        if existing.reseller_id == reseller.id and existing.customer_user_id == customer_id:
-            return {"ok": True, "already_transferred": True,
-                    "subscription_id": sub.id, "reseller_id": reseller.id,
-                    "customer_user_id": customer_id}
+    if existing and existing.reseller_id == reseller.id and existing.customer_user_id == customer_id and sub.user_id == customer_id:
+        return {"ok": True, "already_transferred": True,
+                "subscription_id": sub.id, "reseller_id": reseller.id,
+                "customer_user_id": customer_id, "owner_user_id": customer_id}
+
+    # A purchased reseller subscription carries accounting attribution.
+    # Reassigning that sale to a different reseller would falsify history.
+    if existing and existing.reseller_id != reseller.id and (
+        existing.buy_price_toman or existing.sell_price_toman
+    ):
         raise HTTPException(
             status_code=409,
-            detail="اشتراک قبلاً به نماینده دیگری یا مشتری متفاوت واگذار شده است",
+            detail="انتقال اشتراک خریداری‌شده بین نمایندگان نیازمند تسویه حساب است",
         )
 
     try:
         if not linked_customer:
             db.add(ResellerCustomer(reseller_id=reseller.id, user_id=customer_id))
-        db.add(ResellerSubscription(
-            reseller_id=reseller.id,
-            subscription_id=sub.id,
-            customer_user_id=customer_id,
-            buy_price_toman=0,
-            sell_price_toman=0,
-        ))
+        if existing:
+            existing.reseller_id = reseller.id
+            existing.customer_user_id = customer_id
+        else:
+            db.add(ResellerSubscription(
+                reseller_id=reseller.id,
+                subscription_id=sub.id,
+                customer_user_id=customer_id,
+                buy_price_toman=0,
+                sell_price_toman=0,
+            ))
+        # Real ownership changes in the SAME transaction as reseller mapping.
+        # Do not rotate credentials, modify quota/expiry, or run provisioning.
+        sub.user_id = customer_id
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -457,7 +468,8 @@ def transfer_subscription_to_reseller(
         "subscription_id": sub.id,
         "reseller_id": reseller.id,
         "customer_user_id": customer_id,
-        "message": "اشتراک بدون تغییر کانفیگ به پنل نماینده منتقل شد",
+        "owner_user_id": customer_id,
+        "message": "مالکیت اشتراک و مدیریت آن به نماینده منتقل شد؛ کانفیگ‌ها تغییر نکردند",
     }
 
 
