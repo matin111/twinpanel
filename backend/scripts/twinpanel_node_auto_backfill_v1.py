@@ -13,7 +13,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
@@ -27,10 +27,40 @@ PAIR_LIMIT = 20
 EXEC_TIMEOUT = 350
 
 
+def new_account_work_has_priority() -> bool:
+    """Pause old-account backfill while fresh paid/new account work is active."""
+    from app.database import SessionLocal
+    from app.store_models import StoreOrder
+    from app.reseller_bot_order_models import ResellerBotOrder
+    from app.fast_provision_job_models_v1 import FastProvisionJobV1
+
+    cutoff = datetime.utcnow() - timedelta(minutes=45)
+    with SessionLocal() as db:
+        if db.query(StoreOrder.id).filter(
+            StoreOrder.status == "provisioning",
+            StoreOrder.created_at >= cutoff,
+        ).first():
+            return True
+        if db.query(ResellerBotOrder.id).filter(
+            ResellerBotOrder.status == "provisioning",
+            ResellerBotOrder.created_at >= cutoff,
+        ).first():
+            return True
+        return bool(db.query(FastProvisionJobV1.subscription_id).filter(
+            FastProvisionJobV1.state.in_(("queued", "running", "retry")),
+        ).first())
+
+
 def safe_to_start() -> bool:
     if os.getloadavg()[0] >= float(os.getenv("NODE_AUTO_BACKFILL_MAX_LOAD", "7")):
         return False
     if not api_healthy():
+        return False
+    try:
+        if new_account_work_has_priority():
+            return False
+    except Exception:
+        # A transient DB error must never steal capacity from paid activations.
         return False
     # Do not compete with official updater or active new-account provisioning.
     try:
