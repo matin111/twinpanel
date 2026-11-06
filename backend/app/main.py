@@ -22,11 +22,13 @@ from . import branding_models  # register reseller tables
 from . import storefront_settings_models  # TWINPANEL_STOREFRONT_CMS_V74
 from . import two_factor_models
 from . import runtime_settings_model
+from . import node_connection_settings_models_v1  # additive per-node modern endpoint table
 from . import download_asset_models
 from . import subscription_delivery_policy_v1
 from .payment_crypto_schema import ensure_payment_crypto_schema
 from .wallet_crypto_schema import ensure_wallet_crypto_schema
 from .routers import admin, auth, nodes, plans, provision, subscriptions, tunnels, resellers, reseller_portal, domains, branding
+from .routers.admin_node_connection_settings_v1 import router as admin_node_connection_settings_v1_router
 from .routers import bootstrap as bootstrap_router_module
 from .routers.two_factor import router as two_factor_router  # TWINPANEL_REAL_2FA_REGISTER_V1
 from .routers import quota_security, account_delivery
@@ -324,6 +326,7 @@ app.include_router(customer_subscription_management_router)
 app.include_router(download_assets_admin_router)
 app.include_router(download_assets_public_router)
 app.include_router(nodes.router)
+app.include_router(admin_node_connection_settings_v1_router)
 app.include_router(node_recovery_router)
 app.include_router(subscriptions.router)
 app.include_router(subscription_admin_v2_router, prefix="/v1")
