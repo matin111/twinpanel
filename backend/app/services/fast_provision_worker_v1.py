@@ -81,7 +81,7 @@ async def _provision_claim(job: ClaimedProvisionJob) -> tuple[str, str | None]:
         missing = _missing_provisioned_protocols(
             db, job.subscription_id, list(job.requested_protocols),
         )
-        quota_ok = bool((result or {}).get("quota", {}).get("ok", False))
+        quota_ok = bool(((result or {}).get("quota") or {}).get("ok", False))
         has_usable = len(missing) < len(job.requested_protocols)
         complete = (
             result is not None and bool(result.get("ok"))
@@ -94,7 +94,10 @@ async def _provision_claim(job: ClaimedProvisionJob) -> tuple[str, str | None]:
             "quota_not_synchronized" if not quota_ok else
             "missing_protocols" if missing else "node_partial_failure"
         )
-        if job.attempts < MAX_ATTEMPTS:
+        # A separate explicit provision request may currently own the
+        # subscription guard. Never suspend a customer just because a
+        # concurrent operator action held the lock for a few seconds.
+        if reason == "provisioning_conflict" or job.attempts < MAX_ATTEMPTS:
             return "retry", reason
         # Stop retrying. Preserve usable delivery when quota enforcement is
         # functional; otherwise fail closed like the original fast-create flow.
@@ -128,7 +131,10 @@ async def run_one_fast_provision_job() -> bool:
             # Leave lease for recovery by another process; do not mark success.
             raise
         except Exception:
-            state = "retry" if job.attempts < MAX_ATTEMPTS else "failed"
+            # Unexpected worker/DB faults are not evidence that the account
+            # is invalid. Preserve retryability rather than leaving an ACTIVE
+            # subscription with a falsely terminal job status.
+            state = "retry"
             error = "worker_exception"
     finally:
         heartbeat.cancel()
