@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.609",
+  "version": "1.1.0-rc.610",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T06:08:26Z",
+  "released_at": "2026-11-06T15:28:54Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "878e4dca2cf09cd23718d7acb1af881cd7d4b7e8",
+  "source_sha": "0fdffb955d3d2fffad49c9303b9291e342cd7641",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.609/twinpanel-1.1.0-rc.609-linux-x86_64.tar.gz",
-    "sha256": "3c433720bfbd70195a48ac069d97e1584d3b3ac898650c5a49d502a0eccf4486",
-    "size_bytes": 28897888
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.610/twinpanel-1.1.0-rc.610-linux-x86_64.tar.gz",
+    "sha256": "9ca2b28f83f78a1e7d8bfd7ef3e74ec2c31c518d3a5ed2cf2b9eef23b8403245",
+    "size_bytes": 28907043
   },
   "notes": {
-    "fa": "حذف کامل gRPC قدیمی از Xray نودهای موجود و ساب‌لینک‌ها؛ جلوگیری از قطع سرویس پس از تغییر Inbound یا پاک‌سازی با حفظ مجوز/مالکیت فایل‌ها و اعتبارسنجی قبل از Restart. حفظ UUID، کلیدهای REALITY، WS/TLS، XHTTP/REALITY و پروتکل‌های دیگر. ادامه تمام امکانات rc.608.",
-    "en": "Retire legacy gRPC from Xray nodes and customer subscriptions. Preserve file ownership/permissions during inbound edits and cleanup, preflight active Xray, validate staged configs and rollback safely. Retain UUIDs, REALITY identities, WS/TLS, XHTTP/REALITY and all other rc.608 features."
+    "fa": "اصلاح جلوگیری از ری‌استارت غیرضروری Xray در همگام‌سازی اکانت‌های V2Ray بدون تغییر UUID و کانفیگ کاربران؛ حفظ مجوز فایل‌ها و همه امکانات rc.609.",
+    "en": "Avoid unnecessary Xray config rewrites and service restarts during unchanged VLESS account reconciliation; preserve file permissions, UUIDs and all rc.609 features."
   }
 }
