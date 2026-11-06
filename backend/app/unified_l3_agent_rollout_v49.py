@@ -25,11 +25,18 @@ _original_tunnel_watchdog_loop = None
 _ROLLOUT_CONCURRENCY = 2
 _AGENT_MARKER = "TWINPANEL_UNIFIED_L3_AGENT_V49"
 
+# A newer candidate-registry plugin changes _AGENT_MARKER to its own version.
+# Additive feature markers must never be overwritten by that assignment:
+# otherwise Agent rollout falsely reports old nodes as current.
+_AGENT_REQUIRED_MARKERS: set[str] = set()
+
 
 def _marker_probe_command(*, verify_service: bool = False) -> str:
-    command = (
-        f"grep -q {shlex.quote(_AGENT_MARKER)} "
+    markers = sorted(_AGENT_REQUIRED_MARKERS | {_AGENT_MARKER})
+    command = " && ".join(
+        f"grep -Fq {shlex.quote(marker)} "
         "/opt/twinpanel-agent/agent.py 2>/dev/null"
+        for marker in markers
     )
     if verify_service:
         command += " && systemctl is-active --quiet twinpanel-agent.service"
@@ -192,6 +199,7 @@ async def rollout_unified_l3_agents_once() -> None:
     print(
         "TWINPANEL_UNIFIED_L3_AGENT_ROLLOUT_V49 "
         f"marker={_AGENT_MARKER} "
+        f"required={','.join(sorted(_AGENT_REQUIRED_MARKERS))} "
         f"nodes={len(node_ids)} "
         f"upgraded={upgraded} "
         f"current={current} "
