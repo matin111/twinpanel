@@ -329,7 +329,7 @@ APPS = {
 
 
 
-# Keep the learning/download catalog in step with the shared 15-protocol plan
+# Keep the learning/download catalog in step with the shared 16-protocol plan
 # registry, used by both mlearn (main bot) and rlearn (reseller bots).
 from .protocol_account_registry import MODERN_PROTOCOL_KEYS, PROTOCOL_TITLES
 
@@ -355,6 +355,7 @@ _MODERN_APP_CHOICES = {
     "naive": ("NaiveProxy", "naive"),
     "shadowtls": ("sing-box", "singbox"),
     "snell": ("Surge", "surge"),
+    "socks5": ("sing-box", "singbox"),
     "mieru": ("Karing", "mieru"),
     "trusttunnel": ("TrustTunnel", "trusttunnel_mobile"),
     "amneziawg": ("AmneziaWG", "amnezia_android"),
@@ -368,6 +369,7 @@ _MODERN_NOTES = {
     "naive": "برای NaiveProxy ممکن است واردکردن اطلاعات سرور در فایل تنظیمات یا کلاینت سازگار لازم باشد.",
     "shadowtls": "ShadowTLS معمولاً به کانفیگ کامل زنجیره/transport نیاز دارد؛ لینک خام را بدون بررسی سازگاری وارد نکنید.",
     "snell": "Snell برای Surge طراحی شده است. برای این سیستم‌عامل در صورت نبود Surge، برنامه جایگزین تأییدشده معرفی نمی‌شود.",
+    "socks5": "SOCKS5 فقط با نام کاربری و رمز اشتراک فعال است. اتصال SOCKS5 به‌تنهایی رمزگذاری نمی‌شود؛ از برنامه سازگار با SOCKS5 استفاده کنید.",
     "mieru": "فقط خروجی سازگار با Mieru (مانند Clash/Mihomo یا لینک Mieru) را در برنامه‌ای که از آن پشتیبانی می‌کند وارد کنید.",
     "trusttunnel": "از فایل یا لینک مخصوص TrustTunnel و کلاینت رسمی آن استفاده کنید؛ لینک عمومی VPN جایگزین آن نیست.",
     "amneziawg": "کانفیگ AmneziaWG مخصوص همین پروتکل را بگیرید؛ فایل WireGuard معمولی لزوماً معادل آن نیست.",
