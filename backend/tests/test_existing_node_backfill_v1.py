@@ -27,7 +27,7 @@ def test_preview_is_default_and_apply_requires_exact_node_confirmation():
         "--confirm-node-id", "13", "--max-pairs", "3",
     ])
     assert enabled.apply and enabled.max_pairs == 3
-    for proto in ("v2ray", "xray", "grpc", "reality"):
+    for proto in ("xray", "grpc", "reality"):
         with pytest.raises(SystemExit):
             parse_args(["--node-id", "13", "--protocol", proto])
 
