@@ -659,6 +659,22 @@ async def _admin_status_remote_v47(conn, base_port: int) -> dict[str, Any]:
     return state
 
 
+def reattach_service_routes_v47_after_v87() -> None:
+    """Attach the TCP REALITY ingress route to final configured-route authority.
+
+    V87/V251 replace tunnels._service_routes_for_exit after the first V47
+    installation. Rebind once after V87 and *before* Unified L3 V49 captures
+    it, so TCP REALITY gets the same route metadata/filtering as other VPN
+    services. All other V47 wrappers remain installed exactly once.
+    """
+    global _original_service_routes
+    current = tunnels._service_routes_for_exit
+    if current is _service_routes_v47:
+        return
+    _original_service_routes = current
+    tunnels._service_routes_for_exit = _service_routes_v47
+
+
 def apply_xray_adaptive_three_profiles_v47() -> None:
     global _runtime_applied
     global _original_ensure_modern_xray
