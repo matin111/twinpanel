@@ -6,7 +6,7 @@ resume without replaying credentials already present on the destination.
 from __future__ import annotations
 
 from datetime import datetime
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 
@@ -23,6 +23,7 @@ class NodeAutoBackfillJobV1(Base):
     completed_batches: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     consecutive_errors: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_batch_pairs: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    pause_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     run_after: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
     lease_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     lease_token: Mapped[str | None] = mapped_column(String(40), nullable=True)
