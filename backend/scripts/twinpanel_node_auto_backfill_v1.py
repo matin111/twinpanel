@@ -19,7 +19,7 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
 from app.database import SessionLocal
-from app.services.node_auto_backfill_v1 import claim_next, finish_claim
+from app.services.node_auto_backfill_v1 import claim_next, finish_claim, repair_missing_v2ray_jobs
 from scripts.twinpanel_existing_node_backfill_v1 import api_healthy
 
 LOCK_PATH = "/run/twinpanel-node-auto-backfill-v1.lock"
@@ -134,6 +134,9 @@ def run_once() -> int:
             return 0
 
         with SessionLocal() as db:
+            repaired = repair_missing_v2ray_jobs(db)
+            if repaired:
+                print("NODE_AUTO_BACKFILL_V2RAY_QUEUE_RECOVERED", repaired, flush=True)
             claimed = claim_next(db)
         if claimed is None:
             return 0
