@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 
@@ -10,21 +11,23 @@ ROOT = Path(__file__).resolve().parents[2]
 REPAIR = ROOT / "backend/app/tp27_self_repair_v265.py"
 
 
-def _load_capacity_function():
+def _load_capacity_function(name: str = "_tcp_throughput_health"):
     source = REPAIR.read_text(encoding="utf-8")
     compile(source, str(REPAIR), "exec")
     node = next(
         item for item in ast.parse(source).body
-        if isinstance(item, ast.FunctionDef) and item.name == "_tcp_throughput_health"
+        if isinstance(item, ast.FunctionDef) and item.name == name
     )
     namespace = {
         "Any": Any,
         "datetime": datetime,
         "THROUGHPUT_MAX_SAMPLE_AGE_SECONDS": 900,
         "THROUGHPUT_CRITICAL_Mbps": 3.0,
+        "STABILITY_REVISION": 304,
+        "tp27_fast": SimpleNamespace(MTU=1400),
     }
     exec(compile(ast.Module(body=[node], type_ignores=[]), str(REPAIR), "exec"), namespace)
-    return namespace["_tcp_throughput_health"]
+    return namespace[name]
 
 
 def main() -> None:
@@ -55,6 +58,19 @@ def main() -> None:
 
     assert measure(make(0.2, 0.2, -90), now_epoch=now)["status"] == "stale"
     assert measure(make(-1, 0.2, 30), now_epoch=now)["status"] == "unknown"
+
+    repair_meta = _load_capacity_function("_repair_meta")
+    existing = {
+        "selected_profile": "gre-fou",
+        "smart_auto_v21": {"throughput": {"download_mbps": 0.3}},
+    }
+    args = dict(rt={}, health={}, attempts=[], source="manual", fou_port=None)
+    switched = repair_meta(existing, profile="gre-native", **args)
+    assert switched["smart_auto_v21"]["throughput"] is None
+    assert switched["selected_profile"] == "gre-native"
+
+    retained = repair_meta(existing, profile="gre-fou", **args)
+    assert retained["smart_auto_v21"]["throughput"]["download_mbps"] == 0.3
 
     repair_source = REPAIR.read_text(encoding="utf-8")
     assert "and not quality[\"confirmed_slow\"]" in repair_source
