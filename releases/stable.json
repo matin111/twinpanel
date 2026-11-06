@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.611",
+  "version": "1.1.0-rc.612",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T15:48:22Z",
+  "released_at": "2026-11-06T16:02:29Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "21516448e88bc569b1b5be1d52a1f528bb5e7485",
+  "source_sha": "c5660646d45342cd8d9c94ea06056b65ad22edd1",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.611/twinpanel-1.1.0-rc.611-linux-x86_64.tar.gz",
-    "sha256": "569694cfc88ea0867cfe670bb42956a95c7b5a366b0550c698d37401b12ac969",
-    "size_bytes": 28908866
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.612/twinpanel-1.1.0-rc.612-linux-x86_64.tar.gz",
+    "sha256": "fd3b99d130212379009ad93727c1863d42dbddff6dad4f9741300209f31349a6",
+    "size_bytes": 28910825
   },
   "notes": {
-    "fa": "اصلاح پایدار راه‌اندازی Worker همگام‌سازی پس از آپدیت و Rollback؛ جلوگیری از خطاهای worker_missing و حفظ اصلاح Xray بدون ری‌استارت غیرضروری کاربران موجود در rc.610. تنظیمات نودها، تونل‌ها و سایر پروتکل‌ها تغییر نکرده‌اند.",
-    "en": "Restart release-bound heavy reconcile worker with API/web on upgrade and rollback to prevent missing convergence/quota worker scripts after release activation. Retains rc.610 no-op Xray sync and unchanged tunnel/protocol settings."
+    "fa": "رفع مشکل نمایش نود جدید برای کاربران قدیمی: امکان بازسازی امن و هدفمند کانفیگ اشتراک مشخص، حفظ پروتکل‌های مجاز پلن و جلوگیری از ثبت اطلاعات حساس SSH در لاگ؛ شامل تمام اصلاحات rc.611 و V2Ray.",
+    "en": "Add safe single-subscription canary for backfilling ready node credentials for existing imported accounts; preserve plan entitlements and suppress sensitive SSH mutation logs. Includes all rc.611 V2Ray and updater fixes."
   }
 }
