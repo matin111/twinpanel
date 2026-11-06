@@ -28,6 +28,7 @@ EXPECTED_CLIENTS = {
     "naive": {"windows": "Karing", "android": "Karing", "ios": "Karing"},
     "shadowtls": {"windows": "Karing", "android": "Karing", "ios": "Karing"},
     "snell": {"windows": "sing-box Desktop", "android": "sing-box", "ios": "sing-box"},
+    "socks5": {"windows": "SOCKS5-compatible client", "android": "SOCKS5-compatible client", "ios": "SOCKS5-compatible client"},
     "mieru": {"windows": "Karing", "android": "Karing", "ios": "Karing"},
     "trusttunnel": {"windows": "TrustTunnel GUI", "android": "TrustTunnel", "ios": "TrustTunnel"},
     "amneziawg": {"windows": "AmneziaWG", "android": "AmneziaWG", "ios": "AmneziaWG"},
@@ -99,7 +100,7 @@ def main() -> None:
     classic = python_tuple(v13, "CLASSIC_PROTOCOLS")
     modern = python_tuple(v13, "MODERN_PROTOCOLS")
     inventory = classic + modern
-    require(tuple(EXPECTED_CLIENTS) == inventory, f"15-protocol order drifted: {inventory!r}")
+    require(tuple(EXPECTED_CLIENTS) == inventory, f"16-protocol order drifted: {inventory!r}")
 
     subscription_ui = js_set(v34, "SUBSCRIPTIONS")
     require(subscription_ui == PROVEN_SUBSCRIPTIONS, f"bad V34 subscription cohort: {subscription_ui}")
