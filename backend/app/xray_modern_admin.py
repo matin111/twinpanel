@@ -928,6 +928,43 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
     xhttp_path = str(xhttp_profile.get("path") or "")
     tcp_tls_sni = str((inbounds.get("tcp_tls") or {}).get("server_name") or "")
     ws_tls_sni = str(ws_profile.get("server_name") or "")
+    # DNS aliases may be changed without altering any server listener, but
+    # only if they resolve to the same ingress address as the existing domain.
+    import socket
+
+    expected_domain = str(
+        getattr(node, "xray_domain", None)
+        or getattr(node, "public_domain", None)
+        or getattr(node, "public_ip", None)
+        or ""
+    ).strip().lower()
+
+    def _resolved_addresses(domain: str) -> set[str]:
+        return {
+            item[4][0] for item in socket.getaddrinfo(
+                domain, None, type=socket.SOCK_STREAM
+            )
+        }
+
+    alias_changes: dict[str, str] = {}
+    for profile_key in ("tcp_tls", "ws_tls", "xhttp_reality"):
+        alias = str((inbounds.get(profile_key) or {}).get("connection_domain") or "").strip().lower()
+        if not alias or alias == expected_domain:
+            continue
+        if not expected_domain:
+            raise HTTPException(status_code=422, detail="Cannot verify existing ingress domain")
+        try:
+            expected_ips = await asyncio.wait_for(
+                asyncio.to_thread(_resolved_addresses, expected_domain), timeout=5
+            )
+            new_ips = await asyncio.wait_for(
+                asyncio.to_thread(_resolved_addresses, alias), timeout=5
+            )
+        except (OSError, asyncio.TimeoutError) as exc:
+            raise HTTPException(status_code=422, detail="DNS alias validation failed") from exc
+        if not new_ips or not expected_ips or not new_ips.issubset(expected_ips):
+            raise HTTPException(status_code=422, detail="Connection domain must resolve to the current ingress")
+        alias_changes[profile_key] = alias
     # Published path changes require a valid, non-root path. The node keeps
     # its existing path if no explicit value was supplied.
     for path_value in (ws_path, xhttp_path):
@@ -965,13 +1002,23 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
     settings["reality_target"] = target
     settings["inbound_applied"] = {
         **(settings.get("inbound_applied") or {}),
-        "tcp_tls": {"server_name": tcp_tls_sni} if tcp_tls_sni else (settings.get("inbound_applied") or {}).get("tcp_tls", {}),
+        "tcp_tls": {
+            **((settings.get("inbound_applied") or {}).get("tcp_tls") or {}),
+            **({"server_name": tcp_tls_sni} if tcp_tls_sni else {}),
+            **({"connection_domain": alias_changes["tcp_tls"]} if "tcp_tls" in alias_changes else {}),
+        },
         "ws_tls": {
             **((settings.get("inbound_applied") or {}).get("ws_tls") or {}),
             **({"path": ws_path} if ws_path else {}),
             **({"server_name": ws_tls_sni} if ws_tls_sni else {}),
+            **({"connection_domain": alias_changes["ws_tls"]} if "ws_tls" in alias_changes else {}),
         },
-        "xhttp_reality": {"path": xhttp_path, "server_name": name, "target": target},
+        "xhttp_reality": {
+            **((settings.get("inbound_applied") or {}).get("xhttp_reality") or {}),
+            **({"path": xhttp_path} if xhttp_path else {}),
+            "server_name": name, "target": target,
+            **({"connection_domain": alias_changes["xhttp_reality"]} if "xhttp_reality" in alias_changes else {}),
+        },
     }
     settings["last_verified_at"] = datetime.utcnow().isoformat() + "Z"
     db.execute(
@@ -988,7 +1035,7 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
     db.commit()
     return {
         "ok": True, "node_id": int(node_id),
-        "applied_fields": ["reality_server_name", "reality_target"] + (["ws_path"] if ws_path else []) + (["xhttp_path"] if xhttp_path else []) + (["tcp_tls_sni"] if tcp_tls_sni else []) + (["ws_tls_sni"] if ws_tls_sni else []),
+        "applied_fields": ["reality_server_name", "reality_target"] + (["ws_path"] if ws_path else []) + (["xhttp_path"] if xhttp_path else []) + (["tcp_tls_sni"] if tcp_tls_sni else []) + (["ws_tls_sni"] if ws_tls_sni else []) + (["connection_domain"] if alias_changes else []),
         "reality_server_name": name,
         "note": "TLS, connection domain and transport remain unchanged.",
     }
