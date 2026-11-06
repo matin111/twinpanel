@@ -6,6 +6,8 @@ import {Badge,Card,Shell,Stat} from "./ui";
 import {adminApi,type AdminNode,type RuntimeRow,type XrayDomainState} from "../lib/admin-api";
 import {legacyAdminApi} from "../lib/legacy-admin-api";
 import {useI18n} from "../lib/i18n";
+import {API_BASE} from "../lib/api";
+import {getCustomerToken} from "../lib/customer-api";
 
 const s=(value:unknown)=>String(value??"").trim();
 const n=(value:unknown)=>{const parsed=Number(value??0);return Number.isFinite(parsed)?parsed:0;};
@@ -21,6 +23,7 @@ const protocolKeys=["cisco","openvpn","wireguard","l2tp","v2ray"] as const;
 type NodeRole="iran"|"exit"|"mother";
 type NodeModal="manage"|"ssh"|"domain"|"xray-domain"|null;
 type ExtendedNode=AdminNode&{is_mother?:boolean;public_domain?:string|null};
+type NodeBackfillStatus={node_id:number;published:boolean;queued:boolean;completed_pairs:number;families:Array<{protocol:string;state:string;completed_pairs:number;last_batch:number;attempts:number;error_code:string|null}>};
 
 function roleOf(node:ExtendedNode):NodeRole{
   if(node.is_mother||node.node_type==="mother"||node.node_type==="core")return "mother";
@@ -61,6 +64,48 @@ export function LegacyNodesRuntimePage(){
   const [xrayDomainDraft,setXrayDomainDraft]=useState("");
   const [xrayDomainMeta,setXrayDomainMeta]=useState<XrayDomainState|null>(null);
   const [xrayDomainLoading,setXrayDomainLoading]=useState(false);
+  const [backfill,setBackfill]=useState<NodeBackfillStatus|null>(null);
+  const [backfillBusy,setBackfillBusy]=useState(false);
+  const [backfillError,setBackfillError]=useState("");
+  useEffect(()=>{
+    if(modal!=="manage"||!selectedId)return;
+    let active=true;
+    const poll=async()=>{
+      const token=getCustomerToken();
+      if(!token)return;
+      try{
+        const r=await fetch(`${API_BASE}/v1/nodes/${selectedId}/backfill-status`,{
+          cache:"no-store",headers:{Authorization:`Bearer ${token}`}
+        });
+        if(r.ok&&active)setBackfill(await r.json() as NodeBackfillStatus);
+      }catch{
+        // Transient API errors should not stop local node-management actions.
+      }
+    };
+    setBackfill(null);setBackfillError("");
+    void poll();
+    const interval=window.setInterval(()=>void poll(),10000);
+    return()=>{active=false;window.clearInterval(interval);};
+  },[selectedId,modal]);
+
+  const queueNodeBackfill=async()=>{
+    if(!selectedId||backfillBusy)return;
+    const token=getCustomerToken();
+    if(!token){setBackfillError("AUTH_REQUIRED");return;}
+    const publish=backfill?.published===false;
+    if(publish&&!window.confirm(pick("این نود به اشتراک‌های فعال قبلی اضافه و ساخت کانفیگ‌ها صف می‌شود. ادامه می‌دهید؟","Publish this node to eligible existing accounts and queue credential creation?")))return;
+    setBackfillBusy(true);setBackfillError("");
+    try{
+      const url=`${API_BASE}/v1/nodes/${selectedId}/${publish?"publish-all-users":"backfill-retry"}`;
+      const response=await fetch(url,{method:"POST",cache:"no-store",headers:{Authorization:`Bearer ${token}`}});
+      if(!response.ok)throw new Error(await response.text());
+      const status=await fetch(`${API_BASE}/v1/nodes/${selectedId}/backfill-status`,{cache:"no-store",headers:{Authorization:`Bearer ${token}`}});
+      if(status.ok)setBackfill(await status.json() as NodeBackfillStatus);
+      setSuccess(pick("ساخت کانفیگ در صف پایدار ثبت شد و به‌صورت خودکار ادامه می‌یابد.","Credential generation queued durably and will continue automatically."));
+    }catch(error){setBackfillError(error instanceof Error?error.message:String(error));}
+    finally{setBackfillBusy(false);}
+  };
+
 
   const load=async(silent=false)=>{
     if(!silent)setLoading(true);
@@ -337,6 +382,16 @@ export function LegacyNodesRuntimePage(){
           {selectedRole==="exit"?<div><span>{pick("دامنه Xray / V2Ray","Xray / V2Ray domain")}</span><b dir="ltr">{xrayDomainLoading?"…":displayedXrayDomain||"—"}{xrayDomainMeta?.legacy_public_domain_fallback?` · ${pick("fallback عمومی","public fallback")}`:""}</b></div>:null}
           <div><span>{pick("پروتکل‌های کلاسیک فعال","Enabled classic protocols")}</span><b>{enabledProtocolCount(selected).toLocaleString("fa-IR")}</b></div>
         </div>
+        {selectedRole==="exit"?<div className="runtime-choice-section" style={{marginBottom:12}}>
+          <div className="card-head"><b>{pick("ساخت خودکار کانفیگ کاربران قبلی","Automatic existing-account provisioning")}</b><Badge tone={backfill?.families.some(row=>row.state==="failed")?"bad":backfill?.queued?"warn":"ok"}>{backfill?.queued?pick("در حال پردازش","Processing"):backfill?.families.length?pick("آماده","Ready"):pick("هنوز شروع نشده","Not queued")}</Badge></div>
+          <small>{pick("این عملیات در Worker مستقل و دسته‌های محدود اجرا می‌شود. ساخت اکانت جدید و پنل مسدود نمی‌شوند. V2Ray / REALITY تغییر نمی‌کند.","A separate bounded worker handles existing accounts. New-account creation and the panel remain responsive. V2Ray / REALITY are unchanged.")}</small>
+          <div className="runtime-info-list" style={{marginTop:10}}>
+            <div><span>{pick("جفت کانفیگ ثبت‌شده","Credential pairs recorded")}</span><b>{(backfill?.completed_pairs??0).toLocaleString("fa-IR")}</b></div>
+            {backfill?.families.map(row=><div key={row.protocol}><span dir="ltr">{row.protocol}</span><b>{row.state} · {row.completed_pairs.toLocaleString("fa-IR")}{row.error_code?` · ${row.error_code}`:""}</b></div>)}
+          </div>
+          {backfillError?<div className="runtime-error">{backfillError}</div>:null}
+          <button type="button" className="primary-soft" disabled={backfillBusy} onClick={()=>void queueNodeBackfill()}>{backfillBusy?"…":backfill?.published===false?pick("انتشار نود و شروع ساخت خودکار","Publish and start automatic provisioning"):pick("شروع / تلاش مجدد ساخت کانفیگ","Start / retry credential generation")}</button>
+        </div>:null}
         <div className="runtime-warning">
           {pick("Health، Repair، Port و تنظیمات حرفه‌ای پروتکل‌ها از مرکز «پروتکل‌ها» مدیریت می‌شود. هویت دامنه Xray / V2Ray متعلق به خود Exit Server است و از همین بخش مدیریت می‌شود.","Protocol health, repair, ports and advanced settings remain in Protocols. Xray / V2Ray domain identity belongs to the Exit server and is managed here.")}
         </div>
