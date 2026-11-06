@@ -3,7 +3,7 @@
 
 Default is read-only. Only --apply can write credentials. Deliberately limited
 to one Exit + one protocol family, with bounded batches and API health gates.
-No Xray/V2Ray, no migrated-account global queue and no all-node restarts.
+V2Ray uses missing-only idempotent hot sync (never Xray restart); no global queue or all-node restarts.
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-PROTOCOLS = ("singbox", "openvpn", "cisco", "wireguard", "l2tp")
+PROTOCOLS = ("singbox", "openvpn", "cisco", "wireguard", "l2tp", "v2ray")
 SOURCES = ("eylan", "sanaei", "marzban", "pasargad")
 
 

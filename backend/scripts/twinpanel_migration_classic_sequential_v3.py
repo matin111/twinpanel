@@ -2,6 +2,7 @@
 from __future__ import annotations
 import asyncio
 import inspect
+import uuid
 import fcntl
 import logging
 import os
@@ -22,7 +23,7 @@ from sqlalchemy import or_
 logging.getLogger('asyncssh').setLevel(logging.WARNING)
 SOURCES=('eylan','sanaei','marzban','pasargad')
 PROTOCOL=os.getenv('CLASSIC_ONLY_PROTOCOL','openvpn').strip().lower()
-assert PROTOCOL in {'openvpn','cisco','l2tp','wireguard'}
+assert PROTOCOL in {'openvpn','cisco','l2tp','wireguard','v2ray'}
 PROTOCOLS=(PROTOCOL,)
 PER_NODE=int(os.getenv('CLASSIC_DIRECT_BATCH_PER_NODE','3'))
 NODE_IDS=tuple(int(x) for x in os.getenv('CLASSIC_DIRECT_NODE_IDS','6').split(','))
@@ -81,6 +82,10 @@ async def one_node(db,node_id,*,subscription_id: int | None = None):
                 if any(ad._autosync_item_node_id(x)==node_id for x in items):
                     skipped+=1
                     continue
+                # Never rotate an unreadable existing V2Ray credential.
+                if protocol == 'v2ray' and cred is not None and cred.config_text_encrypted and not items:
+                    failed+=1
+                    continue
                 # Most migrated users already have this node; only read User,
                 # identity, and current status for an actually missing pair.
                 user=db.get(User,sub.user_id)
@@ -109,6 +114,21 @@ async def one_node(db,node_id,*,subscription_id: int | None = None):
                             item=await asyncio.wait_for(ad._openvpn(db,node,sub,user),timeout=180)
                     elif protocol=='wireguard':
                         item=await asyncio.wait_for(ad._wireguard(db,node,sub,user),timeout=90)
+                    elif protocol=='v2ray':
+                        # Keep a single UUID on all Exit nodes; never rotate
+                        # or overwrite inconsistent existing client identities.
+                        known={str(row.get('uuid') or '').strip()
+                               for row in items if isinstance(row,dict)}
+                        if '' in known or len(known)>1:
+                            raise ValueError('invalid existing V2Ray identity')
+                        client_id=next(iter(known)) if known else str(uuid.uuid4())
+                        client_id=str(uuid.UUID(client_id))
+                        # Existing hot sync updates only this client and
+                        # forbids Xray restart or inbound/REALITY replacement.
+                        item=await asyncio.wait_for(
+                            ad._xray(db,node,sub,user,client_id),timeout=90)
+                        if str(item.get('uuid') or '') != client_id:
+                            raise ValueError('V2Ray UUID changed unexpectedly')
                     else:
                         raise ValueError("unsupported protocol")
                     if cred is None:
