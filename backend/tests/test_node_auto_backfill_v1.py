@@ -33,7 +33,7 @@ def fixture_db():
     return engine, db
 
 
-def test_enqueue_is_idempotent_and_no_xray():
+def test_enqueue_is_idempotent_and_includes_safe_v2ray():
     engine, db = fixture_db()
     try:
         a = enqueue_node_backfill(db, 13)
