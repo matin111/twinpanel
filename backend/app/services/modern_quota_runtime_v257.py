@@ -1227,6 +1227,7 @@ def capability_payload() -> dict[str, dict[str, bool]]:
         "naive",
         "shadowtls",
         "snell",
+        "socks5",
     }
     return {
         protocol: {
