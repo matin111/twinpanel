@@ -23,7 +23,7 @@ MOUNT = ROOT / "backend/app/routers/public_connection_forward_mount_v34.py"
 PROVEN_SUBSCRIPTIONS = ("v2ray", "hysteria2", "tuic", "anytls")
 MULTI_PROTOCOLS = (
     "openvpn", "wireguard", "v2ray", "hysteria2", "tuic", "anytls", "naive",
-    "shadowtls", "snell", "mieru", "trusttunnel", "amneziawg", "sudoku", "socks5",
+    "shadowtls", "snell", "socks5", "mieru", "trusttunnel", "amneziawg", "sudoku",
 )
 CANONICAL_PROTOCOLS = (
     "cisco", "openvpn", "wireguard", "l2tp", "v2ray",
