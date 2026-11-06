@@ -1,0 +1,24 @@
+name: Xray Live Subscription V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/public_connection_multilink_v7.py"
+      - "backend/app/xray_modern_admin.py"
+      - "tests/test_xray_live_node_subscription_v1.py"
+      - "components/xray-inbound-editor-in-protocol.tsx"
+      - ".github/workflows/xray-live-subscription-v1-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  subscription:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile inbound and subscription modules
+        run: python -m py_compile backend/app/xray_modern_admin.py backend/app/routers/public_connection_multilink_v7.py
+      - name: Verify live SNI and customer remark preservation
+        run: python -m unittest discover -s tests -p test_xray_live_node_subscription_v1.py -v
