@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.614",
-  "source_sha": "a37da94e40ab5a63292d1a80a6d812da508e96c7",
+  "version": "1.1.0-rc.615",
+  "source_sha": "cf52982a64c5f12a22d3a1d68ec0324fb95f6df0",
   "notes": {
-    "fa": "نسخه رسمی صف پایدار ساخت کانفیگ نود جدید برای اشتراک‌های قدیمی: ثبت خودکار صف پس از انتشار نود، ساخت مرحله‌ای خارج از API، اولویت خریدهای جدید، نمایش پیشرفت و تلاش مجدد از مدیریت نود، با حفظ اصلاحات جدید Xray و محدودیت‌های پلن.",
-    "en": "Official durable new-Exit credential backfill after admin publication, with supervised bounded background worker, retry/progress in node management and priority for new paid accounts, preserving all merged Xray fixes and plan entitlements."
+    "fa": "رفع خطای فرم ساخت دستی اکانت پس از افزایش تعداد پروتکل‌ها به ۱۶: حذف شرط ثابت ۱۵ پروتکل، نمایش صحیح کاربران، نودها و فهرست واقعی پروتکل‌ها بدون تغییر کانفیگ‌های موجود.",
+    "en": "Fix manual admin subscription creation broken by the 16-protocol registry: accept the live nonempty catalog instead of a hardcoded count and restore selectable users, nodes and protocols without touching existing accounts."
   }
 }
