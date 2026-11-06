@@ -780,6 +780,8 @@ target = __TARGET__
 name = __NAME__
 ws_path = __WS_PATH__
 xhttp_path = __XHTTP_PATH__
+tcp_tls_sni = __TCP_TLS_SNI__
+ws_tls_sni = __WS_TLS_SNI__
 lock = open("/run/lock/twinpanel-xray-inbound-editor.lock", "a+")
 fcntl.flock(lock, fcntl.LOCK_EX)
 host, port = target.rsplit(":", 1)
@@ -808,6 +810,32 @@ for entry in inbounds:
     reality["serverNames"] = [name]
 state["reality_target"] = target
 state["reality_server_name"] = name
+# TLS SNI may change only when the currently installed certificate covers it.
+for tag, server_name, state_key in (
+    ("vless-tcp-tls", tcp_tls_sni, "tls_sni_tcp"),
+    ("vless-ws-tls", ws_tls_sni, "tls_sni_ws"),
+):
+    if not server_name:
+        continue
+    entries = [x for x in config["inbounds"] if x.get("tag") == tag]
+    if len(entries) != 1:
+        raise RuntimeError("TLS inbound is missing: " + tag)
+    stream = entries[0]["streamSettings"]
+    tls_settings = stream["tlsSettings"]
+    certificates = tls_settings.get("certificates") or []
+    if not certificates:
+        raise RuntimeError("No managed TLS certificate for " + tag)
+    certificate = certificates[0].get("certificateFile")
+    if not certificate or not os.path.isfile(certificate):
+        raise RuntimeError("TLS certificate unavailable")
+    result = subprocess.run(
+        ["openssl", "x509", "-noout", "-checkhost", server_name, "-in", certificate],
+        capture_output=True, timeout=10,
+    )
+    if result.returncode:
+        raise RuntimeError("TLS certificate does not cover SNI " + server_name)
+    tls_settings["serverName"] = server_name
+    state[state_key] = server_name
 # Apply path changes to matching listeners and persisted state, preserving UUIDs.
 if ws_path:
     matches = [entry for entry in config["inbounds"] if entry.get("tag") == "vless-ws-tls"]
@@ -898,6 +926,8 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
     xhttp_profile = inbounds.get("xhttp_reality") or {}
     ws_path = str(ws_profile.get("path") or "")
     xhttp_path = str(xhttp_profile.get("path") or "")
+    tcp_tls_sni = str((inbounds.get("tcp_tls") or {}).get("server_name") or "")
+    ws_tls_sni = str(ws_profile.get("server_name") or "")
     # Published path changes require a valid, non-root path. The node keeps
     # its existing path if no explicit value was supplied.
     for path_value in (ws_path, xhttp_path):
@@ -912,7 +942,9 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
             "__TARGET__", json.dumps(target)
         ).replace("__NAME__", json.dumps(name)).replace(
             "__WS_PATH__", json.dumps(ws_path)
-        ).replace("__XHTTP_PATH__", json.dumps(xhttp_path))
+        ).replace("__XHTTP_PATH__", json.dumps(xhttp_path)).replace(
+            "__TCP_TLS_SNI__", json.dumps(tcp_tls_sni)
+        ).replace("__WS_TLS_SNI__", json.dumps(ws_tls_sni))
         encoded = base64.b64encode(script.encode("utf-8")).decode("ascii")
         command = (
             "python3 -c "
@@ -933,7 +965,12 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
     settings["reality_target"] = target
     settings["inbound_applied"] = {
         **(settings.get("inbound_applied") or {}),
-        "ws_tls": {"path": ws_path} if ws_path else (settings.get("inbound_applied") or {}).get("ws_tls", {}),
+        "tcp_tls": {"server_name": tcp_tls_sni} if tcp_tls_sni else (settings.get("inbound_applied") or {}).get("tcp_tls", {}),
+        "ws_tls": {
+            **((settings.get("inbound_applied") or {}).get("ws_tls") or {}),
+            **({"path": ws_path} if ws_path else {}),
+            **({"server_name": ws_tls_sni} if ws_tls_sni else {}),
+        },
         "xhttp_reality": {"path": xhttp_path, "server_name": name, "target": target},
     }
     settings["last_verified_at"] = datetime.utcnow().isoformat() + "Z"
@@ -951,7 +988,7 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
     db.commit()
     return {
         "ok": True, "node_id": int(node_id),
-        "applied_fields": ["reality_server_name", "reality_target"] + (["ws_path"] if ws_path else []) + (["xhttp_path"] if xhttp_path else []),
+        "applied_fields": ["reality_server_name", "reality_target"] + (["ws_path"] if ws_path else []) + (["xhttp_path"] if xhttp_path else []) + (["tcp_tls_sni"] if tcp_tls_sni else []) + (["ws_tls_sni"] if ws_tls_sni else []),
         "reality_server_name": name,
         "note": "TLS, connection domain and transport remain unchanged.",
     }
