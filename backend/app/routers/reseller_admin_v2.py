@@ -352,22 +352,28 @@ class SubscriptionTransferIn(BaseModel):
 @router.get("/{reseller_id}/transfer-customers")
 def reseller_transfer_customers(
     reseller_id: int,
+    q: str = Query(default="", max_length=190),
     db: Session = Depends(get_db),
 ):
-    """Only previously linked customers and the reseller owner are candidates.
+    """Find existing active users, including those not yet linked to this reseller.
 
-    Do not expose or automatically attach the administrator's user identity
-    when transferring legacy admin-owned subscriptions.
+    The admin can select an existing account rather than creating a duplicate.
+    Role restrictions are still validated by the transfer endpoint.
     """
     reseller = _get_reseller(db, reseller_id)
-    rows = (
-        db.query(ResellerCustomer.user_id)
-        .filter(ResellerCustomer.reseller_id == reseller.id)
-        .all()
-    )
-    ids = {int(row[0]) for row in rows}
-    ids.add(int(reseller.owner_user_id))
-    users = db.query(User).filter(User.id.in_(ids)).all()
+    needle = q.strip()
+    query = db.query(User).filter(User.is_active.is_(True), User.role != UserRole.ADMIN)
+    if needle:
+        pattern = f"%{needle}%"
+        search = or_(User.email.ilike(pattern), User.full_name.ilike(pattern), User.phone.ilike(pattern))
+        if needle.isdigit():
+            search = or_(search, User.id == int(needle))
+        query = query.filter(search)
+    else:
+        # Keep the initial list compact and relevant to the selected reseller.
+        linked_ids = db.query(ResellerCustomer.user_id).filter(ResellerCustomer.reseller_id == reseller.id)
+        query = query.filter(or_(User.id == reseller.owner_user_id, User.id.in_(linked_ids)))
+    users = query.order_by(User.id.desc()).limit(40).all()
     return [
         {
             "id": int(user.id),
@@ -375,8 +381,7 @@ def reseller_transfer_customers(
             "email": user.email,
             "is_owner": int(user.id) == int(reseller.owner_user_id),
         }
-        for user in users
-        if user.is_active and _owner_role(user) != UserRole.ADMIN.value
+        for user in users if _owner_role(user) != UserRole.ADMIN.value
     ]
 
 
@@ -434,11 +439,8 @@ def transfer_subscription_to_reseller(
         )
         .first()
     )
-    if customer_id != int(reseller.owner_user_id) and not linked_customer:
-        raise HTTPException(
-            status_code=422,
-            detail="ابتدا مشتری را در همین نمایندگی ثبت کنید",
-        )
+    # An existing site user may be linked as part of this same atomic transfer.
+    # Never create a duplicate User record.
 
     existing = (
         db.query(ResellerSubscription)
