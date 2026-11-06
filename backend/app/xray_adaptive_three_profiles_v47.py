@@ -508,6 +508,49 @@ def _customer_profiles_v47(item: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+def _verified_stored_tunnel_endpoint_v47(
+    item: dict[str, Any],
+    raw_profile: dict[str, Any],
+    profile_id: str,
+    node_id: int,
+) -> tuple[str, int] | None:
+    """Reuse an already provisioned public URI only on the expected ingress.
+
+    Xray Modern Runtime's legacy default port families (231xx/233xx) are not
+    the deployed TwinPanel ingress families (240xx/260xx/280xx). Re-resolving
+    a stored profile with those legacy defaults rewrites working URIs to dead
+    ports; it also fails for TCP TLS because it is a V39 extension.
+    Never take an arbitrary URI: require the live public host AND deterministic
+    route port. Direct delivery continues through its dedicated resolver.
+    """
+    if str(item.get("delivery_mode") or "").strip().lower() == "direct":
+        return None
+    bases = {
+        xray_modern_runtime.PROFILE_WS: 26000,
+        xray_modern_runtime.PROFILE_XHTTP: 24000,
+        PROFILE_TCP_TLS: 28000,
+    }
+    base = bases.get(str(profile_id or "").strip().lower())
+    if base is None or not 1 <= int(node_id) <= 999:
+        return None
+    current_host = str(
+        item.get("server") or item.get("server_ip") or ""
+    ).strip().lower()
+    if not current_host:
+        return None
+    try:
+        parsed = urlsplit(str(raw_profile.get("uri") or "").strip())
+        host = str(parsed.hostname or "").strip().lower()
+        port = parsed.port
+        if parsed.scheme != "vless" or not parsed.username:
+            return None
+    except (TypeError, ValueError):
+        return None
+    if host != current_host or port != base + int(node_id):
+        return None
+    return host, int(port)
+
+
 def _customer_xray_item_v47(
     db,
     item: dict[str, Any],
@@ -548,12 +591,16 @@ def _customer_xray_item_v47(
         uri = str(raw_profile.get("uri") or "").strip()
         if not uri:
             continue
+        stored_endpoint = _verified_stored_tunnel_endpoint_v47(
+            item, raw_profile, profile_id, node_id,
+        )
         try:
-            host, port = policy_v30._profile_endpoint_v261(
-                db,
-                node,
-                profile_id,
-                item,
+            host, port = (
+                stored_endpoint
+                if stored_endpoint is not None
+                else policy_v30._profile_endpoint_v261(
+                    db, node, profile_id, item,
+                )
             )
         except Exception:
             continue
