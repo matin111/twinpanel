@@ -21,7 +21,7 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-PROTOCOLS = ("singbox", "openvpn", "cisco", "wireguard", "l2tp")
+PROTOCOLS = ("singbox", "openvpn", "cisco", "wireguard", "l2tp", "v2ray")
 SOURCES = ("eylan", "sanaei", "marzban", "pasargad")
 
 
