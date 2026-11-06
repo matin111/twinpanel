@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 import secrets
+import time
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from pydantic import BaseModel, EmailStr, Field, model_validator
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -351,22 +352,28 @@ class SubscriptionTransferIn(BaseModel):
 @router.get("/{reseller_id}/transfer-customers")
 def reseller_transfer_customers(
     reseller_id: int,
+    q: str = Query(default="", max_length=190),
     db: Session = Depends(get_db),
 ):
-    """Only previously linked customers and the reseller owner are candidates.
+    """Find existing active users, including those not yet linked to this reseller.
 
-    Do not expose or automatically attach the administrator's user identity
-    when transferring legacy admin-owned subscriptions.
+    The admin can select an existing account rather than creating a duplicate.
+    Role restrictions are still validated by the transfer endpoint.
     """
     reseller = _get_reseller(db, reseller_id)
-    rows = (
-        db.query(ResellerCustomer.user_id)
-        .filter(ResellerCustomer.reseller_id == reseller.id)
-        .all()
-    )
-    ids = {int(row[0]) for row in rows}
-    ids.add(int(reseller.owner_user_id))
-    users = db.query(User).filter(User.id.in_(ids)).all()
+    needle = q.strip()
+    query = db.query(User).filter(User.is_active.is_(True), User.role != UserRole.ADMIN)
+    if needle:
+        pattern = f"%{needle}%"
+        search = or_(User.email.ilike(pattern), User.full_name.ilike(pattern), User.phone.ilike(pattern))
+        if needle.isdigit():
+            search = or_(search, User.id == int(needle))
+        query = query.filter(search)
+    else:
+        # Keep the initial list compact and relevant to the selected reseller.
+        linked_ids = db.query(ResellerCustomer.user_id).filter(ResellerCustomer.reseller_id == reseller.id)
+        query = query.filter(or_(User.id == reseller.owner_user_id, User.id.in_(linked_ids)))
+    users = query.order_by(User.id.desc()).limit(40).all()
     return [
         {
             "id": int(user.id),
@@ -374,8 +381,7 @@ def reseller_transfer_customers(
             "email": user.email,
             "is_owner": int(user.id) == int(reseller.owner_user_id),
         }
-        for user in users
-        if user.is_active and _owner_role(user) != UserRole.ADMIN.value
+        for user in users if _owner_role(user) != UserRole.ADMIN.value
     ]
 
 
@@ -394,7 +400,28 @@ def transfer_subscription_to_reseller(
     reseller = _get_reseller(db, reseller_id)
     if not reseller.is_active:
         raise HTTPException(status_code=409, detail="نمایندگی غیرفعال است")
-    sub = db.query(Subscription).filter(Subscription.id == subscription_id).with_for_update().first()
+    # Provisioning can hold this subscription row during slow remote node I/O.
+    # Retry a bounded, non-blocking lock acquisition rather than leak a DB 500.
+    sub = None
+    for attempt in range(6):
+        try:
+            sub = (
+                db.query(Subscription)
+                .filter(Subscription.id == subscription_id)
+                .with_for_update(nowait=True)
+                .first()
+            )
+            break
+        except OperationalError as exc:
+            db.rollback()
+            if getattr(getattr(exc, "orig", None), "pgcode", None) != "55P03":
+                raise
+            if attempt == 5:
+                raise HTTPException(
+                    status_code=409,
+                    detail="این اشتراک در حال پردازش است؛ کمی بعد انتقال را دوباره امتحان کنید",
+                ) from exc
+            time.sleep(0.3 * (attempt + 1))
     if sub is None:
         raise HTTPException(status_code=404, detail="اشتراک پیدا نشد")
     if sub.status == SubscriptionStatus.CANCELED:
@@ -412,11 +439,8 @@ def transfer_subscription_to_reseller(
         )
         .first()
     )
-    if customer_id != int(reseller.owner_user_id) and not linked_customer:
-        raise HTTPException(
-            status_code=422,
-            detail="ابتدا مشتری را در همین نمایندگی ثبت کنید",
-        )
+    # An existing site user may be linked as part of this same atomic transfer.
+    # Never create a duplicate User record.
 
     existing = (
         db.query(ResellerSubscription)

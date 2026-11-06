@@ -107,6 +107,7 @@ export function LegacySubscriptionsRuntimePage(){
   const [transferCustomers,setTransferCustomers]=useState<Array<{id:number;name:string;email?:string|null;is_owner:boolean}>>([]);
   const [transferResellerId,setTransferResellerId]=useState(0);
   const [transferCustomerId,setTransferCustomerId]=useState(0);
+  const [transferCustomerSearch,setTransferCustomerSearch]=useState("");
   const [transferLoading,setTransferLoading]=useState(false);
   // Share URLs are stable for a subscription; cache and dedupe requests so
   // opening the modal does not wait for heavyweight connection-info/provisioning.
@@ -222,7 +223,7 @@ export function LegacySubscriptionsRuntimePage(){
   const openTransfer=async(item:RuntimeRow)=>{
     setSelected(item);setTransferOpen(true);setTransferLoading(true);
     setTransferMode("reseller");setTransferUserId(0);setTransferUserSearch("");
-    setTransferResellerId(0);setTransferCustomerId(0);setTransferCustomers([]);setError("");
+    setTransferResellerId(0);setTransferCustomerId(0);setTransferCustomerSearch("");setTransferCustomers([]);setError("");
     try{
       const resellers=await adminApi.resellersForTransfer();
       setTransferResellers(resellers);
@@ -241,7 +242,7 @@ export function LegacySubscriptionsRuntimePage(){
     return()=>{live=false;window.clearTimeout(timer);};
   },[transferOpen,transferMode,transferUserSearch]);
   const selectTransferReseller=async(id:number)=>{
-    setTransferResellerId(id);setTransferCustomerId(0);setTransferCustomers([]);
+    setTransferResellerId(id);setTransferCustomerId(0);setTransferCustomerSearch("");setTransferCustomers([]);
     if(!id)return;
     setTransferLoading(true);setError("");
     try{
@@ -252,6 +253,16 @@ export function LegacySubscriptionsRuntimePage(){
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setTransferLoading(false);}
   };
+  useEffect(()=>{
+    if(!transferOpen||transferMode!=="reseller"||!transferResellerId)return;
+    let live=true;
+    const timer=window.setTimeout(()=>{
+      void adminApi.resellerTransferCustomers(transferResellerId,transferCustomerSearch.trim())
+        .then(customers=>{if(live)setTransferCustomers(customers);})
+        .catch(reason=>{if(live)setError(reason instanceof Error?reason.message:String(reason));});
+    },transferCustomerSearch.trim()?300:0);
+    return()=>{live=false;window.clearTimeout(timer);};
+  },[transferOpen,transferMode,transferResellerId,transferCustomerSearch]);
   const submitTransfer=()=>{
     if(!selected)return;
     if(transferMode==="user"){
@@ -466,14 +477,15 @@ export function LegacySubscriptionsRuntimePage(){
             {transferResellers.filter(row=>row.is_active===true).map(row=><option key={n(row.id)} value={n(row.id)}>{s(row.name)||s(row.brand_name)||`#${row.id}`} · {s(row.code)}</option>)}
           </select>
         </label>
-        <label className="field"><span>{pick("مشتری ثبت‌شده در نمایندگی","Reseller customer")}</span>
+        <label className="field"><span>{pick("جستجوی کاربر موجود","Search existing site user")}</span><input value={transferCustomerSearch} disabled={!transferResellerId||!!busy} onChange={event=>{setTransferCustomerSearch(event.target.value);setTransferCustomerId(0);}} placeholder={pick("نام، ایمیل، موبایل یا شناسه کاربر…","Name, email, phone or user ID…")}/></label>
+        <label className="field"><span>{pick("کاربر مقصد","Destination user")}</span>
           <select value={transferCustomerId} disabled={!transferResellerId||transferLoading||!!busy} onChange={event=>setTransferCustomerId(Number(event.target.value))}>
             <option value={0}>{pick("انتخاب مشتری","Select customer")}</option>
             {transferCustomers.map(customer=><option key={customer.id} value={customer.id}>{customer.name}{customer.is_owner?` · ${pick("حساب نماینده","Reseller owner")}`:""}</option>)}
           </select>
         </label>
       </div>
-      {transferResellerId&&!transferLoading&&!transferCustomers.length?<p className="runtime-error">{pick("مشتری فعالی در این نمایندگی وجود ندارد. ابتدا از بخش مشتریان نماینده یک مشتری ایجاد کنید.","No active customer found for this reseller. Create a customer first.")}</p>:null}</>}
+      {transferResellerId&&!transferLoading&&!transferCustomers.length?<p className="runtime-error">{pick("کاربری پیدا نشد؛ نام، ایمیل، موبایل یا شناسه کاربر موجود را جستجو کنید.","No active customer found for this reseller. Create a customer first.")}</p>:null}</>}
       <div className="modalActions"><button className="ghost" disabled={!!busy} onClick={()=>setTransferOpen(false)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={!!busy||transferLoading||(transferMode==="user"?!transferUserId:!transferResellerId||!transferCustomerId)} onClick={submitTransfer}>{busy==="transfer"?pick("در حال انتقال…","Transferring…"):pick("تأیید انتقال","Confirm transfer")}</button></div>
     </Modal>}
     {modal==="extend"&&selected&&<Modal title={pick("تمدید اشتراک","Renew subscription")} sub={`MV-${n(selected.id)} · ${expiryCell(selected)}`} onClose={()=>!busy&&setModal(null)}><div className="setting-grid"><label className="field"><span>{pick("روز اضافه","Add days")}</span><input type="number" min={0} value={extendDays} onChange={event=>setExtendDays(Math.max(0,Number(event.target.value)||0))}/></label><label className="field"><span>{pick("حجم اضافه GB","Add traffic GB")}</span><input type="number" min={0} step="0.1" value={extendTraffic} onChange={event=>setExtendTraffic(Math.max(0,Number(event.target.value)||0))}/></label></div><div className="modalActions"><button className="ghost" onClick={()=>setModal(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy==="extend"||(!extendDays&&!extendTraffic)} onClick={saveExtend}>{busy==="extend"?"…":pick("اعمال تمدید","Apply renewal")}</button></div></Modal>}

@@ -16,7 +16,7 @@ from app.models import (
 from app.models_reseller import Reseller, ResellerCustomer, ResellerSubscription
 from app.subscription_override_models import SubscriptionRuntimeOverride
 from app.routers.reseller_admin_v2 import (
-    SubscriptionTransferIn, transfer_subscription_to_reseller,
+    SubscriptionTransferIn, transfer_subscription_to_reseller, reseller_transfer_customers,
 )
 from app.routers.subscription_admin_v2 import (
     SubscriptionOwnerTransferIn, transfer_subscription_to_user, admin_page_v3,
@@ -155,6 +155,37 @@ def test_reseller_filter_is_database_side_before_pagination():
         assert direct["total"] == 1
         assert direct["items"][0]["id"] == 257
         assert owned["stats"]["total"] == direct["stats"]["total"] == 2
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def test_existing_unlinked_site_user_search_and_atomic_reseller_transfer():
+    engine, db = sample_db()
+    try:
+        # User #4 already exists on the site, but is not linked to reseller #3.
+        initial = reseller_transfer_customers(3, q="", db=db)
+        assert 4 not in {item["id"] for item in initial}
+        found = reseller_transfer_customers(3, q="direct@example.test", db=db)
+        assert [item["id"] for item in found] == [4]
+        by_id = reseller_transfer_customers(3, q="4", db=db)
+        assert 4 in {item["id"] for item in by_id}
+
+        before_users = db.query(User).count()
+        response = transfer_subscription_to_reseller(
+            3, 2816, SubscriptionTransferIn(customer_user_id=4), db)
+        assert response["owner_user_id"] == 4
+        assert db.query(User).count() == before_users
+        assert db.get(Subscription, 2816).user_id == 4
+        assert db.query(ResellerCustomer).filter_by(reseller_id=3, user_id=4).count() == 1
+        assert db.query(ResellerSubscription).filter_by(
+            reseller_id=3, subscription_id=2816, customer_user_id=4).count() == 1
+
+        # Repeating the same transfer must not duplicate the link.
+        again = transfer_subscription_to_reseller(
+            3, 2816, SubscriptionTransferIn(customer_user_id=4), db)
+        assert again["already_transferred"] is True
+        assert db.query(ResellerCustomer).filter_by(reseller_id=3, user_id=4).count() == 1
     finally:
         db.close()
         engine.dispose()
