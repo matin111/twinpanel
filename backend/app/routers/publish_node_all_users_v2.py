@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..models import Node, NodeType
+from ..services.node_auto_backfill_v1 import enqueue_node_backfill, job_status
 from . import modern_legacy_reconcile_lockfix_v2 as _modern_lockfix  # noqa: F401
 from . import publish_node_all_users_v1 as legacy_publish
 
@@ -111,6 +112,10 @@ async def publish_node_to_all_users_v2(
         # (including economic/premium tiers) have separate node entitlements.
         # The admin selects nodes for future buyers in the Plan editor.
         # 'Publish to all users' applies to already-purchased, eligible accounts.
+        # Queue missing credentials in the SAME transaction as user
+        # memberships. The independent timer worker does the actual SSH and
+        # retries; this HTTP request remains fast for thousands of accounts.
+        queued_jobs = enqueue_node_backfill(db, int(node.id))
         db.commit()
     except Exception:
         db.rollback()
@@ -141,11 +146,16 @@ async def publish_node_to_all_users_v2(
         "classic_pairs_provisioned": 0,
         "modern_pairs_provisioned": 0,
         "active_memberships_awaiting_background_sync": None,
+        "backfill": {
+            "queued": True,
+            "families": len(queued_jobs),
+            "status_url": f"/v1/nodes/{int(node.id)}/backfill-status",
+        },
         "failed": [],
         "message": (
-            "نود برای اشتراک‌های فعال موجود ثبت شد؛ "
-            "افزودن نود به پلن‌های فروش باید با انتخاب ادمین در ویرایش پلن انجام شود. "
-            "کانفیگ اکانت‌های انتقالی فقط با دستور دستی ساخته می‌شود"
+            "نود برای اشتراک‌های فعال منتشر و ساخت کانفیگ کاربران قبلی به صف پایدار سپرده شد. "
+            "از مدیریت نود می‌توان پیشرفت یا تلاش مجدد را دید؛ "
+            "محدودیت سرورهای پلن اقتصادی و ویژه جداگانه حفظ می‌شود"
         ),
     }
 
@@ -156,6 +166,31 @@ async def publish_node_to_all_users_route_v2(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     return await publish_node_to_all_users_v2(node_id=node_id, db=db)
+
+
+
+@router.get("/{node_id}/backfill-status")
+def read_node_backfill_status_v1(node_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Admin-only status: never exposes credentials or SSH secrets."""
+    try:
+        return job_status(db, node_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="سرور پیدا نشد")
+
+
+@router.post("/{node_id}/backfill-retry")
+def retry_node_backfill_v1(node_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Explicit admin action for an already published Exit, no manual SQL."""
+    try:
+        enqueue_node_backfill(db, node_id, retry_complete=True)
+        db.commit()
+        return job_status(db, node_id)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc))
+    except Exception:
+        db.rollback()
+        raise
 
 
 # The detached installer resolves the V1 global at runtime. Preserve its
