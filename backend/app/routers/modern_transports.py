@@ -476,6 +476,15 @@ async def _wait_manual_cutover_acceptance_v257(
                     item.get("last_error")
                     or "manual_cutover_peer_not_reachable"
                 )
+                # First-time tunnel bootstrap may report waiting_peer_key
+                # before its opposite Agent has published the public key.
+                # Treat this *one* bootstrap state as pending, never as
+                # acceptance. Normal manual switches still reject immediately.
+                if (
+                    str(reason).strip().lower() == "waiting_peer_key"
+                    and timeout_seconds > 30.0
+                ):
+                    continue
                 return False, last_snapshot, str(reason)[:900]
 
         if asyncio.get_running_loop().time() >= deadline:
