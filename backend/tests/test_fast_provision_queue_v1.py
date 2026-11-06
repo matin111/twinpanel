@@ -51,8 +51,10 @@ class DurableProvisionQueueContracts(unittest.TestCase):
         job.run_after = self.now
         self.db.commit()
 
-    def test_feature_disabled_by_default(self):
+    def test_central_queue_enabled_by_default_with_emergency_disable(self):
         with patch.dict(os.environ, {}, clear=True):
+            self.assertTrue(fast_provision_queue_enabled())
+        with patch.dict(os.environ, {"TWINPANEL_FAST_PROVISION_QUEUE_V1": "0"}):
             self.assertFalse(fast_provision_queue_enabled())
 
     def test_priority_claim_and_idempotent_durable_status(self):
@@ -131,17 +133,27 @@ class DurableFastCreateRoutingTests(unittest.TestCase):
         self.assertTrue(result["durable_queue"])
         background.add_task.assert_not_called()
 
-    def test_flag_off_preserves_existing_fast_background_create(self):
+    def test_manual_create_always_uses_durable_queue_not_background_task(self):
         from app.routers import subscription_create_fast_v1 as route
         background = MagicMock()
         with patch.object(route, "_persist_subscription",
-                          return_value=(502, ["anytls"], {"ok": True})), \
-             patch.object(route, "fast_provision_queue_enabled", return_value=False):
+                          return_value=(502, ["anytls"], {"ok": True})):
             result = asyncio.run(route.admin_create_fast_v1({}, background))
         self.assertTrue(result["queued"])
-        self.assertFalse(result["durable_queue"])
-        background.add_task.assert_called_once()
-        self.assertEqual(background.add_task.call_args.args[1], 502)
+        self.assertTrue(result["durable_queue"])
+        background.add_task.assert_not_called()
+
+    def test_explicit_disable_refuses_manual_create_before_db_write(self):
+        from app.routers import subscription_create_fast_v1 as route
+        from fastapi import HTTPException
+        session = MagicMock()
+        with patch.object(route, "fast_provision_queue_enabled", return_value=False), \
+             patch.object(route, "SessionLocal", return_value=session):
+            with self.assertRaises(HTTPException) as ctx:
+                route._persist_subscription({"user_id": 1})
+        self.assertEqual(ctx.exception.status_code, 503)
+        session.add.assert_not_called()
+        session.commit.assert_not_called()
 
 
 if __name__ == "__main__":

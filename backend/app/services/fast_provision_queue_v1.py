@@ -34,8 +34,10 @@ def fast_provision_commerce_enabled() -> bool:
 
 
 def fast_provision_queue_enabled() -> bool:
-    return os.getenv("TWINPANEL_FAST_PROVISION_QUEUE_V1", "").lower().strip() in {
-        "1", "true", "yes",
+    # Central provisioning is a core default. Explicit off is an emergency
+    # kill switch; manual creation must fail before committing when disabled.
+    return os.getenv("TWINPANEL_FAST_PROVISION_QUEUE_V1", "1").lower().strip() not in {
+        "0", "false", "no", "off",
     }
 
 

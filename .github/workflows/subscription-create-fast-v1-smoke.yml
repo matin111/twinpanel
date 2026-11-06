@@ -45,7 +45,10 @@ jobs:
           assert 'def _persist_subscription(' in endpoint
           assert 'async def _provision_subscription_background(' in endpoint
           assert '@router.post("/admin-create-fast-v1", status_code=202)' in endpoint
-          assert 'background_tasks.add_task(' in endpoint
+          # Manual create commits a durable central job, never a transient task.
+          assert 'enqueue_new_subscription(db, int(sub.id), requested_protocols)' in endpoint
+          assert 'background_tasks.add_task(' not in endpoint
+          assert 'durable_queued = True' in endpoint
           assert '"queued": True' in endpoint
           assert '"provisioning_complete": False' in endpoint
           assert 'dependencies=[Depends(require_admin)]' in endpoint
@@ -53,7 +56,7 @@ jobs:
           assert delivery.count('await await_hard_timeout(') >= 2
           assert '_runtime_endpoints.router.include_router(_subscription_create_fast_v1_router)' in init
 
-          print('SUBSCRIPTION_CREATE_FAST_V1_BACKGROUND_CONTRACT_OK')
+          print('SUBSCRIPTION_CREATE_FAST_V1_DURABLE_CENTRAL_CONTRACT_OK')
           PY
 
       - name: Compile endpoint, delivery and hard timeout helper
