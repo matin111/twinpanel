@@ -70,12 +70,6 @@ def main() -> None:
         == 1001
     )
     assert (
-        xray_modern_runtime.PROFILE_META[
-            xray_modern_runtime.PROFILE_HTTPUPGRADE
-        ]["offset"]
-        == 1002
-    )
-    assert (
         xray_modern_runtime.PROFILE_META[policy.PROFILE_TCP_TLS]["offset"]
         == 1003
     )
@@ -84,9 +78,9 @@ def main() -> None:
     base_port = 8443
     tls_targets = {
         xray_modern_runtime._target_port(base_port, profile)
-        for profile in policy.PUBLIC_PROFILE_ORDER
+        for profile in policy.TLS_TARGET_OFFSETS_V261
     }
-    assert tls_targets == {9444, 9445, 9446}, tls_targets
+    assert tls_targets == {9444, 9446}, tls_targets
 
     modern_runtime_ports = {
         int(meta.get("default_port") or 0)
@@ -102,9 +96,6 @@ def main() -> None:
     xray_modern_runtime.PROFILE_META[
         xray_modern_runtime.PROFILE_WS
     ]["public_base"] = 26000
-    xray_modern_runtime.PROFILE_META[
-        xray_modern_runtime.PROFILE_HTTPUPGRADE
-    ]["public_base"] = 27000
     xray_modern_runtime.PROFILE_META[
         policy.PROFILE_TCP_TLS
     ]["public_base"] = 28000
@@ -187,17 +178,16 @@ def main() -> None:
             profile["id"] for profile in delivered["profiles"]
         } == {
             "websocket_tls",
-            "httpupgrade_tls",
+            "xhttp_reality",
             "tcp_tls",
         }
-        assert "24006" not in str(delivered)
-        assert "25006" not in str(delivered)
+        assert "httpupgrade_tls" not in str(delivered)
+        assert "grpc_reality" not in str(delivered)
 
-        # A modern credential which contains only internal profiles must not
-        # fall back to the unrouted XHTTP endpoint.
+        # Deprecated HTTPUpgrade and gRPC profiles must not leak to customers.
         hidden_only = dict(tunnel_item)
         hidden_only["profiles"] = [
-            vless("xhttp_reality", 24006),
+            vless("httpupgrade_tls", 27006),
             vless("grpc_reality", 25006),
         ]
         assert policy._customer_xray_item_v261(db, hidden_only) is None
