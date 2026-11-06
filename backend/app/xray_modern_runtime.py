@@ -809,7 +809,6 @@ async def _ensure_modern_xray(
                 "decryption": "none",
             },
             "streamSettings": {
-                "sockopt": {"tcpCongestion": "bbr"},
                 "network": "xhttp",
                 "security": "reality",
                 "xhttpSettings": {
@@ -836,8 +835,7 @@ async def _ensure_modern_xray(
                     "decryption": "none",
                 },
                 "streamSettings": {
-                    "sockopt": {"tcpCongestion": "bbr"},
-                "network": "ws",
+                    "network": "ws",
                     "security": "tls",
                     "wsSettings": {
                         "path": str(state["ws_path"]),
