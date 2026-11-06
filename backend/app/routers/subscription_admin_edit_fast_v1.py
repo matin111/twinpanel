@@ -80,6 +80,19 @@ async def _legacy_edit_background(subscription_id: int, payload: dict[str, Any])
         db.close()
 
 
+def _invalid_edit_node_ids(
+    desired_node_ids: list[int],
+    allowed_node_ids: list[int],
+    old_node_ids: list[int],
+    *,
+    same_plan: bool,
+) -> list[int]:
+    """Grandfather unchanged existing Exit assignments, never new plan exclusions."""
+    allowed = set(allowed_node_ids)
+    old = set(old_node_ids) if same_plan else set()
+    return [node_id for node_id in desired_node_ids if node_id not in allowed and node_id not in old]
+
+
 @router.patch("/v1/subscriptions/{subscription_id}/admin-edit", status_code=202)
 async def admin_edit_subscription_fast_v1(
     subscription_id: int,
@@ -152,11 +165,9 @@ async def admin_edit_subscription_fast_v1(
     same_plan = (plan is None and sub.plan_id is None) or (
         plan is not None and sub.plan_id == int(plan.id)
     )
-    preserved_old_node_ids = set(old_node_ids) if same_plan else set()
-    invalid_nodes = [
-        node_id for node_id in desired_node_ids
-        if node_id not in allowed_node_ids and node_id not in preserved_old_node_ids
-    ]
+    invalid_nodes = _invalid_edit_node_ids(
+        desired_node_ids, allowed_node_ids, old_node_ids, same_plan=same_plan,
+    )
     if invalid_nodes:
         raise HTTPException(
             status_code=422,
