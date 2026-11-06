@@ -11,12 +11,15 @@ import ipaddress
 import re
 import subprocess
 
-# Reviewed topology only: Iran 9 -> Exit Germany 7.
+# Reviewed topology only: Iran 9 -> Exits Germany 7 and USA 11.
 # Other VPN protocols continue using their existing desired-state route.
 ROUTES = {
     "de-ws": dict(port=26007, target_port=9444,
                   device="tpvx30", local="10.243.0.121",
                   peer="10.243.0.122"),
+    "us-ws": dict(port=26011, target_port=9444,
+                  device="tpvx32", local="10.243.0.129",
+                  peer="10.243.0.130"),
 }
 
 
