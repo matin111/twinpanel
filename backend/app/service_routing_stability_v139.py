@@ -482,10 +482,12 @@ def _service_routing_live_snapshot(desired):
 def _service_routing_matches(desired):
     global _SERVICE_ROUTING_VERIFIED_SNAPSHOT
     fingerprint = _service_routing_live_snapshot(desired)
-    if fingerprint is None:
+    if fingerprint is None or _SERVICE_ROUTING_VERIFIED_SNAPSHOT != fingerprint:
+        # Kernel drift invalidates trust permanently. Returning to the same
+        # text without a new verified atomic restore must not restore trust.
         _SERVICE_ROUTING_VERIFIED_SNAPSHOT = None
         return False
-    return _SERVICE_ROUTING_VERIFIED_SNAPSHOT == fingerprint
+    return True
 
 
 def _service_routing_restore_script(desired):
