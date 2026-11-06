@@ -124,6 +124,8 @@ _ = reseller_bot_order_models
 _ = reseller_pool_models
 _ = reseller_owned_plan_models
 _ = subscription_delivery_policy_v1
+from . import node_backfill_job_models_v1
+_ = node_backfill_job_models_v1
 
 # TWINPANEL_ADMIN_PANEL_NOTIFICATION_REGISTER_V1
 from .admin_panel_notification_models import AdminPanelNotification
