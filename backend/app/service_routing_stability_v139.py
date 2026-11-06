@@ -449,54 +449,42 @@ def _service_routing_rule_map(items, wan_if):
     return desired
 
 
-# Cache is an optimization only. Every invocation still reads the LIVE
-# iptables rules (-S) for each chain; the cache never authorizes stale rules.
+# TWINPANEL_SERVICE_ROUTING_FAST_SNAPSHOT_V140
+# Every comparison reads the actual live chains (-S), but never launches an
+# iptables -C subprocess for each of thousands of rules. A snapshot is trusted
+# only immediately after an atomic, validated iptables-restore commit. On a
+# cold start, changed desired routes, or detected kernel drift we restore the
+# complete desired state atomically before accepting the new snapshot.
 _SERVICE_ROUTING_VERIFIED_SNAPSHOT = None
 
 
-def _service_routing_matches(desired):
-    global _SERVICE_ROUTING_VERIFIED_SNAPSHOT
-    # Fast read-only comparison after a complete -C verification. On Iran
-    # nodes with thousands of rules, spawning one iptables -C per rule made
-    # heartbeat and tunnel reports take 2-4 minutes (stale threshold: 60s).
-    observed = {}
+def _service_routing_live_snapshot(desired):
+    observed = []
     signature = []
     for table, chain in _SERVICE_ROUTING_CHAINS:
         code, output = ipt(table, "-S", chain)
         if code != 0:
-            _SERVICE_ROUTING_VERIFIED_SNAPSHOT = None
-            return False
-
+            return None
         prefix = f"-A {chain} "
         rules = desired[(table, chain)]
-        current_count = sum(
+        count = sum(
             1 for line in output.splitlines()
             if line.strip().startswith(prefix)
         )
-        if current_count != len(rules):
-            _SERVICE_ROUTING_VERIFIED_SNAPSHOT = None
-            return False
-        observed[(table, chain)] = output
+        if count != len(rules):
+            return None
+        observed.append((table, chain, output))
         signature.append((table, chain, tuple(tuple(a) for a in rules)))
+    return (tuple(signature), tuple(observed))
 
-    fingerprint = (tuple(signature), tuple(
-        (table, chain, observed[(table, chain)])
-        for table, chain in _SERVICE_ROUTING_CHAINS
-    ))
-    if _SERVICE_ROUTING_VERIFIED_SNAPSHOT == fingerprint:
-        return True
 
-    # Cache miss or any live rule drift: fall back to the old authoritative
-    # per-rule validation. No unknown rule representation is trusted.
-    for table, chain in _SERVICE_ROUTING_CHAINS:
-        for args in desired[(table, chain)]:
-            code, _ = ipt(table, "-C", chain, *args)
-            if code != 0:
-                _SERVICE_ROUTING_VERIFIED_SNAPSHOT = None
-                return False
-
-    _SERVICE_ROUTING_VERIFIED_SNAPSHOT = fingerprint
-    return True
+def _service_routing_matches(desired):
+    global _SERVICE_ROUTING_VERIFIED_SNAPSHOT
+    fingerprint = _service_routing_live_snapshot(desired)
+    if fingerprint is None:
+        _SERVICE_ROUTING_VERIFIED_SNAPSHOT = None
+        return False
+    return _SERVICE_ROUTING_VERIFIED_SNAPSHOT == fingerprint
 
 
 def _service_routing_restore_script(desired):
@@ -598,6 +586,8 @@ def _service_routing_run_restore(
 
 
 def _service_routing_restore(desired):
+    global _SERVICE_ROUTING_VERIFIED_SNAPSHOT
+    _SERVICE_ROUTING_VERIFIED_SNAPSHOT = None
     script = _service_routing_restore_script(
         desired
     )
@@ -615,6 +605,14 @@ def _service_routing_restore(desired):
         script,
         test_only=False,
     )
+
+    # The kernel accepted this exact TwinPanel-owned transactional ruleset.
+    # Read back all chains in four subprocesses (not one per rule) and
+    # activate the fingerprint only if counts and chain reads succeed.
+    snapshot = _service_routing_live_snapshot(desired)
+    if snapshot is None:
+        raise RuntimeError("service_routing_post_commit_snapshot_unreadable")
+    _SERVICE_ROUTING_VERIFIED_SNAPSHOT = snapshot
 
 
 def reconcile_service_routing(items):
