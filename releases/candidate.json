@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.611",
-  "source_sha": "21516448e88bc569b1b5be1d52a1f528bb5e7485",
+  "version": "1.1.0-rc.612",
+  "source_sha": "c5660646d45342cd8d9c94ea06056b65ad22edd1",
   "notes": {
-    "fa": "اصلاح پایدار راه‌اندازی Worker همگام‌سازی پس از آپدیت و Rollback؛ جلوگیری از خطاهای worker_missing و حفظ اصلاح Xray بدون ری‌استارت غیرضروری کاربران موجود در rc.610. تنظیمات نودها، تونل‌ها و سایر پروتکل‌ها تغییر نکرده‌اند.",
-    "en": "Restart release-bound heavy reconcile worker with API/web on upgrade and rollback to prevent missing convergence/quota worker scripts after release activation. Retains rc.610 no-op Xray sync and unchanged tunnel/protocol settings."
+    "fa": "افزودن بازسازی هدفمند و امن کانفیگ اکانت‌های انتقالی روی نود جدید با انتخاب شناسه اشتراک، بدون بازسازی انبوه و بدون تغییر پروتکل‌های خریداری‌شده؛ کاهش لاگ‌های حساس SSH و حفظ تمامی اصلاحات V2Ray و Worker نسخه rc.611.",
+    "en": "Add explicit, safely scoped imported-account new-node backfill by subscription ID (opt-in), preserve purchased protocol entitlements, suppress verbose SSH command logging, and retain all rc.611 Xray and worker fixes."
   }
 }
