@@ -2244,6 +2244,8 @@ def remove_node_from_delivery_credentials(
 async def sync_installed_node_to_subscriptions(
     db: Session,
     node: Node,
+    *,
+    subscription_ids: set[int] | None = None,
 ) -> dict[str, Any]:
     """
     Keep an installed Node synchronized with subscriptions.
@@ -2302,6 +2304,14 @@ async def sync_installed_node_to_subscriptions(
         )
         .all()
     )
+
+    # Worker-only bounded convergence limits provisioning to selected new
+    # accounts; normal node-publish/admin routes retain their original behavior.
+    if subscription_ids is not None:
+        allowed_ids = {int(value) for value in subscription_ids}
+        all_subscriptions = [
+            sub for sub in all_subscriptions if int(sub.id) in allowed_ids
+        ]
 
     membership_added = 0
     compatibility_updated = 0
