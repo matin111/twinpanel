@@ -28,6 +28,7 @@ export const STORE_PROTOCOL_CATALOG:StoreProtocolMeta[]=[
   {id:"mieru",name:"Mieru",short:"Mieru",mark:"MI",icon:"MI",category:"standalone",transport:"TCP / UDP",fa:"Runtime مستقل مدرن با پشتیبانی هم‌زمان از مسیرهای TCP و UDP.",en:"Standalone modern runtime supporting both TCP and UDP paths.",aliases:["mieru","mita"]},
   {id:"trusttunnel",name:"TrustTunnel",short:"TrustTunnel",mark:"TT",icon:"TT",category:"standalone",transport:"TCP / UDP / QUIC",fa:"Runtime مستقل چندمسیره با پشتیبانی HTTP و QUIC برای اتصال منعطف‌تر.",en:"Standalone multi-path runtime with HTTP and QUIC support.",aliases:["trusttunnel","trust_tunnel","trust-tunnel"]},
   {id:"amneziawg",name:"AmneziaWG",short:"AmneziaWG",mark:"AW",icon:"AW",category:"standalone",transport:"UDP",fa:"گزینه مستقل خانواده WireGuard برای سناریوهای اتصال مدرن.",en:"Standalone WireGuard-family option for modern connectivity scenarios.",aliases:["amneziawg","amnezia_wg","awg"]},
+  {id:"socks5",name:"SOCKS5 Proxy",short:"SOCKS5",mark:"S5",icon:"S5",category:"proxy",transport:"TCP",fa:"پروکسی SOCKS5 با نام کاربری و رمز اختصاصی؛ بدون رمزنگاری داخلی.",en:"Authenticated SOCKS5 proxy, without native transport encryption.",aliases:["socks5","socks","socks-proxy"]},
   {id:"sudoku",name:"Sudoku",short:"Sudoku",mark:"SU",icon:"SU",category:"standalone",transport:"TCP",fa:"Runtime مستقل TCP برای افزودن یک مسیر اتصال متفاوت به مجموعه پروتکل‌ها.",en:"Standalone TCP runtime adding another distinct connectivity path.",aliases:["sudoku"]},
 ];
 
