@@ -88,7 +88,9 @@ def test_browser_create_request_returns_on_backend_acceptance() -> None:
     assert "new AbortController()" not in client
     assert "signal:controller.signal" not in client
     assert '@router.post("/admin-create-fast-v1", status_code=202)' in endpoint
-    assert "background_tasks.add_task(" in endpoint
+    assert "background_tasks.add_task(" not in endpoint
+    assert "enqueue_new_subscription(db, int(sub.id), requested_protocols)" in endpoint
+    assert '"durable_queue": durable_queued' in endpoint
     assert '"queued": True' in endpoint
     assert '"provisioning_complete": False' in endpoint
 
