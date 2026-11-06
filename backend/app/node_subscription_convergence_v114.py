@@ -3,6 +3,9 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import fcntl
+import json
+import os
+from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
 from sqlalchemy import case
@@ -265,7 +268,9 @@ def _migration_singbox_worker_running() -> bool:
     return False
 
 
-async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
+async def _sync_modern_node(
+    db, node: Node, *, subscription_ids: set[int] | None = None
+) -> dict[str, Any]:
     """Add only missing selected Modern credentials for one eligible Exit."""
     from .routers import account_delivery as ad
     from .routers.modern_account_delivery_v1 import _provision_modern_protocol
@@ -317,6 +322,8 @@ async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
         .filter(SubscriptionProtocol.protocol.in_(list(eligible_protocols)))
         .all()
     ):
+        if subscription_ids is not None and int(sub_id) not in subscription_ids:
+            continue
         selected_by_subscription[int(sub_id)].add(str(protocol).strip().lower())
     if not selected_by_subscription:
         return {
@@ -456,8 +463,138 @@ async def _sync_modern_node(db, node: Node) -> dict[str, Any]:
     }
 
 
+# A short-lived process runs the topology convergence job. It must not attempt
+# thousands of account/node pairs in one 300s subprocess, because its timeout
+# kills the entire pass before the new Exit catches up. Checkpoints are limited
+# to this worker path; explicit admin node publishing remains unchanged.
+_BATCH_CHECKPOINT = Path("/run/twinpanel-convergence-batch-v360.json")
+
+
+async def _reconcile_bounded_exit_nodes_once() -> dict:
+    from .migration_import_models import MigrationImportRecord
+    from .routers.account_delivery import sync_installed_node_to_subscriptions
+
+    # Newly registered Exit nodes are prioritized. Imported accounts are
+    # intentionally excluded: only explicit admin provisioning may build them.
+    node_ids = sorted(_eligible_exit_node_ids(), reverse=True)
+    db = SessionLocal()
+    try:
+        imported = db.query(MigrationImportRecord.subscription_id).subquery()
+        eligible_ids = [
+            int(row[0]) for row in db.query(Subscription.id).filter(
+                Subscription.status == SubscriptionStatus.ACTIVE,
+                ~Subscription.id.in_(imported),
+                (Subscription.expires_at.is_(None) | (Subscription.expires_at > datetime.utcnow())),
+                (Subscription.traffic_limit_bytes <= 0) | (
+                    Subscription.traffic_used_bytes < Subscription.traffic_limit_bytes
+                ),
+            ).order_by(Subscription.id.desc()).all()
+        ]
+    finally:
+        db.close()
+
+    if not node_ids or not eligible_ids:
+        try:
+            _BATCH_CHECKPOINT.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return {"ok": True, "nodes": []}
+
+    # New purchases must not reset a long-running scan back to account 0.
+    # Track them and request another pass after the current one finishes.
+    signature = [node_ids]
+    try:
+        checkpoint = json.loads(_BATCH_CHECKPOINT.read_text())
+        if checkpoint.get("signature") != signature:
+            checkpoint = {}
+    except (OSError, ValueError):
+        checkpoint = {}
+
+    node_index = max(0, int(checkpoint.get("node_index") or 0))
+    offset = max(0, int(checkpoint.get("offset") or 0))
+    had_errors = bool(checkpoint.get("had_errors", False))
+    started_count = int(checkpoint.get("started_count") or len(eligible_ids))
+    started_newest = int(checkpoint.get("started_newest") or eligible_ids[0])
+    if node_index >= len(node_ids):
+        node_index, offset, had_errors = 0, 0, False
+
+    node_id = node_ids[node_index]
+    # Older Exits usually have no missing credentials. Scan them in larger
+    # slices; keep the newest Exit small to bound SSH work and API load.
+    limit = 2 if node_index == 0 else 20
+    account_ids = set(eligible_ids[offset:offset + limit])
+    db = SessionLocal()
+    try:
+        node = db.get(Node, node_id)
+        if node is None or node.retired_at is not None:
+            node_result = {"node_id": node_id, "failed_count": 1}
+        else:
+            classic = await sync_installed_node_to_subscriptions(
+                db, node, subscription_ids=account_ids
+            )
+            modern = await _sync_modern_node(
+                db, node, subscription_ids=account_ids
+            )
+            failures = list(classic.get("failed") or []) + list(modern.get("failed") or [])
+            node_result = {
+                "node_id": node_id,
+                "batch_size": len(account_ids),
+                "membership_added": int(classic.get("membership_added") or 0),
+                "provisioned_pairs": int(classic.get("provisioned_pairs") or 0)
+                    + int(modern.get("provisioned_pairs") or 0),
+                "reused_pairs": int(classic.get("reused_pairs") or 0)
+                    + int(modern.get("reused_pairs") or 0),
+                "failed_count": len(failures),
+            }
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        db.rollback()
+        node_result = {
+            "node_id": node_id, "failed_count": 1,
+            "error_type": type(exc).__name__,
+        }
+    finally:
+        db.close()
+
+    had_errors = had_errors or bool(node_result.get("failed_count"))
+    offset += len(account_ids)
+    if offset >= len(eligible_ids):
+        offset = 0
+        node_index += 1
+
+    if node_index >= len(node_ids):
+        try:
+            _BATCH_CHECKPOINT.unlink(missing_ok=True)
+        except OSError:
+            pass
+        changed_while_scanning = (
+            started_count != len(eligible_ids)
+            or started_newest != eligible_ids[0]
+        )
+        return {
+            "ok": not had_errors and not changed_while_scanning,
+            "nodes": [node_result], "batch_complete": True,
+            "new_accounts_during_scan": changed_while_scanning,
+        }
+
+    new_checkpoint = {
+        "signature": signature, "node_index": node_index,
+        "offset": offset, "had_errors": had_errors,
+        "started_count": started_count, "started_newest": started_newest,
+    }
+    _BATCH_CHECKPOINT.parent.mkdir(parents=True, exist_ok=True)
+    target = _BATCH_CHECKPOINT.with_suffix(".tmp")
+    target.write_text(json.dumps(new_checkpoint), encoding="utf-8")
+    os.chmod(target, 0o600)
+    target.replace(_BATCH_CHECKPOINT)
+    return {"ok": False, "nodes": [node_result], "batch_pending": True}
+
+
 async def reconcile_installed_exit_nodes_once() -> dict:
     """Converge historical subscriptions when live delivery topology changes."""
+    if os.environ.get("TWINPANEL_CONVERGENCE_WORKER_V2") == "1":
+        return await _reconcile_bounded_exit_nodes_once()
     from .routers.account_delivery import sync_installed_node_to_subscriptions
 
     results: list[dict] = []
