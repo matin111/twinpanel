@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.597",
-  "source_sha": "b57523f2f349b32c78b1cddc95f60fece66e9181",
+  "version": "1.1.0-rc.598",
+  "source_sha": "734557a543b79973d853edacdf877da3b02b835a",
   "notes": {
-    "fa": "رفع همگام‌سازی نود جدید برای اکانت‌های غیرانتقالی، توقف ساخت خودکار پروتکل‌های انتقالی با حفظ عضویت نود، و افزایش فرصت تأیید ایمن دوطرفه Agent برای تانل تازه بدون تغییر مسیرهای موجود.",
-    "en": "Safely converge new exit nodes for non-imported accounts; keep migrated users manual-only with node memberships intact; longer strict bidirectional agent acceptance on first tunnel cutover, preserving existing routes and rollback."
+    "fa": "رفع خطای ساخت تانل جدید در مرحله انتظار کلید سمت مقابل با حفظ تأیید اتصال دوطرفه و Rollback؛ اصلاحات همگام‌سازی امن نود جدید و توقف ساخت خودکار انتقالی‌ها حفظ شد.",
+    "en": "Fix premature selected-tunnel rollback on transient waiting_peer_key during initial agent bootstrap; keep strict two-sided health acceptance, rollback and imported-account auto-provision pause."
   }
 }
