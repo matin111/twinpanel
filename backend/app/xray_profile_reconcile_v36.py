@@ -19,6 +19,8 @@ from .models import (
     User,
 )
 from .routers import account_delivery
+from .services.central_node_entitlements_v1 import account_is_eligible
+from .v2ray_provision_idempotency_v1 import _deterministic_v2ray_uuid, _uuid_from_items
 from . import xray_modern_runtime
 
 
@@ -169,6 +171,7 @@ async def _ensure_subscription_modern_v36(
     needs_refresh = any(
         not _item_complete_for_node(by_node.get(int(node.id)), node)
         for node in _eligible_nodes(db)
+        if account_is_eligible(db, int(node.id), int(sub.id), "v2ray")
     )
     return await _original_ensure_subscription_modern(
         db,
@@ -192,6 +195,10 @@ async def _reconcile_subscription_for_exit(
     }
     if "v2ray" not in selected:
         return {"ok": True, "skipped": True, "reason": "v2ray_not_selected"}
+    # Reconciler must never provision a node outside the purchased snapshot,
+    # or expired/paused/exhausted users. All entry points use this same gate.
+    if not account_is_eligible(db, int(exit_node.id), int(sub.id), "v2ray"):
+        return {"ok": True, "skipped": True, "reason": "node_not_entitled_or_subscription_inactive"}
 
     cfg = (
         db.query(NodeProtocolConfig)
@@ -218,7 +225,14 @@ async def _reconcile_subscription_for_exit(
     if user is None:
         raise RuntimeError("subscription_user_missing")
 
-    client_id = xray_modern_runtime._existing_uuid(previous) or str(uuid.uuid4())
+    # Never generate a fresh identity for an additional Exit: use the UUID
+    # already delivered for this subscription on another node, or the stable
+    # deterministic value used by the new-account provisioning path.
+    client_id = (
+        _uuid_from_items([previous] if previous else [])
+        or _uuid_from_items(items)
+        or _deterministic_v2ray_uuid(int(sub.id))
+    )
     item = await xray_modern_runtime._xray_account_modern(
         db,
         exit_node,
