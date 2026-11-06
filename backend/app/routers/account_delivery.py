@@ -1,5 +1,6 @@
 from __future__ import annotations
 from ..services.public_urls import subscription_base_url, shop_base_url
+from ..xray_live_reality_sni_delivery_v1 import applied_reality_snis, rewrite_reality_sni_item
 
 import asyncio
 import fcntl
@@ -1897,6 +1898,14 @@ def _stored_info(
         .all()
     )
 
+    # Applied REALITY SNI comes from the central verified node settings.
+    # Read it once per public request; never mutate encrypted credentials.
+    reality_snis = (
+        applied_reality_snis(db)
+        if any(str(x.protocol or "").lower() == "v2ray" for x in rows)
+        else {}
+    )
+
     for row in rows:
 
         payload = _dec(
@@ -1938,6 +1947,17 @@ def _stored_info(
                     item,
                 )
             )
+
+            if protocol_key == "v2ray":
+                try:
+                    exit_node_id = int(live_item.get("node_id") or 0)
+                except (ValueError, TypeError, AttributeError):
+                    exit_node_id = 0
+                if exit_node_id in reality_snis:
+                    live_item = rewrite_reality_sni_item(
+                        live_item,
+                        reality_snis[exit_node_id],
+                    )
 
             if not (
                 _delivery_item_is_usable(
