@@ -16,7 +16,7 @@ from .deps import require_admin
 from .models import Node, NodeProtocolConfig, NodeType
 from .routers import account_delivery, provision
 from .xray_modern_runtime import (
-    PROFILE_GRPC,
+
     PROFILE_HTTPUPGRADE,
     PROFILE_META,
     PROFILE_WS,
@@ -120,7 +120,7 @@ def _profile_rows(
         PROFILE_WS,
         PROFILE_XHTTP,
         PROFILE_HTTPUPGRADE,
-        PROFILE_GRPC,
+
     ):
         meta = PROFILE_META[profile]
 
@@ -352,7 +352,7 @@ async def _status_remote(
 
     for profile in (
         PROFILE_XHTTP,
-        PROFILE_GRPC,
+
         PROFILE_WS,
         PROFILE_HTTPUPGRADE,
     ):
@@ -559,7 +559,7 @@ async def prepare_xray_node(
 # 3x-ui-inspired controls: one node-level draft for all future subscriptions.
 # Saving does NOT activate settings; actual server apply + health check must
 # precede publishing any SNI overrides. Never mutate per-user credentials here.
-_XRAY_TRANSPORTS = frozenset({"tcp", "ws", "xhttp", "grpc", "httpupgrade"})
+_XRAY_TRANSPORTS = frozenset({"tcp", "ws", "xhttp", "httpupgrade"})
 _XRAY_SECURITIES = frozenset({"tls", "reality"})
 
 
@@ -588,11 +588,8 @@ def _validated_editor_settings(payload: InboundEditorDraft) -> dict[str, str]:
     security = payload.security.strip().lower()
     if transport not in _XRAY_TRANSPORTS or security not in _XRAY_SECURITIES:
         raise HTTPException(status_code=422, detail="Unsupported transport/security")
-    if security == "reality" and transport not in {"xhttp", "grpc", "tcp"}:
+    if security == "reality" and transport not in {"xhttp", "tcp"}:
         raise HTTPException(status_code=422, detail="REALITY transport is incompatible")
-    if security == "tls" and transport == "grpc":
-        # The current TwinPanel gRPC inbound is REALITY-only.
-        raise HTTPException(status_code=422, detail="TLS gRPC not provisioned")
 
     target = str(payload.reality_target or "").strip().lower()
     if target:
@@ -804,10 +801,10 @@ config = json.loads(config_path.read_text())
 state = json.loads(state_path.read_text())
 inbounds = [
     entry for entry in config.get("inbounds", [])
-    if entry.get("tag") in ("vless-xhttp-reality", "vless-grpc-reality")
+    if entry.get("tag") == "vless-xhttp-reality"
 ]
-if len(inbounds) != 2:
-    raise RuntimeError("Missing required REALITY inbounds")
+if len(inbounds) != 1:
+    raise RuntimeError("Missing XHTTP REALITY inbound")
 for entry in inbounds:
     settings = entry["streamSettings"]
     if settings.get("security") != "reality":
@@ -887,7 +884,7 @@ try:
     assert all(
         x["streamSettings"]["realitySettings"]["serverNames"] == [name]
         for x in new_config["inbounds"] if x.get("tag") in
-        ("vless-xhttp-reality", "vless-grpc-reality")
+        ("vless-xhttp-reality",)
     )
 except Exception:
     for path, backup in backups:
@@ -925,7 +922,7 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
     # arbitrary transport conversion. Reject rather than publishing broken URIs.
     if (candidate["transport"], candidate["security"]) not in {
         ("tcp", "tls"), ("ws", "tls"), ("httpupgrade", "tls"),
-        ("xhttp", "reality"), ("grpc", "reality"),
+        ("xhttp", "reality"),
     }:
         raise HTTPException(status_code=422, detail="Transport/security not provisioned")
     name = candidate["reality_server_name"]
