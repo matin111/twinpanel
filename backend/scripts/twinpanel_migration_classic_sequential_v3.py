@@ -43,15 +43,21 @@ def healthy():
 async def one_node(db,node_id,*,subscription_id: int | None = None):
     node=db.get(Node,node_id)
     now=datetime.utcnow()
-    eligible_query=(db.query(Subscription).join(MigrationImportRecord, MigrationImportRecord.subscription_id==Subscription.id)
+    eligible_query=(db.query(Subscription)
           .join(SubscriptionNode, SubscriptionNode.subscription_id==Subscription.id)
           .join(SubscriptionProtocol, SubscriptionProtocol.subscription_id==Subscription.id)
-          .filter(MigrationImportRecord.source.in_(SOURCES),
-                  SubscriptionProtocol.protocol==PROTOCOL,
+          .filter(SubscriptionProtocol.protocol==PROTOCOL,
                   SubscriptionNode.node_id==node_id,
                   Subscription.status==SubscriptionStatus.ACTIVE,
                   or_(Subscription.expires_at.is_(None),Subscription.expires_at>now),
                   or_(Subscription.traffic_limit_bytes<=0,Subscription.traffic_used_bytes<Subscription.traffic_limit_bytes)))
+    if PROTOCOL != 'v2ray':
+        # Classic backfill stays imported-only; the V2Ray family is a
+        # missing-profile repair for every active account on this Exit.
+        eligible_query=eligible_query.join(
+            MigrationImportRecord,
+            MigrationImportRecord.subscription_id==Subscription.id,
+        ).filter(MigrationImportRecord.source.in_(SOURCES))
     if subscription_id is not None:
         eligible_query=eligible_query.filter(Subscription.id==int(subscription_id))
     subs=eligible_query.order_by(Subscription.id.asc()).all()
@@ -79,9 +85,29 @@ async def one_node(db,node_id,*,subscription_id: int | None = None):
                 if not bool(getattr(node,'enable_'+protocol,False)):continue
                 cred=existing_credentials.get(int(sub.id))
                 items=ad._autosync_credential_items(cred)
-                if any(ad._autosync_item_node_id(x)==node_id for x in items):
-                    skipped+=1
-                    continue
+                existing_item=next(
+                    (x for x in items if ad._autosync_item_node_id(x)==node_id),
+                    None,
+                )
+                if existing_item is not None:
+                    if protocol != "v2ray":
+                        skipped+=1
+                        continue
+                    if not isinstance(existing_item,dict):
+                        failed+=1
+                        continue
+                    # A new Exit may have one VLESS profile but still miss
+                    # its required companion profile. Never count such a
+                    # partial node as complete or rotate its UUID.
+                    from app.xray_adaptive_three_profiles_v47 import _required_profiles_v47
+                    ready_profiles={
+                        str(p.get("id") or "").strip().lower()
+                        for p in (existing_item.get("profiles") or [])
+                        if isinstance(p,dict) and str(p.get("uri") or "").strip()
+                    }
+                    if _required_profiles_v47(node) <= ready_profiles:
+                        skipped+=1
+                        continue
                 # Never rotate an unreadable existing V2Ray credential.
                 if protocol == 'v2ray' and cred is not None and cred.config_text_encrypted and not items:
                     failed+=1
@@ -135,7 +161,15 @@ async def one_node(db,node_id,*,subscription_id: int | None = None):
                         cred=ProtocolCredential(subscription_id=sub.id,protocol=protocol)
                         db.add(cred)
                         existing_credentials[int(sub.id)]=cred
-                    items.append(item)
+                    if protocol == "v2ray" and existing_item is not None:
+                        # Update only the selected Exit's item; credentials for
+                        # every other node remain byte-for-byte identical.
+                        items=[
+                            item if ad._autosync_item_node_id(x)==node_id else x
+                            for x in items
+                        ]
+                    else:
+                        items.append(item)
                     cred.config_text_encrypted=ad._enc(items)
                     cred.is_active=True
                     if protocol in ('cisco','l2tp'):
