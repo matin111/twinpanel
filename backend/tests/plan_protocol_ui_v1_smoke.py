@@ -37,9 +37,9 @@ def main() -> None:
     canonical = classic + modern
 
     assert len(classic) == 5, classic
-    assert len(modern) == 10, modern
-    assert len(canonical) == 15, canonical
-    assert len(set(canonical)) == 15, canonical
+    assert len(modern) == 11, modern
+    assert len(canonical) == 16, canonical
+    assert len(set(canonical)) == 16, canonical
 
     # Plans remain the creation template/allow-list while SubscriptionProtocol
     # and SubscriptionNode stay the runtime desired-state used by provisioning.
