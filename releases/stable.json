@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.612",
+  "version": "1.1.0-rc.613",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T16:02:29Z",
+  "released_at": "2026-11-06T16:13:03Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "c5660646d45342cd8d9c94ea06056b65ad22edd1",
+  "source_sha": "37d32a026e9f843cd150f4fade74d0d3f3398b44",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.612/twinpanel-1.1.0-rc.612-linux-x86_64.tar.gz",
-    "sha256": "fd3b99d130212379009ad93727c1863d42dbddff6dad4f9741300209f31349a6",
-    "size_bytes": 28910825
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.613/twinpanel-1.1.0-rc.613-linux-x86_64.tar.gz",
+    "sha256": "1724176a32f269ae00c83c35a6a20fea120d2e997e0648025285be76073d6dea",
+    "size_bytes": 28914944
   },
   "notes": {
-    "fa": "رفع مشکل نمایش نود جدید برای کاربران قدیمی: امکان بازسازی امن و هدفمند کانفیگ اشتراک مشخص، حفظ پروتکل‌های مجاز پلن و جلوگیری از ثبت اطلاعات حساس SSH در لاگ؛ شامل تمام اصلاحات rc.611 و V2Ray.",
-    "en": "Add safe single-subscription canary for backfilling ready node credentials for existing imported accounts; preserve plan entitlements and suppress sensitive SSH mutation logs. Includes all rc.611 V2Ray and updater fixes."
+    "fa": "انتشار رسمی اصلاحات جدید TwinPanel شامل ثبت وضعیت نهایی رسیدهای تأیید یا ردشده در ربات ادمین و حذف دکمه‌های تکراری، حفظ فایل رسید، و تمام تغییرات ادغام‌شده پس از rc.612. بسته از سورس دقیق GitHub ساخته می‌شود تا اصلاحات در آپدیت بعدی حذف نشوند.",
+    "en": "Official release including Telegram admin receipt decision finalization, retiring stale approval/rejection buttons while retaining receipt evidence, and all merged changes since rc.612. Build from pinned GitHub source to preserve fixes across updates."
   }
 }
