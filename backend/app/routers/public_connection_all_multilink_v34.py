@@ -43,11 +43,11 @@ MULTI_PROTOCOLS = (
     "naive",
     "shadowtls",
     "snell",
+    "socks5",
     "mieru",
     "trusttunnel",
     "amneziawg",
     "sudoku",
-    "socks5",
 )
 
 # Native clients consume files, not a synthetic share URI. Their one public URL
