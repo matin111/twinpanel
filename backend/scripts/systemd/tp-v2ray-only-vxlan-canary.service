@@ -6,4 +6,5 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/python3 /usr/local/sbin/tp-v2ray-only-vxlan-canary-v1 apply --profile=de-ws
+ExecStart=/usr/bin/python3 /usr/local/sbin/tp-v2ray-only-vxlan-canary-v1 apply --profile=us-ws
 TimeoutStartSec=20
