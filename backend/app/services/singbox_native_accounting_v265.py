@@ -24,7 +24,7 @@ from .quota_node_sync import build_node_devices
 
 
 SINGBOX_ACCOUNTING_PROTOCOLS = frozenset(
-    {"hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"}
+    {"hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"}
 )
 SINGBOX_ACCOUNTING_INTERVAL_SECONDS = 5.0
 SINGBOX_ACCOUNTING_LOCK = Path("/run/twinpanel-singbox-quota-v265.lock")
