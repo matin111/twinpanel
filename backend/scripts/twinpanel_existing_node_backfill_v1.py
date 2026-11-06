@@ -170,6 +170,15 @@ def main(argv: list[str] | None = None) -> int:
         total = 0
         for cycle in range(args.max_cycles):
             try:
+                if cycle:
+                    # Central paid-account priority is rechecked between
+                    # batches, not only when the timer first starts.
+                    from app.services.central_backfill_priority_v1 import (
+                        new_account_work_has_priority,
+                    )
+                    if new_account_work_has_priority():
+                        print("NODE_BACKFILL_PREEMPTED_FOR_NEW_ACCOUNT", flush=True)
+                        break
                 health_guard(args.max_load)
                 rc, count = asyncio.run(apply_cycle(args.node_id, args.protocol, args.max_pairs, args.subscription_id))
                 total += count
