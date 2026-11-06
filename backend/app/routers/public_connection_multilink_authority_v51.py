@@ -62,18 +62,18 @@ _SCRIPT = r"""
 (function(){
   const MULTI=new Set([
     'openvpn','wireguard','v2ray','hysteria2','tuic','anytls','naive',
-    'shadowtls','snell','mieru','trusttunnel','amneziawg','sudoku'
+    'shadowtls','snell','socks5','mieru','trusttunnel','amneziawg','sudoku'
   ]);
   const BUNDLE=new Set(['openvpn','wireguard','amneziawg']);
   const CLASSIC=new Set(['cisco','openvpn','wireguard','l2tp']);
   const MODERN=new Set([
-    'v2ray','hysteria2','tuic','anytls','naive','shadowtls','snell','mieru',
+    'v2ray','hysteria2','tuic','anytls','naive','shadowtls','snell','socks5','mieru',
     'trusttunnel','amneziawg','sudoku'
   ]);
   const RECOMMENDED=new Set(['v2ray','wireguard','openvpn','hysteria2','tuic']);
   const CLIENT={
     openvpn:'openvpn',wireguard:'wireguard',v2ray:'v2ray',hysteria2:'karing',
-    tuic:'karing',anytls:'karing',naive:'karing',shadowtls:'karing',snell:'hiddify',
+    tuic:'karing',anytls:'karing',naive:'karing',shadowtls:'karing',snell:'hiddify',socks5:'singbox',
     mieru:'karing',trusttunnel:'trusttunnel',amneziawg:'amneziawg',sudoku:'sudoku'
   };
   let applyTimer=null;
