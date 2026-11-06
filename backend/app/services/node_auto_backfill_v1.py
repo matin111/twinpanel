@@ -60,6 +60,42 @@ def enqueue_node_backfill(
     return rows
 
 
+def repair_missing_v2ray_jobs(db: Session) -> int:
+    """Recover old published Exit queues created before V2Ray was a family.
+
+    Existing family progress and leases are untouched. Never create work for
+    unpublished, retired, offline, or V2Ray-disabled nodes.
+    """
+    candidates = (
+        db.query(NodeBackfillJobV1.node_id)
+        .distinct()
+        .all()
+    )
+    added = 0
+    for (node_id,) in candidates:
+        node = db.get(Node, int(node_id))
+        if (
+            node is None or node.retired_at is not None
+            or node.node_type != NodeType.EXIT
+            or node.status != NodeStatus.ONLINE
+            or not node.show_to_users
+            or not node.enable_v2ray
+        ):
+            continue
+        if db.get(NodeBackfillJobV1, (int(node_id), "v2ray")) is not None:
+            continue
+        db.add(NodeBackfillJobV1(
+            node_id=int(node_id), protocol="v2ray",
+            state="queued", attempts=0, completed_pairs=0, last_batch=0,
+            run_after=datetime.utcnow(), created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        ))
+        added += 1
+    if added:
+        db.commit()
+    return added
+
+
 def job_status(db: Session, node_id: int) -> dict:
     node = db.get(Node, int(node_id))
     if node is None or node.retired_at is not None:
