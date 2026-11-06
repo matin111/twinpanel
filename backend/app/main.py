@@ -24,6 +24,7 @@ from . import two_factor_models
 from . import runtime_settings_model
 from . import node_connection_settings_models_v1  # additive per-node modern endpoint table
 from . import fast_provision_job_models_v1  # additive durable new-account queue table
+from . import node_auto_backfill_job_models_v1  # durable per-node historic-account queue
 from . import download_asset_models
 from . import subscription_delivery_policy_v1
 from .payment_crypto_schema import ensure_payment_crypto_schema
@@ -67,6 +68,7 @@ from .services.customer_maintenance import customer_maintenance_loop
 from .services.payment_fulfillment_fast_path import payment_fulfillment_recovery_loop
 from .services.fast_provision_queue_v1 import fast_provision_queue_enabled
 from .services.fast_provision_worker_v1 import fast_provision_recovery_loop
+from .services.node_auto_backfill_worker_v1 import node_auto_backfill_recovery_loop
 from .services.payment_market_rates import payment_market_loop
 from .services.wallet_payment_automation import wallet_payment_automation_loop
 from .license_guard import LicenseMutationGuardMiddleware
@@ -173,6 +175,11 @@ async def lifespan(app: FastAPI):
         )
         if fast_provision_queue_enabled() else None
     )
+    # Always idle if no Exit was explicitly published. Network provisioning
+    # runs in a separate subprocess, never inside API request handlers.
+    node_auto_backfill_task = asyncio.create_task(
+        node_auto_backfill_recovery_loop(), name="node-old-account-backfill-v1",
+    )
     payment_market_task = asyncio.create_task(
         payment_market_loop(),
         name="payment-market-rates",
@@ -196,6 +203,7 @@ async def lifespan(app: FastAPI):
         payment_fulfillment_task.cancel()
         if fast_provision_task is not None:
             fast_provision_task.cancel()
+        node_auto_backfill_task.cancel()
         payment_market_task.cancel()
         wallet_payment_task.cancel()
         license_validation_task.cancel()
@@ -206,6 +214,7 @@ async def lifespan(app: FastAPI):
             customer_maintenance_task,
             payment_fulfillment_task,
             fast_provision_task,
+            node_auto_backfill_task,
             payment_market_task,
             wallet_payment_task,
             license_validation_task,
