@@ -480,9 +480,37 @@ async def _wait_manual_cutover_acceptance_v257(
                 # before its opposite Agent has published the public key.
                 # Treat this *one* bootstrap state as pending, never as
                 # acceptance. Normal manual switches still reject immediately.
+                # A newly created pair becomes Agent-visible only after
+                # installation. Its first reports can arrive before the
+                # opposite Agent has discovered the peer, published its key,
+                # or installed the selected data interface. Never treat this
+                # ordinary bootstrap race as a definitive transport failure.
+                # Existing manual switches (30s) keep their immediate
+                # negative-evidence rollback. New-pair bootstrap (90s) gets
+                # a bounded 45s grace, and STILL requires both fresh positive
+                # reports before any success is returned.
+                elapsed = max(0.0, float(timeout_seconds) - max(
+                    0.0, deadline - asyncio.get_running_loop().time()
+                ))
+                bootstrap_transient = (
+                    str(reason).strip().lower() in {
+                        "waiting_peer_key",
+                        "not_installed",
+                        "peer_not_ready",
+                        "manual_cutover_peer_not_reachable",
+                    }
+                    or (
+                        not item.get("last_error")
+                        and (
+                            not item.get("endpoint_reachable")
+                            or not item.get("tunnel_reachable")
+                        )
+                    )
+                )
                 if (
-                    str(reason).strip().lower() == "waiting_peer_key"
-                    and timeout_seconds > 30.0
+                    timeout_seconds > 30.0
+                    and bootstrap_transient
+                    and elapsed < min(45.0, timeout_seconds)
                 ):
                     continue
                 return False, last_snapshot, str(reason)[:900]
