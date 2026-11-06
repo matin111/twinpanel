@@ -264,11 +264,11 @@ def _apply_live_xray_uri(uri: str, settings: dict[str, Any]) -> str:
             if security == "tls":
                 updated = [(k, sni if k == "host" else v) for k, v in updated]
         if profile_key and isinstance(profile_settings, dict):
-                path = str(profile_settings.get("path") or "").strip()
-                if path.startswith("/") and 8 <= len(path) <= 120:
-                    updated = [(k, path if k == "path" else v) for k, v in updated]
-                    if not any(k == "path" for k, _ in updated):
-                        updated.append(("path", path))
+            path = str(profile_settings.get("path") or "").strip()
+            if path.startswith("/") and 8 <= len(path) <= 120:
+                updated = [(k, path if k == "path" else v) for k, v in updated]
+                if not any(k == "path" for k, _ in updated):
+                    updated.append(("path", path))
         return urlunsplit(parsed._replace(query=urlencode(updated)))
     except (TypeError, ValueError):
         return uri
