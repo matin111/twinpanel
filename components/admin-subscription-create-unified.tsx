@@ -46,8 +46,8 @@ export function AdminSubscriptionCreateUnified(){
     setPlanId(id);
     const plan=rows.find(item=>num(item.id)===id);
     if(!plan){setTraffic("");setDuration("");setDeviceLimit("1");return;}
-    setTraffic(String(num(plan.traffic_gb)));
-    setDuration(String(Math.max(1,Math.trunc(num(plan.duration_days)||30))));
+    setTraffic(num(plan.traffic_gb)>0?String(num(plan.traffic_gb)):"");
+    setDuration(num(plan.duration_days)>0?String(Math.trunc(num(plan.duration_days))):"");
     setDeviceLimit(String(Math.max(1,Math.trunc(num(plan.device_limit)||1))));
   };
 
@@ -87,10 +87,10 @@ export function AdminSubscriptionCreateUnified(){
 
   const submitNow=async()=>{
     if(busy||loading)return;
-    const trafficValue=clean(traffic),durationValue=clean(duration),deviceValue=clean(deviceLimit);
+    const trafficValue=traffic.trim()===""?0:clean(traffic),durationValue=duration.trim()===""?0:clean(duration),deviceValue=clean(deviceLimit);
     if(!userId){setError(pick("کاربر را انتخاب کنید","Select a user"));return;}
     if(trafficValue===null||trafficValue<0){setError(pick("حجم معتبر نیست","Invalid traffic"));return;}
-    if(durationValue===null||durationValue<=0||!Number.isInteger(durationValue)){setError(pick("مدت معتبر نیست","Invalid duration"));return;}
+    if(durationValue===null||durationValue<0||!Number.isInteger(durationValue)){setError(pick("مدت معتبر نیست","Invalid duration"));return;}
     if(deviceValue===null||deviceValue<1||!Number.isInteger(deviceValue)){setError(pick("اتصال همزمان معتبر نیست","Invalid device limit"));return;}
     if(!protocols.length){setError(pick("حداقل یک پروتکل انتخاب کنید","Select at least one protocol"));return;}
     if(!nodeIds.length){setError(pick("حداقل یک سرور انتخاب کنید","Select at least one server"));return;}
@@ -146,8 +146,8 @@ export function AdminSubscriptionCreateUnified(){
 
           <section style={{...box,padding:12}}>
             <div style={{display:"grid",gridTemplateColumns:"repeat(5,minmax(0,1fr))",gap:9}}>
-              <label className="field"><span>{pick("حجم GB","Traffic GB")}</span><input type="number" min={0} step="0.1" value={traffic} onChange={e=>setTraffic(e.target.value)}/></label>
-              <label className="field"><span>{pick("مدت روز","Days")}</span><input type="number" min={1} step={1} value={duration} onChange={e=>setDuration(e.target.value)}/></label>
+              <label className="field"><span>{pick("حجم GB","Traffic GB")}</span><input type="number" min={0} step="0.1" value={traffic} onChange={e=>setTraffic(e.target.value)} placeholder={pick("خالی = نامحدود","Empty = unlimited")}/><small>{pick("خالی یا صفر = حجم نامحدود","Empty or 0 = unlimited traffic")}</small></label>
+              <label className="field"><span>{pick("مدت روز","Days")}</span><input type="number" min={0} step={1} value={duration} onChange={e=>setDuration(e.target.value)} placeholder={pick("خالی = نامحدود","Empty = unlimited")}/><small>{pick("خالی یا صفر = زمان نامحدود","Empty or 0 = unlimited duration")}</small></label>
               <label className="field"><span>{pick("اتصال","Devices")}</span><input type="number" min={1} step={1} value={deviceLimit} onChange={e=>setDeviceLimit(e.target.value)}/></label>
               <label className="field"><span>{pick("نام کاربری","Username")}</span><input dir="ltr" value={username} onChange={e=>setUsername(e.target.value)} placeholder={pick("خودکار","Auto")}/></label>
               <label className="field"><span>{pick("رمز عبور","Password")}</span><input dir="ltr" value={password} onChange={e=>setPassword(e.target.value)} placeholder={pick("خودکار","Auto")}/></label>

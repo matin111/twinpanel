@@ -77,18 +77,6 @@ def _persist_subscription(payload: dict[str, Any]) -> tuple[int, list[str], dict
                 detail="هنگام ساخت اشتراک حداقل یک پروتکل انتخاب کنید",
             )
 
-        if manual:
-            if request.traffic_gb is None:
-                raise HTTPException(
-                    status_code=422,
-                    detail="برای اشتراک دستی حجم را وارد کنید؛ صفر یعنی نامحدود",
-                )
-            if request.duration_days is None:
-                raise HTTPException(
-                    status_code=422,
-                    detail="برای اشتراک دستی مدت را وارد کنید",
-                )
-
         traffic_gb = (
             float(request.traffic_gb)
             if request.traffic_gb is not None
@@ -111,15 +99,9 @@ def _persist_subscription(payload: dict[str, Any]) -> tuple[int, list[str], dict
             else 1
         )
 
-        if duration_days <= 0:
-            raise HTTPException(
-                status_code=422,
-                detail=(
-                    "مدت اشتراک دستی باید بیشتر از صفر باشد"
-                    if manual
-                    else "مدت پلن یا اشتراک باید بیشتر از صفر باشد"
-                ),
-            )
+        # A zero-day limit represents an unlimited-duration subscription.
+        # Negative values remain invalid at the request schema boundary.
+        duration_unlimited = duration_days == 0
 
         sub = create_subscription_core(
             db=db,
@@ -138,7 +120,7 @@ def _persist_subscription(payload: dict[str, Any]) -> tuple[int, list[str], dict
             SubscriptionRuntimeOverride(
                 subscription_id=sub.id,
                 device_limit=max(0, device_limit),
-                duration_unlimited=False,
+                duration_unlimited=duration_unlimited,
             )
         )
         db.flush()

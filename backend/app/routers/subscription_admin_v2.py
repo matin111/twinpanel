@@ -61,7 +61,7 @@ class AdminSubscriptionCreateV2(BaseModel):
     # always chosen explicitly for this Subscription at creation time.
     # Manual mode requires traffic + duration directly. Zero GB means unlimited.
     traffic_gb: float | None = Field(default=None, ge=0, le=100000)
-    duration_days: int | None = Field(default=None, ge=1, le=3650)
+    duration_days: int | None = Field(default=None, ge=0, le=3650)
     device_limit: int | None = Field(default=None, ge=0, le=1000)
 
     username: str | None = Field(default=None, max_length=120)
