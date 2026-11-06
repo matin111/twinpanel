@@ -885,6 +885,38 @@ def _watchdog_tunnel_fully_usable(
 
 _SERVICE_ROUTE_FAILBACK_HOLD_SECONDS = 45
 
+# TWINPANEL_TUNNEL_TRANSIENT_ROUTE_HOLD_V1
+# A single short-lived peer health report must not withdraw thousands of
+# live DNAT routes while the selected physical carrier is independently
+# ONLINE and recently verified. A genuine sustained outage still withdraws.
+_SERVICE_ROUTE_TRANSIENT_HOLD_SECONDS = 75
+_SERVICE_ROUTE_PHYSICAL_HEALTH_MAX_AGE_SECONDS = 90
+
+_service_route_unusable_since: dict[tuple[int, int], datetime] = {}
+
+
+def _transient_route_hold_eligible(
+    *,
+    is_active: bool,
+    has_selected_route: bool,
+    physical_online: bool,
+    physical_healthy_at: datetime | None,
+    failure_started_at: datetime | None,
+    now: datetime,
+) -> bool:
+    if not (is_active and has_selected_route and physical_online):
+        return False
+    if physical_healthy_at is None:
+        return False
+    age = (now - physical_healthy_at).total_seconds()
+    if not 0 <= age <= _SERVICE_ROUTE_PHYSICAL_HEALTH_MAX_AGE_SECONDS:
+        return False
+    if failure_started_at is None:
+        return True
+    age_of_failure = (now - failure_started_at).total_seconds()
+    return 0 <= age_of_failure < _SERVICE_ROUTE_TRANSIENT_HOLD_SECONDS
+
+
 _service_route_selected: dict[
     tuple[int, int],
     int,
@@ -972,6 +1004,7 @@ def _select_service_route_tunnel_ids(
                 key,
                 None,
             )
+            _service_route_unusable_since.pop(key, None)
 
     for key, members in groups.items():
 
@@ -1048,6 +1081,9 @@ def _select_service_route_tunnel_ids(
 
             if manager_usable:
                 usable = manager_usable
+
+        if usable:
+            _service_route_unusable_since.pop(key, None)
 
         current_id = (
             _service_route_selected.get(
@@ -1134,7 +1170,36 @@ def _select_service_route_tunnel_ids(
                     for state in states
                 )
                 if fresh_hard_failure:
-                    continue
+                    # No immediate withdrawal for a transient reporting glitch
+                    # when the SAME already-selected physical carrier remains
+                    # independently healthy. Do not seed a new route on failure,
+                    # and never override an administrator deactivation.
+                    physical_online = (
+                        str(active_member.status or "").strip().lower()
+                        == "online"
+                    )
+                    failed_since = _service_route_unusable_since.get(key)
+                    if not _transient_route_hold_eligible(
+                        is_active=bool(candidate.is_active),
+                        has_selected_route=(
+                            current_id is not None
+                            and int(candidate.id) == int(current_id)
+                        ),
+                        physical_online=physical_online,
+                        physical_healthy_at=healthy_at,
+                        failure_started_at=failed_since,
+                        now=now,
+                    ):
+                        continue
+                    _service_route_unusable_since.setdefault(key, now)
+                    print(
+                        "[TunnelFailover] transient peer report ignored "
+                        f"pair={key[0]}->{key[1]} route={candidate.id} "
+                        f"hold_seconds={_SERVICE_ROUTE_TRANSIENT_HOLD_SECONDS}",
+                        flush=True,
+                    )
+                if not fresh_hard_failure:
+                    _service_route_unusable_since.pop(key, None)
                 _service_route_selected[key] = int(candidate.id)
                 selected_ids.add(int(candidate.id))
                 grace_selected = True
@@ -1161,6 +1226,7 @@ def _select_service_route_tunnel_ids(
                 key,
                 None,
             )
+            _service_route_unusable_since.pop(key, None)
 
             continue
 
