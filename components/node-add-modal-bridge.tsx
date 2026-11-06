@@ -15,7 +15,7 @@ export function NodeAddModalBridge(){
   const {pick}=useI18n();
   const [open,setOpen]=useState(false);
   const [draft,setDraft]=useState<NodeDraft>(defaultDraft);
-  const [publishToAll,setPublishToAll]=useState(true);
+  const [publishToAll,setPublishToAll]=useState(false);
   const [busy,setBusy]=useState("");
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
@@ -82,7 +82,7 @@ export function NodeAddModalBridge(){
           <label className="field"><span>SSH Password</span><input type="password" autoComplete="new-password" required value={draft.password} onChange={e=>setDraft(v=>({...v,password:e.target.value}))}/></label>
           <label className="field"><span>{pick("ظرفیت کاربر","User capacity")}</span><input type="number" min={1} value={draft.capacity_users} onChange={e=>setDraft(v=>({...v,capacity_users:Number(e.target.value)||1}))}/></label>
         </div>
-        {draft.node_type==="exit"?<div className="runtime-choice-section"><label className="toggle module-toggle"><span>{pick("نمایش برای همه کاربران سایت","Show for all site users")}</span><input type="checkbox" checked={publishToAll} onChange={e=>setPublishToAll(e.target.checked)}/><i/></label><small>{pick("با فعال‌کردن این گزینه، سرور جدید به اشتراک‌های قبلی هم اضافه می‌شود و کاربران فعال همان سرور را دریافت می‌کنند.","When enabled, the new server is added to existing subscriptions and active users receive credentials for it.")}</small></div>:null}
+        {draft.node_type==="exit"?<div className="runtime-choice-section"><label className="toggle module-toggle"><span>{pick("نمایش برای همه کاربران سایت","Show for all site users")}</span><input type="checkbox" checked={publishToAll} onChange={e=>setPublishToAll(e.target.checked)}/><i/></label><small>{pick("با فعال‌کردن این گزینه، نود به اشتراک‌های قبلی و پلن‌های عمومی آینده اضافه می‌شود. ساخت کانفیگ‌ها در صف جدا انجام می‌شود؛ این گزینه برای پلن‌های اقتصادی و ویژه مشترک است.","When enabled, the server is added to existing subscriptions and future public plans. Credential provisioning is scheduled separately. This includes both economy and premium public plans.")}</small></div>:null}
         <div className="runtime-warning">{pick("پروتکل‌ها بعد از ثبت از صفحه «پروتکل‌ها» مدیریت می‌شوند. برای Exit، Xray baseline به‌صورت خودکار آماده می‌شود.","Protocols are managed from Protocols after registration. Exit nodes automatically receive the Xray baseline.")}</div>
         <div className="action-row"><button type="button" className="ghost" disabled={Boolean(busy)||!draft.host||!draft.password} onClick={()=>void test()}>{busy==="test"?"…":pick("تست SSH","Test SSH")}</button><button className="primary" disabled={Boolean(busy)||!draft.host||!draft.password||!draft.name}>{busy==="register"?pick("در حال ثبت...","Registering..."):pick("ثبت و آماده‌سازی سرور","Register & prepare server")}</button></div>
       </form>
