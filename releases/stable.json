@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.626",
+  "version": "1.1.0-rc.627",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T22:21:55Z",
+  "released_at": "2026-11-06T22:32:41Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "26f61fb6905f58553932da3ecb93523190e7c98c",
+  "source_sha": "a84c9243fc7c10c54bc3b042d3b220d52a73ebc7",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.626/twinpanel-1.1.0-rc.626-linux-x86_64.tar.gz",
-    "sha256": "9cd9ae6353748015320bd2f997ea8f776d62ed9cba1de34cbb8a10dfc1988923",
-    "size_bytes": 28988707
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.627/twinpanel-1.1.0-rc.627-linux-x86_64.tar.gz",
+    "sha256": "5d816b6ac11caa25b0e653ef5d645dc2f06753a88164caffd72c1efefa56f904",
+    "size_bytes": 28988569
   },
   "notes": {
-    "fa": "حذف دائمی HTTPUpgrade از تولید Inbound و لینک‌های V2Ray در تمام نودها؛ حفظ WebSocket TLS، XHTTP REALITY و TCP TLS، همراه با اصلاحات مسیر TCP REALITY نسخه قبلی؛ بدون تغییر تانل‌ها و سایر پروتکل‌ها.",
-    "en": "Permanently retire VLESS HTTPUpgrade from Xray inbound provisioning, new-node route generation and customer subscription delivery; preserve WebSocket TLS, XHTTP REALITY, TCP TLS and previous TCP REALITY ingress corrections. No changes to shared tunnels or other protocols."
+    "fa": "نمایش Connection به جای نام برند در سربرگ و عنوان صفحه ساب‌لینک عمومی؛ بدون تغییر برند پنل، کانفیگ‌ها یا تنظیمات VPN.",
+    "en": "Use neutral Connection label for public subscription hub header and document title, preserving admin/storefront branding and VPN configuration."
   }
 }
