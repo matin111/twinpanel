@@ -52,12 +52,22 @@ def _node_name(item: dict[str, Any]) -> str:
     return _safe_component(item.get("node"), f"node-{node_id or 0}")
 
 
+def _country_flag(code: Any) -> str:
+    """Only valid ISO-style two-letter codes can become flag emojis."""
+    value = str(code or "").strip().upper()
+    if len(value) != 2 or not value.isascii() or not value.isalpha():
+        return "🌐"
+    return "".join(chr(0x1F1E6 + ord(letter) - ord("A")) for letter in value)
+
+
 def _profile_name(sub: Any, protocol: str, item: dict[str, Any]) -> str:
+    # Customer-visible profile name only. Preserve ASCII-safe download stems
+    # for OpenVPN, WireGuard, AmneziaWG and the client-specific file parsers.
     username = _account_name(sub)
-    country = _node_name(item)
+    flag = _country_flag(item.get("country_code"))
     node_id = int(item.get("node_id") or 0)
     protocol_name = _safe_component(protocol, "vpn")
-    return f"{username}-{country}-{protocol_name}-{node_id}"
+    return f"{username} {flag} {protocol_name}-{node_id}"
 
 
 def _download_stem(sub: Any, protocol: str, item: dict[str, Any]) -> str:
