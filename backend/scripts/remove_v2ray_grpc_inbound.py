@@ -14,6 +14,7 @@ import argparse
 import fcntl
 import json
 import os
+import stat
 from pathlib import Path
 import shutil
 import subprocess
@@ -35,12 +36,20 @@ def _validate_file(path: Path) -> None:
     )
 
 
+def _clone_permissions(path: Path, metadata: os.stat_result) -> None:
+    """Keep Xray's original file owner/group and access mode after atomic swap."""
+    os.chown(path, metadata.st_uid, metadata.st_gid)
+    os.chmod(path, stat.S_IMODE(metadata.st_mode))
+
+
 def run(*, apply: bool) -> dict[str, object]:
     lock_path = Path("/run/lock/twinpanel-xray-grpc-remove.lock")
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     with lock_path.open("a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        config = json.loads(CONFIG.read_text(encoding="utf-8"))
+        config_bytes = CONFIG.read_bytes()
+        config_stat = CONFIG.stat()
+        config = json.loads(config_bytes)
         inbounds = config.get("inbounds", [])
         if not isinstance(inbounds, list):
             raise RuntimeError("Invalid Xray inbound list")
@@ -62,6 +71,7 @@ def run(*, apply: bool) -> dict[str, object]:
         backup_config = None
         backup_state = None
         state = None
+        state_stat = None
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         try:
             with tempfile.NamedTemporaryFile(
@@ -76,7 +86,13 @@ def run(*, apply: bool) -> dict[str, object]:
             result = {"changed": True, "retired": 1, "retained_inbounds": len(new_config["inbounds"])}
             if not apply:
                 return dict(result, dry_run=True)
+            if subprocess.run(
+                ["systemctl", "is-active", "--quiet", "xray"], check=False,
+                timeout=10,
+            ).returncode != 0:
+                raise RuntimeError("Xray is not active; refusing production restart")
             if STATE.exists():
+                state_stat = STATE.stat()
                 state = json.loads(STATE.read_text(encoding="utf-8"))
                 if not isinstance(state, dict):
                     raise RuntimeError("Invalid Xray state")
@@ -90,6 +106,10 @@ def run(*, apply: bool) -> dict[str, object]:
                     json.dump(state, handle, ensure_ascii=False, indent=2)
                     handle.write("\n")
                 os.chmod(stage_state, 0o600)
+                _clone_permissions(stage_state, state_stat)
+            # Fail closed if an agent changed the live config during staging.
+            if CONFIG.read_bytes() != config_bytes:
+                raise RuntimeError("Xray config changed during cleanup staging")
             backup_config = ROOT / ("config.json.before-no-grpc-" + stamp)
             shutil.copy2(CONFIG, backup_config)
             os.chmod(backup_config, 0o600)
@@ -97,6 +117,7 @@ def run(*, apply: bool) -> dict[str, object]:
                 backup_state = ROOT / ("twinpanel-modern-state.json.before-no-grpc-" + stamp)
                 shutil.copy2(STATE, backup_state)
                 os.chmod(backup_state, 0o600)
+            _clone_permissions(stage_config, config_stat)
             os.replace(stage_config, CONFIG)
             stage_config = None
             if stage_state is not None:
@@ -112,8 +133,10 @@ def run(*, apply: bool) -> dict[str, object]:
         except Exception:
             if backup_config is not None and backup_config.exists():
                 shutil.copy2(backup_config, CONFIG)
+                _clone_permissions(CONFIG, config_stat)
                 if backup_state is not None and backup_state.exists():
                     shutil.copy2(backup_state, STATE)
+                    _clone_permissions(STATE, state_stat)
                 subprocess.run(["systemctl", "restart", "xray"], timeout=25, check=False)
             raise
         finally:

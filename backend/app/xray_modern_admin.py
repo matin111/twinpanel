@@ -777,6 +777,7 @@ import os
 import shutil
 import subprocess
 import fcntl
+import stat
 from pathlib import Path
 
 root = Path("/usr/local/etc/xray")
@@ -858,15 +859,24 @@ if xhttp_path:
 stamp = str(os.getpid())
 backups = []
 stages = []
+original_modes = {}
 try:
+    if subprocess.run(
+        ["systemctl", "is-active", "--quiet", "xray"], timeout=10,
+    ).returncode != 0:
+        raise RuntimeError("Xray must be active before applying an inbound edit")
     for path, doc in ((config_path, config), (state_path, state)):
+        metadata = path.stat()
+        original_modes[path] = metadata
         backup = path.with_name(path.name + ".pre-inbound-apply-" + stamp)
         shutil.copy2(path, backup)
         os.chmod(backup, 0o600)
         backups.append((path, backup))
         stage = path.with_name(path.stem + ".inbound-" + stamp + ".json")
         stage.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + "\n")
-        os.chmod(stage, 0o600)
+        # Preserve Xray service-user access, including dedicated service groups.
+        os.chown(stage, metadata.st_uid, metadata.st_gid)
+        os.chmod(stage, stat.S_IMODE(metadata.st_mode))
         stages.append(stage)
     result = subprocess.run(
         ["/usr/local/bin/xray", "run", "-test", "-config", str(stages[0])],
@@ -890,7 +900,11 @@ except Exception:
     for path, backup in backups:
         if backup.exists():
             os.replace(backup, path)
-    subprocess.run(["systemctl", "restart", "xray"], capture_output=True, timeout=20)
+            metadata = original_modes[path]
+            os.chown(path, metadata.st_uid, metadata.st_gid)
+            os.chmod(path, stat.S_IMODE(metadata.st_mode))
+    if backups:
+        subprocess.run(["systemctl", "restart", "xray"], capture_output=True, timeout=20)
     raise
 finally:
     for stage in stages:
