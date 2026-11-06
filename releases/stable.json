@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.600",
+  "version": "1.1.0-rc.601",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-06T02:31:35Z",
+  "released_at": "2026-11-06T02:46:37Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "0be427b5dcb24cfe0efb6123fef8fcb8e439ffea",
+  "source_sha": "d46d3c0c3fd1487b302f9132677aaa5587e8d8af",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.600/twinpanel-1.1.0-rc.600-linux-x86_64.tar.gz",
-    "sha256": "bec07779a134ffa393c6b771eb3bba64e7e157b885e92e0d1f433f1094b502d1",
-    "size_bytes": 28792222
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.601/twinpanel-1.1.0-rc.601-linux-x86_64.tar.gz",
+    "sha256": "b3a13347dd901c84812184d8e1fbeb8a869b3693226ef36266a3ba986b02798a",
+    "size_bytes": 28796278
   },
   "notes": {
-    "fa": "ویرایشگر V2Ray در مدیریت پروتکل‌ها، اعمال امن و اعتبارسنجی REALITY روی نود، انتشار زنده SNI در ساب‌لینک‌ها بدون بازسازی اکانت و ریمارک فقط نام کاربری و پرچم کشور. تنظیمات TLS و Transport فعلاً در مرحله پیش‌نویس باقی می‌مانند.",
-    "en": "V2Ray per-node editor in Protocol Library, verified REALITY target/SNI apply with rollback, live subscription SNI and username plus flag-only remarks. TLS/transport changes remain draft-only."
+    "fa": "اصلاح مدیریت V2Ray/Xray برای ویرایش مستقل سه Inbound: TCP+TLS، WebSocket+TLS و XHTTP+REALITY. پیش‌نویس هر نوع جدا ذخیره می‌شود؛ اعمال زنده فقط برای مقصد و SNI REALITY پس از تست فعال است. کانفیگ‌های کاربران و ریمارک نام کاربری و پرچم حفظ می‌شوند.",
+    "en": "Three independent V2Ray inbound editors: TCP TLS, WebSocket TLS and XHTTP REALITY. Per-profile validated drafts; verified REALITY target/SNI applies independently. User credentials and username/flag remarks are preserved."
   }
 }
