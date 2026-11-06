@@ -12,6 +12,11 @@ on:
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    env:
+      # Test-only placeholders. Never use production secrets in CI smoke.
+      APP_SECRET_KEY: smoke-only-nonprod-key
+      DATABASE_URL: sqlite:///./openvpn-runtime-smoke.sqlite3
+      NODE_AGENT_SHARED_SECRET: smoke-only-nonprod-agent-secret
     steps:
       - name: Checkout
         uses: actions/checkout@v4
