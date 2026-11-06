@@ -101,3 +101,19 @@ def test_target_scope_is_applied_to_singbox_and_classic_queries():
     assert "subscription_id=subscription_id" in singbox
     assert "one_node(db, node_id, subscription_id=subscription_id)" in wrapper
     assert "eligible_count(db, args.node_id, args.protocol, args.subscription_id)" in wrapper
+
+
+def test_v2ray_missing_only_uses_existing_uuid_and_no_restart():
+    classic = (BASE / "scripts/twinpanel_migration_classic_sequential_v3.py").read_text()
+    hot = (BASE / "app/xray_hot_client_sync_v1.py").read_text()
+    assert "protocol=='v2ray'" in classic
+    assert "ad._autosync_item_node_id(x)==node_id" in classic
+    assert "cred.config_text_encrypted and not items" in classic
+    assert "len(known)>1" in classic
+    assert "client_id=next(iter(known)) if known else str(uuid.uuid4())" in classic
+    assert "ad._xray(db,node,sub,user,client_id)" in classic
+    assert "V2Ray UUID changed unexpectedly" in classic
+    assert "Xray live user add failed for inbound" in hot
+    assert "global_restart=forbidden" in hot
+    assert "systemctl restart xray" not in classic
+    assert "MigrationImportRecord.source.in_(SOURCES)" in classic
