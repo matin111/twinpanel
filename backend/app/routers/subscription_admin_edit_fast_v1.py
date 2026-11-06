@@ -145,7 +145,18 @@ async def admin_edit_subscription_fast_v1(
     if not desired_node_ids:
         raise HTTPException(status_code=422, detail="حداقل یک سرور خروجی انتخاب کنید")
 
-    invalid_nodes = [node_id for node_id in desired_node_ids if node_id not in allowed_node_ids]
+    # An unchanged subscription/plan can retain previously allocated Exit
+    # nodes even when a plan template was subsequently narrowed. Do not grant
+    # any new out-of-plan node, and enforce the new template on plan changes.
+    # Existing nodes are still checked below for Exit type and retirement.
+    same_plan = (plan is None and sub.plan_id is None) or (
+        plan is not None and sub.plan_id == int(plan.id)
+    )
+    preserved_old_node_ids = set(old_node_ids) if same_plan else set()
+    invalid_nodes = [
+        node_id for node_id in desired_node_ids
+        if node_id not in allowed_node_ids and node_id not in preserved_old_node_ids
+    ]
     if invalid_nodes:
         raise HTTPException(
             status_code=422,
