@@ -93,7 +93,11 @@ class VerifiedRealitySniTests(unittest.TestCase):
         for candidate in ("", "not-a-host", "a..b.com", "www.example.com:443"):
             self.assertIs(rewrite_reality_sni_item(item, candidate), item)
         duplicate = copy.deepcopy(item)
-        duplicate["profiles"][1]["uri"] += "&sni=duplicate.example.com"
+        old_uri = duplicate["profiles"][1]["uri"]
+        payload, fragment = old_uri.split("#", 1)
+        duplicate["profiles"][1]["uri"] = (
+            payload + "&sni=duplicate.example.com#" + fragment
+        )
         self.assertIs(rewrite_reality_sni_item(duplicate, "www.varzesh3.com"), duplicate)
 
     def test_public_delivery_uses_applied_names_before_items_are_published(self):
