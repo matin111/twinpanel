@@ -172,6 +172,8 @@ def _profile_endpoint_v261(
 def _customer_xray_item_v261(
     db: Session,
     item: dict[str, Any],
+    *,
+    include_qr: bool = True,
 ) -> dict[str, Any] | None:
     """Return one TLS-policy-compliant Xray item or fail closed.
 
@@ -225,7 +227,12 @@ def _customer_xray_item_v261(
         profile["server_ip"] = host
         profile["port"] = int(port)
         profile["uri"] = _rewrite_vless_authority_v261(uri, host, int(port))
-        profile["qr"] = account_delivery._qr_data_uri(profile["uri"])
+        if include_qr:
+            profile["qr"] = account_delivery._qr_data_uri(profile["uri"])
+        else:
+            # Subscription feeds only serialize VLESS URIs. Never create nine
+            # expensive SVG QR images just to discard them in /sub.
+            profile.pop("qr", None)
         by_id[profile_id] = profile
 
     profiles = [
@@ -247,7 +254,10 @@ def _customer_xray_item_v261(
     result["server_ip"] = selected["server"]
     result["port"] = int(selected["port"])
     result["uri"] = selected["uri"]
-    result["qr"] = selected["qr"]
+    if include_qr:
+        result["qr"] = selected["qr"]
+    else:
+        result.pop("qr", None)
     result["profile"] = str(selected.get("id") or "")
 
     for key in ("sni", "security", "transport"):
