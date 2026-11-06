@@ -1,0 +1,28 @@
+name: Xray gRPC Removal V1 smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/xray_modern_runtime.py"
+      - "backend/app/xray_modern_admin.py"
+      - "backend/app/xray_adaptive_three_profiles_v47.py"
+      - "backend/app/xray_profile_reconcile_v36.py"
+      - "backend/app/routers/public_connection_multilink_v7.py"
+      - "backend/scripts/remove_v2ray_grpc_inbound.py"
+      - "tests/test_xray_no_grpc_v1.py"
+      - ".github/workflows/xray-remove-grpc-v1-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  remove-grpc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify all modified Python modules compile
+        run: |
+          python -m py_compile backend/app/xray_modern_runtime.py backend/app/xray_modern_admin.py backend/app/xray_adaptive_three_profiles_v47.py backend/app/xray_profile_reconcile_v36.py backend/app/routers/public_connection_multilink_v7.py backend/scripts/remove_v2ray_grpc_inbound.py
+      - name: Run gRPC removal regressions
+        run: python -m unittest discover -s tests -p test_xray_no_grpc_v1.py -v
