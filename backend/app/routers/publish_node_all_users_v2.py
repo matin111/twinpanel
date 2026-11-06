@@ -1,8 +1,8 @@
 """Non-blocking, set-based node publishing (no per-user SSH on HTTP path).
 
 Publishing makes the node part of desired state. The supervised convergence
-worker, not this endpoint, provisions eligible new users. Imported users stay
-manual-only as configured in TwinPanel.
+worker, not this endpoint, provisions eligible new and imported accounts
+in guarded batches after explicit admin publishing.
 """
 from __future__ import annotations
 
@@ -111,6 +111,12 @@ async def publish_node_to_all_users_v2(
         # (including economic/premium tiers) have separate node entitlements.
         # The admin selects nodes for future buyers in the Plan editor.
         # 'Publish to all users' applies to already-purchased, eligible accounts.
+        # Queue the durable per-node credential job in this SAME transaction.
+        # The HTTP request does not perform SSH or restart any VPN service.
+        from ..node_auto_backfill_v1 import enabled as backfill_enabled, queue_backfill
+        queued = backfill_enabled()
+        if queued:
+            queue_backfill(db, int(node.id))
         db.commit()
     except Exception:
         db.rollback()
@@ -141,11 +147,14 @@ async def publish_node_to_all_users_v2(
         "classic_pairs_provisioned": 0,
         "modern_pairs_provisioned": 0,
         "active_memberships_awaiting_background_sync": None,
+        "auto_backfill_queued": queued,
         "failed": [],
         "message": (
             "نود برای اشتراک‌های فعال موجود ثبت شد؛ "
             "افزودن نود به پلن‌های فروش باید با انتخاب ادمین در ویرایش پلن انجام شود. "
-            "کانفیگ اکانت‌های انتقالی فقط با دستور دستی ساخته می‌شود"
+            "کانفیگ‌های ناقص کاربران قبلی در صف پایدار و مرحله‌ای ساخته می‌شوند؛ "
+            "وضعیت از مدیریت نود قابل مشاهده است" if queued else
+            "صف خودکار نود غیرفعال است؛ از تنظیمات فعال کنید"
         ),
     }
 
