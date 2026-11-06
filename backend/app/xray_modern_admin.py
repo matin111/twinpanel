@@ -650,7 +650,7 @@ def _validated_editor_settings(payload: InboundEditorDraft) -> dict[str, str]:
 
 
 @router.get("/nodes/{node_id}/inbound-editor")
-def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
+async def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
     node = _node_or_404(db, node_id)
     row = db.execute(
         text(
@@ -664,28 +664,48 @@ def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
         values = {}
     if not isinstance(values, dict):
         values = {}
+    runtime_state: dict[str, Any] = {}
+    # Fetch the installed runtime defaults from the selected node. Do not
+    # fabricate "/" paths, rotate keys, or provision a customer on UI GET.
+    conn = None
+    try:
+        conn = await account_delivery.ssh_connect_saved(node, db)
+        raw = await provision.cmd(
+            conn,
+            "cat /usr/local/etc/xray/twinpanel-modern-state.json",
+            timeout=8,
+        )
+        runtime_state = json.loads(raw)
+        if not isinstance(runtime_state, dict):
+            runtime_state = {}
+    except Exception:
+        runtime_state = {}
+    finally:
+        if conn is not None:
+            conn.close()
+            await conn.wait_closed()
     default_domain = str(getattr(node, "xray_domain", None) or getattr(node, "public_domain", None) or "")
     return {
         "node_id": int(node.id),
         "defaults": {
             "connection_domain": default_domain,
-            "tls_server_name": default_domain,
-            "reality_server_name": str(values.get("reality_server_name") or ""),
-            "reality_target": str(values.get("reality_target") or ""),
+            "tls_server_name": str(runtime_state.get("tls_domain") or default_domain),
+            "reality_server_name": str(runtime_state.get("reality_server_name") or values.get("reality_server_name") or ""),
+            "reality_target": str(runtime_state.get("reality_target") or values.get("reality_target") or ""),
             "transport": "tcp",
             "security": "tls",
             "inbounds": {
                 "tcp_tls": {
-                    "connection_domain": default_domain, "server_name": default_domain,
+                    "connection_domain": default_domain, "server_name": str(runtime_state.get("tls_domain") or default_domain),
                     "path": "", "target": "", "transport": "tcp", "security": "tls",
                 },
                 "ws_tls": {
-                    "connection_domain": default_domain, "server_name": default_domain,
-                    "path": str(((values.get("inbound_applied") or {}).get("ws_tls") or {}).get("path") or ""), "target": "", "transport": "ws", "security": "tls",
+                    "connection_domain": default_domain, "server_name": str(runtime_state.get("tls_domain") or default_domain),
+                    "path": str(runtime_state.get("ws_path") or ((values.get("inbound_applied") or {}).get("ws_tls") or {}).get("path") or ""), "target": "", "transport": "ws", "security": "tls",
                 },
                 "xhttp_reality": {
-                    "connection_domain": default_domain, "server_name": str(values.get("reality_server_name") or ""),
-                    "path": str(((values.get("inbound_applied") or {}).get("xhttp_reality") or {}).get("path") or ""), "target": str(values.get("reality_target") or ""),
+                    "connection_domain": default_domain, "server_name": str(runtime_state.get("reality_server_name") or values.get("reality_server_name") or ""),
+                    "path": str(runtime_state.get("xhttp_path") or ((values.get("inbound_applied") or {}).get("xhttp_reality") or {}).get("path") or ""), "target": str(runtime_state.get("reality_target") or values.get("reality_target") or ""),
                     "transport": "xhttp", "security": "reality",
                 },
             },
@@ -698,6 +718,7 @@ def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
         "transports": sorted(_XRAY_TRANSPORTS),
         "securities": sorted(_XRAY_SECURITIES),
         "requires_apply": True,
+        "runtime_detected": bool(runtime_state),
         "message": "Saving a draft never modifies Xray or customer links.",
     }
 
