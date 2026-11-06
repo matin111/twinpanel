@@ -198,6 +198,31 @@ def install_telegram_admin_ops(router, request_fn):
                 reply_markup=_buttons([("⬅️ صف رسیدها", "adm:review")]),
             )
 
+    async def _finalize_receipt_message(message: Message, status_text: str):
+        """Replace actionable receipt messages with a permanent status."""
+        if not message:
+            return
+        previous = str(message.caption or message.text or "")
+        first = previous.split("\n", 1)[0]
+        rest = previous.split("\n", 1)[1] if "\n" in previous else ""
+        if "رسید" in first:
+            content = status_text + ("\n" + rest if rest else "")
+        else:
+            content = status_text
+        # Preserve the receipt attachment so the audit evidence remains visible.
+        try:
+            if message.photo or message.document or message.video:
+                await message.edit_caption(caption=content, reply_markup=None)
+            else:
+                await message.edit_text(content, reply_markup=None)
+        except Exception:
+            # A non-editable/old Telegram message must not undo a completed
+            # financial transaction; at minimum disable its buttons.
+            try:
+                await message.edit_reply_markup(reply_markup=None)
+            except Exception:
+                pass
+
     @router.callback_query(F.data.startswith("adm:ask:"))
     async def sensitive_preview(callback: CallbackQuery):
         await callback.answer()
@@ -209,12 +234,26 @@ def install_telegram_admin_ops(router, request_fn):
         if len(parts) != 5:
             return
         _, _, action, kind, item_id = parts
+        if kind in ("purchase", "wallet"):
+            try:
+                receipt = await api(
+                    "GET", f"/receipt/{callback.from_user.id}/{kind}/{int(item_id)}",
+                    callback.from_user.id,
+                )
+                if not receipt.get("can_approve"):
+                    raise ValueError("این رسید دیگر در صف بررسی نیست")
+            except Exception:
+                await _finalize_receipt_message(
+                    callback.message, "ℹ️ رسید قبلاً بررسی شده یا دیگر قابل اقدام نیست."
+                )
+                return
+        source_id = int(callback.message.message_id)
         await callback.message.answer(
             f"⚠️ <b>تأیید نهایی</b>\n"
             f"عملیات: {escape(action)}\nنوع: {escape(kind)} | شناسه: {escape(item_id)}\n"
             "این اقدام وضعیت مالی یا اشتراک را تغییر می‌دهد. مطمئن هستید؟",
             reply_markup=_buttons(
-                [("✅ تأیید نهایی", f"adm:do:{action}:{kind}:{item_id}")],
+                [("✅ تأیید نهایی", f"adm:do:{action}:{kind}:{item_id}:{source_id}")],
                 [("❌ انصراف", "adm:home")],
             ),
         )
@@ -225,7 +264,11 @@ def install_telegram_admin_ops(router, request_fn):
         if not callback.message or callback.message.chat.type != "private":
             return
         try:
-            _, _, action, kind, raw_id = (callback.data or "").split(":")
+            parts = (callback.data or "").split(":")
+            if len(parts) not in (5, 6):
+                raise ValueError("دکمه تأیید معتبر نیست")
+            _, _, action, kind, raw_id = parts[:5]
+            origin_id = int(parts[5]) if len(parts) == 6 else None
             item_id = int(raw_id)
             tg = int(callback.from_user.id)
             if kind in ("purchase", "wallet") and action in ("approve", "reject"):
@@ -240,12 +283,41 @@ def install_telegram_admin_ops(router, request_fn):
                 )
             else:
                 raise ValueError("عملیات نامعتبر است")
-            await callback.message.answer(
-                "✅ عملیات ثبت شد.\n" + escape(str(data.get("ok", True))),
-                reply_markup=_home(),
-            )
         except Exception as exc:
+            # Failure is not success. Leave the confirmation available for a
+            # legitimate retry, while showing the actual backend error.
             await callback.message.answer("❌ " + escape(str(exc)[:200]))
+            return
+
+        status = (
+            "✅ رسید تأیید شد" if action == "approve"
+            else "❌ رسید رد شد" if action == "reject"
+            else "✅ عملیات مدیریت انجام شد"
+        )
+        detail = (
+            f"{status}\n"
+            f"نوع: {escape(kind)} | شناسه: {item_id}\n"
+            "این مورد دیگر منتظر تأیید نیست."
+        )
+        await _finalize_receipt_message(callback.message, detail)
+        if origin_id is not None and kind in ("purchase", "wallet"):
+            try:
+                original = await callback.bot.edit_message_reply_markup(
+                    chat_id=callback.message.chat.id,
+                    message_id=origin_id,
+                    reply_markup=None,
+                )
+            except Exception:
+                pass
+            # The originating receipt may be a photo or text. Telegram does
+            # not provide a fetch-message API; edit the known message ID using
+            # the original callback message's text/caption only at preview time.
+            # Remove all prior action buttons regardless of its media type.
+        await callback.message.answer(
+            detail,
+            reply_markup=_buttons([("🧾 صف رسیدهای جدید", "adm:review")],
+                                  [("🏠 مدیریت", "adm:home")]),
+        )
 
     @router.callback_query(F.data == "adm:lookup")
     async def lookup_start(callback: CallbackQuery, state: FSMContext):
