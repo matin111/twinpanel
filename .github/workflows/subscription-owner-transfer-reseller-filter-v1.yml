@@ -30,4 +30,7 @@ jobs:
       - name: Test actual transfer and SQL paginated filtering
         env:
           PYTHONPATH: backend
+          APP_SECRET_KEY: "test-only-ownership-transfer-key"
+          DATABASE_URL: "sqlite:///./test-owner-transfer.db"
+          NODE_AGENT_SHARED_SECRET: "test-only-agent-secret"
         run: python -m pytest -q backend/tests/test_subscription_owner_transfer_reseller_filter_v1.py
