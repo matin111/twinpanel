@@ -322,6 +322,14 @@ def apply_self_hosted_runtime(
 
     apply_protocol_dataplane_desired_state_v87()
 
+    # V87/V251 replace the route builder captured by the earlier Xray V47
+    # installation. Attach the V47 TCP REALITY ingress extension to this
+    # final authority before Unified L3 V49 wraps/deduplicates the routes.
+    from .xray_adaptive_three_profiles_v47 import (
+        reattach_service_routes_v47_after_v87,
+    )
+    reattach_service_routes_v47_after_v87()
+
     # ------------------------------------------------------------
     # Unified L3 Core V49 + candidate registry V79
     #
