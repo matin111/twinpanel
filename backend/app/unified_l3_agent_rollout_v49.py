@@ -32,12 +32,17 @@ _AGENT_REQUIRED_MARKERS: set[str] = set()
 
 
 def _marker_probe_command(*, verify_service: bool = False) -> str:
-    markers = sorted(_AGENT_REQUIRED_MARKERS | {_AGENT_MARKER})
-    command = " && ".join(
-        f"grep -Fq {shlex.quote(marker)} "
+    # Keep the historical primary-marker contract for earlier transport
+    # smoke tests, then require any additional marker additively.
+    command = (
+        f"grep -Fq {shlex.quote(_AGENT_MARKER)} "
         "/opt/twinpanel-agent/agent.py 2>/dev/null"
-        for marker in markers
     )
+    for marker in sorted(_AGENT_REQUIRED_MARKERS - {_AGENT_MARKER}):
+        command += (
+            f" && grep -Fq {shlex.quote(marker)} "
+            "/opt/twinpanel-agent/agent.py 2>/dev/null"
+        )
     if verify_service:
         command += " && systemctl is-active --quiet twinpanel-agent.service"
     return command
