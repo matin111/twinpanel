@@ -1,0 +1,9 @@
+[Unit]
+Description=TwinPanel V2Ray-only Germany WS VXLAN NAT canary
+After=network-online.target twinpanel-agent.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/sbin/tp-v2ray-only-vxlan-canary-v1 apply --profile=de-ws
+TimeoutStartSec=20
