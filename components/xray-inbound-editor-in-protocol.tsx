@@ -66,7 +66,7 @@ export function XrayInboundEditorInProtocol({nodeId}:{nodeId:number}){
   };
 
   const apply=async()=>{
-    if(!draft||busy||selected!=="xhttp_reality")return;
+    if(!draft||busy)return;
     setBusy("apply");setError("");setNotice("");
     try{
       await adminApi.saveXrayInboundDraft(nodeId,draft);
@@ -74,8 +74,8 @@ export function XrayInboundEditorInProtocol({nodeId}:{nodeId:number}){
       const updated=await adminApi.xrayInboundEditor(nodeId);
       setState(updated);
       setNotice(pick(
-        "مقصد و SNI مربوط به REALITY اعمال و تست شدند؛ دو Inbound نوع TLS تغییر نکردند.",
-        "REALITY target and SNI applied and tested; TLS inbounds were unchanged."
+        "تنظیمات پشتیبانی‌شده هر سه Inbound اعمال و اعتبارسنجی شدند. تغییرات با دریافت مجدد ساب‌لینک نمایش داده می‌شوند.",
+        "Supported settings for all three inbounds were applied and validated. The next subscription refresh reflects the change."
       )+" · "+result.reality_server_name);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy("");}
@@ -127,13 +127,13 @@ export function XrayInboundEditorInProtocol({nodeId}:{nodeId:number}){
         <button type="button" className={styles.primaryButton} disabled={Boolean(busy)} onClick={()=>void save()}>
           {busy==="save"?"…":pick("ذخیره تنظیمات سه Inbound","Save inbound drafts")}
         </button>
-        {selected==="xhttp_reality"?<button type="button" className={styles.secondaryButton} disabled={Boolean(busy)} onClick={()=>void apply()}>
-          {busy==="apply"?"…":pick("اعمال و تست REALITY","Apply & test REALITY")}
-        </button>:null}
+        <button type="button" className={styles.secondaryButton} disabled={Boolean(busy)} onClick={()=>void apply()}>
+          {busy==="apply"?"…":pick("اعمال و تست سه Inbound","Apply & test inbounds")}
+        </button>
       </div>
       <div className={styles.warningBox}>
-        {pick("تغییر TLS، مسیر و دامنه اتصال فعلاً فقط پیش‌نویس است. اعمال REALITY فقط مقصد و SNI آن را پس از اعتبارسنجی روی سرور و ساب‌لینک هماهنگ می‌کند.",
-          "TLS, path and connection-domain changes are drafts only. REALITY apply updates only its target and SNI after validation.")}
+        {pick("تغییر SNIهای TLS فقط با گواهی معتبر، و تغییر Path و REALITY فقط پس از اعتبارسنجی اعمال می‌شوند. تغییر دامنه اتصال فقط در صورت یکسان بودن IP مقصد DNS اعمال می‌شود؛ تغییر Transport بین سه نوع موجود از طریق تب‌ها انجام می‌شود.",
+          "TLS SNI requires a matching certificate; paths and REALITY require validation. Connection-domain aliases are applied only when DNS resolves to the existing ingress. Available transports are managed in their separate inbound tabs.")}
       </div>
     </>}
   </section>;

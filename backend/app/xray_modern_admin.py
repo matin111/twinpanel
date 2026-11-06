@@ -650,7 +650,7 @@ def _validated_editor_settings(payload: InboundEditorDraft) -> dict[str, str]:
 
 
 @router.get("/nodes/{node_id}/inbound-editor")
-def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
+async def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
     node = _node_or_404(db, node_id)
     row = db.execute(
         text(
@@ -664,28 +664,57 @@ def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
         values = {}
     if not isinstance(values, dict):
         values = {}
+    runtime_state: dict[str, Any] = {}
+    # Fetch the installed runtime defaults from the selected node. Do not
+    # fabricate "/" paths, rotate keys, or provision a customer on UI GET.
+    conn = None
+    try:
+        conn = await account_delivery.ssh_connect_saved(node, db)
+        raw = await provision.cmd(
+            conn,
+            "cat /usr/local/etc/xray/twinpanel-modern-state.json",
+            timeout=8,
+        )
+        runtime_state = json.loads(raw)
+        if not isinstance(runtime_state, dict):
+            runtime_state = {}
+    except Exception:
+        runtime_state = {}
+    finally:
+        if conn is not None:
+            conn.close()
+            await conn.wait_closed()
     default_domain = str(getattr(node, "xray_domain", None) or getattr(node, "public_domain", None) or "")
+    applied_profiles = values.get("inbound_applied") or {}
+    if not isinstance(applied_profiles, dict):
+        applied_profiles = {}
+    tcp_applied = applied_profiles.get("tcp_tls") or {}
+    ws_applied = applied_profiles.get("ws_tls") or {}
+    xhttp_applied = applied_profiles.get("xhttp_reality") or {}
     return {
         "node_id": int(node.id),
         "defaults": {
             "connection_domain": default_domain,
-            "tls_server_name": default_domain,
-            "reality_server_name": "www.varzesh3.com",
-            "reality_target": "www.varzesh3.com:443",
+            "tls_server_name": str(runtime_state.get("tls_domain") or default_domain),
+            "reality_server_name": str(runtime_state.get("reality_server_name") or values.get("reality_server_name") or ""),
+            "reality_target": str(runtime_state.get("reality_target") or values.get("reality_target") or ""),
             "transport": "tcp",
             "security": "tls",
             "inbounds": {
                 "tcp_tls": {
-                    "connection_domain": default_domain, "server_name": default_domain,
+                    "connection_domain": str(tcp_applied.get("connection_domain") or default_domain),
+                    "server_name": str(runtime_state.get("tls_sni_tcp") or tcp_applied.get("server_name") or runtime_state.get("tls_domain") or default_domain),
                     "path": "", "target": "", "transport": "tcp", "security": "tls",
                 },
                 "ws_tls": {
-                    "connection_domain": default_domain, "server_name": default_domain,
-                    "path": "/", "target": "", "transport": "ws", "security": "tls",
+                    "connection_domain": str(ws_applied.get("connection_domain") or default_domain),
+                    "server_name": str(runtime_state.get("tls_sni_ws") or ws_applied.get("server_name") or runtime_state.get("tls_domain") or default_domain),
+                    "path": str(runtime_state.get("ws_path") or ((values.get("inbound_applied") or {}).get("ws_tls") or {}).get("path") or ""), "target": "", "transport": "ws", "security": "tls",
                 },
                 "xhttp_reality": {
-                    "connection_domain": default_domain, "server_name": "www.varzesh3.com",
-                    "path": "/", "target": "www.varzesh3.com:443",
+                    "connection_domain": str(xhttp_applied.get("connection_domain") or default_domain),
+                    "server_name": str(runtime_state.get("reality_server_name") or values.get("reality_server_name") or ""),
+                    "path": str(runtime_state.get("xhttp_path") or ((values.get("inbound_applied") or {}).get("xhttp_reality") or {}).get("path") or ""), "target": str(runtime_state.get("reality_target") or values.get("reality_target") or ""),
                     "transport": "xhttp", "security": "reality",
                 },
             },
@@ -698,6 +727,7 @@ def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
         "transports": sorted(_XRAY_TRANSPORTS),
         "securities": sorted(_XRAY_SECURITIES),
         "requires_apply": True,
+        "runtime_detected": bool(runtime_state),
         "message": "Saving a draft never modifies Xray or customer links.",
     }
 
@@ -757,6 +787,10 @@ config_path = root / "config.json"
 state_path = root / "twinpanel-modern-state.json"
 target = __TARGET__
 name = __NAME__
+ws_path = __WS_PATH__
+xhttp_path = __XHTTP_PATH__
+tcp_tls_sni = __TCP_TLS_SNI__
+ws_tls_sni = __WS_TLS_SNI__
 lock = open("/run/lock/twinpanel-xray-inbound-editor.lock", "a+")
 fcntl.flock(lock, fcntl.LOCK_EX)
 host, port = target.rsplit(":", 1)
@@ -785,6 +819,45 @@ for entry in inbounds:
     reality["serverNames"] = [name]
 state["reality_target"] = target
 state["reality_server_name"] = name
+# TLS SNI may change only when the currently installed certificate covers it.
+for tag, server_name, state_key in (
+    ("vless-tcp-tls", tcp_tls_sni, "tls_sni_tcp"),
+    ("vless-ws-tls", ws_tls_sni, "tls_sni_ws"),
+):
+    if not server_name:
+        continue
+    entries = [x for x in config["inbounds"] if x.get("tag") == tag]
+    if len(entries) != 1:
+        raise RuntimeError("TLS inbound is missing: " + tag)
+    stream = entries[0]["streamSettings"]
+    tls_settings = stream["tlsSettings"]
+    certificates = tls_settings.get("certificates") or []
+    if not certificates:
+        raise RuntimeError("No managed TLS certificate for " + tag)
+    certificate = certificates[0].get("certificateFile")
+    if not certificate or not os.path.isfile(certificate):
+        raise RuntimeError("TLS certificate unavailable")
+    result = subprocess.run(
+        ["openssl", "x509", "-noout", "-checkhost", server_name, "-in", certificate],
+        capture_output=True, timeout=10,
+    )
+    if result.returncode:
+        raise RuntimeError("TLS certificate does not cover SNI " + server_name)
+    tls_settings["serverName"] = server_name
+    state[state_key] = server_name
+# Apply path changes to matching listeners and persisted state, preserving UUIDs.
+if ws_path:
+    matches = [entry for entry in config["inbounds"] if entry.get("tag") == "vless-ws-tls"]
+    if len(matches) != 1 or matches[0].get("streamSettings", {}).get("network") != "ws":
+        raise RuntimeError("WebSocket TLS inbound missing")
+    matches[0]["streamSettings"]["wsSettings"]["path"] = ws_path
+    state["ws_path"] = ws_path
+if xhttp_path:
+    matches = [entry for entry in config["inbounds"] if entry.get("tag") == "vless-xhttp-reality"]
+    if len(matches) != 1:
+        raise RuntimeError("XHTTP REALITY inbound missing")
+    matches[0]["streamSettings"]["xhttpSettings"]["path"] = xhttp_path
+    state["xhttp_path"] = xhttp_path
 stamp = str(os.getpid())
 backups = []
 stages = []
@@ -857,6 +930,55 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
         raise HTTPException(status_code=422, detail="Transport/security not provisioned")
     name = candidate["reality_server_name"]
     target = candidate["reality_target"]
+    inbounds = candidate.get("inbounds") or {}
+    ws_profile = inbounds.get("ws_tls") or {}
+    xhttp_profile = inbounds.get("xhttp_reality") or {}
+    ws_path = str(ws_profile.get("path") or "")
+    xhttp_path = str(xhttp_profile.get("path") or "")
+    tcp_tls_sni = str((inbounds.get("tcp_tls") or {}).get("server_name") or "")
+    ws_tls_sni = str(ws_profile.get("server_name") or "")
+    # DNS aliases may be changed without altering any server listener, but
+    # only if they resolve to the same ingress address as the existing domain.
+    import socket
+
+    expected_domain = str(
+        getattr(node, "xray_domain", None)
+        or getattr(node, "public_domain", None)
+        or getattr(node, "public_ip", None)
+        or ""
+    ).strip().lower()
+
+    def _resolved_addresses(domain: str) -> set[str]:
+        return {
+            item[4][0] for item in socket.getaddrinfo(
+                domain, None, type=socket.SOCK_STREAM
+            )
+        }
+
+    alias_changes: dict[str, str] = {}
+    for profile_key in ("tcp_tls", "ws_tls", "xhttp_reality"):
+        alias = str((inbounds.get(profile_key) or {}).get("connection_domain") or "").strip().lower()
+        if not alias or alias == expected_domain:
+            continue
+        if not expected_domain:
+            raise HTTPException(status_code=422, detail="Cannot verify existing ingress domain")
+        try:
+            expected_ips = await asyncio.wait_for(
+                asyncio.to_thread(_resolved_addresses, expected_domain), timeout=5
+            )
+            new_ips = await asyncio.wait_for(
+                asyncio.to_thread(_resolved_addresses, alias), timeout=5
+            )
+        except (OSError, asyncio.TimeoutError) as exc:
+            raise HTTPException(status_code=422, detail="DNS alias validation failed") from exc
+        if not new_ips or not expected_ips or not new_ips.issubset(expected_ips):
+            raise HTTPException(status_code=422, detail="Connection domain must resolve to the current ingress")
+        alias_changes[profile_key] = alias
+    # Published path changes require a valid, non-root path. The node keeps
+    # its existing path if no explicit value was supplied.
+    for path_value in (ws_path, xhttp_path):
+        if path_value and (path_value == "/" or len(path_value) < 8):
+            raise HTTPException(status_code=422, detail="Use a unique path of at least 8 characters")
     if not name or not target or target != name + ":443":
         raise HTTPException(status_code=422, detail="REALITY name and target must match on :443")
 
@@ -864,7 +986,11 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
     try:
         script = _XRAY_REALITY_APPLY_SCRIPT.replace(
             "__TARGET__", json.dumps(target)
-        ).replace("__NAME__", json.dumps(name))
+        ).replace("__NAME__", json.dumps(name)).replace(
+            "__WS_PATH__", json.dumps(ws_path)
+        ).replace("__XHTTP_PATH__", json.dumps(xhttp_path)).replace(
+            "__TCP_TLS_SNI__", json.dumps(tcp_tls_sni)
+        ).replace("__WS_TLS_SNI__", json.dumps(ws_tls_sni))
         encoded = base64.b64encode(script.encode("utf-8")).decode("ascii")
         command = (
             "python3 -c "
@@ -883,6 +1009,26 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
     # remain drafts until corresponding server-side apply is implemented.
     settings["reality_server_name"] = name
     settings["reality_target"] = target
+    settings["inbound_applied"] = {
+        **(settings.get("inbound_applied") or {}),
+        "tcp_tls": {
+            **((settings.get("inbound_applied") or {}).get("tcp_tls") or {}),
+            **({"server_name": tcp_tls_sni} if tcp_tls_sni else {}),
+            **({"connection_domain": alias_changes["tcp_tls"]} if "tcp_tls" in alias_changes else {}),
+        },
+        "ws_tls": {
+            **((settings.get("inbound_applied") or {}).get("ws_tls") or {}),
+            **({"path": ws_path} if ws_path else {}),
+            **({"server_name": ws_tls_sni} if ws_tls_sni else {}),
+            **({"connection_domain": alias_changes["ws_tls"]} if "ws_tls" in alias_changes else {}),
+        },
+        "xhttp_reality": {
+            **((settings.get("inbound_applied") or {}).get("xhttp_reality") or {}),
+            **({"path": xhttp_path} if xhttp_path else {}),
+            "server_name": name, "target": target,
+            **({"connection_domain": alias_changes["xhttp_reality"]} if "xhttp_reality" in alias_changes else {}),
+        },
+    }
     settings["last_verified_at"] = datetime.utcnow().isoformat() + "Z"
     db.execute(
         text(
@@ -898,7 +1044,7 @@ async def apply_xray_inbound_editor(node_id: int, db: Session = Depends(get_db))
     db.commit()
     return {
         "ok": True, "node_id": int(node_id),
-        "applied_fields": ["reality_server_name", "reality_target"],
+        "applied_fields": ["reality_server_name", "reality_target"] + (["ws_path"] if ws_path else []) + (["xhttp_path"] if xhttp_path else []) + (["tcp_tls_sni"] if tcp_tls_sni else []) + (["ws_tls_sni"] if ws_tls_sni else []) + (["connection_domain"] if alias_changes else []),
         "reality_server_name": name,
-        "note": "TLS, connection domain and transport remain unchanged.",
+        "note": "Validated TLS SNI, paths and same-ingress DNS aliases applied; transport types unchanged.",
     }

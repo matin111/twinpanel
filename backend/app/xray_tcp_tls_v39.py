@@ -214,7 +214,7 @@ async def _ensure_modern_xray_v39(
         state["available_profiles"] = available
         return state
 
-    domain = str(state.get("tls_domain") or _effective_domain(node)).strip().lower()
+    domain = str(state.get("tls_sni_tcp") or state.get("tls_domain") or _effective_domain(node)).strip().lower()
     cert = str(state.get("managed_cert") or "").strip()
     key = str(state.get("managed_key") or "").strip()
     target_port = _tcp_tls_target_port(int(base_port))
@@ -305,7 +305,7 @@ def _build_uri_v39(
             state=state,
         )
 
-    domain = str(state.get("tls_domain") or "").strip()
+    domain = str(state.get("tls_sni_tcp") or state.get("tls_domain") or "").strip()
     if not domain:
         raise RuntimeError("TCP TLS domain is unavailable")
 
