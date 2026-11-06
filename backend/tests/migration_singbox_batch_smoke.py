@@ -84,5 +84,7 @@ CONVERGENCE_PATH = ROOT / "backend/app/node_subscription_convergence_v114.py"
 convergence = CONVERGENCE_PATH.read_text(encoding="utf-8")
 compile(convergence, str(CONVERGENCE_PATH), "exec")
 assert "_migration_singbox_worker_running()" in convergence
-assert "int(sub.id) in imported_in_batch and protocol in SINGBOX_ACCOUNT_PROTOCOLS" in convergence
-assert "MigrationImportRecord.source.in_(" in convergence
+# Imported subscriptions are intentionally manual-only after the newer
+# new-account-only convergence policy; no migration worker may backfill them.
+assert "if int(sub.id) in imported_ids:" in convergence
+assert "MigrationImportRecord.subscription_id" in convergence
