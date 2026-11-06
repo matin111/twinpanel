@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.621",
-  "source_sha": "a975401288ccbc70fae2b4ce6129bc4a2c14a87c",
+  "version": "1.1.0-rc.622",
+  "source_sha": "6d1b04e5d56956358a46345104c82c4924c0e66b",
   "notes": {
-    "fa": "اصلاح جستجوی کاربران موجود هنگام انتقال اشتراک به نماینده، اتصال خودکار حساب موجود بدون ساخت کاربر تکراری و مدیریت خطای قفل دیتابیس در انتقال مالکیت.",
-    "en": "Fix reseller subscription transfer: search existing site users, atomically link existing accounts without duplication, and handle transient row-lock contention with bounded retries."
+    "fa": "اصلاح جستجوی کاربران موجود برای انتقال اشتراک به نماینده، جلوگیری از ساخت کاربر تکراری، مدیریت قفل هم‌زمان دیتابیس، و اصلاح سازگاری ساب‌لینک V2Ray با تولید بدون QR.",
+    "en": "Reseller transfer existing user search, atomic linking without duplicate account, transient lock handling; V47 runtime QR-free subscription feed compatibility to pass post-update canary."
   }
 }
