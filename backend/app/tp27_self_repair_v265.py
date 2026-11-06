@@ -259,12 +259,17 @@ def _attempt_order(cfg: dict[str, Any]) -> list[tuple[str, int | None]]:
     if current == "gre-fou" and current_port in ports:
         ports = [value for value in ports if value != current_port] + [current_port]
 
-    fou = [("gre-fou", value) for value in ports]
-    if current == "gre-native":
-        return fou + [("gre-native", None)]
-    if current == "gre-fou":
-        return fou + [("gre-native", None)]
-    return [("gre-native", None)] + fou
+    # Always retry the in-kernel GRE carrier first after a genuine carrier
+    # failure. The previous recovery order tried every FoU port first even
+    # when GRE-native was the previously successful carrier. On networks where
+    # encapsulated UDP passes ICMP but throttles real TCP throughput, that
+    # silently regressed a fast repaired tunnel back to a slow FoU route.
+    #
+    # The manager already guards repair with failure hysteresis and cooldown;
+    # this function only orders attempts once repair is actually requested.
+    # If GRE-native does not pass the full existing TCP/UDP dataplane probe,
+    # retain all FoU ports (and the current-port-last rule) as fallback.
+    return [("gre-native", None)] + [("gre-fou", value) for value in ports]
 
 
 def _repair_meta(
