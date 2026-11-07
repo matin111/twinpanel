@@ -4,10 +4,13 @@ worker=(ROOT/'backend/app/routers/publish_node_all_users_v1.py').read_text()
 helper=(ROOT/'backend/app/services/new_node_modern_bootstrap_v1.py').read_text()
 registry=(ROOT/'backend/app/protocol_account_registry.py').read_text()
 bootstrap='bootstrap_new_exit_modern_protocols('
-publish='result = await publish_node_to_all_users(node_id=node_id, db=db)'
+publish='publish_result = await publish_node_to_all_users('
 assert bootstrap in worker
+assert 'central_stage.run' in worker
+assert 'stage_rc = await asyncio.to_thread(' in worker
 assert publish in worker
-assert worker.index(bootstrap) < worker.index(publish)
+assert worker.index(bootstrap) < worker.index('stage_rc = await asyncio.to_thread(') < worker.index(publish)
+assert 'if stage_rc != 0:' in worker
 assert 'from ..routers.modern_protocol_admin_v3 import ModernInstallV3In, ProtocolProfileIn, install' in helper
 assert 'result = await install(node_id=int(node_id), payload=payload, db=db)' in helper
 assert 'NodeProtocolConfig.status == "online"' in helper
