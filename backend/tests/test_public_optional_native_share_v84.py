@@ -18,8 +18,8 @@ def test_only_ready_real_files_are_offered_for_share():
 def test_web_share_runs_synchronously_in_the_original_tap():
     assert "shareFile.addEventListener('click',event=>" in UI
     assert "shareFile.addEventListener('click',async event=>" not in UI
-    assert "navigator.share(current).catch(error=>" in UI
-    assert "if(error?.name==='AbortError')return;" in UI
+    assert "Promise.resolve(navigator.share(current)).catch(error=>" in UI
+    assert "if(error?.name!=='AbortError')explain(error);" in UI
     assert "application/x-openvpn-profile" in UI
     assert "application/octet-stream" in UI
     assert "new File([config],filename,{type:mime})" in UI
