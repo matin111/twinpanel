@@ -246,6 +246,11 @@ def _modern_routes_for_exit(db, exit_node: Node, exit_tunnel_ip: str) -> list[di
         cfg = configs.get(protocol)
         if cfg is None:
             continue
+        # A SOCKS proxy should never have an ingress port forwarded unless
+        # the managed, authenticated sing-box listener is actually installed.
+        # Other protocols retain their existing route lifecycle unchanged.
+        if protocol == "socks5" and _enum_value(cfg.status) != "online":
+            continue
 
         definition = PROTOCOL_CATALOG.get(protocol) or {}
         target_port = int(cfg.port or definition.get("default_port") or 0)
@@ -338,6 +343,14 @@ def _modern_tunnel_endpoint(
     protocol = str(protocol or "").strip().lower()
     if protocol not in MODERN_TUNNEL_PROTOCOLS:
         return None
+
+    # Do not publish a tunnel endpoint until the authenticated listener is
+    # online and its matching ingress NAT mapping is desired. This prevents
+    # exposing a dead route or a stale port from a removed SOCKS5 service.
+    if protocol == "socks5":
+        config = _configured_modern_protocols(db, int(exit_node.id)).get("socks5")
+        if config is None or _enum_value(config.status) != "online":
+            return None
 
     iran = _selected_iran_node(db, exit_node)
     if iran is None:
