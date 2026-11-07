@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.665",
-  "source_sha": "062166f2a1590c712de74330e8b08e9fd373b53d",
+  "version": "1.1.0-rc.666",
+  "source_sha": "58b368c2e960cb37d8166880dc0269e6e0224fee",
   "notes": {
-    "fa": "نسخه rc.665: حذف کامل نمایش هم‌زمان پنل پروتکل در پایین صفحه موبایل و داخل پاپ‌آپ؛ کلیک روی کارت پروتکل قبل از هندلر قدیمی مستقیماً پاپ‌آپ را باز می‌کند و فقط محتوای داخل پنجره نمایان است. بهبود فونت و تایپوگرافی نام ۱۶ پروتکل با وزن خواناتر، فاصله و اندازه واکنش‌گرا؛ بدون وابستگی به فونت خارجی. تست بازوبسته‌شدن ۱۶ کارت در DOM و وضعیت HTTP 200 موفق بود، تست بصری گوشی واقعی هنوز انجام نشده است. تغییرات نسخه‌های قبلی V2Ray، کپی همه، فیلتر کشورها و دانلود برنامه‌ها حفظ شده‌اند.",
-    "en": "rc.665: eliminate duplicate inline protocol panels below the mobile grid while modal is open. Use window-capture click routing to modal before legacy inline handlers and enforce non-modal panel visibility hiding. Improve protocol name typography using local/system font stack, balanced weight, spacing and responsive sizes without external font assets. All 16 modal open/close synthetic DOM tests passed and Connection HTTP 200. Full real-device visual validation pending; preserve existing V2Ray footer, country filters and downloads."
+    "fa": "نسخه rc.666: رفع مشکل کار نکردن «ارسال فایل به برنامه» برای OpenVPN، WireGuard و AmneziaWG در اندروید و آیفون. منوی اشتراک‌گذاری اکنون بلافاصله با لمس کاربر و فایل واقعی .ovpn/.conf باز می‌شود؛ دانلود شبکه‌ای قبل از Share حذف شد تا مجوز لمس مرورگر از بین نرود. پشتیبانی جایگزین MIME عمومی برای فایل‌های VPN حفظ شد؛ دانلود مستقیم و راهنمای پاپ‌آپ تمام پروتکل‌ها بدون تغییر باقی مانده‌اند. هیچ تغییر در کاربران، اشتراک‌ها، نودها یا سرویس VPN اعمال نشده است.",
+    "en": "rc.666: Fix mobile native file Share actions for OpenVPN, WireGuard and AmneziaWG. Create the original .ovpn/.conf file from already available profile contents and invoke navigator.share synchronously in the user's tap, avoiding an awaited network fetch that loses transient activation. Fall back to generic MIME for uncommon VPN extensions. Preserve ordinary downloads and contextual help for all protocols; no VPN dataplane, node or account changes."
   }
 }
