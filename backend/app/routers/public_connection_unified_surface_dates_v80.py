@@ -921,7 +921,6 @@ _SCRIPT = r"""
      imgs.slice(1).forEach(img=>img.remove());
      [...label.childNodes].forEach(node=>{
        if(node.nodeType===3&&/^\\s*$/u.test(node.textContent||'')) node.textContent='';
-         node.textContent='';
      });
    });
    const count=[...footer.children].filter(n=>n.matches('.tp78-footer-action')).length;
