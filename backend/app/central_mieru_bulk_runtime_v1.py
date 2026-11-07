@@ -82,8 +82,8 @@ with open(lock,"a+") as handle:
         raise SystemExit("MIERU_EMPTY_USER_LIST")
     config["users"]=list(accounts.values())
     STATE.parent.mkdir(parents=True,exist_ok=True)
-    state_text=json.dumps(accounts,separators=(",",":"),ensure_ascii=False)+"\\n"
-    config_text=json.dumps(config,indent=2,ensure_ascii=False)+"\\n"
+    state_text=json.dumps(accounts,separators=(",",":"),ensure_ascii=False)+"\n"
+    config_text=json.dumps(config,indent=2,ensure_ascii=False)+"\n"
     changed=(not STATE.exists() or STATE.read_text(encoding="utf-8")!=state_text
              or CONFIG.read_text(encoding="utf-8")!=config_text)
     if not changed:
