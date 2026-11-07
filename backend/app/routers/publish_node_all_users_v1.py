@@ -162,9 +162,12 @@ async def _install_node_in_background(payload: BackgroundNodeInstallIn, request_
             "cisco", "openvpn", "wireguard", "l2tp"
         }
         failed_classic = sorted(classics.intersection(result.get("failed_protocols") or []))
-        if failed_classic:
+        if failed_classic or not result.get("ok"):
+            # Failed quota/tunnel-fabric setup also prevents this node from
+            # being advertised, even when core listeners are healthy.
             print("TWINPANEL_NODE_AUTO_ENROLL_PAUSED_BASE_INSTALL", {
-                "node_id": node_id, "failed": failed_classic,
+                "node_id": node_id,
+                "failed": list(result.get("failed_protocols") or []),
             }, flush=True)
             return
 
