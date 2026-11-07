@@ -97,10 +97,25 @@ async def reconcile_runtime_families(
                 except asyncio.TimeoutError:proc.kill();await proc.wait()
                 raise
             return family.name,int(code)
-    results=await asyncio.gather(
-        *(run_family(family) for family in families),
+    # Sudoku's live whitelist update/verification is a single shared
+    # service-wide restart. Other adapters can saturate the controller's
+    # SSH/DB and cause a false timeout. Finish the other daemon families
+    # before the single Sudoku apply. Still ONE node operation, no user queue.
+    parallel=[family for family in families if family.name!="sudoku"]
+    shared=[family for family in families if family.name=="sudoku"]
+    in_parallel=await asyncio.gather(
+        *(run_family(family) for family in parallel),
         return_exceptions=True,
     )
+    isolated=await asyncio.gather(
+        *(run_family(family) for family in shared),
+        return_exceptions=True,
+    )
+    responses=dict(zip(
+        [family.name for family in parallel+shared],
+        list(in_parallel)+list(isolated),
+    ))
+    results=[responses[family.name] for family in families]
     failed=[]
     succeeded=[]
     for family,result in zip(families,results):
