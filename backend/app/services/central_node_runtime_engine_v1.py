@@ -114,8 +114,12 @@ async def reconcile_runtime_families(
                 print("CENTRAL_RUNTIME_FAMILY_TIMING",json.dumps({
                     "node_id":node_id,"family":family.name,
                     "seconds":round(time.monotonic()-started,2),
-                    "return_code":(proc.returncode
-                                   if "proc" in locals() else None),
+                    "return_code":(
+                        int(proc.returncode)
+                        if "proc" in locals()
+                        and isinstance(proc.returncode,int)
+                        else None
+                    ),
                 }),flush=True)
     # Sudoku's live whitelist update/verification is a single shared
     # service-wide restart. Other adapters can saturate the controller's
