@@ -49,6 +49,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 BASE=Path(__BASE__)
@@ -98,6 +99,8 @@ try:
             try: sock.bind(("0.0.0.0",port))
             except OSError: raise RuntimeError("SUDOKU_PORT_IN_USE")
         directory.mkdir(mode=0o700)
+        # Register rollback ownership before any file write can fail.
+        newly_created.append((sid,port,directory,unit))
         server={
             "mode":"server","transport":"tcp","local_port":port,
             "fallback_address":"127.0.0.1:80","key":row["master_public"],
@@ -123,7 +126,6 @@ try:
         )
         unit.write_text(body)
         os.chmod(unit,0o644)
-        newly_created.append((sid,port,directory,unit))
     if newly_created:
         reload=subprocess.run(["systemctl","daemon-reload"],
             timeout=30,check=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -140,16 +142,22 @@ try:
     for i in range(0,len(newly_created),4):
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             list(pool.map(enable_one,newly_created[i:i+4]))
-    # Verify all required sockets, including previously created units.
+    # A systemd Type=simple process may become active just before TCP bind.
+    # Allow a bounded listener warm-up, without treating "active" as ready.
     for row in incoming:
         service="twinpanel-sudoku-sub-"+str(row["subscription_id"])+".service"
-        active=subprocess.run(["systemctl","is-active","--quiet",service],
-            timeout=15,check=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        if active.returncode: raise RuntimeError("SUDOKU_SERVICE_UNAVAILABLE")
-        with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as sock:
-            sock.settimeout(2)
-            if sock.connect_ex(("127.0.0.1",row["port"]))!=0:
-                raise RuntimeError("SUDOKU_LISTENER_NOT_READY")
+        ready=False
+        for attempt in range(24):
+            active=subprocess.run(["systemctl","is-active","--quiet",service],
+                timeout=15,check=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            if active.returncode==0:
+                with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as sock:
+                    sock.settimeout(2)
+                    ready=sock.connect_ex(("127.0.0.1",row["port"]))==0
+            if ready: break
+            time.sleep(0.25)
+        if not ready:
+            raise RuntimeError("SUDOKU_LISTENER_NOT_READY")
 except BaseException:
     for sid,port,directory,unit in reversed(newly_created):
         name="twinpanel-sudoku-sub-"+str(sid)+".service"
