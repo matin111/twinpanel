@@ -124,14 +124,15 @@ class BackgroundNodeInstallIn(BaseModel):
     node_type: NodeType
     country_code: str = "IR"
     capacity_users: int = Field(default=1000, gt=0)
-    install_cisco: bool = False
+    install_cisco: bool = True
     cisco_port: int = Field(default=443, ge=1, le=65535)
-    install_openvpn: bool = False
+    install_openvpn: bool = True
     openvpn_port: int = Field(default=1194, ge=1, le=65535)
     openvpn_transport: str = "udp"
-    install_wireguard: bool = False
+    install_wireguard: bool = True
     wireguard_port: int = Field(default=51820, ge=1, le=65535)
-    install_l2tp: bool = False
+    install_l2tp: bool = True
+    # Xray is installed by the dedicated modern-aware classic ensure step.
     install_v2ray: bool = False
     xray_port: int = Field(default=8443, ge=1, le=65535)
     publish_to_all_users: bool = False
@@ -144,64 +145,109 @@ async def _install_node_in_background(payload: BackgroundNodeInstallIn, request_
     db = SessionLocal()
     try:
         request = Request(request_scope)
-        install_payload = InstallIn(**payload.model_dump(exclude={"publish_to_all_users"}))
+        # Stage A: prepare shared infra and Classic services, without the old
+        # unbounded subscription-by-subscription SSH loop.
+        install_payload = InstallIn(
+            **payload.model_dump(exclude={"publish_to_all_users"}),
+            defer_subscription_sync=True,
+        )
         result = await install_node(install_payload, request, db)
         node_id = int(result.get("node_id") or 0)
         if not node_id or install_payload.node_type != NodeType.EXIT:
             return
 
+        # An incomplete base installation must not activate this Exit.
+        classics = {
+            "cisco", "openvpn", "wireguard", "l2tp"
+        }
+        failed_classic = sorted(classics.intersection(result.get("failed_protocols") or []))
+        if failed_classic:
+            print("TWINPANEL_NODE_AUTO_ENROLL_PAUSED_BASE_INSTALL", {
+                "node_id": node_id, "failed": failed_classic,
+            }, flush=True)
+            return
+
+        # Stage B: install Xray once via the dedicated profile-aware path.
+        # Do not run install_xray() and ensure_classic_protocol() back to back.
         try:
             await ensure_classic_protocol(
-                EnsureClassicProtocolIn(node_id=node_id, protocol="v2ray", port=install_payload.xray_port),
+                EnsureClassicProtocolIn(
+                    node_id=node_id, protocol="v2ray", port=install_payload.xray_port
+                ),
                 db=db,
             )
         except Exception as exc:
-            print("TWINPANEL_NODE_BACKGROUND_XRAY_DEGRADED_V1", {"node_id": node_id, "error": str(exc)[:800]}, flush=True)
+            db.rollback()
+            print("TWINPANEL_NODE_AUTO_ENROLL_PAUSED_XRAY", {
+                "node_id": node_id, "error_type": type(exc).__name__,
+            }, flush=True)
+            return
 
+        # Stage C: try every modern protocol whose adapter is actually ready.
+        # Never misreport adapter_pending/experimental_pending as installed.
         try:
             from ..services.new_node_modern_bootstrap_v1 import bootstrap_new_exit_modern_protocols
             modern_bootstrap = await bootstrap_new_exit_modern_protocols(db=db, node_id=node_id)
-            print(
-                "TWINPANEL_NODE_BACKGROUND_MODERN_BOOTSTRAP_V1",
-                {
-                    "node_id": node_id,
-                    "attempted": modern_bootstrap.get("attempted"),
-                    "installed": modern_bootstrap.get("installed"),
-                    "failed": modern_bootstrap.get("failed"),
-                    "already_online": modern_bootstrap.get("already_online"),
-                    "skipped_no_template": modern_bootstrap.get("skipped_no_template"),
-                    "skipped_port_conflict": modern_bootstrap.get("skipped_port_conflict"),
-                    "sources": modern_bootstrap.get("sources"),
-                },
-                flush=True,
-            )
         except Exception as exc:
             db.rollback()
-            print("TWINPANEL_NODE_BACKGROUND_MODERN_BOOTSTRAP_DEGRADED_V1", {"node_id": node_id, "error": str(exc)[:1200]}, flush=True)
+            print("TWINPANEL_NODE_AUTO_ENROLL_PAUSED_MODERN", {
+                "node_id": node_id, "error_type": type(exc).__name__,
+            }, flush=True)
+            return
 
+        from ..protocol_account_registry import ALL_PROTOCOL_KEYS
+        from ..models import NodeProtocolConfig
+        from ..services.new_node_modern_bootstrap_v1 import _status_value
+
+        # Stage D: require all 16 registered protocols to be truly ONLINE
+        # before any user is attached or the new node is advertised.
+        configs = db.query(NodeProtocolConfig).filter(
+            NodeProtocolConfig.node_id == node_id,
+            NodeProtocolConfig.protocol.in_(list(ALL_PROTOCOL_KEYS)),
+        ).all()
+        ready = {
+            str(row.protocol) for row in configs
+            if _status_value(row.status) == "online"
+        }
+        missing = sorted(set(ALL_PROTOCOL_KEYS) - ready)
+        if missing or not modern_bootstrap.get("ok"):
+            print("TWINPANEL_NODE_AUTO_ENROLL_PAUSED_PROTOCOL_READINESS", {
+                "node_id": node_id,
+                "ready_count": len(ready),
+                "required_count": len(ALL_PROTOCOL_KEYS),
+                "missing": missing,
+                "modern_failed": modern_bootstrap.get("failed"),
+                "skipped_no_template": modern_bootstrap.get("skipped_no_template"),
+                "skipped_port_conflict": modern_bootstrap.get("skipped_port_conflict"),
+            }, flush=True)
+            return
+
+        # Stage E: only now mark the node as desired for eligible subscriptions.
+        # The SQL set-based publish enqueues the centrally supervised
+        # missing-only provisioning transactionally; no 1700-user SSH loop
+        # runs inside this install task or API request.
         if payload.publish_to_all_users:
+            from .publish_node_all_users_v2 import publish_node_to_all_users_v2
             try:
-                result = await publish_node_to_all_users(node_id=node_id, db=db)
-                print(
-                    "TWINPANEL_NODE_BACKGROUND_PUBLISH_DONE_V2",
-                    {
-                        "node_id": node_id,
-                        "subscriptions_seen": result.get("subscriptions_seen"),
-                        "memberships_added": result.get("memberships_added"),
-                        "active_reconciled": result.get("active_subscriptions_reconciled"),
-                        "classic_pairs_provisioned": result.get("classic_pairs_provisioned"),
-                        "modern_pairs_provisioned": result.get("modern_pairs_provisioned"),
-                        "reused_pairs": result.get("reused_pairs"),
-                        "failed_count": len(result.get("failed") or []),
-                    },
-                    flush=True,
-                )
+                outcome = await publish_node_to_all_users_v2(node_id=node_id, db=db)
+                print("TWINPANEL_NODE_INSTALL_THEN_AUTO_ENROLL_QUEUED", {
+                    "node_id": node_id,
+                    "protocols_ready": len(ready),
+                    "memberships_added": outcome.get("memberships_added"),
+                    "backfill": outcome.get("backfill"),
+                }, flush=True)
             except Exception as exc:
                 db.rollback()
-                print("TWINPANEL_NODE_BACKGROUND_PUBLISH_DEGRADED_V1", {"node_id": node_id, "error": str(exc)[:800]}, flush=True)
+                print("TWINPANEL_NODE_AUTO_ENROLL_PUBLISH_ERROR", {
+                    "node_id": node_id, "error_type": type(exc).__name__,
+                }, flush=True)
     except Exception as exc:
         db.rollback()
-        print("TWINPANEL_NODE_BACKGROUND_INSTALL_FAILED_V1", {"name": payload.name, "host": payload.host, "error": str(exc)[:1200]}, flush=True)
+        # Never expose SSH passwords, account credentials or remote
+        # subprocess output in server logs.
+        print("TWINPANEL_NODE_BACKGROUND_INSTALL_FAILED_V1", {
+            "name": payload.name, "error_type": type(exc).__name__,
+        }, flush=True)
     finally:
         _NODE_INSTALL_PENDING.discard(payload.name.strip().casefold())
         db.close()
