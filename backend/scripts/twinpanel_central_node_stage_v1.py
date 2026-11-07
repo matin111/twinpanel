@@ -69,6 +69,37 @@ def adapter_command(name, node_id, limit, apply):
         return cmd[:-3]
     return cmd
 
+def missing_runtime_families(node_id, limit):
+    """Select only daemon families with missing CURRENT node deliveries.
+
+    The audit is read-only. Memberships are re-established by _run_locked;
+    no per-account queue or individual SSH jobs are introduced.
+    """
+    with SessionLocal() as db:
+        node = db.get(Node, node_id)
+        if not allow_central_node(db, node):
+            raise RuntimeError("CENTRAL_DELTA_NODE_NOT_OWNED")
+        require_valid_desired_state(
+            load_desired_state(db, node_id), max_users=limit,
+        )
+        audit = verify_coverage(db, node_id)
+        if audit["ok"]:
+            return ()
+        missing = {name for name, count in audit["missing_by_protocol"].items()
+                   if int(count) > 0}
+        selected = tuple(f for f in FAMILIES if f.protocols & missing)
+        mapped = set().union(*(f.protocols for f in selected)) if selected else set()
+        if (not missing.issubset(mapped)
+                or audit["subscriptions_without_entitlements"]
+                or audit["unknown_protocols"]):
+            raise RuntimeError("CENTRAL_DELTA_AUDIT_NOT_RECONCILABLE")
+        # Only membership drift can be repaired by the next bounded
+        # _run_locked membership INSERT, without restarting any daemon.
+        if not selected and not audit["missing_node_memberships"]:
+            raise RuntimeError("CENTRAL_DELTA_AUDIT_NOT_RECONCILABLE")
+        return selected
+
+
 def run(node_id, limit, apply):
     # Prevent two independent staging processes from racing on the same node.
     lock_path = Path(f"/tmp/twinpanel-central-node-stage-{node_id}.lock")
@@ -83,9 +114,15 @@ def run(node_id, limit, apply):
         # A moving target after the final attempt remains hidden and fails.
         if not apply:
             return _run_locked(node_id, limit, False)
+        delta_families = None
         for attempt in range(3):
             try:
-                status = _run_locked(node_id, limit, True)
+                if delta_families is None:
+                    status = _run_locked(node_id, limit, True)
+                else:
+                    status = _run_locked(
+                        node_id, limit, True, families=delta_families,
+                    )
             except RuntimeError as exc:
                 if str(exc) not in {
                     "CENTRAL_NODE_DESIRED_STATE_CHANGED_BEFORE_APPLY",
@@ -94,6 +131,11 @@ def run(node_id, limit, apply):
                     raise
                 if attempt == 2:
                     raise RuntimeError("CENTRAL_NODE_DESIRED_STATE_STILL_CHANGING") from exc
+                delta_families = missing_runtime_families(node_id, limit)
+                if not delta_families:
+                    # No remaining missing deliveries. A subsequent short
+                    # stage verifies and marks the latest fingerprint.
+                    delta_families = ()
                 print("CENTRAL_NODE_DESIRED_STATE_RETRY",json.dumps({
                     "node_id":node_id,"attempt":attempt+2,
                 }),flush=True)
@@ -104,13 +146,14 @@ def run(node_id, limit, apply):
             # addresses ONLY the changed desired-state/coverage race.
             if status != 3 or attempt == 2:
                 return status
+            delta_families = missing_runtime_families(node_id, limit)
             print("CENTRAL_NODE_COVERAGE_DELTA_RETRY",json.dumps({
                 "node_id":node_id,"attempt":attempt+2,
             }),flush=True)
         return 3
 
 
-def _run_locked(node_id, limit, apply):
+def _run_locked(node_id, limit, apply, *, families=None):
     with SessionLocal() as db:
         node = db.get(Node, node_id)
         if (node is None or node.retired_at is not None
@@ -163,7 +206,18 @@ def _run_locked(node_id, limit, apply):
         )
         if latest.fingerprint != desired.fingerprint:
             raise RuntimeError("CENTRAL_NODE_DESIRED_STATE_CHANGED_BEFORE_APPLY")
-    result = asyncio.run(reconcile_runtime_families(node_id, limit, BACKEND))
+    if families is None:
+        families = FAMILIES
+    if families:
+        result = asyncio.run(reconcile_runtime_families(
+            node_id, limit, BACKEND, families=families,
+        ))
+    else:
+        result = {"ok": True, "failed": [], "succeeded": [],
+                  "runtime_families": 0}
+    print("CENTRAL_RUNTIME_SELECTED_FAMILIES", json.dumps({
+        "node_id": node_id, "families": [f.name for f in families],
+    }), flush=True)
     print("CENTRAL_RUNTIME_RECONCILIATION", json.dumps({
         "node_id": node_id, **result,
     }), flush=True)
@@ -172,10 +226,21 @@ def _run_locked(node_id, limit, apply):
     # Final guard: process exit != all purchased node credentials persisted.
     # This is read-only and never publishes a node or queues legacy work.
     with SessionLocal() as db:
-        latest = load_desired_state(db, node_id)
-        if latest.fingerprint != desired.fingerprint:
-            raise RuntimeError("CENTRAL_NODE_DESIRED_STATE_CHANGED_DURING_APPLY")
+        latest = require_valid_desired_state(
+            load_desired_state(db, node_id), max_users=limit,
+        )
+        # A purchase during bulk reconciliation does not always imply missing
+        # credentials: another safe path may already have converged it. Audit
+        # the CURRENT projection before deciding to rerun every daemon.
         audit = verify_coverage(db, node_id)
+        if latest.fingerprint != desired.fingerprint:
+            if not audit["ok"]:
+                raise RuntimeError("CENTRAL_NODE_DESIRED_STATE_CHANGED_DURING_APPLY")
+            print("CENTRAL_NODE_SNAPSHOT_ADVANCED_WITH_FULL_COVERAGE", json.dumps({
+                "node_id": node_id, "eligible_subscriptions": latest.count,
+                "desired_protocol_pairs": latest.pair_count,
+            }), flush=True)
+            desired = latest
     print("CENTRAL_NODE_COVERAGE_AUDIT", json.dumps({
         "node_id": node_id, **audit,
     }), flush=True)
