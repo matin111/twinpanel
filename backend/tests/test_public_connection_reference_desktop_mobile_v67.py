@@ -22,7 +22,7 @@ def test_no_fake_latencies_and_no_backend_changes():
     assert "const latency=tab.dataset.latencyMs" not in source
     assert "status.textContent=" not in source
     assert "footer=document.createElement" not in source
-    assert "linkToOriginal(views[i]" in source
+    assert "linkToOriginal(views[i]" not in source
     assert "const original=linkToOriginal" in source
     assert "copyExisting(original.copy)" in source
     assert "original.deep.getAttribute('href')" in source
