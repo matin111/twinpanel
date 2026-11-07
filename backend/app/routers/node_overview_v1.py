@@ -38,7 +38,7 @@ def configured_ports(rows: list[NodeProtocolConfig]) -> list[int]:
             continue
         if item.port is not None and 1 <= int(item.port) <= 65535:
             ports.add(int(item.port))
-        for raw in re.findall(r"(?<!\\d)\\d{1,5}(?!\\d)", item.port_text or ""):
+        for raw in re.findall(r"(?<!\d)\d{1,5}(?!\d)", item.port_text or ""):
             number = int(raw)
             if 1 <= number <= 65535:
                 ports.add(number)
