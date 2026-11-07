@@ -571,6 +571,34 @@ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > .tp78-f
   min-height:48px!important;font-size:10px!important;padding:7px!important;
  }
 }
+
+/* TWINPANEL_CLIENT_FOOTER_ONLY_V83 */
+html body.tp80-connection .protocol-panel.active .v34-client-card,
+html body.tp80-connection .protocol-panel.active .ref70-app-card,
+html body.tp80-connection .protocol-panel.active .v13-client-only,
+html body.tp80-connection .protocol-panel.active .ref69-download-cta{
+ display:none!important;visibility:hidden!important;height:0!important;
+ min-height:0!important;margin:0!important;padding:0!important;
+}
+html body.tp80-connection .protocol-panel.active > .tp78-action-footer{
+ order:99!important;display:grid!important;
+ grid-template-columns:repeat(var(--tp80-cols,3),minmax(0,1fr))!important;
+ gap:9px!important;margin:14px 16px 16px!important;
+}
+html body.tp80-connection .protocol-panel.active > .tp78-action-footer > [data-kind="app"]{
+ display:flex!important;position:static!important;grid-column:auto!important;
+ width:100%!important;min-height:62px!important;min-width:0!important;
+ margin:0!important;padding:9px!important;box-sizing:border-box!important;
+}
+@media(max-width:720px){
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer{
+ grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ gap:7px!important;margin:10px 8px 12px!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > [data-kind="app"]{
+ min-height:48px!important;
+ }
+}
 """
 
 
@@ -1011,64 +1039,65 @@ _SCRIPT = r"""
    const noApp=/^l2tp(?:[\\/_-]?ipsec)?$/.test(key);
    let footer=panel.querySelector(':scope > .tp78-action-footer');
    if(!footer){
-     footer=el('nav','tp78-action-footer');
-     footer.setAttribute('aria-label','عملیات اشتراک');
+     footer=el('nav','tp78-action-footer');footer.setAttribute('aria-label','عملیات اشتراک');
      panel.append(footer);
    }
-   // Sources are preserved until their live link has been moved to the footer.
-   const cards=[...panel.querySelectorAll(':scope > .v34-client-card,:scope > .ref70-app-card,:scope > .v13-client-only')];
-   const appNodes=[...footer.querySelectorAll('[data-kind="app"]')];
-   const recommended={openvpn:'openvpn',wireguard:'wireguard',amneziawg:'amneziawg',
-     trusttunnel:'trusttunnel',cisco:'openconnect',openconnect:'openconnect'};
    const platform=(()=>{
      const os=String(document.body.dataset.tpPlatform||'').toLowerCase();
-     if(['windows','android','ios','macos'].includes(os))return os;
+     if(['windows','android','ios','macos','linux'].includes(os))return os;
      const ua=navigator.userAgent||'';
      if(/android/i.test(ua))return'android';
      if(/iphone|ipad|ipod/i.test(ua))return'ios';
      if(/macintosh|mac os/i.test(ua))return'macos';
+     if(/linux/i.test(ua))return'linux';
      return'windows';
    })();
+   const client={openvpn:'openvpn',wireguard:'wireguard',amneziawg:'amneziawg',
+     trusttunnel:'trusttunnel',cisco:'openconnect',openconnect:'openconnect'};
+   const cards=[...panel.querySelectorAll('.v34-client-card,.ref70-app-card,.v13-client-only')];
+   // Keep a genuine installed link from existing client components whenever possible.
+   const source=cards.map(card=>card.querySelector('a[href]')).find(Boolean);
+   const existing=[...footer.querySelectorAll('[data-kind="app"]')];
+   let app=existing.find(a=>a.tagName==='A')||source||null;
    if(noApp){
-     appNodes.forEach(node=>node.remove());
+     existing.forEach(node=>node.remove());
+     app=null;
    }else{
-     let app=appNodes.find(node=>node.tagName==='A')||null;
-     const source=cards.map(card=>card.querySelector('a[href]')).find(Boolean);
-     if(!app&&source){
-       app=source;
-       app.dataset.kind='app';
-       app.classList.add('tp78-footer-action');
-     }
-     if(!app&&recommended[key]){
+     if(!app && client[key]){
        app=el('a','tp78-footer-action','دانلود برنامه');
-       app.dataset.kind='app';
      }
      if(app){
-       // A footer client download and a client banner are the same action.
-       // Use the real existing href; canonical endpoint is fallback only.
-       if(recommended[key]){
-         app.href='/v1/connect/app-download/'+recommended[key]+'/'+platform;
+       app.dataset.kind='app';app.classList.add('tp78-footer-action');
+       if(client[key]){
+         app.href='/v1/connect/app-download/'+client[key]+'/'+platform;
          app.target='_blank';app.rel='noopener noreferrer';
        }
        app.textContent='دانلود برنامه';
        footer.append(app);
-       appNodes.filter(node=>node!==app).forEach(node=>node.remove());
+       existing.filter(n=>n!==app).forEach(node=>node.remove());
      }
    }
-   // Remove the redundant client banners themselves. Native configuration-file
-   // downloads and per-server copy actions are intentionally untouched.
+   // Eliminate a second download bar regardless of mounting level.
    cards.forEach(card=>card.remove());
-   // Some previous versions use a second client-download CTA as direct child.
-   panel.querySelectorAll(':scope > .ref69-download-cta').forEach(node=>node.remove());
-   // Keep the footer client button beside subscription/file/copy buttons.
-   const actions=[...footer.children].filter(node=>node.classList.contains('tp78-footer-action'));
-   footer.style.setProperty('--tp80-cols',String(Math.max(1,Math.min(4,actions.length))));
+   panel.querySelectorAll('.ref69-download-cta').forEach(node=>{
+     if(!footer.contains(node))node.remove();
+   });
+   [...panel.children].forEach(node=>{
+     if(node===footer||node.classList.contains('panel-head'))return;
+     if(node.classList.contains('tp78-action-footer'))return;
+     if((node.textContent||'').trim()==='دانلود برنامه' &&
+        !node.classList.contains('protocol-choice'))node.remove();
+   });
+   // Footer must always be physically the last operation block, not a
+   // full-width standalone client banner before the original footer.
+   footer.querySelectorAll('.tp80-extra-actions [data-kind="app"]').forEach(node=>node.remove());
+   const children=[...footer.children].filter(node=>node.classList.contains('tp78-footer-action'));
+   if(app&&app.parentElement===footer&&children[children.length-1]!==app)footer.append(app);
+   const count=[...footer.children].filter(node=>node.classList.contains('tp78-footer-action')).length;
+   footer.style.setProperty('--tp80-cols',String(Math.max(1,Math.min(4,count))));
    footer.dataset.tp80Ready='1';
-   // One country flag per node: duplicate image and decorative flag text
-   // are hidden without deleting the actual TR/DE/US server identifier.
    panel.querySelectorAll('.tp77-native-label').forEach(label=>{
-     const imgs=[...label.querySelectorAll('img')];
-     imgs.slice(1).forEach(img=>img.remove());
+     [...label.querySelectorAll('img')].slice(1).forEach(img=>img.remove());
    });
  }
  function check(){
@@ -1084,8 +1113,11 @@ _SCRIPT = r"""
    });
  }
  check();
+ // Older client-card mount scripts may run after first paint. Keep their
+ // single client action reconciled without reloading the whole Connection page.
  let n=0;
  const timer=setInterval(()=>{check();if(++n>=35)clearInterval(timer)},300);
+ setInterval(()=>{panels().forEach(reconcileClientDownload)},1200);
 })();
 </script>
 """
