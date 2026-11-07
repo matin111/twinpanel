@@ -56,7 +56,7 @@ async def _runtime_aware_connect_saved(node: Node, db: Session):
     return await _original_ssh_connect_saved(node, db)
 
 
-def _modern_direct_item_is_usable(
+def _modern_direct_item_is_usable_uncached(
     db: Session,
     protocol: str,
     item: dict[str, Any],
@@ -100,6 +100,31 @@ def _modern_direct_item_is_usable(
     )
     return bool(cfg and _status_value(getattr(cfg, "status", None)) == "online")
 
+
+
+def _modern_direct_item_is_usable(
+    db: Session,
+    protocol: str,
+    item: dict[str, Any],
+) -> bool:
+    """Reuse node-level delivery eligibility only inside one public request.
+
+    Existing eligibility depends on node_id, protocol, node/tunnel status
+    and the primary L2TP tunnel, not the item's URI or credentials. A new
+    SQLAlchemy Session is created for each HTTP request; all admin/mutation
+    flows bypass this cache and still check live state.
+    """
+    cache = db.info.get("_tp_public_connection_item_cache_v102")
+    if not isinstance(cache, dict) or not isinstance(item, dict):
+        return _modern_direct_item_is_usable_uncached(db, protocol, item)
+    try:
+        node_id = int(item.get("node_id") or 0)
+    except (TypeError, ValueError):
+        return _modern_direct_item_is_usable_uncached(db, protocol, item)
+    key = (node_id, str(protocol or "").strip().lower())
+    if key not in cache:
+        cache[key] = bool(_modern_direct_item_is_usable_uncached(db, protocol, item))
+    return bool(cache[key])
 
 def _subscription_can_use_mother(
     db: Session,
