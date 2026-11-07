@@ -214,12 +214,12 @@ async def main() -> None:
         check({row["uuid"] for row in both_items} == {original_item["uuid"]}, "identity rotated across modes")
         check(both["subscription_link"].endswith("stable-token-100"), "share token changed")
 
-        # 11 Tunnel offline + Tunnel-only => no hidden Direct fallback.
+        # 11 Tunnel offline + Tunnel-only => healthy direct Exit fallback.
         mode.direct_enabled = False
         tunnel_a.status = TunnelStatus.OFFLINE
         db.commit()
         tunnel_only_down = compile_explicit_stored_info(ad, db, sub)
-        check(items(tunnel_only_down) == [], "Tunnel-only silently fell back to Direct")
+        check([row["delivery_mode"] for row in items(tunnel_only_down)] == ["direct"], "Tunnel-only failed to fall back to Direct")
 
         # 12 Tunnel offline + Both => Direct remains independently usable.
         mode.direct_enabled = True
