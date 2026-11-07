@@ -19,8 +19,9 @@ def test_reference_design_is_present_and_is_final_refiner():
 
 def test_no_fake_latencies_and_no_backend_changes():
     source = (ROOT / "public_connection_reference_desktop_mobile_v67.py").read_text(encoding="utf-8")
-    assert "const latency=tab.dataset.latencyMs||views[i]?.dataset.latencyMs||''" in source
-    assert "latency&&Number.isFinite(numeric)&&numeric>=0?numeric+' ms':'—'" in source
+    assert "const latency=tab.dataset.latencyMs" not in source
+    assert "status.textContent=" not in source
+    assert "footer=document.createElement" not in source
     assert "linkToOriginal(views[i]" in source
     assert "const original=linkToOriginal" in source
     assert "copyExisting(original.copy)" in source
