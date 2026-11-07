@@ -53,6 +53,21 @@ async def bootstrap_hidden_central_exit(payload, request, db) -> dict:
         results, failed, _ = await prov.provision_protocols(
             conn, payload, db, node, False,
         )
+        wireguard_pool = {"ok": True, "skipped": True}
+        if payload.install_wireguard and "wireguard" not in failed:
+            from .central_new_exit_wireguard_pool_v1 import (
+                prepare_hidden_exit_wireguard_pool,
+            )
+            try:
+                wireguard_pool = await prepare_hidden_exit_wireguard_pool(conn)
+            except Exception as exc:
+                wireguard_pool = {
+                    "ok": False,
+                    "reason": "central_pool_preparation_failed",
+                    "error_type": type(exc).__name__,
+                }
+                failed = list(failed) + ["wireguard_pool"]
+
         agent = await prov._install_or_upgrade_agent(
             conn, node.id, prov.api_base_url(db, request),
         )
@@ -76,6 +91,7 @@ async def bootstrap_hidden_central_exit(payload, request, db) -> dict:
             "node_name": node.name, "protocols": results,
             "failed_protocols": list(failed),
             "agent": agent, "quota": quota, "fabric": fabric,
+            "wireguard_pool": wireguard_pool,
             "subscription_sync": {
                 "ok": True, "skipped": True,
                 "reason": "central_runtime_owns_all_subscriptions",
