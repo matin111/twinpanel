@@ -25,7 +25,7 @@ def test_share_uses_prepared_config_synchronously_without_fetch():
     assert "window.tpNativeShareFile(file);" in presentation
     assert "application/x-openvpn-profile" in presentation
     assert "application/octet-stream" in presentation
-    assert "if(error?.name==='AbortError')return false" in src
+    assert "if(error?.name==='AbortError')return null" in src
     assert "openvpn://import-profile" not in src
 
 
@@ -35,4 +35,4 @@ def test_share_is_tap_triggered_and_reports_missing_config():
     assert "shareFile.addEventListener('click',async event=>" not in src
     assert "const config=document.getElementById(target)?.value;" in src
     assert "hub-protocol-\\d+-|cfg-|download-source-" in src
-    assert "window.tpNativeShareMessage?.('فایل این سرور آماده نیست" in src
+    assert "showNativeFileShareFallback(download,protocol," in src
