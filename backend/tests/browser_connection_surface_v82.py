@@ -37,6 +37,10 @@ def mock_page():
               "uri":f"vless://synthetic@198.51.100.{n}:443?encryption=none",
               "username":"DEMO","password":"dummy","port":443,"psk":"fake-test-key",
             })
+            if protocol=="socks5":
+                items[-1]["outbound"]={"server":f"198.51.100.{n}",
+                    "server_port":38000+n,"username":"SOCKS-ONLY",
+                    "password":"socks-specific-test-secret"}
         creds.append({"protocol":protocol,"items":items})
     fake_payload={"account":{"username":"DEMO","password":"dummy"},
                   "subscription_link":"https://mock.panel/v1/connect/demo/sub","credentials":creds}
@@ -248,6 +252,8 @@ def verify(context,html,device,outfile):
     first.click()
     assert details.first.is_visible(),(device,"SOCKS5 details not opened under node")
     assert details.first.locator(".facts:visible .fact").count()>=3,(device,"SOCKS5 credentials unavailable")
+    assert "socks-specific-test-secret" in details.first.inner_text(),(device,"SOCKS outbound password must override account password")
+    assert "38013" in details.first.inner_text(),(device,"SOCKS port must come from actual outbound")
     assert details.first.locator(".server-view:visible").count()==0,(device,"duplicate raw SOCKS5 data displayed")
     socks.screenshot(path=str(outfile).replace("openvpn","socks5"),animations="disabled")
     page.close()
