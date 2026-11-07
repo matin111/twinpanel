@@ -50,6 +50,23 @@ class CentralStageLauncherTests(unittest.TestCase):
                         launcher.launch(db,14)
                     run.assert_not_called()
 
+    def test_published_central_exit_launches_delta_only(self):
+        db = self.db(hidden=False)
+        db.get.return_value.id = 14
+        with (patch.object(launcher, "is_central_node", return_value=True),
+              patch.object(launcher, "allow_central_node", return_value=True),
+              patch.object(launcher.shutil, "which",
+                           return_value="/usr/bin/systemd-run"),
+              patch.object(launcher, "STAGE",
+                           MagicMock(is_file=MagicMock(return_value=True))),
+              patch.object(launcher.subprocess, "run") as invoke):
+            invoke.return_value.returncode = 0
+            result = launcher.launch(db, 14)
+        command = invoke.call_args.args[0]
+        self.assertEqual(command[-1], "--delta-only")
+        self.assertEqual(command.count("--delta-only"), 1)
+        self.assertTrue(result["scheduled"])
+
     def test_missing_systemd_fails_closed(self):
         with patch.object(launcher.shutil,"which",return_value=None):
             with self.assertRaisesRegex(launcher.CentralStageLaunchError,
