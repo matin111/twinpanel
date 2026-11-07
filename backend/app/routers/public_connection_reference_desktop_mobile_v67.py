@@ -114,6 +114,7 @@ body.ref67 .ref67-list{margin:0 17px 13px;border-radius:18px;overflow:hidden;
 body.ref67 .ref67-row{display:grid;grid-template-columns: minmax(130px,1fr) minmax(90px,.85fr) auto;
  gap:12px;align-items:center;min-height:75px;padding:10px 14px;border-bottom:1px solid #34405f}
 body.ref67 .ref67-row:last-child{border-bottom:0}
+body.ref67 .ref67-row[hidden]{display:none!important}
 body.ref67 .ref67-row-name{display:flex;gap:12px;align-items:center;min-width:0}
 body.ref67 .ref67-flag{font-size:25px;line-height:1}
 body.ref67 .ref67-row-name b{display:block;color:white;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -246,7 +247,7 @@ _SCRIPT = r"""
       (name==='recommended'&&new Set(['v2ray','wireguard','openvpn','hysteria2','tuic']).has(id));
      choice.classList.toggle('ref67-hidden',!visible);
      // Disable stale filtering from preexisting V51 without mutating protocol data.
-     if(visible)choice.dataset.v51Filtered='0';
+     choice.dataset.v51Filtered='0';
     }
     const active=choices.find(x=>x.classList.contains('active')&&!x.classList.contains('ref67-hidden'));
     if(!active)choices.find(x=>!x.classList.contains('ref67-hidden'))?.click();
