@@ -76,3 +76,74 @@ def test_add_node_defaults_to_auto_enroll_and_no_double_xray_install():
     assert "install_l2tp:true" in ui
     assert "install_v2ray:false" in ui  # dedicated Xray bootstrap
     assert "publish_to_all_users:draft.node_type===\"exit\"?publishToAll:false" in ui
+
+
+
+def test_first_exit_uses_11_catalog_defaults_not_missing_templates():
+    """No other node must be needed to prepare a fresh 16-protocol Exit."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    from sqlalchemy.pool import StaticPool
+
+    from app.database import Base
+    from app.models import Node, NodeProtocolConfig, NodeStatus, NodeType
+    from app.modern_protocol_models import ModernProtocolSetting
+    from app.services.new_node_modern_bootstrap_v1 import (
+        build_modern_bootstrap_plan,
+    )
+    from app.protocol_catalog import resolve_settings
+
+    engine = create_engine(
+        "sqlite://",
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(
+        engine, tables=[
+            Node.__table__,
+            NodeProtocolConfig.__table__,
+            ModernProtocolSetting.__table__,
+        ],
+    )
+    try:
+        with Session(engine) as db:
+            db.add(Node(
+                id=123, name="Fresh Exit", node_type=NodeType.EXIT,
+                public_ip="192.0.2.123",
+                agent_url="https://192.0.2.123:9443",
+                country_code="DE", status=NodeStatus.ONLINE,
+            ))
+            db.commit()
+            plan = build_modern_bootstrap_plan(db, 123)
+            assert set(plan["protocols"]) == set(MODERN_PROTOCOL_KEYS)
+            assert plan["skipped_no_template"] == []
+            assert plan["skipped_port_conflict"] == []
+            assert len(set(plan["ports"].values())) == 11
+            for key in MODERN_PROTOCOL_KEYS:
+                assert plan["sources"][key]["mode"] == "catalog_default"
+                assert plan["sources"][key]["node_id"] is None
+                preset, _, _ = resolve_settings(key, "recommended", {})
+                assert preset == "recommended"
+    finally:
+        engine.dispose()
+
+
+def test_modern_install_persists_real_remapped_ports():
+    """Do not publish wrong client URLs after the remote port preflight."""
+    src = (ROOT / "app/routers/modern_protocol_admin_v3.py").read_text()
+    start = src.index('remaps = (result.get("core") or {}).get("port_remaps") or {}')
+    end = src.index("        db.commit()", start)
+    body = src[start:end]
+    assert 'applied_port = int(remap.get("to") or health.get("port") or requested_port)' in body
+    assert 'health["port"] = applied_port' in body
+    assert "_save_status(db, node, key, health)" in body
+    assert "_save_setting(db, node.id, key, preset, effective, applied_port)" in body
+
+
+def test_standalone_runtime_activates_all_four_adapters():
+    from app.standalone_protocol_runtime import STANDALONE_PROTOCOLS
+    assert STANDALONE_PROTOCOLS == {
+        "mieru", "trusttunnel", "amneziawg", "sudoku",
+    }
+    assert all(PROTOCOL_CATALOG[key]["runtime_status"] == "ready"
+               for key in STANDALONE_PROTOCOLS)
