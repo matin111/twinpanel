@@ -127,8 +127,8 @@ body.ref67 .ref67-row-actions a,body.ref67 .ref67-row-actions button{min-height:
  font:850 11px Tahoma,Arial,sans-serif;text-decoration:none;cursor:pointer;white-space:nowrap}
 body.ref67 .ref67-row-actions a.ref67-primary{border-color:#b874ff}
 body.ref67 .ref67-row-actions button:disabled{opacity:.5}
-body.ref67 .protocol-panel .server-views{display:none!important}
-body.ref67 .protocol-panel .v54-v2ray-groups{display:none!important}
+body.ref67 .protocol-panel[data-ref67-mounted="1"] .server-views{display:none!important}
+body.ref67 .protocol-panel[data-ref67-mounted="1"] .v54-v2ray-groups{display:none!important}
 body.ref67 .ref67-footer{margin:12px 17px 18px;display:flex;gap:10px;justify-content:stretch}
 body.ref67 .ref67-footer>*{min-height:51px;flex:1;display:flex;align-items:center;justify-content:center;
  border-radius:13px;border:1px solid #3a4971;background:#17213d;color:#f2f5ff;text-decoration:none;
