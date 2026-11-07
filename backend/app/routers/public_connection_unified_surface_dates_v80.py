@@ -672,6 +672,95 @@ body .tp84-dialog-body > .v54-v2ray-profiles{
 body .tp84-dialog-body .server-view{display:block!important;max-width:100%!important;width:100%!important}
 body .tp84-dialog-body .facts{display:grid!important;grid-template-columns:1fr!important;gap:9px!important}
 body .tp84-dialog-body .fact{min-width:0!important;max-width:100%!important;overflow-wrap:anywhere!important}
+
+/* TWINPANEL_MOBILE_ACTIONS_STABLE_V85 - no cropped buttons at narrow widths */
+@media(max-width:720px){
+ html body.tp80-connection .protocol-panel.active .ref67-list,
+ html body.tp80-connection .protocol-panel.active .tp77-native-list,
+ html body.tp80-connection .protocol-panel.active .v54-v2ray-groups{
+   width:auto!important;min-width:0!important;max-width:100%!important;
+   box-sizing:border-box!important;overflow:hidden!important;
+ }
+ html body.tp80-connection .protocol-panel.active .ref67-row,
+ html body.tp80-connection .protocol-panel.active .tp77-native-row,
+ html body.tp80-connection .protocol-panel.active .v54-v2ray-server-head{
+   display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;
+   grid-template-rows:1fr!important;column-gap:8px!important;
+   width:100%!important;min-width:0!important;max-width:100%!important;
+   box-sizing:border-box!important;min-height:60px!important;height:auto!important;
+   max-height:none!important;padding:7px 9px!important;overflow:visible!important;
+   align-items:center!important;
+ }
+ html body.tp80-connection .protocol-panel.active .ref67-row-name,
+ html body.tp80-connection .protocol-panel.active .tp77-native-label{
+   grid-column:1!important;min-width:0!important;max-width:100%!important;
+   width:auto!important;overflow:hidden!important;white-space:nowrap!important;
+   text-overflow:ellipsis!important;margin:0!important;
+ }
+ html body.tp80-connection .protocol-panel.active .ref67-row-actions,
+ html body.tp80-connection .protocol-panel.active .tp80-file-actions{
+   grid-column:2!important;display:flex!important;flex-flow:row nowrap!important;
+   align-items:center!important;justify-content:flex-end!important;
+   position:static!important;inset:auto!important;transform:none!important;
+   min-width:0!important;width:auto!important;max-width:190px!important;
+   gap:6px!important;overflow:visible!important;margin:0!important;
+   padding:0!important;float:none!important;
+ }
+ html body.tp80-connection .protocol-panel.active .ref67-row-actions > a,
+ html body.tp80-connection .protocol-panel.active .ref67-row-actions > button,
+ html body.tp80-connection .protocol-panel.active .tp80-file-actions > a,
+ html body.tp80-connection .protocol-panel.active .tp80-file-actions > button{
+   display:inline-flex!important;position:static!important;inset:auto!important;
+   transform:none!important;float:none!important;vertical-align:middle!important;
+   align-items:center!important;justify-content:center!important;
+   box-sizing:border-box!important;flex:0 0 auto!important;
+   width:auto!important;min-width:51px!important;max-width:100px!important;
+   padding:7px 9px!important;margin:0!important;gap:4px!important;
+   min-height:36px!important;height:auto!important;max-height:42px!important;
+   border-radius:9px!important;font-size:11px!important;line-height:1.2!important;
+   white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+   text-decoration:none!important;z-index:auto!important;
+ }
+ html body.tp80-connection .protocol-panel.active .ref67-row-actions > button{
+   color:#fff!important;background:#253553!important;border:1px solid #536485!important;
+ }
+ html body.tp80-connection .protocol-panel.active .ref67-row-actions > a.ref67-primary{
+   color:#fff!important;background:linear-gradient(120deg,var(--p),var(--s))!important;
+   border:1px solid #ac8cff!important;
+ }
+ html body.tp80-connection .protocol-panel.active .tp80-detail-toggle{
+   grid-column:2!important;justify-self:end!important;min-width:70px!important;
+   position:static!important;transform:none!important;inset:auto!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer{
+   order:99!important;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+   grid-auto-flow:row!important;align-items:stretch!important;
+   width:auto!important;min-width:0!important;margin:10px 8px 12px!important;
+   padding:0!important;gap:7px!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > .tp78-footer-action,
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > [data-kind="app"]{
+   grid-column:auto!important;grid-row:auto!important;
+   min-width:0!important;width:100%!important;max-width:100%!important;
+   min-height:48px!important;height:auto!important;max-height:none!important;
+   margin:0!important;padding:8px 6px!important;
+   box-sizing:border-box!important;order:initial!important;
+   text-align:center!important;overflow-wrap:anywhere!important;
+   white-space:normal!important;font-size:10px!important;
+ }
+}
+@media(max-width:365px){
+ html body.tp80-connection .protocol-panel.active .ref67-row,
+ html body.tp80-connection .protocol-panel.active .tp77-native-row{
+   column-gap:4px!important;padding:6px!important;
+ }
+ html body.tp80-connection .protocol-panel.active .ref67-row-actions,
+ html body.tp80-connection .protocol-panel.active .tp80-file-actions{gap:4px!important;max-width:155px!important}
+ html body.tp80-connection .protocol-panel.active .ref67-row-actions > *,
+ html body.tp80-connection .protocol-panel.active .tp80-file-actions > *{
+   min-width:44px!important;max-width:83px!important;padding:6px!important;font-size:10px!important;
+ }
+}
 """
 
 
@@ -1146,7 +1235,7 @@ _SCRIPT = r"""
          app.target='_blank';app.rel='noopener noreferrer';
        }
        app.textContent='دانلود برنامه';
-       footer.append(app);
+       if(app.parentElement!==footer || footer.lastElementChild!==app)footer.append(app);
        existing.filter(n=>n!==app).forEach(node=>node.remove());
      }
    }
@@ -1246,7 +1335,7 @@ _SCRIPT = r"""
  // single client action reconciled without reloading the whole Connection page.
  let n=0;
  const timer=setInterval(()=>{check();if(++n>=35)clearInterval(timer)},300);
- setInterval(()=>{panels().forEach(reconcileClientDownload)},1200);
+ // No perpetual 1.2s reordering: the bounded startup reconciliation above suffices.
 })();
 </script>
 """
