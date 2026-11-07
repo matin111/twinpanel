@@ -29,7 +29,7 @@ sys.path.insert(0,str(ROOT))
 from app.services.central_runtime_ownership_v1 import allow_central_node
 from app.database import SessionLocal
 from app.models import (
-    Node,NodeProtocolConfig,NodeStatus,NodeType,ProtocolCredential,
+    Node,NodeProtocolConfig,NodeStatus,NodeType,ProtocolCredential,User,
     Subscription,SubscriptionNode,SubscriptionProtocol,SubscriptionStatus,
 )
 from app.routers import account_delivery as ad
@@ -196,6 +196,77 @@ def plan(db,node_id:int,limit:int):
     return node,len(subs),selected,required
 
 
+async def bootstrap_same_node_template(db,node_id:int)->int:
+    """Create ONE authoritative same-node Xray profile from installed runtime.
+
+    The modern Xray account path already derives REALITY/TLS parameters
+    from the selected node and hot-syncs an existing imported UUID. Never
+    reuse an unrelated node's public keys, rotate a UUID, or synthesize an
+    unverifiable profile. Subsequent subscriptions use the bulk hot path.
+    """
+    node=db.get(Node,node_id)
+    if not allow_central_node(db,node):
+        raise RuntimeError("XRAY_BOOTSTRAP_NODE_NOT_OWNED")
+    required=_required_profiles_v47(node)
+    try:
+        same_node_template(db,node_id,required)
+        return 0
+    except RuntimeError as exc:
+        if str(exc)!="XRAY_SAME_NODE_COMPLETE_TEMPLATE_MISSING":
+            raise
+    subs,creds=eligible(db,node_id)
+    for sub in subs:
+        cred=creds.get(int(sub.id))
+        if cred is None:
+            continue
+        old=ad._autosync_credential_items(cred)
+        try:
+            identity=choose_existing_uuid(old,node_id)
+        except RuntimeError:
+            continue
+        user=db.get(User,sub.user_id)
+        if user is None:
+            continue
+        from app import xray_adaptive_three_profiles_v47 as v47
+        v47.apply_xray_adaptive_three_profiles_v47()
+        # The existing runtime helper uses one verified node SSH session.
+        # This is a one-time seed, not per-user provisioning.
+        item=await v47._xray_account_modern_v47(
+            db,node,sub,user,identity,
+        )
+        have={str(p.get("id") or "").strip().lower()
+              for p in (item.get("profiles") or [])
+              if isinstance(p,dict) and p.get("uri")}
+        if not required.issubset(have) or uuid_from_item(item)!=identity:
+            raise RuntimeError("XRAY_BOOTSTRAP_INCOMPLETE_LIVE_PROFILES")
+        db.expire_all()
+        if not allow_central_node(db,db.get(Node,node_id)):
+            raise RuntimeError("XRAY_BOOTSTRAP_NODE_OWNERSHIP_CHANGED")
+        if (db.query(SubscriptionProtocol).filter_by(
+                subscription_id=sub.id,protocol="v2ray").first() is None):
+            raise RuntimeError("XRAY_BOOTSTRAP_ENTITLEMENT_CHANGED")
+        saved=db.query(ProtocolCredential).filter_by(
+            subscription_id=sub.id,protocol="v2ray",
+        ).with_for_update().first()
+        if saved is None:
+            raise RuntimeError("XRAY_BOOTSTRAP_CREDENTIAL_REMOVED")
+        items=ad._autosync_credential_items(saved)
+        own=[x for x in items if ad._autosync_item_node_id(x)==node_id]
+        if len(own)>1 or (own and uuid_from_item(own[0])!=identity):
+            raise RuntimeError("XRAY_BOOTSTRAP_EXISTING_IDENTITY_CONFLICT")
+        next_items=[x for x in items
+                    if ad._autosync_item_node_id(x)!=node_id]+[item]
+        saved.config_text_encrypted=ad._enc(next_items)
+        saved.is_active=True
+        db.commit()
+        print("CENTRAL_XRAY_FIRST_NODE_TEMPLATE",json.dumps({
+            "node_id":node_id,"required_profiles":len(required),
+            "seeded":True,
+        }),flush=True)
+        return 1
+    raise RuntimeError("XRAY_BOOTSTRAP_NO_ELIGIBLE_EXISTING_UUID")
+
+
 async def run_one(db,node_id:int,limit:int,apply:bool)->int:
     node,eligible_count,selected,required=plan(db,node_id,limit)
     print("CENTRAL_XRAY_PLAN",json.dumps({
@@ -288,6 +359,8 @@ async def run(node_id:int,limit:int,apply:bool,all_batches:bool):
                 if not readiness.get("ok"):
                     raise RuntimeError("16_PROTOCOL_READINESS_NOT_VERIFIED")
         total=0
+        if apply:
+            total+=await bootstrap_same_node_template(db,node_id)
         for cycle in range(MAX_CYCLES if all_batches and apply else 1):
             saved=await run_one(db,node_id,limit,apply)
             total+=saved
