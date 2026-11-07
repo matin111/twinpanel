@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app.central_sudoku_bulk_runtime_v1 import apply_bulk, verify_accounts
+from app.central_sudoku_keygen_bulk_v1 import generate_many
 from app.database import SessionLocal
 from app.models import (Node, NodeProtocolConfig, NodeStatus, NodeType,
                         ProtocolCredential, Subscription, SubscriptionNode,
@@ -28,7 +29,8 @@ from app.models import (Node, NodeProtocolConfig, NodeStatus, NodeType,
 from app.node_runtime_connection import connect_protocol_runtime
 from app.routers import account_delivery as ad
 from app.standalone_subscription_accounts import (
-    secret_from_dict, secret_to_dict, new_account_secret, _node_host,
+    StandaloneAccountSecret, account_username, _sudoku_port,
+    secret_from_dict, secret_to_dict, _node_host,
     _sudoku_endpoint, _sudoku_share_uri,
 )
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
@@ -148,9 +150,21 @@ async def stage(node_id: int, limit: int, apply: bool):
         try:
             # Record the secrets BEFORE remote apply to preserve retry identity.
             identities = {}
+            missing_ids = [int(sub.id) for sub, _, _, secret in pending
+                           if secret is None]
+            generated = await generate_many(conn, missing_ids) if missing_ids else {}
             for sub, cred, items, secret in pending:
                 if secret is None:
-                    secret = await new_account_secret(conn, "sudoku", int(sub.id))
+                    key = generated[int(sub.id)]
+                    secret = StandaloneAccountSecret(
+                        protocol="sudoku",
+                        subscription_id=int(sub.id),
+                        username=account_username(int(sub.id)),
+                        sudoku_client_key=key["client"],
+                        sudoku_master_private_key=key["master_private"],
+                        sudoku_master_public_key=key["master_public"],
+                        sudoku_port=_sudoku_port(int(sub.id)),
+                    )
                     if cred is None:
                         cred = ProtocolCredential(
                             subscription_id=sub.id, protocol="sudoku")
