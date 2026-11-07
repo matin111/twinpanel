@@ -31,7 +31,7 @@ from app.node_runtime_connection import connect_protocol_runtime
 from app.services.central_openvpn_node_signer_v2 import (
     load_or_import_node_ca, issue_client_identity, verify_client_identity,
 )
-from app.services.new_node_readiness_v1 import verify_new_exit_readiness
+from app.services.central_family_readiness_v1 import verify_central_family_readiness
 from app.routers import account_delivery as ad
 
 logging.getLogger("asyncssh").setLevel(logging.CRITICAL)
@@ -147,7 +147,7 @@ async def run(node_id, limit, apply):
         }), flush=True)
         if not apply or not pending:
             return 0
-        readiness = await asyncio.wait_for(verify_new_exit_readiness(db, node_id), timeout=510)
+        readiness = await asyncio.wait_for(verify_central_family_readiness(db, node_id, {"openvpn"}), timeout=510)
         if not readiness.get("ok"):
             raise RuntimeError("OPENVPN_STAGE_FULL_READINESS_FAILED")
         central_pki = is_openvpn_central_pki_enabled(db)
