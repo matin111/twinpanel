@@ -107,10 +107,21 @@ async def reconcile_runtime_families(
         *(run_family(family) for family in parallel),
         return_exceptions=True,
     )
-    isolated=await asyncio.gather(
-        *(run_family(family) for family in shared),
-        return_exceptions=True,
-    )
+    isolated=[]
+    for family in shared:
+        # A single restart/listener verification can be momentarily
+        # unavailable after the other family applies. Retry ONCE, only
+        # for this node-wide daemon. No subscriber-specific retries.
+        result=await asyncio.gather(
+            run_family(family),return_exceptions=True,
+        )
+        outcome=result[0]
+        if isinstance(outcome,BaseException) or outcome[1]!=0:
+            retry=await asyncio.gather(
+                run_family(family),return_exceptions=True,
+            )
+            outcome=retry[0]
+        isolated.append(outcome)
     responses=dict(zip(
         [family.name for family in parallel+shared],
         list(in_parallel)+list(isolated),
