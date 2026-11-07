@@ -20,11 +20,9 @@ from .account_delivery import (
     _usage_payload,
 )
 from .download_assets import public_downloads_by_platform
-from .public_connection_ping_v78 import router as _live_ping_router
 
 
 router = APIRouter(prefix="/v1/connect", tags=["public-connection-hub-v5"])
-router.include_router(_live_ping_router)
 
 
 def h(value: Any) -> str:
