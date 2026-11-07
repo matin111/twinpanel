@@ -48,9 +48,12 @@ if settings.database_url.startswith(("postgresql://", "postgresql+psycopg2://"))
     request_engine = create_engine(
         settings.database_url,
         pool_pre_ping=True,
-        pool_size=10,
-        max_overflow=6,
-        pool_timeout=5,
+        # Keep HTTP responses responsive when node polling and the admin UI
+        # overlap. 32 HTTP connections + up to 40 worker connections remains
+        # below the PostgreSQL max_connections=100 of the standard install.
+        pool_size=16,
+        max_overflow=16,
+        pool_timeout=10,
         pool_recycle=1800,
         pool_use_lifo=True,
         connect_args=_DATABASE_CONNECT_ARGS,
