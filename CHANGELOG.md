@@ -1,5 +1,15 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.656 — 2026-11-07
+
+### Connection import scripts: verified root-cause fix
+- Fix repeated string rewriting that generated invalid JavaScript `async async function` in V34/V37/V38 client-import scripts.
+- Preserve asynchronous V37 `buildMulti` after the public-Connection request-backpressure transformation; it must await the client import URL resolver.
+- Restore execution of client import / add-to-app and multi-config action builders on all platforms without changing subscription URIs, node configuration or VPN runtime.
+- Retain responsive Windows four-action and Android three-plus-one footer layouts, client download links and the V2Ray per-node copy control.
+- Validated that all **40 scripts** from a live Connection HTML response pass Node.js syntax checks with **zero failures** after applying the server patch.
+- Browser interactive clicks / full visual regression across all protocols still require validation; this release addresses the reproducible JavaScript parse failures.
+
 ## 1.1.0-rc.655 — 2026-11-07
 
 ### V2Ray/Xray late-loading node actions
