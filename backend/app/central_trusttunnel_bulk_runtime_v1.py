@@ -168,7 +168,13 @@ async def apply_bulk(conn: Any, accounts: list[dict[str,str]], endpoint: str) ->
     process.stdin.write_eof()
     result=await asyncio.wait_for(process.wait(),timeout=1200)
     if result.exit_status:
-        raise RuntimeError("TRUST_BULK_REMOTE_FAILED")
+        # Only accept a fixed error-code token from the remote process.
+        # Never include stdout/stderr or credentials in logs.
+        import re
+        diagnostics = str(result.stderr or "")
+        tokens = re.findall(r"\\b(?:TRUST_[A-Z0-9_]+|TRUST_[A-Z0-9_]+)\\b", diagnostics)
+        code = tokens[-1] if tokens else "REMOTE_UNKNOWN"
+        raise RuntimeError("TRUST_BULK_REMOTE_FAILED:"+code)
     try:
         ack=json.loads((result.stdout or "").strip().splitlines()[-1])
     except (ValueError,IndexError) as exc:
