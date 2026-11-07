@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.635",
-  "source_sha": "123d37effa67fc898264ce1aadf204ef1c7be869",
+  "version": "1.1.0-rc.636",
+  "source_sha": "cd2131c8bdc5e8dbb56fd6dec221d43c3cbc36ed",
   "notes": {
-    "fa": "نسخه rc.635 شامل اصلاح مقصد نامعتبر REALITY آلمان اول، حفظ SNI لینک‌های قدیمی و پایدارسازی BBR برای Xray روی نودهای انتخاب‌شده؛ همچنین رابط Connection تأییدشده در نسخه اصلی. بدون تغییر UUIDها، کلیدها، پروتکل‌های سالم یا هسته تونل.",
-    "en": "rc.635 combines the approved Connection UI with the verified Germany REALITY target/SNI compatibility fix and per-node opt-in Xray BBR persistence. No credential rotation, customer account recreation or tunnel carrier change."
+    "fa": "اصلاح چیدمان موبایل صفحه Connection مطابق مرجع؛ نمایش پرچم خودکار تمام کشورهای نود از country_code؛ نمایش نام اشتراک به‌جای نام ادمین. بدون تغییر کانفیگ، آدرس، پورت یا پروتکل.",
+    "en": "Match approved compact mobile Connection layout; decode all registered node country flags from server-provided ISO codes; display subscription username. No change to VPN configuration contents, hosts, ports, SNI, UUID, protocols or links."
   }
 }
