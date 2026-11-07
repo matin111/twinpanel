@@ -1609,7 +1609,7 @@ _SCRIPT = r"""
    const find=kind=>nodes.find(node=>node.dataset.kind===kind);
    let primary=fileProtocol?find('download'):(find('add')||find('download'));
    if(fileProtocol){
-     const token=location.pathname.match(/^\\/v1\\/connect\\/([^/]+)/)?.[1];
+     const token=location.pathname.split('/')[3]||'';
      const url=token?'/v1/connect/'+token+'/multi/'+encodeURIComponent(key):'';
      if(url){
        if(!primary){primary=el('a','tp78-footer-action','دانلود همه فایل‌ها');primary.dataset.kind='download'}
