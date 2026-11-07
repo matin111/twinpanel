@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'backend/app/xray_customer_profile_policy_v30.py'
+      - 'backend/app/xray_node_domain_runtime.py'
+      - 'backend/tests/xray_ip_domain_overlay_smoke.py'
       - 'backend/app/routers/account_delivery.py'
       - 'backend/tests/v2ray_iran_ip_delivery_smoke.py'
       - 'backend/app/xray_modern_runtime.py'
@@ -38,6 +40,8 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/xray_customer_profile_policy_v30.py \
+            backend/app/xray_node_domain_runtime.py \
+            backend/tests/xray_ip_domain_overlay_smoke.py \
             backend/app/routers/account_delivery.py \
             backend/tests/v2ray_iran_ip_delivery_smoke.py \
             backend/tests/xray_customer_delivery_v261_smoke.py
@@ -51,3 +55,8 @@ jobs:
         env:
           PYTHONPATH: backend
         run: python backend/tests/v2ray_iran_ip_delivery_smoke.py
+
+      - name: Preserve assigned Iran ingress IP across dedicated-domain overlay
+        env:
+          PYTHONPATH: backend
+        run: python backend/tests/xray_ip_domain_overlay_smoke.py
