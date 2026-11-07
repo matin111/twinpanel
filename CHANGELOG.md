@@ -1,5 +1,14 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.677 — 2026-11-08
+
+### Faster public Connection page, preserving all protocols and account data
+- Eliminated a SQL N+1 pattern: request-local strong Node identity map, memoized tunnel and eligibility checks, plus a single bulk NodeProtocolConfig read instead of hundreds of individual DB lookups. No globally cached user configuration or changed account mutation paths.
+- Changed QR rendering from huge inline SVG path strings to equivalent high-quality, browser-scannable compact PNG images using the existing pinned qrcode[pil] dependency and QR best-mask selection, without changing source configuration strings.
+- Production performance profiling: database reads reduced from ~551 to 90 before bulk config fetch, and first render significantly reduced. Compressed response size reduced from ~340 KB to ~163 KB; exact end-to-end latency depends on concurrent provisioning/updater load.
+- Added `test_connection_render_fast_v103.py` and GitHub CI regression coverage for request-scoped caches, QR validity, live-state freshness and English UI digits.
+- Public /live traffic and session telemetry remain uncached; credentials, limits, subscriptions, live VPN services, downloads and copy actions unchanged.
+
 ## 1.1.0-rc.674 — 2026-11-08
 
 ### Real connection/accounting and English digits on Connection
