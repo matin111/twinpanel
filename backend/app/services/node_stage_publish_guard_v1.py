@@ -21,6 +21,17 @@ def require_staged_node_publish_ready(db: Session, node_id: int) -> None:
     )
     if job is None:
         return  # Existing/manual nodes did not go through this staged workflow.
+    if job.stage == "enrolling_users":
+        # The old installer changes stage to enrolling_users while applying
+        # node-wide credentials. Allow publish only after the REAL per-node
+        # credential coverage audit passes; never while applying.
+        from ..central_node_stage_audit_v1 import verify_coverage
+        if not verify_coverage(db, node_id)["ok"]:
+            raise HTTPException(
+                status_code=409,
+                detail="CENTRAL_NODE_CREDENTIAL_COVERAGE_INCOMPLETE",
+            )
+        return
     if job.stage not in {"verified_ready", "completed", "users_queued"}:
         raise HTTPException(
             status_code=409,
