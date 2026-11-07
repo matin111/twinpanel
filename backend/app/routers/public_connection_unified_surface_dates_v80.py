@@ -1514,6 +1514,23 @@ html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .tp80-file-c
  background:var(--surface2,#f5f8fd)!important;color:var(--text,#182438)!important;
  border-color:var(--line,#dbe4f1)!important;
 }
+
+/* TWINPANEL_TRUE_LIVE_COUNTRY_HIGHLIGHT_V100 */
+/* Green means the quota ledger confirms a real live session/recent traffic
+   from that actual country, not just a protocol being installed or selected. */
+html[data-theme] body.tp80-connection.ref67 .protocol-choice.live-online,
+html[data-theme] body.tp80-connection.ref67 .protocol-choice.live-online.active{
+ border-color:var(--ok,#10b981)!important;
+ box-shadow:0 0 0 2px color-mix(in srgb,var(--ok,#10b981) 25%,transparent)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp80-country-bar button.live-online,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp93-country-bar button.live-online,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp92-v2-country-bar button.live-online{
+ color:#fff!important;
+ background:linear-gradient(125deg,#059669,#10b981)!important;
+ border-color:#10b981!important;
+ box-shadow:0 0 0 1px color-mix(in srgb,#10b981 25%,transparent)!important;
+}
 """
 
 
