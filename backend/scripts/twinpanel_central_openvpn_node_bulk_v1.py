@@ -186,7 +186,8 @@ async def run(node_id, limit, apply):
                     # Store only this Exit's new identity separately.
                     # Never rewrite the imported/opaque historical secret.
                     store_node_identity(db,"openvpn",int(sub.id),node_id,identity)
-                    cred.username=f"mv{sub.id}n{node_id}"
+                    # Preserve existing username of imported subscriptions.
+                    # Client certificate CN is carried in the .ovpn item.
                 item=build_node_local_client_item(db,node,sub,user,identity)
             items.append(item)
             cred.config_text_encrypted=ad._enc(items)
