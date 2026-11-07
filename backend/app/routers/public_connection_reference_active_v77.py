@@ -156,8 +156,14 @@ _SCRIPT = r"""
    const candidates=choices();
    const active=candidates.find(c=>c.classList.contains('active'));
    const saved=selection&&candidates.find(c=>c.dataset.protocol===selection);
+   // V36 on phones stops propagation on the protocol button before V77's
+   // document listener sees the click. Respect its actual open panel instead
+   // of re-selecting the saved desktop/default V2Ray every 350ms.
+   const compact=document.body.classList.contains('v36-mobile-compact');
+   const mobileOpen=compact&&candidates.find(c=>
+     document.getElementById(c.dataset.protocol)?.classList.contains('v36-open'));
    const v2ray=candidates.find(c=>c.dataset.protocolKey==='v2ray'&&!c.hidden&&!c.classList.contains('ref67-hidden'));
-   const target=saved||active||v2ray||candidates[0];
+   const target=mobileOpen||saved||active||v2ray||candidates[0];
    if(target)selectProtocol(target.dataset.protocol);
  }
  function identity(tab){
