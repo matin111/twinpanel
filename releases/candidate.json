@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.662",
-  "source_sha": "4faf90b3a92146f92166133d12bd12597fa428ce",
+  "version": "1.1.0-rc.663",
+  "source_sha": "21512f35c003ff97447137da14b8a98c96938be9",
   "notes": {
-    "fa": "نسخه rc.662: اصلاح واقعی دسته‌بندی موبایل پیشنهادی، مدرن، کلاسیک و همه (۵/۱۱/۵/۱۶ پروتکل)، رفع نمایش همه سرورها هنگام انتخاب یک کشور در AnyTLS/Naive/TUIC/ShadowTLS/Snell و V2Ray؛ حذف دو نوار فیلتر V2Ray؛ قرارگیری دانلود v2rayN داخل چهار دکمه فوتر ویندوز همراه Karing، حفظ کپی همه کانفیگ‌ها در عملیات اضافی؛ بازکردن اطلاعات اتصال در پاپ‌آپ موبایل و دسکتاپ. تست کلیک فیلتر، دسته‌بندی و پاپ‌آپ با DOM ساختار واقعی صفحه موفق بود؛ تست بصری روی گوشی واقعی هنوز کامل نیست. به تنظیمات VPN، نودها و اعتبار کاربران دست زده نشده است.",
-    "en": "rc.662: real mobile protocol category filtering Recommended/Modern/Classic/All (5/11/5/16 visible); correct per-country filtering in AnyTLS, Naive, TUIC, ShadowTLS, Snell and V2Ray; remove duplicate V2Ray country bars; put Windows v2rayN alongside Karing within four bottom actions and retain copy-all in secondary actions; intercept connection detail triggers into real mobile/desktop modal. DOM interaction smoke tests pass; full visual mobile browser testing remains outstanding. No VPN node or credential changes."
+    "fa": "نسخه rc.663: دکمه «کپی همه کانفیگ‌ها» برای V2Ray در ویندوز به ردیف چهار دکمه اصلی برگشت؛ کنار کپی لینک اشتراک، دانلود Karing و دانلود v2rayN. گزینه واقعی «افزودن همه به Karing» همراه رویداد اصلی خود در عملیات اضافی حفظ شد. کد ترتیب‌دهی فوتر اصلاح شد تا هنگام اجرای مجدد، دکمه‌های داخل سایر عملیات حذف یا مخفی نشوند. تست DOM ردیف چهار دکمه و حفظ افزودن همه موفق بود. به اطلاعات کاربر، نودها و سرویس VPN تغییری داده نشد.",
+    "en": "rc.663 restores V2Ray Windows Copy all configurations as one of four main footer buttons alongside Copy subscription link, Download Karing and Download v2rayN. Retains the real Add all to Karing action with its original event handler in secondary actions. Footer reconciliation now includes previously nested actions to avoid losing them across passes. DOM smoke verified four actions and retained add-all. No changes to VPN runtime or account data."
   }
 }
