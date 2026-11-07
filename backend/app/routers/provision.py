@@ -2548,72 +2548,17 @@ async def install_node(
             # tunnel has not been established yet.
 
 
-        # TWINPANEL_AUTO_QUOTA_AFTER_NODE_INSTALL_V1
-        quota_sync = {
-            "ok": True,
-            "skipped": True,
-            "reason": "iran_tunnel_only",
-        }
-
+        # Initialize quota for the newly installed hidden Exit through the
+        # canonical quota agent-pull builder. The deleted
+        # quota_bootstrap_v1.py and backend/venv paths are NOT shipped.
+        quota_sync = {"ok": True, "skipped": True, "reason": "iran_tunnel_only"}
         if node.node_type == NodeType.EXIT:
-            project_root = (
-                Path(__file__)
-                .resolve()
-                .parents[2]
+            from ..services.new_node_quota_bootstrap_v1 import (
+                bootstrap_fresh_hidden_exit_quota,
             )
-
-            quota_script = (
-                project_root
-                / "quota_bootstrap_v1.py"
-            )
-
-            quota_python = (
-                project_root
-                / "venv"
-                / "bin"
-                / "python"
-            )
-
-            try:
-                proc = await asyncio.to_thread(
-                    subprocess.run,
-                    [
-                        str(quota_python),
-                        str(quota_script),
-                        str(node.id),
-                    ],
-                    cwd=str(project_root),
-                    text=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    timeout=300,
-                    check=False,
-                )
-
-                quota_output = (
-                    proc.stdout or ""
-                )[-4000:]
-
-                quota_sync = {
-                    "ok": proc.returncode == 0,
-                    "returncode":
-                        proc.returncode,
-                    "output":
-                        quota_output,
-                }
-
-                if proc.returncode != 0:
-                    if "quota" not in failed:
-                        failed.append("quota")
-
-            except Exception as exc:
-                quota_sync = {
-                    "ok": False,
-                    "error": str(exc)[:500],
-                }
-
-                if "quota" not in failed:
-                    failed.append("quota")
+            quota_sync = bootstrap_fresh_hidden_exit_quota(db, node.id)
+            if not quota_sync.get("ok") and "quota" not in failed:
+                failed.append("quota")
 
         # Never enumerate/SSH-sync 2000+ existing subscriptions while a new
         # Exit is still installing. The bounded central queue takes over
