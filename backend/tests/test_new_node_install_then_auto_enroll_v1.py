@@ -49,6 +49,10 @@ def test_background_install_sequence_and_entitlement_delivery():
     )
     assert "if missing or not modern_bootstrap.get(\"ok\")" in body
     assert "node_id=node_id, db=db" in body
+    assert "verify_new_exit_readiness(db, node_id)" in body
+    assert body.index("await verify_new_exit_readiness(") < body.index(
+        "await publish_node_to_all_users_v2("
+    )
     assert "SubscriptionNode(" not in body
     assert "sync_installed_node_to_subscriptions" not in body
     assert "NodeProtocolConfig.status" not in body  # query real config rows
@@ -58,6 +62,7 @@ def test_deferred_install_does_not_run_legacy_subscription_loop():
     src = (ROOT / "app/routers/provision.py").read_text()
     ast.parse(src)
     assert "defer_subscription_sync: bool = False" in src
+    assert "show_to_users=(payload.node_type != NodeType.EXIT or not payload.defer_subscription_sync)" in src
     tail = src.split("# TWINPANEL_INSTALL_THEN_AUTO_ENROLL_V1", 1)[1].split(
         "# TWINPANEL_MANUAL_IRAN_EXIT_TUNNEL_V2", 1
     )[0]
@@ -147,3 +152,107 @@ def test_standalone_runtime_activates_all_four_adapters():
     }
     assert all(PROTOCOL_CATALOG[key]["runtime_status"] == "ready"
                for key in STANDALONE_PROTOCOLS)
+
+
+
+def test_live_health_gate_checks_all_16_with_one_connection():
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from app.models import NodeType
+    from app.services import new_node_readiness_v1 as readiness
+
+    class DummyDB:
+        def get(self, model, id):
+            return SimpleNamespace(node_type=NodeType.EXIT, retired_at=None)
+        def query(self, model):
+            return self
+        def filter(self, *clauses):
+            return self
+        def all(self):
+            return [
+                SimpleNamespace(protocol=key, status="online", port=15000 + n)
+                for n, key in enumerate(ALL_PROTOCOL_KEYS)
+            ]
+
+    conn = SimpleNamespace(
+        close=lambda: None,
+        wait_closed=AsyncMock(return_value=None),
+    )
+    db = DummyDB()
+    with (
+        patch.object(readiness, "connect_protocol_runtime",
+                     new_callable=AsyncMock, return_value=conn) as connect,
+        patch.object(readiness, "_protocol_live_health",
+                     new_callable=AsyncMock, return_value={"ok": True}) as classic,
+        patch.object(readiness, "profile_health",
+                     new_callable=AsyncMock, return_value={"ok": True}) as modern,
+    ):
+        result = asyncio.run(readiness.verify_new_exit_readiness(db, 123))
+        assert result == {
+            "ok": True, "reason": "ready", "ready_count": 16,
+            "required_count": 16, "missing": [],
+        }
+        assert connect.await_count == 1
+        assert classic.await_count == 5
+        assert modern.await_count == 11
+        assert conn.wait_closed.await_count == 1
+
+
+def test_live_health_gate_refuses_one_failing_protocol():
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+
+    from app.models import NodeType
+    from app.services import new_node_readiness_v1 as readiness
+
+    class DummyDB:
+        def get(self, model, id):
+            return SimpleNamespace(node_type=NodeType.EXIT, retired_at=None)
+        def query(self, model):
+            return self
+        def filter(self, *clauses):
+            return self
+        def all(self):
+            return [
+                SimpleNamespace(protocol=key, status="online", port=15000 + n)
+                for n, key in enumerate(ALL_PROTOCOL_KEYS)
+            ]
+
+    conn = SimpleNamespace(
+        close=lambda: None,
+        wait_closed=AsyncMock(return_value=None),
+    )
+
+    async def modern_health(_conn, protocol, _port):
+        return {"ok": protocol != "sudoku"}
+
+    with (
+        patch.object(readiness, "connect_protocol_runtime",
+                     new_callable=AsyncMock, return_value=conn),
+        patch.object(readiness, "_protocol_live_health",
+                     new_callable=AsyncMock, return_value={"ok": True}),
+        patch.object(readiness, "profile_health", side_effect=modern_health),
+    ):
+        result = asyncio.run(readiness.verify_new_exit_readiness(DummyDB(), 123))
+        assert result["ok"] is False
+        assert result["missing"] == ["sudoku"]
+        assert result["ready_count"] == 15
+
+
+def test_hidden_node_is_not_published_when_install_failed():
+    src = (ROOT / "app/routers/publish_node_all_users_v1.py").read_text()
+    body = src.split("async def _install_node_in_background(", 1)[1].split(
+        '@router.post("/install-background-v1"', 1
+    )[0]
+    assert body.index('if failed_classic:') < body.index(
+        "await publish_node_to_all_users_v2("
+    )
+    assert body.index('if missing or not modern_bootstrap.get("ok"):') < body.index(
+        "await publish_node_to_all_users_v2("
+    )
+    assert body.index('if not live.get("ok"):') < body.index(
+        "await publish_node_to_all_users_v2("
+    )
