@@ -21,6 +21,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 
 from app.central_wireguard_bulk_runtime_v1 import new_keypair, apply_bulk
+from app.services.central_runtime_ownership_v1 import allow_central_node
 from app.database import SessionLocal
 from app.models import (
     Node,NodeProtocolConfig,NodeStatus,NodeType,ProtocolCredential,
@@ -131,7 +132,7 @@ async def run(node_id:int,limit:int,apply:bool):
         if (
             node is None or node.retired_at is not None
             or node.node_type!=NodeType.EXIT or node.status!=NodeStatus.ONLINE
-            or node.show_to_users or not node.enable_wireguard
+            or not allow_central_node(db,node) or not node.enable_wireguard
         ):
             raise RuntimeError("REQUIRES_HIDDEN_ONLINE_WIREGUARD_EXIT")
         cfg=db.query(NodeProtocolConfig).filter_by(
@@ -181,7 +182,7 @@ async def run(node_id:int,limit:int,apply:bool):
                 or_(Subscription.traffic_limit_bytes<=0,
                     Subscription.traffic_used_bytes<Subscription.traffic_limit_bytes),
             ).all()}
-        if not set(identities).issubset(eligible) or db.get(Node,node_id).show_to_users:
+        if not set(identities).issubset(eligible) or not allow_central_node(db,db.get(Node,node_id)):
             raise RuntimeError("WIREGUARD_ENTITLEMENT_OR_VISIBILITY_CHANGED")
         existing={int(c.subscription_id):c for c in db.query(
             ProtocolCredential
