@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.642",
+  "version": "1.1.0-rc.643",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T03:03:09Z",
+  "released_at": "2026-11-07T03:27:32Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "c43c4ffed33e0325a55ae9a2346ef45d5f78db24",
+  "source_sha": "37b4ef74c4ca844aa4ae247bf1fa7fad50e2a8a3",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.642/twinpanel-1.1.0-rc.642-linux-x86_64.tar.gz",
-    "sha256": "666c973f1211278784f3ee4b2a9b8395247616f7044cf0f010f546075f3e8f84",
-    "size_bytes": 29171321
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.643/twinpanel-1.1.0-rc.643-linux-x86_64.tar.gz",
+    "sha256": "b67302201de5d61000b09bf25c4d3078837676eaf4d988cf0050d869b6b278f6",
+    "size_bytes": 29186530
   },
   "notes": {
-    "fa": "اصلاح صفحه Connection: آیکن واقعی WireGuard و OpenVPN و Cisco، نماد مجزا برای سایر پروتکل‌ها، نمایش پرچم‌های داخلی کشور روی ویندوز و پشتیبانی کشورهای جدید، دانلود برنامه اختصاصی هر پروتکل برای Android/Windows/iOS/macOS/Linux، رنگ‌بندی دکمه‌ها مطابق برند پنل؛ بدون تغییر کانفیگ یا آدرس سرور.",
-    "en": "Public Connection: embedded verified OpenVPN/WireGuard/Cisco logos, protocol-specific symbols, Windows-compatible inline flags, dynamic additional countries, per-protocol OS-aware direct app download links and branding-driven buttons. No VPN config, server IP/port, SNI or subscription payload changes."
+    "fa": "چیدمان Connection مطابق مرجع در موبایل و دسکتاپ: نمایش کانفیگ‌ها و سرورها پیش از دکمه‌های افزودن همه، کپی لینک، کپی/دانلود همه و دانلود برنامه مناسب دستگاه در پایین پنل؛ نمایش سه اینباند V2Ray و پرچم‌های یکپارچه. بدون تغییر کانفیگ‌ها، پروتکل‌ها، پورت‌ها و آدرس‌ها.",
+    "en": "Approved reference placement: display real per-node configs first, then native Add All, Copy Subscription Link, Copy All/Download All and detected-platform app download at the bottom, on desktop and mobile. Preserve all three genuine V2Ray inbounds per node, unified flags and native OpenVPN/WireGuard files. VPN configs, hosts, SNI, ports and credentials unchanged."
   }
 }
