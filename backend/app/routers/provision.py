@@ -88,6 +88,9 @@ class InstallIn(SSHBase, ProtocolSettings):
     node_type: NodeType
     country_code: str = "IR"
     capacity_users: int = Field(default=1000, gt=0)
+    # Only the new-Exit async installer sets this. Prevents a slow
+    # unbounded per-user SSH loop before all protocols have finished installing.
+    defer_subscription_sync: bool = False
 
 
 class RepairProtocolsIn(SSHBase, ProtocolSettings):
