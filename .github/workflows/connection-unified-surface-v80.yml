@@ -6,6 +6,7 @@ on:
       - 'backend/app/routers/public_connection_*.py'
       - 'backend/tests/test_public_connection_*v80.py'
       - 'backend/tests/test_public_connection_full_protocol_matrix_v81.py'
+      - 'backend/tests/test_public_connection_file_bundle_v81.py'
       - 'backend/tests/browser_connection_surface_v82.py'
       - '.github/workflows/connection-unified-surface-v80.yml'
 
@@ -39,6 +40,7 @@ jobs:
           PYTHONPATH=backend python -m pytest -q \
             backend/tests/test_public_connection_unified_surface_dates_v80.py \
             backend/tests/test_public_connection_full_protocol_matrix_v81.py \
+            backend/tests/test_public_connection_file_bundle_v81.py \
             backend/tests/test_public_connection_reference_desktop_mobile_v67.py \
             backend/tests/test_public_connection_real_latency_and_logos_v71.py
 
