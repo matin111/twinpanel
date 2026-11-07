@@ -27,6 +27,7 @@ body.tp65-ready .protocol-icon{height:42px;width:42px;border-radius:14px;backgro
 body.tp65-ready .protocol-text b{font-size:12px;line-height:1.45}
 body.tp65-ready .protocol-text small{font-size:10px;line-height:1.7}
 body.tp65-ready .protocol-choice em{display:none}
+body.tp65-ready.v51-multilink .protocol-choice[data-v51-filtered="1"]{display:none!important}
 body.tp65-ready .protocol-panel{border:1px solid #443b89;border-radius:22px;background:linear-gradient(170deg,#151b32,#0c1121 60%);overflow:hidden}
 body.tp65-ready .panel-head{padding:16px 18px;min-height:75px;background:linear-gradient(90deg,rgba(75,39,153,.27),rgba(29,41,74,.19));border-color:#303957}
 body.tp65-ready .panel-head h3{font-size:18px}
@@ -68,6 +69,7 @@ body.tp65-ready .v54-v2ray-profile-actions button{min-height:40px;border-radius:
   body.tp65-ready .traffic{padding:13px;border-radius:16px;gap:10px}
   body.tp65-ready .section-head{margin:13px 2px 8px}
   body.tp65-ready .protocols{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:6px!important}
+  body.tp65-ready.v51-multilink .protocol-choice[data-v51-filtered="1"]{display:none!important}
   body.tp65-ready .protocol-choice{min-height:70px;padding:7px 3px;display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:5px;border-radius:12px;text-align:center;min-width:0}
   body.tp65-ready .protocol-icon{width:32px;height:32px;border-radius:11px;font-size:14px;flex:0 0 32px}
   body.tp65-ready .protocol-text{min-width:0;width:100%;display:block}
@@ -137,7 +139,9 @@ _SCRIPT = r"""
     const config=view.querySelector('button[data-config-path],a[data-config-path]');
     const path=config?.getAttribute('data-config-path')||'';
     const platform=document.body.dataset.tpPlatform||'';
-    if(path.startsWith('/v1/connect/')&&platform==='android'){
+    const protocol=view.closest('.protocol-panel')?.dataset.v34Protocol||'';
+    const supportsKaring=new Set(['hysteria2','tuic','anytls','naive','shadowtls','mieru','sudoku']).has(protocol);
+    if(path.startsWith('/v1/connect/')&&platform==='android'&&supportsKaring){
       return {kind:'deep',href:'karing://install-config?url='+
         encodeURIComponent(new URL(path,location.origin).href),source:config};
     }
@@ -172,7 +176,8 @@ _SCRIPT = r"""
     const copyLink=[...original.querySelectorAll('a[href]')].find(a=>
       /^(https?:\/\/|(?:vmess|vless|trojan|ss|hysteria2|hy2|tuic|anytls|naive|snell|mieru|sudoku):\/\/)/i.test(a.getAttribute('href')||'')
     );
-    const fallback=stored||copyLink?.getAttribute('href')||'';
+    const uri=/^(?:vless|vmess|trojan|ss|hysteria2|hy2|tuic|anytls|naive|snell|mieru|sudoku|trusttunnel|wg|wireguard):\/\//i;
+    const fallback=(uri.test(stored)?stored:'')||copyLink?.getAttribute('href')||'';
     if(!direct&&!fallback)return; // Show original controls if no safe replacement.
     const row=document.createElement('div');row.className='tp65-single-actions';
     if(direct){
