@@ -1,0 +1,35 @@
+name: L2TP Owned IPsec Repair V1
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/provision.py"
+      - "backend/tests/test_l2tp_owned_port_repair_v1.py"
+      - ".github/workflows/l2tp-owned-ipsec-repair-v1.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/routers/provision.py"
+      - "backend/tests/test_l2tp_owned_port_repair_v1.py"
+      - ".github/workflows/l2tp-owned-ipsec-repair-v1.yml"
+
+jobs:
+  repair-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend
+        run: python -m pip install -r backend/requirements.txt
+      - name: Check source and test syntax
+        run: |
+          python -m py_compile backend/app/routers/provision.py
+          python -m py_compile backend/tests/test_l2tp_owned_port_repair_v1.py
+      - name: Run own-port, active-session and service-health regressions
+        working-directory: backend
+        run: PYTHONPATH=. python -m unittest discover -s tests -p 'test_l2tp_owned_port_repair_v1.py' -v
