@@ -36,7 +36,7 @@ def test_background_install_sequence_and_entitlement_delivery():
     body = src.split("async def _install_node_in_background(", 1)[1].split(
         '@router.post("/install-background-v1"', 1
     )[0]
-    assert "defer_subscription_sync=True" in body
+    assert "defer_subscription_sync=payload.node_type == NodeType.EXIT" in body
     assert body.index("await install_node(") < body.index("await ensure_classic_protocol(")
     assert body.index("await ensure_classic_protocol(") < body.index(
         "await bootstrap_new_exit_modern_protocols("
