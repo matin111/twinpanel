@@ -77,21 +77,42 @@ def selected_subscriptions(db, node_id: int, limit: int, protocol: str = "l2tp")
 
 
 def account_rows(subs) -> list[dict]:
+    """Stable, collision-free node logins without rewriting legacy usernames.
+
+    Imported subscriptions can share the same account_username despite being
+    distinct active subscriptions. A daemon cannot bind two independent
+    passwords to that name. Keep the first original login, and give further
+    collisions a deterministic subscription-scoped login. Both Cisco and L2TP
+    store the resulting username in the *new node's* delivery item; the
+    subscription's username and all existing nodes remain untouched.
+    """
     rows = []
     usernames = set()
+    seen_ids = set()
+    reserved = {str(sub.account_username or "") for sub in subs}
     for sub in subs:
+        sid = int(sub.id)
         name = str(sub.account_username or "")
         password = str(sub.account_password_encrypted or "")
+        if sid <= 0 or sid in seen_ids:
+            raise RuntimeError("DUPLICATE_CENTRAL_SUBSCRIPTION_ID")
         if not USERNAME.fullmatch(name) or not password or any(
             char in password for char in ("\n", "\r", "\x00")
         ):
             raise RuntimeError("ELIGIBLE_ACCOUNT_WITH_INVALID_IDENTITY")
+        seen_ids.add(sid)
         if name in usernames:
-            raise RuntimeError("DUPLICATE_CENTRAL_ACCOUNT_USERNAME")
+            import hashlib
+            candidate = f"tp-sub-{sid}"
+            if candidate in reserved or candidate in usernames:
+                digest = hashlib.sha256(f"{sid}:{name}".encode()).hexdigest()[:12]
+                candidate = f"tp-sub-{sid}-{digest}"
+            if candidate in reserved or candidate in usernames:
+                raise RuntimeError("CENTRAL_ACCOUNT_IDENTITY_COLLISION")
+            name = candidate
         usernames.add(name)
-        rows.append({"id": int(sub.id), "username": name, "password": password})
+        rows.append({"id": sid, "username": name, "password": password})
     return rows
-
 
 def remote_merge_source(path: str = "/etc/ppp/chap-secrets") -> str:
     """Remote Python has no secrets in argv: account JSON arrives on stdin.
