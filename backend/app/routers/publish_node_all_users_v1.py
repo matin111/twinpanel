@@ -149,7 +149,8 @@ async def _install_node_in_background(payload: BackgroundNodeInstallIn, request_
         # unbounded subscription-by-subscription SSH loop.
         install_payload = InstallIn(
             **payload.model_dump(exclude={"publish_to_all_users"}),
-            defer_subscription_sync=True,
+            # Iran relays retain the existing subscription/tunnel lifecycle.
+            defer_subscription_sync=payload.node_type == NodeType.EXIT,
         )
         result = await install_node(install_payload, request, db)
         node_id = int(result.get("node_id") or 0)
