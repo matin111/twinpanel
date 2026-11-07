@@ -22,7 +22,12 @@ assert '["XRAY", "api", "adu"' not in script  # true command uses variable
 assert '[XRAY, "api", "adu", API, str(path)]' in script
 assert "os.replace(stage, CONF)" in script
 assert "rollback incomplete" in script
-assert "CONFIG" not in runner or "CONFIG" in module  # no config overwrite from controller
+assert "os.replace(stage, CONF)" in script  # remote is the sole atomic config writer
+assert "centrally_published" in runner
+assert "db.commit()" in runner
+assert "sub.traffic_used_bytes >= sub.traffic_limit_bytes" in runner
+assert "current.append(item)" in runner
+assert "ad._xray(db, node, sub, user, ident," in runner
 assert "if not apply or not chosen:" in runner
 assert "new_account_work_has_priority()" in runner
 assert "if current is not None:" in runner
