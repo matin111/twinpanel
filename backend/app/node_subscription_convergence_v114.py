@@ -40,6 +40,7 @@ _INITIAL_DELAY_SECONDS = 20
 
 _applied = False
 _task: asyncio.Task | None = None
+_central_task: asyncio.Task | None = None
 _last_topology_signature: str | None = None
 
 
@@ -696,26 +697,33 @@ async def _convergence_loop() -> None:
 
 
 async def _startup() -> None:
-    global _task
-    if _task is not None and not _task.done():
-        return
-    _task = asyncio.create_task(
-        _convergence_loop(),
-        name="node-subscription-convergence-v299",
-    )
+    global _task, _central_task
+    if _task is None or _task.done():
+        _task = asyncio.create_task(
+            _convergence_loop(),
+            name="node-subscription-convergence-v299",
+        )
+    # A separate bounded daemon-level reconciler for all published central
+    # Exits. The old loop above filters them out entirely.
+    if _central_task is None or _central_task.done():
+        from .services.central_runtime_visible_convergence_v1 import loop
+        _central_task = asyncio.create_task(
+            loop(), name="central-runtime-visible-convergence-v1",
+        )
 
 
 async def _shutdown() -> None:
-    global _task
-    task = _task
+    global _task, _central_task
+    tasks=[t for t in (_task,_central_task) if t is not None]
     _task = None
-    if task is None:
-        return
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+    _central_task = None
+    for task in tasks:
+        task.cancel()
+    for task in tasks:
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 def apply_node_subscription_convergence_v114() -> None:
