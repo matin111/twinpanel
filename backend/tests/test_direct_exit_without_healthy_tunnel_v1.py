@@ -1,8 +1,14 @@
 """Regression: healthy Exit clients are delivered with or without Iran tunneling."""
 from __future__ import annotations
 
+import os
 import unittest
 from unittest.mock import patch
+
+# CI uses an in-memory database. No customer data or network access.
+os.environ.setdefault("APP_SECRET_KEY", "ci-only-direct-fallback-key")
+os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
+os.environ.setdefault("NODE_AGENT_SHARED_SECRET", "ci-only-direct-fallback-secret")
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
