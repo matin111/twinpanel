@@ -96,9 +96,25 @@ def test_same_node_rows_countries_and_real_action_footer_for_every_protocol():
 def test_manual_credentials_rehydration_preserves_actual_copy_controls():
     ui = code("public_connection_unified_surface_dates_v80.py")
     assert "const shared=panel.querySelector(':scope > .v35-manual-credentials')" in ui
-    assert "disclosure.append(shared)" in ui
+    assert "credentials.append(shared)" in ui
     assert "panel.querySelector(':scope > .tp80-credentials')" in ui
+    assert "credentials=el('section','tp80-credentials')" in ui
+    assert "disclosure=el('details','tp80-credentials')" not in ui
     assert "panel.dataset.tp80NativeReady='1'" in ui
+
+def test_one_country_nav_uses_iso_code_and_hides_only_matching_server_rows():
+    ui=code("public_connection_unified_surface_dates_v80.py")
+    assert "const groups=new Map()" in ui
+    assert "tab.dataset.countryCode" in ui
+    assert "rows[index].dataset.tp80CountryCode=country" in ui
+    assert "row.dataset.tp80CountryHidden=visible?'0':'1'" in ui
+    assert 'tp77-native-row[data-tp80-country-hidden="1"]' in ui
+    assert "const filterByCountry=country=>" in ui
+    assert "rows.forEach(row=>" in ui
+    assert "groups.get(country).indices.push(index)" in ui
+    assert "filterByCountry('ALL')" in ui
+    assert "original.style.setProperty('display','none','important')" in ui
+
 
 def test_v40_cannot_hide_real_v39_mobile_protocol_choice():
     authority=code("public_connection_mobile_authority_v40.py")
