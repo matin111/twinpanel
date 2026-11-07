@@ -1,5 +1,14 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.658 — 2026-11-07
+
+### HTTP request database pool stability
+- Increase the independent HTTP request DB connection pool from 10+6 overflow to 16+16 overflow, with a 10-second acquisition timeout, to better handle simultaneous node polling and Connection/admin requests.
+- Preserve the separate background engine and existing database credentials, schema, and VPN runtime.
+- The combined configured engine capacities remain below the standard PostgreSQL max_connections of 100, assuming no additional external clients consume the remaining connections.
+- After live hotfix, API and web health returned HTTP 200; recurring long-lived idle transactions are still under investigation.
+- Includes all rc.657 unified footer action fixes for every supported protocol.
+
 ## 1.1.0-rc.657 — 2026-11-07
 
 ### Connection footer repaired for all protocols
