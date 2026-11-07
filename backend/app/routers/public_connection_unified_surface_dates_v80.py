@@ -1302,7 +1302,18 @@ _SCRIPT = r"""
              await window.tpNativeShareFile(url,filename,mime);
            }
          });
-         tools.append(shareFile);
+         // Web Share files is a mobile feature. Desktop Windows Chrome
+         // cannot present an OpenVPN/WireGuard file receiver chooser.
+         // Keep the working attachment download; show actionable file guidance.
+         const device=String(navigator.userAgent||'').toLowerCase();
+         const isMobileDevice=/android|iphone|ipad|ipod/.test(device);
+         if(isMobileDevice){
+           tools.append(shareFile);
+         }else{
+           const hint=el('span','tp80-file-hint',
+             'فایل را دانلود کنید؛ سپس در OpenVPN Connect یا WireGuard از Import File استفاده کنید.');
+           tools.append(hint);
+         }
          const target=download.dataset.target;
          const source=target?document.getElementById(target):null;
          if(source&&source.value.trim()){
