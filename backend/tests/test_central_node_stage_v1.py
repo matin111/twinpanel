@@ -77,7 +77,7 @@ class CentralNodeStageTests(unittest.TestCase):
         db.get.return_value = fake
         with (patch.object(stage, "SessionLocal") as session,
               patch.object(stage, "load_desired_state", return_value=desired_state(1183)),
-              patch.object(stage, "verify_new_exit_readiness", return_value={"ok": False}),
+              patch.object(stage, "verify_new_exit_readiness", new_callable=AsyncMock, return_value={"ok": False}),
               patch.object(stage, "establish_hidden_memberships") as insert):
             session.return_value.__enter__.return_value = db
             with self.assertRaisesRegex(RuntimeError, "PROTOCOLS_NOT_READY"):
@@ -104,7 +104,7 @@ class CentralNodeStageTests(unittest.TestCase):
         db.get.return_value = fake
         with (patch.object(stage, "SessionLocal") as session,
               patch.object(stage, "load_desired_state", return_value=desired_state(3)),
-              patch.object(stage, "verify_new_exit_readiness", return_value={"ok": True}),
+              patch.object(stage, "verify_new_exit_readiness", new_callable=AsyncMock, return_value={"ok": True}),
               patch.object(stage, "establish_hidden_memberships", return_value=3),
               patch.object(stage, "verify_coverage", return_value={"ok": True}),
               patch.object(stage, "reconcile_runtime_families", new_callable=AsyncMock) as invoke):
