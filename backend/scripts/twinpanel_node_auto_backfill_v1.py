@@ -104,9 +104,15 @@ def _unified_all_active_enabled(node_id: int | None = None) -> bool:
         return True
     if node_id is None:
         return False
-    with SessionLocal() as db:
-        scope = db.get(NodeBackfillScopeV1, int(node_id))
-        return bool(scope and scope.include_all_active)
+    try:
+        with SessionLocal() as db:
+            scope = db.get(NodeBackfillScopeV1, int(node_id))
+            return bool(scope and scope.include_all_active)
+    except Exception:
+        # During a mixed-version rolling update or a CI SQLite fixture without
+        # the additive table, keep the previous imported-only behavior.
+        # Never widen account selection on a DB/rollout error.
+        return False
 
 
 def _central_xray_bulk_enabled(node_id: int, protocol: str) -> bool:
