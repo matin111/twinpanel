@@ -81,6 +81,21 @@ with open(LOCK,"a+") as lock:
         capture_output=True,text=True,check=False,timeout=8)
     if live_addr.returncode or "10.96.0.1/21" not in live_addr.stdout:
         raise SystemExit("WG_ADDRESS_POOL_NOT_LIVE")
+    default=subprocess.run(["ip","-4","route","show","default"],
+        capture_output=True,text=True,check=False,timeout=8)
+    interface_match=re.search(r"\bdev\s+(\S+)",default.stdout)
+    if default.returncode or not interface_match:
+        raise SystemExit("WG_PUBLIC_EGRESS_ROUTE_NOT_READY")
+    public_dev=interface_match.group(1)
+    for network in ("10.93.0.0/24","10.96.0.0/21"):
+        nat=subprocess.run(
+            ["iptables","-t","nat","-C","POSTROUTING","-s",network,
+             "-o",public_dev,"-j","MASQUERADE"],
+            stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
+            timeout=8,check=False,
+        )
+        if nat.returncode:
+            raise SystemExit("WG_PUBLIC_EGRESS_NAT_NOT_READY")
     existing=subprocess.run(["wg","show",IFACE,"peers"],
         capture_output=True,text=True,check=False,timeout=8)
     if existing.returncode:
@@ -158,6 +173,8 @@ with open(LOCK,"a+") as lock:
     os.chmod(backup,0o600)
     fd,temp=tempfile.mkstemp(prefix=".central-wg-",dir=str(CONF.parent))
     stripped=None
+    previous_strip=None
+    sync_attempted=False
     try:
         os.fchmod(fd,0o600)
         with os.fdopen(fd,"w",encoding="utf-8") as out:
@@ -166,7 +183,9 @@ with open(LOCK,"a+") as lock:
             os.fsync(out.fileno())
         result=subprocess.run(["wg-quick","strip",temp],capture_output=True,
             text=True,timeout=20,check=False)
-        if result.returncode:
+        previous=subprocess.run(["wg-quick","strip",str(backup)],
+            capture_output=True,text=True,timeout=20,check=False)
+        if result.returncode or previous.returncode:
             raise SystemExit("WG_STAGED_CONFIG_INVALID")
         with tempfile.NamedTemporaryFile(
             mode="w",encoding="utf-8",dir=str(CONF.parent),
@@ -175,25 +194,36 @@ with open(LOCK,"a+") as lock:
             stripped=handle.name
             os.chmod(stripped,0o600)
             handle.write(result.stdout)
+        with tempfile.NamedTemporaryFile(
+            mode="w",encoding="utf-8",dir=str(CONF.parent),
+            prefix=".central-wg-previous-",delete=False,
+        ) as handle:
+            previous_strip=handle.name
+            os.chmod(previous_strip,0o600)
+            handle.write(previous.stdout)
+        sync_attempted=True
         synced=subprocess.run(["wg","syncconf",IFACE,stripped],
             stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
             timeout=40,check=False)
         if synced.returncode:
-            raise SystemExit("WG_LIVE_SYNC_FAILED")
+            raise RuntimeError("WG_LIVE_SYNC_FAILED")
         checked=subprocess.run(["wg","show",IFACE,"peers"],capture_output=True,
             text=True,timeout=15,check=False)
         if checked.returncode or not set(peers.values()).issubset(
             {x.strip() for x in checked.stdout.splitlines()}
         ):
-            # Live state was modified: restore from saved config.
-            subprocess.run(["wg","syncconf",IFACE,
-                subprocess.check_output(["wg-quick","strip",str(backup)],
-                                        text=True,timeout=15)],
-                stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
-            raise SystemExit("WG_LIVE_PEER_VERIFICATION_FAILED")
+            raise RuntimeError("WG_LIVE_PEER_VERIFICATION_FAILED")
         os.replace(temp,CONF)
+    except BaseException:
+        if sync_attempted and previous_strip:
+            restored=subprocess.run(["wg","syncconf",IFACE,previous_strip],
+                stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
+                timeout=40,check=False)
+            if restored.returncode:
+                raise SystemExit("WG_LIVE_SYNC_ROLLBACK_FAILED")
+        raise
     finally:
-        for path in (temp,stripped):
+        for path in (temp,stripped,previous_strip):
             if path and os.path.exists(path):
                 os.unlink(path)
 print(json.dumps({"ok":True,"applied":len(peers),
