@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.database import Base
-from app.models import Node, NodeProtocolConfig, NodeStatus, NodeType, SubscriptionNode
+from app.models import Node, NodeProtocolConfig, NodeStatus, NodeType, Plan, Subscription, SubscriptionNode, SubscriptionStatus, User
 from app.node_install_progress_models_v1 import NodeInstallProgressV1
 from app.quota_models import QuotaUsageEvent
 from app.routers.node_overview_v1 import configured_ports, node_overview, reported_status
@@ -49,7 +49,7 @@ def test_missing_heartbeat_does_not_affect_total_user_count():
 def test_overview_aggregates_assigned_accounts_not_online_sessions():
     engine = _memory_engine()
     Base.metadata.create_all(engine, tables=[
-        Node.__table__, SubscriptionNode.__table__,
+        Node.__table__, Plan.__table__, User.__table__, Subscription.__table__, SubscriptionNode.__table__,
         NodeProtocolConfig.__table__, QuotaUsageEvent.__table__,
     ])
     try:
@@ -62,8 +62,15 @@ def test_overview_aggregates_assigned_accounts_not_online_sessions():
             )
             db.add(node)
             db.add_all([
+                Plan(id=1, name="Metrics Test Plan", duration_days=30, traffic_gb=20, price_toman=1000),
+                User(id=1, email="metrics1@example.invalid", password_hash="dummy"),
+                User(id=2, email="metrics2@example.invalid", password_hash="dummy"),
+                Subscription(id=11, user_id=1, plan_id=1, status=SubscriptionStatus.ACTIVE),
+                Subscription(id=12, user_id=2, plan_id=1, status=SubscriptionStatus.ACTIVE),
+                Subscription(id=13, user_id=1, plan_id=1, status=SubscriptionStatus.ACTIVE),
                 SubscriptionNode(id=501, node_id=101, subscription_id=11),
                 SubscriptionNode(id=502, node_id=101, subscription_id=12),
+                SubscriptionNode(id=503, node_id=101, subscription_id=13),
                 NodeProtocolConfig(id=601, node_id=101, protocol="l2tp",
                                    status="online", port_text="500/4500/1701"),
                 NodeProtocolConfig(id=602, node_id=101, protocol="openvpn",
@@ -92,10 +99,11 @@ def test_overview_aggregates_assigned_accounts_not_online_sessions():
             db.commit()
             with patch("app.routers.node_overview_v1.admin_can_use_mother", return_value=True):
                 data = node_overview(db=db)
-            assert data["users_definition"] == "all_assigned_subscriptions_not_online_sessions"
+            assert data["users_definition"] == "distinct_user_owners_assigned_to_node_not_online_sessions"
             assert len(data["items"]) == 1
             row = data["items"][0]
             assert row["users_total"] == 2
+            assert row["accounts_total"] == 3
             assert row["traffic_bytes"] == 90
             assert row["ports_total"] == 4
             assert row["protocols_online"] == 2
@@ -122,7 +130,7 @@ def test_progress_is_durable_and_never_claims_backfill_finished():
         with Maker() as db:
             row = db.get(NodeInstallProgressV1, job_id)
             value = progress.public_install_progress(row)
-            assert value["state"] == "completed"
+            assert value["state"] == "running"
             assert value["stage"] == "users_queued"
             assert value["backfill_pending"] is True
             assert value["users_assigned"] == 1700

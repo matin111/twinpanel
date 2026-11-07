@@ -1,4 +1,4 @@
-"""Unified migrated/native account selection is optional and missing-only."""
+"""Unified migrated/native account selection defaults on in the supervised queue; the manual CLI stays guarded."""
 from __future__ import annotations
 
 import asyncio
@@ -95,7 +95,7 @@ def test_singbox_one_missing_only_scope_for_migrated_and_created():
         engine.dispose()
 
 
-def test_rollout_requires_explicit_optin_and_existing_confirmed_node():
+def test_auto_worker_defaults_to_both_sources_with_explicit_emergency_optout():
     assert parse_args(["--node-id","77","--protocol","openvpn"]).include_all_active is False
     options = parse_args([
         "--node-id","77","--protocol","openvpn","--include-all-active",
@@ -103,9 +103,9 @@ def test_rollout_requires_explicit_optin_and_existing_confirmed_node():
     ])
     assert options.include_all_active and options.apply
     with patch.dict(os.environ, {}, clear=True):
-        assert not _unified_all_active_enabled()
-    with patch.dict(os.environ, {"TWINPANEL_UNIFIED_NODE_BACKFILL_V1": "1"}):
         assert _unified_all_active_enabled()
+    with patch.dict(os.environ, {"TWINPANEL_UNIFIED_NODE_BACKFILL_V1": "0"}):
+        assert not _unified_all_active_enabled()
 
 
 def test_unified_supervisor_explicitly_passes_one_scope_not_new_worker():
@@ -118,7 +118,7 @@ def test_unified_supervisor_explicitly_passes_one_scope_not_new_worker():
             assert "--include-all-active" in args
             assert "--confirm-node-id" in args
             assert args[args.index("--confirm-node-id")+1] == "77"
-    with patch.dict(os.environ, {}, clear=True):
+    with patch.dict(os.environ, {"TWINPANEL_UNIFIED_NODE_BACKFILL_V1":"0"}, clear=True):
         with patch("scripts.twinpanel_node_auto_backfill_v1.subprocess.run", return_value=completed) as run:
             assert execute_one(77,"openvpn") == (1,None)
             assert "--include-all-active" not in run.call_args.args[0]

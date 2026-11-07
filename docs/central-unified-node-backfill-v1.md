@@ -12,19 +12,28 @@ The existing set-based publisher already creates node memberships for both
 classes atomically. This patch adds one shared account selection for the
 background **sing-box (7 protocols) + five Classic** families.
 
-## Safety / default behavior
+## Unified supervisor default and rollback
 
-**Disabled by default.** The existing background timer only includes both
-classes when this server-local flag is explicitly set:
+The **supervised** `twinpanel-node-auto-backfill` worker now uses the same
+active subscription pool for *migrated* and *native* accounts by default.
+Eligibility is determined by Subscription + SubscriptionNode +
+SubscriptionProtocol, expiration and remaining traffic, not migration origin.
+Never change purchased protocol or plan entitlements.
+
+The install/publish API inserts all eligible account memberships atomically
+and schedules the seven durable backfill families (five Classic, sing-box and
+the bounded four-protocol standalone family) in the same transaction.
+
+Emergency opt-out for the automatic worker only:
 
 ```sh
-TWINPANEL_UNIFIED_NODE_BACKFILL_V1=1
+TWINPANEL_UNIFIED_NODE_BACKFILL_V1=0
 ```
 
-This changes only the missing-node selection of the existing durable
-one-family-at-a-time backfill queue, not its SSH update strategy or online
-customer account creation. Rolling back: unset the flag and restart only the
-backfill timer environment.
+The operator must explicitly choose to deploy/activate the new release.
+Existing working user configs are **missing-only**, retaining other nodes'
+identity, UUID, secret, inbound, tunnel and SNI. No bulk restart is added to
+the Xray path.
 
 Manual migration script stays imported-only by default. Targeted canary
 through the existing CLI can explicitly use:
@@ -45,16 +54,25 @@ pairs that already have a config for that node, reuse existing secrets,
 preserve other nodes' items, and do not rewrite UUIDs. Paid new-account
 orders retain safety priority.
 
-## Not yet complete: 16-protocol native bulk
+## Important: 16-protocol queue coverage is not a three-minute bulk guarantee
 
-The queue currently has 6 families covering 5 Classic plus 7 sing-box
-protocols. **Mieru, TrustTunnel, AmneziaWG, Sudoku** use separate standalone
-drivers and are not part of this worker yet. Some classic and standalone
-drivers still provision per user and may restart services per user. Therefore
-this patch **does not** meet the target of adding ~1,700 accounts across all
-16 protocols in ~3 minutes, and must not be presented as full rollout.
+The unified queue now selects all sixteen protocols via seven families.
+The standalone family (Mieru, TrustTunnel, AmneziaWG and Sudoku) is limited
+to **three missing node/protocol pairs per cycle**, with the same
+subscription-level advisory lock as live account creation, per-node SSH
+scoping, missing-only merges, and no new identity rotation.
 
-Before production activation: integrate the standalone adapters into a
-bounded, replay-safe batch executor, establish lock coordination with the
-new-account fast provisioner, verify exact per-node applied identities,
-and run a real new-Exit canary including an imported and native account.
+**Still not production-complete:** Some standalone and Classic drivers
+restart a service per account or create one Sudoku service/port per user.
+The queue's seven families are not proof of a three-minute bulk install.
+A real new-Exit integration canary, rate/CPU tests, quota-agent accounting,
+capacity/port scalability and all-node applied-credential verification are
+still mandatory. Do not merge/deploy this draft as "instant for all".
+The current detached installer can also be interrupted by an API restart.
+The durable job tracks stage status but does not yet resume installation.
+
+The admin node overview explicitly reports DISTINCT assigned user owners and
+all assigned subscriptions separately; it never uses the legacy agent's
+`current_users=0` or claims that an assigned user is online. Usage is
+cumulative accepted bytes from the quota ledger. Ports are distinct
+configured ONLINE protocol ports, not a full OS socket scan.

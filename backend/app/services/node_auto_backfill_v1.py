@@ -10,9 +10,9 @@ from sqlalchemy.orm import Session
 from ..models import Node, NodeStatus, NodeType
 from ..node_backfill_job_models_v1 import NodeBackfillJobV1
 
-# Imported-account missing-only workers. V2Ray uses existing hot-client sync;
+# One missing-only queue for imported AND native active subscribers. V2Ray uses existing hot-client sync;
 # never changes inbound definitions, REALITY, SNI, or restarts Xray.
-FAMILIES = ("singbox", "openvpn", "cisco", "wireguard", "l2tp", "v2ray")
+FAMILIES = ("singbox", "standalone", "openvpn", "cisco", "wireguard", "l2tp", "v2ray")
 LEASE_MINUTES = 12
 MAX_ATTEMPTS = 8
 

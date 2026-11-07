@@ -21,4 +21,24 @@ def install_job_status(job_id: str, db: Session = Depends(get_db)) -> dict:
     job = db.get(NodeInstallProgressV1, str(job_id))
     if job is None:
         raise HTTPException(status_code=404, detail="install job not found")
-    return public_install_progress(job)
+    result = public_install_progress(job)
+    if job.stage == "users_queued" and job.node_id is not None:
+        from ..services.node_auto_backfill_v1 import job_status
+        try:
+            backfill = job_status(db, int(job.node_id))
+        except ValueError:
+            return result
+        families = backfill.get("families") or []
+        states = {str(row["state"]) for row in families}
+        result["backfill_families"] = len(families)
+        result["completed_pairs"] = int(backfill.get("completed_pairs") or 0)
+        # An empty queue or an installer-created membership is not proof
+        # the remote credentials exist. Only all-seven done is complete.
+        if families and states == {"done"}:
+            result.update(state="completed", stage="completed", backfill_pending=False)
+        elif "failed" in states or "cancelled" in states:
+            result.update(state="failed", error_code="BACKFILL_REQUIRES_ATTENTION",
+                          backfill_pending=True)
+        elif families and bool(backfill.get("queued")):
+            result.update(state="running", backfill_pending=True)
+    return result

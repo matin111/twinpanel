@@ -396,11 +396,22 @@ async def install(
 
         failed: list[str] = []
         warning_map: dict[str, list[str]] = {}
+        remaps = (result.get("core") or {}).get("port_remaps") or {}
         for key in protocols:
-            health = result["protocols"][key]
+            health = dict(result["protocols"][key])
+            preset, effective, warnings, requested_port = resolved_by_key[key]
+            # Multi-protocol preflight may remap a conflicting port on-node.
+            # Persist only the real listener port, never the requested one.
+            remap = remaps.get(key) or {}
+            applied_port = int(remap.get("to") or health.get("port") or requested_port)
+            if not 1 <= applied_port <= 65535:
+                raise RuntimeError("invalid runtime protocol port")
+            if health.get("port") is not None and int(health["port"]) != applied_port:
+                health["ok"] = False
+                health["error"] = "runtime_reported_port_mismatch"
+            health["port"] = applied_port
             _save_status(db, node, key, health)
-            preset, effective, warnings, port = resolved_by_key[key]
-            _save_setting(db, node.id, key, preset, effective, port)
+            _save_setting(db, node.id, key, preset, effective, applied_port)
             warning_map[key] = warnings
             if not health.get("ok"):
                 failed.append(key)
