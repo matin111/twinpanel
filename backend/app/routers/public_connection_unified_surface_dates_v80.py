@@ -1467,6 +1467,53 @@ html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp80-extra-actions 
  }
 }
 
+
+/* TWINPANEL_CONNECTION_EMPTY_STRIP_AND_LIGHT_CONTRAST_V99 */
+html body.tp80-connection .protocol-panel > .v52-multi-card:has(.v51-multi-actions:empty),
+html body.tp80-connection .protocol-panel > .v51-multi-card:has(.v51-multi-actions:empty),
+html body.tp80-connection .protocol-panel > .v52-multi-card:empty,
+html body.tp80-connection .protocol-panel > .v51-multi-card:empty,
+html body.tp80-connection .protocol-panel > .ref67-footer:empty{
+ display:none!important;min-height:0!important;height:0!important;
+ margin:0!important;padding:0!important;border:0!important;
+ background:transparent!important;
+}
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .panel-head h3,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .panel-head h2,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .panel-head strong,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .ref67-row-name b,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .ref67-row-name strong,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .tp77-native-label,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .v54-v2ray-server-name,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .v54-v2ray-server-head,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .v54-v2ray-profile,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .ref67-row-name{
+ color:var(--text,#182438)!important;text-shadow:none!important;
+}
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .ref67-row-name small,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .panel-head .service,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .panel-head small,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .v54-v2ray-server-head small{
+ color:var(--muted,#617087)!important;text-shadow:none!important;
+}
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .tp80-modern-detail,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .tp80-credentials,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .tp80-credentials b,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .fact b,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .fact strong{
+ color:var(--text,#182438)!important;
+}
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .tp78-action-footer > .tp78-footer-action:not([data-kind="add"]):not([data-kind="download"]),
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .tp80-extra-actions .tp78-footer-action{
+ background:var(--surface2,#f5f8fd)!important;
+ border-color:var(--line,#dbe4f1)!important;
+ color:var(--text,#182438)!important;
+}
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .ref67-row-actions button:not(.ref67-primary),
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .tp80-file-copy{
+ background:var(--surface2,#f5f8fd)!important;color:var(--text,#182438)!important;
+ border-color:var(--line,#dbe4f1)!important;
+}
 """
 
 
@@ -2152,6 +2199,15 @@ _SCRIPT = r"""
    }
    // Include secondary actions too: earlier reconciliation may have parked
    // copy-all or import-all inside the expandable extras container.
+   // Remove only inert legacy containers left empty after their buttons
+   // were MOVED to the canonical footer. Never delete a live action.
+   panel.querySelectorAll(':scope > .v51-multi-card,:scope > .v52-multi-card').forEach(card=>{
+     const actions=card.querySelector('.v51-multi-actions');
+     if(actions&&actions.querySelector('a,button,input,textarea'))return;
+     if(card.querySelector('a,button,input,textarea,select'))return;
+     if(card.textContent.trim())return;
+     card.remove();
+   });
    const nodes=[...footer.querySelectorAll(':scope > .tp78-footer-action,:scope > .tp80-extra-actions .tp78-footer-action')];
    const find=kind=>nodes.find(node=>node.dataset.kind===kind);
    let primary=find('add')||find('download');
