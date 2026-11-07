@@ -82,7 +82,7 @@ _SCRIPT = r"""
    // Only replace the identity text, never the server row or existing buttons/listeners.
    if(keepOther){const old=container.querySelector('.tp76-label');if(old)old.remove();
      container.prepend(makeLabel(node));
-   }else container.replaceChildren(makeLabel(node));
+   }else {\n     const latency=container.querySelector(':scope > .ref71-rtt');\n     if(latency)latency.remove();\n     container.replaceChildren(makeLabel(node));\n     if(latency)container.append(latency);\n   }
    container.dataset.tp76Identity=signature;
  }
  function applyPanel(panel){
