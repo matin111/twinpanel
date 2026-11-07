@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.630",
-  "source_sha": "0263c4ba98d189c99141b5fec302b2e656f32422",
+  "version": "1.1.0-rc.631",
+  "source_sha": "3f4f03e87cc6c6f34cd9ec07f35038cfd83be7f5",
   "notes": {
-    "fa": "کاهش سربار ساخت V2Ray در مدیریت مرکزی با استفاده مجدد از SSH هر دسته و ثبت صحیح پیشرفت جزئی هنگام خطا؛ حفظ UUID، سرویس‌های فعال و کنترل سلامت، بدون ری‌استارت Xray.",
-    "en": "Centralized V2Ray batch SSH session reuse and safe backfill partial-progress accounting/diagnostics. Preserve existing UUIDs and hot-user APIs without Xray restarts."
+    "fa": "اصلاح ریشه‌ای انتخاب هسته TP27: اولویت GRE مستقیم پیش از FOU در ترمیم خودکار؛ حفظ مسیر پشتیبان و تشخیص سرعت TCP واقعی، اعتبارسنجی تازگی نمونه‌ها و حذف امتیاز سرعت قدیمی پس از تغییر مسیر. بدون بازسازی خودکار تونل‌های فعال.",
+    "en": "TP27 carrier recovery now qualifies native GRE before FoU fallbacks, retains quarantine and failover, exposes fresh TCP-capacity diagnostics, and invalidates old throughput when switching carriers. No active tunnel rebuild on update."
   }
 }
