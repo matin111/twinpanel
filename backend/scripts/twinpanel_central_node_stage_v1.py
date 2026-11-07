@@ -26,6 +26,7 @@ ADAPTERS = (
     "twinpanel_central_l2tp_node_bulk_v1.py",
     "twinpanel_central_cisco_node_bulk_v1.py",
     "twinpanel_central_singbox_node_bulk_v1.py",
+    "twinpanel_central_xray_node_bulk_v1.py",
 )
 MAX_USERS = 3000
 
@@ -55,6 +56,9 @@ def establish_hidden_memberships(db, node_id):
 def adapter_command(name, node_id, limit, apply):
     cmd = [sys.executable, str(BACKEND / "scripts" / name),
            "--node-id", str(node_id), "--limit", str(limit)]
+    if name == "twinpanel_central_xray_node_bulk_v1.py":
+        cmd[cmd.index("--limit") + 1] = "100"
+        cmd.append("--all")
     if apply:
         cmd += ["--apply", "--confirm-node-id", str(node_id)]
     return cmd
