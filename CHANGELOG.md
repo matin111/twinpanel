@@ -1,5 +1,14 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.654 — 2026-11-07
+
+### V2Ray/Xray Connection repair
+- Add an explicit **Copy server configs** button to every V2Ray/Xray node; copies all distinct, actually available VLESS URIs for that node.
+- Remove conflicting fixed-height/overflow presentation restrictions from expandable Xray profile cards, preserving all returned profile rows and their per-profile copy/import buttons.
+- Keep Windows four-action footer and Android one-primary-plus-three layout, client download links and configured TwinPanel theme.
+- **Data diagnostic:** the tested account's V2Ray metadata currently provides 1, 1, 1 and 2 configurations for its four nodes; this frontend fix does not provision missing inbounds or pretend the nodes have three live configurations each. Provisioning requires separate runtime/back-end verification.
+- No intentional changes to VPN protocol configuration, credentials, tunnels or node runtime.
+
 ## 1.1.0-rc.653 — 2026-11-07
 
 ### Official package parity
