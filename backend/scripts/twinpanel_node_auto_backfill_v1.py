@@ -93,8 +93,13 @@ def sanitized_backfill_error(stdout: str, exit_code: int) -> str:
 
 
 def _unified_all_active_enabled() -> bool:
-    """Opt-in first: do not change live migrated-account handling on upgrade."""
-    return os.getenv("TWINPANEL_UNIFIED_NODE_BACKFILL_V1", "0") == "1"
+    """One eligible-account pool for migrated and native subscriptions.
+
+    An operator may temporarily set the environment variable to 0 for
+    emergency rollback, but a normal new-node queue must never silently
+    restrict itself to migration markers.
+    """
+    return os.getenv("TWINPANEL_UNIFIED_NODE_BACKFILL_V1", "1") == "1"
 
 
 def _central_xray_bulk_enabled(node_id: int, protocol: str) -> bool:
