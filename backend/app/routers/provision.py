@@ -6,6 +6,7 @@ from fastapi import Request
 import asyncio
 import base64
 import json
+import re
 import secrets
 import shlex
 import os
@@ -286,6 +287,49 @@ async def active(conn, *services: str) -> bool:
 async def preflight(conn, port: int, proto: str, label: str):
     if await listener(conn, port, proto):
         raise RuntimeError(f"پورت {port}/{proto.upper()} برای {label} از قبل در حال استفاده است")
+
+
+async def preflight_l2tp_ports(conn):
+    """Allow existing strongSwan and xl2tpd sockets, but never foreign owners.
+
+    A partial L2TP installation already binds UDP 500 and UDP 4500.
+    Blocking its own listener prevents an idempotent repair.
+    """
+    expected = {
+        500: {"charon", "charon-systemd"},
+        4500: {"charon", "charon-systemd"},
+        1701: {"xl2tpd"},
+    }
+    occupied = []
+    for port in (500, 4500, 1701):
+        if not await listener(conn, port, "udp"):
+            continue
+        bindings = await cmd(
+            conn, f"ss -H -u -l -p -n 'sport = :{port}'", check=False,
+        )
+        owners = re.findall(r'users:\(\("([^"]+)"', bindings)
+        if not owners or any(name not in expected[port] for name in owners):
+            raise RuntimeError(
+                f"پورت {port}/UDP توسط سرویس ناشناس اشغال شده؛ نصب L2TP متوقف شد"
+            )
+        services = (
+            ("strongswan-starter", "strongswan", "charon-systemd")
+            if port in (500, 4500) else ("xl2tpd",)
+        )
+        if not await active(conn, *services):
+            raise RuntimeError(
+                f"سرویس مالک پورت {port}/UDP فعال نیست؛ نصب L2TP متوقف شد"
+            )
+        occupied.append(port)
+
+    if occupied:
+        # Never replace the IPsec config while another client has an active SA.
+        # Fail closed when the installed IPsec service cannot report its count.
+        status = await cmd(conn, "ipsec status", check=False)
+        if "Security Associations (0 up, 0 connecting)" not in status:
+            raise RuntimeError(
+                "اتصالات IPsec فعال یا نامشخص هستند؛ تغییر L2TP بدون قطع کاربران مجاز نیست"
+            )
 
 
 async def ufw_allow(conn, port: int, proto: str):
@@ -937,6 +981,26 @@ async def install_l2tp(conn, psk: str):
     psk = str(psk or "").strip()
     if not psk:
         raise RuntimeError("Central L2TP PSK is empty")
+    # Keep the preexisting IPsec, L2TP and PPP files for recovery.
+    # Backups stay on the node in a root-only directory; no secret is logged.
+    await cmd(
+        conn,
+        (
+            "set -eu; "
+            "install -d -m 0700 /var/backups/twinpanel/l2tp; "
+            "D=$(mktemp -d /var/backups/twinpanel/l2tp/pre-install.XXXXXXXX); "
+            "chmod 700 \"$D\"; "
+            "for f in /etc/ipsec.conf /etc/ipsec.secrets "
+            "/etc/xl2tpd/xl2tpd.conf /etc/ppp/options.xl2tpd "
+            "/etc/ppp/chap-secrets; do "
+            "if test -f \"$f\"; then "
+            "mkdir -p \"$D$(dirname \"$f\")\"; "
+            "cp -a \"$f\" \"$D$f\"; "
+            "fi; "
+            "done"
+        ),
+    )
+
     configs = {
         "/etc/ipsec.conf": '''config setup
   uniqueids=no
@@ -1466,7 +1530,16 @@ async def existing_ok(conn, protocol: str, p: ProtocolSettings):
     if protocol == "cisco": return await active(conn,"ocserv") and await listener(conn,p.cisco_port,"tcp")
     if protocol == "openvpn": return await active(conn,"openvpn-server@twinpanel") and await listener(conn,p.openvpn_port,p.openvpn_transport)
     if protocol == "wireguard": return bool((await cmd(conn,"wg show wg-access0",check=False)).strip()) and await listener(conn,p.wireguard_port,"udp")
-    if protocol == "l2tp": return await active(conn,"xl2tpd") and await listener(conn,1701,"udp")
+    if protocol == "l2tp":
+        return (
+            await active(conn, "strongswan-starter", "strongswan", "charon-systemd")
+            and await active(conn, "xl2tpd")
+            and all([
+                await listener(conn, 500, "udp"),
+                await listener(conn, 4500, "udp"),
+                await listener(conn, 1701, "udp"),
+            ])
+        )
     if protocol == "v2ray": return await active(conn,"xray") and await listener(conn,p.xray_port,"tcp")
     return False
 
@@ -1589,13 +1662,7 @@ async def provision_protocols(conn, p: ProtocolSettings, db: Session, node: Node
 
                 ok,err=True,None
             else:
-                for x in (500,4500,1701):
-                    await preflight(
-                        conn,
-                        x,
-                        "udp",
-                        "L2TP/IPsec",
-                    )
+                await preflight_l2tp_ports(conn)
 
                 ok,err,psk=await install_l2tp(
                     conn,
