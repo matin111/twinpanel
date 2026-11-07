@@ -26,6 +26,7 @@ from sqlalchemy import or_
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
+from app.services.central_runtime_ownership_v1 import allow_central_node
 from app.database import SessionLocal
 from app.models import (
     Node,NodeProtocolConfig,NodeStatus,NodeType,ProtocolCredential,
@@ -150,7 +151,7 @@ def plan(db,node_id:int,limit:int):
     node=db.get(Node,node_id)
     if (node is None or node.retired_at is not None
         or node.node_type!=NodeType.EXIT or node.status!=NodeStatus.ONLINE
-        or node.show_to_users or not node.enable_v2ray):
+        or not allow_central_node(db,node) or not node.enable_v2ray):
         raise RuntimeError("REQUIRES_HIDDEN_ONLINE_READY_XRAY_EXIT")
     cfg=db.query(NodeProtocolConfig).filter_by(
         node_id=node_id,protocol="v2ray").first()
@@ -231,7 +232,7 @@ async def run_one(db,node_id:int,limit:int,apply:bool)->int:
     entitled={int(s.id) for s in subs}
     if not {sid for sid,_,_ in selected}.issubset(entitled):
         raise RuntimeError("XRAY_ENTITLEMENT_CHANGED_DURING_STAGE")
-    if db.get(Node,node_id).show_to_users:
+    if not allow_central_node(db,db.get(Node,node_id)):
         raise RuntimeError("XRAY_STAGED_NODE_PUBLISHED_EARLY")
     current_creds={
         int(c.subscription_id):c for c in db.query(ProtocolCredential).filter(
