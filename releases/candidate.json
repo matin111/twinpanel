@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.643",
-  "source_sha": "37b4ef74c4ca844aa4ae247bf1fa7fad50e2a8a3",
+  "version": "1.1.0-rc.644",
+  "source_sha": "acd65a6bf2a77f53529e4c0bafe795f8fae0cb42",
   "notes": {
-    "fa": "چیدمان Connection مطابق مرجع در موبایل و دسکتاپ: نمایش کانفیگ‌ها و سرورها پیش از دکمه‌های افزودن همه، کپی لینک، کپی/دانلود همه و دانلود برنامه مناسب دستگاه در پایین پنل؛ نمایش سه اینباند V2Ray و پرچم‌های یکپارچه. بدون تغییر کانفیگ‌ها، پروتکل‌ها، پورت‌ها و آدرس‌ها.",
-    "en": "Approved reference placement: display real per-node configs first, then native Add All, Copy Subscription Link, Copy All/Download All and detected-platform app download at the bottom, on desktop and mobile. Preserve all three genuine V2Ray inbounds per node, unified flags and native OpenVPN/WireGuard files. VPN configs, hosts, SNI, ports and credentials unchanged."
+    "fa": "یکسان‌سازی نمایش نام و پرچم نودها در تمام پروتکل‌های Connection در موبایل و ویندوز؛ حفظ شناسه نود، لینک‌ها و کانفیگ‌های اصلی و سه اینباند V2Ray. تغییرات فقط در رابط کاربری هستند.",
+    "en": "Unified country flags and actual node numbers across public Connection protocol panels on desktop and mobile; preserve server identity, original configs, import links and all 3 V2Ray profiles per node. Presentation-only change."
   }
 }
