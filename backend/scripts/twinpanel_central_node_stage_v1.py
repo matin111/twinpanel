@@ -26,6 +26,7 @@ from app.models import Node, NodeStatus, NodeType
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
 from app.protocol_account_registry import ALL_PROTOCOL_KEYS
 from app.singbox_subscription_accounts import SINGBOX_PROTOCOLS
+from app.services.central_sudoku_capacity_v1 import assert_capacity
 
 ADAPTERS = (
     "twinpanel_central_l2tp_node_bulk_v1.py",
@@ -107,7 +108,7 @@ def _run_locked(node_id, limit, apply):
         if not apply:
             db.rollback()
             return 0
-        readiness = asyncio.run(verify_new_exit_readiness(db, node_id))
+        # A Sudoku subscription means one dedicated systemd service and TCP\n        # port under the current runtime. Refuse unsafe cardinality or modulo\n        # port collisions before inserting ANY new-node memberships.\n        sudoku_capacity = assert_capacity(db)\n        print("CENTRAL_SUDOKU_CAPACITY_PRECHECK", json.dumps(sudoku_capacity), flush=True)\n        readiness = asyncio.run(verify_new_exit_readiness(db, node_id))
         if not readiness.get("ok"):
             raise RuntimeError("CENTRAL_NODE_STAGE_PROTOCOLS_NOT_READY")
         # Re-read after the potentially slow listener audit and serialize only
