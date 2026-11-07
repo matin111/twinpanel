@@ -110,5 +110,27 @@ class CentralNodeStageTests(unittest.TestCase):
             db.commit.assert_called_once()
 
 
+    def test_listener_probe_runs_without_row_lock(self):
+        fake = MagicMock()
+        fake.retired_at = None
+        fake.node_type = NodeType.EXIT
+        fake.status = NodeStatus.ONLINE
+        fake.show_to_users = False
+        db = MagicMock()
+        db.get.return_value = fake
+        calls_during_health = []
+        async def health(session, node_id):
+            calls_during_health.extend(session.get.call_args_list)
+            return {"ok": False}
+        with (patch.object(stage, "SessionLocal") as session,
+              patch.object(stage, "eligible_count", return_value=3),
+              patch.object(stage, "verify_new_exit_readiness", health)):
+            session.return_value.__enter__.return_value = db
+            with self.assertRaisesRegex(RuntimeError, "PROTOCOLS_NOT_READY"):
+                stage._run_locked(14, 3000, True)
+        self.assertEqual(len(calls_during_health), 1)
+        self.assertNotIn("with_for_update", calls_during_health[0].kwargs)
+
+
 if __name__ == "__main__":
     unittest.main()
