@@ -86,8 +86,8 @@ def build_node_local_client_item(db,node,sub,user,identity):
         "data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305\n"
         "auth SHA256\n"
         "<ca>\n"+identity["ca"]+"\n</ca>\n"
-        "<cert>\n"+identity["client_certificate"]+"\n</cert>\n"
-        "<key>\n"+identity["client_private_key"]+"\n</key>\n"
+        "<cert>\n"+identity["certificate"]+"\n</cert>\n"
+        "<key>\n"+identity["private_key"]+"\n</key>\n"
     )
     return {
         "node_id":node.id,"node":node.name,
