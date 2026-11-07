@@ -200,6 +200,22 @@ def _run_locked(node_id, limit, apply):
             raise RuntimeError("CENTRAL_RUNTIME_NODE_OWNERSHIP_CHANGED")
         mark_central_node(db,node_id)
         mark_central_applied(db,node_id,desired.fingerprint)
+        # A previously failed installer can be recovered after all 16 live
+        # services and the actual credential coverage have passed. Do not
+        # require manual SQL edits or keep a stale 12/16 failed badge.
+        from app.node_install_progress_models_v1 import NodeInstallProgressV1
+        progress=(db.query(NodeInstallProgressV1)
+                  .filter(NodeInstallProgressV1.node_id==int(node_id))
+                  .order_by(NodeInstallProgressV1.created_at.desc())
+                  .first())
+        if progress is not None and progress.stage in {
+                "failed","verified_ready","users_queued","enrolling_users"}:
+            progress.stage="completed"
+            progress.state="completed"
+            progress.installed_protocols=len(ALL_PROTOCOL_KEYS)
+            progress.expected_protocols=len(ALL_PROTOCOL_KEYS)
+            progress.users_assigned=desired.count
+            progress.error_code=None
         db.commit()
     print("CENTRAL_RUNTIME_OWNERSHIP_REGISTERED",json.dumps({
         "node_id":node_id,"engine":"central","published":bool(node.show_to_users),
