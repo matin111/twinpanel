@@ -21,6 +21,7 @@ import re
 import stat
 import subprocess
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 CLIENTS = __CLIENTS__
@@ -137,8 +138,14 @@ def sync():
             for tag, port, additions in changed:
                 attempted.extend((tag, c["email"]) for c in additions)
                 api_add(tag, port, additions)
-                for client in additions:
-                    verify(tag, client["email"], client["id"])
+                # Independent read-only HandlerService checks can overlap.
+                # Keep full per-user verification, rather than weakening
+                # the canary to a sample when a larger batch is selected.
+                with ThreadPoolExecutor(max_workers=min(8, len(additions))) as pool:
+                    list(pool.map(
+                        lambda client: verify(tag, client["email"], client["id"]),
+                        additions,
+                    ))
             if CONF.read_bytes() != original:
                 raise RuntimeError("concurrent config edit; refusing overwrite")
             os.replace(stage, CONF)
