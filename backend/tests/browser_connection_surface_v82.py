@@ -41,6 +41,11 @@ def mock_page():
     fake_payload={"account":{"username":"DEMO","password":"dummy"},
                   "subscription_link":"https://mock.panel/v1/connect/demo/sub","credentials":creds}
     class Query:
+        def filter(self,*args,**kwargs):return self
+        def filter_by(self,*args,**kwargs):return self
+        def order_by(self,*args,**kwargs):return self
+        def join(self,*args,**kwargs):return self
+        def limit(self,*args,**kwargs):return self
         def first(self):return None
         def all(self):return []
     class DB:
