@@ -67,7 +67,7 @@ def adapter_command(family: RuntimeFamily, node_id: int, limit: int,
 
 async def reconcile_runtime_families(
     node_id: int, limit: int, backend: Path,
-    *, families=FAMILIES, timeout_seconds=1200, max_concurrent_families=3,
+    *, families=FAMILIES, timeout_seconds=1200, max_concurrent_families=1,
 ):
     """One remote protocol-wide operation per daemon family; nothing per user.
 
@@ -77,8 +77,9 @@ async def reconcile_runtime_families(
     validate_runtime_families(families)
     if node_id <= 0 or limit <= 0 or max_concurrent_families < 1:
         raise ValueError("CENTRAL_RUNTIME_INVALID_TARGET")
-    # Limit contention on the controller and on shared remote SSH/database
-    # resources. This is concurrency across DAEMONS, never a per-user queue.
+    # One daemon family at a time avoids CPU/SSH/DB thrashing on small
+    # controllers. Each family still applies all users in ONE bulk operation;
+    # this is strictly NOT a per-subscriber worker or queue.
     throttle = asyncio.Semaphore(max_concurrent_families)
     async def run_family(family):
         command=adapter_command(family,node_id,limit,backend)
