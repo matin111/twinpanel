@@ -2560,20 +2560,18 @@ async def install_node(
             "reason": "not_run",
         }
 
-        try:
-            from .account_delivery import (
-                sync_installed_node_to_subscriptions,
-            )
-
-            subscription_sync = (
-                await sync_installed_node_to_subscriptions(
-                    db,
-                    node,
+        if payload.defer_subscription_sync:
+            subscription_sync["reason"] = "deferred_to_central_publisher"
+        else:
+            try:
+                from .account_delivery import (
+                    sync_installed_node_to_subscriptions,
                 )
-            )
-
-        except Exception as exc:
-            db.rollback()
+                subscription_sync = await sync_installed_node_to_subscriptions(
+                    db, node,
+                )
+            except Exception as exc:
+                db.rollback()
 
             subscription_sync = {
                 "ok": False,
