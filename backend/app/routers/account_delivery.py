@@ -1591,7 +1591,7 @@ def _delivery_active_tunnels(
 
     # Public feed requests may evaluate the same Exit repeatedly for many
     # protocols. Cache only within this HTTP Session; never across requests.
-    cache = db.info.get("_tp_public_delivery_tunnels")
+    cache = getattr(db, "info", {}).get("_tp_public_delivery_tunnels")
     cache_key = int(exit_node.id)
     if isinstance(cache, dict) and cache_key in cache:
         return list(cache[cache_key])
