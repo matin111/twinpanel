@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 from ..models import Node, NodeStatus, NodeType
-from .central_runtime_ownership_v1 import allow_central_node
+from .central_runtime_ownership_v1 import allow_central_node, is_central_node
 from ..node_install_progress_models_v1 import NodeInstallProgressV1
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,6 +33,11 @@ def ensure_launchable(db, node_id: int) -> None:
         or node.status != NodeStatus.ONLINE or not allow_central_node(db,node)
     ):
         raise CentralStageLaunchError("CENTRAL_STAGE_REQUIRES_HIDDEN_ONLINE_EXIT")
+    # A published Exit was registered only after the first complete
+    # 16-protocol central audit. Its later purchase-delta runs do not
+    # depend on mutable installer progress stage labels.
+    if node.show_to_users and is_central_node(db,node_id):
+        return
     job = (
         db.query(NodeInstallProgressV1)
         .filter(NodeInstallProgressV1.node_id == int(node_id))
