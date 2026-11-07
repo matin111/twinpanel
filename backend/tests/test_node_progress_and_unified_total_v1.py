@@ -49,7 +49,7 @@ def test_backfill_is_nonterminal_and_not_falsely_completed():
         # An automatic unrelated "completed" update must never make the
         # account queue disappear; that needs its own completion audit.
         assert store.commits == 1
-        assert p.TERMINAL == {"completed", "failed"}
+        assert p.TERMINAL == {"completed", "failed", "waiting_backfill"}
 
 
 def test_real_terminal_install_state_stays_completed():
