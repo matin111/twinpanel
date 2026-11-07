@@ -159,14 +159,15 @@ body.ref67 .protocol-panel[data-ref67-native-protocol] .server-tabs{
 }
 body.ref67 .protocol-panel[data-ref67-native-protocol] .server-views,
 body.ref67 .protocol-panel[data-ref67-native-protocol] details.v34-mobile-servers .server-views{
-  display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  display:block!important;grid-template-columns:none!important;
   padding:12px 16px!important;gap:10px!important;
 }
 body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view{
-  display:block!important;min-width:0!important;border:1px solid #344665!important;
+  display:none!important;min-width:0!important;border:1px solid #344665!important;
   border-radius:14px!important;background:#141d34!important;
   margin:0!important;padding:12px!important;
 }
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view.active{display:block!important}
 body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view .facts{
   display:grid!important;gap:9px!important;grid-template-columns:1fr!important;
 }
