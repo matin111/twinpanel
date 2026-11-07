@@ -285,6 +285,26 @@ class CentralNodeStageTests(unittest.TestCase):
                      stage.missing_runtime_families(14, 3000)]
         self.assertEqual(names, ["wireguard"])
 
+    def test_delta_selector_membership_only_does_not_restart_daemons(self):
+        fake = MagicMock()
+        fake.id = 14
+        fake.retired_at = None
+        fake.node_type = NodeType.EXIT
+        fake.status = NodeStatus.ONLINE
+        fake.show_to_users = False
+        db = MagicMock()
+        db.get.return_value = fake
+        audit = {"ok": False, "missing_by_protocol": {},
+                 "missing_node_memberships": 1,
+                 "subscriptions_without_entitlements": 0,
+                 "unknown_protocols": []}
+        with (patch.object(stage, "SessionLocal") as session,
+              patch.object(stage, "load_desired_state",
+                           return_value=desired_state(3)),
+              patch.object(stage, "verify_coverage", return_value=audit)):
+            session.return_value.__enter__.return_value = db
+            self.assertEqual(stage.missing_runtime_families(14, 3000), ())
+
     def test_delta_selector_fails_closed_on_unmapped_or_invalid_coverage(self):
         fake = MagicMock()
         fake.id = 14
