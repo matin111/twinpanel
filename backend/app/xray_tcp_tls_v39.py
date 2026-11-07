@@ -339,15 +339,21 @@ async def _xray_account_modern_v39(
     sub,
     user,
     client_id: str,
+    *,
+    reusable_connection=None,
 ):
     assert _original_xray_account_modern is not None
 
+    # V47 forwards a reused connection to avoid reconnecting during
+    # targeted recovery. Keep this adapter compatible with the underlying
+    # modern runtime instead of failing before provisioning missing TLS.
     item = await _original_xray_account_modern(
         db,
         node,
         sub,
         user,
         client_id,
+        reusable_connection=reusable_connection,
     )
 
     profiles = item.get("profiles")

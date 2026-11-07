@@ -492,7 +492,10 @@ def _customer_order_for_item(item: dict[str, Any]) -> tuple[str, ...]:
         xray_modern_runtime.PROFILE_XHTTP,
         PROFILE_TCP_TLS,
     )
-    if all(profile in ids for profile in tls_order):
+    # Display every *ready* TLS profile independently. Previously a missing
+    # TCP TLS profile hid an otherwise valid WebSocket TLS URI, causing one
+    # visible inbound even when two working profiles were stored.
+    if any(profile in ids for profile in (xray_modern_runtime.PROFILE_WS, PROFILE_TCP_TLS)):
         return tls_order
 
     return (
