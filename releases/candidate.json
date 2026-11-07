@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.639",
-  "source_sha": "9312891817298f2be1da89da9bd2c2d302957e7b",
+  "version": "1.1.0-rc.640",
+  "source_sha": "f08b7d1f135e5f0bceb258a540036bfebb42da73",
   "notes": {
-    "fa": "بازگردانی دانلود فایل OpenVPN و WireGuard، نمایش واقعی سرور و اطلاعات Cisco و L2TP، لینک دانلود برنامه مخصوص پروتکل با تشخیص دستگاه، پرچم واقعی کشورها در ویندوز و حذف دسته‌بندی تکراری؛ بدون تغییر کانفیگ‌ها و آدرس سرورها.",
-    "en": "Restore actual per-node OpenVPN/WireGuard file downloads and Cisco/L2TP server credentials, preserve per-protocol app download links for Windows/macOS/iOS/Android/Linux, fix Windows country flags and duplicate category strip; no VPN config, endpoint, port, SNI, UUID or subscription changes."
+    "fa": "نمایش تاخیر واقعی و تازه مسیر نودها در صفحه Connection و لوگوهای رسمی OpenVPN، WireGuard و Cisco با حالت جایگزین؛ حفظ دانلود فایل کانفیگ، اطلاعات سرورهای Cisco/L2TP، برنامه‌های دستگاه و تمام کانفیگ‌ها بدون تغییر.",
+    "en": "Show actual fresh reachable Iran-to-Exit tunnel RTT (not client ping) alongside node flags with stale/unavailable fallback; verified official OpenVPN, WireGuard and Cisco logos with glyph fallback. Preserve native OpenVPN/WireGuard files, Cisco/L2TP data, per-protocol OS apps and all existing VPN configs/addresses/ports/SNI/UUIDs."
   }
 }
