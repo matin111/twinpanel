@@ -87,7 +87,7 @@ def run(node_id, limit, apply):
 
 def _run_locked(node_id, limit, apply):
     with SessionLocal() as db:
-        node = db.get(Node, node_id, with_for_update=apply)
+        node = db.get(Node, node_id)
         if (node is None or node.retired_at is not None
                 or node.node_type != NodeType.EXIT
                 or node.status != NodeStatus.ONLINE or node.show_to_users):
@@ -106,9 +106,15 @@ def _run_locked(node_id, limit, apply):
         readiness = asyncio.run(verify_new_exit_readiness(db, node_id))
         if not readiness.get("ok"):
             raise RuntimeError("CENTRAL_NODE_STAGE_PROTOCOLS_NOT_READY")
+        # Re-read after the potentially slow listener audit and serialize only
+        # the short membership transaction, never the network health checks.
+        db.expire_all()
+        node = db.get(Node, node_id, with_for_update=True)
+        if (node is None or node.retired_at is not None or
+                node.node_type != NodeType.EXIT or
+                node.status != NodeStatus.ONLINE or node.show_to_users):
+            raise RuntimeError("NODE_CHANGED_DURING_STAGE")
         added = establish_hidden_memberships(db, node_id)
-        if node.show_to_users:
-            raise RuntimeError("NODE_PUBLISHED_DURING_STAGE")
         db.commit()
     print("CENTRAL_NODE_MEMBERSHIPS_READY", json.dumps({
         "node_id": node_id, "added": added,
