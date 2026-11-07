@@ -881,7 +881,7 @@ _SCRIPT = r"""
    }
    const existing=[...footer.querySelectorAll(':scope > [data-kind="app"]')];
    // L2TP/IPsec uses the OS built-in VPN: never display a download action.
-   if(['l2tp','l2tpipsec','l2tp/ipsec'].includes(key)){
+   if(['l2tp','l2tpipsec','l2tp/ipsec','l2tp_ipsec','l2tp-ipsec'].includes(key)){
      existing.forEach(node=>node.remove());
      footer.querySelectorAll('.tp80-extra-actions [data-kind="app"]').forEach(node=>node.remove());
      panel.querySelectorAll(':scope > .v34-client-card,:scope > .ref70-app-card').forEach(node=>node.hidden=true);
@@ -906,7 +906,7 @@ _SCRIPT = r"""
          app=el('a','tp78-footer-action','دانلود برنامه');
          app.dataset.kind='app';footer.append(app);
        }
-       app.href='/app-download/'+supported[key]+'/'+platform;
+       app.href='/v1/connect/app-download/'+supported[key]+'/'+platform;
        app.textContent='دانلود برنامه';
        app.target='_blank';app.rel='noopener noreferrer';
      }
