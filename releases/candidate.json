@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.672",
-  "source_sha": "3b6544f9c33f8e53c4a4398850d8212ab4483997",
+  "version": "1.1.0-rc.673",
+  "source_sha": "5b1759d74177196486cac12682de699860dafb68",
   "notes": {
-    "fa": "نسخه rc.672: یکپارچه‌سازی معماری مدیریت مرکزی جدید برای نودها، پشتیبانی مرکزی از تمام ۱۶ پروتکل شامل SOCKS5، ساخت دسته‌ای کانفیگ‌ها، همگام‌سازی انتخابی تغییرات اکانت و نود بدون تکرار نصب کامل، تأیید سلامت پروتکل‌های موردنیاز و جلوگیری از پاک‌شدن کانفیگ نود مخفی توسط مدیریت قدیمی. نودهای قدیمی بدون مهاجرت تأییدشده تغییر مالکیت نمی‌دهند؛ کاربران، حجم و انقضای اشتراک‌ها حفظ می‌شوند. نود تازه پیش از انتشار برای کاربران باید مراحل نصب، پوشش کانفیگ‌ها و تست اتصال را طی کند.",
-    "en": "rc.672: Integrate the new central node runtime management for all 16 protocol keys including SOCKS5, batched credential materialization, first-pass selective account/node delta reconciliation, family-scoped listener health checks, and preservation of centrally owned hidden Exit credentials against legacy pruning. Legacy production nodes retain their existing ownership until validated migration; subscription quota, expiry and credentials remain unchanged. New Exits require staged health, coverage and real-connection checks before public rollout."
+    "fa": "نسخه rc.673: رفع ناپدیدشدن دکمه «ارسال فایل به برنامه» در OpenVPN، WireGuard و AmneziaWG پس از خطای Share در موبایل. نوع عمومی فایل در اولویت قرار گرفت؛ خطای واقعی Web Share (NotAllowedError، TypeError و ...) نمایش داده می‌شود و دکمه دیگر حذف نمی‌شود. دانلود فایل واقعی .ovpn و .conf مستقل می‌ماند؛ هیچ تغییر در کاربران، نودها، پروتکل‌ها یا تنظیمات اتصال اعمال نشده است.",
+    "en": "rc.673: Preserve native VPN profile Share button when browser Web Share rejects a file; stop hiding the real rejection reason, show actionable error (NotAllowedError, TypeError, InvalidStateError) and prioritize generic binary MIME with fallback. Keep synchronous user-gesture sharing and ordinary .ovpn/.conf downloads. No VPN runtime or account changes."
   }
 }
