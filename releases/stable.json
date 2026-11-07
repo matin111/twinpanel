@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.641",
+  "version": "1.1.0-rc.642",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T02:54:45Z",
+  "released_at": "2026-11-07T03:03:09Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "6fb6f6511f4fb94ec5b57c94139e03b11843603f",
+  "source_sha": "c43c4ffed33e0325a55ae9a2346ef45d5f78db24",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.641/twinpanel-1.1.0-rc.641-linux-x86_64.tar.gz",
-    "sha256": "639e6cd7d0ebab7941b5efd2de2d956e5038c2f219dc00cac8c4dc7fbd792c66",
-    "size_bytes": 29148591
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.642/twinpanel-1.1.0-rc.642-linux-x86_64.tar.gz",
+    "sha256": "666c973f1211278784f3ee4b2a9b8395247616f7044cf0f010f546075f3e8f84",
+    "size_bytes": 29171321
   },
   "notes": {
-    "fa": "رفع قطعی وابستگی لینک‌های V2Ray به DNS/CDN فیلترشده: آدرس اتصال VLESS در تونل‌های ایران از IP واقعی نود ایران تحویل می‌شود؛ SNI، Host، مسیرها، کلیدها، UUID و پورت‌ها بدون تغییر. مسیر Agent کنترل مرکزی نیز با HTTPS امن مستقیم روی IP پایدار شده است. اصلاحات و امکانات قبلی حفظ می‌شوند.",
-    "en": "DNS-independent VLESS delivery: use the assigned Iran tunnel ingress public IPv4 for the connection address while retaining TLS SNI, WS Host, REALITY keys, UUIDs, ports and paths. Includes secure IP-pinned Node Agent control plane; no GRE, NAT or other protocol runtime changes."
+    "fa": "اصلاح صفحه Connection: آیکن واقعی WireGuard و OpenVPN و Cisco، نماد مجزا برای سایر پروتکل‌ها، نمایش پرچم‌های داخلی کشور روی ویندوز و پشتیبانی کشورهای جدید، دانلود برنامه اختصاصی هر پروتکل برای Android/Windows/iOS/macOS/Linux، رنگ‌بندی دکمه‌ها مطابق برند پنل؛ بدون تغییر کانفیگ یا آدرس سرور.",
+    "en": "Public Connection: embedded verified OpenVPN/WireGuard/Cisco logos, protocol-specific symbols, Windows-compatible inline flags, dynamic additional countries, per-protocol OS-aware direct app download links and branding-driven buttons. No VPN config, server IP/port, SNI or subscription payload changes."
   }
 }
