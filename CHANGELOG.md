@@ -1,5 +1,17 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.657 — 2026-11-07
+
+### Connection footer repaired for all protocols
+- Fix shared footer initialization race: V80 previously marked an app-only footer as complete before V51/V52/V78 supplied the actual protocol actions.
+- Move the **original functional** per-protocol download/add, copy-link, and copy-config controls into one canonical footer without replacing their click handlers or subscription links.
+- Restore distinct download-app links inside the same footer across supported protocols; prevent repeated standalone client cards.
+- Generate real text-based **copy all configurations** for OpenVPN, WireGuard and AmneziaWG, reading actual configuration text from loaded server views.
+- Preserve extra per-protocol YAML/JSON operations in a secondary expandable section, without deleting them.
+- Keep Windows four equally sized actions in one row and Android one full-width main action above three equal actions when four actions are available.
+- Synthetic DOM audit using actual Connection HTML with generated V51 controls confirmed four action kinds for eight protocol samples (OpenVPN, WireGuard, AmneziaWG, Snell, Hysteria2, ShadowTLS, Sudoku and V2Ray). All 40 scripts passed JavaScript syntax checks.
+- Complete interactive browser testing across all device types and protocols is still outstanding. No changes to VPN server runtimes, nodes, tunnels or user credentials.
+
 ## 1.1.0-rc.656 — 2026-11-07
 
 ### Connection import scripts: verified root-cause fix
