@@ -225,6 +225,9 @@ _SCRIPT = r"""
   }
 
   function handleProtocolTap(event){
+    // The approved inline public Connection UI owns mobile protocol panels.
+    // Do not reopen the old fixed bottom sheet or its duplicate close bar.
+    if(document.body.classList.contains('ref69-inline'))return;
     if(!isMobile())return;
     const choice=event.target?.closest?.('.protocol-choice');
     if(!choice)return;
@@ -243,6 +246,10 @@ _SCRIPT = r"""
   }
 
   function apply(){
+    if(document.body.classList.contains('ref69-inline')){
+      document.body.classList.remove('v42-mobile-sheet','v42-sheet-active');
+      return;
+    }
     if(!isMobile()){
       closeSheet();
       document.body.classList.remove('v42-mobile-sheet');
