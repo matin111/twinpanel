@@ -125,7 +125,7 @@ with open(lock,"a+") as handle:
                 stderr=subprocess.DEVNULL,timeout=80,check=False)
             status=subprocess.run(["mita","status"],capture_output=True,text=True,
                 timeout=20,check=False)
-            if started.returncode or status.returncode or "RUNNING" not in status.stdout.upper():
+            if started.returncode or status.returncode or "RUNNING" not in (status.stdout+status.stderr).upper():
                 raise RuntimeError("MIERU_START_FAILED")
         except BaseException:
             for dest,backup in backups:
