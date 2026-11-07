@@ -920,7 +920,7 @@ _SCRIPT = r"""
      const imgs=[...label.querySelectorAll('img')];
      imgs.slice(1).forEach(img=>img.remove());
      [...label.childNodes].forEach(node=>{
-       if(node.nodeType===3&&/^[\\s\\u{1F1E6}-\\u{1F1FF}]+$/u.test(node.textContent||''))
+       if(node.nodeType===3&&/^\\s*$/u.test(node.textContent||'')) node.textContent='';
          node.textContent='';
      });
    });
