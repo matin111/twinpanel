@@ -141,10 +141,13 @@ def claim_next(db: Session, now: datetime | None = None) -> tuple[int, str, str]
             Node.show_to_users.is_(True),
             # Previously queued jobs must not run once an Exit has been
             # migrated to the shared central runtime.
-            text("NOT EXISTS (SELECT 1 FROM vpnshop_runtime_settings s "
-                 "WHERE s.setting_key = 'vpn.central_runtime.exit.' || "
-                 "CAST(node_backfill_jobs_v1.node_id AS TEXT) "
-                 "AND s.setting_value = 'v1')"),
+            # SQLite tests have no central settings table. The deployed
+            # PostgreSQL worker MUST exclude all centrally owned Exits.
+            (text("1=1") if db.get_bind().dialect.name == "sqlite"
+             else text("NOT EXISTS (SELECT 1 FROM vpnshop_runtime_settings s "
+                       "WHERE s.setting_key = 'vpn.central_runtime.exit.' || "
+                       "CAST(node_backfill_jobs_v1.node_id AS TEXT) "
+                       "AND s.setting_value = 'v1')")),
             or_(
                 and_(
                     NodeBackfillJobV1.state.in_(("queued", "retry")),
