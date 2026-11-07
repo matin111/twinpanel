@@ -27,6 +27,7 @@ from app.services.new_node_readiness_v1 import verify_new_exit_readiness
 from app.protocol_account_registry import ALL_PROTOCOL_KEYS
 from app.singbox_subscription_accounts import SINGBOX_PROTOCOLS
 from app.services.central_sudoku_capacity_v1 import assert_capacity
+from app.central_node_stage_audit_v1 import verify_coverage
 
 ADAPTERS = (
     "twinpanel_central_l2tp_node_bulk_v1.py",
@@ -154,12 +155,26 @@ def _run_locked(node_id, limit, apply):
         print("CENTRAL_NODE_STAGE_ADAPTER_OK", json.dumps({
             "node_id": node_id, "adapter": name,
         }), flush=True)
-    print("CENTRAL_NODE_STAGE_PARTIAL", json.dumps({
-        "node_id": node_id, "node_remains_hidden": True,
-        "all_16_protocols_ready_for_users": False,
-        "missing_bulk_protocols": MISSING_BULK_PROTOCOLS,
+    # Final guard: process exit != all purchased node credentials persisted.
+    # This is read-only and never publishes a node or queues legacy work.
+    with SessionLocal() as db:
+        audit = verify_coverage(db, node_id)
+    print("CENTRAL_NODE_COVERAGE_AUDIT", json.dumps({
+        "node_id": node_id, **audit,
     }), flush=True)
-    # A partial stage is NEVER a successful node-publish signal.
+    if not audit["ok"]:
+        print("CENTRAL_NODE_STAGE_PARTIAL", json.dumps({
+            "node_id": node_id, "node_remains_hidden": True,
+            "missing_protocol_pairs": audit["missing_protocol_pairs"],
+            "missing_node_memberships": audit["missing_node_memberships"],
+        }), flush=True)
+        return 3
+    # A complete DB projection still needs a real connection/traffic canary
+    # and the safe publish transition before user-facing availability.
+    print("CENTRAL_NODE_STAGE_COVERAGE_VERIFIED_HIDDEN", json.dumps({
+        "node_id": node_id, "node_remains_hidden": True,
+        "real_connection_canary_verified": False,
+    }), flush=True)
     return 3
 
 
