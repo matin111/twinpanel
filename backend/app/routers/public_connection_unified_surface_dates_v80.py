@@ -480,6 +480,35 @@ html body.tp80-connection .protocol-panel .tp78-action-footer > [data-kind="app"
  }
 }
 
+
+/* Compact contextual help, isolated from protocol download/connection buttons. */
+html body.tp80-connection .protocol-panel .tp-help-launch{
+  margin-inline-start:auto!important;flex:0 0 auto!important;
+  width:36px!important;height:36px!important;min-height:36px!important;
+  border:1px solid var(--tp-brand-stroke,#4a5c81)!important;border-radius:11px!important;
+  background:var(--tp-brand-raised,#263450)!important;color:var(--tp-brand-text,#fff)!important;
+  font-size:17px!important;font-weight:800!important;cursor:pointer!important;
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+}
+body .tp-help-overlay[hidden]{display:none!important}
+body .tp-help-overlay{
+  position:fixed!important;inset:0!important;z-index:2147483300!important;
+  background:#030817d9!important;display:flex!important;align-items:center!important;
+  justify-content:center!important;padding:16px!important;box-sizing:border-box!important;
+}
+body .tp-help-card{
+  width:min(440px,100%)!important;max-height:85dvh!important;overflow:auto!important;
+  border-radius:17px!important;border:1px solid var(--tp-brand-stroke,#52688b)!important;
+  background:var(--tp-brand-card,#121e36)!important;color:var(--tp-brand-text,#fff)!important;
+  padding:18px!important;direction:rtl!important;text-align:right!important;
+  box-shadow:0 20px 75px #0009!important;
+}
+body .tp-help-head{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;margin-bottom:12px!important}
+body .tp-help-title{font-size:17px!important;font-weight:850!important}
+body .tp-help-close{border:1px solid #4b5c79!important;border-radius:9px!important;padding:6px 12px!important;color:inherit!important;background:transparent!important;cursor:pointer!important}
+body .tp-help-step{font-size:13px!important;line-height:2!important;color:inherit!important;margin:7px 0!important}
+body .tp-help-foot{font-size:12px!important;opacity:.76!important;margin-top:12px!important;line-height:1.9!important}
+
 /* TWINPANEL_CONNECTION_VISUAL_PARITY_V82: uniform cards for every protocol */
 html body.tp80-connection .protocol-panel.active{
  display:flex!important;flex-direction:column!important;align-items:stretch!important;
@@ -1320,10 +1349,6 @@ _SCRIPT = r"""
          const isMobileDevice=/android|iphone|ipad|ipod/.test(device);
          if(isMobileDevice){
            tools.append(shareFile);
-         }else{
-           const hint=el('span','tp80-file-hint',
-             'فایل را دانلود کنید؛ سپس در OpenVPN Connect یا WireGuard از Import File استفاده کنید.');
-           tools.append(hint);
          }
          const target=download.dataset.target;
          const source=target?document.getElementById(target):null;
@@ -2036,12 +2061,72 @@ _SCRIPT = r"""
    let tries=0;
    const timer=setInterval(()=>{scan();if(++tries>=45)clearInterval(timer)},500);
  }
+
+ function installProtocolHelp(panel){
+   const head=panel.querySelector(':scope > .panel-head,:scope > .protocol-panel-head');
+   if(!head||head.querySelector(':scope > .tp-help-launch'))return;
+   const btn=el('button','tp-help-launch','?');
+   btn.type='button';btn.title='راهنمای اتصال';btn.setAttribute('aria-label','راهنمای این پروتکل');
+   btn.addEventListener('click',event=>{
+     event.preventDefault();event.stopPropagation();
+     const key=keyForPanel(panel);
+     const label=panel.querySelector('.panel-head h3,.protocol-panel-head h3')?.textContent.trim()||key||'پروتکل';
+     const file=['openvpn','wireguard','amneziawg'].includes(key);
+     const manual=['cisco','l2tp','l2tp/ipsec','openconnect'].some(x=>key.includes(x));
+     const v2ray=['v2ray','xray'].includes(key);
+     const instructions=file?[
+       'کشور و سرور دلخواه را انتخاب کنید، سپس «دانلود فایل» را بزنید.',
+       'در اندروید فایل در Downloads و در آیفون در Downloads مرورگر یا Files قابل دسترسی است.',
+       'در برنامه مربوطه، گزینه Import from file را انتخاب و فایل .'+(key==='openvpn'?'ovpn': 'conf')+' دانلودشده را باز کنید.',
+       'روی گوشی، در صورت پشتیبانی مرورگر، «ارسال فایل به برنامه» منوی اشتراک‌گذاری را باز می‌کند.'
+     ]:manual?[
+       'کشور و سرور را انتخاب کنید و نام کاربری، رمز عبور و آدرس سرور را از بخش اطلاعات اتصال دریافت کنید.',
+       'برنامه سازگار را نصب کنید و اطلاعات همان سرور را در برنامه وارد کنید.',
+       'اگر اتصال برقرار نشد، آدرس و اطلاعات همان سرور را دوباره بررسی کنید.'
+     ]:v2ray?[
+       'برای هر کشور، پروفایل‌های آماده V2Ray را باز کنید.',
+       'کانفیگ موردنظر را کپی کنید یا لینک اشتراک را در v2rayN یا v2rayNG وارد کنید.',
+       'پس از بروزرسانی اشتراک، یکی از اتصال‌های آماده را انتخاب کنید.'
+     ]:[
+       'کشور و سرور دلخواه را انتخاب کنید.',
+       'از دکمه دانلود فایل، کپی کانفیگ یا لینک اشتراک همان پروتکل استفاده کنید.',
+       'فایل یا لینک را در برنامه سازگار با این پروتکل اضافه کنید و اتصال را بررسی کنید.'
+     ];
+     const overlay=document.getElementById('tp-help-overlay');
+     if(!overlay)return;
+     overlay.querySelector('.tp-help-title').textContent='راهنمای '+label;
+     const body=overlay.querySelector('.tp-help-body');
+     body.replaceChildren(...instructions.map((line,i)=>el('p','tp-help-step',(i+1)+'- '+line)));
+     overlay.hidden=false;
+     overlay.querySelector('.tp-help-close').focus();
+   });
+   head.append(btn);
+ }
+ function installHelpOverlay(){
+   if(document.getElementById('tp-help-overlay'))return;
+   const overlay=el('div','tp-help-overlay');overlay.id='tp-help-overlay';overlay.hidden=true;
+   overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');
+   const card=el('div','tp-help-card');
+   const head=el('div','tp-help-head'),title=el('strong','tp-help-title','راهنما');
+   const close=el('button','tp-help-close','بستن');close.type='button';
+   head.append(title,close);
+   const body=el('div','tp-help-body');
+   const note=el('p','tp-help-foot','برنامه مقصد باید از فرمت فایل یا لینک پشتیبانی کند. مسیر ذخیره فایل را مرورگر و سیستم‌عامل تعیین می‌کنند.');
+   card.append(head,body,note);overlay.append(card);document.body.append(overlay);
+   const shut=()=>{overlay.hidden=true};
+   close.addEventListener('click',shut);
+   overlay.addEventListener('click',event=>{if(event.target===overlay)shut()});
+   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!overlay.hidden)shut()});
+ }
+
  function check(){
+   installHelpOverlay();
    installProtocolCategoryFilters();
    reconcileProtocolSelection();
    installMobileDetailsDialog();
    watchAsyncV2rayNodes();
    panels().forEach(panel=>{
+     installProtocolHelp(panel);
      normalizeNative(panel);
      normalizeClassicFlags(panel);
      normalizeV2ray(panel);
