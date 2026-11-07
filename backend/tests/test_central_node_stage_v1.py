@@ -8,7 +8,7 @@ from app.models import NodeStatus, NodeType
 
 class CentralNodeStageTests(unittest.TestCase):
     def test_bulk_adapters_include_xray_and_no_individual_worker(self):
-        self.assertEqual(len(stage.ADAPTERS), 6)
+        self.assertEqual(len(stage.ADAPTERS), 7)
         self.assertFalse(any("backfill" in name for name in stage.ADAPTERS))
         self.assertTrue(all("central_" in name and "bulk" in name
                             for name in stage.ADAPTERS))
@@ -78,7 +78,7 @@ class CentralNodeStageTests(unittest.TestCase):
 
 
     def test_partial_engine_has_explicit_missing_protocols(self):
-        self.assertTrue({"mieru", "trusttunnel", "amneziawg", "sudoku"}.issubset(
+        self.assertTrue({"trusttunnel", "amneziawg", "sudoku"}.issubset(
             set(stage.MISSING_BULK_PROTOCOLS)
         ))
         self.assertEqual(
