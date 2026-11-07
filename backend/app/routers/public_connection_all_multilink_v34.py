@@ -416,7 +416,14 @@ def _delivery(
     if protocol == "v2ray":
         sub, payload = _subscription_and_payload(token, db)
     else:
-        sub, payload = _active(token, db)
+        info = getattr(db, "info", None)
+        if isinstance(info, dict):
+            info["_tp_public_feed_only_protocol"] = protocol
+        try:
+            sub, payload = _active(token, db)
+        finally:
+            if isinstance(info, dict):
+                info.pop("_tp_public_feed_only_protocol", None)
     items = _v2ray_items(payload) if protocol == "v2ray" else _protocol_items(payload, protocol)
     if not items:
         raise HTTPException(status_code=404, detail="سرور آماده‌ای برای این پروتکل وجود ندارد")
