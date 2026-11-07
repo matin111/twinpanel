@@ -27,7 +27,7 @@ class CentralStageLauncherTests(unittest.TestCase):
     def test_hidden_verified_exit_launches_one_systemd_unit(self):
         db=self.db()
         with (patch.object(launcher.shutil, "which", return_value="/usr/bin/systemd-run"),
-              patch.object(launcher.STAGE, "is_file", return_value=True),
+              patch.object(launcher, "STAGE", MagicMock(is_file=MagicMock(return_value=True))),
               patch.object(launcher.subprocess, "run") as run):
             run.return_value.returncode=0
             status=launcher.launch(db,14)
@@ -58,7 +58,7 @@ class CentralStageLauncherTests(unittest.TestCase):
 
     def test_systemd_rejection_not_reported_as_started(self):
         with (patch.object(launcher.shutil,"which",return_value="/usr/bin/systemd-run"),
-              patch.object(launcher.STAGE,"is_file",return_value=True),
+              patch.object(launcher, "STAGE", MagicMock(is_file=MagicMock(return_value=True))),
               patch.object(launcher.subprocess,"run") as run):
             run.return_value.returncode=1
             with self.assertRaisesRegex(launcher.CentralStageLaunchError,
