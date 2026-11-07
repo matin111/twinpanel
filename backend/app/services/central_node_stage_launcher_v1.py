@@ -60,6 +60,11 @@ def launch(db, node_id: int) -> dict:
     if not systemd or not STAGE.is_file():
         raise CentralStageLaunchError("CENTRAL_STAGE_RUNNER_UNAVAILABLE")
     unit = f"twinpanel-central-node-stage-{node_id}"
+    # Only already-registered visible Exits use the first-pass delta path.
+    # Initial hidden Exit installation still runs full listener and runtime
+    # bootstrap validation before any publication.
+    delta_only = bool(db.get(Node,node_id).show_to_users
+                      and is_central_node(db,node_id))
     command = [
         systemd, "--system", "--no-block", "--collect",
         f"--unit={unit}", f"--working-directory={ROOT}",
@@ -70,6 +75,8 @@ def launch(db, node_id: int) -> dict:
         "--limit", str(MAX_USERS),
         "--apply", "--confirm-node-id", str(node_id),
     ]
+    if delta_only:
+        command.append("--delta-only")
     # No shell and no user-controlled command fragment. No passwords in argv.
     try:
         result = subprocess.run(
