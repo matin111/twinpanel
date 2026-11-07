@@ -2621,8 +2621,12 @@ async def install_node(
         subscription_sync = {
             "ok": True, "skipped": True, "reason": "not_run",
         }
-        if payload.defer_subscription_sync:
-            subscription_sync["reason"] = "deferred_to_central_publisher"
+        if payload.defer_subscription_sync or node.node_type == NodeType.EXIT:
+            # No Exit installation path may enter the legacy per-user
+            # provisioning function, even if a caller forgot to set
+            # defer_subscription_sync. The central daemon-level engine
+            # owns registration after health validation.
+            subscription_sync["reason"] = "deferred_to_central_runtime"
         else:
             try:
                 from .account_delivery import sync_installed_node_to_subscriptions
