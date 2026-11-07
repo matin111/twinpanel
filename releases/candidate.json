@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.646",
-  "source_sha": "865d630117b2f6c5d5f1e9ea1da7573dfcc79ec8",
+  "version": "1.1.0-rc.647",
+  "source_sha": "dfdb130cd8659c77730df95c6e1bfd452b4bc890",
   "notes": {
-    "fa": "رفع ریشه‌ای خطای نصب L2TP هنگام اشغال پورت‌های UDP 500 و 4500 توسط سرویس خود StrongSwan؛ جلوگیری از دستکاری در حضور نشست IPsec فعال، ذخیره پشتیبان محرمانه تنظیمات و کنترل کامل سلامت L2TP. تحویل اتصال از مسیر تانل سالم با بازگشت خودکار به آدرس مستقیم نود در نبود تانل.",
-    "en": "Fix L2TP provisioning false port collision with existing strongSwan UDP 500/4500 listeners; refuse changes with active IPsec sessions, back up existing config, and verify full L2TP service readiness. Customer connection delivery prefers healthy tunnel ingress and falls back to direct Exit endpoints."
+    "fa": "اصلاح رابط عمومی Connection مطابق نمونه موبایل و ویندوز: نام پروتکل زیر آیکن در موبایل، دکمه‌های اصلی واقعی در پایین پنل، کپی و افزودن کانفیگ‌های مربوط به هر نود، نمایش وضعیت فعال اشتراک، سنجش تازه واقعی ICMP/TCP از سرور پنل به نود با کلیک روی پینگ و نمایش — به‌جای عدد ساختگی در صورت نرسیدن پاسخ. کانفیگ‌ها و سرویس‌های VPN تغییری نمی‌کنند.",
+    "en": "Connection mobile/desktop reference V78: protocol names below icons on mobile; original add/copy/share/client-download controls at the bottom; original node actions and three V2Ray profiles; subscription active status and on-click fresh panel-to-entitled-node bounded ICMP/TCP RTT. No fabricated latency, no VPN configuration or node/service mutation."
   }
 }
