@@ -154,6 +154,26 @@ def _verified_tunnel_xray_domain(node: Node, tunnel_host: str) -> str:
     every transport parameter remain in the original tunnel resolver.
     """
     current_host = str(tunnel_host or "").strip().lower()
+
+    # TWINPANEL_XRAY_IRAN_IP_PUBLIC_AUTHORITY_V1
+    # The tunnel resolver deliberately publishes the *real* public IPv4 of
+    # its Iran ingress when DNS/CDN/SNI filtering makes normal A records
+    # unreliable. Never replace that verified connection Address with an
+    # xray_domain just because its current DNS happens to resolve to this IP:
+    # clients would fall back to Cloudflare anycast or poisoned DNS later.
+    # TLS SNI / WebSocket Host / REALITY keys come from the Xray profile state
+    # and remain unchanged. Domain authorities and direct Exit mode keep the
+    # preexisting verified-domain policy below.
+    try:
+        connection_ip = ipaddress.ip_address(current_host)
+    except ValueError:
+        connection_ip = None
+    if (
+        isinstance(connection_ip, ipaddress.IPv4Address)
+        and connection_ip.is_global
+    ):
+        return str(connection_ip)
+
     dedicated = _stored_xray_domain(node)
     if not dedicated or not current_host or dedicated == current_host:
         return str(tunnel_host)
