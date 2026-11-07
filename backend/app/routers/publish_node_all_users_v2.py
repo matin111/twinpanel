@@ -198,6 +198,32 @@ async def publish_node_to_all_users_v2(
     }
 
 
+@router.post("/{node_id}/central-stage")
+def start_central_stage_v1(
+    node_id: int, db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Admin-controlled staged materialization; no inline SSH or old queue."""
+    from ..services.central_node_stage_launcher_v1 import (
+        launch, CentralStageLaunchError,
+    )
+    try:
+        return launch(db, node_id)
+    except CentralStageLaunchError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/{node_id}/central-stage-coverage")
+def read_central_stage_coverage_v1(
+    node_id: int, db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Read-only node-specific progress; never returns client credentials."""
+    from ..central_node_stage_audit_v1 import verify_coverage
+    try:
+        return verify_coverage(db, node_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @router.post("/{node_id}/publish-all-users")
 async def publish_node_to_all_users_route_v2(
     node_id: int,
