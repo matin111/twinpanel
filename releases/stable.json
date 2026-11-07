@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.636",
+  "version": "1.1.0-rc.637",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T01:21:56Z",
+  "released_at": "2026-11-07T01:35:08Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "cd2131c8bdc5e8dbb56fd6dec221d43c3cbc36ed",
+  "source_sha": "f0c73f1807591382dc8d438b7c0b4f7f634b6616",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.636/twinpanel-1.1.0-rc.636-linux-x86_64.tar.gz",
-    "sha256": "ac3eea16319b00a87e3ead2ae59a24317739f19f9db20ca3602015dc304fed07",
-    "size_bytes": 29075998
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.637/twinpanel-1.1.0-rc.637-linux-x86_64.tar.gz",
+    "sha256": "0be6cf3991ee5c44efbea497ed6fa01f983771c6b614792b0aad6466374a9e30",
+    "size_bytes": 29075949
   },
   "notes": {
-    "fa": "اصلاح چیدمان موبایل صفحه Connection مطابق مرجع؛ نمایش پرچم خودکار تمام کشورهای نود از country_code؛ نمایش نام اشتراک به‌جای نام ادمین. بدون تغییر کانفیگ، آدرس، پورت یا پروتکل.",
-    "en": "Match approved compact mobile Connection layout; decode all registered node country flags from server-provided ISO codes; display subscription username. No change to VPN configuration contents, hosts, ports, SNI, UUID, protocols or links."
+    "fa": "اصلاح نمایش دانلود و آپلود در تونل‌های TP27 Fast با افزایش مهلت محدود دریافت نتیجه تست TCP از ۳ به ۱۲ ثانیه؛ مشکل ثبت‌نشدن نتیجه در مسیرهای با تأخیر بالا رفع می‌شود. بدون تغییر هسته تونل، مسیر GRE، NAT، پروتکل‌ها یا تنظیمات کاربران.",
+    "en": "Fix TP27 Fast download/upload benchmark results on long-RTT tunnels: extend the bounded TCP receiver finalization window from 3 to 12 seconds after sender completion. No GRE carrier, NAT, port mapping, protocol, credential, or customer config change."
   }
 }
