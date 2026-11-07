@@ -1,4 +1,4 @@
-"""Materialize all eligible Sudoku users on one hidden Exit with bounded four-service waves.
+"""Materialize eligible Sudoku users on one hidden Exit with memory-admitted service waves.
 
 Uses the same existing StandaloneAccountSecret and config schema as normal
 account delivery, but persists missing identities in ONE central transaction
@@ -34,7 +34,7 @@ from app.standalone_subscription_accounts import (
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
 
 logging.getLogger("asyncssh").setLevel(logging.CRITICAL)
-MAX_USERS = 64
+MAX_USERS = 3000
 
 
 def eligible(db, node_id):
