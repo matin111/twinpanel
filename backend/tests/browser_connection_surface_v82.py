@@ -150,6 +150,18 @@ def verify(context,html,device,outfile):
         target.click()
         page.wait_for_timeout(180)
         pane=page.locator("#"+target.get_attribute("data-protocol"))
+        if not pane.is_visible():
+            diagnostic=page.evaluate("""(id)=>{
+              const node=document.getElementById(id);
+              const attrs=e=>!e?null:{id:e.id,classes:e.className,display:getComputedStyle(e).display,
+                visibility:getComputedStyle(e).visibility,ariaHidden:e.getAttribute('aria-hidden')};
+              return {clicked:attrs(document.querySelector('.protocol-choice[data-protocol-key="'+
+                   document.querySelector('.protocol-choice[data-protocol="'+id+'"]')?.dataset.protocolKey+'"]')),
+                selected:attrs(node),
+                active:[...document.querySelectorAll('.protocol-panel.active')].map(attrs),
+                open:[...document.querySelectorAll('.protocol-panel.v36-open')].map(attrs)};
+            }""",target.get_attribute("data-protocol"))
+            print("HIDDEN_PROTOCOL_DEBUG",device,protocol,diagnostic,flush=True)
         assert pane.is_visible(),(device,protocol,"hidden panel")
         assert page.locator(".protocol-panel.active").count()==1,(device,protocol,"multiple panels")
         if protocol in native:
