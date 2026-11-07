@@ -1240,6 +1240,46 @@ _SCRIPT = r"""
          download.classList.add('tp80-file-download');
          download.textContent='↓ دانلود فایل';
          tools.append(download);
+         // Optional native Share sheet: send the real file with its original
+         // extension/MIME. Do not invoke any VPN client or import deep-link.
+         // A browser cannot force OpenVPN Connect into the OS Share targets.
+         const shareFile=el('button','tp80-file-share','ارسال فایل به برنامه');
+         shareFile.type='button';
+         shareFile.addEventListener('click',async event=>{
+           event.preventDefault();event.stopPropagation();
+           const message=text=>{
+             const toast=document.getElementById('toast');
+             if(toast){toast.textContent=text;toast.classList.add('show')}
+           };
+           if(!navigator.share||typeof File==='undefined'){
+             message('ابتدا فایل را دانلود کنید و از Files یا Downloads گزینه اشتراک‌گذاری را بزنید.');
+             return;
+           }
+           const match=String(download.dataset.target||'')
+             .match(/^(?:hub-protocol-\\d+-|cfg-|download-source-)(openvpn|wireguard|amneziawg)-(\\d+)$/);
+           const token=location.pathname.split('/')[3]||'';
+           if(!match||!token)return;
+           const extension=match[1]==='openvpn'?'ovpn':'conf';
+           const fallback=match[1]+'-'+(Number(match[2])+1)+'.'+extension;
+           const rawName=String(download.dataset.filename||fallback).split(/[\\\\/]/).pop();
+           const filename=rawName.toLowerCase().endsWith('.'+extension)?rawName:rawName+'.'+extension;
+           const mime=match[1]==='openvpn'?'application/x-openvpn-profile':'application/octet-stream';
+           const url='/v1/connect/'+token+'/file/'+match[1]+'/'+match[2];
+           try{
+             const response=await fetch(url,{cache:'no-store'});
+             if(!response.ok)throw new Error('download failed');
+             const file=new File([await response.arrayBuffer()],filename,{type:mime});
+             if(navigator.canShare&&!navigator.canShare({files:[file]})){
+               message('برای ارسال، فایل دانلودشده را از Files یا Downloads انتخاب کنید.');
+               return;
+             }
+             await navigator.share({files:[file]});
+           }catch(error){
+             if(error?.name==='AbortError')return;
+             message('ارسال پشتیبانی نشد؛ فایل را دانلود کنید و از Files یا Downloads ارسال کنید.');
+           }
+         });
+         tools.append(shareFile);
          const target=download.dataset.target;
          const source=target?document.getElementById(target):null;
          if(source&&source.value.trim()){
