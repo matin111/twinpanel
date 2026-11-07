@@ -162,6 +162,9 @@ async def _install_node_in_background(
 ) -> None:
     from .classic_protocol_admin_v1 import EnsureClassicProtocolIn, ensure_classic_protocol
     from .provision import InstallIn, install_node
+    from ..services.central_first_exit_bootstrap_v1 import (
+        bootstrap_hidden_central_exit,
+    )
     from sqlalchemy import func
 
     db = SessionLocal()
@@ -177,7 +180,11 @@ async def _install_node_in_background(
             **payload.model_dump(exclude={"publish_to_all_users"}),
             defer_subscription_sync=payload.node_type == NodeType.EXIT,
         )
-        result = await install_node(install_payload, request, db)
+        result = (
+            await bootstrap_hidden_central_exit(install_payload, request, db)
+            if install_payload.node_type == NodeType.EXIT
+            else await install_node(install_payload, request, db)
+        )
         node_id = int(result.get("node_id") or 0)
         base_ok = bool(result.get("ok"))
         installed_count = sum(
