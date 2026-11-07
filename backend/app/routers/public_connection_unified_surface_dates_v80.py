@@ -168,6 +168,20 @@ html body.tp80-connection .protocol-panel.tp80-native .tp80-credentials > .v35-m
 }
 body.tp80-connection .tp80-credentials .v35-manual-head{margin-bottom:10px!important}
 
+/* V69/V34 sometimes regenerate the same client as a separate banner.
+   Retain the source link in the footer, suppress repeated UI only. */
+html body.tp80-connection .protocol-panel:has(> .tp78-action-footer [data-kind="app"])
+  > .v34-client-card,
+html body.tp80-connection .protocol-panel:has(> .tp78-action-footer [data-kind="app"])
+  > .ref70-app-card,
+html body.tp80-connection .protocol-panel:has(> .tp78-action-footer [data-kind="app"])
+  > .ref69-download-cta{
+    display:none!important;
+}
+html body.tp80-connection .protocol-panel .tp78-action-footer > [data-kind="app"]{
+   display:flex!important;align-items:center!important;justify-content:center!important;
+}
+
 body.tp80-connection .protocol-panel .tp78-action-footer{
   order:30!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
   direction:ltr!important;gap:10px!important;margin:18px 16px 18px!important;
@@ -692,6 +706,34 @@ _SCRIPT = r"""
    const children=[...footer.querySelectorAll(':scope > .tp78-footer-action')];
    const find=kind=>children.find(node=>node.dataset.kind===kind);
    const key=String(panel.dataset.ref67NativeProtocol||panel.dataset.v34Protocol||'').toLowerCase();
+   // One verified device-specific app link in the SAME footer for all protocols.
+   // Reuse genuine installed links instead of displaying the same client twice.
+   if(!find('app')){
+     const app=panel.querySelector(':scope > .v34-client-card a[href],:scope > .ref70-app-card a[href]');
+     const url=app?.getAttribute('href')||'';
+     if(app&&/^(https?:\/\/|\/(?!\/))/i.test(url)){
+       app.dataset.kind='app';app.classList.add('tp78-footer-action');
+       children.push(app);
+     }
+   }
+   if(key==='sudoku'&&!find('app')){
+     // Official Sudoku clients (project upstream), not an unrelated puzzle.
+     const os=String(document.body.dataset.tpPlatform||'').toLowerCase();
+     const mobile=/Android/i.test(navigator.userAgent);
+     const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent);
+     let target='https://github.com/SUDOKU-ASCII/sudoku-desktop/releases';
+     let title='دانلود Sudoku Desktop';
+     if(os==='android'||mobile){
+       target='https://github.com/SUDOKU-ASCII/sudoku-android/releases';
+       title='دانلود Sudodroid';
+     }else if(os==='ios'||ios){
+       target='https://apps.apple.com/us/app/anywhere-proxy/id6758235178';
+       title='دانلود Anywhere Proxy';
+     }
+     const app=el('a','tp78-footer-action',title);
+     app.href=target;app.target='_blank';app.rel='noopener noreferrer';
+     app.dataset.kind='app';app.dataset.tp80OfficialSudoku='1';children.push(app);
+   }
    const fileProtocol=new Set(['openvpn','wireguard','amneziawg']).has(key);
    let primary=find('add')||find('download');
    const previousPrimary=primary;
