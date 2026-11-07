@@ -21,7 +21,7 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-PROTOCOLS = ("singbox", "openvpn", "cisco", "wireguard", "l2tp", "v2ray")
+PROTOCOLS = ("singbox", "standalone", "openvpn", "cisco", "wireguard", "l2tp", "v2ray")
 SOURCES = ("eylan", "sanaei", "marzban", "pasargad")
 
 
@@ -87,7 +87,12 @@ def eligible_count(db, node_id: int, protocol: str, subscription_id: int | None 
     if protocol != "singbox":
         query = query.join(
             SubscriptionProtocol, SubscriptionProtocol.subscription_id == Subscription.id
-        ).filter(SubscriptionProtocol.protocol == protocol)
+        )
+        if protocol == "standalone":
+            from app.standalone_subscription_accounts import STANDALONE_ACCOUNT_PROTOCOLS
+            query = query.filter(SubscriptionProtocol.protocol.in_(list(STANDALONE_ACCOUNT_PROTOCOLS)))
+        else:
+            query = query.filter(SubscriptionProtocol.protocol == protocol)
     return int(query.scalar() or 0)
 
 
@@ -124,6 +129,17 @@ async def apply_cycle(
         else:
             count = await run_one_node(node_id, subscription_id=subscription_id)
         return (0, int(count))
+
+    if protocol == "standalone":
+        from scripts.twinpanel_standalone_node_backfill_v1 import run_one_node as apply_standalone
+        committed, need_retry = await apply_standalone(
+            node_id, max_pairs=min(max_pairs, 3),
+            subscription_id=subscription_id,
+            include_all_active=include_all_active,
+        )
+        # Persist successful pairs, retry rather than mark a partially applied
+        # family done whenever a per-account lock/service apply fails.
+        return (3 if need_retry else 0, int(committed))
 
     os.environ["CLASSIC_ONLY_PROTOCOL"] = protocol
     os.environ["CLASSIC_DIRECT_BATCH_PER_NODE"] = str(max_pairs)
@@ -180,6 +196,7 @@ def main(argv: list[str] | None = None) -> int:
     # bounded. Never start it inside FastAPI or during node HTTP publishing.
     lock_name = (
         "/run/twinpanel-migration-singbox-batch.lock" if args.protocol == "singbox"
+        else "/run/twinpanel-standalone-node-batch.lock" if args.protocol == "standalone"
         else "/run/twinpanel-migration-classic-direct.lock"
     )
     with open(lock_name, "a+") as lock:
