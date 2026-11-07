@@ -6,7 +6,9 @@ _MARKER = "TWINPANEL_PUBLIC_CONNECT_FOOTER_LAYOUT_V75"
 
 _CSS = r"""
 /* TWINPANEL_PUBLIC_CONNECT_FOOTER_LAYOUT_V75 */
-body.tp75-footer .protocol-panel{
+/* Only the selected protocol should exist in the visual stack. */
+body.tp75-footer .protocol-panel:not(.active){display:none!important}
+body.tp75-footer .protocol-panel.active{
   display:flex!important;
   flex-direction:column!important;
   align-items:stretch!important;
