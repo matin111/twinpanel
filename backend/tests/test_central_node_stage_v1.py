@@ -1,9 +1,18 @@
 """Guardrails for the single central node staging entrypoint."""
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
+from types import SimpleNamespace
 
 from scripts import twinpanel_central_node_stage_v1 as stage
 from app.models import NodeStatus, NodeType
+
+
+def desired_state(count):
+    return SimpleNamespace(
+        count=count, pair_count=count, fingerprint="fixed-snapshot",
+        entitled_pairs=((1,"sudoku"),) if count else (),
+        invalid_protocols=(), without_entitlements=(),
+    )
 
 
 class CentralNodeStageTests(unittest.TestCase):
@@ -48,13 +57,13 @@ class CentralNodeStageTests(unittest.TestCase):
         db = MagicMock()
         db.get.return_value = fake
         with (patch.object(stage, "SessionLocal") as session,
-              patch.object(stage, "eligible_count", return_value=1183),
+              patch.object(stage, "load_desired_state", return_value=desired_state(1183)),
               patch.object(stage, "establish_hidden_memberships") as insert,
-              patch.object(stage.subprocess, "run") as invoke):
+              patch.object(stage, "reconcile_runtime_families", new_callable=AsyncMock) as invoke):
             session.return_value.__enter__.return_value = db
             self.assertEqual(stage.run(14, 3000, False), 0)
             insert.assert_not_called()
-            invoke.assert_not_called()
+            invoke.assert_not_awaited()
             db.commit.assert_not_called()
 
 
@@ -67,7 +76,7 @@ class CentralNodeStageTests(unittest.TestCase):
         db = MagicMock()
         db.get.return_value = fake
         with (patch.object(stage, "SessionLocal") as session,
-              patch.object(stage, "eligible_count", return_value=1183),
+              patch.object(stage, "load_desired_state", return_value=desired_state(1183)),
               patch.object(stage, "verify_new_exit_readiness", return_value={"ok": False}),
               patch.object(stage, "establish_hidden_memberships") as insert):
             session.return_value.__enter__.return_value = db
@@ -85,7 +94,7 @@ class CentralNodeStageTests(unittest.TestCase):
         )
 
 
-    def test_successful_four_adapter_stage_still_returns_partial(self):
+    def test_all_service_families_reconciled_once_after_snapshot(self):
         fake = MagicMock()
         fake.retired_at = None
         fake.node_type = NodeType.EXIT
@@ -94,15 +103,15 @@ class CentralNodeStageTests(unittest.TestCase):
         db = MagicMock()
         db.get.return_value = fake
         with (patch.object(stage, "SessionLocal") as session,
-              patch.object(stage, "eligible_count", return_value=3),
+              patch.object(stage, "load_desired_state", return_value=desired_state(3)),
               patch.object(stage, "verify_new_exit_readiness", return_value={"ok": True}),
               patch.object(stage, "establish_hidden_memberships", return_value=3),
               patch.object(stage, "verify_coverage", return_value={"ok": True}),
-              patch.object(stage.subprocess, "run") as invoke):
+              patch.object(stage, "reconcile_runtime_families", new_callable=AsyncMock) as invoke):
             session.return_value.__enter__.return_value = db
-            invoke.return_value.returncode = 0
+            invoke.return_value = {"ok": True, "failed": [], "succeeded": []}
             self.assertEqual(stage._run_locked(14, 3000, True), 0)
-            self.assertEqual(invoke.call_count, len(stage.ADAPTERS))
+            invoke.assert_awaited_once()
             db.commit.assert_called_once()
 
 
@@ -119,7 +128,7 @@ class CentralNodeStageTests(unittest.TestCase):
             calls_during_health.extend(session.get.call_args_list)
             return {"ok": False}
         with (patch.object(stage, "SessionLocal") as session,
-              patch.object(stage, "eligible_count", return_value=3),
+              patch.object(stage, "load_desired_state", return_value=desired_state(3)),
               patch.object(stage, "verify_new_exit_readiness", health)):
             session.return_value.__enter__.return_value = db
             with self.assertRaisesRegex(RuntimeError, "PROTOCOLS_NOT_READY"):
@@ -137,16 +146,16 @@ class CentralNodeStageTests(unittest.TestCase):
         db = MagicMock()
         db.get.return_value = fake
         with (patch.object(stage, "SessionLocal") as session,
-              patch.object(stage, "eligible_count", return_value=1900),
-              patch.object(stage, "assert_capacity",
+              patch.object(stage, "load_desired_state", return_value=desired_state(1900)),
+              patch.object(stage, "capacity_report",
                            side_effect=RuntimeError("SUDOKU_CENTRAL_STAGE_CAPACITY_NOT_SUPPORTED")),
               patch.object(stage, "establish_hidden_memberships") as enroll,
-              patch.object(stage.subprocess, "run") as invoke):
+              patch.object(stage, "reconcile_runtime_families", new_callable=AsyncMock) as invoke):
             session.return_value.__enter__.return_value = db
             with self.assertRaisesRegex(RuntimeError, "SUDOKU_CENTRAL_STAGE"):
                 stage._run_locked(14, 3000, True)
             enroll.assert_not_called()
-            invoke.assert_not_called()
+            invoke.assert_not_awaited()
             db.commit.assert_not_called()
 
 
