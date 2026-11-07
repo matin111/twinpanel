@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.661",
+  "version": "1.1.0-rc.662",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T19:35:18Z",
+  "released_at": "2026-11-07T19:57:13Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d0949e359578066266dfc0866703b115562b1aad",
+  "source_sha": "4faf90b3a92146f92166133d12bd12597fa428ce",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.661/twinpanel-1.1.0-rc.661-linux-x86_64.tar.gz",
-    "sha256": "f749397ee104565e34c3e35067b03c21eddbb0b419bedcf12dee04446aa13e41",
-    "size_bytes": 29326097
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.662/twinpanel-1.1.0-rc.662-linux-x86_64.tar.gz",
+    "sha256": "10314f3f7e005c9e88e36fca150bd55004a23d8503bb5c28a72c03c86ccf30cd",
+    "size_bytes": 29336328
   },
   "notes": {
-    "fa": "نسخه rc.661: اصلاح قطعی دو پرچم کنار هم در OpenVPN، WireGuard، AmneziaWG و Cisco با حفظ پرچم اصلی SVG و جلوگیری از ساخت پرچم دوم. رفع timeout نصب از طریق جایگزینی بررسی دسترسی Next.js مبتنی بر runuser با setpriv. تمام امکانات rc.660 از جمله پاپ‌آپ اطلاعات اتصال، تب همه/فیلتر کشورهای V2Ray و پرچم‌ها، دانلود OpenConnect تمام‌عرض، نام واقعی برنامه‌ها و دانلود v2rayN ویندوز حفظ شدند. تست نحوی و بررسی دسترسی موفق؛ تست کامل بصری همه دستگاه‌ها هنوز انجام نشده است.",
-    "en": "rc.661: fix duplicated native V76 country SVG plus V80 flag images on OpenVPN, WireGuard, AmneziaWG and Cisco rows; replace PAM-backed runuser installer permissions checks with setpriv to prevent five-second Next.js cache probe timeouts. Includes rc.660 desktop/mobile connection-info modals, V2Ray country tabs/flags, full-width Cisco installer, named client downloads and Windows v2rayN. JavaScript/Python and permission checks passed; full browser regression remains incomplete."
+    "fa": "نسخه rc.662: اصلاح واقعی دسته‌بندی موبایل پیشنهادی، مدرن، کلاسیک و همه (۵/۱۱/۵/۱۶ پروتکل)، رفع نمایش همه سرورها هنگام انتخاب یک کشور در AnyTLS/Naive/TUIC/ShadowTLS/Snell و V2Ray؛ حذف دو نوار فیلتر V2Ray؛ قرارگیری دانلود v2rayN داخل چهار دکمه فوتر ویندوز همراه Karing، حفظ کپی همه کانفیگ‌ها در عملیات اضافی؛ بازکردن اطلاعات اتصال در پاپ‌آپ موبایل و دسکتاپ. تست کلیک فیلتر، دسته‌بندی و پاپ‌آپ با DOM ساختار واقعی صفحه موفق بود؛ تست بصری روی گوشی واقعی هنوز کامل نیست. به تنظیمات VPN، نودها و اعتبار کاربران دست زده نشده است.",
+    "en": "rc.662: real mobile protocol category filtering Recommended/Modern/Classic/All (5/11/5/16 visible); correct per-country filtering in AnyTLS, Naive, TUIC, ShadowTLS, Snell and V2Ray; remove duplicate V2Ray country bars; put Windows v2rayN alongside Karing within four bottom actions and retain copy-all in secondary actions; intercept connection detail triggers into real mobile/desktop modal. DOM interaction smoke tests pass; full visual mobile browser testing remains outstanding. No VPN node or credential changes."
   }
 }
