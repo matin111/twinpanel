@@ -1,0 +1,31 @@
+/* Node observability + real job stage motion. No invented completion percent. */
+.node-metric-value{font-variant-numeric:tabular-nums;white-space:nowrap}
+.node-install-progress{direction:rtl;display:grid;gap:14px;padding:16px;border:1px solid rgba(130,138,160,.18);border-radius:18px;background:rgba(122,126,151,.06)}
+.node-install-progress-head{display:flex;align-items:center;gap:12px}
+.node-install-progress-head>div:last-child{display:grid;gap:4px;min-width:0}
+.node-install-progress-head b{font-size:16px;overflow-wrap:anywhere}
+.node-install-progress-head small{opacity:.72;line-height:1.7}
+.node-install-orb{width:42px;height:42px;flex:0 0 auto;display:grid;place-items:center;border:1px solid rgba(130,138,160,.28);border-radius:14px;background:rgba(108,60,255,.09);font-size:19px}
+.node-install-orb.is-working{color:#8b69ff;box-shadow:0 0 0 5px rgba(108,60,255,.08);animation:node-status-pulse 1.8s ease-in-out infinite}
+.node-install-orb.is-done{color:#23a86c;background:rgba(35,168,108,.12)}
+.node-install-orb.is-failed{color:#da5660;background:rgba(218,86,96,.09)}
+.node-install-running-line{height:4px;overflow:hidden;border-radius:99px;background:rgba(130,138,160,.17)}
+.node-install-running-line span{display:block;height:100%;width:100%;background:rgba(130,138,160,.25)}
+.node-install-running-line.is-active span{width:30%;border-radius:99px;background:linear-gradient(90deg,rgba(108,60,255,.1),#8152ff,rgba(108,60,255,.1));animation:node-install-wait 1.65s ease-in-out infinite}
+.node-install-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px}
+.node-install-step{display:flex;align-items:center;gap:8px;padding:11px 10px;border-radius:12px;border:1px solid rgba(130,138,160,.16);background:rgba(130,138,160,.035);font-size:12px;line-height:1.5}
+.node-install-step span:nth-child(2){flex:1}
+.node-install-step small{font-size:10px;white-space:nowrap;opacity:.65}
+.node-install-step-icon{display:grid;place-items:center;flex:0 0 24px;width:24px;height:24px;border-radius:8px;background:rgba(130,138,160,.16);font-weight:800}
+.node-install-step.is-done{border-color:rgba(35,168,108,.24);background:rgba(35,168,108,.055)}
+.node-install-step.is-done .node-install-step-icon{color:#15945b;background:rgba(35,168,108,.13)}
+.node-install-step.is-current{border-color:rgba(108,60,255,.4);background:rgba(108,60,255,.07)}
+.node-install-step.is-current .node-install-step-icon{color:#8152ff;background:rgba(108,60,255,.15)}
+.node-install-count{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:12px}
+.node-install-count b{font-variant-numeric:tabular-nums}
+.node-install-live-tag{font-size:10px;color:#15945b;border-radius:99px;background:rgba(35,168,108,.12);padding:3px 8px}
+.node-install-reopen{width:100%;margin-bottom:12px;text-align:right;padding:12px 14px;border:1px solid rgba(108,60,255,.34);border-radius:13px;background:rgba(108,60,255,.075);color:inherit;cursor:pointer;font-weight:700}
+@keyframes node-install-wait{0%{transform:translateX(350%)}100%{transform:translateX(-350%)}}
+@keyframes node-status-pulse{0%,100%{box-shadow:0 0 0 4px rgba(108,60,255,.07)}50%{box-shadow:0 0 0 9px rgba(108,60,255,.035)}}
+@media(max-width:640px){.node-install-progress{padding:11px}.node-install-steps{grid-template-columns:1fr}.node-install-step{padding:9px 10px}}
+@media(prefers-reduced-motion:reduce){.node-install-orb.is-working,.node-install-running-line.is-active span{animation:none}}
