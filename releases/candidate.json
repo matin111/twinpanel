@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.636",
-  "source_sha": "cd2131c8bdc5e8dbb56fd6dec221d43c3cbc36ed",
+  "version": "1.1.0-rc.637",
+  "source_sha": "f0c73f1807591382dc8d438b7c0b4f7f634b6616",
   "notes": {
-    "fa": "اصلاح چیدمان موبایل صفحه Connection مطابق مرجع؛ نمایش پرچم خودکار تمام کشورهای نود از country_code؛ نمایش نام اشتراک به‌جای نام ادمین. بدون تغییر کانفیگ، آدرس، پورت یا پروتکل.",
-    "en": "Match approved compact mobile Connection layout; decode all registered node country flags from server-provided ISO codes; display subscription username. No change to VPN configuration contents, hosts, ports, SNI, UUID, protocols or links."
+    "fa": "اصلاح نمایش دانلود و آپلود در تونل‌های TP27 Fast با افزایش مهلت محدود دریافت نتیجه تست TCP از ۳ به ۱۲ ثانیه؛ مشکل ثبت‌نشدن نتیجه در مسیرهای با تأخیر بالا رفع می‌شود. بدون تغییر هسته تونل، مسیر GRE، NAT، پروتکل‌ها یا تنظیمات کاربران.",
+    "en": "Fix TP27 Fast download/upload benchmark results on long-RTT tunnels: extend the bounded TCP receiver finalization window from 3 to 12 seconds after sender completion. No GRE carrier, NAT, port mapping, protocol, credential, or customer config change."
   }
 }
