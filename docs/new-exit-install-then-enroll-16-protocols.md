@@ -27,22 +27,44 @@ sequence, not copying Eylan's private controller.
    publish-and-backfill queue. This does not manually recreate users in the
    FastAPI request.
 
-## Explicit blockers before enabling as the production default
+## Status and remaining blockers before merging
 
-The current catalog still marks **mieru, trusttunnel, amneziawg, sudoku**
-as adapter_pending / experimental_pending. They are not installable through
-the currently supported automatic Modern installer. The draft therefore
-**deliberately blocks publication for a fresh 16-protocol Exit** until
-those adapters and node health checks are implemented.
+All 16 protocol names are present in the canonical account registry. Four
+standalone adapters (Mieru, TrustTunnel, AmneziaWG, Sudoku) are activated at
+runtime by `standalone_protocol_runtime`; their static catalog initially
+shows pending because that import applies runtime overrides. The modern
+bootstrap now explicitly activates these adapters and can use each catalog's
+recommended defaults when there is no healthy source node.
 
-Other incomplete work:
-- A durable, restart-resumable **node installation** job (current API uses
-  an in-process detached task).
-- Native bulk user sync for all Classic/Modern adapters, not just the
-  existing bounded Xray pilot and sing-box migration path.
-- End-to-end applied count verified on-node and subscription delivery,
-  before promising a three-minute or immediate 1700-account rollout.
-- Automatic resume/retry when pending protocols become ready.
+The draft also:
+- Keeps newly staged Exit nodes hidden until publication.
+- Defers the legacy per-user subscription loop for Exit only; leaves Iran
+  relay behavior unchanged.
+- Persists effective ports after runtime conflict remapping.
+- Requires a new read-only SSH/service/listener health audit of all sixteen
+  protocols before marking the node desired for eligible users.
+
+**Still not complete:** The current automatic enrollment queue has only six
+worker families and some account writers still operate per user. The 16
+protocol services becoming healthy is a separate milestone from having all
+active users applied at the node. We must not report 1,700 accounts "active"
+or `3 minutes` based only on membership rows or queued work.
+
+The new-node background installer itself is still an in-process FastAPI task.
+A process restart can interrupt setup; the proper future fix is a durable,
+restart-resumable installer with persisted stage and safe credential handling.
+
+End-to-end acceptance must measure:
+1. A completely new Exit (including standalone protocols) is installed.
+2. Exactly the expected *eligible* old subscriptions and their purchased
+   protocol permissions are enrolled, without UUID/password rotation.
+3. Each new-node live protocol has all its intended users, not just SQL
+   membership. The last verification includes multiple account clients.
+4. The app and existing Exit nodes stay online through failure/retry.
+5. Restart during install/backfill resumes without duplicating accounts.
+
+Do not merge or deploy this draft to production before that integration
+testing and the remaining bulk adapters are complete.
 
 ## Safety
 
