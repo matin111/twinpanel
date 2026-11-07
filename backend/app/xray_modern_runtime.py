@@ -507,6 +507,9 @@ state = {{
     "reality_target": reality_target,
     "reality_server_name": reality_server_name,
     "reality_legacy_server_names": legacy_reality_names,
+    # Only explicitly opted-in nodes set BBR for Xray listener sockets.
+    # Never change the host-wide TCP default or unrelated VPN processes.
+    "vless_tcp_congestion": "bbr" if str(state.get("vless_tcp_congestion") or "").lower() == "bbr" else "",
     "tls_sni_tcp": str(state.get("tls_sni_tcp") or ""),
     "tls_sni_ws": str(state.get("tls_sni_ws") or ""),
     "short_id_xhttp": short_id_xhttp,
@@ -852,6 +855,7 @@ async def _ensure_modern_xray(
             "streamSettings": {
                 "network": "xhttp",
                 "security": "reality",
+                **({"sockopt": {"tcpcongestion": "bbr"}} if state.get("vless_tcp_congestion") == "bbr" else {}),
                 "xhttpSettings": {
                     "path": str(state["xhttp_path"]),
                     "mode": "stream-up",
@@ -878,6 +882,7 @@ async def _ensure_modern_xray(
                 "streamSettings": {
                     "network": "ws",
                     "security": "tls",
+                    **({"sockopt": {"tcpcongestion": "bbr"}} if state.get("vless_tcp_congestion") == "bbr" else {}),
                     "wsSettings": {
                         "path": str(state["ws_path"]),
                     },
