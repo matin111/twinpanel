@@ -49,6 +49,7 @@ function NodeInstallProgress({job,error}:{job:NodeInstallJob|null;error:string})
     ...(job?.expected_protocols?[
       ["installing_xray","آماده‌سازی Xray","Preparing Xray"],
       ["installing_modern","نصب پروتکل‌های مدرن","Installing modern protocols"],
+      ["verified_ready","تأیید سلامت سرویس‌ها","Services verified healthy"],
       ["enrolling_users","ثبت اکانت‌ها در مدیریت مرکزی","Enrolling accounts"],
     ] as [string,string,string][]:[]),
   ];
