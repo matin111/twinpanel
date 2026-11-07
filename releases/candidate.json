@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.658",
-  "source_sha": "253e6250d96aea56b495fbfb71f9abb33eb82f15",
+  "version": "1.1.0-rc.659",
+  "source_sha": "bd417f01ecb56e0f2b14d2c2e97bdcffe1c8965d",
   "notes": {
-    "fa": "نسخه rc.658: حفظ تمام اصلاحات مشترک دکمه‌های Connection نسخه rc.657 برای همه پروتکل‌ها؛ افزایش محدود و کنترل‌شده ظرفیت استخر دیتابیس درخواست‌های وب از ۱۰+۶ به ۱۶+۱۶ اتصال با مهلت ۱۰ ثانیه به‌منظور کاهش خطای ۵۰۰ هنگام هم‌زمانی درخواست‌های نود و کاربر. سرور، تونل، اطلاعات اشتراک و کانفیگ‌ها تغییر نمی‌کنند. تست تعاملی همه پروتکل‌ها هنوز تکمیل نشده و تراکنش‌های طولانی دیتابیس همچنان نیازمند بررسی ریشه‌ای هستند.",
-    "en": "rc.658: preserves rc.657 universal Connection footer and protocol controls; increases dedicated HTTP request DB pool from 10+6 to 16+16 with 10-second wait to reduce request failures under concurrent node polling/admin/Connection load, without altering VPN nodes, tunnels, credentials, or configs. Full browser regression and root-cause investigation of long-lived DB transactions remain outstanding."
+    "fa": "نسخه rc.659: بازگرداندن واقعی دکمه دانلود برنامه در همه پروتکل‌های پشتیبانی‌شده. به‌جای انتقال لینک‌های مخفی کارت قدیمی، دکمه جدید و قابل مشاهده با لینک دانلود مخصوص پروتکل و سیستم‌عامل ساخته می‌شود؛ حذف hidden و style پنهان، حفظ چیدمان چهار دکمه ویندوز و یک دکمه بالا و سه دکمه پایین اندروید. آزمایش DOM در ۱۴ پروتکل با سناریوی لینک قدیمی مخفی تأیید شد. دانلود کلاینت‌های Karing، OpenVPN، WireGuard، AmneziaWG، OpenConnect، TrustTunnel و Sudoku نیز از روی سرور بررسی شد. تست بصری واقعی همه مرورگرها هنوز تکمیل نشده است.",
+    "en": "rc.659: restore real visible protocol-specific client download buttons in Connection. Replace hidden legacy client-card anchor reuse with a fresh visible accessible link using the appropriate platform and protocol download endpoint. Preserve desktop four-action row and Android one full-width plus three actions. Synthetic DOM test with hidden legacy links verified visible app-action text and URLs for 14 protocols; client download endpoints tested on running server. Complete browser visual regression still outstanding."
   }
 }
