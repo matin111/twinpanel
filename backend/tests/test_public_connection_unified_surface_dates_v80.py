@@ -55,6 +55,9 @@ def test_native_only_one_node_detail_may_appear():
 
 def test_one_protocol_selection_wins_over_legacy_mobile_handlers():
     ui=code("public_connection_unified_surface_dates_v80.py")
+    v77=code("public_connection_reference_active_v77.py")
+    assert "const mobileOpen=compact&&candidates.find" in v77
+    assert "const target=mobileOpen||saved||active||v2ray||candidates[0]" in v77
     assert "function reconcileProtocolSelection()" in ui
     assert "selectedProtocol=card.dataset.protocol" in ui
     assert "queueMicrotask(reconcileProtocolSelection)" in ui
