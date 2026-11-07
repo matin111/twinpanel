@@ -90,14 +90,21 @@ def _modern_direct_item_is_usable_uncached(
     if account_delivery._delivery_active_tunnels(db, node):
         return False
 
-    cfg = (
-        db.query(NodeProtocolConfig)
-        .filter(
-            NodeProtocolConfig.node_id == node_id,
-            NodeProtocolConfig.protocol == key,
+    config_cache = db.info.get("_tp_public_connection_cfg_cache_v102")
+    if (
+        isinstance(config_cache, dict)
+        and db.info.get("_tp_public_connection_cfg_prefetched_v103")
+    ):
+        cfg = config_cache.get((node_id, key))
+    else:
+        cfg = (
+            db.query(NodeProtocolConfig)
+            .filter(
+                NodeProtocolConfig.node_id == node_id,
+                NodeProtocolConfig.protocol == key,
+            )
+            .first()
         )
-        .first()
-    )
     return bool(cfg and _status_value(getattr(cfg, "status", None)) == "online")
 
 
