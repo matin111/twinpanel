@@ -205,7 +205,11 @@ async def run_one(db,node_id:int,limit:int,apply:bool)->int:
     }),flush=True)
     if not selected or not apply:
         return 0
-    if new_account_work_has_priority():
+    # A published centrally owned Exit IS the live purchase reconciler.
+    # Blocking it because there is new-account work creates a deadlock:
+    # those very purchases cannot converge until this daemon family runs.
+    # During initial hidden-node bulk import, keep the priority guard.
+    if not node.show_to_users and new_account_work_has_priority():
         raise RuntimeError("PAID_ACCOUNT_PROVISIONING_HAS_PRIORITY")
     entries=[(ident,f"mv-{sid}@twinpanel") for sid,ident,_ in selected]
     remote_script=staged_hot_script(entries)
@@ -271,11 +275,18 @@ async def run_one(db,node_id:int,limit:int,apply:bool)->int:
 async def run(node_id:int,limit:int,apply:bool,all_batches:bool):
     with SessionLocal() as db:
         if apply:
-            readiness=await asyncio.wait_for(
-                verify_new_exit_readiness(db,node_id),timeout=510,
-            )
-            if not readiness.get("ok"):
-                raise RuntimeError("16_PROTOCOL_READINESS_NOT_VERIFIED")
+            node=db.get(Node,node_id)
+            if not allow_central_node(db,node):
+                raise RuntimeError("CENTRAL_XRAY_NODE_NOT_OWNED")
+            # The full 16-protocol SSH readiness audit belongs to initial
+            # hidden-node staging. Published central Exits were already
+            # certified, and Xray's own adapter checks its live service.
+            if not node.show_to_users:
+                readiness=await asyncio.wait_for(
+                    verify_new_exit_readiness(db,node_id),timeout=510,
+                )
+                if not readiness.get("ok"):
+                    raise RuntimeError("16_PROTOCOL_READINESS_NOT_VERIFIED")
         total=0
         for cycle in range(MAX_CYCLES if all_batches and apply else 1):
             saved=await run_one(db,node_id,limit,apply)
