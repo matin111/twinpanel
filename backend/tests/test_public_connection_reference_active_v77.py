@@ -56,7 +56,7 @@ def test_v2ray_profiles_remain_real_but_collapsed_by_default():
     v54 = read("public_connection_v2ray_mobile_restore_v54.py")
     assert "card.classList.add('open')" not in v74
     assert "card.classList.toggle('open')" in v54
-    assert "if(profiles.length!==3)return null" in v54
+    assert "if(!profiles.length)return null" in v54
     assert "profiles.forEach((profile,profileIndex)=>body.appendChild(profileRow(profile,profileIndex)))" in v54
 
 
