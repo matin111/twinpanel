@@ -34,7 +34,7 @@ def test_real_node_per_protocol_rendered_with_identity_and_deliverable(protocol)
              ]}]}
     cards,panels=render_protocols(payload,"demo","dummy",{})
     assert cards.count('class="protocol-choice')==1, protocol
-    assert panels.count('class="server-tab')==2, protocol
+    assert panels.count('data-server="hub-protocol-0-server-')==2, protocol
     assert 'data-node-id="13"' in panels and 'data-node-id="11"' in panels
     assert 'data-country-code="DE"' in panels and 'data-country-code="US"' in panels
     assert 'data-latency-ms' not in panels  # no stale RTT surfaced
