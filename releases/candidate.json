@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.639",
-  "source_sha": "9312891817298f2be1da89da9bd2c2d302957e7b",
+  "version": "1.1.0-rc.641",
+  "source_sha": "6fb6f6511f4fb94ec5b57c94139e03b11843603f",
   "notes": {
-    "fa": "بازگردانی دانلود فایل OpenVPN و WireGuard، نمایش واقعی سرور و اطلاعات Cisco و L2TP، لینک دانلود برنامه مخصوص پروتکل با تشخیص دستگاه، پرچم واقعی کشورها در ویندوز و حذف دسته‌بندی تکراری؛ بدون تغییر کانفیگ‌ها و آدرس سرورها.",
-    "en": "Restore actual per-node OpenVPN/WireGuard file downloads and Cisco/L2TP server credentials, preserve per-protocol app download links for Windows/macOS/iOS/Android/Linux, fix Windows country flags and duplicate category strip; no VPN config, endpoint, port, SNI, UUID or subscription changes."
+    "fa": "رفع قطعی وابستگی لینک‌های V2Ray به DNS/CDN فیلترشده: آدرس اتصال VLESS در تونل‌های ایران از IP واقعی نود ایران تحویل می‌شود؛ SNI، Host، مسیرها، کلیدها، UUID و پورت‌ها بدون تغییر. مسیر Agent کنترل مرکزی نیز با HTTPS امن مستقیم روی IP پایدار شده است. اصلاحات و امکانات قبلی حفظ می‌شوند.",
+    "en": "DNS-independent VLESS delivery: use the assigned Iran tunnel ingress public IPv4 for the connection address while retaining TLS SNI, WS Host, REALITY keys, UUIDs, ports and paths. Includes secure IP-pinned Node Agent control plane; no GRE, NAT or other protocol runtime changes."
   }
 }
