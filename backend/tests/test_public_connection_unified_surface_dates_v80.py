@@ -73,7 +73,7 @@ def test_same_node_rows_countries_and_real_action_footer_for_every_protocol():
     assert "const ordered=[primary,find('link'),fileProtocol?null:find('copy'),find('app')].filter(Boolean)" in ui
     assert "footer.replaceChildren(...ordered)" in ui  # move original buttons
     assert "missing.disabled=true" not in ui  # no dead placeholders
-    assert "const extra=children.filter(node=>!ordered.includes(node))" in ui
+    assert "const extra=children.filter(node=>!ordered.includes(node)&&node!==primary&&node!==previousPrimary" in ui
     assert "tp80-extra-actions" in ui  # extra formats collapsed, but retained
 
 def test_manual_credentials_rehydration_preserves_actual_copy_controls():
