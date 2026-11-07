@@ -2,18 +2,25 @@ from __future__ import annotations
 
 import asyncio
 import csv
+import re
 import socket
 import time
 import uuid
 from datetime import datetime, timezone
 
 from ..database import SessionLocal
-from ..models import Node
+from ..models import Node, ProtocolCredential
 from ..quota_models import QuotaSession
 from ..quota_schemas import SessionCloseIn, SessionOpenIn, UsageEventIn
 from ..quota_service import close_session
 from ..routers.provision import ssh_connect_saved
-from .quota_node_sync import build_node_devices
+from ..protocol_identity import is_openvpn_central_pki_enabled
+from .quota_node_sync import (
+    _credential_node_ids,
+    _legacy_subscription_node_ids,
+    _quota_device_for_credential,
+    _runtime_identity,
+)
 from .reseller_traffic_pool import apply_usage_event, open_session
 
 
@@ -238,19 +245,80 @@ async def _collect_openvpn_sessions(
         return False, [], f"openvpn_status_parse_failed:{exc}"
 
 
-def _openvpn_device_map(db, node_id: int) -> dict[str, dict]:
-    devices = build_node_devices(db, int(node_id))
-    result: dict[str, dict] = {}
+def _openvpn_device_map(
+    db, node_id: int, observed: list[dict] | None = None,
+) -> dict[str, dict]:
+    """Resolve only live OpenVPN identities to their existing quota devices.
 
-    for item in devices:
-        if str(item.get("protocol") or "") != "openvpn":
+    The former build_node_devices() decrypted *every protocol credential* for
+    every node (tens of thousands of payloads), then issued thousands of device
+    queries. The collector exceeded its 180s process timeout before opening even
+    one live OpenVPN session. Runtime OpenVPN CNs are deterministic and include
+    subscription IDs, so limit DB reads to those actually observed by OpenVPN.
+
+    Do not trust an arbitrary CN as membership: confirm active credential, actual
+    node delivery membership and the existing canonical runtime identity.
+    """
+    node_id = int(node_id)
+    names = {
+        str(item.get("identity") or "").strip()
+        for item in (observed or [])
+        if item.get("identity")
+    }
+    if not names:
+        return {}
+
+    canonical_ids: set[int] = set()
+    for name in names:
+        per_node = re.fullmatch(r"mv([0-9]+)n([0-9]+)", name)
+        central = re.fullmatch(r"mv-sub-([0-9]+)", name)
+        if per_node and int(per_node.group(2)) == node_id:
+            canonical_ids.add(int(per_node.group(1)))
+        elif central:
+            canonical_ids.add(int(central.group(1)))
+    if not canonical_ids:
+        return {}
+
+    central_enabled = is_openvpn_central_pki_enabled(db)
+    credentials = (
+        db.query(ProtocolCredential)
+        .filter(
+            ProtocolCredential.protocol == "openvpn",
+            ProtocolCredential.is_active.is_(True),
+            ProtocolCredential.subscription_id.in_(canonical_ids),
+        )
+        .order_by(ProtocolCredential.id.asc())
+        .all()
+    )
+    result: dict[str, dict] = {}
+    for credential in credentials:
+        sub_id = int(credential.subscription_id)
+        identity = _runtime_identity(
+            protocol="openvpn",
+            subscription_id=sub_id,
+            node_id=node_id,
+            fallback_identity=str(credential.username or ""),
+            openvpn_central_pki_enabled=central_enabled,
+        )
+        if identity not in names or identity in result:
+            continue
+        stored_nodes = _credential_node_ids(credential)
+        if stored_nodes:
+            if node_id not in stored_nodes:
+                continue
+        elif node_id not in _legacy_subscription_node_ids(db, sub_id):
             continue
 
-        identity = str(item.get("telemetry_identity") or "").strip()
-
-        if identity:
-            result[identity] = item
-
+        device = _quota_device_for_credential(db, credential)
+        if device is None:
+            continue
+        result[identity] = {
+            "subscription_id": sub_id,
+            "device_id": int(device.id),
+            "identity": identity,
+            "telemetry_identity": identity,
+            "protocol": "openvpn",
+        }
     return result
 
 
@@ -271,7 +339,7 @@ def _touch_session(db, node_id: int, session_key: str, now: datetime) -> None:
 
 def _apply_openvpn_sessions(db, node: Node, observed: list[dict]) -> dict:
     node_id = int(node.id)
-    devices = _openvpn_device_map(db, node_id)
+    devices = _openvpn_device_map(db, node_id, observed)
     now_aware = datetime.now(timezone.utc)
     now_naive = now_aware.replace(tzinfo=None)
     sequence_base = int(time.time_ns() // 1_000_000)
