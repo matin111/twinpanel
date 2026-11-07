@@ -108,18 +108,18 @@ try:
             "httpmask":{"disable":False,"mode":"auto","tls":False,
                         "host":"","path_root":""},"reverse":{"listen":""},
         }
-        config.write_text(json.dumps(server,ensure_ascii=False,indent=2)+"\\n")
+        config.write_text(json.dumps(server,ensure_ascii=False,indent=2)+"\n")
         os.chmod(config,0o600)
-        marker.write_text(str(sid)+"\\n")
+        marker.write_text(str(sid)+"\n")
         os.chmod(marker,0o600)
         body=(
-            "[Unit]\\nDescription=TwinPanel Sudoku subscription "+str(sid)+
-            "\\nAfter=network-online.target\\nWants=network-online.target"+
-            "\\n[Service]\\nType=simple\\nUser=root\\nExecStart="+
+            "[Unit]\nDescription=TwinPanel Sudoku subscription "+str(sid)+
+            "\nAfter=network-online.target\nWants=network-online.target"+
+            "\n[Service]\nType=simple\nUser=root\nExecStart="+
             str(PROGRAM)+" -c "+str(config)+
-            "\\nRestart=on-failure\\nRestartSec=3"+
-            "\\nLimitNOFILE=1048576\\n[Install]"+
-            "\\nWantedBy=multi-user.target\\n"
+            "\nRestart=on-failure\nRestartSec=3"+
+            "\nLimitNOFILE=1048576\n[Install]"+
+            "\nWantedBy=multi-user.target\n"
         )
         unit.write_text(body)
         os.chmod(unit,0o644)
@@ -175,7 +175,7 @@ async def apply_bulk(conn: Any, accounts: list[dict]) -> dict:
     verify_accounts(accounts)
     encoded=base64.b64encode(remote_source().encode()).decode("ascii")
     process=await asyncio.wait_for(
-        conn.create_process("python3 -c \\"$(printf '%s' '"+encoded+"' | base64 -d)\\""),
+        conn.create_process("python3 -c \"$(printf '%s' '"+encoded+"' | base64 -d)\""),
         timeout=25,
     )
     process.stdin.write(json.dumps(accounts))
