@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.633",
-  "source_sha": "886c92933582c7ed31e593131cc7741974826d35",
+  "version": "1.1.0-rc.634",
+  "source_sha": "9cda8c51681a5de1432fe05ba733cc4d9b3c2da0",
   "notes": {
-    "fa": "طراحی موبایل و دسکتاپ صفحه Connection مطابق طرح تأییدشده، بهبود دکمه‌های افزودن تکی با لینک‌های واقعی و حفظ کامل کانفیگ‌ها، پروتکل‌ها و آدرس سرورها.",
-    "en": "Approved responsive desktop/mobile Connection UI with existing-link single add controls; strictly no VPN config, protocol, endpoint or credentials changes."
+    "fa": "بهینه‌سازی واقعی مدیریت مرکزی در ساخت دسته‌ای V2Ray: ساخت محلی پروفایل از مرجع معتبر همان نود، ثبت همه Credentialهای دسته در یک تراکنش، تأیید موازی همه کاربران با کنترل تعداد و Rollback. بدون تغییر UUID یا راه‌اندازی مجدد Xray. حالت پایلوت محدود و دستی باقی می‌ماند.",
+    "en": "Centralized V2Ray batch provisioning: locally materialize per-user Reality profiles from validated same-node template, persist entire batch in one atomic DB transaction, and concurrently verify all hot-added users with bounded read-only Xray API calls. No UUID changes or Xray restart. Pilot remains opt-in and limited."
   }
 }
