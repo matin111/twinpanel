@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.659",
+  "version": "1.1.0-rc.660",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T18:56:48Z",
+  "released_at": "2026-11-07T19:23:34Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "bd417f01ecb56e0f2b14d2c2e97bdcffe1c8965d",
+  "source_sha": "f0397648849892a7bb0293593012586ecf37b3e5",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.659/twinpanel-1.1.0-rc.659-linux-x86_64.tar.gz",
-    "sha256": "30ca803f80dd4fa6ae200fdac163ec868b0ce4b289c7aad973d04a380f8581cb",
-    "size_bytes": 29319747
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.660/twinpanel-1.1.0-rc.660-linux-x86_64.tar.gz",
+    "sha256": "83e8b1da96958573d7c7898ce47c73236fe07815969d6e92222e8db0a1cb791b",
+    "size_bytes": 29323912
   },
   "notes": {
-    "fa": "نسخه rc.659: بازگرداندن واقعی دکمه دانلود برنامه در همه پروتکل‌های پشتیبانی‌شده. به‌جای انتقال لینک‌های مخفی کارت قدیمی، دکمه جدید و قابل مشاهده با لینک دانلود مخصوص پروتکل و سیستم‌عامل ساخته می‌شود؛ حذف hidden و style پنهان، حفظ چیدمان چهار دکمه ویندوز و یک دکمه بالا و سه دکمه پایین اندروید. آزمایش DOM در ۱۴ پروتکل با سناریوی لینک قدیمی مخفی تأیید شد. دانلود کلاینت‌های Karing، OpenVPN، WireGuard، AmneziaWG، OpenConnect، TrustTunnel و Sudoku نیز از روی سرور بررسی شد. تست بصری واقعی همه مرورگرها هنوز تکمیل نشده است.",
-    "en": "rc.659: restore real visible protocol-specific client download buttons in Connection. Replace hidden legacy client-card anchor reuse with a fresh visible accessible link using the appropriate platform and protocol download endpoint. Preserve desktop four-action row and Android one full-width plus three actions. Synthetic DOM test with hidden legacy links verified visible app-action text and URLs for 14 protocols; client download endpoints tested on running server. Complete browser visual regression still outstanding."
+    "fa": "نسخه rc.660: نمایش اطلاعات اتصال در پاپ‌آپ دسکتاپ و موبایل؛ اضافه‌شدن تب همه و فیلتر کشورهای واقعی با پرچم یکسان به V2Ray، حذف پرچم تکراری کلاسیک‌ها، تمام‌عرض شدن دانلود OpenConnect در Cisco، نمایش نام واقعی کلاینت در دانلود برنامه‌ها (OpenVPN، WireGuard، AmneziaWG، OpenConnect، TrustTunnel، Sudoku و Karing) و لینک مجزای دانلود v2rayN در ویندوز. چیدمان چهار دکمه ویندوز و یک به‌علاوه سه دکمه اندروید و عملکردهای اصلی کپی/افزودن/دانلود حفظ شدند. تست نحوی جاوااسکریپت و آزمون فیلتر کشورها موفق بوده؛ تست بصری و کلیک همه حالت‌ها در مرورگر واقعی هنوز کامل نشده است.",
+    "en": "rc.660: desktop/mobile server-connection information modals; real V2Ray country/flag tabs with working All and country filters; remove duplicate classic node flags; full-width sole Cisco/OpenConnect installer action; named platform-specific client downloads (OpenVPN, WireGuard, AmneziaWG, OpenConnect, TrustTunnel, Sudoku, Karing); distinct Windows v2rayN download. Retain four desktop footer actions and Android 1+3 layout and real config handlers. JS syntax and synthetic country filtering checked; full interactive browser regression remains incomplete."
   }
 }
