@@ -7,6 +7,7 @@ node/protocol job and exits. Paid-account provisioning has priority.
 from __future__ import annotations
 
 import ast
+import json
 import fcntl
 import os
 import re
@@ -91,7 +92,88 @@ def sanitized_backfill_error(stdout: str, exit_code: int) -> str:
     return f"BACKFILL_EXIT_{int(exit_code)}"
 
 
+def _central_xray_bulk_enabled(node_id: int, protocol: str) -> bool:
+    """Explicit rollout for the validated node-13 pilot only.
+
+    Normal central backfill remains the default for every installation,
+    protocol and node. A release by itself cannot enable live bulk writes.
+    """
+    return (
+        protocol == "v2ray"
+        and node_id == 13
+        and os.getenv("TWINPANEL_CENTRAL_XRAY_BULK_NODE13", "0") == "1"
+    )
+
+
+def _parse_central_xray_bulk(stdout: str, node_id: int) -> int | None:
+    """Accept only the pilot's verified *central DB commit* count.
+
+    0 means no selectable existing-UUID accounts; the legacy missing-only
+    worker must then reconcile remaining users. None means unconfirmed output
+    and must never be reported as success.
+    """
+    plans = re.findall(r"^BULK_XRAY_PILOT_PLAN\s+(\{[^\n]+\})$", stdout, re.MULTILINE)
+    results = re.findall(r"^BULK_XRAY_PILOT_RESULT\s+(\{[^\n]+\})$", stdout, re.MULTILINE)
+    if len(plans) != 1 or len(results) > 1:
+        return None
+    try:
+        plan = json.loads(plans[0])
+        selected = int(plan["selected"])
+        if (
+            int(plan["node_id"]) != node_id
+            or plan["mode"] != "apply"
+            or not 0 <= selected <= 10
+        ):
+            return None
+        if selected == 0:
+            return 0 if not results else None
+        if len(results) != 1:
+            return None
+        result = json.loads(results[0])
+        committed = int(result["centrally_published"])
+        if (
+            int(result["node_id"]) != node_id
+            or int(result["selected"]) != selected
+            or not 0 <= committed <= selected
+        ):
+            return None
+        return committed
+    except (ValueError, TypeError, KeyError, AttributeError):
+        return None
+
+
 def execute_one(node_id: int, protocol: str) -> tuple[int, str | None]:
+    if _central_xray_bulk_enabled(node_id, protocol):
+        # The existing pilot guarantees a validated same-node template,
+        # existing UUID, multi-user Xray hot-add, and ONE central DB commit.
+        # It never creates user identities or restarts Xray.
+        pilot = [
+            sys.executable,
+            str(BACKEND / "scripts/twinpanel_xray_bulk_pilot_v1.py"),
+            "--node-id", str(node_id), "--limit", "10", "--apply",
+        ]
+        try:
+            result = subprocess.run(
+                pilot, cwd=str(BACKEND),
+                env={**os.environ, "PYTHONPATH": str(BACKEND)},
+                capture_output=True, text=True, timeout=100, check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return 0, "CENTRAL_XRAY_BULK_TIMEOUT"
+        except OSError:
+            return 0, "CENTRAL_XRAY_BULK_START_ERROR"
+        if result.returncode:
+            # A partial hot-add can be recovered idempotently on the next
+            # claim. Never switch to a competing writer on failure.
+            return 0, "CENTRAL_XRAY_BULK_EXIT_" + str(result.returncode)
+        committed = _parse_central_xray_bulk(result.stdout or "", node_id)
+        if committed is None:
+            return 0, "CENTRAL_XRAY_BULK_UNCONFIRMED"
+        if committed:
+            return committed, None
+        # A node can also have users without reusable V2Ray UUIDs.
+        # Continue through the existing narrowly scoped repair path.
+
     cmd = [
         sys.executable,
         str(BACKEND / "scripts/twinpanel_existing_node_backfill_v1.py"),
