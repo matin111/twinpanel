@@ -102,8 +102,13 @@ def pending_for_node(
         ).all()
     }
     work = []
+    seen: set[tuple[int, str]] = set()
     for sub, protocol in candidates:
         protocol = str(protocol)
+        pair = (int(sub.id), protocol)
+        if pair in seen:
+            continue
+        seen.add(pair)
         cfg = configs.get(protocol)
         if cfg is None:
             # Mark the job retryable, never 'done', when a purchased runtime
