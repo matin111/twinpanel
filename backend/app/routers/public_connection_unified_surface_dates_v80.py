@@ -116,6 +116,49 @@ body.tp80-connection .tp80-country-bar img{
   width:24px!important;height:18px!important;object-fit:cover!important;border-radius:4px!important;
 }
 body.tp80-connection .tp80-country-flag{font-size:20px!important;line-height:1!important}
+
+/* Shared native nodes: one compact 62px row for OpenVPN, WireGuard,
+   Cisco, L2TP and AmneziaWG. Only the selected node expands directly below. */
+html body.tp80-connection .protocol-panel.tp80-native .tp77-native-list{
+  display:block!important;align-self:stretch!important;
+}
+html body.tp80-connection .protocol-panel.tp80-native .tp77-native-row{
+  display:flex!important;flex-direction:row!important;align-items:center!important;
+  justify-content:space-between!important;gap:10px!important;
+  min-height:62px!important;max-height:82px!important;height:auto!important;
+  padding:8px 12px!important;box-sizing:border-box!important;
+}
+html body.tp80-connection .protocol-panel.tp80-native .tp77-native-label{
+  display:flex!important;flex-direction:row!important;align-items:center!important;
+  min-width:0!important;flex:1!important;
+}
+html body.tp80-connection .tp80-country-image{width:25px!important;height:18px!important;
+ object-fit:cover!important;flex-shrink:0!important;border-radius:3px!important}
+html body.tp80-connection .tp80-inline-native-detail[hidden]{display:none!important}
+html body.tp80-connection .protocol-panel.tp80-native .tp80-inline-native-detail:not([hidden]){
+  display:block!important;position:relative!important;margin:0!important;padding:12px!important;
+  background:#16233c!important;border-bottom:1px solid #384968!important;
+}
+html body.tp80-connection .protocol-panel.tp80-native .tp80-inline-native-detail:not([hidden]) .server-view{
+  display:block!important;width:100%!important;max-width:100%!important;
+  margin:0!important;padding:0!important;background:transparent!important;
+}
+html body.tp80-connection .protocol-panel.tp80-native .tp80-inline-native-detail .facts{
+  display:grid!important;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))!important;
+  gap:8px!important;
+}
+html body.tp80-connection .protocol-panel.tp80-native .tp80-inline-native-detail .fact{
+  min-height:65px!important;min-width:0!important;
+}
+@media(max-width:720px){
+ html body.tp80-connection .protocol-panel.tp80-native .tp77-native-row{
+   min-height:58px!important;max-height:80px!important;padding:8px!important;
+ }
+ html body.tp80-connection .protocol-panel.tp80-native .tp80-inline-native-detail .facts{
+   grid-template-columns:repeat(2,minmax(0,1fr))!important
+ }
+}
+
 html body.tp80-connection .protocol-panel.tp80-native > .tp80-credentials{
   display:block!important;visibility:visible!important;padding:10px!important;
 }
@@ -444,6 +487,13 @@ _SCRIPT = r"""
          const visible=country==='ALL'||row.dataset.tp80CountryCode===country;
          row.hidden=!visible;
          row.dataset.tp80CountryHidden=visible?'0':'1';
+         const detail=row.nextElementSibling;
+         if(detail?.classList.contains('tp80-inline-native-detail')){
+           detail.hidden=true;
+           detail.dataset.tp80Expanded='0';
+         }
+         row.querySelector('.tp80-detail-toggle')?.setAttribute('aria-expanded','false');
+         row.querySelector('.tp80-detail-toggle')?.replaceChildren('نمایش اطلاعات');
        });
        choices.forEach(btn=>btn.classList.toggle('active',btn.dataset.tp80Country===country));
        // Filtering must not invoke tab.click(): older scripts reset the view.
@@ -451,11 +501,21 @@ _SCRIPT = r"""
      };
      for(const [country,group] of groups){
        const btn=el('button','');btn.type='button';btn.dataset.tp80Country=country;
-       const source=group.tab.querySelector('img');
-       if(source){const img=source.cloneNode(true);img.alt=country;btn.append(img)}
-       else if(country!=='OTHER'){
-         const flag=[...country].map(c=>String.fromCodePoint(127397+c.charCodeAt(0))).join('');
-         btn.append(el('span','tp80-country-flag',flag));
+       // Flags must render as images on Windows too (regional Unicode is often
+       // displayed as DE/US/TR letters, not the flag artwork). Prefer the
+       // actual icon already in the visible node row.
+       const index=group.indices[0];
+       const source=rows[index]?.querySelector('.tp77-native-label img')||
+         group.tab.querySelector('img');
+       if(source){
+         const img=source.cloneNode(true);
+         img.classList.add('tp80-country-image');img.alt=country;btn.append(img);
+       }else if(country!=='OTHER'){
+         const img=el('img','tp80-country-image');
+         img.alt=country;img.loading='lazy';
+         img.src='https://flagcdn.com/w40/'+country.toLowerCase()+'.png';
+         img.onerror=()=>{img.replaceWith(el('span','tp80-country-fallback',country))};
+         btn.append(img);
        }
        btn.append(document.createTextNode(' '+country+(group.indices.length>1?' ('+group.indices.length+')':'')));
        btn.addEventListener('click',()=>filterByCountry(country));
@@ -465,13 +525,12 @@ _SCRIPT = r"""
      const head=panel.querySelector(':scope > .panel-head');
      head?.insertAdjacentElement('afterend',bar);
      filterByCountry('ALL');
+     const inline=[];
      rows.forEach((row,index)=>{
        const tab=tabs[index];
        const view=tab?panel.querySelector('.server-view[id="'+tab.dataset.server+'"]'):null;
        const show=row.querySelector(':scope > button');
        const isFile=type==='openvpn'||type==='wireguard'||type==='amneziawg';
-       // Move the real per-node file action; preserve its data-target, filename
-       // and original document click handler. Never duplicate a profile card.
        const download=isFile&&view?view.querySelector('button.download-config[data-target],a.tp-v16-safe-download[href]'):null;
        if(download){
          if(show)show.remove();
@@ -510,10 +569,34 @@ _SCRIPT = r"""
          }
          row.append(tools);
          row.dataset.tp80FileRow='1';
-       }else if(show){
-         // Cisco/L2TP and non-file material show only this server's details.
-         show.textContent='نمایش اطلاعات';
-         show.addEventListener('click',()=>{panel.classList.add('tp80-detail-open')});
+       }else if(show&&view){
+         // Move the ORIGINAL facts and copy controls directly below this node.
+         // We never clone credentials/config or depend on a distant global box.
+         const detail=el('section','tp80-inline-native-detail');
+         detail.hidden=true;detail.dataset.tp80Expanded='0';
+         detail.append(view);
+         row.insertAdjacentElement('afterend',detail);
+         const toggle=show;
+         toggle.classList.add('tp80-detail-toggle');
+         toggle.textContent='نمایش اطلاعات';
+         toggle.setAttribute('aria-expanded','false');
+         inline.push({row,detail,toggle,view,tab});
+         toggle.addEventListener('click',event=>{
+           // V77's old handler calls tab.click() and reveals the detail at the
+           // bottom; intercept it to preserve the inline disclosure contract.
+           event.preventDefault();event.stopImmediatePropagation();
+           const opening=detail.hidden;
+           inline.forEach(entry=>{
+             entry.detail.hidden=true;entry.detail.dataset.tp80Expanded='0';
+             entry.toggle.textContent='نمایش اطلاعات';
+             entry.toggle.setAttribute('aria-expanded','false');
+             entry.view.classList.remove('active');
+           });
+           detail.hidden=!opening;detail.dataset.tp80Expanded=opening?'1':'0';
+           toggle.textContent=opening?'بستن':'نمایش اطلاعات';
+           toggle.setAttribute('aria-expanded',opening?'true':'false');
+           if(opening)view.classList.add('active');
+         },true);
        }
      });
      panel.dataset.tp80NativeReady='1';
