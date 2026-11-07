@@ -77,6 +77,54 @@ def pending(db,node_id:int,limit:int):
     return work
 
 
+
+STAGED_SECRET_KEY = "central_wireguard_node_keys_v1"
+
+
+def prepare_persistent_identities(db, node_id: int, subscriptions):
+    """One central transaction before any remote peer mutation.
+
+    Retry must reproduce the same keypair, even if the server succeeded
+    but the later credential-delivery transaction was interrupted.
+    """
+    ids = [int(sub.id) for sub in subscriptions]
+    credentials = {
+        int(row.subscription_id): row for row in db.query(ProtocolCredential)
+        .filter(ProtocolCredential.subscription_id.in_(ids),
+                ProtocolCredential.protocol == "wireguard")
+        .with_for_update().all()
+    } if ids else {}
+    identities = {}
+    for sub in subscriptions:
+        sid = int(sub.id)
+        cred = credentials.get(sid)
+        if cred is None:
+            cred = ProtocolCredential(subscription_id=sid, protocol="wireguard")
+            db.add(cred)
+            credentials[sid] = cred
+        existing = ad._dec(cred.secret_encrypted) if cred.secret_encrypted else {}
+        if not isinstance(existing, dict):
+            raise RuntimeError("WG_STAGED_SECRET_UNREADABLE")
+        all_nodes = existing.get(STAGED_SECRET_KEY) or {}
+        if not isinstance(all_nodes, dict):
+            raise RuntimeError("WG_STAGED_SECRET_CORRUPT")
+        record = all_nodes.get(str(node_id))
+        if record is None:
+            private, public = new_keypair()
+            record = {"private": private, "public": public}
+            all_nodes = {**all_nodes, str(node_id): record}
+            existing = {**existing, STAGED_SECRET_KEY: all_nodes}
+            cred.secret_encrypted = ad._enc(existing)
+        else:
+            if (not isinstance(record, dict)
+                    or not isinstance(record.get("private"), str)
+                    or not isinstance(record.get("public"), str)):
+                raise RuntimeError("WG_STAGED_KEYPAIR_INVALID")
+        identities[sid] = (record["private"], record["public"])
+    db.commit()
+    return identities
+
+
 async def run(node_id:int,limit:int,apply:bool):
     with SessionLocal() as db:
         node=db.get(Node,node_id)
@@ -102,7 +150,7 @@ async def run(node_id:int,limit:int,apply:bool):
         )
         if not verified.get("ok"):
             raise RuntimeError("STAGED_NODE_16_PROTOCOLS_NOT_READY")
-        identities={int(sub.id):new_keypair() for sub in work}
+        identities=prepare_persistent_identities(db,node_id,work)
         peers=[{"id":sid,"public":key[1]} for sid,key in identities.items()]
         conn=await asyncio.wait_for(connect_protocol_runtime(node,db),timeout=25)
         try:
@@ -163,6 +211,10 @@ PersistentKeepalive = 25
             if cred is None:
                 cred=ProtocolCredential(subscription_id=sid,protocol="wireguard")
                 db.add(cred)
+            stored=ad._dec(cred.secret_encrypted)
+            saved=((stored or {}).get(STAGED_SECRET_KEY) or {}).get(str(node_id))
+            if not isinstance(saved,dict) or (saved.get("private"),saved.get("public"))!=identities[sid]:
+                raise RuntimeError("WG_STAGED_IDENTITY_CHANGED")
             items=ad._autosync_credential_items(cred)
             if any(ad._autosync_item_node_id(x)==node_id for x in items):
                 continue
