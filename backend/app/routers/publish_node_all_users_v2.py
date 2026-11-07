@@ -125,6 +125,7 @@ async def publish_node_to_all_users_v2(
             db.add(scope)
         else:
             scope.include_all_active = True
+        db.flush()  # Persist the scope before the queue reads it.
         queued_jobs = enqueue_node_backfill(db, int(node.id))
         db.commit()
     except Exception:
