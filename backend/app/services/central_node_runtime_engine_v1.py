@@ -115,9 +115,9 @@ async def reconcile_runtime_families(
                     "node_id":node_id,"family":family.name,
                     "seconds":round(time.monotonic()-started,2),
                     "return_code":(
-                        int(proc.returncode)
+                        int(getattr(proc,"returncode"))
                         if "proc" in locals()
-                        and isinstance(proc.returncode,int)
+                        and isinstance(getattr(proc,"returncode",None),int)
                         else None
                     ),
                 }),flush=True)
