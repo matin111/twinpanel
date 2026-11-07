@@ -26,7 +26,7 @@ from app.models import Node, NodeStatus, NodeType
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
 from app.protocol_account_registry import ALL_PROTOCOL_KEYS
 from app.singbox_subscription_accounts import SINGBOX_PROTOCOLS
-from app.services.central_sudoku_capacity_v1 import capacity_report, assert_target_sudoku_capacity
+from app.services.central_sudoku_shared_bootstrap_v2 import ensure_shared_binary
 from app.services.central_node_desired_state_v1 import load_desired_state, require_valid_desired_state
 from app.services.central_node_runtime_engine_v1 import (
     FAMILIES, reconcile_runtime_families,
@@ -102,26 +102,15 @@ def _run_locked(node_id, limit, apply):
         if not apply:
             db.rollback()
             return 0
-        # Sudoku currently runs a dedicated service/port for each subscriber.
-        # Refuse unsafe cardinality and modulo port collisions before writes.
-        sudoku_capacity = capacity_report([
-            sid for sid, protocol in desired.entitled_pairs if protocol == "sudoku"
-        ])
-        if not sudoku_capacity["ok"]:
-            raise RuntimeError("SUDOKU_CENTRAL_STAGE_CAPACITY_NOT_SUPPORTED")
-        print("CENTRAL_SUDOKU_CAPACITY_PRECHECK", json.dumps(sudoku_capacity), flush=True)
+        # The original 16 protocol listeners are validated before staging.
         readiness = asyncio.run(verify_new_exit_readiness(db, node_id))
         if not readiness.get("ok"):
             raise RuntimeError("CENTRAL_NODE_STAGE_PROTOCOLS_NOT_READY")
-        # This runs before memberships and any protocol family is applied.
-        # Do not partially change other runtimes if Sudoku cannot fit.
-        sudoku_target = asyncio.run(assert_target_sudoku_capacity(
-            node, db, [
-                sid for sid, protocol in desired.entitled_pairs
-                if protocol == "sudoku"
-            ],
-        ))
-        print("CENTRAL_SUDOKU_TARGET_PREFLIGHT", json.dumps(sudoku_target), flush=True)
+        # Install ONE pinned multi-user Sudoku binary per Exit. Legacy
+        # services, customer credentials and subscriptions remain untouched.
+        shared = asyncio.run(ensure_shared_binary(node, db))
+        print("CENTRAL_SUDOKU_SHARED_RUNTIME_READY",
+              json.dumps({"node_id":node_id,**shared}),flush=True)
         # Re-read after the potentially slow listener audit and serialize only
         # the short membership transaction, never the network health checks.
         db.expire_all()
