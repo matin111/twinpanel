@@ -122,6 +122,46 @@ body.ref69-inline .ref69-app-jump{
   background:#251f4b;color:#f3edff!important;border-radius:11px;
   font-size:11px;font-weight:850;white-space:nowrap
 }
+
+/* Brand-driven buttons. --p/--s are already sanitized by public_connection_hub_v5. */
+body.ref69-inline.ref67 .apps{display:none!important}
+body.ref69-inline .ref69-app-jump{display:none!important}
+body.ref69-inline.ref67 .protocol-panel .v34-client-card>a,
+body.ref69-inline.ref67 .protocol-panel .ref70-app-card>a,
+body.ref69-inline.ref67 .v51-multi-actions .v51-primary,
+body.ref69-inline.ref67 .ref67-row-actions a.ref67-primary,
+body.ref69-inline.ref67 .ref67-footer .ref67-primary,
+body.ref69-inline.ref67 .tp65-single-add,
+body.ref69-inline.ref67 .ref67-filter.active,
+body.ref69-inline.ref67 .ref67-chip.active,
+body.ref69-inline.ref67 .ref69-protocol-os button.active{
+  background:linear-gradient(115deg,var(--p),var(--s))!important;
+  border:1px solid var(--p)!important;
+  box-shadow:0 4px 20px color-mix(in srgb,var(--p) 38%,transparent)!important;
+  color:white!important;
+}
+body.ref69-inline.ref67 .protocol-choice.active{border-color:var(--p)!important;
+  box-shadow:0 0 0 1px var(--p),0 0 19px color-mix(in srgb,var(--p) 35%,transparent)!important}
+body.ref69-inline.ref67 .protocol-panel{border-color:color-mix(in srgb,var(--p) 65%,#455071)!important}
+body.ref69-inline.ref67 .ref69-protocol-os{
+  display:flex;align-items:center;flex-wrap:wrap;gap:5px;max-width:100%;direction:rtl;
+}
+body.ref69-inline.ref67 .ref69-protocol-os button{
+  color:#dce3ff;background:#192342;border:1px solid #3c4b76;border-radius:9px;
+  font:750 10px Tahoma,Arial,sans-serif;min-height:32px;padding:6px 8px;
+}
+body.ref69-inline.ref67 .ref70-app-card .ref69-download-empty{
+  color:#adb9d5;font-size:11px;line-height:1.5;
+}
+body.ref69-inline.ref67 .ref70-app-card .ref69-download-cta{
+  flex:0 0 auto;
+}
+@media(max-width:720px){
+  body.ref69-inline.ref67 .ref70-app-card{flex-direction:column!important;align-items:stretch!important}
+  body.ref69-inline.ref67 .ref69-protocol-os{justify-content:flex-start}
+  body.ref69-inline.ref67 .ref70-app-card .ref69-download-cta{width:100%}
+}
+
 @media(max-width:960px){
  body.ref69-inline .apps .app-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
 }
@@ -300,18 +340,82 @@ _SCRIPT = r"""
    showPerProtocolDownloadLinks();
    if(++perProtocolAttempts>=9)clearInterval(appTimer);
  },250);
- // A visible affordance above the long list, rather than another fake app link.
- if(!document.querySelector('.ref69-app-jump')){
-   const jump=document.createElement('a');
-   jump.href='#apps';jump.className='ref69-app-jump';
-   jump.textContent='↓ دانلود برنامه‌های اتصال';
-   jump.addEventListener('click',event=>{
-     event.preventDefault();
-     target.scrollIntoView({behavior:'smooth',block:'start'});
-   });
-   const categories=document.querySelector('.ref67-categories');
-   if(categories)categories.insertAdjacentElement('afterend',jump);
+
+ // Never render the old global download surface or floating jump button.
+ // App URLs remain in the server-rendered hidden source for exact reuse.
+ document.querySelectorAll('.ref69-app-jump').forEach(el=>el.remove());
+ const osNames={android:'Android',windows:'Windows',ios:'iOS',macos:'macOS',linux:'Linux'};
+ const platformKeys=['android','windows','ios','macos','linux'];
+ function matchingApp(key,os){
+   const group=groups.find(g=>g.dataset.platform===os);
+   const pattern=patterns[key];
+   if(!group||!pattern)return null;
+   const matches=[...group.querySelectorAll('a.app-card[href]')].filter(a=>
+     pattern.test(a.querySelector('b')?.textContent||'') &&
+     /^(https?:\/\/|\/(?!\/))/i.test(a.getAttribute('href')||'')
+   );
+   return matches.find(a=>a.classList.contains('uploaded'))||matches[0]||null;
  }
+ function renderPerProtocolActions(){
+   for(const choice of document.querySelectorAll('.protocol-choice[data-protocol]')){
+     const panel=document.getElementById(choice.dataset.protocol);
+     if(!panel)continue;
+     const key=String(choice.dataset.protocolKey||panel.dataset.v34Protocol||'').toLowerCase();
+     const head=panel.querySelector('.panel-head');
+     if(!head)continue;
+     // Existing native client buttons are preserved; only restyle them.
+     // Move existing card next to protocol as requested, but do not clone it.
+     const native=panel.querySelector('.v34-client-card a[href]');
+     if(native){
+       const card=native.closest('.v34-client-card');
+       if(card&&card.previousElementSibling!==head)
+         head.insertAdjacentElement('afterend',card);
+     }
+     let card=panel.querySelector('.ref70-app-card');
+     if(!card){
+       card=document.createElement('div');card.className='ref70-app-card';
+       head.insertAdjacentElement('afterend',card);
+     }
+     if(card.dataset.ref72Mounted==='1')continue;
+     card.dataset.ref72Mounted='1';
+     card.replaceChildren();
+     const title=document.createElement('strong');
+     title.textContent='دانلود برنامه '+(choice.querySelector('.protocol-text b')?.textContent||key);
+     const picker=document.createElement('nav');picker.className='ref69-protocol-os';
+     picker.setAttribute('aria-label','سیستم‌عامل برای دانلود برنامه');
+     const cta=document.createElement('a');cta.className='ref69-download-cta';
+     const empty=document.createElement('small');empty.className='ref69-download-empty';
+     let os=platformKeys.includes(selected)?selected:'android';
+     function setOS(next){
+       os=next;
+       picker.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x.dataset.os===next));
+       const matched=matchingApp(key,next);
+       if(matched){
+         cta.hidden=false;empty.hidden=true;
+         // Exactly preserve URLs from previous server-rendered app download cards.
+         cta.setAttribute('href',matched.getAttribute('href'));
+         cta.textContent='↓ '+(matched.querySelector('b')?.textContent||'دانلود برنامه');
+         cta.target='_blank';cta.rel='noopener noreferrer';
+       }else{
+         cta.hidden=true;cta.removeAttribute('href');empty.hidden=false;
+         empty.textContent=key==='l2tp'
+           ?'در این دستگاه از تنظیمات VPN داخلی استفاده کنید.'
+           :'لینک برنامه مناسب این دستگاه ثبت نشده است.';
+       }
+     }
+     for(const platform of platformKeys){
+       const b=document.createElement('button');b.type='button';
+       b.dataset.os=platform;b.textContent=osNames[platform];
+       b.addEventListener('click',()=>setOS(platform));
+       picker.appendChild(b);
+     }
+     const label=document.createElement('div');label.append(title,empty);
+     card.append(label,picker,cta);
+     setOS(os);
+   }
+ }
+ renderPerProtocolActions();
+
 })();
 </script>
 """
