@@ -17,7 +17,7 @@ from . import (
     xray_tcp_tls_v39,
 )
 from .database import get_db
-from .models import Node
+from .models import Node, NodeType, Tunnel
 from .routers import account_delivery, provision
 from .xray_tcp_tls_v39 import (
     PROFILE_TCP_TLS,
@@ -160,6 +160,58 @@ def _profile_endpoint_v261(
         ).strip()
         if not host:
             raise RuntimeError("Xray tunnel delivery host is missing")
+
+        # Explicit per-subscription delivery may carry a stale/Cloudflare
+        # hostname from the pre-migration stored credential. Resolve ONLY a
+        # verified Iran ingress of this Exit, respecting explicit tunnel_id
+        # and multi-tunnel assignments; never rewrite direct subscriptions.
+        candidate = None
+        tunnel_id = item.get("tunnel_id")
+        if tunnel_id:
+            try:
+                selected = db.get(Tunnel, int(tunnel_id))
+            except (TypeError, ValueError):
+                selected = None
+            if (
+                selected is not None
+                and selected.is_active
+                and int(selected.exit_node_id) == int(node.id)
+            ):
+                candidate = selected
+        elif hasattr(db, "query"):
+            assigned = (
+                db.query(Tunnel)
+                .filter(
+                    Tunnel.exit_node_id == node.id,
+                    Tunnel.is_active.is_(True),
+                )
+                .order_by(Tunnel.priority.asc(), Tunnel.id.asc())
+                .all()
+            )
+            if len(assigned) == 1:
+                candidate = assigned[0]
+            elif len(assigned) > 1:
+                # Avoid silently moving customers to the wrong Iran hop.
+                for assigned_tunnel in assigned:
+                    iran = db.get(Node, assigned_tunnel.iran_node_id)
+                    if iran and host in (
+                        account_delivery._node_host(iran),
+                        str(getattr(iran, "public_ip", "") or ""),
+                    ):
+                        candidate = assigned_tunnel
+                        break
+
+        if candidate is not None:
+            iran = db.get(Node, candidate.iran_node_id)
+            if (
+                iran is not None
+                and iran.node_type == NodeType.IRAN
+                and getattr(iran, "retired_at", None) is None
+            ):
+                verified_ip = account_delivery._v2ray_iran_public_ip(iran)
+                if verified_ip:
+                    host = verified_ip
+
         return host, xray_modern_runtime._public_port(node.id, profile)
 
     # Legacy delivery follows the currently assigned Iran -> Exit tunnel or the
