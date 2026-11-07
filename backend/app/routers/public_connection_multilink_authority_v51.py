@@ -279,8 +279,9 @@ _SCRIPT = r"""
 
     const actions=document.createElement('div');actions.className='v51-multi-actions';
     if(BUNDLE.has(protocol)){
-      const download=action('a','دانلود همه کانفیگ‌ها',null,true);download.href=url;download.target='_blank';download.rel='noopener noreferrer';actions.appendChild(download);
-      actions.appendChild(action('button','کپی لینک بسته',()=>copy(url).then(ok=>notify(ok?'لینک بسته کپی شد ✓':'کپی انجام نشد')),false));
+      // Real ZIP attachments only; no app import or new-tab preview.
+      const download=action('a','دانلود همه فایل‌ها',null,true);
+      download.href=url;download.setAttribute('download','');actions.appendChild(download);
     }else{
       // Karing's Clash plugin import can treat ShadowTLS as an isolated
       // transport. Its native sing-box JSON import preserves each full
