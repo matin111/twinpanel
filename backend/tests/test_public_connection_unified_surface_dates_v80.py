@@ -143,6 +143,7 @@ def test_compact_inline_native_node_details_and_flags_for_all_countries():
 
 def test_socks5_compact_real_credential_facts_no_duplicate_dump():
     ui=code("public_connection_unified_surface_dates_v80.py")
+    assert 'if protocol in {"cisco", "socks5"}:' in code("public_connection_hub_v5.py")
     assert "view.querySelector('.facts')" in ui
     assert "holder.classList.add('tp80-socks5-detail')" in ui
     assert "holder.append(view,realFacts)" in ui
