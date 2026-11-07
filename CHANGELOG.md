@@ -1,5 +1,13 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.655 — 2026-11-07
+
+### V2Ray/Xray late-loading node actions
+- Observe asynchronous V2Ray server group insertion and attach a real copy-all-existing-configs action to every newly rendered server. Avoid duplicate buttons and mutation feedback loops.
+- Preserve the rc.654 V2Ray cards, mobile/desktop Connection layout and protocol-specific download/import behavior.
+- The public feed intentionally includes only eligible stored profiles; missing runtime/configuration inbounds are **not** fabricated by this UI update.
+- No database schema, node listener or tunnel configuration changes.
+
 ## 1.1.0-rc.654 — 2026-11-07
 
 ### V2Ray/Xray Connection repair
