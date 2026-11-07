@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.673",
+  "version": "1.1.0-rc.674",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T22:24:03Z",
+  "released_at": "2026-11-07T22:28:34Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "5b1759d74177196486cac12682de699860dafb68",
+  "source_sha": "7ddea97b81d9e5f1b90de93687e3960fa7721c72",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.673/twinpanel-1.1.0-rc.673-linux-x86_64.tar.gz",
-    "sha256": "720f2fd8a62498a6eb5afbcb9295b4ba1436bcd90e299a42f8991bd4d742e50a",
-    "size_bytes": 29599210
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.674/twinpanel-1.1.0-rc.674-linux-x86_64.tar.gz",
+    "sha256": "f2703e81f4d67a15a57c5096fc5859bbad61bd15388b942e79969078f2639dc0",
+    "size_bytes": 29602373
   },
   "notes": {
-    "fa": "نسخه rc.673: رفع ناپدیدشدن دکمه «ارسال فایل به برنامه» در OpenVPN، WireGuard و AmneziaWG پس از خطای Share در موبایل. نوع عمومی فایل در اولویت قرار گرفت؛ خطای واقعی Web Share (NotAllowedError، TypeError و ...) نمایش داده می‌شود و دکمه دیگر حذف نمی‌شود. دانلود فایل واقعی .ovpn و .conf مستقل می‌ماند؛ هیچ تغییر در کاربران، نودها، پروتکل‌ها یا تنظیمات اتصال اعمال نشده است.",
-    "en": "rc.673: Preserve native VPN profile Share button when browser Web Share rejects a file; stop hiding the real rejection reason, show actionable error (NotAllowedError, TypeError, InvalidStateError) and prioritize generic binary MIME with fallback. Keep synchronous user-gesture sharing and ordinary .ovpn/.conf downloads. No VPN runtime or account changes."
+    "fa": "نسخه rc.674: اصلاح دائمی ثبت آنلاین و حجم مصرفی OpenVPN/Cisco/L2TP و Xray با پردازش بهینه و خطایابی مجزای هر کاربر؛ اصلاح نمایش فعالیت اخیر V2Ray با توجه به تناوب جمع‌آوری واقعی؛ سبزشدن پروتکل و کشور تنها بر پایه نشست یا ترافیک واقعی؛ اعداد انگلیسی در سراسر رابط Connection موبایل و دسکتاپ؛ تست‌های رگرسیون. بدون تغییر در کاربران، رمزها، پلن‌ها، مدت و حجم اشتراک‌ها.",
+    "en": "rc.674: Persist optimized live OpenVPN/Cisco/L2TP/Xray telemetry and per-client accounting fault isolation; correctly display V2Ray's recently observed traffic across the slower collector cadence, with truthful active country highlighting; render English digits in the public desktop/mobile Connection UI without modifying configuration payloads. Include regression tests; keep all user credentials, plans, durations and quotas untouched."
   }
 }
